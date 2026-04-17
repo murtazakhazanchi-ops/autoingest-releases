@@ -62,6 +62,7 @@ const MAX_EXIF          = 1;            // prevent parallel exifr file descripto
 const EXIF_TIMEOUT_MS   = 500;          // abort hanging exifr calls before descriptors leak
 const SMALL_FILE_BYTES  = 50 * 1024;   // 50 KB — use original directly
 const MAX_CACHE_AGE     = 7 * 24 * 60 * 60 * 1000;  // 7 days in ms — evict stale cache entries
+const MAX_THUMBNAILS    = 50;           // outer gate: max concurrent non-cached thumbnail ops
 const PLACEHOLDER_DATA_URL =
   `data:image/svg+xml;charset=utf-8,${encodeURIComponent('<svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="9" width="34" height="26" rx="3" fill="#1e1e2e" stroke="#89b4fa" stroke-width="1.5"/><circle cx="20" cy="23" r="7" fill="none" stroke="#89b4fa" stroke-width="1.5"/><circle cx="20" cy="23" r="2" fill="#89b4fa"/></svg>')}`;
 
@@ -339,6 +340,47 @@ async function generateThumbnailDataUrl(srcPath, outputPath) {
   return PLACEHOLDER_DATA_URL;
 }
 
+// ── Global thumbnail concurrency gate ────────────────────────────────────────
+// Outer limit applied to ALL non-cached thumbnail work — fast-path file access
+// and full generation alike.  Prevents burst-loading 500+ files simultaneously,
+// which exhausts file descriptors and overwhelms the renderer decode pipeline.
+// Memory-cache hits bypass this gate entirely (they are just Map lookups).
+//
+// Relationship to inner limiters:
+//   runWithLimit        — outer gate, ALL non-cached ops    (MAX_THUMBNAILS = 50)
+//   withConcurrencyLimit — inner gate, generation jobs only  (CONCURRENCY_LIMIT = 4)
+//   withExifLimit        — serialises exifr                  (MAX_EXIF = 1)
+//   withSharpLimit       — serialises sharp                  (MAX_SHARP = 1)
+//   withFileReadLimit    — caps file-descriptor opens        (MAX_FILE_READS = 2)
+let   activeThumbs = 0;
+const thumbQueue   = [];
+
+function runWithLimit(task) {
+  return new Promise((resolve) => {
+    function execute() {
+      activeThumbs++;
+      task()
+        .then(resolve)
+        .catch(() => resolve(PLACEHOLDER_DATA_URL))
+        .finally(() => {
+          activeThumbs--;
+          processThumbQueue();
+        });
+    }
+    if (activeThumbs < MAX_THUMBNAILS) {
+      execute();
+    } else {
+      thumbQueue.push(execute);
+    }
+  });
+}
+
+function processThumbQueue() {
+  if (thumbQueue.length > 0 && activeThumbs < MAX_THUMBNAILS) {
+    thumbQueue.shift()();
+  }
+}
+
 // ── Concurrency queue ─────────────────────────────────────────────────────────
 // Limits how many thumbnail generation jobs run simultaneously.
 let   activeCount = 0;
@@ -392,84 +434,111 @@ async function getThumbnail(srcPath) {
     lastModified: stat.mtimeMs
   });
 
-  // 🔴 1. MEMORY CACHE HIT (FASTEST)
+  // Memory cache hits are instant Map lookups — never rate-limited.
   const memCached = thumbnailCache.get(key);
-  if (memCached) {
-    return memCached;
-  }
+  if (memCached) return memCached;
 
-  // Small-file bypass
-  if (stat.size < SMALL_FILE_BYTES) {
-    return toFileUrl(srcPath);
-  }
+  // All non-cached work goes through the outer gate (MAX_THUMBNAILS = 50).
+  // This prevents burst-loading large folders from exhausting file descriptors
+  // or overwhelming the renderer's image decode pipeline.
+  return runWithLimit(async () => {
+    // Re-check after queuing — another request may have populated the cache
+    // while this one waited for a runWithLimit slot.
+    const fresh = thumbnailCache.get(key);
+    if (fresh) return fresh;
 
-  const tPath = thumbPath(srcPath, stat.mtimeMs, stat.size);
-
-  // Disk cache
-  if (await safeExists(tPath)) {
-    try {
-      const cacheStat = await safeStat(tPath);
-      if (Date.now() - cacheStat.mtimeMs > MAX_CACHE_AGE) {
-        await fsp.unlink(tPath).catch(() => {});
-      } else {
-        const result = toFileUrl(tPath);
-
-        // 🔴 STORE IN MEMORY CACHE
-        thumbnailCache.set(key, result);
-
-        return result;
-      }
-    } catch {}
-  }
-
-  // 🔴 2. IN-FLIGHT (MEMORY LEVEL)
-  if (inFlightCache.has(key)) {
-    return await inFlightCache.get(key);
-  }
-
-  // Existing in-flight (disk level) — KEEP
-  if (inFlight.has(tPath)) {
-    return inFlight.get(tPath);
-  }
-
-  // 🔴 3. CREATE NEW REQUEST (WRAPPED)
-  const promise = (async () => {
-    try {
-      return await withConcurrencyLimit(async () => {
-        try {
-          const result = await generateThumbnailDataUrl(srcPath, tPath);
-
-          // 🔴 STORE IN MEMORY CACHE
-          thumbnailCache.set(key, result);
-
-          return result;
-        } catch (err) {
-          console.error('[thumbnailer] thumbnail error for', srcPath, err.message);
-          return PLACEHOLDER_DATA_URL;
+    // Small-file bypass — confirm source is still readable, then return a
+    // direct file:// URL (guards against card ejection between stat and load).
+    if (stat.size < SMALL_FILE_BYTES) {
+      try {
+        if (await isFileReadable(srcPath)) {
+          const url = pathToFileURL(srcPath).href;
+          if (isValidUrl(url)) {
+            thumbnailCache.set(key, url);
+            return url;
+          }
         }
-      });
-    } finally {
-      inFlightCache.delete(key);
+      } catch (err) {
+        console.warn('[thumbnailer] JPG fast path failed, falling back:', srcPath, err.message);
+      }
+      // fall through to full thumbnail generation
     }
-  })();
 
-  // 🔴 REGISTER IN-FLIGHT (MEMORY LEVEL)
-  inFlightCache.set(key, promise);
+    const tPath = thumbPath(srcPath, stat.mtimeMs, stat.size);
 
-  // Existing in-flight (disk level)
-  inFlight.set(tPath, promise);
+    // Disk cache
+    if (await safeExists(tPath)) {
+      try {
+        const cacheStat = await safeStat(tPath);
+        if (Date.now() - cacheStat.mtimeMs > MAX_CACHE_AGE) {
+          await fsp.unlink(tPath).catch(() => {});
+        } else {
+          const result = toFileUrl(tPath);
+          if (isValidUrl(result)) {
+            thumbnailCache.set(key, result);
+            return result;
+          }
+        }
+      } catch {}
+    }
 
-  try {
-    return await promise;
-  } finally {
-    inFlight.delete(tPath);
-  }
+    // In-flight dedup (memory level)
+    if (inFlightCache.has(key)) return await inFlightCache.get(key);
+
+    // In-flight dedup (disk level)
+    if (inFlight.has(tPath)) return inFlight.get(tPath);
+
+    // Full generation — inner gate (CONCURRENCY_LIMIT = 4) limits heavy I/O
+    const promise = (async () => {
+      try {
+        return await withConcurrencyLimit(async () => {
+          try {
+            const result = await generateThumbnailDataUrl(srcPath, tPath);
+            const url = result || PLACEHOLDER_DATA_URL;
+            thumbnailCache.set(key, url);
+            return url;
+          } catch (err) {
+            console.error('[thumbnailer] thumbnail error for', srcPath, err.message);
+            return PLACEHOLDER_DATA_URL;
+          }
+        });
+      } finally {
+        inFlightCache.delete(key);
+      }
+    })();
+
+    inFlightCache.set(key, promise);
+    inFlight.set(tPath, promise);
+
+    try {
+      return await promise;
+    } finally {
+      inFlight.delete(tPath);
+    }
+  });
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function toFileUrl(absPath) {
   return pathToFileURL(path.normalize(absPath)).href;
+}
+
+// Only cache/return URLs that Electron's renderer can actually load.
+// Guards against undefined/null/empty leaking into the memory cache.
+function isValidUrl(url) {
+  return typeof url === 'string' && (url.startsWith('file://') || url.startsWith('data:'));
+}
+
+// Checks the file is readable before we hand a file:// URL to the renderer.
+// Catches the race where a memory card is ejected between stat() and img.src load.
+async function isFileReadable(filePath) {
+  try {
+    await fsp.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function toDataUrl(buffer) {
