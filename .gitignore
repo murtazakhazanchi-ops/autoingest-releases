@@ -6,3 +6,8 @@ Thumbs.db
 data/*.json
 .env
 config/service-account-key.json
+- name: Create service account key
+        env:
+          SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
+        run: |
+          echo $SERVICE_ACCOUNT_KEY > config/service-account-key.json

@@ -1,6 +1,6 @@
 {
   "name": "auto-ingest",
-  "version": "0.4.6",
+  "version": "0.4.8",
   "description": "AutoIngest — Memory Card Importer",
   "main": "main/main.js",
   "scripts": {
@@ -46,8 +46,9 @@
 
     "extraResources": [
       {
-        "from": "config/service-account-key.json",
-        "to":   "config/service-account-key.json"
+        "from": "config",
+        "to":   "config",
+        "filter": ["app.config.js"]
      }
     ],
 
