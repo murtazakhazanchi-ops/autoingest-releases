@@ -21,6 +21,13 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Create service account key
+        shell: bash
+        env:
+          SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
+        run: |
+          echo "$SERVICE_ACCOUNT_KEY" > config/service-account-key.json
+
       - name: Build and publish Mac
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
@@ -39,6 +46,13 @@ jobs:
 
       - name: Install dependencies
         run: npm install
+
+      - name: Create service account key
+        shell: bash
+        env:
+          SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
+        run: |
+          echo "$SERVICE_ACCOUNT_KEY" > config/service-account-key.json
 
       - name: Build and publish Windows
         env:
