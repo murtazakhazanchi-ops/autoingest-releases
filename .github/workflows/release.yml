@@ -3,11 +3,10 @@ name: Build and Release AutoIngest
 on:
   push:
     tags:
-      - 'v*'   # Triggers on any tag like v0.3.0, v1.0.0 etc.
+      - 'v*'
 
 jobs:
 
-  # ── macOS Build ─────────────────────────────────────────────────────────────
   build-mac:
     runs-on: macos-latest
     steps:
@@ -27,7 +26,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: npm run dist:mac -- -p always
 
-  # ── Windows Build ────────────────────────────────────────────────────────────
   build-windows:
     runs-on: windows-latest
     steps:
