@@ -34,7 +34,7 @@
         "provider": "github",
         "owner":    "murtazakhazanchi-ops",
         "repo":     "autoingest-releases",
-        "private":  false
+        "private":  false,
         "releaseType": "release"
       }
     ],
