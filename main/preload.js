@@ -119,6 +119,14 @@ contextBridge.exposeInMainWorld('api', {
   /** Returns { lowercaseFilename: { size, addedAt } } for cross-session already-imported detection. */
   getImportIndex: () => ipcRenderer.invoke('importIndex:get'),
 
+  // ── Checksum verification ──
+  /** Runs SHA-256 checksum on all files from the last import (user-triggered). */
+  runChecksumVerification: () => ipcRenderer.invoke('checksum:run'),
+  /** Fires after each file during verification. cb({ completed, total }) */
+  onChecksumProgress: (cb) => ipcRenderer.on('checksum:progress', (_e, data) => cb(data)),
+  /** Fires when all checksums are done. cb({ total, failed, failures }) */
+  onChecksumComplete: (cb) => ipcRenderer.on('checksum:complete', (_e, data) => cb(data)),
+
   // ── What's New ──
   /** Returns { version, notes } if the app just updated, null otherwise. Consumed once. */
   getLastUpdateInfo: () => ipcRenderer.invoke('getLastUpdateInfo'),

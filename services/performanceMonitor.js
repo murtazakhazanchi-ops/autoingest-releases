@@ -45,7 +45,9 @@ const activeThumbTimers = new Map(); // srcPath → { startMs, watchdog }
 // ── Bootstrap ────────────────────────────────────────────────────────────────
 function init() {
   if (!telemetry.isEnabled()) return;
-  _startLagMonitor();
+  // Delay lag monitor by 10s — startup I/O always causes false positives
+  // during module load, window creation, and initial drive polling.
+  setTimeout(() => _startLagMonitor(), 10_000);
   _startMemMonitor();
 }
 
@@ -197,9 +199,10 @@ function importSpeedSample(bytesCopied, elapsedMs, totalBytes) {
 function _startMemMonitor() {
   memTimer = setInterval(() => {
     const mem   = process.memoryUsage();
+    const mb    = Math.round(mem.heapUsed / 1_048_576);
+    if (mb < 200) return;  // ignore small initial heap — always a false positive
     const ratio = mem.heapUsed / mem.heapTotal;
     if (ratio < 0.8) return;
-    const mb  = Math.round(mem.heapUsed / 1_048_576);
     const pct = Math.round(ratio * 100);
 
     log(`[perf] High heap: ${mb}MB (${pct}%)`);

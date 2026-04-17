@@ -5,3 +5,4 @@ out/
 Thumbs.db
 data/*.json
 .env
+config/service-account-key.json

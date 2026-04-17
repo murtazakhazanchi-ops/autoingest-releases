@@ -184,6 +184,8 @@
     .folder-item.active { background: var(--blue-dim); border-left-color: var(--blue); color: var(--blue); }
     .folder-item .fi-icon { font-size: 0.9rem; flex-shrink: 0; }
     .folder-item .fi-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .folder-item .fi-toggle { font-size: 0.65rem; width: 12px; flex-shrink: 0; text-align: center; opacity: 0.6; }
+    .folder-child { padding-left: 30px; }
     .sidebar-empty { padding: 16px 14px; font-size: 0.78rem; opacity: 0.35; font-style: italic; }
 
     /* ── FILE PANEL ────────────────────────────── */
@@ -491,6 +493,8 @@
     #progressDoneBtn.visible { display: block; }
     #progressDoneBtn:hover   { background: #a0c4fd; }
     #progressEta { font-size: 0.75rem; color: var(--subtext); min-height: 1.1em; }
+    #runChecksumBtn.csq-success { color: var(--green) !important; border-color: var(--green) !important; }
+    #runChecksumBtn.csq-error   { color: var(--red)   !important; border-color: var(--red)   !important; }
     .progress-controls { display: flex; gap: 8px; }
     #progressPauseBtn, #progressResumeBtn {
       padding: 6px 18px; font-size: 0.8rem; font-weight: 600;

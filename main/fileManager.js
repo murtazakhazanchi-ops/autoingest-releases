@@ -238,6 +238,7 @@ async function copyFiles(filePaths, destination, onProgress) {
   let errors         = 0;
   const skippedReasons = [];
   const failedFiles    = []; // files that failed after all retries
+  const copiedFiles    = []; // { src, dest } for every successfully copied file
 
   // ── Per-file processor (pause + stat + resume-check + copy + verify + retry) ──
   async function processFile(srcPath, origIndex) {
@@ -313,6 +314,8 @@ async function copyFiles(filePaths, destination, onProgress) {
         completedBytes += fileSize;
         const { eta, speedBps } = getSpeedAndEta();
 
+        copiedFiles.push({ src: srcPath, dest: resolved.destPath });
+
         if (resolved.action === 'rename') {
           skippedReasons.push(`Renamed: ${filename} — ${resolved.reason}`);
           onProgress({ total, index: origIndex + 1, completedCount, filename,
@@ -349,7 +352,7 @@ async function copyFiles(filePaths, destination, onProgress) {
 
     function next() {
       if (queueIndex >= total && active === 0) {
-        resolve({ copied, skipped, errors, skippedReasons, failedFiles, duration: Date.now() - startTime });
+        resolve({ copied, skipped, errors, skippedReasons, failedFiles, copiedFiles, duration: Date.now() - startTime });
         return;
       }
 
@@ -370,4 +373,4 @@ async function copyFiles(filePaths, destination, onProgress) {
   });
 }
 
-module.exports = { copyFiles, resolveDestPath, setPaused };
+module.exports = { copyFiles, resolveDestPath, setPaused, getFileHash };

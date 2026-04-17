@@ -60,6 +60,11 @@ function showInlineHint(containerId, message, storageKey) {
 // ════════════════════════════════════════════════════════════════
 let activeDrive      = null;
 let activeFolderPath = null;
+
+/** Sidebar expansion state — persists across folder navigation, cleared on drive change */
+let expandedFolders   = new Set();
+let dcimChildrenCache = [];   // DCIM's immediate subfolders (cached so they stay visible)
+let cachedDcimPath    = null; // DCIM root path, null until first drive load
 let selectedFiles    = new Set();   // absolute source paths — selection truth
 let currentFiles     = [];          // flat list of all files in current folder
 let sortKey          = 'date';
@@ -79,11 +84,37 @@ let lastThumbDispatch = 0;
 /** Dest file cache: lowercase-filename → size */
 let destFileCache = new Map();
 
+function getFileKey(file) {
+  return file.name.toLowerCase() + '_' + file.size;
+}
+
+function isAlreadyImported(file) {
+  const key = getFileKey(file);
+
+  // Check destination cache (current folder)
+  if (destFileCache && destFileCache.has(key)) {
+    return true;
+  }
+
+  // Check global index (all previous imports)
+  if (globalImportIndex && globalImportIndex[key]) {
+    return true;
+  }
+
+  return false;
+}
+
 /** Collapse state per group — persists across folder navigations, resets on drive change */
 let collapsedGroups = { raw: false, photo: false, video: false };
 
 /** True only after the user has explicitly clicked a drive card — gates the loading state. */
 let hasSelectedDrive = false;
+
+/** True while a file-fetch IPC call is in-flight for a user-selected folder. */
+let isLoadingFiles = false;
+
+/** The folder path currently shown in the file area. null = no folder selected yet. */
+let currentFolder = null;
 
 /** Global cross-session import index: lowercaseFilename → sizeBytes */
 let globalImportIndex = {};
@@ -617,25 +648,24 @@ function recoverStuckThumbs() {
 // DESTINATION FILE CACHE
 // ════════════════════════════════════════════════════════════════
 async function refreshDestCache() {
-  if (!destPath) { destFileCache = new Map(); return; }
+  if (!destPath) { 
+    destFileCache = new Map(); 
+    return; 
+  }
+
   try {
     const raw = await window.api.scanDest(destPath);
-    destFileCache = new Map(Object.entries(raw).map(([n, s]) => [n.toLowerCase(), s]));
+
+    destFileCache = new Map(
+      Object.entries(raw).map(([n, s]) => {
+        const key = getFileKey({ name: n, size: s });
+        return [key, true];
+      })
+    );
+
   } catch {
     destFileCache = new Map();
   }
-}
-
-function isAlreadyImported(file) {
-  const key    = file.name.toLowerCase();
-  const cached = destFileCache.get(key);
-  if (cached !== undefined && cached === file.size) return true;
-
-  const global = globalImportIndex[key];
-  if (!global) return false;
-  // New shape: { size, addedAt }. Legacy shape: plain number (size only).
-  const globalSize = (typeof global === 'object') ? global.size : global;
-  return globalSize === file.size;
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -701,23 +731,29 @@ function renderDrives(cards) {
 
 async function selectDrive(drive) {
   hasSelectedDrive = true;
+  isLoadingFiles   = false;  // not loading files — waiting for user to pick a folder
+  currentFolder    = null;   // no folder selected yet
   activeDrive = drive; activeFolderPath = null;
+  expandedFolders.clear(); dcimChildrenCache = []; cachedDcimPath = null;
   selectedFiles.clear(); currentFiles = []; lastClickedPath = null; tileMap = new Map();
   resetViewCache();
   document.getElementById('step1Panel').style.display = 'none';
   document.getElementById('workspace').classList.add('visible');
   document.getElementById('activeDriveName').textContent = drive.label;
   updateSteps(); updateSelectionBar();
-  renderFileArea([], true);
+  renderFileArea([]);   // shows "Select a folder to begin"
   document.getElementById('folderList').innerHTML =
     `<div class="sidebar-empty">Loading folders…</div>`;
-  await browseFolder(drive.mountpoint, null);
+  await browseFolder(drive.mountpoint, null);  // populates sidebar only
 }
 
 document.getElementById('changeDriveBtn').addEventListener('click', () => {
   hasSelectedDrive = false;
+  isLoadingFiles   = false;
+  currentFolder    = null;
   fileLoadRequestId++;
   activeDrive = null; activeFolderPath = null;
+  expandedFolders.clear(); dcimChildrenCache = []; cachedDcimPath = null;
   selectedFiles.clear(); currentFiles = []; lastClickedPath = null; tileMap = new Map();
   resetViewCache();
   document.getElementById('workspace').classList.remove('visible');
@@ -731,6 +767,8 @@ document.getElementById('changeDriveBtn').addEventListener('click', () => {
  */
 function resetAppState() {
   hasSelectedDrive  = false;
+  isLoadingFiles    = false;
+  currentFolder     = null;
   fileLoadRequestId++;   // invalidate any in-flight file loads
 
   activeDrive      = null;
@@ -738,6 +776,7 @@ function resetAppState() {
   lastClickedPath  = null;
   importRunning    = false;
   isShuttingDown   = false;  // cleared last — safe to accept a new card
+  expandedFolders.clear(); dcimChildrenCache = []; cachedDcimPath = null;
 
   selectedFiles.clear();
   currentFiles = [];
@@ -823,19 +862,61 @@ document.getElementById('ejectBtn').addEventListener('click', async () => {
 // FOLDER SIDEBAR
 // ════════════════════════════════════════════════════════════════
 function renderFolders(folders, dcimPath) {
-  const list  = document.getElementById('folderList');
-  const items = [{ name:'DCIM', path:dcimPath, isRoot:true }, ...folders];
-  list.innerHTML = items.map(f => `
-    <div class="folder-item ${activeFolderPath === f.path ? 'active' : ''}"
-         data-path="${escapeHtml(f.path)}">
-      <span class="fi-icon">${f.isRoot ? '📷' : '📁'}</span>
-      <span class="fi-name">${escapeHtml(f.name)}</span>
-    </div>`).join('');
-  list.querySelectorAll('.folder-item').forEach(item =>
+  const list = document.getElementById('folderList');
+
+  // Cache DCIM's children on first load or when browsing DCIM directly.
+  // When browsing a subfolder (activeFolderPath !== dcimPath), keep the
+  // cached list so the sidebar stays expanded.
+  if (!cachedDcimPath || activeFolderPath === dcimPath) {
+    if (!cachedDcimPath) expandedFolders.add(dcimPath);  // auto-expand on first drive load
+    dcimChildrenCache = folders;
+    cachedDcimPath    = dcimPath;
+  }
+
+  const isExpanded = expandedFolders.has(dcimPath);
+
+  const childrenHtml = isExpanded
+    ? dcimChildrenCache.map(f => `
+        <div class="folder-item folder-child${activeFolderPath === f.path ? ' active' : ''}"
+             data-path="${escapeHtml(f.path)}">
+          <span class="fi-icon">📁</span>
+          <span class="fi-name">${escapeHtml(f.name)}</span>
+        </div>`).join('')
+    : '';
+
+  list.innerHTML = `
+    <div class="folder-item folder-root${activeFolderPath === dcimPath ? ' active' : ''}"
+         data-path="${escapeHtml(dcimPath)}">
+      <span class="fi-toggle">${isExpanded ? '▾' : '▸'}</span>
+      <span class="fi-icon">📷</span>
+      <span class="fi-name">DCIM</span>
+    </div>
+    ${childrenHtml}`;
+
+  // Toggle arrow: expand/collapse without navigating
+  list.querySelector('.fi-toggle').addEventListener('click', e => {
+    e.stopPropagation();
+    if (expandedFolders.has(dcimPath)) {
+      expandedFolders.delete(dcimPath);
+    } else {
+      expandedFolders.add(dcimPath);
+    }
+    renderFolders(dcimChildrenCache, dcimPath);
+  });
+
+  // Folder row clicks navigate to that folder
+  list.querySelectorAll('.folder-item').forEach(item => {
     item.addEventListener('click', () => {
       if (!activeDrive) return;
       browseFolder(activeDrive.mountpoint, item.dataset.path);
-    }));
+    });
+  });
+
+  // Scroll active folder into view without jarring jumps
+  requestAnimationFrame(() => {
+    const activeEl = list.querySelector('.folder-item.active');
+    if (activeEl) activeEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  });
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -920,7 +1001,7 @@ document.getElementById('pairToggle').addEventListener('change', e => {
 // Called ONLY on: folder change, sort change, view change, initial load.
 // NEVER called on: scroll, selection toggle, dest change, post-import.
 // ════════════════════════════════════════════════════════════════
-function renderFileArea(files, loading = false) {
+function renderFileArea(files) {
   // Flush the pending queue FIRST — before the session counter advances and
   // before resetThumbLoadState() runs. Truncating in-place (length = 0) rather
   // than replacing the reference means any drainThumbQueue() call that fires
@@ -947,9 +1028,9 @@ function renderFileArea(files, loading = false) {
   // Reset queued thumbnail work — in-flight IPCs remain counted until they finish
   resetThumbLoadState();
 
-  if (loading && hasSelectedDrive) {
+  if (currentFolder === null) {
     area.className = '';
-    area.innerHTML = `<div class="panel-state"><span class="state-icon">⏳</span><span>Loading files…</span></div>`;
+    area.innerHTML = `<div class="panel-state"><span class="state-icon">📁</span><span>Select a folder to begin</span><span style="font-size:0.75rem;opacity:0.6">Choose DCIM or a subfolder from the left panel</span></div>`;
     updateSelectionBar();
     return;
   }
@@ -1449,7 +1530,16 @@ async function browseFolder(drivePath, folderPath) {
   activeFolderPath = folderPath;
   selectedFiles.clear(); currentFiles = []; lastClickedPath = null;
   resetViewCache();
-  renderFileArea([], true);   // legitimate: folder change
+
+  // folderPath === null means this is an auto-browse called from selectDrive to
+  // populate the sidebar — it must NOT touch the file area (which shows
+  // "Select a folder to begin"). Only a real user folder selection drives the
+  // file area state.
+  const isUserFolderSelection = folderPath !== null;
+
+  if (isUserFolderSelection) {
+    currentFolder = folderPath;
+  }
   updateSelectionBar(); updateSteps();
 
   try {
@@ -1462,6 +1552,10 @@ async function browseFolder(drivePath, folderPath) {
     document.querySelectorAll('.folder-item').forEach(item =>
       item.classList.toggle('active', item.dataset.path === result.folderPath));
 
+    if (isUserFolderSelection) {
+      currentFolder = result.folderPath;
+    }
+
     const progressiveComplete =
       currentFiles.length === result.files.length &&
       result.files.every(file => tileMap.has(file.path));
@@ -1470,8 +1564,8 @@ async function browseFolder(drivePath, folderPath) {
     await refreshDestCache();
     if (progressiveComplete) {
       syncImportedBadges();
-    } else {
-      renderFileArea(currentFiles);  // legitimate: new folder data
+    } else if (isUserFolderSelection) {
+      renderFileArea(currentFiles);
     }
     updateSelectionBar(); updateSortButtons(); updateSteps();
     updateFileStatus(currentFiles, result.folders);
@@ -1493,9 +1587,12 @@ async function browseFolder(drivePath, folderPath) {
 async function setDestPath(p) {
   destPath = p;
   document.getElementById('destPath').textContent = p;
+
   await refreshDestCache();
-  // Sync imported badges without re-rendering the grid
-  if (currentFiles.length) syncImportedBadges();
+  try { globalImportIndex = await window.api.getImportIndex() || {}; } catch { /* non-critical */ }
+
+  // Re-render files so badges update correctly
+  renderFileArea(currentFiles);
 }
 
 /**
@@ -1565,8 +1662,7 @@ function detectDuplicates(filePaths) {
   for (const p of filePaths) {
     const filename = p.replace(/\\/g,'/').split('/').pop();
     const size     = sizeMap.get(p);
-    const cached   = destFileCache.get(filename.toLowerCase());
-    if (cached !== undefined && size !== undefined && cached === size) {
+    if (size !== undefined && destFileCache.has(filename.toLowerCase() + '_' + size)) {
       duplicates.push(p);
     } else {
       clean.push(p);
@@ -1666,7 +1762,7 @@ function updateProgress({ total, index, completedCount, filename, status, skipRe
   document.getElementById('progressFilename').textContent = label;
 }
 
-function showProgressSummary({ copied, skipped, errors, skippedReasons, failedFiles, duration }) {
+function showProgressSummary({ copied, skipped, errors, skippedReasons, failedFiles, duration, integrity }) {
   document.getElementById('progressFilename').textContent = 'Import complete.';
   document.getElementById('sumCopied').textContent  = copied;
   document.getElementById('sumSkipped').textContent = skipped;
@@ -1707,9 +1803,45 @@ function showProgressSummary({ copied, skipped, errors, skippedReasons, failedFi
   // Hint 4: show once after first import completes
   showInlineHint('progressModal', 'Review the Copied / Skipped / Failed summary above', 'hint_import_done');
 
+  // ── File integrity indicator (always shown when integrity is confirmed) ───────
+  const summaryEl = document.getElementById('progressSummary');
+  if (summaryEl && !summaryEl.querySelector('#sumIntegrity') && integrity === 'verified') {
+    const row = document.createElement('div');
+    row.id        = 'sumIntegrity';
+    row.className = 'sum-row';
+    row.style.cssText = 'color:var(--green);font-size:0.78rem;margin-top:2px;opacity:1;';
+    row.textContent = '✔ File Integrity Verified (Size Check)';
+    summaryEl.appendChild(row);
+  }
+
+  // ── Deep Verify (Checksum) button — user-triggered, runs in background ────────
+  const modal = document.getElementById('progressModal');
+  if (modal && !modal.querySelector('#runChecksumBtn') && integrity === 'verified') {
+    const checksumBtn = document.createElement('button');
+    checksumBtn.id = 'runChecksumBtn';
+    checksumBtn.textContent = 'Deep Verify (Checksum)';
+    checksumBtn.style.cssText =
+      'padding:6px 14px;font-size:0.75rem;background:transparent;' +
+      'border:1px solid var(--border);border-radius:7px;color:var(--subtext);' +
+      'cursor:pointer;align-self:flex-start;margin-top:-4px;';
+    checksumBtn.onmouseenter = () => {
+      if (!checksumBtn.disabled) { checksumBtn.style.borderColor = 'var(--blue)'; checksumBtn.style.color = 'var(--blue)'; }
+    };
+    checksumBtn.onmouseleave = () => {
+      if (!checksumBtn.disabled) { checksumBtn.style.borderColor = 'var(--border)'; checksumBtn.style.color = 'var(--subtext)'; }
+    };
+    checksumBtn.addEventListener('click', async () => {
+      checksumBtn.disabled = true;
+      checksumBtn.innerText = 'Verifying... 0%';
+      checksumBtn.style.opacity = '0.7';
+      checksumBtn.style.cursor = 'default';
+      await window.api.runChecksumVerification();
+    });
+    document.getElementById('progressDoneBtn').insertAdjacentElement('beforebegin', checksumBtn);
+  }
+
   // ── Report Issue button (shown after every import) ─────────────────────────
   // Removed after Done is clicked to keep the modal clean on next import.
-  const modal = document.getElementById('progressModal');
   if (modal && !modal.querySelector('#progressReportBtn')) {
     const btn = document.createElement('button');
     btn.id          = 'progressReportBtn';
@@ -1733,6 +1865,30 @@ function showProgressSummary({ copied, skipped, errors, skippedReasons, failedFi
 
 window.api.onImportProgress(updateProgress);
 
+window.api.onChecksumProgress(({ completed, total }) => {
+  const btn = document.getElementById('runChecksumBtn');
+  if (!btn) return;
+  const pct = total > 0 ? Math.floor((completed / total) * 100) : 0;
+  btn.innerText = `Verifying... ${pct}%`;
+});
+
+window.api.onChecksumComplete(({ failed }) => {
+  const btn = document.getElementById('runChecksumBtn');
+  if (!btn) return;
+  btn.style.opacity = '1';
+  if (failed === 0) {
+    btn.innerText = '✔ Deep Verification Complete';
+    btn.classList.add('csq-success');
+  } else {
+    btn.innerText = `⚠ ${failed} file(s) failed`;
+    btn.classList.add('csq-error');
+  }
+  window.api.getImportIndex().then(index => {
+    globalImportIndex = index || {};
+    });
+});
+
+
 document.getElementById('importBtn').addEventListener('click', async () => {
   if (!selectedFiles.size || !destPath || importRunning) return;
   let filePaths = [...selectedFiles];
@@ -1752,8 +1908,9 @@ document.getElementById('importBtn').addEventListener('click', async () => {
   try {
     const summary = await window.api.importFiles(filePaths, destPath);
     showProgressSummary(summary);
-    // Refresh cache after import
+    // Refresh both caches after import so badges survive a destination change
     await refreshDestCache();
+    try { globalImportIndex = await window.api.getImportIndex() || {}; } catch { /* non-critical */ }
   } catch (err) {
     document.getElementById('progressFilename').textContent = `Error: ${err.message}`;
     document.getElementById('progressDoneBtn').classList.add('visible');
@@ -1779,9 +1936,13 @@ document.getElementById('progressResumeBtn').addEventListener('click', () => {
 document.getElementById('progressDoneBtn').addEventListener('click', () => {
   document.getElementById('progressOverlay').classList.remove('visible');
   importRunning = false;
-  // Remove the report button so next import gets a fresh one
-  const reportBtn = document.getElementById('progressReportBtn');
+  // Remove per-import buttons and rows so the next import gets a clean modal
+  const reportBtn   = document.getElementById('progressReportBtn');
   if (reportBtn) reportBtn.remove();
+  const checksumBtn = document.getElementById('runChecksumBtn');
+  if (checksumBtn) checksumBtn.remove();
+  const integrityRow = document.getElementById('sumIntegrity');
+  if (integrityRow) integrityRow.remove();
   // PERF: sync badges in-place instead of re-rendering the entire grid
   // This preserves scroll position and avoids image reload
   if (currentFiles.length) syncImportedBadges();
