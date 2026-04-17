@@ -80,7 +80,11 @@ function init() {
   // ── IPC: renderer requests install ──
   ipcMain.on('update:install', () => {
     log('User triggered update install — quitting and installing');
-    autoUpdater.quitAndInstall(false, true);
+    app.relaunch();
+    setTimeout(() => {
+      autoUpdater.quitAndInstall(false, true);
+      setTimeout(() => app.quit(), 2000);
+    }, 500);
   });
 
   // ── Schedule checks ──
