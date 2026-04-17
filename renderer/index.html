@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' file:;" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AutoIngest</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #1e1e2e;
+      --surface:   #313244;
+      --surface2:  #181825;
+      --surface3:  #242436;
+      --border:    #45475a;
+      --text:      #cdd6f4;
+      --subtext:   #a6adc8;
+      --blue:      #89b4fa;
+      --blue-dim:  rgba(137,180,250,0.12);
+      --green:     #a6e3a1;
+      --green-dim: rgba(166,227,161,0.12);
+      --yellow:    #f9e2af;
+      --mauve:     #cba6f7;
+      --red:       #f38ba8;
+      --peach:     #fab387;
+      --step-num:  #585b70;
+    }
+
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg); color: var(--text);
+      display: flex; flex-direction: column;
+    }
+
+    /* ── TOP BAR ───────────────────────────────── */
+    #topBar {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 18px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    #topBar h1      { font-size: 1rem; font-weight: 700; letter-spacing: -0.01em; }
+    #topBar .tagline { font-size: 0.7rem; opacity: 0.3; }
+
+    /* ── UPDATE BANNER ────────────────────────── */
+    #updateBanner {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 18px;
+      background: #1e3a5f;
+      border-bottom: 1px solid var(--blue);
+      flex-shrink: 0;
+      font-size: 0.78rem;
+      color: var(--blue);
+      animation: bannerSlideIn 0.25s ease;
+    }
+    #updateBanner.visible { display: flex; }
+    #updateBanner .upd-icon { font-size: 1rem; flex-shrink: 0; }
+    #updateBanner .upd-msg  { flex: 1; }
+    #updateBanner .upd-progress {
+      font-size: 0.72rem; opacity: 0.7;
+    }
+    #updateBanner .upd-btn {
+      padding: 3px 12px;
+      border: 1px solid var(--blue);
+      border-radius: 4px;
+      background: transparent;
+      color: var(--blue);
+      font-size: 0.75rem;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    #updateBanner .upd-btn:hover { background: rgba(137,180,250,0.15); }
+    #updateBanner .upd-btn.green {
+      border-color: var(--green);
+      color: var(--green);
+    }
+    #updateBanner .upd-btn.green:hover { background: rgba(166,227,161,0.15); }
+    #updateBanner .upd-dismiss {
+      background: none; border: none; color: var(--blue);
+      font-size: 1rem; cursor: pointer; padding: 0 2px;
+      opacity: 0.5; flex-shrink: 0;
+    }
+    #updateBanner .upd-dismiss:hover { opacity: 1; }
+    @keyframes bannerSlideIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── STEP RAIL ─────────────────────────────── */
+    #stepRail {
+      display: flex; align-items: stretch;
+      background: var(--surface2);
+      border-bottom: 2px solid var(--border);
+      flex-shrink: 0; overflow: hidden;
+    }
+    .step {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 18px; font-size: 0.78rem;
+      color: var(--subtext); border-right: 1px solid var(--border);
+      opacity: 0.45; transition: opacity 0.2s, background 0.2s; white-space: nowrap;
+    }
+    .step:last-child { border-right: none; }
+    .step .step-num {
+      width: 20px; height: 20px; border-radius: 50%;
+      background: var(--step-num); color: var(--subtext);
+      font-size: 0.7rem; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      transition: background 0.2s, color 0.2s;
+    }
+    .step.active { opacity: 1; background: var(--blue-dim); color: var(--text); }
+    .step.active .step-num { background: var(--blue); color: var(--surface2); }
+    .step.done   { opacity: 0.75; }
+    .step.done   .step-num { background: var(--green); color: var(--surface2); }
+
+    /* ── STEP 1 PANEL ─────────────────────────── */
+    #step1Panel {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 20px; flex: 1; padding: 40px 24px;
+    }
+    #step1Panel .step-hero { font-size: 3rem; }
+    #step1Panel h2 { font-size: 1.1rem; opacity: 0.8; }
+    #step1Panel p  { font-size: 0.85rem; opacity: 0.4; }
+    #driveListLarge { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+    .drive-card-large {
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      padding: 18px 24px; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      min-width: 130px; user-select: none;
+    }
+    .drive-card-large:hover { border-color: var(--blue); background: var(--blue-dim); }
+    .drive-card-large .dc-icon  { font-size: 2rem; }
+    .drive-card-large .dc-label { font-size: 0.85rem; font-weight: 600; }
+    .drive-card-large .dc-path  { font-size: 0.68rem; color: var(--subtext); font-family: monospace; }
+    #noDriveMsg { display: flex; flex-direction: column; align-items: center; gap: 10px; opacity: 0.38; font-size: 0.88rem; }
+    #noDriveMsg .msg-icon { font-size: 2.2rem; }
+
+    /* ── WORKSPACE ─────────────────────────────── */
+    #workspace { display: none; flex: 1; overflow: hidden; flex-direction: column; }
+    #workspace.visible { display: flex; }
+
+    #driveStrip {
+      display: flex; align-items: center; gap: 10px;
+      padding: 6px 16px; background: var(--surface3);
+      border-bottom: 1px solid var(--border); flex-shrink: 0; font-size: 0.8rem;
+    }
+    #driveStrip .ds-label { opacity: 0.45; }
+    #driveStrip .ds-name  { font-weight: 600; color: var(--blue); }
+    #changeDriveBtn {
+      margin-left: auto; padding: 3px 10px; font-size: 0.73rem;
+      background: transparent; border: 1px solid var(--border);
+      border-radius: 6px; color: var(--subtext); cursor: pointer;
+      transition: border-color 0.12s, color 0.12s;
+    }
+    #changeDriveBtn:hover { border-color: var(--blue); color: var(--blue); }
+
+    #columns { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── SIDEBAR ───────────────────────────────── */
+    #sidebar {
+      width: 210px; min-width: 140px; flex-shrink: 0;
+      background: var(--surface2); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    #sidebarHeader {
+      padding: 9px 14px 7px; font-size: 0.65rem; font-weight: 700;
+      letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.3;
+      border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    #folderList { flex: 1; overflow-y: auto; padding: 4px 0; }
+    .folder-item {
+      display: flex; align-items: center; gap: 8px; padding: 7px 14px;
+      cursor: pointer; font-size: 0.82rem; border-left: 3px solid transparent;
+      transition: background 0.1s; user-select: none;
+    }
+    .folder-item:hover  { background: rgba(137,180,250,0.07); }
+    .folder-item.active { background: var(--blue-dim); border-left-color: var(--blue); color: var(--blue); }
+    .folder-item .fi-icon { font-size: 0.9rem; flex-shrink: 0; }
+    .folder-item .fi-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sidebar-empty { padding: 16px 14px; font-size: 0.78rem; opacity: 0.35; font-style: italic; }
+
+    /* ── FILE PANEL ────────────────────────────── */
+    #filePanel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+    #filePanelHeader {
+      display: flex; align-items: center; gap: 10px;
+      padding: 7px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    #breadcrumb {
+      font-size: 0.72rem; color: var(--subtext);
+      font-family: 'SF Mono','Fira Code', monospace;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
+    }
+
+    /* ── TOOLBAR (sort + view toggle) ──────────── */
+    #toolbar {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 14px; border-bottom: 1px solid var(--border);
+      flex-shrink: 0; background: var(--surface2);
+    }
+    #toolbar .sort-label { font-size: 0.68rem; opacity: 0.35; text-transform: uppercase; letter-spacing: 0.08em; margin-right: 2px; }
+    .sort-btn {
+      padding: 2px 9px; font-size: 0.72rem; font-weight: 600;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 5px;
+      color: var(--subtext); cursor: pointer;
+      transition: border-color 0.12s, color 0.12s; display: flex; align-items: center;
+    }
+    .sort-btn:hover       { border-color: var(--blue); color: var(--text); }
+    .sort-btn.sort-active { border-color: var(--blue); color: var(--blue); background: var(--blue-dim); }
+    .sort-arrow { font-size: 0.68rem; margin-left: 2px; }
+
+    /* P7 — View toggle */
+    .toolbar-sep { width: 1px; height: 16px; background: var(--border); margin: 0 4px; }
+    .view-btn {
+      padding: 2px 9px; font-size: 0.72rem; font-weight: 600;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 5px;
+      color: var(--subtext); cursor: pointer;
+      transition: border-color 0.12s, color 0.12s;
+    }
+    .view-btn:hover     { border-color: var(--blue); color: var(--text); }
+    .view-btn.view-active { border-color: var(--blue); color: var(--blue); background: var(--blue-dim); }
+
+    /* ── SELECTION BAR ─────────────────────────── */
+    #selectionBar {
+      display: none; align-items: center; gap: 8px;
+      padding: 5px 14px; background: var(--surface2);
+      border-bottom: 1px solid var(--border); font-size: 0.78rem; flex-shrink: 0;
+    }
+    #selectionBar.visible { display: flex; }
+    .sel-btn {
+      padding: 2px 9px; font-size: 0.72rem; font-weight: 600;
+      border: 1px solid var(--border); border-radius: 5px;
+      background: transparent; color: var(--text); cursor: pointer;
+      transition: border-color 0.1s, color 0.1s, opacity 0.1s;
+    }
+    .sel-btn:disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+    #selectAllBtn:not(:disabled):hover { border-color: var(--blue); color: var(--blue); }
+    #clearSelBtn:not(:disabled):hover  { border-color: var(--red);  color: var(--red); }
+    #selCount { font-size: 0.75rem; font-weight: 600; color: var(--subtext); margin-left: 4px; }
+
+    /* ── FILE AREA (scroll container) ─────────── */
+    #fileGrid {
+      flex: 1; overflow-y: auto; padding: 0;
+      /* Single compositor layer for the scroll container.
+         Do NOT put will-change on children — that creates a GPU layer per image,
+         exhausts VRAM, and causes textures to be evicted during scroll. */
+      transform: translateZ(0);
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* ── P3 — GROUPED SECTIONS ─────────────────── */
+    .file-section { margin-bottom: 4px; }
+
+    .section-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 14px 6px;
+      background: var(--surface3);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 10;
+    }
+    .section-icon  { font-size: 0.9rem; }
+    .section-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+    .section-count { font-size: 0.68rem; color: var(--subtext); opacity: 0.6; }
+
+    /* P4 — section collapse toggle */
+    .section-toggle {
+      font-size: 0.6rem; cursor: pointer; color: var(--subtext);
+      user-select: none; flex-shrink: 0;
+      transition: color 0.1s;
+    }
+    .section-toggle:hover { color: var(--text); }
+
+    /* P4 — section body collapse */
+    .section-body.collapsed { display: none; }
+
+    /* P4 — per-group select / deselect buttons */
+    .sel-group-btn {
+      margin-left: auto; padding: 2px 9px; font-size: 0.68rem; font-weight: 600;
+      background: transparent; border: 1px solid var(--border); border-radius: 5px;
+      color: var(--subtext); cursor: pointer;
+      transition: border-color 0.1s, color 0.1s;
+    }
+    .sel-group-btn:hover { border-color: var(--blue); color: var(--blue); }
+
+    .desel-group-btn {
+      padding: 2px 9px; font-size: 0.68rem; font-weight: 600;
+      background: transparent; border: 1px solid var(--border); border-radius: 5px;
+      color: var(--subtext); cursor: pointer;
+      transition: border-color 0.1s, color 0.1s;
+    }
+    .desel-group-btn:hover { border-color: var(--red); color: var(--red); }
+
+    /* ── ICON GRID ─────────────────────────────── */
+    .icon-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+      gap: 10px; padding: 12px 14px;
+    }
+
+    /* ── FILE TILE (icon view) ─────────────────── */
+    .file-tile {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 9px; cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      display: flex; flex-direction: column; gap: 7px;
+      position: relative; user-select: none;
+    }
+    .file-tile:hover    { border-color: var(--blue); }
+    .file-tile.selected { border-color: var(--blue); background: var(--blue-dim); }
+
+    /* Already-imported tile */
+    .file-tile.already-imported            { opacity: 0.55; border-color: var(--green); border-style: dashed; }
+    .file-tile.already-imported:hover      { opacity: 0.75; }
+    .file-tile.already-imported.selected   { opacity: 1; border-style: solid; }
+
+    .file-tile input[type="checkbox"] {
+      position: absolute; top: 7px; left: 7px;
+      width: 14px; height: 14px; cursor: pointer; accent-color: var(--blue);
+      z-index: 5;
+    }
+
+    /* P10 — Prominent "Already Imported" badge overlay */
+    .dup-overlay-badge {
+      position: absolute; top: 0; left: 0; right: 0;
+      background: rgba(249,226,175,0.92);
+      color: #1e1e2e;
+      font-size: 0.6rem; font-weight: 800;
+      letter-spacing: 0.04em; text-transform: uppercase;
+      text-align: center; padding: 3px 6px;
+      border-radius: 7px 7px 0 0;
+      pointer-events: none; z-index: 4;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    /* P1 — Thumbnail */
+    .file-thumb {
+      width: 100%; aspect-ratio: 1;
+      background: var(--surface2); border-radius: 5px;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
+    }
+    .file-thumb svg     { width: 68%; height: 68%; }
+    .file-thumb .thumb-img {
+      width: 100%; height: 100%;
+      object-fit: cover; object-position: center;
+      display: block; border-radius: 5px;
+      /* Part 3 — fade-in: start transparent, transition to opaque once decoded.
+         Uses opacity only (GPU-composited) — no layout shift, no reflow. */
+      opacity: 0;
+      transition: opacity 0.18s ease;
+    }
+    .file-thumb .thumb-img.thumb-loaded {
+      opacity: 1;
+    }
+
+    .file-meta { display: flex; flex-direction: column; gap: 3px; }
+    .file-name {
+      font-size: 0.7rem; overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap; line-height: 1.3;
+    }
+    .file-details { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+    .file-ext-badge {
+      font-size: 0.58rem; font-weight: 700; letter-spacing: 0.04em;
+      text-transform: uppercase; padding: 1px 4px; border-radius: 3px; flex-shrink: 0;
+    }
+    .ext-photo { background: rgba(137,180,250,0.15); color: var(--blue);   }
+    .ext-video { background: rgba(203,166,247,0.15); color: var(--mauve);  }
+    .ext-raw   { background: rgba(249,226,175,0.15); color: var(--yellow); }
+    .file-size { font-size: 0.65rem; color: var(--subtext); font-family: monospace; }
+    .file-date { font-size: 0.62rem; color: var(--subtext); opacity: 0.65; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .panel-state {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 10px; padding: 60px 20px; opacity: 0.38; font-size: 0.85rem; text-align: center;
+    }
+    .panel-state .state-icon { font-size: 2.2rem; }
+
+    /* ── P7 — LIST VIEW ────────────────────────── */
+    .list-table {
+      width: 100%; border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+    .list-table thead th {
+      padding: 6px 10px; text-align: left;
+      font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--subtext); opacity: 0.5;
+      border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; background: var(--surface2); z-index: 5;
+    }
+    .list-table tbody tr.file-tile {
+      border-bottom: 1px solid rgba(69,71,90,0.4);
+      transition: background 0.1s;
+      display: table-row;
+      /* override icon-tile flex */
+      flex-direction: unset; gap: unset; padding: unset;
+    }
+    .list-table tbody tr.file-tile:hover   { background: rgba(137,180,250,0.05); }
+    .list-table tbody tr.file-tile.selected { background: var(--blue-dim); }
+    .list-table tbody tr.file-tile.already-imported { opacity: 0.55; }
+    .list-table td { padding: 5px 10px; vertical-align: middle; }
+    .lt-check { width: 28px; }
+    .lt-thumb { width: 36px; }
+    .list-thumb {
+      width: 28px; height: 28px; border-radius: 4px;
+      background: var(--surface2); overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .list-thumb svg      { width: 70%; height: 70%; }
+    .list-thumb .thumb-img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; }
+    .lt-name { max-width: 260px; }
+    .lt-name .file-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lt-type { width: 60px; }
+    .lt-size { width: 70px; font-family: monospace; font-size: 0.72rem; color: var(--subtext); }
+    .lt-date { width: 130px; font-size: 0.7rem; color: var(--subtext); white-space: nowrap; }
+    .dup-list-badge {
+      display: inline-block; margin-left: 6px;
+      font-size: 0.58rem; font-weight: 700; padding: 1px 5px;
+      background: rgba(249,226,175,0.18); color: var(--yellow);
+      border: 1px solid rgba(249,226,175,0.3); border-radius: 3px;
+      text-transform: uppercase; letter-spacing: 0.03em; vertical-align: middle;
+    }
+
+    /* ── IMPORT FOOTER ─────────────────────────── */
+    #importFooter {
+      display: flex; align-items: center; gap: 14px;
+      padding: 10px 16px; background: var(--surface2);
+      border-top: 2px solid var(--border); flex-shrink: 0;
+    }
+    #destBlock { display: flex; flex-direction: column; gap: 2px; flex: 1; overflow: hidden; }
+    #destBlock .dest-label { font-size: 0.63rem; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.35; }
+    #destPath { font-size: 0.75rem; color: var(--blue); font-family: 'SF Mono','Fira Code',monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #changeDestBtn {
+      padding: 5px 12px; font-size: 0.76rem; font-weight: 600;
+      background: transparent; border: 1px solid var(--border); border-radius: 7px;
+      color: var(--subtext); cursor: pointer; white-space: nowrap;
+      transition: border-color 0.12s, color 0.12s; flex-shrink: 0;
+    }
+    #changeDestBtn:hover { border-color: var(--blue); color: var(--blue); }
+    .footer-sep { width: 1px; height: 32px; background: var(--border); flex-shrink: 0; }
+    #importBtn {
+      display: none; padding: 8px 22px; font-size: 0.85rem; font-weight: 700;
+      background: var(--green); color: var(--surface2);
+      border: none; border-radius: 8px; cursor: pointer;
+      white-space: nowrap; flex-shrink: 0;
+      transition: background 0.15s, opacity 0.15s;
+    }
+    #importBtn.visible { display: block; }
+    #importBtn:hover   { background: #b9f0b4; }
+    #importBtn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* ── PROGRESS OVERLAY ──────────────────────── */
+    #progressOverlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.65); z-index: 100;
+      align-items: center; justify-content: center;
+    }
+    #progressOverlay.visible { display: flex; }
+    #progressModal {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 14px; padding: 28px 32px; width: 420px; max-width: 90vw;
+      display: flex; flex-direction: column; gap: 16px;
+    }
+    #progressModal h3   { font-size: 1rem; font-weight: 700; }
+    #progressFilename   { font-size: 0.78rem; color: var(--subtext); font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .progress-track     { width: 100%; height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+    .progress-fill      { height: 100%; background: var(--green); border-radius: 3px; transition: width 0.2s ease; width: 0%; }
+    #progressCount      { font-size: 0.8rem; color: var(--subtext); text-align: right; }
+    #progressSummary    { display: none; flex-direction: column; gap: 6px; font-size: 0.82rem; padding: 10px 14px; background: var(--surface2); border-radius: 8px; }
+    #progressSummary.visible { display: flex; }
+    #progressSummary .sum-row { display: flex; justify-content: space-between; opacity: 0.75; }
+    #progressSummary .sum-row span:last-child { font-weight: 600; }
+    #progressSkipDetails {
+      display: none; flex-direction: column; gap: 3px; max-height: 100px; overflow-y: auto;
+      padding: 6px 10px; background: var(--surface3); border: 1px solid var(--border); border-radius: 6px; margin-top: 2px;
+    }
+    .skip-reason-row { font-size: 0.68rem; color: var(--subtext); font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.8; }
+    .skip-reason-failed { color: var(--red); opacity: 1; }
+    #progressDoneBtn {
+      display: none; padding: 8px 20px; font-size: 0.85rem; font-weight: 700;
+      background: var(--blue); color: var(--surface2); border: none; border-radius: 8px;
+      cursor: pointer; align-self: flex-end; transition: background 0.12s;
+    }
+    #progressDoneBtn.visible { display: block; }
+    #progressDoneBtn:hover   { background: #a0c4fd; }
+    #progressEta { font-size: 0.75rem; color: var(--subtext); min-height: 1.1em; }
+    .progress-controls { display: flex; gap: 8px; }
+    #progressPauseBtn, #progressResumeBtn {
+      padding: 6px 18px; font-size: 0.8rem; font-weight: 600;
+      border: none; border-radius: 8px; cursor: pointer; transition: opacity 0.12s;
+    }
+    #progressPauseBtn  { background: var(--yellow); color: var(--surface); }
+    #progressPauseBtn:hover  { opacity: 0.82; }
+    #progressResumeBtn { background: var(--green);  color: var(--surface); display: none; }
+    #progressResumeBtn:hover { opacity: 0.82; }
+
+    /* ── DUPLICATE WARNING MODAL ───────────────── */
+    #dupWarningOverlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.72); z-index: 200;
+      align-items: center; justify-content: center;
+    }
+    #dupWarningOverlay.visible { display: flex; }
+    #dupWarningModal {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 14px; padding: 28px 28px 24px; width: 400px; max-width: 92vw;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .dup-icon { font-size: 1.8rem; text-align: center; }
+    #dupWarningModal h3 { font-size: 1rem; font-weight: 700; text-align: center; }
+    .dup-subtitle { font-size: 0.82rem; color: var(--subtext); text-align: center; line-height: 1.5; }
+    .dup-subtitle strong { color: var(--text); }
+    #dupFileList { background: var(--surface2); border: 1px solid var(--border); border-radius: 7px; padding: 8px 10px; display: flex; flex-direction: column; gap: 3px; max-height: 110px; overflow-y: auto; }
+    .dup-file-row { font-size: 0.7rem; font-family: monospace; color: var(--subtext); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dup-file-row.dup-more { opacity: 0.5; font-style: italic; font-family: inherit; }
+    .dup-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 2px; }
+    .dup-btn { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 16px; border-radius: 8px; font-size: 0.85rem; font-weight: 700; cursor: pointer; border: 1px solid transparent; transition: opacity 0.15s, border-color 0.15s; }
+    .dup-btn-sub    { font-size: 0.67rem; font-weight: 400; opacity: 0.65; }
+    .dup-btn-primary   { background: var(--green); color: var(--surface2); border-color: var(--green); }
+    .dup-btn-primary:hover { opacity: 0.88; }
+    .dup-btn-secondary { background: transparent; color: var(--yellow); border-color: var(--yellow); }
+    .dup-btn-secondary:hover { background: rgba(249,226,175,0.08); }
+    .dup-btn-cancel    { background: transparent; color: var(--subtext); border-color: var(--border); font-size: 0.8rem; padding: 7px; }
+    .dup-btn-cancel:hover { border-color: var(--red); color: var(--red); }
+
+    /* ── STATUS BAR ────────────────────────────── */
+    #statusBar {
+      padding: 3px 16px; font-size: 0.67rem; opacity: 0.28;
+      border-top: 1px solid var(--border); flex-shrink: 0; display: flex; gap: 16px;
+    }
+    #statusMessage {
+      margin-left: auto; color: var(--yellow); opacity: 1;
+      font-size: 0.7rem; font-weight: 500;
+      transition: opacity 0.3s;
+    }
+    #statusMessage:empty { display: none; }
+    #appVersion {
+      margin-left: auto; font-size: 0.65rem; opacity: 0.45; font-family: monospace;
+    }
+
+    /* ── SCROLLBARS ────────────────────────────── */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* ── ONBOARDING OVERLAY ────────────────────── */
+    #onboardingOverlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.82); z-index: 500;
+      align-items: center; justify-content: center;
+    }
+    #onboardingOverlay.visible { display: flex; }
+    #onboardingModal {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; width: 480px; max-width: 92vw;
+      display: flex; flex-direction: column;
+      overflow: hidden; max-height: 88vh;
+    }
+    #onboardingHeader {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 20px 0;
+    }
+    #onboardingDots {
+      display: flex; gap: 6px;
+    }
+    .ob-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--border); transition: background 0.2s;
+    }
+    .ob-dot.active { background: var(--blue); }
+    #onboardingSkip {
+      font-size: 0.72rem; color: var(--subtext); background: none;
+      border: none; cursor: pointer; opacity: 0.5; padding: 2px 4px;
+    }
+    #onboardingSkip:hover { opacity: 1; }
+    #onboardingBody {
+      padding: 24px 28px 20px; flex: 1; overflow-y: auto;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .ob-hero { font-size: 2.8rem; text-align: center; }
+    .ob-title { font-size: 1.1rem; font-weight: 700; text-align: center; }
+    .ob-text  { font-size: 0.87rem; color: var(--subtext); line-height: 1.65; }
+    .ob-text strong { color: var(--text); }
+    .ob-steps {
+      display: flex; flex-direction: column; gap: 10px;
+      background: var(--surface2); border-radius: 10px; padding: 14px 16px;
+    }
+    .ob-step-row {
+      display: flex; align-items: flex-start; gap: 12px; font-size: 0.85rem;
+    }
+    .ob-step-num {
+      width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+      background: var(--blue); color: var(--surface2);
+      font-size: 0.72rem; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .ob-tips { display: flex; flex-direction: column; gap: 10px; }
+    .ob-tip {
+      background: var(--surface2); border-radius: 8px;
+      padding: 10px 14px; font-size: 0.82rem; line-height: 1.55;
+    }
+    .ob-tip-label {
+      font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.07em; color: var(--blue); margin-bottom: 3px;
+    }
+    .ob-tip-hint {
+      font-size: 0.73rem; color: var(--subtext); margin-top: 3px;
+      font-style: italic;
+    }
+    .ob-result-rows { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+    .ob-result-row  { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; }
+    .ob-result-icon { font-size: 0.9rem; flex-shrink: 0; }
+    .ob-beta { margin-top: 4px; }
+    .ob-beta-title {
+      font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.07em; color: var(--yellow); margin-bottom: 8px;
+    }
+    .ob-beta-list { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+    .ob-beta-list li { font-size: 0.82rem; color: var(--subtext); padding-left: 12px; position: relative; }
+    .ob-beta-list li::before { content: '•'; position: absolute; left: 0; color: var(--yellow); }
+    .ob-log {
+      background: var(--surface3); border: 1px solid var(--border);
+      border-radius: 7px; padding: 8px 12px; margin-top: 6px;
+      font-size: 0.72rem; font-family: monospace; color: var(--subtext);
+      line-height: 1.7;
+    }
+    #onboardingFooter {
+      padding: 16px 28px 20px; display: flex; gap: 10px; justify-content: flex-end;
+      border-top: 1px solid var(--border); flex-shrink: 0;
+    }
+    #obBackBtn {
+      padding: 8px 18px; font-size: 0.83rem; font-weight: 600;
+      background: transparent; border: 1px solid var(--border);
+      border-radius: 8px; color: var(--subtext); cursor: pointer;
+    }
+    #obBackBtn:hover { border-color: var(--blue); color: var(--blue); }
+    #obNextBtn {
+      padding: 8px 22px; font-size: 0.85rem; font-weight: 700;
+      background: var(--blue); color: var(--surface2);
+      border: none; border-radius: 8px; cursor: pointer;
+      transition: background 0.12s;
+    }
+    #obNextBtn:hover { background: #a0c4fd; }
+
+    /* ── HELP BUTTON ───────────────────────────── */
+    #helpBtn {
+      margin-left: auto; padding: 3px 11px; font-size: 0.73rem; font-weight: 600;
+      background: transparent; border: 1px solid var(--border);
+      border-radius: 6px; color: var(--subtext); cursor: pointer;
+      transition: border-color 0.12s, color 0.12s; flex-shrink: 0;
+    }
+    #helpBtn:hover { border-color: var(--blue); color: var(--blue); }
+
+    /* ── HELP MODAL ────────────────────────────── */
+    #helpOverlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.72); z-index: 400;
+      align-items: center; justify-content: center;
+    }
+    #helpOverlay.visible { display: flex; }
+    #helpModal {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; width: 480px; max-width: 92vw;
+      max-height: 88vh; display: flex; flex-direction: column; overflow: hidden;
+    }
+    #helpModalHeader {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 22px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    #helpModalHeader h3 { font-size: 1rem; font-weight: 700; }
+    #helpCloseBtn {
+      background: none; border: none; color: var(--subtext);
+      font-size: 1.2rem; cursor: pointer; padding: 0 4px; line-height: 1;
+    }
+    #helpCloseBtn:hover { color: var(--text); }
+    #helpModalBody {
+      padding: 20px 22px 24px; overflow-y: auto;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+
+    /* ── INLINE HINT BANNER ────────────────────── */
+    .inline-hint {
+      font-size: 0.72rem; color: var(--yellow); padding: 4px 14px;
+      border-bottom: 1px solid rgba(249,226,175,0.15);
+      background: rgba(249,226,175,0.05);
+      display: flex; align-items: center; gap: 6px;
+      animation: hintFadeOut 0.5s ease 4.5s forwards;
+      flex-shrink: 0;
+    }
+    @keyframes hintFadeOut {
+      to { opacity: 0; max-height: 0; padding: 0; overflow: hidden; }
+    }
+
+    /* ── PROGRESS SUMMARY COLOURS ──────────────── */
+    .sum-copied  { color: var(--green); }
+    .sum-skipped { color: var(--yellow); }
+    .sum-errors  { color: var(--red); }
+
+    /* ── FEEDBACK: floating bug button ─────────── */
+    #bugReportBtn {
+      position: fixed; bottom: 20px; right: 20px;
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--subtext); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      z-index: 900; opacity: 0.45;
+      transition: opacity 0.2s, transform 0.15s;
+      padding: 0;
+    }
+    #bugReportBtn:hover { opacity: 1; transform: scale(1.1); }
+    #bugReportBtn svg   { width: 16px; height: 16px; }
+
+    /* ── FEEDBACK: modal overlay ────────────────── */
+    #feedbackOverlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.72);
+      z-index: 1000;
+      align-items: center; justify-content: center;
+    }
+    #feedbackOverlay.visible { display: flex; }
+
+    #feedbackPanel {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; width: 440px; max-width: 92vw; max-height: 90vh;
+      overflow-y: auto;
+      display: flex; flex-direction: column;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+    }
+
+    #feedbackPanelHeader {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 18px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    #feedbackPanelHeader .fp-title {
+      font-size: 0.9rem; font-weight: 700; color: var(--text);
+    }
+    #feedbackPanelClose {
+      background: none; border: none; color: var(--subtext);
+      font-size: 1rem; cursor: pointer; padding: 2px 6px; border-radius: 4px;
+      line-height: 1;
+    }
+    #feedbackPanelClose:hover { background: var(--surface2); }
+
+    #feedbackPanelBody {
+      padding: 14px 18px; display: flex; flex-direction: column; gap: 10px;
+    }
+
+    .fp-meta-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 2px; }
+    .fp-meta-pill {
+      font-size: 0.68rem; font-weight: 600; padding: 2px 8px;
+      border-radius: 99px; background: var(--surface2);
+      color: var(--subtext); letter-spacing: 0.02em;
+    }
+
+    .fp-label {
+      font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--subtext); margin-bottom: -4px;
+    }
+    .fp-input {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 7px; color: var(--text); font-size: 0.8rem;
+      padding: 7px 10px; box-sizing: border-box; outline: none;
+      font-family: inherit; transition: border-color 0.15s;
+    }
+    .fp-input:focus { border-color: var(--blue); }
+    .fp-input.fp-error { border-color: var(--red); }
+    .fp-textarea { resize: vertical; min-height: 72px; }
+    .fp-select { appearance: none; cursor: pointer; }
+
+    .fp-severity-row { display: flex; gap: 5px; }
+    .fp-sev {
+      flex: 1; text-align: center; padding: 5px 0;
+      border-radius: 6px; font-size: 0.7rem; font-weight: 700;
+      cursor: pointer; border: 1px solid transparent;
+      transition: all 0.12s; user-select: none;
+    }
+    .fp-sev-low      { background: rgba(166,227,161,0.1); color: var(--green); }
+    .fp-sev-medium   { background: rgba(249,226,175,0.1); color: var(--yellow); }
+    .fp-sev-high     { background: rgba(250,179,135,0.1); color: var(--peach); }
+    .fp-sev-critical { background: rgba(243,139,168,0.1); color: var(--red); }
+    .fp-sev.fp-sev-active { border-color: currentColor; opacity: 1; }
+    .fp-sev:not(.fp-sev-active) { opacity: 0.45; }
+
+    .fp-hint {
+      font-size: 0.68rem; color: var(--subtext); opacity: 0.6;
+      margin: 0; line-height: 1.5;
+    }
+    .fp-log-row {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 0.75rem; color: var(--subtext); cursor: pointer;
+    }
+    .fp-log-row input { accent-color: var(--blue); }
+
+    #feedbackPanelFooter {
+      padding: 12px 18px 16px;
+      display: flex; gap: 8px; justify-content: flex-end;
+      border-top: 1px solid var(--border); flex-shrink: 0;
+    }
+    #fpCancelBtn {
+      padding: 7px 16px; font-size: 0.78rem; font-weight: 600;
+      background: transparent; border: 1px solid var(--border);
+      border-radius: 7px; color: var(--subtext); cursor: pointer;
+    }
+    #fpCancelBtn:hover { border-color: var(--blue); color: var(--blue); }
+    #fpSubmitBtn {
+      padding: 7px 18px; font-size: 0.78rem; font-weight: 700;
+      background: var(--blue); color: var(--surface2);
+      border: none; border-radius: 7px; cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    #fpSubmitBtn:disabled { opacity: 0.45; cursor: not-allowed; }
+    #fpSubmitBtn:not(:disabled):hover { opacity: 0.85; }
+
+    /* ── WHAT'S NEW MODAL ───────────────────────── */
+    .whats-new-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.65);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 200;
+    }
+    .whats-new-modal {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 28px 28px 22px;
+      width: 460px; max-width: 90vw; max-height: 80vh;
+      overflow-y: auto; color: var(--text);
+      display: flex; flex-direction: column; gap: 14px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+    .wn-title {
+      font-size: 1.1rem; font-weight: 700; color: var(--text);
+      margin: 0; padding-bottom: 10px; border-bottom: 1px solid var(--border);
+    }
+    .wn-body {
+      font-size: 0.82rem; color: var(--subtext); line-height: 1.6;
+    }
+    .wn-body ul {
+      margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 10px;
+    }
+    .wn-body li { color: var(--text); }
+    .wn-body li strong { color: var(--blue); }
+    .wn-body li br + * ,
+    .wn-body li > br { display: block; margin-top: 1px; }
+    .wn-close-btn {
+      align-self: flex-end;
+      padding: 6px 18px; font-size: 0.8rem; font-weight: 600;
+      background: var(--blue); color: var(--bg);
+      border: none; border-radius: 7px; cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .wn-close-btn:hover { opacity: 0.85; }
+
+    /* ── SMART PAIRING TOGGLE ──────────────────── */
+    .pair-toggle {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 0.72rem; font-weight: 600;
+      color: var(--subtext); cursor: pointer; user-select: none;
+      padding: 2px 8px; border: 1px solid var(--border); border-radius: 5px;
+      transition: border-color 0.12s, color 0.12s;
+    }
+    .pair-toggle:hover { border-color: var(--blue); color: var(--text); }
+    .pair-toggle input { accent-color: var(--blue); cursor: pointer; margin: 0; }
+    .pair-toggle:has(input:checked) { border-color: var(--blue); color: var(--blue); }
+
+    /* ── PAIR VISUAL LINKING ───────────────────── */
+    .file-tile.pair-start,
+    .file-tile.pair-linked {
+      background: rgba(100, 150, 255, 0.08);
+    }
+    .file-tile.pair-start:hover,
+    .file-tile.pair-linked:hover {
+      background: rgba(100, 150, 255, 0.14);
+    }
+    .file-tile.selected-linked {
+      border-color: rgba(137, 180, 250, 0.45);
+      box-shadow: 0 0 0 1px rgba(137, 180, 250, 0.2);
+    }
+
+    /* ── TIMELINE VIEW ─────────────────────────── */
+    .timeline-group { margin-bottom: 4px; }
+    .timeline-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 14px 6px;
+      background: var(--surface3);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 10;
+    }
+    .timeline-icon  { font-size: 0.9rem; flex-shrink: 0; }
+    .timeline-label {
+      font-size: 0.75rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="topBar">
+    <h1>⚡ AutoIngest</h1>
+    <span class="tagline">Memory Card Importer</span>
+    <button id="helpBtn">? Help</button>
+  </div>
+
+  <!-- UPDATE BANNER — hidden until an update event fires -->
+  <div id="updateBanner">
+    <span class="upd-icon">🔄</span>
+    <span class="upd-msg" id="updMsg">Downloading update…</span>
+    <span class="upd-progress" id="updProgress"></span>
+    <button class="upd-btn green" id="updInstallBtn" style="display:none">Restart &amp; Install</button>
+    <button class="upd-dismiss" id="updDismissBtn" title="Dismiss">✕</button>
+  </div>
+
+  <div id="stepRail">
+    <div class="step active" id="step1Indicator"><span class="step-num">1</span> Select Memory Card</div>
+    <div class="step"        id="step2Indicator"><span class="step-num">2</span> Browse Files</div>
+    <div class="step"        id="step3Indicator"><span class="step-num">3</span> Select Files</div>
+    <div class="step"        id="step4Indicator"><span class="step-num">4</span> Import</div>
+  </div>
+
+  <!-- STEP 1 -->
+  <div id="step1Panel">
+    <div class="step-hero">💾</div>
+    <h2>Connect a Camera Memory Card</h2>
+    <p id="step1Subtitle">Insert a camera card to start browsing photos and videos.</p>
+    <div id="driveListLarge">
+      <div id="noDriveMsg">
+        <span class="msg-icon">🔍</span>
+        <span>Scanning for memory cards…</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- WORKSPACE (Steps 2-4) -->
+  <div id="workspace">
+    <div id="driveStrip">
+      <span class="ds-label">📷 Active card:</span>
+      <span class="ds-name" id="activeDriveName">—</span>
+      <button id="changeDriveBtn">Change Card</button>
+      <button id="ejectBtn">Eject</button>
+    </div>
+
+    <div id="columns">
+      <!-- Sidebar -->
+      <div id="sidebar">
+        <div id="sidebarHeader">Step 2 — Browse</div>
+        <div id="folderList">
+          <div class="sidebar-empty">Loading folders…</div>
+        </div>
+      </div>
+
+      <!-- File panel -->
+      <div id="filePanel">
+        <div id="filePanelHeader">
+          <span id="breadcrumb">—</span>
+        </div>
+
+        <!-- Toolbar: sort + view toggle -->
+        <div id="toolbar">
+          <span class="sort-label">Sort</span>
+          <button class="sort-btn sort-active" data-sort="date">Date<span class="sort-arrow"> ↓</span></button>
+          <button class="sort-btn" data-sort="name">Name<span class="sort-arrow"></span></button>
+          <button class="sort-btn" data-sort="size">Size<span class="sort-arrow"></span></button>
+          <div class="toolbar-sep"></div>
+          <button class="view-btn view-active" id="viewIconBtn" title="Icon view">⊞ Icons</button>
+          <button class="view-btn" id="viewListBtn" title="List view">☰ List</button>
+          <button class="view-btn view-active" id="thumbToggleBtn" title="Show thumbnails">▧ Thumbs</button>
+          <div class="toolbar-sep"></div>
+          <button class="view-btn" id="timelineViewBtn" title="Group by capture time">📅 Timeline</button>
+          <div class="toolbar-sep"></div>
+          <label class="pair-toggle" title="Place RAW+JPG pairs side by side">
+            <input type="checkbox" id="pairToggle"> Smart Pairing
+          </label>
+        </div>
+
+        <!-- Selection bar -->
+        <div id="selectionBar">
+          <button class="sel-btn" id="selectAllBtn">Select All</button>
+          <button class="sel-btn" id="clearSelBtn">Clear</button>
+          <span id="selCount">0 selected</span>
+        </div>
+
+        <!-- File area — JS writes grouped sections here -->
+        <div id="fileGrid">
+          <div class="panel-state">
+            <span class="state-icon">📁</span>
+            <span>Choose a folder from the left to browse files</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Import footer -->
+    <div id="importFooter">
+      <div id="destBlock">
+        <span class="dest-label">Import destination</span>
+        <span id="destPath">—</span>
+      </div>
+      <button id="changeDestBtn">📂 Change Location</button>
+      <div class="footer-sep"></div>
+      <button id="importBtn">⬇ Import Selected</button>
+    </div>
+  </div>
+
+  <!-- Progress modal -->
+  <div id="progressOverlay">
+    <div id="progressModal">
+      <h3>⬇ Importing Files…</h3>
+      <div id="progressFilename">Preparing…</div>
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      <div id="progressCount">0 / 0</div>
+      <div id="progressEta"></div>
+      <div class="progress-controls">
+        <button id="progressPauseBtn">⏸ Pause</button>
+        <button id="progressResumeBtn">▶ Resume</button>
+      </div>
+      <div id="progressSummary">
+        <div class="sum-row"><span class="sum-copied">✓ Copied</span>   <span id="sumCopied" class="sum-copied">0</span></div>
+        <div class="sum-row"><span class="sum-skipped">↩ Skipped</span> <span id="sumSkipped" class="sum-skipped">0</span></div>
+        <div class="sum-row"><span class="sum-errors">⚠ Failed</span>   <span id="sumErrors" class="sum-errors">0</span></div>
+        <div class="sum-row" id="sumDurationRow" style="display:none"><span>⏱ Duration</span><span id="sumDuration"></span></div>
+      </div>
+      <div id="progressSkipDetails"></div>
+      <button id="progressDoneBtn">Done</button>
+    </div>
+  </div>
+
+  <!-- Duplicate warning modal -->
+  <div id="dupWarningOverlay">
+    <div id="dupWarningModal">
+      <div class="dup-icon">⚠️</div>
+      <h3>Files Already Imported</h3>
+      <p class="dup-subtitle">
+        <strong id="dupCount">0</strong> of <strong id="dupTotal">0</strong>
+        selected files already exist in the destination with the same name and size.
+      </p>
+      <div id="dupFileList"></div>
+      <div class="dup-actions">
+        <button id="dupSkipBtn" class="dup-btn dup-btn-primary">
+          Skip Duplicates
+          <span class="dup-btn-sub">Import new files only</span>
+        </button>
+        <button id="dupImportAllBtn" class="dup-btn dup-btn-secondary">
+          Import Anyway
+          <span class="dup-btn-sub">Overwrite / rename conflicts</span>
+        </button>
+        <button id="dupCancelBtn" class="dup-btn dup-btn-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status bar -->
+  <div id="statusBar">
+    <span id="statusDrives">Scanning for drives…</span>
+    <span id="statusFiles"></span>
+    <span id="statusMessage"></span>
+    <span id="appVersion"></span>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       ONBOARDING OVERLAY (shown on first launch only)
+  ═══════════════════════════════════════════════════════ -->
+  <div id="onboardingOverlay">
+    <div id="onboardingModal">
+      <div id="onboardingHeader">
+        <div id="onboardingDots">
+          <div class="ob-dot active" data-step="0"></div>
+          <div class="ob-dot"       data-step="1"></div>
+          <div class="ob-dot"       data-step="2"></div>
+          <div class="ob-dot"       data-step="3"></div>
+        </div>
+        <button id="onboardingSkip">Skip</button>
+      </div>
+
+      <div id="onboardingBody"><!-- filled by JS --></div>
+
+      <div id="onboardingFooter">
+        <button id="obBackBtn" style="display:none">Back</button>
+        <button id="obNextBtn">Next →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       HELP MODAL (accessible anytime via Help button)
+  ═══════════════════════════════════════════════════════ -->
+  <div id="helpOverlay">
+    <div id="helpModal">
+      <div id="helpModalHeader">
+        <h3>📖 Quick Reference</h3>
+        <button id="helpCloseBtn">✕</button>
+      </div>
+      <div id="helpModalBody"><!-- filled by JS --></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       FEEDBACK — floating bug button + report modal
+  ═══════════════════════════════════════════════════════ -->
+
+  <!-- Floating bug report button (always visible, bottom-right) -->
+  <button id="bugReportBtn" title="Report a bug" aria-label="Report a bug">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 22c-4 0-7-2.7-7-6v-4l-2-2 2-2V6c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2v2l2 2-2 2v4c0 3.3-3 6-7 6z"/>
+      <line x1="12" y1="11" x2="12" y2="15"/>
+      <circle cx="12" cy="8" r="0.8" fill="currentColor" stroke="none"/>
+    </svg>
+  </button>
+
+  <!-- Feedback modal -->
+  <div id="feedbackOverlay" role="dialog" aria-modal="true" aria-labelledby="fpTitle">
+    <div id="feedbackPanel">
+
+      <div id="feedbackPanelHeader">
+        <span class="fp-title" id="fpTitle">⚑ Report an Issue</span>
+        <button id="feedbackPanelClose" aria-label="Close">✕</button>
+      </div>
+
+      <div id="feedbackPanelBody">
+
+        <!-- Auto-filled info pills -->
+        <div class="fp-meta-row">
+          <span class="fp-meta-pill" id="fpMetaVersion">—</span>
+          <span class="fp-meta-pill" id="fpMetaPlatform">—</span>
+          <span class="fp-meta-pill" id="fpMetaImport"></span>
+        </div>
+
+        <!-- Name -->
+        <div class="fp-label">Your name</div>
+        <input id="fpName" class="fp-input" type="text"
+               placeholder="e.g. Hussain / Mustafa" autocomplete="off" />
+
+        <!-- Issue type -->
+        <div class="fp-label">Issue type</div>
+        <select id="fpType" class="fp-input fp-select">
+          <option value="">— Select —</option>
+          <option value="Import Failure">Import Failure</option>
+          <option value="Thumbnail Issue">Thumbnail Issue</option>
+          <option value="Performance">Slow / Lagging</option>
+          <option value="UI Confusion">Confusing UI</option>
+          <option value="Crash">Crash</option>
+          <option value="Other">Other</option>
+        </select>
+
+        <!-- Severity -->
+        <div class="fp-label">Severity</div>
+        <div class="fp-severity-row" id="fpSeverityRow">
+          <button class="fp-sev fp-sev-low    fp-sev-active" data-sev="Low">Low</button>
+          <button class="fp-sev fp-sev-medium"               data-sev="Medium">Medium</button>
+          <button class="fp-sev fp-sev-high"                 data-sev="High">High</button>
+          <button class="fp-sev fp-sev-critical"             data-sev="Critical">Critical</button>
+        </div>
+
+        <!-- Description -->
+        <div class="fp-label">What happened?</div>
+        <textarea id="fpDesc" class="fp-input fp-textarea"
+                  placeholder="Describe the issue — what you were doing, what went wrong, what you expected…"
+                  rows="4"></textarea>
+
+        <p class="fp-hint">
+          💡 Screenshot? Share it directly in WhatsApp or paste a Google Drive link in the description.
+        </p>
+
+        <!-- Log sharing -->
+        <label class="fp-log-row">
+          <input type="checkbox" id="fpIncludeLog" checked />
+          <span>Mark log file as shared in the tracker</span>
+        </label>
+
+      </div>
+
+      <div id="feedbackPanelFooter">
+        <button id="fpCancelBtn">Cancel</button>
+        <button id="fpSubmitBtn">Send Report</button>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
