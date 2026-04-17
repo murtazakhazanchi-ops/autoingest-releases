@@ -1,6 +1,6 @@
 {
-  "name": "electron-base-app",
-  "version": "0.4.4",
+  "name": "auto-ingest",
+  "version": "0.4.5",
   "description": "AutoIngest — Memory Card Importer",
   "main": "main/main.js",
   "scripts": {
@@ -59,12 +59,15 @@
     ],
 
     "mac": {
-      "target": [
-      { "target": "dmg", "arch": ["x64", "arm64"] },
+     "target": [
+       { "target": "dmg", "arch": ["x64", "arm64"] },
       { "target": "zip", "arch": ["x64", "arm64"] }
       ],
-      "icon":    "assets/mac.icns",
-      "category": "public.app-category.photography"
+      "icon":              "assets/mac.icns",
+      "category":          "public.app-category.photography",
+      "identity":          null,
+      "hardenedRuntime":   false,
+      "gatekeeperAssess":  false
     },
 
     "dmg": {
