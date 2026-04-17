@@ -1,6 +1,6 @@
 {
   "name": "electron-base-app",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "description": "AutoIngest — Memory Card Importer",
   "main": "main/main.js",
   "scripts": {
