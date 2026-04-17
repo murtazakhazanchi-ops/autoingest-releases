@@ -17,13 +17,16 @@
 
 const fs   = require('fs');
 const path = require('path');
+const { app } = require('electron');
 
 const TELEMETRY_ENABLED = true;   // set false to instantly disable all telemetry
 
 // ── Config — fill these in ────────────────────────────────────────────────────
 const SHEET_ID    = '1FKOL4bqScljgI8YPIMuCRNa0V7PtElnDFYaTYGx4TgU';      // ← paste your sheet ID here
 const SHEET_RANGE = "'Bug Tracker'!A:S";
-const KEY_PATH    = path.join(__dirname, '../config/service-account-key.json');
+const KEY_PATH = app.isPackaged
+  ? path.join(process.resourcesPath, 'config/service-account-key.json')
+  : path.join(__dirname, '../config/service-account-key.json');
 
 // Dedup window: ignore identical reports within this period (ms)
 const DEDUP_WINDOW_MS = 60_000;
