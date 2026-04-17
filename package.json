@@ -42,7 +42,14 @@
     "directories": {
       "output": "dist",
       "buildResources": "assets"
-    },
+   },
+
+    "extraResources": [
+      {
+        "from": "config/service-account-key.json",
+        "to":   "config/service-account-key.json"
+     }
+    ],
 
     "files": [
       "main/**/*",
