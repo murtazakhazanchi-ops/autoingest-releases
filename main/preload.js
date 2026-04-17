@@ -1,3 +1,4 @@
+// @ts-nocheck
 'use strict';
 
 const { contextBridge, ipcRenderer } = require('electron');
@@ -99,36 +100,21 @@ contextBridge.exposeInMainWorld('api', {
    */
   sendFeedback: (opts) => ipcRenderer.invoke('feedback:send', opts),
 
-  // ── Auto-update ──
-  /** Fires when a new version is available and download begins. cb({ version }) */
-  onUpdateAvailable: (cb) =>
-    ipcRenderer.on('update:available', (_e, info) => cb(info)),
-
-  /** Fires during download with progress. cb({ percent: 0-100 }) */
-  onUpdateProgress: (cb) =>
-    ipcRenderer.on('update:progress', (_e, info) => cb(info)),
-
-  /** Fires when download is complete and app is ready to restart. cb({ version }) */
-  onUpdateReady: (cb) =>
-    ipcRenderer.on('update:ready', (_e, info) => cb(info)),
-
-  /** Triggers quit-and-install immediately. */
-  installUpdate: () => ipcRenderer.send('update:install'),
+// ── Auto-update ──
+  onUpdateAvailable: (cb) => ipcRenderer.on('update:available', (_e, info) => cb(info)),
+  onUpdateProgress:  (cb) => ipcRenderer.on('update:progress',  (_e, info) => cb(info)),
+  onUpdateReady:     (cb) => ipcRenderer.on('update:ready',     (_e, info) => cb(info)),
+  installUpdate:     ()   => ipcRenderer.send('update:install'),
 
   // ── Global import index ──
-  /** Returns { lowercaseFilename: { size, addedAt } } for cross-session already-imported detection. */
   getImportIndex: () => ipcRenderer.invoke('importIndex:get'),
 
   // ── Checksum verification ──
-  /** Runs SHA-256 checksum on all files from the last import (user-triggered). */
   runChecksumVerification: () => ipcRenderer.invoke('checksum:run'),
-  /** Fires after each file during verification. cb({ completed, total }) */
   onChecksumProgress: (cb) => ipcRenderer.on('checksum:progress', (_e, data) => cb(data)),
-  /** Fires when all checksums are done. cb({ total, failed, failures }) */
   onChecksumComplete: (cb) => ipcRenderer.on('checksum:complete', (_e, data) => cb(data)),
 
   // ── What's New ──
-  /** Returns { version, notes } if the app just updated, null otherwise. Consumed once. */
   getLastUpdateInfo: () => ipcRenderer.invoke('getLastUpdateInfo'),
 
 });
