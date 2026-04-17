@@ -362,6 +362,22 @@
     .file-thumb .thumb-img.thumb-loaded {
       opacity: 1;
     }
+    /* Skeleton shimmer shown while a thumbnail is waiting to load.
+       Removed automatically when thumb-loaded is added (opacity kicks in). */
+    @keyframes thumb-shimmer {
+      0%   { background-position: -200% 0; }
+      100% { background-position:  200% 0; }
+    }
+    .file-thumb .thumb-img.lazy-thumb {
+      background: linear-gradient(
+        90deg,
+        var(--surface2) 25%,
+        var(--surface3) 50%,
+        var(--surface2) 75%
+      );
+      background-size: 200% 100%;
+      animation: thumb-shimmer 1.4s ease-in-out infinite;
+    }
 
     .file-meta { display: flex; flex-direction: column; gap: 3px; }
     .file-name {

@@ -410,7 +410,7 @@ function thumbHtml(file) {
     const cachedUrl = thumbCache.get(cacheKey);
 
     return `<img 
-      class="thumb-img ${cachedUrl ? 'thumb-loaded' : ''}"
+      class="thumb-img ${cachedUrl ? 'thumb-loaded' : 'lazy-thumb'}"
       data-src="${escapeHtml(file.path)}"
       data-file="${escapeHtml(file.path)}"
       data-size="${file.size}"
