@@ -299,3 +299,32 @@ FIX-ONLY pass, no new features, no architecture changes. 52 targeted patches app
   - `perf.clearThumbTimers()` called before OS eject
 
 All naming conventions and archive rules (locked per this document) preserved. See `STABILIZATION_LOG.md` for per-patch status and `STABILIZATION_NOTES.md` for intentionally-deferred items (sync fs usage in pre-event-loop paths, debug handlers).
+
+
+### v0.6.0 — Folder View + Scanner Rewrite (2026-04-18)
+
+Major feature release following the v0.5.1 stabilization pass.
+
+Scanner:
+- DCIM-only scan logic replaced with scanMediaRecursive: full recursive descent, 50-file batches, sequential subdir recursion, MAX_SCAN_DEPTH=12, realpath-based visited set, expanded skip list.
+- New buildFolderTree(files) pure transform derives a nested tree with fields name, path, children, files from the flat scan. O(n) insertion, longest-common-ancestor root, alphabetical sort.
+- Sony PRIVATE special-case scan removed -- recursion covers it.
+
+Folder View (new):
+- viewModeType state (media or folder) + toolbar toggle.
+- Media view (default): flat whole-card file list, sidebar hidden.
+- Folder view: sidebar renders full nested tree with expand/collapse chevrons; right side shows leaf-folder files only (intermediate folders show an instruction panel nudging the user to drill deeper). Navigation is sidebar-only; no IPC rescan on folder switch (uses the pre-built tree).
+- Selection persists globally across folder navigation and view toggles.
+- Back-bar above file grid shows currently-viewed folder path.
+
+UX polish:
+- Eject confirmation modal replaces the 4-second toast. Success/failure state, Enter/Escape keyboard. App waits for user OK before returning to drive list.
+- Eject button restyled red (var(--red)) to signal its semi-destructive nature.
+- Sidebar chevrons enlarged (0.65rem -> 0.85rem), blue-tinted, bold, 18px touch target, hover scale-up.
+- Step rail collapsed from 4 steps to 3 (Browse + Select merged into one since the folder-view workflow treats them as one activity).
+- Sidebar active-row highlight follows current folder on every navigation.
+
+Commit history: see git log v0.5.1..v0.6.0 --oneline. 14-commit plan executed with live-smoke-test UX corrections patched in as 11b, 11c, 11d, 12b, 12c, 12d.
+
+Preserved from earlier: all naming conventions, archive rules, no-overwrite semantics, v0.5.1 stabilization patches (52 of them across 3 tiers), intentional-sync-fs deferrals documented in STABILIZATION_NOTES.md.
+
