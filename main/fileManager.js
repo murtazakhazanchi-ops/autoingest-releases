@@ -20,24 +20,40 @@ const crypto = require('crypto');
 const fs     = require('fs');
 const fsp    = require('fs').promises;
 const path   = require('path');
+const { log } = require('../services/logger');
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const ENABLE_CHECKSUM = false; // set true to enable SHA-256 post-copy verification
 const MAX_RETRIES     = 1;     // retry a failed copy once before marking as failed
 
-// ── Pause state ───────────────────────────────────────────────────────────────
+// ── Pause state (event-driven — Patch 18) ────────────────────────────────────
 
 let isPaused = false;
+let pauseResolvers = [];
 
 function setPaused(val) {
+  const wasPaused = isPaused;
   isPaused = !!val;
+  if (wasPaused && !isPaused) {
+    const resolvers = pauseResolvers;
+    pauseResolvers = [];
+    resolvers.forEach(r => r());
+  }
 }
 
-async function waitIfPaused() {
-  while (isPaused) {
-    await new Promise(r => setTimeout(r, 100));
-  }
+function waitIfPaused() {
+  if (!isPaused) return Promise.resolve();
+  return new Promise(resolve => pauseResolvers.push(resolve));
+}
+
+// ── Abort state (Patch 32) ────────────────────────────────────────────────────
+
+let isAborted = false;
+
+function abortCopy() {
+  isAborted = true;
+  setPaused(false); // release any paused waiters
 }
 
 // ── Destination type ──────────────────────────────────────────────────────────
@@ -82,19 +98,32 @@ async function buildDestIndex(destFolder) {
         if (stat.isFile()) map.set(name.toLowerCase(), stat.size);
       } catch { /* skip unreadable entries */ }
     }
-  } catch { /* folder does not exist yet — empty map is correct */ }
+  } catch (err) {
+    if (err.code !== 'ENOENT') {
+      log(`buildDestIndex failed: ${destFolder} — ${err.message}`);
+      throw new Error(`Cannot read destination folder: ${err.message}`);
+    }
+    // ENOENT = folder does not exist yet — empty map is correct
+  }
   return map;
 }
 
 // ── Verification ──────────────────────────────────────────────────────────────
 
-async function getFileHash(filePath) {
+function getFileHash(filePath) {
   return new Promise((resolve, reject) => {
     const hash   = crypto.createHash('sha256');
     const stream = fs.createReadStream(filePath);
+    let done = false;
+    const cleanup = () => {
+      if (done) return;
+      done = true;
+      stream.removeAllListeners();
+      stream.destroy();
+    };
     stream.on('data',  chunk => hash.update(chunk));
-    stream.on('end',   ()    => resolve(hash.digest('hex')));
-    stream.on('error', reject);
+    stream.on('end',   ()    => { cleanup(); resolve(hash.digest('hex')); });
+    stream.on('error', err   => { cleanup(); reject(err); });
   });
 }
 
@@ -118,38 +147,46 @@ async function verifyFile(srcPath, destPath, srcSize) {
 
 /**
  * Resolve a non-colliding destination path for `filename` inside `destDir`.
+ * Async version — uses fsp.stat (one syscall, no TOCTOU race). Patch 1.
  *
  * @param {string} destDir
  * @param {string} filename
  * @param {number} sourceSize  bytes of the source file
- * @returns {{ action: 'copy'|'rename'|'skip', destPath: string|null, reason: string|null }}
+ * @returns {Promise<{ action: 'copy'|'rename'|'skip', destPath: string|null, reason: string|null }>}
  */
-function resolveDestPath(destDir, filename, sourceSize) {
+async function resolveDestPath(destDir, filename, sourceSize) {
   const ext       = path.extname(filename);
   const base      = path.basename(filename, ext);
   const candidate = path.join(destDir, filename);
 
-  if (!fs.existsSync(candidate)) {
-    return { action: 'copy', destPath: candidate, reason: null };
+  try {
+    const st = await fsp.stat(candidate);
+    if (st.isFile() && st.size === sourceSize) {
+      return { action: 'skip', destPath: null, reason: 'already exists (same size)' };
+    }
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      return { action: 'copy', destPath: candidate, reason: null };
+    }
+    throw err;
   }
 
-  const existingSize = fs.statSync(candidate).size;
-  if (existingSize === sourceSize) {
-    return { action: 'skip', destPath: null, reason: 'already exists (same size)' };
-  }
-
-  let n = 1;
-  while (true) {
+  const MAX_RENAME_ATTEMPTS = 9999;
+  for (let n = 1; n <= MAX_RENAME_ATTEMPTS; n++) {
     const numbered = path.join(destDir, `${base}_${n}${ext}`);
-    if (!fs.existsSync(numbered)) {
-      return { action: 'rename', destPath: numbered, reason: `renamed to _${n} (name conflict)` };
+    try {
+      const st = await fsp.stat(numbered);
+      if (st.isFile() && st.size === sourceSize) {
+        return { action: 'skip', destPath: null, reason: 'already exists (same size, renamed copy)' };
+      }
+    } catch (err) {
+      if (err.code === 'ENOENT') {
+        return { action: 'rename', destPath: numbered, reason: `renamed to _${n} (name conflict)` };
+      }
+      throw err;
     }
-    const numberedSize = fs.statSync(numbered).size;
-    if (numberedSize === sourceSize) {
-      return { action: 'skip', destPath: null, reason: 'already exists (same size, renamed copy)' };
-    }
-    n++;
   }
+  throw new Error(`Could not find free rename slot for ${filename} after ${MAX_RENAME_ATTEMPTS} attempts`);
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -170,7 +207,8 @@ function resolveDestPath(destDir, filename, sourceSize) {
 async function copyFiles(filePaths, destination, onProgress) {
   await fsp.mkdir(destination, { recursive: true });
 
-  isPaused = false; // always start fresh
+  isPaused  = false; // always start fresh
+  isAborted = false; // always start fresh
 
   const total = filePaths.length;
   if (total === 0) {
@@ -242,10 +280,12 @@ async function copyFiles(filePaths, destination, onProgress) {
 
   // ── Per-file processor (pause + stat + resume-check + copy + verify + retry) ──
   async function processFile(srcPath, origIndex) {
+    if (isAborted) return; // Patch 32: abort check
     await waitIfPaused();
+    if (isAborted) return; // Patch 32: abort check after pause
 
     const filename = path.basename(srcPath);
-    onProgress({ total, index: origIndex + 1, completedCount, filename, status: 'copying', eta: null, speedBps: 0 });
+    onProgress({ total, index: origIndex + 1, completedCount, filename, status: 'copying', eta: null, speedBps: 0, fileSize: 0 });
 
     // ── Stat source ──────────────────────────────────────────────────────────────
     let srcStat;
@@ -256,7 +296,7 @@ async function copyFiles(filePaths, destination, onProgress) {
       completedCount++;
       const { eta, speedBps } = getSpeedAndEta();
       onProgress({ total, index: origIndex + 1, completedCount, filename,
-                   status: 'error', error: 'Source file not found or inaccessible', eta, speedBps });
+                   status: 'error', error: 'Source file not found or inaccessible', eta, speedBps, fileSize: 0 });
       return;
     }
 
@@ -270,12 +310,23 @@ async function copyFiles(filePaths, destination, onProgress) {
       skippedReasons.push(`Skipped: ${filename} — already exists (same size)`);
       const { eta, speedBps } = getSpeedAndEta();
       onProgress({ total, index: origIndex + 1, completedCount, filename,
-                   status: 'skipped', skipReason: 'already exists (same size)', eta, speedBps });
+                   status: 'skipped', skipReason: 'already exists (same size)', eta, speedBps, fileSize });
       return;
     }
 
-    // ── Resolve destination path (handles rename for size-conflict) ───────────────
-    const resolved = resolveDestPath(destination, filename, fileSize);
+    // ── Resolve destination path (handles rename for size-conflict) — Patch 2 ─────
+    let resolved;
+    try {
+      resolved = await resolveDestPath(destination, filename, fileSize);
+    } catch (err) {
+      errors++;
+      completedCount++;
+      failedFiles.push({ filename, reason: err.message });
+      const { eta, speedBps } = getSpeedAndEta();
+      onProgress({ total, index: origIndex + 1, completedCount, filename,
+                   status: 'error', error: err.message, eta, speedBps, fileSize: 0 });
+      return;
+    }
 
     if (resolved.action === 'skip') {
       skipped++;
@@ -284,13 +335,14 @@ async function copyFiles(filePaths, destination, onProgress) {
       skippedReasons.push(`Skipped: ${filename} — ${resolved.reason}`);
       const { eta, speedBps } = getSpeedAndEta();
       onProgress({ total, index: origIndex + 1, completedCount, filename,
-                   status: 'skipped', skipReason: resolved.reason, eta, speedBps });
+                   status: 'skipped', skipReason: resolved.reason, eta, speedBps, fileSize });
       return;
     }
 
     // ── Copy + verify with retry ──────────────────────────────────────────────────
     let lastError;
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      if (isAborted) return; // Patch 32: abort check before each attempt
       try {
         // Measure raw copy time (excludes pause, stat overhead)
         const copyStart = Date.now();
@@ -319,10 +371,10 @@ async function copyFiles(filePaths, destination, onProgress) {
         if (resolved.action === 'rename') {
           skippedReasons.push(`Renamed: ${filename} — ${resolved.reason}`);
           onProgress({ total, index: origIndex + 1, completedCount, filename,
-                       status: 'renamed', skipReason: resolved.reason, eta, speedBps });
+                       status: 'renamed', skipReason: resolved.reason, eta, speedBps, fileSize });
         } else {
           onProgress({ total, index: origIndex + 1, completedCount, filename,
-                       status: 'done', eta, speedBps });
+                       status: 'done', eta, speedBps, fileSize });
         }
         return; // ← exit retry loop on success
 
@@ -334,13 +386,14 @@ async function copyFiles(filePaths, destination, onProgress) {
       }
     }
 
-    // ── All retries exhausted ─────────────────────────────────────────────────────
+    // ── All retries exhausted — Patch 4: null-safe lastError ─────────────────────
     errors++;
     completedCount++;
-    failedFiles.push({ filename, reason: lastError.message });
+    const lastErrMsg = (lastError && lastError.message) || 'Unknown copy failure';
+    failedFiles.push({ filename, reason: lastErrMsg });
     const { eta, speedBps } = getSpeedAndEta();
     onProgress({ total, index: origIndex + 1, completedCount, filename,
-                 status: 'error', error: lastError.message, eta, speedBps });
+                 status: 'error', error: lastErrMsg, eta, speedBps, fileSize });
   }
 
   // ── Adaptive push queue ───────────────────────────────────────────────────────
@@ -352,6 +405,10 @@ async function copyFiles(filePaths, destination, onProgress) {
 
     function next() {
       if (queueIndex >= total && active === 0) {
+        // Patch 3: accounting invariant check
+        if (copied + skipped + errors !== total) {
+          log(`[copyFiles] accounting drift: copied=${copied} skipped=${skipped} errors=${errors} total=${total}`);
+        }
         resolve({ copied, skipped, errors, skippedReasons, failedFiles, copiedFiles, duration: Date.now() - startTime });
         return;
       }
@@ -373,4 +430,4 @@ async function copyFiles(filePaths, destination, onProgress) {
   });
 }
 
-module.exports = { copyFiles, resolveDestPath, setPaused, getFileHash };
+module.exports = { copyFiles, resolveDestPath, setPaused, getFileHash, abortCopy };

@@ -3,10 +3,10 @@ const path = require('path');
 const os   = require('os');
 const fs   = require('fs');
 const fsp  = require('fs').promises;
-const { exec } = require('child_process');
+const { exec, execFile } = require('child_process');
 const { detectMemoryCards }          = require('./driveDetector');
 const { readDirectory, getDCIMPath, scanPrivateFolder, safeExists } = require('./fileBrowser');
-const { copyFiles, setPaused, getFileHash } = require('./fileManager');
+const { copyFiles, setPaused, getFileHash, abortCopy } = require('./fileManager');
 const { getThumbnail, shutdownWorkers } = require('../services/thumbnailer');
 const { log } = require('../services/logger');
 const telemetry     = require('../services/telemetry');
@@ -51,11 +51,14 @@ function loadImportIndex() {
   }
 }
 
-function saveImportIndex() {
+async function saveImportIndex() {
+  const tmp = IMPORT_INDEX_PATH + '.tmp';
   try {
-    fs.writeFileSync(IMPORT_INDEX_PATH, JSON.stringify(importIndex), 'utf8');
+    await fsp.writeFile(tmp, JSON.stringify(importIndex), 'utf8');
+    await fsp.rename(tmp, IMPORT_INDEX_PATH);
   } catch (err) {
     log(`importIndex save failed: ${err.message}`);
+    try { await fsp.unlink(tmp); } catch {}
   }
 }
 
@@ -101,7 +104,7 @@ async function updateImportIndex(filePaths, destPath) {
   }
   if (changed) {
     trimImportIndex();
-    saveImportIndex();
+    await saveImportIndex();
   }
 }
 
@@ -174,48 +177,67 @@ process.on('unhandledRejection', (reason) => {
 
 // ── IPC Handlers ──────────────────────────────────────────────────────────────
 
+// Patch 22: request-id tracking per sender
+const activeFileRequests = new Map();
+
 // Drive list (on-demand)
 ipcMain.handle('drives:get', async () => detectMemoryCards());
 
 ipcMain.handle('drive:eject', async (event, mountpoint) => {
-  const platform       = process.platform;
-  const safeMountpoint = path.normalize(mountpoint);
+  // Patch 21: input validation + execFile with array args (no shell injection)
+  if (typeof mountpoint !== 'string' || mountpoint.length > 260) {
+    throw new Error('Invalid mountpoint');
+  }
 
-  log(`Eject requested: ${safeMountpoint}`);
+  const cards = await detectMemoryCards();
+  if (!cards.some(c => c.mountpoint === mountpoint)) {
+    throw new Error('Mountpoint is not a known card');
+  }
 
-  const run = (cmd) => new Promise((resolve, reject) => {
-    exec(cmd, (err) => { if (err) reject(err); else resolve(true); });
+  const run = (cmd, args) => new Promise((resolve, reject) => {
+    execFile(cmd, args, (err) => err ? reject(err) : resolve(true));
   });
+
+  const platform = process.platform;
+  const safe     = path.normalize(mountpoint);
+  log(`Eject requested: ${safe}`);
+
+  // Patch 28: clear any pending thumb watchdog timers before unmounting
+  perf.clearThumbTimers();
 
   try {
     if (platform === 'darwin') {
-      try {
-        await run(`diskutil eject "${safeMountpoint}"`);
-      } catch {
-        await run(`diskutil unmount "${safeMountpoint}"`);
-      }
+      if (!/^\/Volumes\/[^'"`$;&|]+\/?$/.test(safe)) throw new Error('Unsafe path');
+      try { await run('diskutil', ['eject', safe]); }
+      catch { await run('diskutil', ['unmount', safe]); }
     } else if (platform === 'win32') {
-      const driveLetter = safeMountpoint.replace(/\\$/, '');
-      await run(`powershell -Command "Remove-Volume -DriveLetter ${driveLetter[0]}"`);
+      const m = safe.match(/^([A-Z]):[\\/]*$/i);
+      if (!m) throw new Error('Invalid Windows drive letter');
+      await run('powershell', ['-Command', `Remove-Volume -DriveLetter ${m[1]} -Confirm:$false`]);
     } else {
-      await run(`udisksctl unmount -b "${safeMountpoint}"`);
+      if (!/^[/\w.\-]+$/.test(safe)) throw new Error('Unsafe path');
+      await run('udisksctl', ['unmount', '-b', safe]);
     }
 
-    log(`Eject success: ${safeMountpoint}`);
+    log(`Eject success: ${safe}`);
     return true;
 
   } catch (err) {
-    log(`Eject failed: ${safeMountpoint} | ${err.message}`);
+    log(`Eject failed: ${safe} | ${err.message}`);
     throw err;
   }
 });
 
 // File browser
 ipcMain.handle('files:get', async (event, { drivePath, folderPath, requestId }) => {
+  const senderId = event.sender.id;
+  activeFileRequests.set(senderId, requestId); // Patch 22: track active request per sender
+
   const dcimPath = getDCIMPath(drivePath);
   if (!dcimPath) throw new Error(`No DCIM folder found on drive: ${drivePath}`);
   const targetPath = folderPath || dcimPath;
   const { folders, files } = await readDirectory(targetPath, (batch) => {
+    if (activeFileRequests.get(senderId) !== requestId) return; // Patch 22: superseded request
     if (!event.sender.isDestroyed()) {
       event.sender.send('files:batch', {
         requestId,
@@ -248,6 +270,11 @@ ipcMain.handle('files:get', async (event, { drivePath, folderPath, requestId }) 
   // sort here costs <1 ms and guarantees consistent order for every path.
   allFiles.sort((a, b) => new Date(b.modifiedAt) - new Date(a.modifiedAt));
 
+  // Patch 22: if a newer request arrived while we were scanning, return empty
+  if (activeFileRequests.get(senderId) !== requestId) {
+    return { dcimPath, folderPath: targetPath, folders: [], files: [] };
+  }
+
   return { dcimPath, folderPath: targetPath, folders, files: allFiles };
 });
 
@@ -266,15 +293,22 @@ ipcMain.handle('dest:choose', async () => {
 
 /**
  * dest:scanFiles — async, non-blocking scan of destination folder.
- * Returns { filename: sizeBytes } map, or {} if folder doesn't exist yet.
+ * Returns { filename: sizeBytes } map filtered to known media extensions.
+ * Patch 17: filters to known media extensions only.
  */
 ipcMain.handle('dest:scanFiles', async (_event, destPath) => {
   const result = {};
   try {
+    const config = require('../config/app.config');
+    const knownExts = new Set([
+      ...config.PHOTO_EXTENSIONS,
+      ...config.VIDEO_EXTENSIONS,
+    ]);
     const entries = await fsp.readdir(destPath, { withFileTypes: true });
     await Promise.all(
       entries
         .filter(e => e.isFile())
+        .filter(e => knownExts.has(path.extname(e.name).toLowerCase()))
         .map(async (entry) => {
           try {
             const stat = await fsp.stat(path.join(destPath, entry.name));
@@ -309,8 +343,7 @@ ipcMain.handle('files:import', async (event, { filePaths, destination }) => {
     }
     // Track bytes for speed sampling (status 'done' or 'renamed' = file was copied)
     if (progress.status === 'done' || progress.status === 'renamed') {
-      const f = filePaths[progress.index - 1];
-      try { bytesCopiedSoFar += require('fs').statSync(f).size; } catch {}
+      bytesCopiedSoFar += progress.fileSize || 0;
       fileIndex++;
       // Sample speed every 10 copied files
       if (fileIndex % 10 === 0) {
@@ -371,17 +404,26 @@ ipcMain.handle('thumb:get', async (_event, srcPath) => {
 // Legacy ping
 ipcMain.handle('ping', async () => 'pong 🏓');
 
-// Pause / Resume copy pipeline
+// Pause / Resume / Abort copy pipeline
 ipcMain.on('copy:pause',  () => setPaused(true));
 ipcMain.on('copy:resume', () => setPaused(false));
+ipcMain.on('copy:abort',  () => {
+  log('Copy abort requested');
+  abortCopy();
+});
 
 // Global import index — returns { lowercaseFilename: { size, addedAt } }
 ipcMain.handle('importIndex:get', async () => importIndex);
+
+// Patch 12: cancellable checksum
+let checksumCancelled = false;
+ipcMain.on('checksum:cancel', () => { checksumCancelled = true; });
 
 // Optional post-import checksum verification (user-triggered, runs in background).
 // Compares SHA-256 of each copied file's source against its destination.
 // Sends 'checksum:progress' after each file and 'checksum:complete' when done.
 ipcMain.handle('checksum:run', async () => {
+  checksumCancelled = false; // reset at start
   const win   = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
   const total = lastImportedFiles.length;
   let completed = 0;
@@ -389,6 +431,7 @@ ipcMain.handle('checksum:run', async () => {
   const failures = [];
 
   for (const file of lastImportedFiles) {
+    if (checksumCancelled) break; // Patch 12: bail on cancel
     try {
       const srcHash  = await getFileHash(file.src);
       const destHash = await getFileHash(file.dest);
@@ -416,6 +459,9 @@ ipcMain.handle('checksum:run', async () => {
 
 // What's New — returns { version, notes } once after an update, then null
 ipcMain.handle('getLastUpdateInfo', () => storedUpdateInfo);
+
+// Patch 44: expose last update state for renderer replay after window reload
+ipcMain.handle('update:getLastState', () => autoUpdater.getLastUpdateState());
 
 // ── Feedback: active user reports from the in-app modal ──────────────────────
 ipcMain.handle('feedback:send', async (_evt, opts) => {

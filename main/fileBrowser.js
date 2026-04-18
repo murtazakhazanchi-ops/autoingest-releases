@@ -164,25 +164,25 @@ async function scanPrivateFolder(privatePath) {
     let entries;
     try { entries = await fsp.readdir(candidate); } catch { continue; }
 
-    for (const file of entries) {
-      if (isJunkFile(file)) continue;
-      const ext = getExt(file);
-      if (!VIDEO_EXTS.has(ext)) continue;
-
-      const fullPath = path.join(candidate, file);
-      const stat     = await safeStat(fullPath);
-      if (!stat) continue;
-      if (stat.size <= 500 * 1024) continue;  // skip XML, proxy, and metadata stubs
-
-      results.push({
-        name:       file,
-        path:       fullPath,
-        type:       'video',
-        size:       stat.size,
-        modifiedAt: stat.mtime.toISOString(),
-        source:     'private',
-      });
-    }
+    // Patch 20: parallelize per-file stat calls within each candidate directory
+    const candidateFiles = await Promise.all(
+      entries
+        .filter(file => !isJunkFile(file) && VIDEO_EXTS.has(getExt(file)))
+        .map(async file => {
+          const fullPath = path.join(candidate, file);
+          const stat     = await safeStat(fullPath);
+          if (!stat || stat.size <= 500 * 1024) return null;
+          return {
+            name:       file,
+            path:       fullPath,
+            type:       'video',
+            size:       stat.size,
+            modifiedAt: stat.mtime.toISOString(),
+            source:     'private',
+          };
+        })
+    );
+    results.push(...candidateFiles.filter(Boolean));
   }
 
   return results;

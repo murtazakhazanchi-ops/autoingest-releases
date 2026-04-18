@@ -3,6 +3,26 @@
 
 const { contextBridge, ipcRenderer } = require('electron');
 
+// Patch 50: centralized listener tracking for clean teardown on reload
+const _renderListeners = new Map();
+
+function _register(channel, wrapped) {
+  if (!_renderListeners.has(channel)) _renderListeners.set(channel, new Set());
+  _renderListeners.get(channel).add(wrapped);
+  ipcRenderer.on(channel, wrapped);
+  return () => {
+    ipcRenderer.removeListener(channel, wrapped);
+    _renderListeners.get(channel)?.delete(wrapped);
+  };
+}
+
+window.addEventListener('beforeunload', () => {
+  for (const [channel, listeners] of _renderListeners) {
+    for (const l of listeners) ipcRenderer.removeListener(channel, l);
+  }
+  _renderListeners.clear();
+});
+
 // ── Generic low-level bridge (backwards compatibility) ────────────────────────
 contextBridge.exposeInMainWorld('electronAPI', {
   sendMessage: (channel, data) => ipcRenderer.send(channel, data),
@@ -46,16 +66,12 @@ contextBridge.exposeInMainWorld('api', {
   // ── Drives ──
   getDrives:       () => ipcRenderer.invoke('drives:get'),
   ejectDrive:      (mountpoint) => ipcRenderer.invoke('drive:eject', mountpoint),
-  onDrivesUpdated: (cb) => ipcRenderer.on('drives:updated', (_e, cards) => cb(cards)),
+  onDrivesUpdated: (cb) => _register('drives:updated', (_e, cards) => cb(cards)),
 
   // ── File browser ──
   getFiles: (drivePath, folderPath = null, requestId = null) =>
     ipcRenderer.invoke('files:get', { drivePath, folderPath, requestId }),
-  onFilesBatch: (cb) => {
-    const listener = (_e, batch) => cb(batch);
-    ipcRenderer.on('files:batch', listener);
-    return () => ipcRenderer.removeListener('files:batch', listener);
-  },
+  onFilesBatch: (cb) => _register('files:batch', (_e, batch) => cb(batch)),
 
   // ── Destination ──
   getDefaultDest: () => ipcRenderer.invoke('dest:getDefault'),
@@ -75,11 +91,11 @@ contextBridge.exposeInMainWorld('api', {
   importFiles: (filePaths, destination) =>
     ipcRenderer.invoke('files:import', { filePaths, destination }),
 
-  onImportProgress: (cb) =>
-    ipcRenderer.on('import:progress', (_e, progress) => cb(progress)),
+  onImportProgress: (cb) => _register('import:progress', (_e, progress) => cb(progress)),
 
   pauseCopy:  () => ipcRenderer.send('copy:pause'),
   resumeCopy: () => ipcRenderer.send('copy:resume'),
+  abortCopy:  () => ipcRenderer.send('copy:abort'),
 
   /**
    * Returns a URL for a small cached thumbnail (max 160px, JPEG 50%).
@@ -101,9 +117,9 @@ contextBridge.exposeInMainWorld('api', {
   sendFeedback: (opts) => ipcRenderer.invoke('feedback:send', opts),
 
 // ── Auto-update ──
-  onUpdateAvailable: (cb) => ipcRenderer.on('update:available', (_e, info) => cb(info)),
-  onUpdateProgress:  (cb) => ipcRenderer.on('update:progress',  (_e, info) => cb(info)),
-  onUpdateReady:     (cb) => ipcRenderer.on('update:ready',     (_e, info) => cb(info)),
+  onUpdateAvailable: (cb) => _register('update:available', (_e, info) => cb(info)),
+  onUpdateProgress:  (cb) => _register('update:progress',  (_e, info) => cb(info)),
+  onUpdateReady:     (cb) => _register('update:ready',     (_e, info) => cb(info)),
   installUpdate:     ()   => ipcRenderer.send('update:install'),
 
   // ── Global import index ──
@@ -111,10 +127,14 @@ contextBridge.exposeInMainWorld('api', {
 
   // ── Checksum verification ──
   runChecksumVerification: () => ipcRenderer.invoke('checksum:run'),
-  onChecksumProgress: (cb) => ipcRenderer.on('checksum:progress', (_e, data) => cb(data)),
-  onChecksumComplete: (cb) => ipcRenderer.on('checksum:complete', (_e, data) => cb(data)),
+  cancelChecksum: () => ipcRenderer.send('checksum:cancel'),
+  onChecksumProgress: (cb) => _register('checksum:progress', (_e, data) => cb(data)),
+  onChecksumComplete: (cb) => _register('checksum:complete', (_e, data) => cb(data)),
 
   // ── What's New ──
   getLastUpdateInfo: () => ipcRenderer.invoke('getLastUpdateInfo'),
+
+  // ── Update state replay (Patch 45) ──
+  getLastUpdateState: () => ipcRenderer.invoke('update:getLastState'),
 
 });

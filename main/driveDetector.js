@@ -4,6 +4,9 @@
  * Uses `drivelist` to enumerate all mounted drives, then checks each
  * mount point for a DCIM folder — the standard directory written by
  * cameras and camera phones. Returns only drives that pass that test.
+ *
+ * Patch 37: async hasDCIM (fsp.stat instead of existsSync/statSync) +
+ *           4-second drivelist timeout to prevent polling hangs.
  */
 
 const drivelist = require('drivelist');
@@ -16,16 +19,22 @@ const DCIM_DIR = 'DCIM';
 /**
  * Returns true when the given mount point contains a DCIM folder.
  * @param {string} mountpoint - Absolute path of the mounted volume.
- * @returns {boolean}
+ * @returns {Promise<boolean>}
  */
-function hasDCIM(mountpoint) {
+async function hasDCIM(mountpoint) {
   try {
-    const dcimPath = path.join(mountpoint, DCIM_DIR);
-    return fs.existsSync(dcimPath) && fs.statSync(dcimPath).isDirectory();
+    const st = await fs.promises.stat(path.join(mountpoint, DCIM_DIR));
+    return st.isDirectory();
   } catch {
-    // No read access or path doesn't exist — not a memory card
     return false;
   }
+}
+
+function withTimeout(promise, ms, fallback) {
+  return Promise.race([
+    promise,
+    new Promise((_, rej) => setTimeout(() => rej(new Error('drivelist timeout')), ms))
+  ]).catch(() => fallback);
 }
 
 /**
@@ -35,25 +44,23 @@ function hasDCIM(mountpoint) {
  * @returns {Promise<Array<{ label: string, mountpoint: string }>>}
  */
 async function detectMemoryCards() {
-  const drives = await drivelist.list();
-  const cards  = [];
+  const drives = await withTimeout(drivelist.list(), 4000, []);
+  const checks = [];
 
   for (const drive of drives) {
-    // A drive can expose multiple mountpoints (e.g. partitions)
     for (const mp of drive.mountpoints) {
       if (!mp.path) continue;
-
-      if (hasDCIM(mp.path)) {
-        cards.push({
-          // Use the volume label when available, fall back to a tidy default
+      checks.push(
+        hasDCIM(mp.path).then(ok => ok ? {
           label:      mp.label || drive.description || 'Unnamed Drive',
-          mountpoint: mp.path
-        });
-      }
+          mountpoint: mp.path,
+        } : null)
+      );
     }
   }
 
-  return cards;
+  const results = await Promise.all(checks);
+  return results.filter(Boolean);
 }
 
 module.exports = { detectMemoryCards };
