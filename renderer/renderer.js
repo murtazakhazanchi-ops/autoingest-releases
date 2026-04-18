@@ -65,6 +65,10 @@ let activeFolderPath = null;
 let expandedFolders   = new Set();
 let dcimChildrenCache = [];   // DCIM's immediate subfolders (cached so they stay visible)
 let cachedDcimPath    = null; // DCIM root path, null until first drive load
+
+// Commit 6 (v0.6.0): folder tree object from files:get. Nested node.
+// Batches do NOT mutate this. Populated only on final browseFolder result.
+let currentFolderTree = null;
 let selectedFiles    = new Set();   // absolute source paths — selection truth
 let currentFiles     = [];          // flat list of all files in current folder
 let sortKey          = 'date';
@@ -1515,19 +1519,22 @@ function updateSelectionBar() {
 // ════════════════════════════════════════════════════════════════
 // BROWSE
 // ════════════════════════════════════════════════════════════════
-function updateFileStatus(files, folders, processed = null, total = null) {
+function updateFileStatus(files, processed = null, total = null) {
+  // Commit 6: folder count comes from currentFolderTree (top-level children).
+  const folderCount = (currentFolderTree && Array.isArray(currentFolderTree.children))
+    ? currentFolderTree.children.length : 0;
   const raw   = files.filter(f => f.type === 'raw').length;
   const photo = files.filter(f => f.type === 'photo').length;
   const video = files.filter(f => f.type === 'video').length;
   const loading = total !== null && processed !== null && processed < total;
 
   document.getElementById('statusFiles').textContent =
-    `${files.length} files` +
-    (raw   ? ` · ${raw} RAW`   : '') +
-    (photo ? ` · ${photo} img` : '') +
-    (video ? ` · ${video} vid` : '') +
-    ` · ${folders.length} folder${folders.length !== 1 ? 's' : ''}` +
-    (loading ? ` · loading ${processed}/${total}` : '');
+    files.length + ' files' +
+    (raw   ? ' \u00b7 ' + raw + ' RAW'   : '') +
+    (photo ? ' \u00b7 ' + photo + ' img' : '') +
+    (video ? ' \u00b7 ' + video + ' vid' : '') +
+    ' \u00b7 ' + folderCount + ' folder' + (folderCount !== 1 ? 's' : '') +
+    (loading ? ' \u00b7 loading ' + processed + '/' + total : '');
 }
 
 function applyFileBatch(batch) {
@@ -1535,7 +1542,13 @@ function applyFileBatch(batch) {
 
   document.getElementById('breadcrumb').textContent = batch.folderPath;
   activeFolderPath = batch.folderPath;
-  renderFolders(batch.folders, batch.dcimPath);
+  // Commit 6: batches pass folders=null (no tree change). Sidebar only updates on final result.
+  if (batch.folders !== null && batch.folders !== undefined) {
+    const list = Array.isArray(batch.folders)
+      ? batch.folders
+      : (batch.folders && batch.folders.children ? batch.folders.children : []);
+    renderFolders(list, batch.dcimPath);
+  }
 
   const seen = new Set(currentFiles.map(f => f.path));
   batch.files.forEach(file => {
@@ -1549,7 +1562,7 @@ function applyFileBatch(batch) {
   updateSelectionBar();
   updateSortButtons();
   updateSteps();
-  updateFileStatus(currentFiles, batch.folders, batch.processed, batch.total);
+  updateFileStatus(currentFiles, batch.processed, batch.total);
 }
 
 async function browseFolder(drivePath, folderPath) {
@@ -1572,7 +1585,12 @@ async function browseFolder(drivePath, folderPath) {
 
     document.getElementById('breadcrumb').textContent = result.folderPath;
     activeFolderPath = result.folderPath;
-    renderFolders(result.folders, result.dcimPath);
+    // Commit 6: result.folders is a tree node {name, path, children, files}.
+    currentFolderTree = (result.folders && typeof result.folders === 'object' && !Array.isArray(result.folders))
+      ? result.folders : null;
+    // Sidebar still consumes a flat list of {name, path}: pass tree.children.
+    const sidebarFolders = currentFolderTree ? currentFolderTree.children : (Array.isArray(result.folders) ? result.folders : []);
+    renderFolders(sidebarFolders, result.dcimPath);
     document.querySelectorAll('.folder-item').forEach(item =>
       item.classList.toggle('active', item.dataset.path === result.folderPath));
 
@@ -1592,7 +1610,7 @@ async function browseFolder(drivePath, folderPath) {
       renderFileArea(currentFiles);
     }
     updateSelectionBar(); updateSortButtons(); updateSteps();
-    updateFileStatus(currentFiles, result.folders);
+    updateFileStatus(currentFiles);
 
   } catch (err) {
     if (requestId !== fileLoadRequestId) return;

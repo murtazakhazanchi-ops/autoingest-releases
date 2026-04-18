@@ -5,7 +5,7 @@ const fs   = require('fs');
 const fsp  = require('fs').promises;
 const { exec, execFile } = require('child_process');
 const { detectMemoryCards }          = require('./driveDetector');
-const { readDirectory, getDCIMPath, scanPrivateFolder, safeExists, scanMediaRecursive } = require('./fileBrowser');
+const { readDirectory, getDCIMPath, scanPrivateFolder, safeExists, scanMediaRecursive, buildFolderTree } = require('./fileBrowser');
 const { copyFiles, setPaused, getFileHash, abortCopy } = require('./fileManager');
 const { getThumbnail, shutdownWorkers } = require('../services/thumbnailer');
 const { log } = require('../services/logger');
@@ -251,7 +251,7 @@ ipcMain.handle('files:get', async (event, { drivePath, folderPath, requestId }) 
       requestId,
       dcimPath:   dcimPathForUI,
       folderPath: targetPath,
-      folders:    [],
+      folders:    null,          // Commit 6: null = "no tree update"; real tree ships in final return
       files:      batch.files,
       processed:  batch.processed,
       total:      batch.total,
@@ -266,7 +266,9 @@ ipcMain.handle('files:get', async (event, { drivePath, folderPath, requestId }) 
     return { dcimPath: dcimPathForUI, folderPath: targetPath, folders: [], files: [] };
   }
 
-  return { dcimPath: dcimPathForUI, folderPath: targetPath, folders: [], files };
+  // Commit 6: build folder tree once from the complete file list and ship it.
+  const folderTree = buildFolderTree(files);
+  return { dcimPath: dcimPathForUI, folderPath: targetPath, folders: folderTree, files };
 });
 
 // Default destination path
