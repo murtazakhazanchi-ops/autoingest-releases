@@ -1558,15 +1558,12 @@ async function browseFolder(drivePath, folderPath) {
   selectedFiles.clear(); currentFiles = []; lastClickedPath = null;
   resetViewCache();
 
-  // folderPath === null means this is an auto-browse called from selectDrive to
-  // populate the sidebar — it must NOT touch the file area (which shows
-  // "Select a folder to begin"). Only a real user folder selection drives the
-  // file area state.
-  const isUserFolderSelection = folderPath !== null;
+  // Commit 3 (v0.6.0): folderPath === null is now a valid user-visible browse.
+  // selectDrive calls browseFolder(drive, null) which triggers a full-card recursive scan;
+  // the resulting file list must be rendered. Treat every browseFolder call as user-facing.
+  const isUserFolderSelection = true;
+  currentFolder = folderPath || drivePath;
 
-  if (isUserFolderSelection) {
-    currentFolder = folderPath;
-  }
   updateSelectionBar(); updateSteps();
 
   try {

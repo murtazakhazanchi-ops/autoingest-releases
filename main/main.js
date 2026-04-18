@@ -233,67 +233,40 @@ ipcMain.handle('files:get', async (event, { drivePath, folderPath, requestId }) 
   const senderId = event.sender.id;
   activeFileRequests.set(senderId, requestId); // Patch 22: track active request per sender
 
-  const dcimPath = getDCIMPath(drivePath);
-  if (!dcimPath) throw new Error(`No DCIM folder found on drive: ${drivePath}`);
-  const targetPath = folderPath || dcimPath;
+  // -- Commit 3 (v0.6.0): full-card recursive scan.
+  // Replaces getDCIMPath + readDirectory + scanPrivateFolder.
+  // scanMediaRecursive walks the tree from targetPath, filters to media, bat-ches stats,
+  // and naturally covers Sony PRIVATE/M4ROOT/CLIP, AVCHD/STREAM, any user-created subdirs.
+  const targetPath = folderPath || drivePath;
 
-  // ── Commit 2 (TEMPORARY): isolation test for scanMediaRecursive.
-  // Runs only on root browse, logs to main-process log, does NOT change return value.
-  // Remove after verifying output in Commit 3.
-  if (!folderPath) {
-    (async () => {
-      try {
-        const t0 = Date.now();
-        const recursive = await scanMediaRecursive(drivePath);
-        const dt = Date.now() - t0;
-        log(`[SCAN-TEST] scanMediaRecursive(${drivePath}) -> ${recursive.length} files in ${dt}ms`);
-        recursive.slice(0, 5).forEach(f => log(`  ${f.path} (${f.type}, ${f.size} bytes)`));
-      } catch (err) {
-        log(`[SCAN-TEST] scanMediaRecursive failed: ${err.message}`);
-      }
-    })();
-  }
+  // dcimPathForUI: anchor value the renderer still consumes for breadcrumb + sidebar.
+  // Until Commit 6 builds a real folder tree, we return the drive mountpoint so the
+  // renderer has a stable non-null root. Folders list is empty in Commits 3-5.
+  const dcimPathForUI = drivePath;
 
-  const { folders, files } = await readDirectory(targetPath, (batch) => {
-    if (activeFileRequests.get(senderId) !== requestId) return; // Patch 22: superseded request
-    if (!event.sender.isDestroyed()) {
-      event.sender.send('files:batch', {
-        requestId,
-        dcimPath,
-        folderPath: targetPath,
-        folders: batch.folders,
-        files: batch.files,
-        processed: batch.processed,
-        total: batch.total
-      });
-    }
+  const files = await scanMediaRecursive(targetPath, (batch) => {
+    if (activeFileRequests.get(senderId) !== requestId) return; // Patch 22: superseded
+    if (event.sender.isDestroyed()) return;
+    event.sender.send('files:batch', {
+      requestId,
+      dcimPath:   dcimPathForUI,
+      folderPath: targetPath,
+      folders:    [],
+      files:      batch.files,
+      processed:  batch.processed,
+      total:      batch.total,
+    });
   });
 
-  // Merge Sony PRIVATE folder videos when browsing a drive root or the DCIM root
-  let allFiles = files;
-  const isBrowsingDcimRoot = !folderPath || folderPath === dcimPath;
-  if (isBrowsingDcimRoot) {
-    const privatePath = path.join(drivePath, 'PRIVATE');
-    if (await safeExists(privatePath)) {
-      const privateFiles = await scanPrivateFolder(privatePath);
-      // Deduplicate by path — PRIVATE files are a separate tree, no overlap expected
-      const seenPaths = new Set(files.map(f => f.path));
-      const newFiles  = privateFiles.filter(f => !seenPaths.has(f.path));
-      allFiles = [...files, ...newFiles];
-    }
-  }
+  // Sort newest-first (renderer pair/timeline logic assumes this).
+  files.sort((a, b) => new Date(b.modifiedAt) - new Date(a.modifiedAt));
 
-  // Always sort the final list newest-first, regardless of source.
-  // DCIM-only lists are pre-sorted by readDirectory, but a second stable
-  // sort here costs <1 ms and guarantees consistent order for every path.
-  allFiles.sort((a, b) => new Date(b.modifiedAt) - new Date(a.modifiedAt));
-
-  // Patch 22: if a newer request arrived while we were scanning, return empty
+  // Patch 22: if a newer request arrived during the scan, return empty.
   if (activeFileRequests.get(senderId) !== requestId) {
-    return { dcimPath, folderPath: targetPath, folders: [], files: [] };
+    return { dcimPath: dcimPathForUI, folderPath: targetPath, folders: [], files: [] };
   }
 
-  return { dcimPath, folderPath: targetPath, folders, files: allFiles };
+  return { dcimPath: dcimPathForUI, folderPath: targetPath, folders: [], files };
 });
 
 // Default destination path
