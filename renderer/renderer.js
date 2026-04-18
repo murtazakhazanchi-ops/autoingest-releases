@@ -1214,79 +1214,28 @@ function folderCounts(node) {
   return { total, raw, photo, video };
 }
 
+// Commit 11c (v0.6.0): folder-view root state.
+// Navigation happens exclusively through the sidebar tree; the right side
+// never shows clickable folder cards. When no folder is selected, show an
+// instruction panel pointing users to the sidebar.
 function renderFolderOnly() {
   const area = document.getElementById('fileGrid');
   if (!area) return;
   area.onscroll = null;
   area.className = '';
 
-  // Pick the node: root tree at top, or drilled node when inside a folder.
-  let node = currentFolderTree;
-  if (!currentFolderContext.isRoot && currentFolderContext.path) {
-    const drilled = findNodeByPath(currentFolderTree, currentFolderContext.path);
-    if (drilled) node = drilled;
-  }
-
-  const hasSubfolders  = node && node.children && node.children.length > 0;
-  const hasDirectFiles = node && node.files    && node.files.length    > 0;
-
-  if (!node || (!hasSubfolders && !hasDirectFiles)) {
-    area.innerHTML = '<div class="panel-state"><span class="state-icon">📁</span><span>No folders found on this card</span></div>';
+  if (!currentFolderTree) {
+    area.innerHTML = '<div class="panel-state"><span class="state-icon">📁</span><span>No card loaded</span></div>';
     updateSelectionBar();
     return;
   }
 
-  // Folder cards (if this node has subfolders).
-  let foldersHtml = '';
-  if (hasSubfolders) {
-    const cards = node.children.map(child => {
-      const c = folderCounts(child);
-      const badges = [
-        c.raw   ? '<span class="ft-badge raw">' + c.raw   + ' RAW</span>' : '',
-        c.photo ? '<span class="ft-badge">'     + c.photo + ' img</span>' : '',
-        c.video ? '<span class="ft-badge vid">' + c.video + ' vid</span>' : '',
-      ].filter(Boolean).join('');
-      return '<div class="folder-tile" data-path="' + escapeHtml(child.path) + '">'
-           +   '<div class="ft-top">'
-           +     '<span class="ft-icon">📁</span>'
-           +     '<span class="ft-name" title="' + escapeHtml(child.name) + '">' + escapeHtml(child.name) + '</span>'
-           +   '</div>'
-           +   '<div class="ft-meta">' + c.total + ' file' + (c.total !== 1 ? 's' : '') + '</div>'
-           +   (badges ? '<div class="ft-badges">' + badges + '</div>' : '')
-           + '</div>';
-    }).join('');
-    foldersHtml = '<div class="icon-grid">' + cards + '</div>';
-  }
-
-  // Leaf folder (no subfolders, only files) -- hand off to renderFileArea for the full pipeline.
-  if (!hasSubfolders && hasDirectFiles) {
-    renderFileArea(node.files);
-    return;
-  }
-
-  // Mixed (subfolders + direct files). Show folder cards plus a summary hint;
-  // direct files are reachable by drilling into the folder or using Media view.
-  if (hasSubfolders && hasDirectFiles) {
-    const directCount = node.files.length;
-    const raw   = node.files.filter(f => f.type === 'raw').length;
-    const photo = node.files.filter(f => f.type === 'photo').length;
-    const video = node.files.filter(f => f.type === 'video').length;
-    const parts = [];
-    if (raw)   parts.push(raw   + ' RAW');
-    if (photo) parts.push(photo + ' img');
-    if (video) parts.push(video + ' vid');
-    const hint = '<div style="padding:10px 14px;border-top:1px solid var(--border);font-size:0.8rem;opacity:0.7;">'
-               +   '<strong>' + directCount + ' file' + (directCount !== 1 ? 's' : '') + '</strong> directly in this folder'
-               +   (parts.length ? ' (' + parts.join(' · ') + ')' : '')
-               +   '.'
-               + '</div>';
-    area.innerHTML = foldersHtml + hint;
-    updateSelectionBar();
-    return;
-  }
-
-  // Pure folder view (subfolders only, no direct files).
-  area.innerHTML = foldersHtml;
+  area.innerHTML =
+      '<div class="panel-state">'
+    +   '<span class="state-icon">📁</span>'
+    +   '<span>Pick a folder from the left to view its files</span>'
+    +   '<span style="font-size:0.75rem;opacity:0.55;margin-top:4px">Every file inside that folder (and its subfolders) will be listed here</span>'
+    + '</div>';
   updateSelectionBar();
 }
 
