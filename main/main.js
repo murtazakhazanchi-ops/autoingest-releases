@@ -5,7 +5,7 @@ const fs   = require('fs');
 const fsp  = require('fs').promises;
 const { exec, execFile } = require('child_process');
 const { detectMemoryCards }          = require('./driveDetector');
-const { readDirectory, getDCIMPath, scanPrivateFolder, safeExists } = require('./fileBrowser');
+const { readDirectory, getDCIMPath, scanPrivateFolder, safeExists, scanMediaRecursive } = require('./fileBrowser');
 const { copyFiles, setPaused, getFileHash, abortCopy } = require('./fileManager');
 const { getThumbnail, shutdownWorkers } = require('../services/thumbnailer');
 const { log } = require('../services/logger');
@@ -236,6 +236,24 @@ ipcMain.handle('files:get', async (event, { drivePath, folderPath, requestId }) 
   const dcimPath = getDCIMPath(drivePath);
   if (!dcimPath) throw new Error(`No DCIM folder found on drive: ${drivePath}`);
   const targetPath = folderPath || dcimPath;
+
+  // ── Commit 2 (TEMPORARY): isolation test for scanMediaRecursive.
+  // Runs only on root browse, logs to main-process log, does NOT change return value.
+  // Remove after verifying output in Commit 3.
+  if (!folderPath) {
+    (async () => {
+      try {
+        const t0 = Date.now();
+        const recursive = await scanMediaRecursive(drivePath);
+        const dt = Date.now() - t0;
+        log(`[SCAN-TEST] scanMediaRecursive(${drivePath}) -> ${recursive.length} files in ${dt}ms`);
+        recursive.slice(0, 5).forEach(f => log(`  ${f.path} (${f.type}, ${f.size} bytes)`));
+      } catch (err) {
+        log(`[SCAN-TEST] scanMediaRecursive failed: ${err.message}`);
+      }
+    })();
+  }
+
   const { folders, files } = await readDirectory(targetPath, (batch) => {
     if (activeFileRequests.get(senderId) !== requestId) return; // Patch 22: superseded request
     if (!event.sender.isDestroyed()) {
