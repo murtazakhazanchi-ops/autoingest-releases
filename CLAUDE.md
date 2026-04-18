@@ -263,3 +263,39 @@ The full system design is in `Final_Detailed_System_Document.pdf`. Key principle
 - Background processing for performance
 - Sync is always safe and additive
 - System enforces discipline instead of relying on users
+
+---
+
+## Stabilization History
+
+### v0.5.1 — Stabilization Phase (2026-04-18)
+
+FIX-ONLY pass, no new features, no architecture changes. 52 targeted patches applied across 3 tiers.
+
+- **Tier 1** (Patches 1–10, 32–37): import pipeline hardening, drive detection, abort path
+  - Async `resolveDestPath` with capped rename loop (no more TOCTOU window, no more event-loop stalls)
+  - `abortCopy` IPC wired from renderer drive-disconnect to main-process copy loop
+  - Atomic `saveImportIndex` via tmp→rename
+  - `fileSize` passed through progress events (removed `statSync` from hot path)
+  - `drivelist.list()` wrapped in 4s timeout; DCIM checks parallelised
+- **Tier 2** (Patches 11–18, 29–31, 42): thumbnail lifecycle, queue cleanup, update sequence
+  - Safe stream cleanup in `getFileHash`
+  - Cancellable checksum verification
+  - Duplicate `inFlight` map in thumbnailer consolidated to `inFlightCache`
+  - `recoverStuckThumbs` rate-limited (1.5s cooldown, visibility-gated, 20/pass cap)
+  - `outerHTML` thumbnail fallback replaced with `src` swap + `.thumb-error` class (preserves tileMap)
+  - Telemetry flushed before `quitAndInstall` with 2s timeout
+  - Event-driven pause/resume (no more polling)
+- **Tier 3** (Patches 19–28, 38–52): hardening, idempotency, resource cleanup
+  - All service `init()` methods idempotent (`_initDone` / `_hooksInstalled` flags)
+  - Centralized `_register()` listener tracking in preload + `beforeunload` cleanup
+  - Validated argv-based `drive:eject` (`execFile` with array args, card verification)
+  - Request-id sender tracking in `files:get`
+  - Exponential backoff for auto-update retries (30s→1m→2m→5m→10m→4h)
+  - `_lastUpdateState` replay so renderer reloads don't miss update banner
+  - `LRUThumbCache.peek()` — no-promote read used in `thumbHtml`
+  - Thumbnail cache expiry sweep on first use
+  - Observer creation reordered in `renderFileArea` (single combined pass)
+  - `perf.clearThumbTimers()` called before OS eject
+
+All naming conventions and archive rules (locked per this document) preserved. See `STABILIZATION_LOG.md` for per-patch status and `STABILIZATION_NOTES.md` for intentionally-deferred items (sync fs usage in pre-event-loop paths, debug handlers).
