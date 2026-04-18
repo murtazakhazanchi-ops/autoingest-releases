@@ -902,58 +902,135 @@ document.getElementById('ejectBtn').addEventListener('click', async () => {
 function renderFolders(folders, dcimPath) {
   const list = document.getElementById('folderList');
 
-  // Cache DCIM's children on first load or when browsing DCIM directly.
-  // When browsing a subfolder (activeFolderPath !== dcimPath), keep the
-  // cached list so the sidebar stays expanded.
-  if (!cachedDcimPath || activeFolderPath === dcimPath) {
-    if (!cachedDcimPath) expandedFolders.add(dcimPath);  // auto-expand on first drive load
-    dcimChildrenCache = folders;
-    cachedDcimPath    = dcimPath;
+  // --- Path A: legacy flat-array shape (pre-Commit-6 callers) ---
+  // Kept for backward compat in case any pre-tree code path reaches here.
+  if (Array.isArray(folders)) {
+    if (!cachedDcimPath || activeFolderPath === dcimPath) {
+      if (!cachedDcimPath) expandedFolders.add(dcimPath);
+      dcimChildrenCache = folders;
+      cachedDcimPath    = dcimPath;
+    }
+    const isExpanded = expandedFolders.has(dcimPath);
+    const childrenHtml = isExpanded
+      ? dcimChildrenCache.map(f => `
+          <div class="folder-item folder-child${activeFolderPath === f.path ? ' active' : ''}"
+               data-path="${escapeHtml(f.path)}">
+            <span class="fi-icon">📁</span>
+            <span class="fi-name">${escapeHtml(f.name)}</span>
+          </div>`).join('')
+      : '';
+    list.innerHTML = `
+      <div class="folder-item folder-root${activeFolderPath === dcimPath ? ' active' : ''}"
+           data-path="${escapeHtml(dcimPath)}">
+        <span class="fi-toggle">${isExpanded ? '▾' : '▸'}</span>
+        <span class="fi-icon">💾</span>
+        <span class="fi-name">${escapeHtml(cardDisplayName(dcimPath))}</span>
+      </div>
+      ${childrenHtml}`;
+    wireFolderListClicks(list, { treeMode: false, dcimPath });
+    return;
   }
 
-  const isExpanded = expandedFolders.has(dcimPath);
+  // --- Path B: tree-mode (Commit 11b) ---
+  // folders is the currentFolderTree object {name, path, children, files}.
+  const tree = folders;
+  if (!tree || typeof tree !== 'object') {
+    list.innerHTML = '';
+    return;
+  }
+  // Auto-expand root on first render.
+  if (!expandedFolders.has(tree.path)) expandedFolders.add(tree.path);
 
-  const childrenHtml = isExpanded
-    ? dcimChildrenCache.map(f => `
-        <div class="folder-item folder-child${activeFolderPath === f.path ? ' active' : ''}"
-             data-path="${escapeHtml(f.path)}">
-          <span class="fi-icon">📁</span>
-          <span class="fi-name">${escapeHtml(f.name)}</span>
-        </div>`).join('')
+  const rootName = cardDisplayName(tree.path) || tree.name || 'Card';
+  const active   = (currentFolderContext && currentFolderContext.path) || null;
+
+  const rootHtml = `
+    <div class="folder-item folder-root${active === tree.path || currentFolderContext.isRoot ? ' active' : ''}"
+         data-path="${escapeHtml(tree.path)}">
+      <span class="fi-toggle">${expandedFolders.has(tree.path) ? '▾' : '▸'}</span>
+      <span class="fi-icon">💾</span>
+      <span class="fi-name">${escapeHtml(rootName)}</span>
+    </div>`;
+
+  const childrenHtml = expandedFolders.has(tree.path)
+    ? tree.children.map(c => renderTreeNodeRecursive(c, 1, active)).join('')
     : '';
 
-  list.innerHTML = `
-    <div class="folder-item folder-root${activeFolderPath === dcimPath ? ' active' : ''}"
-         data-path="${escapeHtml(dcimPath)}">
-      <span class="fi-toggle">${isExpanded ? '▾' : '▸'}</span>
-      <span class="fi-icon">📷</span>
-      <span class="fi-name">DCIM</span>
-    </div>
-    ${childrenHtml}`;
+  list.innerHTML = rootHtml + childrenHtml;
+  wireFolderListClicks(list, { treeMode: true, dcimPath: tree.path });
 
-  // Toggle arrow: expand/collapse without navigating
-  list.querySelector('.fi-toggle').addEventListener('click', e => {
-    e.stopPropagation();
-    if (expandedFolders.has(dcimPath)) {
-      expandedFolders.delete(dcimPath);
-    } else {
-      expandedFolders.add(dcimPath);
-    }
-    renderFolders(dcimChildrenCache, dcimPath);
-  });
-
-  // Folder row clicks navigate to that folder
-  list.querySelectorAll('.folder-item').forEach(item => {
-    item.addEventListener('click', () => {
-      if (!activeDrive) return;
-      browseFolder(activeDrive.mountpoint, item.dataset.path);
-    });
-  });
-
-  // Scroll active folder into view without jarring jumps
   requestAnimationFrame(() => {
     const activeEl = list.querySelector('.folder-item.active');
     if (activeEl) activeEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  });
+}
+
+// Recursively render one tree node and its expanded descendants.
+function renderTreeNodeRecursive(node, depth, activePath) {
+  const hasChildren = node.children && node.children.length > 0;
+  const isExpanded  = expandedFolders.has(node.path);
+  const isActive    = activePath === node.path;
+  const indent      = 8 + depth * 14;
+  const toggleChar  = hasChildren ? (isExpanded ? '▾' : '▸') : '·';
+  const html = `
+    <div class="folder-item folder-child${isActive ? ' active' : ''}"
+         data-path="${escapeHtml(node.path)}"
+         style="padding-left:${indent}px">
+      <span class="fi-toggle"${hasChildren ? '' : ' style="opacity:0.25;pointer-events:none"'}>${toggleChar}</span>
+      <span class="fi-icon">📁</span>
+      <span class="fi-name">${escapeHtml(node.name)}</span>
+    </div>`;
+  const kids = (hasChildren && isExpanded)
+    ? node.children.map(c => renderTreeNodeRecursive(c, depth + 1, activePath)).join('')
+    : '';
+  return html + kids;
+}
+
+// Derive a human-friendly name for the drive root from its path.
+// /Volumes/EOS_DIGITAL -> EOS_DIGITAL
+// C:\ -> C:
+function cardDisplayName(p) {
+  if (!p) return '';
+  const parts = p.split(/[\\/]+/).filter(Boolean);
+  return parts[parts.length - 1] || p;
+}
+
+// Shared click wiring for the sidebar. Called after every innerHTML rewrite.
+function wireFolderListClicks(list, opts) {
+  // Toggle chevrons (expand/collapse) without navigating.
+  list.querySelectorAll('.fi-toggle').forEach(t => {
+    t.addEventListener('click', e => {
+      e.stopPropagation();
+      const item = t.closest('.folder-item');
+      if (!item) return;
+      const p = item.dataset.path;
+      if (!p) return;
+      if (expandedFolders.has(p)) expandedFolders.delete(p);
+      else                         expandedFolders.add(p);
+      // Re-render the sidebar. In tree mode we pass the tree; in flat mode the cached array.
+      if (opts.treeMode) renderFolders(currentFolderTree, opts.dcimPath);
+      else               renderFolders(dcimChildrenCache, opts.dcimPath);
+    });
+  });
+
+  // Row clicks navigate.
+  list.querySelectorAll('.folder-item').forEach(item => {
+    item.addEventListener('click', () => {
+      if (!activeDrive) return;
+      const p = item.dataset.path;
+      if (!p) return;
+      if (opts.treeMode) {
+        // Tree mode: use pre-built tree; no rescan.
+        if (p === opts.dcimPath) {
+          exitToFolderRoot();
+        } else {
+          enterFolderView(p);
+        }
+      } else {
+        // Legacy flat-list mode: IPC rescan.
+        browseFolder(activeDrive.mountpoint, p);
+      }
+    });
   });
 }
 
@@ -1017,6 +1094,13 @@ function renderCurrentView() {
       if (pathEl) pathEl.textContent = currentFolderContext.path || '';
     }
   }
+
+  // Commit 11b: sidebar is only useful in Folder view. Hide it in Media view
+  // so users understand the flat list is the whole card. Show it in Folder view
+  // as the primary navigation surface.
+  const sidebar = document.getElementById('sidebar');
+  if (sidebar) sidebar.style.display = (viewModeType === 'folder') ? '' : 'none';
+
 
   // Commit 9 (v0.6.0): dispatch based on viewModeType.
   if (viewModeType === 'media') {
@@ -1136,36 +1220,74 @@ function renderFolderOnly() {
   area.onscroll = null;
   area.className = '';
 
-  // No tree yet (card not browsed). Empty state.
-  if (!currentFolderTree || !Array.isArray(currentFolderTree.children) || currentFolderTree.children.length === 0) {
-    area.innerHTML = '<div class="panel-state"><span class="state-icon">?</span><span>No folders found on this card</span></div>';
+  // Pick the node: root tree at top, or drilled node when inside a folder.
+  let node = currentFolderTree;
+  if (!currentFolderContext.isRoot && currentFolderContext.path) {
+    const drilled = findNodeByPath(currentFolderTree, currentFolderContext.path);
+    if (drilled) node = drilled;
+  }
+
+  const hasSubfolders  = node && node.children && node.children.length > 0;
+  const hasDirectFiles = node && node.files    && node.files.length    > 0;
+
+  if (!node || (!hasSubfolders && !hasDirectFiles)) {
+    area.innerHTML = '<div class="panel-state"><span class="state-icon">📁</span><span>No folders found on this card</span></div>';
     updateSelectionBar();
     return;
   }
 
-  // Build the folder-card grid. Counts are derived from the tree; no I/O.
-  const cards = currentFolderTree.children.map(node => {
-    const c = folderCounts(node);
-    const badges = [
-      c.raw   ? '<span class="ft-badge raw">' + c.raw + ' RAW</span>'   : '',
-      c.photo ? '<span class="ft-badge">'    + c.photo + ' img</span>' : '',
-      c.video ? '<span class="ft-badge vid">' + c.video + ' vid</span>' : '',
-    ].filter(Boolean).join('');
-    return '<div class="folder-tile" data-path="' + escapeHtml(node.path) + '">'
-         +   '<div class="ft-top">'
-         +     '<span class="ft-icon">?</span>'
-         +     '<span class="ft-name" title="' + escapeHtml(node.name) + '">' + escapeHtml(node.name) + '</span>'
-         +   '</div>'
-         +   '<div class="ft-meta">' + c.total + ' file' + (c.total !== 1 ? 's' : '') + '</div>'
-         +   (badges ? '<div class="ft-badges">' + badges + '</div>' : '')
-         + '</div>';
-  }).join('');
+  // Folder cards (if this node has subfolders).
+  let foldersHtml = '';
+  if (hasSubfolders) {
+    const cards = node.children.map(child => {
+      const c = folderCounts(child);
+      const badges = [
+        c.raw   ? '<span class="ft-badge raw">' + c.raw   + ' RAW</span>' : '',
+        c.photo ? '<span class="ft-badge">'     + c.photo + ' img</span>' : '',
+        c.video ? '<span class="ft-badge vid">' + c.video + ' vid</span>' : '',
+      ].filter(Boolean).join('');
+      return '<div class="folder-tile" data-path="' + escapeHtml(child.path) + '">'
+           +   '<div class="ft-top">'
+           +     '<span class="ft-icon">📁</span>'
+           +     '<span class="ft-name" title="' + escapeHtml(child.name) + '">' + escapeHtml(child.name) + '</span>'
+           +   '</div>'
+           +   '<div class="ft-meta">' + c.total + ' file' + (c.total !== 1 ? 's' : '') + '</div>'
+           +   (badges ? '<div class="ft-badges">' + badges + '</div>' : '')
+           + '</div>';
+    }).join('');
+    foldersHtml = '<div class="icon-grid">' + cards + '</div>';
+  }
 
-  area.innerHTML = '<div class="icon-grid">' + cards + '</div>';
+  // Leaf folder (no subfolders, only files) -- hand off to renderFileArea for the full pipeline.
+  if (!hasSubfolders && hasDirectFiles) {
+    renderFileArea(node.files);
+    return;
+  }
+
+  // Mixed (subfolders + direct files). Show folder cards plus a summary hint;
+  // direct files are reachable by drilling into the folder or using Media view.
+  if (hasSubfolders && hasDirectFiles) {
+    const directCount = node.files.length;
+    const raw   = node.files.filter(f => f.type === 'raw').length;
+    const photo = node.files.filter(f => f.type === 'photo').length;
+    const video = node.files.filter(f => f.type === 'video').length;
+    const parts = [];
+    if (raw)   parts.push(raw   + ' RAW');
+    if (photo) parts.push(photo + ' img');
+    if (video) parts.push(video + ' vid');
+    const hint = '<div style="padding:10px 14px;border-top:1px solid var(--border);font-size:0.8rem;opacity:0.7;">'
+               +   '<strong>' + directCount + ' file' + (directCount !== 1 ? 's' : '') + '</strong> directly in this folder'
+               +   (parts.length ? ' (' + parts.join(' · ') + ')' : '')
+               +   '.'
+               + '</div>';
+    area.innerHTML = foldersHtml + hint;
+    updateSelectionBar();
+    return;
+  }
+
+  // Pure folder view (subfolders only, no direct files).
+  area.innerHTML = foldersHtml;
   updateSelectionBar();
-
-  // Commit 10 note: folder-tile clicks are intentionally no-op in this commit.
-  // Commit 11 wires browseFolder navigation.
 }
 
 document.getElementById('viewMediaBtn').addEventListener('click', () => {
@@ -1757,12 +1879,10 @@ function applyFileBatch(batch) {
 
   document.getElementById('breadcrumb').textContent = batch.folderPath;
   activeFolderPath = batch.folderPath;
-  // Commit 6: batches pass folders=null (no tree change). Sidebar only updates on final result.
+  // Commit 6 (+11b): batches pass folders=null. Sidebar renders from currentFolderTree
+  // when it exists, falling back to the batch payload for the very first render.
   if (batch.folders !== null && batch.folders !== undefined) {
-    const list = Array.isArray(batch.folders)
-      ? batch.folders
-      : (batch.folders && batch.folders.children ? batch.folders.children : []);
-    renderFolders(list, batch.dcimPath);
+    renderFolders(currentFolderTree || batch.folders, batch.dcimPath);
   }
 
   const seen = new Set(currentFiles.map(f => f.path));
@@ -1808,11 +1928,8 @@ async function browseFolder(drivePath, folderPath) {
       currentFolderTree = (result.folders && typeof result.folders === 'object' && !Array.isArray(result.folders))
         ? result.folders : null;
     }
-    // Sidebar always renders the root tree's top-level children.
-    const sidebarFolders = currentFolderTree
-      ? currentFolderTree.children
-      : (Array.isArray(result.folders) ? result.folders : []);
-    renderFolders(sidebarFolders, result.dcimPath);
+    // Commit 11b: sidebar renders the full nested tree (when available).
+    renderFolders(currentFolderTree || (Array.isArray(result.folders) ? result.folders : []), result.dcimPath);
     document.querySelectorAll('.folder-item').forEach(item =>
       item.classList.toggle('active', item.dataset.path === result.folderPath));
 
@@ -2251,6 +2368,11 @@ async function initApp() {
     const updateInfo = await window.api.getLastUpdateInfo();
     if (updateInfo) showWhatsNewModal(updateInfo);
   } catch { /* non-critical — never block startup */ }
+
+  // Commit 11b: default view is Media, which hides the sidebar. Apply it on
+  // first paint so the user sees the flat-list-only layout from the start.
+  const sidebar = document.getElementById('sidebar');
+  if (sidebar && viewModeType === 'media') sidebar.style.display = 'none';
 }
 
 initApp();
