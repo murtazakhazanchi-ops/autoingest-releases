@@ -1007,9 +1007,37 @@ document.querySelectorAll('.sort-btn').forEach(btn => {
 // Commit 9 implements real dispatch; Commits 10-11 add folder view content.
 
 function renderCurrentView() {
-  // Commit 8 stub: just re-render the flat media list.
-  // Commit 9 replaces this with real viewModeType dispatch.
-  if (currentFiles.length) renderFileArea(currentFiles);
+  // Commit 9 (v0.6.0): dispatch based on viewModeType.
+  if (viewModeType === 'media') {
+    // Media view: the flat whole-card list, unchanged pre-existing behaviour.
+    renderFileArea(currentFiles);
+    return;
+  }
+
+  // Folder view.
+  if (currentFolderContext.isRoot) {
+    // At root: show top-level folder cards. Real implementation in Commit 10;
+    // this commit ships a stub placeholder.
+    renderFolderOnly();
+    return;
+  }
+
+  // Inside a folder: render just that folder's files through the existing pipeline.
+  // currentFolderContext.files is populated in Commit 11 (navigation).
+  renderFileArea(currentFolderContext.files);
+}
+
+// Commit 9 (v0.6.0): Folder-view root placeholder.
+// Real implementation in Commit 10 renders top-level folders from currentFolderTree.
+// This stub just paints an empty-state message so Commit 8/9 are testable in isolation.
+function renderFolderOnly() {
+  const area = document.getElementById('fileGrid');
+  if (!area) return;
+  area.onscroll = null;
+  area.className = '';
+  area.innerHTML = '<div class="panel-state"><span class="state-icon">?</span><span>Folder view</span><span style="font-size:0.75rem;opacity:0.6">Coming in Commit 10</span></div>';
+  // Clear selection-bar derived from the media view; folder view has no selection yet.
+  updateSelectionBar();
 }
 
 document.getElementById('viewMediaBtn').addEventListener('click', () => {
