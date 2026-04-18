@@ -258,6 +258,84 @@ async function scanMediaRecursive(startDir, onBatch = null, results = [], depth 
   return results;
 }
 
+
+/**
+ * Commit 5 (v0.6.0): Derive a nested folder tree from a flat file list.
+ *
+ * Pure function -- does NOT touch the filesystem. Walks each file's path,
+ * creating nodes on demand. Files are attached to their parent folder node.
+ *
+ * Expected input: Array<{ name, path, type, size, modifiedAt }> (as returned by
+ * scanMediaRecursive).
+ *
+ * Returns the root tree node. The root's path is the longest common ancestor
+ * of all file paths. Nodes are sorted alphabetically; files keep the caller's
+ * order (scanMediaRecursive already sorts by modifiedAt).
+ *
+ * Shape of every node:
+ *   {
+ *     name:     string,          // basename of this folder
+ *     path:     string,          // absolute path to this folder
+ *     children: Array<Node>,     // subfolder nodes (sorted by name)
+ *     files:    Array<FileObj>,  // files directly in this folder
+ *   }
+ *
+ * If files is empty, returns { name: '', path: '', children: [], files: [] }.
+ */
+function buildFolderTree(files) {
+  if (!Array.isArray(files) || files.length === 0) {
+    return { name: '', path: '', children: [], files: [] };
+  }
+
+  // 1. Longest common ancestor of all file paths becomes the root.
+  const sep = path.sep;
+  const splitPaths = files.map(f => path.dirname(f.path).split(sep));
+
+  let commonParts = splitPaths[0].slice();
+  for (let i = 1; i < splitPaths.length; i++) {
+    const parts = splitPaths[i];
+    let j = 0;
+    while (j < commonParts.length && j < parts.length && commonParts[j] === parts[j]) j++;
+    commonParts = commonParts.slice(0, j);
+    if (commonParts.length === 0) break;
+  }
+  const rootPath = commonParts.join(sep) || sep;
+  const rootName = commonParts[commonParts.length - 1] || rootPath;
+
+  // 2. Build node map for O(1) insertion.
+  const nodesByPath = new Map();
+  const root = { name: rootName, path: rootPath, children: [], files: [] };
+  nodesByPath.set(rootPath, root);
+
+  function ensureNode(folderPath) {
+    if (nodesByPath.has(folderPath)) return nodesByPath.get(folderPath);
+    // Safety: if the file lives outside the detected root, attach to root.
+    if (!folderPath.startsWith(rootPath)) return root;
+    const parentPath = path.dirname(folderPath);
+    const parent = ensureNode(parentPath);
+    const node = { name: path.basename(folderPath), path: folderPath, children: [], files: [] };
+    parent.children.push(node);
+    nodesByPath.set(folderPath, node);
+    return node;
+  }
+
+  // 3. Attach every file to its folder node.
+  for (const f of files) {
+    const parentDir = path.dirname(f.path);
+    const parent = ensureNode(parentDir);
+    parent.files.push(f);
+  }
+
+  // 4. Alphabetical sort at each level.
+  function sortChildren(node) {
+    node.children.sort((a, b) => a.name.localeCompare(b.name));
+    for (const c of node.children) sortChildren(c);
+  }
+  sortChildren(root);
+
+  return root;
+}
+
 /**
  * Scans known Sony PRIVATE folder video paths.
  * Only checks two specific subdirectories — never recurses the full PRIVATE tree.
@@ -301,4 +379,4 @@ async function scanPrivateFolder(privatePath) {
   return results;
 }
 
-module.exports = { readDirectory, getDCIMPath, scanPrivateFolder, safeExists, scanMediaRecursive };
+module.exports = { readDirectory, getDCIMPath, scanPrivateFolder, safeExists, scanMediaRecursive, buildFolderTree };
