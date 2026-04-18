@@ -1158,6 +1158,8 @@ function enterFolderView(folderPath) {
   // Reset scroll and re-render through the dispatcher.
   const area = document.getElementById('fileGrid');
   if (area) area.scrollTop = 0;
+  // Commit 12b: refresh sidebar so the newly-active folder row gets the blue highlight.
+  if (currentFolderTree) renderFolders(currentFolderTree, currentFolderTree.path);
   renderCurrentView();
   updateSteps();
 }
@@ -1173,6 +1175,8 @@ function exitToFolderRoot() {
   }
   currentFolder = currentFolderTree ? currentFolderTree.path : null;
   resetViewCache();
+  // Commit 12b: refresh sidebar so active-row highlight is cleared.
+  if (currentFolderTree) renderFolders(currentFolderTree, currentFolderTree.path);
   renderCurrentView();
   updateSteps();
 }
