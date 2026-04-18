@@ -45,9 +45,12 @@ let   isFlushing          = false;
 let   queuePath           = null;
 let   flushTimer          = null;
 let   consecutiveFailures = 0;
+let   _initDone           = false;
 
-// ── Bootstrap — call once after app.whenReady() ───────────────────────────────
+// ── Bootstrap — call once after app.whenReady() (Patch 39: idempotent) ────────
 function init() {
+  if (_initDone) return;
+  _initDone = true;
   if (!TELEMETRY_ENABLED) return;
   const { app } = require('electron');
   queuePath = path.join(app.getPath('userData'), 'telemetry-queue.json');
@@ -175,8 +178,9 @@ async function flush() {
       requestBody:      { values: batch },
     });
 
-     consecutiveFailures = 0;
-    queue = queue.filter(row => !batch.includes(row));
+    consecutiveFailures = 0;
+    const sentSet = new Set(batch);
+    queue = queue.filter(row => !sentSet.has(row));
     persistQueue();
     // Restart timer if it was stopped by a previous failure streak
     if (!flushTimer) {
@@ -202,10 +206,14 @@ async function flush() {
   }
 }
 
-// ── Persist queue to disk ─────────────────────────────────────────────────────
+// ── Persist queue to disk (atomic rename — Patch 9) ──────────────────────────
 function persistQueue() {
   if (!queuePath) return;
-  try { fs.writeFileSync(queuePath, JSON.stringify(queue), 'utf8'); } catch {}
+  const tmp = queuePath + '.tmp';
+  try {
+    fs.writeFileSync(tmp, JSON.stringify(queue), 'utf8');
+    fs.renameSync(tmp, queuePath);
+  } catch {}
 }
 
 module.exports = { init, enqueue, flush, isEnabled: () => TELEMETRY_ENABLED };

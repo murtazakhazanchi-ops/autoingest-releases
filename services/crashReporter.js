@@ -20,16 +20,20 @@ const { log }   = require('./logger');
 // Stack trace lines to include in each report
 const STACK_DEPTH = 8;
 
-// ── Public: wire up all passive handlers ─────────────────────────────────────
+// ── Public: wire up all passive handlers (Patch 38: idempotent) ──────────────
+let _hooksInstalled = false;
+
 function init(mainWindow) {
   if (!telemetry.isEnabled()) return;
+  if (_hooksInstalled) return;
+  _hooksInstalled = true;
   hookMainProcess();
   hookElectronEvents(mainWindow);
 }
 
 // ── Main-process fatal errors ─────────────────────────────────────────────────
 function hookMainProcess() {
-  process.on('uncaughtException', (err) => {
+  process.on('uncaughtException', async (err) => {
     log(`Crash (uncaughtException): ${err.message}`);
     telemetry.enqueue({
       type:        'crash',
@@ -43,8 +47,17 @@ function hookMainProcess() {
         stack:     trimStack(err.stack),
       },
     });
-    // Best-effort flush before the process dies
-    telemetry.flush().catch(() => {});
+    // Best-effort flush before the process dies (Patch 26: with timeout)
+    try {
+      await Promise.race([
+        telemetry.flush().catch(() => {}),
+        new Promise(r => setTimeout(r, 1000)),
+      ]);
+    } catch {}
+    // Patch 26: exit for truly fatal errors (not permission / file-not-found)
+    if (!/EACCES|EPERM|EBUSY|ENOENT/.test(err.code || '')) {
+      setTimeout(() => process.exit(1), 100);
+    }
   });
 
   // Additional unhandledRejection listener — the existing one in main.js logs to file;

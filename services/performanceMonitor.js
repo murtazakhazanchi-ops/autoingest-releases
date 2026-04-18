@@ -41,9 +41,12 @@ let memTimer            = null;
 let lagCount            = 0;         // occurrences in current window
 let lagWindowStart      = 0;         // ms timestamp when current window started
 const activeThumbTimers = new Map(); // srcPath → { startMs, watchdog }
+let _initDone = false;
 
-// ── Bootstrap ────────────────────────────────────────────────────────────────
+// ── Bootstrap (Patch 40: idempotent) ─────────────────────────────────────────
 function init() {
+  if (_initDone) return;
+  _initDone = true;
   if (!telemetry.isEnabled()) return;
   // Delay lag monitor by 10s — startup I/O always causes false positives
   // during module load, window creation, and initial drive polling.
@@ -224,4 +227,9 @@ function _heapMB() {
   return Math.round(process.memoryUsage().heapUsed / 1_048_576);
 }
 
-module.exports = { init, stop, thumbStart, thumbEnd, importSpeedSample };
+function clearThumbTimers() {
+  for (const { watchdog } of activeThumbTimers.values()) clearTimeout(watchdog);
+  activeThumbTimers.clear();
+}
+
+module.exports = { init, stop, thumbStart, thumbEnd, importSpeedSample, clearThumbTimers };
