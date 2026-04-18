@@ -169,28 +169,52 @@ function getDCIMPath(mountpoint) {
  * @param {Array} results           Accumulator (do not pass — for recursion)
  * @returns {Promise<Array<FileObject>>}
  */
-const SKIP_DIRS    = new Set(['.Spotlight-V100', '.Trashes', 'System Volume Information', '$RECYCLE.BIN', 'lost+found']);
-const MIN_FILE_BYTES = 50 * 1024; // 50 KB — drops proxies, thumb stubs, and metadata sidecars
+const SKIP_DIRS    = new Set(['.Spotlight-V100', '.Trashes', 'System Volume Information', '$RECYCLE.BIN', 'lost+found', 'fseventsd', '.fseventsd', '.TemporaryItems']);
+const MIN_FILE_BYTES = 50 * 1024; // 50 KB -- drops proxies, thumb stubs, metadata sidecars
 const BATCH_SIZE     = 50;
+const MAX_SCAN_DEPTH = 12; // Commit 4: soft depth cap; DCIM trees are rarely > 4 deep
 
-async function scanMediaRecursive(startDir, onBatch = null, results = []) {
-  let entries;
-  try {
-    entries = await fsp.readdir(startDir, { withFileTypes: true });
-  } catch {
-    // Unreadable directory — skip silently. The caller gets whatever was found elsewhere.
+async function scanMediaRecursive(startDir, onBatch = null, results = [], depth = 0, visited = null) {
+  // Commit 4: depth + loop protection.
+  // visited holds resolved paths so a symlink pointing back up the tree cannot
+  // drive us into an infinite loop. Initialised lazily on the first call.
+  if (visited === null) visited = new Set();
+  if (depth > MAX_SCAN_DEPTH) {
     return results;
   }
 
-  // Gather per-directory work: queue subdirs for recursion, stat files in parallel
+  // Commit 4: normalise and de-loop via realpath (best-effort).
+  let resolved;
+  try {
+    resolved = await fsp.realpath(startDir);
+  } catch {
+    resolved = startDir;
+  }
+  if (visited.has(resolved)) {
+    return results;
+  }
+  visited.add(resolved);
+
+  let entries;
+  try {
+    entries = await fsp.readdir(startDir, { withFileTypes: true });
+  } catch (err) {
+    // Commit 4: keep silent skip (resilient to yanked cards / permission errors)
+    // but leave a log breadcrumb so triage isn't blind.
+    if (err && err.code && err.code !== 'ENOENT') {
+      try { require('../services/logger').log('[scan] skipped ' + startDir + ': ' + err.code + ' ' + err.message); } catch {}
+    }
+    return results;
+  }
+
   const subdirs     = [];
   const fileEntries = [];
 
   for (const entry of entries) {
     const name = entry.name;
     if (entry.isDirectory()) {
-      if (name.startsWith('.')) continue;       // skip all hidden dirs (incl. .Trashes)
-      if (SKIP_DIRS.has(name))  continue;       // skip known system dirs
+      if (name.startsWith('.')) continue;       // all hidden dirs
+      if (SKIP_DIRS.has(name))  continue;       // known system dirs
       subdirs.push(path.join(startDir, name));
       continue;
     }
@@ -201,7 +225,8 @@ async function scanMediaRecursive(startDir, onBatch = null, results = []) {
     fileEntries.push({ name, path: path.join(startDir, name), type });
   }
 
-  // Stat this directory's files in parallel (bounded by the number of files per dir)
+  // Stat files in parallel. safeStat returns null on any failure -- one broken
+  // file cannot reject Promise.all.
   const stattedBatch = (await Promise.all(
     fileEntries.map(async f => {
       const stat = await safeStat(f.path);
@@ -217,7 +242,6 @@ async function scanMediaRecursive(startDir, onBatch = null, results = []) {
     })
   )).filter(Boolean);
 
-  // Emit progress batches while accumulating into results
   for (let i = 0; i < stattedBatch.length; i += BATCH_SIZE) {
     const chunk = stattedBatch.slice(i, i + BATCH_SIZE);
     results.push(...chunk);
@@ -226,10 +250,9 @@ async function scanMediaRecursive(startDir, onBatch = null, results = []) {
     }
   }
 
-  // Recurse into subdirectories sequentially — keeps memory flat and plays nicely
-  // with slow SD cards (parallel recursion can saturate the card's read channel).
+  // Sequential recursion keeps SD-card read channel unsaturated and memory flat.
   for (const sub of subdirs) {
-    await scanMediaRecursive(sub, onBatch, results);
+    await scanMediaRecursive(sub, onBatch, results, depth + 1, visited);
   }
 
   return results;
