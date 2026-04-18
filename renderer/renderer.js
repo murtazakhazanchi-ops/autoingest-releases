@@ -1256,6 +1256,9 @@ document.getElementById('viewMediaBtn').addEventListener('click', () => {
   viewModeType = 'media';
   document.getElementById('viewMediaBtn').classList.add('view-active');
   document.getElementById('viewFolderBtn').classList.remove('view-active');
+  // Commit 14: reset scroll on view toggle so the user doesn't land mid-list.
+  const fg = document.getElementById('fileGrid');
+  if (fg) fg.scrollTop = 0;
   renderCurrentView();
 });
 
@@ -1264,6 +1267,9 @@ document.getElementById('viewFolderBtn').addEventListener('click', () => {
   viewModeType = 'folder';
   document.getElementById('viewFolderBtn').classList.add('view-active');
   document.getElementById('viewMediaBtn').classList.remove('view-active');
+  // Commit 14: reset scroll on view toggle so the user doesn't land mid-list.
+  const fg = document.getElementById('fileGrid');
+  if (fg) fg.scrollTop = 0;
   renderCurrentView();
 });
 // Commit 11 (v0.6.0): back-button for folder-view drill-down.
@@ -1806,7 +1812,10 @@ function updateSelectionBar() {
   document.getElementById('selectionBar').classList.toggle('visible', hasFiles);
   document.getElementById('selCount').textContent = `${n} selected`;
 
-  document.getElementById('selectAllBtn').disabled = !hasFiles || n === currentFiles.length;
+  // Commit 12: disable Select All when folder-view shows the instruction panel
+  // (no tiles visible yet -- user hasn't drilled into a leaf).
+  const isInstructionPanel = (viewModeType === 'folder') && (currentFolderContext.isRoot || !currentFolderContext.isLeaf);
+  document.getElementById('selectAllBtn').disabled = !hasFiles || n === currentFiles.length || isInstructionPanel;
   document.getElementById('clearSelBtn').disabled  = n === 0;
 
   const importBtn = document.getElementById('importBtn');
