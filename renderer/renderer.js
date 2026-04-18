@@ -83,6 +83,7 @@ let currentFolderContext = {
   path:   null,
   files:  [],
   isRoot: true,
+  isLeaf: false,
 };
 let selectedFiles    = new Set();   // absolute source paths — selection truth
 let currentFiles     = [];          // flat list of all files in current folder
@@ -1114,7 +1115,16 @@ function renderCurrentView() {
     return;
   }
 
-  // Inside a folder: render that folder's files through the existing pipeline.
+  // Commit 11d: strict leaf-only render. Intermediate folders (with subfolders)
+  // show the same instruction panel; only leaves show files. This forces the
+  // sidebar drill-down so users always know which specific folder the media
+  // lives in.
+  if (!currentFolderContext.isLeaf) {
+    renderFolderOnly();
+    return;
+  }
+
+  // Leaf folder: render its files through the existing pipeline.
   renderFileArea(currentFolderContext.files);
 }
 
@@ -1133,10 +1143,12 @@ function enterFolderView(folderPath) {
   const files = collectFilesRecursive(target);
   files.sort((a, b) => new Date(b.modifiedAt) - new Date(a.modifiedAt));
 
+  const isLeaf = !target.children || target.children.length === 0;
   currentFolderContext = {
     path:   target.path,
     files:  files,
     isRoot: false,
+    isLeaf: isLeaf,
   };
   // Ensure renderFileArea's empty-state check passes.
   currentFolder = target.path;
@@ -1151,7 +1163,7 @@ function enterFolderView(folderPath) {
 }
 
 function exitToFolderRoot() {
-  currentFolderContext = { path: null, files: [], isRoot: true };
+  currentFolderContext = { path: null, files: [], isRoot: true, isLeaf: false };
   // When returning to folder root, currentFiles must NOT stay scoped to the
   // subfolder. Restore the whole-card file list from... wait, we don't keep
   // that separately. Recompute from the tree.
@@ -1234,7 +1246,7 @@ function renderFolderOnly() {
       '<div class="panel-state">'
     +   '<span class="state-icon">📁</span>'
     +   '<span>Pick a folder from the left to view its files</span>'
-    +   '<span style="font-size:0.75rem;opacity:0.55;margin-top:4px">Every file inside that folder (and its subfolders) will be listed here</span>'
+    +   '<span style="font-size:0.75rem;opacity:0.55;margin-top:4px">Drill into a folder to see its media</span>'
     + '</div>';
   updateSelectionBar();
 }
