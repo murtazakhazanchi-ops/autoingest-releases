@@ -146,6 +146,96 @@ function getDCIMPath(mountpoint) {
 }
 
 /**
+ * NEW (v0.6.0): Recursively scans a directory tree for supported media files.
+ *
+ * Unlike readDirectory (single level) and scanPrivateFolder (two hardcoded paths),
+ * this walks the entire tree from \`startDir\`, filtering by media extensions.
+ *
+ * Rules:
+ *   • Skips system/hidden folders (names starting with '.' or matching SKIP_DIRS)
+ *   • Skips files smaller than MIN_FILE_BYTES (50 KB) to omit thumbnails / metadata stubs
+ *   • Skips macOS junk (isJunkFile)
+ *   • Classifies each file via mediaType(); non-media files are dropped
+ *
+ * Batching:
+ *   • onBatch(batch) is invoked approximately every BATCH_SIZE (50) stat-completed files
+ *   • batch shape: { files: [...], processed, total: null }  (total unknown during scan)
+ *
+ * This function is NOT yet wired into files:get — Commit 3 will do that.
+ * Leaving it unused here is intentional (Commit 1 is non-integrated).
+ *
+ * @param {string} startDir         Absolute path to the scan root
+ * @param {Function|null} onBatch   Optional progress callback
+ * @param {Array} results           Accumulator (do not pass — for recursion)
+ * @returns {Promise<Array<FileObject>>}
+ */
+const SKIP_DIRS    = new Set(['.Spotlight-V100', '.Trashes', 'System Volume Information', '$RECYCLE.BIN', 'lost+found']);
+const MIN_FILE_BYTES = 50 * 1024; // 50 KB — drops proxies, thumb stubs, and metadata sidecars
+const BATCH_SIZE     = 50;
+
+async function scanMediaRecursive(startDir, onBatch = null, results = []) {
+  let entries;
+  try {
+    entries = await fsp.readdir(startDir, { withFileTypes: true });
+  } catch {
+    // Unreadable directory — skip silently. The caller gets whatever was found elsewhere.
+    return results;
+  }
+
+  // Gather per-directory work: queue subdirs for recursion, stat files in parallel
+  const subdirs     = [];
+  const fileEntries = [];
+
+  for (const entry of entries) {
+    const name = entry.name;
+    if (entry.isDirectory()) {
+      if (name.startsWith('.')) continue;       // skip all hidden dirs (incl. .Trashes)
+      if (SKIP_DIRS.has(name))  continue;       // skip known system dirs
+      subdirs.push(path.join(startDir, name));
+      continue;
+    }
+    if (!entry.isFile()) continue;
+    if (isJunkFile(name)) continue;
+    const type = mediaType(name);
+    if (!type) continue;
+    fileEntries.push({ name, path: path.join(startDir, name), type });
+  }
+
+  // Stat this directory's files in parallel (bounded by the number of files per dir)
+  const stattedBatch = (await Promise.all(
+    fileEntries.map(async f => {
+      const stat = await safeStat(f.path);
+      if (!stat) return null;
+      if (stat.size < MIN_FILE_BYTES) return null;
+      return {
+        name:       f.name,
+        path:       f.path,
+        type:       f.type,
+        size:       stat.size,
+        modifiedAt: stat.mtime.toISOString(),
+      };
+    })
+  )).filter(Boolean);
+
+  // Emit progress batches while accumulating into results
+  for (let i = 0; i < stattedBatch.length; i += BATCH_SIZE) {
+    const chunk = stattedBatch.slice(i, i + BATCH_SIZE);
+    results.push(...chunk);
+    if (onBatch && chunk.length) {
+      onBatch({ files: chunk, processed: results.length, total: null });
+    }
+  }
+
+  // Recurse into subdirectories sequentially — keeps memory flat and plays nicely
+  // with slow SD cards (parallel recursion can saturate the card's read channel).
+  for (const sub of subdirs) {
+    await scanMediaRecursive(sub, onBatch, results);
+  }
+
+  return results;
+}
+
+/**
  * Scans known Sony PRIVATE folder video paths.
  * Only checks two specific subdirectories — never recurses the full PRIVATE tree.
  * Returns file objects compatible with readDirectory() output.
@@ -188,4 +278,4 @@ async function scanPrivateFolder(privatePath) {
   return results;
 }
 
-module.exports = { readDirectory, getDCIMPath, scanPrivateFolder, safeExists };
+module.exports = { readDirectory, getDCIMPath, scanPrivateFolder, safeExists, scanMediaRecursive };
