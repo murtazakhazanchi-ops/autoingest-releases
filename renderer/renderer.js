@@ -1007,24 +1007,104 @@ document.querySelectorAll('.sort-btn').forEach(btn => {
 // Commit 9 implements real dispatch; Commits 10-11 add folder view content.
 
 function renderCurrentView() {
+  // Commit 11 (v0.6.0): show folder-view back-bar only when inside a folder.
+  const backBar = document.getElementById('folderBackBar');
+  const insideFolder = (viewModeType === 'folder') && !currentFolderContext.isRoot;
+  if (backBar) {
+    backBar.style.display = insideFolder ? 'flex' : 'none';
+    if (insideFolder) {
+      const pathEl = document.getElementById('folderBackPath');
+      if (pathEl) pathEl.textContent = currentFolderContext.path || '';
+    }
+  }
+
   // Commit 9 (v0.6.0): dispatch based on viewModeType.
   if (viewModeType === 'media') {
-    // Media view: the flat whole-card list, unchanged pre-existing behaviour.
     renderFileArea(currentFiles);
     return;
   }
 
   // Folder view.
   if (currentFolderContext.isRoot) {
-    // At root: show top-level folder cards. Real implementation in Commit 10;
-    // this commit ships a stub placeholder.
     renderFolderOnly();
     return;
   }
 
-  // Inside a folder: render just that folder's files through the existing pipeline.
-  // currentFolderContext.files is populated in Commit 11 (navigation).
+  // Inside a folder: render that folder's files through the existing pipeline.
   renderFileArea(currentFolderContext.files);
+}
+
+// Commit 11 (v0.6.0): navigate into a folder node from the pre-built tree.
+// Pure in-memory nav; no file I/O, no IPC, no re-scan.
+// The node argument can be a folder node from currentFolderTree, or a path string
+// that will be looked up inside currentFolderTree.
+function enterFolderView(folderPath) {
+  if (!currentFolderTree) return;
+
+  // Locate the node by path (DFS over the cached tree).
+  const target = findNodeByPath(currentFolderTree, folderPath);
+  if (!target) return;
+
+  // Gather every file under this node, sorted newest-first to match Media View ordering.
+  const files = collectFilesRecursive(target);
+  files.sort((a, b) => new Date(b.modifiedAt) - new Date(a.modifiedAt));
+
+  currentFolderContext = {
+    path:   target.path,
+    files:  files,
+    isRoot: false,
+  };
+  // Ensure renderFileArea's empty-state check passes.
+  currentFolder = target.path;
+  currentFiles  = files;
+  // Clear any cached pairing/timeline view so sort applies cleanly to new scope.
+  resetViewCache();
+  // Reset scroll and re-render through the dispatcher.
+  const area = document.getElementById('fileGrid');
+  if (area) area.scrollTop = 0;
+  renderCurrentView();
+  updateSteps();
+}
+
+function exitToFolderRoot() {
+  currentFolderContext = { path: null, files: [], isRoot: true };
+  // When returning to folder root, currentFiles must NOT stay scoped to the
+  // subfolder. Restore the whole-card file list from... wait, we don't keep
+  // that separately. Recompute from the tree.
+  if (currentFolderTree) {
+    currentFiles = collectFilesRecursive(currentFolderTree);
+    currentFiles.sort((a, b) => new Date(b.modifiedAt) - new Date(a.modifiedAt));
+  }
+  currentFolder = currentFolderTree ? currentFolderTree.path : null;
+  resetViewCache();
+  renderCurrentView();
+  updateSteps();
+}
+
+// Pure helper: DFS the tree looking for a node whose path matches.
+function findNodeByPath(node, targetPath) {
+  if (!node) return null;
+  if (node.path === targetPath) return node;
+  if (!node.children) return null;
+  for (const c of node.children) {
+    const found = findNodeByPath(c, targetPath);
+    if (found) return found;
+  }
+  return null;
+}
+
+// Pure helper: flatten all files in a subtree.
+function collectFilesRecursive(node) {
+  const out = [];
+  const stack = [node];
+  while (stack.length) {
+    const n = stack.pop();
+    if (n.files) out.push(...n.files);
+    if (n.children) {
+      for (const c of n.children) stack.push(c);
+    }
+  }
+  return out;
 }
 
 // Commit 10 (v0.6.0): recursively count files (with type breakdown) under a tree node.
@@ -1103,6 +1183,12 @@ document.getElementById('viewFolderBtn').addEventListener('click', () => {
   document.getElementById('viewMediaBtn').classList.remove('view-active');
   renderCurrentView();
 });
+// Commit 11 (v0.6.0): back-button for folder-view drill-down.
+(function wireFolderBackButton() {
+  const btn = document.getElementById('folderBackBtn');
+  if (btn) btn.addEventListener('click', () => exitToFolderRoot());
+})();
+
 
 // VIEW MODE TOGGLE
 // ════════════════════════════════════════════════════════════════
@@ -1458,6 +1544,13 @@ document.getElementById('fileGrid').addEventListener('click', e => {
 
   // ── Checkbox click — handled by the change event below, skip here ──
   if (e.target.type === 'checkbox') return;
+
+  // ?? Folder-tile click (Commit 11) ?????????????????????????????
+  const folderTile = e.target.closest('.folder-tile');
+  if (folderTile && folderTile.dataset.path) {
+    enterFolderView(folderTile.dataset.path);
+    return;
+  }
 
   // ── Tile click (anywhere on tile except checkbox) ──────────────
   const tile = e.target.closest('.file-tile');

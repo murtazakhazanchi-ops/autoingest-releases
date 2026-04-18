@@ -1033,6 +1033,11 @@
           <span id="selCount">0 selected</span>
         </div>
 
+        <!-- Commit 11 (v0.6.0): folder-view back navigation bar (hidden unless inside a folder) -->
+        <div id="folderBackBar" style="display:none;padding:6px 12px;border-bottom:1px solid var(--border);background:var(--surface);align-items:center;gap:10px;">
+          <button class="sel-btn" id="folderBackBtn" title="Back to folder list">← All Folders</button>
+          <span id="folderBackPath" style="font-size:0.78rem;opacity:0.7;"></span>
+        </div>
         <!-- File area — JS writes grouped sections here -->
         <div id="fileGrid">
           <div class="panel-state">
