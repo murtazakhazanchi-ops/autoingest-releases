@@ -184,7 +184,8 @@
     .folder-item.active { background: var(--blue-dim); border-left-color: var(--blue); color: var(--blue); }
     .folder-item .fi-icon { font-size: 0.9rem; flex-shrink: 0; }
     .folder-item .fi-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .folder-item .fi-toggle { font-size: 0.65rem; width: 12px; flex-shrink: 0; text-align: center; opacity: 0.6; }
+    .folder-item .fi-toggle { font-size: 0.85rem; width: 18px; flex-shrink: 0; text-align: center; opacity: 0.9; color: var(--blue); font-weight: 700; border-radius: 3px; transition: background 0.1s, transform 0.1s; }
+    .folder-item .fi-toggle:hover { background: rgba(137,180,250,0.18); transform: scale(1.15); }
     .folder-child { padding-left: 30px; }
     .sidebar-empty { padding: 16px 14px; font-size: 0.78rem; opacity: 0.35; font-style: italic; }
 
@@ -985,9 +986,8 @@
 
   <div id="stepRail">
     <div class="step active" id="step1Indicator"><span class="step-num">1</span> Select Memory Card</div>
-    <div class="step"        id="step2Indicator"><span class="step-num">2</span> Browse Files</div>
-    <div class="step"        id="step3Indicator"><span class="step-num">3</span> Select Files</div>
-    <div class="step"        id="step4Indicator"><span class="step-num">4</span> Import</div>
+    <div class="step"        id="step2Indicator"><span class="step-num">2</span> Browse &amp; Select Files</div>
+    <div class="step"        id="step3Indicator"><span class="step-num">3</span> Import</div>
   </div>
 
   <!-- STEP 1 -->

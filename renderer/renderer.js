@@ -705,13 +705,13 @@ async function refreshDestCache() {
 // STEP RAIL
 // ════════════════════════════════════════════════════════════════
 function updateSteps() {
-  const hasDrive  = activeDrive !== null;
-  const hasFolder = activeFolderPath !== null;
-  const hasSel    = selectedFiles.size > 0;
+  // Commit 12d: collapsed to 3 steps. Browse + Select merged into one
+  // since the folder-view workflow treats them as a single activity.
+  const hasDrive = activeDrive !== null;
+  const hasSel   = selectedFiles.size > 0;
   setStep('step1Indicator', !hasDrive ? 'active' : 'done');
-  setStep('step2Indicator', !hasDrive ? '' : (!hasFolder ? 'active' : 'done'));
-  setStep('step3Indicator', !hasFolder ? '' : (!hasSel ? 'active' : 'done'));
-  setStep('step4Indicator', hasSel ? 'active' : '');
+  setStep('step2Indicator', !hasDrive ? '' : (!hasSel ? 'active' : 'done'));
+  setStep('step3Indicator', hasSel ? 'active' : '');
 }
 function setStep(id, state) {
   const el = document.getElementById(id);
