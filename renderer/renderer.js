@@ -997,6 +997,37 @@ document.querySelectorAll('.sort-btn').forEach(btn => {
 });
 
 // ════════════════════════════════════════════════════════════════
+
+// ????????????????????????????????????????????????????????????????
+// MEDIA / FOLDER VIEW TOGGLE  (Commit 8/14)
+// ????????????????????????????????????????????????????????????????
+// Flips between the flat media list and the folder-tree view.
+// Calls renderCurrentView() which dispatches based on viewModeType.
+// In Commit 8 this function is a stub that falls back to renderFileArea;
+// Commit 9 implements real dispatch; Commits 10-11 add folder view content.
+
+function renderCurrentView() {
+  // Commit 8 stub: just re-render the flat media list.
+  // Commit 9 replaces this with real viewModeType dispatch.
+  if (currentFiles.length) renderFileArea(currentFiles);
+}
+
+document.getElementById('viewMediaBtn').addEventListener('click', () => {
+  if (viewModeType === 'media') return;
+  viewModeType = 'media';
+  document.getElementById('viewMediaBtn').classList.add('view-active');
+  document.getElementById('viewFolderBtn').classList.remove('view-active');
+  renderCurrentView();
+});
+
+document.getElementById('viewFolderBtn').addEventListener('click', () => {
+  if (viewModeType === 'folder') return;
+  viewModeType = 'folder';
+  document.getElementById('viewFolderBtn').classList.add('view-active');
+  document.getElementById('viewMediaBtn').classList.remove('view-active');
+  renderCurrentView();
+});
+
 // VIEW MODE TOGGLE
 // ════════════════════════════════════════════════════════════════
 document.getElementById('viewIconBtn').addEventListener('click', () => {
