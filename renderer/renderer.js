@@ -1027,17 +1027,65 @@ function renderCurrentView() {
   renderFileArea(currentFolderContext.files);
 }
 
-// Commit 9 (v0.6.0): Folder-view root placeholder.
-// Real implementation in Commit 10 renders top-level folders from currentFolderTree.
-// This stub just paints an empty-state message so Commit 8/9 are testable in isolation.
+// Commit 10 (v0.6.0): recursively count files (with type breakdown) under a tree node.
+// Pure function; no DOM, no I/O. Used for the folder-tile summary labels.
+function folderCounts(node) {
+  if (!node) return { total: 0, raw: 0, photo: 0, video: 0 };
+  let total = 0, raw = 0, photo = 0, video = 0;
+  const stack = [node];
+  while (stack.length) {
+    const n = stack.pop();
+    if (n.files) {
+      for (const f of n.files) {
+        total++;
+        if      (f.type === 'raw')   raw++;
+        else if (f.type === 'photo') photo++;
+        else if (f.type === 'video') video++;
+      }
+    }
+    if (n.children) {
+      for (const c of n.children) stack.push(c);
+    }
+  }
+  return { total, raw, photo, video };
+}
+
 function renderFolderOnly() {
   const area = document.getElementById('fileGrid');
   if (!area) return;
   area.onscroll = null;
   area.className = '';
-  area.innerHTML = '<div class="panel-state"><span class="state-icon">?</span><span>Folder view</span><span style="font-size:0.75rem;opacity:0.6">Coming in Commit 10</span></div>';
-  // Clear selection-bar derived from the media view; folder view has no selection yet.
+
+  // No tree yet (card not browsed). Empty state.
+  if (!currentFolderTree || !Array.isArray(currentFolderTree.children) || currentFolderTree.children.length === 0) {
+    area.innerHTML = '<div class="panel-state"><span class="state-icon">?</span><span>No folders found on this card</span></div>';
+    updateSelectionBar();
+    return;
+  }
+
+  // Build the folder-card grid. Counts are derived from the tree; no I/O.
+  const cards = currentFolderTree.children.map(node => {
+    const c = folderCounts(node);
+    const badges = [
+      c.raw   ? '<span class="ft-badge raw">' + c.raw + ' RAW</span>'   : '',
+      c.photo ? '<span class="ft-badge">'    + c.photo + ' img</span>' : '',
+      c.video ? '<span class="ft-badge vid">' + c.video + ' vid</span>' : '',
+    ].filter(Boolean).join('');
+    return '<div class="folder-tile" data-path="' + escapeHtml(node.path) + '">'
+         +   '<div class="ft-top">'
+         +     '<span class="ft-icon">?</span>'
+         +     '<span class="ft-name" title="' + escapeHtml(node.name) + '">' + escapeHtml(node.name) + '</span>'
+         +   '</div>'
+         +   '<div class="ft-meta">' + c.total + ' file' + (c.total !== 1 ? 's' : '') + '</div>'
+         +   (badges ? '<div class="ft-badges">' + badges + '</div>' : '')
+         + '</div>';
+  }).join('');
+
+  area.innerHTML = '<div class="icon-grid">' + cards + '</div>';
   updateSelectionBar();
+
+  // Commit 10 note: folder-tile clicks are intentionally no-op in this commit.
+  // Commit 11 wires browseFolder navigation.
 }
 
 document.getElementById('viewMediaBtn').addEventListener('click', () => {

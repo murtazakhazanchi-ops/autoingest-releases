@@ -307,7 +307,29 @@
       gap: 10px; padding: 12px 14px;
     }
 
-    /* ── FILE TILE (icon view) ─────────────────── */
+    /* Commit 10 (v0.6.0): Folder View cards */
+    .folder-tile {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 12px; cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      display: flex; flex-direction: column; gap: 6px;
+      position: relative; user-select: none;
+      min-height: 78px;
+    }
+    .folder-tile:hover { border-color: var(--blue); background: var(--blue-dim); }
+    .folder-tile .ft-top   { display: flex; align-items: center; gap: 8px; }
+    .folder-tile .ft-icon  { font-size: 1.5rem; flex-shrink: 0; }
+    .folder-tile .ft-name  { font-size: 0.88rem; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .folder-tile .ft-meta  { font-size: 0.72rem; opacity: 0.65; letter-spacing: 0.02em; }
+    .folder-tile .ft-badges { display: flex; gap: 4px; margin-top: 2px; flex-wrap: wrap; }
+    .folder-tile .ft-badge {
+      font-size: 0.62rem; padding: 1px 5px; border-radius: 3px;
+      background: var(--blue-dim); color: var(--blue); font-weight: 600;
+    }
+    .folder-tile .ft-badge.raw   { background: #f9e2af22; color: #f9e2af; }
+    .folder-tile .ft-badge.vid   { background: #cba6f722; color: #cba6f7; }
+
+    /* ?? FILE TILE (icon view) ??????????????????? */
     .file-tile {
       background: var(--surface); border: 1px solid var(--border);
       border-radius: 8px; padding: 9px; cursor: pointer;
