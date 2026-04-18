@@ -1585,11 +1585,18 @@ async function browseFolder(drivePath, folderPath) {
 
     document.getElementById('breadcrumb').textContent = result.folderPath;
     activeFolderPath = result.folderPath;
-    // Commit 6: result.folders is a tree node {name, path, children, files}.
-    currentFolderTree = (result.folders && typeof result.folders === 'object' && !Array.isArray(result.folders))
-      ? result.folders : null;
-    // Sidebar still consumes a flat list of {name, path}: pass tree.children.
-    const sidebarFolders = currentFolderTree ? currentFolderTree.children : (Array.isArray(result.folders) ? result.folders : []);
+    // Commit 6b: preserve root tree across subfolder browses.
+    // Only overwrite currentFolderTree on a root browse (folderPath === null).
+    // Subfolder browses return a scoped tree we intentionally ignore here so the
+    // sidebar + folder-count remain anchored to the whole-card view.
+    if (folderPath === null) {
+      currentFolderTree = (result.folders && typeof result.folders === 'object' && !Array.isArray(result.folders))
+        ? result.folders : null;
+    }
+    // Sidebar always renders the root tree's top-level children.
+    const sidebarFolders = currentFolderTree
+      ? currentFolderTree.children
+      : (Array.isArray(result.folders) ? result.folders : []);
     renderFolders(sidebarFolders, result.dcimPath);
     document.querySelectorAll('.folder-item').forEach(item =>
       item.classList.toggle('active', item.dataset.path === result.folderPath));
