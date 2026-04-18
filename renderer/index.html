@@ -760,6 +760,29 @@
     #bugReportBtn:hover { opacity: 1; transform: scale(1.1); }
     #bugReportBtn svg   { width: 16px; height: 16px; }
 
+    /* Eject modal (Commit 12c) */
+    #ejectOverlay {
+      display: none; position: fixed; inset: 0; z-index: 11000;
+      background: rgba(0,0,0,0.55);
+      align-items: center; justify-content: center;
+    }
+    #ejectOverlay.visible { display: flex; }
+    #ejectModal {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 14px; padding: 28px 28px 22px; width: 380px; max-width: 92vw;
+      display: flex; flex-direction: column; gap: 14px; text-align: center;
+    }
+    #ejectModal.eject-failure #ejectIcon { color: var(--red); }
+    #ejectBtn {
+      padding: 3px 10px; font-size: 0.73rem;
+      background: transparent; border: 1px solid rgba(243, 139, 168, 0.45);
+      border-radius: 6px; color: var(--red); cursor: pointer; font-weight: 600;
+      transition: background 0.12s, border-color 0.12s, color 0.12s;
+    }
+    #ejectBtn:hover  { background: rgba(243,139,168,0.12); border-color: var(--red); }
+    #ejectBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* End eject modal */
     /* ── FEEDBACK: modal overlay ────────────────── */
     #feedbackOverlay {
       display: none; position: fixed; inset: 0;
@@ -1080,6 +1103,18 @@
       </div>
       <div id="progressSkipDetails"></div>
       <button id="progressDoneBtn">Done</button>
+    </div>
+  </div>
+
+  <!-- Eject confirmation modal (Commit 12c) -->
+  <div id="ejectOverlay">
+    <div id="ejectModal">
+      <div id="ejectIcon" class="dup-icon">✅</div>
+      <h3 id="ejectTitle">Card safely ejected</h3>
+      <p id="ejectMessage" class="dup-subtitle">You can now safely remove the card from your computer.</p>
+      <div class="dup-actions">
+        <button id="ejectOkBtn" class="dup-btn dup-btn-primary">OK</button>
+      </div>
     </div>
   </div>
 

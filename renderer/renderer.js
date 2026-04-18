@@ -885,16 +885,41 @@ document.getElementById('ejectBtn').addEventListener('click', async () => {
   }
 
   // ── Phase 4: always reset UI, report outcome ──────────────────
+  // Commit 12c: show a confirmation modal before resetting UI. Previously a
+  // 4-second toast in the footer was routinely missed because the UI jumped
+  // back to the drive-list screen at the same moment. Reset only AFTER the
+  // user clicks OK.
+  const overlay = document.getElementById('ejectOverlay');
+  const modal   = document.getElementById('ejectModal');
+  const icon    = document.getElementById('ejectIcon');
+  const title   = document.getElementById('ejectTitle');
+  const msg     = document.getElementById('ejectMessage');
+  const okBtn   = document.getElementById('ejectOkBtn');
+
+  if (modal) modal.classList.toggle('eject-failure', !ejected);
+  if (icon)  icon.textContent  = ejected ? '✅' : '⚠️';
+  if (title) title.textContent = ejected ? 'Card safely ejected' : 'Eject failed';
+  if (msg)   msg.textContent   = ejected
+    ? 'You can now safely remove the card from your computer.'
+    : 'The card could not be unmounted. Please close any open files and try again, or remove it manually.';
+
+  await new Promise(resolve => {
+    const done = () => {
+      if (overlay) overlay.classList.remove('visible');
+      if (okBtn)   okBtn.removeEventListener('click', done);
+      document.removeEventListener('keydown', onKey);
+      resolve();
+    };
+    const onKey = (e) => { if (e.key === 'Enter' || e.key === 'Escape') done(); };
+    if (okBtn)   okBtn.addEventListener('click', done);
+    document.addEventListener('keydown', onKey);
+    if (overlay) overlay.classList.add('visible');
+    if (okBtn)   okBtn.focus();
+  });
+
+  // NOW reset the UI and re-poll drives so the drive list is fresh.
   resetAppState();  // clears isShuttingDown as its last step
-
-  // Patch 14: immediate poll so drive list updates without waiting for next 5s cycle
   try { await window.api.getDrives(); } catch {}
-
-  if (ejected) {
-    showMessage('Card safely ejected.');
-  } else {
-    showMessage('Eject failed. Please remove the card manually.');
-  }
 });
 
 // ════════════════════════════════════════════════════════════════
