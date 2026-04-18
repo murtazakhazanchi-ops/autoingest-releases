@@ -1,6 +1,6 @@
 {
   "name": "auto-ingest",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "AutoIngest — Memory Card Importer",
   "main": "main/main.js",
   "scripts": {
