@@ -207,7 +207,7 @@ const RAW_PLACEHOLDER_DATA_URL =
 // Returns a file:// URL to the generated PNG, or null on any failure.
 // The caller is responsible for caching and cleanup.
 
-const QLMANAGE_TIMEOUT_MS = 5000;  // bail out if qlmanage stalls
+const QLMANAGE_TIMEOUT_MS = 8000;  // bail out if qlmanage stalls
 
 /**
  * @param {string} srcPath  Absolute path to the RAW source file.

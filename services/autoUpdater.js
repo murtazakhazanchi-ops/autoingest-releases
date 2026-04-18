@@ -81,19 +81,13 @@ function init() {
   ipcMain.on('update:install', () => {
     log('User triggered update install — quitting and installing');
     const { app } = require('electron');
-
-    // Force relaunch registration before quit — fixes Mac not reopening after update
     app.relaunch();
-
-    // Short delay so renderer can show "Restarting..." before process dies
     setTimeout(() => {
       try {
         autoUpdater.quitAndInstall(false, true);
       } catch (e) {
-        log(`quitAndInstall failed: ${e.message} — forcing quit`);
+        log(`quitAndInstall failed: ${e.message}`);
       }
-      // Hard fallback: if quitAndInstall stalls, force quit after 3s
-      // app.relaunch() above guarantees it comes back up
       setTimeout(() => app.quit(), 3000);
     }, 500);
   });

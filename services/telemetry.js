@@ -17,16 +17,21 @@
 
 const fs   = require('fs');
 const path = require('path');
-const { app } = require('electron');
 
 const TELEMETRY_ENABLED = true;   // set false to instantly disable all telemetry
 
 // ── Config — fill these in ────────────────────────────────────────────────────
 const SHEET_ID    = '1FKOL4bqScljgI8YPIMuCRNa0V7PtElnDFYaTYGx4TgU';      // ← paste your sheet ID here
 const SHEET_RANGE = "'Bug Tracker'!A:S";
-const KEY_PATH = app.isPackaged
-  ? path.join(process.resourcesPath, 'config/service-account-key.json')
-  : path.join(__dirname, '../config/service-account-key.json');
+const KEY_PATH = (() => {
+  try {
+    const { app } = require('electron');
+    if (app.isPackaged) {
+      return require('path').join(process.resourcesPath, 'config/service-account-key.json');
+    }
+  } catch {}
+  return require('path').join(__dirname, '../config/service-account-key.json');
+})();
 
 // Dedup window: ignore identical reports within this period (ms)
 const DEDUP_WINDOW_MS = 60_000;
@@ -183,6 +188,14 @@ async function flush() {
     if (consecutiveFailures >= 5 && flushTimer) {
       clearInterval(flushTimer);
       flushTimer = null;
+      // Restart timer after 5 minutes and reset counter — allows recovery after network outage
+      setTimeout(() => {
+        consecutiveFailures = 0;
+        if (!flushTimer) {
+          flushTimer = setInterval(flush, FLUSH_INTERVAL);
+          if (flushTimer.unref) flushTimer.unref();
+        }
+      }, 5 * 60 * 1000);
     }
   } finally {
     isFlushing = false;
