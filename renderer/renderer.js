@@ -69,6 +69,21 @@ let cachedDcimPath    = null; // DCIM root path, null until first drive load
 // Commit 6 (v0.6.0): folder tree object from files:get. Nested node.
 // Batches do NOT mutate this. Populated only on final browseFolder result.
 let currentFolderTree = null;
+
+// Commit 7 (v0.6.0): view-mode state. Toggles between the original flat
+// media view and the upcoming folder-tree browse view. UI toggle wired in
+// Commit 8; rendering dispatch in Commit 9. Default 'media' preserves
+// existing behaviour for every pre-Commit-8 code path.
+let viewModeType = 'media';  // 'media' | 'folder'
+
+// Tracks what the folder view is currently showing. Populated in Commits 9-11.
+// isRoot=true means the folder view should render top-level folder cards;
+// isRoot=false means we are inside a specific folder and should render its files.
+let currentFolderContext = {
+  path:   null,
+  files:  [],
+  isRoot: true,
+};
 let selectedFiles    = new Set();   // absolute source paths — selection truth
 let currentFiles     = [];          // flat list of all files in current folder
 let sortKey          = 'date';
