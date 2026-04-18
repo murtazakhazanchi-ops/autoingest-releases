@@ -378,6 +378,11 @@ class LRUThumbCache {
     }
   }
 
+  /** Return cached URL without promoting to MRU (Patch 47). */
+  peek(k) {
+    return this._map.get(k);
+  }
+
   /** Current number of cached entries (for debugging). */
   get size() { return this._map.size; }
 }
@@ -390,9 +395,6 @@ const thumbCache = new LRUThumbCache(THUMB_CACHE_MAX);
 // Single element inside .file-thumb — no overlapping layers.
 // ════════════════════════════════════════════════════════════════
 const SVG_FALLBACK_PHOTO = `<svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="9" width="34" height="26" rx="3" fill="#89b4fa22" stroke="#89b4fa" stroke-width="1.5"/><rect x="14" y="4" width="12" height="6" rx="2" fill="#89b4fa33" stroke="#89b4fa" stroke-width="1.2"/><circle cx="20" cy="23" r="7" stroke="#89b4fa" stroke-width="1.5"/><circle cx="20" cy="23" r="3.5" stroke="#89b4fa" stroke-width="1.2"/><circle cx="20" cy="23" r="1.2" fill="#89b4fa"/></svg>`;
-
-const SVG_FALLBACK_ESCAPED = SVG_FALLBACK_PHOTO
-  .replace(/'/g, '&#39;').replace(/"/g, '&quot;');
 
 function thumbHtml(file) {
   const ext   = fileExt(file.name);
@@ -407,9 +409,10 @@ function thumbHtml(file) {
       file.modifiedAt || ''
     );
 
-    const cachedUrl = thumbCache.get(cacheKey);
+    // Patch 48: use peek (no LRU promotion) for read-only access in thumbHtml
+    const cachedUrl = thumbCache.peek ? thumbCache.peek(cacheKey) : thumbCache.get(cacheKey);
 
-    return `<img 
+    return `<img
       class="thumb-img ${cachedUrl ? 'thumb-loaded' : 'lazy-thumb'}"
       data-src="${escapeHtml(file.path)}"
       data-file="${escapeHtml(file.path)}"
@@ -417,7 +420,6 @@ function thumbHtml(file) {
       data-modified="${escapeHtml(file.modifiedAt)}"
       ${cachedUrl ? `src="${cachedUrl}" data-loaded="true"` : ''}
       alt="" decoding="async"
-      onerror="this.dataset.loaded='error';this.outerHTML='${SVG_FALLBACK_ESCAPED}';"
     />`;
   }
 
@@ -531,9 +533,10 @@ if (cachedUrl) {
         // the element now represents a different file, so discard this result.
         if (img.dataset.file !== srcPath) return;
         if (!url) throw new Error('no thumbnail');
-        // Store in LRU cache before applying to DOM — so the URL is available
-        // immediately for any re-render of this file within the same session.
-        thumbCache.set(cacheKey, url);
+        // Store in LRU cache before applying to DOM (Patch 24: skip SVG placeholders)
+        if (url && !url.includes('svg+xml')) {
+          thumbCache.set(cacheKey, url);
+        }
         img.src = url;
         const done = img.decode ? img.decode().catch(() => {}) : Promise.resolve();
         return done.then(() => {
@@ -565,7 +568,8 @@ if (cachedUrl) {
           }, THUMB_RETRY_DELAY_MS);
         } else {
           img.dataset.loaded = 'error';
-          img.outerHTML = SVG_FALLBACK_PHOTO;
+          img.classList.add('thumb-error');
+          img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(SVG_FALLBACK_PHOTO)}`;
         }
       })
       .finally(() => {
@@ -623,25 +627,34 @@ function handleFileGridScroll() {
   }, SCROLL_IDLE_MS);
 }
 
+let lastRecoveryAt = 0;
+const RECOVERY_COOLDOWN_MS = 1500;
+
 /**
- * Scan all .thumb-img elements for ones stuck in no-state or 'retry' state.
- * Called after scroll idle to ensure no tile permanently stays blank.
- * Does NOT touch 'loading', 'true', or 'error' states.
+ * Scan tileMap for stuck thumbnails. Cooldown prevents over-triggering.
+ * Only processes visible or selected tiles (Patch 16).
  */
 function recoverStuckThumbs() {
   if (!showThumbnails) return;
-  const area = document.getElementById('fileGrid');
-  // Cap at 200 to avoid O(n) DOM scans on large folders causing UI jank.
-  // Tiles beyond this limit are covered by the IntersectionObserver as the
-  // user scrolls down, so nothing is permanently abandoned.
-  const imgs = Array.from(area.querySelectorAll('img.thumb-img[data-file]')).slice(0, 200);
-  imgs.forEach(img => {
+  const now = Date.now();
+  if (now - lastRecoveryAt < RECOVERY_COOLDOWN_MS) return;
+  lastRecoveryAt = now;
+
+  let recovered = 0;
+  const MAX_RECOVERIES_PER_PASS = 20;
+
+  for (const [filePath, tile] of tileMap) {
+    if (recovered >= MAX_RECOVERIES_PER_PASS) break;
+    const img = tile.querySelector('img.thumb-img[data-file]');
+    if (!img) continue;
+    if (img.dataset.visible !== 'true' && !selectedFiles.has(filePath)) continue;
     const state = img.dataset.loaded;
     if (!state || state === 'retry') {
-      delete img.dataset.queued;  // clear any stale queued flag
+      delete img.dataset.queued;
       requestThumbForImage(img, false);
+      recovered++;
     }
-  });
+  }
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -699,11 +712,13 @@ function renderDrives(cards) {
   if (activeDrive) {
     const stillPresent = cards.some(c => c.mountpoint === activeDrive.mountpoint);
     if (!stillPresent) {
+      // Patch 35: abort any running import immediately before clearing state
+      window.api.abortCopy();
       // Stop any running import gracefully (importRunning flag gates further IPC)
       importRunning = false;
       // Close progress overlay if open
       document.getElementById('progressOverlay').classList.remove('visible');
-      showMessage('Card disconnected.');
+      showMessage('Card disconnected. Import cancelled.');
       resetAppState();
       return;
     }
@@ -730,6 +745,7 @@ function renderDrives(cards) {
 }
 
 async function selectDrive(drive) {
+  if (isShuttingDown) return; // Patch 13: block during eject
   hasSelectedDrive = true;
   isLoadingFiles   = false;  // not loading files — waiting for user to pick a folder
   currentFolder    = null;   // no folder selected yet
@@ -850,6 +866,9 @@ document.getElementById('ejectBtn').addEventListener('click', async () => {
 
   // ── Phase 4: always reset UI, report outcome ──────────────────
   resetAppState();  // clears isShuttingDown as its last step
+
+  // Patch 14: immediate poll so drive list updates without waiting for next 5s cycle
+  try { await window.api.getDrives(); } catch {}
 
   if (ejected) {
     showMessage('Card safely ejected.');
@@ -1057,10 +1076,7 @@ function renderFileArea(files) {
     area.innerHTML = sections.map(s => buildSectionHtml(s)).join('');
   }
 
-  // Build tileMap from the freshly rendered DOM (O(n) once, then O(1) forever)
-  area.querySelectorAll('.file-tile').forEach(tile => {
-    if (tile.dataset.path) tileMap.set(tile.dataset.path, tile);
-  });
+  // Patch 27: create observer BEFORE building tileMap, then do one combined pass
 
   // Create ONE IntersectionObserver scoped to #fileGrid.
   // root: area          — observe within the scroll container, not the full viewport
@@ -1087,20 +1103,31 @@ function renderFileArea(files) {
     threshold:  0,
   });
 
-  // Observe ALL thumb-img elements. data-observed guards against double-observation
-  // if this code path were ever reached with the same DOM nodes.
-  area.querySelectorAll('img.thumb-img[data-file]').forEach(img => {
-    if (!img.dataset.observed) {
+  // Build tileMap + observe imgs in one combined pass (Patch 27)
+  area.querySelectorAll('.file-tile').forEach(tile => {
+    if (tile.dataset.path) tileMap.set(tile.dataset.path, tile);
+    const img = tile.querySelector('img.thumb-img[data-file]');
+    if (img && !img.dataset.observed) {
       img.dataset.observed = 'true';
       thumbObserver.observe(img);
     }
-    if (selectedFiles.has(img.dataset.file)) requestThumbForImage(img, true, currentSession);
+    if (img && selectedFiles.has(img.dataset.file)) requestThumbForImage(img, true, currentSession);
   });
 
   area.onscroll = handleFileGridScroll;
 
   // Note: NO per-tile addEventListener here.
   // ALL tile interaction is handled by the delegated listener below.
+
+  // Patch 31: delegated error listener for image load failures
+  area.addEventListener('error', (e) => {
+    const img = e.target;
+    if (!(img instanceof HTMLImageElement) || !img.classList.contains('thumb-img')) return;
+    if (img.dataset.loaded === 'error') return;
+    img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(SVG_FALLBACK_PHOTO)}`;
+    img.dataset.loaded = 'error';
+    img.classList.add('thumb-error');
+  }, true);
 
   updateSelectionBar();
 
@@ -1693,9 +1720,9 @@ function showDupWarning(duplicates, total) {
     const onSkip   = () => close('skip');
     const onAll    = () => close('import-all');
     const onCancel = () => close('cancel');
-    document.getElementById('dupSkipBtn').addEventListener('click', onSkip);
-    document.getElementById('dupImportAllBtn').addEventListener('click', onAll);
-    document.getElementById('dupCancelBtn').addEventListener('click', onCancel);
+    document.getElementById('dupSkipBtn').addEventListener('click', onSkip, { once: true });
+    document.getElementById('dupImportAllBtn').addEventListener('click', onAll, { once: true });
+    document.getElementById('dupCancelBtn').addEventListener('click', onCancel, { once: true });
   });
 }
 
@@ -1907,6 +1934,7 @@ document.getElementById('importBtn').addEventListener('click', async () => {
 
   try {
     const summary = await window.api.importFiles(filePaths, destPath);
+    if (!activeDrive) return; // Patch 36: card was disconnected mid-import; reset already ran
     showProgressSummary(summary);
     // Refresh both caches after import so badges survive a destination change
     await refreshDestCache();
@@ -1963,9 +1991,13 @@ async function initApp() {
     globalImportIndex = {};
   }
 
-  // Initialise dest path with the index already in memory so any
-  // syncImportedBadges() called from setDestPath sees correct data.
-  window.api.getDefaultDest().then(p => setDestPath(p));
+  // Patch 49: await default-dest so import index is loaded before setDestPath runs
+  try {
+    const p = await window.api.getDefaultDest();
+    await setDestPath(p);
+  } catch (e) {
+    console.error('Failed to load default destination', e);
+  }
 
   // Register batch listener before the initial getDrives call so no
   // in-flight batch event is missed between registration and first poll.
@@ -2016,9 +2048,9 @@ function showWhatsNewModal({ version, notes }) {
   document.body.appendChild(modal);
 
   const close = () => modal.remove();
-  document.getElementById('wnCloseBtn').addEventListener('click', close);
+  document.getElementById('wnCloseBtn').addEventListener('click', close, { once: true });
   // Also close on backdrop click
-  modal.addEventListener('click', e => { if (e.target === modal) close(); });
+  modal.addEventListener('click', e => { if (e.target === modal) close(); }, { once: true });
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -2417,4 +2449,19 @@ async function _submitFeedback() {
 
   // Dismiss (hides banner; update still downloaded and will apply on next launch)
   dismissBtn.addEventListener('click', hideBanner);
+
+  // Patch 46: replay last update state if renderer was reloaded mid-update
+  if (window.api.getLastUpdateState) {
+    window.api.getLastUpdateState().then(state => {
+      if (!state) return;
+      if (state.channel === 'update:available') {
+        msgEl.textContent = `Downloading update v${state.payload.version}…`;
+        showBanner();
+      } else if (state.channel === 'update:ready') {
+        msgEl.textContent = `v${state.payload.version} ready to install`;
+        installBtn.style.display = 'inline-block';
+        showBanner();
+      }
+    }).catch(() => {});
+  }
 })();

@@ -76,6 +76,29 @@ function getCacheDir() {
   return cacheDir;
 }
 
+// ── Startup cache sweep (Patch 23) ───────────────────────────────────────────
+let sweepDone = false;
+function sweepExpiredCache() {
+  if (sweepDone) return;
+  sweepDone = true;
+  setImmediate(async () => {
+    try {
+      const dir   = getCacheDir();
+      const files = await fsp.readdir(dir);
+      const now   = Date.now();
+      for (const f of files) {
+        if (!f.endsWith('.jpg')) continue;
+        try {
+          const st = await fsp.stat(path.join(dir, f));
+          if (now - st.mtimeMs > MAX_CACHE_AGE) {
+            await fsp.unlink(path.join(dir, f)).catch(() => {});
+          }
+        } catch {}
+      }
+    } catch {}
+  });
+}
+
 // ── Cache key ─────────────────────────────────────────────────────────────────
 function thumbPath(srcPath, mtimeMs, size) {
   const key  = `${path.normalize(srcPath)}:${size}:${mtimeMs}`;
@@ -403,10 +426,6 @@ function withConcurrencyLimit(fn) {
   });
 }
 
-// ── In-memory promise deduplication ──────────────────────────────────────────
-// Map<thumbFilePath, Promise<string|null>>
-const inFlight = new Map();
-
 // ── Public API ─────────────────────────────────────────────────────────────────
 
 /**
@@ -418,6 +437,7 @@ const inFlight = new Map();
  * @returns {Promise<string|null>}
  */
 async function getThumbnail(srcPath) {
+  sweepExpiredCache(); // Patch 23: run once on first call (idempotent)
   srcPath = path.normalize(srcPath);
 
   let stat;
@@ -482,39 +502,28 @@ async function getThumbnail(srcPath) {
       } catch {}
     }
 
-    // In-flight dedup (memory level)
-    if (inFlightCache.has(key)) return await inFlightCache.get(key);
-
-    // In-flight dedup (disk level)
-    if (inFlight.has(tPath)) return inFlight.get(tPath);
+    // In-flight dedup — use inFlightCache (Patch 15: removed duplicate inFlight map)
+    if (inFlightCache.has(key)) {
+      return inFlightCache.get(key);
+    }
 
     // Full generation — inner gate (CONCURRENCY_LIMIT = 4) limits heavy I/O
-    const promise = (async () => {
+    const promise = withConcurrencyLimit(async () => {
       try {
-        return await withConcurrencyLimit(async () => {
-          try {
-            const result = await generateThumbnailDataUrl(srcPath, tPath);
-            const url = result || PLACEHOLDER_DATA_URL;
-            thumbnailCache.set(key, url);
-            return url;
-          } catch (err) {
-            console.error('[thumbnailer] thumbnail error for', srcPath, err.message);
-            return PLACEHOLDER_DATA_URL;
-          }
-        });
-      } finally {
-        inFlightCache.delete(key);
+        const result = await generateThumbnailDataUrl(srcPath, tPath);
+        const url = result || PLACEHOLDER_DATA_URL;
+        thumbnailCache.set(key, url);
+        return url;
+      } catch (err) {
+        console.error('[thumbnailer] thumbnail error for', srcPath, err.message);
+        return PLACEHOLDER_DATA_URL;
       }
-    })();
+    }).finally(() => {
+      inFlightCache.delete(key);
+    });
 
     inFlightCache.set(key, promise);
-    inFlight.set(tPath, promise);
-
-    try {
-      return await promise;
-    } finally {
-      inFlight.delete(tPath);
-    }
+    return promise;
   });
 }
 
