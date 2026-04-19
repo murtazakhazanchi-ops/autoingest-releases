@@ -8,7 +8,8 @@ const { detectMemoryCards }          = require('./driveDetector');
 const { readDirectory, getDCIMPath, scanPrivateFolder, safeExists, scanMediaRecursive, buildFolderTree } = require('./fileBrowser');
 const { copyFiles, setPaused, getFileHash, abortCopy } = require('./fileManager');
 const { getThumbnail, shutdownWorkers } = require('../services/thumbnailer');
-const listManager = require('./listManager');
+const listManager  = require('./listManager');
+const aliasEngine  = require('./aliasEngine');
 const { log } = require('../services/logger');
 const telemetry     = require('../services/telemetry');
 const crashReporter = require('../services/crashReporter');
@@ -151,6 +152,7 @@ app.whenReady().then(() => {
   log('App started');
   loadImportIndex();
   listManager.init(app.getPath('userData'));
+  aliasEngine.init(app.getPath('userData'));
   telemetry.init();
   const mainWindow = createWindow();
   crashReporter.init(mainWindow);
@@ -539,8 +541,10 @@ ipcMain.handle('debug:telemetry', async () => {
 
 // ── List manager ──────────────────────────────────────────────────────────────
 
-ipcMain.handle('lists:get', (_event, name) => listManager.getList(name));
-ipcMain.handle('lists:add', (_event, name, value) => listManager.addToList(name, value));
+ipcMain.handle('lists:get',        (_event, name)                              => listManager.getList(name));
+ipcMain.handle('lists:add',        (_event, name, value)                       => listManager.addToList(name, value));
+ipcMain.handle('lists:match',      (_event, name, input)                       => aliasEngine.match(input, name, listManager.getList(name)));
+ipcMain.handle('lists:learnAlias', (_event, name, canonicalId, label, typed)   => aliasEngine.learnAlias(name, canonicalId, label, typed));
 
 // TEMP DEBUG
 ipcMain.handle('debug:flush', async () => {

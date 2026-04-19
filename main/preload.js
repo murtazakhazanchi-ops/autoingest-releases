@@ -138,7 +138,9 @@ contextBridge.exposeInMainWorld('api', {
   getLastUpdateState: () => ipcRenderer.invoke('update:getLastState'),
 
   // ── Controlled lists ──
-  getLists:  (name)        => ipcRenderer.invoke('lists:get', name),
-  addToList: (name, value) => ipcRenderer.invoke('lists:add', name, value),
+  getLists:    (name)                                  => ipcRenderer.invoke('lists:get',        name),
+  addToList:   (name, value)                           => ipcRenderer.invoke('lists:add',        name, value),
+  matchList:   (name, input)                           => ipcRenderer.invoke('lists:match',      name, input),
+  learnAlias:  (name, canonicalId, label, typedInput)  => ipcRenderer.invoke('lists:learnAlias', name, canonicalId, label, typedInput),
 
 });
