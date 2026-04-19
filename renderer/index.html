@@ -965,6 +965,160 @@
       text-transform: uppercase; letter-spacing: 0.06em;
       font-family: 'SF Mono', 'Fira Code', monospace;
     }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       TreeAutocomplete component
+       ═══════════════════════════════════════════════════════════════════════ */
+
+    .tac { position: relative; width: 100%; }
+
+    .tac-row {
+      display: flex; align-items: center; gap: 4px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 6px; padding: 0 10px;
+      transition: border-color 0.15s;
+    }
+    .tac-row:focus-within { border-color: var(--blue); }
+    .tac-disabled .tac-row { opacity: 0.45; pointer-events: none; }
+
+    .tac-inp {
+      flex: 1; min-width: 0;
+      background: transparent; border: none; outline: none;
+      color: var(--text); font-size: 0.875rem;
+      padding: 8px 0;
+    }
+    .tac-inp::placeholder { color: var(--subtext); opacity: 0.55; }
+
+    .tac-clear-btn {
+      background: none; border: none; cursor: pointer;
+      color: var(--subtext); font-size: 1.05rem; padding: 0 2px; line-height: 1;
+      flex-shrink: 0;
+    }
+    .tac-clear-btn:hover { color: var(--text); }
+
+    .tac-chev {
+      color: var(--subtext); font-size: 0.72rem;
+      pointer-events: none; flex-shrink: 0;
+      transition: transform 0.15s;
+    }
+    .tac-chev::before { content: '▾'; }
+    .tac[data-open] .tac-chev { transform: rotate(180deg); }
+
+    /* ── Dropdown panel ────────────────────────────────────────────────────── */
+    .tac-dd {
+      position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+      z-index: 9500;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,0.45);
+      max-height: 320px; overflow-y: auto; overflow-x: hidden;
+    }
+
+    /* ── Search result items ───────────────────────────────────────────────── */
+    .tac-item {
+      display: flex; align-items: center; gap: 6px;
+      padding: 7px 12px; cursor: pointer;
+      color: var(--text); font-size: 0.875rem;
+    }
+    .tac-item:hover, .tac-item.tac-active { background: var(--surface2); }
+    .tac-item-lbl { flex: 1; }
+
+    .tac-alias-badge {
+      font-size: 0.67rem; padding: 1px 5px; border-radius: 3px;
+      background: var(--mauve); color: var(--bg); flex-shrink: 0;
+    }
+
+    .tac-bc {
+      font-size: 0.71rem; color: var(--subtext); flex-shrink: 0;
+      max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    mark.tac-hl { background: none; color: var(--blue); font-weight: 600; }
+
+    /* ── Add New ───────────────────────────────────────────────────────────── */
+    .tac-add {
+      display: flex; align-items: center; gap: 6px;
+      padding: 7px 12px; cursor: pointer;
+      color: var(--green); font-size: 0.875rem;
+      border-top: 1px solid var(--border);
+    }
+    .tac-add:hover, .tac-add.tac-active { background: var(--surface2); }
+    .tac-add-plus { font-weight: 700; font-size: 1.1rem; }
+    .tac-add-val  { font-style: normal; }
+
+    /* ── Empty / flat hint ─────────────────────────────────────────────────── */
+    .tac-empty, .tac-flat-hint {
+      padding: 10px 14px; color: var(--subtext); font-size: 0.84rem; font-style: italic;
+    }
+
+    /* ── Tree: category headers ────────────────────────────────────────────── */
+    .tac-cat { border-bottom: 1px solid var(--border); }
+    .tac-cat:last-child { border-bottom: none; }
+
+    .tac-cat-hdr {
+      display: flex; align-items: center; gap: 7px;
+      padding: 6px 10px; cursor: pointer; user-select: none;
+      color: var(--subtext); font-size: 0.78rem;
+      font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .tac-cat-hdr:hover { background: var(--surface2); }
+    .tac-cat-body { padding: 2px 0 4px; }
+
+    /* ── Tree: parent events / locations ───────────────────────────────────── */
+    .tac-ev-hdr {
+      display: flex; align-items: center; gap: 7px;
+      padding: 6px 10px 6px 16px; cursor: pointer; user-select: none;
+      color: var(--text); font-size: 0.875rem;
+    }
+    .tac-ev-hdr:hover { background: var(--surface2); }
+
+    /* ── Tree: leaf nodes ──────────────────────────────────────────────────── */
+    .tac-leaf {
+      padding: 6px 12px 6px 22px; cursor: pointer;
+      color: var(--text); font-size: 0.875rem;
+    }
+    .tac-leaf:hover, .tac-leaf.tac-active { background: var(--surface2); }
+
+    .tac-leaf-sub {
+      padding-left: 38px; color: var(--subtext);
+    }
+    .tac-leaf-sub:hover, .tac-leaf-sub.tac-active { color: var(--text); background: var(--surface2); }
+
+    .tac-leaf-general {
+      padding-left: 38px; color: var(--peach); font-style: italic;
+    }
+    .tac-leaf-general:hover, .tac-leaf-general.tac-active { background: var(--surface2); }
+
+    /* ── Tree chevrons ─────────────────────────────────────────────────────── */
+    .tac-tc { font-size: 0.68rem; color: var(--blue); width: 12px; flex-shrink: 0; }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       TAC smoke-test modal  (remove after Commit B)
+       ═══════════════════════════════════════════════════════════════════════ */
+    #tacTestOverlay {
+      display: none; position: fixed; inset: 0; z-index: 10000;
+      background: rgba(0,0,0,0.6); align-items: center; justify-content: center;
+    }
+    #tacTestOverlay.visible { display: flex; }
+    #tacTestModal {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+      padding: 24px; width: 640px; max-height: 88vh; overflow-y: auto;
+      display: flex; flex-direction: column; gap: 20px;
+    }
+    #tacTestModal h2 { color: var(--blue); font-size: 1rem; }
+    .tac-test-row { display: flex; flex-direction: column; gap: 6px; }
+    .tac-test-row label { font-size: 0.8rem; color: var(--subtext); }
+    #tacTestLog {
+      background: var(--surface2); border-radius: 6px; padding: 10px;
+      font-size: 0.78rem; color: var(--subtext); min-height: 60px; max-height: 120px;
+      overflow-y: auto; font-family: monospace; white-space: pre-wrap;
+    }
+    #tacTestClose {
+      align-self: flex-end; padding: 6px 16px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text); cursor: pointer; font-size: 0.85rem;
+    }
+    #tacTestClose:hover { border-color: var(--blue); color: var(--blue); }
+
   </style>
 </head>
 <body>
@@ -1271,6 +1425,41 @@
     </div>
   </div>
 
+  <!-- TAC smoke-test modal (remove after Commit B) ─────────────────────── -->
+  <div id="tacTestOverlay">
+    <div id="tacTestModal">
+      <h2>TreeAutocomplete — Smoke Test  <small style="color:var(--subtext);font-weight:400">(Ctrl+Shift+T to toggle)</small></h2>
+
+      <div class="tac-test-row">
+        <label>Event Type (read-only, no Add New)</label>
+        <div id="tacTestEventType"></div>
+      </div>
+
+      <div class="tac-test-row">
+        <label>City (Add New allowed)</label>
+        <div id="tacTestCity"></div>
+      </div>
+
+      <div class="tac-test-row">
+        <label>Location (Add New allowed)</label>
+        <div id="tacTestLocation"></div>
+      </div>
+
+      <div class="tac-test-row">
+        <label>Photographer (Add New allowed)</label>
+        <div id="tacTestPhotographer"></div>
+      </div>
+
+      <div class="tac-test-row">
+        <label>Selection log</label>
+        <div id="tacTestLog">— nothing selected yet —</div>
+      </div>
+
+      <button id="tacTestClose">Close</button>
+    </div>
+  </div>
+
+  <script src="treeAutocomplete.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>

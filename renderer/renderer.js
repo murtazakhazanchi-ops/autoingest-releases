@@ -2823,3 +2823,63 @@ async function _submitFeedback() {
     }).catch(() => {});
   }
 })();
+
+// ── TAC smoke-test panel (remove after Commit B) ──────────────────────────────
+(function initTacTestPanel() {
+  const overlay  = document.getElementById('tacTestOverlay');
+  const closeBtn = document.getElementById('tacTestClose');
+  const log      = document.getElementById('tacTestLog');
+  if (!overlay) return;
+
+  let instances = null;
+
+  function logSelection(type, val) {
+    const ts  = new Date().toLocaleTimeString();
+    const msg = val
+      ? `[${ts}] ${type}: "${val.label}"  (id: ${val.id})`
+      : `[${ts}] ${type}: cleared`;
+    log.textContent = msg + '\n' + log.textContent;
+  }
+
+  function mountInstances() {
+    if (instances) return;
+    instances = [
+      new TreeAutocomplete({
+        container:   document.getElementById('tacTestEventType'),
+        type:        'event-types',
+        placeholder: 'Select event type…',
+        onSelect:    v => logSelection('event-types', v),
+      }),
+      new TreeAutocomplete({
+        container:   document.getElementById('tacTestCity'),
+        type:        'cities',
+        placeholder: 'Select or add city…',
+        onSelect:    v => logSelection('cities', v),
+      }),
+      new TreeAutocomplete({
+        container:   document.getElementById('tacTestLocation'),
+        type:        'locations',
+        placeholder: 'Select or add location…',
+        onSelect:    v => logSelection('locations', v),
+      }),
+      new TreeAutocomplete({
+        container:   document.getElementById('tacTestPhotographer'),
+        type:        'photographers',
+        placeholder: 'Select or add photographer…',
+        onSelect:    v => logSelection('photographers', v),
+      }),
+    ];
+  }
+
+  function open()  { mountInstances(); overlay.classList.add('visible'); }
+  function close() { overlay.classList.remove('visible'); }
+
+  closeBtn.addEventListener('click', close);
+  overlay.addEventListener('mousedown', e => { if (e.target === overlay) close(); });
+
+  document.addEventListener('keydown', e => {
+    const mod = e.ctrlKey || e.metaKey;
+    if (mod && e.shiftKey && e.key === 'T') { e.preventDefault(); overlay.classList.contains('visible') ? close() : open(); }
+    if (e.key === 'Escape' && overlay.classList.contains('visible')) close();
+  });
+}());
