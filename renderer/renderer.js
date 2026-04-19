@@ -704,9 +704,32 @@ async function refreshDestCache() {
 // ════════════════════════════════════════════════════════════════
 // STEP RAIL
 // ════════════════════════════════════════════════════════════════
+
+// 'card' = import-from-card path  |  'event' = event-creation path
+let railMode = 'card';
+
+const RAIL_LABELS = {
+  card:  ['Select Memory Card', 'Browse &amp; Select Files', 'Import'],
+  event: ['Create Collection',  'Create Event',              'Import'],
+};
+
+function setRailMode(mode) {
+  if (railMode === mode) return;
+  railMode = mode;
+  const labels = RAIL_LABELS[mode];
+  document.getElementById('step1Label').innerHTML = labels[0];
+  document.getElementById('step2Label').innerHTML = labels[1];
+  document.getElementById('step3Label').innerHTML = labels[2];
+}
+
 function updateSteps() {
-  // Commit 12d: collapsed to 3 steps. Browse + Select merged into one
-  // since the folder-view workflow treats them as a single activity.
+  if (railMode === 'event') {
+    setStep('step1Indicator', 'active');
+    setStep('step2Indicator', '');
+    setStep('step3Indicator', '');
+    return;
+  }
+  // card path
   const hasDrive = activeDrive !== null;
   const hasSel   = selectedFiles.size > 0;
   setStep('step1Indicator', !hasDrive ? 'active' : 'done');
@@ -718,6 +741,29 @@ function setStep(id, state) {
   el.classList.remove('active','done');
   if (state) el.classList.add(state);
 }
+
+// ════════════════════════════════════════════════════════════════
+// EVENT CREATOR NAVIGATION
+// ════════════════════════════════════════════════════════════════
+
+function showEventCreator() {
+  document.getElementById('step1Panel').style.display        = 'none';
+  document.getElementById('workspace').classList.remove('visible');
+  document.getElementById('eventCreatorPanel').classList.add('visible');
+  setRailMode('event');
+  updateSteps();
+}
+
+function showLanding() {
+  document.getElementById('eventCreatorPanel').classList.remove('visible');
+  document.getElementById('workspace').classList.remove('visible');
+  document.getElementById('step1Panel').style.display = '';
+  setRailMode('card');
+  updateSteps();
+}
+
+document.getElementById('createEventBtn').addEventListener('click', showEventCreator);
+document.getElementById('ecBackBtn').addEventListener('click', showLanding);
 
 // ════════════════════════════════════════════════════════════════
 // DRIVE SELECTION
@@ -836,9 +882,11 @@ function resetAppState() {
   document.getElementById('folderList').innerHTML = '';
   document.getElementById('breadcrumb').textContent = '';
 
-  // Hide workspace, show landing screen
+  // Hide workspace + event creator, show landing screen
   document.getElementById('workspace').classList.remove('visible');
+  document.getElementById('eventCreatorPanel').classList.remove('visible');
   document.getElementById('step1Panel').style.display = '';
+  setRailMode('card');
 
   updateSteps();
   updateSelectionBar();

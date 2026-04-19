@@ -119,15 +119,58 @@
     .step.done   { opacity: 0.75; }
     .step.done   .step-num { background: var(--green); color: var(--surface2); }
 
-    /* ── STEP 1 PANEL ─────────────────────────── */
+    /* ── LANDING (two-column) ─────────────────── */
     #step1Panel {
-      display: flex; flex-direction: column; align-items: center;
-      justify-content: center; gap: 20px; flex: 1; padding: 40px 24px;
+      display: flex; flex-direction: row; flex: 1; overflow: hidden;
     }
-    #step1Panel .step-hero { font-size: 3rem; }
-    #step1Panel h2 { font-size: 1.1rem; opacity: 0.8; }
-    #step1Panel p  { font-size: 0.85rem; opacity: 0.4; }
+
+    #landingCard, #landingEvent {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 18px; flex: 1; padding: 40px 32px;
+    }
+    #landingEvent { background: var(--surface3); }
+    #landingEvent:hover { background: color-mix(in srgb, var(--surface3) 85%, var(--blue) 15%); }
+    #landingCard h2, #landingEvent h2 { font-size: 1.1rem; font-weight: 600; }
+    #landingCard p,  #landingEvent p  { font-size: 0.84rem; opacity: 0.45; text-align: center; line-height: 1.55; }
+    .landing-icon { font-size: 3rem; }
+
+    .landing-divider {
+      width: 1px; background: var(--border); flex-shrink: 0; align-self: stretch;
+    }
+
+    .landing-cta {
+      margin-top: 8px; padding: 10px 28px;
+      background: var(--blue); color: var(--bg);
+      border: none; border-radius: 8px;
+      font-size: 0.9rem; font-weight: 700; cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .landing-cta:hover { opacity: 0.85; }
+
     #driveListLarge { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+
+    /* ── EVENT CREATOR PANEL ──────────────────── */
+    #eventCreatorPanel {
+      display: none; flex-direction: column; flex: 1; overflow: hidden;
+    }
+    #eventCreatorPanel.visible { display: flex; }
+
+    #ecHeader {
+      display: flex; align-items: center; gap: 14px;
+      padding: 10px 20px; background: var(--surface3);
+      border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    #ecTitle { font-size: 0.95rem; font-weight: 600; color: var(--text); }
+    .ec-back-btn {
+      background: none; border: 1px solid var(--border); border-radius: 6px;
+      color: var(--subtext); font-size: 0.8rem; padding: 4px 10px; cursor: pointer;
+    }
+    .ec-back-btn:hover { border-color: var(--blue); color: var(--blue); }
+
+    #ecBody {
+      flex: 1; overflow-y: auto; padding: 32px;
+      display: flex; flex-direction: column; align-items: center;
+    }
     .drive-card-large {
       display: flex; flex-direction: column; align-items: center; gap: 8px;
       padding: 18px 24px; background: var(--surface); border: 1px solid var(--border);
@@ -1139,21 +1182,49 @@
   </div>
 
   <div id="stepRail">
-    <div class="step active" id="step1Indicator"><span class="step-num">1</span> Select Memory Card</div>
-    <div class="step"        id="step2Indicator"><span class="step-num">2</span> Browse &amp; Select Files</div>
-    <div class="step"        id="step3Indicator"><span class="step-num">3</span> Import</div>
+    <div class="step active" id="step1Indicator"><span class="step-num">1</span> <span id="step1Label">Select Memory Card</span></div>
+    <div class="step"        id="step2Indicator"><span class="step-num">2</span> <span id="step2Label">Browse &amp; Select Files</span></div>
+    <div class="step"        id="step3Indicator"><span class="step-num">3</span> <span id="step3Label">Import</span></div>
   </div>
 
-  <!-- STEP 1 -->
+  <!-- LANDING (two-column) -->
   <div id="step1Panel">
-    <div class="step-hero">💾</div>
-    <h2>Connect a Camera Memory Card</h2>
-    <p id="step1Subtitle">Insert a camera card to start browsing photos and videos.</p>
-    <div id="driveListLarge">
-      <div id="noDriveMsg">
-        <span class="msg-icon">🔍</span>
-        <span>Scanning for memory cards…</span>
+
+    <!-- Left: Card picker -->
+    <div id="landingCard">
+      <div class="landing-icon">📸</div>
+      <h2>Select Memory Card</h2>
+      <p id="step1Subtitle">Insert a camera card to start browsing photos and videos.</p>
+      <div id="driveListLarge">
+        <div id="noDriveMsg">
+          <span class="msg-icon">🔍</span>
+          <span>Scanning for memory cards…</span>
+        </div>
       </div>
+    </div>
+
+    <!-- Divider -->
+    <div class="landing-divider"></div>
+
+    <!-- Right: Create Event -->
+    <div id="landingEvent">
+      <div class="landing-icon">🗂️</div>
+      <h2>Create Event</h2>
+      <p>Set up a master collection and event<br>structure before importing files.</p>
+      <button id="createEventBtn" class="landing-cta">Create Event →</button>
+    </div>
+
+  </div>
+
+  <!-- EVENT CREATOR PANEL (shell; populated in Commits C + D) -->
+  <div id="eventCreatorPanel">
+    <div id="ecHeader">
+      <button id="ecBackBtn" class="ec-back-btn">← Back</button>
+      <span id="ecTitle">Create Event</span>
+    </div>
+    <div id="ecBody">
+      <!-- Master creation form injected by Commit C -->
+      <!-- Event creation form injected by Commit D -->
     </div>
   </div>
 
