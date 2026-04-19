@@ -3,7 +3,9 @@ dist/
 out/
 .DS_Store
 Thumbs.db
-data/*.json
+# Runtime-generated data (never committed)
+data/importIndex.json
+data/syncQueue.json
 .env
 config/service-account-key.json
 

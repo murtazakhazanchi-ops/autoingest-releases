@@ -1,0 +1,778 @@
+[
+  {
+    "label": "00 Miqat",
+    "children": [
+      {
+        "label": "Ayyam al-Beez"
+      },
+      {
+        "label": "Ayyam al-Tashreeq"
+      },
+      {
+        "label": "Chehlum"
+      },
+      {
+        "label": "Eid al-Adha"
+      },
+      {
+        "label": "Eid al-Fitr"
+      },
+      {
+        "label": "Eid Ghadire Khum"
+      },
+      {
+        "label": "Istifadah Ilmiyah"
+      },
+      {
+        "label": "Lailat al-Eid al-Adha"
+      },
+      {
+        "label": "Lailat al-Eid al-Fitr"
+      },
+      {
+        "label": "Lailat al-Meraj"
+      },
+      {
+        "label": "Lailat al-Nisf/Shab e Barat"
+      },
+      {
+        "label": "Lailat al-Qadr"
+      },
+      {
+        "label": "Mawkib"
+      },
+      {
+        "label": "Milad"
+      },
+      {
+        "label": "Milad Imam Zaman"
+      },
+      {
+        "label": "Milad Mawkib"
+      },
+      {
+        "label": "Milad Nabi"
+      },
+      {
+        "label": "Rasme Saifee"
+      },
+      {
+        "label": "Shahadat"
+      },
+      {
+        "label": "Shehrullah"
+      },
+      {
+        "label": "Urs"
+      },
+      {
+        "label": "Yaum al-Mabath"
+      },
+      {
+        "label": "Yaum Arafa"
+      },
+      {
+        "label": "Zikra"
+      }
+    ]
+  },
+  {
+    "label": "01 Ashara Mubarakah",
+    "children": [
+      {
+        "label": "Ashara Fasal"
+      },
+      {
+        "label": "Ashara Highlights"
+      },
+      {
+        "label": "Ashara Majlis"
+      },
+      {
+        "label": "Ashara Mubaraka"
+      },
+      {
+        "label": "Ashara Ohbat"
+      },
+      {
+        "label": "Ashara Waaz"
+      },
+      {
+        "label": "Ashura"
+      },
+      {
+        "label": "Lailat Ashura"
+      },
+      {
+        "label": "Maqtal"
+      },
+      {
+        "label": "Niyaz araz"
+      },
+      {
+        "label": "Taqreer"
+      }
+    ]
+  },
+  {
+    "label": "02 AJS",
+    "children": [
+      {
+        "label": "Abna al-Jamea"
+      },
+      {
+        "label": "AJSK"
+      },
+      {
+        "label": "AJSM"
+      },
+      {
+        "label": "AJSN"
+      },
+      {
+        "label": "AJSS"
+      },
+      {
+        "label": "Imtihan Ikhtetaam"
+      },
+      {
+        "label": "Imtihan Results"
+      },
+      {
+        "label": "Imtihan Shafahi"
+      },
+      {
+        "label": "Imtihan Tehriri"
+      },
+      {
+        "label": "Majhudaat"
+      },
+      {
+        "label": "Munaqasha"
+      },
+      {
+        "label": "Nadwat"
+      },
+      {
+        "label": "Omara AJS"
+      },
+      {
+        "label": "Omara/Hadiashar Ziyafat"
+      },
+      {
+        "label": "Tadbir Manzili"
+      },
+      {
+        "label": "Talabat"
+      },
+      {
+        "label": "Talebaat"
+      }
+    ]
+  },
+  {
+    "label": "03 Namaz",
+    "children": [
+      {
+        "label": "17 mi raat"
+      },
+      {
+        "label": "19 mi raat"
+      },
+      {
+        "label": "21 mi raat"
+      },
+      {
+        "label": "30 mi raat"
+      },
+      {
+        "label": "30 mi raat Ehya al-Lail"
+      },
+      {
+        "label": "Aakhri Jumua"
+      },
+      {
+        "label": "Bihori"
+      },
+      {
+        "label": "Fajr Namaz"
+      },
+      {
+        "label": "Isha Namaz"
+      },
+      {
+        "label": "Ittesaal"
+      },
+      {
+        "label": "Janaza"
+      },
+      {
+        "label": "Jumua"
+      },
+      {
+        "label": "Khutba"
+      },
+      {
+        "label": "Maghrib/Isha Namaz"
+      },
+      {
+        "label": "Namaz"
+      },
+      {
+        "label": "Pehli Rajab"
+      },
+      {
+        "label": "Salaat al-Zawaal"
+      },
+      {
+        "label": "Tahiyyat al-Masjid"
+      },
+      {
+        "label": "Tasbeeh al-Azam"
+      },
+      {
+        "label": "Washeq"
+      },
+      {
+        "label": "Zohr Asr Namaz"
+      }
+    ]
+  },
+  {
+    "label": "04 Majlis",
+    "children": [
+      {
+        "label": "Aqiqa"
+      },
+      {
+        "label": "Ayyam al-Barakat al-Khuldiyyah"
+      },
+      {
+        "label": "Daur al-Quran"
+      },
+      {
+        "label": "Istiqbal"
+      },
+      {
+        "label": "Khushi Majlis"
+      },
+      {
+        "label": "Maqdam"
+      },
+      {
+        "label": "Misaq",
+        "children": [
+          {
+            "label": "Ahed al-Awliyah"
+          },
+          {
+            "label": "Safqat"
+          }
+        ]
+      },
+      {
+        "label": "Nikah Majlis"
+      },
+      {
+        "label": "Pehli raat/tarikh Majlis"
+      },
+      {
+        "label": "Raat Majlis"
+      },
+      {
+        "label": "Suyum Majlis"
+      },
+      {
+        "label": "Urs Majlis"
+      },
+      {
+        "label": "Waaz"
+      },
+      {
+        "label": "Wada Majlis"
+      },
+      {
+        "label": "Waqf Majlis"
+      }
+    ]
+  },
+  {
+    "label": "05 Bethak",
+    "children": [
+      {
+        "label": "Bethak"
+      },
+      {
+        "label": "Haddiyat"
+      },
+      {
+        "label": "Ikram Bethak"
+      },
+      {
+        "label": "Jamiyat Bethak"
+      },
+      {
+        "label": "Mafsuhiyat"
+      },
+      {
+        "label": "Majmui Ziyafat"
+      },
+      {
+        "label": "Qadambosi Bethak"
+      },
+      {
+        "label": "Wadhawani Bethak"
+      },
+      {
+        "label": "Wajebaat Bethak"
+      }
+    ]
+  },
+  {
+    "label": "06 Qadam/Majlis/Ziyafat",
+    "children": [
+      {
+        "label": "Majlis"
+      },
+      {
+        "label": "Qadam"
+      },
+      {
+        "label": "Shifa Qadam"
+      },
+      {
+        "label": "Ziyafat"
+      }
+    ]
+  },
+  {
+    "label": "07 Iftetah",
+    "children": [
+      {
+        "label": "AJS Iftetah"
+      },
+      {
+        "label": "Dar al-Imarat Iftetah"
+      },
+      {
+        "label": "FMB Kitchen Iftetah"
+      },
+      {
+        "label": "Iftetah"
+      },
+      {
+        "label": "Maraz Iftetah"
+      },
+      {
+        "label": "Masjid Iftetah"
+      },
+      {
+        "label": "Mawaid Iftetah"
+      },
+      {
+        "label": "Other Iftetah"
+      },
+      {
+        "label": "Qubba Iftetah"
+      },
+      {
+        "label": "Rasmi Iftetah"
+      },
+      {
+        "label": "Zarih Iftetah"
+      }
+    ]
+  },
+  {
+    "label": "08 Mulaqaat",
+    "children": [
+      {
+        "label": "CM"
+      },
+      {
+        "label": "Governor"
+      },
+      {
+        "label": "King/Queen"
+      },
+      {
+        "label": "Minister"
+      },
+      {
+        "label": "MLA"
+      },
+      {
+        "label": "Mulaqaat/Visit"
+      },
+      {
+        "label": "PM"
+      },
+      {
+        "label": "President"
+      }
+    ]
+  },
+  {
+    "label": "09 Highlights",
+    "children": [
+      {
+        "label": "Arrival"
+      },
+      {
+        "label": "Decoration"
+      },
+      {
+        "label": "Deedar"
+      },
+      {
+        "label": "Departure"
+      },
+      {
+        "label": "Expression"
+      },
+      {
+        "label": "Flow"
+      },
+      {
+        "label": "Highlights"
+      },
+      {
+        "label": "Nazafat Khidmat"
+      },
+      {
+        "label": "Niyaz"
+      },
+      {
+        "label": "Pani Khidmat"
+      },
+      {
+        "label": "Preparation"
+      },
+      {
+        "label": "Qardan Hasanah"
+      },
+      {
+        "label": "Relay Centre"
+      },
+      {
+        "label": "Sabeel"
+      },
+      {
+        "label": "Sabeel al-Anwar"
+      },
+      {
+        "label": "Scanning"
+      },
+      {
+        "label": "Tazyeen"
+      },
+      {
+        "label": "Transport"
+      }
+    ]
+  },
+  {
+    "label": "10 Others",
+    "children": [
+      {
+        "label": "Activities"
+      },
+      {
+        "label": "All India Dawoodi Bohra Convention"
+      },
+      {
+        "label": "Award Ceremony"
+      },
+      {
+        "label": "Ayyam al-Ta’abudaat"
+      },
+      {
+        "label": "Barnamaj"
+      },
+      {
+        "label": "Birthday"
+      },
+      {
+        "label": "Burhani Expo"
+      },
+      {
+        "label": "Case Zikr"
+      },
+      {
+        "label": "Chhatti"
+      },
+      {
+        "label": "Conference"
+      },
+      {
+        "label": "Convocation"
+      },
+      {
+        "label": "Covid"
+      },
+      {
+        "label": "Daris"
+      },
+      {
+        "label": "Eid al-Zahabi/Golden Jubilee"
+      },
+      {
+        "label": "Eid Milan"
+      },
+      {
+        "label": "Exhibition/Expo"
+      },
+      {
+        "label": "Fasal"
+      },
+      {
+        "label": "Fath Mubeen"
+      },
+      {
+        "label": "Haflat al-Quran"
+      },
+      {
+        "label": "Haj"
+      },
+      {
+        "label": "High Tea"
+      },
+      {
+        "label": "Ijtema"
+      },
+      {
+        "label": "Inauguration"
+      },
+      {
+        "label": "Independence Day"
+      },
+      {
+        "label": "India Islamic Cultural Centre"
+      },
+      {
+        "label": "Indo Arab Conference"
+      },
+      {
+        "label": "International Colloquium"
+      },
+      {
+        "label": "Islamic Conference"
+      },
+      {
+        "label": "Istibsaar"
+      },
+      {
+        "label": "Jamiyat Programme"
+      },
+      {
+        "label": "KUN"
+      },
+      {
+        "label": "Light and Sound"
+      },
+      {
+        "label": "Madresah"
+      },
+      {
+        "label": "Maraz"
+      },
+      {
+        "label": "Meeting"
+      },
+      {
+        "label": "Mizaj Pursi"
+      },
+      {
+        "label": "Mujtama al-Iman"
+      },
+      {
+        "label": "Multaqa al-Fatimi al-Ilmi"
+      },
+      {
+        "label": "Multaqa al-Qadi al-Noman al-Sani bil Mehdiyah"
+      },
+      {
+        "label": "Musabaqat al-Quran"
+      },
+      {
+        "label": "Muzakerat/Presentation"
+      },
+      {
+        "label": "Nass"
+      },
+      {
+        "label": "Nathwani Commission"
+      },
+      {
+        "label": "Openning Ceremony"
+      },
+      {
+        "label": "Orientation"
+      },
+      {
+        "label": "Party"
+      },
+      {
+        "label": "Press Conference"
+      },
+      {
+        "label": "Program"
+      },
+      {
+        "label": "Projection Mapping"
+      },
+      {
+        "label": "Raudat al-Adab al-Fatimi"
+      },
+      {
+        "label": "Reception"
+      },
+      {
+        "label": "Report Araz"
+      },
+      {
+        "label": "Republic Day"
+      },
+      {
+        "label": "Sabaq"
+      },
+      {
+        "label": "Sayr Ilmi/Tour"
+      },
+      {
+        "label": "Seminar"
+      },
+      {
+        "label": "Shaadi",
+        "children": [
+          {
+            "label": "Barne Charawu"
+          },
+          {
+            "label": "Katho Mosalu"
+          },
+          {
+            "label": "Khushi Jaman"
+          },
+          {
+            "label": "Mandvo"
+          },
+          {
+            "label": "Naushi Izan"
+          },
+          {
+            "label": "Pan Gulab"
+          },
+          {
+            "label": "Pannat"
+          },
+          {
+            "label": "Shaadi Shehergust"
+          },
+          {
+            "label": "Walima"
+          },
+          {
+            "label": "Zafaf"
+          }
+        ]
+      },
+      {
+        "label": "Skit"
+      },
+      {
+        "label": "Sports Day"
+      },
+      {
+        "label": "Stopover"
+      },
+      {
+        "label": "Tafreeh"
+      },
+      {
+        "label": "Taj Poshi/Enthronement"
+      },
+      {
+        "label": "Tilawat al-Dua"
+      },
+      {
+        "label": "Umra"
+      },
+      {
+        "label": "Vazarat Meeting"
+      },
+      {
+        "label": "Vepaar Araz"
+      },
+      {
+        "label": "Wada"
+      },
+      {
+        "label": "Wafat"
+      },
+      {
+        "label": "Workshop"
+      },
+      {
+        "label": "Yaum Shukr Guzaari"
+      }
+    ]
+  },
+  {
+    "label": "11 Ziyarat",
+    "children": [
+      {
+        "label": "Dakhili"
+      },
+      {
+        "label": "Ghaseel / Sandal"
+      },
+      {
+        "label": "Ziyarat"
+      }
+    ]
+  },
+  {
+    "label": "12 Private",
+    "children": [
+      {
+        "label": "Private"
+      },
+      {
+        "label": "Shikar"
+      }
+    ]
+  },
+  {
+    "label": "13 Titles",
+    "children": [
+      {
+        "label": "Chancellorship"
+      },
+      {
+        "label": "Chief of the Golden Heart"
+      },
+      {
+        "label": "Doctor of Law"
+      },
+      {
+        "label": "Doctor of Theology (ThD)"
+      },
+      {
+        "label": "Doctorate"
+      },
+      {
+        "label": "Key to the CIty"
+      },
+      {
+        "label": "Nishan i Pakistan"
+      },
+      {
+        "label": "Star of Jordan"
+      },
+      {
+        "label": "Wisha al Neel"
+      }
+    ]
+  }
+]
