@@ -119,35 +119,80 @@
     .step.done   { opacity: 0.75; }
     .step.done   .step-num { background: var(--green); color: var(--surface2); }
 
-    /* ── LANDING (two-column) ─────────────────── */
+    /* ── LANDING ─────────────────────────────────── */
     #step1Panel {
-      display: flex; flex-direction: row; flex: 1; overflow: hidden;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      flex: 1; gap: 12px; padding: 48px 32px;
+      overflow-y: auto;
     }
 
-    #landingCard, #landingEvent {
+    .landing-eyebrow {
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--subtext); opacity: 0.6;
+      margin-bottom: 4px;
+    }
+
+    .landing-cards {
+      display: flex; gap: 20px; align-items: stretch;
+    }
+
+    /* Each option card */
+    .landing-card {
       display: flex; flex-direction: column; align-items: center;
-      justify-content: center; gap: 18px; flex: 1; padding: 40px 32px;
+      gap: 14px; padding: 36px 32px 32px;
+      width: 280px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; cursor: default;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
     }
-    #landingEvent { background: var(--surface3); }
-    #landingEvent:hover { background: color-mix(in srgb, var(--surface3) 85%, var(--blue) 15%); }
-    #landingCard h2, #landingEvent h2 { font-size: 1.1rem; font-weight: 600; }
-    #landingCard p,  #landingEvent p  { font-size: 0.84rem; opacity: 0.45; text-align: center; line-height: 1.55; }
-    .landing-icon { font-size: 3rem; }
 
-    .landing-divider {
-      width: 1px; background: var(--border); flex-shrink: 0; align-self: stretch;
+    /* Card icon badge */
+    .lc-icon-wrap {
+      width: 60px; height: 60px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.8rem; flex-shrink: 0;
+    }
+    #landingCard  .lc-icon-wrap { background: rgba(137,180,250,0.12); }
+    #landingEvent .lc-icon-wrap { background: rgba(203,166,247,0.12); }
+
+    .landing-card h2 {
+      font-size: 1rem; font-weight: 700; color: var(--text); margin: 0;
+    }
+    .landing-card p {
+      font-size: 0.81rem; color: var(--subtext); text-align: center;
+      line-height: 1.6; margin: 0; flex: 1;
+    }
+
+    /* Hover lift — card */
+    #landingCard:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 16px 40px rgba(0,0,0,0.35), 0 0 0 1px var(--blue);
+      border-color: var(--blue);
+    }
+    /* Hover lift — event */
+    #landingEvent:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 16px 40px rgba(0,0,0,0.35), 0 0 0 1px var(--mauve);
+      border-color: var(--mauve);
+    }
+
+    /* Drive list inside the card */
+    #driveListLarge {
+      display: flex; gap: 10px; flex-wrap: wrap;
+      justify-content: center; width: 100%; margin-top: 4px;
     }
 
     .landing-cta {
-      margin-top: 8px; padding: 10px 28px;
-      background: var(--blue); color: var(--bg);
+      width: 100%; padding: 10px 0;
+      background: var(--mauve); color: var(--bg);
       border: none; border-radius: 8px;
-      font-size: 0.9rem; font-weight: 700; cursor: pointer;
-      transition: opacity 0.15s;
+      font-size: 0.875rem; font-weight: 700; cursor: pointer;
+      transition: opacity 0.15s; margin-top: auto;
     }
     .landing-cta:hover { opacity: 0.85; }
 
-    #driveListLarge { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+    .landing-divider { display: none; }
 
     /* ── EVENT CREATOR PANEL ──────────────────── */
     #eventCreatorPanel {
@@ -1187,31 +1232,34 @@
     <div class="step"        id="step3Indicator"><span class="step-num">3</span> <span id="step3Label">Import</span></div>
   </div>
 
-  <!-- LANDING (two-column) -->
+  <!-- LANDING -->
   <div id="step1Panel">
 
-    <!-- Left: Card picker -->
-    <div id="landingCard">
-      <div class="landing-icon">📸</div>
-      <h2>Select Memory Card</h2>
-      <p id="step1Subtitle">Insert a camera card to start browsing photos and videos.</p>
-      <div id="driveListLarge">
-        <div id="noDriveMsg">
-          <span class="msg-icon">🔍</span>
-          <span>Scanning for memory cards…</span>
+    <p class="landing-eyebrow">How would you like to start?</p>
+
+    <div class="landing-cards">
+
+      <!-- Card: Memory Card -->
+      <div id="landingCard" class="landing-card">
+        <div class="lc-icon-wrap">📸</div>
+        <h2>Select Memory Card</h2>
+        <p id="step1Subtitle">Insert a camera card to browse and import photos and videos.</p>
+        <div id="driveListLarge">
+          <div id="noDriveMsg">
+            <span class="msg-icon">🔍</span>
+            <span>Scanning for memory cards…</span>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- Divider -->
-    <div class="landing-divider"></div>
+      <!-- Card: Create Event -->
+      <div id="landingEvent" class="landing-card">
+        <div class="lc-icon-wrap">🗂️</div>
+        <h2>Create Event</h2>
+        <p>Set up a master collection and event structure before importing files.</p>
+        <button id="createEventBtn" class="landing-cta">Create Event →</button>
+      </div>
 
-    <!-- Right: Create Event -->
-    <div id="landingEvent">
-      <div class="landing-icon">🗂️</div>
-      <h2>Create Event</h2>
-      <p>Set up a master collection and event<br>structure before importing files.</p>
-      <button id="createEventBtn" class="landing-cta">Create Event →</button>
     </div>
 
   </div>
