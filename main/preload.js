@@ -137,4 +137,8 @@ contextBridge.exposeInMainWorld('api', {
   // ── Update state replay (Patch 45) ──
   getLastUpdateState: () => ipcRenderer.invoke('update:getLastState'),
 
+  // ── Controlled lists ──
+  getLists:  (name)        => ipcRenderer.invoke('lists:get', name),
+  addToList: (name, value) => ipcRenderer.invoke('lists:add', name, value),
+
 });

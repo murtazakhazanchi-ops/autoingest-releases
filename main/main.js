@@ -8,6 +8,7 @@ const { detectMemoryCards }          = require('./driveDetector');
 const { readDirectory, getDCIMPath, scanPrivateFolder, safeExists, scanMediaRecursive, buildFolderTree } = require('./fileBrowser');
 const { copyFiles, setPaused, getFileHash, abortCopy } = require('./fileManager');
 const { getThumbnail, shutdownWorkers } = require('../services/thumbnailer');
+const listManager = require('./listManager');
 const { log } = require('../services/logger');
 const telemetry     = require('../services/telemetry');
 const crashReporter = require('../services/crashReporter');
@@ -149,6 +150,7 @@ let pollHandle = null;
 app.whenReady().then(() => {
   log('App started');
   loadImportIndex();
+  listManager.init(app.getPath('userData'));
   telemetry.init();
   const mainWindow = createWindow();
   crashReporter.init(mainWindow);
@@ -534,6 +536,11 @@ ipcMain.handle('debug:telemetry', async () => {
     sheetsResult,
   };
 });
+
+// ── List manager ──────────────────────────────────────────────────────────────
+
+ipcMain.handle('lists:get', (_event, name) => listManager.getList(name));
+ipcMain.handle('lists:add', (_event, name, value) => listManager.addToList(name, value));
 
 // TEMP DEBUG
 ipcMain.handle('debug:flush', async () => {
