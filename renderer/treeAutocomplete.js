@@ -221,8 +221,11 @@ class TreeAutocomplete {
     if (this._results.length === 0) {
       const msg = document.createElement('div');
       msg.className = 'tac-empty';
-      msg.textContent = 'No matches found';
+      msg.textContent = 'No matches — browse to select and teach an alias:';
       this._dd.append(msg);
+      // Fall through to also render the tree so the user can browse,
+      // select an item, and have the typed text learned as an alias.
+      this._renderTree();
     } else {
       this._results.forEach((item, i) => {
         const el = document.createElement('div');

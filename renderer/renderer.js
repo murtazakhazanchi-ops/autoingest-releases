@@ -2877,9 +2877,10 @@ async function _submitFeedback() {
   closeBtn.addEventListener('click', close);
   overlay.addEventListener('mousedown', e => { if (e.target === overlay) close(); });
 
+  const triggerBtn = document.getElementById('tacTestBtn');
+  if (triggerBtn) triggerBtn.addEventListener('click', () => overlay.classList.contains('visible') ? close() : open());
+
   document.addEventListener('keydown', e => {
-    const mod = e.ctrlKey || e.metaKey;
-    if (mod && e.shiftKey && e.key === 'T') { e.preventDefault(); overlay.classList.contains('visible') ? close() : open(); }
     if (e.key === 'Escape' && overlay.classList.contains('visible')) close();
   });
 }());
