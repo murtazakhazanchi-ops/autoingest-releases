@@ -27,12 +27,12 @@ const EventCreator = (() => {
   // ── Event step state (Commit D) ────────────────────────────────────────────
   let _globalCityVal  = null;   // { id, label } | null
   let _globalCityDD   = null;   // TreeAutocomplete instance
-  let _eventComps     = [];     // [{ id, eventType, location, city }]
-  let _compDDs        = {};     // { [id]: { et, loc, city } } TreeAutocomplete instances
+  let _eventComps     = [];     // [{ id, eventTypes: [{id,label}][], location, city }]
+  let _compDDs        = {};     // { [id]: { loc, city } } TreeAutocomplete instances (ET is chip-managed)
   let _compSeq        = 0;      // monotonic ID for component rows
 
   function _makeComp() {
-    return { id: ++_compSeq, eventType: null, location: null, city: _globalCityVal ? { ..._globalCityVal } : null };
+    return { id: ++_compSeq, eventTypes: [], location: null, city: _globalCityVal ? { ..._globalCityVal } : null };
   }
 
   function _destroyEventDDs() {
@@ -549,7 +549,12 @@ const EventCreator = (() => {
   }
 
   function _buildCompRow(comp, index) {
-    const canRemove = _eventComps.length > 1;
+    const canRemove  = _eventComps.length > 1;
+    const chipsHTML  = comp.eventTypes.map((et, idx) => `
+      <span class="ec-chip">
+        ${esc(et.label)}<button class="ec-chip-x" data-comp="${comp.id}" data-idx="${idx}" aria-label="Remove ${esc(et.label)}">×</button>
+      </span>`).join('');
+
     return `
 <div class="ec-comp-row" data-comp-id="${comp.id}">
   <div class="ec-comp-header">
@@ -560,8 +565,11 @@ const EventCreator = (() => {
   </div>
   <div class="ec-comp-fields">
     <div class="ec-comp-field">
-      <label class="ec-comp-field-label">Event Type <span class="ec-req">*</span></label>
-      <div id="ecET-${comp.id}"></div>
+      <label class="ec-comp-field-label">Event Type(s) <span class="ec-req">*</span></label>
+      <div class="ec-et-wrap">
+        <div class="ec-et-chips" id="ecETChips-${comp.id}">${chipsHTML}</div>
+        <div id="ecET-${comp.id}"></div>
+      </div>
     </div>
     <div class="ec-comp-field">
       <label class="ec-comp-field-label">Location <span class="ec-opt">(optional)</span></label>
@@ -606,13 +614,23 @@ const EventCreator = (() => {
   function _mountCompDDs(comp) {
     const row = {};
 
+    // Event types — multi-select via chips; dropdown clears after each pick
     const etEl = document.getElementById(`ecET-${comp.id}`);
     if (etEl) {
-      row.et = new TreeAutocomplete({
-        container: etEl, type: 'event-types', placeholder: 'Search event type…',
-        onSelect: ({ id, label }) => { comp.eventType = { id, label }; _updateEventPreview(); }
+      const etDD = new TreeAutocomplete({
+        container: etEl, type: 'event-types',
+        placeholder: 'Search event type…',
+        onSelect: ({ id, label }) => {
+          if (!comp.eventTypes.some(e => e.label === label)) {
+            comp.eventTypes.push({ id, label });
+            _refreshETChips(comp);
+            _updateEventPreview();
+          }
+          etDD.clear();
+        }
       });
-      if (comp.eventType) row.et.setValue(comp.eventType.id, comp.eventType.label);
+      row.et = etDD;
+      _wireETChips(comp); // wire any chips already in HTML from restored state
     }
 
     const locEl = document.getElementById(`ecLoc-${comp.id}`);
@@ -634,6 +652,31 @@ const EventCreator = (() => {
     }
 
     _compDDs[comp.id] = row;
+  }
+
+  // ── Chip helpers ───────────────────────────────────────────────────────────
+
+  function _refreshETChips(comp) {
+    const el = document.getElementById(`ecETChips-${comp.id}`);
+    if (!el) return;
+    el.innerHTML = comp.eventTypes.map((et, idx) => `
+      <span class="ec-chip">
+        ${esc(et.label)}<button class="ec-chip-x" data-comp="${comp.id}" data-idx="${idx}" aria-label="Remove ${esc(et.label)}">×</button>
+      </span>`).join('');
+    _wireETChips(comp);
+  }
+
+  function _wireETChips(comp) {
+    const el = document.getElementById(`ecETChips-${comp.id}`);
+    if (!el) return;
+    el.querySelectorAll('.ec-chip-x').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = Number(btn.dataset.idx);
+        comp.eventTypes.splice(idx, 1);
+        _refreshETChips(comp);
+        _updateEventPreview();
+      });
+    });
   }
 
   // ── Listeners ──────────────────────────────────────────────────────────────
@@ -702,7 +745,7 @@ const EventCreator = (() => {
       let j = i;
       while (j < comps.length && (comps[j].city?.label || '') === cityLabel) {
         const c = comps[j];
-        if (c.eventType?.label) result.push(c.eventType.label);
+        c.eventTypes.forEach(et => { if (et?.label) result.push(et.label); });
         if (c.location?.label)  result.push(c.location.label);
         j++;
       }
@@ -722,7 +765,7 @@ const EventCreator = (() => {
     const coll   = sessionCollections.find(c => c.name === selectedCollection);
     const seq    = String((coll?.events.length ?? 0) + 1).padStart(2, '0');
     const parts  = _buildCompString(_eventComps);
-    const valid  = _eventComps.length > 0 && _eventComps.every(c => c.eventType && c.city);
+    const valid  = _eventComps.length > 0 && _eventComps.every(c => c.eventTypes.length > 0 && c.city);
     const name   = parts ? `${coll?.hijriDate || '?'} _${seq}-${parts}` : '';
 
     if (preview) {
@@ -739,9 +782,9 @@ const EventCreator = (() => {
     if (_eventComps.length === 0) {
       _showEventBanner('Add at least one component.', 'error'); return;
     }
-    const missing = _eventComps.find(c => !c.eventType || !c.city);
+    const missing = _eventComps.find(c => c.eventTypes.length === 0 || !c.city);
     if (missing) {
-      _showEventBanner('Every component needs an Event Type and City.', 'error'); return;
+      _showEventBanner('Every component needs at least one Event Type and a City.', 'error'); return;
     }
 
     const coll = sessionCollections.find(c => c.name === selectedCollection);
@@ -751,7 +794,7 @@ const EventCreator = (() => {
     const parts = _buildCompString(_eventComps);
     const name  = `${coll.hijriDate} _${seq}-${parts}`;
 
-    coll.events.push({ name, components: _eventComps.map(c => ({ ...c })) });
+    coll.events.push({ name, components: _eventComps.map(c => ({ ...c, eventTypes: [...c.eventTypes] })) });
 
     // Reset component state for next event; preserve global city
     _eventComps = [_makeComp()];
@@ -822,8 +865,10 @@ const EventCreator = (() => {
 </div>`;
 
     document.getElementById('ecChangeEvent')?.addEventListener('click', () => {
-      if (coll && coll.events.length > 0) coll.events.pop();
-      _eventComps = [_makeComp()];
+      if (coll && coll.events.length > 0) {
+        const popped = coll.events.pop();
+        _eventComps = popped.components.map(c => ({ ...c, eventTypes: [...c.eventTypes] }));
+      }
       _slideToStep(showEventStep);
     });
   }
