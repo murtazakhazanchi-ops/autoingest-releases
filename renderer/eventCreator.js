@@ -620,13 +620,15 @@ const EventCreator = (() => {
       const etDD = new TreeAutocomplete({
         container: etEl, type: 'event-types',
         placeholder: 'Search event type…',
-        onSelect: ({ id, label }) => {
+        onSelect: (item) => {
+          if (!item) return; // fired by clear() — ignore
+          const { id, label } = item;
           if (!comp.eventTypes.some(e => e.label === label)) {
             comp.eventTypes.push({ id, label });
             _refreshETChips(comp);
             _updateEventPreview();
           }
-          etDD.clear();
+          etDD.clear(); // reset field; _debounce auto-reopens on next keystroke
         }
       });
       row.et = etDD;

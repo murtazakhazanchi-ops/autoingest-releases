@@ -152,6 +152,14 @@ class TreeAutocomplete {
       this._render();
       return;
     }
+    // Auto-reopen if the user is typing but the dropdown was closed
+    // (e.g. immediately after a chip selection cleared the field).
+    if (!this._isOpen) {
+      this._isOpen = true;
+      this._dd.hidden = false;
+      this._wrap.dataset.open = '';
+      this._inp.setAttribute('aria-expanded', 'true');
+    }
     this._debTimer = setTimeout(() => this._doSearch(), 150);
   }
 
@@ -223,9 +231,12 @@ class TreeAutocomplete {
       msg.className = 'tac-empty';
       msg.textContent = 'No matches — browse to select and teach an alias:';
       this._dd.append(msg);
-      // Fall through to also render the tree so the user can browse,
-      // select an item, and have the typed text learned as an alias.
-      this._renderTree();
+      // For tree types show collapsible tree; for flat types show scrollable list.
+      if (this.type === 'cities' || this.type === 'photographers') {
+        this._renderFlatList();
+      } else {
+        this._renderTree();
+      }
     } else {
       this._results.forEach((item, i) => {
         const el = document.createElement('div');
@@ -367,6 +378,18 @@ class TreeAutocomplete {
     hint.className = 'tac-flat-hint';
     hint.textContent = `${n} entries — type to search`;
     this._dd.append(hint);
+  }
+
+  // Scrollable clickable list used in zero-results state for flat types.
+  _renderFlatList() {
+    if (!this._fullData) { this._dd.textContent = 'Loading…'; return; }
+    const wrap = document.createElement('div');
+    wrap.className = 'tac-flat-scroll';
+    (this._fullData || []).forEach(item => {
+      const label = typeof item === 'string' ? item : (item.label || '');
+      if (label) wrap.append(this._makeLeaf(label));
+    });
+    this._dd.append(wrap);
   }
 
   // ── Leaf factory ─────────────────────────────────────────────────────────────
