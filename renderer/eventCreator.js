@@ -1026,13 +1026,14 @@ const EventCreator = (() => {
     },
 
     /**
-     * Returns sub-event folder names for the active event's components.
+     * Returns sub-event descriptors for the active event's components.
+     * Each entry: { id: string, name: string } where id === name (folder name).
      * Returns [] for single-component events or when no event is active.
      */
     getSubEventNames() {
       const data = this.getActiveEventData();
       if (!data || data.event.components.length <= 1) return [];
-      return _buildSubEventFolderNames(data.event.components);
+      return _buildSubEventFolderNames(data.event.components).map(name => ({ id: name, name }));
     },
 
     /** Resume at step 3 (for "Change" from landing page). */

@@ -754,11 +754,17 @@ function _ecPanelOpen() {
 }
 
 function showEventCreator() {
+  // Entering event creator invalidates any existing group→sub-event mappings
+  GroupManager.reset();
+  renderGroupPanel();
   _ecPanelOpen();
   EventCreator.start();
 }
 
 function showEventCreatorResume() {
+  // Re-entering to change the event also invalidates existing group mappings
+  GroupManager.reset();
+  renderGroupPanel();
   _ecPanelOpen();
   EventCreator.resume();
 }
@@ -839,6 +845,9 @@ function _renderLandingEventCard() {
 
   document.getElementById('lcEventSelect')?.addEventListener('change', e => {
     EventCreator.setActiveEventIndex(parseInt(e.target.value, 10));
+    // Switching active event invalidates group→sub-event mappings
+    GroupManager.reset();
+    renderGroupPanel();
     _renderLandingEventCard();
   });
 
@@ -909,6 +918,7 @@ async function selectDrive(drive) {
   selectedFiles.clear(); currentFiles = []; lastClickedPath = null; tileMap = new Map();
   resetViewCache();
   GroupManager.reset();
+  renderGroupPanel();
   document.getElementById('step1Panel').style.display = 'none';
   document.getElementById('workspace').classList.add('visible');
   document.getElementById('activeDriveName').textContent = drive.label;
@@ -3080,8 +3090,10 @@ function renderGroupPanel() {
   const activeId  = GroupManager.getActiveTabId() ?? groups[0].id;
   const active    = groups.find(g => g.id === activeId) ?? groups[0];
   const col       = GroupManager.getColor(active.colorIdx);
+  // subNames: { id: string, name: string }[] — empty for single-component / no event
   const subNames  = EventCreator.getSubEventNames();
 
+  // Tabs — no "+ New" button; groups are only created via context menu / Cmd+G
   const tabsHtml = groups.map(g => {
     const c   = GroupManager.getColor(g.colorIdx);
     const act = g.id === active.id;
@@ -3089,22 +3101,24 @@ function renderGroupPanel() {
         style="${act ? `background:${c.bg};color:${c.fg};border-color:transparent` : ''}">
       <span class="gp-tab-dot" style="background:${c.bg}"></span>${_esc(g.label)}<span class="gp-tab-cnt">${g.files.size}</span>
     </button>`;
-  }).join('') + `<button class="gp-tab-add" id="gpAddBtn" title="New Group">＋</button>`;
+  }).join('');
 
+  // Sub-event mapping row (only for multi-component events)
   let subHtml = '';
   if (subNames.length > 0) {
-    const mapped = active.subEventIdx !== null;
+    const mapped   = active.subEventId !== null;
+    const mappedEnt = mapped ? subNames.find(s => s.id === active.subEventId) : null;
     subHtml = `
       <div class="gp-subevent-row">
         <span class="gp-sl">Sub-Event</span>
         <select class="gp-sel" id="gpSubSel">
           <option value="">— select —</option>
-          ${subNames.map((n, i) =>
-            `<option value="${i}"${active.subEventIdx === i ? ' selected' : ''}>${_esc(n)}</option>`
+          ${subNames.map(s =>
+            `<option value="${_esc(s.id)}"${active.subEventId === s.id ? ' selected' : ''}>${_esc(s.name)}</option>`
           ).join('')}
         </select>
       </div>
-      <div class="gp-status ${mapped ? 'ok' : 'warn'}">${mapped ? `✓ ${_esc(subNames[active.subEventIdx])}` : '⚠ Not mapped'}</div>`;
+      <div class="gp-status ${mapped ? 'ok' : 'warn'}">${mapped ? `✓ ${_esc(mappedEnt?.name ?? active.subEventId)}` : '⚠ Not mapped'}</div>`;
   }
 
   const filesHtml = active.files.size === 0
@@ -3133,11 +3147,8 @@ function renderGroupPanel() {
       renderGroupPanel();
     });
   });
-  document.getElementById('gpAddBtn')?.addEventListener('click', () => {
-    GroupManager.createGroup();
-    renderGroupPanel();
-  });
   document.getElementById('gpSubSel')?.addEventListener('change', e => {
+    // val is the subEventId string (folder name) or '' to unmap
     GroupManager.setSubEvent(active.id, e.target.value);
     renderGroupPanel();
   });
