@@ -724,9 +724,8 @@ function setRailMode(mode) {
 
 function updateSteps() {
   if (railMode === 'event') {
-    setStep('step1Indicator', 'active');
-    setStep('step2Indicator', '');
-    setStep('step3Indicator', '');
+    // Rail highlight managed per-step by EventCreator.syncRail()
+    EventCreator.syncRail();
     return;
   }
   // card path
@@ -752,6 +751,7 @@ function showEventCreator() {
   document.getElementById('eventCreatorPanel').classList.add('visible');
   setRailMode('event');
   updateSteps();
+  EventCreator.start();
 }
 
 function showLanding() {
@@ -760,6 +760,7 @@ function showLanding() {
   document.getElementById('step1Panel').style.display = '';
   setRailMode('card');
   updateSteps();
+  EventCreator.resetSelection();
 }
 
 document.getElementById('createEventBtn').addEventListener('click', showEventCreator);
@@ -885,6 +886,7 @@ function resetAppState() {
   // Hide workspace + event creator, show landing screen
   document.getElementById('workspace').classList.remove('visible');
   document.getElementById('eventCreatorPanel').classList.remove('visible');
+  EventCreator.resetSelection();
   document.getElementById('step1Panel').style.display = '';
   setRailMode('card');
 
