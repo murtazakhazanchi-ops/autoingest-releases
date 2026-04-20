@@ -745,13 +745,22 @@ function setStep(id, state) {
 // EVENT CREATOR NAVIGATION
 // ════════════════════════════════════════════════════════════════
 
-function showEventCreator() {
-  document.getElementById('step1Panel').style.display        = 'none';
+function _ecPanelOpen() {
+  document.getElementById('step1Panel').style.display = 'none';
   document.getElementById('workspace').classList.remove('visible');
   document.getElementById('eventCreatorPanel').classList.add('visible');
   setRailMode('event');
   updateSteps();
+}
+
+function showEventCreator() {
+  _ecPanelOpen();
   EventCreator.start();
+}
+
+function showEventCreatorResume() {
+  _ecPanelOpen();
+  EventCreator.resume();
 }
 
 function showLanding() {
@@ -760,7 +769,86 @@ function showLanding() {
   document.getElementById('step1Panel').style.display = '';
   setRailMode('card');
   updateSteps();
-  EventCreator.resetSelection();
+  // Do NOT reset selection — render landing card based on current event state
+  _renderLandingEventCard();
+}
+
+// ── Simple HTML escaper for landing card dynamic content ──────────────────
+function _esc(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function _renderLandingEventCard() {
+  const card = document.getElementById('landingEvent');
+  if (!card) return;
+
+  const data = EventCreator.getActiveEventData();
+
+  if (!data) {
+    // Default: no event created yet
+    card.className = 'landing-card';
+    card.innerHTML = `
+      <div class="lc-icon-wrap">🗂️</div>
+      <h2>Create Event</h2>
+      <p>Set up a master collection and event structure before importing files.</p>
+      <button id="createEventBtn" class="landing-cta">Create Event →</button>`;
+    document.getElementById('createEventBtn')
+      ?.addEventListener('click', showEventCreator);
+    return;
+  }
+
+  // Event confirmed — show summary card
+  const { coll, event, idx: activeIdx } = data;
+  const isMulti   = event.components.length > 1;
+  const modeLabel = isMulti ? 'Multi-component' : 'Single component';
+  const modeCls   = isMulti ? 'ec-mode-multi' : 'ec-mode-single';
+  const events    = coll.events;
+  const count     = events.length;
+
+  const eventsBodyHTML = count === 1
+    ? `<div class="lc-ev-name">${_esc(event.name)}</div>`
+    : `<select class="lc-ev-select" id="lcEventSelect">${
+        events.map((ev, i) =>
+          `<option value="${i}"${i === activeIdx ? ' selected' : ''}>${String(i + 1).padStart(2, '0')} — ${_esc(ev.name)}</option>`
+        ).join('')
+      }</select>`;
+
+  card.className = 'landing-card landing-card-confirmed';
+  card.innerHTML = `
+    <div class="lc-ev-band">
+      <div class="lc-icon-wrap">🗂️</div>
+      <div class="lc-ev-band-info">
+        <span class="lc-ev-band-title">Create Event</span>
+        <span class="lc-ev-band-status">✓ ${count} event${count > 1 ? 's' : ''} configured</span>
+      </div>
+      <span class="ec-mode-badge ${_esc(modeCls)}">${_esc(modeLabel)}</span>
+    </div>
+    <div class="lc-ev-body">
+      <div class="lc-ev-coll-row">
+        <span class="lc-ev-coll-label">Collection</span>
+        <span class="lc-ev-coll-val" title="${_esc(coll.name)}">${_esc(coll.name)}</span>
+      </div>
+      ${eventsBodyHTML}
+    </div>
+    <div class="lc-ev-footer">
+      <button id="lcChangeEventBtn" class="lc-ev-btn-outline">Change</button>
+      <button id="lcNewEventBtn" class="lc-ev-btn-primary">+ New Event →</button>
+    </div>`;
+
+  document.getElementById('lcEventSelect')?.addEventListener('change', e => {
+    EventCreator.setActiveEventIndex(parseInt(e.target.value, 10));
+    _renderLandingEventCard();
+  });
+
+  document.getElementById('lcChangeEventBtn')
+    ?.addEventListener('click', showEventCreatorResume);
+  document.getElementById('lcNewEventBtn')
+    ?.addEventListener('click', () => {
+      EventCreator.resetSelection();
+      showEventCreator();
+    });
 }
 
 document.getElementById('createEventBtn').addEventListener('click', showEventCreator);

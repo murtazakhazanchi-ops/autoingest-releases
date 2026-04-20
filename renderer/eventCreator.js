@@ -28,8 +28,9 @@ const EventCreator = (() => {
   let _globalCityVal  = null;   // { id, label } | null
   let _globalCityDD   = null;   // TreeAutocomplete instance
   let _eventComps     = [];     // [{ id, eventTypes: [{id,label}][], location, city }]
-  let _compDDs        = {};     // { [id]: { loc, city } } TreeAutocomplete instances (ET is chip-managed)
+  let _compDDs        = {};     // { [id]: { et, loc, city } } TreeAutocomplete instances
   let _compSeq        = 0;      // monotonic ID for component rows
+  let _activeEventIdx = 0;      // which event in coll.events is selected for import
 
   function _makeComp() {
     return { id: ++_compSeq, eventTypes: [], location: null, city: _globalCityVal ? { ..._globalCityVal } : null };
@@ -517,9 +518,11 @@ const EventCreator = (() => {
 <div class="ec-master-wrap">
 
   <div class="ec-breadcrumb-bar">
-    <span class="ec-bc-label">Collection</span>
-    <span class="ec-bc-value">${esc(selectedCollection || '')}</span>
-    <button class="ec-bc-change" id="ecChangeCollection">Change</button>
+    <div class="ec-bc-row">
+      <span class="ec-bc-label">Collection</span>
+      <span class="ec-bc-value" title="${esc(selectedCollection || '')}">${esc(selectedCollection || '')}</span>
+      <button class="ec-bc-change" id="ecChangeCollection">Change</button>
+    </div>
   </div>
 
   <div class="ec-global-city">
@@ -790,13 +793,14 @@ const EventCreator = (() => {
     }
 
     const coll = sessionCollections.find(c => c.name === selectedCollection);
-    if (!coll) return;
+    if (!coll) { _showEventBanner('No collection selected — go back to Step 1.', 'error'); return; }
 
     const seq   = String(coll.events.length + 1).padStart(2, '0');
     const parts = _buildCompString(_eventComps);
     const name  = `${coll.hijriDate} _${seq}-${parts}`;
 
     coll.events.push({ name, components: _eventComps.map(c => ({ ...c, eventTypes: [...c.eventTypes] })) });
+    _activeEventIdx = coll.events.length - 1;
 
     // Reset component state for next event; preserve global city
     _eventComps = [_makeComp()];
@@ -821,7 +825,7 @@ const EventCreator = (() => {
     if (!body) { renderFn(); return; }
     body.style.cssText += ';opacity:0;transform:translateX(-14px);transition:opacity 0.18s ease,transform 0.18s ease';
     setTimeout(() => {
-      renderFn();
+      try { renderFn(); } catch (e) { console.error('[EventCreator] step render error:', e); }
       body.style.cssText += ';opacity:0;transform:translateX(14px);transition:none';
       void body.offsetHeight;
       body.style.cssText += ';opacity:1;transform:translateX(0);transition:opacity 0.2s ease,transform 0.2s ease';
@@ -834,44 +838,144 @@ const EventCreator = (() => {
 
 
   // ══════════════════════════════════════════════════════════════════════════
-  // STEP 3 — Preview & Import (placeholder — Commit E will replace this)
+  // STEP 3 — Event Created (Commit E)
+  // Confirms the event, shows Single/Multi mode, offers Add Another or Done.
+  // Photographer is assigned later at import time (spec Step 10).
   // ══════════════════════════════════════════════════════════════════════════
+
+  // ── Sub-event folder name builder (spec Step 11 city-grouping) ───────────
+  // Same city across all components → omit city from folder names.
+  // Any different city → include city in that component's folder name.
+
+  function _buildSubEventFolderNames(components) {
+    const cities   = components.map(c => c.city?.label || '');
+    const sameCity = new Set(cities).size === 1;
+    return components.map((comp, idx) => {
+      const parts = [
+        ...comp.eventTypes.map(e => e.label),
+        comp.location?.label,
+        sameCity ? null : comp.city?.label
+      ].filter(Boolean);
+      return `${pad2(idx + 1)}-${parts.join('-')}`;
+    });
+  }
+
+  // ── Folder tree HTML ───────────────────────────────────────────────────────
+
+  function _buildFolderTreeHTML(coll, event) {
+    const isMulti = event.components.length > 1;
+    const rows    = [];
+    const r = (level, name, cls) =>
+      `<div class="ft-row ft-l${level}">` +
+      `<span class="ft-icon" aria-hidden="true">📁</span>` +
+      `<span class="ft-name${cls ? ' ' + cls : ''}">${esc(name)}</span></div>`;
+
+    rows.push(r(0, coll.name + '/'));
+    rows.push(r(1, event.name + '/'));
+
+    if (isMulti) {
+      const subNames = _buildSubEventFolderNames(event.components);
+      event.components.forEach((_, idx) => {
+        rows.push(r(2, subNames[idx] + '/'));
+        rows.push(r(3, '(photographer)/', 'ft-pending'));
+        rows.push(r(4, 'VIDEO/'));
+      });
+    } else {
+      rows.push(r(2, '(photographer)/', 'ft-pending'));
+      rows.push(r(3, 'VIDEO/'));
+    }
+    return rows.join('');
+  }
+
+  // ── Step 3 renderer ────────────────────────────────────────────────────────
 
   function showPreviewStep() {
     currentStep = 3;
     const title = $ecTitle();
-    if (title) title.textContent = 'Review & Import';
+    if (title) title.textContent = 'Event Created';
     syncRailHighlight(3);
+
+    // Re-lookup from module-level state on every render (not closed over)
+    const coll      = sessionCollections.find(c => c.name === selectedCollection);
+    const lastEvent = coll?.events[_activeEventIdx] ?? coll?.events.at(-1);
 
     const body = $ecBody();
     if (!body) return;
 
-    const coll      = sessionCollections.find(c => c.name === selectedCollection);
-    const lastEvent = coll?.events[coll.events.length - 1];
+    if (!coll || !lastEvent) {
+      console.error('[EventCreator] showPreviewStep: missing coll or lastEvent',
+        { selectedCollection, collFound: !!coll });
+      showEventStep();
+      return;
+    }
+
+    const isMulti  = lastEvent.components.length > 1;
+    const modeLabel = isMulti ? 'Multi-component' : 'Single component';
+
+    const eventRowInner = coll.events.length > 1
+      ? `<select class="ec-bc-select" id="ecEventSelect">${
+          coll.events.map((ev, i) =>
+            `<option value="${i}"${i === _activeEventIdx ? ' selected' : ''}>${String(i + 1).padStart(2, '0')} — ${esc(ev.name)}</option>`
+          ).join('')
+        }</select>`
+      : `<span class="ec-bc-value" title="${esc(lastEvent.name)}">${esc(lastEvent.name)}</span>`;
 
     body.innerHTML = `
 <div class="ec-master-wrap">
-  <div class="ec-breadcrumb-bar">
-    <span class="ec-bc-label">Event</span>
-    <span class="ec-bc-value">${esc(lastEvent?.name || '')}</span>
-    <button class="ec-bc-change" id="ecChangeEvent">Change</button>
-  </div>
 
-  <div class="ec-placeholder-block">
-    <div class="ec-ph-icon">✅</div>
-    <div class="ec-ph-title">Review &amp; Import</div>
-    <div class="ec-ph-desc">
-      Photographer assignment, grouping, and import confirmation<br>coming in the next commit.
+  <div class="ec-breadcrumb-bar">
+    <div class="ec-bc-row">
+      <span class="ec-bc-label">Collection</span>
+      <span class="ec-bc-value" title="${esc(coll.name)}">${esc(coll.name)}</span>
+    </div>
+    <div class="ec-bc-row">
+      <span class="ec-bc-label">Event</span>
+      ${eventRowInner}
+      <button class="ec-bc-change" id="ecChangeEvent">Change</button>
     </div>
   </div>
+
+  <div class="ec-preview-header">
+    <span class="ec-mode-badge ${isMulti ? 'ec-mode-multi' : 'ec-mode-single'}">${esc(modeLabel)}</span>
+    <span class="ec-preview-label">Folder structure</span>
+  </div>
+
+  <div class="ec-folder-tree">${_buildFolderTreeHTML(coll, lastEvent)}</div>
+
+  <div class="ec-success-actions">
+    <button id="ecAddAnotherBtn" class="ec-outline-btn">＋ Add Another Event</button>
+    <button id="ecDoneBtn" class="ec-continue-btn">Done ✓</button>
+  </div>
+
 </div>`;
 
+    // Destroy step-2 DDs after innerHTML replacement (DOM already detached — just removes listeners)
+    _destroyEventDDs();
+
+    document.getElementById('ecEventSelect')?.addEventListener('change', e => {
+      _activeEventIdx = parseInt(e.target.value, 10);
+      showPreviewStep(); // direct re-render, no slide animation
+    });
+
+    // Fresh lookups inside each handler — never rely on closed-over `coll`
     document.getElementById('ecChangeEvent')?.addEventListener('click', () => {
-      if (coll && coll.events.length > 0) {
-        const popped = coll.events.pop();
-        _eventComps = popped.components.map(c => ({ ...c, eventTypes: [...c.eventTypes] }));
+      const c = sessionCollections.find(x => x.name === selectedCollection);
+      if (c && c.events.length > 0) {
+        const idx     = Math.min(_activeEventIdx, c.events.length - 1);
+        const [removed] = c.events.splice(idx, 1);
+        _eventComps   = removed.components.map(comp => ({ ...comp, eventTypes: [...comp.eventTypes] }));
+        _activeEventIdx = Math.max(0, c.events.length - 1);
       }
       _slideToStep(showEventStep);
+    });
+
+    document.getElementById('ecAddAnotherBtn')?.addEventListener('click', () => {
+      _eventComps = [_makeComp()];
+      _slideToStep(showEventStep);
+    });
+
+    document.getElementById('ecDoneBtn')?.addEventListener('click', () => {
+      document.getElementById('ecBackBtn')?.click();
     });
   }
 
@@ -896,9 +1000,33 @@ const EventCreator = (() => {
     /** Called by renderer's updateSteps() when railMode === 'event'. */
     syncRail() { syncRailHighlight(currentStep); },
 
-    /** Expose for Commit D / E to read the chosen collection. */
     getSelectedCollection() { return selectedCollection; },
-    getSessionCollections() { return sessionCollections; }
+    getSessionCollections() { return sessionCollections; },
+
+    /**
+     * Returns { coll, event } for the most recently completed event,
+     * or null if no event has been confirmed yet this session.
+     */
+    getActiveEventData() {
+      if (!selectedCollection) return null;
+      const coll = sessionCollections.find(c => c.name === selectedCollection);
+      if (!coll || coll.events.length === 0) return null;
+      const idx   = Math.min(_activeEventIdx, coll.events.length - 1);
+      const event = coll.events[idx];
+      return event ? { coll, event, idx } : null;
+    },
+
+    setActiveEventIndex(idx) {
+      _activeEventIdx = idx;
+    },
+
+    /** Renders the folder tree HTML for a given collection + event. */
+    buildFolderPreviewHTML(coll, event) {
+      return _buildFolderTreeHTML(coll, event);
+    },
+
+    /** Resume at step 3 (for "Change" from landing page). */
+    resume() { showPreviewStep(); }
   };
 
 })();

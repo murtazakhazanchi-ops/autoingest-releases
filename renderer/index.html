@@ -194,6 +194,112 @@
 
     .landing-divider { display: none; }
 
+    /* ── Landing: confirmed event card ──────────────────────────────────── */
+    #landingEvent.landing-card-confirmed {
+      width: 460px;
+      align-items: stretch;
+      gap: 0;
+      padding: 0;
+      overflow: hidden;
+      cursor: default;
+    }
+    #landingEvent.landing-card-confirmed:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 16px 40px rgba(0,0,0,0.35), 0 0 0 1px var(--green);
+      border-color: var(--green);
+    }
+
+    /* Header band: icon + title/status + mode badge */
+    .lc-ev-band {
+      display: flex; align-items: center; gap: 12px;
+      padding: 20px 24px 18px;
+      background: var(--surface3);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .lc-ev-band .lc-icon-wrap {
+      width: 42px; height: 42px; font-size: 1.25rem; flex-shrink: 0;
+    }
+    .lc-ev-band-info {
+      display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0;
+    }
+    .lc-ev-band-title { font-size: 0.9rem; font-weight: 700; color: var(--text); }
+    .lc-ev-band-status { font-size: 0.7rem; color: var(--green); }
+
+    /* Body: collection + event name */
+    .lc-ev-body {
+      display: flex; flex-direction: column; gap: 10px;
+      padding: 18px 24px 16px;
+    }
+
+    /* Collection label + truncated value */
+    .lc-ev-coll-row {
+      display: flex; align-items: baseline; gap: 8px; min-width: 0;
+    }
+    .lc-ev-coll-label {
+      font-size: 9.5px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--subtext); flex-shrink: 0;
+    }
+    .lc-ev-coll-val {
+      font-size: 0.72rem; color: var(--subtext);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+    }
+
+    /* Event name — monospace pill */
+    .lc-ev-name {
+      width: 100%;
+      font-family: 'SF Mono', 'Cascadia Code', ui-monospace, monospace;
+      font-size: 0.82rem; font-weight: 600; color: var(--text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px 12px;
+    }
+
+    /* Event dropdown — landing card */
+    .lc-ev-select {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'SF Mono', 'Cascadia Code', ui-monospace, monospace;
+      font-size: 0.78rem; font-weight: 600;
+      padding: 8px 32px 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      outline: none;
+      -webkit-appearance: none; appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23a6adc8' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      transition: border-color 0.15s;
+    }
+    .lc-ev-select:hover { border-color: var(--mauve); }
+    .lc-ev-select:focus { border-color: var(--mauve); outline: none; }
+
+    /* Footer: action buttons */
+    .lc-ev-footer {
+      display: flex; gap: 8px;
+      padding: 14px 24px 20px;
+      border-top: 1px solid var(--border);
+    }
+    .lc-ev-btn-outline {
+      flex: 1; padding: 9px 12px;
+      background: transparent; border: 1.5px solid var(--border);
+      border-radius: 8px; color: var(--subtext);
+      font-size: 0.82rem; font-family: inherit; cursor: pointer;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+    }
+    .lc-ev-btn-outline:hover {
+      border-color: var(--blue); color: var(--blue); background: var(--blue-dim);
+    }
+    .lc-ev-btn-primary {
+      flex: 1.4; padding: 9px 12px;
+      background: var(--mauve); border: none; border-radius: 8px;
+      color: var(--bg); font-size: 0.82rem; font-weight: 700;
+      font-family: inherit; cursor: pointer; transition: opacity 0.15s;
+    }
+    .lc-ev-btn-primary:hover { opacity: 0.85; }
+
     /* ── EVENT CREATOR PANEL ──────────────────── */
     #eventCreatorPanel {
       display: none; flex-direction: column; flex: 1; overflow: hidden;
@@ -1627,25 +1733,35 @@
 
 .ec-breadcrumb-bar {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 0;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 11px 16px;
+  overflow: hidden;
   margin-bottom: 28px;
-  flex-wrap: wrap;
+}
+.ec-bc-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  min-width: 0;
+}
+.ec-bc-row + .ec-bc-row {
+  border-top: 1px solid var(--border);
 }
 .ec-bc-label {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 10px;
+  font-weight: 700;
   color: var(--subtext);
   text-transform: uppercase;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.08em;
   flex-shrink: 0;
+  width: 72px;
 }
 .ec-bc-value {
-  font-size: 13px;
+  font-size: 12.5px;
   font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', ui-monospace, monospace;
   color: var(--mauve);
   font-weight: 500;
@@ -1655,12 +1771,34 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Dropdown variant inside the breadcrumb event row */
+.ec-bc-select {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--mauve);
+  font-family: 'SF Mono', 'Cascadia Code', ui-monospace, monospace;
+  font-size: 12px; font-weight: 500;
+  padding: 4px 28px 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  outline: none;
+  -webkit-appearance: none; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23cba6f7' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  transition: border-color 0.15s;
+}
+.ec-bc-select:hover { border-color: var(--mauve); }
+.ec-bc-select:focus { border-color: var(--mauve); outline: none; }
+
 .ec-bc-change {
   background: transparent;
   border: 1px solid var(--border);
   color: var(--subtext);
   border-radius: 6px;
-  padding: 4px 10px;
+  padding: 3px 10px;
   font-size: 11px;
   font-family: inherit;
   cursor: pointer;
@@ -1819,34 +1957,103 @@
   background: color-mix(in srgb, var(--blue) 6%, transparent);
 }
 
-/* ── Placeholder block (while Commit E is built) ─────────────────────────── */
+/* ── Step 3: Breadcrumb separator ────────────────────────────────────────── */
 
-.ec-placeholder-block {
-  background: var(--surface);
-  border: 1.5px dashed var(--border);
-  border-radius: 16px;
-  padding: 48px 32px;
+.ec-bc-sep {
+  color: var(--subtext);
+  opacity: 0.4;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+/* ── Step 3: Preview header row (badge + label) ─────────────────────────── */
+
+.ec-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.ec-preview-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--subtext);
+}
+
+/* ── Step 3: Success / event-created state ───────────────────────────────── */
+
+.ec-success-block {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  padding: 36px 20px 24px;
   text-align: center;
 }
-.ec-ph-icon {
-  font-size: 40px;
-  line-height: 1;
-  opacity: 0.7;
-}
-.ec-ph-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text);
-}
-.ec-ph-desc {
+.ec-success-icon  { font-size: 48px; line-height: 1; }
+.ec-success-title { font-size: 20px; font-weight: 700; color: var(--green); }
+.ec-success-name  {
   font-size: 13px;
-  color: var(--subtext);
-  line-height: 1.6;
-  max-width: 340px;
+  color: var(--text);
+  font-weight: 500;
+  font-family: 'SF Mono', 'Cascadia Code', ui-monospace, monospace;
+  word-break: break-all;
+}
+.ec-mode-badge {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 20px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.ec-mode-single { background: var(--blue-dim);  color: var(--blue);  border: 1px solid rgba(137,180,250,0.3); }
+.ec-mode-multi  { background: rgba(203,166,247,0.12); color: var(--mauve); border: 1px solid rgba(203,166,247,0.3); }
+.ec-success-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+/* ── Step 3: Folder structure tree ───────────────────────────────────────── */
+
+.ec-folder-tree {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 18px;
+  font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.85;
+  overflow-x: auto;
+}
+.ft-row   { display: flex; align-items: center; gap: 5px; }
+.ft-l0    { padding-left: 0;    }
+.ft-l1    { padding-left: 16px; }
+.ft-l2    { padding-left: 32px; }
+.ft-l3    { padding-left: 48px; }
+.ft-l4    { padding-left: 64px; }
+.ft-icon  { flex-shrink: 0; font-size: 11px; }
+.ft-name  { color: var(--text); white-space: nowrap; }
+.ft-pending { color: var(--subtext); opacity: 0.45; font-style: italic; }
+.ec-outline-btn {
+  flex: 1;
+  padding: 11px 20px;
+  background: transparent;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.ec-outline-btn:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+  background: color-mix(in srgb, var(--blue) 6%, transparent);
 }
 
   </style>

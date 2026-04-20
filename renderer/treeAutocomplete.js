@@ -224,14 +224,19 @@ class TreeAutocomplete {
   // ────────────────────────────────────────────────────────────────────────────
 
   _renderSearch() {
-    const input = this._inputVal.trim();
+    const input    = this._inputVal.trim();
+    const hasExact = this._results.some(r => r.matchType === 'exact');
+    const canAdd   = this.allowAdd && input && !hasExact;
 
     if (this._results.length === 0) {
+      // Zero-results: "+ Add" FIRST (prominent), then browse hint + tree
+      if (canAdd) this._dd.append(this._makeAddEl(input));
       const msg = document.createElement('div');
-      msg.className = 'tac-empty';
-      msg.textContent = 'No matches — browse to select and teach an alias:';
+      msg.className   = 'tac-empty';
+      msg.textContent = canAdd
+        ? 'Or browse to select and teach an alias:'
+        : 'No matches — browse to select and teach an alias:';
       this._dd.append(msg);
-      // For tree types show collapsible tree; for flat types show scrollable list.
       if (this.type === 'cities' || this.type === 'photographers') {
         this._renderFlatList();
       } else {
@@ -248,12 +253,11 @@ class TreeAutocomplete {
         const lbl = document.createElement('span');
         lbl.className = 'tac-item-lbl';
         lbl.innerHTML = this._highlight(item.label, input);
-
         el.append(lbl);
 
         if (item.matchType?.startsWith('alias')) {
           const badge = document.createElement('span');
-          badge.className = 'tac-alias-badge';
+          badge.className  = 'tac-alias-badge';
           badge.textContent = 'alias';
           el.append(badge);
         }
@@ -261,7 +265,7 @@ class TreeAutocomplete {
         const path = this._pathMap.get(item.id);
         if (path) {
           const bc = document.createElement('span');
-          bc.className = 'tac-bc';
+          bc.className  = 'tac-bc';
           bc.textContent = path;
           el.append(bc);
         }
@@ -269,17 +273,17 @@ class TreeAutocomplete {
         el.addEventListener('mousedown', e => { e.preventDefault(); this._select(item.id, item.label); });
         this._dd.append(el);
       });
+      // Has results: "+ Add" after results (secondary action)
+      if (canAdd) this._dd.append(this._makeAddEl(input));
     }
+  }
 
-    // "+ Add" — only when no exact match and list allows it
-    const hasExact = this._results.some(r => r.matchType === 'exact');
-    if (this.allowAdd && input && !hasExact) {
-      const addEl = document.createElement('div');
-      addEl.className = 'tac-add';
-      addEl.innerHTML = `<span class="tac-add-plus">+</span> Add <em class="tac-add-val">${this._esc(input)}</em>`;
-      addEl.addEventListener('mousedown', e => { e.preventDefault(); this._addNew(input); });
-      this._dd.append(addEl);
-    }
+  _makeAddEl(input) {
+    const el = document.createElement('div');
+    el.className = 'tac-add';
+    el.innerHTML = `<span class="tac-add-plus">+</span> Add <em class="tac-add-val">${this._esc(input)}</em>`;
+    el.addEventListener('mousedown', e => { e.preventDefault(); this._addNew(input); });
+    return el;
   }
 
   // ────────────────────────────────────────────────────────────────────────────

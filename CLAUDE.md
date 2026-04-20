@@ -16,21 +16,43 @@ with optional NAS sync. It is designed for multi-photographer event coverage (e.
 ## File Structure
 
 ```
-electron-app-v5/
+electron-app-v24/
 ├── config/
 │   └── app.config.js        ← SOLE source of truth for media extensions
+├── data/                    ← Base controlled-vocabulary lists (committed)
+│   ├── event-types.json     ← 14 categories, 222 events, 3-level tree
+│   ├── cities.json          ← 628 cities, flat array
+│   ├── locations.json       ← 451 locations, tree (some with sub-locations)
+│   └── photographers.json   ← 312 names, flat array
 ├── main/
 │   ├── main.js              ← Electron main process, IPC handlers
 │   ├── preload.js           ← contextBridge (window.api namespace)
 │   ├── driveDetector.js     ← drivelist polling, DCIM detection
 │   ├── fileBrowser.js       ← readDirectory(), getDCIMPath()
-│   └── fileManager.js       ← copyFiles(), resolveDestPath()
+│   ├── fileManager.js       ← copyFiles(), resolveDestPath()
+│   ├── listManager.js       ← load/merge/dedupe base+override lists
+│   └── aliasEngine.js       ← normalize, match, learnAlias for dropdowns
 ├── renderer/
 │   ├── index.html           ← All CSS inline, Catppuccin Mocha theme
-│   └── renderer.js          ← All UI logic, no Node/Electron access
-├── services/                ← Future: metadata tagger, sync engine
-├── data/                    ← Future: local state, sync queue
+│   ├── renderer.js          ← All UI logic, no Node/Electron access
+│   └── treeAutocomplete.js  ← Reusable tree+autocomplete dropdown class
+├── scripts/
+│   └── parse-lists.js       ← One-time parser: Downloads → data/*.json
+├── services/                ← Metadata tagger, sync engine (future)
 └── package.json
+```
+
+### userData (runtime, OS app-data dir — never committed)
+```
+~/Library/Application Support/AutoIngest/
+├── importIndex.json
+├── cities.override.json       ← user-added cities
+├── locations.override.json    ← user-added locations
+├── photographers.override.json← user-added photographers
+├── cities.aliases.json        ← learned aliases per leaf node
+├── locations.aliases.json
+├── event-types.aliases.json
+└── photographers.aliases.json
 ```
 
 ---
@@ -112,6 +134,10 @@ These must never appear in the UI, be selectable, or be imported.
 | `dest:getDefault` | invoke | ~/Desktop/AutoIngestTest |
 | `dest:choose` | invoke | Native folder picker |
 | `dest:scanFiles` | invoke | Scan dest for duplicate detection |
+| `lists:get` | invoke | Load merged list (base + override) |
+| `lists:add` | invoke | Add new entry to writable list |
+| `lists:match` | invoke | Alias-aware ranked search |
+| `lists:learnAlias` | invoke | Store typed→canonical alias |
 
 ### window.api (contextBridge)
 
@@ -124,7 +150,26 @@ onImportProgress(cb)
 getDefaultDest()
 chooseDest()
 scanDest(destPath)
+// Controlled vocabulary lists
+getLists(name)                           // 'cities'|'locations'|'event-types'|'photographers'
+addToList(name, value)                   // cities/locations/photographers only
+matchList(name, input)                   // ranked [{id,label,score,matchType}]
+learnAlias(name, canonicalId, label, typed) // persist alias after user selection
 ```
+
+### List Manager Rules (main/listManager.js)
+- Base files in `data/` are **never modified** at runtime
+- User additions go to `userData/{name}.override.json`
+- Merged list = dedupe([...base, ...override])
+- `event-types` is **read-only** — no addToList, no override file
+- `normalize()` = trim + proper case before saving new entries
+
+### Alias Engine Rules (main/aliasEngine.js)
+- Matching is always **flat** (tree structure is UI-only)
+- `flattenToLeaves()`: event-types skips category headers; all other nodes are selectable
+- Alias storage: `userData/{name}.aliases.json` keyed by `slugify(label)`
+- `learnAlias()` is a no-op if typed === canonical label (case-insensitive)
+- Score ranking: exact=100, aliasExact=90, startsWith=80, aliasStarts=70, contains=60, aliasContains=50
 
 ### Drive Detection
 
@@ -208,10 +253,61 @@ Catppuccin Mocha dark theme. CSS variables in `:root`:
 - [x] Destination folder picker (native dialog)
 - [x] macOS junk file filtering (._* and .DS_Store)
 - [x] Performance-optimised rendering (tileMap, event delegation, no scroll triggers)
+- [x] Controlled-vocabulary data layer (event-types, cities, locations, photographers)
+- [x] List manager with base+override merge and runtime persistence
+- [x] Alias engine: normalize, match (scored), learnAlias, flattenToLeaves
+- [x] TreeAutocomplete dropdown: tree browse + live alias-aware search + Add New
+- [x] Two-card landing screen (Select Memory Card / Create Event)
+- [x] Event Creator panel shell with back navigation and dynamic step rail
+
+---
+
+## TreeAutocomplete Component (renderer/treeAutocomplete.js)
+
+Reusable dropdown class. Usage:
+```js
+const dd = new TreeAutocomplete({
+  container: document.getElementById('myContainer'),
+  type: 'cities',           // 'cities'|'locations'|'event-types'|'photographers'
+  placeholder: 'Search…',
+  onSelect: ({ id, label }) => { /* ... */ }
+});
+dd.getValue()              // → { id, label } or null
+dd.setValue(id, label)
+dd.clear()
+dd.setDisabled(true)
+dd.destroy()               // removes global listener, removes DOM
+```
+
+**Critical rules:**
+- NEVER filter locally — always call `window.api.matchList()`
+- Only `id` is stored in state; `label` is display-only
+- `learnAlias` fires automatically on selection when typed ≠ label
+- Add New shown only when no exact match AND type ≠ `event-types`
+- Zero-results state shows tree below "No matches" so user can browse+teach alias
+
+## Landing Screen State Machine (renderer/renderer.js)
+
+```
+Landing (step1Panel)
+  ├─ Click drive card      → selectDrive() → workspace
+  └─ Click Create Event →  → showEventCreator() → eventCreatorPanel
+                                                    └─ ← Back → showLanding()
+```
+
+`railMode` variable: `'card'` | `'event'`
+`setRailMode(mode)` swaps step rail labels:
+- card:  Select Memory Card / Browse & Select Files / Import
+- event: Create Collection / Create Event / Import
 
 ---
 
 ## Features NOT Yet Implemented (planned)
+
+### Event Creation Flow (IN PROGRESS — next commits)
+- **Commit C**: Master (Collection) creation form — Hijri date + label → `{HijriDate} _{Label}`
+- **Commit D**: Event creation form — components (EventType + Location + City), live name preview, city-grouping rules
+- **Commit E**: Single vs Multi mode + sub-event folder structure preview
 
 ### Metadata Tagging
 - Write EXIF metadata after import (background queue)
@@ -300,6 +396,25 @@ FIX-ONLY pass, no new features, no architecture changes. 52 targeted patches app
 
 All naming conventions and archive rules (locked per this document) preserved. See `STABILIZATION_LOG.md` for per-patch status and `STABILIZATION_NOTES.md` for intentionally-deferred items (sync fs usage in pre-event-loop paths, debug handlers).
 
+
+### v0.7.0-dev — Event Creation Foundation (2026-04-20)
+
+Data layer:
+- Four base JSON lists committed to `data/`: event-types (14 categories, 222 events, 3-level tree), cities (628), locations (451, with sub-locations), photographers (312, deduped).
+- `scripts/parse-lists.js` — one-time parser from tab-indented source files. Run `node scripts/parse-lists.js` to regenerate from updated source files.
+- `main/listManager.js` — load/merge/dedupe base+override, addToList with normalize+properCase, event-types read-only.
+- `main/aliasEngine.js` — normalize (punctuation→space, lowercase), slugify, flattenToLeaves, match (6-score ranking), learnAlias (dedup, no-op if same-as-label). Aliases persisted per list in `userData/{name}.aliases.json`.
+
+UI foundation:
+- `renderer/treeAutocomplete.js` — TreeAutocomplete class. Tree browse (collapsible 3-level for event-types and locations, flat hint for cities/photographers) + debounced live search via matchList IPC (no local filtering). Zero-results state falls back to tree for alias teaching. Alias badge on alias matches. Breadcrumb path on search results. Add New flow (cities/locations/photographers only). Full keyboard nav (↑↓ Enter Esc).
+- Landing screen redesigned as two floating cards centered on background: 📸 Select Memory Card (blue tint, existing import flow) + 🗂️ Create Event (mauve tint, new event flow). Hover: 5px lift + colour glow ring.
+- `#eventCreatorPanel` shell added with ← Back nav. Step rail labels are dynamic via `setRailMode('card'|'event')`.
+- Smoke-test modal (`#tacTestBtn` floating button, "⌗ Test Dropdowns") for verifying all 4 dropdown types — to be removed in Commit B or later.
+
+IPC additions: `lists:get`, `lists:add`, `lists:match`, `lists:learnAlias`
+window.api additions: `getLists`, `addToList`, `matchList`, `learnAlias`
+
+Commits: eb67276 → da5eb70 (7 commits)
 
 ### v0.6.0 — Folder View + Scanner Rewrite (2026-04-18)
 

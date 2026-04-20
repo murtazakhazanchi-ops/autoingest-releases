@@ -2,12 +2,47 @@
 
 # AutoIngest — Complete Technical Codebase Overview
 
-**Version:** 0.6.0  
-**Last generated:** 2026-04-18
+**Version:** 0.7.0-dev  
+**Last updated:** 2026-04-20
 
 ---
 
-## 0. v0.6.0 CHANGES (2026-04-18)
+## 0. v0.7.0-dev CHANGES (2026-04-20)
+
+### New files
+- `data/event-types.json` — 14 categories × 222 selectable events, 3-level tree (`{label, children[]}`). Category headers are not selectable.
+- `data/cities.json` — 628 city strings, flat array.
+- `data/locations.json` — 451 location nodes, flat array where some nodes have `children[]` (Kaaba, Jamrat, Raudat Tahera, etc.).
+- `data/photographers.json` — 312 photographer names, flat array, deduplicated.
+- `scripts/parse-lists.js` — one-time Node script that reads tab-indented source files from ~/Downloads and writes the four data files above.
+- `main/listManager.js` — List loading service. `init(userDataPath)`, `getList(name)` → merged+deduped array, `addToList(name, value)` → normalize+properCase, save to userData override. Event-types is read-only.
+- `main/aliasEngine.js` — Alias-aware search engine. `init(userDataPath)`, `normalize(str)` (lowercase, punctuation→space, collapse whitespace), `slugify(label)` (stable ID), `flattenToLeaves(listName, data)` (tree→flat selectable nodes; event-type category headers excluded), `match(input, listName, data)` → scored results, `learnAlias(listName, canonicalId, canonicalLabel, typed)` → persist to userData aliases file.
+- `renderer/treeAutocomplete.js` — `TreeAutocomplete` class. Constructor: `{container, type, placeholder, onSelect}`. Public API: `getValue()`, `setValue(id, label)`, `clear()`, `setDisabled(v)`, `destroy()`. Internally: tree-browse mode (collapsible) when input empty; search mode (flat ranked results via IPC) when typing; Add New flow for writable lists; alias badge + breadcrumb on results; full keyboard nav.
+
+### IPC additions (main/main.js)
+- `lists:get (name)` → `listManager.getList(name)`
+- `lists:add (name, value)` → `listManager.addToList(name, value)`
+- `lists:match (name, input)` → `aliasEngine.match(input, name, listManager.getList(name))`
+- `lists:learnAlias (name, canonicalId, label, typed)` → `aliasEngine.learnAlias(...)`
+
+### window.api additions (main/preload.js)
+- `getLists(name)`, `addToList(name, value)`, `matchList(name, input)`, `learnAlias(name, canonicalId, label, typedInput)`
+
+### Landing screen redesign (renderer/index.html + renderer/renderer.js)
+- `#step1Panel` is now a centered card-pair layout: two `280px` cards side-by-side on the app background. Hover: 5px translateY + glow ring matching card accent.
+- Left card `#landingCard`: blue-tinted icon, existing card-import flow unchanged.
+- Right card `#landingEvent`: mauve-tinted icon, "Create Event →" CTA.
+- `#eventCreatorPanel`: hidden shell panel. Header with ← Back + title. Empty `#ecBody` to be populated by Commits C + D.
+- `railMode` variable (`'card'|'event'`) + `setRailMode()` swaps step rail labels dynamically.
+- `showEventCreator()` / `showLanding()` handle navigation between landing and event creator.
+- `RAIL_LABELS` object defines label sets for both paths.
+
+### Smoke-test infrastructure (to be removed after landing UI is verified)
+- `#tacTestBtn` floating button (bottom-left, mauve) opens `#tacTestOverlay` modal with all four dropdown types and a selection log. Wired in `renderer.js` `initTacTestPanel()` IIFE.
+
+---
+
+## 0b. v0.6.0 CHANGES (2026-04-18)
 
 This release replaces the DCIM-only file discovery with a full recursive scanner, introduces a Folder View with a nested sidebar tree, and consolidates the onboarding step rail.
 
