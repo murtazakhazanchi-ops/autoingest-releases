@@ -35,7 +35,9 @@ electron-app-v24/
 ├── renderer/
 │   ├── index.html           ← All CSS inline, Catppuccin Mocha theme
 │   ├── renderer.js          ← All UI logic, no Node/Electron access
-│   └── treeAutocomplete.js  ← Reusable tree+autocomplete dropdown class
+│   ├── treeAutocomplete.js  ← Reusable tree+autocomplete dropdown class
+│   ├── eventCreator.js      ← Event creation flow (Steps 1–3: Collection → Event → Preview)
+│   └── groupManager.js      ← File-to-group assignment state module
 ├── scripts/
 │   └── parse-lists.js       ← One-time parser: Downloads → data/*.json
 ├── services/                ← Metadata tagger, sync engine (future)
@@ -259,6 +261,16 @@ Catppuccin Mocha dark theme. CSS variables in `:root`:
 - [x] TreeAutocomplete dropdown: tree browse + live alias-aware search + Add New
 - [x] Two-card landing screen (Select Memory Card / Create Event)
 - [x] Event Creator panel shell with back navigation and dynamic step rail
+- [x] Master Collection creation form (Hijri date + label → `{HijriDate} _{Label}`)
+- [x] Event creation form — component builder (EventType + Location + City), multi-chip event types
+- [x] City-grouping rules in event name preview (Case A/B/C)
+- [x] Step 3 preview — Single/Multi mode badge + folder tree (Collection → Event → SubEvent → Photographer → VIDEO)
+- [x] Landing card updates to confirmed state after event creation (collection + event name, Change/New Event actions)
+- [x] File-to-group assignment — right-click context menu on tiles
+- [x] Cmd+G / Ctrl+G group picker modal
+- [x] Group panel (right column, 268px) — coloured tabs, sub-event mapping dropdown, file list, Remove button
+- [x] Group badges on tiles (icon view: coloured pill; list view: inline badge)
+- [x] Auto-remove empty groups; groups only created when files are assigned
 
 ---
 
@@ -290,9 +302,12 @@ dd.destroy()               // removes global listener, removes DOM
 
 ```
 Landing (step1Panel)
-  ├─ Click drive card      → selectDrive() → workspace
-  └─ Click Create Event →  → showEventCreator() → eventCreatorPanel
-                                                    └─ ← Back → showLanding()
+  ├─ Click drive card       → selectDrive() → workspace
+  └─ Click Create Event →   → showEventCreator() → eventCreatorPanel (EventCreator.start)
+  └─ Click Change (card)    → showEventCreatorResume() → eventCreatorPanel (EventCreator.resume)
+  └─ Click New Event →      → EventCreator.resetSelection() → showEventCreator()
+                                      eventCreatorPanel └─ ← Back → showLanding()
+                                                               (re-renders landing card via _renderLandingEventCard)
 ```
 
 `railMode` variable: `'card'` | `'event'`
@@ -300,14 +315,78 @@ Landing (step1Panel)
 - card:  Select Memory Card / Browse & Select Files / Import
 - event: Create Collection / Create Event / Import
 
+`_renderLandingEventCard()` — called every time `showLanding()` runs:
+- No active event → renders default Create Event card
+- Active event exists → renders confirmed card: collection name, event name/dropdown (if multiple), Change + New Event buttons
+
+---
+
+## EventCreator Module (renderer/eventCreator.js)
+
+Module singleton. Steps:
+- **Step 1 — Master Collection**: Hijri date (year/month/day segments, auto-advance) + Label → `{Y}-{MM}-{DD} _{Label}`. Existing collections shown as selectable cards. Duplicate detection → auto-select + banner.
+- **Step 2 — Event Details**: Global City default + per-component override. Components: EventType chips (multi-select, cleared after pick) + optional Location + required City. City-grouping logic builds event name per spec Cases A/B/C. Live preview.
+- **Step 3 — Preview**: Mode badge (Single/Multi-component). Folder tree: Collection → Event → [SubEvent →] (photographer) → VIDEO/. Add Another Event resets Step 2 with global city preserved. Done → showLanding().
+
+Public API:
+```js
+EventCreator.start()                // enter at step 1, full reset
+EventCreator.resume()               // enter at step 3 (Change from landing)
+EventCreator.getActiveEventData()   // → { coll, event, idx } | null
+EventCreator.getSubEventNames()     // → { id: string, name: string }[] ([] if single-component)
+EventCreator.getSessionCollections()
+EventCreator.getSelectedCollection()
+EventCreator.setActiveEventIndex(idx)
+EventCreator.syncRail()
+EventCreator.resetSelection()
+```
+
+**Key rule:** `getSubEventNames()` returns `{id, name}[]` where `id === name` (sub-event folder name). Returns `[]` for single-component events.
+
+---
+
+## GroupManager Module (renderer/groupManager.js)
+
+Module singleton. Manages file-to-group assignments during the import session.
+
+```js
+// Group shape: { id: number, label: string, colorIdx: number,
+//               files: Set<string>,   ← file paths (IDs in this app)
+//               subEventId: string | null }
+
+GroupManager.createGroup()                    // → groupId; only call when files will be assigned immediately
+GroupManager.removeGroup(id)
+GroupManager.assignFiles(paths, groupId)      // auto-removes source group if it empties
+GroupManager.unassignFiles(paths)             // auto-removes group if it empties
+GroupManager.getGroupForFile(path)            // → group | null
+GroupManager.setSubEvent(groupId, subEventId) // subEventId = string (folder name) or ''
+GroupManager.getColor(colorIdx)               // → { bg, fg } CSS var strings
+GroupManager.getActiveTabId() / setActiveTabId(id)
+GroupManager.reset()                          // called on: drive change, eject, showEventCreator, showEventCreatorResume, event select
+GroupManager.hasGroups()
+GroupManager.getGroups()
+GroupManager.getUnassignedFiles(allPaths)     // → paths not in any group
+GroupManager.hasMissingSubEvents()            // → true if any group lacks subEventId
+GroupManager.getDuplicateSubEvents()          // → subEventId[] used by >1 group
+```
+
+**Critical rules:**
+- Groups are NEVER created empty — only via context menu or Cmd+G when files are selected
+- `unassignFiles` auto-removes groups that reach 0 files
+- `GroupManager.reset()` must be called whenever the active event changes (sub-event IDs become stale)
+- `subEventId` stores the sub-event folder name (string), not an array index
+
 ---
 
 ## Features NOT Yet Implemented (planned)
 
-### Event Creation Flow (IN PROGRESS — next commits)
-- **Commit C**: Master (Collection) creation form — Hijri date + label → `{HijriDate} _{Label}`
-- **Commit D**: Event creation form — components (EventType + Location + City), live name preview, city-grouping rules
-- **Commit E**: Single vs Multi mode + sub-event folder structure preview
+### Event Import Flow (Commit G — NEXT)
+- Pre-import validation: all groups must have sub-event assigned (blocks import)
+- Unassigned files warning: "X files not assigned to any group. They will not be imported." → Continue / Cancel (does NOT block)
+- Duplicate sub-event mapping warning (multiple groups → same sub-event) → Continue / Cancel
+- Final confirmation screen: Event Name + Photographer (required, autocomplete) + group→sub-event mapping with file counts
+- File routing: grouped files → `Collection/Event/SubEvent/Photographer/` (multi) or `Collection/Event/Photographer/` (single); VIDEO → `VIDEO/` subfolder
+- Unassigned files are never imported, never moved
 
 ### Metadata Tagging
 - Write EXIF metadata after import (background queue)
@@ -397,24 +476,39 @@ FIX-ONLY pass, no new features, no architecture changes. 52 targeted patches app
 All naming conventions and archive rules (locked per this document) preserved. See `STABILIZATION_LOG.md` for per-patch status and `STABILIZATION_NOTES.md` for intentionally-deferred items (sync fs usage in pre-event-loop paths, debug handlers).
 
 
-### v0.7.0-dev — Event Creation Foundation (2026-04-20)
+### v0.7.0-dev — Event Creation + Grouping (2026-04-20)
 
-Data layer:
-- Four base JSON lists committed to `data/`: event-types (14 categories, 222 events, 3-level tree), cities (628), locations (451, with sub-locations), photographers (312, deduped).
-- `scripts/parse-lists.js` — one-time parser from tab-indented source files. Run `node scripts/parse-lists.js` to regenerate from updated source files.
-- `main/listManager.js` — load/merge/dedupe base+override, addToList with normalize+properCase, event-types read-only.
-- `main/aliasEngine.js` — normalize (punctuation→space, lowercase), slugify, flattenToLeaves, match (6-score ranking), learnAlias (dedup, no-op if same-as-label). Aliases persisted per list in `userData/{name}.aliases.json`.
+HEAD: `cecda35`  Commits A–F + patches complete. Commit G (import routing) is next.
 
-UI foundation:
-- `renderer/treeAutocomplete.js` — TreeAutocomplete class. Tree browse (collapsible 3-level for event-types and locations, flat hint for cities/photographers) + debounced live search via matchList IPC (no local filtering). Zero-results state falls back to tree for alias teaching. Alias badge on alias matches. Breadcrumb path on search results. Add New flow (cities/locations/photographers only). Full keyboard nav (↑↓ Enter Esc).
-- Landing screen redesigned as two floating cards centered on background: 📸 Select Memory Card (blue tint, existing import flow) + 🗂️ Create Event (mauve tint, new event flow). Hover: 5px lift + colour glow ring.
-- `#eventCreatorPanel` shell added with ← Back nav. Step rail labels are dynamic via `setRailMode('card'|'event')`.
-- Smoke-test modal (`#tacTestBtn` floating button, "⌗ Test Dropdowns") for verifying all 4 dropdown types — to be removed in Commit B or later.
+**Data layer (earlier commits):**
+- Four base JSON lists: `data/event-types.json` (14 categories, 222 events), `cities.json` (628), `locations.json` (451), `photographers.json` (312).
+- `main/listManager.js` — load/merge/dedupe base+override, addToList, event-types read-only.
+- `main/aliasEngine.js` — normalize, slugify, flattenToLeaves, match (6-score), learnAlias. Aliases in `userData/{name}.aliases.json`.
+- IPC: `lists:get`, `lists:add`, `lists:match`, `lists:learnAlias`
 
-IPC additions: `lists:get`, `lists:add`, `lists:match`, `lists:learnAlias`
-window.api additions: `getLists`, `addToList`, `matchList`, `learnAlias`
+**Commit A — TreeAutocomplete:**
+- `renderer/treeAutocomplete.js` — tree browse + debounced alias-aware search + Add New + full keyboard nav.
 
-Commits: eb67276 → da5eb70 (7 commits)
+**Commit B — Landing screen:**
+- Two-card layout: Select Memory Card + Create Event. `#eventCreatorPanel` shell. Dynamic step rail via `setRailMode`.
+
+**Commit C — Master Collection (Step 1):**
+- `renderer/eventCreator.js` introduced. Hijri date segments + label → `{Y}-{MM}-{DD} _{Label}`. Existing collections selectable.
+
+**Commit D + patch — Event Details (Step 2):**
+- Component builder: multi-chip EventType + Location + City. Global city default. City-grouping rules (Cases A/B/C). Live event name preview.
+
+**Commit E — Preview (Step 3):**
+- Single/Multi mode badge. Folder tree. Add Another / Done. Landing card updates to confirmed state on return (`_renderLandingEventCard`).
+
+**Commit F + patch — Grouping:**
+- `renderer/groupManager.js` — group state module (files Set, subEventId string, auto-remove empty).
+- Right-click context menu on tiles → assign/create group/unassign.
+- Cmd+G / Ctrl+G modal → group picker.
+- Group panel (#groupPanel, 268px right column) — coloured tabs, sub-event mapping dropdown (multi-component events only), file list, Remove button.
+- Group badges on tiles (icon: coloured pill; list: inline badge).
+- `EventCreator.getSubEventNames()` returns `{id, name}[]`.
+- Reset: `GroupManager.reset()` on drive change, eject, showEventCreator, showEventCreatorResume, event select.
 
 ### v0.6.0 — Folder View + Scanner Rewrite (2026-04-18)
 

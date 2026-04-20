@@ -3,7 +3,51 @@
 # AutoIngest — Complete Technical Codebase Overview
 
 **Version:** 0.7.0-dev  
-**Last updated:** 2026-04-20
+**Last updated:** 2026-04-20  
+**HEAD:** `cecda35` — Commits A–F + patches done. Commit G (import routing) is next.
+
+---
+
+## 0a. v0.7.0-dev Commits B–F (2026-04-20)
+
+### New renderer files
+
+**`renderer/eventCreator.js`** — Module singleton. Orchestrates the 3-step event creation flow.
+- Step 1 (Master Collection): Hijri date input (3 segments, auto-advance) + label → `{Y}-{MM}-{DD} _{Label}`. Existing session collections shown as selectable cards. Duplicate → auto-select + info banner.
+- Step 2 (Event Details): Global City + per-component override. Components: multi-chip EventType (cleared after each pick) + optional Location + required City. City-grouping algorithm (Cases A/B/C) builds event folder name. Live preview card.
+- Step 3 (Preview): Mode badge (Single / Multi-component). Folder tree: Collection → Event → [SubEvent →] (photographer) → VIDEO/. Event selector dropdown when multiple events exist. "Change" removes event + restores components to Step 2. "Add Another Event" resets Step 2. "Done" → showLanding().
+- Public API: `start()`, `resume()`, `getActiveEventData()` → `{coll, event, idx}|null`, `getSubEventNames()` → `{id,name}[]`, `getSessionCollections()`, `getSelectedCollection()`, `setActiveEventIndex(idx)`, `syncRail()`, `resetSelection()`, `buildFolderPreviewHTML(coll, event)`.
+- `getSubEventNames()` returns `[]` for single-component events or no active event.
+
+**`renderer/groupManager.js`** — Module singleton. Manages file-to-group assignments.
+- Group shape: `{ id: number, label: string, colorIdx: number, files: Set<string>, subEventId: string|null }`
+- `subEventId` stores the sub-event folder name (from `EventCreator.getSubEventNames()[].id`), not an array index.
+- `assignFiles(paths, groupId)` — reassigns from old group; auto-removes old group if now empty.
+- `unassignFiles(paths)` — auto-removes any group that reaches 0 files.
+- Groups are NEVER created empty: only via context menu or Cmd+G with files selected.
+- `reset()` called on: drive change, eject, `showEventCreator`, `showEventCreatorResume`, event select dropdown.
+- Validation query helpers (used by Commit G): `getUnassignedFiles(allPaths)`, `hasMissingSubEvents()`, `getDuplicateSubEvents()`.
+
+### renderer/renderer.js additions (Commits B–F)
+
+- `showEventCreator()` — resets groups, calls `EventCreator.start()`, shows `#eventCreatorPanel`.
+- `showEventCreatorResume()` — resets groups, calls `EventCreator.resume()`.
+- `showLanding()` — hides event creator + workspace, calls `_renderLandingEventCard()`.
+- `_renderLandingEventCard()` — idle: default Create Event card. Active event: confirmed card with collection, event name/select, Change + New Event buttons.
+- `renderGroupPanel()` — hides panel when no groups; renders coloured tabs, sub-event `<select>` (multi-component events only), file list, Remove button. No `+` button — groups created only via context menu / Cmd+G.
+- `syncGroupBadge(path)` / `syncAllGroupBadges()` — O(1) badge updates via tileMap.
+- Right-click handler on `#fileGrid` → `_showCtxMenu()` — context menu with group assign/create/unassign.
+- `document keydown` Cmd+G / Ctrl+G → `_showGroupPickerModal()`.
+- `GroupManager.reset()` added to `selectDrive()` and `resetAppState()`.
+
+### renderer/index.html additions (Commits B–F)
+
+- `#eventCreatorPanel` — full-height panel with `#ecHeader` (Back btn + title) and `#ecBody` (content rendered by EventCreator module).
+- `#groupPanel` — 268px right column inside `#columns`; CSS `.visible` toggles `display: flex`.
+- `#groupCtxMenu` — fixed-position context menu div (populated on right-click).
+- `#groupPickerModal` — full-overlay group picker (Cmd+G).
+- Landing card confirmed state CSS (`.landing-card-confirmed`, `.lc-ev-*`).
+- Group panel CSS (`.gp-*`), badge CSS (`.grp-badge`, `.grp-badge-list`), context menu CSS (`.ctx-*`), picker CSS (`.gpm-*`).
 
 ---
 
@@ -867,18 +911,14 @@ Steps are identical except `feedback:send` IPC calls `telemetry.flush()` immedia
 
 ## 9. WHAT IS NOT YET BUILT
 
-The following features appear in comments, CLAUDE.md, or the system document but have no corresponding code:
+The following features have no corresponding code yet:
 
-### Event / Archive System
-- Master Folder → Event Folder → Photographer Folder 3-level hierarchy
-- Event creation UI: name, Hijri date, event type, location, city
-- Auto-generated folder names with `_01`, `_02` sequence numbers
-- Photographer folder with `VIDEO/` subfolder
-- Auto-routing of imported files into the correct photographer folder
-
-### Hijri Date Logic
-- No Hijri calendar conversion anywhere in the codebase
-- Needed by Event creation UI and folder naming
+### Commit G — Import Routing (NEXT)
+- Pre-import validation: block if any group missing `subEventId`; warn (not block) on unassigned files; warn on duplicate sub-event mapping
+- Final confirmation screen: Event Name + Photographer autocomplete (required) + group→sub-event mapping with file counts
+- File routing: grouped files → `Collection/Event/SubEvent/Photographer/` (multi) or `Collection/Event/Photographer/` (single); VIDEO → `VIDEO/` subfolder
+- `main/fileManager.js` extension: `resolveArchivePath(coll, event, subEventId, photographer, file)` and multi-destination copy loop
+- Unassigned files are ignored (not copied, not moved)
 
 ### Metadata Tagging
 - No EXIF write capability (the app only reads thumbnails via `exifr`)
