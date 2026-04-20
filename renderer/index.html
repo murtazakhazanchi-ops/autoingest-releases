@@ -1667,7 +1667,111 @@
   border-color: var(--blue);
 }
 
-/* ── Placeholder block (while Commit D is built) ─────────────────────────── */
+/* ── Step 2: Global city section ────────────────────────────────────────── */
+
+.ec-global-city {
+  margin-bottom: 4px;
+}
+
+/* ── Component list ──────────────────────────────────────────────────────── */
+
+.ec-comp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ec-comp-row {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  padding: 16px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 0.15s;
+}
+
+.ec-comp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ec-comp-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--subtext);
+}
+
+.ec-comp-remove {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--subtext);
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: color 0.13s, border-color 0.13s, background 0.13s;
+}
+.ec-comp-remove:hover {
+  color: var(--red);
+  border-color: color-mix(in srgb, var(--red) 50%, transparent);
+  background: color-mix(in srgb, var(--red) 8%, transparent);
+}
+
+.ec-comp-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+}
+
+.ec-comp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.ec-comp-field-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--subtext);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ec-req  { color: var(--red); }
+.ec-opt  { color: var(--border); font-style: italic; font-weight: 400; text-transform: none; letter-spacing: 0; font-size: 10px; }
+
+/* ── Add component button ────────────────────────────────────────────────── */
+
+.ec-add-comp {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: 1.5px dashed var(--border);
+  border-radius: 10px;
+  color: var(--subtext);
+  font-size: 13px;
+  font-family: inherit;
+  padding: 11px 16px;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 10px;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.ec-add-comp:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+  background: color-mix(in srgb, var(--blue) 6%, transparent);
+}
+
+/* ── Placeholder block (while Commit E is built) ─────────────────────────── */
 
 .ec-placeholder-block {
   background: var(--surface);

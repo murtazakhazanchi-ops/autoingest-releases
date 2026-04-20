@@ -24,6 +24,34 @@ const EventCreator = (() => {
   // ── Internal step tracker ──────────────────────────────────────────────────
   let currentStep = 1; // 1 = collection, 2 = event, 3 = preview
 
+  // ── Event step state (Commit D) ────────────────────────────────────────────
+  let _globalCityVal  = null;   // { id, label } | null
+  let _globalCityDD   = null;   // TreeAutocomplete instance
+  let _eventComps     = [];     // [{ id, eventType, location, city }]
+  let _compDDs        = {};     // { [id]: { et, loc, city } } TreeAutocomplete instances
+  let _compSeq        = 0;      // monotonic ID for component rows
+
+  function _makeComp() {
+    return { id: ++_compSeq, eventType: null, location: null, city: _globalCityVal ? { ..._globalCityVal } : null };
+  }
+
+  function _destroyEventDDs() {
+    if (_globalCityDD) { _globalCityDD.destroy(); _globalCityDD = null; }
+    Object.values(_compDDs).forEach(row => {
+      row.et?.destroy();
+      row.loc?.destroy();
+      row.city?.destroy();
+    });
+    _compDDs = {};
+  }
+
+  function _resetEventForm() {
+    _destroyEventDDs();
+    _eventComps    = [];
+    _globalCityVal = null;
+    _compSeq       = 0;
+  }
+
   // ── DOM shortcuts ──────────────────────────────────────────────────────────
   const $ecBody  = () => document.getElementById('ecBody');
   const $ecTitle = () => document.getElementById('ecTitle');
@@ -461,7 +489,7 @@ const EventCreator = (() => {
 
 
   // ══════════════════════════════════════════════════════════════════════════
-  // STEP 2 — Event Details (placeholder — Commit D will replace this)
+  // STEP 2 — Event Details (Commit D)
   // ══════════════════════════════════════════════════════════════════════════
 
   function showEventStep() {
@@ -470,52 +498,334 @@ const EventCreator = (() => {
     if (title) title.textContent = 'Create Event';
     syncRailHighlight(2);
 
+    if (_eventComps.length === 0) _eventComps = [_makeComp()];
+
     const body = $ecBody();
     if (!body) return;
+
+    _destroyEventDDs();
+    body.innerHTML = _buildEventHTML();
+    _mountEventDropdowns();
+    _attachEventListeners();
+    _updateEventPreview();
+  }
+
+  // ── HTML builder ───────────────────────────────────────────────────────────
+
+  function _buildEventHTML() {
+    return `
+<div class="ec-master-wrap">
+
+  <div class="ec-breadcrumb-bar">
+    <span class="ec-bc-label">Collection</span>
+    <span class="ec-bc-value">${esc(selectedCollection || '')}</span>
+    <button class="ec-bc-change" id="ecChangeCollection">Change</button>
+  </div>
+
+  <div class="ec-global-city">
+    <p class="ec-section-title">Global City</p>
+    <div id="ecGlobalCityDD"></div>
+    <span class="ec-hint">Default city for each new component. Override per-component if needed.</span>
+  </div>
+
+  <div class="ec-comp-section">
+    <p class="ec-section-title" style="margin-top:24px">Components <span class="ec-req">*</span></p>
+    <div class="ec-comp-list" id="ecCompList">
+      ${_eventComps.map((c, i) => _buildCompRow(c, i)).join('')}
+    </div>
+    <button id="ecAddComp" class="ec-add-comp">＋  Add Component</button>
+  </div>
+
+  <div class="ec-preview-card" id="ecEventPreviewCard" aria-live="polite" style="margin-top:24px">
+    <span class="ec-preview-label">📁  Event Folder Preview</span>
+    <span id="ecEventPreviewName" class="ec-preview-name empty">—</span>
+  </div>
+
+  <div id="ecEventError" class="ec-master-error" role="alert" aria-live="polite"></div>
+
+  <button id="ecEventContinue" class="ec-continue-btn" disabled>Create Event →</button>
+
+</div>`;
+  }
+
+  function _buildCompRow(comp, index) {
+    const canRemove = _eventComps.length > 1;
+    return `
+<div class="ec-comp-row" data-comp-id="${comp.id}">
+  <div class="ec-comp-header">
+    <span class="ec-comp-label">Component ${index + 1}</span>
+    ${canRemove
+      ? `<button class="ec-comp-remove" data-comp-id="${comp.id}" aria-label="Remove component ${index + 1}">✕ Remove</button>`
+      : ''}
+  </div>
+  <div class="ec-comp-fields">
+    <div class="ec-comp-field">
+      <label class="ec-comp-field-label">Event Type <span class="ec-req">*</span></label>
+      <div id="ecET-${comp.id}"></div>
+    </div>
+    <div class="ec-comp-field">
+      <label class="ec-comp-field-label">Location <span class="ec-opt">(optional)</span></label>
+      <div id="ecLoc-${comp.id}"></div>
+    </div>
+    <div class="ec-comp-field">
+      <label class="ec-comp-field-label">City <span class="ec-req">*</span></label>
+      <div id="ecCity-${comp.id}"></div>
+    </div>
+  </div>
+</div>`;
+  }
+
+  // ── Dropdown mounting ──────────────────────────────────────────────────────
+
+  function _mountEventDropdowns() {
+    // Global city
+    const gcEl = document.getElementById('ecGlobalCityDD');
+    if (gcEl) {
+      _globalCityDD = new TreeAutocomplete({
+        container: gcEl,
+        type: 'cities',
+        placeholder: 'Search city…',
+        onSelect: ({ id, label }) => {
+          _globalCityVal = { id, label };
+          _eventComps.forEach(c => {
+            if (!c.city) {
+              c.city = { id, label };
+              _compDDs[c.id]?.city?.setValue(id, label);
+            }
+          });
+          _updateEventPreview();
+        }
+      });
+      if (_globalCityVal) _globalCityDD.setValue(_globalCityVal.id, _globalCityVal.label);
+    }
+
+    // Per-component
+    _eventComps.forEach(comp => _mountCompDDs(comp));
+  }
+
+  function _mountCompDDs(comp) {
+    const row = {};
+
+    const etEl = document.getElementById(`ecET-${comp.id}`);
+    if (etEl) {
+      row.et = new TreeAutocomplete({
+        container: etEl, type: 'event-types', placeholder: 'Search event type…',
+        onSelect: ({ id, label }) => { comp.eventType = { id, label }; _updateEventPreview(); }
+      });
+      if (comp.eventType) row.et.setValue(comp.eventType.id, comp.eventType.label);
+    }
+
+    const locEl = document.getElementById(`ecLoc-${comp.id}`);
+    if (locEl) {
+      row.loc = new TreeAutocomplete({
+        container: locEl, type: 'locations', placeholder: 'Location… (optional)',
+        onSelect: ({ id, label }) => { comp.location = { id, label }; _updateEventPreview(); }
+      });
+      if (comp.location) row.loc.setValue(comp.location.id, comp.location.label);
+    }
+
+    const cityEl = document.getElementById(`ecCity-${comp.id}`);
+    if (cityEl) {
+      row.city = new TreeAutocomplete({
+        container: cityEl, type: 'cities', placeholder: 'City…',
+        onSelect: ({ id, label }) => { comp.city = { id, label }; _updateEventPreview(); }
+      });
+      if (comp.city) row.city.setValue(comp.city.id, comp.city.label);
+    }
+
+    _compDDs[comp.id] = row;
+  }
+
+  // ── Listeners ──────────────────────────────────────────────────────────────
+
+  function _attachEventListeners() {
+    document.getElementById('ecChangeCollection')
+      ?.addEventListener('click', showMasterStep);
+
+    document.getElementById('ecAddComp')
+      ?.addEventListener('click', () => {
+        _eventComps.push(_makeComp());
+        _refreshCompList();
+        _updateEventPreview();
+        // Focus the new row's event type field
+        const last = _eventComps[_eventComps.length - 1];
+        document.getElementById(`ecET-${last.id}`)?.querySelector('input')?.focus();
+      });
+
+    _wireRemoveButtons();
+
+    document.getElementById('ecEventContinue')
+      ?.addEventListener('click', _tryCreateEvent);
+  }
+
+  function _wireRemoveButtons() {
+    document.querySelectorAll('.ec-comp-remove').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = Number(btn.dataset.compId);
+        const row = _compDDs[id];
+        row?.et?.destroy(); row?.loc?.destroy(); row?.city?.destroy();
+        delete _compDDs[id];
+        _eventComps = _eventComps.filter(c => c.id !== id);
+        _refreshCompList();
+        _updateEventPreview();
+      });
+    });
+  }
+
+  function _refreshCompList() {
+    const listEl = document.getElementById('ecCompList');
+    if (!listEl) return;
+
+    // Destroy existing per-comp DDs
+    Object.keys(_compDDs).forEach(id => {
+      const row = _compDDs[Number(id)];
+      row?.et?.destroy(); row?.loc?.destroy(); row?.city?.destroy();
+    });
+    _compDDs = {};
+
+    listEl.innerHTML = _eventComps.map((c, i) => _buildCompRow(c, i)).join('');
+    _eventComps.forEach(comp => _mountCompDDs(comp));
+    _wireRemoveButtons();
+  }
+
+  // ── Event name builder ─────────────────────────────────────────────────────
+
+  function _buildCompString(comps) {
+    // Group consecutive same-city components; emit city after each group.
+    // Case A (all same): City appears once at end.
+    // Case B (all different): Each component followed by its city.
+    // Case C (mixed groups): City follows its group.
+    const result = [];
+    let i = 0;
+    while (i < comps.length) {
+      const cityLabel = comps[i].city?.label || '';
+      let j = i;
+      while (j < comps.length && (comps[j].city?.label || '') === cityLabel) {
+        const c = comps[j];
+        if (c.eventType?.label) result.push(c.eventType.label);
+        if (c.location?.label)  result.push(c.location.label);
+        j++;
+      }
+      if (cityLabel) result.push(cityLabel);
+      i = j;
+    }
+    return result.join('-');
+  }
+
+  // ── Live preview + continue-button gate ───────────────────────────────────
+
+  function _updateEventPreview() {
+    const preview = document.getElementById('ecEventPreviewName');
+    const card    = document.getElementById('ecEventPreviewCard');
+    const btn     = document.getElementById('ecEventContinue');
+
+    const coll   = sessionCollections.find(c => c.name === selectedCollection);
+    const seq    = String((coll?.events.length ?? 0) + 1).padStart(2, '0');
+    const parts  = _buildCompString(_eventComps);
+    const valid  = _eventComps.length > 0 && _eventComps.every(c => c.eventType && c.city);
+    const name   = parts ? `${coll?.hijriDate || '?'} _${seq}-${parts}` : '';
+
+    if (preview) {
+      preview.textContent = name || '—';
+      preview.classList.toggle('empty', !name);
+      card?.classList.toggle('has-value', !!name);
+    }
+    if (btn) btn.disabled = !valid;
+  }
+
+  // ── Validate + create ──────────────────────────────────────────────────────
+
+  function _tryCreateEvent() {
+    if (_eventComps.length === 0) {
+      _showEventBanner('Add at least one component.', 'error'); return;
+    }
+    const missing = _eventComps.find(c => !c.eventType || !c.city);
+    if (missing) {
+      _showEventBanner('Every component needs an Event Type and City.', 'error'); return;
+    }
+
+    const coll = sessionCollections.find(c => c.name === selectedCollection);
+    if (!coll) return;
+
+    const seq   = String(coll.events.length + 1).padStart(2, '0');
+    const parts = _buildCompString(_eventComps);
+    const name  = `${coll.hijriDate} _${seq}-${parts}`;
+
+    coll.events.push({ name, components: _eventComps.map(c => ({ ...c })) });
+
+    // Reset component state for next event; preserve global city
+    _eventComps = [_makeComp()];
+
+    _proceedToPreviewStep();
+  }
+
+  function _showEventBanner(msg, type = 'error') {
+    const el = document.getElementById('ecEventError');
+    if (!el) return;
+    el.textContent  = msg;
+    el.dataset.type = type;
+    el.classList.add('visible');
+    clearTimeout(el._hideTimer);
+    el._hideTimer = setTimeout(() => el.classList.remove('visible'), 4500);
+  }
+
+  // ── Slide-transition helper ────────────────────────────────────────────────
+
+  function _slideToStep(renderFn) {
+    const body = $ecBody();
+    if (!body) { renderFn(); return; }
+    body.style.cssText += ';opacity:0;transform:translateX(-14px);transition:opacity 0.18s ease,transform 0.18s ease';
+    setTimeout(() => {
+      renderFn();
+      body.style.cssText += ';opacity:0;transform:translateX(14px);transition:none';
+      void body.offsetHeight;
+      body.style.cssText += ';opacity:1;transform:translateX(0);transition:opacity 0.2s ease,transform 0.2s ease';
+      setTimeout(() => { body.style.opacity = ''; body.style.transform = ''; body.style.transition = ''; }, 220);
+    }, 185);
+  }
+
+  function proceedToEventStep()   { _slideToStep(showEventStep);   }
+  function _proceedToPreviewStep() { _slideToStep(showPreviewStep); }
+
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // STEP 3 — Preview & Import (placeholder — Commit E will replace this)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  function showPreviewStep() {
+    currentStep = 3;
+    const title = $ecTitle();
+    if (title) title.textContent = 'Review & Import';
+    syncRailHighlight(3);
+
+    const body = $ecBody();
+    if (!body) return;
+
+    const coll      = sessionCollections.find(c => c.name === selectedCollection);
+    const lastEvent = coll?.events[coll.events.length - 1];
 
     body.innerHTML = `
 <div class="ec-master-wrap">
   <div class="ec-breadcrumb-bar">
-    <span class="ec-bc-label">Collection</span>
-    <span class="ec-bc-value">${esc(selectedCollection || '')}</span>
-    <button class="ec-bc-change" id="ecChangeCollection" aria-label="Change collection">Change</button>
+    <span class="ec-bc-label">Event</span>
+    <span class="ec-bc-value">${esc(lastEvent?.name || '')}</span>
+    <button class="ec-bc-change" id="ecChangeEvent">Change</button>
   </div>
 
   <div class="ec-placeholder-block">
-    <div class="ec-ph-icon">🗂️</div>
-    <div class="ec-ph-title">Event Details</div>
+    <div class="ec-ph-icon">✅</div>
+    <div class="ec-ph-title">Review &amp; Import</div>
     <div class="ec-ph-desc">
-      The event component builder is coming in the next commit.<br>
-      You'll select Event Type, Location, and City here.
+      Photographer assignment, grouping, and import confirmation<br>coming in the next commit.
     </div>
   </div>
 </div>`;
 
-    document.getElementById('ecChangeCollection')
-      ?.addEventListener('click', showMasterStep);
-  }
-
-  // ── Step routing ───────────────────────────────────────────────────────────
-
-  function proceedToEventStep() {
-    // Animate out ecBody, swap, animate in
-    const body = $ecBody();
-    if (!body) { showEventStep(); return; }
-    body.style.opacity    = '0';
-    body.style.transform  = 'translateX(-12px)';
-    body.style.transition = 'opacity 0.18s ease, transform 0.18s ease';
-    setTimeout(() => {
-      showEventStep();
-      body.style.opacity   = '';
-      body.style.transform = '';
-      body.style.transition = '';
-      // Trigger reflow so transition runs in reverse
-      void body.offsetHeight;
-      body.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
-      body.style.opacity    = '1';
-      body.style.transform  = 'translateX(0)';
-      setTimeout(() => { body.style.transition = ''; }, 220);
-    }, 180);
+    document.getElementById('ecChangeEvent')?.addEventListener('click', () => {
+      if (coll && coll.events.length > 0) coll.events.pop();
+      _eventComps = [_makeComp()];
+      _slideToStep(showEventStep);
+    });
   }
 
 
@@ -527,6 +837,7 @@ const EventCreator = (() => {
     /** Call when entering the event creator panel. Always starts at step 1. */
     start() {
       selectedCollection = null;
+      _resetEventForm();
       showMasterStep();
     },
 
