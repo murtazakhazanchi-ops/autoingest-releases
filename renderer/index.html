@@ -2056,6 +2056,194 @@
   background: color-mix(in srgb, var(--blue) 6%, transparent);
 }
 
+
+    /* ── GROUP PANEL (right panel) ────────────────────────────── */
+    #groupPanel {
+      display: none; flex-direction: column;
+      width: 268px; min-width: 220px; flex-shrink: 0;
+      background: var(--surface2); border-left: 1px solid var(--border);
+      overflow: hidden;
+    }
+    #groupPanel.visible { display: flex; }
+
+    .gp-header {
+      display: flex; align-items: center; padding: 9px 14px 7px;
+      border-bottom: 1px solid var(--border); flex-shrink: 0;
+      font-size: 0.65rem; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; opacity: 0.4;
+    }
+
+    .gp-tabs {
+      display: flex; align-items: center; gap: 4px;
+      padding: 8px 10px 6px; border-bottom: 1px solid var(--border);
+      flex-shrink: 0; flex-wrap: wrap;
+    }
+    .gp-tab {
+      display: flex; align-items: center; gap: 5px;
+      padding: 4px 10px; border-radius: 20px; font-size: 0.75rem;
+      font-weight: 600; cursor: pointer; border: 1.5px solid var(--border);
+      background: transparent; color: var(--subtext);
+      transition: border-color 0.12s, background 0.12s, color 0.12s;
+    }
+    .gp-tab:hover { border-color: var(--blue); color: var(--blue); }
+    .gp-tab.active { border-color: transparent; }
+    .gp-tab-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .gp-tab-cnt { font-size: 0.66rem; opacity: 0.75; }
+    .gp-tab-add {
+      padding: 4px 9px; border-radius: 20px; font-size: 0.82rem;
+      background: transparent; border: 1.5px dashed var(--border);
+      color: var(--subtext); cursor: pointer;
+      transition: border-color 0.12s, color 0.12s;
+    }
+    .gp-tab-add:hover { border-color: var(--green); color: var(--green); }
+
+    .gp-active-label {
+      padding: 10px 14px 8px; font-size: 0.78rem; font-weight: 700;
+      color: var(--text); border-bottom: 1px solid var(--border); flex-shrink: 0;
+      border-left: 3px solid transparent;
+    }
+
+    .gp-subevent-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 12px 4px; flex-shrink: 0;
+    }
+    .gp-sl { font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--subtext); white-space: nowrap; }
+    .gp-sel {
+      flex: 1; padding: 5px 8px; background: var(--surface3);
+      border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text); font-size: 0.75rem; font-family: inherit;
+      cursor: pointer; outline: none;
+      transition: border-color 0.12s;
+    }
+    .gp-sel:hover, .gp-sel:focus { border-color: var(--blue); }
+
+    .gp-status {
+      margin: 2px 12px 8px; padding: 4px 10px; border-radius: 6px;
+      font-size: 0.72rem; font-weight: 600; flex-shrink: 0;
+    }
+    .gp-status.ok   { background: var(--green-dim); color: var(--green); }
+    .gp-status.warn { background: rgba(249,226,175,0.12); color: var(--yellow); }
+
+    .gp-file-list {
+      flex: 1; overflow-y: auto; padding: 6px 0;
+    }
+    .gp-file-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 5px 14px; font-size: 0.77rem; color: var(--subtext);
+      transition: background 0.08s;
+    }
+    .gp-file-row:hover { background: rgba(137,180,250,0.05); }
+    .gp-fdot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .gp-fname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .gp-empty {
+      padding: 20px 14px; font-size: 0.78rem; color: var(--subtext);
+      opacity: 0.45; font-style: italic; text-align: center;
+    }
+
+    .gp-footer {
+      padding: 8px 10px 10px; border-top: 1px solid var(--border); flex-shrink: 0;
+    }
+    .gp-remove-btn {
+      width: 100%; padding: 7px 12px; background: transparent;
+      border: 1.5px solid var(--border); border-radius: 8px;
+      color: var(--subtext); font-size: 0.78rem; font-family: inherit;
+      cursor: pointer; transition: border-color 0.12s, color 0.12s, background 0.12s;
+    }
+    .gp-remove-btn:hover {
+      border-color: var(--red); color: var(--red);
+      background: rgba(243,139,168,0.08);
+    }
+
+    /* ── GROUP BADGE on tiles ─────────────────────────────────── */
+    .grp-badge {
+      position: absolute; bottom: 6px; left: 6px;
+      padding: 2px 6px; border-radius: 10px; font-size: 0.6rem;
+      font-weight: 700; line-height: 1.2; pointer-events: none;
+      z-index: 3; letter-spacing: 0.02em;
+    }
+    /* list view badge — inline */
+    .grp-badge-list {
+      display: inline-flex; align-items: center;
+      padding: 1px 6px; border-radius: 8px; font-size: 0.62rem;
+      font-weight: 700; margin-left: 6px; vertical-align: middle;
+    }
+
+    /* ── CONTEXT MENU ─────────────────────────────────────────── */
+    #groupCtxMenu {
+      position: fixed; z-index: 9999; display: none;
+      background: var(--surface3); border: 1px solid var(--border);
+      border-radius: 10px; padding: 4px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+      min-width: 200px; max-width: 260px;
+    }
+    .ctx-section {
+      padding: 5px 10px 3px; font-size: 0.63rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.08em; color: var(--subtext);
+      opacity: 0.6;
+    }
+    .ctx-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 10px; border-radius: 7px; font-size: 0.8rem;
+      cursor: pointer; color: var(--text);
+      transition: background 0.08s;
+    }
+    .ctx-item:hover { background: rgba(137,180,250,0.12); }
+    .ctx-item.ctx-item-active { font-weight: 700; }
+    .ctx-item.ctx-item-danger { color: var(--red); }
+    .ctx-item.ctx-item-danger:hover { background: rgba(243,139,168,0.12); }
+    .ctx-dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    }
+    .ctx-dot-new {
+      width: 8px; height: 8px; border-radius: 50%; background: var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.6rem; color: var(--subtext); font-weight: 700;
+    }
+    .ctx-count { font-size: 0.7rem; opacity: 0.5; margin-left: auto; }
+    .ctx-sep { height: 1px; background: var(--border); margin: 4px 0; }
+
+    /* ── GROUP PICKER MODAL (Cmd+G) ───────────────────────────── */
+    #groupPickerModal {
+      position: fixed; inset: 0; z-index: 9998;
+      background: rgba(30,30,46,0.7); backdrop-filter: blur(4px);
+      display: none; align-items: center; justify-content: center;
+    }
+    .gpm-box {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 14px; padding: 24px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.5); min-width: 300px;
+    }
+    .gpm-title {
+      font-size: 0.85rem; font-weight: 700; color: var(--text);
+      margin-bottom: 16px; text-align: center;
+    }
+    .gpm-grid {
+      display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+      margin-bottom: 16px;
+    }
+    .gpm-btn {
+      padding: 10px 16px; border-radius: 10px; border: none;
+      font-size: 0.82rem; font-weight: 700; cursor: pointer;
+      min-width: 72px; text-align: center; line-height: 1.3;
+      transition: opacity 0.12s, transform 0.1s;
+    }
+    .gpm-btn:hover { opacity: 0.85; transform: translateY(-1px); }
+    .gpm-btn-new {
+      background: var(--surface3); color: var(--subtext);
+      border: 1.5px dashed var(--border);
+    }
+    .gpm-btn-new:hover { border-color: var(--green); color: var(--green); }
+    .gpm-count { font-size: 0.68rem; font-weight: 400; opacity: 0.75; }
+    .gpm-cancel {
+      display: block; width: 100%; padding: 8px;
+      background: transparent; border: 1px solid var(--border);
+      border-radius: 8px; color: var(--subtext); font-size: 0.78rem;
+      font-family: inherit; cursor: pointer;
+      transition: border-color 0.12s, color 0.12s;
+    }
+    .gpm-cancel:hover { border-color: var(--blue); color: var(--blue); }
+
   </style>
 </head>
 <body>
@@ -2143,7 +2331,7 @@
         </div>
       </div>
 
-      <!-- File panel -->
+      <!-- File panel — center column -->
       <div id="filePanel">
         <div id="filePanelHeader">
           <span id="breadcrumb">—</span>
@@ -2190,6 +2378,11 @@
             <span>Choose a folder from the left to browse files</span>
           </div>
         </div>
+      </div>
+
+      <!-- Group panel — right column, hidden until groups exist -->
+      <div id="groupPanel">
+        <!-- content rendered by renderGroupPanel() in renderer.js -->
       </div>
     </div>
 
@@ -2435,8 +2628,19 @@
     </div>
   </div>
 
+  <!-- Right-click context menu for group assignment -->
+  <div id="groupCtxMenu"></div>
+
+  <!-- Cmd+G / Ctrl+G group picker modal -->
+  <div id="groupPickerModal">
+    <div class="gpm-box" id="gpmBox">
+      <!-- populated by showGroupPickerModal() -->
+    </div>
+  </div>
+
   <script src="treeAutocomplete.js"></script>
   <script src="eventCreator.js"></script>
+  <script src="groupManager.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>

@@ -908,6 +908,7 @@ async function selectDrive(drive) {
   expandedFolders.clear(); dcimChildrenCache = []; cachedDcimPath = null;
   selectedFiles.clear(); currentFiles = []; lastClickedPath = null; tileMap = new Map();
   resetViewCache();
+  GroupManager.reset();
   document.getElementById('step1Panel').style.display = 'none';
   document.getElementById('workspace').classList.add('visible');
   document.getElementById('activeDriveName').textContent = drive.label;
@@ -953,6 +954,8 @@ function resetAppState() {
   currentFiles = [];
   destFileCache = new Map();
   resetViewCache();
+  GroupManager.reset();
+  renderGroupPanel();
 
   // Clear tileMap and disconnect observer
   tileMap = new Map();
@@ -1668,10 +1671,15 @@ function buildIconTilesHtml(files, enablePairing = false) {
     }
     const tileCls  = 'file-tile' + (checked ? ' selected' : '') + (imported ? ' already-imported' : '') + pairCls;
     const dupBadge = imported ? `<div class="dup-overlay-badge">Already Imported</div>` : '';
+    const grp      = GroupManager.getGroupForFile(file.path);
+    const grpBadge = grp
+      ? (() => { const c = GroupManager.getColor(grp.colorIdx); return `<div class="grp-badge" style="background:${c.bg};color:${c.fg}">${grp.label}</div>`; })()
+      : '<div class="grp-badge" style="display:none"></div>';
 
     return `<div class="${tileCls}" data-path="${escapeHtml(file.path)}" data-size="${file.size}" data-base="${escapeHtml(base)}">
       <input type="checkbox" ${checked ? 'checked' : ''} data-path="${escapeHtml(file.path)}" />
       ${dupBadge}
+      ${grpBadge}
       <div class="file-thumb">${thumbHtml(file)}</div>
       <div class="file-meta">
         <div class="file-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</div>
@@ -1700,11 +1708,15 @@ function buildListRowsHtml(files, enablePairing = false) {
     }
     const rowCls   = 'file-tile' + (checked ? ' selected' : '') + (imported ? ' already-imported' : '') + pairCls;
     const dupLabel = imported ? `<span class="dup-list-badge">✓ Imported</span>` : '';
+    const grpR     = GroupManager.getGroupForFile(file.path);
+    const grpLabel = grpR
+      ? (() => { const c = GroupManager.getColor(grpR.colorIdx); return `<span class="grp-badge-list" style="background:${c.bg};color:${c.fg}">${grpR.label}</span>`; })()
+      : '';
 
     return `<tr class="${rowCls}" data-path="${escapeHtml(file.path)}" data-size="${file.size}" data-base="${escapeHtml(base)}">
       <td class="lt-check"><input type="checkbox" ${checked ? 'checked' : ''} data-path="${escapeHtml(file.path)}" /></td>
       <td class="lt-thumb"><div class="list-thumb">${thumbHtml(file)}</div></td>
-      <td class="lt-name"><span class="file-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</span>${dupLabel}</td>
+      <td class="lt-name"><span class="file-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</span>${dupLabel}${grpLabel}</td>
       <td class="lt-type"><span class="file-ext-badge ${badgeCls}">${extUp}</span></td>
       <td class="lt-size">${formatSize(file.size)}</td>
       <td class="lt-date">${formatDate(file.modifiedAt)}</td>
@@ -3022,3 +3034,260 @@ async function _submitFeedback() {
     if (e.key === 'Escape' && overlay.classList.contains('visible')) close();
   });
 }());
+
+// ════════════════════════════════════════════════════════════════
+// GROUPING — Commit F
+// Steps 7 + 8: file-to-group assignment, group panel, context menu
+// ════════════════════════════════════════════════════════════════
+
+// ── Badge sync ─────────────────────────────────────────────────────────────
+
+function syncGroupBadge(path) {
+  const tile = tileMap.get(path);
+  if (!tile) return;
+  const badge = tile.querySelector('.grp-badge');
+  if (!badge) return;
+  const g = GroupManager.getGroupForFile(path);
+  if (g) {
+    const c = GroupManager.getColor(g.colorIdx);
+    badge.textContent    = g.label;
+    badge.style.background = c.bg;
+    badge.style.color      = c.fg;
+    badge.style.display    = '';
+  } else {
+    badge.style.display  = 'none';
+    badge.textContent    = '';
+  }
+}
+
+function syncAllGroupBadges() {
+  for (const [path] of tileMap) syncGroupBadge(path);
+}
+
+// ── Group panel renderer ───────────────────────────────────────────────────
+
+function renderGroupPanel() {
+  const panel = document.getElementById('groupPanel');
+  if (!panel) return;
+
+  if (!GroupManager.hasGroups()) {
+    panel.classList.remove('visible');
+    return;
+  }
+  panel.classList.add('visible');
+
+  const groups    = GroupManager.getGroups();
+  const activeId  = GroupManager.getActiveTabId() ?? groups[0].id;
+  const active    = groups.find(g => g.id === activeId) ?? groups[0];
+  const col       = GroupManager.getColor(active.colorIdx);
+  const subNames  = EventCreator.getSubEventNames();
+
+  const tabsHtml = groups.map(g => {
+    const c   = GroupManager.getColor(g.colorIdx);
+    const act = g.id === active.id;
+    return `<button class="gp-tab${act ? ' active' : ''}" data-gid="${g.id}"
+        style="${act ? `background:${c.bg};color:${c.fg};border-color:transparent` : ''}">
+      <span class="gp-tab-dot" style="background:${c.bg}"></span>${_esc(g.label)}<span class="gp-tab-cnt">${g.files.size}</span>
+    </button>`;
+  }).join('') + `<button class="gp-tab-add" id="gpAddBtn" title="New Group">＋</button>`;
+
+  let subHtml = '';
+  if (subNames.length > 0) {
+    const mapped = active.subEventIdx !== null;
+    subHtml = `
+      <div class="gp-subevent-row">
+        <span class="gp-sl">Sub-Event</span>
+        <select class="gp-sel" id="gpSubSel">
+          <option value="">— select —</option>
+          ${subNames.map((n, i) =>
+            `<option value="${i}"${active.subEventIdx === i ? ' selected' : ''}>${_esc(n)}</option>`
+          ).join('')}
+        </select>
+      </div>
+      <div class="gp-status ${mapped ? 'ok' : 'warn'}">${mapped ? `✓ ${_esc(subNames[active.subEventIdx])}` : '⚠ Not mapped'}</div>`;
+  }
+
+  const filesHtml = active.files.size === 0
+    ? '<div class="gp-empty">Assign files via right-click or ⌘G</div>'
+    : [...active.files].map(p => {
+        const name = p.split(/[/\\]/).pop();
+        return `<div class="gp-file-row">
+          <span class="gp-fdot" style="background:${col.bg}"></span>
+          <span class="gp-fname" title="${_esc(p)}">${_esc(name)}</span>
+        </div>`;
+      }).join('');
+
+  panel.innerHTML = `
+    <div class="gp-header">Groups</div>
+    <div class="gp-tabs">${tabsHtml}</div>
+    <div class="gp-active-label" style="border-left-color:${col.bg}">${_esc(active.label)}</div>
+    ${subHtml}
+    <div class="gp-file-list">${filesHtml}</div>
+    <div class="gp-footer">
+      <button class="gp-remove-btn" id="gpRemoveBtn">✕ Remove ${_esc(active.label)}</button>
+    </div>`;
+
+  panel.querySelectorAll('.gp-tab[data-gid]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      GroupManager.setActiveTabId(Number(btn.dataset.gid));
+      renderGroupPanel();
+    });
+  });
+  document.getElementById('gpAddBtn')?.addEventListener('click', () => {
+    GroupManager.createGroup();
+    renderGroupPanel();
+  });
+  document.getElementById('gpSubSel')?.addEventListener('change', e => {
+    GroupManager.setSubEvent(active.id, e.target.value);
+    renderGroupPanel();
+  });
+  document.getElementById('gpRemoveBtn')?.addEventListener('click', () => {
+    GroupManager.removeGroup(active.id);
+    syncAllGroupBadges();
+    renderGroupPanel();
+  });
+}
+
+// ── Context menu (right-click on tile) ────────────────────────────────────
+
+function _hideCtxMenu() {
+  document.getElementById('groupCtxMenu').style.display = 'none';
+}
+
+document.getElementById('fileGrid').addEventListener('contextmenu', e => {
+  const tile = e.target.closest('[data-path]');
+  if (!tile) return;
+  e.preventDefault();
+
+  const path = tile.dataset.path;
+
+  // Normalize selection: right-clicking outside current selection resets it
+  if (!selectedFiles.has(path)) {
+    selectedFiles.clear();
+    selectedFiles.add(path);
+    syncAllTiles();
+    updateSelectionBar();
+  }
+
+  _showCtxMenu(e.clientX, e.clientY, path);
+});
+
+function _showCtxMenu(x, y, anchorPath) {
+  const menu    = document.getElementById('groupCtxMenu');
+  const groups  = GroupManager.getGroups();
+  const curGrp  = GroupManager.getGroupForFile(anchorPath);
+  const selCount = selectedFiles.size;
+
+  let html = `<div class="ctx-section">Assign ${selCount > 1 ? selCount + ' files' : 'to'} Group</div>`;
+
+  groups.forEach(g => {
+    const c   = GroupManager.getColor(g.colorIdx);
+    const act = curGrp && curGrp.id === g.id;
+    html += `<div class="ctx-item${act ? ' ctx-item-active' : ''}" data-action="assign" data-gid="${g.id}">
+      <span class="ctx-dot" style="background:${c.bg}"></span>
+      ${_esc(g.label)} <span class="ctx-count">${g.files.size} file${g.files.size !== 1 ? 's' : ''}</span>
+    </div>`;
+  });
+
+  html += `<div class="ctx-item ctx-item-new" data-action="new">
+    <span class="ctx-dot-new">+</span> New Group
+  </div>`;
+
+  if (curGrp) {
+    html += `<div class="ctx-sep"></div>
+    <div class="ctx-item ctx-item-danger" data-action="unassign">Remove from ${_esc(curGrp.label)}</div>`;
+  }
+
+  menu.innerHTML = html;
+
+  // Position (keep inside viewport)
+  menu.style.display = 'block';
+  const mw = menu.offsetWidth  || 220;
+  const mh = menu.offsetHeight || 160;
+  menu.style.left = (x + mw > window.innerWidth  ? window.innerWidth  - mw - 8 : x) + 'px';
+  menu.style.top  = (y + mh > window.innerHeight ? window.innerHeight - mh - 8 : y) + 'px';
+
+  menu.querySelectorAll('.ctx-item[data-action]').forEach(item => {
+    item.addEventListener('click', () => {
+      const paths = [...selectedFiles];
+      if (item.dataset.action === 'assign') {
+        GroupManager.assignFiles(paths, Number(item.dataset.gid));
+      } else if (item.dataset.action === 'new') {
+        const gid = GroupManager.createGroup();
+        GroupManager.assignFiles(paths, gid);
+      } else if (item.dataset.action === 'unassign') {
+        GroupManager.unassignFiles(paths);
+      }
+      syncAllGroupBadges();
+      renderGroupPanel();
+      _hideCtxMenu();
+    });
+  });
+}
+
+// Dismiss context menu on click outside
+document.addEventListener('click', e => {
+  const menu = document.getElementById('groupCtxMenu');
+  if (menu && !menu.contains(e.target)) _hideCtxMenu();
+}, true);
+document.addEventListener('scroll', _hideCtxMenu, true);
+
+// ── Cmd+G / Ctrl+G — group picker modal ───────────────────────────────────
+
+document.addEventListener('keydown', e => {
+  if (!((e.metaKey || e.ctrlKey) && e.key === 'g')) return;
+  e.preventDefault();
+  if (selectedFiles.size === 0) return;
+  _showGroupPickerModal();
+});
+
+function _showGroupPickerModal() {
+  const overlay = document.getElementById('groupPickerModal');
+  const box     = document.getElementById('gpmBox');
+  if (!overlay || !box) return;
+
+  const groups   = GroupManager.getGroups();
+  const selCount = selectedFiles.size;
+
+  let html = `<div class="gpm-title">Assign ${selCount} file${selCount !== 1 ? 's' : ''} to Group</div>
+  <div class="gpm-grid">`;
+
+  groups.forEach(g => {
+    const c = GroupManager.getColor(g.colorIdx);
+    html += `<button class="gpm-btn" data-gid="${g.id}" style="background:${c.bg};color:${c.fg}">
+      ${_esc(g.label)}<br><span class="gpm-count">${g.files.size} file${g.files.size !== 1 ? 's' : ''}</span>
+    </button>`;
+  });
+
+  html += `<button class="gpm-btn gpm-btn-new" data-gid="new">
+    <span style="font-size:1.1em">＋</span><br><span class="gpm-count">New Group</span>
+  </button></div>
+  <button class="gpm-cancel" id="gpmCancel">Cancel  (Esc)</button>`;
+
+  box.innerHTML = html;
+  overlay.style.display = 'flex';
+
+  const close = () => { overlay.style.display = 'none'; };
+
+  box.querySelectorAll('.gpm-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const paths = [...selectedFiles];
+      let gid;
+      if (btn.dataset.gid === 'new') {
+        gid = GroupManager.createGroup();
+      } else {
+        gid = Number(btn.dataset.gid);
+      }
+      GroupManager.assignFiles(paths, gid);
+      syncAllGroupBadges();
+      renderGroupPanel();
+      close();
+    });
+  });
+
+  document.getElementById('gpmCancel')?.addEventListener('click', close);
+  overlay.addEventListener('mousedown', e => { if (e.target === overlay) close(); });
+
+  const onEsc = e => { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onEsc); } };
+  document.addEventListener('keydown', onEsc);
+}

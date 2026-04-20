@@ -1025,6 +1025,16 @@ const EventCreator = (() => {
       return _buildFolderTreeHTML(coll, event);
     },
 
+    /**
+     * Returns sub-event folder names for the active event's components.
+     * Returns [] for single-component events or when no event is active.
+     */
+    getSubEventNames() {
+      const data = this.getActiveEventData();
+      if (!data || data.event.components.length <= 1) return [];
+      return _buildSubEventFolderNames(data.event.components);
+    },
+
     /** Resume at step 3 (for "Change" from landing page). */
     resume() { showPreviewStep(); }
   };
