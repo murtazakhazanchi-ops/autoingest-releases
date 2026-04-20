@@ -1,36 +1,37 @@
 // renderer/eventCreator.js
 // ── EventCreator — module singleton ────────────────────────────────────────
 // Orchestrates the full multi-step event creation flow:
-//   Step 1 (Commit C): Master Collection  → pick or create {HijriDate} _{Label}
-//   Step 2 (Commit D): Event Details      → component builder + live name preview
-//   Step 3 (Commit E): Preview & Confirm  → folder tree + final import
+//   Step 1 (M1): Master Collection  → disk-backed create or select existing
+//   Step 2 (Commit D): Event Details → component builder + live name preview
+//   Step 3 (Commit E): Preview & Confirm → folder tree + final import
 //
 // Architecture:
 //   • Pure renderer code — no Node access, all IPC via window.api
+//   • sessionArchiveRoot persists across resets within a session (never cleared by resetSelection or start)
 //   • sessionCollections persists across back/forward navigation this session
-//   • selectedCollection is the single source of truth for the chosen master folder
-//   • Each step renders into #ecBody; never touches anything outside ecBody / ecTitle
+//   • activeMaster = { name, path } | null — cleared on resetSelection/start
+//   • selectedCollection is the single source of truth for the chosen master name (= activeMaster.name)
 
 'use strict';
 
 const EventCreator = (() => {
 
   // ── Session state ──────────────────────────────────────────────────────────
-  // Persists for the full app session (not cleared on resetAppState)
-  // so previously created collections stay available for the next event.
-  const sessionCollections = [];   // { name, hijriDate, label, events[] }[]
+  let sessionArchiveRoot = null;  // string | null — set on first master create, never cleared
+  let activeMaster       = null;  // { name, path } | null — the on-disk master folder in use
+  const sessionCollections = [];  // { name, hijriDate, label, events[], _masterPath }[]
   let   selectedCollection = null; // string (folder name) or null
 
   // ── Internal step tracker ──────────────────────────────────────────────────
-  let currentStep = 1; // 1 = collection, 2 = event, 3 = preview
+  let currentStep = 1;
 
   // ── Event step state (Commit D) ────────────────────────────────────────────
-  let _globalCityVal  = null;   // { id, label } | null
-  let _globalCityDD   = null;   // TreeAutocomplete instance
-  let _eventComps     = [];     // [{ id, eventTypes: [{id,label}][], location, city }]
-  let _compDDs        = {};     // { [id]: { et, loc, city } } TreeAutocomplete instances
-  let _compSeq        = 0;      // monotonic ID for component rows
-  let _activeEventIdx = 0;      // which event in coll.events is selected for import
+  let _globalCityVal  = null;
+  let _globalCityDD   = null;
+  let _eventComps     = [];
+  let _compDDs        = {};
+  let _compSeq        = 0;
+  let _activeEventIdx = 0;
 
   function _makeComp() {
     return { id: ++_compSeq, eventTypes: [], location: null, city: _globalCityVal ? { ..._globalCityVal } : null };
@@ -56,6 +57,12 @@ const EventCreator = (() => {
   // ── DOM shortcuts ──────────────────────────────────────────────────────────
   const $ecBody  = () => document.getElementById('ecBody');
   const $ecTitle = () => document.getElementById('ecTitle');
+
+  // ── Path helpers ───────────────────────────────────────────────────────────
+
+  function pathBasename(p) {
+    return (p || '').replace(/[/\\]+$/, '').split(/[/\\]/).pop() || p;
+  }
 
   // ── Hijri date helpers ─────────────────────────────────────────────────────
 
@@ -91,6 +98,76 @@ const EventCreator = (() => {
       .replace(/"/g, '&quot;');
   }
 
+  // ── Modal helpers ──────────────────────────────────────────────────────────
+  // Shared promise-based overlay modal.
+  // buttons: [{ label, primary, value }] — primary=true uses .ec-continue-btn
+
+  function _showModal({ title, bodyHTML, buttons }) {
+    return new Promise(resolve => {
+      const overlay = document.createElement('div');
+      overlay.className = 'ec-modal-overlay';
+
+      const buttonsHTML = buttons.map(b =>
+        `<button class="${b.primary ? 'ec-continue-btn' : 'ec-outline-btn'}"
+                 data-val="${esc(String(b.value))}">${esc(b.label)}</button>`
+      ).join('');
+
+      overlay.innerHTML = `
+<div class="ec-modal-box">
+  <p class="ec-modal-title">${esc(title)}</p>
+  <p class="ec-modal-body"></p>
+  <div class="ec-modal-actions">${buttonsHTML}</div>
+</div>`;
+
+      // bodyHTML is trusted internal HTML (caller is responsible for escaping user data)
+      overlay.querySelector('.ec-modal-body').innerHTML = bodyHTML;
+      document.body.appendChild(overlay);
+
+      const primaryVal = String(buttons.find(b => b.primary)?.value ?? '');
+      const cancelVal  = String(buttons.find(b => !b.primary)?.value ?? primaryVal);
+
+      function cleanup(val) {
+        document.removeEventListener('keydown', keyHandler);
+        overlay.remove();
+        resolve(val);
+      }
+
+      overlay.querySelectorAll('button[data-val]').forEach(btn => {
+        btn.addEventListener('click', () => cleanup(btn.dataset.val));
+      });
+
+      function keyHandler(e) {
+        if (e.key === 'Enter')  { e.preventDefault(); cleanup(primaryVal); }
+        if (e.key === 'Escape') { e.preventDefault(); cleanup(cancelVal);  }
+      }
+      document.addEventListener('keydown', keyHandler);
+
+      // Focus primary button
+      requestAnimationFrame(() =>
+        overlay.querySelector('.ec-continue-btn')?.focus()
+      );
+    });
+  }
+
+  function showMasterExistsModal(folderName) {
+    return _showModal({
+      title:    'Master Folder Already Exists',
+      bodyHTML: `A folder named <strong>${esc(folderName)}</strong> already exists at this location. Use the existing folder?`,
+      buttons:  [
+        { label: 'No, cancel',  primary: false, value: 'no'  },
+        { label: 'Yes, use it', primary: true,  value: 'yes' }
+      ]
+    }).then(v => v === 'yes');
+  }
+
+  function showErrorModal(message) {
+    return _showModal({
+      title:    'Error',
+      bodyHTML: esc(message),
+      buttons:  [{ label: 'OK', primary: true, value: 'ok' }]
+    });
+  }
+
   // ══════════════════════════════════════════════════════════════════════════
   // STEP 1 — Master Collection
   // ══════════════════════════════════════════════════════════════════════════
@@ -99,8 +176,6 @@ const EventCreator = (() => {
     currentStep = 1;
     const title = $ecTitle();
     if (title) title.textContent = 'Create Collection';
-
-    // Sync step rail highlight (step 1 active, others idle)
     syncRailHighlight(1);
 
     const body = $ecBody();
@@ -113,7 +188,7 @@ const EventCreator = (() => {
 
   function buildMasterHTML() {
     const hasExisting = sessionCollections.length > 0;
-    const formOpen    = !hasExisting; // open by default when nothing exists
+    const formOpen    = !hasExisting;
 
     return `
 <div class="ec-master-wrap">
@@ -137,6 +212,14 @@ const EventCreator = (() => {
     ${buildNewFormHTML()}
   </div>
 
+  <!-- Select Existing Master CTA ──────────────────────────────────────── -->
+  <button id="ecSelectExistingBtn" class="ec-select-existing-btn">
+    📂  Select Existing Master…
+  </button>
+
+  <!-- Location row (only shown once archive root is set) ───────────────── -->
+  ${sessionArchiveRoot ? buildLocationRowHTML() : ''}
+
   <!-- Error banner ─────────────────────────────────────────────────────── -->
   <div id="ecMasterError" class="ec-master-error" role="alert" aria-live="polite"></div>
 
@@ -148,17 +231,29 @@ const EventCreator = (() => {
 </div>`;
   }
 
+  function buildLocationRowHTML() {
+    const displayPath = sessionArchiveRoot.length > 55
+      ? '…' + sessionArchiveRoot.slice(-52)
+      : sessionArchiveRoot;
+    return `
+<div class="ec-location-display" id="ecLocationDisplay">
+  <span class="ec-location-label">Location</span>
+  <span class="ec-location-path" title="${esc(sessionArchiveRoot)}">${esc(displayPath)}</span>
+  <button class="ec-location-change-link" id="ecChangeLocation">Change Location</button>
+</div>`;
+  }
+
   function buildExistingCardsHTML() {
     return `
 <p class="ec-section-title">Existing Collections</p>
 <div class="ec-collection-cards" id="ecCollList" role="listbox" aria-label="Existing collections">
   ${sessionCollections.map(c => `
   <div
-    class="ec-coll-card"
+    class="ec-coll-card${selectedCollection === c.name ? ' selected' : ''}"
     data-name="${esc(c.name)}"
     tabindex="0"
     role="option"
-    aria-selected="false"
+    aria-selected="${selectedCollection === c.name}"
     aria-label="${esc(c.name)}"
   >
     <span class="ec-coll-icon" aria-hidden="true">📁</span>
@@ -245,53 +340,42 @@ const EventCreator = (() => {
       });
     }
 
-    // Hijri date segments — numeric-only + auto-advance
+    // Hijri date segments
     const yEl = document.getElementById('hijriYear');
     const mEl = document.getElementById('hijriMonth');
     const dEl = document.getElementById('hijriDay');
 
     if (yEl && mEl && dEl) {
-      yEl.addEventListener('input', () => {
-        numericOnly(yEl);
-        if (yEl.value.length === 4) mEl.focus();
-        onDateInput();
-      });
-      mEl.addEventListener('input', () => {
-        numericOnly(mEl);
-        if (mEl.value.length === 2) dEl.focus();
-        onDateInput();
-      });
-      dEl.addEventListener('input', () => {
-        numericOnly(dEl);
-        onDateInput();
-      });
-      // Backspace back-navigation
-      mEl.addEventListener('keydown', e => {
-        if (e.key === 'Backspace' && mEl.value === '') { e.preventDefault(); yEl.focus(); }
-      });
-      dEl.addEventListener('keydown', e => {
-        if (e.key === 'Backspace' && dEl.value === '') { e.preventDefault(); mEl.focus(); }
-      });
-      // Enter advances fields
+      yEl.addEventListener('input', () => { numericOnly(yEl); if (yEl.value.length === 4) mEl.focus(); onDateInput(); });
+      mEl.addEventListener('input', () => { numericOnly(mEl); if (mEl.value.length === 2) dEl.focus(); onDateInput(); });
+      dEl.addEventListener('input', () => { numericOnly(dEl); onDateInput(); });
+      mEl.addEventListener('keydown', e => { if (e.key === 'Backspace' && mEl.value === '') { e.preventDefault(); yEl.focus(); } });
+      dEl.addEventListener('keydown', e => { if (e.key === 'Backspace' && dEl.value === '') { e.preventDefault(); mEl.focus(); } });
       yEl.addEventListener('keydown', e => { if (e.key === 'Enter') mEl.focus(); });
       mEl.addEventListener('keydown', e => { if (e.key === 'Enter') dEl.focus(); });
-      dEl.addEventListener('keydown', e => {
-        if (e.key === 'Enter') document.getElementById('collLabel')?.focus();
-      });
+      dEl.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('collLabel')?.focus(); });
     }
 
-    // Label field
     const lEl = document.getElementById('collLabel');
     if (lEl) {
       lEl.addEventListener('input', updatePreview);
       lEl.addEventListener('keydown', e => {
-        if (e.key === 'Enter') tryCreateCollection();
+        if (e.key === 'Enter') _fireTryCreate();
       });
     }
 
-    // Continue button
     document.getElementById('ecMasterContinue')
-      ?.addEventListener('click', tryCreateCollection);
+      ?.addEventListener('click', _fireTryCreate);
+
+    document.getElementById('ecSelectExistingBtn')
+      ?.addEventListener('click', () => handleSelectExistingMaster().catch(err => showBanner(err.message, 'error')));
+
+    document.getElementById('ecChangeLocation')
+      ?.addEventListener('click', () => changeArchiveLocationInternal().catch(err => showBanner(err.message, 'error')));
+  }
+
+  function _fireTryCreate() {
+    tryCreateCollection().catch(err => showBanner(err.message, 'error'));
   }
 
   // ── Input helpers ──────────────────────────────────────────────────────────
@@ -301,7 +385,6 @@ const EventCreator = (() => {
   }
 
   function onDateInput() {
-    // Clear date error while user is still typing
     const errEl = document.getElementById('hijriErr');
     if (errEl) errEl.classList.remove('visible');
     updatePreview();
@@ -315,9 +398,9 @@ const EventCreator = (() => {
     const d = (document.getElementById('hijriDay')?.value   || '').trim();
     const l = (document.getElementById('collLabel')?.value  || '').trim();
 
-    const name     = buildCollectionName(y, m, d, l);
-    const preview  = document.getElementById('ecPreviewName');
-    const card     = document.getElementById('ecPreviewCard');
+    const name    = buildCollectionName(y, m, d, l);
+    const preview = document.getElementById('ecPreviewName');
+    const card    = document.getElementById('ecPreviewCard');
 
     if (preview) {
       if (name) {
@@ -337,12 +420,15 @@ const EventCreator = (() => {
 
   function selectExisting(name) {
     selectedCollection = name;
+    const coll = sessionCollections.find(c => c.name === name);
+    if (coll?._masterPath) {
+      activeMaster = { name, path: coll._masterPath };
+    }
     document.querySelectorAll('.ec-coll-card').forEach(c => {
       const sel = c.dataset.name === name;
       c.classList.toggle('selected', sel);
       c.setAttribute('aria-selected', String(sel));
     });
-    // Collapse the new form when picking existing
     const form   = document.getElementById('ecNewForm');
     const toggle = document.getElementById('ecNewToggle');
     if (form && toggle) {
@@ -355,6 +441,7 @@ const EventCreator = (() => {
 
   function deselectExisting() {
     selectedCollection = null;
+    activeMaster = null;
     document.querySelectorAll('.ec-coll-card').forEach(c => {
       c.classList.remove('selected');
       c.setAttribute('aria-selected', 'false');
@@ -373,7 +460,6 @@ const EventCreator = (() => {
     let label       = 'Continue →';
 
     if (!formOpen && selectedCollection) {
-      // Existing collection picked
       canContinue = true;
       label       = 'Continue →';
     } else if (formOpen) {
@@ -385,22 +471,22 @@ const EventCreator = (() => {
       label       = 'Create & Continue →';
     }
 
-    btn.disabled  = !canContinue;
+    btn.disabled    = !canContinue;
     btn.textContent = label;
   }
 
-  // ── Validate + create ──────────────────────────────────────────────────────
+  // ── Validate + create (now disk-backed) ────────────────────────────────────
 
-  function tryCreateCollection() {
+  async function tryCreateCollection() {
     const formOpen = document.getElementById('ecNewForm')?.classList.contains('open');
 
-    // Using an existing collection
+    // Existing in-session card selected → just proceed
     if (!formOpen && selectedCollection) {
       proceedToEventStep();
       return;
     }
 
-    // Validate new form
+    // Validate new form fields
     const y = (document.getElementById('hijriYear')?.value  || '').trim();
     const m = (document.getElementById('hijriMonth')?.value || '').trim();
     const d = (document.getElementById('hijriDay')?.value   || '').trim();
@@ -408,7 +494,6 @@ const EventCreator = (() => {
 
     let hasError = false;
 
-    // Date
     const dateErr  = validateHijriDate(y, m, d);
     const hijriErr = document.getElementById('hijriErr');
     if (hijriErr) {
@@ -416,16 +501,14 @@ const EventCreator = (() => {
         hijriErr.textContent = dateErr;
         hijriErr.classList.add('visible');
         hasError = true;
-        // Focus the first bad segment
-        if (!y || isNaN(parseInt(y, 10))) document.getElementById('hijriYear')?.focus();
+        if (!y || isNaN(parseInt(y, 10)))      document.getElementById('hijriYear')?.focus();
         else if (!m || isNaN(parseInt(m, 10))) document.getElementById('hijriMonth')?.focus();
-        else document.getElementById('hijriDay')?.focus();
+        else                                    document.getElementById('hijriDay')?.focus();
       } else {
         hijriErr.classList.remove('visible');
       }
     }
 
-    // Label
     const labelErr = document.getElementById('labelErr');
     if (labelErr) {
       if (!l) {
@@ -440,26 +523,78 @@ const EventCreator = (() => {
 
     if (hasError) return;
 
-    const name = buildCollectionName(y, m, d, l);
+    const name      = buildCollectionName(y, m, d, l);
+    const hijriDate = `${y}-${pad2(m)}-${pad2(d)}`;
 
-    // Duplicate — auto-select and continue without erroring
-    if (isDuplicate(name)) {
-      selectedCollection = name;
-      showBanner(`Collection already exists — resuming with "${name}".`, 'info');
-      proceedToEventStep();
+    // Ensure we have an archive root (prompt once, persists for the session)
+    if (!sessionArchiveRoot) {
+      const pick = await window.api.chooseArchiveRoot();
+      if (!pick) return; // user canceled → stay on Step 1
+      sessionArchiveRoot = pick.path;
+    }
+
+    // Disk is the source of truth — always check existence regardless of
+    // whether the name appears in sessionCollections. This makes in-session
+    // duplicates, prior-session duplicates, and externally-created folders
+    // all trigger the same modal flow.
+    const { exists, fullPath } = await window.api.checkMasterExists(sessionArchiveRoot, name);
+    let masterPath;
+
+    if (exists) {
+      const useIt = await showMasterExistsModal(name);
+      if (!useIt) return; // user chose No → stay on Step 1
+      masterPath = fullPath;
+    } else {
+      const created = await window.api.createMaster(sessionArchiveRoot, name);
+      masterPath = created.path;
+    }
+
+    // Register in session state — update existing entry if present, else push
+    let collection = sessionCollections.find(c => c.name === name);
+    if (collection) {
+      collection._masterPath = masterPath;
+    } else {
+      collection = { name, hijriDate, label: l, events: [], _masterPath: masterPath };
+      sessionCollections.push(collection);
+    }
+    selectedCollection = name;
+    activeMaster = { name, path: masterPath };
+
+    proceedToEventStep();
+  }
+
+  // ── Select Existing Master ─────────────────────────────────────────────────
+
+  async function handleSelectExistingMaster() {
+    const pick = await window.api.chooseExistingMaster();
+    if (!pick) return; // canceled
+
+    const folderPath = pick.path;
+    const { valid, reason } = await window.api.validateMasterAccessible(folderPath);
+    if (!valid) {
+      await showErrorModal(`Cannot use this folder: ${reason}`);
       return;
     }
 
-    // Create new entry
-    const collection = {
-      name,
-      hijriDate : `${y}-${pad2(m)}-${pad2(d)}`,
-      label     : l,
-      events    : []
-    };
-    sessionCollections.push(collection);
+    const name = pathBasename(folderPath);
+    activeMaster = { name, path: folderPath };
     selectedCollection = name;
+
+    // Add stub to sessionCollections if not present
+    if (!sessionCollections.some(c => c.name === name)) {
+      sessionCollections.push({ name, hijriDate: '', label: name, events: [], _masterPath: folderPath });
+    }
+
     proceedToEventStep();
+  }
+
+  // ── Change archive location ────────────────────────────────────────────────
+
+  async function changeArchiveLocationInternal() {
+    const pick = await window.api.chooseArchiveRoot();
+    if (!pick) return; // canceled → keep current root
+    sessionArchiveRoot = pick.path;
+    showMasterStep(); // re-render to update location row
   }
 
   // ── Error / info banner ────────────────────────────────────────────────────
@@ -475,8 +610,6 @@ const EventCreator = (() => {
   }
 
   // ── Step rail sync ─────────────────────────────────────────────────────────
-  // Uses the existing step elements: #step1, #step2, #step3
-  // In event rail mode labels are: Create Collection / Create Event / Import
 
   function syncRailHighlight(activeStep) {
     for (let i = 1; i <= 3; i++) {
@@ -589,7 +722,6 @@ const EventCreator = (() => {
   // ── Dropdown mounting ──────────────────────────────────────────────────────
 
   function _mountEventDropdowns() {
-    // Global city
     const gcEl = document.getElementById('ecGlobalCityDD');
     if (gcEl) {
       _globalCityDD = new TreeAutocomplete({
@@ -610,32 +742,30 @@ const EventCreator = (() => {
       if (_globalCityVal) _globalCityDD.setValue(_globalCityVal.id, _globalCityVal.label);
     }
 
-    // Per-component
     _eventComps.forEach(comp => _mountCompDDs(comp));
   }
 
   function _mountCompDDs(comp) {
     const row = {};
 
-    // Event types — multi-select via chips; dropdown clears after each pick
     const etEl = document.getElementById(`ecET-${comp.id}`);
     if (etEl) {
       const etDD = new TreeAutocomplete({
         container: etEl, type: 'event-types',
         placeholder: 'Search event type…',
         onSelect: (item) => {
-          if (!item) return; // fired by clear() — ignore
+          if (!item) return;
           const { id, label } = item;
           if (!comp.eventTypes.some(e => e.label === label)) {
             comp.eventTypes.push({ id, label });
             _refreshETChips(comp);
             _updateEventPreview();
           }
-          etDD.clear(); // reset field; _debounce auto-reopens on next keystroke
+          etDD.clear();
         }
       });
       row.et = etDD;
-      _wireETChips(comp); // wire any chips already in HTML from restored state
+      _wireETChips(comp);
     }
 
     const locEl = document.getElementById(`ecLoc-${comp.id}`);
@@ -695,7 +825,6 @@ const EventCreator = (() => {
         _eventComps.push(_makeComp());
         _refreshCompList();
         _updateEventPreview();
-        // Focus the new row's event type field
         const last = _eventComps[_eventComps.length - 1];
         document.getElementById(`ecET-${last.id}`)?.querySelector('input')?.focus();
       });
@@ -709,7 +838,7 @@ const EventCreator = (() => {
   function _wireRemoveButtons() {
     document.querySelectorAll('.ec-comp-remove').forEach(btn => {
       btn.addEventListener('click', () => {
-        const id = Number(btn.dataset.compId);
+        const id  = Number(btn.dataset.compId);
         const row = _compDDs[id];
         row?.et?.destroy(); row?.loc?.destroy(); row?.city?.destroy();
         delete _compDDs[id];
@@ -724,7 +853,6 @@ const EventCreator = (() => {
     const listEl = document.getElementById('ecCompList');
     if (!listEl) return;
 
-    // Destroy existing per-comp DDs
     Object.keys(_compDDs).forEach(id => {
       const row = _compDDs[Number(id)];
       row?.et?.destroy(); row?.loc?.destroy(); row?.city?.destroy();
@@ -739,10 +867,6 @@ const EventCreator = (() => {
   // ── Event name builder ─────────────────────────────────────────────────────
 
   function _buildCompString(comps) {
-    // Group consecutive same-city components; emit city after each group.
-    // Case A (all same): City appears once at end.
-    // Case B (all different): Each component followed by its city.
-    // Case C (mixed groups): City follows its group.
     const result = [];
     let i = 0;
     while (i < comps.length) {
@@ -751,7 +875,7 @@ const EventCreator = (() => {
       while (j < comps.length && (comps[j].city?.label || '') === cityLabel) {
         const c = comps[j];
         c.eventTypes.forEach(et => { if (et?.label) result.push(et.label); });
-        if (c.location?.label)  result.push(c.location.label);
+        if (c.location?.label) result.push(c.location.label);
         j++;
       }
       if (cityLabel) result.push(cityLabel);
@@ -760,18 +884,18 @@ const EventCreator = (() => {
     return result.join('-');
   }
 
-  // ── Live preview + continue-button gate ───────────────────────────────────
+  // ── Live preview + continue-button gate ────────────────────────────────────
 
   function _updateEventPreview() {
     const preview = document.getElementById('ecEventPreviewName');
     const card    = document.getElementById('ecEventPreviewCard');
     const btn     = document.getElementById('ecEventContinue');
 
-    const coll   = sessionCollections.find(c => c.name === selectedCollection);
-    const seq    = String((coll?.events.length ?? 0) + 1).padStart(2, '0');
-    const parts  = _buildCompString(_eventComps);
-    const valid  = _eventComps.length > 0 && _eventComps.every(c => c.eventTypes.length > 0 && c.city);
-    const name   = parts ? `${coll?.hijriDate || '?'} _${seq}-${parts}` : '';
+    const coll  = sessionCollections.find(c => c.name === selectedCollection);
+    const seq   = String((coll?.events.length ?? 0) + 1).padStart(2, '0');
+    const parts = _buildCompString(_eventComps);
+    const valid = _eventComps.length > 0 && _eventComps.every(c => c.eventTypes.length > 0 && c.city);
+    const name  = parts ? `${coll?.hijriDate || '?'} _${seq}-${parts}` : '';
 
     if (preview) {
       preview.textContent = name || '—';
@@ -802,7 +926,6 @@ const EventCreator = (() => {
     coll.events.push({ name, components: _eventComps.map(c => ({ ...c, eventTypes: [...c.eventTypes] })) });
     _activeEventIdx = coll.events.length - 1;
 
-    // Reset component state for next event; preserve global city
     _eventComps = [_makeComp()];
 
     _proceedToPreviewStep();
@@ -833,19 +956,13 @@ const EventCreator = (() => {
     }, 185);
   }
 
-  function proceedToEventStep()   { _slideToStep(showEventStep);   }
+  function proceedToEventStep()    { _slideToStep(showEventStep);   }
   function _proceedToPreviewStep() { _slideToStep(showPreviewStep); }
 
 
   // ══════════════════════════════════════════════════════════════════════════
   // STEP 3 — Event Created (Commit E)
-  // Confirms the event, shows Single/Multi mode, offers Add Another or Done.
-  // Photographer is assigned later at import time (spec Step 10).
   // ══════════════════════════════════════════════════════════════════════════
-
-  // ── Sub-event folder name builder (spec Step 11 city-grouping) ───────────
-  // Same city across all components → omit city from folder names.
-  // Any different city → include city in that component's folder name.
 
   function _buildSubEventFolderNames(components) {
     const cities   = components.map(c => c.city?.label || '');
@@ -859,8 +976,6 @@ const EventCreator = (() => {
       return `${pad2(idx + 1)}-${parts.join('-')}`;
     });
   }
-
-  // ── Folder tree HTML ───────────────────────────────────────────────────────
 
   function _buildFolderTreeHTML(coll, event) {
     const isMulti = event.components.length > 1;
@@ -887,15 +1002,12 @@ const EventCreator = (() => {
     return rows.join('');
   }
 
-  // ── Step 3 renderer ────────────────────────────────────────────────────────
-
   function showPreviewStep() {
     currentStep = 3;
     const title = $ecTitle();
     if (title) title.textContent = 'Event Created';
     syncRailHighlight(3);
 
-    // Re-lookup from module-level state on every render (not closed over)
     const coll      = sessionCollections.find(c => c.name === selectedCollection);
     const lastEvent = coll?.events[_activeEventIdx] ?? coll?.events.at(-1);
 
@@ -909,7 +1021,7 @@ const EventCreator = (() => {
       return;
     }
 
-    const isMulti  = lastEvent.components.length > 1;
+    const isMulti   = lastEvent.components.length > 1;
     const modeLabel = isMulti ? 'Multi-component' : 'Single component';
 
     const eventRowInner = coll.events.length > 1
@@ -949,21 +1061,19 @@ const EventCreator = (() => {
 
 </div>`;
 
-    // Destroy step-2 DDs after innerHTML replacement (DOM already detached — just removes listeners)
     _destroyEventDDs();
 
     document.getElementById('ecEventSelect')?.addEventListener('change', e => {
       _activeEventIdx = parseInt(e.target.value, 10);
-      showPreviewStep(); // direct re-render, no slide animation
+      showPreviewStep();
     });
 
-    // Fresh lookups inside each handler — never rely on closed-over `coll`
     document.getElementById('ecChangeEvent')?.addEventListener('click', () => {
       const c = sessionCollections.find(x => x.name === selectedCollection);
       if (c && c.events.length > 0) {
         const idx     = Math.min(_activeEventIdx, c.events.length - 1);
         const [removed] = c.events.splice(idx, 1);
-        _eventComps   = removed.components.map(comp => ({ ...comp, eventTypes: [...comp.eventTypes] }));
+        _eventComps     = removed.components.map(comp => ({ ...comp, eventTypes: [...comp.eventTypes] }));
         _activeEventIdx = Math.max(0, c.events.length - 1);
       }
       _slideToStep(showEventStep);
@@ -985,16 +1095,18 @@ const EventCreator = (() => {
   // ══════════════════════════════════════════════════════════════════════════
 
   return {
-    /** Call when entering the event creator panel. Always starts at step 1. */
+    /** Enter the event creator panel. Always starts at step 1. Does NOT clear sessionArchiveRoot. */
     start() {
       selectedCollection = null;
+      activeMaster       = null;
       _resetEventForm();
       showMasterStep();
     },
 
-    /** Call on resetAppState — clears selection but keeps session collections. */
+    /** Called on resetAppState — clears selection but keeps session collections and archive root. */
     resetSelection() {
       selectedCollection = null;
+      activeMaster       = null;
     },
 
     /** Called by renderer's updateSteps() when railMode === 'event'. */
@@ -1003,8 +1115,17 @@ const EventCreator = (() => {
     getSelectedCollection() { return selectedCollection; },
     getSessionCollections() { return sessionCollections; },
 
+    /** Returns { name, path } for the active on-disk master folder, or null. */
+    getActiveMaster()       { return activeMaster; },
+
+    /** Returns the session-scoped archive root path, or null if not yet chosen. */
+    getSessionArchiveRoot() { return sessionArchiveRoot; },
+
+    /** Opens picker to change archive location; re-renders Step 1 if open. */
+    changeArchiveLocation:  changeArchiveLocationInternal,
+
     /**
-     * Returns { coll, event } for the most recently completed event,
+     * Returns { coll, event, idx } for the most recently completed event,
      * or null if no event has been confirmed yet this session.
      */
     getActiveEventData() {
@@ -1020,7 +1141,6 @@ const EventCreator = (() => {
       _activeEventIdx = idx;
     },
 
-    /** Renders the folder tree HTML for a given collection + event. */
     buildFolderPreviewHTML(coll, event) {
       return _buildFolderTreeHTML(coll, event);
     },

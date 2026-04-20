@@ -271,6 +271,9 @@ Catppuccin Mocha dark theme. CSS variables in `:root`:
 - [x] Group panel (right column, 268px) — coloured tabs, sub-event mapping dropdown, file list, Remove button
 - [x] Group badges on tiles (icon view: coloured pill; list view: inline badge)
 - [x] Auto-remove empty groups; groups only created when files are assigned
+- [x] M1: Disk-backed Master creation — archive root picker (persists session), mkdir on Continue, "already exists" modal (Yes/No)
+- [x] M1: Select Existing Master — folder picker + accessibility validation, adopts any readable directory
+- [x] M1: sessionArchiveRoot persists across resets within a session; Change Location link re-opens picker; activeMaster = { name, path }
 
 ---
 

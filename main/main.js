@@ -539,6 +539,54 @@ ipcMain.handle('debug:telemetry', async () => {
   };
 });
 
+// ── Master folder operations ──────────────────────────────────────────────────
+
+ipcMain.handle('master:chooseArchiveRoot', async () => {
+  const win    = BrowserWindow.getFocusedWindow();
+  const result = await dialog.showOpenDialog(win, {
+    title:      'Choose Archive Location',
+    properties: ['openDirectory', 'createDirectory']
+  });
+  return result.canceled ? null : { path: result.filePaths[0] };
+});
+
+ipcMain.handle('master:chooseExisting', async () => {
+  const win    = BrowserWindow.getFocusedWindow();
+  const result = await dialog.showOpenDialog(win, {
+    title:      'Select Existing Master Folder',
+    properties: ['openDirectory']
+  });
+  return result.canceled ? null : { path: result.filePaths[0] };
+});
+
+ipcMain.handle('master:validateAccessible', async (_event, folderPath) => {
+  try {
+    const stat = await fsp.stat(folderPath);
+    if (!stat.isDirectory()) return { valid: false, reason: 'Not a directory.' };
+    await fsp.access(folderPath, fs.constants.R_OK);
+    return { valid: true };
+  } catch (err) {
+    if (err.code === 'ENOENT') return { valid: false, reason: 'Folder does not exist.' };
+    return { valid: false, reason: 'Folder is not accessible.' };
+  }
+});
+
+ipcMain.handle('master:checkExists', async (_event, basePath, folderName) => {
+  const fullPath = path.join(basePath, folderName);
+  try {
+    const stat = await fsp.stat(fullPath);
+    return { exists: stat.isDirectory(), fullPath };
+  } catch {
+    return { exists: false, fullPath };
+  }
+});
+
+ipcMain.handle('master:create', async (_event, basePath, folderName) => {
+  const fullPath = path.join(basePath, folderName);
+  await fsp.mkdir(fullPath, { recursive: true });
+  return { path: fullPath, created: true };
+});
+
 // ── List manager ──────────────────────────────────────────────────────────────
 
 ipcMain.handle('lists:get',        (_event, name)                              => listManager.getList(name));

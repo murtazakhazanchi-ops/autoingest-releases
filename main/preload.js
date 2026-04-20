@@ -143,4 +143,11 @@ contextBridge.exposeInMainWorld('api', {
   matchList:   (name, input)                           => ipcRenderer.invoke('lists:match',      name, input),
   learnAlias:  (name, canonicalId, label, typedInput)  => ipcRenderer.invoke('lists:learnAlias', name, canonicalId, label, typedInput),
 
+  // ── Master folder operations ──
+  chooseArchiveRoot:        ()                       => ipcRenderer.invoke('master:chooseArchiveRoot'),
+  chooseExistingMaster:     ()                       => ipcRenderer.invoke('master:chooseExisting'),
+  validateMasterAccessible: (folderPath)             => ipcRenderer.invoke('master:validateAccessible', folderPath),
+  checkMasterExists:        (basePath, folderName)   => ipcRenderer.invoke('master:checkExists', basePath, folderName),
+  createMaster:             (basePath, folderName)   => ipcRenderer.invoke('master:create',      basePath, folderName),
+
 });
