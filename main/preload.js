@@ -91,6 +91,17 @@ contextBridge.exposeInMainWorld('api', {
   importFiles: (filePaths, destination) =>
     ipcRenderer.invoke('files:import', { filePaths, destination }),
 
+  /**
+   * Event-based import using the fileJobs model (G2).
+   * Each job routes its file to an individual archive destination:
+   *   archiveRoot/Collection/Event/[SubEvent/]Photographer/[VIDEO/]filename
+   *
+   * @param {Array<{src: string, dest: string}>} fileJobs
+   * @returns {Promise<{ copied, skipped, errors, ... }>}
+   */
+  importFileJobs: (fileJobs) =>
+    ipcRenderer.invoke('files:importJobs', { fileJobs }),
+
   onImportProgress: (cb) => _register('import:progress', (_e, progress) => cb(progress)),
 
   pauseCopy:  () => ipcRenderer.send('copy:pause'),

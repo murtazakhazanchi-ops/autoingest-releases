@@ -6,7 +6,7 @@ const fsp  = require('fs').promises;
 const { exec, execFile } = require('child_process');
 const { detectMemoryCards }          = require('./driveDetector');
 const { readDirectory, getDCIMPath, scanPrivateFolder, safeExists, scanMediaRecursive, buildFolderTree } = require('./fileBrowser');
-const { copyFiles, setPaused, getFileHash, abortCopy } = require('./fileManager');
+const { copyFiles, copyFileJobs, setPaused, getFileHash, abortCopy } = require('./fileManager');
 const { getThumbnail, shutdownWorkers } = require('../services/thumbnailer');
 const listManager  = require('./listManager');
 const aliasEngine  = require('./aliasEngine');
@@ -377,6 +377,89 @@ ipcMain.handle('files:import', async (event, { filePaths, destination }) => {
       context: {
         destination,
         totalFiles: filePaths.length,
+        errors:     result.errors,
+      },
+    });
+  }
+
+  return result;
+});
+
+/**
+ * files:importJobs — event-based import using the fileJobs model (G2).
+ *
+ * Each job specifies its own destination path, enabling routing to:
+ *   archiveRoot/Collection/Event/[SubEvent/]Photographer/[VIDEO/]filename
+ *
+ * This handler is the entry point for the structured archive flow (G3–G5).
+ * The legacy files:import handler remains for Quick Import (G6).
+ *
+ * @param {{ fileJobs: Array<{src: string, dest: string}> }} payload
+ * @returns same result shape as files:import
+ */
+ipcMain.handle('files:importJobs', async (event, { fileJobs }) => {
+  if (!Array.isArray(fileJobs) || fileJobs.length === 0) {
+    return { copied: 0, skipped: 0, errors: 0, skippedReasons: [], failedFiles: [], duration: 0, integrity: 'verified' };
+  }
+
+  log(`Import (jobs) started: ${fileJobs.length} files`);
+
+  // Normalise dest paths to the OS-native separator.
+  // The renderer builds dest strings with '/' separators for simplicity;
+  // path.normalize converts them to '\' on Windows and is a no-op on macOS.
+  const normalisedJobs = fileJobs.map(j => ({
+    src:  path.normalize(j.src),
+    dest: path.normalize(j.dest),
+  }));
+
+  const importStartMs    = Date.now();
+  let   bytesCopiedSoFar = 0;
+  let   fileIndex        = 0;
+
+  let result;
+  try {
+    result = await copyFileJobs(normalisedJobs, (progress) => {
+      if (!event.sender.isDestroyed()) {
+        event.sender.send('import:progress', progress);
+      }
+      if (progress.status === 'done' || progress.status === 'renamed') {
+        bytesCopiedSoFar += progress.fileSize || 0;
+        fileIndex++;
+        if (fileIndex % 10 === 0) {
+          perf.importSpeedSample(bytesCopiedSoFar, Date.now() - importStartMs);
+        }
+      }
+    });
+  } catch (err) {
+    // mkdir pre-flight failure (e.g. disk full, permission denied)
+    log(`Import (jobs) mkdir failed: ${err.message}`);
+    throw err;
+  }
+
+  log(`Import (jobs) completed: copied=${result.copied} skipped=${result.skipped} errors=${result.errors}`);
+
+  // Store for optional post-import checksum verification
+  lastImportedFiles = result.copiedFiles || [];
+
+  // Size check is always performed by verifyFile() inside copyFileJobs.
+  result.integrity = 'verified';
+
+  // Persist successfully-imported source files into the global cross-session index.
+  // updateImportIndex only uses the src paths (destPath arg is unused).
+  if (result.copied > 0) {
+    await updateImportIndex(normalisedJobs.map(j => j.src), null);
+  }
+
+  // Auto-report import failures to telemetry
+  if (result.errors > 0) {
+    telemetry.enqueue({
+      type:         'error',
+      issueType:    'Import Failure',
+      severity:     result.errors >= 5 ? 'High' : 'Medium',
+      description:  `Import (jobs) completed with ${result.errors} failure(s) out of ${fileJobs.length} files`,
+      importResult: `Copied: ${result.copied}  Skipped: ${result.skipped}  Failed: ${result.errors}`,
+      context: {
+        totalFiles: fileJobs.length,
         errors:     result.errors,
       },
     });

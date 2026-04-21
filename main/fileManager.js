@@ -430,4 +430,229 @@ async function copyFiles(filePaths, destination, onProgress) {
   });
 }
 
-module.exports = { copyFiles, resolveDestPath, setPaused, getFileHash, abortCopy };
+// ── copyFileJobs (G2) ────────────────────────────────────────────────────────
+
+/**
+ * Copy an array of file jobs, each with its own destination path.
+ *
+ * @param {Array<{src: string, dest: string}>} fileJobs
+ *   src  — absolute source path (on the memory card)
+ *   dest — absolute destination path INCLUDING filename
+ *          (e.g. /archive/Collection/Event/SubEvent/Photographer/IMG_001.CR3)
+ * @param {Function} onProgress
+ *   Same callback shape as copyFiles:
+ *   { total, index, completedCount, filename, status, skipReason?, error?, eta, speedBps, fileSize }
+ *
+ * @returns {Promise<{ copied, skipped, errors, skippedReasons, failedFiles, copiedFiles, duration }>}
+ *
+ * Differences from copyFiles:
+ *   • Each file is routed to its own directory (multi-level archive paths).
+ *   • All unique destination directories are pre-created (mkdir -p) before the
+ *     queue starts — no per-file mkdir overhead in the hot path.
+ *   • The buildDestIndex resume fast-path is omitted (added in G5 once the full
+ *     event-import flow is in place and resumability can be tested end-to-end).
+ *   • pause / abort state is shared with copyFiles (one operation at a time).
+ */
+async function copyFileJobs(fileJobs, onProgress) {
+  if (!Array.isArray(fileJobs) || fileJobs.length === 0) {
+    return { copied: 0, skipped: 0, errors: 0, skippedReasons: [], failedFiles: [], copiedFiles: [], duration: 0 };
+  }
+
+  isPaused  = false; // always start fresh
+  isAborted = false; // always start fresh
+
+  const total   = fileJobs.length;
+  const startTime = Date.now();
+
+  // ── Pre-flight ──────────────────────────────────────────────────────────────
+  const avgFileSize = await estimateAvgSize(fileJobs.map(j => j.src));
+  const destType    = getDestinationType(path.dirname(fileJobs[0].dest));
+  const estimatedTotalBytes = avgFileSize * total;
+
+  // Pre-create every unique destination directory before the queue starts.
+  // Sequential mkdir is fine here — this is a one-time setup, not the hot path.
+  const uniqueDirs = new Set(fileJobs.map(j => path.dirname(j.dest)));
+  for (const dir of uniqueDirs) {
+    try {
+      await fsp.mkdir(dir, { recursive: true });
+    } catch (err) {
+      log(`copyFileJobs: mkdir failed for ${dir} — ${err.message}`);
+      throw new Error(`Cannot create destination folder: ${dir}\n${err.message}`);
+    }
+  }
+
+  // Mutable — may be raised exactly once by adjustConcurrency()
+  let MAX_CONCURRENT_COPIES = getInitialConcurrency(avgFileSize, destType);
+
+  // ── Runtime speed sampling ──────────────────────────────────────────────────
+  let sampleBytes  = 0;
+  let sampleTime   = 0;
+  let sampledFiles = 0;
+  let hasAdjusted  = false;
+
+  function adjustConcurrency() {
+    if (hasAdjusted || sampledFiles < 5) return;
+    const speed = sampleBytes / sampleTime;
+    if      (speed > 150 * 1024 * 1024) MAX_CONCURRENT_COPIES = 4;
+    else if (speed > 80  * 1024 * 1024) MAX_CONCURRENT_COPIES = 3;
+    else                                MAX_CONCURRENT_COPIES = 2;
+    hasAdjusted = true;
+  }
+
+  // ── Smoothed ETA ────────────────────────────────────────────────────────────
+  let completedBytes = 0;
+  let smoothedSpeed  = 0;
+  let lastEtaUpdate  = 0;
+  let lastEta        = null;
+
+  function getSpeedAndEta() {
+    if (completedBytes === 0) return { eta: null, speedBps: 0 };
+    const now = Date.now();
+    if (now - lastEtaUpdate < 100 && lastEta !== null) return { eta: lastEta, speedBps: smoothedSpeed };
+    const elapsed      = (now - startTime) / 1000;
+    const instantSpeed = completedBytes / elapsed;
+    smoothedSpeed = smoothedSpeed ? 0.7 * smoothedSpeed + 0.3 * instantSpeed : instantSpeed;
+    const remaining = Math.max(0, estimatedTotalBytes - completedBytes);
+    lastEta       = remaining / smoothedSpeed;
+    lastEtaUpdate = now;
+    return { eta: lastEta, speedBps: smoothedSpeed };
+  }
+
+  // ── Result tracking ─────────────────────────────────────────────────────────
+  let queueIndex     = 0;
+  let completedCount = 0;
+  let copied         = 0;
+  let skipped        = 0;
+  let errors         = 0;
+  const skippedReasons = [];
+  const failedFiles    = [];
+  const copiedFiles    = [];
+
+  // ── Per-job processor ───────────────────────────────────────────────────────
+  async function processJob(job, origIndex) {
+    if (isAborted) return;
+    await waitIfPaused();
+    if (isAborted) return;
+
+    const destDir  = path.dirname(job.dest);
+    const filename = path.basename(job.dest);
+
+    onProgress({ total, index: origIndex + 1, completedCount, filename, status: 'copying', eta: null, speedBps: 0, fileSize: 0 });
+
+    // ── Stat source ────────────────────────────────────────────────────────────
+    let srcStat;
+    try {
+      srcStat = await fsp.stat(job.src);
+    } catch {
+      errors++;
+      completedCount++;
+      const { eta, speedBps } = getSpeedAndEta();
+      onProgress({ total, index: origIndex + 1, completedCount, filename,
+                   status: 'error', error: 'Source file not found or inaccessible', eta, speedBps, fileSize: 0 });
+      return;
+    }
+
+    const fileSize = srcStat.size;
+
+    // ── Resolve destination (skip / copy / rename) ─────────────────────────────
+    let resolved;
+    try {
+      resolved = await resolveDestPath(destDir, filename, fileSize);
+    } catch (err) {
+      errors++;
+      completedCount++;
+      failedFiles.push({ filename, reason: err.message });
+      const { eta, speedBps } = getSpeedAndEta();
+      onProgress({ total, index: origIndex + 1, completedCount, filename,
+                   status: 'error', error: err.message, eta, speedBps, fileSize: 0 });
+      return;
+    }
+
+    if (resolved.action === 'skip') {
+      skipped++;
+      completedCount++;
+      completedBytes += fileSize;
+      skippedReasons.push(`Skipped: ${filename} — ${resolved.reason}`);
+      const { eta, speedBps } = getSpeedAndEta();
+      onProgress({ total, index: origIndex + 1, completedCount, filename,
+                   status: 'skipped', skipReason: resolved.reason, eta, speedBps, fileSize });
+      return;
+    }
+
+    // ── Copy + verify with retry ───────────────────────────────────────────────
+    let lastError;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      if (isAborted) return;
+      try {
+        const copyStart    = Date.now();
+        await fsp.copyFile(job.src, resolved.destPath);
+        const copyDuration = (Date.now() - copyStart) / 1000;
+
+        if (copyDuration > 0.001) {
+          sampleBytes += fileSize;
+          sampleTime  += copyDuration;
+          sampledFiles++;
+          adjustConcurrency();
+        }
+
+        await verifyFile(job.src, resolved.destPath, fileSize);
+
+        // ── Success ──────────────────────────────────────────────────────────────
+        copied++;
+        completedCount++;
+        completedBytes += fileSize;
+        copiedFiles.push({ src: job.src, dest: resolved.destPath });
+        const { eta, speedBps } = getSpeedAndEta();
+
+        if (resolved.action === 'rename') {
+          skippedReasons.push(`Renamed: ${filename} — ${resolved.reason}`);
+          onProgress({ total, index: origIndex + 1, completedCount, filename,
+                       status: 'renamed', skipReason: resolved.reason, eta, speedBps, fileSize });
+        } else {
+          onProgress({ total, index: origIndex + 1, completedCount, filename,
+                       status: 'done', eta, speedBps, fileSize });
+        }
+        return;
+
+      } catch (err) {
+        lastError = err;
+        try { await fsp.unlink(resolved.destPath); } catch { /* already gone */ }
+      }
+    }
+
+    // ── All retries exhausted ─────────────────────────────────────────────────
+    errors++;
+    completedCount++;
+    const lastErrMsg = (lastError && lastError.message) || 'Unknown copy failure';
+    failedFiles.push({ filename, reason: lastErrMsg });
+    const { eta, speedBps } = getSpeedAndEta();
+    onProgress({ total, index: origIndex + 1, completedCount, filename,
+                 status: 'error', error: lastErrMsg, eta, speedBps, fileSize });
+  }
+
+  // ── Adaptive push queue ─────────────────────────────────────────────────────
+  return new Promise((resolve) => {
+    let active = 0;
+
+    function next() {
+      if (queueIndex >= total && active === 0) {
+        if (copied + skipped + errors !== total) {
+          log(`[copyFileJobs] accounting drift: copied=${copied} skipped=${skipped} errors=${errors} total=${total}`);
+        }
+        resolve({ copied, skipped, errors, skippedReasons, failedFiles, copiedFiles, duration: Date.now() - startTime });
+        return;
+      }
+      while (active < MAX_CONCURRENT_COPIES && queueIndex < total) {
+        const i = queueIndex++;
+        active++;
+        processJob(fileJobs[i], i)
+          .catch(() => {})
+          .finally(() => { active--; next(); });
+      }
+    }
+
+    next();
+  });
+}
+
+module.exports = { copyFiles, copyFileJobs, resolveDestPath, setPaused, getFileHash, abortCopy };
