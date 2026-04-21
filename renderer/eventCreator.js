@@ -41,6 +41,7 @@ const EventCreator = (() => {
   let _scannedEvents   = null;
   let _viewingExisting = null; // { folderName, hijriDate, sequence, isUnresolved } | null
   let _editMode        = false; // M6: when true in view-existing mode, form is editable
+  let _newEventDate    = null;  // M7: hijri date string for new events ("YYYY-MM-DD"), null when viewing/editing
 
   function _makeComp() {
     return { id: ++_compSeq, eventTypes: [], location: null, city: _globalCityVal ? { ..._globalCityVal } : null };
@@ -774,6 +775,7 @@ ${unparseable.map(ev => `
 
     document.getElementById('ecNewEventFromList')?.addEventListener('click', () => {
       _viewingExisting = null;
+      _newEventDate = null;
       _eventComps = [];
       _renderEventForm();
     });
@@ -786,6 +788,7 @@ ${unparseable.map(ev => `
 
     // Rehydrate components from parsed data into the EventCreator's internal shape.
     _editMode = false;
+    _newEventDate = null;
     _compSeq = 0;
     _eventComps = entry.components.map(c => ({
       id:         ++_compSeq,
@@ -818,6 +821,24 @@ ${unparseable.map(ev => `
 
     _destroyEventDDs();
     body.innerHTML = _buildEventHTML();
+
+    // M7: pre-fill hijri date fields for new events.
+    if (!_viewingExisting) {
+      if (!_newEventDate) {
+        const coll = sessionCollections.find(c => c.name === selectedCollection);
+        _newEventDate = coll?.hijriDate || null;
+      }
+      if (_newEventDate) {
+        const [y, m, d] = _newEventDate.split('-');
+        const yEl = document.getElementById('evHijriYear');
+        const mEl = document.getElementById('evHijriMonth');
+        const dEl = document.getElementById('evHijriDay');
+        if (yEl) yEl.value = y || '';
+        if (mEl) mEl.value = m || '';
+        if (dEl) dEl.value = d || '';
+      }
+    }
+
     _mountEventDropdowns();
     _attachEventListeners();
     _updateEventPreview();
@@ -978,6 +999,25 @@ ${unparseable.map(ev => `
     </div>
     ${eventRow}
   </div>
+
+  ${!_viewingExisting ? `
+  <!-- M7: Hijri date for new events (auto-sequences based on this date) -->
+  <div class="ec-field" style="margin-top:16px">
+    <p class="ec-section-title">Event Date</p>
+    <div class="ec-hijri-row">
+      <input id="evHijriYear" class="ec-hijri-seg" type="text" inputmode="numeric"
+             maxlength="4" placeholder="1447" aria-label="Hijri year" autocomplete="off">
+      <span class="ec-sep" aria-hidden="true">–</span>
+      <input id="evHijriMonth" class="ec-hijri-seg" type="text" inputmode="numeric"
+             maxlength="2" placeholder="10" aria-label="Hijri month" autocomplete="off">
+      <span class="ec-sep" aria-hidden="true">–</span>
+      <input id="evHijriDay" class="ec-hijri-seg" type="text" inputmode="numeric"
+             maxlength="2" placeholder="03" aria-label="Hijri day" autocomplete="off">
+    </div>
+    <span class="ec-hint">Date for this event. Sequence auto-assigns based on existing events for this date.</span>
+    <span id="evHijriErr" class="ec-error" role="alert" aria-live="polite"></span>
+  </div>
+  ` : ''}
 
   <div class="ec-global-city">
     <p class="ec-section-title">Global City</p>
@@ -1151,10 +1191,34 @@ ${unparseable.map(ev => `
       ?.addEventListener('click', () => {
         _viewingExisting = null;
         _editMode = false;
+        _newEventDate = null;
         _eventComps = [];
         _destroyEventDDs();
         _renderEventList();
       });
+
+    // M7: hijri date inputs for new events.
+    const evY = document.getElementById('evHijriYear');
+    const evM = document.getElementById('evHijriMonth');
+    const evD = document.getElementById('evHijriDay');
+    if (evY && evM && evD) {
+      const onEvDateInput = () => {
+        const errEl = document.getElementById('evHijriErr');
+        if (errEl) errEl.classList.remove('visible');
+        const y = evY.value.trim(), m = evM.value.trim(), d = evD.value.trim();
+        if (y && m && d && !validateHijriDate(y, m, d)) {
+          _newEventDate = `${y}-${pad2(m)}-${pad2(d)}`;
+        } else {
+          _newEventDate = null;
+        }
+        _updateEventPreview();
+      };
+      evY.addEventListener('input', () => { numericOnly(evY); if (evY.value.length === 4) evM.focus(); onEvDateInput(); });
+      evM.addEventListener('input', () => { numericOnly(evM); if (evM.value.length === 2) evD.focus(); onEvDateInput(); });
+      evD.addEventListener('input', () => { numericOnly(evD); onEvDateInput(); });
+      evM.addEventListener('keydown', e => { if (e.key === 'Backspace' && evM.value === '') { e.preventDefault(); evY.focus(); } });
+      evD.addEventListener('keydown', e => { if (e.key === 'Backspace' && evD.value === '') { e.preventDefault(); evM.focus(); } });
+    }
 
     document.getElementById('ecAddComp')
       ?.addEventListener('click', () => {
@@ -1214,6 +1278,33 @@ ${unparseable.map(ev => `
 
   // ── Event name builder ─────────────────────────────────────────────────────
 
+  // M7: compute the next sequence number for a given hijri date by scanning
+  // both disk events (_scannedEvents) and in-session events (coll.events).
+  function _computeNextSequence(hijriDate) {
+    let maxSeq = 0;
+    // Disk events (parsed by scanner).
+    if (_scannedEvents) {
+      for (const ev of _scannedEvents) {
+        if (ev.isParseable && ev.hijriDate === hijriDate) {
+          const n = parseInt(ev.sequence, 10);
+          if (n > maxSeq) maxSeq = n;
+        }
+      }
+    }
+    // In-session events (not yet on disk, stored in coll.events[].name).
+    const coll = sessionCollections.find(c => c.name === selectedCollection);
+    if (coll) {
+      for (const ev of coll.events) {
+        const m = ev.name.match(/^(\d{4}-\d{2}-\d{2}) _(\d{2})-/);
+        if (m && m[1] === hijriDate) {
+          const n = parseInt(m[2], 10);
+          if (n > maxSeq) maxSeq = n;
+        }
+      }
+    }
+    return String(maxSeq + 1).padStart(2, '0');
+  }
+
   function _buildCompString(comps) {
     const result = [];
     let i = 0;
@@ -1240,20 +1331,30 @@ ${unparseable.map(ev => `
     const btn     = document.getElementById('ecEventContinue');
 
     const coll  = sessionCollections.find(c => c.name === selectedCollection);
-    // M6: use the locked sequence from _viewingExisting when editing, else next seq.
-    const seq   = _viewingExisting
-      ? _viewingExisting.sequence
-      : String((coll?.events.length ?? 0) + 1).padStart(2, '0');
+    // M7: for new events, use _newEventDate + auto-sequence from disk+session scan.
+    // M6: for editing existing, use locked date+sequence from _viewingExisting.
+    let eventDate, seq;
+    if (_viewingExisting) {
+      eventDate = _viewingExisting.hijriDate;
+      seq       = _viewingExisting.sequence;
+    } else if (_newEventDate) {
+      eventDate = _newEventDate;
+      seq       = _computeNextSequence(_newEventDate);
+    } else {
+      eventDate = coll?.hijriDate || '?';
+      seq       = '??';
+    }
     const parts = _buildCompString(_eventComps);
     const valid = _eventComps.length > 0 && _eventComps.every(c => c.eventTypes.length > 0 && c.city);
-    const name  = parts ? `${_viewingExisting ? _viewingExisting.hijriDate : (coll?.hijriDate || '?')} _${seq}-${parts}` : '';
+    const dateValid = _viewingExisting || !!_newEventDate;
+    const name  = (parts && dateValid) ? `${eventDate} _${seq}-${parts}` : '';
 
     if (preview) {
       preview.textContent = name || '—';
       preview.classList.toggle('empty', !name);
       card?.classList.toggle('has-value', !!name);
     }
-    if (btn) btn.disabled = !valid;
+    if (btn) btn.disabled = !(valid && dateValid);
   }
 
   // ── Validate + create ──────────────────────────────────────────────────────
@@ -1270,9 +1371,16 @@ ${unparseable.map(ev => `
     const coll = sessionCollections.find(c => c.name === selectedCollection);
     if (!coll) { _showEventBanner('No collection selected — go back to Step 1.', 'error'); return; }
 
-    const seq   = String(coll.events.length + 1).padStart(2, '0');
+    // M7: validate event date.
+    if (!_newEventDate) {
+      _showEventBanner('Enter a valid Hijri date for this event.', 'error');
+      document.getElementById('evHijriYear')?.focus();
+      return;
+    }
+
+    const seq   = _computeNextSequence(_newEventDate);
     const parts = _buildCompString(_eventComps);
-    const name  = `${coll.hijriDate} _${seq}-${parts}`;
+    const name  = `${_newEventDate} _${seq}-${parts}`;
 
     coll.events.push({ name, components: _eventComps.map(c => ({ ...c, eventTypes: [...c.eventTypes] })) });
     _activeEventIdx = coll.events.length - 1;
@@ -1453,6 +1561,7 @@ ${unparseable.map(ev => `
       _scannedEvents     = null;
       _viewingExisting   = null;
       _editMode          = false;
+      _newEventDate      = null;
       _resetEventForm();
       showMasterStep();
     },
@@ -1464,6 +1573,7 @@ ${unparseable.map(ev => `
       _scannedEvents     = null;
       _viewingExisting   = null;
       _editMode          = false;
+      _newEventDate      = null;
     },
 
     /** Called by renderer's updateSteps() when railMode === 'event'. */
