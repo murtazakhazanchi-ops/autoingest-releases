@@ -17,7 +17,7 @@
 const EventCreator = (() => {
 
   // ── Session state ──────────────────────────────────────────────────────────
-  let sessionArchiveRoot = null;  // string | null — set on first master create, never cleared
+  let sessionArchiveRoot = null;  // string | null — cache of persisted settings.archiveRoot; primed by primeFromSettings(), auto-migrates on create/change
   let activeMaster       = null;  // { name, path } | null — the on-disk master folder in use
   const sessionCollections = [];  // { name, hijriDate, label, events[], _masterPath }[]
   let   selectedCollection = null; // string (folder name) or null
@@ -526,11 +526,15 @@ const EventCreator = (() => {
     const name      = buildCollectionName(y, m, d, l);
     const hijriDate = `${y}-${pad2(m)}-${pad2(d)}`;
 
-    // Ensure we have an archive root (prompt once, persists for the session)
+    // Ensure we have an archive root (prompts once, then persists forever)
     if (!sessionArchiveRoot) {
       const pick = await window.api.chooseArchiveRoot();
       if (!pick) return; // user canceled → stay on Step 1
       sessionArchiveRoot = pick.path;
+      // Auto-migrate: persist on first selection so we never re-prompt.
+      // Non-blocking; failure is logged but doesn't abort the flow.
+      window.api.setArchiveRootSetting(pick.path)
+        .catch(err => console.error('[settings] persist archiveRoot failed:', err));
     }
 
     // Disk is the source of truth — always check existence regardless of
@@ -594,6 +598,9 @@ const EventCreator = (() => {
     const pick = await window.api.chooseArchiveRoot();
     if (!pick) return; // canceled → keep current root
     sessionArchiveRoot = pick.path;
+    // Persist the new choice. Non-blocking; failure is logged.
+    window.api.setArchiveRootSetting(pick.path)
+      .catch(err => console.error('[settings] persist archiveRoot failed:', err));
     showMasterStep(); // re-render to update location row
   }
 
@@ -1123,6 +1130,20 @@ const EventCreator = (() => {
 
     /** Opens picker to change archive location; re-renders Step 1 if open. */
     changeArchiveLocation:  changeArchiveLocationInternal,
+
+    /**
+     * Called once by renderer.initApp() to prime sessionArchiveRoot from
+     * persisted settings. Safe to call before any Step 1 render.
+     * Silently ignored if settings.archiveRoot is null/unavailable.
+     */
+    async primeFromSettings() {
+      try {
+        const stored = await window.api.getArchiveRootSetting();
+        if (stored && !sessionArchiveRoot) sessionArchiveRoot = stored;
+      } catch (err) {
+        console.error('[EventCreator] primeFromSettings failed:', err);
+      }
+    },
 
     /**
      * Returns { coll, event, idx } for the most recently completed event,

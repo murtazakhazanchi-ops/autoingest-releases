@@ -2504,6 +2504,15 @@ async function initApp() {
     globalImportIndex = {};
   }
 
+  // Prime EventCreator's sessionArchiveRoot from persisted settings so the
+  // Location row appears immediately in Step 1 (no picker prompt on subsequent
+  // app launches once the user has chosen a location once).
+  try {
+    await EventCreator.primeFromSettings();
+  } catch (e) {
+    console.error('Failed to prime archive root', e);
+  }
+
   // Patch 49: await default-dest so import index is loaded before setDestPath runs
   try {
     const p = await window.api.getDefaultDest();

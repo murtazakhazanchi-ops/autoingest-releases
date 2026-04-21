@@ -150,4 +150,8 @@ contextBridge.exposeInMainWorld('api', {
   checkMasterExists:        (basePath, folderName)   => ipcRenderer.invoke('master:checkExists', basePath, folderName),
   createMaster:             (basePath, folderName)   => ipcRenderer.invoke('master:create',      basePath, folderName),
 
+  // ── Settings (persisted preferences) ──
+  getArchiveRootSetting:    ()                       => ipcRenderer.invoke('settings:getArchiveRoot'),
+  setArchiveRootSetting:    (value)                  => ipcRenderer.invoke('settings:setArchiveRoot', value),
+
 });

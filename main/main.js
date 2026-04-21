@@ -15,6 +15,7 @@ const telemetry     = require('../services/telemetry');
 const crashReporter = require('../services/crashReporter');
 const perf          = require('../services/performanceMonitor');
 const autoUpdater   = require('../services/autoUpdater');
+const settings      = require('../services/settings');
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const POLL_INTERVAL_MS = 5000;
@@ -151,6 +152,7 @@ let pollHandle = null;
 app.whenReady().then(() => {
   log('App started');
   loadImportIndex();
+  settings.init();
   listManager.init(app.getPath('userData'));
   aliasEngine.init(app.getPath('userData'));
   telemetry.init();
@@ -585,6 +587,15 @@ ipcMain.handle('master:create', async (_event, basePath, folderName) => {
   const fullPath = path.join(basePath, folderName);
   await fsp.mkdir(fullPath, { recursive: true });
   return { path: fullPath, created: true };
+});
+
+// ── Settings (persisted user preferences) ─────────────────────────────
+
+ipcMain.handle('settings:getArchiveRoot', () => settings.getArchiveRoot());
+
+ipcMain.handle('settings:setArchiveRoot', async (_event, value) => {
+  await settings.setArchiveRoot(value);
+  return { ok: true };
 });
 
 // ── List manager ──────────────────────────────────────────────────────────────

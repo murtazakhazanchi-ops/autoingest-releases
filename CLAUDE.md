@@ -274,6 +274,7 @@ Catppuccin Mocha dark theme. CSS variables in `:root`:
 - [x] M1: Disk-backed Master creation — archive root picker (persists session), mkdir on Continue, "already exists" modal (Yes/No)
 - [x] M1: Select Existing Master — folder picker + accessibility validation, adopts any readable directory
 - [x] M1: sessionArchiveRoot persists across resets within a session; Change Location link re-opens picker; activeMaster = { name, path }
+- [x] G1: archiveRoot persisted to `userData/settings.json` — auto-migrates on first master creation / change-location. Primed into EventCreator at startup so Location row appears without re-prompting on subsequent launches.
 
 ---
 
