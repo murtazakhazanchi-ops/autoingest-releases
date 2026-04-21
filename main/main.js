@@ -664,6 +664,26 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
   return [...resolved, ...unparseable];
 });
 
+ipcMain.handle('master:renameEvent', async (_event, masterPath, oldName, newName) => {
+  if (!masterPath || !oldName || !newName) return { ok: false, reason: 'Missing parameters.' };
+  if (oldName === newName) return { ok: true }; // no-op
+  const oldPath = path.join(masterPath, oldName);
+  const newPath = path.join(masterPath, newName);
+  // Fresh stat for collision check (not cached — catches out-of-band changes).
+  try {
+    await fsp.stat(newPath);
+    return { ok: false, reason: 'collision' };
+  } catch (err) {
+    if (err.code !== 'ENOENT') return { ok: false, reason: `Cannot check target: ${err.message}` };
+  }
+  try {
+    await fsp.rename(oldPath, newPath);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: `Rename failed: ${err.message}` };
+  }
+});
+
 // ── Settings (persisted user preferences) ─────────────────────────────
 
 ipcMain.handle('settings:getArchiveRoot', () => settings.getArchiveRoot());

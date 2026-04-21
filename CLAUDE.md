@@ -279,6 +279,7 @@ Catppuccin Mocha dark theme. CSS variables in `:root`:
 - [x] M3: Event scanner — `master:scanEvents` IPC + `master:chooseExisting` flow lists existing event folders on disk, sorted (hijriDate desc, sequence desc). Unresolved/unparseable folders grouped below with ⚠ badges.
 - [x] M4: Event name parser (`main/eventNameParser.js`) — deterministic token classification per locked spec. CITY highest priority; unknown tokens → EVENT_TYPE with `isUnresolved:true`; parse fails ONLY on invalid prefix or no CITY. Pure function, no I/O.
 - [x] M5: View-existing mode — clicking an existing event in the list rehydrates components into the Step-2 form (view-only for now; editing unlocks in M6). "Back to list" preserves scan cache; "Viewing Existing Event" badge; view-lock disables every dropdown + chip-remove + Add Component.
+- [x] M6: Safe editing of viewed events — "Edit Event" outline button unlocks all dropdowns, chips, Add/Remove Component. "Save Changes →" validates, builds new name (hijriDate + sequence locked), calls `master:renameEvent` IPC (fresh `fs.stat` collision check + `fs.rename`), updates `_scannedEvents` cache, returns to list. Edit-to-same-name = no-op. "Back to list" while editing = silent discard. `_editMode` flag reset on `start()`, `resetSelection()`, `_openExistingEvent()`.
 
 ---
 

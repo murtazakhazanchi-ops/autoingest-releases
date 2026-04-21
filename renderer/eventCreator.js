@@ -36,10 +36,11 @@ const EventCreator = (() => {
   // M3/M5: existing-event list + view state.
   //   _scannedEvents:  result of master:scanEvents for the current activeMaster,
   //                    null until a scan has run this Step-2 entry.
-  //   _viewingExisting: when set, the form is read-only (no dropdowns, no chips,
-  //                    no Continue button). M6 will unlock safe editing.
+  //   _viewingExisting: when set, the form starts read-only; M6 edit mode
+  //                    can unlock it via _editMode flag.
   let _scannedEvents   = null;
   let _viewingExisting = null; // { folderName, hijriDate, sequence, isUnresolved } | null
+  let _editMode        = false; // M6: when true in view-existing mode, form is editable
 
   function _makeComp() {
     return { id: ++_compSeq, eventTypes: [], location: null, city: _globalCityVal ? { ..._globalCityVal } : null };
@@ -646,7 +647,7 @@ const EventCreator = (() => {
   function showEventStep() {
     currentStep = 2;
     const title = $ecTitle();
-    if (title) title.textContent = _viewingExisting ? 'View Event' : 'Create Event';
+    if (title) title.textContent = _viewingExisting ? (_editMode ? 'Edit Event' : 'View Event') : 'Create Event';
     syncRailHighlight(2);
 
     // M3: when entering fresh (not in view/edit mode, no in-progress components),
@@ -702,6 +703,10 @@ const EventCreator = (() => {
   function _renderEventList() {
     const body = $ecBody();
     if (!body) return;
+
+    // M6: reset title when returning to the list from view/edit mode.
+    const title = $ecTitle();
+    if (title) title.textContent = 'Existing Events';
 
     const resolved   = _scannedEvents.filter(e => e.isParseable);
     const unparseable = _scannedEvents.filter(e => !e.isParseable);
@@ -774,12 +779,13 @@ ${unparseable.map(ev => `
     });
   }
 
-  // M5: open an existing event in view-only mode (editing comes in M6).
+  // M5/M6: open an existing event — starts in view-only; "Edit Event" unlocks.
   function _openExistingEvent(folderName) {
     const entry = (_scannedEvents || []).find(e => e.folderName === folderName && e.isParseable);
     if (!entry) return;
 
     // Rehydrate components from parsed data into the EventCreator's internal shape.
+    _editMode = false;
     _compSeq = 0;
     _eventComps = entry.components.map(c => ({
       id:         ++_compSeq,
@@ -818,31 +824,127 @@ ${unparseable.map(ev => `
 
     // M5: in view-only mode, lock all inputs AFTER dropdowns have mounted with values.
     if (_viewingExisting) {
-      _lockEventFormForView();
+      _applyEditLockState();
     }
   }
 
-  // M5: disable every interactive element in the Step-2 form when viewing an
-  // existing event. M6 will replace this with a proper edit-mode unlock flow.
-  function _lockEventFormForView() {
+  // M6: applies the correct lock/unlock state based on _editMode.
+  // Called after dropdowns are mounted and values populated.
+  function _applyEditLockState() {
     const body = $ecBody();
     if (!body) return;
-    // Disable every dropdown we just built.
-    if (_globalCityDD)  _globalCityDD.setDisabled(true);
+    const locked = !_editMode; // locked when NOT in edit mode
+
+    // Enable/disable every dropdown.
+    if (_globalCityDD) _globalCityDD.setDisabled(locked);
     Object.values(_compDDs).forEach(row => {
-      row.et?.setDisabled(true);
-      row.loc?.setDisabled(true);
-      row.city?.setDisabled(true);
+      row.et?.setDisabled(locked);
+      row.loc?.setDisabled(locked);
+      row.city?.setDisabled(locked);
     });
-    // Hide chip-remove buttons.
-    body.querySelectorAll('.ec-chip-x').forEach(btn => btn.style.display = 'none');
-    // Hide the Add Component and per-component Remove buttons.
+    // Show/hide chip-remove buttons.
+    body.querySelectorAll('.ec-chip-x').forEach(btn => btn.style.display = locked ? 'none' : '');
+    // Show/hide Add Component and per-component Remove buttons.
     const addBtn = document.getElementById('ecAddComp');
-    if (addBtn) addBtn.style.display = 'none';
-    body.querySelectorAll('.ec-comp-remove').forEach(btn => btn.style.display = 'none');
-    // Rename Continue button and disable (until M6 unlocks edits).
+    if (addBtn) addBtn.style.display = locked ? 'none' : '';
+    body.querySelectorAll('.ec-comp-remove').forEach(btn => btn.style.display = locked ? 'none' : '');
+
+    // Update the Continue button to reflect view / edit mode.
     const cont = document.getElementById('ecEventContinue');
-    if (cont) { cont.textContent = 'View-only — editing in M6'; cont.disabled = true; }
+    if (cont) {
+      if (_editMode) {
+        cont.textContent = 'Save Changes →';
+        cont.className   = 'ec-continue-btn';
+        cont.disabled    = false;
+      } else {
+        cont.textContent = 'Edit Event';
+        cont.className   = 'ec-outline-btn';
+        cont.disabled    = false;
+      }
+    }
+
+    // Update title bar to match.
+    const title = $ecTitle();
+    if (title) title.textContent = _editMode ? 'Edit Event' : 'View Event';
+
+    // Update mode badge.
+    const badges = body.querySelectorAll('.ec-mode-badge');
+    badges.forEach(b => b.textContent = _editMode ? 'Editing Event' : 'Viewing Existing Event');
+  }
+
+  // M6: save edits to an existing event by renaming the folder on disk.
+  async function _handleSaveEditedEvent() {
+    // Validate all components have required fields.
+    if (_eventComps.length === 0) {
+      _showEventBanner('Add at least one component.', 'error'); return;
+    }
+    const missing = _eventComps.find(c => c.eventTypes.length === 0 || !c.city);
+    if (missing) {
+      _showEventBanner('Every component needs at least one Event Type and a City.', 'error'); return;
+    }
+
+    // Build the new event name using locked hijriDate + sequence from _viewingExisting.
+    const parts   = _buildCompString(_eventComps);
+    const newName = `${_viewingExisting.hijriDate} _${_viewingExisting.sequence}-${parts}`;
+    const oldName = _viewingExisting.folderName;
+
+    // If the name hasn't changed, no-op -> back to list.
+    if (newName === oldName) {
+      _editMode = false;
+      _viewingExisting = null;
+      _eventComps = [];
+      _destroyEventDDs();
+      _renderEventList();
+      return;
+    }
+
+    // M6: warn if another event already has the same content parts (different sequence).
+    const dupMatch = (_scannedEvents || []).find(e => {
+      if (e.folderName === oldName || !e.isParseable) return false;
+      const m = e.folderName.match(/^\d{4}-\d{2}-\d{2} _\d{2}-(.+)$/);
+      return m && m[1] === parts;
+    });
+    if (dupMatch) {
+      const proceed = await _showModal({
+        title:    'Similar Event Exists',
+        bodyHTML: `Another event already has the same components:<br><strong>${esc(dupMatch.folderName)}</strong><br><br>Save anyway?`,
+        buttons:  [
+          { label: 'Cancel',       primary: false, value: 'no'  },
+          { label: 'Save Anyway',  primary: true,  value: 'yes' }
+        ]
+      });
+      if (proceed !== 'yes') return;
+    }
+
+    // Call IPC to rename on disk.
+    const result = await window.api.renameEvent(activeMaster.path, oldName, newName);
+    if (!result.ok) {
+      if (result.reason === 'collision') {
+        _showEventBanner(`A folder named "${newName}" already exists.`, 'error');
+      } else {
+        _showEventBanner(result.reason || 'Rename failed.', 'error');
+      }
+      return;
+    }
+
+    // Update the scanned events cache so the list reflects the change.
+    const entry = (_scannedEvents || []).find(e => e.folderName === oldName);
+    if (entry) {
+      entry.folderName = newName;
+      entry.components = _eventComps.map(c => ({
+        eventTypes: c.eventTypes.map(et => et.label),
+        location: c.location?.label || null,
+        city: c.city?.label || '',
+        isUnresolved: false, // User edited through UI = all selections are from controlled lists
+      }));
+      entry.isUnresolved = false;
+    }
+
+    _editMode = false;
+    _viewingExisting = null;
+    _eventComps = [];
+    _destroyEventDDs();
+    _renderEventList();
   }
 
   // ── HTML builder ─────────────────────────────────────────────────────────────────────
@@ -854,7 +956,7 @@ ${unparseable.map(ev => `
       ? `<span class="ec-mode-badge ec-mode-multi" style="margin-left:8px">Viewing Existing Event</span>`
       : '';
     const warnBadge = _viewingExisting && _viewingExisting.isUnresolved
-      ? `<span class="ec-evl-warn" style="margin-left:6px" title="Some tokens don't match the controlled lists. You can still view; editing unlocks in M6.">⚠ Unresolved tokens</span>`
+      ? `<span class="ec-evl-warn" style="margin-left:6px" title="Some tokens don't match the controlled lists. You can still view and edit.">⚠ Unresolved tokens</span>`
       : '';
     const eventRow = _viewingExisting ? `
     <div class="ec-bc-row">
@@ -1044,10 +1146,11 @@ ${unparseable.map(ev => `
         showMasterStep();
       });
 
-    // M5: "Back to list" returns to the event-list without clearing the scan cache.
+    // M5/M6: "Back to list" returns to event-list. Silent discard if editing.
     document.getElementById('ecBackToList')
       ?.addEventListener('click', () => {
         _viewingExisting = null;
+        _editMode = false;
         _eventComps = [];
         _destroyEventDDs();
         _renderEventList();
@@ -1065,7 +1168,19 @@ ${unparseable.map(ev => `
     _wireRemoveButtons();
 
     document.getElementById('ecEventContinue')
-      ?.addEventListener('click', _tryCreateEvent);
+      ?.addEventListener('click', () => {
+        if (_viewingExisting && !_editMode) {
+          // M6: enter edit mode.
+          _editMode = true;
+          _applyEditLockState();
+          _updateEventPreview();
+        } else if (_viewingExisting && _editMode) {
+          // M6: save edits.
+          _handleSaveEditedEvent();
+        } else {
+          _tryCreateEvent();
+        }
+      });
   }
 
   function _wireRemoveButtons() {
@@ -1125,10 +1240,13 @@ ${unparseable.map(ev => `
     const btn     = document.getElementById('ecEventContinue');
 
     const coll  = sessionCollections.find(c => c.name === selectedCollection);
-    const seq   = String((coll?.events.length ?? 0) + 1).padStart(2, '0');
+    // M6: use the locked sequence from _viewingExisting when editing, else next seq.
+    const seq   = _viewingExisting
+      ? _viewingExisting.sequence
+      : String((coll?.events.length ?? 0) + 1).padStart(2, '0');
     const parts = _buildCompString(_eventComps);
     const valid = _eventComps.length > 0 && _eventComps.every(c => c.eventTypes.length > 0 && c.city);
-    const name  = parts ? `${coll?.hijriDate || '?'} _${seq}-${parts}` : '';
+    const name  = parts ? `${_viewingExisting ? _viewingExisting.hijriDate : (coll?.hijriDate || '?')} _${seq}-${parts}` : '';
 
     if (preview) {
       preview.textContent = name || '—';
@@ -1334,6 +1452,7 @@ ${unparseable.map(ev => `
       activeMaster       = null;
       _scannedEvents     = null;
       _viewingExisting   = null;
+      _editMode          = false;
       _resetEventForm();
       showMasterStep();
     },
@@ -1344,6 +1463,7 @@ ${unparseable.map(ev => `
       activeMaster       = null;
       _scannedEvents     = null;
       _viewingExisting   = null;
+      _editMode          = false;
     },
 
     /** Called by renderer's updateSteps() when railMode === 'event'. */

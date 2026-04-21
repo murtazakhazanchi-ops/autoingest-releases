@@ -150,6 +150,7 @@ contextBridge.exposeInMainWorld('api', {
   checkMasterExists:        (basePath, folderName)   => ipcRenderer.invoke('master:checkExists', basePath, folderName),
   createMaster:             (basePath, folderName)   => ipcRenderer.invoke('master:create',      basePath, folderName),
   scanMasterEvents:         (masterPath)             => ipcRenderer.invoke('master:scanEvents',   masterPath),
+  renameEvent:              (masterPath, oldName, newName) => ipcRenderer.invoke('master:renameEvent', masterPath, oldName, newName),
 
   // ── Settings (persisted preferences) ──
   getArchiveRootSetting:    ()                       => ipcRenderer.invoke('settings:getArchiveRoot'),
