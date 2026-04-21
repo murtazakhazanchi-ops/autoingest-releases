@@ -552,12 +552,18 @@ ipcMain.handle('master:chooseArchiveRoot', async () => {
   return result.canceled ? null : { path: result.filePaths[0] };
 });
 
-ipcMain.handle('master:chooseExisting', async () => {
+ipcMain.handle('master:chooseExisting', async (_event, startPath) => {
   const win    = BrowserWindow.getFocusedWindow();
-  const result = await dialog.showOpenDialog(win, {
+  const opts = {
     title:      'Select Existing Master Folder',
     properties: ['openDirectory']
-  });
+  };
+  // Soft nudge: start the picker inside the current archive root when available.
+  // User is still free to navigate elsewhere; the defaultPath is just the initial view.
+  if (startPath && typeof startPath === 'string') {
+    opts.defaultPath = startPath;
+  }
+  const result = await dialog.showOpenDialog(win, opts);
   return result.canceled ? null : { path: result.filePaths[0] };
 });
 

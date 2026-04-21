@@ -275,6 +275,7 @@ Catppuccin Mocha dark theme. CSS variables in `:root`:
 - [x] M1: Select Existing Master — folder picker + accessibility validation, adopts any readable directory
 - [x] M1: sessionArchiveRoot persists across resets within a session; Change Location link re-opens picker; activeMaster = { name, path }
 - [x] G1: archiveRoot persisted to `userData/settings.json` — auto-migrates on first master creation / change-location. Primed into EventCreator at startup so Location row appears without re-prompting on subsequent launches.
+- [x] M2: Select Existing Master picker defaults to `sessionArchiveRoot` (soft nudge; user can still navigate elsewhere). Validation is accessibility-only — no naming or structure checks.
 
 ---
 

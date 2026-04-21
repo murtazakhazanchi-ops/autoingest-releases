@@ -145,7 +145,7 @@ contextBridge.exposeInMainWorld('api', {
 
   // ── Master folder operations ──
   chooseArchiveRoot:        ()                       => ipcRenderer.invoke('master:chooseArchiveRoot'),
-  chooseExistingMaster:     ()                       => ipcRenderer.invoke('master:chooseExisting'),
+  chooseExistingMaster:     (startPath)              => ipcRenderer.invoke('master:chooseExisting', startPath),
   validateMasterAccessible: (folderPath)             => ipcRenderer.invoke('master:validateAccessible', folderPath),
   checkMasterExists:        (basePath, folderName)   => ipcRenderer.invoke('master:checkExists', basePath, folderName),
   createMaster:             (basePath, folderName)   => ipcRenderer.invoke('master:create',      basePath, folderName),

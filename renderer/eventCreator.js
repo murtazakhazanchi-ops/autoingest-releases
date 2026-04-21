@@ -570,7 +570,9 @@ const EventCreator = (() => {
   // ── Select Existing Master ─────────────────────────────────────────────────
 
   async function handleSelectExistingMaster() {
-    const pick = await window.api.chooseExistingMaster();
+    // M2: pass sessionArchiveRoot so the picker defaults to inside the archive.
+    // User can still navigate elsewhere — this is a soft nudge, not a restriction.
+    const pick = await window.api.chooseExistingMaster(sessionArchiveRoot);
     if (!pick) return; // canceled
 
     const folderPath = pick.path;
