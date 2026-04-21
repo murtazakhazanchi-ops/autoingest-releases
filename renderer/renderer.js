@@ -742,6 +742,44 @@ function setStep(id, state) {
 }
 
 // ════════════════════════════════════════════════════════════════
+// M8: CONTEXT BAR — breadcrumb + mode indicator
+// ════════════════════════════════════════════════════════════════
+
+function _updateContextBar() {
+  const bar   = document.getElementById('contextBar');
+  const crumb = document.getElementById('ctxBreadcrumb');
+  const mode  = document.getElementById('ctxMode');
+  if (!bar || !crumb || !mode) return;
+
+  // Hide when inside the event creator (it has its own breadcrumb).
+  const ecVisible = document.getElementById('eventCreatorPanel')?.classList.contains('visible');
+  if (ecVisible) { bar.classList.remove('visible'); return; }
+
+  const eventData = EventCreator.getActiveEventData();
+  const master    = EventCreator.getActiveMaster();
+
+  if (eventData) {
+    // Event flow: show Master → Event breadcrumb + "Event Import" badge.
+    const masterName = _esc(master?.name || eventData.coll.name);
+    const eventName  = _esc(eventData.event.name);
+    crumb.innerHTML = `<span class="ctx-label">${masterName}</span>` +
+                      `<span class="ctx-sep">›</span>` +
+                      `<span class="ctx-label">${eventName}</span>`;
+    mode.textContent = 'Event Import';
+    mode.className   = 'ctx-mode event';
+    bar.classList.add('visible');
+  } else if (activeDrive) {
+    // Quick flow: drive selected but no event active.
+    crumb.innerHTML = `<span class="ctx-label">${_esc(activeDrive.label)}</span>`;
+    mode.textContent = 'Quick Import';
+    mode.className   = 'ctx-mode quick';
+    bar.classList.add('visible');
+  } else {
+    bar.classList.remove('visible');
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
 // EVENT CREATOR NAVIGATION
 // ════════════════════════════════════════════════════════════════
 
@@ -751,6 +789,7 @@ function _ecPanelOpen() {
   document.getElementById('eventCreatorPanel').classList.add('visible');
   setRailMode('event');
   updateSteps();
+  _updateContextBar();
 }
 
 function showEventCreator() {
@@ -775,6 +814,7 @@ function showLanding() {
   document.getElementById('step1Panel').style.display = '';
   setRailMode('card');
   updateSteps();
+  _updateContextBar();
   // Do NOT reset selection — render landing card based on current event state
   _renderLandingEventCard();
 }
@@ -923,6 +963,7 @@ async function selectDrive(drive) {
   document.getElementById('workspace').classList.add('visible');
   document.getElementById('activeDriveName').textContent = drive.label;
   updateSteps(); updateSelectionBar();
+  _updateContextBar();
   renderFileArea([]);   // shows "Select a folder to begin"
   document.getElementById('folderList').innerHTML =
     `<div class="sidebar-empty">Loading folders…</div>`;
@@ -941,6 +982,7 @@ document.getElementById('changeDriveBtn').addEventListener('click', () => {
   document.getElementById('workspace').classList.remove('visible');
   document.getElementById('step1Panel').style.display = '';
   updateSteps(); updateSelectionBar();
+  _updateContextBar();
 });
 
 /**
@@ -993,6 +1035,7 @@ function resetAppState() {
 
   updateSteps();
   updateSelectionBar();
+  _updateContextBar();
 }
 
 document.getElementById('ejectBtn').addEventListener('click', async () => {

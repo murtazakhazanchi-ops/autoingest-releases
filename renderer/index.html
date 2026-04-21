@@ -119,6 +119,46 @@
     .step.done   { opacity: 0.75; }
     .step.done   .step-num { background: var(--green); color: var(--surface2); }
 
+    /* ── CONTEXT BAR (M8) ───────────────── */
+    #contextBar {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 5px 18px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      font-size: 0.72rem;
+      color: var(--subtext);
+      min-height: 26px;
+    }
+    #contextBar.visible { display: flex; }
+    #contextBar .ctx-breadcrumb {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    #contextBar .ctx-breadcrumb .ctx-sep {
+      margin: 0 6px;
+      opacity: 0.4;
+    }
+    #contextBar .ctx-breadcrumb .ctx-label {
+      color: var(--text);
+      font-weight: 600;
+    }
+    #contextBar .ctx-mode {
+      flex-shrink: 0;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    #contextBar .ctx-mode.event { background: var(--blue-dim); color: var(--blue); }
+    #contextBar .ctx-mode.quick { background: var(--green-dim); color: var(--green); }
+
     /* ── LANDING ─────────────────────────────────── */
     #step1Panel {
       display: flex; flex-direction: column;
@@ -2462,6 +2502,12 @@
     <div class="step active" id="step1Indicator"><span class="step-num">1</span> <span id="step1Label">Select Memory Card</span></div>
     <div class="step"        id="step2Indicator"><span class="step-num">2</span> <span id="step2Label">Browse &amp; Select Files</span></div>
     <div class="step"        id="step3Indicator"><span class="step-num">3</span> <span id="step3Label">Import</span></div>
+  </div>
+
+  <!-- M8: CONTEXT BAR (breadcrumb + mode indicator) -->
+  <div id="contextBar">
+    <div class="ctx-breadcrumb" id="ctxBreadcrumb"></div>
+    <span class="ctx-mode" id="ctxMode"></span>
   </div>
 
   <!-- LANDING -->
