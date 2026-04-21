@@ -10,6 +10,7 @@ const { copyFiles, setPaused, getFileHash, abortCopy } = require('./fileManager'
 const { getThumbnail, shutdownWorkers } = require('../services/thumbnailer');
 const listManager  = require('./listManager');
 const aliasEngine  = require('./aliasEngine');
+const { parseEventName } = require('./eventNameParser');
 const { log } = require('../services/logger');
 const telemetry     = require('../services/telemetry');
 const crashReporter = require('../services/crashReporter');
@@ -593,6 +594,74 @@ ipcMain.handle('master:create', async (_event, basePath, folderName) => {
   const fullPath = path.join(basePath, folderName);
   await fsp.mkdir(fullPath, { recursive: true });
   return { path: fullPath, created: true };
+});
+
+/**
+ * Scan a master folder for event subfolders.
+ * Ignores files and any directory whose name doesn't match the event-name
+ * prefix pattern. For each match, runs parseEventName() against the current
+ * controlled-vocabulary lists so the renderer can render resolvable events
+ * directly and mark the rest as warnings.
+ *
+ * Returns an array sorted by (hijriDate, seq) DESCENDING so newest events
+ * are listed first. Unparseable entries are appended at the end in the same
+ * insertion order (their hijriDate/seq are unreliable).
+ *
+ * Never throws for missing or unreadable masters — returns [] instead.
+ */
+ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
+  if (!masterPath || typeof masterPath !== 'string') return [];
+
+  let entries;
+  try {
+    entries = await fsp.readdir(masterPath, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  // Load lists ONCE for this scan; parser is a pure function of its inputs.
+  const lists = {
+    cities:     listManager.getList('cities'),
+    locations:  listManager.getList('locations'),
+    eventTypes: listManager.getList('event-types'),
+  };
+
+  const resolved   = [];
+  const unparseable = [];
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const name = entry.name;
+    // Skip macOS/system artefacts defensively (even though these aren't directories usually)
+    if (name.startsWith('.')) continue;
+
+    const parsed = parseEventName(name, lists);
+    if (parsed.ok) {
+      resolved.push({
+        folderName: name,
+        hijriDate:  parsed.hijriDate,
+        sequence:   parsed.sequence,
+        components: parsed.components,
+        isParseable: true,
+        isUnresolved: parsed.components.some(c => c.isUnresolved),
+      });
+    } else {
+      unparseable.push({
+        folderName: name,
+        isParseable: false,
+        reason:      parsed.reason,
+      });
+    }
+  }
+
+  // Sort resolved newest-first by (hijriDate desc, sequence desc). Both are
+  // fixed-width strings so lexicographic comparison is equivalent to numeric.
+  resolved.sort((a, b) => {
+    if (a.hijriDate !== b.hijriDate) return b.hijriDate.localeCompare(a.hijriDate);
+    return b.sequence.localeCompare(a.sequence);
+  });
+
+  return [...resolved, ...unparseable];
 });
 
 // ── Settings (persisted user preferences) ─────────────────────────────

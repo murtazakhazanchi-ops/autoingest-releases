@@ -33,6 +33,14 @@ const EventCreator = (() => {
   let _compSeq        = 0;
   let _activeEventIdx = 0;
 
+  // M3/M5: existing-event list + view state.
+  //   _scannedEvents:  result of master:scanEvents for the current activeMaster,
+  //                    null until a scan has run this Step-2 entry.
+  //   _viewingExisting: when set, the form is read-only (no dropdowns, no chips,
+  //                    no Continue button). M6 will unlock safe editing.
+  let _scannedEvents   = null;
+  let _viewingExisting = null; // { folderName, hijriDate, sequence, isUnresolved } | null
+
   function _makeComp() {
     return { id: ++_compSeq, eventTypes: [], location: null, city: _globalCityVal ? { ..._globalCityVal } : null };
   }
@@ -638,9 +646,165 @@ const EventCreator = (() => {
   function showEventStep() {
     currentStep = 2;
     const title = $ecTitle();
-    if (title) title.textContent = 'Create Event';
+    if (title) title.textContent = _viewingExisting ? 'View Event' : 'Create Event';
     syncRailHighlight(2);
 
+    // M3: when entering fresh (not in view/edit mode, no in-progress components),
+    // scan the active master for existing events. If any are found, show the
+    // list-first view with a "Create New Event" button. Otherwise fall through
+    // to the existing empty-form behavior for brand-new masters.
+    if (!_viewingExisting && _eventComps.length === 0 && activeMaster && _scannedEvents === null) {
+      _renderEventListSpinner();
+      _scanAndRenderEventList().catch(err => {
+        console.error('[EventCreator] scanMasterEvents failed:', err);
+        // Fallback: render the empty form as if nothing existed.
+        _scannedEvents = [];
+        _renderEventForm();
+      });
+      return;
+    }
+
+    _renderEventForm();
+  }
+
+  // ── M3: event-list UI (shown when activeMaster has event subfolders) ──────
+
+  function _renderEventListSpinner() {
+    const body = $ecBody();
+    if (!body) return;
+    body.innerHTML = `
+<div class="ec-master-wrap">
+  <div class="ec-breadcrumb-bar">
+    <div class="ec-bc-row">
+      <span class="ec-bc-label">Collection</span>
+      <span class="ec-bc-value" title="${esc(selectedCollection || '')}">${esc(selectedCollection || '')}</span>
+      <button class="ec-bc-change" id="ecChangeCollection">Change</button>
+    </div>
+  </div>
+  <p class="ec-hint" style="margin:24px 0;text-align:center">Scanning master for existing events…</p>
+</div>`;
+    document.getElementById('ecChangeCollection')?.addEventListener('click', () => {
+      _scannedEvents = null; _viewingExisting = null;
+      showMasterStep();
+    });
+  }
+
+  async function _scanAndRenderEventList() {
+    _scannedEvents = await window.api.scanMasterEvents(activeMaster.path);
+    if (!_scannedEvents || _scannedEvents.length === 0) {
+      // No existing events — skip the list and go straight to the empty form.
+      _renderEventForm();
+      return;
+    }
+    _renderEventList();
+  }
+
+  function _renderEventList() {
+    const body = $ecBody();
+    if (!body) return;
+
+    const resolved   = _scannedEvents.filter(e => e.isParseable);
+    const unparseable = _scannedEvents.filter(e => !e.isParseable);
+
+    const resolvedHTML = resolved.map(ev => {
+      const badge = ev.isUnresolved
+        ? `<span class="ec-evl-warn" title="Some tokens in this event don't match the controlled lists yet. You can still view or edit.">⚠</span>`
+        : '';
+      return `
+<div class="ec-evl-item" data-folder="${esc(ev.folderName)}" tabindex="0" role="button">
+  <span class="ec-evl-seq">${esc(ev.sequence)}</span>
+  <div class="ec-evl-meta">
+    <div class="ec-evl-name" title="${esc(ev.folderName)}">${esc(ev.folderName)}</div>
+    <div class="ec-evl-date">${esc(ev.hijriDate)}</div>
+  </div>
+  ${badge}
+</div>`;
+    }).join('');
+
+    const unparseableHTML = unparseable.length === 0 ? '' : `
+<p class="ec-section-title" style="margin-top:20px;opacity:0.6">Unrecognised Folders</p>
+${unparseable.map(ev => `
+<div class="ec-evl-item ec-evl-disabled" title="${esc(ev.reason || 'Cannot parse')}">
+  <span class="ec-evl-seq">?</span>
+  <div class="ec-evl-meta">
+    <div class="ec-evl-name">${esc(ev.folderName)}</div>
+    <div class="ec-evl-date ec-evl-warn-text">${esc(ev.reason || 'Cannot parse')}</div>
+  </div>
+  <span class="ec-evl-warn">⚠</span>
+</div>`).join('')}`;
+
+    body.innerHTML = `
+<div class="ec-master-wrap">
+
+  <div class="ec-breadcrumb-bar">
+    <div class="ec-bc-row">
+      <span class="ec-bc-label">Collection</span>
+      <span class="ec-bc-value" title="${esc(selectedCollection || '')}">${esc(selectedCollection || '')}</span>
+      <button class="ec-bc-change" id="ecChangeCollection">Change</button>
+    </div>
+  </div>
+
+  <p class="ec-section-title">Existing Events <span class="ec-hint" style="font-weight:normal">(${resolved.length} found)</span></p>
+  <div class="ec-evl-list">
+    ${resolvedHTML || '<p class="ec-hint">No resolvable events yet.</p>'}
+  </div>
+  ${unparseableHTML}
+
+  <button id="ecNewEventFromList" class="ec-continue-btn" style="margin-top:20px">+ Create New Event</button>
+
+</div>`;
+
+    document.getElementById('ecChangeCollection')?.addEventListener('click', () => {
+      _scannedEvents = null; _viewingExisting = null;
+      showMasterStep();
+    });
+
+    body.querySelectorAll('.ec-evl-item[data-folder]').forEach(el => {
+      const open = () => _openExistingEvent(el.dataset.folder);
+      el.addEventListener('click', open);
+      el.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+      });
+    });
+
+    document.getElementById('ecNewEventFromList')?.addEventListener('click', () => {
+      _viewingExisting = null;
+      _eventComps = [];
+      _renderEventForm();
+    });
+  }
+
+  // M5: open an existing event in view-only mode (editing comes in M6).
+  function _openExistingEvent(folderName) {
+    const entry = (_scannedEvents || []).find(e => e.folderName === folderName && e.isParseable);
+    if (!entry) return;
+
+    // Rehydrate components from parsed data into the EventCreator's internal shape.
+    _compSeq = 0;
+    _eventComps = entry.components.map(c => ({
+      id:         ++_compSeq,
+      // Event types get id===label since we don't round-trip list-IDs through parsed strings.
+      // TreeAutocomplete accepts that shape for display; the alias engine handles search later.
+      eventTypes: c.eventTypes.map(label => ({ id: label, label })),
+      location:   c.location ? { id: c.location, label: c.location } : null,
+      city:       { id: c.city, label: c.city },
+      isUnresolved: !!c.isUnresolved,
+    }));
+
+    _viewingExisting = {
+      folderName: entry.folderName,
+      hijriDate:  entry.hijriDate,
+      sequence:   entry.sequence,
+      isUnresolved: entry.isUnresolved,
+    };
+
+    _renderEventForm();
+  }
+
+  // Pure render of the Step-2 form. Split out of showEventStep so both the
+  // scan path (after choosing "Create New Event") and the view-existing path
+  // reach the same builder.
+  function _renderEventForm() {
     if (_eventComps.length === 0) _eventComps = [_makeComp()];
 
     const body = $ecBody();
@@ -651,11 +815,54 @@ const EventCreator = (() => {
     _mountEventDropdowns();
     _attachEventListeners();
     _updateEventPreview();
+
+    // M5: in view-only mode, lock all inputs AFTER dropdowns have mounted with values.
+    if (_viewingExisting) {
+      _lockEventFormForView();
+    }
   }
 
-  // ── HTML builder ───────────────────────────────────────────────────────────
+  // M5: disable every interactive element in the Step-2 form when viewing an
+  // existing event. M6 will replace this with a proper edit-mode unlock flow.
+  function _lockEventFormForView() {
+    const body = $ecBody();
+    if (!body) return;
+    // Disable every dropdown we just built.
+    if (_globalCityDD)  _globalCityDD.setDisabled(true);
+    Object.values(_compDDs).forEach(row => {
+      row.et?.setDisabled(true);
+      row.loc?.setDisabled(true);
+      row.city?.setDisabled(true);
+    });
+    // Hide chip-remove buttons.
+    body.querySelectorAll('.ec-chip-x').forEach(btn => btn.style.display = 'none');
+    // Hide the Add Component and per-component Remove buttons.
+    const addBtn = document.getElementById('ecAddComp');
+    if (addBtn) addBtn.style.display = 'none';
+    body.querySelectorAll('.ec-comp-remove').forEach(btn => btn.style.display = 'none');
+    // Rename Continue button and disable (until M6 unlocks edits).
+    const cont = document.getElementById('ecEventContinue');
+    if (cont) { cont.textContent = 'View-only — editing in M6'; cont.disabled = true; }
+  }
+
+  // ── HTML builder ─────────────────────────────────────────────────────────────────────
 
   function _buildEventHTML() {
+    // M5: mode badge + breadcrumb differ depending on whether we're creating new
+    // or viewing an existing event from disk.
+    const modeBadge = _viewingExisting
+      ? `<span class="ec-mode-badge ec-mode-multi" style="margin-left:8px">Viewing Existing Event</span>`
+      : '';
+    const warnBadge = _viewingExisting && _viewingExisting.isUnresolved
+      ? `<span class="ec-evl-warn" style="margin-left:6px" title="Some tokens don't match the controlled lists. You can still view; editing unlocks in M6.">⚠ Unresolved tokens</span>`
+      : '';
+    const eventRow = _viewingExisting ? `
+    <div class="ec-bc-row">
+      <span class="ec-bc-label">Event</span>
+      <span class="ec-bc-value" title="${esc(_viewingExisting.folderName)}">${esc(_viewingExisting.folderName)}</span>
+      <button class="ec-bc-change" id="ecBackToList">← Back to list</button>
+    </div>` : '';
+
     return `
 <div class="ec-master-wrap">
 
@@ -663,8 +870,11 @@ const EventCreator = (() => {
     <div class="ec-bc-row">
       <span class="ec-bc-label">Collection</span>
       <span class="ec-bc-value" title="${esc(selectedCollection || '')}">${esc(selectedCollection || '')}</span>
+      ${modeBadge}
+      ${warnBadge}
       <button class="ec-bc-change" id="ecChangeCollection">Change</button>
     </div>
+    ${eventRow}
   </div>
 
   <div class="ec-global-city">
@@ -827,7 +1037,21 @@ const EventCreator = (() => {
 
   function _attachEventListeners() {
     document.getElementById('ecChangeCollection')
-      ?.addEventListener('click', showMasterStep);
+      ?.addEventListener('click', () => {
+        // M3: going back to Step 1 clears the scan cache so we rescan on re-entry.
+        _scannedEvents = null;
+        _viewingExisting = null;
+        showMasterStep();
+      });
+
+    // M5: "Back to list" returns to the event-list without clearing the scan cache.
+    document.getElementById('ecBackToList')
+      ?.addEventListener('click', () => {
+        _viewingExisting = null;
+        _eventComps = [];
+        _destroyEventDDs();
+        _renderEventList();
+      });
 
     document.getElementById('ecAddComp')
       ?.addEventListener('click', () => {
@@ -1108,6 +1332,8 @@ const EventCreator = (() => {
     start() {
       selectedCollection = null;
       activeMaster       = null;
+      _scannedEvents     = null;
+      _viewingExisting   = null;
       _resetEventForm();
       showMasterStep();
     },
@@ -1116,6 +1342,8 @@ const EventCreator = (() => {
     resetSelection() {
       selectedCollection = null;
       activeMaster       = null;
+      _scannedEvents     = null;
+      _viewingExisting   = null;
     },
 
     /** Called by renderer's updateSteps() when railMode === 'event'. */

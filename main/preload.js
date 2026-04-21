@@ -149,6 +149,7 @@ contextBridge.exposeInMainWorld('api', {
   validateMasterAccessible: (folderPath)             => ipcRenderer.invoke('master:validateAccessible', folderPath),
   checkMasterExists:        (basePath, folderName)   => ipcRenderer.invoke('master:checkExists', basePath, folderName),
   createMaster:             (basePath, folderName)   => ipcRenderer.invoke('master:create',      basePath, folderName),
+  scanMasterEvents:         (masterPath)             => ipcRenderer.invoke('master:scanEvents',   masterPath),
 
   // ── Settings (persisted preferences) ──
   getArchiveRootSetting:    ()                       => ipcRenderer.invoke('settings:getArchiveRoot'),

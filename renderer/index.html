@@ -2086,7 +2086,76 @@
 
 /* ── Location display row ─────────────────────────────────────────────────── */
 
-.ec-location-display {
+    /* ── M3: Event list (Step 2 entry with existing events) ── */
+    .ec-evl-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .ec-evl-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
+    }
+    .ec-evl-item:hover {
+      border-color: var(--blue);
+      background: var(--surface2);
+    }
+    .ec-evl-item:focus {
+      outline: 2px solid var(--blue);
+      outline-offset: 1px;
+    }
+    .ec-evl-item:active { transform: translateY(1px); }
+    .ec-evl-item.ec-evl-disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+    .ec-evl-seq {
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      color: var(--blue);
+      background: var(--blue-dim);
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      min-width: 34px;
+      text-align: center;
+    }
+    .ec-evl-meta {
+      flex: 1;
+      min-width: 0;
+    }
+    .ec-evl-name {
+      font-size: 0.85rem;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .ec-evl-date {
+      font-size: 0.72rem;
+      color: var(--subtext);
+      margin-top: 2px;
+    }
+    .ec-evl-warn {
+      color: var(--yellow);
+      font-size: 1rem;
+      margin-left: 6px;
+      cursor: help;
+    }
+    .ec-evl-warn-text {
+      color: var(--yellow);
+    }
+
+    .ec-location-display {
   display: flex;
   align-items: center;
   gap: 8px;

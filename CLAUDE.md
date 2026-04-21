@@ -276,6 +276,9 @@ Catppuccin Mocha dark theme. CSS variables in `:root`:
 - [x] M1: sessionArchiveRoot persists across resets within a session; Change Location link re-opens picker; activeMaster = { name, path }
 - [x] G1: archiveRoot persisted to `userData/settings.json` — auto-migrates on first master creation / change-location. Primed into EventCreator at startup so Location row appears without re-prompting on subsequent launches.
 - [x] M2: Select Existing Master picker defaults to `sessionArchiveRoot` (soft nudge; user can still navigate elsewhere). Validation is accessibility-only — no naming or structure checks.
+- [x] M3: Event scanner — `master:scanEvents` IPC + `master:chooseExisting` flow lists existing event folders on disk, sorted (hijriDate desc, sequence desc). Unresolved/unparseable folders grouped below with ⚠ badges.
+- [x] M4: Event name parser (`main/eventNameParser.js`) — deterministic token classification per locked spec. CITY highest priority; unknown tokens → EVENT_TYPE with `isUnresolved:true`; parse fails ONLY on invalid prefix or no CITY. Pure function, no I/O.
+- [x] M5: View-existing mode — clicking an existing event in the list rehydrates components into the Step-2 form (view-only for now; editing unlocks in M6). "Back to list" preserves scan cache; "Viewing Existing Event" badge; view-lock disables every dropdown + chip-remove + Add Component.
 
 ---
 
