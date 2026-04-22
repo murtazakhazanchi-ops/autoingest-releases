@@ -2479,6 +2479,71 @@
     }
     .gpm-cancel:hover { border-color: var(--blue); color: var(--blue); }
 
+    /* ── G4: missing sub-event / unassigned / dup-sub-event modals ─────────── */
+    #missingSubEventOverlay, #unassignedOverlay, #dupSubEventOverlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.65); z-index: 200;
+      align-items: center; justify-content: center;
+    }
+    #missingSubEventOverlay.visible,
+    #unassignedOverlay.visible,
+    #dupSubEventOverlay.visible { display: flex; }
+    .dupWarningModal {
+      background: var(--surface); border-radius: 14px; padding: 28px 28px 24px;
+      width: min(480px, 90vw); box-shadow: 0 12px 48px rgba(0,0,0,.5);
+      border: 1px solid var(--border);
+    }
+    .dupWarningModal h3 { font-size: 1rem; font-weight: 700; text-align: center; }
+
+    /* ── G5: event import confirmation modal ────────────────────────────────── */
+    #eventImportOverlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.65); z-index: 201;
+      align-items: center; justify-content: center;
+    }
+    #eventImportOverlay.visible { display: flex; }
+    #eventImportModal {
+      background: var(--surface); border-radius: 14px; padding: 28px 28px 24px;
+      width: min(520px, 94vw); box-shadow: 0 12px 48px rgba(0,0,0,.5);
+      border: 1px solid var(--border); max-height: 88vh; overflow-y: auto;
+    }
+    #eventImportModal h3 { font-size: 1rem; font-weight: 700; margin: 0 0 16px; text-align: center; }
+    .ei-event-name {
+      background: var(--surface2); border-radius: 8px; padding: 8px 12px;
+      font-size: 0.8rem; font-family: 'SF Mono','Fira Code',monospace;
+      color: var(--blue); margin-bottom: 18px; word-break: break-all;
+    }
+    .ei-field-row { margin-bottom: 14px; }
+    .ei-label {
+      font-size: 0.73rem; font-weight: 600; color: var(--subtext);
+      text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px;
+    }
+    .ei-required { color: var(--red); }
+    #eiMappingSection { margin-bottom: 14px; }
+    .ei-map-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 8px; border-radius: 7px;
+      background: var(--surface2); margin-bottom: 5px;
+      font-size: 0.78rem;
+    }
+    .ei-map-group {
+      padding: 2px 8px; border-radius: 5px; font-weight: 700; font-size: 0.72rem;
+      flex-shrink: 0;
+    }
+    .ei-map-arrow { color: var(--subtext); flex-shrink: 0; }
+    .ei-map-sub { flex: 1; font-size: 0.78rem; color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ei-map-count { font-size: 0.7rem; color: var(--subtext); flex-shrink: 0; }
+    #eiFileSummary {
+      font-size: 0.78rem; color: var(--subtext); text-align: center;
+      margin: 6px 0 18px;
+    }
+    .ei-actions {
+      display: flex; gap: 10px; justify-content: flex-end;
+    }
+    #eiImportBtn { background: var(--green); color: var(--bg); font-weight: 700; }
+    #eiImportBtn:not([disabled]):hover { background: #b9f0b4; }
+    #eiImportBtn[disabled] { opacity: 0.4; cursor: not-allowed; }
+
   </style>
 </head>
 <body>
@@ -2876,6 +2941,70 @@
   <div id="groupPickerModal">
     <div class="gpm-box" id="gpmBox">
       <!-- populated by showGroupPickerModal() -->
+    </div>
+  </div>
+
+  <!-- G4: Missing sub-event (blocking) -->
+  <div id="missingSubEventOverlay">
+    <div id="missingSubEventModal" class="dupWarningModal">
+      <div class="dup-icon">⛔</div>
+      <h3>Sub-event Required</h3>
+      <p class="dup-subtitle">All groups must have a sub-event assigned before importing. Open the Group panel and assign a sub-event to each group.</p>
+      <div class="dup-actions">
+        <button id="missingSubEventOkBtn" class="dup-btn dup-btn-primary">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- G4: Unassigned files warning (non-blocking) -->
+  <div id="unassignedOverlay">
+    <div id="unassignedModal" class="dupWarningModal">
+      <div class="dup-icon">⚠️</div>
+      <h3>Unassigned Files</h3>
+      <p class="dup-subtitle"><strong id="unassignedCount">0</strong> selected file(s) are not assigned to any group and will <em>not</em> be imported.</p>
+      <div class="dup-actions">
+        <button id="unassignedContinueBtn" class="dup-btn dup-btn-primary">Continue anyway</button>
+        <button id="unassignedCancelBtn" class="dup-btn dup-btn-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- G4: Duplicate sub-event warning (non-blocking) -->
+  <div id="dupSubEventOverlay">
+    <div id="dupSubEventModal" class="dupWarningModal">
+      <div class="dup-icon">⚠️</div>
+      <h3>Duplicate Sub-event Mapping</h3>
+      <p class="dup-subtitle">Multiple groups point to the same sub-event. Files from both groups will go into the same folder.</p>
+      <div id="dupSubEventList"></div>
+      <div class="dup-actions">
+        <button id="dupSubEventContinueBtn" class="dup-btn dup-btn-primary">Continue anyway</button>
+        <button id="dupSubEventCancelBtn" class="dup-btn dup-btn-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- G5: Event import confirmation -->
+  <div id="eventImportOverlay">
+    <div id="eventImportModal">
+      <h3>Confirm Event Import</h3>
+      <div class="ei-event-name" id="eiEventName"></div>
+
+      <div class="ei-field-row">
+        <div class="ei-label">Photographer <span class="ei-required">*</span></div>
+        <div id="eiPhotographerContainer"></div>
+      </div>
+
+      <div id="eiMappingSection">
+        <div class="ei-label">Group assignments</div>
+        <div id="eiMappingTable"></div>
+      </div>
+
+      <div id="eiFileSummary"></div>
+
+      <div class="ei-actions">
+        <button id="eiCancelBtn" class="dup-btn dup-btn-cancel">Cancel</button>
+        <button id="eiImportBtn" class="dup-btn" disabled>Import →</button>
+      </div>
     </div>
   </div>
 

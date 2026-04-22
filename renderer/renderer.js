@@ -2051,8 +2051,12 @@ function updateSelectionBar() {
   document.getElementById('clearSelBtn').disabled  = n === 0;
 
   const importBtn = document.getElementById('importBtn');
-  importBtn.classList.toggle('visible', n > 0);
-  importBtn.disabled = n === 0 || importRunning;
+  // In event mode, the Import button is also shown when groups have files (even if nothing is selected).
+  const hasGroupedFiles = railMode === 'event' && GroupManager.hasGroups();
+  const canImport = n > 0 || hasGroupedFiles;
+  importBtn.classList.toggle('visible', canImport);
+  importBtn.disabled = !canImport || importRunning;
+  importBtn.textContent = hasGroupedFiles ? '⬇ Import Groups' : '⬇ Import Selected';
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -2473,7 +2477,63 @@ window.api.onChecksumComplete(({ failed }) => {
 
 
 document.getElementById('importBtn').addEventListener('click', async () => {
-  if (!selectedFiles.size || !destPath || importRunning) return;
+  if (importRunning) return;
+
+  const eventData     = EventCreator.getActiveEventData();
+  const isEventImport = railMode === 'event' && eventData !== null && GroupManager.hasGroups();
+
+  // ── Event Import path (G4 + G5) ──────────────────────────────────────────
+  if (isEventImport) {
+    const groups = GroupManager.getGroups();
+
+    // G4-1: Blocking — groups with no sub-event in a multi-component event.
+    if (eventData.event.components.length > 1 && GroupManager.hasMissingSubEvents()) {
+      await showMissingSubEventModal();
+      return;
+    }
+
+    // G4-2: Non-blocking — selected files not assigned to any group.
+    const unassigned = GroupManager.getUnassignedFiles([...selectedFiles]);
+    if (unassigned.length > 0) {
+      const proceed = await showUnassignedWarningModal(unassigned.length);
+      if (!proceed) return;
+    }
+
+    // G4-3: Non-blocking — multiple groups mapped to the same sub-event.
+    const dupSubs = GroupManager.getDuplicateSubEvents();
+    if (dupSubs.length > 0) {
+      const proceed = await showDupSubEventModal(dupSubs);
+      if (!proceed) return;
+    }
+
+    // G5: Confirmation screen — photographer + mapping summary.
+    const photographer = await showEventImportConfirmModal(groups, eventData);
+    if (!photographer) return; // user cancelled
+
+    const { fileJobs } = ImportRouter.buildFileJobs({ groups, eventData, photographer });
+    if (fileJobs.length === 0) { showMessage('No files to import.'); return; }
+
+    importRunning = true;
+    updateSelectionBar();
+    showProgress();
+
+    try {
+      const summary = await window.api.importFileJobs(fileJobs);
+      if (!activeDrive) return;
+      showProgressSummary(summary);
+      await refreshDestCache();
+      try { globalImportIndex = await window.api.getImportIndex() || {}; } catch { /* non-critical */ }
+    } catch (err) {
+      document.getElementById('progressFilename').textContent = `Error: ${err.message}`;
+      document.getElementById('progressDoneBtn').classList.add('visible');
+    } finally {
+      importRunning = false;
+    }
+    return;
+  }
+
+  // ── Quick Import path (legacy) ────────────────────────────────────────────
+  if (!selectedFiles.size || !destPath) return;
   let filePaths = [...selectedFiles];
 
   const { duplicates, clean } = detectDuplicates(filePaths);
@@ -2492,7 +2552,6 @@ document.getElementById('importBtn').addEventListener('click', async () => {
     const summary = await window.api.importFiles(filePaths, destPath);
     if (!activeDrive) return; // Patch 36: card was disconnected mid-import; reset already ran
     showProgressSummary(summary);
-    // Refresh both caches after import so badges survive a destination change
     await refreshDestCache();
     try { globalImportIndex = await window.api.getImportIndex() || {}; } catch { /* non-critical */ }
   } catch (err) {
@@ -2502,6 +2561,143 @@ document.getElementById('importBtn').addEventListener('click', async () => {
     importRunning = false;
   }
 });
+
+// ════════════════════════════════════════════════════════════════
+// G4: PRE-IMPORT VALIDATION MODALS
+// ════════════════════════════════════════════════════════════════
+
+function showMissingSubEventModal() {
+  return new Promise(resolve => {
+    const overlay = document.getElementById('missingSubEventOverlay');
+    overlay.classList.add('visible');
+    const btn = document.getElementById('missingSubEventOkBtn');
+    function onOk() {
+      overlay.classList.remove('visible');
+      btn.removeEventListener('click', onOk);
+      resolve();
+    }
+    btn.addEventListener('click', onOk, { once: true });
+  });
+}
+
+function showUnassignedWarningModal(count) {
+  return new Promise(resolve => {
+    const overlay = document.getElementById('unassignedOverlay');
+    document.getElementById('unassignedCount').textContent = count;
+    overlay.classList.add('visible');
+
+    function close(result) {
+      overlay.classList.remove('visible');
+      document.getElementById('unassignedContinueBtn').removeEventListener('click', onContinue);
+      document.getElementById('unassignedCancelBtn').removeEventListener('click', onCancel);
+      resolve(result);
+    }
+    const onContinue = () => close(true);
+    const onCancel   = () => close(false);
+    document.getElementById('unassignedContinueBtn').addEventListener('click', onContinue, { once: true });
+    document.getElementById('unassignedCancelBtn').addEventListener('click', onCancel,   { once: true });
+  });
+}
+
+function showDupSubEventModal(dupSubEvents) {
+  return new Promise(resolve => {
+    const overlay = document.getElementById('dupSubEventOverlay');
+    const list    = document.getElementById('dupSubEventList');
+    list.innerHTML = dupSubEvents.map(id =>
+      `<div class="dup-file-row">↩ ${_esc(id)}</div>`
+    ).join('');
+    overlay.classList.add('visible');
+
+    function close(result) {
+      overlay.classList.remove('visible');
+      document.getElementById('dupSubEventContinueBtn').removeEventListener('click', onContinue);
+      document.getElementById('dupSubEventCancelBtn').removeEventListener('click', onCancel);
+      resolve(result);
+    }
+    const onContinue = () => close(true);
+    const onCancel   = () => close(false);
+    document.getElementById('dupSubEventContinueBtn').addEventListener('click', onContinue, { once: true });
+    document.getElementById('dupSubEventCancelBtn').addEventListener('click', onCancel,   { once: true });
+  });
+}
+
+// ════════════════════════════════════════════════════════════════
+// G5: EVENT IMPORT CONFIRMATION MODAL
+// ════════════════════════════════════════════════════════════════
+
+let _eiPhotographerDD = null;
+
+/**
+ * Opens the event import confirmation modal.
+ * @returns {Promise<string|null>} Photographer name, or null if cancelled.
+ */
+function showEventImportConfirmModal(groups, eventData) {
+  return new Promise(resolve => {
+    const overlay   = document.getElementById('eventImportOverlay');
+    const importBtn = document.getElementById('eiImportBtn');
+
+    // Event name
+    document.getElementById('eiEventName').textContent = eventData.event.name;
+
+    // Photographer dropdown
+    const container = document.getElementById('eiPhotographerContainer');
+    container.innerHTML = '';
+    if (_eiPhotographerDD) { _eiPhotographerDD.destroy(); _eiPhotographerDD = null; }
+
+    importBtn.disabled = true;
+    _eiPhotographerDD = new TreeAutocomplete({
+      container,
+      type:        'photographers',
+      placeholder: 'Search photographer…',
+      onSelect:    ({ label }) => { importBtn.disabled = !label?.trim(); },
+    });
+
+    // Group → sub-event mapping table (multi-component events only)
+    const isMulti         = eventData.event.components.length > 1;
+    const mappingSection  = document.getElementById('eiMappingSection');
+    const mappingTable    = document.getElementById('eiMappingTable');
+    if (isMulti) {
+      mappingSection.style.display = '';
+      mappingTable.innerHTML = groups.map(g => {
+        const { bg, fg } = GroupManager.getColor(g.colorIdx);
+        const count      = g.files.size;
+        return `<div class="ei-map-row">
+          <span class="ei-map-group" style="background:${bg};color:${fg}">${_esc(g.label)}</span>
+          <span class="ei-map-arrow">→</span>
+          <span class="ei-map-sub">${_esc(g.subEventId || '—')}</span>
+          <span class="ei-map-count">${count} file${count !== 1 ? 's' : ''}</span>
+        </div>`;
+      }).join('');
+    } else {
+      mappingSection.style.display = 'none';
+    }
+
+    // File count summary
+    const total = groups.reduce((s, g) => s + g.files.size, 0);
+    document.getElementById('eiFileSummary').textContent =
+      `${total} file${total !== 1 ? 's' : ''} will be imported`;
+
+    overlay.classList.add('visible');
+
+    function close(result) {
+      overlay.classList.remove('visible');
+      document.getElementById('eiCancelBtn').removeEventListener('click', onCancel);
+      importBtn.removeEventListener('click', onImport);
+      if (_eiPhotographerDD) { _eiPhotographerDD.destroy(); _eiPhotographerDD = null; }
+      resolve(result);
+    }
+
+    function onCancel() { close(null); }
+    function onImport() {
+      const val = _eiPhotographerDD?.getValue();
+      if (!val?.label?.trim()) return;
+      close(val.label.trim());
+    }
+
+    document.getElementById('eiCancelBtn').addEventListener('click', onCancel, { once: true });
+    importBtn.addEventListener('click', onImport, { once: true });
+  });
+}
 
 document.getElementById('progressPauseBtn').addEventListener('click', () => {
   window.api.pauseCopy();
