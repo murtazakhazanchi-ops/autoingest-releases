@@ -24,13 +24,12 @@ const GroupManager = (() => {
 
   let _groups       = [];          // Group[]
   let _fileGroupMap = new Map();   // filePath → groupId
-  let _nextId       = 1;
   let _activeTabId  = null;
 
   // ── CRUD ───────────────────────────────────────────────────────────────────
 
   function createGroup() {
-    const id       = _nextId++;
+    const id       = _groups.length + 1;
     const colorIdx = _groups.length % COLORS.length;
     _groups.push({ id, label: `G${id}`, colorIdx, files: new Set(), subEventId: null });
     _activeTabId = id;
@@ -42,6 +41,18 @@ const GroupManager = (() => {
     if (!g) return;
     for (const p of g.files) _fileGroupMap.delete(p);
     _groups = _groups.filter(x => x.id !== id);
+
+    // Renumber remaining groups sequentially from 1
+    _groups.forEach((group, idx) => {
+      const newId = idx + 1;
+      if (group.id !== newId) {
+        for (const p of group.files) _fileGroupMap.set(p, newId);
+        if (_activeTabId === group.id) _activeTabId = newId;
+        group.id    = newId;
+        group.label = `G${newId}`;
+      }
+    });
+
     if (_activeTabId === id)
       _activeTabId = _groups.length ? _groups[_groups.length - 1].id : null;
   }
@@ -49,37 +60,41 @@ const GroupManager = (() => {
   function assignFiles(paths, groupId) {
     const g = _groups.find(x => x.id === groupId);
     if (!g) return;
+    // Collect emptied source groups as object refs — defer removal until after the
+    // full loop so mid-loop renumbering can't corrupt subsequent _fileGroupMap writes.
+    const toRemove = [];
     for (const path of paths) {
       const old = _fileGroupMap.get(path);
-      if (old !== undefined && old !== groupId) {
+      if (old !== undefined && old !== g.id) {
         const og = _groups.find(x => x.id === old);
         if (og) {
           og.files.delete(path);
-          // auto-remove now-empty groups (except the target group mid-assign)
-          if (og.files.size === 0) removeGroup(og.id);
+          if (og.files.size === 0 && !toRemove.includes(og)) toRemove.push(og);
         }
       }
       g.files.add(path);
-      _fileGroupMap.set(path, groupId);
+      _fileGroupMap.set(path, g.id); // use g.id — stays correct if g is renumbered later
     }
-    _activeTabId = groupId;
+    // Remove empty source groups; renumbering updates g.id via object ref so
+    // _activeTabId = g.id below always reflects the final id.
+    for (const og of toRemove) removeGroup(og.id);
+    _activeTabId = g.id;
   }
 
   function unassignFiles(paths) {
-    // Collect groups that may become empty after unassignment
-    const affectedIds = new Set();
+    const toRemove = [];
     for (const path of paths) {
       const gid = _fileGroupMap.get(path);
       if (gid === undefined) continue;
       const g = _groups.find(x => x.id === gid);
-      if (g) { g.files.delete(path); affectedIds.add(gid); }
+      if (g) {
+        g.files.delete(path);
+        if (g.files.size === 0 && !toRemove.includes(g)) toRemove.push(g);
+      }
       _fileGroupMap.delete(path);
     }
-    // Auto-remove groups that are now empty
-    for (const gid of affectedIds) {
-      const g = _groups.find(x => x.id === gid);
-      if (g && g.files.size === 0) removeGroup(gid);
-    }
+    // Remove empty groups after the full loop; renumbering propagates through object refs.
+    for (const g of toRemove) removeGroup(g.id);
   }
 
   // ── Queries ────────────────────────────────────────────────────────────────
@@ -132,7 +147,7 @@ const GroupManager = (() => {
   // ── Reset ──────────────────────────────────────────────────────────────────
 
   function reset() {
-    _groups = []; _fileGroupMap = new Map(); _nextId = 1; _activeTabId = null;
+    _groups = []; _fileGroupMap = new Map(); _activeTabId = null;
   }
 
   // ── Public API ─────────────────────────────────────────────────────────────

@@ -95,7 +95,6 @@ let viewMode         = 'icon';
 let lastClickedPath  = null;
 let fileLoadRequestId = 0;
 let _draggedPaths    = [];          // paths being dragged from the file grid
-let _isDragging      = false;       // true while a tile drag is in progress
 let showThumbnails    = true;
 let isScrolling       = false;
 let isShuttingDown    = false;  // true while eject is in progress — blocks all new thumb I/O
@@ -1734,13 +1733,13 @@ function buildIconTilesHtml(files, enablePairing = false) {
     return `<div class="${tileCls}" data-path="${escapeHtml(file.path)}" data-size="${file.size}" data-base="${escapeHtml(base)}" draggable="true">
       <input type="checkbox" ${checked ? 'checked' : ''} data-path="${escapeHtml(file.path)}" />
       ${dupBadge}
-      ${grpBadge}
       <div class="file-thumb">${thumbHtml(file)}</div>
       <div class="file-meta">
         <div class="file-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</div>
         <div class="file-details">
           <span class="file-ext-badge ${badgeCls}">${extUp}</span>
           <span class="file-size">${formatSize(file.size)}</span>
+          ${grpBadge}
         </div>
         <div class="file-date">${formatDate(file.modifiedAt)}</div>
       </div>
@@ -1895,6 +1894,33 @@ document.getElementById('fileGrid').addEventListener('change', e => {
 // buildListRowsHtml. Drag all currently-selected files when the dragged tile
 // is inside the selection; otherwise drag only the single tile.
 
+function _buildDragGhost(paths) {
+  const ghost = document.createElement('div');
+  ghost.className = 'drag-ghost';
+
+  // Try to reuse the thumbnail from the first tile in tileMap
+  const firstTile = tileMap.get(paths[0]);
+  const firstImg  = firstTile?.querySelector('img');
+  const thumbHtml = (firstImg && firstImg.src && firstImg.src.startsWith('file://'))
+    ? `<div class="drag-ghost-thumb"><img src="${firstImg.src}" alt="" draggable="false"></div>`
+    : `<div class="drag-ghost-thumb"><svg width="12" height="14" viewBox="0 0 12 14" fill="none">
+        <rect x="1" y="1" width="10" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/>
+        <line x1="3" y1="5" x2="9" y2="5" stroke="currentColor" stroke-width="1"/>
+        <line x1="3" y1="7.5" x2="9" y2="7.5" stroke="currentColor" stroke-width="1"/>
+        <line x1="3" y1="10" x2="7" y2="10" stroke="currentColor" stroke-width="1"/>
+      </svg></div>`;
+
+  const label     = paths.length === 1 ? '1 file' : `${paths.length} files`;
+  const badgeHtml = paths.length > 1
+    ? `<span class="drag-ghost-badge">${paths.length}</span>`
+    : '';
+
+  ghost.innerHTML = `${thumbHtml}<span>${label}</span>${badgeHtml}`;
+  ghost.style.cssText = 'position:fixed;top:-1000px;left:-1000px;pointer-events:none;z-index:9999;';
+  document.body.appendChild(ghost);
+  return ghost;
+}
+
 document.getElementById('fileGrid').addEventListener('dragstart', e => {
   const tile = e.target.closest('.file-tile[data-path]');
   if (!tile) { e.preventDefault(); return; }
@@ -1902,19 +1928,23 @@ document.getElementById('fileGrid').addEventListener('dragstart', e => {
   _draggedPaths = selectedFiles.has(path) ? [...selectedFiles] : [path];
   e.dataTransfer.effectAllowed = 'move';
   e.dataTransfer.setData('text/plain', String(_draggedPaths.length));
+
+  // Custom drag image — ghost offset (0,0) puts top-left at cursor, ghost appears below-right
+  const ghost = _buildDragGhost(_draggedPaths);
+  e.dataTransfer.setDragImage(ghost, 0, 0);
+  setTimeout(() => { ghost.parentNode?.removeChild(ghost); }, 0);
+
   for (const p of _draggedPaths) tileMap.get(p)?.classList.add('dragging');
-  _isDragging = true;
-  renderGroupPanel(); // shows drag-empty-state when no groups exist yet
 });
 
 document.getElementById('fileGrid').addEventListener('dragend', () => {
   for (const p of _draggedPaths) tileMap.get(p)?.classList.remove('dragging');
   _draggedPaths = [];
-  _isDragging   = false;
   const panel = document.getElementById('groupPanel');
   panel.classList.remove('gp-drop-over');
   panel.querySelectorAll('.gp-tab').forEach(t => t.classList.remove('gp-drop-tab'));
-  renderGroupPanel(); // hides drag-empty-state if no groups remain
+  const hint = document.getElementById('gpDragHint');
+  if (hint) hint.classList.remove('visible');
 });
 
 // ════════════════════════════════════════════════════════════════
@@ -3358,13 +3388,8 @@ function renderGroupPanel() {
   if (!panel) return;
 
   if (!GroupManager.hasGroups()) {
-    if (_isDragging) {
-      panel.classList.add('visible');
-      panel.innerHTML = '<div class="gp-drop-empty">Drop here to create a group</div>';
-    } else {
-      panel.classList.remove('visible');
-      panel.innerHTML = '';
-    }
+    panel.classList.remove('visible');
+    panel.innerHTML = '';
     return;
   }
   panel.classList.add('visible');
@@ -3376,7 +3401,6 @@ function renderGroupPanel() {
   // subNames: { id: string, name: string }[] — empty for single-component / no event
   const subNames  = EventCreator.getSubEventNames();
 
-  // Tabs — no "+ New" button; groups are only created via context menu / Cmd+G
   const tabsHtml = groups.map(g => {
     const c   = GroupManager.getColor(g.colorIdx);
     const act = g.id === active.id;
@@ -3385,6 +3409,7 @@ function renderGroupPanel() {
       <span class="gp-tab-dot" style="background:${c.bg}"></span>${_esc(g.label)}<span class="gp-tab-cnt">${g.files.size}</span>
     </button>`;
   }).join('');
+  const newGroupTabHtml = `<button class="gp-tab gp-new-group-tab" title="Create new group">＋ New</button>`;
 
   // Sub-event mapping row (only for multi-component events)
   let subHtml = '';
@@ -3416,7 +3441,8 @@ function renderGroupPanel() {
 
   panel.innerHTML = `
     <div class="gp-header">Groups</div>
-    <div class="gp-tabs">${tabsHtml}</div>
+    <div class="gp-tabs">${tabsHtml}${newGroupTabHtml}</div>
+    <div class="gp-drag-hint" id="gpDragHint"></div>
     <div class="gp-active-label" style="border-left-color:${col.bg}">${_esc(active.label)}</div>
     ${subHtml}
     <div class="gp-file-list">${filesHtml}</div>
@@ -3429,6 +3455,10 @@ function renderGroupPanel() {
       GroupManager.setActiveTabId(Number(btn.dataset.gid));
       renderGroupPanel();
     });
+  });
+  panel.querySelector('.gp-new-group-tab')?.addEventListener('click', () => {
+    GroupManager.createGroup();
+    renderGroupPanel();
   });
   document.getElementById('gpSubSel')?.addEventListener('change', e => {
     // val is the subEventId string (folder name) or '' to unmap
@@ -3526,73 +3556,79 @@ document.addEventListener('click', e => {
 }, true);
 document.addEventListener('scroll', _hideCtxMenu, true);
 
-// ── Cmd+G / Ctrl+G — group picker modal ───────────────────────────────────
+// ── Cmd/Ctrl+G → digit chord — group assignment ───────────────────────────
+// Phase 1: Cmd+G starts a 500ms window + shows "Assign to group…" toast.
+// Phase 2: digit 1–9 completes it, shows "Assigned to G{n}" for 1.2s.
+// Guards: no-op when focus is inside an input/select/textarea.
+// After assignment, selected files are auto-deselected.
+
+let _gChordActive    = false;
+let _gChordTimer     = null;
+let _chordToastTimer = null;
+
+function _showChordToast(text, variant) {
+  const el = document.getElementById('gpChordToast');
+  if (!el) return;
+  clearTimeout(_chordToastTimer);
+  el.textContent = text;
+  el.className   = variant ? `active ${variant}` : 'active';
+}
+function _hideChordToast(delayMs) {
+  _chordToastTimer = setTimeout(() => {
+    const el = document.getElementById('gpChordToast');
+    if (el) el.className = '';
+  }, delayMs ?? 0);
+}
 
 document.addEventListener('keydown', e => {
-  if (!((e.metaKey || e.ctrlKey) && e.key === 'g')) return;
+  // Never intercept when the user is typing in a form field
+  const tag = document.activeElement?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+  if ((e.metaKey || e.ctrlKey) && e.key === 'g') {
+    e.preventDefault();
+    clearTimeout(_gChordTimer);
+    _gChordActive = true;
+    _gChordTimer  = setTimeout(() => {
+      _gChordActive = false;
+      _hideChordToast(0);
+    }, 500);
+    if (selectedFiles.size > 0) _showChordToast('Assign to group…');
+    return;
+  }
+
+  if (!_gChordActive) return;
+  const n = parseInt(e.key, 10);
+  if (isNaN(n) || n < 1 || n > 9) return;
+
   e.preventDefault();
-  if (selectedFiles.size === 0) return;
-  _showGroupPickerModal();
+  clearTimeout(_gChordTimer);
+  _gChordActive = false;
+
+  if (selectedFiles.size === 0) { _hideChordToast(0); return; }
+
+  const existing = GroupManager.getGroups().find(g => g.id === n);
+  const gid      = existing ? existing.id : GroupManager.createGroup();
+  GroupManager.assignFiles([...selectedFiles], gid);
+
+  // Auto-deselect — no renderFileArea(), just tile class sync
+  selectedFiles.clear();
+  syncAllTiles();
+  syncAllGroupBadges();
+  renderGroupPanel();
+
+  _showChordToast(`Assigned to G${gid}`, 'success');
+  _hideChordToast(1200);
 });
-
-function _showGroupPickerModal() {
-  const overlay = document.getElementById('groupPickerModal');
-  const box     = document.getElementById('gpmBox');
-  if (!overlay || !box) return;
-
-  const groups   = GroupManager.getGroups();
-  const selCount = selectedFiles.size;
-
-  let html = `<div class="gpm-title">Assign ${selCount} file${selCount !== 1 ? 's' : ''} to Group</div>
-  <div class="gpm-grid">`;
-
-  groups.forEach(g => {
-    const c = GroupManager.getColor(g.colorIdx);
-    html += `<button class="gpm-btn" data-gid="${g.id}" style="background:${c.bg};color:${c.fg}">
-      ${_esc(g.label)}<br><span class="gpm-count">${g.files.size} file${g.files.size !== 1 ? 's' : ''}</span>
-    </button>`;
-  });
-
-  html += `<button class="gpm-btn gpm-btn-new" data-gid="new">
-    <span style="font-size:1.1em">＋</span><br><span class="gpm-count">New Group</span>
-  </button></div>
-  <button class="gpm-cancel" id="gpmCancel">Cancel  (Esc)</button>`;
-
-  box.innerHTML = html;
-  overlay.style.display = 'flex';
-
-  const close = () => { overlay.style.display = 'none'; };
-
-  box.querySelectorAll('.gpm-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const paths = [...selectedFiles];
-      let gid;
-      if (btn.dataset.gid === 'new') {
-        gid = GroupManager.createGroup();
-      } else {
-        gid = Number(btn.dataset.gid);
-      }
-      GroupManager.assignFiles(paths, gid);
-      syncAllGroupBadges();
-      renderGroupPanel();
-      close();
-    });
-  });
-
-  document.getElementById('gpmCancel')?.addEventListener('click', close);
-  overlay.addEventListener('mousedown', e => { if (e.target === overlay) close(); });
-
-  const onEsc = e => { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onEsc); } };
-  document.addEventListener('keydown', onEsc);
-}
 
 // ── Drag-and-drop: drop target (group panel) ─────────────────────────────────
 // Attached once to the stable #groupPanel element — not re-attached inside
 // renderGroupPanel() which rebuilds innerHTML. Tab targets are resolved via
 // event delegation (e.target.closest('.gp-tab[data-gid]')).
 //
-//   Drop on .gp-tab  → assign dragged files to that group
-//   Drop on panel body → create a new group and assign dragged files to it
+//   Drop on .gp-tab[data-gid]  → assign dragged files to that group
+//   Drop on .gp-new-group-tab  → create new group and assign dragged files
+//   Drop on panel body          → assign to active group (never creates)
 
 (function _wireGroupPanelDrop() {
   const panel = document.getElementById('groupPanel');
@@ -3602,38 +3638,63 @@ function _showGroupPickerModal() {
     if (!_draggedPaths.length) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    const tab = e.target.closest('.gp-tab[data-gid]');
+
+    const hint   = document.getElementById('gpDragHint');
+    const newTab = e.target.closest('.gp-new-group-tab');
+    const tab    = !newTab && e.target.closest('.gp-tab[data-gid]');
+
     panel.querySelectorAll('.gp-tab').forEach(t => t.classList.remove('gp-drop-tab'));
-    if (tab) {
+    panel.classList.remove('gp-drop-over');
+
+    if (newTab) {
+      newTab.classList.add('gp-drop-tab');
+      if (hint) { hint.textContent = 'Drop to create new group'; hint.classList.add('visible'); }
+    } else if (tab) {
       tab.classList.add('gp-drop-tab');
-      panel.classList.remove('gp-drop-over');
+      if (hint) hint.classList.remove('visible');
     } else {
       panel.classList.add('gp-drop-over');
+      const groups   = GroupManager.getGroups();
+      const activeId = GroupManager.getActiveTabId() ?? groups[0]?.id;
+      if (hint) { hint.textContent = `Drop to assign to G${activeId}`; hint.classList.add('visible'); }
     }
   });
 
   panel.addEventListener('dragleave', e => {
-    // Only clear highlights when the cursor actually leaves the panel boundary
     if (panel.contains(e.relatedTarget)) return;
     panel.classList.remove('gp-drop-over');
     panel.querySelectorAll('.gp-tab').forEach(t => t.classList.remove('gp-drop-tab'));
+    const hint = document.getElementById('gpDragHint');
+    if (hint) hint.classList.remove('visible');
   });
 
   panel.addEventListener('drop', e => {
     e.preventDefault();
     panel.classList.remove('gp-drop-over');
     panel.querySelectorAll('.gp-tab').forEach(t => t.classList.remove('gp-drop-tab'));
+    const hint = document.getElementById('gpDragHint');
+    if (hint) hint.classList.remove('visible');
+
     if (!_draggedPaths.length) return;
-    const paths = [..._draggedPaths];
+    const paths  = [..._draggedPaths];
+    for (const p of _draggedPaths) tileMap.get(p)?.classList.remove('dragging');
     _draggedPaths = [];
-    const tab = e.target.closest('.gp-tab[data-gid]');
-    if (tab) {
-      GroupManager.assignFiles(paths, Number(tab.dataset.gid));
-    } else {
+
+    const newTab = e.target.closest('.gp-new-group-tab');
+    const tab    = !newTab && e.target.closest('.gp-tab[data-gid]');
+
+    if (newTab) {
       const gid = GroupManager.createGroup();
       GroupManager.assignFiles(paths, gid);
+    } else if (tab) {
+      GroupManager.assignFiles(paths, Number(tab.dataset.gid));
+    } else {
+      // Panel body → assign to active group, never create
+      const groups   = GroupManager.getGroups();
+      const activeId = GroupManager.getActiveTabId() ?? groups[0]?.id;
+      if (activeId != null) GroupManager.assignFiles(paths, activeId);
     }
-    syncAllGroupBadges(); // O(n) badge update via tileMap — no renderFileArea()
+    syncAllGroupBadges(); // O(n) via tileMap — no renderFileArea()
     renderGroupPanel();
   });
 })();
