@@ -39,9 +39,10 @@ const EventCreator = (() => {
   //   _viewingExisting: when set, the form starts read-only; M6 edit mode
   //                    can unlock it via _editMode flag.
   let _scannedEvents   = null;
-  let _viewingExisting = null; // { folderName, hijriDate, sequence, isUnresolved } | null
+  let _viewingExisting = null; // { folderName, hijriDate, sequence, isUnresolved, components } | null
   let _editMode        = false; // M6: when true in view-existing mode, form is editable
   let _newEventDate    = null;  // M7: hijri date string for new events ("YYYY-MM-DD"), null when viewing/editing
+  let _navScreen       = 'masterStep'; // 'masterStep' | 'eventList' | 'eventForm' | 'previewStep'
 
   function _makeComp() {
     return { id: ++_compSeq, eventTypes: [], location: null, city: _globalCityVal ? { ..._globalCityVal } : null };
@@ -184,6 +185,7 @@ const EventCreator = (() => {
 
   function showMasterStep() {
     currentStep = 1;
+    _navScreen  = 'masterStep';
     const title = $ecTitle();
     if (title) title.textContent = 'Create Collection';
     syncRailHighlight(1);
@@ -702,6 +704,7 @@ const EventCreator = (() => {
   }
 
   function _renderEventList() {
+    _navScreen = 'eventList';
     const body = $ecBody();
     if (!body) return;
 
@@ -801,10 +804,12 @@ ${unparseable.map(ev => `
     }));
 
     _viewingExisting = {
-      folderName: entry.folderName,
-      hijriDate:  entry.hijriDate,
-      sequence:   entry.sequence,
+      folderName:   entry.folderName,
+      hijriDate:    entry.hijriDate,
+      sequence:     entry.sequence,
       isUnresolved: entry.isUnresolved,
+      // Snapshot of parsed components — source of truth for _selectExistingForImport.
+      components:   _eventComps.map(c => ({ ...c, eventTypes: [...c.eventTypes] })),
     };
 
     _renderEventForm();
@@ -814,6 +819,7 @@ ${unparseable.map(ev => `
   // scan path (after choosing "Create New Event") and the view-existing path
   // reach the same builder.
   function _renderEventForm() {
+    _navScreen = 'eventForm';
     if (_eventComps.length === 0) _eventComps = [_makeComp()];
 
     const body = $ecBody();
@@ -870,17 +876,21 @@ ${unparseable.map(ev => `
     if (addBtn) addBtn.style.display = locked ? 'none' : '';
     body.querySelectorAll('.ec-comp-remove').forEach(btn => btn.style.display = locked ? 'none' : '');
 
-    // Update the Continue button to reflect view / edit mode.
-    const cont = document.getElementById('ecEventContinue');
+    // Update the action button(s) to reflect view / edit mode.
+    const cont    = document.getElementById('ecEventContinue');
+    const editBtn = document.getElementById('ecEventEdit');
     if (cont) {
       if (_editMode) {
-        cont.textContent = 'Save Changes →';
+        cont.textContent = 'Save and Select Event →';
         cont.className   = 'ec-continue-btn';
         cont.disabled    = false;
+        if (editBtn) editBtn.style.display = 'none';
       } else {
-        cont.textContent = 'Edit Event';
-        cont.className   = 'ec-outline-btn';
+        // View mode: primary = "Select for Import →", secondary = "Edit Event"
+        cont.textContent = 'Select for Import →';
+        cont.className   = 'ec-continue-btn';
         cont.disabled    = false;
+        if (editBtn) editBtn.style.display = '';
       }
     }
 
@@ -909,13 +919,16 @@ ${unparseable.map(ev => `
     const newName = `${_viewingExisting.hijriDate} _${_viewingExisting.sequence}-${parts}`;
     const oldName = _viewingExisting.folderName;
 
-    // If the name hasn't changed, no-op -> back to list.
+    // If the name hasn't changed, skip rename but still select and proceed.
     if (newName === oldName) {
       _editMode = false;
-      _viewingExisting = null;
-      _eventComps = [];
+      _viewingExisting = {
+        ..._viewingExisting,
+        isUnresolved: false,
+        components: _eventComps.map(c => ({ ...c, eventTypes: [...c.eventTypes] })),
+      };
       _destroyEventDDs();
-      _renderEventList();
+      _selectExistingForImport();
       return;
     }
 
@@ -962,10 +975,14 @@ ${unparseable.map(ev => `
     }
 
     _editMode = false;
-    _viewingExisting = null;
-    _eventComps = [];
+    _viewingExisting = {
+      ..._viewingExisting,
+      folderName:   newName,
+      isUnresolved: false,
+      components:   _eventComps.map(c => ({ ...c, eventTypes: [...c.eventTypes] })),
+    };
     _destroyEventDDs();
-    _renderEventList();
+    _selectExistingForImport();
   }
 
   // ── HTML builder ─────────────────────────────────────────────────────────────────────
@@ -1040,7 +1057,12 @@ ${unparseable.map(ev => `
 
   <div id="ecEventError" class="ec-master-error" role="alert" aria-live="polite"></div>
 
-  <button id="ecEventContinue" class="ec-continue-btn" disabled>Create Event →</button>
+  ${_viewingExisting
+    ? `<div class="ec-view-actions">
+         <button id="ecEventEdit" class="ec-outline-btn">Edit Event</button>
+         <button id="ecEventContinue" class="ec-continue-btn">Select for Import →</button>
+       </div>`
+    : `<button id="ecEventContinue" class="ec-continue-btn" disabled>Create Event →</button>`}
 
 </div>`;
   }
@@ -1234,16 +1256,20 @@ ${unparseable.map(ev => `
     document.getElementById('ecEventContinue')
       ?.addEventListener('click', () => {
         if (_viewingExisting && !_editMode) {
-          // M6: enter edit mode.
-          _editMode = true;
-          _applyEditLockState();
-          _updateEventPreview();
+          _selectExistingForImport();
         } else if (_viewingExisting && _editMode) {
           // M6: save edits.
           _handleSaveEditedEvent();
         } else {
           _tryCreateEvent();
         }
+      });
+
+    document.getElementById('ecEventEdit')
+      ?.addEventListener('click', () => {
+        _editMode = true;
+        _applyEditLockState();
+        _updateEventPreview();
       });
   }
 
@@ -1359,6 +1385,25 @@ ${unparseable.map(ev => `
 
   // ── Validate + create ──────────────────────────────────────────────────────
 
+  function _selectExistingForImport() {
+    if (!selectedCollection || !_viewingExisting) return;
+    const coll = sessionCollections.find(c => c.name === selectedCollection);
+    if (!coll) return;
+
+    const eventName   = _viewingExisting.folderName;
+    const existingIdx = coll.events.findIndex(e => e.name === eventName);
+    if (existingIdx >= 0) {
+      _activeEventIdx = existingIdx;
+    } else {
+      coll.events.push({
+        name:       eventName,
+        components: _viewingExisting.components,  // snapshot from disk, not live form state
+      });
+      _activeEventIdx = coll.events.length - 1;
+    }
+    _proceedToPreviewStep();
+  }
+
   function _tryCreateEvent() {
     if (_eventComps.length === 0) {
       _showEventBanner('Add at least one component.', 'error'); return;
@@ -1461,6 +1506,7 @@ ${unparseable.map(ev => `
 
   function showPreviewStep() {
     currentStep = 3;
+    _navScreen  = 'previewStep';
     const title = $ecTitle();
     if (title) title.textContent = 'Event Created';
     syncRailHighlight(3);
@@ -1542,7 +1588,7 @@ ${unparseable.map(ev => `
     });
 
     document.getElementById('ecDoneBtn')?.addEventListener('click', () => {
-      document.getElementById('ecBackBtn')?.click();
+      document.dispatchEvent(new CustomEvent('eventcreator:done'));
     });
   }
 
@@ -1572,6 +1618,7 @@ ${unparseable.map(ev => `
       _viewingExisting   = null;
       _editMode          = false;
       _newEventDate      = null;
+      _navScreen         = 'masterStep';
     },
 
     /** Called by renderer's updateSteps() when railMode === 'event'. */
@@ -1636,7 +1683,36 @@ ${unparseable.map(ev => `
     },
 
     /** Resume at step 3 (for "Change" from landing page). */
-    resume() { showPreviewStep(); }
+    resume() { showPreviewStep(); },
+
+    /**
+     * Steps back one level within the event creator.
+     * Returns true if navigation was handled internally; false if the caller
+     * (renderer.js) should navigate away (e.g. showLanding()).
+     */
+    navigateBack() {
+      switch (_navScreen) {
+        case 'masterStep':
+          return false;
+        case 'eventList':
+          _slideToStep(showMasterStep);
+          return true;
+        case 'eventForm':
+          _viewingExisting = null;
+          _editMode        = false;
+          _eventComps      = [];
+          _newEventDate    = null;
+          _destroyEventDDs();
+          _slideToStep(_renderEventList);
+          return true;
+        case 'previewStep':
+          if (_viewingExisting) _slideToStep(_renderEventForm);
+          else                  _slideToStep(_renderEventList);
+          return true;
+        default:
+          return false;
+      }
+    },
   };
 
 })();

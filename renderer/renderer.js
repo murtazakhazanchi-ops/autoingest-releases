@@ -902,7 +902,10 @@ function _renderLandingEventCard() {
 }
 
 document.getElementById('createEventBtn').addEventListener('click', showEventCreator);
-document.getElementById('ecBackBtn').addEventListener('click', showLanding);
+document.getElementById('ecBackBtn').addEventListener('click', () => {
+  if (!EventCreator.navigateBack()) showLanding();
+});
+document.addEventListener('eventcreator:done', showLanding);
 
 // ════════════════════════════════════════════════════════════════
 // DRIVE SELECTION
