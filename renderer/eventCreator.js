@@ -1424,13 +1424,11 @@ ${unparseable.map(ev => `
   // ══════════════════════════════════════════════════════════════════════════
 
   function _buildSubEventFolderNames(components) {
-    const cities   = components.map(c => c.city?.label || '');
-    const sameCity = new Set(cities).size === 1;
     return components.map((comp, idx) => {
       const parts = [
         ...comp.eventTypes.map(e => e.label),
         comp.location?.label,
-        sameCity ? null : comp.city?.label
+        comp.city?.label,
       ].filter(Boolean);
       return `${pad2(idx + 1)}-${parts.join('-')}`;
     });
