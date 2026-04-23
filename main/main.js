@@ -776,6 +776,30 @@ ipcMain.handle('settings:setArchiveRoot', async (_event, value) => {
   return { ok: true };
 });
 
+ipcMain.handle('settings:getLastDestPath', () => settings.getLastDestPath());
+
+ipcMain.handle('settings:setLastDestPath', async (_event, value) => {
+  await settings.setLastDestPath(value);
+  return { ok: true };
+});
+
+ipcMain.handle('settings:getLastEvent', () => settings.getLastEvent());
+
+ipcMain.handle('settings:setLastEvent', async (_event, value) => {
+  await settings.setLastEvent(value);
+  return { ok: true };
+});
+
+// Checks that the collection folder still exists on disk.
+// Event folders are only created at import time, so we don't verify them.
+ipcMain.handle('settings:verifyLastEvent', async (_event, collectionPath) => {
+  if (!collectionPath) return false;
+  try {
+    const stat = await fsp.stat(collectionPath);
+    return stat.isDirectory();
+  } catch { return false; }
+});
+
 // ── List manager ──────────────────────────────────────────────────────────────
 
 ipcMain.handle('lists:get',        (_event, name)                              => listManager.getList(name));

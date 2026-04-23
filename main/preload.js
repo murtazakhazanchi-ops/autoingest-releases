@@ -166,5 +166,10 @@ contextBridge.exposeInMainWorld('api', {
   // ── Settings (persisted preferences) ──
   getArchiveRootSetting:    ()                       => ipcRenderer.invoke('settings:getArchiveRoot'),
   setArchiveRootSetting:    (value)                  => ipcRenderer.invoke('settings:setArchiveRoot', value),
+  getLastDestPath:          ()                       => ipcRenderer.invoke('settings:getLastDestPath'),
+  setLastDestPath:          (p)                      => ipcRenderer.invoke('settings:setLastDestPath', p),
+  getLastEvent:             ()                       => ipcRenderer.invoke('settings:getLastEvent'),
+  setLastEvent:             (v)                      => ipcRenderer.invoke('settings:setLastEvent', v),
+  verifyLastEvent:          (collectionPath)          => ipcRenderer.invoke('settings:verifyLastEvent', collectionPath),
 
 });

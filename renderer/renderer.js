@@ -2299,7 +2299,10 @@ try {
 
 document.getElementById('changeDestBtn').addEventListener('click', async () => {
   const chosen = await window.api.chooseDest();
-  if (chosen) await setDestPath(chosen);
+  if (chosen) {
+    await setDestPath(chosen);
+    window.api.setLastDestPath(chosen).catch(() => {});
+  }
 });
 
 // ════════════════════════════════════════════════════════════════
@@ -2814,12 +2817,32 @@ async function initApp() {
     console.error('Failed to prime archive root', e);
   }
 
-  // Patch 49: await default-dest so import index is loaded before setDestPath runs
+  // Restore last active event so the landing card shows the previous context
+  // without any user action. Uses the stored collectionPath (full disk path)
+  // so verification is independent of the archiveRoot setting. Only the
+  // collection folder is checked — event folders are created at import time.
   try {
-    const p = await window.api.getDefaultDest();
+    const lastEvent = await window.api.getLastEvent();
+    if (lastEvent?.collectionPath && lastEvent?.collectionName && lastEvent?.eventName) {
+      const valid = await window.api.verifyLastEvent(lastEvent.collectionPath);
+      if (valid) {
+        EventCreator.restoreLastEvent(lastEvent.collectionName, lastEvent.eventName);
+        _renderLandingEventCard(); // redraw now that selection is populated
+      } else {
+        window.api.setLastEvent(null).catch(() => {});
+      }
+    }
+  } catch (e) {
+    console.error('Failed to restore last event', e);
+  }
+
+  // Quick Import: use last chosen destination; fall back to DEFAULT_DEST.
+  try {
+    const saved = await window.api.getLastDestPath();
+    const p = saved || await window.api.getDefaultDest();
     await setDestPath(p);
   } catch (e) {
-    console.error('Failed to load default destination', e);
+    console.error('Failed to load destination', e);
   }
 
   // Register batch listener before the initial getDrives call so no

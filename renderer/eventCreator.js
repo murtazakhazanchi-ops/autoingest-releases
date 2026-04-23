@@ -1461,7 +1461,24 @@ ${unparseable.map(ev => `
   }
 
   function proceedToEventStep()    { _slideToStep(showEventStep);   }
-  function _proceedToPreviewStep() { _slideToStep(showPreviewStep); }
+
+  function _proceedToPreviewStep() {
+    // Persist active selection so startup can restore it next session.
+    // Use activeMaster.path (full disk path) so verification doesn't depend on
+    // the stored archiveRoot, which may differ from the actual parent folder.
+    if (activeMaster && selectedCollection) {
+      const coll = sessionCollections.find(c => c.name === selectedCollection);
+      const evt  = coll?.events[_activeEventIdx] ?? coll?.events.at(-1);
+      if (evt) {
+        window.api.setLastEvent({
+          collectionPath: activeMaster.path,
+          collectionName: selectedCollection,
+          eventName:      evt.name,
+        }).catch(() => {});
+      }
+    }
+    _slideToStep(showPreviewStep);
+  }
 
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -1648,6 +1665,28 @@ ${unparseable.map(ev => `
       } catch (err) {
         console.error('[EventCreator] primeFromSettings failed:', err);
       }
+    },
+
+    /**
+     * Restores a previously active event into session state without rendering
+     * any panel. Called at startup after disk verification. The landing card
+     * will reflect the restored selection when _renderLandingEventCard() runs.
+     * @param {string} collectionName
+     * @param {string} eventName
+     */
+    restoreLastEvent(collectionName, eventName) {
+      let coll = sessionCollections.find(c => c.name === collectionName);
+      if (!coll) {
+        coll = { name: collectionName, hijriDate: '', events: [] };
+        sessionCollections.push(coll);
+      }
+      let eventIdx = coll.events.findIndex(e => e.name === eventName);
+      if (eventIdx < 0) {
+        coll.events.push({ name: eventName, components: [] });
+        eventIdx = coll.events.length - 1;
+      }
+      selectedCollection = collectionName;
+      _activeEventIdx    = eventIdx;
     },
 
     /**

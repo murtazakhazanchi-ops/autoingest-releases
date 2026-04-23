@@ -107,4 +107,72 @@ async function setArchiveRoot(value) {
   await _save();
 }
 
-module.exports = { init, getArchiveRoot, setArchiveRoot };
+/**
+ * Returns the last user-chosen import destination, or null if never set.
+ * @returns {string | null}
+ */
+function getLastDestPath() {
+  if (!_loaded) init();
+  const v = _state.lastDestPath;
+  return (typeof v === 'string' && v.length > 0) ? v : null;
+}
+
+/**
+ * Persists the last import destination. Pass null or '' to clear.
+ * @param {string | null} value
+ * @returns {Promise<void>}
+ */
+async function setLastDestPath(value) {
+  if (!_loaded) init();
+  if (value === null || value === '') {
+    delete _state.lastDestPath;
+  } else if (typeof value === 'string') {
+    _state.lastDestPath = value;
+  } else {
+    throw new Error('setLastDestPath: expected string or null');
+  }
+  await _save();
+}
+
+/**
+ * Returns the last active event context, or null if never set.
+ * Requires collectionPath (full disk path) — old entries missing it return null.
+ * @returns {{ collectionPath: string, collectionName: string, eventName: string } | null}
+ */
+function getLastEvent() {
+  if (!_loaded) init();
+  const v = _state.lastEvent;
+  if (!v || typeof v !== 'object') return null;
+  if (typeof v.collectionPath !== 'string' || !v.collectionPath.length) return null;
+  if (typeof v.collectionName !== 'string' || !v.collectionName.length) return null;
+  if (typeof v.eventName !== 'string' || !v.eventName.length) return null;
+  return { collectionPath: v.collectionPath, collectionName: v.collectionName, eventName: v.eventName };
+}
+
+/**
+ * Persists the last active event context. Pass null to clear.
+ * @param {{ collectionPath: string, collectionName: string, eventName: string } | null} value
+ * @returns {Promise<void>}
+ */
+async function setLastEvent(value) {
+  if (!_loaded) init();
+  if (value === null || value === undefined) {
+    delete _state.lastEvent;
+  } else if (
+    value && typeof value === 'object' &&
+    typeof value.collectionPath === 'string' && value.collectionPath.length > 0 &&
+    typeof value.collectionName === 'string' && value.collectionName.length > 0 &&
+    typeof value.eventName === 'string' && value.eventName.length > 0
+  ) {
+    _state.lastEvent = {
+      collectionPath: value.collectionPath,
+      collectionName: value.collectionName,
+      eventName:      value.eventName,
+    };
+  } else {
+    throw new Error('setLastEvent: expected { collectionPath, collectionName, eventName } or null');
+  }
+  await _save();
+}
+
+module.exports = { init, getArchiveRoot, setArchiveRoot, getLastDestPath, setLastDestPath, getLastEvent, setLastEvent };
