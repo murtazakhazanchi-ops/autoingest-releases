@@ -25,7 +25,6 @@
       --mauve:     #cba6f7;
       --red:       #f38ba8;
       --peach:     #fab387;
-      --step-num:  #585b70;
     }
 
     html, body { height: 100%; overflow: hidden; }
@@ -34,17 +33,6 @@
       background: var(--bg); color: var(--text);
       display: flex; flex-direction: column;
     }
-
-    /* ── TOP BAR ───────────────────────────────── */
-    #topBar {
-      display: flex; align-items: center; gap: 10px;
-      padding: 9px 18px;
-      background: var(--surface2);
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-    #topBar h1      { font-size: 1rem; font-weight: 700; letter-spacing: -0.01em; }
-    #topBar .tagline { font-size: 0.7rem; opacity: 0.3; }
 
     /* ── UPDATE BANNER ────────────────────────── */
     #updateBanner {
@@ -93,32 +81,6 @@
       to   { opacity: 1; transform: translateY(0); }
     }
 
-    /* ── STEP RAIL ─────────────────────────────── */
-    #stepRail {
-      display: flex; align-items: stretch;
-      background: var(--surface2);
-      border-bottom: 2px solid var(--border);
-      flex-shrink: 0; overflow: hidden;
-    }
-    .step {
-      display: flex; align-items: center; gap: 8px;
-      padding: 8px 18px; font-size: 0.78rem;
-      color: var(--subtext); border-right: 1px solid var(--border);
-      opacity: 0.45; transition: opacity 0.2s, background 0.2s; white-space: nowrap;
-    }
-    .step:last-child { border-right: none; }
-    .step .step-num {
-      width: 20px; height: 20px; border-radius: 50%;
-      background: var(--step-num); color: var(--subtext);
-      font-size: 0.7rem; font-weight: 700;
-      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-      transition: background 0.2s, color 0.2s;
-    }
-    .step.active { opacity: 1; background: var(--blue-dim); color: var(--text); }
-    .step.active .step-num { background: var(--blue); color: var(--surface2); }
-    .step.done   { opacity: 0.75; }
-    .step.done   .step-num { background: var(--green); color: var(--surface2); }
-
     /* ── CONTEXT BAR (M8) ───────────────── */
     #contextBar {
       display: none;
@@ -159,186 +121,182 @@
     #contextBar .ctx-mode.event { background: var(--blue-dim); color: var(--blue); }
     #contextBar .ctx-mode.quick { background: var(--green-dim); color: var(--green); }
 
-    /* ── LANDING ─────────────────────────────────── */
+    /* ── LANDING DASHBOARD ─────────────────────────────────────────── */
+    :root {
+      --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+      --space-5: 20px; --space-6: 24px; --space-7: 32px;
+    }
+
     #step1Panel {
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      flex: 1; gap: 12px; padding: 48px 32px;
-      overflow-y: auto;
+      display: flex; flex-direction: column; align-items: stretch;
+      flex: 1; overflow: hidden;
+      background:
+        radial-gradient(ellipse at 15% 60%, rgba(137,180,250,0.05) 0%, transparent 55%),
+        radial-gradient(ellipse at 85% 20%, rgba(203,166,247,0.05) 0%, transparent 55%),
+        var(--bg);
     }
 
-    .landing-eyebrow {
-      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em;
-      text-transform: uppercase; color: var(--subtext); opacity: 0.6;
-      margin-bottom: 4px;
-    }
-
-    .landing-cards {
-      display: flex; gap: 20px; align-items: stretch;
-    }
-
-    /* Each option card */
-    .landing-card {
-      display: flex; flex-direction: column; align-items: center;
-      gap: 14px; padding: 36px 32px 32px;
-      width: 280px;
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 16px; cursor: default;
-      transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
-    }
-
-    /* Card icon badge */
-    .lc-icon-wrap {
-      width: 60px; height: 60px; border-radius: 14px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1.8rem; flex-shrink: 0;
-    }
-    #landingCard  .lc-icon-wrap { background: rgba(137,180,250,0.12); }
-    #landingEvent .lc-icon-wrap { background: rgba(203,166,247,0.12); }
-
-    .landing-card h2 {
-      font-size: 1rem; font-weight: 700; color: var(--text); margin: 0;
-    }
-    .landing-card p {
-      font-size: 0.81rem; color: var(--subtext); text-align: center;
-      line-height: 1.6; margin: 0; flex: 1;
-    }
-
-    /* Hover lift — card */
-    #landingCard:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 16px 40px rgba(0,0,0,0.35), 0 0 0 1px var(--blue);
-      border-color: var(--blue);
-    }
-    /* Hover lift — event */
-    #landingEvent:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 16px 40px rgba(0,0,0,0.35), 0 0 0 1px var(--mauve);
-      border-color: var(--mauve);
-    }
-
-    /* Drive list inside the card */
-    #driveListLarge {
-      display: flex; gap: 10px; flex-wrap: wrap;
-      justify-content: center; width: 100%; margin-top: 4px;
-    }
-
-    .landing-cta {
-      width: 100%; padding: 10px 0;
-      background: var(--mauve); color: var(--bg);
-      border: none; border-radius: 8px;
-      font-size: 0.875rem; font-weight: 700; cursor: pointer;
-      transition: opacity 0.15s; margin-top: auto;
-    }
-    .landing-cta:hover { opacity: 0.85; }
-
-    .landing-divider { display: none; }
-
-    /* ── Landing: confirmed event card ──────────────────────────────────── */
-    #landingEvent.landing-card-confirmed {
-      width: 460px;
-      align-items: stretch;
-      gap: 0;
-      padding: 0;
-      overflow: hidden;
-      cursor: default;
-    }
-    #landingEvent.landing-card-confirmed:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 16px 40px rgba(0,0,0,0.35), 0 0 0 1px var(--green);
-      border-color: var(--green);
-    }
-
-    /* Header band: icon + title/status + mode badge */
-    .lc-ev-band {
-      display: flex; align-items: center; gap: 12px;
-      padding: 20px 24px 18px;
-      background: var(--surface3);
-      border-bottom: 1px solid var(--border);
+    /* ── Dashboard header ──────────────────────────────────────────── */
+    #dashHeader {
+      display: flex; align-items: center; gap: var(--space-6);
+      padding: 7px var(--space-6);
+      background: rgba(24,24,37,0.82); backdrop-filter: blur(14px);
+      border-bottom: 1px solid rgba(69,71,90,0.5);
       flex-shrink: 0;
     }
-    .lc-ev-band .lc-icon-wrap {
-      width: 42px; height: 42px; font-size: 1.25rem; flex-shrink: 0;
+    .dash-left { display: flex; align-items: center; gap: var(--space-3); min-width: 200px; }
+    .dash-logo-icon {
+      width: 34px; height: 34px; border-radius: 9px;
+      background: rgba(137,180,250,0.12);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
     }
-    .lc-ev-band-info {
-      display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0;
-    }
-    .lc-ev-band-title { font-size: 0.9rem; font-weight: 700; color: var(--text); }
-    .lc-ev-band-status { font-size: 0.7rem; color: var(--green); }
+    .dash-logo-icon svg { width: 18px; height: 18px; stroke: var(--blue); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .dash-brand { display: flex; flex-direction: column; gap: 1px; }
+    .dash-app-name { font-size: 0.88rem; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
+    .dash-tagline { font-size: 0.61rem; color: var(--subtext); opacity: 0.5; }
+    .dash-center { flex: 1; display: flex; align-items: center; gap: var(--space-5); justify-content: center; }
+    .dash-ctx-item { display: flex; align-items: center; gap: 7px; }
+    .dash-ctx-item svg { width: 13px; height: 13px; stroke: var(--subtext); fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; opacity: 0.5; flex-shrink: 0; }
+    .dash-ctx-inner { display: flex; flex-direction: column; gap: 1px; }
+    .dash-ctx-label { font-size: 0.57rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--subtext); opacity: 0.5; font-weight: 700; }
+    .dash-ctx-value { font-size: 0.73rem; color: var(--text); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+    .dash-ctx-sub { font-size: 0.63rem; color: var(--mauve); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+    .dash-ctx-divider { width: 1px; height: 26px; background: rgba(69,71,90,0.45); flex-shrink: 0; }
+    .dash-right { display: flex; align-items: center; gap: var(--space-2); min-width: 160px; justify-content: flex-end; }
+    .dash-status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; box-shadow: 0 0 6px rgba(166,227,161,0.45); }
+    .dash-status-label { font-size: 0.72rem; color: var(--green); font-weight: 600; }
+    .dash-unsynced-badge { padding: 2px 8px; border-radius: 10px; background: rgba(249,226,175,0.1); border: 1px solid rgba(249,226,175,0.22); font-size: 0.62rem; color: var(--yellow); font-weight: 700; }
 
-    /* Body: collection + event name */
-    .lc-ev-body {
-      display: flex; flex-direction: column; gap: 10px;
-      padding: 18px 24px 16px;
-    }
+    /* ── Content container ─────────────────────────────────────────── */
+    .dash-container { max-width: 1100px; width: 100%; margin: 0 auto; padding: 0 var(--space-5) var(--space-2); display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
 
-    /* Collection label + truncated value */
-    .lc-ev-coll-row {
-      display: flex; align-items: baseline; gap: 8px; min-width: 0;
+    /* ── Hero card ─────────────────────────────────────────────────── */
+    #heroCard {
+      display: flex; align-items: center; gap: var(--space-5);
+      padding: var(--space-4) var(--space-6);
+      background: rgba(49,50,68,0.6); backdrop-filter: blur(16px);
+      border: 1px solid rgba(137,180,250,0.2); border-radius: 14px;
+      box-shadow: 0 0 0 1px rgba(137,180,250,0.06), 0 6px 24px rgba(0,0,0,0.3), 0 0 40px rgba(137,180,250,0.04);
+      flex-shrink: 0; margin-top: var(--space-3);
+      transition: border-color 0.25s, box-shadow 0.25s;
     }
-    .lc-ev-coll-label {
-      font-size: 9.5px; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.08em; color: var(--subtext); flex-shrink: 0;
+    #heroCard.has-event {
+      border-color: rgba(166,227,161,0.22);
+      box-shadow: 0 0 0 1px rgba(166,227,161,0.07), 0 8px 32px rgba(0,0,0,0.35), 0 0 56px rgba(166,227,161,0.05);
     }
-    .lc-ev-coll-val {
-      font-size: 0.72rem; color: var(--subtext);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+    .hero-icon-wrap {
+      width: 46px; height: 46px; border-radius: 12px;
+      background: rgba(137,180,250,0.1);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
     }
-
-    /* Event name — monospace pill */
-    .lc-ev-name {
-      width: 100%;
-      font-family: 'SF Mono', 'Cascadia Code', ui-monospace, monospace;
-      font-size: 0.82rem; font-weight: 600; color: var(--text);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      background: var(--surface2); border: 1px solid var(--border);
-      border-radius: 8px; padding: 8px 12px;
-    }
-
-    /* Event dropdown — landing card */
-    .lc-ev-select {
-      width: 100%;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      color: var(--text);
-      font-family: 'SF Mono', 'Cascadia Code', ui-monospace, monospace;
-      font-size: 0.78rem; font-weight: 600;
-      padding: 8px 32px 8px 12px;
-      border-radius: 8px;
-      cursor: pointer;
-      outline: none;
+    #heroCard.has-event .hero-icon-wrap { background: rgba(166,227,161,0.1); }
+    .hero-icon-wrap svg { width: 22px; height: 22px; stroke: var(--blue); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+    #heroCard.has-event .hero-icon-wrap svg { stroke: var(--green); }
+    .hero-body { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+    .hero-pretitle { font-size: 1rem; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
+    .hero-event-name { font-size: 0.95rem; color: var(--subtext); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #heroCard.has-event .hero-event-name { font-family: 'SF Mono','Cascadia Code',ui-monospace,monospace; font-size: 0.85rem; color: var(--text); }
+    .hero-collection { font-size: 0.72rem; color: var(--subtext); margin-top: 2px; }
+    .hero-coll-label { font-size: 0.57rem; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; color: var(--subtext); opacity: 0.5; margin-right: 4px; }
+    .hero-event-select {
+      width: 100%; max-width: 440px;
+      background: rgba(24,24,37,0.6); border: 1px solid var(--border);
+      color: var(--text); font-family: 'SF Mono','Cascadia Code',ui-monospace,monospace;
+      font-size: 0.78rem; font-weight: 600; padding: 7px 30px 7px 10px;
+      border-radius: 8px; cursor: pointer; outline: none;
       -webkit-appearance: none; appearance: none;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23a6adc8' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-      background-repeat: no-repeat;
-      background-position: right 12px center;
-      transition: border-color 0.15s;
+      background-repeat: no-repeat; background-position: right 10px center;
+      margin-top: 6px; transition: border-color 0.15s;
     }
-    .lc-ev-select:hover { border-color: var(--mauve); }
-    .lc-ev-select:focus { border-color: var(--mauve); outline: none; }
+    .hero-event-select:focus { border-color: var(--mauve); }
+    .hero-mode-badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 6px; font-size: 0.61rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 6px; align-self: flex-start; }
+    .hero-mode-badge.single { background: rgba(137,180,250,0.1); color: var(--blue); }
+    .hero-mode-badge.multi  { background: rgba(203,166,247,0.1); color: var(--mauve); }
+    .hero-actions { display: flex; flex-direction: column; gap: var(--space-2); flex-shrink: 0; min-width: 164px; }
+    .hero-btn-primary { padding: 11px 20px; background: var(--blue); border: none; border-radius: 10px; color: var(--bg); font-size: 0.86rem; font-weight: 700; font-family: inherit; cursor: pointer; transition: opacity 0.15s; white-space: nowrap; }
+    .hero-btn-primary:hover { opacity: 0.85; }
+    .hero-btn-primary.green { background: var(--green); }
+    .hero-btn-secondary { padding: 9px 20px; background: transparent; border: 1.5px solid rgba(69,71,90,0.65); border-radius: 10px; color: var(--subtext); font-size: 0.83rem; font-family: inherit; cursor: pointer; transition: border-color 0.15s, color 0.15s; white-space: nowrap; }
+    .hero-btn-secondary:hover { border-color: var(--blue); color: var(--blue); }
 
-    /* Footer: action buttons */
-    .lc-ev-footer {
-      display: flex; gap: 8px;
-      padding: 14px 24px 20px;
-      border-top: 1px solid var(--border);
-    }
-    .lc-ev-btn-outline {
-      flex: 1; padding: 9px 12px;
-      background: transparent; border: 1.5px solid var(--border);
-      border-radius: 8px; color: var(--subtext);
-      font-size: 0.82rem; font-family: inherit; cursor: pointer;
-      transition: border-color 0.15s, color 0.15s, background 0.15s;
-    }
-    .lc-ev-btn-outline:hover {
-      border-color: var(--blue); color: var(--blue); background: var(--blue-dim);
-    }
-    .lc-ev-btn-primary {
-      flex: 1.4; padding: 9px 12px;
-      background: var(--mauve); border: none; border-radius: 8px;
-      color: var(--bg); font-size: 0.82rem; font-weight: 700;
-      font-family: inherit; cursor: pointer; transition: opacity 0.15s;
-    }
-    .lc-ev-btn-primary:hover { opacity: 0.85; }
+    /* ── Mode toggle ───────────────────────────────────────────────── */
+    #modeToggleRow { display: flex; align-items: center; margin-top: var(--space-3); }
+    .mode-seg-group { display: flex; align-items: center; background: rgba(24,24,37,0.6); border: 1px solid rgba(69,71,90,0.4); border-radius: 10px; padding: 3px; gap: 2px; }
+    .mode-seg-btn { display: flex; align-items: center; gap: var(--space-2); padding: 5px 15px; background: transparent; border: none; border-radius: 7px; color: var(--subtext); font-size: 0.8rem; font-weight: 600; font-family: inherit; cursor: pointer; transition: background 0.15s, color 0.15s; }
+    .mode-seg-btn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+    .mode-seg-btn.active { background: rgba(137,180,250,0.15); color: var(--blue); }
+    .mode-seg-btn:not(.active):hover { background: rgba(69,71,90,0.2); color: var(--text); }
+
+    /* ── Section structure ──────────────────────────────────────────── */
+    .dash-section-header { display: flex; align-items: baseline; gap: var(--space-2); margin-bottom: var(--space-2); }
+    .dash-section-title { font-size: 0.88rem; font-weight: 700; color: var(--text); }
+    .dash-section-sub { font-size: 0.71rem; color: var(--subtext); opacity: 0.5; }
+    .dev-count { margin-left: auto; font-size: 0.71rem; color: var(--blue); font-weight: 600; }
+    #sourceSection { margin-top: var(--space-3); }
+    #deviceSection { margin-top: var(--space-3); flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+    #overviewSection { margin-top: var(--space-3); flex-shrink: 0; }
+
+    /* ── Source cards (horizontal layout) ──────────────────────────── */
+    #sourceGrid { display: flex; gap: var(--space-4); }
+    .src-card-h { flex: 1; display: flex; flex-direction: column; background: rgba(36,36,54,0.55); backdrop-filter: blur(10px); border: 1px solid rgba(69,71,90,0.35); border-radius: 14px; overflow: hidden; transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease; cursor: default; position: relative; }
+    .src-card-h:hover { transform: translateY(-3px); border-color: rgba(137,180,250,0.3); box-shadow: 0 10px 24px rgba(0,0,0,0.25), 0 0 12px rgba(137,180,250,0.05); }
+    .src-card-h.highlighted { border-color: rgba(137,180,250,0.4); box-shadow: 0 0 0 1px rgba(137,180,250,0.15), 0 8px 20px rgba(0,0,0,0.25); }
+    .src-card-h.hidden { display: none; }
+    .src-badge { position: absolute; top: var(--space-2); right: var(--space-2); background: var(--blue); color: var(--bg); font-size: 0.58rem; font-weight: 700; padding: 1px 6px; border-radius: 8px; display: none; }
+    .src-badge.visible { display: block; }
+    .src-card-h-top { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-5) var(--space-4) var(--space-4); }
+    .src-h-icon { width: 42px; height: 42px; border-radius: 10px; background: rgba(137,180,250,0.1); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .src-h-icon svg { width: 20px; height: 20px; stroke: var(--blue); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+    .src-h-icon--ext { background: rgba(137,180,250,0.08); }
+    .src-h-icon--local { background: rgba(203,166,247,0.08); }
+    .src-h-icon--local svg { stroke: var(--mauve); }
+    .src-h-info { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+    .src-h-title { font-size: 0.88rem; font-weight: 700; color: var(--text); }
+    .src-h-desc { font-size: 0.7rem; color: var(--subtext); line-height: 1.4; }
+    .src-h-chevron { font-size: 1rem; color: var(--subtext); opacity: 0.3; flex-shrink: 0; }
+    .src-card-h-foot { display: flex; align-items: center; justify-content: space-between; padding: var(--space-3) var(--space-4); border-top: 1px solid rgba(69,71,90,0.22); background: rgba(24,24,37,0.22); margin-top: auto; }
+    .src-h-status { display: flex; align-items: center; gap: var(--space-2); font-size: 0.68rem; color: var(--subtext); opacity: 0.65; }
+    .src-h-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--subtext); opacity: 0.35; flex-shrink: 0; }
+    .src-h-dot--active { background: var(--green); opacity: 1; box-shadow: 0 0 4px rgba(166,227,161,0.4); }
+    .src-h-btn { padding: 5px 12px; background: rgba(137,180,250,0.1); border: 1px solid rgba(137,180,250,0.2); border-radius: 7px; color: var(--blue); font-size: 0.7rem; font-weight: 600; font-family: inherit; cursor: pointer; transition: background 0.15s, border-color 0.15s; white-space: nowrap; }
+    .src-h-btn:hover { background: rgba(137,180,250,0.18); border-color: rgba(137,180,250,0.35); }
+    .src-h-btn--ext { background: rgba(137,180,250,0.07); border-color: rgba(137,180,250,0.15); }
+    .src-h-btn--local { background: rgba(203,166,247,0.1); border-color: rgba(203,166,247,0.2); color: var(--mauve); }
+    .src-h-btn--local:hover { background: rgba(203,166,247,0.18); border-color: rgba(203,166,247,0.35); }
+
+    /* ── Device panel ──────────────────────────────────────────────── */
+    #driveListLarge { display: flex; gap: var(--space-3); flex-wrap: wrap; flex: 1; overflow-y: auto; min-height: 48px; align-content: flex-start; }
+    .drive-card-large { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); background: rgba(36,36,54,0.55); border: 1px solid rgba(69,71,90,0.35); border-radius: 12px; cursor: pointer; transition: border-color 0.15s, background 0.15s; min-width: 180px; max-width: 260px; user-select: none; flex-shrink: 0; }
+    .drive-card-large:hover { border-color: var(--blue); background: var(--blue-dim); }
+    .drive-card-large .dc-icon { font-size: 1.4rem; flex-shrink: 0; }
+    .drive-card-large .dc-label { font-size: 0.82rem; font-weight: 600; color: var(--text); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .drive-card-large .dc-path { font-size: 0.62rem; color: var(--subtext); font-family: monospace; max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #noDriveMsg { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4) var(--space-6); border-radius: 12px; background: rgba(24,24,37,0.4); border: 1px dashed rgba(69,71,90,0.3); color: var(--subtext); font-size: 0.75rem; opacity: 0.6; width: 100%; }
+    #noDriveMsg .msg-icon { font-size: 1rem; }
+
+    /* ── System overview ───────────────────────────────────────────── */
+    #overviewGrid { display: flex; gap: var(--space-3); }
+    .ov-tile { flex: 1; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); background: rgba(36,36,54,0.45); border: 1px solid rgba(69,71,90,0.28); border-radius: 10px; min-width: 0; }
+    .ov-tile--warn { border-color: rgba(249,226,175,0.14); background: rgba(249,226,175,0.03); }
+    .ov-tile--action { cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+    .ov-tile--action:hover { border-color: rgba(137,180,250,0.28); background: rgba(137,180,250,0.05); }
+    .ov-tile-icon { width: 28px; height: 28px; border-radius: 7px; background: rgba(137,180,250,0.08); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .ov-tile-icon svg { width: 15px; height: 15px; stroke: var(--blue); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+    .ov-tile--warn .ov-tile-icon { background: rgba(249,226,175,0.07); }
+    .ov-tile--warn .ov-tile-icon svg { stroke: var(--yellow); }
+    .ov-tile-body { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+    .ov-value { font-size: 0.92rem; font-weight: 700; color: var(--text); line-height: 1; }
+    .ov-label { font-size: 0.59rem; color: var(--subtext); text-transform: uppercase; letter-spacing: 0.07em; opacity: 0.5; margin-top: 3px; }
+    .ov-arrow { font-size: 1rem; color: var(--subtext); opacity: 0.3; flex-shrink: 0; }
+
+    /* ── Dashboard footer ──────────────────────────────────────────── */
+    #dashFooter { display: flex; align-items: center; justify-content: space-between; padding: var(--space-2) var(--space-5); border-top: 1px solid rgba(69,71,90,0.18); flex-shrink: 0; }
+    #dashVersion { font-size: 0.62rem; color: var(--subtext); opacity: 0.3; }
+    .footer-utils { display: flex; align-items: center; gap: 2px; }
+    .footer-icon-btn { width: 28px; height: 28px; border-radius: 7px; background: transparent; border: 1px solid transparent; color: var(--subtext); cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0.38; transition: opacity 0.15s, border-color 0.15s, background 0.15s; padding: 0; }
+    .footer-icon-btn:hover { opacity: 1; border-color: rgba(69,71,90,0.4); background: rgba(69,71,90,0.12); }
+    .footer-icon-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
     /* ── EVENT CREATOR PANEL ──────────────────── */
     #eventCreatorPanel {
@@ -362,19 +320,7 @@
       flex: 1; overflow-y: auto; padding: 32px;
       display: flex; flex-direction: column; align-items: center;
     }
-    .drive-card-large {
-      display: flex; flex-direction: column; align-items: center; gap: 8px;
-      padding: 18px 24px; background: var(--surface); border: 1px solid var(--border);
-      border-radius: 12px; cursor: pointer;
-      transition: border-color 0.15s, background 0.15s;
-      min-width: 130px; user-select: none;
-    }
-    .drive-card-large:hover { border-color: var(--blue); background: var(--blue-dim); }
-    .drive-card-large .dc-icon  { font-size: 2rem; }
-    .drive-card-large .dc-label { font-size: 0.85rem; font-weight: 600; }
-    .drive-card-large .dc-path  { font-size: 0.68rem; color: var(--subtext); font-family: monospace; }
-    #noDriveMsg { display: flex; flex-direction: column; align-items: center; gap: 10px; opacity: 0.38; font-size: 0.88rem; }
-    #noDriveMsg .msg-icon { font-size: 2.2rem; }
+    /* drive-card-large and #noDriveMsg styled in landing dashboard section above */
 
     /* ── WORKSPACE ─────────────────────────────── */
     #workspace { display: none; flex: 1; overflow: hidden; flex-direction: column; }
@@ -927,15 +873,6 @@
     }
     #obNextBtn:hover { background: #a0c4fd; }
 
-    /* ── HELP BUTTON ───────────────────────────── */
-    #helpBtn {
-      margin-left: auto; padding: 3px 11px; font-size: 0.73rem; font-weight: 600;
-      background: transparent; border: 1px solid var(--border);
-      border-radius: 6px; color: var(--subtext); cursor: pointer;
-      transition: border-color 0.12s, color 0.12s; flex-shrink: 0;
-    }
-    #helpBtn:hover { border-color: var(--blue); color: var(--blue); }
-
     /* ── HELP MODAL ────────────────────────────── */
     #helpOverlay {
       display: none; position: fixed; inset: 0;
@@ -981,19 +918,6 @@
     .sum-skipped { color: var(--yellow); }
     .sum-errors  { color: var(--red); }
 
-    /* ── FEEDBACK: floating bug button ─────────── */
-    #bugReportBtn {
-      position: fixed; bottom: 20px; right: 20px;
-      width: 36px; height: 36px; border-radius: 50%;
-      background: var(--surface); border: 1px solid var(--border);
-      color: var(--subtext); cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      z-index: 900; opacity: 0.45;
-      transition: opacity 0.2s, transform 0.15s;
-      padding: 0;
-    }
-    #bugReportBtn:hover { opacity: 1; transform: scale(1.1); }
-    #bugReportBtn svg   { width: 16px; height: 16px; }
 
     /* Eject modal (Commit 12c) */
     #ejectOverlay {
@@ -1330,33 +1254,6 @@
     /* ── Tree chevrons ─────────────────────────────────────────────────────── */
     .tac-tc { font-size: 0.68rem; color: var(--blue); width: 12px; flex-shrink: 0; }
 
-    /* ═══════════════════════════════════════════════════════════════════════
-       TAC smoke-test modal  (remove after Commit B)
-       ═══════════════════════════════════════════════════════════════════════ */
-    #tacTestOverlay {
-      display: none; position: fixed; inset: 0; z-index: 10000;
-      background: rgba(0,0,0,0.6); align-items: center; justify-content: center;
-    }
-    #tacTestOverlay.visible { display: flex; }
-    #tacTestModal {
-      background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
-      padding: 24px; width: 640px; max-height: 88vh; overflow-y: auto;
-      display: flex; flex-direction: column; gap: 20px;
-    }
-    #tacTestModal h2 { color: var(--blue); font-size: 1rem; }
-    .tac-test-row { display: flex; flex-direction: column; gap: 6px; }
-    .tac-test-row label { font-size: 0.8rem; color: var(--subtext); }
-    #tacTestLog {
-      background: var(--surface2); border-radius: 6px; padding: 10px;
-      font-size: 0.78rem; color: var(--subtext); min-height: 60px; max-height: 120px;
-      overflow-y: auto; font-family: monospace; white-space: pre-wrap;
-    }
-    #tacTestClose {
-      align-self: flex-end; padding: 6px 16px;
-      background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
-      color: var(--text); cursor: pointer; font-size: 0.85rem;
-    }
-    #tacTestClose:hover { border-color: var(--blue); color: var(--blue); }
 
 /* ─────────────────────────────────────────────────────────────────────────────
    Event Creator — CSS additions for renderer/index.html
@@ -2691,12 +2588,6 @@
 </head>
 <body>
 
-  <div id="topBar">
-    <h1>⚡ AutoIngest</h1>
-    <span class="tagline">Memory Card Importer</span>
-    <button id="helpBtn">? Help</button>
-  </div>
-
   <!-- UPDATE BANNER — hidden until an update event fires -->
   <div id="updateBanner">
     <span class="upd-icon">🔄</span>
@@ -2706,30 +2597,164 @@
     <button class="upd-dismiss" id="updDismissBtn" title="Dismiss">✕</button>
   </div>
 
-  <div id="stepRail">
-    <div class="step active" id="step1Indicator"><span class="step-num">1</span> <span id="step1Label">Select Memory Card</span></div>
-    <div class="step"        id="step2Indicator"><span class="step-num">2</span> <span id="step2Label">Browse &amp; Select Files</span></div>
-    <div class="step"        id="step3Indicator"><span class="step-num">3</span> <span id="step3Label">Import</span></div>
-  </div>
-
   <!-- M8: CONTEXT BAR (breadcrumb + mode indicator) -->
   <div id="contextBar">
     <div class="ctx-breadcrumb" id="ctxBreadcrumb"></div>
     <span class="ctx-mode" id="ctxMode"></span>
   </div>
 
-  <!-- LANDING -->
+  <!-- LANDING DASHBOARD -->
   <div id="step1Panel">
 
-    <p class="landing-eyebrow">How would you like to start?</p>
+    <!-- 1. HEADER BAR -->
+    <div id="dashHeader">
+      <div class="dash-left">
+        <div class="dash-logo-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        </div>
+        <div class="dash-brand">
+          <span class="dash-app-name">AutoIngest</span>
+          <span class="dash-tagline">Photo Archive Intake System</span>
+        </div>
+      </div>
+      <div class="dash-center">
+        <div class="dash-ctx-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          <div class="dash-ctx-inner">
+            <span class="dash-ctx-label">Archive Root</span>
+            <span class="dash-ctx-value" id="dashArchivePath">No archive set</span>
+          </div>
+        </div>
+        <div class="dash-ctx-divider"></div>
+        <div class="dash-ctx-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <div class="dash-ctx-inner">
+            <span class="dash-ctx-label">Active Event</span>
+            <span class="dash-ctx-value" id="dashEventName">No active event</span>
+            <span class="dash-ctx-sub" id="dashCollName" style="display:none"></span>
+          </div>
+        </div>
+      </div>
+      <div class="dash-right">
+        <span class="dash-status-dot"></span>
+        <span class="dash-status-label">Ready</span>
+        <span class="dash-unsynced-badge" id="dashUnsyncedBadge" style="display:none">0 Unsynced</span>
+      </div>
+    </div>
 
-    <div class="landing-cards">
+    <!-- 2–7. CONTENT CONTAINER (max-width 1100px, centered) -->
+    <div class="dash-container">
 
-      <!-- Card: Memory Card -->
-      <div id="landingCard" class="landing-card">
-        <div class="lc-icon-wrap">📸</div>
-        <h2>Select Memory Card</h2>
-        <p id="step1Subtitle">Insert a camera card to browse and import photos and videos.</p>
+      <!-- 2. HERO CARD -->
+      <div id="heroCard">
+        <div class="hero-icon-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        </div>
+        <div class="hero-body">
+          <div class="hero-pretitle">Create New Event</div>
+          <div class="hero-event-name">Set up a master collection and event structure before importing files.</div>
+        </div>
+        <div class="hero-actions">
+          <button id="heroPrimaryBtn" class="hero-btn-primary">Create Event →</button>
+        </div>
+      </div>
+
+      <!-- 3. MODE TOGGLE -->
+      <div id="modeToggleRow">
+        <div class="mode-seg-group">
+          <button class="mode-seg-btn active" id="modeEventBtn" data-mode="event">
+            <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            Event Import
+          </button>
+          <button class="mode-seg-btn" id="modeQuickBtn" data-mode="quick">
+            <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            Quick Import
+          </button>
+        </div>
+      </div>
+
+      <!-- 4. SOURCE SELECTION -->
+      <div id="sourceSection">
+        <div class="dash-section-header">
+          <span class="dash-section-title">Select Source</span>
+          <span class="dash-section-sub">Choose where to import media from</span>
+        </div>
+        <div id="sourceGrid">
+
+          <!-- Memory Card -->
+          <div class="src-card-h highlighted" id="srcMemCard">
+            <span class="src-badge" id="srcMemCardBadge"></span>
+            <div class="src-card-h-top">
+              <div class="src-h-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><path d="M9 2v4M12 2v4M15 2v4"/></svg>
+              </div>
+              <div class="src-h-info">
+                <span class="src-h-title">Memory Card</span>
+                <span class="src-h-desc">Auto-detected camera media</span>
+              </div>
+              <span class="src-h-chevron">›</span>
+            </div>
+            <div class="src-card-h-foot">
+              <div class="src-h-status">
+                <span class="src-h-dot"></span>
+                <span id="srcMemCardStatus">Scanning…</span>
+              </div>
+              <button class="src-h-btn" id="srcMemCardBtn">Select Card</button>
+            </div>
+          </div>
+
+          <!-- External Drive -->
+          <div class="src-card-h" id="srcExtDrive">
+            <div class="src-card-h-top">
+              <div class="src-h-icon src-h-icon--ext">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="17" cy="12" r="1.5"/><path d="M6 12h6"/></svg>
+              </div>
+              <div class="src-h-info">
+                <span class="src-h-title">External Drive</span>
+                <span class="src-h-desc">Import from HDD / SSD / USB devices</span>
+              </div>
+              <span class="src-h-chevron">›</span>
+            </div>
+            <div class="src-card-h-foot">
+              <div class="src-h-status">
+                <span class="src-h-dot src-h-dot--active"></span>
+                <span>Browse mounted drives</span>
+              </div>
+              <button class="src-h-btn src-h-btn--ext" id="srcExtDriveBtn">Browse Drives</button>
+            </div>
+          </div>
+
+          <!-- Local Folder (hidden in Quick Import mode) -->
+          <div class="src-card-h" id="srcLocalFolder">
+            <div class="src-card-h-top">
+              <div class="src-h-icon src-h-icon--local">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              </div>
+              <div class="src-h-info">
+                <span class="src-h-title">Local Folder</span>
+                <span class="src-h-desc">Import from internal storage</span>
+              </div>
+              <span class="src-h-chevron">›</span>
+            </div>
+            <div class="src-card-h-foot">
+              <div class="src-h-status">
+                <span class="src-h-dot src-h-dot--active"></span>
+                <span>Choose any folder</span>
+              </div>
+              <button class="src-h-btn src-h-btn--local" id="srcLocalFolderBtn">Choose Folder</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- 5. DEVICE PANEL -->
+      <div id="deviceSection">
+        <div class="dash-section-header">
+          <span class="dash-section-title">Detected Devices</span>
+          <span class="dash-section-sub">Available storage devices</span>
+          <span class="dev-count" id="deviceCountLabel"></span>
+        </div>
         <div id="driveListLarge">
           <div id="noDriveMsg">
             <span class="msg-icon">🔍</span>
@@ -2738,17 +2763,80 @@
         </div>
       </div>
 
-      <!-- Card: Create Event -->
-      <div id="landingEvent" class="landing-card">
-        <div class="lc-icon-wrap">🗂️</div>
-        <h2>Create Event</h2>
-        <p>Set up a master collection and event structure before importing files.</p>
-        <button id="createEventBtn" class="landing-cta">Create Event →</button>
+      <!-- 6. SYSTEM OVERVIEW -->
+      <div id="overviewSection">
+        <div class="dash-section-header">
+          <span class="dash-section-title">System Overview</span>
+        </div>
+        <div id="overviewGrid">
+          <div class="ov-tile" id="ovImports">
+            <div class="ov-tile-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </div>
+            <div class="ov-tile-body">
+              <span class="ov-value" id="ovImportsVal">—</span>
+              <span class="ov-label">Imports This Session</span>
+            </div>
+          </div>
+          <div class="ov-tile" id="ovEvents">
+            <div class="ov-tile-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            </div>
+            <div class="ov-tile-body">
+              <span class="ov-value" id="ovEventsVal">—</span>
+              <span class="ov-label">Events This Week</span>
+            </div>
+          </div>
+          <div class="ov-tile ov-tile--warn" id="ovUnsynced">
+            <div class="ov-tile-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+            </div>
+            <div class="ov-tile-body">
+              <span class="ov-value" id="ovUnsyncedVal">0</span>
+              <span class="ov-label">Unsynced Events</span>
+            </div>
+          </div>
+          <div class="ov-tile" id="ovLastImport">
+            <div class="ov-tile-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div class="ov-tile-body">
+              <span class="ov-value" id="ovLastImportVal">—</span>
+              <span class="ov-label">Last Import</span>
+            </div>
+          </div>
+          <div class="ov-tile ov-tile--action" id="ovActivityLog">
+            <div class="ov-tile-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            </div>
+            <div class="ov-tile-body">
+              <span class="ov-value">Open</span>
+              <span class="ov-label">Activity Log</span>
+            </div>
+            <span class="ov-arrow">›</span>
+          </div>
+        </div>
       </div>
 
-    </div>
+      <!-- 7. FOOTER -->
+      <div id="dashFooter">
+        <span id="dashVersion">AutoIngest v24.0.0</span>
+        <div class="footer-utils">
+          <button id="helpBtn" class="footer-icon-btn" title="Help &amp; Reference" aria-label="Help">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </button>
+          <button id="bugReportBtn" class="footer-icon-btn" title="Report a bug" aria-label="Report a bug">
+            <svg viewBox="0 0 24 24"><path d="M12 22c-4 0-7-2.7-7-6v-4l-2-2 2-2V6c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2v2l2 2-2 2v4c0 3.3-3 6-7 6z"/><line x1="12" y1="11" x2="12" y2="15"/><circle cx="12" cy="8" r="0.8" fill="currentColor" stroke="none"/></svg>
+          </button>
+          <button id="settingsBtn" class="footer-icon-btn" title="Settings" aria-label="Settings">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
+        </div>
+      </div>
 
-  </div>
+    </div><!-- .dash-container -->
+
+  </div><!-- #step1Panel -->
 
   <!-- EVENT CREATOR PANEL (shell; populated in Commits C + D) -->
   <div id="eventCreatorPanel">
@@ -2955,15 +3043,6 @@
        FEEDBACK — floating bug button + report modal
   ═══════════════════════════════════════════════════════ -->
 
-  <!-- Floating bug report button (always visible, bottom-right) -->
-  <button id="bugReportBtn" title="Report a bug" aria-label="Report a bug">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M12 22c-4 0-7-2.7-7-6v-4l-2-2 2-2V6c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2v2l2 2-2 2v4c0 3.3-3 6-7 6z"/>
-      <line x1="12" y1="11" x2="12" y2="15"/>
-      <circle cx="12" cy="8" r="0.8" fill="currentColor" stroke="none"/>
-    </svg>
-  </button>
 
   <!-- Feedback modal -->
   <div id="feedbackOverlay" role="dialog" aria-modal="true" aria-labelledby="fpTitle">
@@ -3032,48 +3111,6 @@
         <button id="fpSubmitBtn">Send Report</button>
       </div>
 
-    </div>
-  </div>
-
-  <!-- TAC smoke-test trigger button (remove after Commit B) -->
-  <button id="tacTestBtn" style="
-    position:fixed;bottom:48px;left:12px;z-index:9999;
-    background:var(--mauve);color:var(--bg);border:none;border-radius:6px;
-    padding:5px 10px;font-size:0.75rem;font-weight:700;cursor:pointer;
-    opacity:0.85;
-  ">⌗ Test Dropdowns</button>
-
-  <!-- TAC smoke-test modal (remove after Commit B) ─────────────────────── -->
-  <div id="tacTestOverlay">
-    <div id="tacTestModal">
-      <h2>TreeAutocomplete — Smoke Test  <small style="color:var(--subtext);font-weight:400">(Ctrl+Shift+T to toggle)</small></h2>
-
-      <div class="tac-test-row">
-        <label>Event Type (read-only, no Add New)</label>
-        <div id="tacTestEventType"></div>
-      </div>
-
-      <div class="tac-test-row">
-        <label>City (Add New allowed)</label>
-        <div id="tacTestCity"></div>
-      </div>
-
-      <div class="tac-test-row">
-        <label>Location (Add New allowed)</label>
-        <div id="tacTestLocation"></div>
-      </div>
-
-      <div class="tac-test-row">
-        <label>Photographer (Add New allowed)</label>
-        <div id="tacTestPhotographer"></div>
-      </div>
-
-      <div class="tac-test-row">
-        <label>Selection log</label>
-        <div id="tacTestLog">— nothing selected yet —</div>
-      </div>
-
-      <button id="tacTestClose">Close</button>
     </div>
   </div>
 

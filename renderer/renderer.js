@@ -92,6 +92,7 @@ let sortDir          = 'desc';
 let destPath         = '';
 let importRunning    = false;
 let viewMode         = 'icon';
+let importMode       = 'event'; // 'event' | 'quick'
 let lastClickedPath  = null;
 let fileLoadRequestId = 0;
 let _draggedPaths    = [];          // paths being dragged from the file grid
@@ -717,10 +718,6 @@ const RAIL_LABELS = {
 function setRailMode(mode) {
   if (railMode === mode) return;
   railMode = mode;
-  const labels = RAIL_LABELS[mode];
-  document.getElementById('step1Label').innerHTML = labels[0];
-  document.getElementById('step2Label').innerHTML = labels[1];
-  document.getElementById('step3Label').innerHTML = labels[2];
 }
 
 function updateSteps() {
@@ -738,6 +735,7 @@ function updateSteps() {
 }
 function setStep(id, state) {
   const el = document.getElementById(id);
+  if (!el) return;
   el.classList.remove('active','done');
   if (state) el.classList.add(state);
 }
@@ -816,8 +814,7 @@ function showLanding() {
   setRailMode('card');
   updateSteps();
   _updateContextBar();
-  // Do NOT reset selection — render landing card based on current event state
-  _renderLandingEventCard();
+  renderHome();
 }
 
 // ── Simple HTML escaper for landing card dynamic content ──────────────────
@@ -828,84 +825,186 @@ function _esc(s) {
 }
 
 function _renderLandingEventCard() {
-  const card = document.getElementById('landingEvent');
+  const card = document.getElementById('heroCard');
   if (!card) return;
 
   const data = EventCreator.getActiveEventData();
 
   if (!data) {
-    // Default: no event created yet
-    card.className = 'landing-card';
+    card.className = '';
     card.innerHTML = `
-      <div class="lc-icon-wrap">🗂️</div>
-      <h2>Create Event</h2>
-      <p>Set up a master collection and event structure before importing files.</p>
-      <button id="createEventBtn" class="landing-cta">Create Event →</button>`;
-    document.getElementById('createEventBtn')
+      <div class="hero-icon-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+          <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+          <line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+      </div>
+      <div class="hero-body">
+        <div class="hero-pretitle">Create New Event</div>
+        <div class="hero-event-name">Set up a master collection and event structure before importing files.</div>
+      </div>
+      <div class="hero-actions">
+        <button id="heroPrimaryBtn" class="hero-btn-primary">Create Event →</button>
+      </div>`;
+    document.getElementById('heroPrimaryBtn')
       ?.addEventListener('click', showEventCreator);
     return;
   }
 
-  // Event confirmed — show summary card
+  // Event confirmed — show summary in hero
   const { coll, event, idx: activeIdx } = data;
   const isMulti   = event.components.length > 1;
   const modeLabel = isMulti ? 'Multi-component' : 'Single component';
-  const modeCls   = isMulti ? 'ec-mode-multi' : 'ec-mode-single';
   const events    = coll.events;
   const count     = events.length;
 
-  const eventsBodyHTML = count === 1
-    ? `<div class="lc-ev-name">${_esc(event.name)}</div>`
-    : `<select class="lc-ev-select" id="lcEventSelect">${
+  const eventDisplay = count === 1
+    ? `<div class="hero-event-name">${_esc(event.name)}</div>`
+    : `<select class="hero-event-select" id="heroEventSelect">${
         events.map((ev, i) =>
           `<option value="${i}"${i === activeIdx ? ' selected' : ''}>${String(i + 1).padStart(2, '0')} — ${_esc(ev.name)}</option>`
         ).join('')
       }</select>`;
 
-  card.className = 'landing-card landing-card-confirmed';
+  card.className = 'has-event';
   card.innerHTML = `
-    <div class="lc-ev-band">
-      <div class="lc-icon-wrap">🗂️</div>
-      <div class="lc-ev-band-info">
-        <span class="lc-ev-band-title">Create Event</span>
-        <span class="lc-ev-band-status">✓ ${count} event${count > 1 ? 's' : ''} configured</span>
-      </div>
-      <span class="ec-mode-badge ${_esc(modeCls)}">${_esc(modeLabel)}</span>
+    <div class="hero-icon-wrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+        <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+        <line x1="3" y1="10" x2="21" y2="10"/>
+        <path d="M9 14l2 2 4-4"/>
+      </svg>
     </div>
-    <div class="lc-ev-body">
-      <div class="lc-ev-coll-row">
-        <span class="lc-ev-coll-label">Collection</span>
-        <span class="lc-ev-coll-val" title="${_esc(coll.name)}">${_esc(coll.name)}</span>
+    <div class="hero-body">
+      <div class="hero-pretitle">Continue Event</div>
+      ${eventDisplay}
+      <div class="hero-collection">
+        <span class="hero-coll-label">Collection</span>${_esc(coll.name)}
       </div>
-      ${eventsBodyHTML}
+      <span class="hero-mode-badge ${isMulti ? 'multi' : 'single'}">${_esc(modeLabel)}</span>
     </div>
-    <div class="lc-ev-footer">
-      <button id="lcChangeEventBtn" class="lc-ev-btn-outline">Change</button>
-      <button id="lcNewEventBtn" class="lc-ev-btn-primary">+ New Event →</button>
+    <div class="hero-actions">
+      <button id="heroPrimaryBtn" class="hero-btn-primary green">Continue Event →</button>
+      <button id="heroSecondaryBtn" class="hero-btn-secondary">Change Event</button>
     </div>`;
 
-  document.getElementById('lcEventSelect')?.addEventListener('change', e => {
+  document.getElementById('heroEventSelect')?.addEventListener('change', e => {
     EventCreator.setActiveEventIndex(parseInt(e.target.value, 10));
-    // Switching active event invalidates group→sub-event mappings
     GroupManager.reset();
     renderGroupPanel();
     _renderLandingEventCard();
   });
-
-  document.getElementById('lcChangeEventBtn')
-    ?.addEventListener('click', showEventCreatorResume);
-  document.getElementById('lcNewEventBtn')
+  document.getElementById('heroPrimaryBtn')
     ?.addEventListener('click', () => {
-      EventCreator.resetSelection();
-      showEventCreator();
+      document.getElementById('sourceSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
+  document.getElementById('heroSecondaryBtn')
+    ?.addEventListener('click', showEventCreatorResume);
 }
 
-document.getElementById('createEventBtn').addEventListener('click', showEventCreator);
+function _renderHomeContextBar() {
+  const archiveRoot = EventCreator.getSessionArchiveRoot();
+  const data        = EventCreator.getActiveEventData();
+  const archiveEl   = document.getElementById('dashArchivePath');
+  const eventEl     = document.getElementById('dashEventName');
+  const collEl      = document.getElementById('dashCollName');
+  if (archiveEl) {
+    archiveEl.textContent = archiveRoot
+      ? (archiveRoot.length > 52 ? '…' + archiveRoot.slice(-49) : archiveRoot)
+      : 'No archive set';
+  }
+  if (data) {
+    if (eventEl) eventEl.textContent = data.event.name;
+    if (collEl) { collEl.textContent = data.coll.name; collEl.style.display = ''; }
+  } else {
+    if (eventEl) eventEl.textContent = 'No active event';
+    if (collEl) collEl.style.display = 'none';
+  }
+}
+
+function _renderInsightsBar() {
+  const count = Object.keys(globalImportIndex || {}).length;
+  const impEl = document.getElementById('ovImportsVal');
+  if (impEl) impEl.textContent = count > 0 ? String(count) : '—';
+  const lastEntry = Object.values(globalImportIndex || {})
+    .sort((a, b) => (b.importedAt || 0) - (a.importedAt || 0))[0];
+  const lastEl = document.getElementById('ovLastImportVal');
+  if (lastEl) lastEl.textContent = lastEntry?.importedAt
+    ? new Date(lastEntry.importedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : '—';
+}
+
+function _applyImportMode(mode) {
+  importMode = mode;
+  document.getElementById('modeEventBtn')?.classList.toggle('active', mode === 'event');
+  document.getElementById('modeQuickBtn')?.classList.toggle('active', mode === 'quick');
+  const srcLocal = document.getElementById('srcLocalFolder');
+  if (srcLocal) srcLocal.classList.toggle('hidden', mode === 'quick');
+}
+
+function renderHome() {
+  _renderHomeContextBar();
+  _renderLandingEventCard();
+  _renderInsightsBar();
+  _applyImportMode(importMode);
+}
+
+function _updateMemCardBadge(count) {
+  const badge = document.getElementById('srcMemCardBadge');
+  if (badge) {
+    badge.textContent = String(count);
+    badge.classList.toggle('visible', count > 0);
+  }
+  document.getElementById('srcMemCard')?.classList.toggle('highlighted', count > 0);
+
+  const statusEl = document.getElementById('srcMemCardStatus');
+  if (statusEl) {
+    statusEl.textContent = count > 0
+      ? `${count} card${count > 1 ? 's' : ''} detected`
+      : 'No cards detected';
+    const dot = statusEl.previousElementSibling;
+    if (dot) dot.className = count > 0 ? 'src-h-dot src-h-dot--active' : 'src-h-dot';
+  }
+
+  const countLabel = document.getElementById('deviceCountLabel');
+  if (countLabel) {
+    countLabel.textContent = count > 0 ? `${count} device${count > 1 ? 's' : ''} detected` : '';
+  }
+}
+
+async function chooseSourceFolder() {
+  return await window.api.chooseDest();
+}
+
+function selectMemoryCard() {
+  document.getElementById('devicePanel')?.scrollIntoView({ behavior: 'smooth' });
+}
+
+async function selectExternalDrive() {
+  const chosen = await chooseSourceFolder();
+  if (!chosen) return;
+  const label = chosen.replace(/\\/g, '/').split('/').filter(Boolean).pop() || 'External Drive';
+  await selectDrive({ mountpoint: chosen, label });
+}
+
+async function selectLocalFolder() {
+  const chosen = await chooseSourceFolder();
+  if (!chosen) return;
+  const label = chosen.replace(/\\/g, '/').split('/').filter(Boolean).pop() || 'Local Folder';
+  await selectDrive({ mountpoint: chosen, label });
+}
+
 document.getElementById('ecBackBtn').addEventListener('click', () => {
   if (!EventCreator.navigateBack()) showLanding();
 });
 document.addEventListener('eventcreator:done', showLanding);
+document.getElementById('srcMemCardBtn')?.addEventListener('click', selectMemoryCard);
+document.getElementById('srcExtDriveBtn')?.addEventListener('click', selectExternalDrive);
+document.getElementById('srcLocalFolderBtn')?.addEventListener('click', selectLocalFolder);
+document.getElementById('modeEventBtn')?.addEventListener('click', () => _applyImportMode('event'));
+document.getElementById('modeQuickBtn')?.addEventListener('click', () => _applyImportMode('quick'));
 
 // ════════════════════════════════════════════════════════════════
 // DRIVE SELECTION
@@ -914,6 +1013,7 @@ function renderDrives(cards) {
   const container = document.getElementById('driveListLarge');
   document.getElementById('statusDrives').textContent =
     `Drives scanned: ${new Date().toLocaleTimeString()}`;
+  _updateMemCardBadge(cards.length);
 
   // ── Disconnect detection ───────────────────────────────────────
   // If the active drive is no longer in the card list, it was physically removed.
@@ -987,6 +1087,7 @@ document.getElementById('changeDriveBtn').addEventListener('click', () => {
   document.getElementById('step1Panel').style.display = '';
   updateSteps(); updateSelectionBar();
   _updateContextBar();
+  renderHome();
 });
 
 /**
@@ -1040,6 +1141,7 @@ function resetAppState() {
   updateSteps();
   updateSelectionBar();
   _updateContextBar();
+  renderHome();
 }
 
 document.getElementById('ejectBtn').addEventListener('click', async () => {
@@ -2827,7 +2929,6 @@ async function initApp() {
       const valid = await window.api.verifyLastEvent(lastEvent.collectionPath);
       if (valid) {
         EventCreator.restoreLastEvent(lastEvent.collectionName, lastEvent.eventName);
-        _renderLandingEventCard(); // redraw now that selection is populated
       } else {
         window.api.setLastEvent(null).catch(() => {});
       }
@@ -2844,6 +2945,9 @@ async function initApp() {
   } catch (e) {
     console.error('Failed to load destination', e);
   }
+
+  // Render the full home dashboard (context bar, primary card, insights)
+  renderHome();
 
   // Register batch listener before the initial getDrives call so no
   // in-flight batch event is missed between registration and first poll.
