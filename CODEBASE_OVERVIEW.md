@@ -2,9 +2,52 @@
 
 # AutoIngest — Complete Technical Codebase Overview
 
-**Version:** 0.7.0-dev  
-**Last updated:** 2026-04-20  
-**HEAD:** `cecda35` — Commits A–F + patches done. Commit G (import routing) is next.
+**Version:** 0.7.1-dev  
+**Last updated:** 2026-04-23  
+**HEAD:** `ba4c4a6` — Dashboard rebuild + UI cleanup done. Commit G (import routing) is next.
+
+---
+
+## 0c. v0.7.1-dev Dashboard Rebuild + UI Cleanup (2026-04-23)
+
+Commit `ba4c4a6` — pure renderer changes (`renderer/index.html`, `renderer/renderer.js`).
+
+### Home screen rebuilt as structured dashboard
+
+`#step1Panel` is now a locked-height flex column (no scroll). Layout from top to bottom:
+
+1. **`#dashHeader`** — frosted-glass bar (`backdrop-filter: blur(14px)`). Left: logo icon + app name + tagline. Centre: archive root + active event context (populated by `_renderHomeContextBar()`). Right: green status dot + "Ready" + optional unsynced badge.
+2. **`.dash-container`** — `max-width: 1100px`, centred, `flex: 1; min-height: 0; overflow: hidden` — fills remaining height after header.
+3. **`#heroCard`** — single landscape card. No-event state: "Create New Event" CTA wired to `showEventCreator`. Has-event state (`.has-event` class): green border, checkmark icon, event name, collection label, "Continue Event →" + "Change Event" buttons. Managed entirely by `_renderLandingEventCard()`.
+4. **`#modeToggleRow`** — segmented control with `#modeEventBtn` / `#modeQuickBtn`. Drives `importMode` state and `_applyImportMode()`.
+5. **`#sourceSection`** — three horizontal `.src-card-h` cards: `#srcMemCard` (Memory Card, auto-detected), `#srcExtDrive` (External Drive), `#srcLocalFolder` (Local Folder — `display:none` in Quick mode). IDs and inner structure preserved for `renderDrives()` / `_updateMemCardBadge()` compatibility.
+6. **`#deviceSection`** — `flex: 1; min-height: 0` — grows to fill all remaining space. Contains `#driveListLarge` (`flex: 1; overflow-y: auto`) which is the **only scrollable zone** on the dashboard.
+7. **`#overviewSection`** — `flex-shrink: 0` — compact 5-tile row at the bottom before the footer.
+8. **`#dashFooter`** — `justify-content: space-between`. Left: `#dashVersion`. Right: `.footer-utils` with three `.footer-icon-btn` elements: `#helpBtn`, `#bugReportBtn`, `#settingsBtn`.
+
+### New renderer.js state and functions
+
+| Symbol | What it does |
+|---|---|
+| `importMode` | `'event' \| 'quick'` — persists across `renderHome()` calls |
+| `_applyImportMode(mode)` | Toggles `.active` on seg buttons; toggles `.hidden` on `#srcLocalFolder` |
+| `renderHome()` | Orchestrates `_renderHomeContextBar()` + `_renderLandingEventCard()` + `_renderInsightsBar()` + `_applyImportMode(importMode)` |
+| `_renderHomeContextBar()` | Populates `#dashArchivePath`, `#dashEventName`, `#dashCollName` |
+| `_renderInsightsBar()` | Populates `#ovImportsVal`, `#ovLastImportVal` from `globalImportIndex` |
+| `_updateMemCardBadge(count)` | Updates `#srcMemCardBadge`, `#srcMemCardStatus` dot + text, `#deviceCountLabel` |
+
+`renderHome()` is called from: `showLanding()`, `resetAppState()`, `changeDriveBtn` click.
+
+### Removals
+
+| What | Where | Impact |
+|---|---|---|
+| `#topBar` (title bar + old Help button) | HTML + CSS | Gone. `#dashHeader` replaces it. |
+| `#stepRail` (step nav bar) | HTML + CSS + `--step-num` var | Gone. `setStep()` null-guarded. `setRailMode()` state-only (no DOM writes). |
+| TAC smoke-test (`#tacTestBtn`, `#tacTestOverlay`, `#tacTestModal`) | HTML + CSS | Gone. `initTacTestPanel` IIFE null-guard still in renderer.js. |
+| Footer tagline "Built with ♥ for Safar Coverage" | HTML | Removed. |
+| Floating `#bugReportBtn` (`position:fixed`) | HTML moved; CSS removed | Now a `.footer-icon-btn` inside `#dashFooter`. |
+| Old `#helpBtn` CSS | CSS | Removed. Now inherits `.footer-icon-btn`. |
 
 ---
 
@@ -565,11 +608,18 @@ Central project manifest and electron-builder configuration.
 **One sentence:** The single HTML page containing all CSS (Catppuccin Mocha dark theme variables + component styles) and the full DOM structure for all UI panels.
 
 **Key sections:**
-- CSS custom properties (`:root`) — 15 colour variables
-- `#topBar` — logo + Help button
+- CSS custom properties (`:root`) — 14 colour variables + spacing tokens `--space-1` through `--space-7`
 - `#updateBanner` — hidden until auto-update event fires
-- `#stepRail` — 4-step progress indicator
-- `#step1Panel` — landing screen with drive card list
+- `#contextBar` — M8 breadcrumb bar; hidden on landing, shown in workspace/event creator
+- `#step1Panel` — full-height no-scroll dashboard (see §0c for structure); `overflow: hidden`
+  - `#dashHeader` — frosted-glass header bar (brand / context / status)
+  - `#heroCard` — event state card (create vs. continue modes)
+  - `#modeToggleRow` — Event Import | Quick Import segmented control
+  - `#sourceSection` / `#sourceGrid` — 3 source cards (`#srcMemCard`, `#srcExtDrive`, `#srcLocalFolder`)
+  - `#deviceSection` — flex-grow zone wrapping `#driveListLarge` (scrollable)
+  - `#overviewSection` / `#overviewGrid` — 5 stat tiles
+  - `#dashFooter` — version left; `#helpBtn` `#bugReportBtn` `#settingsBtn` icon buttons right
+- `#eventCreatorPanel` — full-height event creation flow (EventCreator module)
 - `#workspace` — two-panel layout (sidebar + file panel + import footer), shown when a drive is selected
 - `#fileGrid` — scrollable file area; JS writes all tile HTML here
 - `#progressOverlay` — import progress modal with pause/resume
@@ -870,6 +920,7 @@ Steps are identical except `feedback:send` IPC calls `telemetry.flush()` immedia
 
 | Variable | Type | What it tracks | Read by | Written by |
 |---|---|---|---|---|
+| `importMode` | `'event' \| 'quick'` | Active ingestion mode; `'quick'` hides Local Folder source card | `_applyImportMode`, `renderHome` | `modeEventBtn` / `modeQuickBtn` click handlers |
 | `activeDrive` | `{ label, mountpoint } \| null` | Currently selected memory card | `renderDrives`, `browseFolder`, `renderFolders`, `ejectBtn`, `resetAppState` | `selectDrive`, `changeDriveBtn`, `resetAppState`, `renderDrives` (disconnect) |
 | `activeFolderPath` | `string \| null` | Path of the currently browsed folder | `renderFolders`, `browseFolder` | `selectDrive`, `browseFolder`, `applyFileBatch`, `changeDriveBtn`, `resetAppState` |
 | `selectedFiles` | `Set<string>` | Absolute paths of selected files (selection truth) | `detectDuplicates`, `handleTileClick`, `updateSelectionBar`, `isAlreadyImported`, `syncAllTiles`, `syncOneTile`, `buildIconTilesHtml`, `buildListRowsHtml`, `requestVisibleAndSelectedThumbs`, `syncPairLinks`, `importBtn.click` | `handleTileClick`, `selectAllBtn`, `clearSelBtn`, `groupBtn`, `deselBtn`, `browseFolder`, `selectDrive`, `changeDriveBtn`, `resetAppState` |

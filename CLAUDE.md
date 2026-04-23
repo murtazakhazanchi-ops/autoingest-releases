@@ -282,6 +282,11 @@ Catppuccin Mocha dark theme. CSS variables in `:root`:
 - [x] M6: Safe editing of viewed events — "Edit Event" outline button unlocks all dropdowns, chips, Add/Remove Component. "Save Changes →" validates, builds new name (hijriDate + sequence locked), calls `master:renameEvent` IPC (fresh `fs.stat` collision check + `fs.rename`), updates `_scannedEvents` cache, returns to list. Edit-to-same-name = no-op. "Back to list" while editing = silent discard. `_editMode` flag reset on `start()`, `resetSelection()`, `_openExistingEvent()`. Duplicate-content warning modal (non-blocking). `isUnresolved` cleared to false on save.
 - [x] M7: New event auto-sequencing — hijri date picker on new-event form (pre-filled from `coll.hijriDate`, editable). `_computeNextSequence(hijriDate)` scans `_scannedEvents` (disk) + `coll.events` (session) for max sequence on that date, returns max+1. Preview and create both use `_newEventDate` + computed sequence. Date required for create; button gated on date validity. `_newEventDate` state reset on `start()`, `resetSelection()`, `_openExistingEvent()`, Back-to-list, Create New Event.
 - [x] M8: Context bar (UX clarity) — `#contextBar` below step rail shows breadcrumb (Master › Event) + mode badge ("Event Import" blue / "Quick Import" green). Hidden inside event creator (has own breadcrumb). `_updateContextBar()` in renderer.js called from `_ecPanelOpen`, `showLanding`, `selectDrive`, `resetAppState`, `changeDriveBtn`. Passive, no interaction, no toggles.
+- [x] Dashboard rebuild — `#step1Panel` replaced narrow card layout with structured 1100px dashboard: frosted-glass `#dashHeader` (brand / archive+event context / status), `#heroCard` (event state card), `#modeToggleRow` (Event Import | Quick Import segmented control), `#sourceSection` (3 horizontal source cards: Memory Card / External Drive / Local Folder), `#deviceSection` (wraps `renderDrives()`), `#overviewSection` (5 stat tiles), `#dashFooter`.
+- [x] Mode toggle — `importMode = 'event' | 'quick'` state; `_applyImportMode()` hides `#srcLocalFolder` in Quick mode. Listener registered once at init.
+- [x] No-scroll layout — `#step1Panel` `overflow: hidden`; `.dash-container` `flex: 1; min-height: 0`; `#deviceSection` `flex: 1` (grows to fill); `#driveListLarge` only scrollable zone.
+- [x] UI cleanup — removed `#topBar` (title bar), `#stepRail` (step nav bar), TAC smoke-test button/modal; `setStep()` null-guarded; `setRailMode()` simplified to state-only.
+- [x] Utility buttons moved to footer — `#helpBtn`, `#bugReportBtn` (formerly floating `position:fixed`) and new `#settingsBtn` placeholder are `.footer-icon-btn` icon buttons in `#dashFooter` bottom-right. All existing JS listeners preserved.
 
 ---
 
@@ -312,23 +317,27 @@ dd.destroy()               // removes global listener, removes DOM
 ## Landing Screen State Machine (renderer/renderer.js)
 
 ```
-Landing (step1Panel)
+Landing (#step1Panel — full-screen dashboard, no scroll)
   ├─ Click drive card       → selectDrive() → workspace
-  └─ Click Create Event →   → showEventCreator() → eventCreatorPanel (EventCreator.start)
-  └─ Click Change (card)    → showEventCreatorResume() → eventCreatorPanel (EventCreator.resume)
-  └─ Click New Event →      → EventCreator.resetSelection() → showEventCreator()
+  ├─ Click "Create Event →" (heroCard) → showEventCreator() → eventCreatorPanel (EventCreator.start)
+  ├─ Click "Change Event"  (heroCard) → showEventCreatorResume() → eventCreatorPanel (EventCreator.resume)
+  └─ Click "New Event →"   (heroCard) → EventCreator.resetSelection() → showEventCreator()
                                       eventCreatorPanel └─ ← Back → showLanding()
-                                                               (re-renders landing card via _renderLandingEventCard)
+                                                               (re-renders hero card via _renderLandingEventCard)
 ```
 
 `railMode` variable: `'card'` | `'event'`
-`setRailMode(mode)` swaps step rail labels:
-- card:  Select Memory Card / Browse & Select Files / Import
-- event: Create Collection / Create Event / Import
+`setRailMode(mode)` — tracks mode only; `#stepRail` is removed so no DOM writes.
 
-`_renderLandingEventCard()` — called every time `showLanding()` runs:
-- No active event → renders default Create Event card
-- Active event exists → renders confirmed card: collection name, event name/dropdown (if multiple), Change + New Event buttons
+`importMode` variable: `'event'` | `'quick'`
+`_applyImportMode(mode)` — toggles `.active` on mode buttons; hides/shows `#srcLocalFolder` (hidden in `'quick'` mode).
+
+`renderHome()` — called on `showLanding()`, `resetAppState()`, `changeDriveBtn` click:
+- Calls `_renderHomeContextBar()`, `_renderLandingEventCard()`, `_renderInsightsBar()`, `_applyImportMode(importMode)`.
+
+`_renderLandingEventCard()` — targets `#heroCard`, called every time `showLanding()` runs:
+- No active event → hero with "Create New Event" + primary CTA button wired to `showEventCreator`.
+- Active event → hero gains `.has-event` class; shows collection name, event name/select, "Continue Event →" + "Change Event" buttons.
 
 ---
 
@@ -486,6 +495,35 @@ FIX-ONLY pass, no new features, no architecture changes. 52 targeted patches app
 
 All naming conventions and archive rules (locked per this document) preserved. See `STABILIZATION_LOG.md` for per-patch status and `STABILIZATION_NOTES.md` for intentionally-deferred items (sync fs usage in pre-event-loop paths, debug handlers).
 
+
+### v0.7.1-dev — Dashboard Rebuild + UI Cleanup (2026-04-23)
+
+HEAD: `ba4c4a6`  Committed on top of af9d91a (smart defaulting). Commit G (import routing) is next.
+
+**Dashboard rebuild (`renderer/index.html`, `renderer/renderer.js`):**
+- `#step1Panel` replaced with structured 1100px dashboard (7 sections: header / hero / mode toggle / source / device / overview / footer).
+- Frosted-glass `#dashHeader`: brand left, archive+event context centre, status right.
+- `#heroCard`: single card that switches between no-event (Create Event CTA) and has-event (Continue + Change) states via `_renderLandingEventCard()`.
+- `#modeToggleRow`: segmented control (Event Import | Quick Import). `importMode` state drives `_applyImportMode()`.
+- `#sourceSection`: 3 horizontal source cards. Local Folder hidden in Quick mode.
+- `#deviceSection`: wraps existing `renderDrives()` / `#driveListLarge` unchanged. `flex: 1` — grows to fill space.
+- `#overviewSection`: 5 compact stat tiles.
+- `#dashFooter`: version left + `.footer-icon-btn` group right (Help, Bug Report, Settings).
+
+**No-scroll enforcement:**
+- `#step1Panel` `overflow: hidden`, `.dash-container` `flex: 1; min-height: 0`, `#deviceSection` `flex: 1`, `#driveListLarge` `flex: 1; overflow-y: auto`.
+
+**Removals:**
+- `#topBar` (title bar + old help button) — HTML + CSS gone.
+- `#stepRail` — HTML + CSS gone. `setStep()` null-guarded. `setRailMode()` state-only.
+- TAC smoke-test panel (`#tacTestBtn`, `#tacTestOverlay`, `#tacTestModal`) — HTML + CSS gone. IIFE null-guard still present.
+- Footer tagline "Built with ♥ for Safar Coverage" — removed.
+
+**Moves:**
+- `#helpBtn` → `#dashFooter` `.footer-icon-btn` (same id, JS listener unchanged).
+- `#bugReportBtn` → `#dashFooter` `.footer-icon-btn` (was `position:fixed`; JS listener null-guarded so no change needed).
+
+---
 
 ### v0.7.0-dev — Event Creation + Grouping (2026-04-20)
 
