@@ -282,11 +282,17 @@ Catppuccin Mocha dark theme. CSS variables in `:root`:
 - [x] M6: Safe editing of viewed events — "Edit Event" outline button unlocks all dropdowns, chips, Add/Remove Component. "Save Changes →" validates, builds new name (hijriDate + sequence locked), calls `master:renameEvent` IPC (fresh `fs.stat` collision check + `fs.rename`), updates `_scannedEvents` cache, returns to list. Edit-to-same-name = no-op. "Back to list" while editing = silent discard. `_editMode` flag reset on `start()`, `resetSelection()`, `_openExistingEvent()`. Duplicate-content warning modal (non-blocking). `isUnresolved` cleared to false on save.
 - [x] M7: New event auto-sequencing — hijri date picker on new-event form (pre-filled from `coll.hijriDate`, editable). `_computeNextSequence(hijriDate)` scans `_scannedEvents` (disk) + `coll.events` (session) for max sequence on that date, returns max+1. Preview and create both use `_newEventDate` + computed sequence. Date required for create; button gated on date validity. `_newEventDate` state reset on `start()`, `resetSelection()`, `_openExistingEvent()`, Back-to-list, Create New Event.
 - [x] M8: Context bar (UX clarity) — `#contextBar` below step rail shows breadcrumb (Master › Event) + mode badge ("Event Import" blue / "Quick Import" green). Hidden inside event creator (has own breadcrumb). `_updateContextBar()` in renderer.js called from `_ecPanelOpen`, `showLanding`, `selectDrive`, `resetAppState`, `changeDriveBtn`. Passive, no interaction, no toggles.
-- [x] Dashboard rebuild — `#step1Panel` replaced narrow card layout with structured 1100px dashboard: frosted-glass `#dashHeader` (brand / archive+event context / status), `#heroCard` (event state card), `#modeToggleRow` (Event Import | Quick Import segmented control), `#sourceSection` (3 horizontal source cards: Memory Card / External Drive / Local Folder), `#deviceSection` (wraps `renderDrives()`), `#overviewSection` (5 stat tiles), `#dashFooter`.
+- [x] Dashboard rebuild — `#step1Panel` replaced narrow card layout with structured 1100px dashboard: frosted-glass `#dashHeader` (brand / archive+event context / status), `#heroCard` (event state card), `#modeToggleRow` (Event Import | Quick Import segmented control), `#sourceSection` (3 horizontal source cards: Memory Card / External Drive / Local Folder), `#overviewSection` (5 stat tiles), `#dashFooter`.
 - [x] Mode toggle — `importMode = 'event' | 'quick'` state; `_applyImportMode()` hides `#srcLocalFolder` in Quick mode. Listener registered once at init.
-- [x] No-scroll layout — `#step1Panel` `overflow: hidden`; `.dash-container` `flex: 1; min-height: 0`; `#deviceSection` `flex: 1` (grows to fill); `#driveListLarge` only scrollable zone.
+- [x] No-scroll layout — `#step1Panel` `overflow: hidden`; `.dash-container` `flex: 1; min-height: 0`; `#overviewSection` `margin-top: auto` (pushed to bottom); no scrollable zone on dashboard.
 - [x] UI cleanup — removed `#topBar` (title bar), `#stepRail` (step nav bar), TAC smoke-test button/modal; `setStep()` null-guarded; `setRailMode()` simplified to state-only.
 - [x] Utility buttons moved to footer — `#helpBtn`, `#bugReportBtn` (formerly floating `position:fixed`) and new `#settingsBtn` placeholder are `.footer-icon-btn` icon buttons in `#dashFooter` bottom-right. All existing JS listeners preserved.
+- [x] Frameless window — `frame: false`, `titleBarStyle: 'hiddenInset'`, `trafficLightPosition: { x: 16, y: 8 }`; `#dashHeader` has `-webkit-app-region: drag`; interactive elements have `no-drag`. Window controls (`minimize`, `toggleMaximize`, `close`) exposed via `window.api` and handled by `window:minimize/toggleMaximize/close` IPC.
+- [x] Explicit source selection — `activeSource` state `{ type: 'memory-card'|'external-drive'|'local-folder', name, path }`; user must click a device then press Continue — device click never auto-navigates. `_setActiveSource(source)` manages state + targeted hero updates without full innerHTML rebuild.
+- [x] Inline device lists — `#deviceSection` entirely removed; memory card devices render inside `.src-card-device-list#srcMemCardList` within the Memory Card source card. `renderDrives()` targets `#srcMemCardList`. Selection persisted across re-renders via `activeSource` path comparison.
+- [x] Source label format — hero displays `"EOS_DIGITAL (Memory Card)"` via `_typeLabelFor(type)` helper. `.hero-src-val` + `.hero-src-type` updated atomically via targeted DOM update (no rebuild, transitions animate cleanly).
+- [x] Readiness status — `.hero-readiness` transitions between "Select a source to continue" (muted) and "Ready to import" (green) with CSS `color`/`opacity` transitions. Continue button `disabled` until `activeSource !== null`.
+- [x] Selection animations — `@keyframes selectPulse` (device item confirmation glow), `deviceAppear` (fade-in + slide-up on list populate), `btnEnablePop` (Continue button scale pop on enable). JS wires `just-selected` / `just-enabled` classes with `animationend` self-cleanup via `{ once: true }`. `just-enabled` fires only on disabled→enabled transition (not on every `_setActiveSource` call).
 
 ---
 
@@ -318,13 +324,18 @@ dd.destroy()               // removes global listener, removes DOM
 
 ```
 Landing (#step1Panel — full-screen dashboard, no scroll)
-  ├─ Click drive card       → selectDrive() → workspace
+  ├─ Click device in #srcMemCardList → _setActiveSource() → hero updates, Continue enabled
+  ├─ Click source card btn (ExtDrive/LocalFolder) → _setActiveSource() → hero updates
+  ├─ Click Continue → selectDrive(activeSource) → workspace
   ├─ Click "Create Event →" (heroCard) → showEventCreator() → eventCreatorPanel (EventCreator.start)
   ├─ Click "Change Event"  (heroCard) → showEventCreatorResume() → eventCreatorPanel (EventCreator.resume)
   └─ Click "New Event →"   (heroCard) → EventCreator.resetSelection() → showEventCreator()
                                       eventCreatorPanel └─ ← Back → showLanding()
                                                                (re-renders hero card via _renderLandingEventCard)
 ```
+
+`activeSource` variable: `{ type: 'memory-card'|'external-drive'|'local-folder', name, path }` | `null`
+`_setActiveSource(source)` — sets state, syncs `.active-source` highlight on source cards, does targeted hero update (no innerHTML rebuild).
 
 `railMode` variable: `'card'` | `'event'`
 `setRailMode(mode)` — tracks mode only; `#stepRail` is removed so no DOM writes.
@@ -337,7 +348,7 @@ Landing (#step1Panel — full-screen dashboard, no scroll)
 
 `_renderLandingEventCard()` — targets `#heroCard`, called every time `showLanding()` runs:
 - No active event → hero with "Create New Event" + primary CTA button wired to `showEventCreator`.
-- Active event → hero gains `.has-event` class; shows collection name, event name/select, "Continue Event →" + "Change Event" buttons.
+- Active event → hero gains `.has-event` class; shows collection name, event name/select, source row (`hero-src-val` + readiness), "Continue Event →" (disabled until `activeSource`) + "Change Event" buttons.
 
 ---
 
@@ -495,6 +506,51 @@ FIX-ONLY pass, no new features, no architecture changes. 52 targeted patches app
 
 All naming conventions and archive rules (locked per this document) preserved. See `STABILIZATION_LOG.md` for per-patch status and `STABILIZATION_NOTES.md` for intentionally-deferred items (sync fs usage in pre-event-loop paths, debug handlers).
 
+
+### v0.7.2-dev — Home Screen Import Flow + UI Polish (2026-04-24)
+
+Uncommitted changes on top of `7f93af7`. Pure renderer + window-config changes; no import logic or data layer touched.
+
+**Frameless window (`main/main.js`, `main/preload.js`):**
+- Window size bumped to 1280×820, `frame: false`, `titleBarStyle: 'hiddenInset'`, `trafficLightPosition: { x: 16, y: 8 }`.
+- `window:minimize / window:toggleMaximize / window:close` IPC handlers added.
+- `window.api.minimize / toggleMaximize / close` exposed via preload.
+
+**Layout fixes (`renderer/index.html`):**
+- `.dash-container` expanded to `max-width: 1680px; padding: 0 32px` (was 1100px — caused empty space on wide displays).
+- `#sourceGrid` uses `repeat(auto-fit, minmax(320px, 1fr))` (was fixed 3-column).
+- `#heroCard` max-width 1150px, centred with `margin: var(--space-3) auto 0`.
+- Body background: `radial-gradient(ellipse at 50% 28%, rgba(137,180,250,0.055)…)` for subtle depth.
+
+**`#deviceSection` removed:**
+- Entire `#deviceSection` / `#driveListLarge` removed from HTML and CSS.
+- Memory card devices now render inside `.src-card-device-list#srcMemCardList` inside the Memory Card source card (`#srcMemCard`).
+- `#overviewSection { margin-top: auto }` pushes stats + footer to bottom of flex column, preserving no-scroll layout.
+
+**Source selection flow (`renderer/renderer.js`):**
+- `activeSource` state: `{ type: 'memory-card'|'external-drive'|'local-folder', name, path }` or `null`.
+- `_setActiveSource(source)` — updates state, syncs `.active-source` class on source cards, does targeted hero updates (no `innerHTML` rebuild; allows CSS transitions to fire).
+- `_typeLabelFor(type)` — returns `'Memory Card'` / `'External Drive'` / `'Local Folder'`.
+- `renderDrives(cards)` rewrote to target `#srcMemCardList`; re-applies `.selected` from `activeSource` on re-render without changing state. Two-line empty state. Stale `#driveListLarge` catch handler redirected.
+- `selectExternalDrive()` / `selectLocalFolder()` now call `_setActiveSource()` instead of `selectDrive()`.
+- `_updateMemCardBadge()` — stale `#deviceCountLabel` reference removed.
+- `activeSource = null` on `resetAppState()` and `changeDriveBtn` handler.
+
+**Readiness + button state:**
+- Hero has-event branch shows source value as `"NAME (Type)"` + `.hero-readiness` text.
+- Continue button `disabled` until `activeSource !== null`; transitions via `opacity` + `transform`.
+- On device click: device item gets `.just-selected` (triggers `selectPulse` keyframe), removed on `animationend`.
+- On button enable (disabled→enabled only): gets `.just-enabled` (triggers `btnEnablePop` keyframe), removed on `animationend`.
+
+**CSS additions:**
+- `@keyframes selectPulse` — glow pulse on device item selection (0.28s).
+- `@keyframes deviceAppear` — fade-in + `translateY(4px→0)` for new items (0.2s).
+- `@keyframes btnEnablePop` — subtle scale pop on Continue enable (0.22s).
+- `.src-device-item.just-selected`, `.hero-btn-primary.just-enabled` — single-fire animation classes.
+- `.hero-btn-primary:disabled { opacity: 0.5 }` (was 0.35).
+- Scrollbar polish on device list: `scrollbar-width: thin`, 4px thumb.
+
+---
 
 ### v0.7.1-dev — Dashboard Rebuild + UI Cleanup (2026-04-23)
 

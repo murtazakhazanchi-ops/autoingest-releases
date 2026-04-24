@@ -14,6 +14,9 @@
 
 'use strict';
 
+// ── Platform detection (frameless window) ─────────────────────────────────────
+if (navigator.platform.startsWith('Mac')) document.body.classList.add('is-mac');
+
 // ════════════════════════════════════════════════════════════════
 // USER FEEDBACK — non-blocking status bar messages
 // Replaces alert() for all user-facing notifications.
@@ -60,6 +63,7 @@ function showInlineHint(containerId, message, storageKey) {
 // ════════════════════════════════════════════════════════════════
 let activeDrive      = null;
 let activeFolderPath = null;
+let activeSource     = null; // { type: 'memory-card'|'external-drive'|'local-folder', name, path }
 
 /** Sidebar expansion state — persists across folder navigation, cleared on drive change */
 let expandedFolders   = new Set();
@@ -817,6 +821,66 @@ function showLanding() {
   renderHome();
 }
 
+function _typeLabelFor(type) {
+  return type === 'memory-card'   ? 'Memory Card'
+       : type === 'external-drive' ? 'External Drive'
+       : 'Local Folder';
+}
+
+/**
+ * Set the active import source and sync all UI that depends on it:
+ *   - highlights the owning source card
+ *   - updates hero source label, readiness, and Continue button
+ *     via targeted DOM update (preserves CSS transitions on the button)
+ */
+function _setActiveSource(source) {
+  activeSource = source;
+
+  // 1. Source card highlight
+  ['srcMemCard', 'srcExtDrive', 'srcLocalFolder'].forEach(id =>
+    document.getElementById(id)?.classList.remove('active-source'));
+  if (source) {
+    const cardId = source.type === 'memory-card'   ? 'srcMemCard'
+                 : source.type === 'external-drive' ? 'srcExtDrive'
+                 : 'srcLocalFolder';
+    document.getElementById(cardId)?.classList.add('active-source');
+  }
+
+  const onLanding = document.getElementById('step1Panel')?.style.display !== 'none';
+  if (!onLanding) return;
+
+  const heroCard = document.getElementById('heroCard');
+  const srcReady = source !== null;
+
+  if (heroCard?.classList.contains('has-event')) {
+    // 2. Targeted hero update — no innerHTML rebuild, so transitions fire cleanly
+    const srcVal = heroCard.querySelector('.hero-src-val');
+    const readiness = heroCard.querySelector('.hero-readiness');
+    const continueBtn = document.getElementById('heroPrimaryBtn');
+
+    if (srcVal) {
+      srcVal.innerHTML = srcReady
+        ? `${_esc(source.name)}<span class="hero-src-type">(${_typeLabelFor(source.type)})</span>`
+        : '—';
+    }
+    if (readiness) {
+      readiness.className = `hero-readiness${srcReady ? ' ready' : ''}`;
+      readiness.innerHTML = `<span class="hero-readiness-dot"></span>${srcReady ? 'Ready to import' : 'Select a source to continue'}`;
+    }
+    if (continueBtn) {
+      const wasDisabled = continueBtn.disabled;
+      continueBtn.disabled = !srcReady;
+      if (wasDisabled && srcReady) {
+        continueBtn.classList.add('just-enabled');
+        continueBtn.addEventListener('animationend', () => continueBtn.classList.remove('just-enabled'), { once: true });
+      }
+    }
+  } else {
+    // No-event state: full rebuild (no source row rendered there anyway)
+    _renderLandingEventCard();
+  }
+}
+
 // ── Simple HTML escaper for landing card dynamic content ──────────────────
 function _esc(s) {
   return String(s ?? '')
@@ -867,6 +931,8 @@ function _renderLandingEventCard() {
         ).join('')
       }</select>`;
 
+  const srcReady = activeSource !== null;
+
   card.className = 'has-event';
   card.innerHTML = `
     <div class="hero-icon-wrap">
@@ -878,15 +944,23 @@ function _renderLandingEventCard() {
       </svg>
     </div>
     <div class="hero-body">
-      <div class="hero-pretitle">Continue Event</div>
+      <div class="hero-pretitle">Current Event</div>
       ${eventDisplay}
       <div class="hero-collection">
         <span class="hero-coll-label">Collection</span>${_esc(coll.name)}
       </div>
       <span class="hero-mode-badge ${isMulti ? 'multi' : 'single'}">${_esc(modeLabel)}</span>
+      <div class="hero-source-row">
+        <span class="hero-src-lbl">Source</span>
+        <span class="hero-src-val">${srcReady ? `${_esc(activeSource.name)}<span class="hero-src-type">(${_typeLabelFor(activeSource.type)})</span>` : '—'}</span>
+      </div>
+      <div class="hero-readiness${srcReady ? ' ready' : ''}">
+        <span class="hero-readiness-dot"></span>
+        ${srcReady ? 'Ready to import' : 'Select a source to continue'}
+      </div>
     </div>
     <div class="hero-actions">
-      <button id="heroPrimaryBtn" class="hero-btn-primary green">Continue Event →</button>
+      <button id="heroPrimaryBtn" class="hero-btn-primary green"${srcReady ? '' : ' disabled'}>Continue →</button>
       <button id="heroSecondaryBtn" class="hero-btn-secondary">Change Event</button>
     </div>`;
 
@@ -898,7 +972,8 @@ function _renderLandingEventCard() {
   });
   document.getElementById('heroPrimaryBtn')
     ?.addEventListener('click', () => {
-      document.getElementById('sourceSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (!activeSource) { showMessage('Select a source to continue'); return; }
+      selectDrive({ mountpoint: activeSource.path, label: activeSource.name });
     });
   document.getElementById('heroSecondaryBtn')
     ?.addEventListener('click', showEventCreatorResume);
@@ -968,39 +1043,30 @@ function _updateMemCardBadge(count) {
     if (dot) dot.className = count > 0 ? 'src-h-dot src-h-dot--active' : 'src-h-dot';
   }
 
-  const countLabel = document.getElementById('deviceCountLabel');
-  if (countLabel) {
-    countLabel.textContent = count > 0 ? `${count} device${count > 1 ? 's' : ''} detected` : '';
-  }
 }
 
 async function chooseSourceFolder() {
   return await window.api.chooseDest();
 }
 
-function selectMemoryCard() {
-  document.getElementById('devicePanel')?.scrollIntoView({ behavior: 'smooth' });
-}
-
 async function selectExternalDrive() {
   const chosen = await chooseSourceFolder();
   if (!chosen) return;
   const label = chosen.replace(/\\/g, '/').split('/').filter(Boolean).pop() || 'External Drive';
-  await selectDrive({ mountpoint: chosen, label });
+  _setActiveSource({ type: 'external-drive', name: label, path: chosen });
 }
 
 async function selectLocalFolder() {
   const chosen = await chooseSourceFolder();
   if (!chosen) return;
   const label = chosen.replace(/\\/g, '/').split('/').filter(Boolean).pop() || 'Local Folder';
-  await selectDrive({ mountpoint: chosen, label });
+  _setActiveSource({ type: 'local-folder', name: label, path: chosen });
 }
 
 document.getElementById('ecBackBtn').addEventListener('click', () => {
   if (!EventCreator.navigateBack()) showLanding();
 });
 document.addEventListener('eventcreator:done', showLanding);
-document.getElementById('srcMemCardBtn')?.addEventListener('click', selectMemoryCard);
 document.getElementById('srcExtDriveBtn')?.addEventListener('click', selectExternalDrive);
 document.getElementById('srcLocalFolderBtn')?.addEventListener('click', selectLocalFolder);
 document.getElementById('modeEventBtn')?.addEventListener('click', () => _applyImportMode('event'));
@@ -1010,21 +1076,16 @@ document.getElementById('modeQuickBtn')?.addEventListener('click', () => _applyI
 // DRIVE SELECTION
 // ════════════════════════════════════════════════════════════════
 function renderDrives(cards) {
-  const container = document.getElementById('driveListLarge');
   document.getElementById('statusDrives').textContent =
     `Drives scanned: ${new Date().toLocaleTimeString()}`;
   _updateMemCardBadge(cards.length);
 
-  // ── Disconnect detection ───────────────────────────────────────
-  // If the active drive is no longer in the card list, it was physically removed.
+  // ── Disconnect detection: active workspace drive removed ───────
   if (activeDrive) {
     const stillPresent = cards.some(c => c.mountpoint === activeDrive.mountpoint);
     if (!stillPresent) {
-      // Patch 35: abort any running import immediately before clearing state
       window.api.abortCopy();
-      // Stop any running import gracefully (importRunning flag gates further IPC)
       importRunning = false;
-      // Close progress overlay if open
       document.getElementById('progressOverlay').classList.remove('visible');
       showMessage('Card disconnected. Import cancelled.');
       resetAppState();
@@ -1032,24 +1093,54 @@ function renderDrives(cards) {
     }
   }
 
-  const subtitle = document.getElementById('step1Subtitle');
+  // ── Disconnect detection: selected source card removed ─────────
+  if (activeSource && activeSource.type === 'memory-card') {
+    const stillPresent = cards.some(c => c.mountpoint === activeSource.path);
+    if (!stillPresent) {
+      activeSource = null;
+      _renderLandingEventCard();
+    }
+  }
+
+  // ── Render drive list inside the Memory Card source card ───────
+  const list = document.getElementById('srcMemCardList');
+  if (!list) return;
+
   if (!cards.length) {
-    if (subtitle) subtitle.textContent = 'Insert a camera card to start browsing photos and videos.';
-    container.innerHTML = `<div id="noDriveMsg"><span class="msg-icon">🔌</span><span>No memory cards detected. Connect a camera card to begin.</span></div>`;
+    list.innerHTML = `<div class="src-device-empty-row"><span class="empty-icon">🔌</span><span>No memory cards detected</span><span class="empty-sub">Connect a camera card to continue</span></div>`;
     return;
   }
-  if (subtitle) subtitle.textContent = 'Select a card below to view photos and videos.';
-  container.innerHTML = cards.map(c => `
-    <div class="drive-card-large"
+
+  const selectedPath = activeSource?.type === 'memory-card' ? activeSource.path : null;
+  list.innerHTML = cards.map(c => {
+    const isSel = c.mountpoint === selectedPath;
+    return `<div class="src-device-item${isSel ? ' selected' : ''}"
          data-mountpoint="${escapeHtml(c.mountpoint)}"
          data-label="${escapeHtml(c.label)}">
-      <span class="dc-icon">📸</span>
-      <span class="dc-label">${escapeHtml(c.label)}</span>
-      <span class="dc-path">${escapeHtml(c.mountpoint)}</span>
-    </div>`).join('');
-  container.querySelectorAll('.drive-card-large').forEach(el =>
-    el.addEventListener('click', () =>
-      selectDrive({ mountpoint: el.dataset.mountpoint, label: el.dataset.label })));
+      <span style="font-size:1rem;flex-shrink:0">📸</span>
+      <div style="flex:1;min-width:0">
+        <div class="src-device-item-name">${escapeHtml(c.label)}</div>
+        <div class="src-device-item-path">${escapeHtml(c.mountpoint)}</div>
+      </div>
+      <div class="src-device-check">${isSel ? '✓' : ''}</div>
+    </div>`;
+  }).join('');
+
+  list.querySelectorAll('.src-device-item').forEach(el => {
+    el.addEventListener('click', () => {
+      _setActiveSource({ type: 'memory-card', name: el.dataset.label, path: el.dataset.mountpoint });
+      // Sync selection visuals immediately (no full re-render of list)
+      list.querySelectorAll('.src-device-item').forEach(item => {
+        const sel = item.dataset.mountpoint === el.dataset.mountpoint;
+        item.classList.toggle('selected', sel);
+        const chk = item.querySelector('.src-device-check');
+        if (chk) chk.textContent = sel ? '✓' : '';
+      });
+      // Confirmation pulse
+      el.classList.add('just-selected');
+      el.addEventListener('animationend', () => el.classList.remove('just-selected'), { once: true });
+    });
+  });
 }
 
 async function selectDrive(drive) {
@@ -1079,7 +1170,7 @@ document.getElementById('changeDriveBtn').addEventListener('click', () => {
   isLoadingFiles   = false;
   currentFolder    = null;
   fileLoadRequestId++;
-  activeDrive = null; activeFolderPath = null;
+  activeDrive = null; activeFolderPath = null; activeSource = null;
   expandedFolders.clear(); dcimChildrenCache = []; cachedDcimPath = null;
   selectedFiles.clear(); currentFiles = []; lastClickedPath = null; tileMap = new Map();
   resetViewCache();
@@ -1102,6 +1193,7 @@ function resetAppState() {
 
   activeDrive      = null;
   activeFolderPath = null;
+  activeSource     = null;
   lastClickedPath  = null;
   importRunning    = false;
   isShuttingDown   = false;  // cleared last — safe to accept a new card
@@ -2955,8 +3047,8 @@ async function initApp() {
   window.api.onDrivesUpdated(renderDrives);
 
   window.api.getDrives().then(renderDrives).catch(err => {
-    document.getElementById('driveListLarge').innerHTML =
-      `<div id="noDriveMsg"><span class="msg-icon">⚠️</span><span>${escapeHtml(err.message)}</span></div>`;
+    const list = document.getElementById('srcMemCardList');
+    if (list) list.innerHTML = `<div class="src-device-empty-row"><span class="empty-icon">⚠️</span><span>${escapeHtml(err.message)}</span></div>`;
   });
 
   // Show "What's New" if the app just updated — non-blocking, after UI is ready
@@ -3147,6 +3239,15 @@ function openHelp() {
 }
 
 document.getElementById('helpBtn').addEventListener('click', openHelp);
+
+// ── Frameless window controls ─────────────────────────────────────────────────
+document.getElementById('minBtn')?.addEventListener('click', () => window.api.minimize());
+document.getElementById('maxBtn')?.addEventListener('click', () => window.api.toggleMaximize());
+document.getElementById('closeBtn')?.addEventListener('click', () => window.api.close());
+document.getElementById('dashHeader')?.addEventListener('dblclick', (e) => {
+  if (e.target.closest('button, input, select, a')) return;
+  window.api.toggleMaximize();
+});
 document.getElementById('helpCloseBtn').addEventListener('click', () => {
   document.getElementById('helpOverlay').classList.remove('visible');
 });

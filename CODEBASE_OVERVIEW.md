@@ -2,13 +2,65 @@
 
 # AutoIngest — Complete Technical Codebase Overview
 
-**Version:** 0.7.1-dev  
-**Last updated:** 2026-04-23  
-**HEAD:** `ba4c4a6` — Dashboard rebuild + UI cleanup done. Commit G (import routing) is next.
+**Version:** 0.7.2-dev  
+**Last updated:** 2026-04-24  
+**HEAD:** `7f93af7` — docs update. Uncommitted: frameless window + source-selection flow + UI polish.
 
 ---
 
-## 0c. v0.7.1-dev Dashboard Rebuild + UI Cleanup (2026-04-23)
+## 0c. v0.7.2-dev — Home Screen Import Flow + UI Polish (2026-04-24)
+
+Changes in `main/main.js`, `main/preload.js`, `renderer/index.html`, `renderer/renderer.js`. No import logic or data layer touched.
+
+### Frameless window
+
+`createWindow()` now uses `frame: false`, `titleBarStyle: 'hiddenInset'`, `trafficLightPosition: { x: 16, y: 8 }`, window size 1280×820. Three new IPC handlers (`window:minimize`, `window:toggleMaximize`, `window:close`) and matching `window.api` methods (`minimize`, `toggleMaximize`, `close`) via preload.
+
+### Layout fixes
+
+- `.dash-container` max-width expanded to `1680px; padding: 0 32px` — eliminates empty space on wide displays.
+- `#sourceGrid` uses `repeat(auto-fit, minmax(320px, 1fr))` for adaptive column count.
+- `#heroCard` centred at `max-width: 1150px` with glow-enhanced box-shadow.
+- Body: subtle `radial-gradient` at 50% 28% in `--blue` hue for depth.
+
+### `#deviceSection` removed
+
+`#deviceSection` and `#driveListLarge` are completely gone from HTML and CSS. Memory card device items now render inside `#srcMemCardList` (a `.src-card-device-list` inside `#srcMemCard`). `#overviewSection { margin-top: auto }` pushes the stats row and footer to the bottom of the flex column, preserving the no-scroll single-screen layout.
+
+### Source selection flow
+
+New `activeSource` state: `{ type: 'memory-card'|'external-drive'|'local-folder', name, path }` or `null`.
+
+| New symbol | What it does |
+|---|---|
+| `activeSource` | Single source of truth for which drive/folder the user has picked |
+| `_setActiveSource(source)` | Sets state; syncs `.active-source` class on source cards; does targeted hero DOM update (no `innerHTML` rebuild — CSS transitions fire cleanly) |
+| `_typeLabelFor(type)` | Returns `'Memory Card'` / `'External Drive'` / `'Local Folder'` |
+
+`renderDrives(cards)` now writes into `#srcMemCardList`; re-applies `.selected` from `activeSource` path on re-render without mutating state. Two-line empty state shown when no cards detected. Stale `#driveListLarge` reference in `getDrives().catch` redirected; stale `#deviceCountLabel` reference removed from `_updateMemCardBadge()`.
+
+`selectExternalDrive()` / `selectLocalFolder()` call `_setActiveSource()`. Device click does NOT navigate — only the Continue button triggers `selectDrive()`.
+
+### Readiness UI
+
+Hero has-event branch shows:
+- `.hero-src-val` — source name in monospace + `.hero-src-type` in parentheses.
+- `.hero-readiness` — transitions between "Select a source to continue" (muted) and "Ready to import" (green, `var(--green)`).
+- Continue button: `disabled` when `activeSource === null`; `opacity: 0.5` disabled state.
+
+### CSS animations
+
+| Keyframe | Duration | Trigger | What it does |
+|---|---|---|---|
+| `selectPulse` | 0.28s | `.just-selected` on device item click | Blue glow pulse confirmation |
+| `deviceAppear` | 0.2s | Always on `.src-device-item` | Fade-in + `translateY(4px→0)` on list populate |
+| `btnEnablePop` | 0.22s | `.just-enabled` on Continue button | Subtle scale pop (0→1.04→1) on enable |
+
+Both `.just-selected` and `.just-enabled` are added in JS and removed via `animationend` with `{ once: true }`. `just-enabled` fires only on the disabled→enabled transition.
+
+---
+
+## 0d. v0.7.1-dev Dashboard Rebuild + UI Cleanup (2026-04-23)
 
 Commit `ba4c4a6` — pure renderer changes (`renderer/index.html`, `renderer/renderer.js`).
 
@@ -20,9 +72,8 @@ Commit `ba4c4a6` — pure renderer changes (`renderer/index.html`, `renderer/ren
 2. **`.dash-container`** — `max-width: 1100px`, centred, `flex: 1; min-height: 0; overflow: hidden` — fills remaining height after header.
 3. **`#heroCard`** — single landscape card. No-event state: "Create New Event" CTA wired to `showEventCreator`. Has-event state (`.has-event` class): green border, checkmark icon, event name, collection label, "Continue Event →" + "Change Event" buttons. Managed entirely by `_renderLandingEventCard()`.
 4. **`#modeToggleRow`** — segmented control with `#modeEventBtn` / `#modeQuickBtn`. Drives `importMode` state and `_applyImportMode()`.
-5. **`#sourceSection`** — three horizontal `.src-card-h` cards: `#srcMemCard` (Memory Card, auto-detected), `#srcExtDrive` (External Drive), `#srcLocalFolder` (Local Folder — `display:none` in Quick mode). IDs and inner structure preserved for `renderDrives()` / `_updateMemCardBadge()` compatibility.
-6. **`#deviceSection`** — `flex: 1; min-height: 0` — grows to fill all remaining space. Contains `#driveListLarge` (`flex: 1; overflow-y: auto`) which is the **only scrollable zone** on the dashboard.
-7. **`#overviewSection`** — `flex-shrink: 0` — compact 5-tile row at the bottom before the footer.
+5. **`#sourceSection`** — three horizontal `.src-card-h` cards: `#srcMemCard` (Memory Card, auto-detected), `#srcExtDrive` (External Drive), `#srcLocalFolder` (Local Folder — `display:none` in Quick mode). Each card contains a `.src-card-device-list` for inline device items. `#srcMemCardList` receives `renderDrives()` output.
+6. **`#overviewSection`** — `margin-top: auto; flex-shrink: 0` — pushed to bottom of flex column. Compact 5-tile stat row.
 8. **`#dashFooter`** — `justify-content: space-between`. Left: `#dashVersion`. Right: `.footer-utils` with three `.footer-icon-btn` elements: `#helpBtn`, `#bugReportBtn`, `#settingsBtn`.
 
 ### New renderer.js state and functions
@@ -783,6 +834,9 @@ See **Section 5 (Data Flow — Import Pipeline)** for the full import sequence.
 | `getLastUpdateInfo` | renderer → main | `window.api.getLastUpdateInfo()` | `ipcMain.handle` | Returns `{ version, notes }` once per update |
 | `renderer:error` | renderer → main | preload `window.error` listener | `ipcMain.on` (crashReporter) | Forwards JS error to telemetry |
 | `renderer:unhandledRejection` | renderer → main | preload `unhandledrejection` | `ipcMain.on` (crashReporter) | Forwards rejection to telemetry |
+| `window:minimize` | renderer → main | `window.api.minimize()` | `ipcMain.handle` | Minimizes the focused window |
+| `window:toggleMaximize` | renderer → main | `window.api.toggleMaximize()` | `ipcMain.handle` | Maximizes or restores the focused window |
+| `window:close` | renderer → main | `window.api.close()` | `ipcMain.handle` | Closes the focused window |
 | `debug:telemetry` | renderer → main | (temp debug only) | `ipcMain.handle` | Tests Sheets auth and append |
 | `debug:flush` | renderer → main | (temp debug only) | `ipcMain.handle` | Directly appends debug row to Sheets |
 | `ping` | renderer → main | legacy | `ipcMain.handle` | Returns `'pong 🏓'` |
@@ -920,6 +974,7 @@ Steps are identical except `feedback:send` IPC calls `telemetry.flush()` immedia
 
 | Variable | Type | What it tracks | Read by | Written by |
 |---|---|---|---|---|
+| `activeSource` | `{ type, name, path } \| null` | Which drive/folder the user has explicitly selected on the dashboard; drives Continue button enabled state | `_setActiveSource`, `renderDrives` (re-apply `.selected`), `resetAppState` | `_setActiveSource` (device click, ext-drive/local-folder pick), `resetAppState`, `changeDriveBtn` |
 | `importMode` | `'event' \| 'quick'` | Active ingestion mode; `'quick'` hides Local Folder source card | `_applyImportMode`, `renderHome` | `modeEventBtn` / `modeQuickBtn` click handlers |
 | `activeDrive` | `{ label, mountpoint } \| null` | Currently selected memory card | `renderDrives`, `browseFolder`, `renderFolders`, `ejectBtn`, `resetAppState` | `selectDrive`, `changeDriveBtn`, `resetAppState`, `renderDrives` (disconnect) |
 | `activeFolderPath` | `string \| null` | Path of the currently browsed folder | `renderFolders`, `browseFolder` | `selectDrive`, `browseFolder`, `applyFileBatch`, `changeDriveBtn`, `resetAppState` |

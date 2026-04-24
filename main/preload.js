@@ -172,4 +172,9 @@ contextBridge.exposeInMainWorld('api', {
   setLastEvent:             (v)                      => ipcRenderer.invoke('settings:setLastEvent', v),
   verifyLastEvent:          (collectionPath)          => ipcRenderer.invoke('settings:verifyLastEvent', collectionPath),
 
+  // ── Window controls ──
+  minimize:       () => ipcRenderer.invoke('window:minimize'),
+  toggleMaximize: () => ipcRenderer.invoke('window:toggleMaximize'),
+  close:          () => ipcRenderer.invoke('window:close'),
+
 });

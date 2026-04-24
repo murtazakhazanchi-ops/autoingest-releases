@@ -115,8 +115,16 @@ async function updateImportIndex(filePaths, destPath) {
 // ── Window ───────────────────────────────────────────────────────────────────
 function createWindow() {
   const win = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: 1280,
+    height: 820,
+    frame: false,
+    titleBarStyle: 'hiddenInset',
+    trafficLightPosition: { x: 16, y: 8 },
+    titleBarOverlay: {
+      color: '#00000000',
+      symbolColor: '#ffffff'
+    },
+    resizable: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -806,6 +814,18 @@ ipcMain.handle('lists:get',        (_event, name)                              =
 ipcMain.handle('lists:add',        (_event, name, value)                       => listManager.addToList(name, value));
 ipcMain.handle('lists:match',      (_event, name, input)                       => aliasEngine.match(input, name, listManager.getList(name)));
 ipcMain.handle('lists:learnAlias', (_event, name, canonicalId, label, typed)   => aliasEngine.learnAlias(name, canonicalId, label, typed));
+
+// ── Window controls ──────────────────────────────────────────────────────────
+ipcMain.handle('window:minimize', () => {
+  BrowserWindow.getFocusedWindow()?.minimize();
+});
+ipcMain.handle('window:toggleMaximize', () => {
+  const win = BrowserWindow.getFocusedWindow();
+  if (win) win.isMaximized() ? win.unmaximize() : win.maximize();
+});
+ipcMain.handle('window:close', () => {
+  BrowserWindow.getFocusedWindow()?.close();
+});
 
 // TEMP DEBUG
 ipcMain.handle('debug:flush', async () => {
