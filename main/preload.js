@@ -66,7 +66,8 @@ contextBridge.exposeInMainWorld('api', {
   // ── Drives ──
   getDrives:       () => ipcRenderer.invoke('drives:get'),
   ejectDrive:      (mountpoint) => ipcRenderer.invoke('drive:eject', mountpoint),
-  onDrivesUpdated: (cb) => _register('drives:updated', (_e, cards) => cb(cards)),
+  onDrivesUpdated:    (cb) => _register('drives:updated',    (_e, cards) => cb(cards)),
+  onAllDrivesUpdated: (cb) => _register('drives:allUpdated', (_e, cards) => cb(cards)),
 
   // ── File browser ──
   getFiles: (drivePath, folderPath = null, requestId = null) =>

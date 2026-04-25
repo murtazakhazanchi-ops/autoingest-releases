@@ -18,6 +18,56 @@
 if (navigator.platform.startsWith('Mac')) document.body.classList.add('is-mac');
 
 // ════════════════════════════════════════════════════════════════
+// THEME SYSTEM
+// ════════════════════════════════════════════════════════════════
+
+function getEffectiveTheme() {
+  const pref = localStorage.getItem('theme') || 'auto';
+  if (pref === 'auto') {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  return pref;
+}
+
+function applyTheme() {
+  document.documentElement.setAttribute('data-theme', getEffectiveTheme());
+}
+
+function setThemePref(pref) {
+  localStorage.setItem('theme', pref);
+  applyTheme();
+  document.querySelectorAll('.settings-theme-radio').forEach(r => {
+    r.checked = r.value === pref;
+  });
+}
+
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  if ((localStorage.getItem('theme') || 'auto') === 'auto') applyTheme();
+});
+
+// Settings modal open
+document.getElementById('settingsBtn')?.addEventListener('click', () => {
+  const pref = localStorage.getItem('theme') || 'auto';
+  document.querySelectorAll('.settings-theme-radio').forEach(r => { r.checked = r.value === pref; });
+  document.getElementById('settingsModal').classList.add('visible');
+});
+
+// Settings modal close
+document.getElementById('settingsClose')?.addEventListener('click', () => {
+  document.getElementById('settingsModal').classList.remove('visible');
+});
+
+// Radio changes
+document.querySelectorAll('.settings-theme-radio').forEach(r => {
+  r.addEventListener('change', () => setThemePref(r.value));
+});
+
+// Click-outside dismiss
+document.getElementById('settingsModal')?.addEventListener('click', e => {
+  if (e.target === e.currentTarget) e.currentTarget.classList.remove('visible');
+});
+
+// ════════════════════════════════════════════════════════════════
 // USER FEEDBACK — non-blocking status bar messages
 // Replaces alert() for all user-facing notifications.
 // ════════════════════════════════════════════════════════════════
@@ -64,6 +114,10 @@ function showInlineHint(containerId, message, storageKey) {
 let activeDrive      = null;
 let activeFolderPath = null;
 let activeSource     = null; // { type: 'memory-card'|'external-drive'|'local-folder', name, path }
+let _prevDriveKeys   = null; // diff key for drive list; null = never rendered
+let _prevExtKeys     = null; // diff key for external drive list
+let quickImportDest  = localStorage.getItem('quickImportDest') || null;
+let _currentMemCardMountpoints = new Set(); // mountpoints of DCIM cards, for ext-drive filtering
 
 /** Sidebar expansion state — persists across folder navigation, cleared on drive change */
 let expandedFolders   = new Set();
@@ -420,7 +474,7 @@ const thumbCache = new LRUThumbCache(THUMB_CACHE_MAX);
 // THUMBNAIL BUILDER
 // Single element inside .file-thumb — no overlapping layers.
 // ════════════════════════════════════════════════════════════════
-const SVG_FALLBACK_PHOTO = `<svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="9" width="34" height="26" rx="3" fill="#89b4fa22" stroke="#89b4fa" stroke-width="1.5"/><rect x="14" y="4" width="12" height="6" rx="2" fill="#89b4fa33" stroke="#89b4fa" stroke-width="1.2"/><circle cx="20" cy="23" r="7" stroke="#89b4fa" stroke-width="1.5"/><circle cx="20" cy="23" r="3.5" stroke="#89b4fa" stroke-width="1.2"/><circle cx="20" cy="23" r="1.2" fill="#89b4fa"/></svg>`;
+const SVG_FALLBACK_PHOTO = `<svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="9" width="34" height="26" rx="3" fill="currentColor" fill-opacity="0.13" stroke="currentColor" stroke-width="1.5"/><rect x="14" y="4" width="12" height="6" rx="2" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-width="1.2"/><circle cx="20" cy="23" r="7" stroke="currentColor" stroke-width="1.5"/><circle cx="20" cy="23" r="3.5" stroke="currentColor" stroke-width="1.2"/><circle cx="20" cy="23" r="1.2" fill="currentColor"/></svg>`;
 
 function thumbHtml(file) {
   const ext   = fileExt(file.name);
@@ -595,7 +649,8 @@ if (cachedUrl) {
         } else {
           img.dataset.loaded = 'error';
           img.classList.add('thumb-error');
-          img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(SVG_FALLBACK_PHOTO)}`;
+          const accentHex = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#89b4fa';
+          img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(SVG_FALLBACK_PHOTO.replace(/currentColor/g, accentHex))}`;
         }
       })
       .finally(() => {
@@ -849,6 +904,8 @@ function _setActiveSource(source) {
   const onLanding = document.getElementById('step1Panel')?.style.display !== 'none';
   if (!onLanding) return;
 
+  _syncQiImportBtn();
+
   const heroCard = document.getElementById('heroCard');
   const srcReady = source !== null;
 
@@ -961,7 +1018,7 @@ function _renderLandingEventCard() {
     </div>
     <div class="hero-actions">
       <button id="heroPrimaryBtn" class="hero-btn-primary green"${srcReady ? '' : ' disabled'}>Continue →</button>
-      <button id="heroSecondaryBtn" class="hero-btn-secondary">Change Event</button>
+      <button id="heroSecondaryBtn" class="hero-btn-secondary"><svg viewBox="0 0 24 24"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>Change Event</button>
     </div>`;
 
   document.getElementById('heroEventSelect')?.addEventListener('change', e => {
@@ -1011,12 +1068,37 @@ function _renderInsightsBar() {
     : '—';
 }
 
+function _switchModeCard(toMode) {
+  document.getElementById('heroCard')?.classList.toggle('card-active', toMode === 'event');
+  document.getElementById('quickImportCard')?.classList.toggle('card-active', toMode === 'quick');
+}
+
+function _getEffectiveQuickDest() {
+  return quickImportDest || EventCreator.getSessionArchiveRoot() || '';
+}
+
+function _syncQiImportBtn() {
+  const btn = document.getElementById('qiImportBtn');
+  if (btn) btn.disabled = !(activeSource && _getEffectiveQuickDest());
+}
+
+function _renderQuickImportCard() {
+  const dest = _getEffectiveQuickDest();
+  const el   = document.getElementById('qiDestPath');
+  if (el) el.textContent = dest
+    ? (dest.length > 60 ? '…' + dest.slice(-57) : dest)
+    : 'Select a destination to continue';
+  _syncQiImportBtn();
+}
+
 function _applyImportMode(mode) {
   importMode = mode;
   document.getElementById('modeEventBtn')?.classList.toggle('active', mode === 'event');
   document.getElementById('modeQuickBtn')?.classList.toggle('active', mode === 'quick');
   const srcLocal = document.getElementById('srcLocalFolder');
   if (srcLocal) srcLocal.classList.toggle('hidden', mode === 'quick');
+  _switchModeCard(mode);
+  if (mode === 'quick') _renderQuickImportCard();
 }
 
 function renderHome() {
@@ -1038,7 +1120,7 @@ function _updateMemCardBadge(count) {
   if (statusEl) {
     statusEl.textContent = count > 0
       ? `${count} card${count > 1 ? 's' : ''} detected`
-      : 'No cards detected';
+      : 'No memory cards detected';
     const dot = statusEl.previousElementSibling;
     if (dot) dot.className = count > 0 ? 'src-h-dot src-h-dot--active' : 'src-h-dot';
   }
@@ -1072,6 +1154,58 @@ document.getElementById('srcLocalFolderBtn')?.addEventListener('click', selectLo
 document.getElementById('modeEventBtn')?.addEventListener('click', () => _applyImportMode('event'));
 document.getElementById('modeQuickBtn')?.addEventListener('click', () => _applyImportMode('quick'));
 
+document.getElementById('qiChangeDestBtn')?.addEventListener('click', async () => {
+  const chosen = await window.api.chooseDest();
+  if (chosen) {
+    quickImportDest = chosen;
+    localStorage.setItem('quickImportDest', chosen);
+    _renderQuickImportCard();
+  }
+});
+
+document.getElementById('qiImportBtn')?.addEventListener('click', async () => {
+  const dest = _getEffectiveQuickDest();
+  if (!activeSource || !dest) return;
+  await setDestPath(dest);
+  selectDrive({ mountpoint: activeSource.path, label: activeSource.name });
+});
+
+// ════════════════════════════════════════════════════════════════
+// DRIVE METADATA HELPERS
+// ════════════════════════════════════════════════════════════════
+
+function _formatCapacity(bytes) {
+  if (!bytes || bytes <= 0) return '';
+  const gb = bytes / (1024 ** 3);
+  if (gb >= 1) return `${Math.round(gb)} GB`;
+  const mb = bytes / (1024 ** 2);
+  return `${Math.round(mb)} MB`;
+}
+
+function _inferCardType(drive) {
+  const bus  = (drive.busType    || '').toUpperCase();
+  const desc = (drive.description || '').toLowerCase();
+  if (bus === 'SD' || drive.isCard) {
+    if (desc.includes('sdxc')) return 'SDXC';
+    if (desc.includes('sdhc')) return 'SDHC';
+    if (desc.includes('sdsc') || desc.includes('sd ')) return 'SD';
+    return 'SD Card';
+  }
+  if (bus === 'USB') return 'USB';
+  if (bus === 'ATA' || bus === 'SATA') return 'SSD';
+  if (bus === 'NVME') return 'NVMe';
+  return '';
+}
+
+function _buildDeviceMeta(drive) {
+  const parts = [drive.mountpoint];
+  const cap  = _formatCapacity(drive.size);
+  if (cap) parts.push(cap);
+  const type = _inferCardType(drive);
+  if (type) parts.push(type);
+  return parts.join(' • '); // bullet separator
+}
+
 // ════════════════════════════════════════════════════════════════
 // DRIVE SELECTION
 // ════════════════════════════════════════════════════════════════
@@ -1079,6 +1213,7 @@ function renderDrives(cards) {
   document.getElementById('statusDrives').textContent =
     `Drives scanned: ${new Date().toLocaleTimeString()}`;
   _updateMemCardBadge(cards.length);
+  _currentMemCardMountpoints = new Set(cards.map(c => c.mountpoint));
 
   // ── Disconnect detection: active workspace drive removed ───────
   if (activeDrive) {
@@ -1106,8 +1241,23 @@ function renderDrives(cards) {
   const list = document.getElementById('srcMemCardList');
   if (!list) return;
 
+  const newKey = cards.map(c => c.mountpoint).join('|');
+
+  if (newKey === _prevDriveKeys) {
+    // List unchanged — sync selection highlights only (prevents DOM-rebuild flicker)
+    const selectedPath = activeSource?.type === 'memory-card' ? activeSource.path : null;
+    list.querySelectorAll('.src-device-item').forEach(item => {
+      const sel = item.dataset.mountpoint === selectedPath;
+      item.classList.toggle('selected', sel);
+      const chk = item.querySelector('.src-device-check');
+      if (chk) chk.textContent = sel ? '✓' : '';
+    });
+    return;
+  }
+  _prevDriveKeys = newKey;
+
   if (!cards.length) {
-    list.innerHTML = `<div class="src-device-empty-row"><span class="empty-icon">🔌</span><span>No memory cards detected</span><span class="empty-sub">Connect a camera card to continue</span></div>`;
+    list.innerHTML = `<div class="src-device-empty-row"><span class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h11v20H4V8z"/></svg></span><span>No memory cards detected</span><span class="empty-sub">Connect a camera card to continue</span></div>`;
     return;
   }
 
@@ -1117,10 +1267,10 @@ function renderDrives(cards) {
     return `<div class="src-device-item${isSel ? ' selected' : ''}"
          data-mountpoint="${escapeHtml(c.mountpoint)}"
          data-label="${escapeHtml(c.label)}">
-      <span style="font-size:1rem;flex-shrink:0">📸</span>
+      <svg class="device-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h11v20H4V8z"/><path d="M9 14v5M12 14v5M15 14v5"/></svg>
       <div style="flex:1;min-width:0">
         <div class="src-device-item-name">${escapeHtml(c.label)}</div>
-        <div class="src-device-item-path">${escapeHtml(c.mountpoint)}</div>
+        <div class="src-device-item-meta">${escapeHtml(_buildDeviceMeta(c))}</div>
       </div>
       <div class="src-device-check">${isSel ? '✓' : ''}</div>
     </div>`;
@@ -1137,6 +1287,71 @@ function renderDrives(cards) {
         if (chk) chk.textContent = sel ? '✓' : '';
       });
       // Confirmation pulse
+      el.classList.add('just-selected');
+      el.addEventListener('animationend', () => el.classList.remove('just-selected'), { once: true });
+    });
+  });
+}
+
+function renderExtDrives(cards) {
+  const list = document.getElementById('srcExtDriveList');
+  if (!list) return;
+
+  const filtered = cards.filter(c => c.mountpoint && !_currentMemCardMountpoints.has(c.mountpoint));
+
+  // Disconnect detection: selected ext drive removed
+  if (activeSource && activeSource.type === 'external-drive') {
+    const stillPresent = filtered.some(c => c.mountpoint === activeSource.path);
+    if (!stillPresent) {
+      activeSource = null;
+      _renderLandingEventCard();
+    }
+  }
+  const newKey   = filtered.map(c => c.mountpoint).join('|');
+
+  if (newKey === _prevExtKeys) {
+    // List unchanged — sync selection highlights only
+    const selectedPath = activeSource?.type === 'external-drive' ? activeSource.path : null;
+    list.querySelectorAll('.src-device-item').forEach(item => {
+      const sel = item.dataset.mountpoint === selectedPath;
+      item.classList.toggle('selected', sel);
+      const chk = item.querySelector('.src-device-check');
+      if (chk) chk.textContent = sel ? '✓' : '';
+    });
+    return;
+  }
+  _prevExtKeys = newKey;
+
+  if (!filtered.length) {
+    list.innerHTML = `<div class="src-device-empty-row"><span class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="17" cy="12" r="1.5"/><path d="M6 12h6"/></svg></span><span>No external drives detected</span><span class="empty-sub">Connect a drive to continue</span></div>`;
+    return;
+  }
+
+  const selectedPath = activeSource?.type === 'external-drive' ? activeSource.path : null;
+  list.innerHTML = filtered.map(d => {
+    const name = d.label || d.device || d.mountpoint;
+    const isSel = d.mountpoint === selectedPath;
+    return `<div class="src-device-item${isSel ? ' selected' : ''}"
+         data-mountpoint="${escapeHtml(d.mountpoint)}"
+         data-label="${escapeHtml(name)}">
+      <svg class="device-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="17" cy="12" r="1.5"/><path d="M6 12h6"/></svg>
+      <div style="flex:1;min-width:0">
+        <div class="src-device-item-name">${escapeHtml(name)}</div>
+        <div class="src-device-item-meta">${escapeHtml(d.busType || 'USB')}</div>
+      </div>
+      <div class="src-device-check">${isSel ? '✓' : ''}</div>
+    </div>`;
+  }).join('');
+
+  list.querySelectorAll('.src-device-item').forEach(el => {
+    el.addEventListener('click', () => {
+      _setActiveSource({ type: 'external-drive', name: el.dataset.label, path: el.dataset.mountpoint });
+      list.querySelectorAll('.src-device-item').forEach(item => {
+        const sel = item.dataset.mountpoint === el.dataset.mountpoint;
+        item.classList.toggle('selected', sel);
+        const chk = item.querySelector('.src-device-check');
+        if (chk) chk.textContent = sel ? '✓' : '';
+      });
       el.classList.add('just-selected');
       el.addEventListener('animationend', () => el.classList.remove('just-selected'), { once: true });
     });
@@ -1341,7 +1556,7 @@ function renderFolders(folders, dcimPath) {
       <div class="folder-item folder-root${activeFolderPath === dcimPath ? ' active' : ''}"
            data-path="${escapeHtml(dcimPath)}">
         <span class="fi-toggle">${isExpanded ? '▾' : '▸'}</span>
-        <span class="fi-icon">💾</span>
+        <span class="fi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h11v20H4V8z"/><path d="M9 14v5M12 14v5M15 14v5"/></svg></span>
         <span class="fi-name">${escapeHtml(cardDisplayName(dcimPath))}</span>
       </div>
       ${childrenHtml}`;
@@ -1366,7 +1581,7 @@ function renderFolders(folders, dcimPath) {
     <div class="folder-item folder-root${active === tree.path || currentFolderContext.isRoot ? ' active' : ''}"
          data-path="${escapeHtml(tree.path)}">
       <span class="fi-toggle">${expandedFolders.has(tree.path) ? '▾' : '▸'}</span>
-      <span class="fi-icon">💾</span>
+      <span class="fi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h11v20H4V8z"/><path d="M9 14v5M12 14v5M15 14v5"/></svg></span>
       <span class="fi-name">${escapeHtml(rootName)}</span>
     </div>`;
 
@@ -1846,7 +2061,8 @@ function renderFileArea(files) {
     const img = e.target;
     if (!(img instanceof HTMLImageElement) || !img.classList.contains('thumb-img')) return;
     if (img.dataset.loaded === 'error') return;
-    img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(SVG_FALLBACK_PHOTO)}`;
+    const accentHex = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#89b4fa';
+    img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(SVG_FALLBACK_PHOTO.replace(/currentColor/g, accentHex))}`;
     img.dataset.loaded = 'error';
     img.classList.add('thumb-error');
   }, true);
@@ -3045,6 +3261,7 @@ async function initApp() {
   // in-flight batch event is missed between registration and first poll.
   window.api.onFilesBatch(applyFileBatch);
   window.api.onDrivesUpdated(renderDrives);
+  window.api.onAllDrivesUpdated(renderExtDrives);
 
   window.api.getDrives().then(renderDrives).catch(err => {
     const list = document.getElementById('srcMemCardList');
@@ -3815,6 +4032,11 @@ document.addEventListener('keydown', e => {
   // Never intercept when the user is typing in a form field
   const tag = document.activeElement?.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+  if (e.key === 'Escape') {
+    const sm = document.getElementById('settingsModal');
+    if (sm?.classList.contains('visible')) { sm.classList.remove('visible'); return; }
+  }
 
   if ((e.metaKey || e.ctrlKey) && e.key === 'g') {
     e.preventDefault();

@@ -129,7 +129,8 @@ These must never appear in the UI, be selectable, or be imported.
 | Channel | Direction | Purpose |
 |---|---|---|
 | `drives:get` | invoke | On-demand drive list |
-| `drives:updated` | push | Polled every 5s |
+| `drives:updated` | push | Polled every 5s (DCIM cards only) |
+| `drives:allUpdated` | push | Polled every 5s (all removable drives) |
 | `files:get` | invoke | Read directory |
 | `files:import` | invoke | Copy files |
 | `import:progress` | push | Per-file progress |
@@ -145,7 +146,8 @@ These must never appear in the UI, be selectable, or be imported.
 
 ```js
 getDrives()
-onDrivesUpdated(cb)
+onDrivesUpdated(cb)          // DCIM cards only
+onAllDrivesUpdated(cb)       // all removable drives (for ext-drive list)
 getFiles(drivePath, folderPath)
 importFiles(filePaths, destination)
 onImportProgress(cb)
@@ -293,6 +295,12 @@ Catppuccin Mocha dark theme. CSS variables in `:root`:
 - [x] Source label format — hero displays `"EOS_DIGITAL (Memory Card)"` via `_typeLabelFor(type)` helper. `.hero-src-val` + `.hero-src-type` updated atomically via targeted DOM update (no rebuild, transitions animate cleanly).
 - [x] Readiness status — `.hero-readiness` transitions between "Select a source to continue" (muted) and "Ready to import" (green) with CSS `color`/`opacity` transitions. Continue button `disabled` until `activeSource !== null`.
 - [x] Selection animations — `@keyframes selectPulse` (device item confirmation glow), `deviceAppear` (fade-in + slide-up on list populate), `btnEnablePop` (Continue button scale pop on enable). JS wires `just-selected` / `just-enabled` classes with `animationend` self-cleanup via `{ once: true }`. `just-enabled` fires only on disabled→enabled transition (not on every `_setActiveSource` call).
+- [x] Dual-mode home screen — Event Import / Quick Import segmented control (`#modeToggleRow`). `_applyImportMode(mode)` toggles card visibility, hides `#srcLocalFolder` in quick mode, and calls `_renderQuickImportCard()`. `activeSource` is NOT reset on mode switch.
+- [x] Card crossfade system — `#heroCard` and `#quickImportCard` share a CSS grid slot (`grid-row: 1; grid-column: 1`). Class `.card-active` toggles `opacity + transform: translateY(6px→0) + visibility`. Transition `0.2s ease` on all three; `visibility: hidden` on inactive prevents interaction bleed during fade. No `setTimeout` needed — pure CSS.
+- [x] Quick Import card (`#quickImportCard`) — dest persisted to `localStorage('quickImportDest')`. `_getEffectiveQuickDest()` returns `quickImportDest || sessionArchiveRoot || ''`. `_syncQiImportBtn()` disables "Import Now" unless both `activeSource` and `_getEffectiveQuickDest()` are truthy. On import: `setDestPath(dest)` then `selectDrive()` to navigate source browser.
+- [x] External drive inline list — `driveDetector.listAllDrives()` returns `{ dcim, removable }` from a single `drivelist.list()` call. Main process emits `drives:allUpdated` with removable set alongside `drives:updated`. Renderer `renderExtDrives(cards)` filters out `_currentMemCardMountpoints` (DCIM overlap), uses diff-key `_prevExtKeys` to prevent flicker, detects physical disconnects, and falls back drive name via `d.label || d.device || d.mountpoint`.
+- [x] Premium segmented toggle — `.mode-seg-group` uses `var(--bg-secondary)` container, `var(--border-subtle)` border, `var(--shadow-soft)`. Active pill: `var(--accent-soft)` fill + `var(--accent-border)` border + `0 2px 6px rgba(0,0,0,0.08)` elevation. Each button has `min-width: 140px` to prevent width jitter on switch. No hardcoded rgba for container — all semantic tokens.
+- [x] "Change Event" button upgrade — `#heroSecondaryBtn` restyled as `var(--card-hover)` bg + `var(--border-strong)` border + pencil SVG icon. Hover: `var(--accent-soft)` fill + `var(--accent-border)` border + `var(--text-primary)` text. Active: `scale(0.98)`. All tokens, no hardcoded colors. Clearly secondary to primary Continue button.
 
 ---
 
@@ -341,7 +349,14 @@ Landing (#step1Panel — full-screen dashboard, no scroll)
 `setRailMode(mode)` — tracks mode only; `#stepRail` is removed so no DOM writes.
 
 `importMode` variable: `'event'` | `'quick'`
-`_applyImportMode(mode)` — toggles `.active` on mode buttons; hides/shows `#srcLocalFolder` (hidden in `'quick'` mode).
+`_applyImportMode(mode)` — toggles `.active` on mode buttons; hides/shows `#srcLocalFolder` (hidden in `'quick'` mode); calls `_switchModeCard(mode)` (CSS class toggle on `#heroCard` / `#quickImportCard`); if `'quick'`, calls `_renderQuickImportCard()` which syncs dest display + `_syncQiImportBtn()`.
+
+`quickImportDest` — `string | null`, persisted in `localStorage('quickImportDest')`. `_getEffectiveQuickDest()` returns `quickImportDest || sessionArchiveRoot || ''`.
+`_syncQiImportBtn()` — disables `#qiImportBtn` unless both `activeSource` and `_getEffectiveQuickDest()` are truthy. Called from `_setActiveSource()`, `_applyImportMode('quick')`, and the `#qiChangeDestBtn` handler.
+
+`_currentMemCardMountpoints: Set` — updated in `renderDrives()`, read by `renderExtDrives()` to filter DCIM drives from the ext drive list.
+`_prevExtKeys: string | null` — diff key for external drive list; prevents full innerHTML rebuild when the drive set hasn't changed.
+`renderExtDrives(cards)` — listener on `drives:allUpdated`; filters DCIM overlap, detects disconnects, diff-renders the `#srcExtDriveList`.
 
 `renderHome()` — called on `showLanding()`, `resetAppState()`, `changeDriveBtn` click:
 - Calls `_renderHomeContextBar()`, `_renderLandingEventCard()`, `_renderInsightsBar()`, `_applyImportMode(importMode)`.

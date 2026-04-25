@@ -38,29 +38,54 @@ function withTimeout(promise, ms, fallback) {
 }
 
 /**
+ * Single drivelist.list() call that returns both DCIM-detected memory cards
+ * and all removable non-system drives in one pass.
+ *
+ * @returns {Promise<{ dcim: Array, removable: Array }>}
+ */
+async function listAllDrives() {
+  const drives = await withTimeout(drivelist.list(), 4000, []);
+  const dcimChecks = [];
+  const removable  = [];
+
+  for (const drive of drives) {
+    if (drive.isSystem) continue;
+    for (const mp of drive.mountpoints) {
+      if (!mp.path) continue;
+      dcimChecks.push(
+        hasDCIM(mp.path).then(ok => ok ? {
+          label:       mp.label || drive.description || 'Unnamed Drive',
+          mountpoint:  mp.path,
+          size:        drive.size        || 0,
+          description: drive.description || '',
+          busType:     drive.busType     || '',
+          isCard:      drive.isCard      || false,
+        } : null)
+      );
+      if (drive.isRemovable) {
+        removable.push({
+          label:      drive.description || mp.label || 'Removable Drive',
+          mountpoint: mp.path,
+          size:       drive.size || 0,
+          busType:    drive.busType || '',
+        });
+      }
+    }
+  }
+
+  const dcimResults = await Promise.all(dcimChecks);
+  return { dcim: dcimResults.filter(Boolean), removable };
+}
+
+/**
  * Scans all connected drives and returns those that look like camera
  * memory cards (i.e. contain a DCIM folder at their root).
  *
  * @returns {Promise<Array<{ label: string, mountpoint: string }>>}
  */
 async function detectMemoryCards() {
-  const drives = await withTimeout(drivelist.list(), 4000, []);
-  const checks = [];
-
-  for (const drive of drives) {
-    for (const mp of drive.mountpoints) {
-      if (!mp.path) continue;
-      checks.push(
-        hasDCIM(mp.path).then(ok => ok ? {
-          label:      mp.label || drive.description || 'Unnamed Drive',
-          mountpoint: mp.path,
-        } : null)
-      );
-    }
-  }
-
-  const results = await Promise.all(checks);
-  return results.filter(Boolean);
+  const { dcim } = await listAllDrives();
+  return dcim;
 }
 
-module.exports = { detectMemoryCards };
+module.exports = { detectMemoryCards, listAllDrives };

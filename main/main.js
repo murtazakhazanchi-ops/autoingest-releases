@@ -4,7 +4,7 @@ const os   = require('os');
 const fs   = require('fs');
 const fsp  = require('fs').promises;
 const { exec, execFile } = require('child_process');
-const { detectMemoryCards }          = require('./driveDetector');
+const { detectMemoryCards, listAllDrives } = require('./driveDetector');
 const { readDirectory, getDCIMPath, scanPrivateFolder, safeExists, scanMediaRecursive, buildFolderTree } = require('./fileBrowser');
 const { copyFiles, copyFileJobs, setPaused, getFileHash, abortCopy } = require('./fileManager');
 const { getThumbnail, shutdownWorkers } = require('../services/thumbnailer');
@@ -140,12 +140,15 @@ function createWindow() {
 function startDrivePolling() {
   async function poll() {
     try {
-      const cards = await detectMemoryCards();
-      if (cards.length) {
-        cards.forEach(c => log(`Drive detected: ${c.mountpoint} (${c.label})`));
+      const { dcim, removable } = await listAllDrives();
+      if (dcim.length) {
+        dcim.forEach(c => log(`Drive detected: ${c.mountpoint} (${c.label})`));
       }
       for (const win of BrowserWindow.getAllWindows()) {
-        if (!win.isDestroyed()) win.webContents.send('drives:updated', cards);
+        if (!win.isDestroyed()) {
+          win.webContents.send('drives:updated', dcim);
+          win.webContents.send('drives:allUpdated', removable);
+        }
       }
     } catch (err) {
       console.error('[driveDetector] poll error:', err.message);
