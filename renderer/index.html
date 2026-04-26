@@ -152,10 +152,38 @@
       to   { opacity: 1; transform: translateY(0); }
     }
 
+    /* ── GLOBAL TITLE BAR ───────────────── */
+    #appTitleBar {
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      -webkit-app-region: drag;
+      user-select: none;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 10;
+    }
+    .is-mac #appTitleBar { padding-top: 4px; }
+    #appTitleBar .title-text {
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      opacity: 0.45;
+      color: var(--text-primary);
+      pointer-events: none;
+    }
+    #appTitleBar .app-version {
+      opacity: 0.6;
+      font-weight: 400;
+      letter-spacing: 0.02em;
+    }
+
     /* ── CONTEXT BAR (M8) ───────────────── */
     #contextBar {
       display: none;
       align-items: center;
+      justify-content: space-between;
       gap: 10px;
       padding: 5px 18px;
       background: var(--surface2);
@@ -166,6 +194,17 @@
       min-height: 26px;
     }
     #contextBar.visible { display: flex; }
+    .ctx-left { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
+    .ctx-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .ctx-source {
+      font-size: 0.72rem; color: var(--text-secondary);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px;
+      font-weight: 500;
+    }
+    .ctx-sep-v {
+      width: 1px; height: 12px;
+      background: var(--border-subtle); flex-shrink: 0;
+    }
     #contextBar .ctx-breadcrumb {
       flex: 1;
       overflow: hidden;
@@ -191,6 +230,15 @@
     }
     #contextBar .ctx-mode.event { background: var(--blue-dim); color: var(--blue); }
     #contextBar .ctx-mode.quick { background: var(--green-dim); color: var(--green); }
+    .ctx-action-btn {
+      padding: 2px 8px; font-size: 0.68rem;
+      background: transparent; border: 1px solid var(--border-subtle);
+      border-radius: 5px; color: var(--text-secondary); cursor: pointer;
+      transition: border-color 0.12s, color 0.12s; -webkit-app-region: no-drag;
+    }
+    .ctx-action-btn:hover { border-color: var(--border-strong); color: var(--text-primary); }
+    .ctx-eject-btn { border-color: color-mix(in srgb, var(--red) 35%, transparent); color: var(--red); }
+    .ctx-eject-btn:hover { border-color: var(--red); background: color-mix(in srgb, var(--red) 8%, transparent); }
 
     /* ── LANDING DASHBOARD ─────────────────────────────────────────── */
     :root {
@@ -216,8 +264,8 @@
       -webkit-app-region: drag;
       user-select: none;
     }
-    /* macOS: 28px top clears the 12px-tall traffic lights at y=8 (ends at y=20) */
-    .is-mac .header-wrapper { padding-top: 28px; }
+    /* macOS: title bar handles traffic light clearance; header just needs modest top padding */
+    .is-mac .header-wrapper { padding-top: 8px; }
     #dashHeader {
       display: flex; align-items: center; justify-content: space-between;
       width: 100%; box-sizing: border-box;
@@ -596,20 +644,6 @@
     #workspace { display: none; flex: 1; overflow: hidden; flex-direction: column; }
     #workspace.visible { display: flex; }
 
-    #driveStrip {
-      display: flex; align-items: center; gap: 10px;
-      padding: 6px 16px; background: var(--surface3);
-      border-bottom: 1px solid var(--border); flex-shrink: 0; font-size: 0.8rem;
-    }
-    #driveStrip .ds-label { opacity: 0.45; }
-    #driveStrip .ds-name  { font-weight: 600; color: var(--blue); }
-    #changeDriveBtn {
-      margin-left: auto; padding: 3px 10px; font-size: 0.73rem;
-      background: transparent; border: 1px solid var(--border);
-      border-radius: 6px; color: var(--subtext); cursor: pointer;
-      transition: border-color 0.12s, color 0.12s;
-    }
-    #changeDriveBtn:hover { border-color: var(--blue); color: var(--blue); }
 
     #columns { display: flex; flex: 1; overflow: hidden; }
 
@@ -1033,7 +1067,6 @@
       flex-shrink: 0; position: relative;
     }
     .status-left { display: flex; align-items: center; gap: 12px; opacity: 0.7; min-width: 0; }
-    .status-center { position: absolute; left: 50%; transform: translateX(-50%); opacity: 0.45; font-size: 0.65rem; pointer-events: none; }
     .status-right { display: flex; align-items: center; gap: 4px; }
     #statusMessage { color: var(--yellow); opacity: 1; font-weight: 500; transition: opacity 0.3s; }
     #statusMessage:empty { display: none; }
@@ -3088,6 +3121,11 @@
 </head>
 <body>
 
+  <!-- GLOBAL TITLE BAR — always visible, drag region, hosts version label -->
+  <div id="appTitleBar">
+    <span class="title-text">AutoIngest <span class="app-version" id="appVersion"></span></span>
+  </div>
+
   <!-- UPDATE BANNER — hidden until an update event fires -->
   <div id="updateBanner">
     <span class="upd-icon">🔄</span>
@@ -3097,10 +3135,20 @@
     <button class="upd-dismiss" id="updDismissBtn" title="Dismiss">✕</button>
   </div>
 
-  <!-- M8: CONTEXT BAR (breadcrumb + mode indicator) -->
+  <!-- CONTEXT BAR — source + event breadcrumb + mode badge + workspace actions -->
   <div id="contextBar">
-    <div class="ctx-breadcrumb" id="ctxBreadcrumb"></div>
-    <span class="ctx-mode" id="ctxMode"></span>
+    <!-- Hidden span kept for renderer.js compatibility (selectSource sets activeDriveName) -->
+    <span id="activeDriveName" style="display:none" aria-hidden="true"></span>
+    <div class="ctx-left">
+      <div class="ctx-source" id="ctxSource"></div>
+      <div class="ctx-sep-v" id="ctxSepV" style="display:none"></div>
+      <div class="ctx-breadcrumb" id="ctxBreadcrumb"></div>
+    </div>
+    <div class="ctx-right">
+      <span class="ctx-mode" id="ctxMode"></span>
+      <button id="changeDriveBtn" class="ctx-action-btn">Change</button>
+      <button id="ejectBtn" class="ctx-action-btn ctx-eject-btn">Eject</button>
+    </div>
   </div>
 
   <!-- LANDING DASHBOARD -->
@@ -3401,17 +3449,11 @@
 
   <!-- WORKSPACE (Steps 2-4) -->
   <div id="workspace">
-    <div id="driveStrip">
-      <span class="ds-label">📷 Active card:</span>
-      <span class="ds-name" id="activeDriveName">—</span>
-      <button id="changeDriveBtn">Change Card</button>
-      <button id="ejectBtn">Eject</button>
-    </div>
 
     <div id="columns">
       <!-- Sidebar -->
       <div id="sidebar">
-        <div id="sidebarHeader">Step 2 — Browse</div>
+        <div id="sidebarHeader"></div>
         <div id="folderList">
           <div class="sidebar-empty">Loading folders…</div>
         </div>
@@ -3550,7 +3592,6 @@
       <span id="statusFiles"></span>
       <span id="statusMessage"></span>
     </div>
-    <div class="status-center"><span id="appVersion">AutoIngest v24.0.0</span></div>
     <div class="status-right">
       <button id="helpBtn" class="status-icon-btn" title="Help &amp; Reference" aria-label="Help">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>

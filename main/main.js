@@ -118,13 +118,8 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1280,
     height: 820,
-    frame: false,
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 8 },
-    titleBarOverlay: {
-      color: '#00000000',
-      symbolColor: '#ffffff'
-    },
     resizable: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),

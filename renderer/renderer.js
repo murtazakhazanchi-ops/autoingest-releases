@@ -84,6 +84,20 @@ function showMessage(msg, durationMs = 4000) {
   }, durationMs);
 }
 
+// Priority-based status bar messages: higher priority wins.
+// 3 = importing (highest), 2 = selection, 1 = info/filter, 0 = default
+const _statusMessages = {};
+function setStatusBarMessage(key, text, priority = 1) {
+  if (text == null || text === '') {
+    delete _statusMessages[key];
+  } else {
+    _statusMessages[key] = { text, priority };
+  }
+  const top = Object.values(_statusMessages).sort((a, b) => b.priority - a.priority)[0];
+  const el = document.getElementById('statusMessage');
+  if (el) el.textContent = top ? top.text : '';
+}
+
 /**
  * Show a one-time inline hint banner inside a container element.
  * Guarded by localStorage so it only appears once per key.
@@ -807,6 +821,8 @@ function _updateContextBar() {
   const bar   = document.getElementById('contextBar');
   const crumb = document.getElementById('ctxBreadcrumb');
   const mode  = document.getElementById('ctxMode');
+  const srcEl = document.getElementById('ctxSource');
+  const sepEl = document.getElementById('ctxSepV');
   if (!bar || !crumb || !mode) return;
 
   // Hide when the event management modal is open (it has its own breadcrumb).
@@ -816,7 +832,9 @@ function _updateContextBar() {
   const master    = EventCreator.getActiveMaster();
 
   if (eventData) {
-    // Event flow: show Master → Event breadcrumb + "Event Import" badge.
+    // Event flow: source name left + Master → Event breadcrumb + "Event Import" badge.
+    if (srcEl) srcEl.textContent = activeSource ? activeSource.name : '';
+    if (sepEl) sepEl.style.display = activeSource ? '' : 'none';
     const masterName = _esc(master?.name || eventData.coll.name);
     const eventName  = _esc(eventData.event.name);
     crumb.innerHTML = `<span class="ctx-label">${masterName}</span>` +
@@ -826,12 +844,16 @@ function _updateContextBar() {
     mode.className   = 'ctx-mode event';
     bar.classList.add('visible');
   } else if (activeSource) {
-    // Quick flow: source selected but no event active.
-    crumb.innerHTML = `<span class="ctx-label">${_esc(activeSource.name)}</span>`;
+    // Quick flow: source name in left slot, breadcrumb empty.
+    if (srcEl) srcEl.textContent = activeSource.name;
+    if (sepEl) sepEl.style.display = 'none';
+    crumb.innerHTML = '';
     mode.textContent = 'Quick Import';
     mode.className   = 'ctx-mode quick';
     bar.classList.add('visible');
   } else {
+    if (srcEl) srcEl.textContent = '';
+    if (sepEl) sepEl.style.display = 'none';
     bar.classList.remove('visible');
   }
 }
@@ -1454,8 +1476,7 @@ async function selectSource({ type, path, label = null, driveObj = null }) {
   GroupManager.reset();
   renderGroupPanel();
 
-  // Prepare workspace labels while still hidden — DOM updates on hidden elements are safe
-  document.getElementById('activeDriveName').textContent = name;
+  // Prepare workspace while still hidden — DOM updates on hidden elements are safe
   document.getElementById('folderList').innerHTML =
     `<div class="sidebar-empty">Loading folders…</div>`;
 
@@ -2622,6 +2643,7 @@ function updateSelectionBar() {
 
   document.getElementById('selectionBar').classList.toggle('visible', hasFiles);
   document.getElementById('selCount').textContent = `${n} selected`;
+  setStatusBarMessage('selection', n > 0 ? `${n} file${n === 1 ? '' : 's'} selected` : null, 2);
 
   // Commit 12: disable Select All when folder-view shows the instruction panel
   // (no tiles visible yet -- user hasn't drilled into a leaf).
@@ -2809,11 +2831,11 @@ function syncImportedBadges() {
 
 // Dest path is now initialised inside initApp() after the import index loads.
 
-// Show beta version label in status bar
+// Populate version span in global title bar
 try {
   const ver = window.api.getVersion();
   const el  = document.getElementById('appVersion');
-  if (el) el.textContent = `AutoIngest Beta v${ver}`;
+  if (el) el.textContent = `v${ver}`;
 } catch { /* non-critical — version label is informational only */ }
 
 document.getElementById('changeDestBtn').addEventListener('click', async () => {
@@ -3129,6 +3151,8 @@ document.getElementById('importBtn').addEventListener('click', async () => {
   if (!filePaths.length) return;
 
   importRunning = true;
+  setStatusBarMessage('selection', null);   // clear selection count while import runs
+  setStatusBarMessage('import', 'Importing…', 3);
   updateSelectionBar();
   showProgress();
 
@@ -3143,6 +3167,7 @@ document.getElementById('importBtn').addEventListener('click', async () => {
     document.getElementById('progressDoneBtn').classList.add('visible');
   } finally {
     importRunning = false;
+    setStatusBarMessage('import', null);    // clear import message once done
   }
 });
 
