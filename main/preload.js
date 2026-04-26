@@ -178,4 +178,10 @@ contextBridge.exposeInMainWorld('api', {
   toggleMaximize: () => ipcRenderer.invoke('window:toggleMaximize'),
   close:          () => ipcRenderer.invoke('window:close'),
 
+  // ── Date engine ──
+  getTodayDate:      ()                   => ipcRenderer.invoke('date:getToday'),
+  convertToHijri:    (isoDate)            => ipcRenderer.invoke('date:toHijri',     isoDate),
+  convertToGregorian:(hijri)              => ipcRenderer.invoke('date:toGregorian', hijri),
+  getHijriCalendar:  (year, month)        => ipcRenderer.invoke('date:getCalendar', year, month),
+
 });

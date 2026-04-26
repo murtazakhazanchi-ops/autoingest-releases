@@ -41,8 +41,11 @@ const EventCreator = (() => {
   let _scannedEvents   = null;
   let _viewingExisting = null; // { folderName, hijriDate, sequence, isUnresolved, components } | null
   let _editMode        = false; // M6: when true in view-existing mode, form is editable
+  let _repairMode      = false; // Phase 5: when true, form is repairing an unparseable folder
+  let _repairFolderName = null; // Phase 5: original (bad) folder name being repaired
   let _newEventDate    = null;  // M7: hijri date string for new events ("YYYY-MM-DD"), null when viewing/editing
-  let _navScreen       = 'masterStep'; // 'masterStep' | 'eventList' | 'eventForm' | 'previewStep'
+  let _navScreen           = 'masterStep'; // 'masterStep' | 'eventList' | 'eventForm' | 'previewStep'
+  let _selectedListFolder  = null;         // Phase 2: folder name highlighted in SELECT mode
 
   function _makeComp() {
     return { id: ++_compSeq, eventTypes: [], location: null, city: _globalCityVal ? { ..._globalCityVal } : null };
@@ -189,11 +192,24 @@ const EventCreator = (() => {
     const title = $ecTitle();
     if (title) title.textContent = 'Create Collection';
     syncRailHighlight(1);
+    if (typeof EventMgmt !== 'undefined' && EventMgmt.isOpen()) EventMgmt.setMode('master');
 
     const body = $ecBody();
     if (!body) return;
     body.innerHTML = buildMasterHTML();
     attachMasterListeners();
+
+    // Pre-fill Hijri date only when ALL three fields are empty (avoids clobbering partial edits)
+    window.api.getTodayDate().then(today => {
+      const yEl = document.getElementById('hijriYear');
+      const mEl = document.getElementById('hijriMonth');
+      const dEl = document.getElementById('hijriDay');
+      if (!yEl?.value && !mEl?.value && !dEl?.value) {
+        if (yEl) yEl.value = String(today.hijri.year);
+        if (mEl) mEl.value = String(today.hijri.month).padStart(2, '0');
+        if (dEl) dEl.value = String(today.hijri.day).padStart(2, '0');
+      }
+    }).catch(() => {});
   }
 
   // ── HTML builders ──────────────────────────────────────────────────────────
@@ -678,28 +694,15 @@ const EventCreator = (() => {
     if (!body) return;
     body.innerHTML = `
 <div class="ec-master-wrap">
-  <div class="ec-breadcrumb-bar">
-    <div class="ec-bc-row">
-      <span class="ec-bc-label">Collection</span>
-      <span class="ec-bc-value" title="${esc(selectedCollection || '')}">${esc(selectedCollection || '')}</span>
-      <button class="ec-bc-change" id="ecChangeCollection">Change</button>
-    </div>
-  </div>
   <p class="ec-hint" style="margin:24px 0;text-align:center">Scanning master for existing events…</p>
 </div>`;
-    document.getElementById('ecChangeCollection')?.addEventListener('click', () => {
-      _scannedEvents = null; _viewingExisting = null;
-      showMasterStep();
-    });
   }
 
   async function _scanAndRenderEventList() {
     _scannedEvents = await window.api.scanMasterEvents(activeMaster.path);
-    if (!_scannedEvents || _scannedEvents.length === 0) {
-      // No existing events — skip the list and go straight to the empty form.
-      _renderEventForm();
-      return;
-    }
+    if (!_scannedEvents) _scannedEvents = [];
+    // Always render the list — empty state shows "No resolvable events yet" + "+ Create New Event".
+    // Never auto-open the create form; the user must click the button explicitly.
     _renderEventList();
   }
 
@@ -708,11 +711,13 @@ const EventCreator = (() => {
     const body = $ecBody();
     if (!body) return;
 
-    // M6: reset title when returning to the list from view/edit mode.
-    const title = $ecTitle();
-    if (title) title.textContent = 'Existing Events';
+    // Entering SELECT mode — reset footer whenever the list is shown (covers navigateBack too).
+    if (typeof EventMgmt !== 'undefined' && EventMgmt.isOpen()) EventMgmt.setMode('select');
 
-    const resolved   = _scannedEvents.filter(e => e.isParseable);
+    const title = $ecTitle();
+    if (title) title.textContent = 'Create or Select Event';
+
+    const resolved    = _scannedEvents.filter(e => e.isParseable);
     const unparseable = _scannedEvents.filter(e => !e.isParseable);
 
     const resolvedHTML = resolved.map(ev => {
@@ -720,8 +725,7 @@ const EventCreator = (() => {
         ? `<span class="ec-evl-warn" title="Some tokens in this event don't match the controlled lists yet. You can still view or edit.">⚠</span>`
         : '';
       return `
-<div class="ec-evl-item" data-folder="${esc(ev.folderName)}" tabindex="0" role="button">
-  <span class="ec-evl-seq">${esc(ev.sequence)}</span>
+<div class="ec-evl-item" data-folder="${esc(ev.folderName)}" tabindex="0" role="option" aria-selected="false">
   <div class="ec-evl-meta">
     <div class="ec-evl-name" title="${esc(ev.folderName)}">${esc(ev.folderName)}</div>
     <div class="ec-evl-date">${esc(ev.hijriDate)}</div>
@@ -733,64 +737,188 @@ const EventCreator = (() => {
     const unparseableHTML = unparseable.length === 0 ? '' : `
 <p class="ec-section-title" style="margin-top:20px;opacity:0.6">Unrecognised Folders</p>
 ${unparseable.map(ev => `
-<div class="ec-evl-item ec-evl-disabled" title="${esc(ev.reason || 'Cannot parse')}">
-  <span class="ec-evl-seq">?</span>
+<div class="ec-evl-item ec-evl-disabled ec-unrec-item" title="${esc(ev.reason || 'Cannot parse')}">
   <div class="ec-evl-meta">
     <div class="ec-evl-name">${esc(ev.folderName)}</div>
     <div class="ec-evl-date ec-evl-warn-text">${esc(ev.reason || 'Cannot parse')}</div>
   </div>
   <span class="ec-evl-warn">⚠</span>
+  <button class="ec-evl-repair-btn" data-folder="${esc(ev.folderName)}" title="Fix this folder by filling in the missing event details">Fix &amp; Convert →</button>
 </div>`).join('')}`;
 
     body.innerHTML = `
 <div class="ec-master-wrap">
 
-  <div class="ec-breadcrumb-bar">
-    <div class="ec-bc-row">
-      <span class="ec-bc-label">Collection</span>
-      <span class="ec-bc-value" title="${esc(selectedCollection || '')}">${esc(selectedCollection || '')}</span>
-      <button class="ec-bc-change" id="ecChangeCollection">Change</button>
-    </div>
+  <div class="ec-collection-bar">
+    <span class="ec-label">Collection</span>
+    <span class="ec-name" title="${esc(selectedCollection || '')}">${esc(selectedCollection || '—')}</span>
+    <button class="ec-change-btn" id="ecChangeCollection">Change</button>
   </div>
 
-  <p class="ec-section-title">Existing Events <span class="ec-hint" style="font-weight:normal">(${resolved.length} found)</span></p>
-  <div class="ec-evl-list">
+  <button id="ecNewEventFromList" class="ec-new-event-btn">+ Create New Event</button>
+
+  <p class="ec-section-title">Existing Events <span class="ec-hint" style="font-weight:normal">(${resolved.length})</span></p>
+  ${resolved.length > 0 ? '<input type="search" id="ecEvlSearch" class="ec-evl-search" placeholder="Search events…" autocomplete="off">' : ''}
+  <div class="ec-evl-list" id="ecEvlList" role="listbox" aria-label="Events">
     ${resolvedHTML || '<p class="ec-hint">No resolvable events yet.</p>'}
   </div>
   ${unparseableHTML}
 
-  <button id="ecNewEventFromList" class="ec-continue-btn" style="margin-top:20px">+ Create New Event</button>
-
 </div>`;
 
+    // Scroll reset so the list always starts at the top.
+    body.scrollTop = 0;
+
+    // Collection bar: Change → go back to master step.
     document.getElementById('ecChangeCollection')?.addEventListener('click', () => {
-      _scannedEvents = null; _viewingExisting = null;
+      _scannedEvents = null;
+      _viewingExisting = null;
+      _selectedListFolder = null;
       showMasterStep();
     });
 
-    body.querySelectorAll('.ec-evl-item[data-folder]').forEach(el => {
-      const open = () => _openExistingEvent(el.dataset.folder);
-      el.addEventListener('click', open);
-      el.addEventListener('keydown', e => {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+    // Phase 5: wire "Fix & Convert →" buttons on unparseable items.
+    body.querySelectorAll('.ec-evl-repair-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation(); // prevent bubble to disabled parent
+        _openRepairEvent(btn.dataset.folder);
       });
+    });
+
+    // Local reference to the currently highlighted element — avoids querySelectorAll
+    // on every click (point 11: only touch prev + new element).
+    let _localSelectedEl = null;
+
+    // Central select helper — applies highlight and fires events (points 2, 8, 11).
+    const _applySelect = (el) => {
+      if (_localSelectedEl === el) return; // same element ref: true no-op
+      if (_localSelectedEl && _selectedListFolder === el.dataset.folder) return; // already visually selected by folder
+      if (_localSelectedEl) {
+        _localSelectedEl.classList.remove('ec-evl-selected');
+        _localSelectedEl.setAttribute('aria-selected', 'false');
+      }
+      el.classList.add('ec-evl-selected');
+      el.setAttribute('aria-selected', 'true');
+      _localSelectedEl = el;
+      _selectedListFolder = el.dataset.folder;
+      document.dispatchEvent(new CustomEvent('eventcreator:listSelect'));
+    };
+
+    // Wire click + keyboard on each selectable item.
+    body.querySelectorAll('.ec-evl-item[data-folder]').forEach(el => {
+      el.addEventListener('click', () => _applySelect(el));
+      el.addEventListener('keydown', e => {
+        if (e.key === ' ') { e.preventDefault(); _applySelect(el); return; }
+        if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); _applySelect(el); if (!_selectedListFolder) return; document.getElementById('emmContinueBtn')?.click(); return; }
+        // Point 7: ↑/↓ arrow navigation within the visible item set.
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          const items = [...body.querySelectorAll('.ec-evl-item[data-folder]')]
+            .filter(i => i.style.display !== 'none');
+          const curIdx = items.indexOf(el);
+          const nextIdx = e.key === 'ArrowDown'
+            ? Math.min(curIdx + 1, items.length - 1)
+            : Math.max(curIdx - 1, 0);
+          if (nextIdx !== curIdx) {
+            _applySelect(items[nextIdx]);
+            items[nextIdx].focus();
+            items[nextIdx].scrollIntoView({ block: 'nearest' });
+          }
+        }
+      });
+    });
+
+    // Point 1: preselect the active event (or the folder from the last selection).
+    const preselectFolder = _selectedListFolder ||
+      sessionCollections.find(c => c.name === selectedCollection)?.events[_activeEventIdx]?.name ||
+      null;
+    if (preselectFolder) {
+      const target = [...body.querySelectorAll('.ec-evl-item[data-folder]')]
+        .find(el => el.dataset.folder === preselectFolder);
+      if (target) {
+        _applySelect(target);
+        target.scrollIntoView({ block: 'nearest' }); // point 1: ensure preselected item is visible
+      }
+    }
+
+    // Point 2: focus selected item (or first selectable) for keyboard navigation.
+    requestAnimationFrame(() => {
+      const focusTarget = body.querySelector('.ec-evl-item.ec-evl-selected')
+        || body.querySelector('.ec-evl-item[tabindex="0"]:not(.ec-evl-disabled)');
+      focusTarget?.focus();
+    });
+
+    // Point 5: search filter — hides non-matching items, shows empty state, deselects if filtered out.
+    document.getElementById('ecEvlSearch')?.addEventListener('input', function () {
+      const q = this.value.trim().toLowerCase();
+      const visibleFolders = [];
+      body.querySelectorAll('.ec-evl-item[data-folder]').forEach(item => {
+        const matches = !q || item.dataset.folder.toLowerCase().includes(q);
+        item.style.display = matches ? '' : 'none';
+        if (matches) visibleFolders.push(item.dataset.folder);
+      });
+      // Empty search state message (point 5)
+      let emptyMsg = document.getElementById('ecEvlEmptySearch');
+      if (q && visibleFolders.length === 0) {
+        if (!emptyMsg) {
+          emptyMsg = document.createElement('p');
+          emptyMsg.id            = 'ecEvlEmptySearch';
+          emptyMsg.className     = 'ec-hint';
+          emptyMsg.style.cssText = 'text-align:center;padding:16px 0;margin:0;';
+          emptyMsg.textContent   = 'No events match your search.';
+          document.getElementById('ecEvlList')?.after(emptyMsg);
+        }
+        emptyMsg.style.display = '';
+      } else if (emptyMsg) {
+        emptyMsg.style.display = 'none';
+      }
+      if (_selectedListFolder && !visibleFolders.includes(_selectedListFolder)) {
+        if (_localSelectedEl) {
+          _localSelectedEl.classList.remove('ec-evl-selected');
+          _localSelectedEl.setAttribute('aria-selected', 'false');
+        }
+        _localSelectedEl      = null;
+        _selectedListFolder   = null;
+        document.dispatchEvent(new CustomEvent('eventcreator:listDeselect'));
+        // Move focus to first visible item so keyboard nav is still possible
+        const firstVisible = [...body.querySelectorAll('.ec-evl-item[data-folder]')]
+          .find(i => i.style.display !== 'none');
+        firstVisible?.focus();
+      }
     });
 
     document.getElementById('ecNewEventFromList')?.addEventListener('click', () => {
       _viewingExisting = null;
-      _newEventDate = null;
-      _eventComps = [];
+      _newEventDate    = null;
+      _eventComps      = [];
+      if (typeof EventMgmt !== 'undefined' && EventMgmt.isOpen()) EventMgmt.setMode('create');
       _renderEventForm();
     });
   }
 
+  // Phase 5: open an unparseable folder in repair mode — user fills in all fields
+  // and saves to rename the folder to a valid event name.
+  function _openRepairEvent(folderName) {
+    const entry = (_scannedEvents || []).find(e => e.folderName === folderName && !e.isParseable);
+    if (!entry) return;
+    _repairMode       = true;
+    _repairFolderName = folderName;
+    _viewingExisting  = null;
+    _editMode         = false;
+    _newEventDate     = null;
+    _eventComps       = [_makeComp()];
+    if (typeof EventMgmt !== 'undefined' && EventMgmt.isOpen()) EventMgmt.setMode('repair');
+    _renderEventForm();
+  }
+
   // M5/M6: open an existing event — starts in view-only; "Edit Event" unlocks.
-  function _openExistingEvent(folderName) {
+  // opts.edit = true skips the view-lock and opens directly in edit mode (Phase 2).
+  function _openExistingEvent(folderName, opts) {
     const entry = (_scannedEvents || []).find(e => e.folderName === folderName && e.isParseable);
     if (!entry) return;
 
     // Rehydrate components from parsed data into the EventCreator's internal shape.
-    _editMode = false;
+    _editMode = opts?.edit === true;
     _newEventDate = null;
     _compSeq = 0;
     _eventComps = entry.components.map(c => ({
@@ -819,14 +947,26 @@ ${unparseable.map(ev => `
   // scan path (after choosing "Create New Event") and the view-existing path
   // reach the same builder.
   function _renderEventForm() {
+    // Hard guard: never render the form while the modal is in SELECT mode.
+    if (typeof EventMgmt !== 'undefined' && EventMgmt.isOpen() && EventMgmt.getMode() === 'select') return;
+
     _navScreen = 'eventForm';
     if (_eventComps.length === 0) _eventComps = [_makeComp()];
 
     const body = $ecBody();
     if (!body) return;
 
+    // Point 10: set modal title for create / repair / view (edit set by _applyEditLockState).
+    const title = $ecTitle();
+    if (title) {
+      if (_repairMode)         title.textContent = 'Repair Event';
+      else if (!_viewingExisting) title.textContent = 'Create New Event';
+      // view/edit: _applyEditLockState() will set 'View Event' / 'Edit Event'
+    }
+
     _destroyEventDDs();
     body.innerHTML = _buildEventHTML();
+    body.scrollTop = 0; // Point 2: always start at top of the form.
 
     // M7: pre-fill hijri date fields for new events.
     if (!_viewingExisting) {
@@ -853,6 +993,12 @@ ${unparseable.map(ev => `
     if (_viewingExisting) {
       _applyEditLockState();
     }
+
+    // Point 3: focus first visible input so keyboard users can start typing immediately.
+    requestAnimationFrame(() => {
+      const first = body.querySelector('input:not([type="hidden"]):not(:disabled)');
+      first?.focus();
+    });
   }
 
   // M6: applies the correct lock/unlock state based on _editMode.
@@ -988,15 +1134,21 @@ ${unparseable.map(ev => `
   // ── HTML builder ─────────────────────────────────────────────────────────────────────
 
   function _buildEventHTML() {
-    // M5: mode badge + breadcrumb differ depending on whether we're creating new
-    // or viewing an existing event from disk.
-    const modeBadge = _viewingExisting
+    // M5 / Phase 5: mode badge + breadcrumb differ by create / view / edit / repair.
+    const modeBadge = _repairMode
+      ? `<span class="ec-mode-badge ec-mode-repair" style="margin-left:8px">Repairing Event</span>`
+      : _viewingExisting
       ? `<span class="ec-mode-badge ec-mode-multi" style="margin-left:8px">Viewing Existing Event</span>`
       : '';
     const warnBadge = _viewingExisting && _viewingExisting.isUnresolved
       ? `<span class="ec-evl-warn" style="margin-left:6px" title="Some tokens don't match the controlled lists. You can still view and edit.">⚠ Unresolved tokens</span>`
       : '';
-    const eventRow = _viewingExisting ? `
+    const eventRow = _repairMode ? `
+    <div class="ec-bc-row">
+      <span class="ec-bc-label" style="color:var(--yellow)">Original</span>
+      <span class="ec-bc-value ec-evl-warn-text" title="${esc(_repairFolderName)}">${esc(_repairFolderName)}</span>
+      <button class="ec-bc-change" id="ecBackToList">← Back to list</button>
+    </div>` : _viewingExisting ? `
     <div class="ec-bc-row">
       <span class="ec-bc-label">Event</span>
       <span class="ec-bc-value" title="${esc(_viewingExisting.folderName)}">${esc(_viewingExisting.folderName)}</span>
@@ -1058,11 +1210,11 @@ ${unparseable.map(ev => `
   <div id="ecEventError" class="ec-master-error" role="alert" aria-live="polite"></div>
 
   ${_viewingExisting
-    ? `<div class="ec-view-actions">
+    ? `<div class="ec-view-actions" style="display:none" aria-hidden="true">
          <button id="ecEventEdit" class="ec-outline-btn">Edit Event</button>
          <button id="ecEventContinue" class="ec-continue-btn">Select for Import →</button>
        </div>`
-    : `<button id="ecEventContinue" class="ec-continue-btn" disabled>Create Event →</button>`}
+    : `<button id="ecEventContinue" class="ec-continue-btn" disabled style="display:none" aria-hidden="true">Create Event →</button>`}
 
 </div>`;
   }
@@ -1202,19 +1354,31 @@ ${unparseable.map(ev => `
   function _attachEventListeners() {
     document.getElementById('ecChangeCollection')
       ?.addEventListener('click', () => {
+        // Dirty check: CREATE / EDIT / REPAIR all have unsaved state in the form.
+        if (_editMode || _repairMode || !_viewingExisting) {
+          if (!window.confirm('You have unsaved changes. Discard them?')) return;
+        }
         // M3: going back to Step 1 clears the scan cache so we rescan on re-entry.
-        _scannedEvents = null;
-        _viewingExisting = null;
+        _scannedEvents    = null;
+        _viewingExisting  = null;
+        _editMode         = false;
+        _repairMode       = false;
+        _repairFolderName = null;
+        _eventComps       = [];
+        _newEventDate     = null;
+        _destroyEventDDs();
         showMasterStep();
       });
 
-    // M5/M6: "Back to list" returns to event-list. Silent discard if editing.
+    // M5/M6/Phase5: "Back to list" returns to event-list. Silent discard (dirty check is in handleBack).
     document.getElementById('ecBackToList')
       ?.addEventListener('click', () => {
-        _viewingExisting = null;
-        _editMode = false;
-        _newEventDate = null;
-        _eventComps = [];
+        _viewingExisting  = null;
+        _editMode         = false;
+        _repairMode       = false;
+        _repairFolderName = null;
+        _newEventDate     = null;
+        _eventComps       = [];
         _destroyEventDDs();
         _renderEventList();
       });
@@ -1297,6 +1461,11 @@ ${unparseable.map(ev => `
     });
     _compDDs = {};
 
+    if (_eventComps.length === 0) {
+      listEl.innerHTML = '<p class="ec-hint" style="padding:12px 0;margin:0">No components added yet.</p>';
+      return;
+    }
+
     listEl.innerHTML = _eventComps.map((c, i) => _buildCompRow(c, i)).join('');
     _eventComps.forEach(comp => _mountCompDDs(comp));
     _wireRemoveButtons();
@@ -1376,11 +1545,23 @@ ${unparseable.map(ev => `
     const name  = (parts && dateValid) ? `${eventDate} _${seq}-${parts}` : '';
 
     if (preview) {
-      preview.textContent = name || '—';
-      preview.classList.toggle('empty', !name);
-      card?.classList.toggle('has-value', !!name);
+      const displayName = name || '—';
+      if (preview.textContent !== displayName) {
+        preview.textContent = displayName;
+        preview.classList.toggle('empty', !name);
+        card?.classList.toggle('has-value', !!name);
+      }
     }
     if (btn) btn.disabled = !(valid && dateValid);
+
+    // Mirror to modal footer — Create / Save / Repair all share the same validity gate.
+    const isValid  = valid && dateValid;
+    const emmCreate = document.getElementById('emmCreateBtn');
+    const emmSave   = document.getElementById('emmSaveBtn');
+    const emmRepair = document.getElementById('emmRepairBtn');
+    if (emmCreate) emmCreate.disabled = !isValid;
+    if (emmSave)   emmSave.disabled   = !isValid;
+    if (emmRepair) emmRepair.disabled = !isValid;
   }
 
   // ── Validate + create ──────────────────────────────────────────────────────
@@ -1435,6 +1616,73 @@ ${unparseable.map(ev => `
     _proceedToPreviewStep();
   }
 
+  // Phase 5: validate form, build a valid event name, rename the bad folder on disk,
+  // update the cache, and return to the event list with the repaired entry pre-selected.
+  async function _tryRepairEvent() {
+    if (!_repairMode || !_repairFolderName) return;
+
+    if (_eventComps.length === 0) {
+      _showEventBanner('Add at least one component.', 'error'); return;
+    }
+    const missing = _eventComps.find(c => c.eventTypes.length === 0 || !c.city);
+    if (missing) {
+      _showEventBanner('Every component needs at least one Event Type and a City.', 'error'); return;
+    }
+    if (!_newEventDate) {
+      _showEventBanner('Enter a valid Hijri date for this event.', 'error');
+      document.getElementById('evHijriYear')?.focus();
+      return;
+    }
+
+    const seq     = _computeNextSequence(_newEventDate);
+    const parts   = _buildCompString(_eventComps);
+    const newName = `${_newEventDate} _${seq}-${parts}`;
+    const oldName = _repairFolderName;
+
+    const result = await window.api.renameEvent(activeMaster.path, oldName, newName);
+    if (!result.ok) {
+      _showEventBanner(result.reason || 'Rename failed.', 'error');
+      return;
+    }
+
+    // Replace unparseable entry with a fully resolved one in the scan cache.
+    if (_scannedEvents) {
+      const idx = _scannedEvents.findIndex(e => e.folderName === oldName && !e.isParseable);
+      if (idx >= 0) {
+        _scannedEvents.splice(idx, 1, {
+          folderName:   newName,
+          hijriDate:    _newEventDate,
+          sequence:     seq,
+          components:   _eventComps.map(c => ({
+            eventTypes:   c.eventTypes.map(et => et.label),
+            location:     c.location?.label || null,
+            city:         c.city?.label     || '',
+            isUnresolved: false,
+          })),
+          isParseable:  true,
+          isUnresolved: false,
+        });
+      }
+    }
+
+    // Preselect the repaired event on return to list, then enable Continue.
+    _selectedListFolder = newName;
+    _repairMode         = false;
+    _repairFolderName   = null;
+    _eventComps         = [];
+    _newEventDate       = null;
+    _editMode           = false;
+    _destroyEventDDs();
+
+    if (typeof EventMgmt !== 'undefined' && EventMgmt.isOpen()) {
+      EventMgmt.setMode('select');
+      _renderEventList();
+      document.dispatchEvent(new CustomEvent('eventcreator:listSelect'));
+    } else {
+      _renderEventList();
+    }
+  }
+
   function _showEventBanner(msg, type = 'error') {
     const el = document.getElementById('ecEventError');
     if (!el) return;
@@ -1448,6 +1696,7 @@ ${unparseable.map(ev => `
   // ── Slide-transition helper ────────────────────────────────────────────────
 
   function _slideToStep(renderFn) {
+    console.log('[EventCreator] STEP →', renderFn.name || '(anonymous)');
     const body = $ecBody();
     if (!body) { renderFn(); return; }
     body.style.cssText += ';opacity:0;transform:translateX(-14px);transition:opacity 0.18s ease,transform 0.18s ease';
@@ -1476,6 +1725,11 @@ ${unparseable.map(ev => `
           eventName:      evt.name,
         }).catch(() => {});
       }
+    }
+    // In modal mode: dispatch done and close instead of sliding to the preview step.
+    if (typeof EventMgmt !== 'undefined' && EventMgmt.isOpen()) {
+      document.dispatchEvent(new CustomEvent('eventcreator:done'));
+      return;
     }
     _slideToStep(showPreviewStep);
   }
@@ -1617,25 +1871,27 @@ ${unparseable.map(ev => `
   return {
     /** Enter the event creator panel. Always starts at step 1. Does NOT clear sessionArchiveRoot. */
     start() {
-      selectedCollection = null;
-      activeMaster       = null;
-      _scannedEvents     = null;
-      _viewingExisting   = null;
-      _editMode          = false;
-      _newEventDate      = null;
+      selectedCollection  = null;
+      activeMaster        = null;
+      _scannedEvents      = null;
+      _viewingExisting    = null;
+      _editMode           = false;
+      _newEventDate       = null;
+      _selectedListFolder = null;
       _resetEventForm();
       showMasterStep();
     },
 
     /** Called on resetAppState — clears selection but keeps session collections and archive root. */
     resetSelection() {
-      selectedCollection = null;
-      activeMaster       = null;
-      _scannedEvents     = null;
-      _viewingExisting   = null;
-      _editMode          = false;
-      _newEventDate      = null;
-      _navScreen         = 'masterStep';
+      selectedCollection  = null;
+      activeMaster        = null;
+      _scannedEvents      = null;
+      _viewingExisting    = null;
+      _editMode           = false;
+      _newEventDate       = null;
+      _navScreen          = 'masterStep';
+      _selectedListFolder = null;
     },
 
     /** Called by renderer's updateSteps() when railMode === 'event'. */
@@ -1674,19 +1930,24 @@ ${unparseable.map(ev => `
      * @param {string} collectionName
      * @param {string} eventName
      */
-    restoreLastEvent(collectionName, eventName) {
+    restoreLastEvent(collectionName, eventName, collectionPath) {
       let coll = sessionCollections.find(c => c.name === collectionName);
       if (!coll) {
-        coll = { name: collectionName, hijriDate: '', events: [] };
+        coll = { name: collectionName, hijriDate: '', events: [], _masterPath: collectionPath || null };
         sessionCollections.push(coll);
+      } else if (collectionPath && !coll._masterPath) {
+        coll._masterPath = collectionPath;
       }
+      // Restore activeMaster so resetToList() can scan without going through Step 1 again.
+      if (collectionPath) activeMaster = { name: collectionName, path: collectionPath };
       let eventIdx = coll.events.findIndex(e => e.name === eventName);
       if (eventIdx < 0) {
         coll.events.push({ name: eventName, components: [] });
         eventIdx = coll.events.length - 1;
       }
-      selectedCollection = collectionName;
-      _activeEventIdx    = eventIdx;
+      selectedCollection  = collectionName;
+      _activeEventIdx     = eventIdx;
+      _selectedListFolder = eventName; // pre-set for preselection when "Change Event" opens
     },
 
     /**
@@ -1725,6 +1986,77 @@ ${unparseable.map(ev => `
     resume() { showPreviewStep(); },
 
     /**
+     * Navigate to the event list in SELECT mode, preselecting the currently
+     * active event. Used by "Change Event" so the user lands on the list
+     * with their event highlighted — not on the form or preview.
+     */
+    resetToList() {
+      // Resolve the active event folder name for preselection (fallback if not already set by restoreLastEvent).
+      if (!_selectedListFolder) {
+        const coll = selectedCollection
+          ? sessionCollections.find(c => c.name === selectedCollection)
+          : null;
+        if (coll && coll.events.length > 0) {
+          const idx = Math.min(_activeEventIdx, coll.events.length - 1);
+          _selectedListFolder = coll.events[idx]?.name || null;
+        }
+      }
+
+      // Clear any form / edit / repair state — returning to the list.
+      _viewingExisting  = null;
+      _editMode         = false;
+      _repairMode       = false;
+      _repairFolderName = null;
+      _eventComps       = [];
+      _newEventDate     = null;
+      _destroyEventDDs();
+
+      if (typeof EventMgmt !== 'undefined' && EventMgmt.isOpen()) EventMgmt.setMode('select');
+
+      // No collection established — must go to master step to pick one.
+      if (!selectedCollection) {
+        console.log('[EventCreator] resetToList → no collection, going to master step');
+        _slideToStep(showMasterStep);
+        return;
+      }
+
+      // Reconstruct activeMaster from the collection's persisted path if it was lost
+      // (e.g. app restart restores selectedCollection but not activeMaster).
+      if (!activeMaster) {
+        const coll = sessionCollections.find(c => c.name === selectedCollection);
+        if (coll?._masterPath) {
+          activeMaster = { name: selectedCollection, path: coll._masterPath };
+          console.log('[EventCreator] resetToList → reconstructed activeMaster from _masterPath');
+        }
+      }
+
+      console.log('[EventCreator] resetToList: collection=%s scannedEvents=%s activeMaster=%s selectedFolder=%s',
+        selectedCollection,
+        _scannedEvents ? `${_scannedEvents.length} events` : 'null',
+        activeMaster ? activeMaster.path : 'null',
+        _selectedListFolder);
+
+      if (_scannedEvents !== null) {
+        // Events already cached — go straight to the list.
+        _slideToStep(_renderEventList);
+      } else if (activeMaster) {
+        // Need to scan — always render list afterward, never the create form.
+        _slideToStep(() => {
+          _renderEventListSpinner();
+          _scanAndRenderEventList().catch(err => {
+            console.error('[EventCreator] resetToList scan failed:', err);
+            _scannedEvents = [];
+            _renderEventList();
+          });
+        });
+      } else {
+        // Collection known but master path unavailable — must re-establish via Step 1.
+        console.log('[EventCreator] resetToList → no activeMaster, going to master step');
+        _slideToStep(showMasterStep);
+      }
+    },
+
+    /**
      * Steps back one level within the event creator.
      * Returns true if navigation was handled internally; false if the caller
      * (renderer.js) should navigate away (e.g. showLanding()).
@@ -1737,10 +2069,12 @@ ${unparseable.map(ev => `
           _slideToStep(showMasterStep);
           return true;
         case 'eventForm':
-          _viewingExisting = null;
-          _editMode        = false;
-          _eventComps      = [];
-          _newEventDate    = null;
+          _viewingExisting  = null;
+          _editMode         = false;
+          _repairMode       = false;
+          _repairFolderName = null;
+          _eventComps       = [];
+          _newEventDate     = null;
           _destroyEventDDs();
           _slideToStep(_renderEventList);
           return true;
@@ -1752,6 +2086,97 @@ ${unparseable.map(ev => `
           return false;
       }
     },
+
+    /** Phase 3 — Create Event footer button: validates and creates the event, then closes the modal. */
+    tryCreateEvent() { _tryCreateEvent(); },
+
+    /** Phase 4 — Save Changes footer button: validates, renames folder, then closes the modal. Returns Promise. */
+    saveEditedEvent() { return _handleSaveEditedEvent(); },
+
+    /** Phase 5 — Save & Repair footer button: validates, renames bad folder to valid name. Returns Promise. */
+    tryRepairEvent() { return _tryRepairEvent(); },
+
+    /**
+     * Phase 2 — Continue from SELECT mode: adopt the highlighted event into the
+     * session without going through preview, then dispatch eventcreator:done.
+     */
+    adoptSelectedEvent() {
+      if (!_selectedListFolder || !selectedCollection) return false;
+      const entry = (_scannedEvents || []).find(e => e.folderName === _selectedListFolder && e.isParseable);
+      if (!entry) return false;
+
+      _editMode = false;
+      _newEventDate = null;
+      _compSeq = 0;
+      _eventComps = entry.components.map(c => ({
+        id:           ++_compSeq,
+        eventTypes:   c.eventTypes.map(label => ({ id: label, label })),
+        location:     c.location ? { id: c.location, label: c.location } : null,
+        city:         { id: c.city, label: c.city },
+        isUnresolved: !!c.isUnresolved,
+      }));
+      _viewingExisting = {
+        folderName:   entry.folderName,
+        hijriDate:    entry.hijriDate,
+        sequence:     entry.sequence,
+        isUnresolved: entry.isUnresolved,
+        components:   _eventComps.map(c => ({ ...c, eventTypes: [...c.eventTypes] })),
+      };
+
+      const coll = sessionCollections.find(c => c.name === selectedCollection);
+      if (!coll) return false;
+      const existingIdx = coll.events.findIndex(e => e.name === entry.folderName);
+      if (existingIdx >= 0) {
+        _activeEventIdx = existingIdx;
+      } else {
+        coll.events.push({ name: entry.folderName, components: _viewingExisting.components });
+        _activeEventIdx = coll.events.length - 1;
+      }
+
+      if (activeMaster) {
+        const evt = coll.events[_activeEventIdx];
+        if (evt) window.api.setLastEvent({
+          collectionPath: activeMaster.path,
+          collectionName: selectedCollection,
+          eventName:      evt.name,
+        }).catch(() => {});
+      }
+
+      document.dispatchEvent(new CustomEvent('eventcreator:done'));
+      return true;
+    },
+
+    /** Phase 2 — Edit from SELECT mode: open highlighted event directly in edit mode. */
+    editSelectedEvent() {
+      if (!_selectedListFolder) return false;
+      _openExistingEvent(_selectedListFolder, { edit: true });
+      return true;
+    },
+
+    /**
+     * Navigate to the master-step (collection picker) from any screen.
+     * Caller is responsible for the dirty-state confirm before calling this.
+     */
+    goToMasterStep() {
+      _viewingExisting  = null;
+      _editMode         = false;
+      _repairMode       = false;
+      _repairFolderName = null;
+      _selectedListFolder = null;
+      _scannedEvents    = null;
+      _eventComps       = [];
+      _newEventDate     = null;
+      _destroyEventDDs();
+      if (typeof EventMgmt !== 'undefined' && EventMgmt.isOpen()) EventMgmt.setMode('select');
+      document.dispatchEvent(new CustomEvent('eventcreator:listDeselect'));
+      _slideToStep(showMasterStep);
+    },
+
+    isDirty() {
+      return _navScreen === 'eventForm' && (_editMode || _repairMode || !_viewingExisting);
+    },
+
+    getNavScreen() { return _navScreen; },
   };
 
 })();

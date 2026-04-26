@@ -10,6 +10,7 @@ const { copyFiles, copyFileJobs, setPaused, getFileHash, abortCopy } = require('
 const { getThumbnail, shutdownWorkers } = require('../services/thumbnailer');
 const listManager  = require('./listManager');
 const aliasEngine  = require('./aliasEngine');
+const dateEngine   = require('./dateEngine');
 const { parseEventName } = require('./eventNameParser');
 const { log } = require('../services/logger');
 const telemetry     = require('../services/telemetry');
@@ -817,6 +818,12 @@ ipcMain.handle('lists:get',        (_event, name)                              =
 ipcMain.handle('lists:add',        (_event, name, value)                       => listManager.addToList(name, value));
 ipcMain.handle('lists:match',      (_event, name, input)                       => aliasEngine.match(input, name, listManager.getList(name)));
 ipcMain.handle('lists:learnAlias', (_event, name, canonicalId, label, typed)   => aliasEngine.learnAlias(name, canonicalId, label, typed));
+
+// ── Date engine ──────────────────────────────────────────────────────────────
+ipcMain.handle('date:getToday',       ()                   => dateEngine.getToday());
+ipcMain.handle('date:toHijri',        (_event, isoDate)    => dateEngine.convertToHijri(isoDate));
+ipcMain.handle('date:toGregorian',    (_event, hijri)      => dateEngine.convertToGregorian(hijri));
+ipcMain.handle('date:getCalendar',    (_event, year, month)=> dateEngine.getHijriCalendar(year, month));
 
 // ── Window controls ──────────────────────────────────────────────────────────
 ipcMain.handle('window:minimize', () => {
