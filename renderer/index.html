@@ -28,18 +28,24 @@
       --text-secondary:    #aab1c3;
       --text-muted:        #6b7280;
       --accent:            #89b4fa;
-      --accent-soft:       rgba(137,180,250,0.12);
-      --accent-hover:      rgba(137,180,250,0.08);
+      --accent-soft:       color-mix(in srgb, var(--accent) 35%, transparent);
+      --accent-hover:      color-mix(in srgb, var(--accent) 20%, transparent);
       --accent-border:     rgba(137,180,250,0.25);
       --accent-border-sel: rgba(137,180,250,0.6);
       --success:           #a6e3a1;
       --success-soft:      rgba(166,227,161,0.12);
-      --border-subtle:     rgba(255,255,255,0.06);
-      --border-strong:     rgba(255,255,255,0.12);
+      --border-subtle:     color-mix(in srgb, white 10%, transparent);
+      --border-strong:     color-mix(in srgb, white 18%, transparent);
       --shadow-soft:       0 0 20px rgba(0,0,0,0.25);
       --scrim:             rgba(0,0,0,0.55);
       --accent-glow:       color-mix(in srgb, var(--accent) 7%, transparent);
       --accent-tint:       color-mix(in srgb, var(--accent) 15%, transparent);
+      /* ── Glass surface tokens ───────────────────── */
+      --divider-color:     color-mix(in srgb, white 18%, transparent);
+      --glass-header:      rgba(30,30,46,0.55);
+      --glass-hero:        rgba(30,30,46,0.50);
+      --glass-card:        rgba(30,30,46,0.42);
+      --glass-tile:        rgba(30,30,46,0.35);
       /* ── Catppuccin alias layer ─────────────────── */
       --bg:        var(--bg-primary);
       --surface:   var(--card-bg);
@@ -67,14 +73,14 @@
       --text-secondary:    #4b5563;
       --text-muted:        #9aa3af;
       --accent:            #3b82f6;
-      --accent-soft:       rgba(59,130,246,0.12);
-      --accent-hover:      rgba(59,130,246,0.08);
+      --accent-soft:       color-mix(in srgb, var(--accent) 35%, transparent);
+      --accent-hover:      color-mix(in srgb, var(--accent) 20%, transparent);
       --accent-border:     rgba(59,130,246,0.25);
       --accent-border-sel: rgba(59,130,246,0.5);
       --success:           #16a34a;
       --success-soft:      rgba(22,163,74,0.12);
-      --border-subtle:     rgba(0,0,0,0.06);
-      --border-strong:     rgba(0,0,0,0.12);
+      --border-subtle:     rgba(0,0,0,0.08);
+      --border-strong:     rgba(0,0,0,0.16);
       --shadow-soft:       0 4px 20px rgba(0,0,0,0.08);
       --scrim:             rgba(0,0,0,0.45);
       --border:            rgba(0,0,0,0.15);
@@ -82,6 +88,12 @@
       --mauve:             #7c3aed;
       --red:               #dc2626;
       --peach:             #ea580c;
+      /* ── Glass surface tokens (light) ────────────── */
+      --divider-color:     rgba(0,0,0,0.10);
+      --glass-header:      color-mix(in srgb, white 72%, transparent);
+      --glass-hero:        color-mix(in srgb, white 85%, transparent);
+      --glass-card:        color-mix(in srgb, white 80%, transparent);
+      --glass-tile:        color-mix(in srgb, white 70%, transparent);
     }
 
     html { transition: background-color 0.15s ease, color 0.15s ease; }
@@ -198,7 +210,8 @@
 
     /* ── Dashboard header (frameless title bar) ───────────────────── */
     .header-wrapper {
-      padding: 12px;
+      padding: 12px 32px;
+      margin-top: 12px;
       flex-shrink: 0;
       -webkit-app-region: drag;
       user-select: none;
@@ -206,54 +219,56 @@
     /* macOS: 28px top clears the 12px-tall traffic lights at y=8 (ends at y=20) */
     .is-mac .header-wrapper { padding-top: 28px; }
     #dashHeader {
-      display: flex; align-items: stretch;
-      background: rgba(20, 22, 36, 0.78);
-      backdrop-filter: blur(20px) saturate(160%);
+      display: flex; align-items: center; justify-content: space-between;
+      width: 100%; box-sizing: border-box;
+      padding: 10px 16px; gap: 0;
+      background: var(--glass-header);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
       border: 1px solid var(--border-subtle);
-      border-radius: 16px;
+      border-radius: 14px;
+      min-height: 52px;
       flex-shrink: 0;
       overflow: hidden;
       -webkit-app-region: drag;
       user-select: none;
     }
-    /* Ensure all interactive elements inside header are clickable (not drag targets) */
     #dashHeader button, #dashHeader input, #dashHeader select, #dashHeader a { -webkit-app-region: no-drag; }
 
-    .dash-left {
-      display: flex; align-items: center; gap: var(--space-3);
-      padding: 14px 20px;
-      background: color-mix(in srgb, var(--text-primary) 2.5%, transparent);
-      border-right: 1px solid var(--border-subtle);
-      min-width: 190px; flex-shrink: 0;
-    }
-    /* macOS: extra left padding so traffic lights don't overlap brand content */
-    .is-mac .dash-left { padding-left: 72px; min-width: 252px; }
+    /* ── Header sections ──────────────────────────────────────────── */
+    .header-section { display: flex; align-items: center; gap: 8px; }
+    .header-section.brand { flex-direction: column; align-items: flex-start; gap: 1px; }
+    .is-mac .header-section.brand { padding-left: 62px; }
+    .app-title { font-size: 15px; font-weight: 700; letter-spacing: 0.6px; color: var(--text); }
+    .app-subtitle { font-size: 11px; color: var(--subtext); opacity: 0.7; }
 
-    .dash-logo-icon {
-      width: 34px; height: 34px; border-radius: 9px;
-      background: var(--accent-soft);
-      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-    }
-    .dash-logo-icon svg { width: 18px; height: 18px; stroke: var(--blue); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-    .dash-brand { display: flex; flex-direction: column; gap: 1px; }
-    .dash-app-name { font-size: 0.88rem; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
-    .dash-tagline { font-size: 0.61rem; color: var(--subtext); opacity: 0.5; }
+    /* Date */
+    .header-section.date { font-size: 14px; font-weight: 500; color: var(--text); white-space: nowrap; padding: 0 16px; }
+    .date-separator { opacity: 0.4; font-weight: 400; }
+    #headerDateGreg { color: var(--text); }
+    #headerDateHijri { color: var(--text); opacity: 0.82; }
 
-    .dash-center { flex: 1; display: flex; align-items: stretch; overflow: hidden; }
-    .dash-ctx-item { display: flex; align-items: center; gap: 10px; padding: 14px 20px; min-width: 0; }
-    #dashCtxEvent { flex: 1; }
-    .dash-ctx-item svg { width: 13px; height: 13px; stroke: var(--subtext); fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; opacity: 0.45; flex-shrink: 0; }
-    .dash-ctx-inner { display: flex; flex-direction: column; gap: 2px; }
-    .dash-ctx-label { font-size: 0.57rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--subtext); opacity: 0.5; font-weight: 700; }
-    .dash-ctx-value { font-size: 0.76rem; color: var(--text); font-weight: 600; white-space: normal; line-height: 1.35; word-break: break-word; }
-    .dash-ctx-sub { font-size: 0.63rem; color: var(--mauve); font-weight: 500; }
-    .dash-ctx-divider { width: 1px; background: var(--border-subtle); align-self: stretch; flex-shrink: 0; }
+    /* Archive */
+    .header-section.archive { font-size: 13px; color: var(--subtext); padding: 0 16px; max-width: 240px; }
+    .header-section.archive #archivePath { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; display: inline-block; }
 
-    .dash-right { display: flex; align-items: stretch; flex-shrink: 0; -webkit-app-region: no-drag; }
-    .dash-status-row { display: flex; align-items: center; gap: 6px; }
-    .dash-status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; box-shadow: 0 0 6px color-mix(in srgb, var(--success) 45%, transparent); }
-    .dash-status-label { font-size: 0.72rem; color: var(--green); font-weight: 600; }
-    .dash-unsynced-badge { padding: 2px 8px; border-radius: 10px; background: color-mix(in srgb, var(--yellow) 10%, transparent); border: 1px solid color-mix(in srgb, var(--yellow) 22%, transparent); font-size: 0.62rem; color: var(--yellow); font-weight: 700; }
+    /* Status */
+    .header-section.status { padding: 0 16px; align-items: center; }
+    .status-block { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 8px; row-gap: 2px; align-items: center; }
+    .status-block .label { font-size: 10px; color: var(--subtext); opacity: 0.7; text-transform: uppercase; letter-spacing: 0.4px; line-height: 1; }
+    .status-icon-wrap { grid-row: 1 / span 2; display: flex; align-items: center; }
+    .status-icon { width: 14px; height: 14px; stroke-width: 1.8; opacity: 0.7; display: block; }
+    .status-value { display: flex; align-items: center; gap: 6px; }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+    .status-text { font-size: 13px; font-weight: 500; color: var(--text); }
+
+    /* Dividers */
+    .hdr-divider { width: 1px; height: 24px; background: var(--divider-color); flex-shrink: 0; }
+
+    /* ── Global SVG icon class ───────────────────────────────── */
+    .icon { width: 16px; height: 16px; stroke-width: 1.6; opacity: 0.85; flex-shrink: 0; position: relative; top: 1px; }
+    .header-section.date .icon { opacity: 0.75; }
+    .header-section.archive .icon { opacity: 0.7; }
 
     /* ── Window controls (Windows/Linux only) ─────────────────────── */
     .window-controls { display: flex; align-items: stretch; }
@@ -295,8 +310,8 @@
     #heroCard {
       display: flex; align-items: center; gap: var(--space-5);
       padding: var(--space-4) var(--space-6);
-      background: rgba(49,50,68,0.6); backdrop-filter: blur(16px);
-      border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent); border-radius: 14px;
+      background: var(--glass-hero); backdrop-filter: blur(16px);
+      border: 1px solid var(--border-subtle); border-radius: 14px;
       box-shadow: 0 0 0 1px var(--accent-glow), 0 6px 24px rgba(0,0,0,0.3), 0 0 56px var(--accent-glow);
       transition: border-color 0.25s, box-shadow 0.25s, opacity 0.2s ease;
     }
@@ -348,26 +363,14 @@
       display: flex; align-items: center; justify-content: center; flex-shrink: 0;
     }
     #heroCard.has-event .hero-icon-wrap { background: color-mix(in srgb, var(--success) 10%, transparent); }
-    .hero-icon-wrap svg { width: 22px; height: 22px; stroke: var(--blue); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+    .hero-icon-wrap svg { width: 22px; height: 22px; stroke: var(--blue); fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
     #heroCard.has-event .hero-icon-wrap svg { stroke: var(--green); }
     .hero-body { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
     .hero-pretitle { font-size: 1rem; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
-    .hero-event-name { font-size: 0.95rem; color: var(--subtext); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hero-event-name { font-size: 0.95rem; color: var(--subtext); white-space: normal; overflow: visible; text-overflow: unset; line-height: 1.4; }
     #heroCard.has-event .hero-event-name { font-family: 'SF Mono','Cascadia Code',ui-monospace,monospace; font-size: 0.85rem; color: var(--text); }
     .hero-collection { font-size: 0.72rem; color: var(--subtext); margin-top: 2px; }
     .hero-coll-label { font-size: 0.57rem; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; color: var(--subtext); opacity: 0.5; margin-right: 4px; }
-    .hero-event-select {
-      width: 100%; max-width: 440px;
-      background: rgba(24,24,37,0.6); border: 1px solid var(--border);
-      color: var(--text); font-family: 'SF Mono','Cascadia Code',ui-monospace,monospace;
-      font-size: 0.78rem; font-weight: 600; padding: 7px 30px 7px 10px;
-      border-radius: 8px; cursor: pointer; outline: none;
-      -webkit-appearance: none; appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23a6adc8' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-      background-repeat: no-repeat; background-position: right 10px center;
-      margin-top: 6px; transition: border-color 0.15s;
-    }
-    .hero-event-select:focus { border-color: var(--mauve); }
     .hero-mode-badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 6px; font-size: 0.61rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 6px; align-self: flex-start; }
     .hero-mode-badge.single { background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--blue); }
     .hero-mode-badge.multi  { background: color-mix(in srgb, var(--mauve) 10%, transparent); color: var(--mauve); }
@@ -377,7 +380,7 @@
     .hero-btn-primary:active { transform: translateY(0); }
     .hero-btn-primary.green { background: var(--green); }
     .hero-btn-secondary { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 16px; background: var(--card-hover); border: 1px solid var(--border-strong); border-radius: 10px; color: var(--text-secondary); font-size: 0.83rem; font-family: inherit; cursor: pointer; transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease; white-space: nowrap; }
-    .hero-btn-secondary svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+    .hero-btn-secondary svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
     .hero-btn-secondary:hover { background: var(--accent-soft); color: var(--text-primary); border-color: var(--accent-border); }
     .hero-btn-secondary:active { transform: scale(0.98); }
 
@@ -385,7 +388,7 @@
     #modeToggleRow { display: flex; align-items: center; justify-content: center; margin-top: 20px; flex-shrink: 0; }
     .mode-seg-group { display: inline-flex; align-items: center; background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 4px; gap: 2px; box-shadow: var(--shadow-soft); }
     .mode-seg-btn { display: flex; align-items: center; justify-content: center; gap: var(--space-2); min-width: 140px; padding: 8px 18px; background: transparent; border: 1px solid transparent; border-radius: 8px; color: var(--text-secondary); font-size: 0.8rem; font-weight: 500; font-family: inherit; cursor: pointer; transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease; }
-    .mode-seg-btn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+    .mode-seg-btn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
     .mode-seg-btn.active { background: var(--accent-soft); color: var(--text-primary); border-color: var(--accent-border); box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
     .mode-seg-btn:not(.active):hover { background: var(--card-hover); color: var(--text-primary); }
 
@@ -394,12 +397,12 @@
     .dash-section-title { font-size: 0.88rem; font-weight: 700; color: var(--text); }
     .dash-section-sub { font-size: 0.71rem; color: var(--subtext); opacity: 0.5; }
     .dev-count { margin-left: auto; font-size: 0.71rem; color: var(--blue); font-weight: 600; }
-    #sourceSection { margin-top: 16px; flex-shrink: 0; }
-    #overviewSection { margin-top: auto; flex-shrink: 0; }
+    #sourceSection { width: 100%; margin-top: 16px; flex-shrink: 0; }
+    #overviewSection { width: 100%; margin-top: 48px; flex-shrink: 0; }
 
     /* ── Source cards (horizontal layout) ──────────────────────────── */
     #sourceGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
-    .src-card-h { display: flex; flex-direction: column; background: rgba(36,36,54,0.55); backdrop-filter: blur(10px); border: 1px solid color-mix(in srgb, var(--border) 35%, transparent); border-radius: 14px; overflow: hidden; transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease; cursor: default; position: relative; }
+    .src-card-h { display: flex; flex-direction: column; background: var(--glass-card); backdrop-filter: blur(10px); border: 1px solid var(--border-subtle); border-radius: 14px; overflow: hidden; transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease; cursor: default; position: relative; }
     .src-card-h:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--accent) 30%, transparent); box-shadow: 0 10px 24px rgba(0,0,0,0.25), 0 0 12px color-mix(in srgb, var(--accent) 5%, transparent); }
     .src-card-h.highlighted { border-color: color-mix(in srgb, var(--accent) 40%, transparent); box-shadow: 0 0 0 1px var(--accent-tint), 0 8px 20px rgba(0,0,0,0.25); }
     .src-card-h.hidden { display: none; }
@@ -407,7 +410,7 @@
     .src-badge.visible { display: block; }
     .src-card-h-top { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-5) var(--space-4) var(--space-4); }
     .src-h-icon { width: 42px; height: 42px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 10%, transparent); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    .src-h-icon svg { width: 20px; height: 20px; stroke: var(--blue); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+    .src-h-icon svg { width: 20px; height: 20px; stroke: var(--blue); fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
     .src-h-icon--ext { background: var(--accent-hover); }
     .src-h-icon--local { background: color-mix(in srgb, var(--mauve) 8%, transparent); }
     .src-h-icon--local svg { stroke: var(--mauve); }
@@ -415,7 +418,7 @@
     .src-h-title { font-size: 0.88rem; font-weight: 700; color: var(--text); }
     .src-h-desc { font-size: 0.7rem; color: var(--subtext); line-height: 1.4; }
     .src-h-chevron { font-size: 1rem; color: var(--subtext); opacity: 0.3; flex-shrink: 0; }
-    .src-card-h-foot { display: flex; align-items: center; justify-content: space-between; padding: var(--space-3) var(--space-4); border-top: 1px solid color-mix(in srgb, var(--border) 22%, transparent); background: rgba(24,24,37,0.22); margin-top: auto; }
+    .src-card-h-foot { display: flex; align-items: center; justify-content: space-between; padding: var(--space-3) var(--space-4); border-top: 1px solid var(--border-subtle); background: rgba(24,24,37,0.22); margin-top: auto; }
     .src-h-status { display: flex; align-items: center; gap: var(--space-2); font-size: 0.68rem; color: var(--subtext); opacity: 0.65; }
     .src-h-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--subtext); opacity: 0.35; flex-shrink: 0; }
     .src-h-dot--active { background: var(--green); opacity: 1; box-shadow: 0 0 4px color-mix(in srgb, var(--success) 40%, transparent); }
@@ -427,7 +430,7 @@
     .src-h-btn--local:hover { background: color-mix(in srgb, var(--mauve) 18%, transparent); border-color: color-mix(in srgb, var(--mauve) 35%, transparent); }
 
     /* ── Device panel (workspace view) ────────────────────────────── */
-    .drive-card-large { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); background: rgba(36,36,54,0.55); border: 1px solid color-mix(in srgb, var(--border) 35%, transparent); border-radius: 12px; cursor: pointer; transition: border-color 0.18s, background 0.18s, transform 0.18s, box-shadow 0.18s; min-width: 180px; max-width: 260px; user-select: none; flex-shrink: 0; }
+    .drive-card-large { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); background: var(--glass-card); border: 1px solid var(--border-subtle); border-radius: 12px; cursor: pointer; transition: border-color 0.18s, background 0.18s, transform 0.18s, box-shadow 0.18s; min-width: 180px; max-width: 260px; user-select: none; flex-shrink: 0; }
     .drive-card-large:hover { border-color: var(--blue); background: var(--blue-dim); transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.2), 0 0 10px color-mix(in srgb, var(--accent) 6%, transparent); }
     .drive-card-large:active { transform: translateY(0); box-shadow: none; }
     .drive-card-large .dc-icon { font-size: 1.4rem; flex-shrink: 0; }
@@ -451,10 +454,10 @@
       45%  { transform: scale(1.04); }
       100% { transform: scale(1); }
     }
-    .src-card-device-list { padding: 0 var(--space-2) var(--space-2); display: flex; flex-direction: column; gap: 3px; max-height: 200px; overflow-y: auto; scroll-behavior: smooth; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--border) 40%, transparent) transparent; }
+    .src-card-device-list { padding: 0 var(--space-2) var(--space-2); display: flex; flex-direction: column; gap: 3px; max-height: 200px; overflow-y: auto; scroll-behavior: smooth; scrollbar-width: thin; scrollbar-color: var(--border-subtle) transparent; }
     .src-card-device-list::-webkit-scrollbar { width: 4px; }
     .src-card-device-list::-webkit-scrollbar-track { background: transparent; }
-    .src-card-device-list::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--border) 45%, transparent); border-radius: 4px; }
+    .src-card-device-list::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 4px; }
     .src-device-item { display: flex; align-items: center; gap: var(--space-3); padding: 8px 10px; border-radius: 8px; border: 1px solid transparent; background: color-mix(in srgb, var(--text-primary) 2%, transparent); cursor: pointer; transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease; animation: deviceAppear 0.2s ease both; }
     .src-device-item:hover { background: var(--accent-hover); border-color: color-mix(in srgb, var(--accent) 20%, transparent); transform: translateY(-2px); }
     .src-device-item.selected { background: color-mix(in srgb, var(--accent) 9%, transparent); border-color: var(--accent-border-sel); box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 14%, transparent); transform: none; }
@@ -485,12 +488,12 @@
 
     /* ── System overview ───────────────────────────────────────────── */
     #overviewGrid { display: flex; gap: var(--space-3); }
-    .ov-tile { flex: 1; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); background: rgba(36,36,54,0.45); border: 1px solid color-mix(in srgb, var(--border) 28%, transparent); border-radius: 10px; min-width: 0; }
+    .ov-tile { flex: 1; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); background: var(--glass-tile); border: 1px solid var(--border-subtle); border-bottom: none; border-radius: 10px; min-width: 0; }
     .ov-tile--warn { border-color: color-mix(in srgb, var(--yellow) 14%, transparent); background: color-mix(in srgb, var(--yellow) 3%, transparent); }
     .ov-tile--action { cursor: pointer; transition: border-color 0.15s, background 0.15s; }
     .ov-tile--action:hover { border-color: color-mix(in srgb, var(--accent) 28%, transparent); background: color-mix(in srgb, var(--accent) 5%, transparent); }
     .ov-tile-icon { width: 28px; height: 28px; border-radius: 7px; background: var(--accent-hover); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    .ov-tile-icon svg { width: 15px; height: 15px; stroke: var(--blue); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+    .ov-tile-icon svg { width: 15px; height: 15px; stroke: var(--blue); fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
     .ov-tile--warn .ov-tile-icon { background: color-mix(in srgb, var(--yellow) 7%, transparent); }
     .ov-tile--warn .ov-tile-icon svg { stroke: var(--yellow); }
     .ov-tile-body { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
@@ -499,35 +502,94 @@
     .ov-arrow { font-size: 1rem; color: var(--subtext); opacity: 0.3; flex-shrink: 0; }
 
     /* ── Dashboard footer ──────────────────────────────────────────── */
-    #dashFooter { display: flex; align-items: center; justify-content: space-between; padding: var(--space-2) var(--space-5); border-top: 1px solid color-mix(in srgb, var(--border) 18%, transparent); flex-shrink: 0; }
-    #dashVersion { font-size: 0.62rem; color: var(--subtext); opacity: 0.3; }
-    .footer-utils { display: flex; align-items: center; gap: 2px; }
-    .footer-icon-btn { width: 28px; height: 28px; border-radius: 7px; background: transparent; border: 1px solid transparent; color: var(--subtext); cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0.38; transition: opacity 0.15s, border-color 0.15s, background 0.15s; padding: 0; }
-    .footer-icon-btn:hover { opacity: 1; border-color: color-mix(in srgb, var(--border) 40%, transparent); background: color-mix(in srgb, var(--border) 12%, transparent); }
-    .footer-icon-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    /* dashFooter merged into #statusBar — see unified status bar CSS below */
 
-    /* ── EVENT CREATOR PANEL ──────────────────── */
-    #eventCreatorPanel {
-      display: none; flex-direction: column; flex: 1; overflow: hidden;
-    }
-    #eventCreatorPanel.visible { display: flex; }
+    /* ── EVENT MANAGEMENT MODAL ──────────────── */
+    #eventCreatorPanel { display: none; }
 
-    #ecHeader {
-      display: flex; align-items: center; gap: 14px;
-      padding: 10px 20px; background: var(--surface3);
-      border-bottom: 1px solid var(--border); flex-shrink: 0;
+    .emm-overlay {
+      position: fixed; inset: 0; z-index: 1000;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--scrim);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.18s ease;
     }
-    #ecTitle { font-size: 0.95rem; font-weight: 600; color: var(--text); }
-    .ec-back-btn {
-      background: none; border: 1px solid var(--border); border-radius: 6px;
-      color: var(--subtext); font-size: 0.8rem; padding: 4px 10px; cursor: pointer;
+    .emm-overlay.open { opacity: 1; pointer-events: all; }
+    .emm-box {
+      background: var(--card-bg);
+      border: 1px solid var(--border-strong);
+      border-radius: 16px;
+      width: min(720px, calc(100vw - 48px));
+      max-height: calc(100vh - 80px);
+      display: flex; flex-direction: column;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.35);
+      transform: translateY(10px);
+      transition: transform 0.18s ease;
     }
-    .ec-back-btn:hover { border-color: var(--blue); color: var(--blue); }
-
+    .emm-overlay.open .emm-box { transform: translateY(0); }
+    .emm-topbar {
+      display: flex; align-items: center;
+      height: 44px; padding: 0 20px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-subtle);
+      border-radius: 16px 16px 0 0; flex-shrink: 0;
+    }
+    .emm-topbar-title {
+      font-size: 12.5px; font-weight: 500;
+      color: var(--text-muted); letter-spacing: 0.04em;
+    }
+    .emm-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px 12px; flex-shrink: 0;
+    }
+    #ecTitle {
+      font-size: 18px; font-weight: 600; color: var(--text-primary);
+      letter-spacing: -0.01em;
+    }
+    .emm-close-btn {
+      width: 28px; height: 28px; border-radius: 7px;
+      background: transparent; border: 1px solid transparent;
+      color: var(--text-muted); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .emm-close-btn:hover { background: var(--card-hover); color: var(--text-primary); border-color: var(--border-subtle); }
+    .emm-close-btn svg { width: 14px; height: 14px; }
     #ecBody {
-      flex: 1; overflow-y: auto; padding: 32px;
-      display: flex; flex-direction: column; align-items: center;
+      flex: 1; overflow-y: auto; padding: 20px 20px 22px;
+      scroll-behavior: smooth; min-height: 320px;
+      transition: opacity 0.2s ease, transform 0.2s ease;
     }
+    .emm-footer {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 24px; border-top: 1px solid var(--border-subtle); flex-shrink: 0;
+    }
+    .emm-footer-right { display: flex; align-items: center; gap: 10px; }
+    .emm-btn-ghost {
+      background: none; border: none; cursor: pointer; font-family: inherit;
+      color: var(--text-muted); font-size: 0.8rem;
+      padding: 6px 10px; border-radius: 7px;
+      transition: background 0.15s, color 0.15s;
+    }
+    .emm-btn-ghost:hover { background: var(--card-hover); color: var(--text-secondary); }
+    .emm-btn-secondary {
+      padding: 7px 16px; background: var(--card-hover);
+      border: 1px solid var(--border-strong); border-radius: 9px;
+      color: var(--text-secondary); font-size: 0.8rem; font-weight: 500;
+      font-family: inherit; cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .emm-btn-secondary:hover { background: var(--accent-soft); color: var(--text-primary); border-color: var(--accent-border); }
+    .emm-btn-primary {
+      padding: 7px 18px; background: var(--accent);
+      border: none; border-radius: 9px;
+      color: #fff; font-size: 0.8rem; font-weight: 600;
+      font-family: inherit; cursor: pointer;
+      transition: opacity 0.15s, transform 0.12s;
+    }
+    .emm-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+    .emm-btn-primary:not(:disabled):hover { opacity: 0.88; }
+    .emm-btn-primary:not(:disabled):active { transform: scale(0.97); }
     /* drive-card-large and #noDriveMsg styled in landing dashboard section above */
 
     /* ── WORKSPACE ─────────────────────────────── */
@@ -963,20 +1025,21 @@
     .dup-btn-cancel    { background: transparent; color: var(--subtext); border-color: var(--border); font-size: 0.8rem; padding: 7px; }
     .dup-btn-cancel:hover { border-color: var(--red); color: var(--red); }
 
-    /* ── STATUS BAR ────────────────────────────── */
+    /* ── UNIFIED STATUS BAR ─────────────────────── */
     #statusBar {
-      padding: 3px 16px; font-size: 0.67rem; opacity: 0.28;
-      border-top: 1px solid var(--border); flex-shrink: 0; display: flex; gap: 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 5px 16px; font-size: 0.72rem; color: var(--text-muted);
+      background: var(--bg-secondary); border-top: 1px solid var(--border-subtle);
+      flex-shrink: 0; position: relative;
     }
-    #statusMessage {
-      margin-left: auto; color: var(--yellow); opacity: 1;
-      font-size: 0.7rem; font-weight: 500;
-      transition: opacity 0.3s;
-    }
+    .status-left { display: flex; align-items: center; gap: 12px; opacity: 0.7; min-width: 0; }
+    .status-center { position: absolute; left: 50%; transform: translateX(-50%); opacity: 0.45; font-size: 0.65rem; pointer-events: none; }
+    .status-right { display: flex; align-items: center; gap: 4px; }
+    #statusMessage { color: var(--yellow); opacity: 1; font-weight: 500; transition: opacity 0.3s; }
     #statusMessage:empty { display: none; }
-    #appVersion {
-      margin-left: auto; font-size: 0.65rem; opacity: 0.45; font-family: monospace;
-    }
+    .status-icon-btn { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; background: none; border: none; cursor: pointer; color: var(--text-muted); opacity: 0.45; border-radius: 5px; transition: opacity 0.15s, background 0.15s; padding: 0; }
+    .status-icon-btn:hover { opacity: 1; background: color-mix(in srgb, var(--border) 15%, transparent); }
+    .status-icon-btn svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 
     /* ── SCROLLBARS ────────────────────────────── */
     ::-webkit-scrollbar { width: 4px; }
@@ -1470,61 +1533,8 @@
    Uses only CSS variables already defined in :root (Catppuccin Mocha).
    ───────────────────────────────────────────────────────────────────────────── */
 
-/* ── Event Creator Panel layout ──────────────────────────────────────────── */
-
-#eventCreatorPanel {
-  display: none;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-  background: var(--bg);
-}
-#eventCreatorPanel.visible {
-  display: flex;
-}
-
-#ecHeader {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 16px 28px;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-  background: var(--surface);
-}
-
-.ec-back-btn {
-  background: transparent;
-  border: 1.5px solid var(--border);
-  color: var(--subtext);
-  padding: 6px 14px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 13px;
-  font-family: inherit;
-  letter-spacing: 0.01em;
-  transition: border-color 0.15s, color 0.15s;
-  flex-shrink: 0;
-}
-.ec-back-btn:hover {
-  border-color: var(--blue);
-  color: var(--blue);
-}
-
-#ecTitle {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text);
-  letter-spacing: 0.01em;
-}
-
-#ecBody {
-  flex: 1;
-  overflow-y: auto;
-  padding: 36px 32px 48px;
-  /* Smooth scroll */
-  scroll-behavior: smooth;
-}
+/* ── Event Creator Panel — obsolete; modal CSS is in the compact block above ── */
+/* #eventCreatorPanel, #ecBody, #ecTitle, .emm-* all defined in Event Management Modal block. */
 
 /* ── Master wrapper — constrains max width, centers content ──────────────── */
 
@@ -1536,14 +1546,90 @@
   gap: 0;
 }
 
+/* ── SELECT mode: page title, collection bar, create button ─────────────── */
+
+.ec-evl-page-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 10px;
+}
+
+.ec-collection-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: color-mix(in srgb, var(--card-bg) 85%, var(--bg-secondary));
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+}
+.ec-collection-bar .ec-label {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.ec-collection-bar .ec-name {
+  font-size: 13px;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+  color: var(--text-primary);
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ec-collection-bar .ec-change-btn {
+  font-size: 12px;
+  color: var(--accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  font-family: inherit;
+}
+.ec-collection-bar .ec-change-btn:hover { text-decoration: underline; }
+
+.ec-new-event-btn {
+  display: block;
+  width: 100%;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid var(--accent-border);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  box-sizing: border-box;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.ec-new-event-btn:hover {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  color: var(--text-primary);
+  border-color: var(--accent-border);
+}
+
 /* ── Section title ───────────────────────────────────────────────────────── */
 
 .ec-section-title {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--subtext);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin: 0 0 6px;
+}
+
+.ec-subtext {
+  font-size: 12px;
+  color: var(--text-muted);
   margin: 0 0 12px;
 }
 
@@ -2155,8 +2241,9 @@
   font-weight: 600;
   letter-spacing: 0.04em;
 }
-.ec-mode-single { background: var(--blue-dim);  color: var(--blue);  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); }
-.ec-mode-multi  { background: color-mix(in srgb, var(--mauve) 12%, transparent); color: var(--mauve); border: 1px solid color-mix(in srgb, var(--mauve) 30%, transparent); }
+.ec-mode-single  { background: var(--blue-dim);  color: var(--blue);  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); }
+.ec-mode-multi   { background: color-mix(in srgb, var(--mauve) 12%, transparent); color: var(--mauve); border: 1px solid color-mix(in srgb, var(--mauve) 30%, transparent); }
+.ec-mode-repair  { background: color-mix(in srgb, var(--yellow) 14%, transparent); color: var(--yellow); border: 1px solid color-mix(in srgb, var(--yellow) 35%, transparent); }
 .ec-success-actions {
   display: flex;
   gap: 12px;
@@ -2237,7 +2324,9 @@
       display: flex;
       flex-direction: column;
       gap: 6px;
-      margin-top: 8px;
+      margin-top: 4px;
+      padding-bottom: 4px;
+      scroll-behavior: smooth;
     }
     .ec-evl-item {
       display: flex;
@@ -2246,23 +2335,52 @@
       padding: 10px 14px;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 10px;
       cursor: pointer;
-      transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
+      transition: border-color 0.12s ease, background 0.12s ease, transform 0.12s ease, box-shadow 0.12s ease;
     }
     .ec-evl-item:hover {
-      border-color: var(--blue);
+      border-color: var(--accent-border);
       background: var(--surface2);
+      transform: translateY(-0.5px);
     }
-    .ec-evl-item:focus {
-      outline: 2px solid var(--blue);
-      outline-offset: 1px;
+    .ec-evl-item:focus { outline: none; }
+    .ec-evl-item:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 1.5px var(--accent-border);
     }
-    .ec-evl-item:active { transform: translateY(1px); }
+    .ec-evl-item:active { transform: translateY(0); box-shadow: none; }
+    .ec-evl-item.ec-evl-selected {
+      border-color: var(--accent-border);
+      background: color-mix(in srgb, var(--accent) 10%, transparent);
+      transform: none;
+    }
+    .ec-evl-item.ec-evl-selected .ec-evl-name { color: var(--text-primary); font-weight: 600; }
+    .ec-evl-item.ec-evl-selected:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); transform: none; }
     .ec-evl-item.ec-evl-disabled {
-      opacity: 0.55;
+      opacity: 0.65;
       cursor: not-allowed;
       pointer-events: none;
+    }
+    .ec-evl-item.ec-evl-disabled .ec-evl-repair-btn {
+      pointer-events: auto;
+      cursor: pointer;
+    }
+    .ec-evl-repair-btn {
+      flex-shrink: 0;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--yellow);
+      background: color-mix(in srgb, var(--yellow) 12%, transparent);
+      border: 1px solid color-mix(in srgb, var(--yellow) 30%, transparent);
+      border-radius: 6px;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+      white-space: nowrap;
+    }
+    .ec-evl-repair-btn:hover {
+      background: color-mix(in srgb, var(--yellow) 22%, transparent);
     }
     .ec-evl-seq {
       font-variant-numeric: tabular-nums;
@@ -2300,6 +2418,35 @@
     .ec-evl-warn-text {
       color: var(--yellow);
     }
+    .ec-evl-search {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 7px 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.82rem;
+      outline: none;
+      margin-bottom: 8px;
+      transition: border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
+    }
+    .ec-evl-search:focus {
+      border-color: var(--accent-border);
+      background: var(--surface2);
+      box-shadow: 0 0 0 2px var(--accent-soft);
+    }
+    .ec-evl-search::placeholder { color: var(--subtext); opacity: 0.7; }
+    .ec-empty-search {
+      font-size: 12px;
+      color: var(--text-muted);
+      padding: 10px 4px;
+    }
+    .ec-unrec-item {
+      opacity: 0.9;
+      transition: opacity 0.15s ease;
+    }
+    .ec-unrec-item:hover { opacity: 1; }
 
     .ec-location-display {
   display: flex;
@@ -2794,8 +2941,9 @@
   }
 
   /* ── LIGHT MODE STRUCTURAL OVERRIDES ──────────────────────────────────────
-     These override hardcoded dark-mode rgba surface values that can't be
-     covered by the semantic token layer alone.
+     Glass surfaces and structural backgrounds that differ between themes.
+     Glass tokens (--glass-*) defined in [data-theme="light"] handle most of
+     these; overrides here address context-specific adjustments.
   ───────────────────────────────────────────────────────────────────────── */
   [data-theme="light"] body {
     background: radial-gradient(ellipse at 50% 28%, color-mix(in srgb, var(--accent) 4%, transparent) 0%, transparent 58%), var(--bg);
@@ -2804,17 +2952,12 @@
     background: linear-gradient(160deg, #f6f8fc 0%, #eef2f8 100%);
   }
   [data-theme="light"] #dashHeader {
-    background: rgba(255,255,255,0.9);
-    border-color: rgba(0,0,0,0.08);
+    background: var(--glass-header);
+    border-color: var(--border-subtle);
   }
-  [data-theme="light"] .dash-left {
-    background: rgba(0,0,0,0.025);
-    border-right-color: rgba(0,0,0,0.06);
-  }
-  [data-theme="light"] .dash-ctx-divider { background: rgba(0,0,0,0.06); }
   [data-theme="light"] #heroCard {
-    background: rgba(255,255,255,0.85);
-    border-color: color-mix(in srgb, var(--accent) 20%, transparent);
+    background: var(--glass-hero);
+    border-color: var(--border-subtle);
     box-shadow: 0 0 0 1px var(--accent-glow), 0 6px 24px rgba(0,0,0,0.08);
   }
   [data-theme="light"] #heroCard.has-event {
@@ -2824,8 +2967,8 @@
   [data-theme="light"] .hero-icon-wrap { background: color-mix(in srgb, var(--accent) 10%, transparent); }
   [data-theme="light"] #heroCard.has-event .hero-icon-wrap { background: color-mix(in srgb, var(--success) 10%, transparent); }
   [data-theme="light"] .src-card-h {
-    background: rgba(255,255,255,0.8);
-    border-color: rgba(0,0,0,0.1);
+    background: var(--glass-card);
+    border-color: var(--border-subtle);
   }
   [data-theme="light"] .src-card-h:hover {
     border-color: color-mix(in srgb, var(--accent) 30%, transparent);
@@ -2837,7 +2980,7 @@
   }
   [data-theme="light"] .src-card-h-foot {
     background: rgba(0,0,0,0.02);
-    border-top-color: rgba(0,0,0,0.06);
+    border-top-color: var(--border-subtle);
   }
   [data-theme="light"] .src-device-item { background: rgba(0,0,0,0.02); }
   [data-theme="light"] .src-device-item:hover {
@@ -2850,17 +2993,17 @@
   }
   [data-theme="light"] #noDriveMsg {
     background: rgba(0,0,0,0.03);
-    border-color: rgba(0,0,0,0.12);
+    border-color: var(--border-strong);
   }
   [data-theme="light"] .drive-card-large {
     background: rgba(0,0,0,0.02);
-    border-color: rgba(0,0,0,0.1);
+    border-color: var(--border-subtle);
   }
   [data-theme="light"] .ov-tile {
-    background: rgba(255,255,255,0.7);
-    border-color: rgba(0,0,0,0.08);
+    background: var(--glass-tile);
+    border-color: var(--border-subtle);
   }
-  [data-theme="light"] #dashFooter { border-top-color: rgba(0,0,0,0.08); }
+
   [data-theme="light"] #updateBanner {
     background: #eff6ff;
     border-bottom-color: var(--accent);
@@ -2878,13 +3021,16 @@
   [data-theme="light"] #ejectBtn { border-color: color-mix(in srgb, var(--red) 45%, transparent); }
   [data-theme="light"] #ejectBtn:hover { background: color-mix(in srgb, var(--red) 10%, transparent); }
   [data-theme="light"] .tac-dd { box-shadow: 0 8px 28px rgba(0,0,0,0.15); }
+  /* Scrollbar visibility in light mode — tokens override the darker dark-mode defaults */
+  [data-theme="light"] .src-card-device-list {
+    scrollbar-color: var(--border-strong) transparent;
+  }
+  [data-theme="light"] .src-card-device-list::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+  }
   [data-theme="light"] .src-card-h.active-source {
     border-color: color-mix(in srgb, var(--success) 40%, transparent);
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--success) 10%, transparent), 0 8px 20px rgba(0,0,0,0.1);
-  }
-  [data-theme="light"] .hero-event-select {
-    background: rgba(0,0,0,0.04);
-    border-color: rgba(0,0,0,0.15);
   }
   [data-theme="light"] #groupPickerModal .gpm-box {
     box-shadow: 0 12px 40px rgba(0,0,0,0.15);
@@ -2963,52 +3109,55 @@
     <!-- 1. HEADER BAR -->
     <div class="header-wrapper">
     <div id="dashHeader">
-      <div class="dash-left">
-        <div class="dash-logo-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-        </div>
-        <div class="dash-brand">
-          <span class="dash-app-name">AutoIngest</span>
-          <span class="dash-tagline">Photo Archive Intake System</span>
-        </div>
+
+      <!-- BRAND -->
+      <div class="header-section brand">
+        <div class="app-title">AUTOINGEST</div>
+        <div class="app-subtitle">AJS Photo Archive Intake System</div>
       </div>
-      <div class="dash-center">
-        <div class="dash-ctx-item">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-          <div class="dash-ctx-inner">
-            <span class="dash-ctx-label">Archive Root</span>
-            <span class="dash-ctx-value" id="dashArchivePath">No archive set</span>
+
+      <div class="hdr-divider"></div>
+
+      <!-- DATE: Gregorian • Hijri -->
+      <div class="header-section date">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>
+        <span id="headerDateGreg"></span>
+        <span class="date-separator">•</span>
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
+        <span id="headerDateHijri"></span>
+      </div>
+
+      <div class="hdr-divider"></div>
+
+      <!-- ARCHIVE -->
+      <div class="header-section archive">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+        <span id="archivePath">No archive set</span>
+      </div>
+
+      <div class="hdr-divider"></div>
+
+      <!-- STATUS -->
+      <div class="header-section status">
+        <div class="status-block">
+          <div class="status-icon-wrap">
+            <svg class="icon status-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+          </div>
+          <span class="label">SYSTEM STATUS</span>
+          <div class="status-value">
+            <span class="status-dot"></span>
+            <span class="status-text">Ready</span>
           </div>
         </div>
-        <div class="dash-ctx-divider"></div>
-        <div class="dash-ctx-item" id="dashCtxEvent">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          <div class="dash-ctx-inner">
-            <span class="dash-ctx-label">Active Event</span>
-            <span class="dash-ctx-value" id="dashEventName">No active event</span>
-            <span class="dash-ctx-sub" id="dashCollName" style="display:none"></span>
-          </div>
-        </div>
-        <div class="dash-ctx-divider"></div>
-        <div class="dash-ctx-item">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-          <div class="dash-ctx-inner">
-            <span class="dash-ctx-label">System Status</span>
-            <div class="dash-status-row">
-              <span class="dash-status-dot"></span>
-              <span class="dash-status-label">Ready</span>
-              <span class="dash-unsynced-badge" id="dashUnsyncedBadge" style="display:none">0 Unsynced</span>
-            </div>
-          </div>
-        </div>
       </div>
-      <div class="dash-right">
-        <div class="window-controls">
-          <button class="wc-btn" id="minBtn" title="Minimize">&#8212;</button>
-          <button class="wc-btn" id="maxBtn" title="Maximize">&#9633;</button>
-          <button class="wc-btn" id="closeBtn" title="Close">&#10005;</button>
-        </div>
+
+      <!-- WINDOW CONTROLS (Windows/Linux only) -->
+      <div class="window-controls">
+        <button class="wc-btn" id="minBtn" title="Minimize">&#8212;</button>
+        <button class="wc-btn" id="maxBtn" title="Maximize">&#9633;</button>
+        <button class="wc-btn" id="closeBtn" title="Close">&#10005;</button>
       </div>
+
     </div><!-- #dashHeader -->
     </div><!-- .header-wrapper -->
 
@@ -3020,7 +3169,7 @@
 
         <div id="heroCard" class="card-active">
           <div class="hero-icon-wrap">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
           </div>
           <div class="hero-body">
             <div class="hero-pretitle">Create New Event</div>
@@ -3033,7 +3182,7 @@
 
         <div id="quickImportCard">
           <div class="qi-icon">
-            <svg viewBox="0 0 24 24"><path d="M12 3v13M7 11l5 5 5-5"/><path d="M5 20h14"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13M7 11l5 5 5-5"/><path d="M5 20h14"/></svg>
           </div>
           <div class="qi-content">
             <div class="qi-title">Quick Import</div>
@@ -3057,11 +3206,11 @@
       <div id="modeToggleRow">
         <div class="mode-seg-group">
           <button class="mode-seg-btn active" id="modeEventBtn" data-mode="event">
-            <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
             Event Import
           </button>
           <button class="mode-seg-btn" id="modeQuickBtn" data-mode="quick">
-            <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
             Quick Import
           </button>
         </div>
@@ -3080,7 +3229,7 @@
             <span class="src-badge" id="srcMemCardBadge"></span>
             <div class="src-card-h-top">
               <div class="src-h-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><path d="M9 2v4M12 2v4M15 2v4"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><path d="M9 2v4M12 2v4M15 2v4"/></svg>
               </div>
               <div class="src-h-info">
                 <span class="src-h-title">Memory Card</span>
@@ -3089,7 +3238,7 @@
             </div>
             <div class="src-card-device-list" id="srcMemCardList">
               <div class="src-device-empty-row">
-                <span class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h11v20H4V8z"/></svg></span>
+                <span class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h11v20H4V8z"/></svg></span>
                 <span>Scanning for memory cards…</span>
               </div>
             </div>
@@ -3105,7 +3254,7 @@
           <div class="src-card-h" id="srcExtDrive">
             <div class="src-card-h-top">
               <div class="src-h-icon src-h-icon--ext">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="17" cy="12" r="1.5"/><path d="M6 12h6"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="17" cy="12" r="1.5"/><path d="M6 12h6"/></svg>
               </div>
               <div class="src-h-info">
                 <span class="src-h-title">External Drive</span>
@@ -3114,7 +3263,7 @@
             </div>
             <div class="src-card-device-list" id="srcExtDriveList">
               <div class="src-device-empty-row">
-                <span class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="17" cy="12" r="1.5"/><path d="M6 12h6"/></svg></span>
+                <span class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="17" cy="12" r="1.5"/><path d="M6 12h6"/></svg></span>
                 <span>Scanning for drives…</span>
               </div>
             </div>
@@ -3131,7 +3280,7 @@
           <div class="src-card-h" id="srcLocalFolder">
             <div class="src-card-h-top">
               <div class="src-h-icon src-h-icon--local">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
               </div>
               <div class="src-h-info">
                 <span class="src-h-title">Local Folder</span>
@@ -3159,7 +3308,7 @@
         <div id="overviewGrid">
           <div class="ov-tile" id="ovImports">
             <div class="ov-tile-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             </div>
             <div class="ov-tile-body">
               <span class="ov-value" id="ovImportsVal">—</span>
@@ -3168,7 +3317,7 @@
           </div>
           <div class="ov-tile" id="ovEvents">
             <div class="ov-tile-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
             </div>
             <div class="ov-tile-body">
               <span class="ov-value" id="ovEventsVal">—</span>
@@ -3177,7 +3326,7 @@
           </div>
           <div class="ov-tile ov-tile--warn" id="ovUnsynced">
             <div class="ov-tile-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
             </div>
             <div class="ov-tile-body">
               <span class="ov-value" id="ovUnsyncedVal">0</span>
@@ -3186,7 +3335,7 @@
           </div>
           <div class="ov-tile" id="ovLastImport">
             <div class="ov-tile-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
             </div>
             <div class="ov-tile-body">
               <span class="ov-value" id="ovLastImportVal">—</span>
@@ -3195,7 +3344,7 @@
           </div>
           <div class="ov-tile ov-tile--action" id="ovActivityLog">
             <div class="ov-tile-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
             </div>
             <div class="ov-tile-body">
               <span class="ov-value">Open</span>
@@ -3207,34 +3356,46 @@
       </div>
 
       <!-- 7. FOOTER -->
-      <div id="dashFooter">
-        <span id="dashVersion">AutoIngest v24.0.0</span>
-        <div class="footer-utils">
-          <button id="helpBtn" class="footer-icon-btn" title="Help &amp; Reference" aria-label="Help">
-            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          </button>
-          <button id="bugReportBtn" class="footer-icon-btn" title="Report a bug" aria-label="Report a bug">
-            <svg viewBox="0 0 24 24"><path d="M12 22c-4 0-7-2.7-7-6v-4l-2-2 2-2V6c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2v2l2 2-2 2v4c0 3.3-3 6-7 6z"/><line x1="12" y1="11" x2="12" y2="15"/><circle cx="12" cy="8" r="0.8" fill="currentColor" stroke="none"/></svg>
-          </button>
-          <button id="settingsBtn" class="footer-icon-btn" title="Settings" aria-label="Settings">
-            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          </button>
-        </div>
-      </div>
 
     </div><!-- .dash-container -->
 
   </div><!-- #step1Panel -->
 
-  <!-- EVENT CREATOR PANEL (shell; populated in Commits C + D) -->
-  <div id="eventCreatorPanel">
-    <div id="ecHeader">
-      <button id="ecBackBtn" class="ec-back-btn">← Back</button>
-      <span id="ecTitle">Create Event</span>
-    </div>
-    <div id="ecBody">
-      <!-- Master creation form injected by Commit C -->
-      <!-- Event creation form injected by Commit D -->
+  <!-- EVENT CREATOR PANEL — empty placeholder kept for compat; modal replaced it -->
+  <div id="eventCreatorPanel"></div>
+
+  <!-- EVENT MANAGEMENT MODAL -->
+  <div id="eventMgmtModal" class="emm-overlay" role="dialog" aria-modal="true" aria-labelledby="ecTitle">
+    <div class="emm-box">
+
+      <!-- SYSTEM HEADER -->
+      <div class="emm-topbar">
+        <span class="emm-topbar-title">Event Management</span>
+      </div>
+
+      <!-- MODAL HEADER -->
+      <div class="emm-header">
+        <span id="ecTitle" class="emm-title">Select Event</span>
+        <button class="emm-close-btn" id="emmCloseBtn" aria-label="Close">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <!-- BODY — EventCreator renders here -->
+      <div id="ecBody"></div>
+
+      <!-- FOOTER -->
+      <div class="emm-footer">
+        <button class="emm-btn-ghost" id="emmBackBtn">← Back</button>
+        <div class="emm-footer-right">
+          <button class="emm-btn-secondary" id="emmEditBtn" style="display:none">Edit</button>
+          <button class="emm-btn-primary" id="emmContinueBtn" disabled style="display:none">Continue</button>
+          <button class="emm-btn-primary" id="emmCreateBtn" disabled style="display:none">Create Event →</button>
+          <button class="emm-btn-primary" id="emmSaveBtn" style="display:none">Save Changes →</button>
+          <button class="emm-btn-primary" id="emmRepairBtn" style="display:none">Save &amp; Repair →</button>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -3384,10 +3545,23 @@
 
   <!-- Status bar -->
   <div id="statusBar">
-    <span id="statusDrives">Scanning for drives…</span>
-    <span id="statusFiles"></span>
-    <span id="statusMessage"></span>
-    <span id="appVersion"></span>
+    <div class="status-left">
+      <span id="statusDrives">Scanning for drives…</span>
+      <span id="statusFiles"></span>
+      <span id="statusMessage"></span>
+    </div>
+    <div class="status-center"><span id="appVersion">AutoIngest v24.0.0</span></div>
+    <div class="status-right">
+      <button id="helpBtn" class="status-icon-btn" title="Help &amp; Reference" aria-label="Help">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </button>
+      <button id="bugReportBtn" class="status-icon-btn" title="Report a bug" aria-label="Report a bug">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c-4 0-7-2.7-7-6v-4l-2-2 2-2V6c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2v2l2 2-2 2v4c0 3.3-3 6-7 6z"/><line x1="12" y1="11" x2="12" y2="15"/><circle cx="12" cy="8" r="0.8" fill="currentColor" stroke="none"/></svg>
+      </button>
+      <button id="settingsBtn" class="status-icon-btn" title="Settings" aria-label="Settings">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>
   </div>
 
   <!-- ═══════════════════════════════════════════════════════
@@ -3585,9 +3759,7 @@
       <div class="settings-header">
         <span class="settings-title">Settings</span>
         <button id="settingsClose" class="settings-close-btn" aria-label="Close settings">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
       <div class="settings-body">
@@ -3623,6 +3795,7 @@
 
   <script src="treeAutocomplete.js"></script>
   <script src="eventCreator.js"></script>
+  <script src="eventMgmt.js"></script>
   <script src="groupManager.js"></script>
   <script src="importRouter.js"></script>
   <script src="renderer.js"></script>

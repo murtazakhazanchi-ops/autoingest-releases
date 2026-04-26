@@ -567,6 +567,44 @@ Uncommitted changes on top of `7f93af7`. Pure renderer + window-config changes; 
 
 ---
 
+### v0.7.3-dev — Theme System, activeDrive Fix + UI Polish (2026-04-26)
+
+Pure `renderer/index.html` + `renderer/renderer.js` changes. No import logic, IPC, or data layer touched.
+
+**Token system (`renderer/index.html` — `:root` and `[data-theme="light"]`):**
+- Full two-layer theme: `:root` dark defaults, `[data-theme="light"]` light overrides.
+- Glass surface hierarchy unified: `--glass-header/hero/card/tile` at progressive opacity (0.55/0.50/0.42/0.35) over `rgba(30,30,46,…)` base.
+- Accent states differentiated: `--accent-hover: color-mix(in srgb, var(--accent) 20%, transparent)` (hover), `--accent-soft: 35%` (active/selected). Clear 20 vs 35% gap.
+- Border tokens: `--border-subtle: color-mix(in srgb, white 10%, transparent)`, `--border-strong: 18%`. Light overrides: `rgba(0,0,0,0.08/0.16)`.
+- `--divider-color` scoped to header separators only. No raw `rgba(255,255,255,…)` in component rules.
+- All dashboard-layer elements (`.src-card-h`, `.drive-card-large`, `.ov-tile`, `#heroCard`, `#dashHeader`) converted from inline `rgba` borders to `var(--border-subtle)`.
+- `[data-theme="light"]` structural overrides completed for all 6 surface elements.
+
+**activeDrive architectural fix (`renderer/renderer.js`):**
+- Verified all 6 plan changes already in place from prior session.
+- `activeDrive` is null for `local-folder` sources; set for `memory-card` and `external-drive` (eject support).
+- Disconnect guard in `renderDrives()`: `if (activeDrive && activeSource?.type === 'memory-card')` — local folder and external drive paths never trigger `resetAppState()`.
+- All workspace guards use `activeSource` as the sentinel (`updateSteps`, `_updateContextBar`, folder nav, import callbacks). No false-disconnect resets for non-memory-card sources.
+
+**Header alignment (`renderer/index.html`):**
+- `.header-wrapper` horizontal padding set to `32px` to match `.dash-container` (was `12px`, causing 20px drift per side).
+- `margin-top: 12px` added to `.header-wrapper` for breathing room below macOS traffic lights.
+- `#dashHeader` given explicit `width: 100%; box-sizing: border-box`.
+- `#sourceSection` and `#overviewSection` given explicit `width: 100%`.
+
+**System Status icon layout (`renderer/index.html`):**
+- Status block restructured from flex-column + inline-flex row to a 2-column CSS grid.
+- Grid: `grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 8px; row-gap: 2px; align-items: center`.
+- `.status-icon-wrap { grid-row: 1 / span 2 }` — icon vertically centered across both the label row and value row.
+- Label (`SYSTEM STATUS`) and `.status-value` (`● Ready`) are direct grid children in column 2, rows 1 and 2.
+- Heartbeat polyline SVG added (was missing entirely from HTML — only text label existed before).
+- All `position: relative; top: …` offset hacks removed.
+
+**Section spacing (`renderer/index.html`):**
+- `#overviewSection` `margin-top` changed from `auto` (greedy flex spacer → pushed overview to window bottom) to `48px` (consistent fixed gap).
+
+---
+
 ### v0.7.1-dev — Dashboard Rebuild + UI Cleanup (2026-04-23)
 
 HEAD: `ba4c4a6`  Committed on top of af9d91a (smart defaulting). Commit G (import routing) is next.

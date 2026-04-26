@@ -786,7 +786,7 @@ function updateSteps() {
     return;
   }
   // card path
-  const hasDrive = activeDrive !== null;
+  const hasDrive = activeSource !== null;
   const hasSel   = selectedFiles.size > 0;
   setStep('step1Indicator', !hasDrive ? 'active' : 'done');
   setStep('step2Indicator', !hasDrive ? '' : (!hasSel ? 'active' : 'done'));
@@ -809,9 +809,8 @@ function _updateContextBar() {
   const mode  = document.getElementById('ctxMode');
   if (!bar || !crumb || !mode) return;
 
-  // Hide when inside the event creator (it has its own breadcrumb).
-  const ecVisible = document.getElementById('eventCreatorPanel')?.classList.contains('visible');
-  if (ecVisible) { bar.classList.remove('visible'); return; }
+  // Hide when the event management modal is open (it has its own breadcrumb).
+  if (EventMgmt.isOpen()) { bar.classList.remove('visible'); return; }
 
   const eventData = EventCreator.getActiveEventData();
   const master    = EventCreator.getActiveMaster();
@@ -826,9 +825,9 @@ function _updateContextBar() {
     mode.textContent = 'Event Import';
     mode.className   = 'ctx-mode event';
     bar.classList.add('visible');
-  } else if (activeDrive) {
-    // Quick flow: drive selected but no event active.
-    crumb.innerHTML = `<span class="ctx-label">${_esc(activeDrive.label)}</span>`;
+  } else if (activeSource) {
+    // Quick flow: source selected but no event active.
+    crumb.innerHTML = `<span class="ctx-label">${_esc(activeSource.name)}</span>`;
     mode.textContent = 'Quick Import';
     mode.className   = 'ctx-mode quick';
     bar.classList.add('visible');
@@ -842,11 +841,9 @@ function _updateContextBar() {
 // ════════════════════════════════════════════════════════════════
 
 function _ecPanelOpen() {
-  document.getElementById('step1Panel').style.display = 'none';
-  document.getElementById('workspace').classList.remove('visible');
-  document.getElementById('eventCreatorPanel').classList.add('visible');
   setRailMode('event');
   updateSteps();
+  EventMgmt.open({ mode: 'select' });
   _updateContextBar();
 }
 
@@ -859,21 +856,42 @@ function showEventCreator() {
 }
 
 function showEventCreatorResume() {
+  console.log('--- CHANGE EVENT CLICK ---');
+  console.log('  collection:', EventCreator.getSelectedCollection());
+  const activeData = EventCreator.getActiveEventData();
+  console.log('  active event:', activeData?.event?.name ?? 'none');
   // Re-entering to change the event also invalidates existing group mappings
   GroupManager.reset();
   renderGroupPanel();
   _ecPanelOpen();
-  EventCreator.resume();
+  EventCreator.resetToList();
 }
 
 function showLanding() {
-  document.getElementById('eventCreatorPanel').classList.remove('visible');
+  // Render home first so the hero reflects the new event state before the modal fade begins.
   document.getElementById('workspace').classList.remove('visible');
   document.getElementById('step1Panel').style.display = '';
   setRailMode('card');
   updateSteps();
   _updateContextBar();
   renderHome();
+  // Close modal after hero is updated so the user sees the correct state through the fade.
+  EventMgmt.close();
+}
+
+// Clears event/source/group context when the user explicitly returns to landing
+// (e.g. "Change Source" from workspace). NOT called from event-creator back navigation,
+// which must preserve event state.
+function resetWorkspaceState() {
+  activeSource = null;
+  activeDrive  = null;
+  GroupManager.reset();
+  setRailMode('card');
+}
+
+function resetEntireSession() {
+  resetWorkspaceState();
+  EventCreator.resetSelection();
 }
 
 function _typeLabelFor(type) {
@@ -955,7 +973,7 @@ function _renderLandingEventCard() {
     card.className = '';
     card.innerHTML = `
       <div class="hero-icon-wrap">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
           <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
           <line x1="3" y1="10" x2="21" y2="10"/>
@@ -978,22 +996,15 @@ function _renderLandingEventCard() {
   const isMulti   = event.components.length > 1;
   const modeLabel = isMulti ? 'Multi-component' : 'Single component';
   const events    = coll.events;
-  const count     = events.length;
 
-  const eventDisplay = count === 1
-    ? `<div class="hero-event-name">${_esc(event.name)}</div>`
-    : `<select class="hero-event-select" id="heroEventSelect">${
-        events.map((ev, i) =>
-          `<option value="${i}"${i === activeIdx ? ' selected' : ''}>${String(i + 1).padStart(2, '0')} — ${_esc(ev.name)}</option>`
-        ).join('')
-      }</select>`;
+  const eventDisplay = `<div class="hero-event-name">${_esc(event.name)}</div>`;
 
   const srcReady = activeSource !== null;
 
   card.className = 'has-event';
   card.innerHTML = `
     <div class="hero-icon-wrap">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
         <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
         <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
         <line x1="3" y1="10" x2="21" y2="10"/>
@@ -1018,19 +1029,14 @@ function _renderLandingEventCard() {
     </div>
     <div class="hero-actions">
       <button id="heroPrimaryBtn" class="hero-btn-primary green"${srcReady ? '' : ' disabled'}>Continue →</button>
-      <button id="heroSecondaryBtn" class="hero-btn-secondary"><svg viewBox="0 0 24 24"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>Change Event</button>
+      <button id="heroSecondaryBtn" class="hero-btn-secondary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>Change Event</button>
     </div>`;
 
-  document.getElementById('heroEventSelect')?.addEventListener('change', e => {
-    EventCreator.setActiveEventIndex(parseInt(e.target.value, 10));
-    GroupManager.reset();
-    renderGroupPanel();
-    _renderLandingEventCard();
-  });
   document.getElementById('heroPrimaryBtn')
     ?.addEventListener('click', () => {
       if (!activeSource) { showMessage('Select a source to continue'); return; }
-      selectDrive({ mountpoint: activeSource.path, label: activeSource.name });
+      const { type: srcType, path: srcPath, name: srcName } = activeSource;
+      selectSource({ type: srcType, path: srcPath, label: srcName });
     });
   document.getElementById('heroSecondaryBtn')
     ?.addEventListener('click', showEventCreatorResume);
@@ -1038,21 +1044,11 @@ function _renderLandingEventCard() {
 
 function _renderHomeContextBar() {
   const archiveRoot = EventCreator.getSessionArchiveRoot();
-  const data        = EventCreator.getActiveEventData();
-  const archiveEl   = document.getElementById('dashArchivePath');
-  const eventEl     = document.getElementById('dashEventName');
-  const collEl      = document.getElementById('dashCollName');
+  const archiveEl   = document.getElementById('archivePath');
   if (archiveEl) {
     archiveEl.textContent = archiveRoot
       ? (archiveRoot.length > 52 ? '…' + archiveRoot.slice(-49) : archiveRoot)
       : 'No archive set';
-  }
-  if (data) {
-    if (eventEl) eventEl.textContent = data.event.name;
-    if (collEl) { collEl.textContent = data.coll.name; collEl.style.display = ''; }
-  } else {
-    if (eventEl) eventEl.textContent = 'No active event';
-    if (collEl) collEl.style.display = 'none';
   }
 }
 
@@ -1145,9 +1141,78 @@ async function selectLocalFolder() {
   _setActiveSource({ type: 'local-folder', name: label, path: chosen });
 }
 
-document.getElementById('ecBackBtn').addEventListener('click', () => {
+document.getElementById('ecBackBtn')?.addEventListener('click', () => {
   if (!EventCreator.navigateBack()) showLanding();
 });
+document.getElementById('emmBackBtn')?.addEventListener('click', () => EventMgmt.handleBack());
+document.getElementById('emmCloseBtn')?.addEventListener('click', () => EventMgmt.requestClose());
+document.getElementById('emmContinueBtn')?.addEventListener('click', () => {
+  const btn = document.getElementById('emmContinueBtn');
+  if (!btn || btn.disabled) return;
+  console.log('[emmContinueBtn] clicked, navScreen:', EventCreator.getNavScreen());
+  btn.disabled = true;
+  try {
+    const ok = EventCreator.adoptSelectedEvent();
+    if (!ok) console.warn('[emmContinueBtn] adoptSelectedEvent returned false — check _selectedListFolder and _scannedEvents');
+    // On success, eventcreator:done fires → showLanding → modal closes. No re-enable needed.
+  } finally {
+    // Re-enable only if the modal is still open (adoptSelectedEvent failed silently).
+    if (EventMgmt.isOpen()) btn.disabled = false;
+  }
+});
+document.getElementById('emmCreateBtn')?.addEventListener('click', () => {
+  const btn = document.getElementById('emmCreateBtn');
+  if (!btn || btn.disabled) return;
+  btn.disabled = true;
+  try {
+    EventCreator.tryCreateEvent();
+    // On success, eventcreator:done fires → showLanding → modal closes. No re-enable needed.
+  } finally {
+    // Re-enable only if the modal is still open (validation failed or exception thrown).
+    if (EventMgmt.isOpen()) btn.disabled = false;
+  }
+});
+document.getElementById('emmEditBtn')?.addEventListener('click', () => {
+  // Point 4: setMode first so the footer updates before the form renders.
+  EventMgmt.setMode('edit');
+  if (!EventCreator.editSelectedEvent()) EventMgmt.setMode('select');
+});
+document.getElementById('emmSaveBtn')?.addEventListener('click', async () => {
+  const btn = document.getElementById('emmSaveBtn');
+  if (!btn || btn.disabled) return;
+  btn.disabled = true;
+  try {
+    await EventCreator.saveEditedEvent();
+    // On success, eventcreator:done fires → showLanding. No re-enable needed.
+  } finally {
+    if (EventMgmt.isOpen()) btn.disabled = false;
+  }
+});
+document.getElementById('emmRepairBtn')?.addEventListener('click', async () => {
+  const btn = document.getElementById('emmRepairBtn');
+  if (!btn || btn.disabled) return;
+  btn.disabled = true;
+  try {
+    await EventCreator.tryRepairEvent();
+    // On success, returns to event list with preselected event. No re-enable needed.
+  } finally {
+    if (EventMgmt.isOpen()) btn.disabled = false;
+  }
+});
+document.addEventListener('eventcreator:listSelect', () => {
+  const cont = document.getElementById('emmContinueBtn');
+  if (cont) cont.disabled = false;
+  const edit = document.getElementById('emmEditBtn');
+  if (edit) edit.style.display = '';
+});
+// Point 8: deselect — restore disabled/hidden state on Continue + Edit.
+document.addEventListener('eventcreator:listDeselect', () => {
+  const cont = document.getElementById('emmContinueBtn');
+  if (cont) cont.disabled = true;
+  const edit = document.getElementById('emmEditBtn');
+  if (edit) edit.style.display = 'none';
+});
+document.addEventListener('eventmgmt:requestClose', showLanding);
 document.addEventListener('eventcreator:done', showLanding);
 document.getElementById('srcExtDriveBtn')?.addEventListener('click', selectExternalDrive);
 document.getElementById('srcLocalFolderBtn')?.addEventListener('click', selectLocalFolder);
@@ -1167,7 +1232,12 @@ document.getElementById('qiImportBtn')?.addEventListener('click', async () => {
   const dest = _getEffectiveQuickDest();
   if (!activeSource || !dest) return;
   await setDestPath(dest);
-  selectDrive({ mountpoint: activeSource.path, label: activeSource.name });
+  const { type: srcType, path: srcPath, name: srcName } = activeSource;
+  selectSource({ type: srcType, path: srcPath, label: srcName });
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && EventMgmt.isOpen()) EventMgmt.requestClose();
 });
 
 // ════════════════════════════════════════════════════════════════
@@ -1216,7 +1286,9 @@ function renderDrives(cards) {
   _currentMemCardMountpoints = new Set(cards.map(c => c.mountpoint));
 
   // ── Disconnect detection: active workspace drive removed ───────
-  if (activeDrive) {
+  // Only check DCIM presence when the active source IS a memory card.
+  // Local folder and external drive paths never appear in the DCIM card list.
+  if (activeDrive && activeSource?.type === 'memory-card') {
     const stillPresent = cards.some(c => c.mountpoint === activeDrive.mountpoint);
     if (!stillPresent) {
       window.api.abortCopy();
@@ -1257,7 +1329,7 @@ function renderDrives(cards) {
   _prevDriveKeys = newKey;
 
   if (!cards.length) {
-    list.innerHTML = `<div class="src-device-empty-row"><span class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h11v20H4V8z"/></svg></span><span>No memory cards detected</span><span class="empty-sub">Connect a camera card to continue</span></div>`;
+    list.innerHTML = `<div class="src-device-empty-row"><span class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h11v20H4V8z"/></svg></span><span>No memory cards detected</span><span class="empty-sub">Connect a camera card to continue</span></div>`;
     return;
   }
 
@@ -1267,7 +1339,7 @@ function renderDrives(cards) {
     return `<div class="src-device-item${isSel ? ' selected' : ''}"
          data-mountpoint="${escapeHtml(c.mountpoint)}"
          data-label="${escapeHtml(c.label)}">
-      <svg class="device-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h11v20H4V8z"/><path d="M9 14v5M12 14v5M15 14v5"/></svg>
+      <svg class="device-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h11v20H4V8z"/><path d="M9 14v5M12 14v5M15 14v5"/></svg>
       <div style="flex:1;min-width:0">
         <div class="src-device-item-name">${escapeHtml(c.label)}</div>
         <div class="src-device-item-meta">${escapeHtml(_buildDeviceMeta(c))}</div>
@@ -1323,7 +1395,7 @@ function renderExtDrives(cards) {
   _prevExtKeys = newKey;
 
   if (!filtered.length) {
-    list.innerHTML = `<div class="src-device-empty-row"><span class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="17" cy="12" r="1.5"/><path d="M6 12h6"/></svg></span><span>No external drives detected</span><span class="empty-sub">Connect a drive to continue</span></div>`;
+    list.innerHTML = `<div class="src-device-empty-row"><span class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="17" cy="12" r="1.5"/><path d="M6 12h6"/></svg></span><span>No external drives detected</span><span class="empty-sub">Connect a drive to continue</span></div>`;
     return;
   }
 
@@ -1334,7 +1406,7 @@ function renderExtDrives(cards) {
     return `<div class="src-device-item${isSel ? ' selected' : ''}"
          data-mountpoint="${escapeHtml(d.mountpoint)}"
          data-label="${escapeHtml(name)}">
-      <svg class="device-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="17" cy="12" r="1.5"/><path d="M6 12h6"/></svg>
+      <svg class="device-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="17" cy="12" r="1.5"/><path d="M6 12h6"/></svg>
       <div style="flex:1;min-width:0">
         <div class="src-device-item-name">${escapeHtml(name)}</div>
         <div class="src-device-item-meta">${escapeHtml(d.busType || 'USB')}</div>
@@ -1358,29 +1430,60 @@ function renderExtDrives(cards) {
   });
 }
 
-async function selectDrive(drive) {
+async function selectSource({ type, path, label = null, driveObj = null }) {
+  if (!type || !path) {
+    console.error('selectSource: invalid source', { type, path });
+    return;
+  }
   if (isShuttingDown) return; // Patch 13: block during eject
+
+  const parts = path.split(/[\\/]/);
+  const name  = label || parts[parts.length - 1] || path;
+
   hasSelectedDrive = true;
-  isLoadingFiles   = false;  // not loading files — waiting for user to pick a folder
-  currentFolder    = null;   // no folder selected yet
-  activeDrive = drive; activeFolderPath = null;
+  isLoadingFiles   = false;
+  currentFolder    = null;
+
+  activeSource     = { type, path, name };
+  activeDrive      = (type === 'memory-card' || type === 'external-drive') ? (driveObj || { mountpoint: path, label: name }) : null;
+  activeFolderPath = null;
+
   expandedFolders.clear(); dcimChildrenCache = []; cachedDcimPath = null;
   selectedFiles.clear(); currentFiles = []; lastClickedPath = null; tileMap = new Map();
   resetViewCache();
   GroupManager.reset();
   renderGroupPanel();
-  document.getElementById('step1Panel').style.display = 'none';
-  document.getElementById('workspace').classList.add('visible');
-  document.getElementById('activeDriveName').textContent = drive.label;
-  updateSteps(); updateSelectionBar();
-  _updateContextBar();
-  renderFileArea([]);   // shows "Select a folder to begin"
+
+  // Prepare workspace labels while still hidden — DOM updates on hidden elements are safe
+  document.getElementById('activeDriveName').textContent = name;
   document.getElementById('folderList').innerHTML =
     `<div class="sidebar-empty">Loading folders…</div>`;
-  await browseFolder(drive.mountpoint, null);  // populates sidebar only
+
+  // Load files BEFORE transitioning the UI (requirement 7: never render before files exist)
+  const loaded = await browseFolder(path, null);
+
+  // Abort if another selectSource() call invalidated this session mid-load
+  if (activeSource?.path !== path) return;
+
+  // Abort if IPC failed — browseFolder already rendered the error into the hidden workspace
+  if (!loaded) {
+    console.error('selectSource: file load failed — aborting workspace transition');
+    return;
+  }
+
+  // Files ready — reveal workspace; tiles already rendered by browseFolder
+  document.getElementById('step1Panel').style.display = 'none';
+  document.getElementById('workspace').classList.add('visible');
+  updateSteps(); updateSelectionBar();
+  _updateContextBar();
+}
+
+function selectDrive() {
+  console.warn('selectDrive is deprecated — use selectSource()');
 }
 
 document.getElementById('changeDriveBtn').addEventListener('click', () => {
+  resetWorkspaceState();
   hasSelectedDrive = false;
   isLoadingFiles   = false;
   currentFolder    = null;
@@ -1438,9 +1541,9 @@ function resetAppState() {
   document.getElementById('folderList').innerHTML = '';
   document.getElementById('breadcrumb').textContent = '';
 
-  // Hide workspace + event creator, show landing screen
+  // Hide workspace + event modal, show landing screen
   document.getElementById('workspace').classList.remove('visible');
-  document.getElementById('eventCreatorPanel').classList.remove('visible');
+  EventMgmt.close();
   EventCreator.resetSelection();
   document.getElementById('step1Panel').style.display = '';
   setRailMode('card');
@@ -1556,7 +1659,7 @@ function renderFolders(folders, dcimPath) {
       <div class="folder-item folder-root${activeFolderPath === dcimPath ? ' active' : ''}"
            data-path="${escapeHtml(dcimPath)}">
         <span class="fi-toggle">${isExpanded ? '▾' : '▸'}</span>
-        <span class="fi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h11v20H4V8z"/><path d="M9 14v5M12 14v5M15 14v5"/></svg></span>
+        <span class="fi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h11v20H4V8z"/><path d="M9 14v5M12 14v5M15 14v5"/></svg></span>
         <span class="fi-name">${escapeHtml(cardDisplayName(dcimPath))}</span>
       </div>
       ${childrenHtml}`;
@@ -1581,7 +1684,7 @@ function renderFolders(folders, dcimPath) {
     <div class="folder-item folder-root${active === tree.path || currentFolderContext.isRoot ? ' active' : ''}"
          data-path="${escapeHtml(tree.path)}">
       <span class="fi-toggle">${expandedFolders.has(tree.path) ? '▾' : '▸'}</span>
-      <span class="fi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h11v20H4V8z"/><path d="M9 14v5M12 14v5M15 14v5"/></svg></span>
+      <span class="fi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h11v20H4V8z"/><path d="M9 14v5M12 14v5M15 14v5"/></svg></span>
       <span class="fi-name">${escapeHtml(rootName)}</span>
     </div>`;
 
@@ -1649,7 +1752,7 @@ function wireFolderListClicks(list, opts) {
   // Row clicks navigate.
   list.querySelectorAll('.folder-item').forEach(item => {
     item.addEventListener('click', () => {
-      if (!activeDrive) return;
+      if (!activeSource) return;
       const p = item.dataset.path;
       if (!p) return;
       if (opts.treeMode) {
@@ -1661,7 +1764,7 @@ function wireFolderListClicks(list, opts) {
         }
       } else {
         // Legacy flat-list mode: IPC rescan.
-        browseFolder(activeDrive.mountpoint, p);
+        browseFolder(activeSource.path, p);
       }
     });
   });
@@ -1958,6 +2061,10 @@ document.getElementById('pairToggle').addEventListener('change', e => {
 // NEVER called on: scroll, selection toggle, dest change, post-import.
 // ════════════════════════════════════════════════════════════════
 function renderFileArea(files) {
+  if (!currentFiles) {
+    console.error('renderFileArea called without files — aborting');
+    return;
+  }
   // Flush the pending queue FIRST — before the session counter advances and
   // before resetThumbLoadState() runs. Truncating in-place (length = 0) rather
   // than replacing the reference means any drainThumbQueue() call that fires
@@ -2628,6 +2735,7 @@ async function browseFolder(drivePath, folderPath) {
     }
     updateSelectionBar(); updateSortButtons(); updateSteps();
     updateFileStatus(currentFiles);
+    return true;
 
   } catch (err) {
     if (requestId !== fileLoadRequestId) return;
@@ -2635,6 +2743,7 @@ async function browseFolder(drivePath, folderPath) {
       `<div class="sidebar-empty">⚠️ ${escapeHtml(err.message)}</div>`;
     document.getElementById('fileGrid').innerHTML =
       `<div class="panel-state"><span class="state-icon">⚠️</span><span>${escapeHtml(err.message)}</span></div>`;
+    return false;
   }
 }
 
@@ -2994,7 +3103,7 @@ document.getElementById('importBtn').addEventListener('click', async () => {
 
     try {
       const summary = await window.api.importFileJobs(fileJobs);
-      if (!activeDrive) return;
+      if (!activeSource) return;
       showProgressSummary(summary);
       await refreshDestCache();
       try { globalImportIndex = await window.api.getImportIndex() || {}; } catch { /* non-critical */ }
@@ -3025,7 +3134,7 @@ document.getElementById('importBtn').addEventListener('click', async () => {
 
   try {
     const summary = await window.api.importFiles(filePaths, destPath);
-    if (!activeDrive) return; // Patch 36: card was disconnected mid-import; reset already ran
+    if (!activeSource) return; // workspace cleared (disconnect or eject) mid-import
     showProgressSummary(summary);
     await refreshDestCache();
     try { globalImportIndex = await window.api.getImportIndex() || {}; } catch { /* non-critical */ }
@@ -3204,6 +3313,29 @@ document.getElementById('progressDoneBtn').addEventListener('click', () => {
   updateSelectionBar();
 });
 
+// ── Header date display ───────────────────────────────────────────────────────
+
+function updateHeaderDate() {
+  window.api.getTodayDate().then(data => {
+    const gregEl  = document.getElementById('headerDateGreg');
+    const hijriEl = document.getElementById('headerDateHijri');
+    if (gregEl)  gregEl.textContent  = data.gregorian.display;
+    if (hijriEl) hijriEl.textContent = data.hijri.display;
+  }).catch(err => {
+    console.error('Date fetch failed', err);
+  });
+}
+
+function scheduleMidnightRefresh() {
+  const now  = new Date();
+  const next = new Date();
+  next.setHours(24, 0, 0, 0);
+  setTimeout(() => {
+    updateHeaderDate();
+    setInterval(updateHeaderDate, 24 * 60 * 60 * 1000);
+  }, next - now);
+}
+
 // ════════════════════════════════════════════════════════════════
 // APP BOOTSTRAP
 // Load the global import index FIRST so "Already Imported" badges
@@ -3236,7 +3368,7 @@ async function initApp() {
     if (lastEvent?.collectionPath && lastEvent?.collectionName && lastEvent?.eventName) {
       const valid = await window.api.verifyLastEvent(lastEvent.collectionPath);
       if (valid) {
-        EventCreator.restoreLastEvent(lastEvent.collectionName, lastEvent.eventName);
+        EventCreator.restoreLastEvent(lastEvent.collectionName, lastEvent.eventName, lastEvent.collectionPath);
       } else {
         window.api.setLastEvent(null).catch(() => {});
       }
@@ -3253,6 +3385,9 @@ async function initApp() {
   } catch (e) {
     console.error('Failed to load destination', e);
   }
+
+  updateHeaderDate();
+  scheduleMidnightRefresh();
 
   // Render the full home dashboard (context bar, primary card, insights)
   renderHome();
