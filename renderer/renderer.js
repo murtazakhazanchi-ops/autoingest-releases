@@ -2776,8 +2776,6 @@ async function browseFolder(drivePath, folderPath) {
 // ════════════════════════════════════════════════════════════════
 async function setDestPath(p) {
   destPath = p;
-  document.getElementById('destPath').textContent = p;
-
   await refreshDestCache();
   try { globalImportIndex = await window.api.getImportIndex() || {}; } catch { /* non-critical */ }
 
@@ -2838,13 +2836,6 @@ try {
   if (el) el.textContent = `v${ver}`;
 } catch { /* non-critical — version label is informational only */ }
 
-document.getElementById('changeDestBtn').addEventListener('click', async () => {
-  const chosen = await window.api.chooseDest();
-  if (chosen) {
-    await setDestPath(chosen);
-    window.api.setLastDestPath(chosen).catch(() => {});
-  }
-});
 
 // ════════════════════════════════════════════════════════════════
 // PRE-IMPORT DUPLICATE DETECTION
@@ -3496,7 +3487,7 @@ function renderTipsContent() {
       </div>
       <div class="ob-tip">
         <div class="ob-tip-label">📂 Destination folder</div>
-        Check the destination path before importing. Use <strong>"Change Location"</strong> if needed.
+        Destination is set on the home screen before starting an import.
       </div>
       <div class="ob-tip">
         <div class="ob-tip-label">📊 Import results</div>
@@ -3649,10 +3640,6 @@ const _hintSortObserver = setInterval(() => {
   }
 }, 800);
 
-// Hint 2: Destination bar — shown on first load
-setTimeout(() => {
-  showInlineHint('importFooter', 'Check destination before importing', 'hint_dest_done');
-}, 1200);
 
 // Hint 3: Selection hint — shown when files load but nothing is selected
 const _hintSelObserver = setInterval(() => {
