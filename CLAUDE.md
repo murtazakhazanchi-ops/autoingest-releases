@@ -426,13 +426,13 @@ GroupManager.getDuplicateSubEvents()          // → subEventId[] used by >1 gro
 
 ## Features NOT Yet Implemented (planned)
 
-### Event Import Flow (Commit G — NEXT)
-- Pre-import validation: all groups must have sub-event assigned (blocks import)
-- Unassigned files warning: "X files not assigned to any group. They will not be imported." → Continue / Cancel (does NOT block)
-- Duplicate sub-event mapping warning (multiple groups → same sub-event) → Continue / Cancel
-- Final confirmation screen: Event Name + Photographer (required, autocomplete) + group→sub-event mapping with file counts
-- File routing: grouped files → `Collection/Event/SubEvent/Photographer/` (multi) or `Collection/Event/Photographer/` (single); VIDEO → `VIDEO/` subfolder
-- Unassigned files are never imported, never moved
+### Event Import Flow (Commit G — COMPLETE)
+- [x] Pre-import validation: all groups must have sub-event assigned (blocks import) — `showMissingSubEventModal()` in renderer.js
+- [x] Unassigned files warning → Continue / Cancel (non-blocking)
+- [x] Duplicate sub-event mapping warning → Continue / Cancel — `showDupSubEventModal()` in renderer.js
+- [x] Final confirmation screen: Photographer autocomplete + group→sub-event mapping — `showEventImportConfirmModal()` in renderer.js
+- [x] File routing: grouped → `Collection/Event/SubEvent/Photographer/[VIDEO/]`; single → `Collection/Event/Photographer/` — `ImportRouter.buildFileJobs()` in `renderer/importRouter.js`
+- [x] Unassigned files never imported — enforced in ImportRouter
 
 ### Metadata Tagging
 - Write EXIF metadata after import (background queue)
