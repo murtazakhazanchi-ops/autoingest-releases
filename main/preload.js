@@ -162,6 +162,7 @@ contextBridge.exposeInMainWorld('api', {
   checkMasterExists:        (basePath, folderName)   => ipcRenderer.invoke('master:checkExists', basePath, folderName),
   createMaster:             (basePath, folderName)   => ipcRenderer.invoke('master:create',      basePath, folderName),
   scanMasterEvents:         (masterPath)             => ipcRenderer.invoke('master:scanEvents',   masterPath),
+  parseEvent:               (folderName)             => ipcRenderer.invoke('master:parseEvent',   folderName),
   renameEvent:              (masterPath, oldName, newName) => ipcRenderer.invoke('master:renameEvent', masterPath, oldName, newName),
 
   // ── Settings (persisted preferences) ──
@@ -172,6 +173,17 @@ contextBridge.exposeInMainWorld('api', {
   getLastEvent:             ()                       => ipcRenderer.invoke('settings:getLastEvent'),
   setLastEvent:             (v)                      => ipcRenderer.invoke('settings:setLastEvent', v),
   verifyLastEvent:          (collectionPath)          => ipcRenderer.invoke('settings:verifyLastEvent', collectionPath),
+
+  // ── Event JSON (disk-backed event persistence) ──
+  writeEventJson:   (eventFolderPath, eventData) => ipcRenderer.invoke('event:write',         eventFolderPath, eventData),
+  readEventJson:    (eventFolderPath)            => ipcRenderer.invoke('event:read',          eventFolderPath),
+  updateEventJson:  (eventFolderPath, patch)     => ipcRenderer.invoke('event:update',        eventFolderPath, patch),
+  appendImports:    (eventFolderPath, entries)   => ipcRenderer.invoke('event:appendImports', eventFolderPath, entries),
+
+  // ── Directory operations ──
+  ensureDir:       (dirPath)           => ipcRenderer.invoke('dir:ensure',       dirPath),
+  findDirByPrefix: (basePath, prefix)  => ipcRenderer.invoke('dir:findByPrefix', basePath, prefix),
+  renameDir:       (oldPath, newPath)  => ipcRenderer.invoke('dir:rename',       oldPath, newPath),
 
   // ── Window controls ──
   minimize:       () => ipcRenderer.invoke('window:minimize'),

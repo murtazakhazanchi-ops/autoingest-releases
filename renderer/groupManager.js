@@ -4,7 +4,7 @@
 // Groups are reset on drive change / eject / event change (caller invokes reset()).
 //
 // Group shape:
-//   { id: number, label: string, colorIdx: number,
+//   { id: number, label: string,
 //     files: Set<string>,        ← file paths (unique identifiers in this app)
 //     subEventId: string | null  ← id from EventCreator.getSubEventNames()
 //   }
@@ -12,14 +12,20 @@
 
 const GroupManager = (() => {
 
-  // Catppuccin Mocha palette colours — cycled as groups are created
-  const COLORS = [
-    { bg: 'var(--blue)',   fg: 'var(--base)' },
-    { bg: 'var(--mauve)',  fg: 'var(--base)' },
-    { bg: 'var(--green)',  fg: 'var(--base)' },
-    { bg: 'var(--yellow)', fg: 'var(--base)' },
-    { bg: 'var(--peach)',  fg: 'var(--base)' },
-    { bg: 'var(--red)',    fg: 'var(--base)' },
+  // 10 pastel group colours keyed by --group-N CSS custom properties.
+  // Index is stable while a group exists; colour is derived at render time from
+  // the group's position in _groups, so no drift after deletions.
+  const GROUP_COLORS = [
+    'var(--group-1)',
+    'var(--group-2)',
+    'var(--group-3)',
+    'var(--group-4)',
+    'var(--group-5)',
+    'var(--group-6)',
+    'var(--group-7)',
+    'var(--group-8)',
+    'var(--group-9)',
+    'var(--group-10)',
   ];
 
   let _groups       = [];          // Group[]
@@ -29,9 +35,8 @@ const GroupManager = (() => {
   // ── CRUD ───────────────────────────────────────────────────────────────────
 
   function createGroup() {
-    const id       = _groups.length + 1;
-    const colorIdx = _groups.length % COLORS.length;
-    _groups.push({ id, label: `G${id}`, colorIdx, files: new Set(), subEventId: null });
+    const id = _groups.length + 1;
+    _groups.push({ id, label: `G${id}`, files: new Set(), subEventId: null });
     _activeTabId = id;
     return id;
   }
@@ -104,8 +109,14 @@ const GroupManager = (() => {
     return gid !== undefined ? (_groups.find(x => x.id === gid) ?? null) : null;
   }
 
-  function getColor(colorIdx) {
-    return COLORS[colorIdx % COLORS.length];
+  /** Returns the CSS var string for a group at position `idx` in _groups. */
+  function getGroupColor(idx) {
+    return GROUP_COLORS[Math.max(0, idx) % GROUP_COLORS.length];
+  }
+
+  /** Returns the current array index (0-based) for the group with `groupId`, or -1. */
+  function getGroupIndex(groupId) {
+    return _groups.findIndex(x => x.id === groupId);
   }
 
   /** Returns file paths from `allPaths` that are not assigned to any group. */
@@ -158,7 +169,8 @@ const GroupManager = (() => {
     assignFiles,
     unassignFiles,
     getGroupForFile,
-    getColor,
+    getGroupColor,
+    getGroupIndex,
     setSubEvent,
     getActiveTabId,
     setActiveTabId,

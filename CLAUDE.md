@@ -141,6 +141,10 @@ These must never appear in the UI, be selectable, or be imported.
 | `lists:add` | invoke | Add new entry to writable list |
 | `lists:match` | invoke | Alias-aware ranked search |
 | `lists:learnAlias` | invoke | Store typed→canonical alias |
+| `dir:ensure` | invoke | mkdir -p a path |
+| `dir:findByPrefix` | invoke | Find first dir in basePath whose name starts with prefix |
+| `dir:rename` | invoke | Rename a directory (oldPath → newPath) |
+| `event:appendImports` | invoke | Merge-safe append of audit log entries to event.json |
 
 ### window.api (contextBridge)
 
@@ -159,6 +163,12 @@ getLists(name)                           // 'cities'|'locations'|'event-types'|'
 addToList(name, value)                   // cities/locations/photographers only
 matchList(name, input)                   // ranked [{id,label,score,matchType}]
 learnAlias(name, canonicalId, label, typed) // persist alias after user selection
+// Directory helpers
+ensureDir(dirPath)                       // mkdir -p
+findDirByPrefix(basePath, prefix)        // → { name } | null
+renameDir(oldPath, newPath)              // → { ok, reason }
+// Audit log
+appendImports(eventFolderPath, entries)  // merge-safe append to event.json imports array
 ```
 
 ### List Manager Rules (main/listManager.js)
@@ -301,6 +311,11 @@ Catppuccin Mocha dark theme. CSS variables in `:root`:
 - [x] External drive inline list — `driveDetector.listAllDrives()` returns `{ dcim, removable }` from a single `drivelist.list()` call. Main process emits `drives:allUpdated` with removable set alongside `drives:updated`. Renderer `renderExtDrives(cards)` filters out `_currentMemCardMountpoints` (DCIM overlap), uses diff-key `_prevExtKeys` to prevent flicker, detects physical disconnects, and falls back drive name via `d.label || d.device || d.mountpoint`.
 - [x] Premium segmented toggle — `.mode-seg-group` uses `var(--bg-secondary)` container, `var(--border-subtle)` border, `var(--shadow-soft)`. Active pill: `var(--accent-soft)` fill + `var(--accent-border)` border + `0 2px 6px rgba(0,0,0,0.08)` elevation. Each button has `min-width: 140px` to prevent width jitter on switch. No hardcoded rgba for container — all semantic tokens.
 - [x] "Change Event" button upgrade — `#heroSecondaryBtn` restyled as `var(--card-hover)` bg + `var(--border-strong)` border + pencil SVG icon. Hover: `var(--accent-soft)` fill + `var(--accent-border)` border + `var(--text-primary)` text. Active: `scale(0.98)`. All tokens, no hardcoded colors. Clearly secondary to primary Continue button.
+- [x] Single-source-of-truth pipeline — `safeNormComps` deleted; all component rehydration flows through `loadEventFromDisk()` → `setEventState()`. `_eventComps` is the only live state; session store injected from live state at import time (`eventData.event.components = liveComps`).
+- [x] Component subfolders at creation — `_tryCreateEvent()` (now async) creates one subfolder per component after `writeEventJson` using deterministic naming: `{01}-{TypePart}[-LocationPart][-CityPart]`. City included only when components have different cities. Uses `sanitizeForFolder`, sorted by component id, `Promise.all` with structured `{ ok, path }` results.
+- [x] Subfolder sync on edit — `_handleSaveEditedEvent()` syncs component subfolders after `updateEventJson`: index-prefix match via `dir:findByPrefix`, rename if name changed, create via `dir:ensure` if absent. No deletes.
+- [x] Import flow fix — import button handler snapshots `liveComps = EventCreator.getEventComps()`, validates early (`liveComps.length === 0` → abort), injects into `eventData.event.components` so all downstream consumers (`showEventImportConfirmModal`, `ImportRouter.buildFileJobs`) use live state.
+- [x] Audit logging — append-only per-import log written to `event.json:imports[]` after each successful event import. Entry shape: `{ id, seq, timestamp, photographer, componentIndex, componentName, counts: { photos, videos } }`. ID uses base36 timestamp + random + machine name for cross-user uniqueness. Double-read before write for NAS concurrency safety. Entries deduplicated by `id`. Capped at 5000 entries (oldest trimmed). Validated via `isValidImportEntry`. Sorted by `sortImports` (timestamp desc, seq tiebreaker).
 
 ---
 
@@ -379,15 +394,22 @@ Public API:
 EventCreator.start()                // enter at step 1, full reset
 EventCreator.resume()               // enter at step 3 (Change from landing)
 EventCreator.getActiveEventData()   // → { coll, event, idx } | null
+EventCreator.getEventComps()        // → deep clone of live _eventComps (source of truth for import handler)
 EventCreator.getSubEventNames()     // → { id: string, name: string }[] ([] if single-component)
 EventCreator.getSessionCollections()
 EventCreator.getSelectedCollection()
 EventCreator.setActiveEventIndex(idx)
 EventCreator.syncRail()
 EventCreator.resetSelection()
+EventCreator.restoreLastEvent()     // async, no-arg — full restore from disk via loadEventFromDisk
+EventCreator.editSelectedEvent()    // async — reload from disk + enter edit mode
 ```
 
 **Key rule:** `getSubEventNames()` returns `{id, name}[]` where `id === name` (sub-event folder name). Returns `[]` for single-component events.
+
+**Single source of truth pipeline:** `event.json` on disk → `loadEventFromDisk()` → `setEventState()` → `_eventComps`. All rehydration paths (view, edit, restore, import confirm) use this pipeline. Direct `_eventComps` assignment only inside `setEventState`.
+
+**`sanitizeForFolder(name)`** — filesystem-safe label sanitizer used for component subfolder names. Strips `/ \ : * ? " < > |`, normalises spaces and dashes.
 
 ---
 

@@ -62,6 +62,19 @@
       --mauve:     #cba6f7;
       --red:       #f38ba8;
       --peach:     #fab387;
+      --warning:   #f59e0b;
+      --warning-border: rgba(245,158,11,0.45);
+      /* ── Group colour palette (index-based, 10 pastels) ── */
+      --group-1:  #89b4fa;
+      --group-2:  #cba6f7;
+      --group-3:  #a6e3a1;
+      --group-4:  #f9e2af;
+      --group-5:  #fab387;
+      --group-6:  #f38ba8;
+      --group-7:  #89dceb;
+      --group-8:  #74c7ec;
+      --group-9:  #b4befe;
+      --group-10: #f5c2e7;
     }
 
     [data-theme="light"] {
@@ -88,6 +101,8 @@
       --mauve:             #7c3aed;
       --red:               #dc2626;
       --peach:             #ea580c;
+      --warning:           #f59e0b;
+      --warning-border:    rgba(245,158,11,0.35);
       /* ── Glass surface tokens (light) ────────────── */
       --divider-color:     rgba(0,0,0,0.10);
       --glass-header:      color-mix(in srgb, white 72%, transparent);
@@ -179,57 +194,58 @@
       letter-spacing: 0.02em;
     }
 
-    /* ── CONTEXT BAR (M8) ───────────────── */
+    /* ── CONTEXT BAR ─────────────────────── */
     #contextBar {
       display: none;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      padding: 5px 18px;
+      flex-direction: column;
+      gap: 3px;
+      padding: 6px 18px;
       background: var(--surface2);
       border-bottom: 1px solid var(--border);
       flex-shrink: 0;
-      font-size: 0.72rem;
-      color: var(--subtext);
-      min-height: 26px;
     }
     #contextBar.visible { display: flex; }
-    .ctx-left { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
-    .ctx-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-    .ctx-source {
-      font-size: 0.72rem; color: var(--text-secondary);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px;
-      font-weight: 500;
+    .ctx-line1, .ctx-line2 {
+      display: flex; align-items: center;
+      justify-content: space-between; gap: 10px; min-height: 20px;
     }
-    .ctx-sep-v {
-      width: 1px; height: 12px;
-      background: var(--border-subtle); flex-shrink: 0;
+    .ctx-line1-left, .ctx-line2-left {
+      display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;
     }
-    #contextBar .ctx-breadcrumb {
-      flex: 1;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+    .ctx-line1-right, .ctx-line2-right {
+      display: flex; align-items: center; gap: 6px; flex-shrink: 0;
     }
-    #contextBar .ctx-breadcrumb .ctx-sep {
-      margin: 0 6px;
-      opacity: 0.4;
+    .ctx-field-label {
+      font-size: 0.67rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--text-muted);
+      white-space: nowrap; flex-shrink: 0;
     }
-    #contextBar .ctx-breadcrumb .ctx-label {
-      color: var(--text);
-      font-weight: 600;
+    .ctx-field-value {
+      font-size: 0.72rem; color: var(--text-primary); font-weight: 500;
     }
-    #contextBar .ctx-mode {
-      flex-shrink: 0;
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-size: 0.65rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
+    #ctxSourceVal {
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px;
     }
+    .ctx-v-sep {
+      width: 1px; height: 14px;
+      background: var(--divider-color); flex-shrink: 0;
+    }
+    #contextBar .ctx-mode,
+    #contextBar .ctx-tag {
+      flex-shrink: 0; padding: 2px 8px; border-radius: 4px;
+      font-size: 0.65rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    #contextBar .ctx-tag { background: var(--border-subtle); color: var(--text-secondary); }
     #contextBar .ctx-mode.event { background: var(--blue-dim); color: var(--blue); }
     #contextBar .ctx-mode.quick { background: var(--green-dim); color: var(--green); }
+    #contextBar .ctx-source-type {
+      flex-shrink: 0; padding: 2px 8px; border-radius: 999px;
+      font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.04em;
+      background: color-mix(in srgb, var(--accent) 10%, transparent);
+      color: var(--text-secondary);
+    }
     .ctx-action-btn {
       padding: 2px 8px; font-size: 0.68rem;
       background: transparent; border: 1px solid var(--border-subtle);
@@ -648,51 +664,77 @@
     #columns { display: flex; flex: 1; overflow: hidden; }
 
     /* ── SIDEBAR ───────────────────────────────── */
+    /* ── SIDEBAR (folder navigator) ──────────── */
     #sidebar {
-      width: 210px; min-width: 140px; flex-shrink: 0;
-      background: var(--surface2); border-right: 1px solid var(--border);
+      width: 220px; min-width: 220px; flex-shrink: 0;
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border-subtle);
       display: flex; flex-direction: column; overflow: hidden;
     }
-    #sidebarHeader {
-      padding: 9px 14px 7px; font-size: 0.65rem; font-weight: 700;
-      letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.3;
-      border-bottom: 1px solid var(--border); flex-shrink: 0;
+    #sidebarHeader { display: none; }
+    #folderList {
+      flex: 1; overflow-y: auto; padding: 4px 0;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border-strong) transparent;
     }
-    #folderList { flex: 1; overflow-y: auto; padding: 4px 0; }
     .folder-item {
-      display: flex; align-items: center; gap: 8px; padding: 7px 14px;
-      cursor: pointer; font-size: 0.82rem; border-left: 3px solid transparent;
-      transition: background 0.1s; user-select: none;
+      display: flex; align-items: center; gap: 5px;
+      padding: 5px 10px; min-height: 28px;
+      cursor: pointer; font-size: 12.5px; font-weight: 400;
+      color: var(--text-muted);
+      border-left: 2px solid transparent;
+      border-radius: 0;
+      transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+      user-select: none;
     }
-    .folder-item:hover  { background: var(--accent-glow); }
-    .folder-item.active { background: var(--blue-dim); border-left-color: var(--blue); color: var(--blue); }
-    .folder-item .fi-icon { font-size: 0.9rem; flex-shrink: 0; display: inline-flex; align-items: center; }
-    .folder-item .fi-icon svg { width: 1em; height: 1em; }
-    .folder-item .fi-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .folder-item .fi-toggle { font-size: 0.85rem; width: 18px; flex-shrink: 0; text-align: center; opacity: 0.9; color: var(--blue); font-weight: 700; border-radius: 3px; transition: background 0.1s, transform 0.1s; }
-    .folder-item .fi-toggle:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); transform: scale(1.15); }
-    .folder-child { padding-left: 30px; }
-    .sidebar-empty { padding: 16px 14px; font-size: 0.78rem; opacity: 0.35; font-style: italic; }
+    .folder-item:hover {
+      background: color-mix(in srgb, var(--accent) 6%, transparent);
+      color: var(--text-secondary);
+    }
+    .folder-item:hover .fi-icon,
+    .folder-item:hover .fi-toggle { opacity: 0.75; }
+    .folder-item.active {
+      background: color-mix(in srgb, var(--accent) 9%, transparent);
+      border-left-color: var(--accent);
+      color: var(--text-primary);
+    }
+    .folder-item.active .fi-icon,
+    .folder-item.active .fi-toggle { opacity: 0.9; }
+    .folder-item:focus-visible {
+      outline: none;
+      box-shadow: inset 0 0 0 1.5px var(--accent);
+      border-radius: 6px;
+    }
+    .folder-item.folder-root { font-weight: 500; color: var(--text-primary); }
+    .folder-item .fi-toggle {
+      width: 14px; height: 14px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: currentColor; opacity: 0.55;
+      transition: opacity 0.12s ease;
+    }
+    .folder-item .fi-toggle svg { width: 11px; height: 11px; }
+    .folder-item .fi-icon {
+      flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+      width: 14px; height: 14px; color: currentColor; opacity: 0.55;
+      transition: opacity 0.12s ease;
+    }
+    .folder-item .fi-icon svg { width: 14px; height: 14px; }
+    .folder-item .fi-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .folder-child { padding-left: 22px; }
+    .sidebar-empty { padding: 14px 12px; font-size: 12.5px; color: var(--text-muted); opacity: 0.45; }
 
     /* ── FILE PANEL ────────────────────────────── */
     #filePanel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 
-    #filePanelHeader {
-      display: flex; align-items: center; gap: 10px;
-      padding: 7px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0;
-    }
-    #breadcrumb {
-      font-size: 0.72rem; color: var(--subtext);
-      font-family: 'SF Mono','Fira Code', monospace;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
-    }
-
     /* ── TOOLBAR (sort + view toggle) ──────────── */
     #toolbar {
       display: flex; align-items: center; gap: 6px;
+      justify-content: space-between;
       padding: 6px 14px; border-bottom: 1px solid var(--border);
       flex-shrink: 0; background: var(--surface2);
     }
+    .toolbar-left  { display: flex; align-items: center; gap: 6px; }
+    .toolbar-right { min-width: 220px; display: flex; justify-content: flex-end; }
     #toolbar .sort-label { font-size: 0.68rem; opacity: 0.35; text-transform: uppercase; letter-spacing: 0.08em; margin-right: 2px; }
     .sort-btn {
       padding: 2px 9px; font-size: 0.72rem; font-weight: 600;
@@ -711,17 +753,19 @@
       background: var(--surface); border: 1px solid var(--border); border-radius: 5px;
       color: var(--subtext); cursor: pointer;
       transition: border-color 0.12s, color 0.12s;
+      display: inline-flex; align-items: center; gap: 5px;
     }
+    .view-btn svg { width: 13px; height: 13px; flex-shrink: 0; }
     .view-btn:hover     { border-color: var(--blue); color: var(--text); }
     .view-btn.view-active { border-color: var(--blue); color: var(--blue); background: var(--blue-dim); }
 
-    /* ── SELECTION BAR ─────────────────────────── */
-    #selectionBar {
-      display: none; align-items: center; gap: 8px;
-      padding: 5px 14px; background: var(--surface2);
-      border-bottom: 1px solid var(--border); font-size: 0.78rem; flex-shrink: 0;
+    /* ── TOOLBAR SELECTION CLUSTER ─────────────── */
+    #toolbarSelCluster {
+      display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.12s ease;
     }
-    #selectionBar.visible { display: flex; }
+    #toolbar.has-selection #toolbarSelCluster { opacity: 1; pointer-events: auto; }
     .sel-btn {
       padding: 2px 9px; font-size: 0.72rem; font-weight: 600;
       border: 1px solid var(--border); border-radius: 5px;
@@ -729,9 +773,9 @@
       transition: border-color 0.1s, color 0.1s, opacity 0.1s;
     }
     .sel-btn:disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
-    #selectAllBtn:not(:disabled):hover { border-color: var(--blue); color: var(--blue); }
     #clearSelBtn:not(:disabled):hover  { border-color: var(--red);  color: var(--red); }
-    #selCount { font-size: 0.75rem; font-weight: 600; color: var(--subtext); margin-left: 4px; }
+    #selectAllBtn:not(:disabled):hover { border-color: var(--blue); color: var(--blue); }
+    #selCount { font-size: 0.75rem; font-weight: 600; color: var(--text-primary); }
 
     /* ── FILE AREA (scroll container) ─────────── */
     #fileGrid {
@@ -754,7 +798,7 @@
       border-bottom: 1px solid var(--border);
       position: sticky; top: 0; z-index: 10;
     }
-    .section-icon  { font-size: 0.9rem; }
+    .section-icon  { display: inline-flex; align-items: center; color: var(--accent); flex-shrink: 0; }
     .section-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
     .section-count { font-size: 0.68rem; color: var(--subtext); opacity: 0.6; }
 
@@ -790,7 +834,7 @@
     .icon-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
-      gap: 10px; padding: 12px 14px;
+      gap: 12px; padding: 12px 14px;
     }
 
     /* Commit 10 (v0.6.0): Folder View cards */
@@ -815,39 +859,105 @@
     .folder-tile .ft-badge.raw   { background: #f9e2af22; color: #f9e2af; }
     .folder-tile .ft-badge.vid   { background: #cba6f722; color: #cba6f7; }
 
-    /* ?? FILE TILE (icon view) ??????????????????? */
+    /* FILE TILE (icon view) */
     .file-tile {
-      background: var(--surface); border: 1px solid var(--border);
+      background: var(--surface); border: 1px solid var(--border-subtle);
       border-radius: 8px; padding: 9px; cursor: pointer;
-      transition: border-color 0.15s, background 0.15s;
+      transition: all 0.12s ease;
       display: flex; flex-direction: column; gap: 7px;
       position: relative; user-select: none;
     }
-    .file-tile:hover    { border-color: var(--blue); }
-    .file-tile.selected { border-color: var(--blue); background: var(--blue-dim); }
+    .file-tile:hover {
+      border-color: color-mix(in srgb, var(--accent) 30%, var(--border-subtle));
+      background: color-mix(in srgb, var(--accent) 6%, transparent);
+      transform: translateY(-0.5px);
+    }
+    /* Selected unimported — blue highlight */
+    .file-tile.selected:not(.already-imported) {
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
+      border: 1px solid var(--accent-border-sel);
+      opacity: 1;
+    }
+    .file-tile.selected:hover { transform: none; }
 
-    /* Already-imported tile */
-    .file-tile.already-imported            { opacity: 0.55; border-color: var(--green); border-style: dashed; }
-    .file-tile.already-imported:hover      { opacity: 0.75; }
-    .file-tile.already-imported.selected   { opacity: 1; border-style: solid; }
-
-    .file-tile input[type="checkbox"] {
-      position: absolute; top: 7px; left: 7px;
-      width: 14px; height: 14px; cursor: pointer; accent-color: var(--blue);
-      z-index: 5;
+    /* Imported but not selected — dimmed */
+    .file-tile.already-imported:not(.selected) {
+      background: color-mix(in srgb, var(--bg) 92%, var(--accent) 2%);
+      opacity: 0.5;
+    }
+    .file-tile.already-imported:not(.selected) img {
+      filter: saturate(0.45) contrast(0.8) brightness(0.8);
     }
 
-    /* P10 — Prominent "Already Imported" badge overlay */
-    .dup-overlay-badge {
-      position: absolute; top: 0; left: 0; right: 0;
-      background: color-mix(in srgb, var(--yellow) 92%, transparent);
-      color: #1e1e2e;
-      font-size: 0.6rem; font-weight: 800;
-      letter-spacing: 0.04em; text-transform: uppercase;
-      text-align: center; padding: 3px 6px;
-      border-radius: 7px 7px 0 0;
-      pointer-events: none; z-index: 4;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    /* Selected + already-imported — orange highlight, full opacity */
+    .file-tile.selected.already-imported {
+      background: color-mix(in srgb, var(--warning) 10%, transparent);
+      border: 1px solid var(--warning-border);
+      opacity: 1;
+    }
+    .file-tile.selected.already-imported img { filter: none; }
+    .file-tile.selected.already-imported input[type="checkbox"] { opacity: 1; }
+
+    /* Dimmed state (non-group files when a group is active) */
+    .file-tile.dimmed { opacity: 0.35; }
+    /* Selected always wins over dimmed */
+    .file-tile.selected { opacity: 1; }
+
+    /* z-index: 3 — checkbox (top-left corner) */
+    .file-tile input[type="checkbox"] {
+      position: absolute; top: 6px; left: 6px;
+      width: 14px; height: 14px; cursor: pointer; accent-color: var(--accent);
+      z-index: 3; opacity: 0.5; transition: opacity 0.12s ease;
+    }
+    .file-tile:hover input[type="checkbox"] { opacity: 0.8; }
+    .file-tile input[type="checkbox"]:checked { opacity: 1; }
+    .file-tile.already-imported:not(.selected) input[type="checkbox"] { opacity: 0.3; }
+
+    /* z-index: 3 — imported label (top-left, after checkbox) */
+    .file-imported-label {
+      position: absolute; top: 5px; left: 28px; z-index: 3;
+      display: inline-flex; align-items: center; gap: 3px;
+      background: color-mix(in srgb, var(--accent) 18%, var(--bg));
+      color: var(--text-primary);
+      border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+      font-size: 10.5px; font-weight: 600; letter-spacing: 0.05em;
+      text-transform: uppercase; padding: 2px 6px; border-radius: 4px;
+      pointer-events: none; line-height: 1; opacity: 0.95;
+    }
+
+    /* Metadata flex row — left content + right group badge */
+    .file-meta-row {
+      display: flex; align-items: flex-end; gap: 6px;
+    }
+    .file-meta-left {
+      flex: 1; min-width: 0;
+    }
+    .file-meta-right {
+      flex-shrink: 0; display: flex; align-items: flex-end;
+    }
+
+    /* Group badge — inline in metadata row */
+    .file-group-badge {
+      position: static;
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 10.5px; font-weight: 600; padding: 2px 7px;
+      border-radius: 999px; pointer-events: none; line-height: 1;
+      color: var(--text-primary); opacity: 0.95;
+      background: color-mix(in srgb, var(--group-color, var(--accent)) 18%, transparent);
+      border: 1px solid color-mix(in srgb, var(--group-color, var(--accent)) 30%, transparent);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    .file-group-badge::before {
+      content: '';
+      display: inline-block;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--group-color, var(--accent));
+      flex-shrink: 0;
+    }
+    .file-tile.in-active-group .file-group-badge {
+      background: color-mix(in srgb, var(--group-color, var(--accent)) 28%, transparent);
     }
 
     /* P1 — Thumbnail */
@@ -890,8 +1000,8 @@
 
     .file-meta { display: flex; flex-direction: column; gap: 3px; }
     .file-name {
-      font-size: 0.7rem; overflow: hidden;
-      text-overflow: ellipsis; white-space: nowrap; line-height: 1.3;
+      font-size: 0.7rem; font-weight: 500; color: var(--text-primary);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.3;
     }
     .file-details { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
     .file-ext-badge {
@@ -901,14 +1011,15 @@
     .ext-photo { background: var(--accent-tint); color: var(--blue);   }
     .ext-video { background: color-mix(in srgb, var(--mauve) 15%, transparent); color: var(--mauve);  }
     .ext-raw   { background: color-mix(in srgb, var(--yellow) 15%, transparent); color: var(--yellow); }
-    .file-size { font-size: 0.65rem; color: var(--subtext); font-family: monospace; }
-    .file-date { font-size: 0.62rem; color: var(--subtext); opacity: 0.65; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .file-size { font-size: 11.5px; color: var(--text-muted); font-family: monospace; }
+    .file-date { font-size: 11.5px; color: var(--text-muted); opacity: 0.65; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     .panel-state {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       gap: 10px; padding: 60px 20px; opacity: 0.38; font-size: 0.85rem; text-align: center;
     }
-    .panel-state .state-icon { font-size: 2.2rem; }
+    .panel-state .state-icon { font-size: 2.2rem; display: flex; align-items: center; justify-content: center; opacity: 0.4; }
+    .panel-state .state-icon svg { width: 36px; height: 36px; }
 
     /* ── P7 — LIST VIEW ────────────────────────── */
     .list-table {
@@ -929,9 +1040,10 @@
       /* override icon-tile flex */
       flex-direction: unset; gap: unset; padding: unset;
     }
-    .list-table tbody tr.file-tile:hover   { background: color-mix(in srgb, var(--accent) 5%, transparent); }
-    .list-table tbody tr.file-tile.selected { background: var(--blue-dim); }
-    .list-table tbody tr.file-tile.already-imported { opacity: 0.55; }
+    .list-table tbody tr.file-tile:hover   { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+    .list-table tbody tr.file-tile.selected { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+    .list-table tbody tr.file-tile.already-imported:not(.selected) { opacity: 0.5; }
+    .list-table tbody tr.file-tile.selected.already-imported { background: color-mix(in srgb, var(--warning) 10%, transparent); }
     .list-table td { padding: 5px 10px; vertical-align: middle; }
     .lt-check { width: 28px; }
     .lt-thumb { width: 36px; }
@@ -949,10 +1061,10 @@
     .lt-date { width: 130px; font-size: 0.7rem; color: var(--subtext); white-space: nowrap; }
     .dup-list-badge {
       display: inline-block; margin-left: 6px;
-      font-size: 0.58rem; font-weight: 700; padding: 1px 5px;
-      background: color-mix(in srgb, var(--yellow) 18%, transparent); color: var(--yellow);
-      border: 1px solid color-mix(in srgb, var(--yellow) 30%, transparent); border-radius: 3px;
-      text-transform: uppercase; letter-spacing: 0.03em; vertical-align: middle;
+      font-size: 10px; font-weight: 600; padding: 1px 5px;
+      background: color-mix(in srgb, var(--yellow) 12%, transparent); color: var(--yellow);
+      border-radius: 3px; text-transform: uppercase; letter-spacing: 0.05em;
+      vertical-align: middle;
     }
 
     /* ── IMPORT FOOTER ─────────────────────────── */
@@ -1411,7 +1523,7 @@
       border-bottom: 1px solid var(--border);
       position: sticky; top: 0; z-index: 10;
     }
-    .timeline-icon  { font-size: 0.9rem; flex-shrink: 0; }
+    .timeline-icon  { display: flex; align-items: center; flex-shrink: 0; color: var(--text-muted); opacity: 0.6; }
     .timeline-label {
       font-size: 0.75rem; font-weight: 700;
       text-transform: uppercase; letter-spacing: 0.06em;
@@ -2606,7 +2718,15 @@
       background: transparent; color: var(--subtext);
     }
     .gp-tab:hover { border-color: var(--blue); color: var(--blue); }
-    .gp-tab.active { border-color: transparent; }
+    .gp-tab.active {
+      border-color: color-mix(in srgb, var(--group-color, var(--accent)) 40%, transparent);
+      background: color-mix(in srgb, var(--group-color, var(--accent)) 15%, transparent);
+      color: var(--text-primary);
+    }
+    .group-item.active {
+      background: color-mix(in srgb, var(--accent) 10%, transparent);
+      border-left: 2px solid var(--accent);
+    }
     .gp-tab-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
     .gp-tab-cnt { font-size: 0.66rem; opacity: 0.75; }
     .gp-tab-add {
@@ -2677,16 +2797,24 @@
 
     /* ── GROUP BADGE on tiles ─────────────────────────────────── */
     .grp-badge {
-      display: inline-flex; align-items: center;
-      padding: 2px 6px; border-radius: 10px; font-size: 0.6rem;
-      font-weight: 700; line-height: 1.2; pointer-events: none;
-      letter-spacing: 0.02em; flex-shrink: 0; margin-left: auto;
+      display: none; /* legacy; icon-view uses .file-group-badge instead */
     }
-    /* list view badge — inline */
+    /* list view badge — inline, glass morphism using --group-color */
     .grp-badge-list {
-      display: inline-flex; align-items: center;
-      padding: 1px 6px; border-radius: 8px; font-size: 0.62rem;
-      font-weight: 700; margin-left: 6px; vertical-align: middle;
+      display: inline-flex; align-items: center; gap: 3px;
+      padding: 1px 6px; border-radius: 8px; font-size: 10px;
+      font-weight: 600; margin-left: 6px; vertical-align: middle;
+      background: color-mix(in srgb, var(--group-color, var(--accent)) 18%, transparent);
+      color: var(--text-primary);
+      border: 1px solid color-mix(in srgb, var(--group-color, var(--accent)) 30%, transparent);
+    }
+    .grp-badge-list::before {
+      content: '';
+      display: inline-block;
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--group-color, var(--accent));
+      flex-shrink: 0;
     }
 
     /* ── CONTEXT MENU ─────────────────────────────────────────── */
@@ -2814,6 +2942,9 @@
     .ei-map-group {
       padding: 2px 8px; border-radius: 5px; font-weight: 700; font-size: 0.72rem;
       flex-shrink: 0;
+      background: color-mix(in srgb, var(--group-color, var(--accent)) 20%, transparent);
+      color: var(--text-primary);
+      border: 1px solid color-mix(in srgb, var(--group-color, var(--accent)) 35%, transparent);
     }
     .ei-map-arrow { color: var(--subtext); flex-shrink: 0; }
     .ei-map-sub { flex: 1; font-size: 0.78rem; color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -3124,19 +3255,43 @@
     <button class="upd-dismiss" id="updDismissBtn" title="Dismiss">✕</button>
   </div>
 
-  <!-- CONTEXT BAR — source + event breadcrumb + mode badge + workspace actions -->
+  <!-- CONTEXT BAR — source + event/quick info + workspace actions -->
   <div id="contextBar">
-    <!-- Hidden span kept for renderer.js compatibility (selectSource sets activeDriveName) -->
     <span id="activeDriveName" style="display:none" aria-hidden="true"></span>
-    <div class="ctx-left">
-      <div class="ctx-source" id="ctxSource"></div>
-      <div class="ctx-sep-v" id="ctxSepV" style="display:none"></div>
-      <div class="ctx-breadcrumb" id="ctxBreadcrumb"></div>
+    <!-- Line 1: Source name + Change / Eject -->
+    <div class="ctx-line1">
+      <div class="ctx-line1-left">
+        <span class="ctx-field-label">Source</span>
+        <span class="ctx-field-value" id="ctxSourceVal"></span>
+      </div>
+      <div class="ctx-line1-right">
+        <span class="ctx-source-type" id="ctxSourceType" style="display:none"></span>
+        <button id="changeDriveBtn" class="ctx-action-btn">Change</button>
+        <button id="ejectBtn" class="ctx-action-btn ctx-eject-btn">Eject</button>
+      </div>
     </div>
-    <div class="ctx-right">
-      <span class="ctx-mode" id="ctxMode"></span>
-      <button id="changeDriveBtn" class="ctx-action-btn">Change</button>
-      <button id="ejectBtn" class="ctx-action-btn ctx-eject-btn">Eject</button>
+    <!-- Line 2 — Event Import mode -->
+    <div class="ctx-line2" id="ctxLine2Event" style="display:none">
+      <div class="ctx-line2-left">
+        <span class="ctx-field-label">Master</span>
+        <span class="ctx-field-value" id="ctxMasterVal"></span>
+        <div class="ctx-v-sep"></div>
+        <span class="ctx-field-label">Event</span>
+        <span class="ctx-field-value" id="ctxEventVal"></span>
+      </div>
+      <div class="ctx-line2-right">
+        <span class="ctx-tag" id="ctxCompTag"></span>
+        <span class="ctx-mode event">EVENT IMPORT</span>
+      </div>
+    </div>
+    <!-- Line 2 — Quick Import mode -->
+    <div class="ctx-line2" id="ctxLine2Quick" style="display:none">
+      <div class="ctx-line2-left">
+        <span class="ctx-field-value">Quick Import Mode</span>
+      </div>
+      <div class="ctx-line2-right">
+        <span class="ctx-mode quick">QUICK IMPORT</span>
+      </div>
     </div>
   </div>
 
@@ -3450,37 +3605,49 @@
 
       <!-- File panel — center column -->
       <div id="filePanel">
-        <div id="filePanelHeader">
-          <span id="breadcrumb">—</span>
-        </div>
-
         <!-- Toolbar: sort + view toggle -->
         <div id="toolbar">
-          <!-- Commit 8 (v0.6.0): Media/Folder view toggle. Wired in renderer.js. -->
-          <button class="view-btn view-active" id="viewMediaBtn" title="Flat media list across the whole card">🖼 Media</button>
-          <button class="view-btn" id="viewFolderBtn" title="Browse the card by folder">📁 Folder</button>
-          <div class="toolbar-sep"></div>
-          <span class="sort-label">Sort</span>
-          <button class="sort-btn sort-active" data-sort="date">Date<span class="sort-arrow"> ↓</span></button>
-          <button class="sort-btn" data-sort="name">Name<span class="sort-arrow"></span></button>
-          <button class="sort-btn" data-sort="size">Size<span class="sort-arrow"></span></button>
-          <div class="toolbar-sep"></div>
-          <button class="view-btn view-active" id="viewIconBtn" title="Icon view">⊞ Icons</button>
-          <button class="view-btn" id="viewListBtn" title="List view">☰ List</button>
-          <button class="view-btn view-active" id="thumbToggleBtn" title="Show thumbnails">▧ Thumbs</button>
-          <div class="toolbar-sep"></div>
-          <button class="view-btn" id="timelineViewBtn" title="Group by capture time">📅 Timeline</button>
-          <div class="toolbar-sep"></div>
-          <label class="pair-toggle" title="Place RAW+JPG pairs side by side">
-            <input type="checkbox" id="pairToggle"> Smart Pairing
-          </label>
-        </div>
-
-        <!-- Selection bar -->
-        <div id="selectionBar">
-          <button class="sel-btn" id="selectAllBtn">Select All</button>
-          <button class="sel-btn" id="clearSelBtn">Clear</button>
-          <span id="selCount">0 selected</span>
+          <div class="toolbar-left">
+            <!-- Commit 8 (v0.6.0): Media/Folder view toggle. Wired in renderer.js. -->
+            <button class="view-btn view-active" id="viewMediaBtn" title="Flat media list across the whole card">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="14" rx="2"/><path d="m3 13 4-4 4 4 4-5 4 5"/></svg>
+              Media
+            </button>
+            <button class="view-btn" id="viewFolderBtn" title="Browse the card by folder">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              Folder
+            </button>
+            <div class="toolbar-sep"></div>
+            <span class="sort-label">Sort</span>
+            <button class="sort-btn sort-active" data-sort="date">Date<span class="sort-arrow"> ↓</span></button>
+            <button class="sort-btn" data-sort="name">Name<span class="sort-arrow"></span></button>
+            <button class="sort-btn" data-sort="size">Size<span class="sort-arrow"></span></button>
+            <div class="toolbar-sep"></div>
+            <button class="view-btn view-active" id="viewIconBtn" title="Grid view">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+              Grid
+            </button>
+            <button class="view-btn" id="viewListBtn" title="List view">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+              List
+            </button>
+            <div class="toolbar-sep"></div>
+            <button class="view-btn" id="timelineViewBtn" title="Group by capture time">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              Timeline
+            </button>
+            <div class="toolbar-sep"></div>
+            <label class="pair-toggle" title="Place RAW+JPG pairs side by side">
+              <input type="checkbox" id="pairToggle"> Smart Pairing
+            </label>
+          </div>
+          <div class="toolbar-right">
+            <div id="toolbarSelCluster">
+              <span id="selCount"></span>
+              <button class="sel-btn" id="clearSelBtn">Clear</button>
+              <button class="sel-btn" id="selectAllBtn">Select All</button>
+            </div>
+          </div>
         </div>
 
         <!-- Commit 11 (v0.6.0): folder-view back navigation bar (hidden unless inside a folder) -->
@@ -3491,7 +3658,9 @@
         <!-- File area — JS writes grouped sections here -->
         <div id="fileGrid">
           <div class="panel-state">
-            <span class="state-icon">📁</span>
+            <span class="state-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="32" height="32"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            </span>
             <span>Choose a folder from the left to browse files</span>
           </div>
         </div>

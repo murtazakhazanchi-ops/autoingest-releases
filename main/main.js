@@ -725,21 +725,88 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
     // Skip macOS/system artefacts defensively (even though these aren't directories usually)
     if (name.startsWith('.')) continue;
 
+    // Try event.json first (authoritative); fallback to parser for legacy events.
+    const jsonPath = path.join(masterPath, name, 'event.json');
+    let eventJson = null;
+    let jsonCorrupt = false;
+    try {
+      const raw = await fsp.readFile(jsonPath, 'utf8');
+      const obj = JSON.parse(raw);
+      if (isValidEventJson(obj)) {
+        eventJson = obj;
+        // Patch 3: crash recovery — reset stuck in-progress status on next startup.
+        // An event left as 'in-progress' means the app crashed or was force-quit
+        // mid-import. Reset to 'created' so the user can retry cleanly.
+        if (eventJson.status === 'in-progress') {
+          eventJson.status   = 'created';
+          eventJson.updatedAt = Date.now();
+          const tmp = jsonPath + '.tmp';
+          await fsp.writeFile(tmp, JSON.stringify(eventJson, null, 2), 'utf8');
+          await fsp.rename(tmp, jsonPath);
+        }
+      } else {
+        jsonCorrupt = true; // exists but fails shape validation — treat as corrupt
+      }
+    } catch (err) {
+      if (err.code !== 'ENOENT') jsonCorrupt = true;
+      // ENOENT = no JSON file → legacy event, fallback to parser below
+    }
+
     const parsed = parseEventName(name, lists);
-    if (parsed.ok) {
+
+    if (eventJson) {
+      // event.json is the SOLE source of components. Parser provides hijriDate+sequence only.
+      const hijriDate = parsed.ok ? parsed.hijriDate : (eventJson.hijriDate || '');
+      const sequence  = parsed.ok ? parsed.sequence  : (eventJson.sequence  || '00');
       resolved.push({
-        folderName: name,
-        hijriDate:  parsed.hijriDate,
-        sequence:   parsed.sequence,
-        components: parsed.components,
-        isParseable: true,
-        isUnresolved: parsed.components.some(c => c.isUnresolved),
+        folderName:           name,
+        hijriDate,
+        sequence,
+        components:           eventJson.components,
+        isFromJson:           true,
+        isParseable:          true,
+        isUnresolved:         eventJson.components.some(c => c.isUnresolved),
+        isCorrupt:            false,
+        isLegacy:             false,
+        needsReconciliation:  (eventJson.safeEventName || sanitizeForPath(eventJson.eventName || '')) !== name,
+        _eventJson:           eventJson,
+      });
+    } else if (!jsonCorrupt && parsed.ok) {
+      // No event.json (ENOENT) and folder name is parseable → legacy event, no components.
+      // Components intentionally empty: event.json is the ONLY source. Legacy events must
+      // be opened via the event.json write path before they can be viewed or edited.
+      resolved.push({
+        folderName:   name,
+        hijriDate:    parsed.hijriDate,
+        sequence:     parsed.sequence,
+        components:   [],
+        isFromJson:   false,
+        isParseable:  true,
+        isUnresolved: false,
+        isLegacy:     true,
+        isCorrupt:    false,
+      });
+    } else if (jsonCorrupt && parsed.ok) {
+      // event.json exists but failed shape validation. Components intentionally empty.
+      resolved.push({
+        folderName:   name,
+        hijriDate:    parsed.hijriDate,
+        sequence:     parsed.sequence,
+        components:   [],
+        isFromJson:   false,
+        isParseable:  true,
+        isUnresolved: false,
+        isLegacy:     true,
+        isCorrupt:    true,
+        _eventJson:   null,
       });
     } else {
+      // Both JSON (if present) and parser failed.
       unparseable.push({
         folderName: name,
         isParseable: false,
-        reason:      parsed.reason,
+        reason:      parsed.ok ? 'corrupt-json' : parsed.reason,
+        isCorrupt:   jsonCorrupt,
       });
     }
   }
@@ -752,6 +819,236 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
   });
 
   return [...resolved, ...unparseable];
+});
+
+// Parse a single event folder name and return its components array.
+// Used at startup to restore component data from the canonical source (the
+// folder name itself) rather than from settings, which would drift on rename.
+ipcMain.handle('master:parseEvent', (_event, folderName) => {
+  if (!folderName || typeof folderName !== 'string') return [];
+  const lists = {
+    cities:     listManager.getList('cities'),
+    locations:  listManager.getList('locations'),
+    eventTypes: listManager.getList('event-types'),
+  };
+  const parsed = parseEventName(folderName, lists);
+  return parsed.ok ? parsed.components : [];
+});
+
+// ── event.json disk-backed event persistence ──────────────────────────────────
+
+// Strict shape validator. Returns true only when the object is safe to trust.
+// Every caller that loads event.json MUST pass through this gate before using
+// any field — partial or malformed data must never reach the UI.
+function sanitizeForPath(name) {
+  if (typeof name !== 'string') return '';
+  return name
+    .replace(/[/\\]/g, '-')
+    .replace(/[:*?"<>|]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isValidEventJson(obj) {
+  return (
+    obj !== null &&
+    typeof obj === 'object' &&
+    obj.version === 1 &&
+    typeof obj.hijriDate === 'string' && obj.hijriDate.length > 0 &&
+    typeof obj.sequence === 'number' &&
+    typeof obj.eventName === 'string' && obj.eventName.length > 0 &&
+    Array.isArray(obj.components) &&
+    obj.components.length > 0 &&
+    obj.components.every(c =>
+      c !== null &&
+      typeof c === 'object' &&
+      Array.isArray(c.types) &&
+      c.types.length > 0 &&
+      typeof c.city === 'string' &&
+      c.city.length > 0 &&
+      (typeof c.location === 'string' || c.location === null || c.location === undefined)
+    )
+  );
+}
+
+// Write event.json to a new event folder. Creates the folder if absent.
+// If event.json already exists, returns the existing data without overwriting
+// (idempotent — duplicate creation is a no-op).
+ipcMain.handle('event:write', async (_event, eventFolderPath, eventData) => {
+  if (!eventFolderPath || typeof eventFolderPath !== 'string') {
+    return { ok: false, reason: 'Invalid folder path.' };
+  }
+  const jsonPath = path.join(eventFolderPath, 'event.json');
+  try {
+    await fsp.mkdir(eventFolderPath, { recursive: true });
+  } catch (err) {
+    return { ok: false, reason: `mkdir failed: ${err.message}` };
+  }
+  // Check if already exists — don't overwrite
+  try {
+    const existing = await fsp.readFile(jsonPath, 'utf8');
+    return { ok: true, alreadyExisted: true, data: JSON.parse(existing) };
+  } catch (err) {
+    if (err.code !== 'ENOENT') return { ok: false, reason: `Read check failed: ${err.message}` };
+  }
+  const tmp = jsonPath + '.tmp';
+  try {
+    await fsp.writeFile(tmp, JSON.stringify(eventData, null, 2), 'utf8');
+    await fsp.rename(tmp, jsonPath);
+    return { ok: true, alreadyExisted: false, data: eventData };
+  } catch (err) {
+    try { await fsp.unlink(tmp); } catch {}
+    return { ok: false, reason: `Write failed: ${err.message}` };
+  }
+});
+
+// Read event.json from a folder. Returns parsed object, null (missing), or
+// { _corrupt: true } (invalid JSON, wrong version, or fails shape validation).
+ipcMain.handle('event:read', async (_event, eventFolderPath) => {
+  if (!eventFolderPath || typeof eventFolderPath !== 'string') return null;
+  const jsonPath = path.join(eventFolderPath, 'event.json');
+  try {
+    const raw = await fsp.readFile(jsonPath, 'utf8');
+    const obj = JSON.parse(raw);
+    if (!isValidEventJson(obj)) return { _corrupt: true };
+    return obj;
+  } catch (err) {
+    if (err.code === 'ENOENT') return null;
+    return { _corrupt: true };
+  }
+});
+
+// Atomically update allowed fields in event.json. Only the fields listed in
+// ALLOWED_UPDATE_KEYS may be changed — unknown fields from `patch` are silently
+// ignored so a stale caller can never corrupt the schema.
+const ALLOWED_UPDATE_KEYS = ['components', 'status', 'eventName', 'safeEventName', 'updatedAt'];
+
+ipcMain.handle('event:update', async (_event, eventFolderPath, patch) => {
+  if (!eventFolderPath || typeof eventFolderPath !== 'string') {
+    return { ok: false, reason: 'Invalid folder path.' };
+  }
+  const jsonPath = path.join(eventFolderPath, 'event.json');
+  let existing = {};
+  try {
+    const raw = await fsp.readFile(jsonPath, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object') existing = parsed;
+  } catch { /* no file yet — start fresh */ }
+  // Allowlist merge: only modify permitted keys, never spread unknown fields.
+  const updated = { ...existing };
+  for (const key of ALLOWED_UPDATE_KEYS) {
+    if (patch[key] !== undefined) updated[key] = patch[key];
+  }
+  updated.updatedAt = Date.now();
+  const tmp = jsonPath + '.tmp';
+  try {
+    await fsp.writeFile(tmp, JSON.stringify(updated, null, 2), 'utf8');
+    await fsp.rename(tmp, jsonPath);
+    return { ok: true };
+  } catch (err) {
+    try { await fsp.unlink(tmp); } catch {}
+    return { ok: false, reason: `Write failed: ${err.message}` };
+  }
+});
+
+// Merge-safe import log append. Reads current event.json, deduplicates
+// Stable sort: newest first, seq as tiebreaker (clock-skew safe).
+function sortImports(a, b) {
+  const t = new Date(b.timestamp) - new Date(a.timestamp);
+  if (t !== 0) return t;
+  return (b.seq || 0) - (a.seq || 0);
+}
+
+// Backward-compatible: counts shape is validated as object, not individual fields.
+function isValidImportEntry(e) {
+  return (
+    e &&
+    typeof e.id === 'string' &&
+    typeof e.timestamp === 'string' &&
+    typeof e.componentIndex === 'number' &&
+    e.counts &&
+    typeof e.counts === 'object'
+  );
+}
+
+// Merge-safe import log append. Reads current event.json, deduplicates
+// incoming entries by id, writes atomically via tmp→rename.
+// TODO: support archive of trimmed logs if needed
+ipcMain.handle('event:appendImports', async (_event, eventFolderPath, entries) => {
+  if (!eventFolderPath || !Array.isArray(entries)) return { ok: false, reason: 'Invalid args.' };
+  const jsonPath = path.join(eventFolderPath, 'event.json');
+  let doc = {};
+  try {
+    const raw = await fsp.readFile(jsonPath, 'utf8');
+    doc = JSON.parse(raw);
+  } catch { /* no file yet — start from empty doc */ }
+  // Re-read latest before final write (handles concurrent writers on NAS).
+  let latestImports = [];
+  try {
+    const latestRaw = await fsp.readFile(jsonPath, 'utf8');
+    const latest = JSON.parse(latestRaw);
+    if (Array.isArray(latest.imports)) latestImports = latest.imports;
+    doc = latest; // use freshest doc as base for write
+  } catch { /* file unchanged or gone — fall back to first read */ }
+  const incomingSafe = Array.isArray(entries) ? entries : [];
+  const mergedMap = new Map();
+  [...latestImports, ...incomingSafe].forEach(entry => {
+    if (isValidImportEntry(entry)) {
+      mergedMap.set(entry.id, entry);
+    } else {
+      console.warn('[AUDIT] Skipped invalid entry:', entry);
+    }
+  });
+  doc.imports = Array.from(mergedMap.values());
+  const MAX_IMPORTS = 5000;
+  if (doc.imports.length > MAX_IMPORTS) {
+    doc.imports = doc.imports.sort(sortImports).slice(0, MAX_IMPORTS);
+    console.warn('[AUDIT] Trimmed to latest', MAX_IMPORTS);
+  }
+  const tmp = jsonPath + '.tmp';
+  try {
+    await fsp.writeFile(tmp, JSON.stringify(doc, null, 2), 'utf8');
+    await fsp.rename(tmp, jsonPath);
+    return { ok: true, count: incomingSafe.length };
+  } catch (err) {
+    try { await fsp.unlink(tmp); } catch {}
+    return { ok: false, reason: err.message };
+  }
+});
+
+ipcMain.handle('dir:ensure', async (_event, dirPath) => {
+  if (!dirPath || typeof dirPath !== 'string') return { ok: false, reason: 'Invalid path.' };
+  try {
+    await fsp.mkdir(dirPath, { recursive: true });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: err.message };
+  }
+});
+
+ipcMain.handle('dir:findByPrefix', async (_event, basePath, prefix) => {
+  if (!basePath || !prefix) return null;
+  try {
+    const entries = await fsp.readdir(basePath, { withFileTypes: true });
+    const matches = entries.filter(e => e.isDirectory() && e.name.startsWith(prefix));
+    if (matches.length > 1) {
+      console.warn('[FS] Multiple folders match prefix:', prefix, matches.map(m => m.name));
+    }
+    return matches.length > 0 ? { name: matches[0].name } : null;
+  } catch {
+    return null;
+  }
+});
+
+ipcMain.handle('dir:rename', async (_event, oldPath, newPath) => {
+  if (!oldPath || !newPath) return { ok: false, reason: 'Missing paths.' };
+  if (oldPath === newPath) return { ok: true };
+  try {
+    await fsp.rename(oldPath, newPath);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: err.message };
+  }
 });
 
 ipcMain.handle('master:renameEvent', async (_event, masterPath, oldName, newName) => {

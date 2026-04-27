@@ -16,6 +16,151 @@
 
 const EventCreator = (() => {
 
+  // Produces a filesystem-safe name: replaces path separators with '-' and
+  // strips characters illegal on Windows. Used for folder paths only — display
+  // always uses the original name.
+  function sanitizeForPath(name) {
+    if (typeof name !== 'string') return '';
+    return name
+      .replace(/[/\\]/g, '-')
+      .replace(/[:*?"<>|]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  // Normalize disk-format components ({ types, city, location } as strings) to
+  // session format ({ eventTypes: [{id,label}], city: {id,label}, location }).
+  // Safe to call on components already in session format — handles both via fallbacks.
+  // Used by restoreLastEvent so coll.events always carries consistent format.
+  function _normComps(components) {
+    if (!Array.isArray(components)) return [];
+    return components.map(c => ({
+      eventTypes: (c.types || c.eventTypes || []).map(t => ({ id: t, label: t })),
+      location:   c.location ? { id: c.location, label: c.location } : null,
+      city:       c.city    ? { id: c.city,     label: c.city     } : null,
+    }));
+  }
+
+  function assertValidComponents(comps, label) {
+    if (!Array.isArray(comps)) {
+      console.error(`[assertValidComponents] ${label || '?'}: not an array —`, comps);
+      return;
+    }
+    for (const c of comps) {
+      if (!Array.isArray(c.eventTypes)) {
+        console.error(`[assertValidComponents] ${label || '?'}: eventTypes corrupted in component —`, c);
+      }
+    }
+    console.log(`[assertValidComponents] ${label || '?'}: OK — ${comps.length} component(s). Structure:`,
+      JSON.stringify(comps.map(c => ({ eventTypes: c.eventTypes, city: c.city, location: c.location })), null, 2));
+  }
+
+  function assertStrictComponents(comps) {
+    if (!Array.isArray(comps) || comps.length === 0) {
+      throw new Error('Invalid components: empty or not array');
+    }
+    for (const c of comps) {
+      if (!Array.isArray(c.eventTypes) || c.eventTypes.length === 0) {
+        throw new Error('Invalid component: missing eventTypes');
+      }
+      if (c.eventTypes.some(t => typeof t === 'string')) {
+        throw new Error('CORRUPTION: eventTypes must be objects, not strings');
+      }
+      if (!c.city || !c.city.label) {
+        throw new Error('Invalid component: missing city');
+      }
+    }
+  }
+
+  function deepFreeze(obj) {
+    if (obj === null || typeof obj !== 'object') return obj;
+    Object.freeze(obj);
+    Object.getOwnPropertyNames(obj).forEach(name => {
+      const val = obj[name];
+      if (val && typeof val === 'object' && !Object.isFrozen(val)) deepFreeze(val);
+    });
+    return obj;
+  }
+
+  function sanitizeForFolder(name) {
+    if (!name) return '';
+    return name
+      .replace(/[\/\\:*?"<>|]/g, '-')
+      .replace(/\s+/g, ' ')
+      .replace(/\s*-\s*/g, '-')
+      .replace(/-+/g, '-')
+      .trim();
+  }
+
+  function sanitizeEventName(name) {
+    if (!name) return '';
+    return name
+      .replace(/[+_]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/\s+/g, ' ')
+      .replace(/\s*-\s*/g, '-')
+      .trim();
+  }
+
+  async function loadEventFromDisk(eventPath) {
+    try {
+      const json = await window.api.readEventJson(eventPath);
+
+      if (!json || !Array.isArray(json.components)) {
+        console.error('[loadEventFromDisk] Invalid or missing event.json at:', eventPath);
+        return null;
+      }
+
+      const normalized = json.components.map((c, i) => ({
+        id: i + 1,
+        eventTypes: Array.isArray(c.types)
+          ? c.types.map(t => ({ label: t }))
+          : [],
+        location: c.location ? { label: c.location } : null,
+        city: c.city ? { label: c.city } : null,
+      }));
+
+      console.log('[loadEventFromDisk] Loaded', normalized.length, 'components from', eventPath);
+
+      return normalized;
+    } catch (err) {
+      console.error('[loadEventFromDisk] Failed to read event.json:', err);
+      return null;
+    }
+  }
+
+  function setEventState(components) {
+    if (!Array.isArray(components)) {
+      console.error('[setEventState] Invalid components input');
+      _eventComps = [];
+      return;
+    }
+
+    if (components.length === 0) {
+      _eventComps = [];
+      console.log('[setEventState] Cleared state');
+      return;
+    }
+
+    const normalized = components.map((c, i) => ({
+      id: i + 1,
+      eventTypes: Array.isArray(c.eventTypes)
+        ? c.eventTypes.map(t => ({ label: t.label }))
+        : [],
+      location: c.location ? { label: c.location.label } : null,
+      city: c.city ? { label: c.city.label } : null,
+    }));
+
+    if (normalized.some(c => !Array.isArray(c.eventTypes))) {
+      console.error('[setEventState] Corrupted eventTypes detected');
+      return;
+    }
+
+    _eventComps = normalized;
+
+    console.log('[setEventState] Locked state with', _eventComps.length, 'components');
+  }
+
   // ── Session state ──────────────────────────────────────────────────────────
   let sessionArchiveRoot = null;  // string | null — cache of persisted settings.archiveRoot; primed by primeFromSettings(), auto-migrates on create/change
   let activeMaster       = null;  // { name, path } | null — the on-disk master folder in use
@@ -46,6 +191,8 @@ const EventCreator = (() => {
   let _newEventDate    = null;  // M7: hijri date string for new events ("YYYY-MM-DD"), null when viewing/editing
   let _navScreen           = 'masterStep'; // 'masterStep' | 'eventList' | 'eventForm' | 'previewStep'
   let _selectedListFolder  = null;         // Phase 2: folder name highlighted in SELECT mode
+  let _listenersAttached   = false;        // Guard: delegated panel listeners registered only once
+  let _saveInProgress      = false;        // Guard: prevent concurrent save executions
 
   function _makeComp() {
     return { id: ++_compSeq, eventTypes: [], location: null, city: _globalCityVal ? { ..._globalCityVal } : null };
@@ -63,9 +210,10 @@ const EventCreator = (() => {
 
   function _resetEventForm() {
     _destroyEventDDs();
-    _eventComps    = [];
-    _globalCityVal = null;
-    _compSeq       = 0;
+    setEventState([]);
+    _globalCityVal  = null;
+    _compSeq        = 0;
+    _saveInProgress = false;
   }
 
   // ── DOM shortcuts ──────────────────────────────────────────────────────────
@@ -724,10 +872,11 @@ const EventCreator = (() => {
       const badge = ev.isUnresolved
         ? `<span class="ec-evl-warn" title="Some tokens in this event don't match the controlled lists yet. You can still view or edit.">⚠</span>`
         : '';
+      const displayName = ev._eventJson?.eventName || ev.folderName;
       return `
 <div class="ec-evl-item" data-folder="${esc(ev.folderName)}" tabindex="0" role="option" aria-selected="false">
   <div class="ec-evl-meta">
-    <div class="ec-evl-name" title="${esc(ev.folderName)}">${esc(ev.folderName)}</div>
+    <div class="ec-evl-name" title="${esc(displayName)}">${esc(displayName)}</div>
     <div class="ec-evl-date">${esc(ev.hijriDate)}</div>
   </div>
   ${badge}
@@ -890,7 +1039,7 @@ ${unparseable.map(ev => `
     document.getElementById('ecNewEventFromList')?.addEventListener('click', () => {
       _viewingExisting = null;
       _newEventDate    = null;
-      _eventComps      = [];
+      setEventState([]);
       if (typeof EventMgmt !== 'undefined' && EventMgmt.isOpen()) EventMgmt.setMode('create');
       _renderEventForm();
     });
@@ -906,39 +1055,78 @@ ${unparseable.map(ev => `
     _viewingExisting  = null;
     _editMode         = false;
     _newEventDate     = null;
-    _eventComps       = [_makeComp()];
+    setEventState([_makeComp()]);
     if (typeof EventMgmt !== 'undefined' && EventMgmt.isOpen()) EventMgmt.setMode('repair');
     _renderEventForm();
   }
 
   // M5/M6: open an existing event — starts in view-only; "Edit Event" unlocks.
   // opts.edit = true skips the view-lock and opens directly in edit mode (Phase 2).
-  function _openExistingEvent(folderName, opts) {
+  // event.json is the ONLY source of components — no entry.components fallback.
+  async function _openExistingEvent(folderName, opts) {
     const entry = (_scannedEvents || []).find(e => e.folderName === folderName && e.isParseable);
     if (!entry) return;
 
-    // Rehydrate components from parsed data into the EventCreator's internal shape.
-    _editMode = opts?.edit === true;
-    _newEventDate = null;
-    _compSeq = 0;
-    _eventComps = entry.components.map(c => ({
-      id:         ++_compSeq,
-      // Event types get id===label since we don't round-trip list-IDs through parsed strings.
-      // TreeAutocomplete accepts that shape for display; the alias engine handles search later.
-      eventTypes: c.eventTypes.map(label => ({ id: label, label })),
-      location:   c.location ? { id: c.location, label: c.location } : null,
-      city:       { id: c.city, label: c.city },
-      isUnresolved: !!c.isUnresolved,
-    }));
+    if (!activeMaster?.path) {
+      console.error('[_openExistingEvent] No activeMaster path');
+      return;
+    }
+
+    const eventPath = activeMaster.path + '/' + entry.folderName;
+
+    const components = await loadEventFromDisk(eventPath);
+
+    if (!components) {
+      console.error('[_openExistingEvent] Failed to load components');
+      return;
+    }
+
+    setEventState(components);
+
+    _compSeq = components.length;
 
     _viewingExisting = {
-      folderName:   entry.folderName,
-      hijriDate:    entry.hijriDate,
-      sequence:     entry.sequence,
-      isUnresolved: entry.isUnresolved,
-      // Snapshot of parsed components — source of truth for _selectExistingForImport.
-      components:   _eventComps.map(c => ({ ...c, eventTypes: [...c.eventTypes] })),
+      folderName:  entry.folderName,
+      displayName: entry._eventJson?.eventName || entry.folderName,
     };
+
+    _renderEventForm();
+  }
+
+  async function openEventForEdit(entry) {
+    const eventPath = activeMaster.path + '/' + entry.folderName;
+
+    if (!eventPath) {
+      console.error('[openEventForEdit] Missing event path');
+      return;
+    }
+
+    const components = await loadEventFromDisk(eventPath);
+
+    if (!components) {
+      console.error('[openEventForEdit] Failed to load components');
+      return;
+    }
+
+    const editable = components.map(c => ({
+      id:         c.id,
+      eventTypes: c.eventTypes.map(t => ({ label: t.label })),
+      location:   c.location,
+      city:       c.city,
+    }));
+
+    setEventState(editable);
+
+    _compSeq = editable.length;
+
+    _viewingExisting = {
+      folderName:  entry.folderName,
+      displayName: entry._eventJson?.eventName || entry.folderName,
+    };
+
+    _editMode = true;
+
+    console.log('[openEventForEdit] Ready for editing:', editable.length, 'components');
 
     _renderEventForm();
   }
@@ -951,7 +1139,7 @@ ${unparseable.map(ev => `
     if (typeof EventMgmt !== 'undefined' && EventMgmt.isOpen() && EventMgmt.getMode() === 'select') return;
 
     _navScreen = 'eventForm';
-    if (_eventComps.length === 0) _eventComps = [_makeComp()];
+    if (_eventComps.length === 0) setEventState([_makeComp()]);
 
     const body = $ecBody();
     if (!body) return;
@@ -986,7 +1174,7 @@ ${unparseable.map(ev => `
     }
 
     _mountEventDropdowns();
-    _attachEventListeners();
+    _attachPanelDelegatedListeners();
     _updateEventPreview();
 
     // M5: in view-only mode, lock all inputs AFTER dropdowns have mounted with values.
@@ -1061,12 +1249,13 @@ ${unparseable.map(ev => `
     }
 
     // Build the new event name using locked hijriDate + sequence from _viewingExisting.
-    const parts   = _buildCompString(_eventComps);
-    const newName = `${_viewingExisting.hijriDate} _${_viewingExisting.sequence}-${parts}`;
-    const oldName = _viewingExisting.folderName;
+    const parts       = _buildCompString(_eventComps);
+    const newName     = `${_viewingExisting.hijriDate} _${_viewingExisting.sequence}-${parts}`;
+    const safeNewName = sanitizeForPath(newName);
+    const oldName     = _viewingExisting.folderName;
 
-    // If the name hasn't changed, skip rename but still select and proceed.
-    if (newName === oldName) {
+    // If the safe folder name hasn't changed, skip rename but still select and proceed.
+    if (safeNewName === oldName) {
       _editMode = false;
       _viewingExisting = {
         ..._viewingExisting,
@@ -1074,7 +1263,7 @@ ${unparseable.map(ev => `
         components: _eventComps.map(c => ({ ...c, eventTypes: [...c.eventTypes] })),
       };
       _destroyEventDDs();
-      _selectExistingForImport();
+      await _selectExistingForImport();
       return;
     }
 
@@ -1082,12 +1271,12 @@ ${unparseable.map(ev => `
     const dupMatch = (_scannedEvents || []).find(e => {
       if (e.folderName === oldName || !e.isParseable) return false;
       const m = e.folderName.match(/^\d{4}-\d{2}-\d{2} _\d{2}-(.+)$/);
-      return m && m[1] === parts;
+      return m && m[1] === sanitizeForPath(parts);
     });
     if (dupMatch) {
       const proceed = await _showModal({
         title:    'Similar Event Exists',
-        bodyHTML: `Another event already has the same components:<br><strong>${esc(dupMatch.folderName)}</strong><br><br>Save anyway?`,
+        bodyHTML: `Another event already has the same components:<br><strong>${esc(dupMatch._eventJson?.eventName || dupMatch.folderName)}</strong><br><br>Save anyway?`,
         buttons:  [
           { label: 'Cancel',       primary: false, value: 'no'  },
           { label: 'Save Anyway',  primary: true,  value: 'yes' }
@@ -1096,44 +1285,113 @@ ${unparseable.map(ev => `
       if (proceed !== 'yes') return;
     }
 
-    // Call IPC to rename on disk.
-    const result = await window.api.renameEvent(activeMaster.path, oldName, newName);
+    // Call IPC to rename on disk using the filesystem-safe name.
+    const result = await window.api.renameEvent(activeMaster.path, oldName, safeNewName);
     if (!result.ok) {
       if (result.reason === 'collision') {
-        _showEventBanner(`A folder named "${newName}" already exists.`, 'error');
+        _showEventBanner(`A folder named "${safeNewName}" already exists.`, 'error');
       } else {
         _showEventBanner(result.reason || 'Rename failed.', 'error');
       }
       return;
     }
 
+    // Validate and snapshot _eventComps before write — blocks corrupted saves.
+    console.log('WRITING EVENT JSON (_handleSaveEditedEvent):', JSON.stringify(_eventComps, null, 2));
+    try {
+      assertStrictComponents(_eventComps);
+    } catch (err) {
+      console.error('BLOCKED CORRUPTED SAVE (_handleSaveEditedEvent):', err);
+      _showEventBanner('Internal error: component structure is invalid. Cannot save.', 'error');
+      return;
+    }
+    const cleanComps = JSON.parse(JSON.stringify(_eventComps));
+
     // Update the scanned events cache so the list reflects the change.
+    const compsForDisk = cleanComps.map(c => ({
+      types:        c.eventTypes.map(et => et.label),
+      location:     c.location?.label || null,
+      city:         c.city?.label     || '',
+      isUnresolved: false,
+    }));
     const entry = (_scannedEvents || []).find(e => e.folderName === oldName);
     if (entry) {
-      entry.folderName = newName;
-      entry.components = _eventComps.map(c => ({
-        eventTypes: c.eventTypes.map(et => et.label),
-        location: c.location?.label || null,
-        city: c.city?.label || '',
-        isUnresolved: false, // User edited through UI = all selections are from controlled lists
-      }));
+      entry.folderName   = safeNewName;
+      entry.components   = compsForDisk;
       entry.isUnresolved = false;
+      if (entry._eventJson) {
+        entry._eventJson.components    = compsForDisk;
+        entry._eventJson.eventName     = newName;
+        entry._eventJson.safeEventName = safeNewName;
+      }
+    }
+
+    // Update (or create for legacy events) event.json at the new safe path.
+    if (activeMaster?.path) {
+      const newEventPath = activeMaster.path + '/' + safeNewName;
+      window.api.updateEventJson(newEventPath, {
+        eventName:     newName,
+        safeEventName: safeNewName,
+        components:    compsForDisk,
+        status:        'created',
+      }).catch(err => console.error('[EventCreator] updateEventJson (save edit) failed:', err));
+
+      // Sync component subfolders: rename existing by index prefix, create new ones.
+      try {
+        const basePath = newEventPath;
+        const comps = JSON.parse(JSON.stringify(_eventComps));
+        const allSameCity = comps.every(c => c.city?.label === comps[0].city?.label);
+        const orderedComps = [...comps].sort((a, b) => (a.id || 0) - (b.id || 0));
+        const tasks = [];
+        for (let idx = 0; idx < orderedComps.length; idx++) {
+          const comp          = orderedComps[idx];
+          const indexPart     = String(idx + 1).padStart(2, '0');
+          const typePart      = sanitizeForFolder(comp.eventTypes.map(t => t.label).join('-'));
+          const locationPart  = comp.location?.label ? '-' + sanitizeForFolder(comp.location.label) : '';
+          const cityPart      = (!allSameCity && comp.city?.label) ? '-' + sanitizeForFolder(comp.city.label) : '';
+          const newFolderName = `${indexPart}-${typePart}${locationPart}${cityPart}`;
+          const newPath       = basePath + '/' + newFolderName;
+          const existingPrefix = indexPart + '-';
+          const existing = await window.api.findDirByPrefix(basePath, existingPrefix);
+          if (existing) {
+            if (existing.name !== newFolderName) {
+              tasks.push(
+                window.api.renameDir(basePath + '/' + existing.name, newPath)
+                  .catch(err => console.error('[Subfolder Rename] Failed:', existing.name, err))
+              );
+            }
+          } else {
+            tasks.push(
+              window.api.ensureDir(newPath)
+                .catch(err => console.error('[Subfolder Create] Failed:', newPath, err))
+            );
+          }
+        }
+        await Promise.all(tasks);
+        console.log('[Subfolder Sync] Completed with rename support');
+      } catch (err) {
+        console.error('[Subfolder Sync] Error:', err);
+      }
     }
 
     _editMode = false;
     _viewingExisting = {
       ..._viewingExisting,
-      folderName:   newName,
+      folderName:   safeNewName,
+      displayName:  newName,
       isUnresolved: false,
       components:   _eventComps.map(c => ({ ...c, eventTypes: [...c.eventTypes] })),
     };
     _destroyEventDDs();
-    _selectExistingForImport();
+    await _selectExistingForImport();
   }
 
   // ── HTML builder ─────────────────────────────────────────────────────────────────────
 
   function _buildEventHTML() {
+    if (!Array.isArray(_eventComps)) {
+      console.error('Invalid components structure', _eventComps);
+    }
     // M5 / Phase 5: mode badge + breadcrumb differ by create / view / edit / repair.
     const modeBadge = _repairMode
       ? `<span class="ec-mode-badge ec-mode-repair" style="margin-left:8px">Repairing Event</span>`
@@ -1151,7 +1409,7 @@ ${unparseable.map(ev => `
     </div>` : _viewingExisting ? `
     <div class="ec-bc-row">
       <span class="ec-bc-label">Event</span>
-      <span class="ec-bc-value" title="${esc(_viewingExisting.folderName)}">${esc(_viewingExisting.folderName)}</span>
+      <span class="ec-bc-value" title="${esc(_viewingExisting.displayName || _viewingExisting.folderName)}">${esc(_viewingExisting.displayName || _viewingExisting.folderName)}</span>
       <button class="ec-bc-change" id="ecBackToList">← Back to list</button>
     </div>` : '';
 
@@ -1220,6 +1478,7 @@ ${unparseable.map(ev => `
   }
 
   function _buildCompRow(comp, index) {
+    console.log('UI EVENT TYPES:', comp.eventTypes);
     const canRemove  = _eventComps.length > 1;
     const chipsHTML  = comp.eventTypes.map((et, idx) => `
       <span class="ec-chip">
@@ -1300,7 +1559,7 @@ ${unparseable.map(ev => `
         }
       });
       row.et = etDD;
-      _wireETChips(comp);
+      // Chip-x clicks handled by delegated listener on #ecBody — no per-chip wiring needed.
     }
 
     const locEl = document.getElementById(`ecLoc-${comp.id}`);
@@ -1333,121 +1592,166 @@ ${unparseable.map(ev => `
       <span class="ec-chip">
         ${esc(et.label)}<button class="ec-chip-x" data-comp="${comp.id}" data-idx="${idx}" aria-label="Remove ${esc(et.label)}">×</button>
       </span>`).join('');
-    _wireETChips(comp);
-  }
-
-  function _wireETChips(comp) {
-    const el = document.getElementById(`ecETChips-${comp.id}`);
-    if (!el) return;
-    el.querySelectorAll('.ec-chip-x').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const idx = Number(btn.dataset.idx);
-        comp.eventTypes.splice(idx, 1);
-        _refreshETChips(comp);
-        _updateEventPreview();
-      });
-    });
+    // Chip-x clicks handled by delegated listener on #ecBody — no per-chip wiring needed.
   }
 
   // ── Listeners ──────────────────────────────────────────────────────────────
+  // All form-area interactions are handled by THREE delegated listeners on
+  // #ecBody (stable element, never replaced). _attachPanelDelegatedListeners()
+  // is called from _renderEventForm() but is guarded by _listenersAttached so
+  // the actual addEventListener calls run exactly once per session.
 
-  function _attachEventListeners() {
-    document.getElementById('ecChangeCollection')
-      ?.addEventListener('click', () => {
-        // Dirty check: CREATE / EDIT / REPAIR all have unsaved state in the form.
+  function _onEvDateInput() {
+    const errEl = document.getElementById('evHijriErr');
+    if (errEl) errEl.classList.remove('visible');
+    const y = document.getElementById('evHijriYear')?.value.trim()  || '';
+    const m = document.getElementById('evHijriMonth')?.value.trim() || '';
+    const d = document.getElementById('evHijriDay')?.value.trim()   || '';
+    if (y && m && d && !validateHijriDate(y, m, d)) {
+      _newEventDate = `${y}-${pad2(m)}-${pad2(d)}`;
+    } else {
+      _newEventDate = null;
+    }
+    _updateEventPreview();
+  }
+
+  function _attachPanelDelegatedListeners() {
+    if (_listenersAttached) return;
+    const body = $ecBody();
+    if (!body) return;
+    _listenersAttached = true;
+
+    // ── Click delegation ────────────────────────────────────────────────────
+    body.addEventListener('click', async e => {
+
+      // #ecChangeCollection — go back to master step (dirty check for unsaved state)
+      if (e.target.closest('#ecChangeCollection')) {
         if (_editMode || _repairMode || !_viewingExisting) {
           if (!window.confirm('You have unsaved changes. Discard them?')) return;
         }
-        // M3: going back to Step 1 clears the scan cache so we rescan on re-entry.
         _scannedEvents    = null;
         _viewingExisting  = null;
         _editMode         = false;
         _repairMode       = false;
         _repairFolderName = null;
-        _eventComps       = [];
+        setEventState([]);
         _newEventDate     = null;
         _destroyEventDDs();
         showMasterStep();
-      });
+        return;
+      }
 
-    // M5/M6/Phase5: "Back to list" returns to event-list. Silent discard (dirty check is in handleBack).
-    document.getElementById('ecBackToList')
-      ?.addEventListener('click', () => {
+      // #ecBackToList — return to event list, silent discard
+      if (e.target.closest('#ecBackToList')) {
         _viewingExisting  = null;
         _editMode         = false;
         _repairMode       = false;
         _repairFolderName = null;
         _newEventDate     = null;
-        _eventComps       = [];
+        setEventState([]);
         _destroyEventDDs();
         _renderEventList();
-      });
+        return;
+      }
 
-    // M7: hijri date inputs for new events.
-    const evY = document.getElementById('evHijriYear');
-    const evM = document.getElementById('evHijriMonth');
-    const evD = document.getElementById('evHijriDay');
-    if (evY && evM && evD) {
-      const onEvDateInput = () => {
-        const errEl = document.getElementById('evHijriErr');
-        if (errEl) errEl.classList.remove('visible');
-        const y = evY.value.trim(), m = evM.value.trim(), d = evD.value.trim();
-        if (y && m && d && !validateHijriDate(y, m, d)) {
-          _newEventDate = `${y}-${pad2(m)}-${pad2(d)}`;
-        } else {
-          _newEventDate = null;
-        }
-        _updateEventPreview();
-      };
-      evY.addEventListener('input', () => { numericOnly(evY); if (evY.value.length === 4) evM.focus(); onEvDateInput(); });
-      evM.addEventListener('input', () => { numericOnly(evM); if (evM.value.length === 2) evD.focus(); onEvDateInput(); });
-      evD.addEventListener('input', () => { numericOnly(evD); onEvDateInput(); });
-      evM.addEventListener('keydown', e => { if (e.key === 'Backspace' && evM.value === '') { e.preventDefault(); evY.focus(); } });
-      evD.addEventListener('keydown', e => { if (e.key === 'Backspace' && evD.value === '') { e.preventDefault(); evM.focus(); } });
-    }
-
-    document.getElementById('ecAddComp')
-      ?.addEventListener('click', () => {
+      // #ecAddComp — add a new component row
+      if (e.target.closest('#ecAddComp')) {
         _eventComps.push(_makeComp());
         _refreshCompList();
         _updateEventPreview();
         const last = _eventComps[_eventComps.length - 1];
         document.getElementById(`ecET-${last.id}`)?.querySelector('input')?.focus();
-      });
+        return;
+      }
 
-    _wireRemoveButtons();
+      // #ecEventEdit — reload from disk into editable copy, then unlock
+      if (e.target.closest('#ecEventEdit')) {
+        const entry = (_scannedEvents || []).find(e => e.folderName === _viewingExisting?.folderName) || _viewingExisting;
+        await openEventForEdit(entry);
+        return;
+      }
 
-    document.getElementById('ecEventContinue')
-      ?.addEventListener('click', () => {
+      // #ecEventContinue — Save / Select / Create (guarded against concurrent calls)
+      if (e.target.closest('#ecEventContinue')) {
+        if (_saveInProgress) return;
+        const btn = document.getElementById('ecEventContinue');
+        if (btn?.disabled) return;
         if (_viewingExisting && !_editMode) {
-          _selectExistingForImport();
+          const entry = (_scannedEvents || []).find(e => e.folderName === _viewingExisting.folderName) || _viewingExisting;
+          const success = await _selectExistingForImport(entry);
+          if (!success) {
+            console.error('[Continue] Failed to select event');
+            return;
+          }
         } else if (_viewingExisting && _editMode) {
-          // M6: save edits.
-          _handleSaveEditedEvent();
+          _saveInProgress = true;
+          if (btn) btn.disabled = true;
+          try {
+            await _handleSaveEditedEvent();
+          } finally {
+            _saveInProgress = false;
+            // Re-enable only if save failed and we are still in edit mode.
+            if (_editMode) { if (btn) btn.disabled = false; }
+          }
         } else {
           _tryCreateEvent();
         }
-      });
+        return;
+      }
 
-    document.getElementById('ecEventEdit')
-      ?.addEventListener('click', () => {
-        _editMode = true;
-        _applyEditLockState();
-        _updateEventPreview();
-      });
-  }
-
-  function _wireRemoveButtons() {
-    document.querySelectorAll('.ec-comp-remove').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const id  = Number(btn.dataset.compId);
+      // .ec-comp-remove — remove a component row
+      const removeBtn = e.target.closest('.ec-comp-remove');
+      if (removeBtn) {
+        const id  = Number(removeBtn.dataset.compId);
         const row = _compDDs[id];
         row?.et?.destroy(); row?.loc?.destroy(); row?.city?.destroy();
         delete _compDDs[id];
-        _eventComps = _eventComps.filter(c => c.id !== id);
+        setEventState(_eventComps.filter(c => c.id !== id));
         _refreshCompList();
         _updateEventPreview();
-      });
+        return;
+      }
+
+      // .ec-chip-x — remove an event-type chip
+      const chipX = e.target.closest('.ec-chip-x');
+      if (chipX) {
+        const compId = Number(chipX.dataset.comp);
+        const idx    = Number(chipX.dataset.idx);
+        const comp   = _eventComps.find(c => c.id === compId);
+        if (comp) {
+          comp.eventTypes.splice(idx, 1);
+          _refreshETChips(comp);
+          _updateEventPreview();
+        }
+        return;
+      }
+    });
+
+    // ── Input delegation (hijri date fields) ────────────────────────────────
+    body.addEventListener('input', e => {
+      const id = e.target.id;
+      if (id === 'evHijriYear' || id === 'evHijriMonth' || id === 'evHijriDay') {
+        numericOnly(e.target);
+        if (id === 'evHijriYear'  && e.target.value.length === 4) document.getElementById('evHijriMonth')?.focus();
+        if (id === 'evHijriMonth' && e.target.value.length === 2) document.getElementById('evHijriDay')?.focus();
+        _onEvDateInput();
+      }
+    });
+
+    // ── Keydown delegation (hijri date navigation) ───────────────────────────
+    body.addEventListener('keydown', e => {
+      const { id, value } = e.target;
+      if (id === 'evHijriMonth' && e.key === 'Backspace' && value === '') {
+        e.preventDefault(); document.getElementById('evHijriYear')?.focus();
+      } else if (id === 'evHijriDay' && e.key === 'Backspace' && value === '') {
+        e.preventDefault(); document.getElementById('evHijriMonth')?.focus();
+      } else if (id === 'evHijriYear'  && e.key === 'Enter') {
+        document.getElementById('evHijriMonth')?.focus();
+      } else if (id === 'evHijriMonth' && e.key === 'Enter') {
+        document.getElementById('evHijriDay')?.focus();
+      } else if (id === 'evHijriDay'   && e.key === 'Enter') {
+        document.getElementById('collLabel')?.focus();
+      }
     });
   }
 
@@ -1468,7 +1772,7 @@ ${unparseable.map(ev => `
 
     listEl.innerHTML = _eventComps.map((c, i) => _buildCompRow(c, i)).join('');
     _eventComps.forEach(comp => _mountCompDDs(comp));
-    _wireRemoveButtons();
+    // Remove-button clicks handled by delegated listener on #ecBody — no per-button wiring needed.
   }
 
   // ── Event name builder ─────────────────────────────────────────────────────
@@ -1501,21 +1805,25 @@ ${unparseable.map(ev => `
   }
 
   function _buildCompString(comps) {
-    const result = [];
-    let i = 0;
-    while (i < comps.length) {
-      const cityLabel = comps[i].city?.label || '';
-      let j = i;
-      while (j < comps.length && (comps[j].city?.label || '') === cityLabel) {
-        const c = comps[j];
-        c.eventTypes.forEach(et => { if (et?.label) result.push(et.label); });
-        if (c.location?.label) result.push(c.location.label);
-        j++;
-      }
-      if (cityLabel) result.push(cityLabel);
-      i = j;
-    }
-    return result.join('-');
+    if (!Array.isArray(comps) || comps.length === 0) return '';
+
+    const normalized = comps;
+    if (!normalized.length) return '';
+
+    const firstCity  = normalized[0]?.city?.label || '';
+    const allSameCity = normalized.every(c => (c.city?.label || '') === firstCity);
+
+    const parts = [];
+    normalized.forEach(comp => {
+      comp.eventTypes.forEach(et => { if (et.label) parts.push(et.label); });
+      if (comp.location?.label) parts.push(comp.location.label);
+      if (!allSameCity && comp.city?.label) parts.push(comp.city.label);
+    });
+    if (allSameCity && firstCity) parts.push(firstCity);
+
+    const finalName = sanitizeEventName(parts.join('-'));
+    console.log('FINAL EVENT NAME:', finalName);
+    return finalName;
   }
 
   // ── Live preview + continue-button gate ────────────────────────────────────
@@ -1566,26 +1874,36 @@ ${unparseable.map(ev => `
 
   // ── Validate + create ──────────────────────────────────────────────────────
 
-  function _selectExistingForImport() {
-    if (!selectedCollection || !_viewingExisting) return;
-    const coll = sessionCollections.find(c => c.name === selectedCollection);
-    if (!coll) return;
+  async function _selectExistingForImport(entry) {
+    const eventPath = activeMaster.path + '/' + entry.folderName;
 
-    const eventName   = _viewingExisting.folderName;
-    const existingIdx = coll.events.findIndex(e => e.name === eventName);
-    if (existingIdx >= 0) {
-      _activeEventIdx = existingIdx;
-    } else {
-      coll.events.push({
-        name:       eventName,
-        components: _viewingExisting.components,  // snapshot from disk, not live form state
-      });
-      _activeEventIdx = coll.events.length - 1;
+    if (!eventPath) {
+      console.error('[selectExistingForImport] Missing event path');
+      return;
     }
-    _proceedToPreviewStep();
+
+    const components = await loadEventFromDisk(eventPath);
+
+    if (!components) {
+      console.error('[selectExistingForImport] Failed to load components');
+      return;
+    }
+
+    setEventState(components);
+
+    _compSeq = components.length;
+
+    _viewingExisting = {
+      folderName:  entry.folderName,
+      displayName: entry._eventJson?.eventName || entry.folderName,
+    };
+
+    console.log('[selectExistingForImport] Loaded', components.length, 'components');
+
+    return true;
   }
 
-  function _tryCreateEvent() {
+  async function _tryCreateEvent() {
     if (_eventComps.length === 0) {
       _showEventBanner('Add at least one component.', 'error'); return;
     }
@@ -1604,14 +1922,101 @@ ${unparseable.map(ev => `
       return;
     }
 
-    const seq   = _computeNextSequence(_newEventDate);
-    const parts = _buildCompString(_eventComps);
-    const name  = `${_newEventDate} _${seq}-${parts}`;
+    // Validate and snapshot before write — blocks corrupted saves.
+    console.log('WRITING EVENT JSON (_tryCreateEvent):', JSON.stringify(_eventComps, null, 2));
+    try {
+      assertStrictComponents(_eventComps);
+    } catch (err) {
+      console.error('BLOCKED CORRUPTED SAVE (_tryCreateEvent):', err);
+      _showEventBanner('Internal error: component structure is invalid. Cannot create.', 'error');
+      return;
+    }
+    const cleanComps = JSON.parse(JSON.stringify(_eventComps));
 
-    coll.events.push({ name, components: _eventComps.map(c => ({ ...c, eventTypes: [...c.eventTypes] })) });
+    const seq  = _computeNextSequence(_newEventDate);
+    const parts = _buildCompString(cleanComps);
+    const name  = `${_newEventDate} _${seq}-${parts}`;
+    const safe  = sanitizeForPath(name);
+
+    coll.events.push({ name: safe, displayName: name, components: JSON.parse(JSON.stringify(cleanComps)) });
     _activeEventIdx = coll.events.length - 1;
 
-    _eventComps = [_makeComp()];
+    // Persist event.json immediately (Patch 4: handles folder-exists-no-JSON case too).
+    // writeEventJson: creates folder if absent, writes JSON if absent, returns existing
+    // JSON unmodified if already present — so a duplicate create is always a safe no-op.
+    if (activeMaster?.path) {
+      const eventFolderPath = activeMaster.path + '/' + safe;
+      const compsForDisk = cleanComps.map(c => ({
+        types:        c.eventTypes.map(et => et.label),
+        location:     c.location?.label || null,
+        city:         c.city?.label     || '',
+        isUnresolved: false,
+      }));
+      window.api.writeEventJson(eventFolderPath, {
+        version:       1,
+        hijriDate:     _newEventDate,
+        sequence:      seq,
+        eventName:     name,
+        safeEventName: safe,
+        components:    compsForDisk,
+        globalCity:    compsForDisk[0]?.city || '',
+        status:        'created',
+        createdAt:     Date.now(),
+        updatedAt:     Date.now(),
+      }).then(result => {
+        if (result?.alreadyExisted) {
+          console.log('[EventCreator] event.json already existed; kept existing record:', name);
+        }
+      }).catch(err => console.error('[EventCreator] writeEventJson failed:', err));
+
+      // Create one subfolder per component using _eventComps as the sole source.
+      try {
+        const basePath = activeMaster.path + '/' + safe;
+        // Snapshot components to avoid mutation issues
+        const comps = JSON.parse(JSON.stringify(_eventComps));
+
+        if (!Array.isArray(comps) || comps.length === 0) {
+          console.warn('[Subfolders] No components found');
+        } else {
+          const allSameCity = comps.every(c =>
+            c.city?.label === comps[0].city?.label
+          );
+
+          // Ensure stable ordering by component id
+          const orderedComps = [...comps].sort((a, b) => (a.id || 0) - (b.id || 0));
+          const tasks = [];
+          orderedComps.forEach((comp, idx) => {
+            const indexPart    = String(idx + 1).padStart(2, '0');
+            const typePart     = sanitizeForFolder(comp.eventTypes.map(t => t.label).join('-'));
+            const locationPart = comp.location?.label ? '-' + sanitizeForFolder(comp.location.label) : '';
+            const cityPart     = (!allSameCity && comp.city?.label) ? '-' + sanitizeForFolder(comp.city.label) : '';
+            const folderName   = `${indexPart}-${typePart}${locationPart}${cityPart}`;
+            const fullPath     = basePath + '/' + folderName;
+            tasks.push(
+              window.api.ensureDir(fullPath)
+                .then(() => ({ ok: true, path: fullPath }))
+                .catch(err => {
+                  console.error('[Subfolders] Failed for:', fullPath, err);
+                  return { ok: false, path: fullPath, error: err };
+                })
+            );
+          });
+          const results = await Promise.all(tasks);
+
+          const failed = results.filter(r => !r.ok);
+          if (failed.length > 0) {
+            console.warn('[Subfolders] Failed folders:', failed.map(f => f.path));
+          } else {
+            console.log('[Subfolders] All folders created successfully');
+          }
+          console.log('[Subfolders] Created', comps.length, 'component folders');
+        }
+      } catch (err) {
+        console.error('[Subfolders] Failed:', err);
+      }
+    }
+
+    setEventState([_makeComp()]);
 
     _proceedToPreviewStep();
   }
@@ -1634,42 +2039,73 @@ ${unparseable.map(ev => `
       return;
     }
 
-    const seq     = _computeNextSequence(_newEventDate);
-    const parts   = _buildCompString(_eventComps);
-    const newName = `${_newEventDate} _${seq}-${parts}`;
-    const oldName = _repairFolderName;
+    // Validate and snapshot before write — blocks corrupted saves.
+    console.log('WRITING EVENT JSON (_tryRepairEvent):', JSON.stringify(_eventComps, null, 2));
+    try {
+      assertStrictComponents(_eventComps);
+    } catch (err) {
+      console.error('BLOCKED CORRUPTED SAVE (_tryRepairEvent):', err);
+      _showEventBanner('Internal error: component structure is invalid. Cannot repair.', 'error');
+      return;
+    }
+    const cleanComps = JSON.parse(JSON.stringify(_eventComps));
 
-    const result = await window.api.renameEvent(activeMaster.path, oldName, newName);
+    const seq         = _computeNextSequence(_newEventDate);
+    const parts       = _buildCompString(cleanComps);
+    const newName     = `${_newEventDate} _${seq}-${parts}`;
+    const safeNewName = sanitizeForPath(newName);
+    const oldName     = _repairFolderName;
+
+    const result = await window.api.renameEvent(activeMaster.path, oldName, safeNewName);
     if (!result.ok) {
       _showEventBanner(result.reason || 'Rename failed.', 'error');
       return;
     }
 
     // Replace unparseable entry with a fully resolved one in the scan cache.
+    const repairCompsForDisk = cleanComps.map(c => ({
+      types:        c.eventTypes.map(et => et.label),
+      location:     c.location?.label || null,
+      city:         c.city?.label     || '',
+      isUnresolved: false,
+    }));
     if (_scannedEvents) {
       const idx = _scannedEvents.findIndex(e => e.folderName === oldName && !e.isParseable);
       if (idx >= 0) {
         _scannedEvents.splice(idx, 1, {
-          folderName:   newName,
+          folderName:   safeNewName,
           hijriDate:    _newEventDate,
           sequence:     seq,
-          components:   _eventComps.map(c => ({
-            eventTypes:   c.eventTypes.map(et => et.label),
-            location:     c.location?.label || null,
-            city:         c.city?.label     || '',
-            isUnresolved: false,
-          })),
+          components:   repairCompsForDisk,
           isParseable:  true,
           isUnresolved: false,
+          _eventJson:   { eventName: newName, safeEventName: safeNewName },
         });
       }
     }
 
-    // Preselect the repaired event on return to list, then enable Continue.
-    _selectedListFolder = newName;
+    // Write event.json for the newly repaired event folder.
+    if (activeMaster?.path) {
+      const newEventPath = activeMaster.path + '/' + safeNewName;
+      window.api.writeEventJson(newEventPath, {
+        version:       1,
+        hijriDate:     _newEventDate,
+        sequence:      seq,
+        eventName:     newName,
+        safeEventName: safeNewName,
+        components:    repairCompsForDisk,
+        globalCity:    repairCompsForDisk[0]?.city || '',
+        status:        'created',
+        createdAt:     Date.now(),
+        updatedAt:     Date.now(),
+      }).catch(err => console.error('[EventCreator] writeEventJson (repair) failed:', err));
+    }
+
+    // Preselect the repaired event on return to list (use safe name for list lookup).
+    _selectedListFolder = safeNewName;
     _repairMode         = false;
     _repairFolderName   = null;
-    _eventComps         = [];
+    setEventState([]);
     _newEventDate       = null;
     _editMode           = false;
     _destroyEventDDs();
@@ -1722,7 +2158,8 @@ ${unparseable.map(ev => `
         window.api.setLastEvent({
           collectionPath: activeMaster.path,
           collectionName: selectedCollection,
-          eventName:      evt.name,
+          eventName:      evt.displayName || evt.name,
+          safeEventName:  evt.name,
         }).catch(() => {});
       }
     }
@@ -1746,7 +2183,7 @@ ${unparseable.map(ev => `
         comp.location?.label,
         comp.city?.label,
       ].filter(Boolean);
-      return `${pad2(idx + 1)}-${parts.join('-')}`;
+      return sanitizeForPath(`${pad2(idx + 1)}-${parts.join('-')}`);
     });
   }
 
@@ -1759,7 +2196,7 @@ ${unparseable.map(ev => `
       `<span class="ft-name${cls ? ' ' + cls : ''}">${esc(name)}</span></div>`;
 
     rows.push(r(0, coll.name + '/'));
-    rows.push(r(1, event.name + '/'));
+    rows.push(r(1, (event.displayName || event.name) + '/'));
 
     if (isMulti) {
       const subNames = _buildSubEventFolderNames(event.components);
@@ -1847,14 +2284,16 @@ ${unparseable.map(ev => `
       if (c && c.events.length > 0) {
         const idx     = Math.min(_activeEventIdx, c.events.length - 1);
         const [removed] = c.events.splice(idx, 1);
-        _eventComps     = removed.components.map(comp => ({ ...comp, eventTypes: [...comp.eventTypes] }));
+        setEventState(removed.components);
+        _compSeq = _eventComps.length;
+        assertValidComponents(_eventComps, 'ecChangeEvent');
         _activeEventIdx = Math.max(0, c.events.length - 1);
       }
       _slideToStep(showEventStep);
     });
 
     document.getElementById('ecAddAnotherBtn')?.addEventListener('click', () => {
-      _eventComps = [_makeComp()];
+      setEventState([_makeComp()]);
       _slideToStep(showEventStep);
     });
 
@@ -1924,30 +2363,74 @@ ${unparseable.map(ev => `
     },
 
     /**
-     * Restores a previously active event into session state without rendering
-     * any panel. Called at startup after disk verification. The landing card
-     * will reflect the restored selection when _renderLandingEventCard() runs.
-     * @param {string} collectionName
-     * @param {string} eventName
+     * Restores the previously active event at startup. Reads all state from
+     * disk — never reuses cached components or parser output.
      */
-    restoreLastEvent(collectionName, eventName, collectionPath) {
-      let coll = sessionCollections.find(c => c.name === collectionName);
-      if (!coll) {
-        coll = { name: collectionName, hijriDate: '', events: [], _masterPath: collectionPath || null };
-        sessionCollections.push(coll);
-      } else if (collectionPath && !coll._masterPath) {
-        coll._masterPath = collectionPath;
+    async restoreLastEvent() {
+      try {
+        const last = await window.api.getLastEvent();
+
+        if (!last || !last.collectionPath || !last.collectionName) {
+          console.log('[restoreLastEvent] No previous event');
+          return;
+        }
+
+        const valid = await window.api.verifyLastEvent(last.collectionPath);
+        if (!valid) {
+          window.api.setLastEvent(null).catch(() => {});
+          return;
+        }
+
+        const safeName  = last.safeEventName || sanitizeForPath(last.eventName || '');
+        const eventPath = last.collectionPath + '/' + safeName;
+
+        const components = await loadEventFromDisk(eventPath);
+
+        if (!components) {
+          console.error('[restoreLastEvent] Failed to load event');
+          return;
+        }
+
+        // Restore session state so landing card and resetToList() work correctly.
+        let coll = sessionCollections.find(c => c.name === last.collectionName);
+        if (!coll) {
+          coll = { name: last.collectionName, hijriDate: '', events: [], _masterPath: last.collectionPath };
+          sessionCollections.push(coll);
+        } else if (!coll._masterPath) {
+          coll._masterPath = last.collectionPath;
+        }
+
+        activeMaster = { name: last.collectionName, path: last.collectionPath };
+
+        const displayName = last.eventName || safeName;
+        let eventIdx = coll.events.findIndex(e => e.name === safeName);
+        if (eventIdx < 0) {
+          coll.events.push({ name: safeName, displayName, components });
+          eventIdx = coll.events.length - 1;
+        } else {
+          coll.events[eventIdx].components = components;
+        }
+
+        selectedCollection  = last.collectionName;
+        _activeEventIdx     = eventIdx;
+        _selectedListFolder = safeName;
+
+        setEventState(components);
+        _compSeq = components.length;
+
+        _viewingExisting = {
+          folderName:  safeName,
+          displayName: last.eventName || safeName,
+        };
+
+        if (!Array.isArray(_eventComps) || _eventComps.length === 0) {
+          console.warn('[restoreLastEvent] Empty components after restore');
+        }
+
+        console.log('[restoreLastEvent] Restored', components.length, 'components');
+      } catch (err) {
+        console.error('[restoreLastEvent] Error restoring event:', err);
       }
-      // Restore activeMaster so resetToList() can scan without going through Step 1 again.
-      if (collectionPath) activeMaster = { name: collectionName, path: collectionPath };
-      let eventIdx = coll.events.findIndex(e => e.name === eventName);
-      if (eventIdx < 0) {
-        coll.events.push({ name: eventName, components: [] });
-        eventIdx = coll.events.length - 1;
-      }
-      selectedCollection  = collectionName;
-      _activeEventIdx     = eventIdx;
-      _selectedListFolder = eventName; // pre-set for preselection when "Change Event" opens
     },
 
     /**
@@ -1961,6 +2444,11 @@ ${unparseable.map(ev => `
       const idx   = Math.min(_activeEventIdx, coll.events.length - 1);
       const event = coll.events[idx];
       return event ? { coll, event, idx } : null;
+    },
+
+    /** Returns a snapshot of the current live components (_eventComps). */
+    getEventComps() {
+      return JSON.parse(JSON.stringify(_eventComps));
     },
 
     setActiveEventIndex(idx) {
@@ -2007,7 +2495,7 @@ ${unparseable.map(ev => `
       _editMode         = false;
       _repairMode       = false;
       _repairFolderName = null;
-      _eventComps       = [];
+      setEventState([]);
       _newEventDate     = null;
       _destroyEventDDs();
 
@@ -2073,7 +2561,7 @@ ${unparseable.map(ev => `
           _editMode         = false;
           _repairMode       = false;
           _repairFolderName = null;
-          _eventComps       = [];
+          setEventState([]);
           _newEventDate     = null;
           _destroyEventDDs();
           _slideToStep(_renderEventList);
@@ -2100,23 +2588,42 @@ ${unparseable.map(ev => `
      * Phase 2 — Continue from SELECT mode: adopt the highlighted event into the
      * session without going through preview, then dispatch eventcreator:done.
      */
-    adoptSelectedEvent() {
+    async adoptSelectedEvent() {
       if (!_selectedListFolder || !selectedCollection) return false;
       const entry = (_scannedEvents || []).find(e => e.folderName === _selectedListFolder && e.isParseable);
       if (!entry) return false;
 
+      // event.json is the ONLY source — no entry.components fallback.
+      if (!activeMaster?.path) {
+        console.error('[adoptSelectedEvent] No activeMaster path — cannot read event.json');
+        return false;
+      }
+      const eventPath = activeMaster.path + '/' + entry.folderName;
+      let json = null;
+      try {
+        json = await window.api.readEventJson(eventPath);
+      } catch (err) {
+        console.error('[adoptSelectedEvent] Failed to read event.json:', err);
+      }
+      if (!json || json._corrupt || !Array.isArray(json.components) || json.components.length === 0) {
+        console.error('CRITICAL: Missing or invalid event.json for', entry.folderName);
+        return false;
+      }
+      const freshComponents = json.components;
+
       _editMode = false;
       _newEventDate = null;
-      _compSeq = 0;
-      _eventComps = entry.components.map(c => ({
-        id:           ++_compSeq,
-        eventTypes:   c.eventTypes.map(label => ({ id: label, label })),
-        location:     c.location ? { id: c.location, label: c.location } : null,
-        city:         { id: c.city, label: c.city },
-        isUnresolved: !!c.isUnresolved,
-      }));
+      setEventState(freshComponents);
+      _compSeq = _eventComps.length;
+      console.log('REHYDRATED COMPONENTS:', _eventComps.length);
+      if (!Array.isArray(_eventComps) || _eventComps.length === 0) {
+        console.error('INVALID STATE: components lost after rehydration');
+      }
+      assertValidComponents(_eventComps, 'adoptSelectedEvent');
+      deepFreeze(_eventComps);
       _viewingExisting = {
         folderName:   entry.folderName,
+        displayName:  json.eventName || entry.folderName,
         hijriDate:    entry.hijriDate,
         sequence:     entry.sequence,
         isUnresolved: entry.isUnresolved,
@@ -2128,8 +2635,18 @@ ${unparseable.map(ev => `
       const existingIdx = coll.events.findIndex(e => e.name === entry.folderName);
       if (existingIdx >= 0) {
         _activeEventIdx = existingIdx;
+        // Always refresh components — the restored entry may carry disk-format components
+        // from restoreLastEvent; _viewingExisting.components is always session format.
+        coll.events[existingIdx].components = JSON.parse(JSON.stringify(_eventComps));
+        if (!coll.events[existingIdx].displayName) {
+          coll.events[existingIdx].displayName = _viewingExisting.displayName;
+        }
       } else {
-        coll.events.push({ name: entry.folderName, components: _viewingExisting.components });
+        coll.events.push({
+          name:        entry.folderName,
+          displayName: _viewingExisting.displayName,
+          components:  JSON.parse(JSON.stringify(_eventComps)),
+        });
         _activeEventIdx = coll.events.length - 1;
       }
 
@@ -2138,7 +2655,8 @@ ${unparseable.map(ev => `
         if (evt) window.api.setLastEvent({
           collectionPath: activeMaster.path,
           collectionName: selectedCollection,
-          eventName:      evt.name,
+          eventName:      evt.displayName || evt.name,
+          safeEventName:  evt.name,
         }).catch(() => {});
       }
 
@@ -2147,9 +2665,10 @@ ${unparseable.map(ev => `
     },
 
     /** Phase 2 — Edit from SELECT mode: open highlighted event directly in edit mode. */
-    editSelectedEvent() {
+    async editSelectedEvent() {
       if (!_selectedListFolder) return false;
-      _openExistingEvent(_selectedListFolder, { edit: true });
+      const entry = (_scannedEvents || []).find(e => e.folderName === _selectedListFolder) || { folderName: _selectedListFolder };
+      await openEventForEdit(entry);
       return true;
     },
 
@@ -2164,7 +2683,7 @@ ${unparseable.map(ev => `
       _repairFolderName = null;
       _selectedListFolder = null;
       _scannedEvents    = null;
-      _eventComps       = [];
+      setEventState([]);
       _newEventDate     = null;
       _destroyEventDDs();
       if (typeof EventMgmt !== 'undefined' && EventMgmt.isOpen()) EventMgmt.setMode('select');

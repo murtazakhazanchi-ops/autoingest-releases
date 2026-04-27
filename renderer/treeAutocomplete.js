@@ -492,16 +492,17 @@ class TreeAutocomplete {
   }
 
   _highlight(label, query) {
-    // Normalize query the same way the alias engine does so the highlight
-    // matches what the engine matched on.
-    const normQ = query.toLowerCase().replace(/[.\-_,;:'"()/\\]/g, ' ').replace(/\s+/g, ' ').trim();
-    const lo    = label.toLowerCase();
-    const idx   = lo.indexOf(normQ);
+    // Raw substring match — no normalization of / or - so labels like
+    // "Maghrib/Isha Namaz" or "Al-Masjid al-Moazzam" highlight correctly
+    // and are never treated as multi-token by this layer.
+    const rawQ = query.toLowerCase().trim();
+    const lo   = label.toLowerCase();
+    const idx  = lo.indexOf(rawQ);
     if (idx < 0) return this._esc(label);
     return (
       this._esc(label.slice(0, idx)) +
-      `<mark class="tac-hl">${this._esc(label.slice(idx, idx + normQ.length))}</mark>` +
-      this._esc(label.slice(idx + normQ.length))
+      `<mark class="tac-hl">${this._esc(label.slice(idx, idx + rawQ.length))}</mark>` +
+      this._esc(label.slice(idx + rawQ.length))
     );
   }
 

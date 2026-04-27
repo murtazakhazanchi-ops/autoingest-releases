@@ -14,6 +14,17 @@
 
 'use strict';
 
+// Mirrors the same function in eventCreator.js — produces filesystem-safe folder
+// names. Used only when constructing event folder paths from persisted settings.
+function sanitizeForPath(name) {
+  if (typeof name !== 'string') return '';
+  return name
+    .replace(/[/\\]/g, '-')
+    .replace(/[:*?"<>|]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // ── Platform detection (frameless window) ─────────────────────────────────────
 if (navigator.platform.startsWith('Mac')) document.body.classList.add('is-mac');
 
@@ -818,44 +829,52 @@ function setStep(id, state) {
 // ════════════════════════════════════════════════════════════════
 
 function _updateContextBar() {
-  const bar   = document.getElementById('contextBar');
-  const crumb = document.getElementById('ctxBreadcrumb');
-  const mode  = document.getElementById('ctxMode');
-  const srcEl = document.getElementById('ctxSource');
-  const sepEl = document.getElementById('ctxSepV');
-  if (!bar || !crumb || !mode) return;
+  const bar = document.getElementById('contextBar');
+  if (!bar) return;
 
-  // Hide when the event management modal is open (it has its own breadcrumb).
   if (EventMgmt.isOpen()) { bar.classList.remove('visible'); return; }
+  if (!activeSource)      { bar.classList.remove('visible'); return; }
+
+  const srcValEl    = document.getElementById('ctxSourceVal');
+  const srcTypeEl   = document.getElementById('ctxSourceType');
+  const line2Event  = document.getElementById('ctxLine2Event');
+  const line2Quick  = document.getElementById('ctxLine2Quick');
+  const ejectBtn    = document.getElementById('ejectBtn');
+
+  if (srcValEl) srcValEl.textContent = activeSource.name;
+
+  if (srcTypeEl) {
+    const typeLabels = { 'memory-card': 'CARD', 'external-drive': 'DRIVE', 'local-folder': 'LOCAL' };
+    const label = typeLabels[activeSource.type] || '';
+    srcTypeEl.textContent    = label;
+    srcTypeEl.style.display  = label ? '' : 'none';
+  }
+
+  const isEjectable = activeSource.type === 'memory-card' || activeSource.type === 'external-drive';
+  if (ejectBtn) ejectBtn.style.display = isEjectable ? 'inline-flex' : 'none';
 
   const eventData = EventCreator.getActiveEventData();
   const master    = EventCreator.getActiveMaster();
 
   if (eventData) {
-    // Event flow: source name left + Master → Event breadcrumb + "Event Import" badge.
-    if (srcEl) srcEl.textContent = activeSource ? activeSource.name : '';
-    if (sepEl) sepEl.style.display = activeSource ? '' : 'none';
-    const masterName = _esc(master?.name || eventData.coll.name);
-    const eventName  = _esc(eventData.event.name);
-    crumb.innerHTML = `<span class="ctx-label">${masterName}</span>` +
-                      `<span class="ctx-sep">›</span>` +
-                      `<span class="ctx-label">${eventName}</span>`;
-    mode.textContent = 'Event Import';
-    mode.className   = 'ctx-mode event';
-    bar.classList.add('visible');
-  } else if (activeSource) {
-    // Quick flow: source name in left slot, breadcrumb empty.
-    if (srcEl) srcEl.textContent = activeSource.name;
-    if (sepEl) sepEl.style.display = 'none';
-    crumb.innerHTML = '';
-    mode.textContent = 'Quick Import';
-    mode.className   = 'ctx-mode quick';
-    bar.classList.add('visible');
+    const masterValEl = document.getElementById('ctxMasterVal');
+    const eventValEl  = document.getElementById('ctxEventVal');
+    const compTagEl   = document.getElementById('ctxCompTag');
+    if (masterValEl) masterValEl.textContent = master?.name || eventData.coll.name || '';
+    if (eventValEl)  eventValEl.textContent  = eventData.event.displayName || eventData.event.name || '';
+    if (compTagEl) {
+      const _heroComps = Array.isArray(eventData.event.components) ? eventData.event.components : [];
+      console.log('HERO COMPONENT COUNT:', _heroComps.length);
+      compTagEl.textContent = _heroComps.length > 1 ? 'MULTI' : 'SINGLE';
+    }
+    if (line2Event) line2Event.style.display = '';
+    if (line2Quick) line2Quick.style.display = 'none';
   } else {
-    if (srcEl) srcEl.textContent = '';
-    if (sepEl) sepEl.style.display = 'none';
-    bar.classList.remove('visible');
+    if (line2Event) line2Event.style.display = 'none';
+    if (line2Quick) line2Quick.style.display = '';
   }
+
+  bar.classList.add('visible');
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1015,11 +1034,12 @@ function _renderLandingEventCard() {
 
   // Event confirmed — show summary in hero
   const { coll, event, idx: activeIdx } = data;
-  const isMulti   = event.components.length > 1;
-  const modeLabel = isMulti ? 'Multi-component' : 'Single component';
+  const components = Array.isArray(event?.components) ? event.components : [];
+  const isMulti    = components.length > 1;
+  const modeLabel  = isMulti ? 'Multi-component' : 'Single component';
   const events    = coll.events;
 
-  const eventDisplay = `<div class="hero-event-name">${_esc(event.name)}</div>`;
+  const eventDisplay = `<div class="hero-event-name">${_esc(event.displayName || event.name)}</div>`;
 
   const srcReady = activeSource !== null;
 
@@ -1168,13 +1188,13 @@ document.getElementById('ecBackBtn')?.addEventListener('click', () => {
 });
 document.getElementById('emmBackBtn')?.addEventListener('click', () => EventMgmt.handleBack());
 document.getElementById('emmCloseBtn')?.addEventListener('click', () => EventMgmt.requestClose());
-document.getElementById('emmContinueBtn')?.addEventListener('click', () => {
+document.getElementById('emmContinueBtn')?.addEventListener('click', async () => {
   const btn = document.getElementById('emmContinueBtn');
   if (!btn || btn.disabled) return;
   console.log('[emmContinueBtn] clicked, navScreen:', EventCreator.getNavScreen());
   btn.disabled = true;
   try {
-    const ok = EventCreator.adoptSelectedEvent();
+    const ok = await EventCreator.adoptSelectedEvent();
     if (!ok) console.warn('[emmContinueBtn] adoptSelectedEvent returned false — check _selectedListFolder and _scannedEvents');
     // On success, eventcreator:done fires → showLanding → modal closes. No re-enable needed.
   } finally {
@@ -1194,10 +1214,11 @@ document.getElementById('emmCreateBtn')?.addEventListener('click', () => {
     if (EventMgmt.isOpen()) btn.disabled = false;
   }
 });
-document.getElementById('emmEditBtn')?.addEventListener('click', () => {
+document.getElementById('emmEditBtn')?.addEventListener('click', async () => {
   // Point 4: setMode first so the footer updates before the form renders.
   EventMgmt.setMode('edit');
-  if (!EventCreator.editSelectedEvent()) EventMgmt.setMode('select');
+  const ok = await EventCreator.editSelectedEvent();
+  if (!ok) EventMgmt.setMode('select');
 });
 document.getElementById('emmSaveBtn')?.addEventListener('click', async () => {
   const btn = document.getElementById('emmSaveBtn');
@@ -1560,7 +1581,7 @@ function resetAppState() {
   fileGrid.innerHTML = '';
 
   document.getElementById('folderList').innerHTML = '';
-  document.getElementById('breadcrumb').textContent = '';
+  const _bc0 = document.getElementById('breadcrumb'); if (_bc0) _bc0.textContent = '';
 
   // Hide workspace + event modal, show landing screen
   document.getElementById('workspace').classList.remove('visible');
@@ -1656,6 +1677,37 @@ document.getElementById('ejectBtn').addEventListener('click', async () => {
 // ════════════════════════════════════════════════════════════════
 // FOLDER SIDEBAR
 // ════════════════════════════════════════════════════════════════
+
+// Sidebar SVG icon constants — 14×14px, stroke-based, currentColor, matches toolbar system
+const _SVG_CHEVRON_DOWN  = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
+const _SVG_CHEVRON_RIGHT = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>`;
+const _SVG_FOLDER        = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`;
+const _SVG_SD_CARD       = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h11v20H4V8z"/><path d="M9 14v5M12 14v5M15 14v5"/></svg>`;
+const _SVG_HDD           = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="17" cy="12" r="1.5"/></svg>`;
+const _SVG_LEAF_DOT      = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>`;
+const _SVG_FOLDER_LG     = `<svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`;
+const _SVG_SEARCH_LG     = `<svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`;
+const _SVG_CLOCK_SM      = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
+const _SVG_CHECK_XS      = `<svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="1.5 6 4.5 9 10.5 3"/></svg>`;
+const _SVG_SECT_RAW      = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 23v-3M15 23v-3M1 9h3M1 15h3M23 9h-3M23 15h-3"/></svg>`;
+const _SVG_SECT_PHOTO    = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`;
+const _SVG_SECT_VIDEO    = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>`;
+
+// Returns the source-type-specific icon for root nodes.
+function getSourceIcon(sourceType) {
+  switch (sourceType) {
+    case 'memory-card':    return _SVG_SD_CARD;
+    case 'external-drive': return _SVG_HDD;
+    case 'local-folder':   return _SVG_FOLDER;
+    default:               return _SVG_FOLDER;
+  }
+}
+
+// Node-aware icon: root reflects source type, every child node is always a folder.
+function getNodeIcon(node, sourceType) {
+  return node.isRoot ? getSourceIcon(sourceType) : _SVG_FOLDER;
+}
+
 function renderFolders(folders, dcimPath) {
   const list = document.getElementById('folderList');
 
@@ -1672,15 +1724,16 @@ function renderFolders(folders, dcimPath) {
       ? dcimChildrenCache.map(f => `
           <div class="folder-item folder-child${activeFolderPath === f.path ? ' active' : ''}"
                data-path="${escapeHtml(f.path)}">
-            <span class="fi-icon">📁</span>
+            <span class="fi-toggle" style="opacity:0;pointer-events:none">${_SVG_LEAF_DOT}</span>
+            <span class="fi-icon">${_SVG_FOLDER}</span>
             <span class="fi-name">${escapeHtml(f.name)}</span>
           </div>`).join('')
       : '';
     list.innerHTML = `
       <div class="folder-item folder-root${activeFolderPath === dcimPath ? ' active' : ''}"
            data-path="${escapeHtml(dcimPath)}">
-        <span class="fi-toggle">${isExpanded ? '▾' : '▸'}</span>
-        <span class="fi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h11v20H4V8z"/><path d="M9 14v5M12 14v5M15 14v5"/></svg></span>
+        <span class="fi-toggle">${isExpanded ? _SVG_CHEVRON_DOWN : _SVG_CHEVRON_RIGHT}</span>
+        <span class="fi-icon">${getNodeIcon({ isRoot: true }, activeSource?.type)}</span>
         <span class="fi-name">${escapeHtml(cardDisplayName(dcimPath))}</span>
       </div>
       ${childrenHtml}`;
@@ -1704,8 +1757,8 @@ function renderFolders(folders, dcimPath) {
   const rootHtml = `
     <div class="folder-item folder-root${active === tree.path || currentFolderContext.isRoot ? ' active' : ''}"
          data-path="${escapeHtml(tree.path)}">
-      <span class="fi-toggle">${expandedFolders.has(tree.path) ? '▾' : '▸'}</span>
-      <span class="fi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h11v20H4V8z"/><path d="M9 14v5M12 14v5M15 14v5"/></svg></span>
+      <span class="fi-toggle">${expandedFolders.has(tree.path) ? _SVG_CHEVRON_DOWN : _SVG_CHEVRON_RIGHT}</span>
+      <span class="fi-icon">${getNodeIcon({ isRoot: true }, activeSource?.type)}</span>
       <span class="fi-name">${escapeHtml(rootName)}</span>
     </div>`;
 
@@ -1727,14 +1780,15 @@ function renderTreeNodeRecursive(node, depth, activePath) {
   const hasChildren = node.children && node.children.length > 0;
   const isExpanded  = expandedFolders.has(node.path);
   const isActive    = activePath === node.path;
-  const indent      = 8 + depth * 14;
-  const toggleChar  = hasChildren ? (isExpanded ? '▾' : '▸') : '·';
+  const indent     = 8 + depth * 14;
+  const toggleSvg  = hasChildren ? (isExpanded ? _SVG_CHEVRON_DOWN : _SVG_CHEVRON_RIGHT) : _SVG_LEAF_DOT;
+  const toggleAttr = hasChildren ? '' : ' style="opacity:0;pointer-events:none"';
   const html = `
     <div class="folder-item folder-child${isActive ? ' active' : ''}"
          data-path="${escapeHtml(node.path)}"
          style="padding-left:${indent}px">
-      <span class="fi-toggle"${hasChildren ? '' : ' style="opacity:0.25;pointer-events:none"'}>${toggleChar}</span>
-      <span class="fi-icon">📁</span>
+      <span class="fi-toggle"${toggleAttr}>${toggleSvg}</span>
+      <span class="fi-icon">${_SVG_FOLDER}</span>
       <span class="fi-name">${escapeHtml(node.name)}</span>
     </div>`;
   const kids = (hasChildren && isExpanded)
@@ -1997,17 +2051,17 @@ function renderFolderOnly() {
   area.className = '';
 
   if (!currentFolderTree) {
-    area.innerHTML = '<div class="panel-state"><span class="state-icon">📁</span><span>No card loaded</span></div>';
+    area.innerHTML = `<div class="panel-state"><span class="state-icon">${_SVG_FOLDER_LG}</span><span>No card loaded</span></div>`;
     updateSelectionBar();
     return;
   }
 
   area.innerHTML =
-      '<div class="panel-state">'
-    +   '<span class="state-icon">📁</span>'
-    +   '<span>Pick a folder from the left to view its files</span>'
-    +   '<span style="font-size:0.75rem;opacity:0.55;margin-top:4px">Drill into a folder to see its media</span>'
-    + '</div>';
+      `<div class="panel-state">`
+    +   `<span class="state-icon">${_SVG_FOLDER_LG}</span>`
+    +   `<span>Pick a folder from the left to view its files</span>`
+    +   `<span style="font-size:0.75rem;opacity:0.55;margin-top:4px">Drill into a folder to see its media</span>`
+    + `</div>`;
   updateSelectionBar();
 }
 
@@ -2056,12 +2110,6 @@ document.getElementById('viewListBtn').addEventListener('click', () => {
   if (currentFiles.length) renderFileArea(currentFiles);  // legitimate re-render
 });
 
-document.getElementById('thumbToggleBtn').addEventListener('click', () => {
-  showThumbnails = !showThumbnails;
-  document.getElementById('thumbToggleBtn').classList.toggle('view-active', showThumbnails);
-  resetThumbLoadState();
-  if (currentFiles.length) renderFileArea(currentFiles);
-});
 
 document.getElementById('timelineViewBtn').addEventListener('click', () => {
   timelineMode = !timelineMode;
@@ -2114,13 +2162,13 @@ function renderFileArea(files) {
 
   if (currentFolder === null) {
     area.className = '';
-    area.innerHTML = `<div class="panel-state"><span class="state-icon">📁</span><span>Select a folder to begin</span><span style="font-size:0.75rem;opacity:0.6">Choose DCIM or a subfolder from the left panel</span></div>`;
+    area.innerHTML = `<div class="panel-state"><span class="state-icon">${_SVG_FOLDER_LG}</span><span>Select a folder to begin</span><span style="font-size:0.75rem;opacity:0.6">Choose DCIM or a subfolder from the left panel</span></div>`;
     updateSelectionBar();
     return;
   }
   if (!files.length) {
     area.className = '';
-    area.innerHTML = `<div class="panel-state"><span class="state-icon">📭</span><span>No supported media files found in this folder</span></div>`;
+    area.innerHTML = `<div class="panel-state"><span class="state-icon">${_SVG_SEARCH_LG}</span><span>No supported media files found in this folder</span></div>`;
     updateSelectionBar();
     return;
   }
@@ -2134,9 +2182,9 @@ function renderFileArea(files) {
     area.innerHTML = buildFlatHtml(prepareDisplayData(files));
   } else {
     const sections = [
-      { key:'raw',   label:'RAW Files',   icon:'🟡', files: files.filter(f => f.type === 'raw')   },
-      { key:'photo', label:'Image Files', icon:'🔵', files: files.filter(f => f.type === 'photo') },
-      { key:'video', label:'Video Files', icon:'🟣', files: files.filter(f => f.type === 'video') },
+      { key:'raw',   label:'RAW Files',   icon:_SVG_SECT_RAW,   files: files.filter(f => f.type === 'raw')   },
+      { key:'photo', label:'Image Files', icon:_SVG_SECT_PHOTO, files: files.filter(f => f.type === 'photo') },
+      { key:'video', label:'Video Files', icon:_SVG_SECT_VIDEO, files: files.filter(f => f.type === 'video') },
     ].filter(s => s.files.length > 0);
     area.innerHTML = sections.map(s => buildSectionHtml(s)).join('');
   }
@@ -2264,25 +2312,29 @@ function buildIconTilesHtml(files, enablePairing = false) {
       if (files[i + 1] && isSamePair(file, files[i + 1])) pairCls += ' pair-start';
       if (i > 0 && isSamePair(file, files[i - 1]))        pairCls += ' pair-linked';
     }
-    const tileCls  = 'file-tile' + (checked ? ' selected' : '') + (imported ? ' already-imported' : '') + pairCls;
-    const dupBadge = imported ? `<div class="dup-overlay-badge">Already Imported</div>` : '';
-    const grp      = GroupManager.getGroupForFile(file.path);
-    const grpBadge = grp
-      ? (() => { const c = GroupManager.getColor(grp.colorIdx); return `<div class="grp-badge" style="background:${c.bg};color:${c.fg}">${grp.label}</div>`; })()
-      : '<div class="grp-badge" style="display:none"></div>';
+    const tileCls      = 'file-tile' + (checked ? ' selected' : '') + (imported ? ' already-imported' : '') + pairCls;
+    const importedLabel = imported ? `<div class="file-imported-label">${_SVG_CHECK_XS}Imported</div>` : '';
+    const grp           = GroupManager.getGroupForFile(file.path);
+    const grpBadge      = grp
+      ? `<div class="file-group-badge" style="--group-color:${GroupManager.getGroupColor(GroupManager.getGroupIndex(grp.id))}">${grp.label}</div>`
+      : '';
 
     return `<div class="${tileCls}" data-path="${escapeHtml(file.path)}" data-size="${file.size}" data-base="${escapeHtml(base)}" draggable="true">
       <input type="checkbox" ${checked ? 'checked' : ''} data-path="${escapeHtml(file.path)}" />
-      ${dupBadge}
+      ${importedLabel}
       <div class="file-thumb">${thumbHtml(file)}</div>
       <div class="file-meta">
-        <div class="file-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</div>
-        <div class="file-details">
-          <span class="file-ext-badge ${badgeCls}">${extUp}</span>
-          <span class="file-size">${formatSize(file.size)}</span>
-          ${grpBadge}
+        <div class="file-meta-row">
+          <div class="file-meta-left">
+            <div class="file-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</div>
+            <div class="file-details">
+              <span class="file-ext-badge ${badgeCls}">${extUp}</span>
+              <span class="file-size">${formatSize(file.size)}</span>
+            </div>
+            <div class="file-date">${formatDate(file.modifiedAt)}</div>
+          </div>
+          <div class="file-meta-right">${grpBadge}</div>
         </div>
-        <div class="file-date">${formatDate(file.modifiedAt)}</div>
       </div>
     </div>`;
   }).join('');
@@ -2302,10 +2354,10 @@ function buildListRowsHtml(files, enablePairing = false) {
       if (i > 0 && isSamePair(file, files[i - 1]))        pairCls += ' pair-linked';
     }
     const rowCls   = 'file-tile' + (checked ? ' selected' : '') + (imported ? ' already-imported' : '') + pairCls;
-    const dupLabel = imported ? `<span class="dup-list-badge">✓ Imported</span>` : '';
+    const dupLabel = imported ? `<span class="dup-list-badge">Imported</span>` : '';
     const grpR     = GroupManager.getGroupForFile(file.path);
     const grpLabel = grpR
-      ? (() => { const c = GroupManager.getColor(grpR.colorIdx); return `<span class="grp-badge-list" style="background:${c.bg};color:${c.fg}">${grpR.label}</span>`; })()
+      ? `<span class="grp-badge-list" style="--group-color:${GroupManager.getGroupColor(GroupManager.getGroupIndex(grpR.id))}">${grpR.label}</span>`
       : '';
 
     return `<tr class="${rowCls}" data-path="${escapeHtml(file.path)}" data-size="${file.size}" data-base="${escapeHtml(base)}" draggable="true">
@@ -2346,7 +2398,7 @@ function buildTimelineHtml(groups) {
       : buildIconTilesHtml(files, pairingEnabled);
     return `<div class="timeline-group">
       <div class="timeline-header">
-        <span class="timeline-icon">🕐</span>
+        <span class="timeline-icon">${_SVG_CLOCK_SM}</span>
         <span class="timeline-label">${escapeHtml(label)}</span>
         <span class="section-count">${files.length} file${files.length !== 1 ? 's' : ''}</span>
       </div>
@@ -2598,13 +2650,36 @@ function syncPairLinks() {
 }
 
 // ════════════════════════════════════════════════════════════════
+// VISIBLE FILE SCOPE
+// Returns only the files currently rendered in the grid.
+// Media mode → all currentFiles; folder-leaf mode → leaf files only;
+// folder-root/non-leaf → [] (instruction panel, no tiles rendered).
+// ════════════════════════════════════════════════════════════════
+function getVisibleFiles() {
+  if (viewModeType === 'folder') {
+    return (currentFolderContext.isLeaf && !currentFolderContext.isRoot)
+      ? currentFolderContext.files
+      : [];
+  }
+  return currentFiles;
+}
+
+// ════════════════════════════════════════════════════════════════
 // GLOBAL SELECT ALL / CLEAR
 // ════════════════════════════════════════════════════════════════
 document.getElementById('selectAllBtn').addEventListener('click', () => {
-  const paths = currentFiles.map(f => f.path);
-  paths.forEach(path => selectedFiles.add(path));
+  const visible      = getVisibleFiles();
+  const visiblePaths = visible.map(f => f.path);
+  const allVisibleSelected = visiblePaths.length > 0 &&
+    visiblePaths.every(p => selectedFiles.has(p));
+  if (allVisibleSelected) {
+    visiblePaths.forEach(p => selectedFiles.delete(p));
+    lastClickedPath = null;
+  } else {
+    visiblePaths.forEach(p => selectedFiles.add(p));
+    requestThumbsForPaths(visiblePaths);
+  }
   syncAllTiles();
-  requestThumbsForPaths(paths);
   updateSelectionBar();
   updateSteps();
 });
@@ -2618,18 +2693,25 @@ document.getElementById('clearSelBtn').addEventListener('click', () => {
 });
 
 // ════════════════════════════════════════════════════════════════
-// Cmd/Ctrl+A keyboard shortcut
+// Cmd/Ctrl+A keyboard shortcut — mirrors Select All visible scope
 // ════════════════════════════════════════════════════════════════
 document.addEventListener('keydown', e => {
   if (!(e.metaKey || e.ctrlKey) || e.key !== 'a') return;
   const tag = document.activeElement.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-  if (!currentFiles.length) return;
+  const visible = getVisibleFiles();
+  if (!visible.length) return;
   e.preventDefault();
-  const paths = currentFiles.map(f => f.path);
-  paths.forEach(path => selectedFiles.add(path));
+  const visiblePaths = visible.map(f => f.path);
+  const allVisibleSelected = visiblePaths.every(p => selectedFiles.has(p));
+  if (allVisibleSelected) {
+    visiblePaths.forEach(p => selectedFiles.delete(p));
+    lastClickedPath = null;
+  } else {
+    visiblePaths.forEach(p => selectedFiles.add(p));
+    requestThumbsForPaths(visiblePaths);
+  }
   syncAllTiles();
-  requestThumbsForPaths(paths);
   updateSelectionBar();
   updateSteps();
 });
@@ -2638,18 +2720,20 @@ document.addEventListener('keydown', e => {
 // SELECTION BAR STATE
 // ════════════════════════════════════════════════════════════════
 function updateSelectionBar() {
-  const hasFiles = currentFiles.length > 0;
-  const n        = selectedFiles.size;
+  const n            = selectedFiles.size;
+  const visible      = getVisibleFiles();
+  const visiblePaths = visible.map(f => f.path);
+  const allVisibleSelected = visiblePaths.length > 0 &&
+    visiblePaths.every(p => selectedFiles.has(p));
 
-  document.getElementById('selectionBar').classList.toggle('visible', hasFiles);
+  document.getElementById('toolbar').classList.toggle('has-selection', n > 0);
   document.getElementById('selCount').textContent = `${n} selected`;
   setStatusBarMessage('selection', n > 0 ? `${n} file${n === 1 ? '' : 's'} selected` : null, 2);
 
-  // Commit 12: disable Select All when folder-view shows the instruction panel
-  // (no tiles visible yet -- user hasn't drilled into a leaf).
-  const isInstructionPanel = (viewModeType === 'folder') && (currentFolderContext.isRoot || !currentFolderContext.isLeaf);
-  document.getElementById('selectAllBtn').disabled = !hasFiles || n === currentFiles.length || isInstructionPanel;
-  document.getElementById('clearSelBtn').disabled  = n === 0;
+  const selectAllBtn = document.getElementById('selectAllBtn');
+  selectAllBtn.textContent = allVisibleSelected ? 'Deselect All' : 'Select All';
+  selectAllBtn.disabled = visiblePaths.length === 0;
+  document.getElementById('clearSelBtn').disabled = n === 0;
 
   const importBtn = document.getElementById('importBtn');
   // In event mode, the Import button is also shown when groups have files (even if nothing is selected).
@@ -2684,7 +2768,7 @@ function updateFileStatus(files, processed = null, total = null) {
 function applyFileBatch(batch) {
   if (batch.requestId !== fileLoadRequestId) return;
 
-  document.getElementById('breadcrumb').textContent = batch.folderPath;
+  const _bc1 = document.getElementById('breadcrumb'); if (_bc1) _bc1.textContent = batch.folderPath;
   activeFolderPath = batch.folderPath;
   // Commit 6 (+11b): batches pass folders=null. Sidebar renders from currentFolderTree
   // when it exists, falling back to the batch payload for the very first render.
@@ -2725,7 +2809,7 @@ async function browseFolder(drivePath, folderPath) {
     const result = await window.api.getFiles(drivePath, folderPath, requestId);
     if (requestId !== fileLoadRequestId) return;
 
-    document.getElementById('breadcrumb').textContent = result.folderPath;
+    const _bc2 = document.getElementById('breadcrumb'); if (_bc2) _bc2.textContent = result.folderPath;
     activeFolderPath = result.folderPath;
     // Commit 6b: preserve root tree across subfolder browses.
     // Only overwrite currentFolderTree on a root browse (folderPath === null).
@@ -2762,7 +2846,7 @@ async function browseFolder(drivePath, folderPath) {
   } catch (err) {
     if (requestId !== fileLoadRequestId) return;
     document.getElementById('folderList').innerHTML =
-      `<div class="sidebar-empty">⚠️ ${escapeHtml(err.message)}</div>`;
+      `<div class="sidebar-empty">${escapeHtml(err.message)}</div>`;
     document.getElementById('fileGrid').innerHTML =
       `<div class="panel-state"><span class="state-icon">⚠️</span><span>${escapeHtml(err.message)}</span></div>`;
     return false;
@@ -2797,16 +2881,19 @@ function syncImportedBadges() {
     const imported = isAlreadyImported(file);
     tile.classList.toggle('already-imported', imported);
 
-    // Update or add/remove the dup-overlay-badge (icon view)
+    // Update or add/remove the imported label (icon view)
     if (viewMode === 'icon') {
-      let badge = tile.querySelector('.dup-overlay-badge');
-      if (imported && !badge) {
-        badge = document.createElement('div');
-        badge.className = 'dup-overlay-badge';
-        badge.textContent = 'Already Imported';
-        tile.insertBefore(badge, tile.firstChild);
-      } else if (!imported && badge) {
-        badge.remove();
+      let label = tile.querySelector('.file-imported-label');
+      if (imported && !label) {
+        label = document.createElement('div');
+        label.className = 'file-imported-label';
+        label.innerHTML = _SVG_CHECK_XS + 'Imported';
+        // Insert after checkbox (first child)
+        const cb = tile.querySelector('input[type="checkbox"]');
+        if (cb) cb.after(label);
+        else tile.insertBefore(label, tile.firstChild);
+      } else if (!imported && label) {
+        label.remove();
       }
     }
 
@@ -2818,7 +2905,7 @@ function syncImportedBadges() {
       if (imported && !badge) {
         badge = document.createElement('span');
         badge.className = 'dup-list-badge';
-        badge.textContent = '✓ Imported';
+        badge.textContent = 'Imported';
         nameCell.appendChild(badge);
       } else if (!imported && badge) {
         badge.remove();
@@ -3076,6 +3163,14 @@ window.api.onChecksumComplete(({ failed }) => {
 document.getElementById('importBtn').addEventListener('click', async () => {
   if (importRunning) return;
 
+  const liveComps = EventCreator.getEventComps();
+  console.log('[IMPORT CLICKED]', liveComps);
+
+  if (!Array.isArray(liveComps) || liveComps.length === 0) {
+    console.error('[IMPORT] No components available');
+    return;
+  }
+
   const eventData     = EventCreator.getActiveEventData();
   const isEventImport = railMode === 'event' && eventData !== null && GroupManager.hasGroups();
 
@@ -3083,8 +3178,11 @@ document.getElementById('importBtn').addEventListener('click', async () => {
   if (isEventImport) {
     const groups = GroupManager.getGroups();
 
+    // Inject live components so all downstream consumers use _eventComps as source.
+    eventData.event.components = liveComps;
+
     // G4-1: Blocking — groups with no sub-event in a multi-component event.
-    if (eventData.event.components.length > 1 && GroupManager.hasMissingSubEvents()) {
+    if (liveComps.length > 1 && GroupManager.hasMissingSubEvents()) {
       await showMissingSubEventModal();
       return;
     }
@@ -3110,19 +3208,89 @@ document.getElementById('importBtn').addEventListener('click', async () => {
     const { fileJobs } = ImportRouter.buildFileJobs({ groups, eventData, photographer });
     if (fileJobs.length === 0) { showMessage('No files to import.'); return; }
 
+    // Resolve event folder path for status tracking.
+    const _eventJsonPath = eventData.coll._masterPath
+      ? (eventData.coll._masterPath + '/' + eventData.event.name)
+      : null;
+
     importRunning = true;
     updateSelectionBar();
     showProgress();
 
+    // Mark event as in-progress so an interrupted import is detectable on restart.
+    if (_eventJsonPath) {
+      window.api.updateEventJson(_eventJsonPath, { status: 'in-progress' }).catch(() => {});
+    }
+
     try {
       const summary = await window.api.importFileJobs(fileJobs);
       if (!activeSource) return;
+      // Mark event complete only on full success.
+      if (_eventJsonPath) {
+        window.api.updateEventJson(_eventJsonPath, { status: 'complete' }).catch(() => {});
+      }
+
+      // ── Audit log — append-only, merge-safe ──────────────────────────────
+      if (_eventJsonPath) {
+        try {
+          const now = new Date().toISOString();
+          const baseSeq = Date.now();
+          const subEventNames = EventCreator.getSubEventNames(); // [{id, name}] ordered by component
+          const isMulti = subEventNames.length > 0;
+          const logs = [];
+
+          groups.forEach((group, index) => {
+            let componentIndex = 0;
+            if (isMulti) {
+              const matchIdx = subEventNames.findIndex(se => se.name === group.subEventId);
+              if (matchIdx >= 0) componentIndex = matchIdx;
+            }
+            const comp = liveComps[componentIndex];
+            const componentName = comp ? comp.eventTypes.map(t => t.label).join(', ') : '';
+            let photos = 0, videos = 0;
+            for (const filePath of group.files) {
+              const ext = '.' + (filePath.split('.').pop() || '').toLowerCase();
+              if (VIDEO_EXT_SET.has(ext)) videos++; else photos++;
+            }
+            const id = Date.now().toString(36) +
+              '-' + Math.random().toString(36).slice(2) +
+              '-' + (activeMaster?.name || 'node');
+            logs.push({
+              id,
+              seq:            baseSeq + index,
+              timestamp:      now,
+              photographer,
+              componentIndex,
+              componentName,
+              counts:         { photos, videos },
+            });
+          });
+
+          if (!logs || logs.length === 0) {
+            console.log('[AUDIT] No imports recorded yet');
+            return;
+          }
+
+          await window.api.appendImports(_eventJsonPath, logs);
+          if (logs.length > 0) {
+            console.log('[AUDIT] +', logs.length, 'entries');
+          }
+        } catch (err) {
+          console.error('[AUDIT] Logging failed:', err);
+        }
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
       showProgressSummary(summary);
       await refreshDestCache();
       try { globalImportIndex = await window.api.getImportIndex() || {}; } catch { /* non-critical */ }
     } catch (err) {
       document.getElementById('progressFilename').textContent = `Error: ${err.message}`;
       document.getElementById('progressDoneBtn').classList.add('visible');
+      // Reset to 'created' so the event is not stuck in-progress after failure.
+      if (_eventJsonPath) {
+        window.api.updateEventJson(_eventJsonPath, { status: 'created' }).catch(() => {});
+      }
     } finally {
       importRunning = false;
     }
@@ -3237,7 +3405,7 @@ function showEventImportConfirmModal(groups, eventData) {
     const importBtn = document.getElementById('eiImportBtn');
 
     // Event name
-    document.getElementById('eiEventName').textContent = eventData.event.name;
+    document.getElementById('eiEventName').textContent = eventData.event.displayName || eventData.event.name;
 
     // Photographer dropdown
     const container = document.getElementById('eiPhotographerContainer');
@@ -3253,16 +3421,16 @@ function showEventImportConfirmModal(groups, eventData) {
     });
 
     // Group → sub-event mapping table (multi-component events only)
-    const isMulti         = eventData.event.components.length > 1;
+    const isMulti         = Array.isArray(eventData.event.components) && eventData.event.components.length > 1;
     const mappingSection  = document.getElementById('eiMappingSection');
     const mappingTable    = document.getElementById('eiMappingTable');
     if (isMulti) {
       mappingSection.style.display = '';
-      mappingTable.innerHTML = groups.map(g => {
-        const { bg, fg } = GroupManager.getColor(g.colorIdx);
-        const count      = g.files.size;
+      mappingTable.innerHTML = groups.map((g, idx) => {
+        const color = GroupManager.getGroupColor(idx);
+        const count = g.files.size;
         return `<div class="ei-map-row">
-          <span class="ei-map-group" style="background:${bg};color:${fg}">${_esc(g.label)}</span>
+          <span class="ei-map-group" style="--group-color:${color}">${_esc(g.label)}</span>
           <span class="ei-map-arrow">→</span>
           <span class="ei-map-sub">${_esc(g.subEventId || '—')}</span>
           <span class="ei-map-count">${count} file${count !== 1 ? 's' : ''}</span>
@@ -3375,23 +3543,8 @@ async function initApp() {
     console.error('Failed to prime archive root', e);
   }
 
-  // Restore last active event so the landing card shows the previous context
-  // without any user action. Uses the stored collectionPath (full disk path)
-  // so verification is independent of the archiveRoot setting. Only the
-  // collection folder is checked — event folders are created at import time.
-  try {
-    const lastEvent = await window.api.getLastEvent();
-    if (lastEvent?.collectionPath && lastEvent?.collectionName && lastEvent?.eventName) {
-      const valid = await window.api.verifyLastEvent(lastEvent.collectionPath);
-      if (valid) {
-        EventCreator.restoreLastEvent(lastEvent.collectionName, lastEvent.eventName, lastEvent.collectionPath);
-      } else {
-        window.api.setLastEvent(null).catch(() => {});
-      }
-    }
-  } catch (e) {
-    console.error('Failed to restore last event', e);
-  }
+  // Restore last active event — all logic delegated to EventCreator.
+  await EventCreator.restoreLastEvent();
 
   // Quick Import: use last chosen destination; fall back to DEFAULT_DEST.
   try {
@@ -3644,7 +3797,7 @@ const _hintSortObserver = setInterval(() => {
 // Hint 3: Selection hint — shown when files load but nothing is selected
 const _hintSelObserver = setInterval(() => {
   if (currentFiles.length > 0 && selectedFiles.size === 0) {
-    showInlineHint('selectionBar', 'New files are auto-selected', 'hint_sel_done');
+    showInlineHint('toolbarSelCluster', 'New files are auto-selected', 'hint_sel_done');
     clearInterval(_hintSelObserver);
   }
 }, 1500);
@@ -3957,18 +4110,43 @@ async function _submitFeedback() {
 function syncGroupBadge(path) {
   const tile = tileMap.get(path);
   if (!tile) return;
-  const badge = tile.querySelector('.grp-badge');
-  if (!badge) return;
   const g = GroupManager.getGroupForFile(path);
-  if (g) {
-    const c = GroupManager.getColor(g.colorIdx);
-    badge.textContent    = g.label;
-    badge.style.background = c.bg;
-    badge.style.color      = c.fg;
-    badge.style.display    = '';
+
+  if (viewMode === 'icon') {
+    let badge = tile.querySelector('.file-group-badge');
+    if (g) {
+      const color = GroupManager.getGroupColor(GroupManager.getGroupIndex(g.id));
+      if (!badge) {
+        badge = document.createElement('div');
+        badge.className = 'file-group-badge';
+        const metaRight = tile.querySelector('.file-meta-right');
+        (metaRight || tile).appendChild(badge);
+      }
+      badge.textContent = g.label;
+      badge.style.setProperty('--group-color', color);
+      badge.style.removeProperty('background');
+      badge.style.removeProperty('color');
+    } else if (badge) {
+      badge.remove();
+    }
   } else {
-    badge.style.display  = 'none';
-    badge.textContent    = '';
+    const nameCell = tile.querySelector('.lt-name');
+    if (!nameCell) return;
+    let badge = nameCell.querySelector('.grp-badge-list');
+    if (g) {
+      const color = GroupManager.getGroupColor(GroupManager.getGroupIndex(g.id));
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'grp-badge-list';
+        nameCell.appendChild(badge);
+      }
+      badge.textContent = g.label;
+      badge.style.setProperty('--group-color', color);
+      badge.style.removeProperty('background');
+      badge.style.removeProperty('color');
+    } else if (badge) {
+      badge.remove();
+    }
   }
 }
 
@@ -3992,16 +4170,16 @@ function renderGroupPanel() {
   const groups    = GroupManager.getGroups();
   const activeId  = GroupManager.getActiveTabId() ?? groups[0].id;
   const active    = groups.find(g => g.id === activeId) ?? groups[0];
-  const col       = GroupManager.getColor(active.colorIdx);
+  const activeColor = GroupManager.getGroupColor(groups.indexOf(active));
   // subNames: { id: string, name: string }[] — empty for single-component / no event
-  const subNames  = EventCreator.getSubEventNames();
+  const subNames    = EventCreator.getSubEventNames();
 
-  const tabsHtml = groups.map(g => {
-    const c   = GroupManager.getColor(g.colorIdx);
-    const act = g.id === active.id;
+  const tabsHtml = groups.map((g, idx) => {
+    const color = GroupManager.getGroupColor(idx);
+    const act   = g.id === active.id;
     return `<button class="gp-tab${act ? ' active' : ''}" data-gid="${g.id}"
-        style="${act ? `background:${c.bg};color:${c.fg};border-color:transparent` : ''}">
-      <span class="gp-tab-dot" style="background:${c.bg}"></span>${_esc(g.label)}<span class="gp-tab-cnt">${g.files.size}</span>
+        style="${act ? `--group-color:${color}` : ''}">
+      <span class="gp-tab-dot" style="background:${color}"></span>${_esc(g.label)}<span class="gp-tab-cnt">${g.files.size}</span>
     </button>`;
   }).join('');
   const newGroupTabHtml = `<button class="gp-tab gp-new-group-tab" title="Create new group">＋ New</button>`;
@@ -4029,7 +4207,7 @@ function renderGroupPanel() {
     : [...active.files].map(p => {
         const name = p.split(/[/\\]/).pop();
         return `<div class="gp-file-row">
-          <span class="gp-fdot" style="background:${col.bg}"></span>
+          <span class="gp-fdot" style="background:${activeColor}"></span>
           <span class="gp-fname" title="${_esc(p)}">${_esc(name)}</span>
         </div>`;
       }).join('');
@@ -4038,11 +4216,11 @@ function renderGroupPanel() {
     <div class="gp-header">Groups</div>
     <div class="gp-tabs">${tabsHtml}${newGroupTabHtml}</div>
     <div class="gp-drag-hint" id="gpDragHint"></div>
-    <div class="gp-active-label" style="border-left-color:${col.bg}">${_esc(active.label)}</div>
+    <div class="gp-active-label" style="border-left-color:${activeColor}">${_esc(active.label)}</div>
     ${subHtml}
     <div class="gp-file-list">${filesHtml}</div>
     <div class="gp-footer">
-      <button class="gp-remove-btn" id="gpRemoveBtn">✕ Remove ${_esc(active.label)}</button>
+      <button class="gp-remove-btn" id="gpRemoveBtn">✕ Remove from ${_esc(active.label)}</button>
     </div>`;
 
   panel.querySelectorAll('.gp-tab[data-gid]').forEach(btn => {
@@ -4099,11 +4277,11 @@ function _showCtxMenu(x, y, anchorPath) {
 
   let html = `<div class="ctx-section">Assign ${selCount > 1 ? selCount + ' files' : 'to'} Group</div>`;
 
-  groups.forEach(g => {
-    const c   = GroupManager.getColor(g.colorIdx);
-    const act = curGrp && curGrp.id === g.id;
+  groups.forEach((g, idx) => {
+    const color = GroupManager.getGroupColor(idx);
+    const act   = curGrp && curGrp.id === g.id;
     html += `<div class="ctx-item${act ? ' ctx-item-active' : ''}" data-action="assign" data-gid="${g.id}">
-      <span class="ctx-dot" style="background:${c.bg}"></span>
+      <span class="ctx-dot" style="background:${color}"></span>
       ${_esc(g.label)} <span class="ctx-count">${g.files.size} file${g.files.size !== 1 ? 's' : ''}</span>
     </div>`;
   });

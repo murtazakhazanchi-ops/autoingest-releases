@@ -137,6 +137,8 @@ async function setLastDestPath(value) {
 /**
  * Returns the last active event context, or null if never set.
  * Requires collectionPath (full disk path) — old entries missing it return null.
+ * Only lookup keys are stored here; component data is re-derived from the
+ * event folder name at restore time via master:parseEvent.
  * @returns {{ collectionPath: string, collectionName: string, eventName: string } | null}
  */
 function getLastEvent() {
@@ -151,6 +153,7 @@ function getLastEvent() {
 
 /**
  * Persists the last active event context. Pass null to clear.
+ * Only lookup keys are persisted — not component objects, which drift on rename.
  * @param {{ collectionPath: string, collectionName: string, eventName: string } | null} value
  * @returns {Promise<void>}
  */
