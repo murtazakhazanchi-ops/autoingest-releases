@@ -1086,8 +1086,11 @@ ${unparseable.map(ev => `
     _compSeq = components.length;
 
     _viewingExisting = {
-      folderName:  entry.folderName,
-      displayName: entry._eventJson?.eventName || entry.folderName,
+      folderName:   entry.folderName,
+      displayName:  entry._eventJson?.eventName || entry.folderName,
+      hijriDate:    entry.hijriDate    || entry._eventJson?.hijriDate    || null,
+      sequence:     entry.sequence     ?? entry._eventJson?.sequence     ?? null,
+      isUnresolved: !!entry.isUnresolved,
     };
 
     _renderEventForm();
@@ -1120,9 +1123,23 @@ ${unparseable.map(ev => `
     _compSeq = editable.length;
 
     _viewingExisting = {
-      folderName:  entry.folderName,
-      displayName: entry._eventJson?.eventName || entry.folderName,
+      folderName:   entry.folderName,
+      displayName:  entry._eventJson?.eventName || entry.folderName,
+      hijriDate:    entry.hijriDate    || entry._eventJson?.hijriDate    || null,
+      sequence:     entry.sequence     ?? entry._eventJson?.sequence     ?? null,
+      isUnresolved: !!entry.isUnresolved,
     };
+
+    // Guard: event identity must be complete before entering edit mode.
+    if (!_viewingExisting.hijriDate || _viewingExisting.sequence == null) {
+      console.error('[openEventForEdit] CRITICAL: event identity incomplete — cannot edit', {
+        folderName: entry.folderName,
+        hijriDate:  _viewingExisting.hijriDate,
+        sequence:   _viewingExisting.sequence,
+        entry,
+      });
+      return;
+    }
 
     _editMode = true;
 
@@ -1443,6 +1460,16 @@ ${unparseable.map(ev => `
     </div>
     <span class="ec-hint">Date for this event. Sequence auto-assigns based on existing events for this date.</span>
     <span id="evHijriErr" class="ec-error" role="alert" aria-live="polite"></span>
+  </div>
+  ` : _viewingExisting ? `
+  <!-- M6: Locked date + sequence display for edit mode — identity comes from event.json, never recomputed -->
+  <div class="ec-field" style="margin-top:16px">
+    <p class="ec-section-title">Event Date <span class="ec-req" style="font-size:0.7rem;opacity:0.6">(locked)</span></p>
+    <div class="ec-hijri-row" style="opacity:0.7;pointer-events:none">
+      <span class="ec-hijri-seg" style="display:inline-flex;align-items:center;justify-content:center">${esc(_viewingExisting.hijriDate || '—')}</span>
+      <span style="margin-left:8px;font-size:0.75rem;color:var(--text-secondary)">seq ${esc(String(_viewingExisting.sequence ?? '—'))}</span>
+    </div>
+    <span class="ec-hint">Date and sequence are locked. Only components can be changed.</span>
   </div>
   ` : ''}
 
