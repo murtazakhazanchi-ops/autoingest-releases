@@ -850,25 +850,30 @@ function sanitizeForPath(name) {
 }
 
 function isValidEventJson(obj) {
-  return (
-    obj !== null &&
-    typeof obj === 'object' &&
-    obj.version === 1 &&
-    typeof obj.hijriDate === 'string' && obj.hijriDate.length > 0 &&
-    (typeof obj.sequence === 'number' || (typeof obj.sequence === 'string' && obj.sequence.length > 0)) &&
-    typeof obj.eventName === 'string' && obj.eventName.length > 0 &&
-    Array.isArray(obj.components) &&
-    obj.components.length > 0 &&
-    obj.components.every(c =>
-      c !== null &&
-      typeof c === 'object' &&
-      Array.isArray(c.types) &&
-      c.types.length > 0 &&
-      typeof c.city === 'string' &&
-      c.city.length > 0 &&
-      (typeof c.location === 'string' || c.location === null || c.location === undefined)
-    )
-  );
+  if (obj === null || typeof obj !== 'object') return false;
+  if (obj.version !== 1) return false;
+  if (!obj.hijriDate || typeof obj.hijriDate !== 'string') return false;
+
+  // Normalize sequence: accept a number or a parseable string (e.g. "02" → 2).
+  if (typeof obj.sequence !== 'number') {
+    const parsed = parseInt(obj.sequence, 10);
+    if (Number.isNaN(parsed)) return false;
+    obj.sequence = parsed;
+  }
+
+  if (!obj.eventName || typeof obj.eventName !== 'string') return false;
+  if (!Array.isArray(obj.components)) return false;
+
+  // Structural per-component check only — content (non-empty types/city) is enforced
+  // by the edit form, not here. Repair payloads legitimately write empty types and city.
+  for (const c of obj.components) {
+    if (c === null || typeof c !== 'object') return false;
+    if (!Array.isArray(c.types)) return false;
+    if (typeof c.city !== 'string') return false;
+    if (c.location !== null && c.location !== undefined && typeof c.location !== 'string') return false;
+  }
+
+  return true;
 }
 
 // Write event.json to a new event folder. Creates the folder if absent.
@@ -902,47 +907,68 @@ ipcMain.handle('event:write', async (_event, eventFolderPath, eventData) => {
   }
 });
 
-// Read event.json from a folder. Returns parsed object, null (missing), or
-// { _corrupt: true } (invalid JSON, wrong version, or fails shape validation).
+// Read event.json from a folder. Returns a valid parsed object or null.
 ipcMain.handle('event:read', async (_event, eventFolderPath) => {
   if (!eventFolderPath || typeof eventFolderPath !== 'string') return null;
   const jsonPath = path.join(eventFolderPath, 'event.json');
   try {
     const raw = await fsp.readFile(jsonPath, 'utf8');
     const obj = JSON.parse(raw);
-    if (!isValidEventJson(obj)) return { _corrupt: true };
+    if (!isValidEventJson(obj)) {
+      console.error('[MAIN VALIDATION FAILED]', obj);
+      return null;
+    }
     return obj;
   } catch (err) {
     if (err.code === 'ENOENT') return null;
-    return { _corrupt: true };
+    console.error('[MAIN VALIDATION FAILED] parse error:', err.message);
+    return null;
   }
 });
 
-// Atomically update allowed fields in event.json. Only the fields listed in
-// ALLOWED_UPDATE_KEYS may be changed — unknown fields from `patch` are silently
-// ignored so a stale caller can never corrupt the schema.
-const ALLOWED_UPDATE_KEYS = ['components', 'status', 'eventName', 'safeEventName', 'updatedAt'];
-
-ipcMain.handle('event:update', async (_event, eventFolderPath, patch) => {
+// Atomically write event.json. Detects full vs. partial payload:
+// - Full (has hijriDate + sequence + components): writes the complete canonical shape.
+// - Partial (e.g. { status: 'complete' }): reads existing file, merges, writes back.
+// This prevents status-only callers from corrupting identity/component fields.
+ipcMain.handle('event:update', async (_event, eventFolderPath, payload) => {
   if (!eventFolderPath || typeof eventFolderPath !== 'string') {
     return { ok: false, reason: 'Invalid folder path.' };
   }
+
   const jsonPath = path.join(eventFolderPath, 'event.json');
-  let existing = {};
-  try {
-    const raw = await fsp.readFile(jsonPath, 'utf8');
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === 'object') existing = parsed;
-  } catch { /* no file yet — start fresh */ }
-  // Allowlist merge: only modify permitted keys, never spread unknown fields.
-  const updated = { ...existing };
-  for (const key of ALLOWED_UPDATE_KEYS) {
-    if (patch[key] !== undefined) updated[key] = patch[key];
+  const isFullPayload = payload.hijriDate != null &&
+                        payload.sequence !== undefined &&
+                        Array.isArray(payload.components);
+
+  let dataToWrite;
+  if (isFullPayload) {
+    // Repair / save path — caller supplies the complete payload; write it directly.
+    dataToWrite = {
+      version:       payload.version ?? 1,
+      hijriDate:     payload.hijriDate,
+      sequence:      typeof payload.sequence === 'number'
+                       ? payload.sequence
+                       : parseInt(payload.sequence, 10),
+      eventName:     payload.eventName,
+      safeEventName: payload.safeEventName,
+      status:        payload.status ?? 'created',
+      components:    payload.components,
+      updatedAt:     payload.updatedAt ?? Date.now(),
+    };
+  } else {
+    // Status-only / partial-patch path — read existing, merge, write back.
+    let existing = {};
+    try {
+      const raw = await fsp.readFile(jsonPath, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') existing = parsed;
+    } catch { /* no file yet — partial write will be best-effort */ }
+    dataToWrite = { ...existing, ...payload, updatedAt: Date.now() };
   }
-  updated.updatedAt = Date.now();
+
   const tmp = jsonPath + '.tmp';
   try {
-    await fsp.writeFile(tmp, JSON.stringify(updated, null, 2), 'utf8');
+    await fsp.writeFile(tmp, JSON.stringify(dataToWrite, null, 2), 'utf-8');
     await fsp.rename(tmp, jsonPath);
     return { ok: true };
   } catch (err) {

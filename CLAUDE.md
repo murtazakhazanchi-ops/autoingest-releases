@@ -411,6 +411,18 @@ EventCreator.editSelectedEvent()    // async — reload from disk + enter edit m
 
 **`sanitizeForFolder(name)`** — filesystem-safe label sanitizer used for component subfolder names. Strips `/ \ : * ? " < > |`, normalises spaces and dashes.
 
+**`folderName` persistence** — each disk-format component carries an optional `folderName: string` field set once at creation and never recomputed. `buildFolderName(comp, idx, allSameCity)` computes the name; `ensureFolderName(diskComp, idx, allSameCity)` sets it if absent. Import routing reads `group.subEventId` (the persisted `folderName`), never calls `buildFolderName` at import time.
+
+**Single-component subfolder rule** — subfolders are created only when `components.length > 1`. Single-component events route files directly into `Collection/Event/Photographer/`. The guard lives in `_tryCreateEvent` (creation) and `_handleSaveEditedEvent` (edit/save sync).
+
+**Legacy event handling** — events without a valid `event.json` show a `LEGACY` amber badge in the event list. Clicking Continue opens `showLegacyEventWarningModal()` (glass modal, SVG icon). Choosing "Edit Event" calls `openEventForEdit(entry, { skipAutoRepair: true })` which opens the editor with a blank component, no disk write. `EventMgmt.setMode('edit')` is called before `_renderEventForm()` to bypass the SELECT-mode guard. Save creates `event.json` for the first time.
+
+**`openEventForEdit(entry, { skipAutoRepair = false } = {})`** — `skipAutoRepair: true` skips `_repairLegacyEvent`, initialises blank `_makeComp()` state, sets `_viewingExisting.isLegacy = true`, transitions EventMgmt to `'edit'` mode. Default `false` keeps existing repair behaviour for explicitly corrupt entries.
+
+**Structure-change warning** — editing a single-component event to add more components, when that event has existing imports, triggers `showStructureChangeWarningModal()` (blocking, glassmorphism). Guard: `_structureWarningPending` flag + `try/finally` reset prevents double-modal. `_legacyModalOpen` flag (same pattern) guards the legacy modal.
+
+**`_renderEventForm` navigation guard** — fires `console.warn` when blocked by SELECT mode, making the class of bug (missing `EventMgmt.setMode` call before navigation) immediately visible in DevTools.
+
 ---
 
 ## GroupManager Module (renderer/groupManager.js)
@@ -455,6 +467,21 @@ GroupManager.getDuplicateSubEvents()          // → subEventId[] used by >1 gro
 - [x] Final confirmation screen: Photographer autocomplete + group→sub-event mapping — `showEventImportConfirmModal()` in renderer.js
 - [x] File routing: grouped → `Collection/Event/SubEvent/Photographer/[VIDEO/]`; single → `Collection/Event/Photographer/` — `ImportRouter.buildFileJobs()` in `renderer/importRouter.js`
 - [x] Unassigned files never imported — enforced in ImportRouter
+
+### Import Routing + Legacy Event Hardening (session 2026-04-28 — COMPLETE)
+
+- [x] `folderName` persisted on disk-format components at creation — never recomputed at import time
+- [x] Single-component subfolder guard — `if (compsForDisk.length > 1)` in `_tryCreateEvent` + `_handleSaveEditedEvent`
+- [x] `ImportRouter._buildDestBase` defensive assertion — logs error if single-component group arrives with `subEventId` set
+- [x] `importRouter.js` confirmed clean — `buildFolderName` absent, routing uses `group.subEventId` throughout
+- [x] `_buildSubEventFolderNames` prefers `comp.folderName` over recomputation for legacy-safe modal dropdown
+- [x] Structure-change warning modal (`showStructureChangeWarningModal`) — blocks save when single→multi component change + existing imports; `_structureWarningPending` + `try/finally` guard
+- [x] LEGACY badge (`ec-evl-badge--legacy`) in event list — amber pill, all CSS tokens, no hardcoded colours
+- [x] `showLegacyEventWarningModal` — glass modal, SVG warning icon, "Edit Event" / "Cancel", Enter/Escape keyboard
+- [x] `adoptSelectedEvent` — legacy detection moved above corrupt/reload guard; three states cleanly separated: legacy (modal) → corrupt (reload) → unexpected-post-check (silent error)
+- [x] `openEventForEdit({ skipAutoRepair: true })` — no `_repairLegacyEvent` call, blank editor, `EventMgmt.setMode('edit')` before `_renderEventForm` to bypass SELECT guard
+- [x] `_legacyModalOpen` double-click guard + `try/finally` reset
+- [x] `_renderEventForm` SELECT-mode block now logs `console.warn` instead of silently returning
 
 ### Metadata Tagging
 - Write EXIF metadata after import (background queue)

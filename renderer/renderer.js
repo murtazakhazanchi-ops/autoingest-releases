@@ -2750,8 +2750,8 @@ function updateSelectionBar() {
   document.getElementById('clearSelBtn').disabled = n === 0;
 
   const importBtn = document.getElementById('importBtn');
-  // In event mode, the Import button is also shown when groups have files (even if nothing is selected).
-  const hasGroupedFiles = railMode === 'event' && GroupManager.hasGroups();
+  // Show "Import Groups" when an event is active and groups exist — regardless of railMode.
+  const hasGroupedFiles = EventCreator.getActiveEventData() !== null && GroupManager.hasGroups();
   const canImport = n > 0 || hasGroupedFiles;
   importBtn.classList.toggle('visible', canImport);
   importBtn.disabled = !canImport || importRunning;
@@ -3199,46 +3199,96 @@ document.getElementById('importBtn').addEventListener('click', async () => {
     return;
   }
 
-  const isEventImport = railMode === 'event' && eventData !== null && GroupManager.hasGroups();
-
   // ── Event Import path (G4 + G5) ──────────────────────────────────────────
-  if (isEventImport) {
-    const groups = GroupManager.getGroups();
+  if (eventData !== null) {
+    if (
+      !eventData?.eventPath ||
+      !eventData?.event ||
+      !Array.isArray(eventData.event.components) ||
+      eventData.event.components.length === 0
+    ) {
+      console.error('[IMPORT BLOCKED] Invalid eventData structure', eventData);
+      return;
+    }
+
+    if (!eventData.collectionPath) {
+      console.error('[IMPORT] Missing collectionPath — cannot route files. Aborting.');
+      return;
+    }
+
+    // If no explicit groups exist, create an implicit single group from selected files.
+    // This covers the common single-component event case where the user skips grouping.
+    const hasExplicitGroups = GroupManager.hasGroups();
+    let groups;
+    if (hasExplicitGroups) {
+      groups = GroupManager.getGroups();
+    } else {
+      if (liveComps.length > 1) {
+        showMessage('Multi-component events require file grouping — use Cmd+G to assign files to sub-events.');
+        return;
+      }
+      if (selectedFiles.size === 0) {
+        showMessage('Select files to import.');
+        return;
+      }
+      groups = [{ id: 0, label: 'All Files', colorIdx: 0, files: new Set([...selectedFiles]), subEventId: null }];
+    }
 
     // Inject live components so all downstream consumers use _eventComps as source.
     eventData.event.components = liveComps;
 
-    // G4-1: Blocking — groups with no sub-event in a multi-component event.
-    if (liveComps.length > 1 && GroupManager.hasMissingSubEvents()) {
-      await showMissingSubEventModal();
+    if (hasExplicitGroups) {
+      // G4-1: Blocking — groups with no sub-event in a multi-component event.
+      if (liveComps.length > 1 && GroupManager.hasMissingSubEvents()) {
+        await showMissingSubEventModal();
+        return;
+      }
+
+      // G4-2: Non-blocking — selected files not assigned to any group.
+      const unassigned = GroupManager.getUnassignedFiles([...selectedFiles]);
+      if (unassigned.length > 0) {
+        const proceed = await showUnassignedWarningModal(unassigned.length);
+        if (!proceed) return;
+      }
+
+      // G4-3: Non-blocking — multiple groups mapped to the same sub-event.
+      const dupSubs = GroupManager.getDuplicateSubEvents();
+      if (dupSubs.length > 0) {
+        const proceed = await showDupSubEventModal(dupSubs);
+        if (!proceed) return;
+      }
+    }
+
+    // G4-4: Blocking — component missing event type or city (can't build folder structure).
+    const incompleteComp = liveComps.find(c => !c.eventTypes?.length || !c.city?.label);
+    if (incompleteComp) {
+      showMessage('Complete all event details (event type + city) before importing.');
       return;
     }
 
-    // G4-2: Non-blocking — selected files not assigned to any group.
-    const unassigned = GroupManager.getUnassignedFiles([...selectedFiles]);
-    if (unassigned.length > 0) {
-      const proceed = await showUnassignedWarningModal(unassigned.length);
-      if (!proceed) return;
-    }
-
-    // G4-3: Non-blocking — multiple groups mapped to the same sub-event.
-    const dupSubs = GroupManager.getDuplicateSubEvents();
-    if (dupSubs.length > 0) {
-      const proceed = await showDupSubEventModal(dupSubs);
-      if (!proceed) return;
-    }
+    console.log('[IMPORT] Pre-import state — components:', liveComps.length, liveComps.map(c => ({
+      id: c.id, eventTypes: c.eventTypes.map(t => t.label), city: c.city?.label,
+    })));
+    console.log('[IMPORT] Pre-import state — groups:', groups.map(g => ({
+      id: g.id, files: g.files.size, subEventId: g.subEventId,
+    })));
 
     // G5: Confirmation screen — photographer + mapping summary.
+    console.log('[FLOW] Opening modal');
     const photographer = await showEventImportConfirmModal(groups, eventData);
-    if (!photographer) return; // user cancelled
+    console.log('[FLOW] Modal resolved', photographer ? `photographer=${photographer}` : 'cancelled');
 
     const { fileJobs } = ImportRouter.buildFileJobs({ groups, eventData, photographer });
     if (fileJobs.length === 0) { showMessage('No files to import.'); return; }
 
-    // Resolve event folder path for status tracking.
-    const _eventJsonPath = eventData.coll._masterPath
-      ? (eventData.coll._masterPath + '/' + eventData.event.name)
-      : null;
+    // Use path from getActiveEventData() — already validated above.
+    const _eventJsonPath = eventData.eventPath;
+
+    console.log('[IMPORT DESTINATION]', {
+      eventPath:      eventData.eventPath,
+      collectionPath: eventData.collectionPath,
+      photographer,
+    });
 
     importRunning = true;
     updateSelectionBar();
@@ -3246,7 +3296,7 @@ document.getElementById('importBtn').addEventListener('click', async () => {
 
     // Mark event as in-progress so an interrupted import is detectable on restart.
     if (_eventJsonPath) {
-      window.api.updateEventJson(_eventJsonPath, { status: 'in-progress' }).catch(() => {});
+      await window.api.updateEventJson(_eventJsonPath, { status: 'in-progress' });
     }
 
     try {
@@ -3254,7 +3304,7 @@ document.getElementById('importBtn').addEventListener('click', async () => {
       if (!activeSource) return;
       // Mark event complete only on full success.
       if (_eventJsonPath) {
-        window.api.updateEventJson(_eventJsonPath, { status: 'complete' }).catch(() => {});
+        await window.api.updateEventJson(_eventJsonPath, { status: 'complete' });
       }
 
       // ── Audit log — append-only, merge-safe ──────────────────────────────
@@ -3281,7 +3331,7 @@ document.getElementById('importBtn').addEventListener('click', async () => {
             }
             const id = Date.now().toString(36) +
               '-' + Math.random().toString(36).slice(2) +
-              '-' + (activeMaster?.name || 'node');
+              '-' + (eventData.coll?.name || 'unknown');
             logs.push({
               id,
               seq:            baseSeq + index,
@@ -3293,15 +3343,18 @@ document.getElementById('importBtn').addEventListener('click', async () => {
             });
           });
 
-          if (!logs || logs.length === 0) {
-            console.log('[AUDIT] No imports recorded yet');
-            return;
+          if (logs.length > 0) {
+            await window.api.appendImports(_eventJsonPath, logs);
+            console.log('[AUDIT] +', logs.length, 'entries');
+          } else {
+            console.log('[AUDIT] No log entries to write');
           }
 
-          await window.api.appendImports(_eventJsonPath, logs);
-          if (logs.length > 0) {
-            console.log('[AUDIT] +', logs.length, 'entries');
-          }
+          // Write lastImport summary for quick querying without scanning imports[].
+          const totalFileCount = logs.reduce((s, e) => s + (e.counts.photos + e.counts.videos), 0);
+          await window.api.updateEventJson(_eventJsonPath, {
+            lastImport: { photographer, timestamp: now, fileCount: totalFileCount },
+          });
         } catch (err) {
           console.error('[AUDIT] Logging failed:', err);
         }
@@ -3316,7 +3369,7 @@ document.getElementById('importBtn').addEventListener('click', async () => {
       document.getElementById('progressDoneBtn').classList.add('visible');
       // Reset to 'created' so the event is not stuck in-progress after failure.
       if (_eventJsonPath) {
-        window.api.updateEventJson(_eventJsonPath, { status: 'created' }).catch(() => {});
+        await window.api.updateEventJson(_eventJsonPath, { status: 'created' });
       }
     } finally {
       importRunning = false;

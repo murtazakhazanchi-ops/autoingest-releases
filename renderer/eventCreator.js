@@ -92,6 +92,23 @@ const EventCreator = (() => {
       .trim();
   }
 
+  // Sourced from renderer/folderNameHelper.js — tested independently there.
+  // City is included only when allSameCity is false (mixed cities across components).
+  // The index encodes the sorted-by-id position and must not change after first write.
+  function buildFolderName(comp, idx, allSameCity) {
+    const indexPart    = String(idx + 1).padStart(2, '0');
+    const typePart     = sanitizeForFolder(
+      (comp.eventTypes || []).map(t => t.label).join('-')
+    );
+    const locationPart = comp.location?.label
+      ? '-' + sanitizeForFolder(comp.location.label)
+      : '';
+    const cityPart     = (!allSameCity && comp.city?.label)
+      ? '-' + sanitizeForFolder(comp.city.label)
+      : '';
+    return `${indexPart}-${typePart}${locationPart}${cityPart}`;
+  }
+
   function sanitizeEventName(name) {
     if (!name) return '';
     return name
@@ -104,10 +121,23 @@ const EventCreator = (() => {
 
   async function loadEventFromDisk(eventPath) {
     try {
-      const json = await window.api.readEventJson(eventPath);
+      let json = await window.api.readEventJson(eventPath);
+
+      // Normalize IPC return shape — may arrive as a JSON string or wrapped object.
+      if (typeof json === 'string') {
+        try {
+          json = JSON.parse(json);
+        } catch (e) {
+          console.error('[loadEventFromDisk] JSON parse failed:', e);
+          return null;
+        }
+      }
+      if (json && typeof json === 'object' && 'data' in json) {
+        json = json.data;
+      }
 
       if (!json || !Array.isArray(json.components)) {
-        console.error('[loadEventFromDisk] Invalid or missing event.json at:', eventPath);
+        console.error('[loadEventFromDisk] INVALID JSON', { eventPath, json });
         return null;
       }
 
@@ -118,6 +148,7 @@ const EventCreator = (() => {
           : [],
         location: c.location ? { label: c.location } : null,
         city: c.city ? { label: c.city } : null,
+        folderName: c.folderName ?? null,
       }));
 
       console.log('[loadEventFromDisk] Loaded', normalized.length, 'components from', eventPath);
@@ -127,6 +158,91 @@ const EventCreator = (() => {
       console.error('[loadEventFromDisk] Failed to read event.json:', err);
       return null;
     }
+  }
+
+  // Creates a minimal event.json for legacy event folders that predate the schema.
+  // Receives the full entry object so it can use pre-parsed identity (hijriDate, sequence)
+  // instead of re-parsing the folder name — consistent with the "no fallback parsing" rule.
+  async function _repairLegacyEvent(eventPath, entry) {
+    const folderName = eventPath.split('/').pop();
+
+    // Prefer identity already parsed by the scanner.
+    let hijriDate = entry?.hijriDate ?? null;
+    const rawSeq  = entry?.sequence  ?? null;
+
+    // Normalize sequence to number — scanner may return a string (e.g. "02").
+    let sequence = typeof rawSeq === 'number' ? rawSeq : parseInt(rawSeq, 10);
+    console.log('[REPAIR NORMALIZED]', { rawSequence: rawSeq, parsedSequence: sequence });
+
+    // If the scanner couldn't parse identity (truly unresolved), try parsing folder name.
+    if (!hijriDate || Number.isNaN(sequence)) {
+      // Correct format: "YYYY-MM-DD _NN-..." (space before underscore)
+      const match = folderName.match(/^(\d{4}-\d{2}-\d{2}) _(\d+)-(.+)$/);
+      if (!match) {
+        console.error('[REPAIR] Cannot resolve identity for legacy folder:', folderName);
+        return null;
+      }
+      hijriDate = match[1];
+      sequence  = parseInt(match[2], 10);
+    }
+
+    if (!hijriDate || Number.isNaN(sequence)) {
+      console.error('[REPAIR] Invalid identity:', { folderName, hijriDate, sequence });
+      return null;
+    }
+
+    // Write a minimal event.json using disk component format (types[], not eventTypes[]).
+    try {
+      await window.api.updateEventJson(eventPath, {
+        version:       1,
+        hijriDate,
+        sequence:      Number(sequence),
+        eventName:     entry.folderName,
+        safeEventName: entry.folderName,
+        status:        'created',
+        components:    [{ id: 1, types: [], location: null, city: '', isUnresolved: true }],
+        updatedAt:     Date.now(),
+      });
+      console.log('[REPAIR] event.json created:', { path: eventPath, hijriDate, sequence: Number(sequence) });
+    } catch (err) {
+      console.error('[REPAIR FAILED] Could not write event.json:', err);
+      return null;
+    }
+
+    // Reload from disk with retries — the IPC write may not be immediately visible.
+    let repaired = null;
+    for (let i = 0; i < 3; i++) {
+      repaired = await loadEventFromDisk(eventPath);
+      console.log('[REPAIR RETRY]', { attempt: i + 1, result: repaired ? repaired.length : null });
+      if (repaired && repaired.length > 0) break;
+      await new Promise(r => setTimeout(r, 50));
+    }
+
+    if (!repaired) {
+      console.error('[CRITICAL] Repair failed: loadEventFromDisk returned null after retries:', eventPath);
+      return null;
+    }
+    if (repaired.length === 0) {
+      console.error('[CRITICAL] Repair failed: components empty after reload (possible format mismatch: types not array):', eventPath);
+      return null;
+    }
+
+    // Patch the scanned entry so the list view reflects the repaired state immediately.
+    const idx = _scannedEvents.findIndex(e => e.folderName === entry.folderName);
+    if (idx !== -1) {
+      _scannedEvents[idx] = {
+        ..._scannedEvents[idx],
+        _eventJson: {
+          hijriDate,
+          sequence: Number(sequence),
+          components: repaired,
+        },
+        _corrupt: false,
+      };
+      console.log('[REPAIR] Updated scannedEvents cache for:', entry.folderName);
+    }
+
+    return repaired;
   }
 
   function setEventState(components) {
@@ -142,6 +258,14 @@ const EventCreator = (() => {
       return;
     }
 
+    // Guard against disk-format components being passed in.
+    // Disk format uses { types, city, location } (strings); UI format uses { eventTypes, city, location } (objects).
+    // Any caller that passes disk-format will silently zero-out eventTypes — catch it here instead.
+    if (!components[0]?.eventTypes) {
+      console.error('[setEventState] Non-normalized components — disk format passed directly. Use loadEventFromDisk first.', components);
+      return;
+    }
+
     const normalized = components.map((c, i) => ({
       id: i + 1,
       eventTypes: Array.isArray(c.eventTypes)
@@ -149,6 +273,9 @@ const EventCreator = (() => {
         : [],
       location: c.location ? { label: c.location.label } : null,
       city: c.city ? { label: c.city.label } : null,
+      // Preserve folderName threaded in by loadEventFromDisk.
+      // Once set, folderName is never recomputed — it is the stable folder identity.
+      folderName: c.folderName ?? null,
     }));
 
     if (normalized.some(c => !Array.isArray(c.eventTypes))) {
@@ -189,6 +316,8 @@ const EventCreator = (() => {
   let _repairMode      = false; // Phase 5: when true, form is repairing an unparseable folder
   let _repairFolderName = null; // Phase 5: original (bad) folder name being repaired
   let _newEventDate    = null;  // M7: hijri date string for new events ("YYYY-MM-DD"), null when viewing/editing
+  let _structureWarningPending = false; // prevents double-modal if save is triggered concurrently
+  let _legacyModalOpen         = false; // prevents double-modal on fast double-click of Continue
   let _navScreen           = 'masterStep'; // 'masterStep' | 'eventList' | 'eventForm' | 'previewStep'
   let _selectedListFolder  = null;         // Phase 2: folder name highlighted in SELECT mode
   let _listenersAttached   = false;        // Guard: delegated panel listeners registered only once
@@ -327,6 +456,105 @@ const EventCreator = (() => {
       title:    'Error',
       bodyHTML: esc(message),
       buttons:  [{ label: 'OK', primary: true, value: 'ok' }]
+    });
+  }
+
+  function showStructureChangeWarningModal() {
+    return new Promise(resolve => {
+      const overlay = document.createElement('div');
+      overlay.className = 'ec-modal-overlay';
+
+      overlay.innerHTML = `
+<div class="ec-struct-modal-box">
+  <div class="ec-struct-modal-header">
+    <div class="ec-struct-modal-icon">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+        <line x1="12" y1="9" x2="12" y2="13"/>
+        <line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+    </div>
+    <p class="ec-struct-modal-title">Event Structure Change Detected</p>
+  </div>
+  <div class="ec-struct-modal-body">
+    <p>This event was originally a <strong>single-component event</strong>. Existing photos are stored directly in the event folder and will not be automatically reorganized into sub-events.</p>
+    <p>New imports will follow the multi-component structure.</p>
+    <p>You can reorganize existing photos manually if needed.</p>
+  </div>
+  <div class="ec-struct-modal-actions">
+    <button class="ec-outline-btn" data-val="cancel">Cancel</button>
+    <button class="ec-continue-btn" data-val="proceed">Proceed</button>
+  </div>
+</div>`;
+
+      document.body.appendChild(overlay);
+
+      function cleanup(val) {
+        document.removeEventListener('keydown', keyHandler);
+        overlay.remove();
+        resolve(val === 'proceed');
+      }
+
+      overlay.querySelectorAll('button[data-val]').forEach(btn => {
+        btn.addEventListener('click', () => cleanup(btn.dataset.val));
+      });
+
+      function keyHandler(e) {
+        if (e.key === 'Enter')  { e.preventDefault(); cleanup('proceed'); }
+        if (e.key === 'Escape') { e.preventDefault(); cleanup('cancel');  }
+      }
+      document.addEventListener('keydown', keyHandler);
+
+      requestAnimationFrame(() => overlay.querySelector('.ec-continue-btn')?.focus());
+    });
+  }
+
+  function showLegacyEventWarningModal() {
+    return new Promise(resolve => {
+      const overlay = document.createElement('div');
+      overlay.className = 'ec-modal-overlay';
+
+      overlay.innerHTML = `
+<div class="ec-struct-modal-box">
+  <div class="ec-struct-modal-header">
+    <div class="ec-struct-modal-icon">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+        <line x1="12" y1="9" x2="12" y2="13"/>
+        <line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+    </div>
+    <p class="ec-struct-modal-title">Legacy Event Detected</p>
+  </div>
+  <div class="ec-struct-modal-body">
+    <p>This event folder does not have a valid <strong>event.json</strong> file. It was likely created outside the app or predates the current format.</p>
+    <p>You cannot import into this event until it has been set up. Open it in the editor to configure its details and create the required metadata.</p>
+  </div>
+  <div class="ec-struct-modal-actions">
+    <button class="ec-outline-btn" data-val="cancel">Cancel</button>
+    <button class="ec-continue-btn" data-val="edit">Edit Event</button>
+  </div>
+</div>`;
+
+      document.body.appendChild(overlay);
+
+      function cleanup(val) {
+        document.removeEventListener('keydown', keyHandler);
+        overlay.remove();
+        resolve(val);
+      }
+
+      overlay.querySelectorAll('button[data-val]').forEach(btn => {
+        btn.addEventListener('click', () => cleanup(btn.dataset.val));
+      });
+
+      function keyHandler(e) {
+        if (e.key === 'Enter')  { e.preventDefault(); cleanup('edit');   }
+        if (e.key === 'Escape') { e.preventDefault(); cleanup('cancel'); }
+      }
+      document.addEventListener('keydown', keyHandler);
+
+      requestAnimationFrame(() => overlay.querySelector('.ec-continue-btn')?.focus());
     });
   }
 
@@ -869,8 +1097,12 @@ const EventCreator = (() => {
     const unparseable = _scannedEvents.filter(e => !e.isParseable);
 
     const resolvedHTML = resolved.map(ev => {
-      const badge = ev.isUnresolved
+      const isLegacy = !ev._eventJson || !Array.isArray(ev._eventJson.components);
+      const warnBadge = ev.isUnresolved
         ? `<span class="ec-evl-warn" title="Some tokens in this event don't match the controlled lists yet. You can still view or edit.">⚠</span>`
+        : '';
+      const legacyBadge = isLegacy
+        ? `<span class="ec-evl-badge--legacy">LEGACY</span>`
         : '';
       const displayName = ev._eventJson?.eventName || ev.folderName;
       return `
@@ -879,7 +1111,7 @@ const EventCreator = (() => {
     <div class="ec-evl-name" title="${esc(displayName)}">${esc(displayName)}</div>
     <div class="ec-evl-date">${esc(ev.hijriDate)}</div>
   </div>
-  ${badge}
+  ${legacyBadge}${warnBadge}
 </div>`;
     }).join('');
 
@@ -1074,11 +1306,15 @@ ${unparseable.map(ev => `
 
     const eventPath = activeMaster.path + '/' + entry.folderName;
 
-    const components = await loadEventFromDisk(eventPath);
+    let components = await loadEventFromDisk(eventPath);
 
     if (!components) {
-      console.error('[_openExistingEvent] Failed to load components');
-      return;
+      console.warn('[_openExistingEvent] Missing event.json, attempting legacy repair:', eventPath);
+      components = await _repairLegacyEvent(eventPath, entry);
+      if (!components) {
+        console.error('[_openExistingEvent] Legacy repair failed — cannot open event');
+        return;
+      }
     }
 
     setEventState(components);
@@ -1096,7 +1332,7 @@ ${unparseable.map(ev => `
     _renderEventForm();
   }
 
-  async function openEventForEdit(entry) {
+  async function openEventForEdit(entry, { skipAutoRepair = false } = {}) {
     const eventPath = activeMaster.path + '/' + entry.folderName;
 
     if (!eventPath) {
@@ -1104,11 +1340,51 @@ ${unparseable.map(ev => `
       return;
     }
 
-    const components = await loadEventFromDisk(eventPath);
+    let components = await loadEventFromDisk(eventPath);
 
     if (!components) {
-      console.error('[openEventForEdit] Failed to load components');
-      return;
+      if (skipAutoRepair) {
+        // Legacy path: no event.json exists and we must NOT write one yet.
+        // Open the editor with one blank component so the user configures it
+        // from scratch. event.json is only written when they click Save.
+        console.log('[openEventForEdit] Legacy open (no auto-repair) for:', entry.folderName);
+
+        _viewingExisting = {
+          folderName:   entry.folderName,
+          displayName:  entry.folderName,
+          hijriDate:    entry.hijriDate ?? null,
+          sequence:     entry.sequence  ?? null,
+          isUnresolved: true,
+          isLegacy:     true,
+        };
+
+        // Identity guard — hijriDate + sequence are needed to build the save path.
+        if (!_viewingExisting.hijriDate || _viewingExisting.sequence == null) {
+          console.error('[openEventForEdit] Legacy entry has incomplete identity — cannot edit', {
+            folderName: entry.folderName,
+            hijriDate:  _viewingExisting.hijriDate,
+            sequence:   _viewingExisting.sequence,
+          });
+          return;
+        }
+
+        setEventState([_makeComp()]);
+        _compSeq = 1;
+        _editMode = true;
+        // Transition EventMgmt out of SELECT mode so _renderEventForm's SELECT guard
+        // does not block navigation. Mirrors what emmEditBtn handler does in renderer.js.
+        if (typeof EventMgmt !== 'undefined' && EventMgmt.isOpen()) EventMgmt.setMode('edit');
+        console.log('[openEventForEdit] Legacy editor open — awaiting user configuration');
+        _renderEventForm();
+        return;
+      }
+
+      console.warn('[openEventForEdit] Missing event.json, attempting legacy repair:', eventPath);
+      components = await _repairLegacyEvent(eventPath, entry);
+      if (!components) {
+        console.error('[openEventForEdit] Legacy repair failed — cannot enter edit mode');
+        return;
+      }
     }
 
     const editable = components.map(c => ({
@@ -1153,7 +1429,10 @@ ${unparseable.map(ev => `
   // reach the same builder.
   function _renderEventForm() {
     // Hard guard: never render the form while the modal is in SELECT mode.
-    if (typeof EventMgmt !== 'undefined' && EventMgmt.isOpen() && EventMgmt.getMode() === 'select') return;
+    if (typeof EventMgmt !== 'undefined' && EventMgmt.isOpen() && EventMgmt.getMode() === 'select') {
+      console.warn('[EventCreator] _renderEventForm blocked — EventMgmt mode is select, expected edit/create/repair');
+      return;
+    }
 
     _navScreen = 'eventForm';
     if (_eventComps.length === 0) setEventState([_makeComp()]);
@@ -1265,6 +1544,30 @@ ${unparseable.map(ev => `
       _showEventBanner('Every component needs at least one Event Type and a City.', 'error'); return;
     }
 
+    // Warn before saving if a previously single-component event is now multi-component
+    // and has existing imported data. Files stored in the old flat structure will not
+    // be automatically reorganized — the user must be aware before proceeding.
+    // _structureWarningPending prevents a second modal if save is triggered concurrently.
+    {
+      const _origEntry       = (_scannedEvents || []).find(e => e.folderName === _viewingExisting?.folderName);
+      const _wasSingle       = (_origEntry?._eventJson?.components || []).length === 1;
+      const _isNowMulti      = _eventComps.length > 1;
+      // imports.length > 0 is the reliable proxy for existing on-disk data: each import
+      // appends an audit entry, so an empty imports array means no files were ever written
+      // via this app. Manually copied files (outside the app) are not detected here —
+      // hasFilesOnDisk is not tracked in the scanned event shape, so this is a known gap.
+      const _hasExistingData = (_origEntry?._eventJson?.imports || []).length > 0;
+      if (_wasSingle && _isNowMulti && _hasExistingData && !_structureWarningPending) {
+        _structureWarningPending = true;
+        try {
+          const proceed = await showStructureChangeWarningModal();
+          if (!proceed) return;
+        } finally {
+          _structureWarningPending = false;
+        }
+      }
+    }
+
     // Build the new event name using locked hijriDate + sequence from _viewingExisting.
     const parts       = _buildCompString(_eventComps);
     const newName     = `${_viewingExisting.hijriDate} _${_viewingExisting.sequence}-${parts}`;
@@ -1273,14 +1576,44 @@ ${unparseable.map(ev => `
 
     // If the safe folder name hasn't changed, skip rename but still select and proceed.
     if (safeNewName === oldName) {
-      _editMode = false;
-      _viewingExisting = {
-        ..._viewingExisting,
+      try { assertStrictComponents(_eventComps); }
+      catch (err) {
+        console.error('BLOCKED CORRUPTED SAVE (no-rename):', err);
+        _showEventBanner('Internal error: component structure is invalid. Cannot save.', 'error');
+        return;
+      }
+      const _noRenameAllSameCity = _eventComps.length <= 1 ||
+        _eventComps.every(c => c.city?.label === _eventComps[0].city?.label);
+      const noRenameCompsForDisk = JSON.parse(JSON.stringify(_eventComps)).map((c, idx) => ({
+        types:        c.eventTypes.map(et => et.label),
+        location:     c.location?.label || null,
+        city:         c.city?.label     || '',
         isUnresolved: false,
-        components: _eventComps.map(c => ({ ...c, eventTypes: [...c.eventTypes] })),
-      };
+        // Preserve existing folderName (set once at creation — never recompute).
+        folderName:   c.folderName ?? buildFolderName(c, idx, _noRenameAllSameCity),
+      }));
+      if (activeMaster?.path) {
+        const noRenamePath = activeMaster.path + '/' + oldName;
+        const noRenamePayload = {
+          eventName:     newName,
+          safeEventName: safeNewName,
+          hijriDate:     _viewingExisting.hijriDate,
+          sequence:      _viewingExisting.sequence,
+          components:    noRenameCompsForDisk,
+          status:        'created',
+        };
+        try {
+          await window.api.updateEventJson(noRenamePath, noRenamePayload);
+          console.log('[POST-SAVE]', { path: noRenamePath, components: noRenamePayload.components.length, sequence: noRenamePayload.sequence });
+        } catch (err) {
+          console.error('[EventCreator] updateEventJson (no-rename) failed:', err);
+          return;
+        }
+      }
+      _editMode = false;
+      _viewingExisting = { ..._viewingExisting, isUnresolved: false };
       _destroyEventDDs();
-      await _selectExistingForImport();
+      await _selectExistingForImport(_viewingExisting);
       return;
     }
 
@@ -1323,13 +1656,27 @@ ${unparseable.map(ev => `
       return;
     }
     const cleanComps = JSON.parse(JSON.stringify(_eventComps));
+    try {
+      cleanComps.forEach((c, i) => {
+        if (c.city && typeof c.city !== 'object')         throw new Error(`CORRUPTION: city must be object at component ${i}`);
+        if (c.location && typeof c.location !== 'object') throw new Error(`CORRUPTION: location must be object at component ${i}`);
+      });
+    } catch (err) {
+      console.error('BLOCKED CORRUPTED SAVE (validation):', err);
+      _showEventBanner('Internal error: component data is corrupted. Cannot save.', 'error');
+      return;
+    }
 
     // Update the scanned events cache so the list reflects the change.
-    const compsForDisk = cleanComps.map(c => ({
+    const _renameAllSameCity = cleanComps.length <= 1 ||
+      cleanComps.every(c => c.city?.label === cleanComps[0].city?.label);
+    const compsForDisk = cleanComps.map((c, idx) => ({
       types:        c.eventTypes.map(et => et.label),
       location:     c.location?.label || null,
       city:         c.city?.label     || '',
       isUnresolved: false,
+      // Preserve existing folderName (set once at creation — never recompute).
+      folderName:   c.folderName ?? buildFolderName(c, idx, _renameAllSameCity),
     }));
     const entry = (_scannedEvents || []).find(e => e.folderName === oldName);
     if (entry) {
@@ -1346,29 +1693,32 @@ ${unparseable.map(ev => `
     // Update (or create for legacy events) event.json at the new safe path.
     if (activeMaster?.path) {
       const newEventPath = activeMaster.path + '/' + safeNewName;
-      window.api.updateEventJson(newEventPath, {
+      const renamePayload = {
         eventName:     newName,
         safeEventName: safeNewName,
+        hijriDate:     _viewingExisting.hijriDate,
+        sequence:      _viewingExisting.sequence,
         components:    compsForDisk,
         status:        'created',
-      }).catch(err => console.error('[EventCreator] updateEventJson (save edit) failed:', err));
-
-      // Sync component subfolders: rename existing by index prefix, create new ones.
+      };
       try {
+        await window.api.updateEventJson(newEventPath, renamePayload);
+        console.log('[POST-SAVE]', { path: newEventPath, components: renamePayload.components.length, sequence: renamePayload.sequence });
+      } catch (err) {
+        console.error('[EventCreator] updateEventJson (save edit) failed:', err);
+        return;
+      }
+
+      // Sync component subfolders — only for multi-component events.
+      // Single-component events have no subfolders to sync.
+      if (compsForDisk.length > 1) try {
         const basePath = newEventPath;
-        const comps = JSON.parse(JSON.stringify(_eventComps));
-        const allSameCity = comps.every(c => c.city?.label === comps[0].city?.label);
-        const orderedComps = [...comps].sort((a, b) => (a.id || 0) - (b.id || 0));
         const tasks = [];
-        for (let idx = 0; idx < orderedComps.length; idx++) {
-          const comp          = orderedComps[idx];
-          const indexPart     = String(idx + 1).padStart(2, '0');
-          const typePart      = sanitizeForFolder(comp.eventTypes.map(t => t.label).join('-'));
-          const locationPart  = comp.location?.label ? '-' + sanitizeForFolder(comp.location.label) : '';
-          const cityPart      = (!allSameCity && comp.city?.label) ? '-' + sanitizeForFolder(comp.city.label) : '';
-          const newFolderName = `${indexPart}-${typePart}${locationPart}${cityPart}`;
-          const newPath       = basePath + '/' + newFolderName;
-          const existingPrefix = indexPart + '-';
+        for (let idx = 0; idx < compsForDisk.length; idx++) {
+          // Use the persisted folderName — not a recomputed name — as the target.
+          const newFolderName  = compsForDisk[idx].folderName;
+          const newPath        = basePath + '/' + newFolderName;
+          const existingPrefix = String(idx + 1).padStart(2, '0') + '-';
           const existing = await window.api.findDirByPrefix(basePath, existingPrefix);
           if (existing) {
             if (existing.name !== newFolderName) {
@@ -1385,7 +1735,7 @@ ${unparseable.map(ev => `
           }
         }
         await Promise.all(tasks);
-        console.log('[Subfolder Sync] Completed with rename support');
+        console.log('[Subfolder Sync] Completed', compsForDisk.length, 'components');
       } catch (err) {
         console.error('[Subfolder Sync] Error:', err);
       }
@@ -1397,10 +1747,9 @@ ${unparseable.map(ev => `
       folderName:   safeNewName,
       displayName:  newName,
       isUnresolved: false,
-      components:   _eventComps.map(c => ({ ...c, eventTypes: [...c.eventTypes] })),
     };
     _destroyEventDDs();
-    await _selectExistingForImport();
+    await _selectExistingForImport(_viewingExisting);
   }
 
   // ── HTML builder ─────────────────────────────────────────────────────────────────────
@@ -1462,12 +1811,20 @@ ${unparseable.map(ev => `
     <span id="evHijriErr" class="ec-error" role="alert" aria-live="polite"></span>
   </div>
   ` : _viewingExisting ? `
-  <!-- M6: Locked date + sequence display for edit mode — identity comes from event.json, never recomputed -->
+  <!-- M6: Locked date + sequence display for view/edit mode — identity from event.json, never recomputed -->
   <div class="ec-field" style="margin-top:16px">
     <p class="ec-section-title">Event Date <span class="ec-req" style="font-size:0.7rem;opacity:0.6">(locked)</span></p>
-    <div class="ec-hijri-row" style="opacity:0.7;pointer-events:none">
-      <span class="ec-hijri-seg" style="display:inline-flex;align-items:center;justify-content:center">${esc(_viewingExisting.hijriDate || '—')}</span>
-      <span style="margin-left:8px;font-size:0.75rem;color:var(--text-secondary)">seq ${esc(String(_viewingExisting.sequence ?? '—'))}</span>
+    <div class="ec-hijri-row">
+      ${(() => {
+        const [y='', m='', d=''] = (_viewingExisting.hijriDate || '').split('-');
+        return `
+      <input class="ec-hijri-seg" type="text" value="${esc(y)}" disabled aria-label="Hijri year" style="opacity:0.6">
+      <span class="ec-sep" aria-hidden="true">–</span>
+      <input class="ec-hijri-seg" type="text" value="${esc(m)}" disabled aria-label="Hijri month" style="opacity:0.6">
+      <span class="ec-sep" aria-hidden="true">–</span>
+      <input class="ec-hijri-seg" type="text" value="${esc(d)}" disabled aria-label="Hijri day" style="opacity:0.6">
+      <span style="margin-left:10px;font-size:0.75rem;color:var(--text-secondary)">seq&nbsp;${esc(String(_viewingExisting.sequence ?? '—'))}</span>`;
+      })()}
     </div>
     <span class="ec-hint">Date and sequence are locked. Only components can be changed.</span>
   </div>
@@ -1902,31 +2259,60 @@ ${unparseable.map(ev => `
   // ── Validate + create ──────────────────────────────────────────────────────
 
   async function _selectExistingForImport(entry) {
-    const eventPath = activeMaster.path + '/' + entry.folderName;
-
-    if (!eventPath) {
-      console.error('[selectExistingForImport] Missing event path');
-      return;
+    if (!entry || !entry.folderName) {
+      console.error('[_selectExistingForImport] CRITICAL: invalid entry', entry);
+      return false;
     }
 
-    const components = await loadEventFromDisk(eventPath);
+    const eventPath = activeMaster.path + '/' + entry.folderName;
 
+    const components = await loadEventFromDisk(eventPath);
     if (!components) {
-      console.error('[selectExistingForImport] Failed to load components');
-      return;
+      console.error('[_selectExistingForImport] Failed to load components from', eventPath);
+      return false;
     }
 
     setEventState(components);
-
-    _compSeq = components.length;
+    _compSeq = _eventComps.length;
 
     _viewingExisting = {
-      folderName:  entry.folderName,
-      displayName: entry._eventJson?.eventName || entry.folderName,
+      folderName:   entry.folderName,
+      displayName:  entry.displayName || entry._eventJson?.eventName || entry.folderName,
+      hijriDate:    entry.hijriDate    || entry._eventJson?.hijriDate    || null,
+      sequence:     entry.sequence     ?? entry._eventJson?.sequence     ?? null,
+      isUnresolved: !!entry.isUnresolved,
+      components:   _eventComps.map(c => ({ ...c, eventTypes: [...c.eventTypes] })),
     };
 
-    console.log('[selectExistingForImport] Loaded', components.length, 'components');
+    if (!_viewingExisting.hijriDate || _viewingExisting.sequence == null) {
+      console.error('[_selectExistingForImport] CRITICAL: identity incomplete after hydration', _viewingExisting);
+      return false;
+    }
 
+    const coll = selectedCollection
+      ? sessionCollections.find(c => c.name === selectedCollection)
+      : null;
+    if (coll) {
+      const existingIdx = coll.events.findIndex(e => e.name === entry.folderName);
+      if (existingIdx >= 0) {
+        _activeEventIdx = existingIdx;
+        coll.events[existingIdx].components = JSON.parse(JSON.stringify(_eventComps));
+        if (!coll.events[existingIdx].displayName) {
+          coll.events[existingIdx].displayName = _viewingExisting.displayName;
+        }
+      } else {
+        coll.events.push({
+          name:        entry.folderName,
+          displayName: _viewingExisting.displayName,
+          components:  JSON.parse(JSON.stringify(_eventComps)),
+        });
+        _activeEventIdx = coll.events.length - 1;
+      }
+    }
+
+    console.log('[_selectExistingForImport] Loaded', _eventComps.length, 'components, dispatching done');
+    console.log('[EVENT READY]', { date: _viewingExisting.hijriDate, sequence: _viewingExisting.sequence, components: _eventComps.length });
+    document.dispatchEvent(new CustomEvent('eventcreator:done'));
     return true;
   }
 
@@ -1973,12 +2359,20 @@ ${unparseable.map(ev => `
     // JSON unmodified if already present — so a duplicate create is always a safe no-op.
     if (activeMaster?.path) {
       const eventFolderPath = activeMaster.path + '/' + safe;
-      const compsForDisk = cleanComps.map(c => ({
+
+      // Component order here is the same order they appear in _eventComps (setEventState
+      // always assigns ids 1…n in array order, so cleanComps is already position-ordered).
+      // folderName is computed once at creation from this order and never recomputed.
+      const allSameCity = cleanComps.length <= 1 ||
+        cleanComps.every(c => c.city?.label === cleanComps[0].city?.label);
+      const compsForDisk = cleanComps.map((c, idx) => ({
         types:        c.eventTypes.map(et => et.label),
         location:     c.location?.label || null,
         city:         c.city?.label     || '',
         isUnresolved: false,
+        folderName:   buildFolderName(c, idx, allSameCity),
       }));
+
       window.api.writeEventJson(eventFolderPath, {
         version:       1,
         hijriDate:     _newEventDate,
@@ -1996,37 +2390,22 @@ ${unparseable.map(ev => `
         }
       }).catch(err => console.error('[EventCreator] writeEventJson failed:', err));
 
-      // Create one subfolder per component using _eventComps as the sole source.
-      try {
-        const basePath = activeMaster.path + '/' + safe;
-        // Snapshot components to avoid mutation issues
-        const comps = JSON.parse(JSON.stringify(_eventComps));
+      // Create one subfolder per component — only for multi-component events.
+      // Single-component events route files directly into the event folder.
+      if (compsForDisk.length > 1) {
+        try {
+          const basePath = activeMaster.path + '/' + safe;
 
-        if (!Array.isArray(comps) || comps.length === 0) {
-          console.warn('[Subfolders] No components found');
-        } else {
-          const allSameCity = comps.every(c =>
-            c.city?.label === comps[0].city?.label
-          );
-
-          // Ensure stable ordering by component id
-          const orderedComps = [...comps].sort((a, b) => (a.id || 0) - (b.id || 0));
-          const tasks = [];
-          orderedComps.forEach((comp, idx) => {
-            const indexPart    = String(idx + 1).padStart(2, '0');
-            const typePart     = sanitizeForFolder(comp.eventTypes.map(t => t.label).join('-'));
-            const locationPart = comp.location?.label ? '-' + sanitizeForFolder(comp.location.label) : '';
-            const cityPart     = (!allSameCity && comp.city?.label) ? '-' + sanitizeForFolder(comp.city.label) : '';
-            const folderName   = `${indexPart}-${typePart}${locationPart}${cityPart}`;
-            const fullPath     = basePath + '/' + folderName;
-            tasks.push(
-              window.api.ensureDir(fullPath)
-                .then(() => ({ ok: true, path: fullPath }))
-                .catch(err => {
-                  console.error('[Subfolders] Failed for:', fullPath, err);
-                  return { ok: false, path: fullPath, error: err };
-                })
-            );
+          // folderName was already computed and persisted into compsForDisk above.
+          // Use those names directly so disk folders match event.json exactly.
+          const tasks = compsForDisk.map(diskComp => {
+            const fullPath = basePath + '/' + diskComp.folderName;
+            return window.api.ensureDir(fullPath)
+              .then(() => ({ ok: true, path: fullPath }))
+              .catch(err => {
+                console.error('[Subfolders] Failed for:', fullPath, err);
+                return { ok: false, path: fullPath, error: err };
+              });
           });
           const results = await Promise.all(tasks);
 
@@ -2036,10 +2415,10 @@ ${unparseable.map(ev => `
           } else {
             console.log('[Subfolders] All folders created successfully');
           }
-          console.log('[Subfolders] Created', comps.length, 'component folders');
+          console.log('[Subfolders] Created', compsForDisk.length, 'component folders');
+        } catch (err) {
+          console.error('[Subfolders] Failed:', err);
         }
-      } catch (err) {
-        console.error('[Subfolders] Failed:', err);
       }
     }
 
@@ -2204,13 +2583,16 @@ ${unparseable.map(ev => `
   // ══════════════════════════════════════════════════════════════════════════
 
   function _buildSubEventFolderNames(components) {
+    // Prefer the persisted folderName (written at event creation, stable thereafter).
+    // Fallback: compute from current metadata for legacy events that predate this field.
+    // Note: the fallback always includes city, which may differ from the naming logic used
+    // at creation (which conditionally omits city when all components share one). This is
+    // acceptable for legacy events — no folder scanning or matching is attempted.
+    const allSameCity = components.length <= 1 ||
+      components.every(c => c.city?.label === components[0].city?.label);
     return components.map((comp, idx) => {
-      const parts = [
-        ...comp.eventTypes.map(e => e.label),
-        comp.location?.label,
-        comp.city?.label,
-      ].filter(Boolean);
-      return sanitizeForPath(`${pad2(idx + 1)}-${parts.join('-')}`);
+      if (comp.folderName != null) return comp.folderName;
+      return buildFolderName(comp, idx, allSameCity);
     });
   }
 
@@ -2418,6 +2800,16 @@ ${unparseable.map(ev => `
           return;
         }
 
+        // Read identity from disk — getLastEvent() doesn't persist hijriDate/sequence.
+        let _restoredHijriDate = null, _restoredSequence = null;
+        try {
+          const ejson = await window.api.readEventJson(eventPath);
+          if (ejson && ejson.hijriDate) {
+            _restoredHijriDate = ejson.hijriDate;
+            _restoredSequence  = ejson.sequence ?? null;
+          }
+        } catch {}
+
         // Restore session state so landing card and resetToList() work correctly.
         let coll = sessionCollections.find(c => c.name === last.collectionName);
         if (!coll) {
@@ -2446,15 +2838,23 @@ ${unparseable.map(ev => `
         _compSeq = components.length;
 
         _viewingExisting = {
-          folderName:  safeName,
-          displayName: last.eventName || safeName,
+          folderName:   safeName,
+          displayName:  last.eventName || safeName,
+          hijriDate:    _restoredHijriDate,
+          sequence:     _restoredSequence,
+          isUnresolved: false,
         };
 
         if (!Array.isArray(_eventComps) || _eventComps.length === 0) {
           console.warn('[restoreLastEvent] Empty components after restore');
         }
 
-        console.log('[restoreLastEvent] Restored', components.length, 'components');
+        console.log('[restoreLastEvent] Restored', components.length, 'components', {
+          folderName: safeName,
+          hijriDate:  _restoredHijriDate,
+          sequence:   _restoredSequence,
+          comps: components.map(c => ({ id: c.id, eventTypes: c.eventTypes.map(t => t.label), city: c.city?.label })),
+        });
       } catch (err) {
         console.error('[restoreLastEvent] Error restoring event:', err);
       }
@@ -2470,7 +2870,14 @@ ${unparseable.map(ev => `
       if (!coll || coll.events.length === 0) return null;
       const idx   = Math.min(_activeEventIdx, coll.events.length - 1);
       const event = coll.events[idx];
-      return event ? { coll, event, idx } : null;
+      if (!event) return null;
+      return {
+        coll,
+        event,
+        idx,
+        collectionPath: coll._masterPath || null,
+        eventPath: coll._masterPath ? (coll._masterPath + '/' + event.name) : null,
+      };
     },
 
     /** Returns a snapshot of the current live components (_eventComps). */
@@ -2624,7 +3031,7 @@ ${unparseable.map(ev => `
      */
     async adoptSelectedEvent() {
       if (!_selectedListFolder || !selectedCollection) return false;
-      const entry = (_scannedEvents || []).find(e => e.folderName === _selectedListFolder && e.isParseable);
+      const entry = (_scannedEvents || []).find(e => e.folderName === _selectedListFolder);
       if (!entry) return false;
 
       // event.json is the ONLY source — no entry.components fallback.
@@ -2633,6 +3040,44 @@ ${unparseable.map(ev => `
         return false;
       }
       const eventPath = activeMaster.path + '/' + entry.folderName;
+
+      // ── Legacy check — must come before the corrupt/reload guard ────────────
+      // A legacy event has no event.json on disk (_eventJson is null) or has a
+      // JSON file that is missing the components array. This is a recoverable
+      // state: the user should open Edit to configure it. Do NOT treat it as
+      // corruption — the reload below would also return null and silently exit.
+      const _isLegacyEntry = !entry._eventJson || !Array.isArray(entry._eventJson?.components);
+      if (_isLegacyEntry) {
+        console.warn('[LEGACY] Event has no valid event.json, redirecting to edit:', entry.folderName);
+        if (_legacyModalOpen) return false;
+        _legacyModalOpen = true;
+        try {
+          const action = await showLegacyEventWarningModal();
+          if (action === 'edit') { await openEventForEdit(entry, { skipAutoRepair: true }); }
+        } finally {
+          _legacyModalOpen = false;
+        }
+        return false;
+      }
+
+      // ── Corrupt guard — stale/corrupt entries that have a valid _eventJson ─
+      // Only reached when _eventJson exists and has a components array.
+      // Attempts a fresh reload for entries repaired after the initial scan.
+      if (entry._corrupt) {
+        console.warn('[adoptSelectedEvent] corrupt entry, forcing reload:', entry.folderName);
+        const comps = await loadEventFromDisk(eventPath);
+        if (!comps) {
+          console.error('[adoptSelectedEvent] Reload failed — cannot adopt:', entry.folderName);
+          return false;
+        }
+        entry._eventJson = {
+          hijriDate:  entry.hijriDate,
+          sequence:   entry.sequence,
+          components: comps,
+        };
+        entry._corrupt = false;
+      }
+
       let json = null;
       try {
         json = await window.api.readEventJson(eventPath);
@@ -2640,10 +3085,20 @@ ${unparseable.map(ev => `
         console.error('[adoptSelectedEvent] Failed to read event.json:', err);
       }
       if (!json || json._corrupt || !Array.isArray(json.components) || json.components.length === 0) {
-        console.error('CRITICAL: Missing or invalid event.json for', entry.folderName);
+        // Unexpected: the entry passed the legacy check (had valid _eventJson) but the
+        // fresh disk read failed. Not a legacy event — treat as non-recoverable corruption.
+        console.error('[adoptSelectedEvent] Fresh read invalid after legacy check passed:', eventPath);
         return false;
       }
-      const freshComponents = json.components;
+
+      // json.components is DISK format ({ types, city, location } as strings).
+      // setEventState expects UI format ({ eventTypes:[{label}], city:{label}, location:{label} }).
+      // loadEventFromDisk performs the normalization — never pass json.components directly.
+      const freshComponents = await loadEventFromDisk(eventPath);
+      if (!freshComponents || freshComponents.length === 0) {
+        console.error('[adoptSelectedEvent] loadEventFromDisk returned empty for', eventPath);
+        return false;
+      }
 
       _editMode = false;
       _newEventDate = null;

@@ -80,6 +80,10 @@ const ImportRouter = (() => {
     const { masterPath, eventName, photographer, isMulti } = ctx;
     const subEventId = _normalizeSubEventId(group.subEventId);
 
+    if (!isMulti && subEventId) {
+      console.error('[IMPORT] Unexpected subEventId in single-component event', subEventId);
+    }
+
     if (isMulti) {
       // Multi-component: subEventId is required — null means the group is unmapped.
       if (!subEventId) return null;
