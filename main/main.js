@@ -855,7 +855,7 @@ function isValidEventJson(obj) {
     typeof obj === 'object' &&
     obj.version === 1 &&
     typeof obj.hijriDate === 'string' && obj.hijriDate.length > 0 &&
-    typeof obj.sequence === 'number' &&
+    (typeof obj.sequence === 'number' || (typeof obj.sequence === 'string' && obj.sequence.length > 0)) &&
     typeof obj.eventName === 'string' && obj.eventName.length > 0 &&
     Array.isArray(obj.components) &&
     obj.components.length > 0 &&

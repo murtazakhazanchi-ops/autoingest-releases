@@ -1955,7 +1955,7 @@ ${unparseable.map(ev => `
       window.api.writeEventJson(eventFolderPath, {
         version:       1,
         hijriDate:     _newEventDate,
-        sequence:      seq,
+        sequence:      parseInt(seq, 10),
         eventName:     name,
         safeEventName: safe,
         components:    compsForDisk,
@@ -2090,7 +2090,7 @@ ${unparseable.map(ev => `
       window.api.writeEventJson(newEventPath, {
         version:       1,
         hijriDate:     _newEventDate,
-        sequence:      seq,
+        sequence:      parseInt(seq, 10),
         eventName:     newName,
         safeEventName: safeNewName,
         components:    repairCompsForDisk,
@@ -2449,6 +2449,13 @@ ${unparseable.map(ev => `
     /** Returns a snapshot of the current live components (_eventComps). */
     getEventComps() {
       return JSON.parse(JSON.stringify(_eventComps));
+    },
+
+    /** Repopulates _eventComps from an external snapshot (e.g. session store fallback). */
+    setEventComps(comps) {
+      if (Array.isArray(comps) && comps.length > 0) {
+        setEventState(JSON.parse(JSON.stringify(comps)));
+      }
     },
 
     setActiveEventIndex(idx) {

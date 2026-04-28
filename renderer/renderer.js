@@ -1479,6 +1479,10 @@ async function selectSource({ type, path, label = null, driveObj = null }) {
     return;
   }
   if (isShuttingDown) return; // Patch 13: block during eject
+  // Reject concurrent calls — a second click while loading would create a stale
+  // browseFolder race. The first call's own ++fileLoadRequestId inside browseFolder
+  // makes subsequent calls supersede it; guard here so only one proceeds at a time.
+  if (isLoadingFiles) return;
 
   const parts = path.split(/[\\/]/);
   const name  = label || parts[parts.length - 1] || path;
@@ -1502,16 +1506,26 @@ async function selectSource({ type, path, label = null, driveObj = null }) {
     `<div class="sidebar-empty">Loading folders…</div>`;
 
   // Load files BEFORE transitioning the UI (requirement 7: never render before files exist)
+  isLoadingFiles = true;
   const loaded = await browseFolder(path, null);
 
-  // Abort if another selectSource() call invalidated this session mid-load
-  if (activeSource?.path !== path) return;
+  // browseFolder returns undefined when a newer request superseded this one.
+  // Distinguish that from false (genuine IPC/render failure) before the
+  // activeSource path guard — a double-click keeps activeSource.path the same,
+  // so the path guard alone can't detect the superseded case.
+  if (loaded === undefined) { isLoadingFiles = false; return; }
 
-  // Abort if IPC failed — browseFolder already rendered the error into the hidden workspace
+  // Abort if another selectSource() call changed the active source mid-load.
+  if (activeSource?.path !== path) { isLoadingFiles = false; return; }
+
+  // Abort if IPC failed — browseFolder already rendered the error into the workspace.
   if (!loaded) {
+    isLoadingFiles = false;
     console.error('selectSource: file load failed — aborting workspace transition');
     return;
   }
+
+  isLoadingFiles = false;
 
   // Files ready — reveal workspace; tiles already rendered by browseFolder
   document.getElementById('step1Panel').style.display = 'none';
@@ -2844,11 +2858,13 @@ async function browseFolder(drivePath, folderPath) {
     return true;
 
   } catch (err) {
+    console.error('[browseFolder] exception during file load:', err);
     if (requestId !== fileLoadRequestId) return;
+    const msg = (err && err.message) ? err.message : String(err);
     document.getElementById('folderList').innerHTML =
-      `<div class="sidebar-empty">${escapeHtml(err.message)}</div>`;
+      `<div class="sidebar-empty">${escapeHtml(msg)}</div>`;
     document.getElementById('fileGrid').innerHTML =
-      `<div class="panel-state"><span class="state-icon">⚠️</span><span>${escapeHtml(err.message)}</span></div>`;
+      `<div class="panel-state"><span class="state-icon">⚠️</span><span>${escapeHtml(msg)}</span></div>`;
     return false;
   }
 }
@@ -3163,15 +3179,26 @@ window.api.onChecksumComplete(({ failed }) => {
 document.getElementById('importBtn').addEventListener('click', async () => {
   if (importRunning) return;
 
-  const liveComps = EventCreator.getEventComps();
-  console.log('[IMPORT CLICKED]', liveComps);
+  const eventData = EventCreator.getActiveEventData();
 
-  if (!Array.isArray(liveComps) || liveComps.length === 0) {
+  // Enforce invariant: _eventComps must match session store before import.
+  // resetToList() clears _eventComps but leaves event.components intact — re-sync here.
+  if (!EventCreator.getEventComps().length && eventData?.event?.components?.length) {
+    console.warn('[IMPORT FIX] Hydrating _eventComps from currentEvent');
+    EventCreator.setEventComps(eventData.event.components);
+  }
+
+  const liveComps = EventCreator.getEventComps()?.length
+    ? EventCreator.getEventComps()
+    : (eventData?.event?.components ? JSON.parse(JSON.stringify(eventData.event.components)) : []);
+
+  console.log('[IMPORT] USING COMPONENTS:', liveComps.length, liveComps);
+
+  if (!liveComps || liveComps.length === 0) {
     console.error('[IMPORT] No components available');
     return;
   }
 
-  const eventData     = EventCreator.getActiveEventData();
   const isEventImport = railMode === 'event' && eventData !== null && GroupManager.hasGroups();
 
   // ── Event Import path (G4 + G5) ──────────────────────────────────────────
