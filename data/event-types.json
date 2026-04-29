@@ -157,7 +157,7 @@
         "label": "Omara AJS"
       },
       {
-        "label": "Omara/Hadiashar Ziyafat"
+        "label": "Omara Hadiashar Ziyafat"
       },
       {
         "label": "Tadbir Manzili"
@@ -213,7 +213,7 @@
         "label": "Khutba"
       },
       {
-        "label": "Maghrib/Isha Namaz"
+        "label": "Maghrib Isha Namaz"
       },
       {
         "label": "Namaz"
@@ -286,7 +286,7 @@
         "label": "Urs Majlis"
       },
       {
-        "label": "Waaz"
+        "label": "Waaz Mubarak"
       },
       {
         "label": "Wada Majlis"
@@ -331,6 +331,9 @@
   {
     "label": "06 Qadam/Majlis/Ziyafat",
     "children": [
+      {
+        "label": "QMZ"
+      },
       {
         "label": "Majlis"
       },

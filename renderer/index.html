@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' file:;" />
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' file: data:;" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AutoIngest</title>
   <script>
@@ -64,6 +64,15 @@
       --peach:     #fab387;
       --warning:   #f59e0b;
       --warning-border: rgba(245,158,11,0.45);
+      /* ── Modal / form surface aliases ──────────────────── */
+      --bg-surface:  var(--card-bg);
+      --bg-elevated: var(--bg-secondary);
+      --bg-input:    var(--card-hover);
+      /* ── Glass depth tokens (depth 1→3, low→high elevation) */
+      --glass-bg-1:  color-mix(in srgb, var(--bg-elevated) 92%, transparent);
+      --glass-bg-2:  color-mix(in srgb, var(--bg-surface)  88%, transparent);
+      --glass-bg-3:  color-mix(in srgb, var(--bg)          85%, transparent);
+      --glass-border: color-mix(in srgb, var(--border-subtle) 60%, transparent);
       /* ── Group colour palette (index-based, 10 pastels) ── */
       --group-1:  #89b4fa;
       --group-2:  #cba6f7;
@@ -134,7 +143,7 @@
       animation: bannerSlideIn 0.25s ease;
     }
     #updateBanner.visible { display: flex; }
-    #updateBanner .upd-icon { font-size: 1rem; flex-shrink: 0; }
+    #updateBanner .upd-icon { display: flex; align-items: center; flex-shrink: 0; }
     #updateBanner .upd-msg  { flex: 1; }
     #updateBanner .upd-progress {
       font-size: 0.72rem; opacity: 0.7;
@@ -804,7 +813,8 @@
 
     /* P4 — section collapse toggle */
     .section-toggle {
-      font-size: 0.6rem; cursor: pointer; color: var(--subtext);
+      display: flex; align-items: center;
+      cursor: pointer; color: var(--subtext);
       user-select: none; flex-shrink: 0;
       transition: color 0.1s;
     }
@@ -883,7 +893,7 @@
     /* Imported but not selected — dimmed */
     .file-tile.already-imported:not(.selected) {
       background: color-mix(in srgb, var(--bg) 92%, var(--accent) 2%);
-      opacity: 0.5;
+      opacity: 0.65;
     }
     .file-tile.already-imported:not(.selected) img {
       filter: saturate(0.45) contrast(0.8) brightness(0.8);
@@ -1042,7 +1052,7 @@
     }
     .list-table tbody tr.file-tile:hover   { background: color-mix(in srgb, var(--accent) 6%, transparent); }
     .list-table tbody tr.file-tile.selected { background: color-mix(in srgb, var(--accent) 10%, transparent); }
-    .list-table tbody tr.file-tile.already-imported:not(.selected) { opacity: 0.5; }
+    .list-table tbody tr.file-tile.already-imported:not(.selected) { opacity: 0.65; }
     .list-table tbody tr.file-tile.selected.already-imported { background: color-mix(in srgb, var(--warning) 10%, transparent); }
     .list-table td { padding: 5px 10px; vertical-align: middle; }
     .lt-check { width: 28px; }
@@ -1074,13 +1084,14 @@
       border-top: 2px solid var(--border); flex-shrink: 0;
     }
     #importBtn {
-      display: none; padding: 8px 22px; font-size: 0.85rem; font-weight: 700;
+      display: none; align-items: center; gap: 6px;
+      padding: 8px 22px; font-size: 0.85rem; font-weight: 700;
       background: var(--green); color: var(--surface2);
       border: none; border-radius: 8px; cursor: pointer;
       white-space: nowrap; flex-shrink: 0;
       transition: background 0.15s, opacity 0.15s;
     }
-    #importBtn.visible { display: block; }
+    #importBtn.visible { display: flex; }
     #importBtn:hover   { background: #b9f0b4; }
     #importBtn:disabled { opacity: 0.45; cursor: not-allowed; }
 
@@ -1092,37 +1103,60 @@
     }
     #progressOverlay.visible { display: flex; }
     #progressModal {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 14px; padding: 28px 32px; width: 420px; max-width: 90vw;
-      display: flex; flex-direction: column; gap: 16px;
+      border-radius: 18px; padding: 28px 30px; width: 460px; max-width: 92vw;
+      display: flex; flex-direction: column; gap: 14px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.45), 0 4px 16px rgba(0,0,0,0.2);
     }
-    #progressModal h3   { font-size: 1rem; font-weight: 700; }
-    #progressFilename   { font-size: 0.78rem; color: var(--subtext); font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .progress-track     { width: 100%; height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
-    .progress-fill      { height: 100%; background: var(--green); border-radius: 3px; transition: width 0.2s ease; width: 0%; }
-    #progressCount      { font-size: 0.8rem; color: var(--subtext); text-align: right; }
-    #progressSummary    { display: none; flex-direction: column; gap: 6px; font-size: 0.82rem; padding: 10px 14px; background: var(--surface2); border-radius: 8px; }
+    .im-header {
+      display: flex; align-items: center; gap: 12px;
+      padding-bottom: 14px; border-bottom: 1px solid var(--border-subtle);
+    }
+    .im-header-icon {
+      width: 36px; height: 36px; border-radius: 9px; flex-shrink: 0;
+      background: color-mix(in srgb, var(--blue) 14%, transparent);
+      border: 1px solid color-mix(in srgb, var(--blue) 28%, transparent);
+      display: flex; align-items: center; justify-content: center; color: var(--blue);
+    }
+    .im-header h3 { font-size: 1rem; font-weight: 700; margin: 0; }
+    .im-current {
+      background: var(--glass-bg-1); border: 1px solid var(--border-subtle);
+      border-radius: 8px; padding: 8px 12px;
+    }
+    #progressFilename { font-size: 0.78rem; color: var(--subtext); font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .im-progress { width: 100%; height: 5px; background: var(--border-subtle); border-radius: 3px; overflow: hidden; }
+    .im-progress-fill { height: 100%; background: var(--blue); border-radius: 3px; transition: width 0.2s ease, background 0.2s ease, box-shadow 0.2s ease; width: 0%; }
+    .im-progress-fill.done { background: var(--green); box-shadow: 0 0 0 1px rgba(34,197,94,0.3), 0 0 12px rgba(34,197,94,0.25); }
+    .im-meta { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--subtext); }
+    #progressSummary {
+      display: none; flex-direction: column; gap: 5px; font-size: 0.82rem;
+      padding: 12px 14px; background: var(--glass-bg-1); border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+    }
     #progressSummary.visible { display: flex; }
-    #progressSummary .sum-row { display: flex; justify-content: space-between; opacity: 0.75; }
+    #progressSummary .sum-row { display: flex; justify-content: space-between; }
     #progressSummary .sum-row span:last-child { font-weight: 600; }
     #progressSkipDetails {
       display: none; flex-direction: column; gap: 3px; max-height: 100px; overflow-y: auto;
-      padding: 6px 10px; background: var(--surface3); border: 1px solid var(--border); border-radius: 6px; margin-top: 2px;
+      padding: 6px 10px; background: var(--glass-bg-1); border: 1px solid var(--border-subtle); border-radius: 8px;
     }
     .skip-reason-row { font-size: 0.68rem; color: var(--subtext); font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.8; }
     .skip-reason-failed { color: var(--red); opacity: 1; }
-    #progressDoneBtn {
-      display: none; padding: 8px 20px; font-size: 0.85rem; font-weight: 700;
-      background: var(--blue); color: var(--surface2); border: none; border-radius: 8px;
-      cursor: pointer; align-self: flex-end; transition: background 0.12s;
+    .im-actions {
+      display: flex; gap: 8px; justify-content: flex-end; align-items: center; flex-wrap: wrap;
+      padding-top: 14px; border-top: 1px solid var(--border-subtle);
     }
-    #progressDoneBtn.visible { display: block; }
-    #progressDoneBtn:hover   { background: #a0c4fd; }
-    #progressEta { font-size: 0.75rem; color: var(--subtext); min-height: 1.1em; }
+    .im-btn-primary {
+      display: none; padding: 8px 22px; font-size: 0.85rem; font-weight: 700;
+      background: var(--blue); color: var(--bg); border: none; border-radius: 9px;
+      cursor: pointer; transition: opacity 0.12s;
+    }
+    .im-btn-primary.visible { display: block; }
+    .im-btn-primary:hover { opacity: 0.85; }
     #runChecksumBtn.csq-success { color: var(--green) !important; border-color: var(--green) !important; }
     #runChecksumBtn.csq-error   { color: var(--red)   !important; border-color: var(--red)   !important; }
     .progress-controls { display: flex; gap: 8px; }
     #progressPauseBtn, #progressResumeBtn {
+      display: flex; align-items: center; gap: 5px;
       padding: 6px 18px; font-size: 0.8rem; font-weight: 600;
       border: none; border-radius: 8px; cursor: pointer; transition: opacity 0.12s;
     }
@@ -1143,7 +1177,11 @@
       border-radius: 14px; padding: 28px 28px 24px; width: 400px; max-width: 92vw;
       display: flex; flex-direction: column; gap: 14px;
     }
-    .dup-icon { font-size: 1.8rem; text-align: center; }
+    .dup-icon { display: flex; align-items: center; justify-content: center; color: var(--green); }
+    #dupWarningModal .dup-icon,
+    #unassignedModal .dup-icon,
+    #dupSubEventModal .dup-icon { color: var(--yellow); }
+    #missingSubEventModal .dup-icon { color: var(--red); }
     #dupWarningModal h3 { font-size: 1rem; font-weight: 700; text-align: center; }
     .dup-subtitle { font-size: 0.82rem; color: var(--subtext); text-align: center; line-height: 1.5; }
     .dup-subtitle strong { color: var(--text); }
@@ -1214,7 +1252,7 @@
       padding: 24px 28px 20px; flex: 1; overflow-y: auto;
       display: flex; flex-direction: column; gap: 14px;
     }
-    .ob-hero { font-size: 2.8rem; text-align: center; }
+    .ob-hero { display: flex; align-items: center; justify-content: center; color: var(--blue); }
     .ob-title { font-size: 1.1rem; font-weight: 700; text-align: center; }
     .ob-text  { font-size: 0.87rem; color: var(--subtext); line-height: 1.65; }
     .ob-text strong { color: var(--text); }
@@ -1246,7 +1284,7 @@
     }
     .ob-result-rows { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
     .ob-result-row  { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; }
-    .ob-result-icon { font-size: 0.9rem; flex-shrink: 0; }
+    .ob-result-icon { flex-shrink: 0; display: flex; align-items: center; }
     .ob-beta { margin-top: 4px; }
     .ob-beta-title {
       font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
@@ -1295,7 +1333,7 @@
       display: flex; align-items: center; justify-content: space-between;
       padding: 16px 22px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0;
     }
-    #helpModalHeader h3 { font-size: 1rem; font-weight: 700; }
+    #helpModalHeader h3 { font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 7px; }
     #helpCloseBtn {
       background: none; border: none; color: var(--subtext);
       font-size: 1.2rem; cursor: pointer; padding: 0 4px; line-height: 1;
@@ -1323,6 +1361,7 @@
     .sum-copied  { color: var(--green); }
     .sum-skipped { color: var(--yellow); }
     .sum-errors  { color: var(--red); }
+    .sum-label   { display: flex; align-items: center; gap: 5px; }
 
 
     /* Eject modal (Commit 12c) */
@@ -1337,6 +1376,7 @@
       border-radius: 14px; padding: 28px 28px 22px; width: 380px; max-width: 92vw;
       display: flex; flex-direction: column; gap: 14px; text-align: center;
     }
+    #ejectIcon { color: var(--green); }
     #ejectModal.eject-failure #ejectIcon { color: var(--red); }
     #ejectBtn {
       padding: 3px 10px; font-size: 0.73rem;
@@ -1371,6 +1411,7 @@
     }
     #feedbackPanelHeader .fp-title {
       font-size: 0.9rem; font-weight: 700; color: var(--text);
+      display: flex; align-items: center; gap: 6px;
     }
     #feedbackPanelClose {
       background: none; border: none; color: var(--subtext);
@@ -1422,6 +1463,7 @@
     .fp-hint {
       font-size: 0.68rem; color: var(--subtext); opacity: 0.6;
       margin: 0; line-height: 1.5;
+      display: flex; align-items: flex-start; gap: 5px;
     }
     .fp-log-row {
       display: flex; align-items: center; gap: 8px;
@@ -1777,8 +1819,8 @@
 }
 
 .ec-coll-card {
-  background: var(--surface);
-  border: 1.5px solid var(--border);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
   border-radius: 12px;
   padding: 14px 18px;
   cursor: pointer;
@@ -1789,23 +1831,22 @@
   user-select: none;
 }
 .ec-coll-card:hover {
-  border-color: var(--mauve);
-  background: color-mix(in srgb, var(--mauve) 7%, var(--surface));
+  border-color: var(--accent-border);
+  background: var(--accent-hover);
 }
 .ec-coll-card:focus-visible {
-  outline: 2px solid var(--mauve);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 .ec-coll-card.selected {
-  border-color: var(--mauve);
-  background: color-mix(in srgb, var(--mauve) 12%, var(--surface));
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mauve) 20%, transparent);
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 3px var(--accent-hover);
 }
 
 .ec-coll-icon {
-  font-size: 20px;
-  line-height: 1;
-  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; color: var(--subtext);
 }
 
 .ec-coll-info {
@@ -1829,8 +1870,8 @@
 
 .ec-coll-check {
   margin-left: auto;
-  font-size: 15px;
-  color: var(--mauve);
+  display: flex; align-items: center;
+  color: var(--blue);
   opacity: 0;
   transition: opacity 0.15s;
   flex-shrink: 0;
@@ -1846,10 +1887,10 @@
   align-items: center;
   gap: 10px;
   background: transparent;
-  border: 1.5px dashed var(--border);
+  border: 1px solid var(--border-subtle);
   border-radius: 12px;
   padding: 14px 18px;
-  color: var(--subtext);
+  color: var(--text-muted);
   font-size: 13px;
   font-family: inherit;
   cursor: pointer;
@@ -1860,12 +1901,12 @@
 }
 .ec-new-toggle:hover,
 .ec-new-toggle.open {
-  border-color: var(--mauve);
-  color: var(--mauve);
-  background: color-mix(in srgb, var(--mauve) 5%, transparent);
+  border-color: var(--accent);
+  color: var(--text-primary);
+  background: var(--accent-hover);
 }
 .ec-new-toggle:focus-visible {
-  outline: 2px solid var(--mauve);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -1876,7 +1917,7 @@
 }
 .ec-new-arrow {
   margin-left: auto;
-  font-size: 9px;
+  display: flex; align-items: center;
   transition: transform 0.2s ease;
   flex-shrink: 0;
 }
@@ -1890,9 +1931,9 @@
   display: none;               /* hidden by default, JS adds .open */
   flex-direction: column;
   gap: 22px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
   padding: 26px 24px;
   margin-top: 10px;
 
@@ -1928,19 +1969,18 @@
 /* Common input base */
 .ec-field input[type="text"],
 .ec-hijri-seg {
-  background: var(--bg);
-  border: 1.5px solid var(--border);
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
   border-radius: 8px;
   color: var(--text);
   font-size: 14px;
   font-family: inherit;
   outline: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s ease;
 }
 .ec-field input[type="text"]:focus,
 .ec-hijri-seg:focus {
-  border-color: var(--mauve);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mauve) 18%, transparent);
+  border-color: var(--accent);
 }
 .ec-field input[type="text"].has-error,
 .ec-hijri-seg.has-error {
@@ -1969,6 +2009,24 @@
 .ec-error.visible {
   display: block;
 }
+
+/* ── Generic .input class (passive; dormant if unused) ───────────────────── */
+.input {
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.input:focus { border-color: var(--accent); }
+.input[disabled] { opacity: 0.6; cursor: not-allowed; }
+.input.error { border-color: #ef4444; }
+.input.warning { border-color: #f59e0b; }
+.field-error { font-size: 11px; color: #ef4444; margin-top: 4px; }
+.field-warning { font-size: 11px; color: #f59e0b; margin-top: 4px; }
 
 /* ── Hijri date — three-segment input ────────────────────────────────────── */
 
@@ -2000,8 +2058,8 @@
 /* ── Live preview card ───────────────────────────────────────────────────── */
 
 .ec-preview-card {
-  background: color-mix(in srgb, var(--mauve) 6%, var(--bg));
-  border: 1.5px solid color-mix(in srgb, var(--mauve) 30%, var(--border));
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
   border-radius: 12px;
   padding: 16px 20px;
   display: flex;
@@ -2010,8 +2068,8 @@
   transition: border-color 0.2s ease, background 0.2s ease;
 }
 .ec-preview-card.has-value {
-  border-color: color-mix(in srgb, var(--mauve) 60%, var(--border));
-  background: color-mix(in srgb, var(--mauve) 10%, var(--bg));
+  border-color: var(--accent-border);
+  background: var(--bg-elevated);
 }
 
 .ec-preview-label {
@@ -2020,12 +2078,13 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 600;
+  display: flex; align-items: center; gap: 5px;
 }
 
 .ec-preview-name {
   font-size: 14.5px;
   font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', ui-monospace, monospace;
-  color: var(--mauve);
+  color: var(--text-primary);
   font-weight: 500;
   word-break: break-all;
   min-height: 22px;
@@ -2068,23 +2127,21 @@
 
 .ec-continue-btn {
   margin-top: 20px;
-  background: var(--mauve);
-  color: var(--bg);
+  background: var(--accent);
+  color: #fff;
   border: none;
   border-radius: 10px;
   padding: 13px 28px;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   font-family: inherit;
   cursor: pointer;
   width: 100%;
   letter-spacing: 0.02em;
-  transition: opacity 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  transition: opacity 0.15s ease, transform 0.12s ease;
 }
 .ec-continue-btn:not(:disabled):hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px color-mix(in srgb, var(--mauve) 35%, transparent);
+  opacity: 0.88;
 }
 .ec-continue-btn:not(:disabled):active {
   transform: translateY(0);
@@ -2101,8 +2158,8 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
   border-radius: 10px;
   overflow: hidden;
   margin-bottom: 28px;
@@ -2115,7 +2172,7 @@
   min-width: 0;
 }
 .ec-bc-row + .ec-bc-row {
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--border-subtle);
 }
 .ec-bc-label {
   font-size: 10px;
@@ -2129,7 +2186,7 @@
 .ec-bc-value {
   font-size: 12.5px;
   font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', ui-monospace, monospace;
-  color: var(--mauve);
+  color: var(--text-secondary);
   font-weight: 500;
   flex: 1;
   min-width: 0;
@@ -2141,9 +2198,9 @@
 .ec-bc-select {
   flex: 1;
   min-width: 0;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  color: var(--mauve);
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
   font-family: 'SF Mono', 'Cascadia Code', ui-monospace, monospace;
   font-size: 12px; font-weight: 500;
   padding: 4px 28px 4px 8px;
@@ -2151,13 +2208,13 @@
   cursor: pointer;
   outline: none;
   -webkit-appearance: none; appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23cba6f7' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23aab1c3' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 8px center;
   transition: border-color 0.15s;
 }
-.ec-bc-select:hover { border-color: var(--mauve); }
-.ec-bc-select:focus { border-color: var(--mauve); outline: none; }
+.ec-bc-select:hover { border-color: var(--accent); }
+.ec-bc-select:focus { border-color: var(--accent); outline: none; }
 
 .ec-bc-change {
   background: transparent;
@@ -2191,9 +2248,9 @@
 }
 
 .ec-comp-row {
-  background: var(--surface);
-  border: 1.5px solid var(--border);
-  border-radius: 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
   padding: 16px 18px 18px;
   display: flex;
   flex-direction: column;
@@ -2218,7 +2275,7 @@
 .ec-comp-remove {
   background: transparent;
   border: 1px solid transparent;
-  color: var(--subtext);
+  color: var(--text-muted);
   font-size: 11px;
   padding: 3px 9px;
   border-radius: 6px;
@@ -2227,9 +2284,9 @@
   transition: color 0.13s, border-color 0.13s, background 0.13s;
 }
 .ec-comp-remove:hover {
-  color: var(--red);
-  border-color: color-mix(in srgb, var(--red) 50%, transparent);
-  background: color-mix(in srgb, var(--red) 8%, transparent);
+  color: #ef4444;
+  border-color: color-mix(in srgb, #ef4444 50%, transparent);
+  background: color-mix(in srgb, #ef4444 8%, transparent);
 }
 
 .ec-comp-fields {
@@ -2275,9 +2332,9 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  background: color-mix(in srgb, var(--mauve) 14%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--mauve) 38%, transparent);
-  color: var(--mauve);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
   border-radius: 6px;
   padding: 3px 6px 3px 9px;
   font-size: 11.5px;
@@ -2288,7 +2345,7 @@
 .ec-chip-x {
   background: transparent;
   border: none;
-  color: var(--mauve);
+  color: var(--text-secondary);
   cursor: pointer;
   font-size: 15px;
   line-height: 1;
@@ -2306,9 +2363,9 @@
   align-items: center;
   gap: 8px;
   background: transparent;
-  border: 1.5px dashed var(--border);
+  border: 1px solid var(--border-subtle);
   border-radius: 10px;
-  color: var(--subtext);
+  color: var(--text-muted);
   font-size: 13px;
   font-family: inherit;
   padding: 11px 16px;
@@ -2318,9 +2375,9 @@
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
 .ec-add-comp:hover {
-  border-color: var(--blue);
-  color: var(--blue);
-  background: color-mix(in srgb, var(--blue) 6%, transparent);
+  border-color: var(--accent);
+  color: var(--text-primary);
+  background: var(--accent-hover);
 }
 
 /* ── Step 3: Breadcrumb separator ────────────────────────────────────────── */
@@ -2387,8 +2444,8 @@
 /* ── Step 3: Folder structure tree ───────────────────────────────────────── */
 
 .ec-folder-tree {
-  background: var(--surface2);
-  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
   border-radius: 10px;
   padding: 14px 18px;
   font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', ui-monospace, monospace;
@@ -2409,18 +2466,18 @@
   flex: 1;
   padding: 11px 20px;
   background: transparent;
-  border: 1.5px solid var(--border);
+  border: 1px solid var(--border-subtle);
   border-radius: 10px;
-  color: var(--text);
+  color: var(--text-secondary);
   font-size: 14px;
   font-family: inherit;
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
 .ec-outline-btn:hover {
-  border-color: var(--blue);
-  color: var(--blue);
-  background: color-mix(in srgb, var(--blue) 6%, transparent);
+  border-color: var(--accent);
+  color: var(--text-primary);
+  background: var(--accent-hover);
 }
 
 /* ── Select Existing Master button ───────────────────────────────────────── */
@@ -2429,22 +2486,23 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 7px;
   width: 100%;
   margin-top: 10px;
   padding: 11px 20px;
   background: transparent;
-  border: 1.5px dashed var(--border);
+  border: 1px solid var(--border-subtle);
   border-radius: 12px;
-  color: var(--subtext);
+  color: var(--text-muted);
   font-size: 13px;
   font-family: inherit;
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
 .ec-select-existing-btn:hover {
-  border-color: var(--blue);
-  color: var(--blue);
-  background: color-mix(in srgb, var(--blue) 6%, transparent);
+  border-color: var(--accent);
+  color: var(--text-primary);
+  background: var(--accent-hover);
 }
 .ec-select-existing-btn:focus-visible {
   outline: 2px solid var(--blue);
@@ -2560,9 +2618,10 @@
     }
     .ec-evl-warn {
       color: var(--yellow);
-      font-size: 1rem;
+      display: flex; align-items: center;
       margin-left: 6px;
       cursor: help;
+      flex-shrink: 0;
     }
     .ec-evl-warn-text {
       color: var(--yellow);
@@ -2571,19 +2630,17 @@
       width: 100%;
       box-sizing: border-box;
       padding: 7px 12px;
-      background: var(--surface);
-      border: 1px solid var(--border);
+      background: var(--bg-input);
+      border: 1px solid var(--border-subtle);
       border-radius: 8px;
       color: var(--text);
       font-size: 0.82rem;
       outline: none;
       margin-bottom: 8px;
-      transition: border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
+      transition: border-color 0.12s ease;
     }
     .ec-evl-search:focus {
-      border-color: var(--accent-border);
-      background: var(--surface2);
-      box-shadow: 0 0 0 2px var(--accent-soft);
+      border-color: var(--accent);
     }
     .ec-evl-search::placeholder { color: var(--subtext); opacity: 0.7; }
     .ec-empty-search {
@@ -2603,8 +2660,8 @@
   gap: 8px;
   margin-top: 10px;
   padding: 8px 14px;
-  background: color-mix(in srgb, var(--blue) 6%, var(--surface2));
-  border: 1px solid color-mix(in srgb, var(--blue) 25%, transparent);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
   border-radius: 8px;
   font-size: 11.5px;
 }
@@ -2637,7 +2694,7 @@
   flex-shrink: 0;
   font-family: inherit;
 }
-.ec-location-change-link:hover { color: var(--mauve); }
+.ec-location-change-link:hover { color: var(--accent); }
 
 /* ── Master-exists / error modal overlay ─────────────────────────────────── */
 
@@ -2761,6 +2818,46 @@
   margin: 0;
   padding: 9px 22px;
 }
+/* Disk-content summary inside structure-change warning modal */
+.ec-struct-disk-info {
+  background: color-mix(in srgb, var(--yellow) 7%, var(--bg));
+  border: 1px solid color-mix(in srgb, var(--yellow) 22%, transparent);
+  border-radius: 8px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ec-struct-disk-counts {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.ec-struct-disk-counts span {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.ec-struct-disk-folders {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 2px;
+  padding-top: 6px;
+  border-top: 1px solid color-mix(in srgb, var(--border-subtle) 60%, transparent);
+}
+.ec-struct-disk-item {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ec-struct-disk-more {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
 
 /* Event detail view — "Select for Import →" + "Edit Event" side by side */
 .ec-view-actions {
@@ -2778,7 +2875,7 @@
     #groupPanel {
       display: none; flex-direction: column;
       width: 268px; min-width: 220px; flex-shrink: 0;
-      background: var(--surface2); border-left: 1px solid var(--border);
+      background: var(--surface2); border-left: 1px solid var(--border-subtle, var(--border));
       overflow: hidden;
     }
     #groupPanel.visible { display: flex; }
@@ -2850,16 +2947,34 @@
     .gp-status.warn { background: color-mix(in srgb, var(--yellow) 12%, transparent); color: var(--yellow); }
 
     .gp-file-list {
-      flex: 1; overflow-y: auto; padding: 6px 0;
+      flex: 1; overflow-y: auto; padding: 4px 0;
+      scrollbar-width: thin;
     }
     .gp-file-row {
-      display: flex; align-items: center; gap: 8px;
-      padding: 5px 14px; font-size: 0.77rem; color: var(--subtext);
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 6px;
+      align-items: center;
+      padding: 6px 12px 6px 16px;
+      font-size: 0.74rem; color: var(--subtext);
       transition: background 0.08s;
+      cursor: default;
     }
-    .gp-file-row:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); }
-    .gp-fdot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-    .gp-fname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .gp-file-row:hover {
+      background: color-mix(in srgb, var(--active-group-color, var(--accent)) 8%, transparent);
+    }
+    .gp-fname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .file-format {
+      font-size: 0.59rem; font-weight: 700; letter-spacing: 0.05em;
+      text-transform: uppercase; white-space: nowrap;
+      padding: 1px 5px; border-radius: 4px;
+      background: color-mix(in srgb, var(--active-group-color, var(--accent)) 13%, transparent);
+      color: color-mix(in srgb, var(--active-group-color, var(--accent)) 75%, var(--text));
+      flex-shrink: 0;
+    }
+    .file-time {
+      font-size: 0.62rem; opacity: 0.38; white-space: nowrap; flex-shrink: 0;
+    }
     .gp-empty {
       padding: 20px 14px; font-size: 0.78rem; color: var(--subtext);
       opacity: 0.45; font-style: italic; text-align: center;
@@ -2878,6 +2993,165 @@
       border-color: var(--red); color: var(--red);
       background: color-mix(in srgb, var(--red) 8%, transparent);
     }
+
+    /* ── MULTI-CARD GROUP PANEL ───────────────────────────────── */
+    .gp-cards-container {
+      flex: 1; overflow-y: auto; padding: 8px 10px 6px;
+      display: flex; flex-direction: column; gap: 8px;
+      scrollbar-width: thin;
+    }
+    .group-card {
+      position: relative; flex-shrink: 0;
+      background: color-mix(in srgb, var(--surface3) 82%, transparent);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      border: 1px solid var(--border-subtle, var(--border));
+      border-radius: 12px; overflow: hidden;
+      transition: box-shadow 0.15s ease;
+    }
+    .group-card::before {
+      content: ''; position: absolute;
+      left: 0; top: 0; bottom: 0; width: 3px;
+      background: var(--group-color, var(--accent));
+      pointer-events: none;
+    }
+    .group-card.drag-over {
+      outline: 2px dashed var(--group-color, var(--accent));
+      outline-offset: -2px;
+      background: color-mix(in srgb, var(--group-color, var(--accent)) 10%, transparent);
+    }
+    .gc-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 12px 7px 16px;
+      border-bottom: 1px solid var(--border-subtle, var(--border));
+    }
+    .gc-label { font-size: 0.76rem; font-weight: 700; color: var(--text); }
+    .gc-count {
+      font-size: 0.64rem; color: var(--subtext);
+      background: color-mix(in srgb, var(--group-color, var(--accent)) 13%, transparent);
+      padding: 1px 6px; border-radius: 8px;
+    }
+    .gc-subevent {
+      padding: 5px 12px 4px 16px;
+      display: flex; flex-direction: column; gap: 3px;
+      border-bottom: 1px solid var(--border-subtle, var(--border));
+    }
+    .gc-subevent-row { display: flex; align-items: center; gap: 6px; }
+    .gc-subevent-row > .gp-sl { flex-shrink: 0; }
+    .gc-sub-trigger {
+      flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 4px;
+      padding: 4px 8px;
+      background: var(--glass-bg-3); border: 1px solid var(--glass-border, var(--border-subtle));
+      border-radius: 6px; color: var(--subtext); font-size: 0.72rem;
+      font-family: inherit; cursor: pointer; outline: none; text-align: left;
+      transition: border-color 0.12s, color 0.12s, background 0.12s;
+    }
+    .gc-sub-trigger:hover {
+      border-color: var(--group-color, var(--accent));
+      color: var(--text);
+    }
+    .gc-sub-trigger.mapped {
+      color: var(--text);
+      border-color: color-mix(in srgb, var(--group-color, var(--accent)) 40%, transparent);
+    }
+    .gc-sub-value { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .gc-sub-chevron { flex-shrink: 0; opacity: 0.5; transition: transform 0.15s, opacity 0.12s; }
+    .gc-sub-trigger:hover .gc-sub-chevron { opacity: 0.85; }
+    .gc-status {
+      padding: 2px 7px; border-radius: 5px;
+      font-size: 0.65rem; font-weight: 600;
+    }
+    .gc-status.ok   { background: var(--green-dim); color: var(--green); }
+    .gc-status.warn { background: color-mix(in srgb, var(--yellow) 10%, transparent); color: var(--yellow); }
+
+    /* ── PORTAL DROPDOWN ─────────────────────────────────────────── */
+    @keyframes gc-dropdown-appear {
+      from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+      to   { opacity: 1; transform: translateY(0)    scale(1);    }
+    }
+    #dropdown-root { position: fixed; top: 0; left: 0; width: 0; height: 0; z-index: 10000; }
+    .gc-dropdown {
+      position: fixed;
+      background: var(--glass-bg-1); backdrop-filter: blur(18px) saturate(1.4);
+      border: 1px solid var(--glass-border, var(--border-subtle));
+      border-radius: 10px; padding: 4px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.30), 0 2px 8px rgba(0,0,0,0.18);
+      max-height: 240px; overflow-y: auto; scrollbar-width: thin;
+      animation: gc-dropdown-appear 0.14s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      transform-origin: top center;
+    }
+    .gc-dropdown-item {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 10px; border-radius: 6px;
+      font-size: 0.72rem; color: var(--text); font-family: inherit;
+      cursor: pointer; transition: background 0.08s;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      user-select: none;
+    }
+    .gc-dropdown-item:hover:not(.disabled) {
+      background: color-mix(in srgb, var(--group-color, var(--accent)) 16%, transparent);
+    }
+    .gc-dropdown-item.current {
+      background: color-mix(in srgb, var(--group-color, var(--accent)) 24%, transparent);
+      font-weight: 600;
+    }
+    .gc-dropdown-item.current::before {
+      content: '✓'; margin-right: 2px;
+      color: color-mix(in srgb, var(--group-color, var(--accent)) 85%, var(--text));
+    }
+    .gc-dropdown-item.disabled { opacity: 0.35; cursor: not-allowed; }
+    .gc-dropdown-clear {
+      color: var(--subtext); font-style: italic; font-size: 0.68rem;
+      border-bottom: 1px solid var(--border-subtle); margin-bottom: 3px; padding-bottom: 8px;
+    }
+
+    .gc-file-list {
+      max-height: calc(5 * 34px); overflow-y: auto;
+      padding: 2px 0; scrollbar-width: thin;
+    }
+    .gc-file-row {
+      display: grid; grid-template-columns: 1fr auto auto;
+      gap: 5px; align-items: center;
+      padding: 5px 12px 5px 16px;
+      font-size: 0.72rem; color: var(--subtext);
+      transition: background 0.08s; cursor: default;
+    }
+    .gc-file-row:hover {
+      background: color-mix(in srgb, var(--group-color, var(--accent)) 8%, transparent);
+    }
+    .gc-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .gc-file-format {
+      font-size: 0.58rem; font-weight: 700; letter-spacing: 0.05em;
+      text-transform: uppercase; white-space: nowrap; flex-shrink: 0;
+      padding: 1px 4px; border-radius: 3px;
+      background: color-mix(in srgb, var(--group-color, var(--accent)) 13%, transparent);
+      color: color-mix(in srgb, var(--group-color, var(--accent)) 75%, var(--text));
+    }
+    .gc-file-time { font-size: 0.60rem; opacity: 0.38; white-space: nowrap; flex-shrink: 0; }
+    .gc-empty {
+      padding: 10px 16px; font-size: 0.73rem;
+      color: var(--subtext); opacity: 0.4;
+      font-style: italic; text-align: center;
+    }
+    .gc-footer { padding: 5px 10px 7px; }
+    .gc-remove-btn {
+      width: 100%; padding: 5px 10px;
+      background: transparent; border: 1.5px solid var(--border);
+      border-radius: 7px; color: var(--subtext);
+      font-size: 0.72rem; font-family: inherit; cursor: pointer;
+      transition: border-color 0.12s, color 0.12s, background 0.12s;
+    }
+    .gc-remove-btn:hover {
+      border-color: var(--red); color: var(--red);
+      background: color-mix(in srgb, var(--red) 8%, transparent);
+    }
+    .gp-add-card-btn {
+      margin: 0 10px 10px; padding: 7px; flex-shrink: 0;
+      background: transparent; border: 1.5px dashed var(--border);
+      border-radius: 9px; color: var(--subtext);
+      font-size: 0.73rem; font-family: inherit; cursor: pointer;
+      text-align: center; transition: border-color 0.12s, color 0.12s;
+    }
+    .gp-add-card-btn:hover { border-color: var(--green); color: var(--green); }
 
     /* ── GROUP BADGE on tiles ─────────────────────────────────── */
     .grp-badge {
@@ -2993,56 +3267,102 @@
     .dupWarningModal h3 { font-size: 1rem; font-weight: 700; text-align: center; }
 
     /* ── G5: event import confirmation modal ────────────────────────────────── */
-    #eventImportOverlay {
+    #quickImportOverlay, #eventImportOverlay {
       display: none; position: fixed; inset: 0;
       background: rgba(0,0,0,.65); z-index: 201;
       align-items: center; justify-content: center;
     }
-    #eventImportOverlay.visible { display: flex; }
-    #eventImportModal {
-      background: var(--surface); border-radius: 14px; padding: 28px 28px 24px;
-      width: min(520px, 94vw); box-shadow: 0 12px 48px rgba(0,0,0,.5);
-      border: 1px solid var(--border); max-height: 88vh; overflow-y: auto;
+    #quickImportOverlay.visible, #eventImportOverlay.visible { display: flex; }
+    #quickImportModal, #eventImportModal {
+      border-radius: 18px; padding: 28px 30px 24px;
+      width: min(520px, 94vw);
+      box-shadow: 0 24px 64px rgba(0,0,0,0.45), 0 4px 16px rgba(0,0,0,0.2);
+      max-height: 88vh; overflow-y: auto;
     }
-    #eventImportModal h3 { font-size: 1rem; font-weight: 700; margin: 0 0 16px; text-align: center; }
+    #quickImportModal h3, #eventImportModal h3 { font-size: 1rem; font-weight: 700; margin: 0 0 18px; text-align: center; }
+    #qiModalImportBtn { background: var(--green); color: var(--bg); font-weight: 700; }
+    #qiModalImportBtn:not([disabled]):hover { opacity: 0.85; }
+    #qiModalImportBtn[disabled] { opacity: 0.4; cursor: not-allowed; }
     .ei-event-name {
-      background: var(--surface2); border-radius: 8px; padding: 8px 12px;
+      background: var(--glass-bg-1); border: 1px solid var(--border-subtle);
+      border-radius: 10px; padding: 10px 14px;
       font-size: 0.8rem; font-family: 'SF Mono','Fira Code',monospace;
-      color: var(--blue); margin-bottom: 18px; word-break: break-all;
+      color: var(--blue); margin-bottom: 20px; word-break: break-all; text-align: center;
     }
-    .ei-field-row { margin-bottom: 14px; }
+    .ei-field-row { margin-bottom: 16px; }
     .ei-label {
       font-size: 0.73rem; font-weight: 600; color: var(--subtext);
       text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px;
     }
     .ei-required { color: var(--red); }
-    #eiMappingSection { margin-bottom: 14px; }
+    #eiMappingSection { margin-bottom: 16px; }
     .ei-map-row {
       display: flex; align-items: center; gap: 8px;
-      padding: 6px 8px; border-radius: 7px;
-      background: var(--surface2); margin-bottom: 5px;
-      font-size: 0.78rem;
+      padding: 7px 10px; border-radius: 9px;
+      background: var(--glass-bg-1); border: 1px solid var(--border-subtle);
+      margin-bottom: 6px; font-size: 0.78rem;
     }
     .ei-map-group {
-      padding: 2px 8px; border-radius: 5px; font-weight: 700; font-size: 0.72rem;
+      padding: 2px 9px; border-radius: 6px; font-weight: 700; font-size: 0.72rem;
       flex-shrink: 0;
-      background: color-mix(in srgb, var(--group-color, var(--accent)) 20%, transparent);
-      color: var(--text-primary);
-      border: 1px solid color-mix(in srgb, var(--group-color, var(--accent)) 35%, transparent);
+      background: color-mix(in srgb, var(--group-color, var(--blue)) 20%, transparent);
+      color: var(--text);
+      border: 1px solid color-mix(in srgb, var(--group-color, var(--blue)) 35%, transparent);
     }
     .ei-map-arrow { color: var(--subtext); flex-shrink: 0; }
     .ei-map-sub { flex: 1; font-size: 0.78rem; color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .ei-map-count { font-size: 0.7rem; color: var(--subtext); flex-shrink: 0; }
     #eiFileSummary {
       font-size: 0.78rem; color: var(--subtext); text-align: center;
-      margin: 6px 0 18px;
+      margin: 8px 0 20px; line-height: 1.5;
     }
     .ei-actions {
       display: flex; gap: 10px; justify-content: flex-end;
+      padding-top: 16px; border-top: 1px solid var(--border-subtle);
     }
-    #eiImportBtn { background: var(--green); color: var(--bg); font-weight: 700; }
-    #eiImportBtn:not([disabled]):hover { background: #b9f0b4; }
+    #eiImportBtn {
+      padding: 8px 22px; font-size: 0.85rem; font-weight: 700;
+      background: var(--green); color: var(--bg); border: none; border-radius: 9px;
+      cursor: pointer; transition: opacity 0.12s;
+    }
+    #eiImportBtn:not([disabled]):hover { opacity: 0.85; }
     #eiImportBtn[disabled] { opacity: 0.4; cursor: not-allowed; }
+    #eiCancelBtn {
+      padding: 7px 16px; font-size: 0.82rem; font-weight: 600;
+      background: transparent; color: var(--subtext);
+      border: 1px solid var(--border-subtle); border-radius: 9px; cursor: pointer;
+      transition: border-color 0.12s, color 0.12s;
+    }
+    #eiCancelBtn:hover { border-color: var(--border-strong); color: var(--text); }
+
+    /* Destination structure tree */
+    #eiDestSection { margin-bottom: 16px; }
+    .cm-tree {
+      margin-top: 8px; padding: 10px 14px;
+      background: var(--glass-bg-1); border: 1px solid var(--glass-border);
+      border-radius: 10px;
+      font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+      font-size: 11px; line-height: 1.8; overflow: hidden;
+    }
+    .cm-node {
+      position: relative; padding-left: 14px;
+      color: var(--subtext); white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+      transition: color 0.1s;
+    }
+    .cm-node:hover { overflow: visible; white-space: normal; }
+    .cm-node::before { content: "└ "; position: absolute; left: 0; opacity: 0.28; }
+    .cm-node.root { padding-left: 0; font-weight: 600; color: var(--text-primary); }
+    .cm-node.root::before { content: none; }
+    .cm-node.branch { color: var(--text-primary); font-weight: 600; }
+    .cm-node.photographer { color: var(--accent); font-weight: 500; }
+    .cm-node.video-dir { color: var(--text-muted); font-style: italic; }
+    .cm-node.placeholder { color: var(--text-muted); opacity: 0.6; font-style: italic; }
+    .cm-level-1 { margin-left: 8px; }
+    .cm-level-2 { margin-left: 16px; }
+    .cm-level-3 { margin-left: 24px; }
+    .cm-level-4 { margin-left: 32px; }
+    .cm-node-count { margin-left: 6px; opacity: 0.6; font-size: 11px; }
 
   /* ── Drag-and-drop grouping ─────────────────────────────────────────────── */
 
@@ -3170,11 +3490,17 @@
 
   @media (prefers-reduced-motion: reduce) {
     #groupPanel.visible          { animation: none; }
-    .gp-drag-hint                { animation: none; }
-    .gp-new-group-tab.gp-drop-tab { animation: none !important; }
     #gpChordToast                { transition: none; }
     .file-tile.dragging          { transition: none; }
-    .gp-tab                      { transition: none; }
+    .group-card                  { transition: none; }
+    .gc-file-row                 { transition: none; }
+    .gc-remove-btn               { transition: none; }
+    .gp-add-card-btn             { transition: none; }
+    .gc-sub-trigger              { transition: none; }
+    .gc-dropdown                 { animation: none; backdrop-filter: none; }
+    .gc-dropdown-item            { transition: none; }
+    .im-progress-fill            { transition: none; }
+    .im-btn-primary              { transition: none; }
   }
 
   /* ── LIGHT MODE STRUCTURAL OVERRIDES ──────────────────────────────────────
@@ -3321,6 +3647,147 @@
   .settings-theme-name { font-size: 0.82rem; font-weight: 500; color: var(--text); }
   .settings-theme-desc { font-size: 0.67rem; color: var(--text-muted); }
 
+  /* ══════════════════════════════════════════════════════════════════════════
+     GLASS DEPTH SYSTEM — purely visual, no layout or logic changes
+     Depth 3 (strongest) → modal boxes
+     Depth 2             → panels + header
+     Depth 1 (lightest)  → section blocks inside panels
+     ══════════════════════════════════════════════════════════════════════════ */
+
+  /* ── Depth 3 — Modal boxes ───────────────────────────────────────────────── */
+  .emm-box,
+  .settings-box,
+  .gpm-box,
+  .dupWarningModal,
+  #quickImportModal,
+  #eventImportModal,
+  #progressModal,
+  #ejectModal {
+    background: var(--glass-bg-3);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+  }
+
+  /* ── Depth 2 — Panels + header ───────────────────────────────────────────── */
+  #sidebar,
+  #groupPanel,
+  #contextBar {
+    background: var(--glass-bg-2);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  /* ── Depth 1 — Section blocks ────────────────────────────────────────────── */
+  .ec-comp-row,
+  .ec-new-form,
+  .ec-folder-tree {
+    background: var(--glass-bg-1);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+
+  /* ── Fallback — no backdrop-filter support ───────────────────────────────── */
+  @supports not (backdrop-filter: blur(10px)) {
+    .emm-box,
+    .settings-box,
+    .gpm-box,
+    .dupWarningModal,
+    #quickImportModal,
+    #eventImportModal,
+    #progressModal,
+    #ejectModal,
+    #sidebar,
+    #groupPanel,
+    #contextBar,
+    .ec-comp-row,
+    .ec-new-form,
+    .ec-folder-tree {
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      background: var(--bg-elevated);
+    }
+  }
+
+  /* ── Light mode — higher opacity for readability ─────────────────────────── */
+  [data-theme="light"] .emm-box,
+  [data-theme="light"] .settings-box,
+  [data-theme="light"] .gpm-box,
+  [data-theme="light"] .dupWarningModal,
+  [data-theme="light"] #quickImportModal,
+  [data-theme="light"] #eventImportModal,
+  [data-theme="light"] #progressModal,
+  [data-theme="light"] #ejectModal {
+    background: color-mix(in srgb, var(--bg) 92%, white);
+  }
+
+  [data-theme="light"] #sidebar,
+  [data-theme="light"] #groupPanel,
+  [data-theme="light"] #contextBar {
+    background: color-mix(in srgb, var(--bg) 88%, white);
+  }
+
+  [data-theme="light"] .ec-comp-row,
+  [data-theme="light"] .ec-new-form,
+  [data-theme="light"] .ec-folder-tree {
+    background: color-mix(in srgb, var(--bg-elevated) 92%, white);
+  }
+
+  /* ── Group Visual System ─────────────────────────────────────────────────
+     CSS-only, additive. Enhances grouped file visibility across icon + list
+     views. Selection (blue/orange) always wins — :not(.selected) guards used
+     everywhere a background is overridden.
+  ─────────────────────────────────────────────────────────────────────────── */
+
+  /* position context for accent strip pseudo-element */
+  .file-tile.in-group,
+  .list-row.in-group,
+  .timeline-item.in-group { position: relative; }
+
+  /* PART 1 — left accent strip (primary group signal) */
+  .file-tile.in-group::before,
+  .list-row.in-group::before,
+  .timeline-item.in-group::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--group-color, var(--accent));
+    border-radius: 2px;
+    transition: background-color 160ms ease;
+    pointer-events: none;
+  }
+
+  /* PART 2 — subtle background tint (secondary signal, deselected only) */
+  .file-tile.in-group:not(.selected),
+  .list-row.in-group:not(.selected),
+  .timeline-item.in-group:not(.selected) {
+    background: color-mix(in srgb, var(--group-color, var(--accent)) 10%, var(--bg));
+  }
+
+  /* PART 3 — smooth color transitions for group reindexing.
+     Preserves the base tile's transform 0.12s ease (hover lift). */
+  .file-tile.in-group,
+  .list-row.in-group,
+  .timeline-item.in-group {
+    transition:
+      background-color 160ms ease,
+      border-color     160ms ease,
+      box-shadow       160ms ease,
+      transform        0.12s ease;
+  }
+
+  /* list-table rows have higher base specificity; match it */
+  .list-table tbody tr.file-tile.in-group {
+    transition:
+      background-color 160ms ease,
+      border-color     160ms ease,
+      box-shadow       160ms ease;
+  }
+  .list-table tbody tr.file-tile.in-group:not(.selected) {
+    background: color-mix(in srgb, var(--group-color, var(--accent)) 10%, var(--bg));
+  }
+
   </style>
 </head>
 <body>
@@ -3332,7 +3799,9 @@
 
   <!-- UPDATE BANNER — hidden until an update event fires -->
   <div id="updateBanner">
-    <span class="upd-icon">🔄</span>
+    <span class="upd-icon" aria-hidden="true">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+    </span>
     <span class="upd-msg" id="updMsg">Downloading update…</span>
     <span class="upd-progress" id="updProgress"></span>
     <button class="upd-btn green" id="updInstallBtn" style="display:none">Restart &amp; Install</button>
@@ -3666,8 +4135,8 @@
         <div class="emm-footer-right">
           <button class="emm-btn-secondary" id="emmEditBtn" style="display:none">Edit</button>
           <button class="emm-btn-primary" id="emmContinueBtn" disabled style="display:none">Continue</button>
-          <button class="emm-btn-primary" id="emmCreateBtn" disabled style="display:none">Create Event →</button>
-          <button class="emm-btn-primary" id="emmSaveBtn" style="display:none">Save Changes →</button>
+          <button class="emm-btn-primary" id="emmCreateBtn" disabled style="display:none">Continue</button>
+          <button class="emm-btn-primary" id="emmSaveBtn" style="display:none">Save</button>
           <button class="emm-btn-primary" id="emmRepairBtn" style="display:none">Save &amp; Repair →</button>
         </div>
       </div>
@@ -3758,37 +4227,87 @@
 
     <!-- Import footer -->
     <div id="importFooter">
-      <button id="importBtn">⬇ Import Selected</button>
+      <button id="importBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+        Import Selected
+      </button>
     </div>
   </div>
 
   <!-- Progress modal -->
   <div id="progressOverlay">
     <div id="progressModal">
-      <h3>⬇ Importing Files…</h3>
-      <div id="progressFilename">Preparing…</div>
-      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
-      <div id="progressCount">0 / 0</div>
-      <div id="progressEta"></div>
+      <div class="im-header">
+        <div class="im-header-icon" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="8 17 12 21 16 17"/><line x1="12" y1="3" x2="12" y2="21"/>
+          </svg>
+        </div>
+        <h3>Importing Files</h3>
+      </div>
+      <div class="im-current">
+        <div id="progressFilename">Preparing…</div>
+      </div>
+      <div class="im-progress">
+        <div class="im-progress-fill" id="progressFill"></div>
+      </div>
+      <div class="im-meta">
+        <span id="progressCount">0 / 0</span>
+        <span id="progressEta"></span>
+      </div>
       <div class="progress-controls">
-        <button id="progressPauseBtn">⏸ Pause</button>
-        <button id="progressResumeBtn">▶ Resume</button>
+        <button id="progressPauseBtn">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+          Pause
+        </button>
+        <button id="progressResumeBtn">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Resume
+        </button>
       </div>
       <div id="progressSummary">
-        <div class="sum-row"><span class="sum-copied">✓ Copied</span>   <span id="sumCopied" class="sum-copied">0</span></div>
-        <div class="sum-row"><span class="sum-skipped">↩ Skipped</span> <span id="sumSkipped" class="sum-skipped">0</span></div>
-        <div class="sum-row"><span class="sum-errors">⚠ Failed</span>   <span id="sumErrors" class="sum-errors">0</span></div>
-        <div class="sum-row" id="sumDurationRow" style="display:none"><span>⏱ Duration</span><span id="sumDuration"></span></div>
+        <div class="sum-row">
+          <span class="sum-copied sum-label">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+            Copied
+          </span>
+          <span id="sumCopied" class="sum-copied">0</span>
+        </div>
+        <div class="sum-row">
+          <span class="sum-skipped sum-label">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 00-4-4H4"/></svg>
+            Skipped
+          </span>
+          <span id="sumSkipped" class="sum-skipped">0</span>
+        </div>
+        <div class="sum-row">
+          <span class="sum-errors sum-label">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            Failed
+          </span>
+          <span id="sumErrors" class="sum-errors">0</span>
+        </div>
+        <div class="sum-row" id="sumDurationRow" style="display:none">
+          <span class="sum-label">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Duration
+          </span>
+          <span id="sumDuration"></span>
+        </div>
       </div>
       <div id="progressSkipDetails"></div>
-      <button id="progressDoneBtn">Done</button>
+      <div class="im-actions">
+        <button id="progressDoneBtn" class="im-btn-primary">Done</button>
+      </div>
     </div>
   </div>
 
   <!-- Eject confirmation modal (Commit 12c) -->
   <div id="ejectOverlay">
     <div id="ejectModal">
-      <div id="ejectIcon" class="dup-icon">✅</div>
+      <div id="ejectIcon" class="dup-icon">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      </div>
       <h3 id="ejectTitle">Card safely ejected</h3>
       <p id="ejectMessage" class="dup-subtitle">You can now safely remove the card from your computer.</p>
       <div class="dup-actions">
@@ -3800,7 +4319,9 @@
   <!-- Duplicate warning modal -->
   <div id="dupWarningOverlay">
     <div id="dupWarningModal">
-      <div class="dup-icon">⚠️</div>
+      <div class="dup-icon">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
       <h3>Files Already Imported</h3>
       <p class="dup-subtitle">
         <strong id="dupCount">0</strong> of <strong id="dupTotal">0</strong>
@@ -3871,7 +4392,10 @@
   <div id="helpOverlay">
     <div id="helpModal">
       <div id="helpModalHeader">
-        <h3>📖 Quick Reference</h3>
+        <h3>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
+          Quick Reference
+        </h3>
         <button id="helpCloseBtn">✕</button>
       </div>
       <div id="helpModalBody"><!-- filled by JS --></div>
@@ -3888,7 +4412,10 @@
     <div id="feedbackPanel">
 
       <div id="feedbackPanelHeader">
-        <span class="fp-title" id="fpTitle">⚑ Report an Issue</span>
+        <span class="fp-title" id="fpTitle">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+          Report an Issue
+        </span>
         <button id="feedbackPanelClose" aria-label="Close">✕</button>
       </div>
 
@@ -3934,7 +4461,8 @@
                   rows="4"></textarea>
 
         <p class="fp-hint">
-          💡 Screenshot? Share it directly in WhatsApp or paste a Google Drive link in the description.
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          Screenshot? Share it directly in WhatsApp or paste a Google Drive link in the description.
         </p>
 
         <!-- Log sharing -->
@@ -3969,7 +4497,9 @@
   <!-- G4: Missing sub-event (blocking) -->
   <div id="missingSubEventOverlay">
     <div id="missingSubEventModal" class="dupWarningModal">
-      <div class="dup-icon">⛔</div>
+      <div class="dup-icon">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+      </div>
       <h3>Sub-event Required</h3>
       <p class="dup-subtitle">All groups must have a sub-event assigned before importing. Open the Group panel and assign a sub-event to each group.</p>
       <div class="dup-actions">
@@ -3981,7 +4511,9 @@
   <!-- G4: Unassigned files warning (non-blocking) -->
   <div id="unassignedOverlay">
     <div id="unassignedModal" class="dupWarningModal">
-      <div class="dup-icon">⚠️</div>
+      <div class="dup-icon">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
       <h3>Unassigned Files</h3>
       <p class="dup-subtitle"><strong id="unassignedCount">0</strong> selected file(s) are not assigned to any group and will <em>not</em> be imported.</p>
       <div class="dup-actions">
@@ -3994,7 +4526,9 @@
   <!-- G4: Duplicate sub-event warning (non-blocking) -->
   <div id="dupSubEventOverlay">
     <div id="dupSubEventModal" class="dupWarningModal">
-      <div class="dup-icon">⚠️</div>
+      <div class="dup-icon">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
       <h3>Duplicate Sub-event Mapping</h3>
       <p class="dup-subtitle">Multiple groups point to the same sub-event. Files from both groups will go into the same folder.</p>
       <div id="dupSubEventList"></div>
@@ -4006,6 +4540,25 @@
   </div>
 
   <!-- G5: Event import confirmation -->
+  <div id="quickImportOverlay">
+    <div id="quickImportModal">
+      <h3>Confirm Quick Import</h3>
+      <div class="ei-event-name" id="qiModalDestPath"></div>
+
+      <div class="ei-field-row">
+        <div class="ei-label">Photographer <span class="ei-required">*</span></div>
+        <div id="qiModalPhotographerContainer"></div>
+      </div>
+
+      <div id="qiModalFileSummary" style="font-size:0.78rem;color:var(--subtext);text-align:center;margin:6px 0 18px;"></div>
+
+      <div class="ei-actions">
+        <button id="qiModalCancelBtn" class="dup-btn dup-btn-cancel">Cancel</button>
+        <button id="qiModalImportBtn" class="dup-btn" disabled>Import →</button>
+      </div>
+    </div>
+  </div>
+
   <div id="eventImportOverlay">
     <div id="eventImportModal">
       <h3>Confirm Event Import</h3>
@@ -4021,11 +4574,16 @@
         <div id="eiMappingTable"></div>
       </div>
 
+      <div id="eiDestSection">
+        <div class="ei-label">Destination Structure</div>
+        <div class="cm-tree" id="cmDestinationTree"></div>
+      </div>
+
       <div id="eiFileSummary"></div>
 
       <div class="ei-actions">
-        <button id="eiCancelBtn" class="dup-btn dup-btn-cancel">Cancel</button>
-        <button id="eiImportBtn" class="dup-btn" disabled>Import →</button>
+        <button id="eiCancelBtn">Cancel</button>
+        <button id="eiImportBtn" disabled>Import →</button>
       </div>
     </div>
   </div>
@@ -4070,6 +4628,7 @@
     </div>
   </div>
 
+  <div id="dropdown-root"></div>
   <script src="treeAutocomplete.js"></script>
   <script src="eventCreator.js"></script>
   <script src="eventMgmt.js"></script>

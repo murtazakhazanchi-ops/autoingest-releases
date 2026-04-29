@@ -183,6 +183,9 @@ contextBridge.exposeInMainWorld('api', {
   // ── Directory operations ──
   ensureDir:       (dirPath)           => ipcRenderer.invoke('dir:ensure',       dirPath),
   findDirByPrefix: (basePath, prefix)  => ipcRenderer.invoke('dir:findByPrefix', basePath, prefix),
+  dirExists:          (dirPath) => ipcRenderer.invoke('dir:exists',          dirPath),
+  dirHasContent:      (dirPath) => ipcRenderer.invoke('dir:hasContent',      dirPath),
+  dirInspectContent:  (dirPath) => ipcRenderer.invoke('dir:inspectContent',  dirPath),
   renameDir:       (oldPath, newPath)  => ipcRenderer.invoke('dir:rename',       oldPath, newPath),
 
   // ── Window controls ──

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, screen } = require('electron');
 const path = require('path');
 const os   = require('os');
 const fs   = require('fs');
@@ -115,9 +115,17 @@ async function updateImportIndex(filePaths, destPath) {
 
 // ── Window ───────────────────────────────────────────────────────────────────
 function createWindow() {
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+  const savedBounds = settings.getWindowBounds();
   const win = new BrowserWindow({
-    width: 1280,
-    height: 820,
+    width:     savedBounds?.width  ?? Math.floor(width  * 0.85),
+    height:    savedBounds?.height ?? Math.floor(height * 0.9),
+    x:         savedBounds?.x,
+    y:         savedBounds?.y,
+    minWidth:  1100,
+    minHeight: 700,
+    center:    !savedBounds,
+    show:      false,
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 8 },
     resizable: true,
@@ -128,6 +136,8 @@ function createWindow() {
       sandbox: true
     }
   });
+  win.on('close', () => settings.setWindowBounds(win.getBounds()));
+  win.once('ready-to-show', () => win.show());
   win.loadFile(path.join(__dirname, '../renderer/index.html'));
   return win;
 }
@@ -731,7 +741,7 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
     let jsonCorrupt = false;
     try {
       const raw = await fsp.readFile(jsonPath, 'utf8');
-      const obj = JSON.parse(raw);
+      const obj = normalizeEventJson(JSON.parse(raw));
       if (isValidEventJson(obj)) {
         eventJson = obj;
         // Patch 3: crash recovery — reset stuck in-progress status on next startup.
@@ -745,10 +755,14 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
           await fsp.rename(tmp, jsonPath);
         }
       } else {
-        jsonCorrupt = true; // exists but fails shape validation — treat as corrupt
+        jsonCorrupt = true;
+        console.error('[scanEvents] isValidEventJson failed for', name, '— shape dump:', JSON.stringify(obj).slice(0, 400));
       }
     } catch (err) {
-      if (err.code !== 'ENOENT') jsonCorrupt = true;
+      if (err.code !== 'ENOENT') {
+        jsonCorrupt = true;
+        console.error('[scanEvents] Failed to parse event.json for', name, ':', err.message);
+      }
       // ENOENT = no JSON file → legacy event, fallback to parser below
     }
 
@@ -849,6 +863,14 @@ function sanitizeForPath(name) {
     .trim();
 }
 
+function normalizeEventJson(data) {
+  data.components = (data.components || []).map((c, i) => ({
+    id: typeof c.id === 'number' ? c.id : (i + 1),
+    ...c,
+  }));
+  return data;
+}
+
 function isValidEventJson(obj) {
   if (obj === null || typeof obj !== 'object') return false;
   if (obj.version !== 1) return false;
@@ -913,9 +935,9 @@ ipcMain.handle('event:read', async (_event, eventFolderPath) => {
   const jsonPath = path.join(eventFolderPath, 'event.json');
   try {
     const raw = await fsp.readFile(jsonPath, 'utf8');
-    const obj = JSON.parse(raw);
+    const obj = normalizeEventJson(JSON.parse(raw));
     if (!isValidEventJson(obj)) {
-      console.error('[MAIN VALIDATION FAILED]', obj);
+      console.error('[event:read] isValidEventJson failed:', eventFolderPath, JSON.stringify(obj).slice(0, 400));
       return null;
     }
     return obj;
@@ -1063,6 +1085,43 @@ ipcMain.handle('dir:findByPrefix', async (_event, basePath, prefix) => {
     return matches.length > 0 ? { name: matches[0].name } : null;
   } catch {
     return null;
+  }
+});
+
+ipcMain.handle('dir:exists', async (_event, dirPath) => {
+  if (!dirPath || typeof dirPath !== 'string') return false;
+  try { await fsp.access(dirPath); return true; } catch { return false; }
+});
+
+ipcMain.handle('dir:hasContent', async (_event, dirPath) => {
+  if (!dirPath || typeof dirPath !== 'string') return false;
+  try {
+    const entries = await fsp.readdir(dirPath);
+    return entries.some(name =>
+      name !== 'event.json' &&
+      !name.startsWith('.') &&
+      name.trim() !== ''
+    );
+  } catch {
+    return false;
+  }
+});
+
+ipcMain.handle('dir:inspectContent', async (_event, dirPath) => {
+  const empty = { hasContent: false, folders: [], files: [], folderCount: 0, fileCount: 0 };
+  if (!dirPath || typeof dirPath !== 'string') return empty;
+  try {
+    const entries = await fsp.readdir(dirPath, { withFileTypes: true });
+    const filtered = entries.filter(e =>
+      e.name !== 'event.json' &&
+      !e.name.startsWith('.') &&
+      e.name.trim() !== ''
+    );
+    const folders = filtered.filter(e => e.isDirectory()).map(e => e.name);
+    const files   = filtered.filter(e => e.isFile()).map(e => e.name);
+    return { hasContent: filtered.length > 0, folders, files, folderCount: folders.length, fileCount: files.length };
+  } catch {
+    return empty;
   }
 });
 

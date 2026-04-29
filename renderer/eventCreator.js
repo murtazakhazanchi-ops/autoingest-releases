@@ -137,17 +137,20 @@ const EventCreator = (() => {
       }
 
       if (!json || !Array.isArray(json.components)) {
-        console.error('[loadEventFromDisk] INVALID JSON', { eventPath, json });
+        const exists = await window.api.dirExists(eventPath);
+        if (!exists) {
+          console.error('[loadEventFromDisk] PATH NOT FOUND:', eventPath);
+        } else {
+          console.error('[loadEventFromDisk] event.json missing or invalid at:', eventPath, '— raw response:', json);
+        }
         return null;
       }
 
       const normalized = json.components.map((c, i) => ({
-        id: i + 1,
-        eventTypes: Array.isArray(c.types)
-          ? c.types.map(t => ({ label: t }))
-          : [],
-        location: c.location ? { label: c.location } : null,
-        city: c.city ? { label: c.city } : null,
+        id:         typeof c.id === 'number' ? c.id : (i + 1),
+        eventTypes: Array.isArray(c.types) ? c.types.map(t => ({ label: t })) : [],
+        location:   c.location ? { label: c.location } : null,
+        city:       c.city    ? { label: c.city }    : null,
         folderName: c.folderName ?? null,
       }));
 
@@ -459,7 +462,30 @@ const EventCreator = (() => {
     });
   }
 
-  function showStructureChangeWarningModal() {
+  function showStructureChangeWarningModal(diskInfo = null) {
+    // Build the disk summary block when we have real data from disk.
+    let diskSummaryHtml = '';
+    if (diskInfo && diskInfo.hasContent) {
+      const { folders, files, folderCount, fileCount } = diskInfo;
+      const fLabel    = folderCount === 1 ? 'folder'  : 'folders';
+      const fileLabel = fileCount   === 1 ? 'file'    : 'files';
+      const countParts = [];
+      if (folderCount > 0) countParts.push(`${folderCount} ${fLabel}`);
+      if (fileCount   > 0) countParts.push(`${fileCount} ${fileLabel}`);
+
+      const preview     = folders.slice(0, 3).map(f => `<span class="ec-struct-disk-item">• ${esc(f)}</span>`).join('');
+      const overflow    = folders.length > 3 ? `<span class="ec-struct-disk-more">+${folders.length - 3} more</span>` : '';
+      const folderBlock = folders.length > 0
+        ? `<div class="ec-struct-disk-folders">${preview}${overflow}</div>`
+        : '';
+
+      diskSummaryHtml = `
+<div class="ec-struct-disk-info">
+  <div class="ec-struct-disk-counts">${countParts.map(p => `<span>● ${esc(p)}</span>`).join('')}</div>
+  ${folderBlock}
+</div>`;
+    }
+
     return new Promise(resolve => {
       const overlay = document.createElement('div');
       overlay.className = 'ec-modal-overlay';
@@ -478,6 +504,7 @@ const EventCreator = (() => {
   </div>
   <div class="ec-struct-modal-body">
     <p>This event was originally a <strong>single-component event</strong>. Existing photos are stored directly in the event folder and will not be automatically reorganized into sub-events.</p>
+    ${diskSummaryHtml}
     <p>New imports will follow the multi-component structure.</p>
     <p>You can reorganize existing photos manually if needed.</p>
   </div>
@@ -608,7 +635,7 @@ const EventCreator = (() => {
   >
     <span class="ec-new-plus" aria-hidden="true">＋</span>
     <span>${hasExisting ? 'Create New Collection' : 'New Collection'}</span>
-    <span class="ec-new-arrow" aria-hidden="true">▶</span>
+    <span class="ec-new-arrow" aria-hidden="true"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
   </button>
 
   <!-- New collection form ─────────────────────────────────────────────── -->
@@ -618,7 +645,8 @@ const EventCreator = (() => {
 
   <!-- Select Existing Master CTA ──────────────────────────────────────── -->
   <button id="ecSelectExistingBtn" class="ec-select-existing-btn">
-    📂  Select Existing Master…
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+    Select Existing Master…
   </button>
 
   <!-- Location row (only shown once archive root is set) ───────────────── -->
@@ -660,12 +688,12 @@ const EventCreator = (() => {
     aria-selected="${selectedCollection === c.name}"
     aria-label="${esc(c.name)}"
   >
-    <span class="ec-coll-icon" aria-hidden="true">📁</span>
+    <span class="ec-coll-icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></span>
     <div class="ec-coll-info">
       <div class="ec-coll-name">${esc(c.name)}</div>
       <div class="ec-coll-meta">${esc(c.events.length)} event${c.events.length === 1 ? '' : 's'}</div>
     </div>
-    <span class="ec-coll-check" aria-hidden="true">✓</span>
+    <span class="ec-coll-check" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
   </div>`).join('')}
 </div>
 <p class="ec-section-title" style="margin-top:28px">Or Create New</p>`;
@@ -710,7 +738,7 @@ const EventCreator = (() => {
 </div>
 
 <div class="ec-preview-card" id="ecPreviewCard" aria-live="polite">
-  <span class="ec-preview-label">📁  Folder Name Preview</span>
+  <span class="ec-preview-label"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>  Folder Name Preview</span>
   <span id="ecPreviewName" class="ec-preview-name empty">—</span>
 </div>`;
   }
@@ -1097,9 +1125,9 @@ const EventCreator = (() => {
     const unparseable = _scannedEvents.filter(e => !e.isParseable);
 
     const resolvedHTML = resolved.map(ev => {
-      const isLegacy = !ev._eventJson || !Array.isArray(ev._eventJson.components);
+      const isLegacy = !ev._eventJson || !Array.isArray(ev._eventJson.components) || ev._eventJson.components.length === 0;
       const warnBadge = ev.isUnresolved
-        ? `<span class="ec-evl-warn" title="Some tokens in this event don't match the controlled lists yet. You can still view or edit.">⚠</span>`
+        ? `<span class="ec-evl-warn" title="Some tokens in this event don't match the controlled lists yet. You can still view or edit."><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>`
         : '';
       const legacyBadge = isLegacy
         ? `<span class="ec-evl-badge--legacy">LEGACY</span>`
@@ -1123,7 +1151,7 @@ ${unparseable.map(ev => `
     <div class="ec-evl-name">${esc(ev.folderName)}</div>
     <div class="ec-evl-date ec-evl-warn-text">${esc(ev.reason || 'Cannot parse')}</div>
   </div>
-  <span class="ec-evl-warn">⚠</span>
+  <span class="ec-evl-warn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
   <button class="ec-evl-repair-btn" data-folder="${esc(ev.folderName)}" title="Fix this folder by filling in the missing event details">Fix &amp; Convert →</button>
 </div>`).join('')}`;
 
@@ -1527,10 +1555,6 @@ ${unparseable.map(ev => `
     // Update title bar to match.
     const title = $ecTitle();
     if (title) title.textContent = _editMode ? 'Edit Event' : 'View Event';
-
-    // Update mode badge.
-    const badges = body.querySelectorAll('.ec-mode-badge');
-    badges.forEach(b => b.textContent = _editMode ? 'Editing Event' : 'Viewing Existing Event');
   }
 
   // M6: save edits to an existing event by renaming the folder on disk.
@@ -1544,35 +1568,47 @@ ${unparseable.map(ev => `
       _showEventBanner('Every component needs at least one Event Type and a City.', 'error'); return;
     }
 
+    // Build the new event name using locked hijriDate + sequence from _viewingExisting.
+    const parts       = _buildCompString(_eventComps);
+    const newName     = `${_viewingExisting.hijriDate} _${_viewingExisting.sequence}-${parts}`;
+    const safeNewName = sanitizeForPath(newName);
+    const oldName     = _viewingExisting.folderName;
+
     // Warn before saving if a previously single-component event is now multi-component
     // and has existing imported data. Files stored in the old flat structure will not
     // be automatically reorganized — the user must be aware before proceeding.
     // _structureWarningPending prevents a second modal if save is triggered concurrently.
     {
-      const _origEntry       = (_scannedEvents || []).find(e => e.folderName === _viewingExisting?.folderName);
-      const _wasSingle       = (_origEntry?._eventJson?.components || []).length === 1;
-      const _isNowMulti      = _eventComps.length > 1;
-      // imports.length > 0 is the reliable proxy for existing on-disk data: each import
-      // appends an audit entry, so an empty imports array means no files were ever written
-      // via this app. Manually copied files (outside the app) are not detected here —
-      // hasFilesOnDisk is not tracked in the scanned event shape, so this is a known gap.
-      const _hasExistingData = (_origEntry?._eventJson?.imports || []).length > 0;
+      const _origEntry  = (_scannedEvents || []).find(e => e.folderName === _viewingExisting?.folderName);
+      const _wasSingle  = (_origEntry?._eventJson?.components || []).length === 1;
+      const _isNowMulti = _eventComps.length > 1;
+      let _diskChecked     = false;
+      let _diskInfo        = null;
+      let _hasExistingData = false;
+      if (_wasSingle && _isNowMulti) {
+        if (activeMaster?.path && oldName) {
+          _diskChecked = true;
+          const _eventDiskPath = activeMaster.path + '/' + oldName;
+          const _pathExists    = await window.api.dirExists(_eventDiskPath);
+          if (_pathExists) {
+            _diskInfo        = await window.api.dirInspectContent(_eventDiskPath);
+            _hasExistingData = _diskInfo.hasContent;
+          }
+        }
+        if (!_diskChecked) {
+          _hasExistingData = (_origEntry?._eventJson?.imports || []).length > 0;
+        }
+      }
       if (_wasSingle && _isNowMulti && _hasExistingData && !_structureWarningPending) {
         _structureWarningPending = true;
         try {
-          const proceed = await showStructureChangeWarningModal();
+          const proceed = await showStructureChangeWarningModal(_diskInfo);
           if (!proceed) return;
         } finally {
           _structureWarningPending = false;
         }
       }
     }
-
-    // Build the new event name using locked hijriDate + sequence from _viewingExisting.
-    const parts       = _buildCompString(_eventComps);
-    const newName     = `${_viewingExisting.hijriDate} _${_viewingExisting.sequence}-${parts}`;
-    const safeNewName = sanitizeForPath(newName);
-    const oldName     = _viewingExisting.folderName;
 
     // If the safe folder name hasn't changed, skip rename but still select and proceed.
     if (safeNewName === oldName) {
@@ -1585,11 +1621,11 @@ ${unparseable.map(ev => `
       const _noRenameAllSameCity = _eventComps.length <= 1 ||
         _eventComps.every(c => c.city?.label === _eventComps[0].city?.label);
       const noRenameCompsForDisk = JSON.parse(JSON.stringify(_eventComps)).map((c, idx) => ({
+        id:           c.id,
         types:        c.eventTypes.map(et => et.label),
         location:     c.location?.label || null,
         city:         c.city?.label     || '',
         isUnresolved: false,
-        // Preserve existing folderName (set once at creation — never recompute).
         folderName:   c.folderName ?? buildFolderName(c, idx, _noRenameAllSameCity),
       }));
       if (activeMaster?.path) {
@@ -1608,6 +1644,27 @@ ${unparseable.map(ev => `
         } catch (err) {
           console.error('[EventCreator] updateEventJson (no-rename) failed:', err);
           return;
+        }
+        // Patch in-memory scan cache so list view reflects saved state immediately.
+        const _cachedEntry = (_scannedEvents || []).find(e => e.folderName === oldName);
+        if (_cachedEntry) {
+          _cachedEntry.components   = noRenameCompsForDisk;
+          _cachedEntry.isUnresolved = false;
+          _cachedEntry.isLegacy     = false;
+          _cachedEntry.isCorrupt    = false;
+          if (_cachedEntry._eventJson) {
+            _cachedEntry._eventJson.components    = noRenameCompsForDisk;
+            _cachedEntry._eventJson.eventName     = newName;
+            _cachedEntry._eventJson.safeEventName = safeNewName;
+          } else {
+            _cachedEntry._eventJson = {
+              hijriDate:     _viewingExisting.hijriDate,
+              sequence:      _viewingExisting.sequence,
+              eventName:     newName,
+              safeEventName: safeNewName,
+              components:    noRenameCompsForDisk,
+            };
+          }
         }
       }
       _editMode = false;
@@ -1646,6 +1703,16 @@ ${unparseable.map(ev => `
       return;
     }
 
+    // Persist the new folder name immediately — the disk rename just succeeded so
+    // safeNewName is the ground truth. Any subsequent failure (event.json write, etc.)
+    // won't affect the folder itself; the persisted pointer must reflect reality now.
+    window.api.setLastEvent({
+      collectionPath: activeMaster.path,
+      collectionName: selectedCollection,
+      eventName:      newName,
+      safeEventName:  safeNewName,
+    }).catch(err => console.error('[setLastEvent after rename] failed:', err));
+
     // Validate and snapshot _eventComps before write — blocks corrupted saves.
     console.log('WRITING EVENT JSON (_handleSaveEditedEvent):', JSON.stringify(_eventComps, null, 2));
     try {
@@ -1667,10 +1734,19 @@ ${unparseable.map(ev => `
       return;
     }
 
+    // Assign stable unique ids: keep existing numeric ids, seed new ones above
+    // the current max so insertions and deletions never produce collisions.
+    const _usedIds = new Set(cleanComps.filter(c => typeof c.id === 'number').map(c => c.id));
+    let _nextId = (_usedIds.size ? Math.max(..._usedIds) : 0) + 1;
+    const compsWithIds = cleanComps.map(c =>
+      typeof c.id === 'number' ? c : { ...c, id: _nextId++ }
+    );
+
     // Update the scanned events cache so the list reflects the change.
-    const _renameAllSameCity = cleanComps.length <= 1 ||
-      cleanComps.every(c => c.city?.label === cleanComps[0].city?.label);
-    const compsForDisk = cleanComps.map((c, idx) => ({
+    const _renameAllSameCity = compsWithIds.length <= 1 ||
+      compsWithIds.every(c => c.city?.label === compsWithIds[0].city?.label);
+    const compsForDisk = compsWithIds.map((c, idx) => ({
+      id:           c.id,
       types:        c.eventTypes.map(et => et.label),
       location:     c.location?.label || null,
       city:         c.city?.label     || '',
@@ -1678,15 +1754,28 @@ ${unparseable.map(ev => `
       // Preserve existing folderName (set once at creation — never recompute).
       folderName:   c.folderName ?? buildFolderName(c, idx, _renameAllSameCity),
     }));
+    if (!compsForDisk.every(c => typeof c.id === 'number')) {
+      throw new Error('Invalid component structure: missing id');
+    }
     const entry = (_scannedEvents || []).find(e => e.folderName === oldName);
     if (entry) {
       entry.folderName   = safeNewName;
       entry.components   = compsForDisk;
       entry.isUnresolved = false;
+      entry.isLegacy     = false;
+      entry.isCorrupt    = false;
       if (entry._eventJson) {
         entry._eventJson.components    = compsForDisk;
         entry._eventJson.eventName     = newName;
         entry._eventJson.safeEventName = safeNewName;
+      } else {
+        entry._eventJson = {
+          hijriDate:     _viewingExisting.hijriDate,
+          sequence:      _viewingExisting.sequence,
+          eventName:     newName,
+          safeEventName: safeNewName,
+          components:    compsForDisk,
+        };
       }
     }
 
@@ -1758,24 +1847,20 @@ ${unparseable.map(ev => `
     if (!Array.isArray(_eventComps)) {
       console.error('Invalid components structure', _eventComps);
     }
-    // M5 / Phase 5: mode badge + breadcrumb differ by create / view / edit / repair.
-    const modeBadge = _repairMode
-      ? `<span class="ec-mode-badge ec-mode-repair" style="margin-left:8px">Repairing Event</span>`
-      : _viewingExisting
-      ? `<span class="ec-mode-badge ec-mode-multi" style="margin-left:8px">Viewing Existing Event</span>`
-      : '';
-    const warnBadge = _viewingExisting && _viewingExisting.isUnresolved
-      ? `<span class="ec-evl-warn" style="margin-left:6px" title="Some tokens don't match the controlled lists. You can still view and edit.">⚠ Unresolved tokens</span>`
+    // M5 / Phase 5: breadcrumb differs by create / view / edit / repair.
+    const warnText = _viewingExisting && _viewingExisting.isUnresolved
+      ? `<span style="margin-left:8px;font-size:11px;color:var(--text-muted)">unresolved tokens</span>`
       : '';
     const eventRow = _repairMode ? `
     <div class="ec-bc-row">
-      <span class="ec-bc-label" style="color:var(--yellow)">Original</span>
-      <span class="ec-bc-value ec-evl-warn-text" title="${esc(_repairFolderName)}">${esc(_repairFolderName)}</span>
+      <span class="ec-bc-label">Original</span>
+      <span class="ec-bc-value" title="${esc(_repairFolderName)}">${esc(_repairFolderName)}</span>
       <button class="ec-bc-change" id="ecBackToList">← Back to list</button>
     </div>` : _viewingExisting ? `
     <div class="ec-bc-row">
       <span class="ec-bc-label">Event</span>
       <span class="ec-bc-value" title="${esc(_viewingExisting.displayName || _viewingExisting.folderName)}">${esc(_viewingExisting.displayName || _viewingExisting.folderName)}</span>
+      ${warnText}
       <button class="ec-bc-change" id="ecBackToList">← Back to list</button>
     </div>` : '';
 
@@ -1786,8 +1871,6 @@ ${unparseable.map(ev => `
     <div class="ec-bc-row">
       <span class="ec-bc-label">Collection</span>
       <span class="ec-bc-value" title="${esc(selectedCollection || '')}">${esc(selectedCollection || '')}</span>
-      ${modeBadge}
-      ${warnBadge}
       <button class="ec-bc-change" id="ecChangeCollection">Change</button>
     </div>
     ${eventRow}
@@ -1845,7 +1928,7 @@ ${unparseable.map(ev => `
   </div>
 
   <div class="ec-preview-card" id="ecEventPreviewCard" aria-live="polite" style="margin-top:24px">
-    <span class="ec-preview-label">📁  Event Folder Preview</span>
+    <span class="ec-preview-label"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>  Event Folder Preview</span>
     <span id="ecEventPreviewName" class="ec-preview-name empty">—</span>
   </div>
 
@@ -2601,7 +2684,7 @@ ${unparseable.map(ev => `
     const rows    = [];
     const r = (level, name, cls) =>
       `<div class="ft-row ft-l${level}">` +
-      `<span class="ft-icon" aria-hidden="true">📁</span>` +
+      `<span class="ft-icon" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></span>` +
       `<span class="ft-name${cls ? ' ' + cls : ''}">${esc(name)}</span></div>`;
 
     rows.push(r(0, coll.name + '/'));
@@ -2676,7 +2759,7 @@ ${unparseable.map(ev => `
 
   <div class="ec-success-actions">
     <button id="ecAddAnotherBtn" class="ec-outline-btn">＋ Add Another Event</button>
-    <button id="ecDoneBtn" class="ec-continue-btn">Done ✓</button>
+    <button id="ecDoneBtn" class="ec-continue-btn">Done <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></button>
   </div>
 
 </div>`;
@@ -2792,6 +2875,13 @@ ${unparseable.map(ev => `
 
         const safeName  = last.safeEventName || sanitizeForPath(last.eventName || '');
         const eventPath = last.collectionPath + '/' + safeName;
+
+        console.log('[restoreLastEvent] path:', eventPath);
+        if (!(await window.api.dirExists(eventPath))) {
+          console.warn('[restoreLastEvent] stale path detected, clearing:', eventPath);
+          window.api.setLastEvent(null).catch(() => {});
+          return;
+        }
 
         const components = await loadEventFromDisk(eventPath);
 
@@ -3046,7 +3136,7 @@ ${unparseable.map(ev => `
       // JSON file that is missing the components array. This is a recoverable
       // state: the user should open Edit to configure it. Do NOT treat it as
       // corruption — the reload below would also return null and silently exit.
-      const _isLegacyEntry = !entry._eventJson || !Array.isArray(entry._eventJson?.components);
+      const _isLegacyEntry = !entry._eventJson || !Array.isArray(entry._eventJson?.components) || entry._eventJson.components.length === 0;
       if (_isLegacyEntry) {
         console.warn('[LEGACY] Event has no valid event.json, redirecting to edit:', entry.folderName);
         if (_legacyModalOpen) return false;

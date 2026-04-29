@@ -178,4 +178,34 @@ async function setLastEvent(value) {
   await _save();
 }
 
-module.exports = { init, getArchiveRoot, setArchiveRoot, getLastDestPath, setLastDestPath, getLastEvent, setLastEvent };
+/**
+ * Returns the last saved window bounds, or null if never set.
+ * @returns {{ x: number, y: number, width: number, height: number } | null}
+ */
+function getWindowBounds() {
+  if (!_loaded) init();
+  const v = _state.windowBounds;
+  if (!v || typeof v !== 'object') return null;
+  if (typeof v.width !== 'number' || typeof v.height !== 'number') return null;
+  return { x: v.x, y: v.y, width: v.width, height: v.height };
+}
+
+/**
+ * Persists the current window bounds. Pass null to clear.
+ * @param {{ x: number, y: number, width: number, height: number } | null} value
+ * @returns {Promise<void>}
+ */
+async function setWindowBounds(value) {
+  if (!_loaded) init();
+  if (value === null || value === undefined) {
+    delete _state.windowBounds;
+  } else if (value && typeof value === 'object' &&
+             typeof value.width === 'number' && typeof value.height === 'number') {
+    _state.windowBounds = { x: value.x, y: value.y, width: value.width, height: value.height };
+  } else {
+    throw new Error('setWindowBounds: expected { x, y, width, height } or null');
+  }
+  await _save();
+}
+
+module.exports = { init, getArchiveRoot, setArchiveRoot, getLastDestPath, setLastDestPath, getLastEvent, setLastEvent, getWindowBounds, setWindowBounds };
