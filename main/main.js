@@ -3,9 +3,9 @@ const path = require('path');
 const os   = require('os');
 const fs   = require('fs');
 const fsp  = require('fs').promises;
-const { exec, execFile } = require('child_process');
+const { execFile } = require('child_process');
 const { detectMemoryCards, listAllDrives } = require('./driveDetector');
-const { readDirectory, getDCIMPath, scanPrivateFolder, safeExists, scanMediaRecursive, buildFolderTree } = require('./fileBrowser');
+const { scanMediaRecursive, buildFolderTree } = require('./fileBrowser');
 const { copyFiles, copyFileJobs, setPaused, getFileHash, abortCopy } = require('./fileManager');
 const { getThumbnail, shutdownWorkers } = require('../services/thumbnailer');
 const listManager  = require('./listManager');
@@ -18,6 +18,7 @@ const crashReporter = require('../services/crashReporter');
 const perf          = require('../services/performanceMonitor');
 const autoUpdater   = require('../services/autoUpdater');
 const settings      = require('../services/settings');
+const { validateEventJson } = require('./contracts/dataValidator');
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const POLL_INTERVAL_MS = 5000;
@@ -136,7 +137,7 @@ function createWindow() {
       sandbox: true
     }
   });
-  win.on('close', () => settings.setWindowBounds(win.getBounds()));
+  win.on('close', () => settings.setWindowBoundsSync(win.getBounds()));
   win.once('ready-to-show', () => win.show());
   win.loadFile(path.join(__dirname, '../renderer/index.html'));
   return win;
@@ -151,7 +152,7 @@ function startDrivePolling() {
         dcim.forEach(c => log(`Drive detected: ${c.mountpoint} (${c.label})`));
       }
       for (const win of BrowserWindow.getAllWindows()) {
-        if (!win.isDestroyed()) {
+        if (!win.isDestroyed() && !win.webContents.isDestroyed()) {
           win.webContents.send('drives:updated', dcim);
           win.webContents.send('drives:allUpdated', removable);
         }
@@ -402,19 +403,7 @@ ipcMain.handle('files:import', async (event, { filePaths, destination }) => {
   return result;
 });
 
-/**
- * files:importJobs — event-based import using the fileJobs model (G2).
- *
- * Each job specifies its own destination path, enabling routing to:
- *   archiveRoot/Collection/Event/[SubEvent/]Photographer/[VIDEO/]filename
- *
- * This handler is the entry point for the structured archive flow (G3–G5).
- * The legacy files:import handler remains for Quick Import (G6).
- *
- * @param {{ fileJobs: Array<{src: string, dest: string}> }} payload
- * @returns same result shape as files:import
- */
-ipcMain.handle('files:importJobs', async (event, { fileJobs }) => {
+async function importFileJobs(event, fileJobs) {
   if (!Array.isArray(fileJobs) || fileJobs.length === 0) {
     return { copied: 0, skipped: 0, errors: 0, skippedReasons: [], failedFiles: [], duration: 0, integrity: 'verified' };
   }
@@ -483,6 +472,198 @@ ipcMain.handle('files:importJobs', async (event, { fileJobs }) => {
   }
 
   return result;
+}
+
+/**
+ * files:importJobs — event-based import using the fileJobs model (G2).
+ *
+ * Each job specifies its own destination path, enabling routing to:
+ *   archiveRoot/Collection/Event/[SubEvent/]Photographer/[VIDEO/]filename
+ *
+ * This handler is the entry point for the structured archive flow (G3–G5).
+ * The legacy files:import handler remains for Quick Import (G6).
+ *
+ * @param {{ fileJobs: Array<{src: string, dest: string}> }} payload
+ * @returns same result shape as files:import
+ */
+ipcMain.handle('files:importJobs', async (event, { fileJobs }) => {
+  return importFileJobs(event, fileJobs);
+});
+
+function normalizeImportSource(src) {
+  if (!src || typeof src !== 'object') {
+    return { type: 'unknown', label: 'Unknown source', path: '' };
+  }
+  const type  = typeof src.type  === 'string' ? src.type.trim()  : '';
+  const label = typeof src.label === 'string' ? src.label.trim() : '';
+  const p     = typeof src.path  === 'string' ? src.path.trim()  : '';
+  return {
+    type:  type  || 'unknown',
+    label: label || 'Unknown source',
+    path:  p,
+  };
+}
+
+function buildAuditImportEntries(auditContext = {}) {
+  const now = new Date().toISOString();
+  const baseSeq = Date.now();
+  const subEventNames = Array.isArray(auditContext.subEventNames) ? auditContext.subEventNames : [];
+  const isMulti = subEventNames.length > 0;
+  const groups = Array.isArray(auditContext.groups) ? auditContext.groups : [];
+  const liveComps = Array.isArray(auditContext.components) ? auditContext.components : [];
+  const photographer = auditContext.photographer;
+  const source       = normalizeImportSource(auditContext.source);
+  const config = require('../config/app.config');
+  const VIDEO_EXT_SET = new Set(config.VIDEO_EXTENSIONS);
+  const logs = [];
+
+  groups.forEach((group, index) => {
+    let componentIndex = 0;
+    if (isMulti) {
+      const matchIdx = subEventNames.findIndex(se => se.name === group.subEventId);
+      if (matchIdx >= 0) componentIndex = matchIdx;
+    }
+    const comp = liveComps[componentIndex];
+    const componentName = comp ? comp.eventTypes.map(t => t.label).join(', ') : '';
+    let photos = 0, videos = 0;
+    for (const filePath of (group.files || [])) {
+      const ext = '.' + (filePath.split('.').pop() || '').toLowerCase();
+      if (VIDEO_EXT_SET.has(ext)) videos++; else photos++;
+    }
+    const id = Date.now().toString(36) +
+      '-' + Math.random().toString(36).slice(2) +
+      '-' + (auditContext.collName || 'unknown');
+    logs.push({
+      id,
+      seq:            baseSeq + index,
+      timestamp:      now,
+      photographer,
+      componentIndex,
+      componentName,
+      counts:         { photos, videos },
+      source,
+    });
+  });
+
+  return logs;
+}
+
+ipcMain.handle('import:commitTransaction', async (event, {
+  fileJobs,
+  eventJsonPath,
+  groups,
+  photographer,
+  liveComps,
+  subEventNames,
+  collName,
+  source,
+}) => {
+  let originalEventJson = null;
+
+  const restoreCreatedStatus = async () => {
+    if (!eventJsonPath) return;
+
+    if (originalEventJson && typeof originalEventJson === 'object') {
+      const jsonPath = path.join(eventJsonPath, 'event.json');
+      const tmp = jsonPath + '.tmp';
+      await fsp.writeFile(
+        tmp,
+        JSON.stringify({ ...originalEventJson, status: 'created', updatedAt: Date.now() }, null, 2),
+        'utf-8'
+      );
+      await fsp.rename(tmp, jsonPath);
+      return;
+    }
+
+    const rollbackResult = await updateEventJson(eventJsonPath, { status: 'created' });
+    if (!rollbackResult?.ok) {
+      throw new Error(rollbackResult?.reason || 'Event rollback failed.');
+    }
+  };
+
+  try {
+    if (eventJsonPath) {
+      try {
+        const raw = await fsp.readFile(path.join(eventJsonPath, 'event.json'), 'utf8');
+        originalEventJson = JSON.parse(raw);
+      } catch { /* rollback falls back to status-only patch */ }
+    }
+
+    const result = await importFileJobs(event, fileJobs);
+
+    const auditContext = {
+      groups,
+      photographer,
+      components: liveComps,
+      subEventNames,
+      collName,
+      source,
+    };
+    const logs = buildAuditImportEntries(auditContext);
+    result.auditLogs = logs;
+
+    if (eventJsonPath) {
+      // Single atomic write: merge audit logs + set lastImport + set status:'complete'.
+      // All three fields are updated in one read/merge/write cycle to eliminate the
+      // partial-state window where a crash between writes would erase already-committed
+      // audit entries while leaving copied files on disk.
+      const jsonPath = path.join(eventJsonPath, 'event.json');
+      let doc = {};
+      // First read
+      try {
+        const raw = await fsp.readFile(jsonPath, 'utf8');
+        doc = JSON.parse(raw);
+      } catch { /* no file yet — start from empty */ }
+      // Second read (handles concurrent writers on NAS)
+      try {
+        const latestRaw = await fsp.readFile(jsonPath, 'utf8');
+        doc = JSON.parse(latestRaw);
+      } catch { /* fall back to first read */ }
+
+      if (logs.length > 0) {
+        const mergedMap = new Map();
+        (Array.isArray(doc.imports) ? doc.imports : [])
+          .concat(logs)
+          .forEach(entry => {
+            if (isValidImportEntry(entry)) mergedMap.set(entry.id, entry);
+            else console.warn('[AUDIT] Skipped invalid entry:', entry);
+          });
+        doc.imports = Array.from(mergedMap.values());
+        const MAX_IMPORTS = 5000;
+        if (doc.imports.length > MAX_IMPORTS) {
+          doc.imports = doc.imports.sort(sortImports).slice(0, MAX_IMPORTS);
+          console.warn('[AUDIT] Trimmed to latest', MAX_IMPORTS);
+        }
+        const latestLog = logs[logs.length - 1];
+        doc.lastImport = {
+          photographer: latestLog.photographer,
+          timestamp:    latestLog.timestamp,
+          fileCount:    latestLog.counts.photos + latestLog.counts.videos,
+        };
+      }
+
+      doc.status    = 'complete';
+      doc.updatedAt = Date.now();
+
+      const tmp = jsonPath + '.tmp';
+      try {
+        await fsp.writeFile(tmp, JSON.stringify(doc, null, 2), 'utf8');
+        await fsp.rename(tmp, jsonPath);
+      } catch (err) {
+        try { await fsp.unlink(tmp); } catch {}
+        throw new Error(`Event finalization failed: ${err.message}`);
+      }
+    }
+
+    return result;
+  } catch (err) {
+    try {
+      await restoreCreatedStatus();
+    } catch (rollbackErr) {
+      log(`Import transaction rollback failed: ${eventJsonPath || 'unknown'} | ${rollbackErr.message}`);
+    }
+    throw err;
+  }
 });
 
 /**
@@ -500,9 +681,6 @@ ipcMain.handle('thumb:get', async (_event, srcPath) => {
     return null;
   }
 });
-
-// Legacy ping
-ipcMain.handle('ping', async () => 'pong 🏓');
 
 // Pause / Resume / Abort copy pipeline
 ipcMain.on('copy:pause',  () => setPaused(true));
@@ -580,66 +758,6 @@ ipcMain.handle('feedback:send', async (_evt, opts) => {
   } catch (err) {
     return { success: false, error: err.message };
   }
-});
-
-// TEMPORARY DEBUG — remove after diagnosis
-ipcMain.handle('debug:telemetry', async () => {
-  const fs   = require('fs');
-  const path = require('path');
-
-  const KEY_PATH  = path.join(__dirname, '../config/service-account-key.json');
-  const SHEET_ID  = require('../services/telemetry').SHEET_ID ||
-                    'check telemetry.js directly';
-
-  const keyExists = fs.existsSync(KEY_PATH);
-  let   keyValid  = false;
-  let   keyEmail  = null;
-  let   keyError  = null;
-
-  if (keyExists) {
-    try {
-      const k = JSON.parse(fs.readFileSync(KEY_PATH, 'utf8'));
-      keyEmail = k.client_email || null;
-      keyValid = k.type === 'service_account' && !!k.private_key && !k._SETUP_INSTRUCTIONS;
-    } catch (e) {
-      keyError = e.message;
-    }
-  }
-
-  // Try an actual Sheets append with full error surfacing
-  let sheetsResult = null;
-  if (keyValid) {
-    try {
-      const { google } = require('googleapis');
-      const k    = JSON.parse(fs.readFileSync(KEY_PATH, 'utf8'));
-      const auth = new google.auth.JWT(
-        k.client_email, null, k.private_key,
-        ['https://www.googleapis.com/auth/spreadsheets']
-      );
-      const sheets = google.sheets({ version: 'v4', auth });
-      await sheets.spreadsheets.values.append({
-        spreadsheetId:    SHEET_ID,
-        range:            "'Bug Tracker'!A:S",
-        valueInputOption: 'USER_ENTERED',
-        insertDataOption: 'INSERT_ROWS',
-        requestBody: { values: [['', new Date().toDateString(), 'DEBUG', '0.1.0',
-                                 'Mac', '', '', 'debug', 'Other', 'debug test',
-                                 '', '', '', 'No', 'No', 'Low', 'New', '', '']] },
-      });
-      sheetsResult = 'SUCCESS — row appended';
-    } catch (e) {
-      sheetsResult = `FAILED: ${e.message}`;
-    }
-  }
-
-  return {
-    keyExists,
-    keyValid,
-    keyEmail,
-    keyError,
-    sheetId:      SHEET_ID,
-    sheetsResult,
-  };
 });
 
 // ── Master folder operations ──────────────────────────────────────────────────
@@ -864,11 +982,14 @@ function sanitizeForPath(name) {
 }
 
 function normalizeEventJson(data) {
-  data.components = (data.components || []).map((c, i) => ({
-    id: typeof c.id === 'number' ? c.id : (i + 1),
-    ...c,
-  }));
-  return data;
+  if (!data || typeof data !== 'object') return data;
+  const components = Array.isArray(data.components)
+    ? data.components.map((c, i) => ({
+        ...c,
+        id: Number.isInteger(c.id) && c.id > 0 ? c.id : i + 1,
+      }))
+    : data.components;
+  return { ...data, components };
 }
 
 function isValidEventJson(obj) {
@@ -876,12 +997,9 @@ function isValidEventJson(obj) {
   if (obj.version !== 1) return false;
   if (!obj.hijriDate || typeof obj.hijriDate !== 'string') return false;
 
-  // Normalize sequence: accept a number or a parseable string (e.g. "02" → 2).
-  if (typeof obj.sequence !== 'number') {
-    const parsed = parseInt(obj.sequence, 10);
-    if (Number.isNaN(parsed)) return false;
-    obj.sequence = parsed;
-  }
+  // Validate sequence without mutating — normalization lives in normalizeEventJson.
+  const seqNum = typeof obj.sequence === 'number' ? obj.sequence : parseInt(obj.sequence, 10);
+  if (!Number.isInteger(seqNum) || seqNum < 1) return false;
 
   if (!obj.eventName || typeof obj.eventName !== 'string') return false;
   if (!Array.isArray(obj.components)) return false;
@@ -932,19 +1050,38 @@ ipcMain.handle('event:write', async (_event, eventFolderPath, eventData) => {
 // Read event.json from a folder. Returns a valid parsed object or null.
 ipcMain.handle('event:read', async (_event, eventFolderPath) => {
   if (!eventFolderPath || typeof eventFolderPath !== 'string') return null;
+
   const jsonPath = path.join(eventFolderPath, 'event.json');
+
   try {
     const raw = await fsp.readFile(jsonPath, 'utf8');
-    const obj = normalizeEventJson(JSON.parse(raw));
+
+    const parsed = JSON.parse(raw);
+
+    // Normalize first so backfillable fields (e.g. missing component id) are
+    // repaired before validation — READ → NORMALIZE → VALIDATE.
+    const obj = normalizeEventJson(parsed);
+
     if (!isValidEventJson(obj)) {
       console.error('[event:read] isValidEventJson failed:', eventFolderPath, JSON.stringify(obj).slice(0, 400));
-      return null;
+      throw new Error('Invalid event.json structure');
     }
+
+    validateEventJson(obj);
+
     return obj;
+
   } catch (err) {
     if (err.code === 'ENOENT') return null;
+
+    // 🔴 IMPORTANT: show contract errors clearly
+    if (err.name === 'ContractError') {
+      console.error(err.toString(), err.meta);
+      throw err; // do NOT swallow
+    }
+
     console.error('[MAIN VALIDATION FAILED] parse error:', err.message);
-    return null;
+    throw err;
   }
 });
 
@@ -952,7 +1089,7 @@ ipcMain.handle('event:read', async (_event, eventFolderPath) => {
 // - Full (has hijriDate + sequence + components): writes the complete canonical shape.
 // - Partial (e.g. { status: 'complete' }): reads existing file, merges, writes back.
 // This prevents status-only callers from corrupting identity/component fields.
-ipcMain.handle('event:update', async (_event, eventFolderPath, payload) => {
+async function updateEventJson(eventFolderPath, payload) {
   if (!eventFolderPath || typeof eventFolderPath !== 'string') {
     return { ok: false, reason: 'Invalid folder path.' };
   }
@@ -997,6 +1134,10 @@ ipcMain.handle('event:update', async (_event, eventFolderPath, payload) => {
     try { await fsp.unlink(tmp); } catch {}
     return { ok: false, reason: `Write failed: ${err.message}` };
   }
+}
+
+ipcMain.handle('event:update', async (_event, eventFolderPath, payload) => {
+  return updateEventJson(eventFolderPath, payload);
 });
 
 // Merge-safe import log append. Reads current event.json, deduplicates
@@ -1179,14 +1320,21 @@ ipcMain.handle('settings:setLastEvent', async (_event, value) => {
   return { ok: true };
 });
 
-// Checks that the collection folder still exists on disk.
-// Event folders are only created at import time, so we don't verify them.
-ipcMain.handle('settings:verifyLastEvent', async (_event, collectionPath) => {
+// Checks that the collection folder (and optionally the event folder) still
+// exist on disk. Returns false if either is missing or inaccessible.
+ipcMain.handle('settings:verifyLastEvent', async (_event, collectionPath, eventFolderPath) => {
   if (!collectionPath) return false;
   try {
-    const stat = await fsp.stat(collectionPath);
-    return stat.isDirectory();
+    const collStat = await fsp.stat(collectionPath);
+    if (!collStat.isDirectory()) return false;
   } catch { return false; }
+  if (eventFolderPath) {
+    try {
+      const evStat = await fsp.stat(eventFolderPath);
+      if (!evStat.isDirectory()) return false;
+    } catch { return false; }
+  }
+  return true;
 });
 
 // ── List manager ──────────────────────────────────────────────────────────────
@@ -1202,6 +1350,71 @@ ipcMain.handle('date:toHijri',        (_event, isoDate)    => dateEngine.convert
 ipcMain.handle('date:toGregorian',    (_event, hijri)      => dateEngine.convertToGregorian(hijri));
 ipcMain.handle('date:getCalendar',    (_event, year, month)=> dateEngine.getHijriCalendar(year, month));
 
+// ── Audit: event integrity verification (read-only, on-demand) ────────────────
+// Counts media files on disk inside the event folder and compares with the
+// expected total derived from imports[].counts in event.json.
+// Bounded to depth 8 — event archive trees are at most 5 levels deep.
+ipcMain.handle('audit:verifyEvent', async (_event, eventPath) => {
+  if (!eventPath || typeof eventPath !== 'string') {
+    return { ok: false, error: 'Invalid path' };
+  }
+
+  let eventJson;
+  try {
+    const raw = await fsp.readFile(path.join(eventPath, 'event.json'), 'utf8');
+    eventJson = JSON.parse(raw);
+  } catch {
+    return { ok: false, error: 'Could not read event.json' };
+  }
+
+  const imports = Array.isArray(eventJson?.imports) ? eventJson.imports : [];
+  let expectedPhotos = 0;
+  let expectedVideos = 0;
+  for (const entry of imports) {
+    expectedPhotos += Math.max(0, parseInt(entry?.counts?.photos, 10) || 0);
+    expectedVideos += Math.max(0, parseInt(entry?.counts?.videos, 10) || 0);
+  }
+  const expectedTotal = expectedPhotos + expectedVideos;
+
+  const cfg        = require('../config/app.config');
+  const MEDIA_EXTS = new Set([...cfg.PHOTO_EXTENSIONS, ...cfg.VIDEO_EXTENSIONS]);
+  const VIDEO_EXTS = new Set(cfg.VIDEO_EXTENSIONS);
+
+  let actualPhotos = 0;
+  let actualVideos = 0;
+
+  async function countMedia(dir, depth) {
+    if (depth > 8) return;
+    let entries;
+    try { entries = await fsp.readdir(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      if (e.name.startsWith('.')) continue;
+      if (e.isDirectory()) {
+        await countMedia(path.join(dir, e.name), depth + 1);
+      } else if (e.isFile()) {
+        const ext = path.extname(e.name).toLowerCase();
+        if (!MEDIA_EXTS.has(ext)) continue;
+        if (VIDEO_EXTS.has(ext)) actualVideos++; else actualPhotos++;
+      }
+    }
+  }
+
+  try {
+    await countMedia(eventPath, 0);
+  } catch {
+    return { ok: false, error: 'Scan failed' };
+  }
+
+  const actualTotal = actualPhotos + actualVideos;
+  return {
+    ok:             true,
+    match:          actualTotal === expectedTotal,
+    expectedPhotos, expectedVideos, expectedTotal,
+    actualPhotos,   actualVideos,   actualTotal,
+    delta:          actualTotal - expectedTotal,
+  };
+});
+
 // ── Window controls ──────────────────────────────────────────────────────────
 ipcMain.handle('window:minimize', () => {
   BrowserWindow.getFocusedWindow()?.minimize();
@@ -1214,32 +1427,3 @@ ipcMain.handle('window:close', () => {
   BrowserWindow.getFocusedWindow()?.close();
 });
 
-// TEMP DEBUG
-ipcMain.handle('debug:flush', async () => {
-  const fs   = require('fs');
-  const path = require('path');
-  const KEY_PATH = path.join(__dirname, '../config/service-account-key.json');
-  const SHEET_ID = '1FKOL4bqScljgI8YPIMuCRNa0V7PtElnDFYaTYGx4TgU';
-
-  try {
-    const { google } = require('googleapis');
-    const key  = JSON.parse(fs.readFileSync(KEY_PATH, 'utf8'));
-    const auth = new google.auth.JWT(
-      key.client_email, null, key.private_key,
-      ['https://www.googleapis.com/auth/spreadsheets']
-    );
-    const sheets = google.sheets({ version: 'v4', auth });
-    const res = await sheets.spreadsheets.values.append({
-      spreadsheetId:    SHEET_ID,
-      range:            "'Bug Tracker'!A:S",
-      valueInputOption: 'USER_ENTERED',
-      insertDataOption: 'INSERT_ROWS',
-      requestBody: { values: [['', '16 Apr 2026', 'DebugTest', '0.1.0',
-                               'Mac', '', '', 'debug', 'Other', 'direct debug test',
-                               '', '', '', 'No', 'No', 'Low', 'New', '', '']] },
-    });
-    return { success: true, updatedRange: res.data.updates && res.data.updates.updatedRange };
-  } catch (e) {
-    return { success: false, error: e.message, code: e.code };
-  }
-});

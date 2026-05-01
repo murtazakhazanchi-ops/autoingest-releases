@@ -63,9 +63,7 @@ function init() {
 }
 
 /**
- * Persist the current in-memory state to disk atomically.
- * Writes to a .tmp file then renames over the real file so a partial write
- * cannot corrupt the settings file.
+ * Persist the current in-memory state to disk atomically (async).
  */
 async function _save() {
   const p   = _resolvePath();
@@ -77,6 +75,23 @@ async function _save() {
     console.error('[settings] Save failed:', err.message);
     try { await fsp.unlink(tmp); } catch { /* tmp may not exist */ }
     throw err;
+  }
+}
+
+/**
+ * Synchronous variant — used only in the window close handler where the event
+ * loop may not flush async work before the process exits. Same atomic
+ * tmp → rename guarantee as _save().
+ */
+function _saveSync() {
+  const p   = _resolvePath();
+  const tmp = p + '.tmp';
+  try {
+    fs.writeFileSync(tmp, JSON.stringify(_state, null, 2), 'utf8');
+    fs.renameSync(tmp, p);
+  } catch (err) {
+    console.error('[settings] Sync save failed:', err.message);
+    try { fs.unlinkSync(tmp); } catch { /* ignore */ }
   }
 }
 
@@ -208,4 +223,22 @@ async function setWindowBounds(value) {
   await _save();
 }
 
-module.exports = { init, getArchiveRoot, setArchiveRoot, getLastDestPath, setLastDestPath, getLastEvent, setLastEvent, getWindowBounds, setWindowBounds };
+/**
+ * Synchronous version of setWindowBounds — call from the BrowserWindow 'close'
+ * handler so bounds are guaranteed to flush before the process exits.
+ * @param {{ x: number, y: number, width: number, height: number } | null} value
+ */
+function setWindowBoundsSync(value) {
+  if (!_loaded) init();
+  if (value === null || value === undefined) {
+    delete _state.windowBounds;
+  } else if (value && typeof value === 'object' &&
+             typeof value.width === 'number' && typeof value.height === 'number') {
+    _state.windowBounds = { x: value.x, y: value.y, width: value.width, height: value.height };
+  } else {
+    return; // silently ignore invalid bounds on close — non-critical
+  }
+  _saveSync();
+}
+
+module.exports = { init, getArchiveRoot, setArchiveRoot, getLastDestPath, setLastDestPath, getLastEvent, setLastEvent, getWindowBounds, setWindowBounds, setWindowBoundsSync };

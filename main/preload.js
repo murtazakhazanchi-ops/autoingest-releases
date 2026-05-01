@@ -102,6 +102,8 @@ contextBridge.exposeInMainWorld('api', {
    */
   importFileJobs: (fileJobs) =>
     ipcRenderer.invoke('files:importJobs', { fileJobs }),
+  commitImportTransaction: (fileJobs, eventJsonPath, auditContext = {}) =>
+    ipcRenderer.invoke('import:commitTransaction', { fileJobs, eventJsonPath, ...auditContext }),
 
   onImportProgress: (cb) => _register('import:progress', (_e, progress) => cb(progress)),
 
@@ -172,7 +174,7 @@ contextBridge.exposeInMainWorld('api', {
   setLastDestPath:          (p)                      => ipcRenderer.invoke('settings:setLastDestPath', p),
   getLastEvent:             ()                       => ipcRenderer.invoke('settings:getLastEvent'),
   setLastEvent:             (v)                      => ipcRenderer.invoke('settings:setLastEvent', v),
-  verifyLastEvent:          (collectionPath)          => ipcRenderer.invoke('settings:verifyLastEvent', collectionPath),
+  verifyLastEvent:          (collectionPath, eventFolderPath) => ipcRenderer.invoke('settings:verifyLastEvent', collectionPath, eventFolderPath),
 
   // ── Event JSON (disk-backed event persistence) ──
   writeEventJson:   (eventFolderPath, eventData) => ipcRenderer.invoke('event:write',         eventFolderPath, eventData),
@@ -198,5 +200,8 @@ contextBridge.exposeInMainWorld('api', {
   convertToHijri:    (isoDate)            => ipcRenderer.invoke('date:toHijri',     isoDate),
   convertToGregorian:(hijri)              => ipcRenderer.invoke('date:toGregorian', hijri),
   getHijriCalendar:  (year, month)        => ipcRenderer.invoke('date:getCalendar', year, month),
+
+  // ── Audit (read-only, on-demand) ──
+  verifyEventIntegrity: (eventPath) => ipcRenderer.invoke('audit:verifyEvent', eventPath),
 
 });

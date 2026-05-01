@@ -51,8 +51,6 @@ const EventCreator = (() => {
         console.error(`[assertValidComponents] ${label || '?'}: eventTypes corrupted in component —`, c);
       }
     }
-    console.log(`[assertValidComponents] ${label || '?'}: OK — ${comps.length} component(s). Structure:`,
-      JSON.stringify(comps.map(c => ({ eventTypes: c.eventTypes, city: c.city, location: c.location })), null, 2));
   }
 
   function assertStrictComponents(comps) {
@@ -2867,21 +2865,17 @@ ${unparseable.map(ev => `
           return;
         }
 
-        const valid = await window.api.verifyLastEvent(last.collectionPath);
+        const safeName  = last.safeEventName || sanitizeForPath(last.eventName || '');
+        const eventPath = safeName ? (last.collectionPath + '/' + safeName) : null;
+
+        const valid = await window.api.verifyLastEvent(last.collectionPath, eventPath);
         if (!valid) {
+          console.warn('[restoreLastEvent] stale path detected, clearing:', eventPath || last.collectionPath);
           window.api.setLastEvent(null).catch(() => {});
           return;
         }
-
-        const safeName  = last.safeEventName || sanitizeForPath(last.eventName || '');
-        const eventPath = last.collectionPath + '/' + safeName;
 
         console.log('[restoreLastEvent] path:', eventPath);
-        if (!(await window.api.dirExists(eventPath))) {
-          console.warn('[restoreLastEvent] stale path detected, clearing:', eventPath);
-          window.api.setLastEvent(null).catch(() => {});
-          return;
-        }
 
         const components = await loadEventFromDisk(eventPath);
 
@@ -3269,6 +3263,9 @@ ${unparseable.map(ev => `
       document.dispatchEvent(new CustomEvent('eventcreator:listDeselect'));
       _slideToStep(showMasterStep);
     },
+
+    /** Force the next event list / Activity Log open to re-scan from disk. */
+    invalidateScannedEvents() { _scannedEvents = null; },
 
     isDirty() {
       return _navScreen === 'eventForm' && (_editMode || _repairMode || !_viewingExisting);

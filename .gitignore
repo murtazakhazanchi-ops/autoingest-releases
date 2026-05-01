@@ -11,3 +11,7 @@ config/service-account-key.json
 
 # Generated documentation helpers (not tracked)
 CODE_BUNDLE.md
+
+# Separate tooling repos (not part of AutoIngest)
+everything-claude-code/
+pixel-agents/

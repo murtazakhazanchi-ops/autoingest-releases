@@ -1,0 +1,6 @@
+{
+  "enabledPlugins": {
+    "frontend-design@claude-plugins-official": true,
+    "antigravity-skills@antigravity-skills": true
+  }
+}

@@ -14,17 +14,6 @@
 
 'use strict';
 
-// Mirrors the same function in eventCreator.js — produces filesystem-safe folder
-// names. Used only when constructing event folder paths from persisted settings.
-function sanitizeForPath(name) {
-  if (typeof name !== 'string') return '';
-  return name
-    .replace(/[/\\]/g, '-')
-    .replace(/[:*?"<>|]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
 // ── Platform detection (frameless window) ─────────────────────────────────────
 if (navigator.platform.startsWith('Mac')) document.body.classList.add('is-mac');
 
@@ -238,6 +227,7 @@ let timelineMode   = false;   // Timeline: group by date+hour instead of type se
 let cachedPaired   = null;    // sorted (+ optionally paired) flat file array
 let cachedTimeline = null;    // Array<[key, files[]]> from groupByTime
 let cacheKey       = null;    // generateCacheKey result; null forces rebuild
+let _syncingToggles = false;  // re-entrancy guard for syncViewToggles()
 
 /**
  * Single IntersectionObserver for viewport-based image loading.
@@ -394,10 +384,6 @@ function prepareDisplayData(files) {
 // ════════════════════════════════════════════════════════════════
 // CONSTANTS
 // ════════════════════════════════════════════════════════════════
-const RAW_EXT_SET   = new Set(['.cr2','.cr3','.nef','.nrw','.arw','.sr2','.srf',
-                                '.dng','.raf','.orf','.rw2','.pef','.x3f']);
-const PHOTO_EXT_SET = new Set(['.jpg','.jpeg','.png','.tiff','.tif']);
-const VIDEO_EXT_SET = new Set(['.mp4','.mov']);
 const THUMB_EXT_SET = new Set(['.jpg','.jpeg','.png']);
 
 function fileExt(filename) {
@@ -412,6 +398,64 @@ function escapeHtml(s) {
   return String(s)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;')
     .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function normalizeImportDisplayEntry(entry) {
+  const timestamp = typeof entry?.timestamp === 'string' ? entry.timestamp : '';
+  const timeMs = Date.parse(timestamp);
+  if (!Number.isFinite(timeMs)) return null;
+
+  const photographer  = typeof entry?.photographer  === 'string' ? entry.photographer.trim()  : '';
+  const componentName = typeof entry?.componentName === 'string' ? entry.componentName.trim() : '';
+
+  const photos = Math.max(0, parseInt(entry?.counts?.photos, 10) || 0);
+  const videos = Math.max(0, parseInt(entry?.counts?.videos, 10) || 0);
+
+  const skipped    = Math.max(0, parseInt(entry?.skipped,    10) || 0);
+  const duplicates = Math.max(0, parseInt(entry?.duplicates, 10) || 0);
+  const source     = entry?.source || null;
+
+  return {
+    photographer:  photographer  || '—',
+    componentName: componentName || '—',
+    timestamp,
+    timeMs,
+    seq:       parseInt(entry?.seq, 10) || 0,
+    photos,
+    videos,
+    skipped,
+    duplicates,
+    source,
+  };
+}
+
+function getEventImportSummary(event) {
+  const imports = Array.isArray(event?.imports) ? event.imports : [];
+  const entries = imports
+    .map(normalizeImportDisplayEntry)
+    .filter(Boolean)
+    .sort((a, b) => {
+      const t = b.timeMs - a.timeMs;
+      if (t !== 0) return t;
+      return (b.seq || 0) - (a.seq || 0);
+    });
+
+  if (entries.length === 0) return null;
+
+  let totalPhotos = 0;
+  let totalVideos = 0;
+
+  for (const entry of entries) {
+    totalPhotos += entry.photos;
+    totalVideos += entry.videos;
+  }
+
+  return {
+    totalPhotos,
+    totalVideos,
+    lastImport: entries[0],
+    entries,
+  };
 }
 
 // ── Inline SVG icon strings ───────────────────────────────────────────────────
@@ -457,6 +501,34 @@ function formatDate(iso) {
     day:'2-digit', month:'short', year:'numeric',
     hour:'2-digit', minute:'2-digit'
   });
+}
+
+function mediaCountLabel(photos, videos) {
+  const photoCount = parseInt(photos, 10) || 0;
+  const videoCount = parseInt(videos, 10) || 0;
+  const parts = [`${photoCount} photo${photoCount === 1 ? '' : 's'}`];
+  if (videoCount > 0) parts.push(`${videoCount} video${videoCount === 1 ? '' : 's'}`);
+  return parts.join(' • ');
+}
+
+function LastImportArea(summary) {
+  const lastImport = summary?.lastImport;
+  if (!lastImport) return '';
+
+  const lastTimestamp = formatDate(lastImport.timestamp);
+  const totalMedia = mediaCountLabel(summary.totalPhotos, summary.totalVideos);
+
+  return `
+    <div class="last-import-area" aria-label="Last import">
+      <div class="last-import-summary">
+        <span class="last-import-icon">${SVG.clock}</span>
+        <span class="last-import-title">Last Import</span>
+        <span class="last-import-separator">·</span>
+        <span class="last-import-meta">${escapeHtml(lastImport.photographer)} · ${escapeHtml(lastTimestamp)}</span>
+        <span class="last-import-total">${escapeHtml(totalMedia)}</span>
+      </div>
+    </div>
+  `;
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -900,8 +972,6 @@ function _updateContextBar() {
   const eventData = EventCreator.getActiveEventData();
   const master    = EventCreator.getActiveMaster();
 
-  console.log('[CTX MODE]', importMode, eventData ? 'hasEvent' : 'noEvent');
-
   if (importMode === 'event' && eventData) {
     const masterValEl = document.getElementById('ctxMasterVal');
     const eventValEl  = document.getElementById('ctxEventVal');
@@ -910,7 +980,6 @@ function _updateContextBar() {
     if (eventValEl)  eventValEl.textContent  = eventData.event.displayName || eventData.event.name || '';
     if (compTagEl) {
       const _heroComps = Array.isArray(eventData.event.components) ? eventData.event.components : [];
-      console.log('HERO COMPONENT COUNT:', _heroComps.length);
       compTagEl.textContent = _heroComps.length > 1 ? 'MULTI' : 'SINGLE';
     }
     if (line2Event) line2Event.style.display = '';
@@ -936,6 +1005,7 @@ function _ecPanelOpen() {
 
 function showEventCreator() {
   // Entering event creator invalidates any existing group→sub-event mappings
+  _clearHeroLastImportArea();
   GroupManager.reset();
   renderGroupPanel();
   _ecPanelOpen();
@@ -943,11 +1013,8 @@ function showEventCreator() {
 }
 
 function showEventCreatorResume() {
-  console.log('--- CHANGE EVENT CLICK ---');
-  console.log('  collection:', EventCreator.getSelectedCollection());
-  const activeData = EventCreator.getActiveEventData();
-  console.log('  active event:', activeData?.event?.name ?? 'none');
   // Re-entering to change the event also invalidates existing group mappings
+  _clearHeroLastImportArea();
   GroupManager.reset();
   renderGroupPanel();
   _ecPanelOpen();
@@ -1055,9 +1122,10 @@ function _renderLandingEventCard() {
   if (!card) return;
 
   const data = EventCreator.getActiveEventData();
+  const activeClass = card.classList.contains('card-active') || importMode === 'event' ? ' card-active' : '';
 
   if (!data) {
-    card.className = '';
+    card.className = `event-context-section event-context-section--hero${activeClass}`;
     card.innerHTML = `
       <div class="hero-icon-wrap">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -1089,7 +1157,7 @@ function _renderLandingEventCard() {
 
   const srcReady = activeSource !== null;
 
-  card.className = 'has-event';
+  card.className = `event-context-section event-context-section--hero has-event${activeClass}`;
   card.innerHTML = `
     <div class="hero-icon-wrap">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -1121,13 +1189,64 @@ function _renderLandingEventCard() {
     </div>`;
 
   document.getElementById('heroPrimaryBtn')
-    ?.addEventListener('click', () => {
+    ?.addEventListener('click', async () => {
       if (!activeSource) { showMessage('Select a source to continue'); return; }
+      const btn = document.getElementById('heroPrimaryBtn');
       const { type: srcType, path: srcPath, name: srcName } = activeSource;
-      selectSource({ type: srcType, path: srcPath, label: srcName });
+      showSourceScanState(srcName);
+      if (btn) btn.disabled = true;
+      try {
+        await selectSource({ type: srcType, path: srcPath, label: srcName });
+      } finally {
+        hideSourceScanState();
+        const b = document.getElementById('heroPrimaryBtn');
+        if (b) b.disabled = !activeSource;
+      }
     });
   document.getElementById('heroSecondaryBtn')
     ?.addEventListener('click', showEventCreatorResume);
+}
+
+let lastImportRenderSeq = 0;
+
+function _removeHeroLastImportArea() {
+  document.querySelectorAll('.last-import-area').forEach(el => el.remove());
+}
+
+function _clearHeroLastImportArea() {
+  lastImportRenderSeq++;
+  _removeHeroLastImportArea();
+}
+
+async function _renderHeroLastImportArea() {
+  const renderSeq = ++lastImportRenderSeq;
+
+  _removeHeroLastImportArea();
+
+  const activeData = EventCreator.getActiveEventData();
+  const eventJsonPath = activeData?.eventPath;
+  if (importMode !== 'event') return;
+  if (!eventJsonPath) return;
+
+  let currentEvent = null;
+  try {
+    currentEvent = await window.api.readEventJson(eventJsonPath);
+  } catch {
+    return;
+  }
+
+  if (renderSeq !== lastImportRenderSeq) return;
+  if (importMode !== 'event') return;
+  if (EventCreator.getActiveEventData()?.eventPath !== eventJsonPath) return;
+
+  const summary = getEventImportSummary(currentEvent);
+  if (!summary) return;
+
+  const heroCard = document.getElementById('heroCard');
+  const heroBody = heroCard?.querySelector('.hero-body');
+  if (!heroCard?.classList.contains('has-event') || !heroBody) return;
+
+  heroBody.insertAdjacentHTML('beforeend', LastImportArea(summary));
 }
 
 function _renderHomeContextBar() {
@@ -1137,6 +1256,337 @@ function _renderHomeContextBar() {
     archiveEl.textContent = archiveRoot
       ? (archiveRoot.length > 52 ? '…' + archiveRoot.slice(-49) : archiveRoot)
       : 'No archive set';
+  }
+}
+
+// ── Activity Log Modal ────────────────────────────────────────────────────────
+
+let _alEventList        = null;
+let _alMasterPath       = null;
+let _alCurrentEventPath = null;
+
+function _alClose() {
+  const overlay = document.getElementById('activityLogModal');
+  if (overlay) overlay.classList.remove('open');
+  document.body.style.overflow = '';
+  _alEventList        = null;
+  _alMasterPath       = null;
+  _alCurrentEventPath = null;
+  const pickerRow = document.getElementById('alPickerRow');
+  if (pickerRow) pickerRow.innerHTML = '';
+  document.getElementById('ovActivityLog')?.focus();
+}
+
+function _buildImportSourceMeta() {
+  if (!activeSource) {
+    return { type: 'unknown', label: 'Unknown source', path: '' };
+  }
+  return {
+    type:  activeSource.type || 'unknown',
+    label: activeSource.name || 'Unknown source',
+    path:  activeSource.path || '',
+  };
+}
+
+function _formatImportSource(source) {
+  if (!source || typeof source !== 'object') return 'Not recorded';
+  const label = typeof source.label === 'string' ? source.label.trim() : '';
+  const p     = typeof source.path  === 'string' ? source.path.trim()  : '';
+  if (!label) return 'Not recorded';
+  if (p && p !== label) return `${escapeHtml(label)} &middot; ${escapeHtml(p)}`;
+  return escapeHtml(label);
+}
+
+function _wireAlVerifyBtn() {
+  document.getElementById('alVerifyBtn')
+    ?.addEventListener('click', _runAlVerify);
+}
+
+async function _runAlVerify() {
+  const btn    = document.getElementById('alVerifyBtn');
+  const result = document.getElementById('alVerifyResult');
+  if (!btn || !result || !_alCurrentEventPath) return;
+
+  btn.disabled    = true;
+  btn.textContent = 'Verifying…';
+  result.innerHTML = '';
+
+  let res;
+  try {
+    res = await window.api.verifyEventIntegrity(_alCurrentEventPath);
+  } catch {
+    res = { ok: false, error: 'Verification failed' };
+  }
+
+  btn.disabled    = false;
+  btn.textContent = 'Verify Integrity';
+
+  if (!res.ok) {
+    result.innerHTML = `<div class="al-verify-result al-verify-result--error">${SVG.warn} ${escapeHtml(res.error || 'Verification error')}</div>`;
+    return;
+  }
+
+  if (res.match) {
+    result.innerHTML = `<div class="al-verify-result al-verify-result--ok">${SVG.check} Audit Verified &middot; ${res.actualTotal} file${res.actualTotal === 1 ? '' : 's'} on disk</div>`;
+  } else {
+    const delta = res.actualTotal - res.expectedTotal;
+    const sign  = delta > 0 ? '+' : '';
+    result.innerHTML = `<div class="al-verify-result al-verify-result--warn">${SVG.warn} Mismatch &middot; Expected: ${res.expectedTotal} &middot; Found: ${res.actualTotal} (${sign}${delta})</div>`;
+  }
+}
+
+function _hasEntryIssue(entry) {
+  if (!Number.isFinite(entry.timeMs))  return true;
+  if (entry.photographer === '—')      return true;
+  if (entry.componentName === '—')     return true;
+  if (entry.photos <= 0 && entry.videos <= 0) return true;
+  return false;
+}
+
+function _getEventIssueCount(entries) {
+  let count = 0;
+  for (const entry of entries) {
+    if (_hasEntryIssue(entry)) count++;
+  }
+  return count;
+}
+
+function _groupEntriesByDate(entries) {
+  const groups = [];
+  let currentDateStr = null;
+  let currentGroup   = null;
+  for (const entry of entries) {
+    const dateStr = new Date(entry.timeMs).toLocaleDateString(undefined, {
+      day: 'numeric', month: 'long', year: 'numeric',
+    });
+    if (dateStr !== currentDateStr) {
+      currentDateStr = dateStr;
+      currentGroup = { date: dateStr, entries: [] };
+      groups.push(currentGroup);
+    }
+    currentGroup.entries.push(entry);
+  }
+  return groups;
+}
+
+function _renderActivityLogBody(ev, activeData, folderName) {
+  const eventName = folderName || ev?.name || ev?.folderName || activeData?.event?.name || '—';
+  const collName  = activeData?.coll?.name || null;
+
+  const collRow = collName
+    ? `<p class="al-coll-name">${escapeHtml(collName)}</p>`
+    : '';
+  const headerHTML = `
+    <div class="al-event-header">
+      <p class="al-event-name">${escapeHtml(eventName)}</p>
+      ${collRow}
+    </div>`;
+
+  const summary = getEventImportSummary(ev);
+
+  if (!summary) {
+    return `${headerHTML}
+      <div class="al-empty">
+        <div class="al-empty-icon">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <div class="al-empty-title">No imports recorded yet</div>
+        <p>Imports will appear here after the first ingest.</p>
+      </div>`;
+  }
+
+  const mediaParts = [`${summary.totalPhotos} photo${summary.totalPhotos === 1 ? '' : 's'}`];
+  if (summary.totalVideos > 0) mediaParts.push(`${summary.totalVideos} video${summary.totalVideos === 1 ? '' : 's'}`);
+  const sessionCount = summary.entries.length;
+  const sessionLabel = `${sessionCount} import${sessionCount === 1 ? '' : 's'}`;
+  const issueCount   = _getEventIssueCount(summary.entries);
+  const lastOrWarn   = issueCount > 0
+    ? `<span class="al-summary-stat al-summary-warn">Check Imports</span>`
+    : (summary.lastImport
+        ? `<span class="al-summary-stat">${SVG.clock} Last by ${escapeHtml(summary.lastImport.photographer)} &middot; ${escapeHtml(formatDate(summary.lastImport.timestamp))}</span>`
+        : '');
+  const summaryHTML = `
+    <div class="al-summary-row">
+      <span class="al-summary-stat">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        ${mediaParts.join(' &bull; ')}
+      </span>
+      <span class="al-summary-stat">${escapeHtml(sessionLabel)}</span>
+      ${lastOrWarn}
+    </div>`;
+
+  const groups = _groupEntriesByDate(summary.entries);
+  const groupsHTML = groups.map(({ date, entries }) => {
+    const entriesHTML = entries.map(entry => {
+      const counts    = mediaCountLabel(entry.photos, entry.videos);
+      const badgeHTML = _hasEntryIssue(entry)
+        ? `<span class="al-entry-badge al-entry-badge--warn">Check</span>`
+        : '';
+      const qParts = [];
+      if (entry.skipped    > 0) qParts.push(`${entry.skipped} skipped`);
+      if (entry.duplicates > 0) qParts.push(`${entry.duplicates} duplicate${entry.duplicates === 1 ? '' : 's'}`);
+      const qualityHTML = qParts.length > 0
+        ? `<div class="al-entry-quality">${escapeHtml(qParts.join(' • '))}</div>`
+        : '';
+      const sourceHTML = `<div class="al-entry-source">Source: ${_formatImportSource(entry.source)}</div>`;
+      return `
+        <div class="al-entry">
+          <div class="al-entry-header">
+            <span class="al-entry-photographer">${escapeHtml(entry.photographer)}</span>
+            <span class="al-entry-time">${escapeHtml(formatDate(entry.timestamp))}</span>
+          </div>
+          <div class="al-entry-meta">
+            <span class="al-entry-component">${escapeHtml(entry.componentName)}</span>
+            ${badgeHTML}
+            <span class="al-entry-counts">${escapeHtml(counts)}</span>
+          </div>
+          ${qualityHTML}
+          ${sourceHTML}
+        </div>`;
+    }).join('');
+    return `
+      <div class="al-date-group">
+        <div class="al-date-label">${escapeHtml(date)}</div>
+        <div class="al-date-entries">${entriesHTML}</div>
+      </div>`;
+  }).join('');
+
+  return `${headerHTML}
+    ${summaryHTML}
+    <div class="al-divider"></div>
+    <p class="al-section-label">Import History</p>
+    ${groupsHTML}
+    <div class="al-verify-area">
+      <button class="al-verify-btn" id="alVerifyBtn" type="button">Verify Integrity</button>
+      <div id="alVerifyResult"></div>
+    </div>`;
+}
+
+function _renderAlPicker(events, activeFolder) {
+  const options = events.map(ev => {
+    const folder = ev.folderName || '';
+    const sel = folder === activeFolder ? ' selected' : '';
+    return `<option value="${escapeHtml(folder)}"${sel}>${escapeHtml(folder)}</option>`;
+  }).join('');
+  return `<span class="al-picker-label">Event</span>
+    <select class="al-picker-select" id="alPickerSelect" aria-label="Select event to view">${options}</select>`;
+}
+
+async function _onAlPickerChange(e) {
+  const folderName = e.target.value;
+  const activeData = EventCreator.getActiveEventData();
+  const body       = document.getElementById('alBody');
+  if (!body || !folderName || !_alMasterPath) return;
+  body.innerHTML = '';
+
+  let ev = null;
+  try {
+    ev = await window.api.readEventJson(_alMasterPath + '/' + folderName);
+  } catch { ev = null; }
+
+  const ctx = folderName === (activeData?.event?.name || '')
+    ? activeData
+    : { coll: activeData?.coll, event: { name: folderName } };
+  body.innerHTML = _renderActivityLogBody(ev, ctx, folderName);
+  _alCurrentEventPath = _alMasterPath ? (_alMasterPath + '/' + folderName) : null;
+  _wireAlVerifyBtn();
+}
+
+async function openActivityLogModal() {
+  const overlay   = document.getElementById('activityLogModal');
+  const body      = document.getElementById('alBody');
+  const pickerRow = document.getElementById('alPickerRow');
+  if (!overlay || !body) return;
+
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  body.innerHTML = '';
+  if (pickerRow) pickerRow.innerHTML = '';
+  setTimeout(() => document.getElementById('alCloseBtn')?.focus(), 200);
+
+  if (importMode !== 'event') {
+    body.innerHTML = `
+      <div class="al-empty">
+        <div class="al-empty-icon">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+        </div>
+        <div class="al-empty-title">Event mode only</div>
+        <p>Activity Log shows import history for events.<br>Switch to Event mode and select an event to view history.</p>
+      </div>`;
+    return;
+  }
+
+  const master     = EventCreator.getActiveMaster();
+  const activeData = EventCreator.getActiveEventData();
+
+  if (!activeData?.eventPath) {
+    body.innerHTML = `
+      <div class="al-empty">
+        <div class="al-empty-icon">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        </div>
+        <div class="al-empty-title">No event selected</div>
+        <p>Select an event to view its import history.</p>
+      </div>`;
+    return;
+  }
+
+  // Load active event immediately while scan runs in parallel
+  let currentEvent = null;
+  try {
+    currentEvent = await window.api.readEventJson(activeData.eventPath);
+  } catch {
+    body.innerHTML = `
+      <div class="al-empty">
+        <div class="al-empty-icon">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <div class="al-empty-title">Could not load event data</div>
+        <p>The event file could not be read.</p>
+      </div>`;
+    return;
+  }
+
+  if (!currentEvent) {
+    body.innerHTML = `
+      <div class="al-empty">
+        <div class="al-empty-icon">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        </div>
+        <div class="al-empty-title">Event not found</div>
+        <p>The event file could not be found on disk.</p>
+      </div>`;
+    return;
+  }
+
+  const activeFolder = activeData.event?.name || '';
+  body.innerHTML = _renderActivityLogBody(currentEvent, activeData, activeFolder);
+  _alCurrentEventPath = activeData.eventPath || null;
+  _wireAlVerifyBtn();
+
+  // Scan master for all events to populate picker
+  if (!master?.path) return;
+  _alMasterPath = master.path;
+  let rawList = [];
+  try {
+    rawList = await window.api.scanMasterEvents(master.path);
+  } catch { rawList = []; }
+
+  // Strip _eventJson immediately — store only lightweight picker data to prevent OOM.
+  // Full event.json is loaded on demand per-event when the picker selection changes.
+  _alEventList = (rawList || [])
+    .filter(e => e.isParseable && !e.isCorrupt)
+    .map(({ folderName, hijriDate, sequence, isLegacy }) => ({
+      folderName,
+      hijriDate:  hijriDate  || '',
+      sequence:   sequence   || '',
+      isLegacy:   isLegacy   || false,
+    }));
+
+  if (pickerRow && _alEventList.length > 1) {
+    pickerRow.innerHTML = _renderAlPicker(_alEventList, activeFolder);
+    document.getElementById('alPickerSelect')
+      ?.addEventListener('change', _onAlPickerChange);
   }
 }
 
@@ -1182,7 +1632,10 @@ function _applyImportMode(mode) {
   const srcLocal = document.getElementById('srcLocalFolder');
   if (srcLocal) srcLocal.classList.toggle('hidden', mode === 'quick');
   _switchModeCard(mode);
-  if (mode === 'quick') _renderQuickImportCard();
+  if (mode === 'quick') {
+    _clearHeroLastImportArea();
+    _renderQuickImportCard();
+  }
 }
 
 function renderHome() {
@@ -1190,6 +1643,7 @@ function renderHome() {
   _renderLandingEventCard();
   _renderInsightsBar();
   _applyImportMode(importMode);
+  _renderHeroLastImportArea();
 }
 
 function _updateMemCardBadge(count) {
@@ -1237,7 +1691,6 @@ document.getElementById('emmCloseBtn')?.addEventListener('click', () => EventMgm
 document.getElementById('emmContinueBtn')?.addEventListener('click', async () => {
   const btn = document.getElementById('emmContinueBtn');
   if (!btn || btn.disabled) return;
-  console.log('[emmContinueBtn] clicked, navScreen:', EventCreator.getNavScreen());
   btn.disabled = true;
   try {
     const ok = await EventCreator.adoptSelectedEvent();
@@ -1309,8 +1762,14 @@ document.addEventListener('eventcreator:done', () => {
 });
 document.getElementById('srcExtDriveBtn')?.addEventListener('click', selectExternalDrive);
 document.getElementById('srcLocalFolderBtn')?.addEventListener('click', selectLocalFolder);
-document.getElementById('modeEventBtn')?.addEventListener('click', () => _applyImportMode('event'));
-document.getElementById('modeQuickBtn')?.addEventListener('click', () => _applyImportMode('quick'));
+document.getElementById('modeEventBtn')?.addEventListener('click', () => {
+  _applyImportMode('event');
+  _renderHeroLastImportArea();
+});
+document.getElementById('modeQuickBtn')?.addEventListener('click', () => {
+  _applyImportMode('quick');
+  _renderHeroLastImportArea();
+});
 
 document.getElementById('qiChangeDestBtn')?.addEventListener('click', async () => {
   const chosen = await window.api.chooseDest();
@@ -1324,14 +1783,31 @@ document.getElementById('qiChangeDestBtn')?.addEventListener('click', async () =
 document.getElementById('qiImportBtn')?.addEventListener('click', async () => {
   const dest = _getEffectiveQuickDest();
   if (!activeSource || !dest) return;
-  await setDestPath(dest);
-  const { type: srcType, path: srcPath, name: srcName } = activeSource;
-  selectSource({ type: srcType, path: srcPath, label: srcName });
+  const btn = document.getElementById('qiImportBtn');
+  showSourceScanState(activeSource.name);
+  if (btn) btn.disabled = true;
+  try {
+    await setDestPath(dest);
+    const { type: srcType, path: srcPath, name: srcName } = activeSource;
+    await selectSource({ type: srcType, path: srcPath, label: srcName });
+  } finally {
+    hideSourceScanState();
+    const b = document.getElementById('qiImportBtn');
+    if (b) b.disabled = false;
+  }
 });
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && EventMgmt.isOpen()) EventMgmt.requestClose();
+  if (e.key === 'Escape' && document.getElementById('activityLogModal')?.classList.contains('open')) _alClose();
 });
+
+document.getElementById('ovActivityLog')?.addEventListener('click', openActivityLogModal);
+document.getElementById('ovActivityLog')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openActivityLogModal(); }
+});
+document.getElementById('alCloseBtn')?.addEventListener('click', _alClose);
+document.getElementById('alCloseFooterBtn')?.addEventListener('click', _alClose);
 
 // ════════════════════════════════════════════════════════════════
 // DRIVE METADATA HELPERS
@@ -1584,11 +2060,8 @@ async function selectSource({ type, path, label = null, driveObj = null }) {
   _updateContextBar();
 }
 
-function selectDrive() {
-  console.warn('selectDrive is deprecated — use selectSource()');
-}
-
 document.getElementById('changeDriveBtn').addEventListener('click', () => {
+  hideSourceScanState();
   resetWorkspaceState();
   hasSelectedDrive = false;
   isLoadingFiles   = false;
@@ -1605,11 +2078,25 @@ document.getElementById('changeDriveBtn').addEventListener('click', () => {
   renderHome();
 });
 
+function showSourceScanState(label) {
+  const el  = document.getElementById('sourceScanState');
+  const sub = document.getElementById('scanSubtitle');
+  if (!el) return;
+  if (sub) sub.textContent = label ? `Scanning ${label}` : 'Preparing media list';
+  el.classList.remove('hidden');
+}
+
+function hideSourceScanState() {
+  const el = document.getElementById('sourceScanState');
+  if (el) el.classList.add('hidden');
+}
+
 /**
  * resetAppState — called after eject or device disconnect.
  * Clears all drive/file state and returns UI to the landing screen.
  */
 function resetAppState() {
+  hideSourceScanState();
   hasSelectedDrive  = false;
   isLoadingFiles    = false;
   currentFolder     = null;
@@ -2138,6 +2625,7 @@ document.getElementById('viewMediaBtn').addEventListener('click', () => {
   const fg = document.getElementById('fileGrid');
   if (fg) fg.scrollTop = 0;
   renderCurrentView();
+  syncViewToggles();
 });
 
 document.getElementById('viewFolderBtn').addEventListener('click', () => {
@@ -2149,6 +2637,7 @@ document.getElementById('viewFolderBtn').addEventListener('click', () => {
   const fg = document.getElementById('fileGrid');
   if (fg) fg.scrollTop = 0;
   renderCurrentView();
+  syncViewToggles();
 });
 // Commit 11 (v0.6.0): back-button for folder-view drill-down.
 (function wireFolderBackButton() {
@@ -2165,6 +2654,7 @@ document.getElementById('viewIconBtn').addEventListener('click', () => {
   document.getElementById('viewIconBtn').classList.add('view-active');
   document.getElementById('viewListBtn').classList.remove('view-active');
   if (currentFiles.length) renderFileArea(currentFiles);  // legitimate re-render
+  syncViewToggles();
 });
 document.getElementById('viewListBtn').addEventListener('click', () => {
   if (viewMode === 'list') return;  // no-op if already in list mode
@@ -2172,6 +2662,7 @@ document.getElementById('viewListBtn').addEventListener('click', () => {
   document.getElementById('viewListBtn').classList.add('view-active');
   document.getElementById('viewIconBtn').classList.remove('view-active');
   if (currentFiles.length) renderFileArea(currentFiles);  // legitimate re-render
+  syncViewToggles();
 });
 
 
@@ -2180,6 +2671,7 @@ document.getElementById('timelineViewBtn').addEventListener('click', () => {
   document.getElementById('timelineViewBtn').classList.toggle('view-active', timelineMode);
   resetViewCache();
   if (currentFiles.length) renderFileArea(currentFiles);
+  syncViewToggles();
 });
 
 document.getElementById('pairToggle').addEventListener('change', e => {
@@ -2187,6 +2679,44 @@ document.getElementById('pairToggle').addEventListener('change', e => {
   resetViewCache();
   if (currentFiles.length) renderFileArea(currentFiles);
 });
+
+// Media/Folder toggle: unchecked = Media (left/default), checked = Folder (right)
+document.getElementById('mediaFolderSwitch').addEventListener('change', e => {
+  if (_syncingToggles) return;
+  if (e.target.checked) document.getElementById('viewFolderBtn').click();
+  else document.getElementById('viewMediaBtn').click();
+});
+
+// Grid/List toggle: unchecked = Grid (left/default), checked = List (right)
+// Inlined directly — avoids relying on hidden button .click() dispatch.
+document.getElementById('gridListSwitch').addEventListener('change', e => {
+  if (_syncingToggles) return;
+  const next = e.target.checked ? 'list' : 'icon';
+  if (viewMode === next) return;
+  viewMode = next;
+  if (currentFiles.length) renderFileArea(currentFiles);
+  syncViewToggles();
+});
+
+// Timeline toggle switch — proxies to the hidden timelineViewBtn
+document.getElementById('timelineSwitch').addEventListener('change', () => {
+  if (_syncingToggles) return;
+  document.getElementById('timelineViewBtn').click();
+});
+
+// Syncs toggle switch checked states to match current JS state variables.
+// Called after any programmatic view change so UI never drifts.
+// Convention: unchecked = left option, checked = right option.
+function syncViewToggles() {
+  _syncingToggles = true;
+  const mf = document.getElementById('mediaFolderSwitch');
+  const gl = document.getElementById('gridListSwitch');
+  const tl = document.getElementById('timelineSwitch');
+  if (mf) mf.checked = (viewModeType === 'folder');
+  if (gl) gl.checked = (viewMode === 'list');
+  if (tl) tl.checked = timelineMode;
+  _syncingToggles = false;
+}
 
 // ════════════════════════════════════════════════════════════════
 // RENDER FILE AREA
@@ -2863,9 +3393,8 @@ async function browseFolder(drivePath, folderPath) {
   selectedFiles.clear(); currentFiles = []; lastClickedPath = null;
   resetViewCache();
 
-  // Commit 3 (v0.6.0): folderPath === null is now a valid user-visible browse.
-  // selectDrive calls browseFolder(drive, null) which triggers a full-card recursive scan;
-  // the resulting file list must be rendered. Treat every browseFolder call as user-facing.
+  // Commit 3 (v0.6.0): folderPath === null is a valid user-visible browse.
+  // Every browseFolder call is treated as user-facing; the resulting list must be rendered.
   const isUserFolderSelection = true;
   currentFolder = folderPath || drivePath;
 
@@ -3158,42 +3687,27 @@ function showProgressSummary({ copied, skipped, errors, skippedReasons, failedFi
 
   // ── Deep Verify (Checksum) button — user-triggered, runs in background ────────
   const modal = document.getElementById('progressModal');
-  if (modal && !modal.querySelector('#runChecksumBtn') && integrity === 'verified') {
+  const actLeft = modal && modal.querySelector('.im-actions-left');
+  if (actLeft && !modal.querySelector('#runChecksumBtn') && integrity === 'verified') {
     const checksumBtn = document.createElement('button');
-    checksumBtn.id = 'runChecksumBtn';
+    checksumBtn.id        = 'runChecksumBtn';
+    checksumBtn.className = 'im-btn-secondary';
     checksumBtn.textContent = 'Deep Verify (Checksum)';
-    checksumBtn.style.cssText =
-      'padding:6px 14px;font-size:0.75rem;background:transparent;' +
-      'border:1px solid var(--border);border-radius:7px;color:var(--subtext);' +
-      'cursor:pointer;align-self:flex-start;margin-top:-4px;';
-    checksumBtn.onmouseenter = () => {
-      if (!checksumBtn.disabled) { checksumBtn.style.borderColor = 'var(--blue)'; checksumBtn.style.color = 'var(--blue)'; }
-    };
-    checksumBtn.onmouseleave = () => {
-      if (!checksumBtn.disabled) { checksumBtn.style.borderColor = 'var(--border)'; checksumBtn.style.color = 'var(--subtext)'; }
-    };
     checksumBtn.addEventListener('click', async () => {
-      checksumBtn.disabled = true;
-      checksumBtn.innerText = 'Verifying... 0%';
-      checksumBtn.style.opacity = '0.7';
-      checksumBtn.style.cursor = 'default';
+      checksumBtn.disabled    = true;
+      checksumBtn.textContent = 'Verifying... 0%';
       await window.api.runChecksumVerification();
     });
-    document.getElementById('progressDoneBtn').insertAdjacentElement('beforebegin', checksumBtn);
+    actLeft.appendChild(checksumBtn);
   }
 
   // ── Report Issue button (shown after every import) ─────────────────────────
   // Removed after Done is clicked to keep the modal clean on next import.
-  if (modal && !modal.querySelector('#progressReportBtn')) {
+  if (actLeft && !modal.querySelector('#progressReportBtn')) {
     const btn = document.createElement('button');
-    btn.id          = 'progressReportBtn';
-    btn.innerHTML = `${SVG.flag} Report an Issue`;
-    btn.style.cssText =
-      'padding:6px 14px;font-size:0.75rem;background:transparent;' +
-      'border:1px solid var(--border);border-radius:7px;color:var(--subtext);' +
-      'cursor:pointer;align-self:flex-start;margin-top:-4px;';
-    btn.onmouseenter = () => { btn.style.borderColor = 'var(--red)'; btn.style.color = 'var(--red)'; };
-    btn.onmouseleave = () => { btn.style.borderColor = 'var(--border)'; btn.style.color = 'var(--subtext)'; };
+    btn.id        = 'progressReportBtn';
+    btn.className = 'im-btn-tertiary';
+    btn.innerHTML = `<span class="icon">${SVG.flag}</span> Report an Issue`;
     btn.addEventListener('click', () => {
       document.getElementById('progressOverlay').classList.remove('visible');
       openFeedbackModal({
@@ -3201,7 +3715,7 @@ function showProgressSummary({ copied, skipped, errors, skippedReasons, failedFi
         importResult: `Copied: ${copied}  Skipped: ${skipped}  Failed: ${errors}`,
       });
     });
-    document.getElementById('progressDoneBtn').insertAdjacentElement('beforebegin', btn);
+    actLeft.appendChild(btn);
   }
 }
 
@@ -3217,7 +3731,6 @@ window.api.onChecksumProgress(({ completed, total }) => {
 window.api.onChecksumComplete(({ failed }) => {
   const btn = document.getElementById('runChecksumBtn');
   if (!btn) return;
-  btn.style.opacity = '1';
   if (failed === 0) {
     btn.innerHTML = `${SVG.check} Deep Verification Complete`;
     btn.classList.add('csq-success');
@@ -3237,8 +3750,6 @@ document.getElementById('importBtn').addEventListener('click', async () => {
   const eventData = EventCreator.getActiveEventData();
   const mode = importMode;
 
-  console.log('[IMPORT MODE]', mode);
-
   if (mode === 'event' && !eventData) {
     console.warn('[IMPORT] Event mode active but no event selected');
     showMessage('No event selected. Please select or create an event before importing.');
@@ -3257,8 +3768,6 @@ document.getElementById('importBtn').addEventListener('click', async () => {
     const liveComps = EventCreator.getEventComps()?.length
       ? EventCreator.getEventComps()
       : (eventData?.event?.components ? JSON.parse(JSON.stringify(eventData.event.components)) : []);
-
-    console.log('[IMPORT] USING COMPONENTS:', liveComps.length, liveComps);
 
     if (!liveComps || liveComps.length === 0) {
       console.error('[IMPORT] No components available');
@@ -3333,29 +3842,14 @@ document.getElementById('importBtn').addEventListener('click', async () => {
       return;
     }
 
-    console.log('[IMPORT] Pre-import state — components:', liveComps.length, liveComps.map(c => ({
-      id: c.id, eventTypes: c.eventTypes.map(t => t.label), city: c.city?.label,
-    })));
-    console.log('[IMPORT] Pre-import state — groups:', groups.map(g => ({
-      id: g.id, files: g.files.size, subEventId: g.subEventId,
-    })));
-
     // G5: Confirmation screen — photographer + mapping summary.
-    console.log('[FLOW] Opening modal');
     const photographer = await showEventImportConfirmModal(groups, eventData);
-    console.log('[FLOW] Modal resolved', photographer ? `photographer=${photographer}` : 'cancelled');
 
     const { fileJobs } = ImportRouter.buildFileJobs({ groups, eventData, photographer });
     if (fileJobs.length === 0) { showMessage('No files to import.'); return; }
 
     // Use path from getActiveEventData() — already validated above.
     const _eventJsonPath = eventData.eventPath;
-
-    console.log('[IMPORT DESTINATION]', {
-      eventPath:      eventData.eventPath,
-      collectionPath: eventData.collectionPath,
-      photographer,
-    });
 
     importRunning = true;
     updateSelectionBar();
@@ -3366,71 +3860,28 @@ document.getElementById('importBtn').addEventListener('click', async () => {
       await window.api.updateEventJson(_eventJsonPath, { status: 'in-progress' });
     }
 
+    const auditContext = {
+      collName: eventData.coll?.name,
+      photographer,
+      subEventNames: EventCreator.getSubEventNames(),
+      liveComps,
+      groups: groups.map(group => ({
+        id: group.id,
+        subEventId: group.subEventId,
+        files: [...group.files],
+      })),
+      source: _buildImportSourceMeta(),
+    };
+
     try {
-      const summary = await window.api.importFileJobs(fileJobs);
+      const summary = await window.api.commitImportTransaction(fileJobs, _eventJsonPath, auditContext);
       if (!activeSource) return;
-      // Mark event complete only on full success.
-      if (_eventJsonPath) {
-        await window.api.updateEventJson(_eventJsonPath, { status: 'complete' });
-      }
-
-      // ── Audit log — append-only, merge-safe ──────────────────────────────
-      if (_eventJsonPath) {
-        try {
-          const now = new Date().toISOString();
-          const baseSeq = Date.now();
-          const subEventNames = EventCreator.getSubEventNames(); // [{id, name}] ordered by component
-          const isMulti = subEventNames.length > 0;
-          const logs = [];
-
-          groups.forEach((group, index) => {
-            let componentIndex = 0;
-            if (isMulti) {
-              const matchIdx = subEventNames.findIndex(se => se.name === group.subEventId);
-              if (matchIdx >= 0) componentIndex = matchIdx;
-            }
-            const comp = liveComps[componentIndex];
-            const componentName = comp ? comp.eventTypes.map(t => t.label).join(', ') : '';
-            let photos = 0, videos = 0;
-            for (const filePath of group.files) {
-              const ext = '.' + (filePath.split('.').pop() || '').toLowerCase();
-              if (VIDEO_EXT_SET.has(ext)) videos++; else photos++;
-            }
-            const id = Date.now().toString(36) +
-              '-' + Math.random().toString(36).slice(2) +
-              '-' + (eventData.coll?.name || 'unknown');
-            logs.push({
-              id,
-              seq:            baseSeq + index,
-              timestamp:      now,
-              photographer,
-              componentIndex,
-              componentName,
-              counts:         { photos, videos },
-            });
-          });
-
-          if (logs.length > 0) {
-            await window.api.appendImports(_eventJsonPath, logs);
-            console.log('[AUDIT] +', logs.length, 'entries');
-          } else {
-            console.log('[AUDIT] No log entries to write');
-          }
-
-          // Write lastImport summary for quick querying without scanning imports[].
-          const totalFileCount = logs.reduce((s, e) => s + (e.counts.photos + e.counts.videos), 0);
-          await window.api.updateEventJson(_eventJsonPath, {
-            lastImport: { photographer, timestamp: now, fileCount: totalFileCount },
-          });
-        } catch (err) {
-          console.error('[AUDIT] Logging failed:', err);
-        }
-      }
-      // ─────────────────────────────────────────────────────────────────────
 
       showProgressSummary(summary);
+      EventCreator.invalidateScannedEvents();
       await refreshDestCache();
       try { globalImportIndex = await window.api.getImportIndex() || {}; } catch { /* non-critical */ }
+      _renderHeroLastImportArea();
     } catch (err) {
       document.getElementById('progressFilename').textContent = `Error: ${err.message}`;
       document.getElementById('progressDoneBtn').classList.add('visible');
@@ -3461,7 +3912,6 @@ document.getElementById('importBtn').addEventListener('click', async () => {
 
   const uniqueFiles = Array.from(new Set(filePaths));
   const finalDest = destPath + '/' + photographer;
-  console.log('[QUICK IMPORT]', { destPath, photographer, fileCount: uniqueFiles.length, finalDest });
 
   await window.api.ensureDir(finalDest);
 
@@ -3906,43 +4356,58 @@ function showWhatsNewModal({ version, notes }) {
 
 // ── Shared tips content (rendered in both onboarding step 4 and Help modal) ──
 function renderTipsContent() {
-  const sortIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>`;
-  const selIcon  = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>`;
-  const destIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>`;
-  const resIcon  = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`;
+  const importIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`;
+  const qiIcon     = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>`;
+  const selIcon    = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>`;
+  const groupIcon  = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>`;
+  const logIcon    = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
+  const resIcon    = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`;
   return `
     <div class="ob-tips">
       <div class="ob-tip">
-        <div class="ob-tip-label">${sortIcon} Sorting</div>
-        Use Date, Name, or Size to organise files.
-        <div class="ob-tip-hint">Tip: Sort by Date to review newest photos first.</div>
+        <div class="ob-tip-label">${importIcon} Event Import</div>
+        Create or select an event, then import files into the structured archive.
+        <div class="ob-tip-hint">For multi-component events, assign files to groups/sub-events before importing.</div>
       </div>
       <div class="ob-tip">
-        <div class="ob-tip-label">${selIcon} Selecting files</div>
-        Only new files are selected automatically — you can still select or deselect manually.
+        <div class="ob-tip-label">${qiIcon} Quick Import</div>
+        Use Quick Import for simple destination-based imports without event routing.
+        <div class="ob-tip-hint">Choose a destination, select files, and import directly.</div>
       </div>
       <div class="ob-tip">
-        <div class="ob-tip-label">${destIcon} Destination folder</div>
-        Destination is set on the home screen before starting an import.
+        <div class="ob-tip-label">${selIcon} Selecting &amp; Sorting</div>
+        Select files manually or use Shift+click for range selection. Sort by Date to review newest files first.
+        <div class="ob-tip-hint">Already-imported files are marked so they can be skipped safely.</div>
       </div>
       <div class="ob-tip">
-        <div class="ob-tip-label">${resIcon} Import results</div>
+        <div class="ob-tip-label">${groupIcon} Grouping Files</div>
+        Use groups to route files into the correct sub-event.
+        <div class="ob-tip-hint">Right-click selected files or use Cmd/Ctrl+G to assign them.</div>
+      </div>
+      <div class="ob-tip">
+        <div class="ob-tip-label">${logIcon} Activity Log &amp; Verify Integrity</div>
+        The Activity Log shows who imported what, when, from which source, and into which sub-event. Older imports may show "Source: Not recorded."
+        <div class="ob-tip-hint">Use Verify Integrity to compare the audit record with files on disk — read-only, no changes made.</div>
+      </div>
+      <div class="ob-tip">
+        <div class="ob-tip-label">${resIcon} Import Results</div>
         <div class="ob-result-rows">
           <div class="ob-result-row"><span class="ob-result-icon sum-copied">${SVG.check}</span><span><strong>Copied</strong> — successfully imported</span></div>
-          <div class="ob-result-row"><span class="ob-result-icon sum-skipped">${SVG.skip}</span><span><strong>Skipped</strong> — already exists at destination</span></div>
+          <div class="ob-result-row"><span class="ob-result-icon sum-skipped">${SVG.skip}</span><span><strong>Skipped</strong> — already exists or intentionally skipped</span></div>
           <div class="ob-result-row"><span class="ob-result-icon sum-errors">${SVG.warn}</span><span><strong>Failed</strong> — could not be copied</span></div>
+          <div class="ob-result-row"><span class="ob-result-icon" style="color:var(--yellow)">${SVG.warn}</span><span><strong>Check Imports</strong> — the audit entry needs review</span></div>
         </div>
       </div>
     </div>
     <div class="ob-beta">
-      <div class="ob-beta-title">Help us improve</div>
+      <div class="ob-beta-title">Beta Feedback</div>
       <ul class="ob-beta-list">
-        <li><strong>Speed</strong> — does anything feel slow?</li>
-        <li><strong>Ease</strong> — is anything confusing?</li>
-        <li><strong>Reliability</strong> — did anything fail?</li>
+        <li><strong>Speed</strong> — anything slow or stuck?</li>
+        <li><strong>Ease</strong> — anything confusing?</li>
+        <li><strong>Reliability</strong> — any failed import, mismatch, or unexpected result?</li>
       </ul>
       <div style="margin-top:10px; font-size:0.82rem; color:var(--subtext);">
-        If something doesn't work: take a screenshot, send a short message, and share the log file if possible.
+        If something fails: send a screenshot, describe what you were doing, and share the log file if possible.
       </div>
       <div class="ob-log">
         <strong style="color:var(--text);">Log file location:</strong><br>
@@ -3955,30 +4420,36 @@ function renderTipsContent() {
 // ── Onboarding screens definition ────────────────────────────────────────────
 const OB_SCREENS = [
   {
-    hero:  SVG.camera,
-    title: 'Import your camera files safely',
-    body:  `<p class="ob-text">Quickly select and copy photos from memory cards — without duplicates.</p>`
-  },
-  {
     hero:  SVG.layers,
-    title: 'How it works',
+    title: 'Choose Event Import or Quick Import',
     body: `
       <div class="ob-steps">
-        <div class="ob-step-row"><span class="ob-step-num">1</span><span>Insert your memory card</span></div>
-        <div class="ob-step-row"><span class="ob-step-num">2</span><span>Select the files you want</span></div>
-        <div class="ob-step-row"><span class="ob-step-num">3</span><span>Click <strong>Import</strong></span></div>
+        <div class="ob-step-row"><span class="ob-step-num">1</span><span><strong>Event Import</strong> — structured archive work with event routing and grouping.</span></div>
+        <div class="ob-step-row"><span class="ob-step-num">2</span><span><strong>Quick Import</strong> — simple destination-based copying without event setup.</span></div>
       </div>
-      <p class="ob-text">Only new files are selected automatically.</p>`
+      <p class="ob-text">Select your mode on the home screen before starting.</p>`
   },
   {
     hero:  SVG.save,
-    title: 'Ready to begin',
-    body:  `<p class="ob-text" style="text-align:center; font-size:1rem;">Insert a card to begin.</p>
-            <p class="ob-text">AutoIngest will detect your memory card automatically and show your files within seconds.</p>`
+    title: 'Set the event context',
+    body: `
+      <p class="ob-text">Create a new event or select an existing one from your master archive.</p>
+      <p class="ob-text">AutoIngest uses the event structure to route files into the correct archive folders — no manual path entry needed.</p>`
+  },
+  {
+    hero:  SVG.camera,
+    title: 'Select and route files',
+    body: `
+      <div class="ob-steps">
+        <div class="ob-step-row"><span class="ob-step-num">1</span><span>Connect or choose your source (card, drive, or folder)</span></div>
+        <div class="ob-step-row"><span class="ob-step-num">2</span><span>Select the files you want to import</span></div>
+        <div class="ob-step-row"><span class="ob-step-num">3</span><span>For multi-component events, assign files to <strong>groups/sub-events</strong></span></div>
+        <div class="ob-step-row"><span class="ob-step-num">4</span><span>Choose photographer and click <strong>Import</strong></span></div>
+      </div>`
   },
   {
     hero:  SVG.sparkles,
-    title: "You're ready — a few quick tips",
+    title: "You're ready — quick reference",
     body:  renderTipsContent()
   }
 ];
@@ -4655,8 +5126,7 @@ function renderGroupPanel() {
     <div class="gp-header">Groups</div>
     <div class="gp-cards-container">
       ${groups.map((g, idx) => _buildCardHtml(g, idx)).join('')}
-    </div>
-    <button class="gp-add-card-btn">＋ New Group</button>`;
+    </div>`;
 
   // Remove buttons
   panel.querySelectorAll('.gc-remove-btn[data-gid]').forEach(btn => {
@@ -4667,11 +5137,6 @@ function renderGroupPanel() {
     });
   });
 
-  // New group button
-  panel.querySelector('.gp-add-card-btn')?.addEventListener('click', () => {
-    GroupManager.createGroup();
-    renderGroupPanel();
-  });
 }
 
 // ── Context menu (right-click on tile) ────────────────────────────────────
