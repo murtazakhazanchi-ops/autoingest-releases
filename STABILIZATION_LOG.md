@@ -101,3 +101,159 @@ See `STABILIZATION_NOTES.md` for out-of-scope findings.
 ---
 
 *Completed: 2026-04-18*
+
+
+---
+
+## v0.7.4-dev — Event System & Transaction Stabilization (2026-05-01)
+
+FIX-ONLY stabilization pass focused on persistence integrity, event system correctness, and renderer consistency. No feature additions, no architectural changes.
+
+---
+
+### Tier 4 — Event System + Transaction Integrity + Cache Consistency
+
+| # | File | Summary | Status |
+|---|------|--------|--------|
+| 53 | `main/main.js` | Make `isValidEventJson` non-mutating (remove `obj.sequence` assignment) | done |
+| 54 | `main/main.js` | Delete dead code `updateLastImport` (unused competing writer) | done |
+| 55 | `renderer/eventCreator.js` | Expose `invalidateScannedEvents()` (cache invalidation hook) | done |
+| 56 | `renderer/renderer.js` | Call `invalidateScannedEvents()` after successful event import | done |
+| 57 | `main/main.js` | Consolidate `import:commitTransaction` into single atomic event.json write | done |
+| 58 | `services/settings.js` | Add synchronous `_saveSync()` using tmp→rename | done |
+| 59 | `services/settings.js` | Add `setWindowBoundsSync()` for safe close-time persistence | done |
+| 60 | `main/main.js` | Use `setWindowBoundsSync()` in window close handler | done |
+| 61 | `main/main.js` | Strengthen `settings:verifyLastEvent` to validate event folder path | done |
+| 62 | `main/preload.js` | Pass eventFolderPath to `verifyLastEvent` IPC | done |
+| 63 | `renderer/eventCreator.js` | Update restore flow to pass event path for validation | done |
+
+---
+
+### Critical Issues Resolved
+
+#### 1. Transaction Rollback Audit Loss (SEVERE)
+
+- **Before:** Multiple independent writes to `event.json` (imports, lastImport, status)
+- **Failure:** Crash between writes → rollback erased audit entries while files remained on disk
+- **Fix:** Single atomic merge + tmp→rename write after all fields prepared
+- **Result:** No partial state possible; rollback always restores a valid pre-transaction snapshot
+
+---
+
+#### 2. Stale `_scannedEvents` Cache After Import
+
+- **Before:** Activity Log used stale in-memory cache after import
+- **Failure:** User could not verify import without restarting or rescanning
+- **Fix:** Explicit cache invalidation via `invalidateScannedEvents()`
+- **Result:** Next Activity Log read always reflects disk state
+
+---
+
+#### 3. Validator Side-Effect Mutation
+
+- **Before:** `isValidEventJson` mutated `obj.sequence`
+- **Failure:** Could convert string → number, breaking sort (`localeCompare`) and scanner
+- **Fix:** Local numeric validation only; no mutation
+- **Result:** Validator is now pure and side-effect free
+
+---
+
+#### 4. Dead Code Write Path (`updateLastImport`)
+
+- **Before:** Unused function performing full read-modify-write of event.json
+- **Risk:** Future accidental use → competing writes → silent corruption
+- **Fix:** Removed completely
+- **Result:** Single authoritative write path preserved
+
+---
+
+#### 5. Window Bounds Persistence Race
+
+- **Before:** Async write during close could be dropped
+- **Fix:** Synchronous `_saveSync()` with atomic rename
+- **Result:** Guaranteed persistence on app exit
+
+---
+
+#### 6. Incomplete Event Restore Validation
+
+- **Before:** Only collection path validated
+- **Failure:** Missing event folder silently failed restore
+- **Fix:** Validate both collection + event folder
+- **Result:** Deterministic restore behavior
+
+---
+
+### Architectural Impact
+
+This pass introduces:
+
+- **Atomic transaction boundary for event.json**
+- **Strict separation of validation vs normalization**
+- **Cache invalidation instead of cache mutation**
+- **Elimination of competing write paths**
+
+No changes to:
+
+- ImportRouter
+- GroupManager
+- File copy pipeline
+- Thumbnail system
+- UI structure
+- event.json schema
+
+---
+
+### Guarantees Achieved
+
+- No partial event.json writes
+- No audit data loss after file copy
+- No stale Activity Log after import
+- No mutation side-effects in validation layer
+- No unsafe async persistence during app close
+- No silent restore failures for events
+
+---
+
+### Validation Summary
+
+- event.json write is now single atomic operation
+- rollback cannot erase committed audit entries
+- Activity Log reflects import immediately
+- scanner no longer risks `.localeCompare` crash
+- dead write path removed completely
+- window bounds persist reliably on exit
+- verifyLastEvent fails correctly when event folder missing
+- Quick Import unaffected
+- Event Import routing unchanged
+- GroupManager unchanged
+- ImportRouter unchanged
+
+---
+
+### Tier 5 — Activity Log, Audit Layer, Source Attribution, Dead Code (2026-05-01)
+
+| # | File | Summary | Status |
+|---|------|---------|--------|
+| 64 | `renderer/renderer.js` | Activity Log renders history grouped by date; `_groupEntriesByDate` produces `{date, entries[]}` sections | done |
+| 65 | `renderer/renderer.js` | Event-level summary: photo/video/session counts, last import attribution, "Check Imports" warning when issues exist | done |
+| 66 | `renderer/renderer.js` | `_hasEntryIssue` / `_getEventIssueCount` — binary issue detection; amber Check badge only; no false-positive badge on clean entries | done |
+| 67 | `renderer/renderer.js` | `_alEventList` stores only `{folderName, hijriDate, sequence, isLegacy}` — never full `_eventJson`; OOM prevention (Oilpan Large Allocation crash eliminated) | done |
+| 68 | `renderer/renderer.js` | `_alCurrentEventPath` tracks displayed event path; cleared on modal close; used by `_runAlVerify` | done |
+| 69 | `renderer/renderer.js` | `_wireAlVerifyBtn` / `_runAlVerify` — on-demand Verify Integrity: calls `audit:verifyEvent`, shows result inline | done |
+| 70 | `renderer/renderer.js` | `_buildImportSourceMeta` / `_formatImportSource` — source attribution display in Activity Log | done |
+| 71 | `renderer/renderer.js` | `normalizeImportDisplayEntry` passes through `skipped` and `duplicates` fields (future-safe) | done |
+| 72 | `renderer/renderer.js` | `auditContext` at import call site includes `source` field for transaction commit | done |
+| 73 | `main/main.js` | `normalizeImportSource(src)` — validates and normalises source shape before event.json write | done |
+| 74 | `main/main.js` | `buildAuditImportEntries` — each log entry now includes `source: {type, label, path}` | done |
+| 75 | `main/main.js` | `import:commitTransaction` destructures `source` from IPC payload; passes through `auditContext` | done |
+| 76 | `main/main.js` | `audit:verifyEvent` IPC handler — recursive media count walk, depth ≤ 8, no size filter, returns match/delta result | done |
+| 77 | `main/main.js` | Drive polling sends guarded with `!win.isDestroyed()` and `!win.webContents.isDestroyed()` | done |
+| 78 | `main/main.js` | Removed: `exec` from child_process destructure (dead), four dead `fileBrowser` imports, `findEventFolderForJobs` (never called), debug `console.log` statements inside `commitTransaction`, legacy `ping` handler | done |
+| 79 | `main/preload.js` | Added `verifyEventIntegrity(eventPath)` → `audit:verifyEvent` | done |
+| 80 | `renderer/index.html` | Added CSS for Activity Log: date groups, entry badges, verify area, verify result states | done |
+| 81 | `renderer/eventCreator.js` | Removed OK-path `console.log` in `assertValidComponents` (debug trace only; error lines preserved) | done |
+
+---
+
+*Completed: 2026-05-01*
