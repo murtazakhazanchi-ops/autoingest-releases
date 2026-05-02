@@ -200,6 +200,46 @@ Validation:
 - Confirm valid legacy data passes.
 - Confirm errors identify the violated contract or field clearly.
 
+### Renderer Session State Must Reset Comprehensively
+
+Context:
+- Applies to EventCreator and any renderer module that holds session state across modal open/close cycles, event changes, and event deselection.
+
+Rule:
+- When a reset or clear operation is performed on renderer session state, all fields that were set together must be cleared together.
+- Clearing only the component list while leaving active event reference, selected collection, active index, scanned events, or `_viewingExisting` flag creates desynced session state.
+- A reset path that exits early (stale-path, not-found path) must still explicitly clear all session fields before returning.
+
+Avoid:
+- Partial resets that clear one field but leave related fields populated.
+- Assuming null-initialized fields are already safe after a partial clear.
+- Early-return paths that skip session cleanup.
+
+Validation:
+- Confirm all session fields related to the active event are cleared in every reset path.
+- Confirm stale-path and not-found-path branches include explicit cleanup before returning.
+- Confirm subsequent reads of session state after reset return consistent null/empty values.
+
+### Import Handler Must Not Fall Back to Raw Disk-Format Components
+
+Context:
+- Applies to the import handler in the renderer whenever it reads event components for validation or processing.
+
+Rule:
+- When session-format event components are empty or unavailable, the correct recovery is to reload from disk using an API that produces session-format data (`loadEventFromDisk` → `setEventState`).
+- Raw `eventData.event.components` from a cached event object is disk format. It does not have `eventTypes` properties and will fail normalization, producing false validation errors.
+- A dedicated reload API (`reloadForImport` or equivalent) must be the recovery path, never a raw disk-format fallback.
+
+Avoid:
+- Using `setEventComps(eventData.event.components)` as a workaround when session cache is empty.
+- Passing disk-format components directly to normalization or validation logic that expects session format.
+- Treating `getEventComps()` returning empty as a signal to reach into the cached event data structure.
+
+Validation:
+- Confirm `liveComps` in the import handler always comes from `getEventComps()`.
+- Confirm when `_eventComps` is empty the recovery reads from disk via session-format API.
+- Confirm no code path passes raw disk-format components to session-format validation logic.
+
 ### Documentation Follow-Up
 
 Context:

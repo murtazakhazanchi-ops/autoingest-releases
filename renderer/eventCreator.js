@@ -2872,6 +2872,11 @@ ${unparseable.map(ev => `
         if (!valid) {
           console.warn('[restoreLastEvent] stale path detected, clearing:', eventPath || last.collectionPath);
           window.api.setLastEvent(null).catch(() => {});
+          selectedCollection  = null;
+          activeMaster        = null;
+          _viewingExisting    = null;
+          _scannedEvents      = null;
+          setEventState([]);
           return;
         }
 
@@ -2974,6 +2979,19 @@ ${unparseable.map(ev => `
       if (Array.isArray(comps) && comps.length > 0) {
         setEventState(JSON.parse(JSON.stringify(comps)));
       }
+    },
+
+    /**
+     * Re-reads the event at eventPath from disk and locks _eventComps.
+     * Used by the import handler when _eventComps was cleared (e.g. after resetToList)
+     * but the event context is still active. Always reads fresh from disk — no session cache.
+     * Returns true on success, false if the event could not be read or is empty.
+     */
+    async reloadForImport(eventPath) {
+      const components = await loadEventFromDisk(eventPath);
+      if (!components || components.length === 0) return false;
+      setEventState(components);
+      return _eventComps.length > 0;
     },
 
     setActiveEventIndex(idx) {

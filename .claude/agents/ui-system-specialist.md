@@ -218,6 +218,26 @@ Validation:
 - Confirm dropdown positions correctly near viewport edges.
 - Confirm visual style matches existing modal/dropdown system.
 
+### No Inline Scripts in Renderer HTML
+
+Context:
+- Applies to `renderer/index.html` and any renderer HTML file when the app enforces `script-src 'self'` CSP.
+
+Rule:
+- Never place `<script>` blocks inline in renderer HTML files.
+- All JavaScript, including initialization code, theme detection, and startup logic, must be in external `.js` files loaded via `<script src="..."></script>`.
+- This applies to IIFEs and any one-liner initialization code. If it is script, it must be external.
+
+Avoid:
+- Inlining theme detection or dark-mode logic directly in `<head>` or `<body>` of the HTML file.
+- Adding inline `<script>` blocks for convenience or "it's only a few lines" reasons.
+- Treating inline scripts as acceptable for startup/initialization because they run early.
+
+Validation:
+- Confirm `renderer/index.html` contains no `<script>` blocks without `src=""`.
+- Confirm any initialization logic moved inline is externalized to a `.js` file.
+- Confirm the app loads without CSP violations in the DevTools console.
+
 ### Light/Dark and Viewport Compatibility
 
 Context:

@@ -4378,30 +4378,33 @@ document.getElementById('importBtn').addEventListener('click', async () => {
 
   // ── Event Import path (G4 + G5) ──────────────────────────────────────────
   if (mode === 'event') {
-    // Enforce invariant: _eventComps must match session store before import.
-    // resetToList() clears _eventComps but leaves event.components intact — re-sync here.
-    if (!EventCreator.getEventComps().length && eventData?.event?.components?.length) {
-      console.warn('[IMPORT FIX] Hydrating _eventComps from currentEvent');
-      EventCreator.setEventComps(eventData.event.components);
+    if (!eventData?.eventPath) {
+      console.error('[IMPORT BLOCKED] Invalid eventData — no eventPath', eventData);
+      return;
     }
 
-    const liveComps = EventCreator.getEventComps()?.length
-      ? EventCreator.getEventComps()
-      : (eventData?.event?.components ? JSON.parse(JSON.stringify(eventData.event.components)) : []);
+    // If _eventComps was cleared (e.g. by resetToList while the event context remained),
+    // re-read from disk so import always operates on fresh, validated session-format components.
+    if (!EventCreator.getEventComps().length) {
+      const ok = await EventCreator.reloadForImport(eventData.eventPath);
+      if (!ok) {
+        console.error('[IMPORT] reloadForImport failed for', eventData.eventPath);
+        showMessage('Event details could not be loaded — please select the event again.');
+        return;
+      }
+    }
 
-    if (!liveComps || liveComps.length === 0) {
+    const liveComps = EventCreator.getEventComps();
+
+    if (!liveComps.length) {
       console.error('[IMPORT] No components available');
       return;
     }
 
-    if (
-      !eventData?.eventPath ||
-      !eventData?.event ||
-      !Array.isArray(eventData.event.components) ||
-      eventData.event.components.length === 0
-    ) {
-      console.error('[IMPORT BLOCKED] Invalid eventData structure', eventData);
-      return;
+    // Sync coll.events[idx].components so downstream code (folder naming, routing) uses
+    // the same session-format components as liveComps.
+    if (eventData?.event) {
+      eventData.event.components = liveComps;
     }
 
     if (!eventData.collectionPath) {
@@ -4413,9 +4416,6 @@ document.getElementById('importBtn').addEventListener('click', async () => {
     // Single-component: bypass GroupManager entirely — files route directly to eventPath/photographer.
     // Multi-component: full GroupManager flow, unchanged.
     const isMulti = liveComps.length > 1;
-
-    // Inject live components so all downstream consumers use _eventComps as source.
-    eventData.event.components = liveComps;
 
     let groups;
     if (isMulti) {

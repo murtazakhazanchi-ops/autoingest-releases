@@ -958,6 +958,9 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
       // event.json is the SOLE source of components. Parser provides hijriDate+sequence only.
       const hijriDate = parsed.ok ? parsed.hijriDate : (eventJson.hijriDate || '');
       const sequence  = parsed.ok ? parsed.sequence  : (eventJson.sequence  || '00');
+      // Strip imports[] before sending over IPC — it can be hundreds of entries per event.
+      // All consumers need only the metadata fields; imports are loaded on demand per-event.
+      const { imports: _omit, ...eventJsonMeta } = eventJson;
       resolved.push({
         folderName:           name,
         hijriDate,
@@ -969,7 +972,7 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
         isCorrupt:            false,
         isLegacy:             false,
         needsReconciliation:  (eventJson.safeEventName || sanitizeForPath(eventJson.eventName || '')) !== name,
-        _eventJson:           eventJson,
+        _eventJson:           eventJsonMeta,
       });
     } else if (!jsonCorrupt && parsed.ok) {
       // No event.json (ENOENT) and folder name is parseable → legacy event, no components.

@@ -116,17 +116,20 @@ Rule:
 - Renderer must not retain full event objects for many events.
 - Strip `_eventJson`, `imports[]`, and other heavyweight nested data before assigning scan results to module-level renderer state.
 - Load one event’s full `event.json` lazily on selection when needed.
+- Heavy nested arrays (`imports[]`, large metadata) must be excluded at the IPC handler in the main process, not left for the renderer to strip after structured-clone serialization. Structured-clone of a large payload happens before any renderer code runs and can OOM the renderer heap before stripping is possible.
 
 Avoid:
 - Caching full structured-clone scan payloads.
 - Returning all import histories for all events when only picker metadata is needed.
 - Loading complete archive histories when opening a modal.
+- Relying on the renderer to strip large arrays from IPC responses; strip them in the main-process handler.
 
 Validation:
-- Inspect IPC response shape.
+- Inspect IPC response shape at the handler, not only in the renderer.
 - Inspect renderer module-level caches.
 - Confirm only scalar/lightweight metadata is retained.
 - Confirm full event data is loaded lazily.
+- Confirm `imports[]` and large nested arrays are excluded from multi-event scan responses.
 
 ### Filesystem Scan Efficiency
 
