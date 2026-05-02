@@ -89,8 +89,8 @@ contextBridge.exposeInMainWorld('api', {
   scanDest: (destPath) => ipcRenderer.invoke('dest:scanFiles', destPath),
 
   // ── Import ──
-  importFiles: (filePaths, destination) =>
-    ipcRenderer.invoke('files:import', { filePaths, destination }),
+  importFiles: (filePaths, destination, options = {}) =>
+    ipcRenderer.invoke('files:import', { filePaths, destination, ...options }),
 
   /**
    * Event-based import using the fileJobs model (G2).
@@ -119,7 +119,15 @@ contextBridge.exposeInMainWorld('api', {
    * @param {string} srcPath  Absolute path of the source image
    * @returns {Promise<string|null>}
    */
-  getThumb: (srcPath) => ipcRenderer.invoke('thumb:get', srcPath),
+  getThumb:      (srcPath) => ipcRenderer.invoke('thumb:get',               srcPath),
+  getVideoThumb: (srcPath) => ipcRenderer.invoke('thumbnail:getVideoThumb', srcPath),
+
+  // ── User / operator identity ──
+  listUsers:      ()         => ipcRenderer.invoke('users:list'),
+  createUser:     (profile)  => ipcRenderer.invoke('users:create',    profile),
+  getActiveUser:  ()         => ipcRenderer.invoke('users:getActive'),
+  setActiveUser:  (userId)   => ipcRenderer.invoke('users:setActive', userId),
+  splashComplete: ()         => ipcRenderer.invoke('splash:complete'),
 
   /**
    * Send a user feedback report to Google Sheets via the main process.
@@ -203,5 +211,12 @@ contextBridge.exposeInMainWorld('api', {
 
   // ── Audit (read-only, on-demand) ──
   verifyEventIntegrity: (eventPath) => ipcRenderer.invoke('audit:verifyEvent', eventPath),
+
+  // ── Source cleanup (post-import only) ──
+  deleteFromSource: (files, sourceRoot) => ipcRenderer.invoke('files:deleteFromSource', files, sourceRoot),
+
+  // ── Media preview ──
+  getPreviewUrl: (srcPath) => ipcRenderer.invoke('files:getPreviewUrl',   srcPath),
+  getRawPreview: (srcPath) => ipcRenderer.invoke('preview:getRawPreview', srcPath),
 
 });

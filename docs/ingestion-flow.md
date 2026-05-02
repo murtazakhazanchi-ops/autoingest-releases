@@ -64,9 +64,11 @@ VIDEO files:
 - Deduplicated entries (by `id`)
 - Sorted by timestamp (descending), then `seq` tiebreaker
 - Written to event.json `imports[]` via `import:commitTransaction` (single atomic write)
-- Each entry records: `id`, `seq`, `timestamp`, `photographer`, `componentIndex`, `componentName`, `counts: {photos, videos}`, and optionally `source: {type, label, path}`
+- Each entry records: `id`, `seq`, `timestamp`, `photographer`, `componentIndex`, `componentName`, `counts: {photos, videos}`, and optionally `source: {type, label, path}` and `importedBy: {id, name}`
 - `source` is captured from the renderer's active source state (`activeSource`) at import time — not derived from the file system after the fact
+- `importedBy` is captured from the renderer's active operator (`_activeUser`) at import time — the operator who triggered the import session
 - Entries without `source` are backward-compatible and displayed as "Source: Not recorded" in the Activity Log
+- Entries without `importedBy` are backward-compatible and displayed as "Imported by: Not recorded" in the Activity Log
 
 ---
 

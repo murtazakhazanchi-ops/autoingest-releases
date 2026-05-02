@@ -40,12 +40,31 @@
 
 ## Selection System
 
-- selectedFiles: Set
-- O(1) tile updates via tileMap
-- Shift-click range
-- Cmd/Ctrl+A support
+Two separate concepts — must never be conflated:
 
-- Selection state must not affect system logic directly
+**Import selection** (`selectedFiles: Set`)
+- Controlled by: Cmd/Ctrl-click, Shift-click range, Cmd/Ctrl+A (select all), Cmd/Ctrl+D (deselect all), Clear button, checkboxes
+- Source of truth for import, group assignment, and selected counter
+- O(1) tile updates via tileMap
+
+**Preview focus** (`lastClickedPath`)
+- Set by: any click (normal, Cmd/Ctrl, Shift), arrow key navigation
+- Used only for Space-bar preview open; never affects import or group logic
+- Visual indicator: `.pv-focused` CSS class (see design-system.md)
+- Cleared only on source/folder change — not on deselect operations
+
+**Shift-click anchor** (`_selectionAnchor`)
+- Separate from `lastClickedPath`
+- Set only on Cmd/Ctrl-click or first shift-click; cleared on deselect/source change
+- Validated against `currentFiles` before each shift-range to prevent stale anchor
+
+**Keyboard shortcuts**
+- Cmd/Ctrl+A: select all visible files for import
+- Cmd/Ctrl+D: deselect all import selection; preview focus preserved
+- Arrow Left/Right/Up/Down (preview closed): move preview focus through rendered order
+- Space: open preview for focused file (fallback: first selected → first in view)
+
+- Import selection state must not affect system logic directly
 
 ---
 

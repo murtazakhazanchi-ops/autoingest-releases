@@ -93,7 +93,7 @@ Use this as a reference before implementing or modifying any feature.
 ### 8. Atomic Transaction Write
 
 **Description**
-- event.json is written in a single atomic operation: import → logs (including `source` attribution) → lastImport → status, committed together via `import:commitTransaction` using tmp→rename
+- event.json is written in a single atomic operation: import → logs (including `source` and `importedBy` attribution) → lastImport → status, committed together via `import:commitTransaction` using tmp→rename
 
 **System Impact**
 - DATA
@@ -144,6 +144,43 @@ Use this as a reference before implementing or modifying any feature.
 **System Impact**
 - DATA
 - INGEST
+
+---
+
+### 12. Media Preview
+
+**Description**
+- Space-bar opens a full-screen preview overlay for the focused file
+- JPEG/PNG: full-resolution image via `file://` URL
+- RAW: high-quality extracted preview via `preview:getRawPreview` IPC
+  - macOS: qlmanage (QuickLook) at 1200px → PNG
+  - Windows: PowerShell + System.Drawing at 1200px → PNG (requires OS RAW codec support)
+  - Fallback: thumbnail via existing thumb pipeline when extraction fails or codecs are absent
+  - Persistent disk cache: `userData/raw-preview-cache/`, 30-day TTL, keyed by path + size + mtime
+  - Caption: "extracted preview" / "thumbnail preview" / "thumbnail preview (RAW codec not available)" on Windows
+- MP4/MOV: native `<video>` player with controls
+- Arrow keys navigate between files in current rendered order; Esc/Space closes
+- Object URLs revoked on close; video src cleared to release memory
+
+**System Impact**
+- UI
+- FILESYSTEM (read-only, via `files:getPreviewUrl` and `preview:getRawPreview` IPC)
+
+---
+
+### 13. Preview Focus / Selection Separation
+
+**Description**
+- Normal click sets preview focus only — does not select for import
+- Import selection requires Cmd/Ctrl-click, Shift-click, Cmd/Ctrl+A, or checkbox
+- `lastClickedPath` (preview focus) and `_selectionAnchor` (shift-range anchor) are independent variables
+- Cmd/Ctrl+D deselects all import selection while preserving preview focus
+- Arrow keys (Left/Right/Up/Down) move preview focus through rendered order when preview is closed
+- `.pv-focused` CSS class marks the focused tile; three visual strengths based on selection context
+
+**System Impact**
+- UI
+- (no backend impact — selection and focus are renderer-only concerns)
 
 ---
 

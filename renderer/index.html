@@ -1138,6 +1138,33 @@
     /* Selected always wins over dimmed */
     .file-tile.selected { opacity: 1; }
 
+    /* ── Preview focus ring — three states ──────────────────────────────
+     * Primary   (no import selection): strong ring + faint bg tint
+     * Secondary (import selection exists, tile not selected): subtle ring only
+     * Combined  (focused + selected): selected bg wins, solid accent ring
+     * ─────────────────────────────────────────────────────────────────── */
+    .file-tile.pv-focused {
+      outline: 2px solid color-mix(in srgb, var(--accent) 75%, transparent);
+      outline-offset: 1px;
+      background: color-mix(in srgb, var(--accent) 4%, transparent);
+    }
+    body.has-import-selection .file-tile.pv-focused:not(.selected) {
+      outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+      background: transparent;
+    }
+    .file-tile.pv-focused.selected { outline: 2px solid var(--accent); }
+
+    /* List view: left-edge indicator instead of outline */
+    .list-table tbody tr.file-tile.pv-focused {
+      box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent) 70%, transparent);
+    }
+    body.has-import-selection .list-table tbody tr.file-tile.pv-focused:not(.selected) {
+      box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent) 40%, transparent);
+    }
+    .list-table tbody tr.file-tile.pv-focused.selected {
+      box-shadow: inset 3px 0 0 var(--accent);
+    }
+
     /* z-index: 3 — checkbox (top-left corner) */
     .file-tile input[type="checkbox"] {
       position: absolute; top: 6px; left: 6px;
@@ -1231,6 +1258,28 @@
       );
       background-size: 200% 100%;
       animation: thumb-shimmer 1.4s ease-in-out infinite;
+    }
+    /* Video thumbnail container — positions play badge over the thumb */
+    .video-thumb-container {
+      position: relative;
+      width: 100%; height: 100%;
+    }
+    .video-thumb-container .thumb-img {
+      width: 100%; height: 100%;
+    }
+    .video-play-badge {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 30px; height: 30px;
+      background: rgba(0, 0, 0, 0.45);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: none;
+    }
+    .video-play-badge svg {
+      filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
+      margin-left: 2px; /* optical center for play triangle */
     }
 
     .file-meta { display: flex; flex-direction: column; gap: 3px; }
@@ -1367,22 +1416,26 @@
     .skip-reason-row { font-size: 0.68rem; color: var(--subtext); font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.8; }
     .skip-reason-failed { color: var(--red); opacity: 1; }
     .im-actions {
-      display: flex; justify-content: space-between; align-items: center; gap: 8px;
-      padding-top: 14px; border-top: 1px solid var(--border-subtle);
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border-subtle);
     }
-    .im-actions-left  { display: flex; align-items: center; gap: 8px; }
-    .im-actions-right { display: flex; align-items: center; gap: 8px; }
+    .im-actions-left  { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; flex-wrap: wrap; }
+    .im-actions-right { display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0; }
+    .im-btn-primary, .im-btn-secondary, .im-btn-tertiary {
+      height: 38px; min-height: 38px;
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      white-space: nowrap; line-height: 1; border-radius: 12px; box-sizing: border-box;
+    }
     .im-btn-primary {
-      display: none; height: 36px; padding: 0 22px; font-size: 0.85rem; font-weight: 700;
-      background: var(--blue); color: var(--bg); border: none; border-radius: 10px;
+      display: none; padding: 0 22px; min-width: 112px; flex-shrink: 0;
+      font-size: 0.85rem; font-weight: 700;
+      background: var(--blue); color: var(--bg); border: none;
       cursor: pointer; transition: opacity 0.12s;
     }
-    .im-btn-primary.visible { display: inline-flex; align-items: center; }
+    .im-btn-primary.visible { display: inline-flex; }
     .im-btn-primary:hover { opacity: 0.85; }
     .im-btn-secondary {
-      display: inline-flex; align-items: center; gap: 5px;
-      height: 36px; padding: 0 16px; border-radius: 10px;
-      font-size: 0.8rem; font-weight: 600;
+      padding: 0 14px; font-size: 0.8rem; font-weight: 600;
       background: transparent; color: var(--subtext);
       border: 1px solid var(--border);
       cursor: pointer; transition: border-color 0.15s, color 0.15s;
@@ -1392,18 +1445,19 @@
     .im-btn-secondary.csq-success { color: var(--green) !important; border-color: var(--green) !important; }
     .im-btn-secondary.csq-error   { color: var(--red)   !important; border-color: var(--red)   !important; }
     .im-btn-tertiary {
-      display: inline-flex; align-items: center; gap: 5px;
-      height: 36px; padding: 0 14px; border-radius: 10px;
-      font-size: 0.8rem; font-weight: 500;
+      padding: 0 12px; font-size: 0.8rem; font-weight: 500;
       background: transparent; color: var(--subtext);
       border: 1px solid transparent;
       cursor: pointer; transition: border-color 0.15s, color 0.15s;
     }
     .im-btn-tertiary:hover { border-color: color-mix(in srgb, var(--red) 55%, transparent); color: var(--red); }
-    .im-btn-tertiary .icon { display: inline-flex; align-items: center; }
-    @media (max-width: 620px) {
+    .im-btn-tertiary .icon { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; flex-shrink: 0; }
+    .im-btn-tertiary .icon svg { width: 100%; height: 100%; }
+    .im-actions button { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    @media (max-width: 680px) {
       .im-actions { flex-direction: column; align-items: stretch; }
-      .im-actions-left, .im-actions-right { justify-content: center; flex-wrap: wrap; }
+      .im-actions-left { width: 100%; flex-wrap: wrap; }
+      .im-actions-right { width: 100%; justify-content: flex-end; }
     }
     .progress-controls { display: flex; gap: 8px; }
     #progressPauseBtn, #progressResumeBtn {
@@ -4197,6 +4251,480 @@
   [data-theme="light"] .source-scan-state { background: rgba(0,0,0,0.22); }
   [data-theme="light"] .scan-card { box-shadow: 0 8px 32px rgba(0,0,0,0.16); }
 
+  /* ── Media Preview Overlay (Space-bar preview, Phase 1) ───────────────────── */
+  /* Extension point: replace pv-content inner HTML with PhotoSwipe by importing
+     renderer/lib/photoswipe.esm.min.js + photoswipe-lightbox.esm.min.js       */
+  #previewOverlay {
+    position: fixed; inset: 0; z-index: 600;
+    background: rgba(0,0,0,0.88);
+    display: flex; align-items: center; justify-content: center;
+    gap: 16px;
+  }
+  #previewOverlay.hidden { display: none; }
+  .pv-center {
+    flex: 1; display: flex; flex-direction: column;
+    max-width: min(1280px, calc(100vw - 120px));
+    max-height: 92vh;
+  }
+  .pv-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 14px;
+    background: rgba(30,30,46,0.72); backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-bottom: none; border-radius: 12px 12px 0 0;
+  }
+  .pv-filename {
+    flex: 1; font-size: 0.84rem; font-weight: 600;
+    color: rgba(255,255,255,0.9);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .pv-badge {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.05em;
+    padding: 2px 8px; border-radius: 5px; text-transform: uppercase;
+    flex-shrink: 0;
+  }
+  .pv-badge:empty { display: none; }
+  .pv-badge-raw   { background: rgba(255,149,0,0.15); color: #ff9500; border: 1px solid rgba(255,149,0,0.28); }
+  .pv-badge-video { background: rgba(137,180,250,0.15); color: var(--accent); border: 1px solid var(--accent-border); }
+  .pv-close {
+    width: 28px; height: 28px; flex-shrink: 0;
+    background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 7px; color: rgba(255,255,255,0.7);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    padding: 0; transition: background 0.12s, color 0.12s;
+  }
+  .pv-close:hover { background: rgba(255,255,255,0.14); color: #fff; }
+  .pv-close svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2.2; }
+  .pv-content {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.45);
+    border: 1px solid rgba(255,255,255,0.07); border-radius: 0 0 12px 12px;
+    min-height: 200px; max-height: calc(92vh - 48px);
+    overflow: hidden; position: relative;
+  }
+  .pv-image {
+    max-width: 100%; max-height: 100%;
+    object-fit: contain; display: block;
+    border-radius: 0 0 10px 10px;
+  }
+  .pv-video {
+    max-width: 100%; max-height: 100%;
+    display: block; border-radius: 0 0 10px 10px; outline: none;
+  }
+  .pv-loading { font-size: 0.82rem; color: rgba(255,255,255,0.4); padding: 48px; text-align: center; }
+  .pv-loading-label { display: block; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em; opacity: 0.5; margin-bottom: 8px; text-transform: uppercase; }
+  .pv-err     { font-size: 0.82rem; color: #f38ba8; padding: 48px; text-align: center; }
+  .pv-nav {
+    width: 42px; height: 42px; flex-shrink: 0;
+    background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 50%; color: rgba(255,255,255,0.7);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    padding: 0; transition: background 0.12s, opacity 0.12s;
+  }
+  .pv-nav:hover:not(:disabled) { background: rgba(255,255,255,0.15); color: #fff; }
+  .pv-nav:disabled { opacity: 0.2; cursor: default; pointer-events: none; }
+  .pv-nav svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2.2; }
+  .pv-raw-caption {
+    position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.55); color: rgba(255,255,255,0.65);
+    font-size: 0.67rem; font-weight: 700; letter-spacing: 0.06em;
+    padding: 3px 10px; border-radius: 5px; text-transform: uppercase;
+    pointer-events: none; white-space: nowrap;
+  }
+  .pv-hint {
+    position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%);
+    font-size: 0.69rem; color: rgba(255,255,255,0.3);
+    letter-spacing: 0.03em; pointer-events: none; white-space: nowrap;
+    user-select: none;
+  }
+  [data-theme="light"] #previewOverlay { background: rgba(0,0,0,0.72); }
+  [data-theme="light"] .pv-header { background: rgba(240,240,252,0.92); border-color: rgba(0,0,0,0.1); }
+  [data-theme="light"] .pv-filename { color: #111; }
+  [data-theme="light"] .pv-close { background: rgba(0,0,0,0.07); border-color: rgba(0,0,0,0.12); color: #555; }
+  [data-theme="light"] .pv-close:hover { background: rgba(0,0,0,0.13); color: #111; }
+  [data-theme="light"] .pv-nav { background: rgba(0,0,0,0.08); border-color: rgba(0,0,0,0.14); color: #555; }
+  [data-theme="light"] .pv-nav:hover:not(:disabled) { background: rgba(0,0,0,0.15); color: #111; }
+
+  /* ── Source Cleanup Modal ─────────────────────────────────────────────────── */
+  #sourceCleanupOverlay {
+    position: fixed; inset: 0; z-index: 200;
+    background: var(--scrim);
+    display: flex; align-items: center; justify-content: center;
+  }
+  #sourceCleanupOverlay.hidden { display: none; }
+  .sc-modal {
+    background: var(--card-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 26px 26px 22px;
+    width: min(520px, calc(100vw - 32px));
+    max-height: 82vh;
+    display: flex; flex-direction: column; gap: 14px;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.45);
+  }
+  .sc-title { font-size: 1rem; font-weight: 700; color: var(--text); margin: 0; }
+  .sc-desc  { font-size: 0.79rem; color: var(--subtext); margin: 0; line-height: 1.55; }
+  .sc-select-all-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 0 2px 4px;
+    font-size: 0.75rem; color: var(--subtext); cursor: pointer;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .sc-select-all-row input { accent-color: var(--red); }
+  .sc-file-list {
+    flex: 1; overflow-y: auto; max-height: 210px;
+    display: flex; flex-direction: column; gap: 2px;
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px; padding: 8px 8px 6px;
+    background: var(--bg-secondary);
+  }
+  .sc-file-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 6px; border-radius: 6px;
+    font-size: 0.78rem; color: var(--text);
+    cursor: pointer;
+  }
+  .sc-file-row:hover { background: var(--card-hover); }
+  .sc-file-row input[type="checkbox"] { flex-shrink: 0; accent-color: var(--red); cursor: pointer; }
+  .sc-file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sc-file-size { color: var(--subtext); flex-shrink: 0; font-size: 0.72rem; }
+  .sc-confirm-gate { display: flex; flex-direction: column; gap: 5px; }
+  .sc-confirm-label { font-size: 0.75rem; color: var(--subtext); }
+  .sc-confirm-label strong { color: var(--text); font-family: monospace; letter-spacing: 0.02em; }
+  .sc-confirm-input {
+    height: 36px; padding: 0 12px; border-radius: 8px;
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-secondary); color: var(--text);
+    font-size: 0.85rem; font-family: monospace;
+    outline: none; transition: border-color 0.15s;
+  }
+  .sc-confirm-input:focus { border-color: var(--red); }
+  .sc-actions { display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
+  .sc-sel-count { flex: 1; font-size: 0.75rem; color: var(--subtext); }
+  .sc-btn-cancel {
+    height: 36px; padding: 0 18px; border-radius: 10px;
+    font-size: 0.82rem; font-weight: 600;
+    background: transparent; color: var(--subtext);
+    border: 1px solid var(--border); cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .sc-btn-cancel:hover { border-color: var(--text); color: var(--text); }
+  .sc-btn-delete {
+    height: 36px; padding: 0 18px; border-radius: 10px;
+    font-size: 0.82rem; font-weight: 700;
+    background: var(--red); color: #fff; border: none; cursor: pointer;
+    transition: opacity 0.12s;
+  }
+  .sc-btn-delete:hover:not(:disabled) { opacity: 0.85; }
+  .sc-btn-delete:disabled { opacity: 0.35; cursor: default; }
+  .sc-result { font-size: 0.78rem; line-height: 1.7; max-height: 120px; overflow-y: auto; }
+  .sc-result-ok  { color: var(--green); }
+  .sc-result-err { color: var(--red); }
+
+  /* ── Startup Splash Overlay ──────────────────────────────────────────── */
+  #loginSplash {
+    position: fixed; inset: 0; z-index: 9999;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg-primary);
+    background-image: radial-gradient(ellipse 72% 56% at 50% 44%, rgba(137,180,250,0.08), transparent);
+    -webkit-app-region: drag;
+    transition: opacity 0.22s ease;
+  }
+  #loginSplash.splash-hidden {
+    opacity: 0; pointer-events: none;
+  }
+  .splash-card {
+    display: flex; flex-direction: row;
+    width: clamp(820px, 78vw, 1040px);
+    height: clamp(380px, 43vh, 490px);
+    background: var(--card-bg);
+    border: 1px solid var(--border-subtle);
+    border-radius: 20px;
+    box-shadow: 0 28px 72px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.035);
+    overflow: hidden;
+    -webkit-app-region: no-drag;
+  }
+  /* LEFT — branding panel */
+  .splash-left {
+    width: 42%; min-width: 300px; flex-shrink: 0;
+    background: linear-gradient(148deg, #0d1528 0%, #090d1a 100%);
+    border-right: 1px solid var(--border-subtle);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 18px; padding: 48px 36px;
+  }
+  .splash-logo-img {
+    width: 96px; height: 96px; object-fit: contain;
+    pointer-events: none; user-select: none; -webkit-user-drag: none;
+    flex-shrink: 0;
+    filter:
+      drop-shadow(0 8px 20px rgba(0,0,0,0.70))
+      drop-shadow(0 2px 5px rgba(0,0,0,0.50))
+      drop-shadow(-1px -1px 3px rgba(255,255,255,0.04));
+  }
+  .splash-brand-name {
+    font-size: 17px; font-weight: 800; letter-spacing: 2.8px;
+    color: var(--text-primary); text-transform: uppercase;
+  }
+  .splash-brand-sub {
+    font-size: 11px; color: var(--text-secondary); opacity: 0.5;
+    text-align: center; line-height: 1.55; max-width: 190px;
+  }
+  .splash-copyright {
+    font-size: 10px; color: var(--text-muted); opacity: 0.38;
+    text-align: center; letter-spacing: 0.2px;
+  }
+  /* RIGHT — state container */
+  .splash-right {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    padding: 44px 52px;
+  }
+  .splash-panel { width: 100%; display: flex; flex-direction: column; }
+  .splash-panel.hidden { display: none; }
+
+  /* State 1 — Welcome Back */
+  .splash-welcome-label {
+    font-size: 15px; font-weight: 400; letter-spacing: 0;
+    color: var(--text-secondary); margin-bottom: 10px;
+  }
+  .splash-user-name {
+    font-size: 30px; font-weight: 700; color: var(--text-primary);
+    line-height: 1.1; margin-bottom: 28px;
+  }
+  .splash-start-btn {
+    padding: 0 40px; height: 46px; min-width: 144px;
+    background: var(--accent); color: #07090f;
+    border: none; border-radius: 10px;
+    font-size: 13px; font-weight: 800; letter-spacing: 1.8px; text-transform: uppercase;
+    cursor: pointer; -webkit-app-region: no-drag;
+    transition: opacity 0.13s, transform 0.1s;
+    margin-bottom: 20px; align-self: flex-start;
+  }
+  .splash-start-btn:hover:not(:disabled) { opacity: 0.86; }
+  .splash-start-btn:active:not(:disabled) { transform: scale(0.97); }
+  .splash-start-btn:disabled { opacity: 0.32; cursor: default; }
+  .splash-switch-row { display: flex; align-items: center; gap: 10px; }
+  .splash-not-you { font-size: 13px; color: var(--text-secondary); opacity: 0.5; }
+  .splash-switch-btn {
+    background: none; border: 1px solid var(--accent-border); border-radius: 14px;
+    padding: 4px 12px; font-size: 12px; color: var(--accent); cursor: pointer;
+    -webkit-app-region: no-drag; opacity: 0.8;
+    font-family: inherit; transition: opacity 0.12s, border-color 0.12s;
+  }
+  .splash-switch-btn:hover { opacity: 1; border-color: var(--accent); }
+
+  /* State 2 — Select User */
+  .splash-panel-title {
+    font-size: 20px; font-weight: 700; color: var(--text-primary); margin-bottom: 16px;
+  }
+  .splash-user-list {
+    width: 100%; max-height: 168px; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px;
+  }
+  .splash-user-item {
+    padding: 10px 14px; border-radius: 9px;
+    background: var(--card-hover); border: 1px solid var(--border-subtle);
+    cursor: pointer; -webkit-app-region: no-drag;
+    display: flex; align-items: center; gap: 12px;
+    transition: border-color 0.11s, background 0.11s;
+  }
+  .splash-user-item:hover { border-color: var(--accent-border); }
+  .splash-user-item.selected { border-color: var(--accent-border-sel); background: var(--accent-hover); }
+  .splash-user-initials {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: var(--accent-soft); color: var(--accent);
+    font-size: 11px; font-weight: 800; letter-spacing: 0.5px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .splash-user-info { display: flex; flex-direction: column; gap: 1px; }
+  .splash-user-item-name { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+  .splash-user-item-role { font-size: 12px; color: var(--text-secondary); opacity: 0.58; }
+  .splash-select-actions { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+  .splash-select-btns { display: flex; gap: 10px; align-items: center; }
+  .splash-ghost-btn {
+    background: none; border: 1px solid var(--border-subtle); border-radius: 8px;
+    padding: 8px 14px; font-size: 13px; color: var(--text-secondary);
+    cursor: pointer; -webkit-app-region: no-drag;
+    transition: border-color 0.12s, color 0.12s;
+  }
+  .splash-ghost-btn:hover { border-color: var(--accent-border); color: var(--accent); }
+  .splash-continue-btn {
+    padding: 0 24px; height: 38px; border: none; border-radius: 8px;
+    background: var(--accent); color: #07090f;
+    font-size: 13px; font-weight: 700; letter-spacing: 0.6px;
+    cursor: pointer; -webkit-app-region: no-drag;
+    transition: opacity 0.13s;
+  }
+  .splash-continue-btn:disabled { opacity: 0.3; cursor: default; }
+  .splash-continue-btn:not(:disabled):hover { opacity: 0.83; }
+  .splash-back-btn {
+    background: none; border: 1px solid var(--border-subtle); border-radius: 8px;
+    padding: 0 16px; height: 38px;
+    font-size: 13px; color: var(--text-secondary); cursor: pointer;
+    -webkit-app-region: no-drag;
+    transition: border-color 0.12s, color 0.12s;
+  }
+  .splash-back-btn:hover { border-color: var(--border-strong); color: var(--text-primary); }
+  .splash-back-btn.hidden { display: none; }
+
+  /* State 3 — Create User */
+  .splash-create-sub {
+    font-size: 13px; color: var(--text-secondary); opacity: 0.62; margin-bottom: 18px; line-height: 1.5;
+  }
+  .splash-form { display: flex; flex-direction: column; gap: 4px; width: 100%; margin-bottom: 18px; }
+  .splash-label {
+    font-size: 11px; font-weight: 600; color: var(--text-secondary); opacity: 0.75;
+    letter-spacing: 0.3px; margin-top: 10px;
+  }
+  .splash-label:first-child { margin-top: 0; }
+  .splash-optional { font-weight: 400; opacity: 0.5; }
+  .splash-input {
+    width: 100%; height: 38px; padding: 0 12px;
+    background: var(--bg-secondary); border: 1px solid var(--border-subtle);
+    border-radius: 8px; color: var(--text-primary); font-size: 14px;
+    outline: none; -webkit-app-region: no-drag;
+    transition: border-color 0.13s;
+    font-family: inherit;
+  }
+  .splash-input:focus { border-color: var(--accent-border-sel); }
+  .splash-input-sm { max-width: 130px; }
+  .splash-field-error { font-size: 11.5px; color: #f38ba8; min-height: 15px; line-height: 1.4; }
+  .splash-create-actions { display: flex; align-items: center; gap: 12px; }
+  .splash-error { font-size: 12px; color: #f38ba8; margin-top: 8px; min-height: 16px; line-height: 1.4; }
+
+  /* ── Operator indicator (main header) ────────────────────────────── */
+  .header-section.operator { padding: 0 14px; gap: 6px; flex-shrink: 0; }
+  .operator-pill {
+    display: flex; align-items: center; gap: 8px;
+    padding: 3px 10px 3px 7px; border-radius: 20px;
+    background: var(--accent-tint); border: 1px solid var(--accent-border);
+  }
+  .operator-initials {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--accent-soft); color: var(--accent);
+    font-size: 9px; font-weight: 800; letter-spacing: 0.3px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .operator-name-text { font-size: 12px; font-weight: 600; color: var(--text); }
+  .operator-switch-btn {
+    background: none; border: 1px solid var(--border-subtle); border-radius: 5px;
+    padding: 2px 8px; font-size: 11px; font-weight: 500; color: var(--subtext);
+    cursor: pointer; -webkit-app-region: no-drag;
+    transition: border-color 0.12s, color 0.12s;
+    font-family: inherit;
+  }
+  .operator-switch-btn:hover { border-color: var(--accent-border); color: var(--accent); }
+
+  /* ── Operator dropdown ─────────────────────────────────────────────── */
+  #operatorDropdown {
+    position: fixed;
+    background: var(--card-bg);
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    box-shadow: 0 16px 40px rgba(0,0,0,0.50), 0 2px 8px rgba(0,0,0,0.28);
+    min-width: 220px; max-width: 280px;
+    z-index: 10000;
+    overflow: hidden;
+    padding: 6px;
+    opacity: 0; transform: translateY(-6px);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    pointer-events: none;
+  }
+  #operatorDropdown.op-dropdown-visible {
+    opacity: 1; transform: translateY(0);
+    pointer-events: auto;
+  }
+  .op-dropdown-list { display: flex; flex-direction: column; gap: 2px; }
+  .op-dropdown-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: 8px; cursor: pointer;
+    transition: background 0.1s;
+  }
+  .op-dropdown-item:hover { background: var(--card-hover); }
+  .op-dropdown-item.op-active { background: var(--accent-hover); }
+  .op-dropdown-initials {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--accent-soft); color: var(--accent);
+    font-size: 10px; font-weight: 800; letter-spacing: 0.3px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .op-dropdown-item-info { display: flex; flex-direction: column; gap: 1px; }
+  .op-dropdown-item-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+  .op-dropdown-item-role { font-size: 11px; color: var(--text-secondary); opacity: 0.6; }
+  .op-dropdown-divider { height: 1px; background: var(--border-subtle); margin: 4px 2px; }
+  .op-dropdown-add-btn {
+    display: flex; align-items: center; gap: 8px;
+    width: 100%; padding: 8px 10px; border-radius: 8px;
+    background: none; border: none; cursor: pointer;
+    font-size: 13px; color: var(--text-secondary); font-family: inherit;
+    transition: background 0.1s, color 0.1s; text-align: left;
+  }
+  .op-dropdown-add-btn:hover { background: var(--card-hover); color: var(--text-primary); }
+
+  /* ── Add-user modal ────────────────────────────────────────────────── */
+  #addUserModal {
+    position: fixed; inset: 0; z-index: 10001;
+    background: var(--scrim);
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity 0.18s ease;
+    pointer-events: none;
+  }
+  #addUserModal.au-modal-visible { opacity: 1; pointer-events: auto; }
+  .au-modal-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-subtle);
+    border-radius: 16px;
+    box-shadow: 0 24px 56px rgba(0,0,0,0.55);
+    padding: 30px 32px;
+    width: 360px; max-width: calc(100vw - 48px);
+    transform: scale(0.97);
+    transition: transform 0.18s ease;
+  }
+  #addUserModal.au-modal-visible .au-modal-card { transform: scale(1); }
+  .au-modal-title {
+    font-size: 18px; font-weight: 700; color: var(--text-primary);
+    margin-bottom: 22px;
+  }
+  .au-modal-form { display: flex; flex-direction: column; gap: 4px; }
+  .au-modal-label {
+    font-size: 11px; font-weight: 600; color: var(--text-secondary); opacity: 0.75;
+    letter-spacing: 0.3px; margin-top: 12px;
+  }
+  .au-modal-label:first-child { margin-top: 0; }
+  .au-modal-input {
+    width: 100%; height: 38px; padding: 0 12px;
+    background: var(--bg-secondary); border: 1px solid var(--border-subtle);
+    border-radius: 8px; color: var(--text-primary); font-size: 14px;
+    outline: none; font-family: inherit;
+    transition: border-color 0.13s;
+  }
+  .au-modal-input:focus { border-color: var(--accent-border-sel); }
+  .au-modal-error {
+    font-size: 12px; color: var(--red);
+    margin-top: 10px; min-height: 16px; line-height: 1.4;
+  }
+  .au-modal-actions {
+    display: flex; gap: 10px; align-items: center;
+    margin-top: 22px;
+  }
+  .au-modal-btn-primary {
+    padding: 0 24px; height: 40px;
+    background: var(--accent); color: #07090f;
+    border: none; border-radius: 8px;
+    font-size: 13px; font-weight: 700; letter-spacing: 0.4px;
+    cursor: pointer; font-family: inherit;
+    transition: opacity 0.13s;
+  }
+  .au-modal-btn-primary:hover:not(:disabled) { opacity: 0.85; }
+  .au-modal-btn-primary:disabled { opacity: 0.3; cursor: default; }
+  .au-modal-btn-cancel {
+    padding: 0 20px; height: 40px;
+    background: none; border: 1px solid var(--border-subtle);
+    border-radius: 8px; font-size: 13px; color: var(--text-secondary);
+    cursor: pointer; font-family: inherit;
+    transition: border-color 0.12s, color 0.12s;
+  }
+  .au-modal-btn-cancel:hover { border-color: var(--border-strong); color: var(--text-primary); }
+
   </style>
 </head>
 <body>
@@ -4308,6 +4836,17 @@
             <span class="status-text">Ready</span>
           </div>
         </div>
+      </div>
+
+      <div class="hdr-divider"></div>
+
+      <!-- OPERATOR IDENTITY -->
+      <div class="header-section operator" id="operatorSection">
+        <div class="operator-pill">
+          <div class="operator-initials" id="operatorInitials">—</div>
+          <span class="operator-name-text" id="operatorName">—</span>
+        </div>
+        <button id="operatorSwitchBtn" class="operator-switch-btn" title="Switch operator">Switch</button>
       </div>
 
       <!-- WINDOW CONTROLS (Windows/Linux only) -->
@@ -5099,6 +5638,50 @@
     </div>
   </div>
 
+  <!-- Media Preview Overlay (Space-bar preview) -->
+  <div id="previewOverlay" class="hidden" role="dialog" aria-modal="true" aria-label="Media preview">
+    <button id="pvPrevBtn" class="pv-nav" aria-label="Previous file">
+      <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <div class="pv-center">
+      <div class="pv-header">
+        <span id="pvFilename" class="pv-filename"></span>
+        <span id="pvTypeBadge" class="pv-badge"></span>
+        <button id="pvCloseBtn" class="pv-close" aria-label="Close preview">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div id="pvContent" class="pv-content"></div>
+    </div>
+    <button id="pvNextBtn" class="pv-nav" aria-label="Next file">
+      <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>
+    <div class="pv-hint" aria-hidden="true">← → navigate &nbsp;·&nbsp; Space / Esc close</div>
+  </div>
+
+  <!-- Source Cleanup Modal -->
+  <div id="sourceCleanupOverlay" class="hidden" role="dialog" aria-modal="true" aria-labelledby="scTitle">
+    <div class="sc-modal">
+      <p class="sc-title" id="scTitle">Clean Up Source</p>
+      <p class="sc-desc">Permanently delete these files from the source card. Only files confirmed imported to the archive are listed. This cannot be undone.</p>
+      <label class="sc-select-all-row">
+        <input type="checkbox" id="scSelectAll" />
+        <span>Select all</span>
+      </label>
+      <div class="sc-file-list" id="scFileList"></div>
+      <div class="sc-confirm-gate">
+        <span class="sc-confirm-label">Type <strong>DELETE FROM SOURCE</strong> to confirm</span>
+        <input id="scConfirmInput" class="sc-confirm-input" type="text" autocomplete="off" spellcheck="false" placeholder="DELETE FROM SOURCE" />
+      </div>
+      <div id="scResultArea" style="display:none;" class="sc-result"></div>
+      <div class="sc-actions">
+        <span class="sc-sel-count" id="scSelCount"></span>
+        <button id="scCancelBtn" class="sc-btn-cancel">Cancel</button>
+        <button id="scDeleteBtn" class="sc-btn-delete" disabled>Delete Selected</button>
+      </div>
+    </div>
+  </div>
+
   <div id="dropdown-root"></div>
   <script src="treeAutocomplete.js"></script>
   <script src="eventCreator.js"></script>
@@ -5106,5 +5689,92 @@
   <script src="groupManager.js"></script>
   <script src="importRouter.js"></script>
   <script src="renderer.js"></script>
+
+  <!-- ── STARTUP LOGIN SPLASH ───────────────────────────────────────────── -->
+  <div id="loginSplash" role="dialog" aria-modal="true" aria-label="Operator sign-in" style="display:none">
+    <div class="splash-card">
+
+      <!-- LEFT PANEL — logo + branding -->
+      <div class="splash-left">
+        <img src="../assets/icon.png" class="splash-logo-img" alt="AutoIngest logo" draggable="false">
+        <div class="splash-brand-name">AUTOINGEST</div>
+        <div class="splash-brand-sub">AJS Photo Archive Intake System</div>
+        <div class="splash-copyright">© Aljamea-tus-Saifiyah. All rights reserved.</div>
+      </div>
+
+      <!-- RIGHT PANEL — state machine -->
+      <div class="splash-right">
+
+        <!-- STATE 1: Welcome Back -->
+        <div class="splash-panel" id="splashWelcome">
+          <div class="splash-welcome-label">Welcome back</div>
+          <div class="splash-user-name" id="splashWelcomeUserName">—</div>
+          <button class="splash-start-btn" id="splashContinueBtn">START</button>
+          <div class="splash-switch-row">
+            <span class="splash-not-you">Not you?</span>
+            <button class="splash-switch-btn" id="splashNotYouBtn">Switch operator</button>
+          </div>
+        </div>
+
+        <!-- STATE 2: Select User -->
+        <div class="splash-panel" id="splashSelect" style="display:none">
+          <div class="splash-panel-title">Select operator</div>
+          <div class="splash-user-list" id="splashUserList" role="listbox" aria-label="Select operator"></div>
+          <div class="splash-select-actions">
+            <div class="splash-select-btns">
+              <button class="splash-continue-btn" id="splashSelectStartBtn" disabled>Start session</button>
+              <button class="splash-ghost-btn" id="splashNewProfileBtn">New profile</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- STATE 3: Create User -->
+        <div class="splash-panel" id="splashCreate" style="display:none">
+          <div class="splash-panel-title">Create operator profile</div>
+          <div class="splash-form">
+            <label class="splash-label" for="splashInputName">Full name <span class="splash-required" aria-hidden="true">*</span></label>
+            <input class="splash-input" id="splashInputName" type="text" placeholder="e.g. Ahmad Al-Farsi" maxlength="60" autocomplete="off" spellcheck="false">
+            <label class="splash-label" for="splashInputRole">Role <span class="splash-optional">(optional)</span></label>
+            <input class="splash-input" id="splashInputRole" type="text" placeholder="e.g. Lead Photographer" maxlength="50" autocomplete="off" spellcheck="false">
+          </div>
+          <div class="splash-error" id="splashCreateError" style="display:none"></div>
+          <div class="splash-create-actions">
+            <button class="splash-start-btn" id="splashCreateStartBtn">Create &amp; start</button>
+            <button class="splash-back-btn" id="splashCreateBackBtn">Back</button>
+          </div>
+        </div>
+
+      </div><!-- .splash-right -->
+    </div><!-- .splash-card -->
+  </div><!-- #loginSplash -->
+
+  <!-- ── OPERATOR DROPDOWN ─────────────────────────────────────────────── -->
+  <div id="operatorDropdown" role="menu" aria-label="Switch operator" style="display:none">
+    <div class="op-dropdown-list" id="opDropdownList" role="group"></div>
+    <div class="op-dropdown-divider"></div>
+    <button class="op-dropdown-add-btn" id="opAddUserBtn" role="menuitem">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Add operator
+    </button>
+  </div>
+
+  <!-- ── ADD OPERATOR MODAL ────────────────────────────────────────────── -->
+  <div id="addUserModal" role="dialog" aria-modal="true" aria-label="Add operator" style="display:none">
+    <div class="au-modal-card">
+      <div class="au-modal-title">Add operator</div>
+      <div class="au-modal-form">
+        <label class="au-modal-label" for="addUserName">Full name <span aria-hidden="true">*</span></label>
+        <input class="au-modal-input" id="addUserName" type="text" placeholder="e.g. Ahmad Al-Farsi" maxlength="60" autocomplete="off" spellcheck="false">
+        <label class="au-modal-label" for="addUserRole">Role <span style="opacity:0.5;font-weight:400">(optional)</span></label>
+        <input class="au-modal-input" id="addUserRole" type="text" placeholder="e.g. Lead Photographer" maxlength="50" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="au-modal-error" id="addUserError" style="display:none"></div>
+      <div class="au-modal-actions">
+        <button class="au-modal-btn-primary" id="addUserCreateBtn">Create</button>
+        <button class="au-modal-btn-cancel" id="addUserCancelBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>

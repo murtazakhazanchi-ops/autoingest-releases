@@ -343,6 +343,29 @@ PERFORMANCE / IPC
 
 ---
 
+## 13. RAW Preview Shows Thumbnail Instead of High-Quality Preview (Windows)
+
+### Primary Layer
+UI / FILESYSTEM
+
+### Symptoms
+- RAW files display "thumbnail preview (RAW codec not available)" caption on Windows
+- macOS shows high-quality extracted preview; Windows does not
+
+### Likely Cause
+- Windows RAW codecs not installed — `System.Drawing.Image.FromFile()` cannot decode the RAW format
+
+### First Check
+- Main process logs: `[rawPreview][win] codec-fail | <elapsed>ms | <path>`
+
+### Fix
+- Install Windows RAW codec support (any of):
+  - Windows "Raw Image Extension" from the Microsoft Store
+  - Manufacturer codec pack (Canon, Nikon, Sony, etc.)
+- After install, clear `userData/raw-preview-cache/` to force re-extraction
+
+---
+
 ## Usage Rule
 
 This file is a guide, not a shortcut.

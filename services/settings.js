@@ -241,4 +241,31 @@ function setWindowBoundsSync(value) {
   _saveSync();
 }
 
-module.exports = { init, getArchiveRoot, setArchiveRoot, getLastDestPath, setLastDestPath, getLastEvent, setLastEvent, getWindowBounds, setWindowBounds, setWindowBoundsSync };
+/**
+ * Returns the last active operator user ID, or null if never set.
+ * @returns {string | null}
+ */
+function getLastActiveUserId() {
+  if (!_loaded) init();
+  const v = _state.lastActiveUserId;
+  return (typeof v === 'string' && v.length > 0) ? v : null;
+}
+
+/**
+ * Persists the last active operator user ID. Pass null or '' to clear.
+ * @param {string | null} value
+ * @returns {Promise<void>}
+ */
+async function setLastActiveUserId(value) {
+  if (!_loaded) init();
+  if (value === null || value === '') {
+    delete _state.lastActiveUserId;
+  } else if (typeof value === 'string') {
+    _state.lastActiveUserId = value;
+  } else {
+    throw new Error('setLastActiveUserId: expected string or null');
+  }
+  await _save();
+}
+
+module.exports = { init, getArchiveRoot, setArchiveRoot, getLastDestPath, setLastDestPath, getLastEvent, setLastEvent, getWindowBounds, setWindowBounds, setWindowBoundsSync, getLastActiveUserId, setLastActiveUserId };

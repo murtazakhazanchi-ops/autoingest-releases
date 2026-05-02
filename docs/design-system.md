@@ -99,6 +99,31 @@ All UI must follow these rules.
 
 ---
 
+## 8a. File Tile Visual States
+
+Four distinct states — must not be visually confused:
+
+| State | Class | Visual |
+|---|---|---|
+| Default | (none) | Surface background, subtle border |
+| Hovered | `:hover` | Accent-tinted background, slight lift |
+| Import selected | `.selected` | Strong accent background + visible checkbox |
+| Preview focused | `.pv-focused` | Accent outline ring only |
+
+**Focus ring strength adapts to context (`body.has-import-selection`):**
+- No import selection → strong ring + faint bg tint (focus is the primary affordance)
+- Import selection exists → subtle ring, no bg (selection dominates)
+- Both selected and focused → selected bg + solid accent ring (combined state)
+
+**List view:** left-edge `inset box-shadow` instead of outline.
+
+Rules:
+- `.pv-focused` must never imply import selection
+- `.selected` must never imply preview focus
+- Both can coexist on the same tile simultaneously
+
+---
+
 ## 9. Forbidden
 
 - No emoji usage

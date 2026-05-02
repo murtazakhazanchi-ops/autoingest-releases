@@ -18,6 +18,7 @@ const crashReporter = require('../services/crashReporter');
 const perf          = require('../services/performanceMonitor');
 const autoUpdater   = require('../services/autoUpdater');
 const settings      = require('../services/settings');
+const userManager   = require('./userManager');
 const { validateEventJson } = require('./contracts/dataValidator');
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -114,8 +115,8 @@ async function updateImportIndex(filePaths, destPath) {
   }
 }
 
-// ── Window ───────────────────────────────────────────────────────────────────
-function createWindow() {
+// ── Windows ──────────────────────────────────────────────────────────────────
+function createMainWindow() {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
   const savedBounds = settings.getWindowBounds();
   const win = new BrowserWindow({
@@ -138,8 +139,29 @@ function createWindow() {
     }
   });
   win.on('close', () => settings.setWindowBoundsSync(win.getBounds()));
-  win.once('ready-to-show', () => win.show());
   win.loadFile(path.join(__dirname, '../renderer/index.html'));
+  return win;
+}
+
+function createSplashWindow() {
+  const win = new BrowserWindow({
+    width:       980,
+    height:      480,
+    center:      true,
+    resizable:   false,
+    show:        false,
+    frame:       false,
+    transparent: true,  // lets CSS fade reach true transparency (no dark bg flash)
+    hasShadow:   true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
+    }
+  });
+  win.once('ready-to-show', () => win.show());
+  win.loadFile(path.join(__dirname, '../renderer/splash.html'));
   return win;
 }
 
@@ -167,6 +189,7 @@ function startDrivePolling() {
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 let pollHandle = null;
+let _splashWin = null;
 
 app.whenReady().then(() => {
   log('App started');
@@ -175,13 +198,13 @@ app.whenReady().then(() => {
   listManager.init(app.getPath('userData'));
   aliasEngine.init(app.getPath('userData'));
   telemetry.init();
-  const mainWindow = createWindow();
-  crashReporter.init(mainWindow);
   perf.init();
   autoUpdater.init();
-  pollHandle = startDrivePolling();
+  _splashWin = createSplashWindow();
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (BrowserWindow.getAllWindows().length === 0) {
+      _splashWin = createSplashWindow();
+    }
   });
 });
 
@@ -204,6 +227,31 @@ process.on('unhandledRejection', (reason) => {
 
 // Patch 22: request-id tracking per sender
 const activeFileRequests = new Map();
+
+// Startup: splash complete → open main window, close splash
+ipcMain.handle('splash:complete', () => {
+  const mainWin = createMainWindow();
+  crashReporter.init(mainWin);
+  if (pollHandle) clearInterval(pollHandle);
+  pollHandle = startDrivePolling();
+  // Start invisible so we can fade in after the splash closes
+  mainWin.setOpacity(0);
+  mainWin.once('ready-to-show', () => {
+    // Show main window (invisible) then close splash — both windows swap without a gap
+    mainWin.show();
+    if (_splashWin && !_splashWin.isDestroyed()) {
+      _splashWin.close();
+      _splashWin = null;
+    }
+    // Fade main window in over 200ms (10 steps × 20ms)
+    let step = 0;
+    const fadeIn = setInterval(() => {
+      step++;
+      mainWin.setOpacity(step / 10);
+      if (step >= 10) clearInterval(fadeIn);
+    }, 20);
+  });
+});
 
 // Drive list (on-demand)
 ipcMain.handle('drives:get', async () => detectMemoryCards());
@@ -341,7 +389,7 @@ ipcMain.handle('dest:scanFiles', async (_event, destPath) => {
 /**
  * files:import — ensures dest exists (async mkdir), copies files, logs outcome.
  */
-ipcMain.handle('files:import', async (event, { filePaths, destination }) => {
+ipcMain.handle('files:import', async (event, { filePaths, destination, importedBy }) => {
   log(`Import started: ${filePaths.length} files → ${destination}`);
 
   try {
@@ -400,6 +448,9 @@ ipcMain.handle('files:import', async (event, { filePaths, destination }) => {
     });
   }
 
+  result.importedBy = importedBy || null;
+  // TODO: persist importedBy into importIndex entries and event.json imports[]
+  //       once the audit schema is extended for operator attribution.
   return result;
 });
 
@@ -513,6 +564,9 @@ function buildAuditImportEntries(auditContext = {}) {
   const liveComps = Array.isArray(auditContext.components) ? auditContext.components : [];
   const photographer = auditContext.photographer;
   const source       = normalizeImportSource(auditContext.source);
+  const importedBy   = (auditContext.importedBy && typeof auditContext.importedBy === 'object')
+    ? auditContext.importedBy
+    : null;
   const config = require('../config/app.config');
   const VIDEO_EXT_SET = new Set(config.VIDEO_EXTENSIONS);
   const logs = [];
@@ -542,6 +596,7 @@ function buildAuditImportEntries(auditContext = {}) {
       componentName,
       counts:         { photos, videos },
       source,
+      importedBy,
     });
   });
 
@@ -557,6 +612,7 @@ ipcMain.handle('import:commitTransaction', async (event, {
   subEventNames,
   collName,
   source,
+  importedBy,
 }) => {
   let originalEventJson = null;
 
@@ -598,6 +654,7 @@ ipcMain.handle('import:commitTransaction', async (event, {
       subEventNames,
       collName,
       source,
+      importedBy,
     };
     const logs = buildAuditImportEntries(auditContext);
     result.auditLogs = logs;
@@ -681,6 +738,17 @@ ipcMain.handle('thumb:get', async (_event, srcPath) => {
     return null;
   }
 });
+
+ipcMain.handle('thumbnail:getVideoThumb', async (_event, srcPath) => {
+  const { getVideoThumb } = require('./videoThumbService');
+  return getVideoThumb(srcPath);
+});
+
+// ── User / operator identity ──────────────────────────────────────────────────
+ipcMain.handle('users:list',      async ()         => userManager.listUsers());
+ipcMain.handle('users:create',    async (_e, p)    => userManager.createUser(p));
+ipcMain.handle('users:getActive', async ()         => userManager.getActiveUser());
+ipcMain.handle('users:setActive', async (_e, id)   => userManager.setActiveUser(id));
 
 // Pause / Resume / Abort copy pipeline
 ipcMain.on('copy:pause',  () => setPaused(true));
@@ -1416,6 +1484,108 @@ ipcMain.handle('audit:verifyEvent', async (_event, eventPath) => {
 });
 
 // ── Window controls ──────────────────────────────────────────────────────────
+ipcMain.handle('files:deleteFromSource', async (_event, files, sourceRoot) => {
+  if (!Array.isArray(files) || !sourceRoot || typeof sourceRoot !== 'string') {
+    return { ok: false, error: 'Invalid arguments' };
+  }
+
+  // Resolve symlinks on the root once — fail the whole batch if the root is gone
+  let realRoot;
+  try {
+    realRoot = await fsp.realpath(sourceRoot);
+  } catch {
+    return { ok: false, error: 'Cannot resolve source root — drive may have been ejected' };
+  }
+
+  const results = [];
+  for (const f of files) {
+    if (!f || typeof f !== 'object') {
+      results.push({ src: String(f), deleted: false, error: 'Invalid entry' });
+      continue;
+    }
+    const { src, dest, size } = f;
+    if (!src || typeof src !== 'string') {
+      results.push({ src: String(src), deleted: false, error: 'Invalid src path' });
+      continue;
+    }
+
+    // ── Resolve symlinks on the source path ──────────────────────────────────
+    let realSrc;
+    try {
+      realSrc = await fsp.realpath(src);
+    } catch {
+      results.push({ src, deleted: false, error: 'Source file not found' });
+      continue;
+    }
+
+    // ── Containment check (after symlink resolution) ─────────────────────────
+    if (!realSrc.startsWith(realRoot + path.sep)) {
+      results.push({ src, deleted: false, error: 'Path outside source root' });
+      continue;
+    }
+
+    // ── Must be a regular file, not a directory or device ────────────────────
+    let srcStat;
+    try {
+      srcStat = await fsp.stat(realSrc);
+    } catch {
+      results.push({ src, deleted: false, error: 'Cannot stat source file' });
+      continue;
+    }
+    if (!srcStat.isFile()) {
+      results.push({ src, deleted: false, error: 'Not a regular file' });
+      continue;
+    }
+
+    // ── Destination revalidation ──────────────────────────────────────────────
+    if (!dest || typeof dest !== 'string') {
+      results.push({ src, deleted: false, error: 'No destination path provided' });
+      continue;
+    }
+    let destStat;
+    try {
+      destStat = await fsp.stat(dest);
+    } catch {
+      results.push({ src, deleted: false, error: 'Destination file not found — cannot confirm import' });
+      continue;
+    }
+    if (typeof size === 'number' && destStat.size !== size) {
+      results.push({ src, deleted: false, error: `Destination size mismatch (expected ${size}, got ${destStat.size})` });
+      continue;
+    }
+
+    // ── All checks passed — delete ────────────────────────────────────────────
+    try {
+      await fsp.unlink(realSrc);
+      log(`[sourceCleanup] Deleted: ${realSrc} | dest: ${dest} | size: ${size ?? 'unknown'}`);
+      results.push({ src, deleted: true });
+    } catch (err) {
+      results.push({ src, deleted: false, error: err.message });
+    }
+  }
+
+  return { ok: true, results };
+});
+
+// ── Media preview URL (read-only) ────────────────────────────────────────────
+// Returns a safe file:// URL for JPEG/PNG/MP4/MOV preview.
+ipcMain.handle('files:getPreviewUrl', async (_event, srcPath) => {
+  if (!srcPath || typeof srcPath !== 'string') return null;
+  const { pathToFileURL } = require('url');
+  const resolved = path.normalize(srcPath);
+  try {
+    const st = await fsp.stat(resolved);
+    if (!st.isFile()) return null;
+    return pathToFileURL(resolved).href;
+  } catch { return null; }
+});
+
+// ── RAW full-size preview (Phase 2: macOS qlmanage, userData cache) ──────────
+ipcMain.handle('preview:getRawPreview', async (_event, srcPath) => {
+  const { getRawPreview } = require('./rawPreviewService');
+  return getRawPreview(srcPath);
+});
+
 ipcMain.handle('window:minimize', () => {
   BrowserWindow.getFocusedWindow()?.minimize();
 });

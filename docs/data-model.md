@@ -106,6 +106,17 @@ Each entry in `imports[]` has the following shape:
 
 `source` is optional and backward-compatible. Entries written before source attribution was implemented are valid without it. `isValidImportEntry` does not require `source`. The Activity Log displays "Source: Not recorded" for entries that lack it.
 
+`importedBy` is optional and backward-compatible. Entries written before operator attribution was implemented are valid without it. `isValidImportEntry` does not require `importedBy`. The Activity Log displays "Imported by: Not recorded" for entries that lack it.
+
+```json
+{
+  "importedBy": {
+    "id":   "string (user UUID)",
+    "name": "string (display name of the operator)"
+  }
+}
+```
+
 ---
 
 ## Debugging Role

@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' file: data:;" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AutoIngest</title>
+  <script>
+    (function() {
+      var p = localStorage.getItem('theme') || 'auto';
+      var t = p === 'auto'
+        ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+        : p;
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-primary:        #0b0f1a;
+      --bg-secondary:      #0f1422;
+      --card-bg:           #121826;
+      --card-hover:        #161c2e;
+      --text-primary:      #e6e9ef;
+      --text-secondary:    #aab1c3;
+      --text-muted:        #6b7280;
+      --accent:            #89b4fa;
+      --accent-soft:       color-mix(in srgb, var(--accent) 35%, transparent);
+      --accent-hover:      color-mix(in srgb, var(--accent) 20%, transparent);
+      --accent-border:     rgba(137,180,250,0.25);
+      --accent-border-sel: rgba(137,180,250,0.6);
+      --border-subtle:     color-mix(in srgb, white 10%, transparent);
+      --border-strong:     color-mix(in srgb, white 18%, transparent);
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      margin: 0; padding: 0;
+      overflow: hidden;
+      background: transparent;  /* transparent window — CSS fade reaches true alpha */
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      -webkit-app-region: drag;
+    }
+
+    /* ── Card — window IS the card ──────────────────────────── */
+    .splash-card {
+      display: flex; flex-direction: row;
+      width: 100%; height: 100%;
+      background: var(--card-bg);
+      -webkit-app-region: drag;
+      /* exit transition — triggered by body.splash-exiting */
+      transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+    }
+
+    /* Exit state — card fades and contracts slightly */
+    body.splash-exiting .splash-card {
+      opacity: 0;
+      transform: scale(0.97);
+    }
+
+    /* ── LEFT — dominant branding panel ─────────────────────── */
+    .splash-left {
+      width: 42%; min-width: 290px; flex-shrink: 0;
+      background: linear-gradient(155deg, #0d1528 0%, #090d1a 100%);
+      border-right: 1px solid rgba(255,255,255,0.07);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 40px 32px;
+      gap: 0;
+    }
+
+    /* Icon — primary anchor of the left panel */
+    .splash-logo-img {
+      width: 200px; height: 200px; object-fit: contain;
+      pointer-events: none; user-select: none; -webkit-user-drag: none;
+      flex-shrink: 0; margin-bottom: 22px;
+      filter:
+        drop-shadow(0 12px 32px rgba(0,0,0,0.75))
+        drop-shadow(0 3px 8px rgba(0,0,0,0.55))
+        drop-shadow(-1px -1px 4px rgba(255,255,255,0.05));
+    }
+
+    /* Text block — tight internal spacing */
+    .splash-brand-block {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 7px; margin-bottom: 20px;
+    }
+
+    .splash-brand-name {
+      font-size: 21px; font-weight: 800; letter-spacing: 4px;
+      color: var(--text-primary); text-transform: uppercase;
+    }
+
+    .splash-brand-sub {
+      font-size: 11.5px; color: var(--text-secondary); opacity: 0.72;
+      text-align: center; line-height: 1.6; max-width: 220px;
+    }
+
+    .splash-copyright {
+      font-size: 10px; color: var(--text-muted); opacity: 0.42;
+      text-align: center; letter-spacing: 0.1px;
+    }
+
+    /* ── RIGHT — state container ─────────────────────────────── */
+    .splash-right {
+      flex: 1; display: flex; align-items: stretch;
+      padding: 44px 52px;
+      -webkit-app-region: no-drag;
+    }
+
+    .splash-panel { width: 100%; display: flex; flex-direction: column; }
+
+    /* ════════════════════════════════════
+       STATE 1 — WELCOME BACK
+       Layout: 3-zone vertical composition
+       ════════════════════════════════════ */
+
+    /* Top push — shifts welcome+START group downward as one unit */
+    .splash-top-push { flex: 0.25; }
+
+    /* Zone A: welcome group — upper */
+    .splash-welcome-group { /* natural height, no grow */ }
+
+    .splash-welcome-label {
+      font-size: 14px; font-weight: 500; letter-spacing: 0.01em;
+      color: var(--text-secondary); margin-bottom: 7px;
+    }
+
+    .splash-user-name {
+      font-size: 36px; font-weight: 700; color: var(--text-primary);
+      font-family: inherit; line-height: 1.05; letter-spacing: -0.5px;
+    }
+
+    /* Zone B: start zone — takes remaining height, centers the START button */
+    .splash-start-zone {
+      flex: 1; min-height: 32px;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* Primary action — START (large, centered, confident) */
+    .splash-start-btn {
+      padding: 0 52px; height: 46px;
+      background: var(--accent); color: #07090f;
+      border: none; border-radius: 8px;
+      font-family: inherit; font-size: 13px; font-weight: 800;
+      letter-spacing: 1.4px; text-transform: uppercase;
+      cursor: pointer; -webkit-app-region: no-drag;
+      transition: opacity 0.13s, transform 0.10s;
+    }
+    .splash-start-btn:hover:not(:disabled) { opacity: 0.87; }
+    .splash-start-btn:active:not(:disabled) { transform: scale(0.97); }
+    .splash-start-btn:disabled { opacity: 0.30; cursor: default; }
+
+    /* Zone C: "Not you?" — bottom of panel */
+    .splash-switch-row {
+      display: flex; align-items: center; gap: 10px;
+      padding-top: 14px;
+    }
+
+    .splash-not-you {
+      font-size: 12.5px; color: var(--text-secondary); opacity: 0.55;
+    }
+
+    .splash-switch-btn {
+      background: none; border: 1px solid var(--border-subtle);
+      border-radius: 20px; padding: 4px 14px;
+      font-size: 12px; font-family: inherit; color: var(--text-secondary);
+      cursor: pointer; -webkit-app-region: no-drag;
+      transition: border-color 0.12s, color 0.12s;
+    }
+    .splash-switch-btn:hover { border-color: var(--accent-border); color: var(--accent); }
+
+    /* ════════════════════════════════════
+       STATE 2 — SELECT OPERATOR
+       ════════════════════════════════════ */
+
+    .splash-panel-title {
+      font-size: 22px; font-weight: 700; color: var(--text-primary);
+      margin-bottom: 16px; letter-spacing: -0.2px;
+    }
+
+    .splash-user-list {
+      flex: 1; min-height: 0;
+      max-height: 200px; overflow-y: auto;
+      display: flex; flex-direction: column; gap: 5px;
+      margin-bottom: 18px;
+    }
+
+    .splash-user-item {
+      padding: 11px 14px; border-radius: 10px;
+      background: var(--card-hover); border: 1px solid var(--border-subtle);
+      cursor: pointer; -webkit-app-region: no-drag;
+      display: flex; align-items: center; gap: 12px;
+      transition: border-color 0.12s, background 0.12s;
+      flex-shrink: 0;
+    }
+    .splash-user-item:hover {
+      border-color: var(--accent-border);
+      background: color-mix(in srgb, var(--card-hover) 55%, var(--accent-hover));
+    }
+    .splash-user-item.selected {
+      border-color: var(--accent-border-sel);
+      background: var(--accent-hover);
+    }
+
+    .splash-user-initials {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--accent-soft); color: var(--accent);
+      font-size: 12px; font-weight: 800; letter-spacing: 0.4px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+
+    .splash-user-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .splash-user-item-name {
+      font-size: 14px; font-weight: 600; color: var(--text-primary);
+      line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .splash-user-item-role {
+      font-size: 11.5px; color: var(--text-secondary); opacity: 0.65; line-height: 1.2;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    .splash-select-actions {
+      display: flex; align-items: center; gap: 10px;
+    }
+
+    /* ════════════════════════════════════
+       STATE 3 — CREATE OPERATOR
+       ════════════════════════════════════ */
+
+    .splash-form {
+      display: flex; flex-direction: column; gap: 4px; width: 100%; margin-bottom: 18px;
+    }
+
+    .splash-label {
+      font-size: 11px; font-weight: 600; color: var(--text-secondary);
+      letter-spacing: 0.3px; margin-top: 12px;
+    }
+    .splash-label:first-child { margin-top: 0; }
+    .splash-optional { font-weight: 400; opacity: 0.50; }
+
+    .splash-input {
+      width: 100%; height: 40px; padding: 0 12px;
+      background: var(--bg-secondary); border: 1px solid var(--border-subtle);
+      border-radius: 8px; color: var(--text-primary); font-size: 14px;
+      outline: none; font-family: inherit; -webkit-app-region: no-drag;
+      transition: border-color 0.13s;
+    }
+    .splash-input:focus { border-color: var(--accent-border-sel); }
+
+    .splash-create-actions { display: flex; align-items: center; gap: 10px; }
+
+    .splash-error {
+      font-size: 12px; color: #f38ba8; margin-bottom: 14px;
+      min-height: 16px; line-height: 1.4;
+    }
+
+    /* ════════════════════════════════════
+       UNIFIED BUTTON SYSTEM
+       Primary  — accent fill, h46 (welcome START) / h40 (other primaries)
+       Secondary — ghost border, h40
+       ════════════════════════════════════ */
+
+    /* Secondary / ghost — shared by "New profile", "Back", sub-actions */
+    .splash-ghost-btn {
+      height: 40px; padding: 0 18px;
+      background: none; border: 1px solid var(--border-subtle); border-radius: 8px;
+      font-family: inherit; font-size: 13px; font-weight: 500; color: var(--text-secondary);
+      cursor: pointer; -webkit-app-region: no-drag;
+      transition: border-color 0.12s, color 0.12s;
+    }
+    .splash-ghost-btn:hover { border-color: var(--border-strong); color: var(--text-primary); }
+
+    /* Primary — state 2 "Start session" and state 3 "Create & start" */
+    .splash-continue-btn {
+      height: 40px; padding: 0 24px; border: none; border-radius: 8px;
+      background: var(--accent); color: #07090f;
+      font-family: inherit; font-size: 13px; font-weight: 700; letter-spacing: 0.5px;
+      cursor: pointer; -webkit-app-region: no-drag;
+      transition: opacity 0.13s;
+    }
+    .splash-continue-btn:disabled { opacity: 0.30; cursor: default; }
+    .splash-continue-btn:not(:disabled):hover { opacity: 0.84; }
+    .splash-continue-btn:not(:disabled):active { opacity: 0.92; }
+
+  </style>
+</head>
+<body>
+  <div class="splash-card">
+
+    <!-- LEFT PANEL — logo + branding -->
+    <div class="splash-left">
+      <img src="../assets/icon.png" class="splash-logo-img" alt="AutoIngest logo" draggable="false">
+      <div class="splash-brand-block">
+        <div class="splash-brand-name">AUTOINGEST</div>
+        <div class="splash-brand-sub">AJS Photo Archive Intake System</div>
+      </div>
+      <div class="splash-copyright">© Aljamea-tus-Saifiyah. All rights reserved.</div>
+    </div>
+
+    <!-- RIGHT PANEL — state machine -->
+    <div class="splash-right">
+
+      <!-- STATE 1: Welcome Back — 3-zone vertical composition -->
+      <div class="splash-panel" id="splashWelcome">
+
+        <!-- top push: shifts welcome+START down as one group -->
+        <div class="splash-top-push" aria-hidden="true"></div>
+
+        <!-- Zone A — upper: label + name -->
+        <div class="splash-welcome-group">
+          <div class="splash-welcome-label">Welcome back</div>
+          <div class="splash-user-name" id="splashWelcomeUserName">—</div>
+        </div>
+
+        <!-- Zone B — middle: START button centered in remaining space -->
+        <div class="splash-start-zone">
+          <button class="splash-start-btn" id="splashContinueBtn">START</button>
+        </div>
+
+        <!-- Zone C — bottom: identity switch -->
+        <div class="splash-switch-row">
+          <span class="splash-not-you">Not you?</span>
+          <button class="splash-switch-btn" id="splashNotYouBtn">Switch operator</button>
+        </div>
+
+      </div>
+
+      <!-- STATE 2: Select User -->
+      <div class="splash-panel" id="splashSelect" style="display:none">
+        <div class="splash-panel-title">Select operator</div>
+        <div class="splash-user-list" id="splashUserList" role="listbox" aria-label="Select operator"></div>
+        <div class="splash-select-actions">
+          <button class="splash-continue-btn" id="splashSelectStartBtn" disabled>Start session</button>
+          <button class="splash-ghost-btn" id="splashNewProfileBtn">New profile</button>
+        </div>
+      </div>
+
+      <!-- STATE 3: Create User -->
+      <div class="splash-panel" id="splashCreate" style="display:none">
+        <div class="splash-panel-title" id="splashCreateTitle">Create operator profile</div>
+        <div class="splash-form">
+          <label class="splash-label" for="splashInputName">Full name <span aria-hidden="true">*</span></label>
+          <input class="splash-input" id="splashInputName" type="text"
+                 placeholder="e.g. Ahmad Al-Farsi" maxlength="60" autocomplete="off" spellcheck="false">
+          <label class="splash-label" for="splashInputRole">Role <span class="splash-optional">(optional)</span></label>
+          <input class="splash-input" id="splashInputRole" type="text"
+                 placeholder="e.g. Lead Photographer" maxlength="50" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="splash-error" id="splashCreateError" style="display:none"></div>
+        <div class="splash-create-actions">
+          <button class="splash-continue-btn" id="splashCreateStartBtn">Create &amp; start</button>
+          <button class="splash-ghost-btn" id="splashCreateBackBtn">Back</button>
+        </div>
+      </div>
+
+    </div><!-- .splash-right -->
+  </div><!-- .splash-card -->
+
+  <script src="splash.js"></script>
+</body>
+</html>

@@ -15,3 +15,5 @@ CODE_BUNDLE.md
 # Separate tooling repos (not part of AutoIngest)
 everything-claude-code/
 pixel-agents/
+docs/
+.agent/skills/

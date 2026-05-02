@@ -111,6 +111,117 @@ New feature planning
 → docs/workflows.md
 → docs/decision-matrix.md
 
+---
+
+## Agent Learning Update Workflow
+
+AutoIngest uses project-level Claude Code agents stored in `.claude/agents/`.
+
+After significant completed work, Claude may be asked to run an Agent Learning Update.
+
+### Purpose
+
+The purpose is to improve future specialist-agent behavior by recording durable lessons from completed work.
+
+### Rules
+
+- Do not auto-edit `.claude/agents/*.md` without explicit user request.
+- First record reusable lessons in `.claude/learning-log.md`.
+- Use `.claude/learning-rules.md` as the policy for what may be promoted.
+- Promote only durable, reusable rules into `.claude/agents/*.md`.
+- Keep agent files concise.
+- Do not duplicate the same rule across many agents unless each agent genuinely needs it.
+- Never store temporary chat content, screenshots, or one-off wording as agent rules.
+- Agent Learning Update is documentation-only.
+- Do not edit app code during an Agent Learning Update task.
+
+### When requested to run Agent Learning Update
+
+Claude must:
+
+1. Classify the completed work.
+2. Read `.claude/learning-rules.md`.
+3. Inspect only relevant `.claude/agents/*.md` files.
+4. Add a concise entry to `.claude/learning-log.md`.
+5. Declare which lessons should be promoted.
+6. Update only the necessary agent files.
+7. Return:
+   - learning-log entry added
+   - agent files inspected
+   - agent files updated
+   - rules promoted
+   - validation checks added
+   - suggested commit message
+
+---
+
+## Agent Learning Update Prompt Trigger
+
+After completing significant AutoIngest work, Claude must evaluate whether the work produced reusable lessons for future specialist-agent behavior.
+
+Claude must not automatically run Agent Learning Update.
+
+Instead, Claude must ask the user whether to run it.
+
+### When Claude should ask
+
+Ask after work that includes any of the following:
+
+- A bug fix that revealed a reusable debugging pattern
+- A UI/layout correction that created a durable design rule
+- A data model or event.json behavior change
+- An ingestion, routing, transaction, or import-flow change
+- A performance optimization or discovered bottleneck pattern
+- A new workflow, validation rule, or contract clarification
+- A repeated mistake that should be prevented in future tasks
+- A change that affects how specialist agents should reason or validate
+
+### When Claude should not ask
+
+Do not ask after:
+
+- Tiny wording changes
+- One-off visual tweaks with no reusable lesson
+- Temporary experiments
+- Reverted changes
+- Tasks that produced no durable rule
+- Pure command/output assistance
+- Simple explanations with no project behavior change
+
+### Required post-task question
+
+If the completed work appears to contain reusable lessons, Claude must end the task with:
+
+> This work may contain reusable lessons for future AutoIngest agents. Should I run an Agent Learning Update?
+
+Claude must wait for user confirmation.
+
+### If the user says yes
+
+Claude must run the Agent Learning Update Workflow:
+
+1. Classify the completed work.
+2. Read `.claude/learning-rules.md`.
+3. Inspect only relevant `.claude/agents/*.md` files.
+4. Add a concise entry to `.claude/learning-log.md`.
+5. Declare which lessons should be promoted.
+6. Update only the necessary agent files.
+7. Return:
+   - learning-log entry added
+   - agent files inspected
+   - agent files updated
+   - rules promoted
+   - validation checks added
+   - suggested commit message
+
+### If the user says no
+
+Claude must not update `.claude/learning-log.md` or `.claude/agents/*.md`.
+
+Claude may simply continue with the next requested task.
+
+---
+
 ## Context Loading Protocol
 
 - Architecture → /docs/architecture.md

@@ -166,8 +166,17 @@ let importRunning    = false;
 let viewMode         = 'icon';
 let importMode       = 'event'; // 'event' | 'quick'
 let lastClickedPath  = null;
+let _selectionAnchor = null;       // last explicitly import-selected path (shift-click range anchor)
+let _prevFocusPath   = null;       // previous pv-focused tile path for O(1) class swap
 let fileLoadRequestId = 0;
 let _draggedPaths    = [];          // paths being dragged from the file grid
+let _csqEligibleFiles = null;       // [{src,dest,size}] — set after successful import
+let _csqSourceRoot    = null;       // source root path for path-containment validation
+let _previewOpen      = false;      // true while preview overlay is visible
+let _previewPath      = null;       // path of currently previewed file
+let _previewOrder     = [];         // snapshot of getRenderedPathOrder() at open time
+let _pvRawImg         = null;       // reused <img> node for RAW preview renders
+let _pvObjUrls        = [];         // object URLs to revoke on close
 let showThumbnails    = true;
 let isScrolling       = false;
 let isShuttingDown    = false;  // true while eject is in progress — blocks all new thumb I/O
@@ -414,6 +423,9 @@ function normalizeImportDisplayEntry(entry) {
   const skipped    = Math.max(0, parseInt(entry?.skipped,    10) || 0);
   const duplicates = Math.max(0, parseInt(entry?.duplicates, 10) || 0);
   const source     = entry?.source || null;
+  const importedBy = (entry?.importedBy && typeof entry.importedBy === 'object')
+    ? entry.importedBy
+    : null;
 
   return {
     photographer:  photographer  || '—',
@@ -426,6 +438,7 @@ function normalizeImportDisplayEntry(entry) {
     skipped,
     duplicates,
     source,
+    importedBy,
   };
 }
 
@@ -516,7 +529,7 @@ function LastImportArea(summary) {
   if (!lastImport) return '';
 
   const lastTimestamp = formatDate(lastImport.timestamp);
-  const totalMedia = mediaCountLabel(summary.totalPhotos, summary.totalVideos);
+  const totalMedia = mediaCountLabel(lastImport.photos, lastImport.videos);
 
   return `
     <div class="last-import-area" aria-label="Last import">
@@ -649,8 +662,19 @@ function thumbHtml(file) {
     return `<div>${extUp}</div>`;
   }
 
-  // VIDEO fallback
+  // VIDEO — lazy thumbnail with play badge when thumbnails are enabled
   if (file.type === 'video') {
+    if (showThumbnails) {
+      return `<div class="video-thumb-container"><img
+          class="thumb-img video-thumb lazy-thumb"
+          data-thumb-type="video"
+          data-src="${escapeHtml(file.path)}"
+          data-file="${escapeHtml(file.path)}"
+          data-size="${file.size}"
+          data-modified="${escapeHtml(file.modifiedAt)}"
+          alt="" decoding="async"
+        /><span class="video-play-badge" aria-hidden="true"><svg viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg" width="18" height="18"><path d="M8 5v14l11-7z"/></svg></span></div>`;
+    }
     return `<div>VIDEO</div>`;
   }
 
@@ -743,7 +767,10 @@ if (cachedUrl) {
     }
 
     activeLoads++;
-    window.api.getThumb(srcPath)
+    const _thumbFn = (img.dataset.thumbType === 'video' && window.api.getVideoThumb)
+      ? window.api.getVideoThumb
+      : window.api.getThumb;
+    _thumbFn(srcPath)
       .then(url => {
         // Stale-check 1: render session — a new folder was opened while this
         // request was in-flight; discard the result entirely.
@@ -1429,6 +1456,10 @@ function _renderActivityLogBody(ev, activeData, folderName) {
         ? `<div class="al-entry-quality">${escapeHtml(qParts.join(' • '))}</div>`
         : '';
       const sourceHTML = `<div class="al-entry-source">Source: ${_formatImportSource(entry.source)}</div>`;
+      const importedByName = (entry.importedBy?.name && typeof entry.importedBy.name === 'string')
+        ? escapeHtml(entry.importedBy.name)
+        : 'Not recorded';
+      const importedByHTML = `<div class="al-entry-source">Imported by: ${importedByName}</div>`;
       return `
         <div class="al-entry">
           <div class="al-entry-header">
@@ -1442,6 +1473,7 @@ function _renderActivityLogBody(ev, activeData, folderName) {
           </div>
           ${qualityHTML}
           ${sourceHTML}
+          ${importedByHTML}
         </div>`;
     }).join('');
     return `
@@ -2022,7 +2054,7 @@ async function selectSource({ type, path, label = null, driveObj = null }) {
   activeFolderPath = null;
 
   expandedFolders.clear(); dcimChildrenCache = []; cachedDcimPath = null;
-  selectedFiles.clear(); currentFiles = []; lastClickedPath = null; tileMap = new Map();
+  selectedFiles.clear(); currentFiles = []; lastClickedPath = null; _selectionAnchor = null; _prevFocusPath = null; tileMap = new Map();
   resetViewCache();
   GroupManager.reset();
   renderGroupPanel();
@@ -2069,7 +2101,7 @@ document.getElementById('changeDriveBtn').addEventListener('click', () => {
   fileLoadRequestId++;
   activeDrive = null; activeFolderPath = null; activeSource = null;
   expandedFolders.clear(); dcimChildrenCache = []; cachedDcimPath = null;
-  selectedFiles.clear(); currentFiles = []; lastClickedPath = null; tileMap = new Map();
+  selectedFiles.clear(); currentFiles = []; lastClickedPath = null; _selectionAnchor = null; _prevFocusPath = null; tileMap = new Map();
   resetViewCache();
   document.getElementById('workspace').classList.remove('visible');
   document.getElementById('step1Panel').style.display = '';
@@ -2097,6 +2129,9 @@ function hideSourceScanState() {
  */
 function resetAppState() {
   hideSourceScanState();
+  closePreview();
+  _csqEligibleFiles = null;
+  _csqSourceRoot    = null;
   hasSelectedDrive  = false;
   isLoadingFiles    = false;
   currentFolder     = null;
@@ -2106,6 +2141,8 @@ function resetAppState() {
   activeFolderPath = null;
   activeSource     = null;
   lastClickedPath  = null;
+  _selectionAnchor = null;
+  _prevFocusPath   = null;
   importRunning    = false;
   isShuttingDown   = false;  // cleared last — safe to accept a new card
   expandedFolders.clear(); dcimChildrenCache = []; cachedDcimPath = null;
@@ -2821,6 +2858,12 @@ function renderFileArea(files) {
     if (img && selectedFiles.has(img.dataset.file)) requestThumbForImage(img, true, currentSession);
   });
 
+  // Restore preview-focus ring after render (pv-focused not baked into HTML)
+  if (lastClickedPath) {
+    tileMap.get(lastClickedPath)?.classList.add('pv-focused');
+    _prevFocusPath = lastClickedPath;
+  }
+
   area.onscroll = handleFileGridScroll;
 
   // Note: NO per-tile addEventListener here.
@@ -3052,6 +3095,8 @@ document.getElementById('fileGrid').addEventListener('click', e => {
   }
 
   // ── Checkbox click — handled by the change event below, skip here ──
+  // Returning early prevents the click from also reaching handleTileClick,
+  // avoiding a double-trigger (click + change both calling handleTileClick).
   if (e.target.type === 'checkbox') return;
 
   // ?? Folder-tile click (Commit 11) ?????????????????????????????
@@ -3064,7 +3109,7 @@ document.getElementById('fileGrid').addEventListener('click', e => {
   // ── Tile click (anywhere on tile except checkbox) ──────────────
   const tile = e.target.closest('.file-tile');
   if (!tile || !tile.dataset.path) return;
-  handleTileClick(tile.dataset.path, e.shiftKey);
+  handleTileClick(tile.dataset.path, e.shiftKey, e.metaKey || e.ctrlKey);
 });
 
 // Separate delegated listener for checkbox change events
@@ -3072,7 +3117,7 @@ document.getElementById('fileGrid').addEventListener('change', e => {
   if (e.target.type !== 'checkbox') return;
   const path = e.target.dataset.path;
   if (!path) return;
-  handleTileClick(path, false);
+  handleTileClick(path, false, true);  // checkbox = explicit import selection (always ctrlKey semantics)
   // Restore checkbox visual state to match selectedFiles (handleTileClick already syncs)
 });
 
@@ -3158,10 +3203,100 @@ function getRenderedPathOrder() {
   );
 }
 
-function handleTileClick(filePath, shiftKey) {
-  if (shiftKey && lastClickedPath && lastClickedPath !== filePath) {
+/**
+ * O(1) — swaps pv-focused class from the old focused tile to the new one.
+ * Always updates lastClickedPath.
+ */
+function _setPreviewFocus(path) {
+  if (_prevFocusPath) tileMap.get(_prevFocusPath)?.classList.remove('pv-focused');
+  if (path) tileMap.get(path)?.classList.add('pv-focused');
+  _prevFocusPath  = path;
+  lastClickedPath = path;
+}
+
+/**
+ * Returns the target path for arrow-key focus navigation, or null if already at boundary.
+ *
+ * Left/Right : ±1 in flat rendered order (both grid and list).
+ * Up/Down    : ±1 in list view; visual-row navigation in grid view via getBoundingClientRect.
+ *
+ * @param {string}   key    — ArrowLeft | ArrowRight | ArrowUp | ArrowDown
+ * @param {string[]} order  — getRenderedPathOrder() snapshot
+ */
+function _arrowFocusTarget(key, order) {
+  const curIdx = lastClickedPath ? order.indexOf(lastClickedPath) : -1;
+
+  if (key === 'ArrowLeft') {
+    if (curIdx === -1) return order[0];
+    return curIdx > 0 ? order[curIdx - 1] : null;
+  }
+  if (key === 'ArrowRight') {
+    if (curIdx === -1) return order[0];
+    return curIdx < order.length - 1 ? order[curIdx + 1] : null;
+  }
+
+  // Up/Down in list mode: ±1 (single-column layout)
+  if (viewMode === 'list') {
+    if (curIdx === -1) return order[0];
+    const next = curIdx + (key === 'ArrowDown' ? 1 : -1);
+    return (next >= 0 && next < order.length) ? order[next] : null;
+  }
+
+  // Up/Down in grid/icon mode: find tile in same visual column of next/prev row
+  if (curIdx === -1) return order[0];
+  const curTile = tileMap.get(lastClickedPath);
+  if (!curTile) return null;
+
+  const curRect = curTile.getBoundingClientRect();
+  const TOL     = 4; // px — same-row tolerance
+  const goDown  = key === 'ArrowDown';
+
+  // 1. Find the y-coordinate of the adjacent row
+  let targetY = null;
+  for (const t of tileMap.values()) {
+    const ty = t.getBoundingClientRect().top;
+    if (goDown) {
+      if (ty > curRect.top + TOL && (targetY === null || ty < targetY)) targetY = ty;
+    } else {
+      if (ty < curRect.top - TOL && (targetY === null || ty > targetY)) targetY = ty;
+    }
+  }
+  if (targetY === null) return null;  // already at top/bottom row
+
+  // 2. Find tile in that row whose horizontal centre is closest to ours
+  const curCX = curRect.left + curRect.width / 2;
+  let best = null, bestD = Infinity;
+  for (const [path, t] of tileMap) {
+    const r = t.getBoundingClientRect();
+    if (Math.abs(r.top - targetY) <= TOL) {
+      const d = Math.abs((r.left + r.width / 2) - curCX);
+      if (d < bestD) { bestD = d; best = path; }
+    }
+  }
+  return best;
+}
+
+/**
+ * @param {string}  filePath
+ * @param {boolean} shiftKey  — extend import selection range from anchor
+ * @param {boolean} ctrlKey   — toggle import selection for this file
+ *
+ * Normal click (shiftKey=false, ctrlKey=false): sets preview focus only.
+ * Cmd/Ctrl-click: toggles import selection + sets anchor + preview focus.
+ * Shift-click: range-selects from _selectionAnchor to filePath + preview focus.
+ */
+function handleTileClick(filePath, shiftKey, ctrlKey = false) {
+  // Preview focus always follows the clicked file
+  _setPreviewFocus(filePath);
+
+  // Guard: if anchor left currentFiles (sort/filter/folder change), reset it
+  if (_selectionAnchor && !currentFiles.some(f => f.path === _selectionAnchor)) {
+    _selectionAnchor = null;
+  }
+
+  if (shiftKey && _selectionAnchor && _selectionAnchor !== filePath) {
     const order = getRenderedPathOrder();
-    const a = order.indexOf(lastClickedPath);
+    const a = order.indexOf(_selectionAnchor);
     const b = order.indexOf(filePath);
     if (a !== -1 && b !== -1) {
       const [lo, hi] = a < b ? [a, b] : [b, a];
@@ -3175,19 +3310,33 @@ function handleTileClick(filePath, shiftKey) {
     }
   }
 
-  // Normal toggle
-  if (selectedFiles.has(filePath)) {
-    selectedFiles.delete(filePath);
-  } else {
+  if (shiftKey && !_selectionAnchor) {
+    // Shift with no anchor: add this one file to import selection, set anchor
     selectedFiles.add(filePath);
+    _selectionAnchor = filePath;
     requestThumbForPath(filePath, true);
+    syncOneTile(filePath);
+    updateSelectionBar();
+    updateSteps();
+    return;
   }
-  lastClickedPath = filePath;
 
-  // O(1) single-tile sync via tileMap
-  syncOneTile(filePath);
-  updateSelectionBar();
-  updateSteps();
+  if (ctrlKey) {
+    // Cmd/Ctrl-click: toggle import selection, update anchor
+    if (selectedFiles.has(filePath)) {
+      selectedFiles.delete(filePath);
+    } else {
+      selectedFiles.add(filePath);
+      requestThumbForPath(filePath, true);
+    }
+    _selectionAnchor = filePath;
+    syncOneTile(filePath);
+    updateSelectionBar();
+    updateSteps();
+    return;
+  }
+
+  // Normal click: preview focus only — no selection change
 }
 
 /**
@@ -3212,9 +3361,11 @@ function syncAllTiles() {
   for (const [path, tile] of tileMap) {
     const checked = selectedFiles.has(path);
     tile.classList.toggle('selected', checked);
+    tile.classList.toggle('pv-focused', path === lastClickedPath);
     const cb = tile.querySelector('input[type="checkbox"]');
     if (cb) cb.checked = checked;
   }
+  _prevFocusPath = lastClickedPath;
   syncPairLinks();
 }
 
@@ -3268,7 +3419,7 @@ document.getElementById('selectAllBtn').addEventListener('click', () => {
     visiblePaths.every(p => selectedFiles.has(p));
   if (allVisibleSelected) {
     visiblePaths.forEach(p => selectedFiles.delete(p));
-    lastClickedPath = null;
+    _selectionAnchor = null;
   } else {
     visiblePaths.forEach(p => selectedFiles.add(p));
     requestThumbsForPaths(visiblePaths);
@@ -3280,7 +3431,7 @@ document.getElementById('selectAllBtn').addEventListener('click', () => {
 
 document.getElementById('clearSelBtn').addEventListener('click', () => {
   selectedFiles.clear();
-  lastClickedPath = null;
+  _selectionAnchor = null;
   syncAllTiles();
   updateSelectionBar();
   updateSteps();
@@ -3300,11 +3451,27 @@ document.addEventListener('keydown', e => {
   const allVisibleSelected = visiblePaths.every(p => selectedFiles.has(p));
   if (allVisibleSelected) {
     visiblePaths.forEach(p => selectedFiles.delete(p));
-    lastClickedPath = null;
+    _selectionAnchor = null;
   } else {
     visiblePaths.forEach(p => selectedFiles.add(p));
     requestThumbsForPaths(visiblePaths);
   }
+  syncAllTiles();
+  updateSelectionBar();
+  updateSteps();
+});
+
+// ════════════════════════════════════════════════════════════════
+// Cmd/Ctrl+D — deselect all import selection, preserve preview focus
+// ════════════════════════════════════════════════════════════════
+document.addEventListener('keydown', e => {
+  if (!(e.metaKey || e.ctrlKey) || e.key !== 'd') return;
+  const tag = document.activeElement.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+  if (!getVisibleFiles().length) return;
+  e.preventDefault();
+  selectedFiles.clear();
+  _selectionAnchor = null;
   syncAllTiles();
   updateSelectionBar();
   updateSteps();
@@ -3321,6 +3488,7 @@ function updateSelectionBar() {
     visiblePaths.every(p => selectedFiles.has(p));
 
   document.getElementById('toolbar').classList.toggle('has-selection', n > 0);
+  document.body.classList.toggle('has-import-selection', n > 0);  // CSS: focus ring strength
   document.getElementById('selCount').textContent = `${n} selected`;
   setStatusBarMessage('selection', n > 0 ? `${n} file${n === 1 ? '' : 's'} selected` : null, 2);
 
@@ -3390,7 +3558,7 @@ function applyFileBatch(batch) {
 async function browseFolder(drivePath, folderPath) {
   const requestId = ++fileLoadRequestId;
   activeFolderPath = folderPath;
-  selectedFiles.clear(); currentFiles = []; lastClickedPath = null;
+  selectedFiles.clear(); currentFiles = []; lastClickedPath = null; _selectionAnchor = null; _prevFocusPath = null;
   resetViewCache();
 
   // Commit 3 (v0.6.0): folderPath === null is a valid user-visible browse.
@@ -3632,7 +3800,7 @@ function updateProgress({ total, index, completedCount, filename, status, skipRe
   document.getElementById('progressFilename').innerHTML = labelHtml;
 }
 
-function showProgressSummary({ copied, skipped, errors, skippedReasons, failedFiles, duration, integrity }) {
+function showProgressSummary({ copied, skipped, errors, skippedReasons, failedFiles, duration, integrity, copiedFiles }) {
   document.getElementById('progressFilename').textContent = 'Import complete.';
   document.getElementById('sumCopied').textContent  = copied;
   document.getElementById('sumSkipped').textContent = skipped;
@@ -3692,7 +3860,8 @@ function showProgressSummary({ copied, skipped, errors, skippedReasons, failedFi
     const checksumBtn = document.createElement('button');
     checksumBtn.id        = 'runChecksumBtn';
     checksumBtn.className = 'im-btn-secondary';
-    checksumBtn.textContent = 'Deep Verify (Checksum)';
+    checksumBtn.textContent = 'Deep Verify';
+    checksumBtn.title       = 'Deep Verify (Checksum)';
     checksumBtn.addEventListener('click', async () => {
       checksumBtn.disabled    = true;
       checksumBtn.textContent = 'Verifying... 0%';
@@ -3707,7 +3876,8 @@ function showProgressSummary({ copied, skipped, errors, skippedReasons, failedFi
     const btn = document.createElement('button');
     btn.id        = 'progressReportBtn';
     btn.className = 'im-btn-tertiary';
-    btn.innerHTML = `<span class="icon">${SVG.flag}</span> Report an Issue`;
+    btn.title     = 'Report an Issue';
+    btn.innerHTML = `<span class="icon">${SVG.flag}</span> Report Issue`;
     btn.addEventListener('click', () => {
       document.getElementById('progressOverlay').classList.remove('visible');
       openFeedbackModal({
@@ -3716,6 +3886,19 @@ function showProgressSummary({ copied, skipped, errors, skippedReasons, failedFi
       });
     });
     actLeft.appendChild(btn);
+  }
+
+  // ── Clean Up Source button — only when files were copied ───────────────────
+  if (actLeft && !modal.querySelector('#scqOpenBtn') && copiedFiles && copiedFiles.length > 0 && activeSource?.path) {
+    _csqEligibleFiles = copiedFiles;
+    _csqSourceRoot    = activeSource.path;
+    const cleanBtn = document.createElement('button');
+    cleanBtn.id        = 'scqOpenBtn';
+    cleanBtn.className = 'im-btn-secondary';
+    cleanBtn.textContent = 'Review Cleanup';
+    cleanBtn.title       = 'Review Source Cleanup';
+    cleanBtn.addEventListener('click', () => openSourceCleanup());
+    actLeft.appendChild(cleanBtn);
   }
 }
 
@@ -3741,6 +3924,443 @@ window.api.onChecksumComplete(({ failed }) => {
   window.api.getImportIndex().then(index => {
     globalImportIndex = index || {};
     });
+});
+
+// ── Source Cleanup ─────────────────────────────────────────────────────────
+
+function _formatBytes(bytes) {
+  if (!bytes || bytes < 1024) return `${bytes || 0} B`;
+  if (bytes < 1024 * 1024)    return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function _updateScqDeleteBtn() {
+  const list    = document.getElementById('scFileList');
+  const input   = document.getElementById('scConfirmInput');
+  const btn     = document.getElementById('scDeleteBtn');
+  const countEl = document.getElementById('scSelCount');
+  if (!list || !input || !btn) return;
+  const checked = list.querySelectorAll('input[type="checkbox"]:checked');
+  const n = checked.length;
+  if (countEl) countEl.textContent = n > 0 ? `${n} file${n > 1 ? 's' : ''} selected` : '';
+  btn.disabled = !(n > 0 && input.value === 'DELETE FROM SOURCE');
+}
+
+function openSourceCleanup() {
+  const overlay      = document.getElementById('sourceCleanupOverlay');
+  const fileList     = document.getElementById('scFileList');
+  const confirmInput = document.getElementById('scConfirmInput');
+  const resultArea   = document.getElementById('scResultArea');
+  const selectAll    = document.getElementById('scSelectAll');
+  const deleteBtn    = document.getElementById('scDeleteBtn');
+  const cancelBtn    = document.getElementById('scCancelBtn');
+  const confirmGate  = document.getElementById('sourceCleanupOverlay')?.querySelector('.sc-confirm-gate');
+  const scActions    = document.getElementById('sourceCleanupOverlay')?.querySelector('.sc-actions');
+  const selectAllRow = document.getElementById('sourceCleanupOverlay')?.querySelector('.sc-select-all-row');
+  if (!overlay || !fileList || !_csqEligibleFiles) return;
+
+  // Reset modal to file-list state
+  fileList.innerHTML = '';
+  if (confirmInput) confirmInput.value = '';
+  if (resultArea)   { resultArea.style.display = 'none'; resultArea.innerHTML = ''; }
+  if (selectAll)    { selectAll.checked = false; selectAll.indeterminate = false; }
+  if (deleteBtn)    { deleteBtn.disabled = true; deleteBtn.textContent = 'Delete Selected'; }
+  if (cancelBtn)    { cancelBtn.disabled = false; cancelBtn.textContent = 'Cancel'; cancelBtn.onclick = _closeSourceCleanup; }
+  if (confirmGate)  confirmGate.style.display = '';
+  if (scActions)    scActions.style.display = '';
+  if (selectAllRow) selectAllRow.style.display = '';
+
+  // Populate file rows using current _csqEligibleFiles (already filtered of past deletions)
+  _csqEligibleFiles.forEach((f, idx) => {
+    const filename = f.src.split(/[\\/]/).pop();
+    const row = document.createElement('label');
+    row.className = 'sc-file-row';
+    row.dataset.src = f.src;
+    row.innerHTML = `
+      <input type="checkbox" data-idx="${idx}" />
+      <span class="sc-file-name" title="${escapeHtml(f.src)}">${escapeHtml(filename)}</span>
+      <span class="sc-file-size">${_formatBytes(f.size)}</span>`;
+    row.querySelector('input').addEventListener('change', () => {
+      _syncSelectAll();
+      _updateScqDeleteBtn();
+    });
+    fileList.appendChild(row);
+  });
+
+  if (selectAll) {
+    selectAll.onchange = () => {
+      fileList.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = selectAll.checked);
+      _updateScqDeleteBtn();
+    };
+  }
+  if (confirmInput) confirmInput.oninput = _updateScqDeleteBtn;
+  if (deleteBtn)    deleteBtn.onclick = _handleSourceDelete;
+
+  overlay.classList.remove('hidden');
+}
+
+function _syncSelectAll() {
+  const list      = document.getElementById('scFileList');
+  const selectAll = document.getElementById('scSelectAll');
+  if (!list || !selectAll) return;
+  const all     = list.querySelectorAll('input[type="checkbox"]');
+  const checked = list.querySelectorAll('input[type="checkbox"]:checked');
+  selectAll.indeterminate = checked.length > 0 && checked.length < all.length;
+  selectAll.checked       = all.length > 0 && checked.length === all.length;
+}
+
+async function _handleSourceDelete() {
+  if (!_csqEligibleFiles || !_csqSourceRoot) return;
+  const list       = document.getElementById('scFileList');
+  const deleteBtn  = document.getElementById('scDeleteBtn');
+  const cancelBtn  = document.getElementById('scCancelBtn');
+  const resultArea = document.getElementById('scResultArea');
+  if (!list || !deleteBtn) return;
+
+  const checkedBoxes = list.querySelectorAll('input[type="checkbox"]:checked');
+  const toDelete = Array.from(checkedBoxes).map(cb => {
+    const idx = parseInt(cb.getAttribute('data-idx'), 10);
+    return _csqEligibleFiles[idx];
+  }).filter(Boolean);
+  if (!toDelete.length) return;
+
+  deleteBtn.disabled = true;
+  deleteBtn.textContent = 'Deleting…';
+  if (cancelBtn) cancelBtn.disabled = true;
+
+  try {
+    const { ok, results, error } = await window.api.deleteFromSource(toDelete, _csqSourceRoot);
+
+    if (!ok) {
+      if (resultArea) {
+        resultArea.style.display = '';
+        resultArea.innerHTML = `<div class="sc-result-err">Error: ${escapeHtml(error || 'Unknown error')}</div>`;
+      }
+      deleteBtn.textContent = 'Delete Selected';
+      deleteBtn.disabled = false;
+      if (cancelBtn) cancelBtn.disabled = false;
+      return;
+    }
+
+    let successCount = 0;
+    let failCount    = 0;
+    const lines = results.map(r => {
+      const name = (r.src || '').split(/[\\/]/).pop();
+      if (r.deleted) {
+        successCount++;
+        return `<div class="sc-result-ok">✓ ${escapeHtml(name)}</div>`;
+      }
+      failCount++;
+      return `<div class="sc-result-err">✗ ${escapeHtml(name)} — ${escapeHtml(r.error || 'Unknown')}</div>`;
+    });
+
+    // Remove deleted rows from DOM and update eligible set
+    const deletedSrcs = new Set(results.filter(r => r.deleted).map(r => r.src));
+    Array.from(checkedBoxes).forEach(cb => {
+      const idx = parseInt(cb.getAttribute('data-idx'), 10);
+      const f   = _csqEligibleFiles[idx];
+      if (f && deletedSrcs.has(f.src)) cb.closest('.sc-file-row').remove();
+    });
+    _csqEligibleFiles = _csqEligibleFiles.filter(f => !deletedSrcs.has(f.src));
+
+    // Surgically remove deleted files from the visible file grid
+    if (deletedSrcs.size > 0) {
+      currentFiles = currentFiles.filter(f => !deletedSrcs.has(f.path));
+      for (const srcPath of deletedSrcs) {
+        selectedFiles.delete(srcPath);
+        const tile = tileMap.get(srcPath);
+        if (tile) { tile.remove(); tileMap.delete(srcPath); }
+      }
+      updateSelectionBar();
+    }
+
+    // Show result summary
+    const summary = successCount > 0
+      ? `<div class="sc-result-ok" style="margin-bottom:6px;font-weight:600;">${successCount} file${successCount > 1 ? 's' : ''} removed from source${failCount > 0 ? `, ${failCount} failed` : ''}.</div>`
+      : '';
+    if (resultArea) {
+      resultArea.style.display = '';
+      resultArea.innerHTML = summary + lines.join('');
+    }
+
+    // Replace action row with a single Done button — no auto-close
+    const scActions = document.getElementById('sourceCleanupOverlay')?.querySelector('.sc-actions');
+    const confirmGate = document.getElementById('sourceCleanupOverlay')?.querySelector('.sc-confirm-gate');
+    const selectAllRow = document.getElementById('sourceCleanupOverlay')?.querySelector('.sc-select-all-row');
+    if (confirmGate)  confirmGate.style.display  = 'none';
+    if (selectAllRow) selectAllRow.style.display = 'none';
+    if (scActions) {
+      scActions.innerHTML = '';
+      const doneBtn = document.createElement('button');
+      doneBtn.className   = 'sc-btn-cancel';
+      doneBtn.textContent = 'Done';
+      doneBtn.onclick     = _closeSourceCleanup;
+      scActions.appendChild(doneBtn);
+    }
+
+    // If failures remain, re-enable for retry
+    if (failCount > 0) {
+      _syncSelectAll();
+      _updateScqDeleteBtn();
+    }
+  } catch (err) {
+    if (resultArea) {
+      resultArea.style.display = '';
+      resultArea.innerHTML = `<div class="sc-result-err">Error: ${escapeHtml(err.message)}</div>`;
+    }
+    deleteBtn.textContent = 'Delete Selected';
+    deleteBtn.disabled = false;
+    if (cancelBtn) cancelBtn.disabled = false;
+  }
+}
+
+function _closeSourceCleanup() {
+  const overlay = document.getElementById('sourceCleanupOverlay');
+  if (overlay) overlay.classList.add('hidden');
+  // State (_csqEligibleFiles, _csqSourceRoot) intentionally kept — cleared by
+  // progressDoneBtn or resetAppState, not here, so partial results survive Cancel.
+}
+
+// ── Space-bar Media Preview ────────────────────────────────────────────────
+// Phase 1: JPEG/PNG (full-res via files:getPreviewUrl), RAW (thumbnail via
+// getThumb), MP4/MOV (native <video>). Arrow navigation, Esc/Space to close.
+//
+// Phase 2 extension point: when rawPreviewService.js is available, replace the
+// getThumb call in _pvLoadContent (RAW branch) with:
+//   window.api.getRawPreview(file.path)
+//   → IPC → main/rawPreviewService.js → LibRaw embedded JPEG → cached file URL
+// No renderer changes needed beyond swapping that one call.
+
+function _isEditableTarget(el) {
+  if (!el) return false;
+  const t = el.tagName;
+  if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return true;
+  if (el.isContentEditable) return true;
+  return false;
+}
+
+// Ref.6 — centralised blocking-overlay check, future-safe
+function _isAnyBlockingOverlayOpen() {
+  if (document.getElementById('progressOverlay')?.classList.contains('visible')) return true;
+  if (document.getElementById('settingsModal')?.classList.contains('visible')) return true;
+  if (document.getElementById('onboardingOverlay')?.classList.contains('visible')) return true;
+  if (document.getElementById('helpOverlay')?.classList.contains('visible')) return true;
+  if (!document.getElementById('sourceCleanupOverlay')?.classList.contains('hidden')) return true;
+  if (typeof EventMgmt !== 'undefined' && EventMgmt.isOpen?.()) return true;
+  return false;
+}
+
+async function openPreview(filePath) {
+  if (_previewOpen) return;
+  if (!filePath) return;
+  if (_isAnyBlockingOverlayOpen()) return;    // Ref.6
+
+  const file = currentFiles.find(f => f.path === filePath);
+  if (!file) return;
+
+  _previewPath  = filePath;
+  _previewOrder = getRenderedPathOrder();
+  _previewOpen  = true;
+
+  const overlay    = document.getElementById('previewOverlay');
+  const pvContent  = document.getElementById('pvContent');
+  const pvFilename = document.getElementById('pvFilename');
+  const pvBadge    = document.getElementById('pvTypeBadge');
+
+  pvFilename.textContent = file.name;
+  pvBadge.textContent    = '';
+  pvBadge.className      = 'pv-badge';
+  pvContent.innerHTML    = '<div class="pv-loading">Loading…</div>';
+  overlay.classList.remove('hidden');
+
+  await _pvLoadContent(file, true);
+  _pvUpdateNav();
+
+  document.getElementById('pvCloseBtn').onclick = closePreview;
+  document.getElementById('pvPrevBtn').onclick  = () => navigatePreview(-1);
+  document.getElementById('pvNextBtn').onclick  = () => navigatePreview(1);
+}
+
+async function _pvLoadContent(file, autoplay = false) {
+  const pvContent = document.getElementById('pvContent');
+  const pvBadge   = document.getElementById('pvTypeBadge');
+  if (!pvContent || !pvBadge) return;
+
+  try {
+    if (file.type === 'video') {
+      const url = await window.api.getPreviewUrl(file.path);
+      if (!_previewOpen || _previewPath !== file.path) return;
+      if (!url) { pvContent.innerHTML = '<div class="pv-err">Preview unavailable</div>'; return; }
+      const vid = document.createElement('video');
+      vid.id        = 'pvVideo';
+      vid.controls  = true;
+      vid.preload   = 'metadata';
+      vid.className = 'pv-video';
+      vid.src = url;
+      pvContent.innerHTML = '';
+      pvContent.appendChild(vid);
+      pvBadge.textContent = 'Video';
+      pvBadge.className   = 'pv-badge pv-badge-video';
+
+      if (autoplay) {
+        vid.currentTime = 0;
+        const playPromise = vid.play();
+        if (playPromise) playPromise.catch(() => {});
+      }
+
+    } else if (file.type === 'raw') {
+      pvBadge.textContent = 'RAW';
+      pvBadge.className   = 'pv-badge pv-badge-raw';
+      pvContent.innerHTML = '<div class="pv-loading"><span class="pv-loading-label">RAW PREVIEW</span>Extracting high-quality preview…</div>';
+
+      const rawUrl = await window.api.getRawPreview(file.path);
+      if (!_previewOpen || _previewPath !== file.path) return;
+
+      let displayUrl = rawUrl;
+      let caption    = 'extracted preview';
+      if (!displayUrl) {
+        displayUrl = await window.api.getThumb(file.path);
+        if (!_previewOpen || _previewPath !== file.path) return;
+        caption = process.platform === 'win32' ? 'thumbnail preview (RAW codec not available)' : 'thumbnail preview';
+      }
+
+      if (!_pvRawImg) {
+        _pvRawImg = document.createElement('img');
+        _pvRawImg.className = 'pv-image';
+        _pvRawImg.onload = () => {
+          const MAX_PX = 1200;
+          if (_pvRawImg.naturalWidth > MAX_PX || _pvRawImg.naturalHeight > MAX_PX) {
+            _pvRawImg.style.maxWidth  = MAX_PX + 'px';
+            _pvRawImg.style.maxHeight = MAX_PX + 'px';
+          }
+        };
+      }
+      _pvRawImg.style.maxWidth  = '';
+      _pvRawImg.style.maxHeight = '';
+      _pvRawImg.alt             = file.name;
+      _pvRawImg.src             = displayUrl || '';
+      pvContent.innerHTML = '';
+      pvContent.appendChild(_pvRawImg);
+      const cap = document.createElement('div');
+      cap.className   = 'pv-raw-caption';
+      cap.textContent = caption;
+      pvContent.appendChild(cap);
+
+    } else {
+      // photo (JPEG / PNG — full resolution)
+      const url = await window.api.getPreviewUrl(file.path);
+      if (!_previewOpen || _previewPath !== file.path) return;
+      if (!url) { pvContent.innerHTML = '<div class="pv-err">Preview unavailable</div>'; return; }
+      const img = document.createElement('img');
+      img.className = 'pv-image';
+      img.alt       = file.name;
+      img.src       = url;
+      pvContent.innerHTML = '';
+      pvContent.appendChild(img);
+    }
+  } catch (err) {
+    if (!_previewOpen || _previewPath !== file.path) return;
+    pvContent.innerHTML = `<div class="pv-err">Error: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function _pvUpdateNav() {
+  const idx     = _previewOrder.indexOf(_previewPath);
+  const prevBtn = document.getElementById('pvPrevBtn');
+  const nextBtn = document.getElementById('pvNextBtn');
+  if (prevBtn) prevBtn.disabled = idx <= 0;
+  if (nextBtn) nextBtn.disabled = idx < 0 || idx >= _previewOrder.length - 1;
+}
+
+function closePreview() {
+  if (!_previewOpen) return;
+
+  // Stop and clear video to fully release media resources (Ref.5)
+  const vid = document.getElementById('pvVideo');
+  if (vid) { vid.pause(); vid.currentTime = 0; vid.removeAttribute('src'); vid.load(); }
+
+  _pvObjUrls.forEach(u => URL.revokeObjectURL(u));
+  _pvObjUrls = [];
+
+  _previewOpen  = false;
+  _previewPath  = null;
+  _previewOrder = [];
+
+  const overlay = document.getElementById('previewOverlay');
+  if (overlay) overlay.classList.add('hidden');
+}
+
+async function navigatePreview(dir) {
+  if (!_previewOpen || !_previewPath || !_previewOrder.length) return;
+
+  // Ref.2 — close gracefully if current path is no longer in the snapshot
+  // (e.g. Source Cleanup removed the file, or folder changed mid-preview)
+  if (!_previewOrder.includes(_previewPath)) { closePreview(); return; }
+
+  const idx = _previewOrder.indexOf(_previewPath);
+  if (idx === -1) return;
+  const next = idx + dir;
+  if (next < 0 || next >= _previewOrder.length) return;
+  const nextPath = _previewOrder[next];
+
+  // Ref.7 — skip redundant load on rapid key presses
+  if (nextPath === _previewPath) return;
+
+  const nextFile = currentFiles.find(f => f.path === nextPath);
+  if (!nextFile) return;
+
+  // Stop current video before switching (Ref.5)
+  const vid = document.getElementById('pvVideo');
+  if (vid) { vid.pause(); vid.currentTime = 0; vid.removeAttribute('src'); vid.load(); }
+
+  _previewPath = nextPath;
+
+  const pvContent  = document.getElementById('pvContent');
+  const pvFilename = document.getElementById('pvFilename');
+  const pvBadge    = document.getElementById('pvTypeBadge');
+  pvFilename.textContent = nextFile.name;
+  pvBadge.textContent    = '';
+  pvBadge.className      = 'pv-badge';
+  pvContent.innerHTML    = '<div class="pv-loading">Loading…</div>';
+
+  await _pvLoadContent(nextFile);
+  _pvUpdateNav();
+}
+
+// ── Preview keyboard handler ───────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (_isEditableTarget(document.activeElement)) return;
+
+  if (e.key === ' ') {
+    if (_previewOpen) { e.preventDefault(); e.stopPropagation(); closePreview(); return; }
+    // Ref.1 — fallback: lastClick → first selected → first file in view
+    const fp = lastClickedPath || [...selectedFiles][0] || currentFiles[0]?.path;
+    if (fp) { e.preventDefault(); e.stopPropagation(); openPreview(fp); }
+    return;
+  }
+
+  // ── Grid focus navigation (preview closed) ───────────────────────
+  if (!_previewOpen &&
+      (e.key === 'ArrowRight' || e.key === 'ArrowLeft' ||
+       e.key === 'ArrowDown'  || e.key === 'ArrowUp')) {
+    if (_isAnyBlockingOverlayOpen()) return;
+    const order = getRenderedPathOrder();
+    if (!order.length) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const nextPath = _arrowFocusTarget(e.key, order);
+    if (nextPath) {
+      _setPreviewFocus(nextPath);
+      tileMap.get(nextPath)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+    return;
+  }
+
+  if (!_previewOpen) return;
+
+  if (e.key === 'Escape')     { closePreview(); return; }
+  if (e.key === 'ArrowLeft')  { e.preventDefault(); e.stopPropagation(); navigatePreview(-1); return; }
+  if (e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); navigatePreview(1);  return; }
 });
 
 
@@ -3871,6 +4491,7 @@ document.getElementById('importBtn').addEventListener('click', async () => {
         files: [...group.files],
       })),
       source: _buildImportSourceMeta(),
+      importedBy: _activeUser ? { id: _activeUser.id, name: _activeUser.name } : null,
     };
 
     try {
@@ -3922,7 +4543,9 @@ document.getElementById('importBtn').addEventListener('click', async () => {
   showProgress();
 
   try {
-    const summary = await window.api.importFiles(uniqueFiles, finalDest);
+    const summary = await window.api.importFiles(uniqueFiles, finalDest, {
+      importedBy: _activeUser ? { id: _activeUser.id, name: _activeUser.name } : null,
+    });
     if (!activeSource) return; // workspace cleared (disconnect or eject) mid-import
     showProgressSummary(summary);
     await refreshDestCache();
@@ -4220,6 +4843,10 @@ document.getElementById('progressDoneBtn').addEventListener('click', () => {
   if (checksumBtn) checksumBtn.remove();
   const integrityRow = document.getElementById('sumIntegrity');
   if (integrityRow) integrityRow.remove();
+  const cleanupBtn = document.getElementById('scqOpenBtn');
+  if (cleanupBtn) cleanupBtn.remove();
+  _csqEligibleFiles = null;
+  _csqSourceRoot    = null;
   // PERF: sync badges in-place instead of re-rendering the entire grid
   // This preserves scroll position and avoids image reload
   if (currentFiles.length) syncImportedBadges();
@@ -4313,6 +4940,197 @@ async function initApp() {
   if (sidebar && viewModeType === 'media') sidebar.style.display = 'none';
 }
 
+// ════════════════════════════════════════════════════════════════
+// OPERATOR IDENTITY — in-app user switching via compact dropdown
+// ════════════════════════════════════════════════════════════════
+
+let _activeUser  = null;  // { id, name, role, initials }
+let _splashUsers = [];
+
+// ── Operator dropdown ──────────────────────────────────────────
+
+function _renderOpDropdownList() {
+  const list = document.getElementById('opDropdownList');
+  if (!list) return;
+  list.innerHTML = '';
+  _splashUsers.forEach(u => {
+    const item = document.createElement('div');
+    item.className = 'op-dropdown-item' + (u.id === _activeUser?.id ? ' op-active' : '');
+    item.setAttribute('role', 'menuitem');
+    item.dataset.userId = u.id;
+    item.innerHTML =
+      `<div class="op-dropdown-initials">${escapeHtml(u.initials || '?')}</div>` +
+      `<div class="op-dropdown-item-info">` +
+        `<div class="op-dropdown-item-name">${escapeHtml(u.name)}</div>` +
+        (u.role ? `<div class="op-dropdown-item-role">${escapeHtml(u.role)}</div>` : '') +
+      `</div>`;
+    item.addEventListener('click', async () => {
+      _closeOpDropdown();
+      if (u.id === _activeUser?.id) return;
+      try {
+        const updated = await window.api.setActiveUser(u.id);
+        _activeUser = updated;
+        updateOperatorIndicator();
+      } catch (err) {
+        console.error('[operator] setActiveUser failed:', err.message);
+      }
+    });
+    list.appendChild(item);
+  });
+}
+
+function _openOpDropdown() {
+  const dropdown = document.getElementById('operatorDropdown');
+  const switchBtn = document.getElementById('operatorSwitchBtn');
+  if (!dropdown || !switchBtn) return;
+  const rect  = switchBtn.getBoundingClientRect();
+  const vw    = document.documentElement.clientWidth;
+  const vh    = document.documentElement.clientHeight;
+  const GUTTER = 8;
+
+  // First pass: render (hidden) so we can measure natural size
+  dropdown.style.visibility = 'hidden';
+  dropdown.style.display    = '';
+  _renderOpDropdownList();
+
+  const dw = dropdown.offsetWidth;
+  const dh = dropdown.offsetHeight;
+
+  // Horizontal: right-align to button; clamp so left edge stays on-screen
+  let rightEdge = vw - rect.right;
+  if (rect.right - dw < GUTTER) rightEdge = vw - dw - GUTTER;
+  dropdown.style.right = rightEdge + 'px';
+  dropdown.style.left  = 'auto';
+
+  // Vertical: below button unless it clips bottom; flip above if needed
+  if (rect.bottom + 6 + dh + GUTTER > vh) {
+    dropdown.style.top    = 'auto';
+    dropdown.style.bottom = (vh - rect.top + 6) + 'px';
+  } else {
+    dropdown.style.top    = (rect.bottom + 6) + 'px';
+    dropdown.style.bottom = 'auto';
+  }
+
+  dropdown.style.visibility = '';
+  requestAnimationFrame(() => dropdown.classList.add('op-dropdown-visible'));
+}
+
+function _closeOpDropdown() {
+  const dropdown = document.getElementById('operatorDropdown');
+  if (!dropdown || dropdown.style.display === 'none') return;
+  dropdown.classList.remove('op-dropdown-visible');
+  dropdown.addEventListener('transitionend', () => { dropdown.style.display = 'none'; }, { once: true });
+}
+
+// ── Add-operator modal ─────────────────────────────────────────
+
+function _openAddUserModal() {
+  const modal    = document.getElementById('addUserModal');
+  const nameInp  = document.getElementById('addUserName');
+  const roleInp  = document.getElementById('addUserRole');
+  const errEl    = document.getElementById('addUserError');
+  const createBtn = document.getElementById('addUserCreateBtn');
+  if (!modal) return;
+  if (nameInp) nameInp.value = '';
+  if (roleInp) roleInp.value = '';
+  if (errEl)   { errEl.textContent = ''; errEl.style.display = 'none'; }
+  if (createBtn) { createBtn.disabled = false; createBtn.textContent = 'Create'; }
+  modal.style.display = '';
+  requestAnimationFrame(() => modal.classList.add('au-modal-visible'));
+  nameInp?.focus();
+}
+
+function _closeAddUserModal() {
+  const modal = document.getElementById('addUserModal');
+  if (!modal) return;
+  modal.classList.remove('au-modal-visible');
+  modal.addEventListener('transitionend', () => { modal.style.display = 'none'; }, { once: true });
+}
+
+async function _addUserCreate() {
+  const nameInp  = document.getElementById('addUserName');
+  const roleInp  = document.getElementById('addUserRole');
+  const errEl    = document.getElementById('addUserError');
+  const createBtn = document.getElementById('addUserCreateBtn');
+  const name = (nameInp?.value || '').trim();
+  if (!name) {
+    if (errEl) { errEl.textContent = 'Full name is required.'; errEl.style.display = ''; }
+    nameInp?.focus();
+    return;
+  }
+  if (errEl) errEl.style.display = 'none';
+  if (createBtn) { createBtn.disabled = true; createBtn.textContent = 'Creating…'; }
+  try {
+    const user = await window.api.createUser({ name, role: (roleInp?.value || '').trim() || null });
+    _splashUsers = (await window.api.listUsers()) || [];
+    _activeUser  = user;
+    updateOperatorIndicator();
+    _closeAddUserModal();
+  } catch (err) {
+    if (errEl) { errEl.textContent = err.message || 'Could not create profile.'; errEl.style.display = ''; }
+    if (createBtn) { createBtn.disabled = false; createBtn.textContent = 'Create'; }
+  }
+}
+
+// ── Wire all operator-switch interactions ──────────────────────
+
+function _wireSplashHandlers() {
+  const switchBtn = document.getElementById('operatorSwitchBtn');
+  const dropdown  = document.getElementById('operatorDropdown');
+
+  switchBtn?.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    if (importRunning) return;
+    if (dropdown && dropdown.style.display !== 'none') { _closeOpDropdown(); return; }
+    try { _splashUsers = (await window.api.listUsers()) || []; } catch { /* ignore */ }
+    _openOpDropdown();
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!dropdown || dropdown.style.display === 'none') return;
+    if (!dropdown.contains(e.target) && !switchBtn?.contains(e.target)) _closeOpDropdown();
+  });
+
+  document.getElementById('opAddUserBtn')?.addEventListener('click', () => {
+    _closeOpDropdown();
+    _openAddUserModal();
+  });
+
+  document.getElementById('addUserCreateBtn')?.addEventListener('click', _addUserCreate);
+  document.getElementById('addUserName')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') _addUserCreate();
+  });
+  document.getElementById('addUserCancelBtn')?.addEventListener('click', _closeAddUserModal);
+  document.getElementById('addUserModal')?.addEventListener('click', (e) => {
+    if (e.target === document.getElementById('addUserModal')) _closeAddUserModal();
+  });
+}
+
+async function initOperator() {
+  try {
+    const user = await window.api.getActiveUser();
+    if (user) _activeUser = user;
+    _splashUsers = (await window.api.listUsers()) || [];
+  } catch { /* ignore */ }
+  updateOperatorIndicator();
+  _wireSplashHandlers();
+}
+
+function updateOperatorIndicator() {
+  const initialsEl = document.getElementById('operatorInitials');
+  const nameEl     = document.getElementById('operatorName');
+  const switchBtn  = document.getElementById('operatorSwitchBtn');
+  if (_activeUser) {
+    if (initialsEl) initialsEl.textContent = _activeUser.initials || '?';
+    if (nameEl)     nameEl.textContent     = _activeUser.name || '—';
+    if (switchBtn)  switchBtn.disabled     = importRunning;
+  } else {
+    if (initialsEl) initialsEl.textContent = '—';
+    if (nameEl)     nameEl.textContent     = '—';
+  }
+}
+
+initOperator();
 initApp();
 
 // ════════════════════════════════════════════════════════════════
