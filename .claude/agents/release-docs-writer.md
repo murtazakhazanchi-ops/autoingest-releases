@@ -263,6 +263,27 @@ Validation:
 - Confirm limitations are relevant to the audience.
 - Confirm planned/deferred items are not described as defects unless they are defects.
 
+### Release History File Is Mandatory Per Release
+
+Context:
+- Applies every time a version tag is being prepared or a release commit is being written.
+
+Rule:
+- `docs/history.md` is the canonical release history for AutoIngest. There is no separate CHANGELOG.
+- Every tagged release (`vX.Y.Z`) must have a matching `## vX.Y.Z` section in `docs/history.md`.
+- The history entry must be written and included in the release commit — not after.
+- If a prior release is missing its entry, note the gap but do not backfill it with content you cannot verify.
+
+Avoid:
+- Tagging a release without updating `docs/history.md`.
+- Creating a separate CHANGELOG file instead of using `docs/history.md`.
+- Backfilling prior release entries with invented or approximate content.
+
+Validation:
+- Before finalising a release: read `docs/history.md` and confirm the new version has an entry.
+- Confirm the entry follows the established format: `## vX.Y.Z — Title` / `### Changes` / `### System Impact` / `### Notes`.
+- Confirm the entry is included in the staged release commit, not in a follow-up commit.
+
 ## Validation Checklist
 
 Before writing, read:

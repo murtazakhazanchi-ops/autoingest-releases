@@ -17,6 +17,32 @@ Rules:
 
 ---
 
+### 2026-05-02 — Release v0.8.1 Preparation
+
+Task type:
+- Feature Status / Release / Documentation
+
+What happened:
+- v0.8.0 was committed and tagged without adding an entry to `docs/history.md`. The gap was discovered during v0.8.1 release prep when `docs/history.md` still showed v0.7.4-dev as the latest entry.
+- v0.8.1 was the first release where `docs/history.md` was explicitly updated as part of the release commit.
+
+Reusable lesson:
+- `docs/history.md` is the canonical release history file for AutoIngest. Every tagged release must have a matching entry there. There is no separate CHANGELOG. If a prior release is missing its entry, note the gap rather than backfill it with invented content.
+
+Common failure mode:
+- Committing and tagging a release without appending to `docs/history.md`, leaving the version history permanently inconsistent.
+
+Preferred pattern:
+- During every release: read `docs/history.md`, append a new `## vX.Y.Z` section following the established format (Changes / System Impact / Notes), then include the doc update in the release commit.
+
+Promote to agents:
+- release-docs-writer.md
+
+Status:
+- Promoted
+
+---
+
 ## Entry Template
 
 ### YYYY-MM-DD — Task Name
