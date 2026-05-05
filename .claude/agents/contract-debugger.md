@@ -208,6 +208,75 @@ Validation:
 - Confirm user switching preserves intended workflow state.
 - Confirm Electron security settings remain unchanged.
 
+### exiftool-vendored Silent Write Failure via Boolean Tag Values
+
+Context:
+- Applies to any debugging session where `exifService` reports all files as failed, or metadata does not appear in any output files despite the write appearing to succeed.
+
+Rule:
+- `exiftool-vendored`'s `WriteTask.enc()` handles null, number, string, DateTime, Array, and Struct — but throws `Error: cannot encode <value>` for any other type, including JavaScript booleans. This error propagates as a rejected Promise from `et.write()`, causing every write in the batch to fail and set `status = 'error'` silently.
+- The symptom is total metadata failure across all files with no obvious log output — because `_processFile` catches the error and continues, and batch failures only surface via the badge/error event.
+- First thing to check when all metadata writes fail: inspect the tag object passed to `et.write()` for boolean values. XMP boolean fields must use string `'True'`/`'False'`, not JavaScript `true`/`false`.
+
+Avoid:
+- Assuming ExifTool process failure when all writes silently fail — the failure may be in `WriteTask.enc()` before ExifTool is ever contacted.
+- Debugging ExifTool startup or config when the real error is a type-encoding failure.
+
+Validation:
+- Enable `DEBUG_METADATA=1` to surface per-file readback.
+- Check the main-process console for `Write failed:` lines — the error message will say `cannot encode true` if this is the cause.
+- Inspect `_buildTags()` output for any value that is not a string, number, array of strings, or null.
+
+### Renderer `process.*` Reference as Cross-Platform Bug Signal
+
+Context:
+- Applies when diagnosing a `ReferenceError: process is not defined` or any renderer crash that appears only on Windows but not macOS.
+
+Rule:
+- With `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, the renderer has no Node `process` object.
+- On macOS, Electron partially shims `process`, masking the bug. On Windows it throws at runtime.
+- When a crash is Windows-only and the renderer is involved, grep for `process\.platform|process\.env` before inspecting anything else.
+- The fix is always: move the value into `preload.js` via `contextBridge.exposeInMainWorld` and access it as `window.api.<field>` in the renderer.
+
+Avoid:
+- Diagnosing Windows-only renderer crashes as Windows-specific environment issues before checking for `process.*` references.
+- Assuming the renderer code is correct because it works on macOS.
+
+Validation:
+- Confirm the crash trace references `process is not defined` or a property access on undefined `process`.
+- Confirm the offending renderer file contains `process\.platform` or `process\.env`.
+- Confirm fix routes the value through `contextBridge` in `preload.js`.
+- Confirm the renderer now uses `window.api.<field>`.
+
+### Escape Key Swallowed by INPUT Guard — Keyboard Handler Diagnostic
+
+Context:
+- Applies when diagnosing a bug where pressing Escape does not dismiss a modal when a text field inside the modal has focus.
+
+Rule:
+- A `keydown` handler that places an `INPUT/TEXTAREA/SELECT` early-return guard before the Escape check will silently swallow Escape whenever a form field has focus.
+- Escape is always an unconditional dismiss. It must be checked and handled before any form-field guard.
+- The form-field guard exists to prevent shortcuts like Ctrl+A, arrow nav, and similar typing-sensitive keys from firing while the user is typing — it must not block Escape.
+
+```js
+// Correct order:
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { dismissModal(); return; }      // runs even from inside inputs
+  const tag = document.activeElement?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  // ... other shortcuts
+});
+```
+
+Avoid:
+- Placing the Escape branch after the INPUT/TEXTAREA/SELECT guard.
+- Treating "Escape doesn't work in modal" as a focus or event-propagation problem before checking handler order.
+
+Validation:
+- Confirm the Escape branch appears before any form-field early-return guard.
+- Confirm pressing Escape while a text field inside the modal has focus dismisses the modal.
+- Confirm other shortcuts (Ctrl+A, arrow nav) still do not fire while typing.
+
 ## Validation Checklist
 
 Before debugging, read:

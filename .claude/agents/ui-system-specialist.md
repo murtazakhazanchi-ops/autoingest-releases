@@ -238,6 +238,168 @@ Validation:
 - Confirm any initialization logic moved inline is externalized to a `.js` file.
 - Confirm the app loads without CSP violations in the DevTools console.
 
+### Modal Result-State Transition Cleanup
+
+Context:
+- Applies to any modal that transitions from a pre-action state (file selector, confirm gate, list) to a result/completion state (deletion result, import complete, cleanup result).
+
+Rule:
+- When a modal enters a result state, every pre-action container element must be explicitly hidden (`display: none`), not just its children.
+- A container element that held a list, selector, or input will render as a ghost empty box if its children are removed but its own display is not reset.
+- The result state must enumerate and hide all pre-action elements unconditionally before rendering the result area.
+
+Avoid:
+- Hiding only interactive child elements (checkboxes, buttons) while leaving their parent container visible.
+- Assuming that removing a list's items collapses the list container.
+- Partial transitions that show a mix of pre-action UI and result UI simultaneously.
+
+Validation:
+- Confirm all pre-action containers (file list wrappers, confirm gates, select-all rows) are explicitly hidden in result-state code.
+- Confirm no empty box is visible in the result state.
+- Confirm result area renders without visual artifacts from the prior state.
+
+### Completion-State Modal Footer Composition
+
+Context:
+- Applies to import modal, cleanup modal, and any operation modal that has a success/completion state footer.
+
+Rule:
+- Completion-state footers must contain only success-path actions.
+- Debug, fallback, or error-recovery actions (e.g., "Report Issue") must not appear in the normal success footer.
+- The standard pattern is: secondary success actions on the left, primary Done on the right.
+- The Done button in a completion state must use the primary button style, not the cancel or outline style.
+
+Avoid:
+- Injecting debug or fallback buttons into a success footer because they are convenient to add in the same code block.
+- Using a cancel/outline style for the Done button in a result state.
+- Adding error-path actions to success-path footers.
+
+Validation:
+- Confirm the completion-state footer contains only success-path controls.
+- Confirm no debug or fallback buttons are present in the success footer.
+- Confirm the Done button uses the primary button style.
+- Confirm the error-state footer (if it exists) is the correct place for fallback actions.
+
+### Window Controls DOM Placement
+
+Context:
+- Applies to any renderer change that adds, moves, or resizes custom minimize/maximize/close controls in `renderer/index.html`.
+
+Rule:
+- Custom window controls must live inside the dedicated drag-region title bar element (`#appTitleBar`), not inside any content header (`#dashHeader` or equivalent).
+- `#appTitleBar` is `position: relative` with `-webkit-app-region: drag`. Controls inside it use `position: absolute; right: 0; top: 0; bottom: 0`.
+- Each control button must carry `-webkit-app-region: no-drag` (via `.wc-btn` or equivalent) so clicks are not eaten by the drag region.
+- On macOS, native traffic lights serve this role. Use `.is-mac .window-controls { display: none }` to hide the custom controls on macOS.
+
+Avoid:
+- Placing window controls inside `#dashHeader` or any content-area element — they will appear mid-layout on every content page.
+- Omitting `-webkit-app-region: no-drag` on control buttons — clicks will be swallowed by the drag region.
+- Showing custom controls on macOS where native traffic lights already exist.
+
+Validation:
+- Confirm window controls are inside `#appTitleBar`, not `#dashHeader` or other content containers.
+- Confirm each control button has `-webkit-app-region: no-drag`.
+- Confirm `.is-mac .window-controls { display: none }` (or equivalent guard) is present and effective.
+- Confirm controls do not appear inside the page content area on any platform.
+
+### Escape Key Must Precede the INPUT Guard in Keyboard Handlers
+
+Context:
+- Applies to any `keydown` handler that combines "do not intercept while typing" logic with modal or panel dismissal via Escape.
+
+Rule:
+- The Escape check must be the first branch in the handler, before any `INPUT/TEXTAREA/SELECT` early-return guard.
+- The form-field guard exists to prevent typing-sensitive shortcuts from firing while the user is typing — it must not block Escape.
+- Escape is always an unconditional modal dismiss regardless of which element has focus.
+
+```js
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { dismissModal(); return; }     // always runs, even from inputs
+  const tag = document.activeElement?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  // ... typing-sensitive shortcuts below
+});
+```
+
+Avoid:
+- Placing the Escape branch after the INPUT/TEXTAREA/SELECT guard.
+- Assuming modal keyboard behavior works correctly without testing with focus inside an input.
+
+Validation:
+- Confirm Escape appears before the form-field guard in every relevant `keydown` handler.
+- Confirm pressing Escape while a text field inside the modal has focus dismisses the modal.
+- Confirm typing-sensitive shortcuts still do not fire while a text field is focused.
+
+### HTML5 Drag-to-Reorder in Electron Renderer
+
+Context:
+- Applies when implementing reorderable list UI (e.g., EventCreator component rows) using HTML5 drag-and-drop in the renderer.
+
+Rule:
+- Set `draggable="true"` on the handle element only (not the card or row). This prevents the full card from being accidentally draggable from any touch point.
+- Wire `dragstart`, `dragend`, `dragover`, and `drop` events after each `innerHTML` rebuild — event delegation cannot handle `dragover`/`drop` reliably on dynamically reinserted nodes.
+- On drop: splice the source-of-truth array directly to reorder, then call the existing refresh function. Do not manipulate the DOM directly.
+- Scope a `_dragSrcId` variable inside the refresh function so it resets automatically on each re-render.
+- No external library is needed for this pattern.
+
+CSS required:
+```css
+.ec-comp-row.ec-drag-over  { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent); }
+.ec-comp-row.ec-dragging   { opacity: 0.45; }
+.ec-drag-handle            { cursor: grab; user-select: none; }
+.ec-drag-handle:active     { cursor: grabbing; }
+```
+
+Avoid:
+- Setting `draggable` on the full row/card — makes the entire card surface a drag initiator.
+- Wiring drag events before the `innerHTML` rebuild — listeners will be lost when the DOM is replaced.
+- Reordering by manipulating DOM node order instead of the source-of-truth array.
+
+Validation:
+- Confirm `draggable="true"` is on the handle element only.
+- Confirm drag events are wired after each `innerHTML` rebuild.
+- Confirm reorder is applied to the source-of-truth array and then re-rendered via the existing refresh function.
+- Confirm drag-over and dragging visual states appear and clear correctly.
+
+### Never Set Inline style.maxHeight on a Flex-Child Image
+
+Context:
+- Applies to preview modals, lightboxes, or any container where an image is a flex child and the container uses `flex: 1` or `min-height: 0` to control sizing.
+
+Rule:
+- Never assign `style.maxHeight` to an image element via JavaScript.
+- Inline styles override CSS constraints and will cause portrait images to overflow their container on viewports smaller than the hardcoded pixel value.
+- Use an explicit viewport-anchored CSS value instead: `max-height: calc(92vh - Xpx)` applied in the stylesheet.
+- `max-height: 100%` on a flex child is unreliable when the parent uses `flex: 1` without an explicit height — always prefer a viewport-based constraint.
+
+Avoid:
+- `img.style.maxHeight = '1200px'` (or any pixel value) in a JS `onload` handler.
+- Relying on `max-height: 100%` on a flex child inside a `flex: 1` parent without an explicit pixel or viewport anchor.
+
+Validation:
+- Confirm no JS `onload` or resize handler assigns `style.maxHeight` to an image inside a modal or preview container.
+- Confirm the image's `max-height` CSS value is viewport-anchored (e.g., `calc(92vh - 52px)`).
+- Confirm portrait images at small window heights do not overflow or get clipped by the container.
+
+### All Non-Submit Buttons Must Have type="button"
+
+Context:
+- Applies to every `<button>` element in renderer HTML that is not intended to submit a form: close buttons, cancel buttons, dismiss buttons, icon-only action buttons.
+
+Rule:
+- HTML `<button>` defaults to `type="submit"`. Any button without an explicit type that is inside or near a `<form>` element will submit the form when clicked.
+- Every close, dismiss, cancel, and non-submit action button must carry `type="button"`.
+- When auditing renderer HTML, grep for `<button` and verify each instance either has `type="button"` or is an intentional submit.
+
+Avoid:
+- Omitting `type="button"` from close/cancel buttons for brevity.
+- Assuming a button is safe because it does not look like a submit button visually.
+
+Validation:
+- Confirm every modal close button has `type="button"`.
+- Confirm every cancel/dismiss/action button that is not a form submit has `type="button"`.
+- Grep renderer HTML for `<button` missing an explicit `type=` attribute before closing a UI task.
+
 ### Light/Dark and Viewport Compatibility
 
 Context:

@@ -62,6 +62,7 @@ contextBridge.exposeInMainWorld('api', {
 
   // ── App info ──
   getVersion: () => require('../package.json').version,
+  platform:   process.platform,
 
   // ── Drives ──
   getDrives:       () => ipcRenderer.invoke('drives:get'),
@@ -183,6 +184,13 @@ contextBridge.exposeInMainWorld('api', {
   getLastEvent:             ()                       => ipcRenderer.invoke('settings:getLastEvent'),
   setLastEvent:             (v)                      => ipcRenderer.invoke('settings:setLastEvent', v),
   verifyLastEvent:          (collectionPath, eventFolderPath) => ipcRenderer.invoke('settings:verifyLastEvent', collectionPath, eventFolderPath),
+  getAutoMetadataEnabled:   ()                       => ipcRenderer.invoke('settings:getAutoMetadataEnabled'),
+  setAutoMetadataEnabled:   (v)                      => ipcRenderer.invoke('settings:setAutoMetadataEnabled', v),
+
+  // ── EXIF metadata service ──
+  getMetadataStatus:    (batchId)          => ipcRenderer.invoke('metadata:getStatus', batchId),
+  retryMetadata:        (batchId)          => ipcRenderer.invoke('metadata:retry', batchId),
+  onMetadataProgress:   (cb) => _register('metadata:progress', (_e, progress) => cb(progress)),
 
   // ── Event JSON (disk-backed event persistence) ──
   writeEventJson:   (eventFolderPath, eventData) => ipcRenderer.invoke('event:write',         eventFolderPath, eventData),

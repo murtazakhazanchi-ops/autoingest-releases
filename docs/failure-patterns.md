@@ -366,6 +366,53 @@ UI / FILESYSTEM
 
 ---
 
+## 14. Modal Close Button Triggers Unintended Action
+
+### Primary Layer
+UI
+
+### Symptoms
+- Closing a modal via its close button causes a form action to fire (e.g., submits a form, triggers a keyboard shortcut handler, or causes unexpected state change)
+- Closing is unreliable: sometimes works, sometimes produces side effects
+
+### Likely Cause
+- A `<button>` inside a modal lacks `type="button"`, causing the browser engine to default it to `type="submit"` when it is a descendant of a `<form>` element
+
+### First Check
+- Inspect the close button element: confirm presence of `type="button"` attribute
+- Confirm whether any ancestor in the DOM is a `<form>`
+
+### Fix
+- Add `type="button"` to every close, dismiss, and cancel button inside modals
+- See `docs/design-system.md` § Buttons for the enforced rule
+
+---
+
+## 15. `process is not defined` Error in Renderer (Electron Sandbox)
+
+### Primary Layer
+UI / IPC
+
+### Symptoms
+- `ReferenceError: process is not defined` thrown in renderer process
+- Platform-specific behavior missing or broken (e.g., Windows path separators, platform guards)
+- Error surface only on Windows or only in sandboxed environments
+
+### Likely Cause
+- Renderer code accesses `process.platform` or `process.env.*` directly
+- With `sandbox: true` and `contextIsolation: true`, `process` is not available in the renderer global scope
+
+### First Check
+- Search renderer code for direct `process.platform` or `process.env` references
+- Confirm `window.api` (contextBridge) exposes the needed value
+
+### Fix
+- Expose `platform` (and any other required process values) via `contextBridge.exposeInMainWorld` in `main/preload.js`
+- Access via `window.api.platform` in renderer code — never via `process` directly
+- See `CLAUDE.md` § Security Model for the enforced sandbox constraints
+
+---
+
 ## Usage Rule
 
 This file is a guide, not a shortcut.

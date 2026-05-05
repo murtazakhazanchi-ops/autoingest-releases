@@ -45,6 +45,7 @@ All UI must follow these rules.
   - primary
   - secondary
   - destructive
+- All close/dismiss buttons inside modals must carry `type="button"` — omitting this causes the browser engine to treat the button as a submit trigger inside any ancestor `<form>`, which can fire unintended form-submission side effects in Electron renderer contexts
 
 ---
 

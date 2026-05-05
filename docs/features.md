@@ -46,6 +46,7 @@ Use this as a reference before implementing or modifying any feature.
 
 **Description**
 - Builds event.json structure from user input
+- Component rows in the Create New Event panel support drag-to-reorder; dropping a row reorders `_eventComps` in-place and immediately refreshes the event name preview
 
 **System Impact**
 - DATA

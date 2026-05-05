@@ -349,8 +349,11 @@
     .header-section.date .icon { opacity: 0.75; }
     .header-section.archive .icon { opacity: 0.7; }
 
-    /* ── Window controls (Windows/Linux only) ─────────────────────── */
-    .window-controls { display: flex; align-items: stretch; }
+    /* ── Window controls (Windows/Linux only — lives in #appTitleBar) ──── */
+    .window-controls {
+      display: flex; align-items: stretch;
+      position: absolute; right: 0; top: 0; bottom: 0;
+    }
     .is-mac .window-controls { display: none; }
     .wc-btn {
       width: 46px; background: transparent; border: none;
@@ -1407,8 +1410,15 @@
     }
     .skip-reason-row { font-size: 0.68rem; color: var(--subtext); font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.8; }
     .skip-reason-failed { color: var(--red); opacity: 1; }
+    .metadata-badge {
+      display: inline-block; margin: 8px 0 0; padding: 3px 10px; border-radius: 8px;
+      font-size: 0.72rem; font-weight: 600; color: var(--subtext);
+      background: var(--bg-secondary); border: 1px solid var(--glass-border);
+    }
+    .metadata-badge--done  { color: var(--green); }
+    .metadata-badge--error { color: var(--red); }
     .im-actions {
-      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      display: flex; align-items: center; justify-content: space-between; gap: 18px;
       margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border-subtle);
     }
     .im-actions-left  { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; flex-wrap: wrap; }
@@ -1419,7 +1429,7 @@
       white-space: nowrap; line-height: 1; border-radius: 12px; box-sizing: border-box;
     }
     .im-btn-primary {
-      display: none; padding: 0 22px; min-width: 112px; flex-shrink: 0;
+      display: none; padding: 0 24px; min-width: 112px; flex-shrink: 0;
       font-size: 0.85rem; font-weight: 700;
       background: var(--blue); color: var(--bg); border: none;
       cursor: pointer; transition: opacity 0.12s;
@@ -2627,11 +2637,23 @@
   gap: 12px;
   transition: border-color 0.15s;
 }
+.ec-comp-row.ec-drag-over { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent); }
+.ec-comp-row.ec-dragging  { opacity: 0.45; }
+
+.ec-drag-handle {
+  display: flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; flex-shrink: 0;
+  color: var(--text-muted); cursor: grab; font-size: 13px;
+  border-radius: 4px; transition: color 0.12s, background 0.12s;
+  user-select: none;
+}
+.ec-drag-handle:hover { color: var(--text-secondary); background: var(--border-subtle); }
+.ec-drag-handle:active { cursor: grabbing; }
 
 .ec-comp-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 6px;
 }
 
 .ec-comp-label {
@@ -4295,7 +4317,7 @@
     overflow: hidden; position: relative;
   }
   .pv-image {
-    max-width: 100%; max-height: 100%;
+    max-width: 100%; max-height: calc(92vh - 52px);
     object-fit: contain; display: block;
     border-radius: 0 0 10px 10px;
   }
@@ -4347,12 +4369,12 @@
   .sc-modal {
     background: var(--card-bg);
     border: 1px solid var(--glass-border);
-    border-radius: 16px;
+    border-radius: 18px;
     padding: 26px 26px 22px;
     width: min(520px, calc(100vw - 32px));
     max-height: 82vh;
     display: flex; flex-direction: column; gap: 14px;
-    box-shadow: 0 16px 48px rgba(0,0,0,0.45);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.35);
   }
   .sc-title { font-size: 1rem; font-weight: 700; color: var(--text); margin: 0; }
   .sc-desc  { font-size: 0.79rem; color: var(--subtext); margin: 0; line-height: 1.55; }
@@ -4391,7 +4413,7 @@
     outline: none; transition: border-color 0.15s;
   }
   .sc-confirm-input:focus { border-color: var(--red); }
-  .sc-actions { display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
+  .sc-actions { display: flex; justify-content: flex-end; align-items: center; gap: 10px; padding-top: 16px; border-top: 1px solid var(--border-subtle); }
   .sc-sel-count { flex: 1; font-size: 0.75rem; color: var(--subtext); }
   .sc-btn-cancel {
     height: 36px; padding: 0 18px; border-radius: 10px;
@@ -4412,6 +4434,25 @@
   .sc-result { font-size: 0.78rem; line-height: 1.7; max-height: 120px; overflow-y: auto; }
   .sc-result-ok  { color: var(--green); }
   .sc-result-err { color: var(--red); }
+  /* Cleanup result state — shown after deletion completes */
+  .cleanup-result { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; font-weight: 700; }
+  .cleanup-result.success { color: var(--green); }
+  .cleanup-icon { display: inline-flex; align-items: center; flex-shrink: 0; }
+  .cleanup-icon--err { color: var(--red); }
+  .cleanup-file-list {
+    margin-top: 8px; max-height: 160px; overflow-y: auto;
+    padding: 8px; border-radius: 12px;
+    background: var(--bg-secondary); border: 1px solid var(--glass-border);
+  }
+  .cleanup-file-row { display: flex; align-items: center; gap: 8px; min-height: 28px; font-size: 0.78rem; color: var(--text); }
+  .cleanup-file-row--err { color: var(--red); }
+  .sc-btn-done {
+    height: 36px; padding: 0 22px; border-radius: 10px;
+    font-size: 0.82rem; font-weight: 700;
+    background: var(--blue); color: var(--bg); border: none;
+    cursor: pointer; transition: opacity 0.12s;
+  }
+  .sc-btn-done:hover { opacity: 0.85; }
 
   /* ── Startup Splash Overlay ──────────────────────────────────────────── */
   #loginSplash {
@@ -4721,9 +4762,14 @@
 </head>
 <body>
 
-  <!-- GLOBAL TITLE BAR — always visible, drag region, hosts version label -->
+  <!-- GLOBAL TITLE BAR — always visible, drag region, hosts version label and window controls -->
   <div id="appTitleBar">
     <span class="title-text">AutoIngest <span class="app-version" id="appVersion"></span></span>
+    <div class="window-controls">
+      <button class="wc-btn" id="minBtn" title="Minimize">&#8212;</button>
+      <button class="wc-btn" id="maxBtn" title="Maximize">&#9633;</button>
+      <button class="wc-btn" id="closeBtn" title="Close">&#10005;</button>
+    </div>
   </div>
 
   <!-- UPDATE BANNER — hidden until an update event fires -->
@@ -4839,13 +4885,6 @@
           <span class="operator-name-text" id="operatorName">—</span>
         </div>
         <button id="operatorSwitchBtn" class="operator-switch-btn" title="Switch operator">Switch</button>
-      </div>
-
-      <!-- WINDOW CONTROLS (Windows/Linux only) -->
-      <div class="window-controls">
-        <button class="wc-btn" id="minBtn" title="Minimize">&#8212;</button>
-        <button class="wc-btn" id="maxBtn" title="Maximize">&#9633;</button>
-        <button class="wc-btn" id="closeBtn" title="Close">&#10005;</button>
       </div>
 
     </div><!-- #dashHeader -->
@@ -5080,7 +5119,7 @@
       <!-- MODAL HEADER -->
       <div class="emm-header">
         <span id="ecTitle" class="emm-title">Select Event</span>
-        <button class="emm-close-btn" id="emmCloseBtn" aria-label="Close">
+        <button type="button" class="emm-close-btn" id="emmCloseBtn" aria-label="Close">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
@@ -5111,7 +5150,7 @@
       </div>
       <div class="emm-header">
         <span id="alTitle">Activity Log</span>
-        <button class="emm-close-btn" id="alCloseBtn" aria-label="Close">
+        <button type="button" class="emm-close-btn" id="alCloseBtn" aria-label="Close">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
@@ -5295,6 +5334,7 @@
         </div>
       </div>
       <div id="progressSkipDetails"></div>
+      <div id="metadataProgressBadge" class="metadata-badge" style="display:none"></div>
       <div class="im-actions">
         <div class="im-actions-left"></div>
         <div class="im-actions-right">
@@ -5398,7 +5438,7 @@
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
           Quick Reference
         </h3>
-        <button id="helpCloseBtn">✕</button>
+        <button type="button" id="helpCloseBtn" aria-label="Close">✕</button>
       </div>
       <div id="helpModalBody"><!-- filled by JS --></div>
     </div>
@@ -5418,7 +5458,7 @@
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
           Report an Issue
         </span>
-        <button id="feedbackPanelClose" aria-label="Close">✕</button>
+        <button type="button" id="feedbackPanelClose" aria-label="Close">✕</button>
       </div>
 
       <div id="feedbackPanelBody">
@@ -5595,7 +5635,7 @@
     <div class="settings-box">
       <div class="settings-header">
         <span class="settings-title">Settings</span>
-        <button id="settingsClose" class="settings-close-btn" aria-label="Close settings">
+        <button type="button" id="settingsClose" class="settings-close-btn" aria-label="Close settings">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
@@ -5639,7 +5679,7 @@
       <div class="pv-header">
         <span id="pvFilename" class="pv-filename"></span>
         <span id="pvTypeBadge" class="pv-badge"></span>
-        <button id="pvCloseBtn" class="pv-close" aria-label="Close preview">
+        <button type="button" id="pvCloseBtn" class="pv-close" aria-label="Close preview">
           <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>

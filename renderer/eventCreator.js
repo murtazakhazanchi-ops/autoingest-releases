@@ -1943,7 +1943,6 @@ ${unparseable.map(ev => `
   }
 
   function _buildCompRow(comp, index) {
-    console.log('UI EVENT TYPES:', comp.eventTypes);
     const canRemove  = _eventComps.length > 1;
     const chipsHTML  = comp.eventTypes.map((et, idx) => `
       <span class="ec-chip">
@@ -1953,9 +1952,10 @@ ${unparseable.map(ev => `
     return `
 <div class="ec-comp-row" data-comp-id="${comp.id}">
   <div class="ec-comp-header">
+    <span class="ec-drag-handle" title="Drag to reorder" aria-hidden="true">⠿</span>
     <span class="ec-comp-label">Component ${index + 1}</span>
     ${canRemove
-      ? `<button class="ec-comp-remove" data-comp-id="${comp.id}" aria-label="Remove component ${index + 1}">✕ Remove</button>`
+      ? `<button type="button" class="ec-comp-remove" data-comp-id="${comp.id}" aria-label="Remove component ${index + 1}">✕ Remove</button>`
       : ''}
   </div>
   <div class="ec-comp-fields">
@@ -2238,6 +2238,42 @@ ${unparseable.map(ev => `
     listEl.innerHTML = _eventComps.map((c, i) => _buildCompRow(c, i)).join('');
     _eventComps.forEach(comp => _mountCompDDs(comp));
     // Remove-button clicks handled by delegated listener on #ecBody — no per-button wiring needed.
+
+    // Wire drag-to-reorder on the drag handles.
+    let _dragSrcId = null;
+    listEl.querySelectorAll('.ec-comp-row[data-comp-id]').forEach(row => {
+      const handle = row.querySelector('.ec-drag-handle');
+      if (!handle) return;
+      handle.setAttribute('draggable', 'true');
+      handle.addEventListener('dragstart', e => {
+        _dragSrcId = Number(row.dataset.compId);
+        e.dataTransfer.effectAllowed = 'move';
+        row.classList.add('ec-dragging');
+      });
+      handle.addEventListener('dragend', () => {
+        row.classList.remove('ec-dragging');
+        listEl.querySelectorAll('.ec-comp-row').forEach(r => r.classList.remove('ec-drag-over'));
+      });
+      row.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        listEl.querySelectorAll('.ec-comp-row').forEach(r => r.classList.remove('ec-drag-over'));
+        row.classList.add('ec-drag-over');
+      });
+      row.addEventListener('drop', e => {
+        e.preventDefault();
+        const targetId = Number(row.dataset.compId);
+        if (_dragSrcId === null || _dragSrcId === targetId) return;
+        const fromIdx = _eventComps.findIndex(c => c.id === _dragSrcId);
+        const toIdx   = _eventComps.findIndex(c => c.id === targetId);
+        if (fromIdx === -1 || toIdx === -1) return;
+        const [moved] = _eventComps.splice(fromIdx, 1);
+        _eventComps.splice(toIdx, 0, moved);
+        _dragSrcId = null;
+        _refreshCompList();
+        _updateEventPreview();
+      });
+    });
   }
 
   // ── Event name builder ─────────────────────────────────────────────────────

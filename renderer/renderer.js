@@ -619,9 +619,7 @@ function safeSetImageSrc(img, src) {
     img.src = src;
     return;
   }
-  if (process.env.NODE_ENV === 'development') {
-    console.warn('[INVALID IMG SRC]', src);
-  }
+  console.warn('[INVALID IMG SRC]', src);
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -3870,24 +3868,6 @@ function showProgressSummary({ copied, skipped, errors, skippedReasons, failedFi
     actLeft.appendChild(checksumBtn);
   }
 
-  // ── Report Issue button (shown after every import) ─────────────────────────
-  // Removed after Done is clicked to keep the modal clean on next import.
-  if (actLeft && !modal.querySelector('#progressReportBtn')) {
-    const btn = document.createElement('button');
-    btn.id        = 'progressReportBtn';
-    btn.className = 'im-btn-tertiary';
-    btn.title     = 'Report an Issue';
-    btn.innerHTML = `<span class="icon">${SVG.flag}</span> Report Issue`;
-    btn.addEventListener('click', () => {
-      document.getElementById('progressOverlay').classList.remove('visible');
-      openFeedbackModal({
-        issueType:    errors > 0 ? 'Import Failure' : '',
-        importResult: `Copied: ${copied}  Skipped: ${skipped}  Failed: ${errors}`,
-      });
-    });
-    actLeft.appendChild(btn);
-  }
-
   // ── Clean Up Source button — only when files were copied ───────────────────
   if (actLeft && !modal.querySelector('#scqOpenBtn') && copiedFiles && copiedFiles.length > 0 && activeSource?.path) {
     _csqEligibleFiles = copiedFiles;
@@ -3903,6 +3883,82 @@ function showProgressSummary({ copied, skipped, errors, skippedReasons, failedFi
 }
 
 window.api.onImportProgress(updateProgress);
+
+// ── Metadata progress ─────────────────────────────────────────────────────────
+// Tracks the active metadata batch so the progress badge stays accurate.
+let _metaBatchId     = null;
+let _metaBatchTotal  = 0;
+let _metaBatchDone   = 0;
+let _metaBatchFailed = 0;
+
+window.api.onMetadataProgress((progress) => {
+  if (!progress || !progress.batchId) return;
+
+  if (progress.event === 'batch_start') {
+    _metaBatchId     = progress.batchId;
+    _metaBatchTotal  = progress.total || 0;
+    _metaBatchDone   = 0;
+    _metaBatchFailed = 0;
+    _renderMetadataBadge();
+    return;
+  }
+
+  if (progress.batchId !== _metaBatchId) return;
+
+  if (progress.event === 'file_done') {
+    _metaBatchDone   = progress.done   || 0;
+    _metaBatchFailed = progress.failed || 0;
+    _renderMetadataBadge();
+    return;
+  }
+
+  if (progress.event === 'batch_complete') {
+    _metaBatchDone   = progress.done   || 0;
+    _metaBatchFailed = progress.failed || 0;
+    _renderMetadataBadge();
+    return;
+  }
+
+  if (progress.event === 'batch_error') {
+    showMessage(`Metadata failed for ${progress.failed} file(s) — see red badge above`, 8000);
+  }
+});
+
+function _renderMetadataBadge() {
+  const badge = document.getElementById('metadataProgressBadge');
+  if (!badge) return;
+
+  if (!_metaBatchId || _metaBatchTotal === 0) {
+    badge.style.display = 'none';
+    return;
+  }
+
+  const finished = _metaBatchDone + _metaBatchFailed >= _metaBatchTotal;
+  const pct      = Math.floor((_metaBatchDone / _metaBatchTotal) * 100);
+
+  if (finished) {
+    if (_metaBatchFailed > 0) {
+      badge.textContent   = `Metadata: ${_metaBatchFailed} failed`;
+      badge.className     = 'metadata-badge metadata-badge--error';
+      badge.style.display = '';
+      badge.style.cursor  = 'pointer';
+      badge.onclick       = openActivityLogModal;
+    } else {
+      badge.textContent   = `Metadata: tagged ${_metaBatchDone}`;
+      badge.className     = 'metadata-badge metadata-badge--done';
+      badge.style.display = '';
+      badge.style.cursor  = '';
+      badge.onclick       = null;
+      setTimeout(() => { if (badge) badge.style.display = 'none'; }, 5000);
+    }
+  } else {
+    badge.textContent   = `Metadata: ${pct}%`;
+    badge.className     = 'metadata-badge';
+    badge.style.display = '';
+    badge.style.cursor  = '';
+    badge.onclick       = null;
+  }
+}
 
 window.api.onChecksumProgress(({ completed, total }) => {
   const btn = document.getElementById('runChecksumBtn');
@@ -4048,10 +4104,10 @@ async function _handleSourceDelete() {
       const name = (r.src || '').split(/[\\/]/).pop();
       if (r.deleted) {
         successCount++;
-        return `<div class="sc-result-ok">✓ ${escapeHtml(name)}</div>`;
+        return `<div class="cleanup-file-row"><span class="cleanup-icon">${SVG.check}</span><span>${escapeHtml(name)}</span></div>`;
       }
       failCount++;
-      return `<div class="sc-result-err">✗ ${escapeHtml(name)} — ${escapeHtml(r.error || 'Unknown')}</div>`;
+      return `<div class="cleanup-file-row cleanup-file-row--err"><span class="cleanup-icon cleanup-icon--err">${SVG.warn}</span><span>${escapeHtml(name)} — ${escapeHtml(r.error || 'Unknown')}</span></div>`;
     });
 
     // Remove deleted rows from DOM and update eligible set
@@ -4074,16 +4130,22 @@ async function _handleSourceDelete() {
       updateSelectionBar();
     }
 
-    // Show result summary
-    const summary = successCount > 0
-      ? `<div class="sc-result-ok" style="margin-bottom:6px;font-weight:600;">${successCount} file${successCount > 1 ? 's' : ''} removed from source${failCount > 0 ? `, ${failCount} failed` : ''}.</div>`
-      : '';
+    // Show structured result — summary + bounded file list
     if (resultArea) {
-      resultArea.style.display = '';
-      resultArea.innerHTML = summary + lines.join('');
+      const summaryText = successCount > 0
+        ? `${successCount} file${successCount > 1 ? 's' : ''} removed from source${failCount > 0 ? `, ${failCount} failed` : ''}.`
+        : failCount > 0 ? `${failCount} file${failCount > 1 ? 's' : ''} failed to remove.` : '';
+      const fileRows = lines.join('');
+      resultArea.style.display   = '';
+      resultArea.style.maxHeight = 'none';
+      resultArea.innerHTML =
+        `<div class="cleanup-result success"><span class="cleanup-icon">${SVG.check}</span><span>${escapeHtml(summaryText)}</span></div>` +
+        (fileRows ? `<div class="cleanup-file-list">${fileRows}</div>` : '');
     }
+    // Hide the pre-deletion file-selector list — it is empty or partially cleared
+    list.style.display = 'none';
 
-    // Replace action row with a single Done button — no auto-close
+    // Replace action row with a primary Done button — no auto-close
     const scActions = document.getElementById('sourceCleanupOverlay')?.querySelector('.sc-actions');
     const confirmGate = document.getElementById('sourceCleanupOverlay')?.querySelector('.sc-confirm-gate');
     const selectAllRow = document.getElementById('sourceCleanupOverlay')?.querySelector('.sc-select-all-row');
@@ -4092,7 +4154,7 @@ async function _handleSourceDelete() {
     if (scActions) {
       scActions.innerHTML = '';
       const doneBtn = document.createElement('button');
-      doneBtn.className   = 'sc-btn-cancel';
+      doneBtn.className   = 'sc-btn-done';
       doneBtn.textContent = 'Done';
       doneBtn.onclick     = _closeSourceCleanup;
       scActions.appendChild(doneBtn);
@@ -4221,23 +4283,14 @@ async function _pvLoadContent(file, autoplay = false) {
       if (!displayUrl) {
         displayUrl = await window.api.getThumb(file.path);
         if (!_previewOpen || _previewPath !== file.path) return;
-        caption = process.platform === 'win32' ? 'thumbnail preview (RAW codec not available)' : 'thumbnail preview';
+        caption = window.api.platform === 'win32' ? 'thumbnail preview (RAW codec not available)' : 'thumbnail preview';
       }
 
       if (!_pvRawImg) {
         _pvRawImg = document.createElement('img');
         _pvRawImg.className = 'pv-image';
-        _pvRawImg.onload = () => {
-          const MAX_PX = 1200;
-          if (_pvRawImg.naturalWidth > MAX_PX || _pvRawImg.naturalHeight > MAX_PX) {
-            _pvRawImg.style.maxWidth  = MAX_PX + 'px';
-            _pvRawImg.style.maxHeight = MAX_PX + 'px';
-          }
-        };
       }
-      _pvRawImg.style.maxWidth  = '';
-      _pvRawImg.style.maxHeight = '';
-      _pvRawImg.alt             = file.name;
+      _pvRawImg.alt = file.name;
       _pvRawImg.src             = displayUrl || '';
       pvContent.innerHTML = '';
       pvContent.appendChild(_pvRawImg);
@@ -4384,8 +4437,21 @@ document.getElementById('importBtn').addEventListener('click', async () => {
     }
 
     // If _eventComps was cleared (e.g. by resetToList while the event context remained),
+    // or reset to a blank placeholder (e.g. _tryCreateEvent calls setEventState([_makeComp()])
+    // to clear the form immediately after saving, before the user can trigger import),
     // re-read from disk so import always operates on fresh, validated session-format components.
-    if (!EventCreator.getEventComps().length) {
+    //
+    // Blank-placeholder detection: every component has empty eventTypes.
+    // _makeComp() always produces eventTypes:[] regardless of whether a global city is set,
+    // so city==null is NOT a reliable signal. The reliable signal is eventTypes being empty
+    // across all components: EventCreator's save-gate (line: "c.eventTypes.length === 0 || !c.city")
+    // blocks any disk-persisted event from having empty eventTypes, so this condition can only
+    // be true for an unsaved in-memory placeholder. Reloading for a genuinely-incomplete event
+    // (unresolved/legacy) is harmless — disk has the same data, validation still fires correctly.
+    const _preImportComps = EventCreator.getEventComps();
+    const _isBlankPlaceholder = _preImportComps.length > 0 &&
+      _preImportComps.every(c => !c.eventTypes?.length);
+    if (!_preImportComps.length || _isBlankPlaceholder) {
       const ok = await EventCreator.reloadForImport(eventData.eventPath);
       if (!ok) {
         console.error('[IMPORT] reloadForImport failed for', eventData.eventPath);
@@ -6067,14 +6133,15 @@ function _hideChordToast(delayMs) {
 }
 
 document.addEventListener('keydown', e => {
-  // Never intercept when the user is typing in a form field
-  const tag = document.activeElement?.tagName;
-  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-
+  // Escape dismisses modals even when focus is inside an input.
   if (e.key === 'Escape') {
     const sm = document.getElementById('settingsModal');
     if (sm?.classList.contains('visible')) { sm.classList.remove('visible'); return; }
   }
+
+  // Never intercept shortcuts when the user is typing in a form field.
+  const tag = document.activeElement?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
   if ((e.metaKey || e.ctrlKey) && e.key === 'g') {
     e.preventDefault();
