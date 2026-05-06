@@ -365,6 +365,45 @@
     .wc-btn:hover { background: var(--border-subtle); color: var(--text-secondary); }
     #closeBtn:hover { background: rgba(196,43,28,0.85); color: #fff; }
 
+    /* ── Title-bar Metadata Status Indicator ────────────────────── */
+    #metaTitleIndicator {
+      position: absolute;
+      right: 150px; /* clear 3 × 46px window-controls + 12px gap */
+      top: 50%; transform: translateY(-50%);
+      display: flex; align-items: center; gap: 5px;
+      padding: 2px 9px 2px 7px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      background: transparent;
+      cursor: pointer;
+      -webkit-app-region: no-drag;
+      font-size: 0.67rem; font-weight: 600;
+      letter-spacing: 0.03em;
+      color: var(--text-secondary);
+      transition: background 0.12s, border-color 0.12s, color 0.12s;
+      white-space: nowrap;
+      outline: none;
+    }
+    #metaTitleIndicator:hover {
+      background: var(--border-subtle);
+      border-color: var(--border);
+      color: var(--text-primary);
+    }
+    .is-mac #metaTitleIndicator { right: 8px; }
+    #metaTitleIndicator .mti-dot {
+      width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+      background: var(--green); transition: background 0.2s, box-shadow 0.2s;
+    }
+    #metaTitleIndicator[data-state="off"]       { opacity: 0.55; }
+    #metaTitleIndicator[data-state="off"]       .mti-dot { background: var(--text-muted); box-shadow: none; }
+    #metaTitleIndicator[data-state="idle"]      .mti-dot { background: var(--green); box-shadow: none; }
+    #metaTitleIndicator[data-state="running"]   .mti-dot { background: var(--blue); box-shadow: 0 0 5px color-mix(in srgb, var(--blue) 60%, transparent); }
+    #metaTitleIndicator[data-state="completed"] .mti-dot { background: var(--green); box-shadow: 0 0 6px color-mix(in srgb, var(--green) 55%, transparent); }
+    #metaTitleIndicator[data-state="applied"]   .mti-dot { background: var(--green); box-shadow: none; }
+    #metaTitleIndicator[data-state="outdated"]  .mti-dot { background: #f59e0b; box-shadow: 0 0 5px rgba(245,158,11,0.5); }
+    #metaTitleIndicator[data-state="partial"]   .mti-dot { background: #f59e0b; box-shadow: 0 0 5px rgba(245,158,11,0.5); }
+    #metaTitleIndicator[data-state="failed"]    .mti-dot { background: var(--red); box-shadow: 0 0 5px color-mix(in srgb, var(--red) 55%, transparent); }
+
     /* ── Content container ─────────────────────────────────────────── */
     .dash-container { max-width: 1680px; width: 100%; margin: 0 auto; padding: var(--space-6) 32px var(--space-2); display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
 
@@ -789,6 +828,7 @@
     /* drive-card-large and #noDriveMsg styled in landing dashboard section above */
 
     /* ── ACTIVITY LOG MODAL ──────────────────────── */
+    #activityLogModal .emm-box { height: calc(100vh - 80px); }
     #alTitle { font-size: 18px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.01em; }
     #alBody {
       flex: 1; overflow-y: auto; padding: 20px 20px 22px;
@@ -805,6 +845,7 @@
     }
     .al-summary-stat { display: inline-flex; align-items: center; gap: 5px; }
     .al-summary-stat svg { opacity: 0.55; flex-shrink: 0; }
+    .al-summary-muted { font-size: 11px; font-weight: 400; color: var(--text-muted); }
     .al-divider { height: 1px; background: var(--border-subtle); margin: 0 0 14px; }
     .al-section-label {
       font-size: 11px; letter-spacing: 0.05em; color: var(--text-muted);
@@ -847,7 +888,13 @@
     .al-summary-warn { font-weight: 600; color: #a16207; }
     .al-entry-quality { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
     .al-entry-source  { font-size: 11px; color: var(--text-muted); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .al-verify-area { padding-top: 14px; }
+    /* ── Action row token — consistent spacing for section-level action areas ── */
+    .al-action-row,
+    .al-verify-area,
+    .al-reapply-area {
+      margin-top: 20px; padding-top: 12px; padding-bottom: 8px;
+      border-top: 1px solid var(--border-subtle);
+    }
     .al-verify-btn {
       font-size: 12px; font-weight: 500; color: var(--text-secondary);
       background: none; border: 1px solid var(--border); border-radius: 8px;
@@ -884,6 +931,114 @@
     }
     .al-picker-select:hover { border-color: var(--blue); }
     .al-picker-select:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 2px color-mix(in srgb, var(--blue) 18%, transparent); }
+    /* ── Activity Log tabs ─────────────────────── */
+    .al-tab-nav {
+      display: flex; gap: 2px; padding: 0 0 10px;
+      border-bottom: 1px solid var(--border-subtle);
+      margin-bottom: 14px; flex-wrap: wrap;
+    }
+    .al-tab-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 4px 10px; border-radius: 6px; border: none;
+      background: transparent; cursor: pointer;
+      font-size: 12px; font-weight: 500; color: var(--text-muted);
+      transition: background 0.12s, color 0.12s;
+    }
+    .al-tab-btn:hover { background: var(--bg-secondary); color: var(--text-secondary); }
+    .al-tab-btn--active { background: var(--bg-secondary); color: var(--text-primary); }
+    .al-tab-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 16px; height: 16px; padding: 0 4px;
+      border-radius: 8px; font-size: 10px; font-weight: 700; line-height: 1;
+      background: rgba(239,68,68,0.15); color: #dc2626;
+    }
+    .al-panel { display: none; }
+    .al-tabs[data-active="all"]      .al-panel[data-tabs~="all"]      { display: block; }
+    .al-tabs[data-active="import"]   .al-panel[data-tabs~="import"]   { display: block; }
+    .al-tabs[data-active="metadata"] .al-panel[data-tabs~="metadata"] { display: block; }
+    .al-tabs[data-active="cleanup"]  .al-panel[data-tabs~="cleanup"]  { display: block; }
+    .al-tabs[data-active="errors"]   .al-panel[data-tabs~="errors"]   { display: block; }
+    .al-panel--section { border-top: 1px solid var(--border-subtle); padding-top: 14px; margin-top: 4px; }
+    .al-section-sublabel { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin: 12px 0 6px; }
+    .al-section-sublabel:first-child { margin-top: 0; }
+    .al-section-note { font-size: 11.5px; color: var(--text-muted); margin: 0 0 10px; }
+    .al-inline-empty { font-size: 12.5px; color: var(--text-muted); margin: 0; padding: 4px 0; }
+    .al-meta-summary {
+      display: flex; flex-wrap: wrap; gap: 6px 14px;
+      font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;
+    }
+    .al-meta-status {
+      font-size: 12px; font-weight: 500; padding: 4px 9px;
+      border-radius: 5px; display: inline-block; margin-bottom: 10px;
+      background: var(--bg-secondary); color: var(--text-secondary);
+    }
+    .al-meta-status--ok    { background: rgba(34,197,94,0.1);  color: #15803d; }
+    .al-meta-status--error { background: rgba(239,68,68,0.1);  color: #dc2626; }
+    .al-entry--error { border-color: rgba(239,68,68,0.25); background: rgba(239,68,68,0.04); }
+    .al-retry-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      margin-top: 14px; padding: 5px 12px;
+      border-radius: 6px; border: 1px solid rgba(239,68,68,0.35);
+      background: rgba(239,68,68,0.08); color: #dc2626;
+      font-size: 12px; font-weight: 500; cursor: pointer;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .al-retry-btn:hover:not(:disabled) { background: rgba(239,68,68,0.14); border-color: rgba(239,68,68,0.55); }
+    .al-retry-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+    .al-reapply-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 12px;
+      border-radius: 6px; border: 1px solid var(--border-subtle);
+      background: var(--bg-secondary); color: var(--text-secondary);
+      font-size: 12px; font-weight: 500; cursor: pointer;
+      transition: background 0.12s, border-color 0.12s, color 0.12s;
+    }
+    .al-reapply-btn:hover:not(:disabled) { background: var(--border-subtle); color: var(--text-primary); border-color: var(--border-strong); }
+    .al-reapply-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    /* ── Metadata status card ─── */
+    .al-meta-status-card { margin-bottom: 10px; gap: 10px 14px; }
+    .al-status-dot {
+      width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; display: inline-block;
+    }
+    .al-status-dot--applied  { background: #22c55e; box-shadow: 0 0 5px rgba(34,197,94,0.45); }
+    .al-status-dot--partial  { background: #f59e0b; box-shadow: 0 0 5px rgba(245,158,11,0.45); }
+    .al-status-dot--failed   { background: #ef4444; box-shadow: 0 0 5px rgba(239,68,68,0.45); }
+    .al-status-dot--running  { background: var(--accent); }
+    .al-status-dot--outdated { background: #f59e0b; box-shadow: 0 0 5px rgba(245,158,11,0.45); }
+    .al-outdated-hint { font-size: 11.5px; color: var(--text-muted); margin: -4px 0 6px; line-height: 1.5; }
+    .al-status-label { font-size: 12.5px; font-weight: 600; color: var(--text-primary); }
+
+    /* ── Reapply inline confirm ─ */
+    .al-reapply-confirm-msg {
+      font-size: 12px; color: var(--text-secondary); margin: 0 0 10px; line-height: 1.55;
+    }
+    .al-reapply-confirm-btns { display: flex; gap: 8px; }
+    .al-reapply-confirm-cancel {
+      padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border-subtle);
+      background: transparent; color: var(--text-muted);
+      font-size: 12px; font-weight: 500; cursor: pointer;
+      transition: background 0.12s, color 0.12s;
+    }
+    .al-reapply-confirm-cancel:hover { background: var(--border-subtle); color: var(--text-secondary); }
+    .al-reapply-confirm-go {
+      padding: 5px 12px; border-radius: 6px; border: 1px solid var(--accent-border);
+      background: var(--accent-hover); color: var(--accent);
+      font-size: 12px; font-weight: 500; cursor: pointer;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .al-reapply-confirm-go:hover { background: var(--accent-tint); border-color: var(--accent-border-sel); }
+
+    /* ── Metadata grouping breakdown (Activity Log) ─── */
+    .al-breakdown { margin: 8px 0 4px; display: flex; flex-direction: column; gap: 3px; }
+    .al-breakdown-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      padding: 4px 8px; border-radius: 6px;
+      background: color-mix(in srgb, var(--surface3) 60%, transparent);
+      font-size: 11px;
+    }
+    .al-breakdown-tag { color: var(--text-primary); font-weight: 600; }
+    .al-breakdown-count { color: var(--text-muted); flex-shrink: 0; }
 
     /* ── WORKSPACE ─────────────────────────────── */
     #workspace { display: none; flex: 1; overflow: hidden; flex-direction: column; }
@@ -3545,6 +3700,47 @@
     }
     .gp-add-card-btn:hover { border-color: var(--green); color: var(--green); }
 
+    /* ── METADATA GROUP HINT ─────────────────────────────────── */
+    #metaGroupHint {
+      display: none; flex-shrink: 0;
+      align-items: center; gap: 7px;
+      padding: 6px 16px;
+      background: color-mix(in srgb, var(--blue) 7%, transparent);
+      border-top: 1px solid color-mix(in srgb, var(--blue) 14%, transparent);
+      font-size: 0.71rem; color: var(--subtext);
+    }
+    #metaGroupHint.visible { display: flex; }
+    #metaGroupHint strong { color: var(--text-primary); font-weight: 600; }
+    #metaGroupHint svg { flex-shrink: 0; opacity: 0.55; }
+
+    /* ── METADATA GROUP PANEL EXTRAS ─────────────────────────── */
+    .gp-subtitle {
+      padding: 4px 14px 8px; font-size: 0.67rem;
+      color: var(--subtext); line-height: 1.45;
+      border-bottom: 1px solid var(--border-subtle, var(--border)); flex-shrink: 0;
+    }
+    .gc-metatag-area {
+      padding: 5px 12px 4px 16px;
+      display: flex; flex-direction: column; gap: 3px;
+      border-bottom: 1px solid var(--border-subtle, var(--border));
+    }
+    .gc-meta-trigger {
+      flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 4px;
+      padding: 4px 8px;
+      background: var(--glass-bg-3, var(--surface3));
+      border: 1px solid var(--glass-border, var(--border-subtle, var(--border)));
+      border-radius: 6px; color: var(--subtext); font-size: 0.72rem;
+      font-family: inherit; cursor: pointer; outline: none; text-align: left;
+      transition: border-color 0.12s, color 0.12s;
+    }
+    .gc-meta-trigger:hover {
+      border-color: var(--group-color, var(--accent)); color: var(--text);
+    }
+    .gc-meta-trigger.assigned {
+      color: var(--text);
+      border-color: color-mix(in srgb, var(--group-color, var(--accent)) 40%, transparent);
+    }
+
     /* ── GROUP BADGE on tiles ─────────────────────────────────── */
     .grp-badge {
       display: none; /* legacy; icon-view uses .file-group-badge instead */
@@ -4765,6 +4961,13 @@
   <!-- GLOBAL TITLE BAR — always visible, drag region, hosts version label and window controls -->
   <div id="appTitleBar">
     <span class="title-text">AutoIngest <span class="app-version" id="appVersion"></span></span>
+    <button id="metaTitleIndicator" type="button"
+            title="Auto-metadata enabled — click for details"
+            aria-label="Metadata status"
+            data-state="idle">
+      <span class="mti-dot"></span>
+      <span id="mtiLabel">Metadata: On</span>
+    </button>
     <div class="window-controls">
       <button class="wc-btn" id="minBtn" title="Minimize">&#8212;</button>
       <button class="wc-btn" id="maxBtn" title="Maximize">&#9633;</button>
@@ -5119,9 +5322,6 @@
       <!-- MODAL HEADER -->
       <div class="emm-header">
         <span id="ecTitle" class="emm-title">Select Event</span>
-        <button type="button" class="emm-close-btn" id="emmCloseBtn" aria-label="Close">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
       </div>
 
       <!-- BODY — EventCreator renders here -->
@@ -5150,9 +5350,6 @@
       </div>
       <div class="emm-header">
         <span id="alTitle">Activity Log</span>
-        <button type="button" class="emm-close-btn" id="alCloseBtn" aria-label="Close">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
       </div>
       <div id="alPickerRow" class="al-picker-row"></div>
       <div id="alBody"></div>
@@ -5263,6 +5460,11 @@
       </div>
     </div>
 
+    <!-- Metadata grouping hint — shown before first group in metadata grouping mode -->
+    <div id="metaGroupHint">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span>Use groups to assign keywords to files. This will not change folder structure. <strong>Right-click</strong> or <strong>⌘G</strong>.</span>
+    </div>
     <!-- Import footer -->
     <div id="importFooter">
       <button id="importBtn">

@@ -257,6 +257,213 @@ Status:
 
 ---
 
+### 2026-05-05 — Event Management Modal X Button Removal and Hijri Date Async Prefill
+
+Task type:
+- UI / Renderer / Modal / Keyboard Accessibility / Form Prefill / Async IPC
+
+What happened:
+
+**Part A — Remove emmCloseBtn from Event Management modal:**
+`emmCloseBtn` was removed from `#eventMgmtModal` in `renderer/index.html`, its click listener was removed from `renderer/renderer.js`, and its lazy DOM ref `$closeBtn` was removed from `renderer/eventMgmt.js`. A code-reviewer agent caught a third-file fix needed: `eventMgmt.js` used `$closeBtn()` as the focus fallback in `open()`. When the button was removed from the DOM, `$closeBtn()` returned `null`. Optional chaining prevented a crash but silently dropped focus on modal open — a keyboard accessibility regression. Fix: replaced `$closeBtn()` with `document.getElementById('emmBackBtn')`, which is persistently present in the footer.
+
+**Part B — Prefill "Create New Event" Hijri date with today:**
+Synchronous `coll?.hijriDate` fallback was replaced with async `window.api.getTodayDate()` IPC call. Two guards were added: module-level (`if (_newEventDate) return` before the `.then()` writes) to prevent clobbering user edits if IPC resolves after interaction, and field-level (`if (yEl && !yEl.value)`) to avoid overwriting partial user input. `_updateEventPreview()` is called inside `.then()` to sync the preview after async fill. All navigation-out paths reset `_newEventDate` to `null` to allow a fresh prefill on next entry.
+
+Reusable lessons:
+
+1. **Removing a modal close/X button requires searching all JS files for focus fallback references to its element ID.** Click listeners and HTML are the obvious targets; `open()` focus management in the module is easily missed. Grep for the element ID across the full renderer directory before closing the task.
+
+2. **Focus fallback in a modal's `open()` must always target a persistently rendered element.** The Back/Done button in the footer is a reliable fallback. The modal X button is not — it may be conditionally absent. If the fallback element is removed, the modal will silently drop focus on open, causing a keyboard accessibility regression.
+
+3. **Async form prefill in a re-entrant modal requires two guards and a preview trigger.** Module-state guard (`if (_newEventDate) return`) prevents duplicate IPC writes on re-entry. DOM-value guard (`if (el && !el.value)`) prevents overwriting partial user input. `_updateEventPreview()` call inside `.then()` keeps the preview in sync. Both guards are required — neither alone is sufficient.
+
+Common failure modes:
+- Removing a modal button from HTML and its click listener but missing its use as a focus fallback in the same or a related JS module.
+- Using a conditionally rendered modal element (X button) as a focus target instead of a persistent footer element.
+- Adding only a module-state guard for async prefill without checking the DOM field value (leaves partial input vulnerable to clobber on slow IPC).
+- Forgetting to call `_updateEventPreview()` after async write to the date fields.
+
+Preferred patterns:
+- After removing any modal DOM element: grep for its ID across all renderer JS files before closing the task.
+- Modal `open()` focus fallback: `document.getElementById('emmBackBtn')` or equivalent persistent footer element.
+- Async prefill: `if (moduleState) return; ipc.then(() => { if (moduleState) return; if (el && !el.value) el.value = val; triggerPreview(); })`.
+
+Promote to agents:
+- ui-system-specialist.md (focus fallback must target persistent element; async prefill two-guard pattern)
+- contract-debugger.md (removing DOM element → search all JS for focus fallback references)
+
+Status:
+- Promoted
+
+---
+
+### 2026-05-05 — Activity Log Tabbed UI, Source Cleanup Tracking, and Retry Failed Metadata
+
+Task type:
+- UI / Renderer / IPC / Feature
+
+What happened:
+
+**Activity Log tab architecture:**
+Added five filter tabs (All / Import / Metadata / Source Cleanup / Errors) using `<div class="al-tabs" data-active="all">` as the container. Panel visibility is driven entirely by CSS: `[data-active="tab"] .al-panel[data-tabs~="tab"] { display: block }`. No per-panel JS class toggling. `_wireAlTabs()` sets `tabs.dataset.active` on button click. `_alLastImportEntries` is cached from each `_renderActivityLogBody()` call so live panel refreshes during background ops can access import data synchronously.
+
+Source cleanup results are captured in a session-ephemeral module-level variable `_scLastBatch = { deleted, failed, timestamp, errors }` set inside the cleanup IPC result handler — the same approach as `_metaBatch*`. Volatile op results that don't belong in event.json use module-level state.
+
+**Retry Failed Metadata button:**
+`Retry Failed` button appears in the Metadata panel when `_metaBatchFailed > 0`. Click handler: disables the button immediately and sets "Retrying…" text — it does NOT re-enable the button on IPC return. After retry, the existing `onMetadataProgress` listener fires `batch_complete` and `batch_error` (because `retryFailed()` re-enqueues on the same batch, which re-satisfies the total). `_refreshAlMetadataPanel()` and `_refreshAlErrorsPanel()` are called from those branches, rebuilding the button in the correct enabled/hidden state from fresh `_metaBatch*` state.
+
+Reusable lessons:
+
+1. **Data-attribute CSS tabs for modal panels**: Use `data-active` on the container and `data-tabs~=` whitespace-token matching on panels. CSS handles all visibility; JS only updates `dataset.active`. No per-panel toggle logic needed.
+
+2. **IPC async action buttons: disable on click, let the IPC listener re-render**: The click handler disables the button and shows loading text. The button's re-enabled or removed state comes from the panel refresh triggered by the progress listener (`batch_complete`, `batch_error`). Never re-enable the button from the click handler's success path — by the time the listener fires, the panel has already been rebuilt with the correct state.
+
+3. **Live modal panel refresh via IPC progress listener**: When a modal panel reflects the state of a background operation, hook the refresh call into the existing IPC listener branches. Guard with `classList.contains('open')` before touching the DOM. Cache any async data (import entries) from the initial render so live refreshes are synchronous.
+
+Common failure modes:
+- Toggling panel visibility with per-panel JS class changes instead of using `data-active` + `data-tabs~=` CSS.
+- Re-enabling an async action button in the IPC call's success/catch path — the panel refresh rebuilds the correct button state; a second re-enable races with that.
+- Calling `body.innerHTML = _renderActivityLogBody(...)` on every `file_done` progress event — resets tab state and re-renders all panels on every file.
+
+Promote to agents:
+- ui-system-specialist.md (data-attribute tab panels; IPC async button disabled-guard; live panel refresh pattern)
+
+Status:
+- Promoted
+
+---
+
+### 2026-05-05 — Metadata Reapply: IPC Handler, Per-File Photographer, and Reapply UI
+
+Task type:
+- Metadata / IPC / ExifService / Renderer / UI / Feature
+
+What happened:
+
+**Task 1 — `metadata:reapplyEvent` IPC handler (main/main.js):**
+New IPC handler scans the destination folder structure, discovers files, builds synthetic `copiedFiles` where `src === dest`, and calls `exifService.applyBatch()`. `resolvePhotographer(filePath, baseDir)` derives photographer from `path.relative(baseDir, f).split(path.sep)[0]` — always the photographer folder segment, depth-independent.
+
+**Task 2 — Per-file photographer in exifService (main/exifService.js):**
+Backward-compatible extension: `copiedFiles[i].photographer` stored in `fileStatuses` at batch-start, read in `_processFile` via `file.photographer != null ? file.photographer : context.photographer`. Propagated through `retryFailed()`. Callers that do not set `.photographer` on file objects continue to work via context fallback.
+
+**Task 3 — Status state, summary card, reapply confirm (renderer/renderer.js + renderer/index.html):**
+- `_computeMetaStatus()` — pure function deriving `idle`/`running`/`applied`/`partial`/`failed` from four module-level state variables. Status is never stored; always derived on call.
+- `_metaBatchTimestamp` — epoch ms, cleared on `batch_start`, set on `batch_complete`.
+- `REAPPLY_CONFIRM_THRESHOLD = 50` — estimated file count threshold from `_alLastImportEntries.reduce()`.
+- Inline confirm pattern: swaps `#alReapplyArea` `innerHTML` on Confirm click; Cancel restores via `_refreshAlMetadataPanel()`; Confirm calls `_doReapply()` directly. No modal overlay required.
+- Summary card reuses `.al-summary-row` design-system card pattern.
+
+**Bugs caught:**
+
+1. **Per-file photographer regression** — `context.photographer` (single string) would be applied to all files during reapply. Fix: per-file `.photographer` property on `copiedFiles[]`, stored in `fileStatuses`, read in `_processFile` with context fallback for callers that omit it.
+2. **Undefined CSS variables** — `.al-reapply-btn:hover` used `--bg-tertiary` and `--border-hover`, which are not defined in the theme. Fixed by switching to `--border-subtle` / `--border-strong`.
+
+Reusable lessons:
+
+1. **Per-file property propagation on exifService batch objects requires a three-point change: set on the file object before batch-start, store in `fileStatuses` during batch-start, read in `_processFile` with context fallback.** Callers that omit the per-file property continue to work via fallback — backward-compatible by design. Must also propagate through `retryFailed()`.
+
+2. **Derive operation status from state variables via a pure function; never store derived status as its own variable.** A pure `_computeMetaStatus()` reading `_metaBatchRunning`, `_metaBatchTotal`, `_metaBatchFailed`, `_metaBatchTimestamp` removes the risk of status/state desync. Call it fresh on each render.
+
+3. **Inline confirm pattern for large-operation UI: swap the action area's `innerHTML`, restore via the panel refresh function on Cancel.** No modal overlay is needed for simple confirm/cancel flows within a panel. Cancel must use the existing panel refresh function (not a manual restore) so the panel state is always consistent.
+
+4. **Verify CSS custom property names against the actual theme before shipping any new style rule.** Using `--bg-tertiary` or `--border-hover` without confirming they exist in the theme will silently produce no-op hover states (transparent/no border change). Check against `renderer/theme.css` or equivalent.
+
+Common failure modes:
+- Applying `context.photographer` (a single string) to all files in a reapply batch instead of per-file photographer derived from folder structure.
+- Storing derived status as a module-level variable and failing to update it in every code path that changes state.
+- Writing a custom restore path for inline confirm/cancel instead of reusing the panel refresh function.
+- Using CSS variable names that look plausible but are undefined in the actual theme.
+
+Preferred patterns:
+- Per-file property on batch object: `copiedFiles[i].photographer = resolvePhotographer(...)` → `fileStatuses[i].photographer = file.photographer` → `_processFile` reads `file.photographer != null ? file.photographer : context.photographer`.
+- Derived status: `function _computeMetaStatus() { if (_metaBatchRunning) return 'running'; ... }` — no stored status variable.
+- Inline confirm: `area.innerHTML = confirmHtml` on action button click; Cancel button calls `_refreshAlMetadataPanel()`.
+
+Promote to agents:
+- autoingest-architect.md (per-file property propagation pattern for exifService batches)
+- ui-system-specialist.md (derived status pure function; inline confirm pattern; CSS token verification)
+
+Status:
+- Promoted
+
+---
+
+### 2026-05-06 — Activity Log Tab Content Separation
+
+Task type:
+- UI / Renderer
+
+What happened:
+- The Import tab was showing metadata summary content. Root cause: `_refreshAlMetadataPanel()` used `.al-panel[data-tabs~="metadata"]`, which matched the shared header panel (`data-tabs="all import metadata cleanup errors"`) first in DOM order because the header panel appears before the metadata content panel and also contains the token "metadata". The metadata section content was written into the header panel, which shows on all tabs (including Import). The same bug existed in `_refreshAlErrorsPanel()` using `.al-panel[data-tabs~="errors"]`.
+- The import section content was built entirely inline inside `_renderActivityLogBody()` (~80 lines), making it impossible to audit quickly which content belongs to which tab.
+
+Reusable lessons:
+1. **Shared-token header panels cause querySelector collisions.** The Activity Log header panel (`data-tabs="all import metadata cleanup errors"`) is a `.al-panel` that contains every tab's token. Any `querySelector('.al-panel[data-tabs~="<tab>"]')` will match the header first in DOM order. Refresh functions must use `.al-panel--section[data-tabs~="<tab>"]` — the header lacks `al-panel--section`, so the modifier class provides the selector specificity needed to skip it.
+2. **One `_build<X>Section()` function per tab section.** Inline section builds inside `_renderActivityLogBody()` make tab content boundaries invisible and hard to audit. Each section belongs in a named builder function, matching the existing `_buildMetadataSection()`, `_buildSourceCleanupSection()`, and `_buildErrorsSection()` pattern. Import content must be in `_buildImportSection(summary, issueCount)`.
+
+Common failure modes:
+- Writing `.al-panel[data-tabs~="X"]` in a panel refresh function without checking whether the header panel also carries the token "X" — it does for every tab.
+- Placing section HTML inline inside the body-render function and assuming content isolation is maintained by surrounding structure.
+
+Preferred patterns:
+- Panel refresh selector: `.al-panel--section[data-tabs~="metadata"]`, `.al-panel--section[data-tabs~="errors"]`.
+- Section builder: `function _buildImportSection(summary, issueCount) { ... }` called in `_renderActivityLogBody()` template.
+
+Promote to agents:
+- ui-system-specialist.md (selector specificity rule for Activity Log refresh; section builder per tab rule)
+- code-reviewer.md (validation check: Activity Log refresh function selector specificity)
+
+Status:
+- Promoted
+
+---
+
+### 2026-05-06 — Metadata Summary Persistence: Folder-vs-File Path and EISDIR Silent Failure
+
+Task type:
+- Persistence / Debugging / IPC / Event System
+
+What happened:
+
+**Root cause — `_writeLastMetadataRun` receiving a folder path:**
+`_writeLastMetadataRun(eventJsonPath, ...)` was called from the import-triggered metadata path with `eventJsonPath` holding the event folder path (not the `event.json` file path). Inside `_writeLastMetadataRun`, `fsp.readFile(eventJsonFilePath, 'utf8')` received the folder path and threw `EISDIR`. That error was silently caught by the surrounding try/catch with only a log line. The caller received no indication of failure, so `lastMetadataRun` and `metadataSummary` were never written to `event.json` after successful import-triggered metadata runs.
+
+The reapply path (the reference/correct path) already passed `path.join(folderPath, 'event.json')` — a file path.
+
+**Fix 1 — Correct call site (main/main.js ~line 801):**
+Changed from passing `eventJsonPath` (folder) to passing `path.join(eventJsonPath, 'event.json')` (file).
+
+**Fix 2 — Atomic write:**
+`_writeLastMetadataRun` was using a non-atomic `fsp.writeFile`. Upgraded to the tmp/rename pattern consistent with all other event.json writers.
+
+Reusable lessons:
+
+1. **Folder-vs-file path mismatch at persistence call sites.** IPC handlers that hold a folder path (`eventFolderPath`, `eventJsonPath`) must construct the full file path with `path.join(folderPath, 'event.json')` before passing to any persistence function whose parameter is named `*FilePath` or `*JsonPath`. Passing the folder silently fails via EISDIR.
+
+2. **EISDIR silent failure pattern.** Any persistence function that opens a file path will silently fail if given a directory. The symptom is: fields that should be present in `event.json` after a successful operation are simply absent — no user-visible error, no crash. Diagnosis: check whether the call site is passing a folder path to a function expecting a file path.
+
+3. **Atomic write required for all event.json mutations.** The tmp/rename pattern must be used consistently. Non-atomic `fsp.writeFile` is always wrong for `event.json` writers.
+
+Common failure modes:
+- A variable named `eventJsonPath` or `eventFolderPath` at the IPC handler level is the folder, not the file — passing it directly to a persistence function expecting a file path.
+- Assuming a try/catch with a log line will surface a persistence failure visibly.
+- Using non-atomic `writeFile` in a new or modified `event.json` writer.
+
+Preferred patterns:
+- Call site: `_writeLastMetadataRun(path.join(eventFolderPath, 'event.json'), ...)`.
+- Function signature: parameter named `eventJsonFilePath` (not `eventJsonPath`) signals a file, not a folder.
+- Diagnosis: when expected fields are absent from `event.json` after a successful operation, check the path type passed to the persistence function.
+
+Promote to agents:
+- event-data-guardian.md (folder-vs-file path mismatch; atomic write rule)
+- contract-debugger.md (EISDIR silent failure as a diagnostic pattern)
+
+Status:
+- Promoted
+
+---
+
 ## Entry Template
 
 ### YYYY-MM-DD — Task Name

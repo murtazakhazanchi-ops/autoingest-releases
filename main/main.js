@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, screen, Menu } = require('electron');
 const path = require('path');
 const os   = require('os');
 const fs   = require('fs');
@@ -20,6 +20,10 @@ const autoUpdater   = require('../services/autoUpdater');
 const settings      = require('../services/settings');
 const userManager   = require('./userManager');
 const { validateEventJson } = require('./contracts/dataValidator');
+const exifService   = require('./exifService');
+
+// ── Platform ─────────────────────────────────────────────────────────────────
+const isMac = process.platform === 'darwin';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const POLL_INTERVAL_MS = 5000;
@@ -128,8 +132,9 @@ function createMainWindow() {
     minHeight: 700,
     center:    !savedBounds,
     show:      false,
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 16, y: 8 },
+    ...(isMac
+      ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 16, y: 8 } }
+      : { frame: false }),
     resizable: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -192,6 +197,7 @@ let pollHandle = null;
 let _splashWin = null;
 
 app.whenReady().then(() => {
+  if (!isMac) Menu.setApplicationMenu(null);
   log('App started');
   loadImportIndex();
   settings.init();
@@ -213,6 +219,7 @@ app.on('window-all-closed', () => {
   perf.stop();
   telemetry.flush().catch(() => {});
   shutdownWorkers();
+  exifService.shutdown().catch(() => {});
   if (pollHandle) clearInterval(pollHandle);
   if (process.platform !== 'darwin') app.quit();
 });
@@ -603,6 +610,44 @@ function buildAuditImportEntries(auditContext = {}) {
   return logs;
 }
 
+async function _writeLastMetadataRun(eventJsonFilePath, batchStats, contextGroups) {
+  const { done = 0, failed = 0, skipped = 0 } = batchStats;
+  const status = failed === 0 ? 'applied' : (done > 0 || skipped > 0) ? 'partial' : 'failed';
+  const lastMetadataRun = {
+    timestamp: new Date().toISOString(),
+    status,
+    processed: done,
+    failed,
+    skipped,
+    metadataVersion: 1,
+  };
+  const taggedGroups = Array.isArray(contextGroups)
+    ? contextGroups.filter(g => Array.isArray(g.metadataTags))
+    : [];
+  const metadataSummary = taggedGroups.length > 0
+    ? taggedGroups.map(g => ({
+        tag: g.metadataTags.length === 0 ? 'No component tag' : g.metadataTags.join(' + '),
+        fileCount: Array.isArray(g.files) ? g.files.length : 0,
+      }))
+    : null;
+  try {
+    const raw = await fsp.readFile(eventJsonFilePath, 'utf8');
+    const doc = JSON.parse(raw);
+    doc.lastMetadataRun = lastMetadataRun;
+    if (metadataSummary) doc.metadataSummary = metadataSummary;
+    const tmp = eventJsonFilePath + '.tmp';
+    try {
+      await fsp.writeFile(tmp, JSON.stringify(doc, null, 2), 'utf8');
+      await fsp.rename(tmp, eventJsonFilePath);
+    } catch (writeErr) {
+      try { await fsp.unlink(tmp); } catch {}
+      throw writeErr;
+    }
+  } catch (err) {
+    log(`[main] Failed to persist lastMetadataRun to ${path.basename(eventJsonFilePath)}: ${err.message}`);
+  }
+}
+
 ipcMain.handle('import:commitTransaction', async (event, {
   fileJobs,
   eventJsonPath,
@@ -659,6 +704,26 @@ ipcMain.handle('import:commitTransaction', async (event, {
     const logs = buildAuditImportEntries(auditContext);
     result.auditLogs = logs;
 
+    // Build metadataGroups for reapply: map dest-relative paths → metadataTags.
+    // Only populated when at least one group carries an explicit metadataTags array.
+    let metadataGroupsForDisk = null;
+    if (Array.isArray(groups) && groups.some(g => Array.isArray(g.metadataTags)) && result.copiedFiles?.length > 0) {
+      const srcToTags = new Map();
+      for (const g of groups) {
+        if (!Array.isArray(g.metadataTags)) continue;
+        for (const src of (g.files || [])) srcToTags.set(path.normalize(src), g.metadataTags);
+      }
+      const buckets = new Map(); // JSON(tags) → { metadataTags, relPaths }
+      for (const cf of result.copiedFiles) {
+        const tags = srcToTags.get(path.normalize(cf.src));
+        if (!Array.isArray(tags)) continue;
+        const key = JSON.stringify(tags);
+        if (!buckets.has(key)) buckets.set(key, { metadataTags: tags, relPaths: [] });
+        if (eventJsonPath) buckets.get(key).relPaths.push(path.relative(eventJsonPath, cf.dest));
+      }
+      if (buckets.size > 0) metadataGroupsForDisk = Array.from(buckets.values());
+    }
+
     if (eventJsonPath) {
       // Single atomic write: merge audit logs + set lastImport + set status:'complete'.
       // All three fields are updated in one read/merge/write cycle to eliminate the
@@ -701,6 +766,7 @@ ipcMain.handle('import:commitTransaction', async (event, {
 
       doc.status    = 'complete';
       doc.updatedAt = Date.now();
+      if (metadataGroupsForDisk) doc.metadataGroups = metadataGroupsForDisk;
 
       const tmp = jsonPath + '.tmp';
       try {
@@ -710,6 +776,35 @@ ipcMain.handle('import:commitTransaction', async (event, {
         try { await fsp.unlink(tmp); } catch {}
         throw new Error(`Event finalization failed: ${err.message}`);
       }
+    }
+
+    // Post-import EXIF metadata hook — fire-and-forget; never blocks the response.
+    // Context is derived from event.json (originalEventJson) + import results,
+    // not from transient renderer UI state (liveComps is intentionally excluded).
+    if (settings.getAutoMetadataEnabled() && result.copiedFiles?.length > 0) {
+      const batchId = result.auditLogs?.[0]?.id || Date.now().toString(36);
+      const win = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
+      const metaContext = {
+        photographer:   photographer || '',
+        eventName:      eventJsonPath ? path.basename(eventJsonPath) : '',
+        collName:       collName || '',
+        hijriDate:      originalEventJson?.hijriDate || null,
+        groups:         groups || [],
+        diskComponents: originalEventJson?.components || [],
+      };
+      const baseEmit = win
+        ? (p) => { if (!win.isDestroyed()) win.webContents.send('metadata:progress', p); }
+        : null;
+      const emitFn = baseEmit
+        ? async (p) => {
+            if (p.event === 'batch_complete' && eventJsonPath)
+              await _writeLastMetadataRun(path.join(eventJsonPath, 'event.json'), p, metaContext.groups);
+            baseEmit(p);
+          }
+        : null;
+
+      exifService.applyBatch(batchId, result.copiedFiles, metaContext, emitFn);
+      result.metadataBatchId = batchId;
     }
 
     return result;
@@ -1391,6 +1486,13 @@ ipcMain.handle('settings:setLastEvent', async (_event, value) => {
   return { ok: true };
 });
 
+ipcMain.handle('settings:getAutoMetadataEnabled', () => settings.getAutoMetadataEnabled());
+
+ipcMain.handle('settings:setAutoMetadataEnabled', async (_event, value) => {
+  await settings.setAutoMetadataEnabled(value);
+  return { ok: true };
+});
+
 // Checks that the collection folder (and optionally the event folder) still
 // exist on disk. Returns false if either is missing or inaccessible.
 ipcMain.handle('settings:verifyLastEvent', async (_event, collectionPath, eventFolderPath) => {
@@ -1406,6 +1508,180 @@ ipcMain.handle('settings:verifyLastEvent', async (_event, collectionPath, eventF
     } catch { return false; }
   }
   return true;
+});
+
+// ── EXIF metadata service ─────────────────────────────────────────────────────
+
+ipcMain.handle('metadata:getStatus', (_event, batchId) => {
+  return exifService.getBatchStatus(batchId);
+});
+
+ipcMain.handle('metadata:retry', async (_event, batchId) => {
+  const win = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
+  const emitFn = win
+    ? (progress) => { if (!win.isDestroyed()) win.webContents.send('metadata:progress', progress); }
+    : null;
+  // Context is taken from the stored batch state (event.json-derived), not from the renderer.
+  exifService.retryFailed(batchId, emitFn);
+  return { ok: true };
+});
+
+ipcMain.handle('metadata:getLastRun', async (_event, eventFolderPath) => {
+  if (!eventFolderPath || typeof eventFolderPath !== 'string') return null;
+  try {
+    const raw = await fsp.readFile(path.join(eventFolderPath, 'event.json'), 'utf8');
+    const doc = JSON.parse(raw);
+    if (!doc.lastMetadataRun) return null;
+    return {
+      ...doc.lastMetadataRun,
+      metadataSummary: Array.isArray(doc.metadataSummary) ? doc.metadataSummary : null,
+    };
+  } catch {
+    return null;
+  }
+});
+
+ipcMain.handle('metadata:reapplyEvent', async (_event, eventFolderPath) => {
+  if (!eventFolderPath || typeof eventFolderPath !== 'string') {
+    return { ok: false, error: 'Invalid path' };
+  }
+
+  let eventJson;
+  try {
+    const raw = await fsp.readFile(path.join(eventFolderPath, 'event.json'), 'utf8');
+    eventJson = JSON.parse(raw);
+  } catch {
+    return { ok: false, error: 'Could not read event.json' };
+  }
+
+  const components      = Array.isArray(eventJson?.components) ? eventJson.components : [];
+  const hijriDate       = eventJson?.hijriDate || null;
+  const imports         = Array.isArray(eventJson?.imports) ? eventJson.imports : [];
+  // Fallback photographer used when path derivation yields an empty segment.
+  const fallbackPhotographer = imports.length > 0 ? (imports[imports.length - 1].photographer || '') : '';
+  const eventName       = path.basename(eventFolderPath);
+  const collName        = path.basename(path.dirname(eventFolderPath));
+  const isMulti         = components.length > 1;
+  // Persisted metadata grouping: relPath → metadataTags[], built from last grouping import.
+  const savedMetaGroups = Array.isArray(eventJson?.metadataGroups) ? eventJson.metadataGroups : null;
+
+  const cfg        = require('../config/app.config');
+  const MEDIA_EXTS = new Set([...cfg.PHOTO_EXTENSIONS, ...cfg.VIDEO_EXTENSIONS]);
+
+  async function scanMediaDir(dir, depth) {
+    if (depth > 8) return [];
+    let entries;
+    try { entries = await fsp.readdir(dir, { withFileTypes: true }); } catch { return []; }
+    const files = [];
+    for (const e of entries) {
+      if (e.name.startsWith('.')) continue;
+      const fullPath = path.join(dir, e.name);
+      if (e.isDirectory()) {
+        files.push(...(await scanMediaDir(fullPath, depth + 1)));
+      } else if (e.isFile()) {
+        const ext = path.extname(e.name).toLowerCase();
+        if (MEDIA_EXTS.has(ext)) files.push(fullPath);
+      }
+    }
+    return files;
+  }
+
+  // Resolve photographer from archive folder structure.
+  // Single-component:  eventFolder/<photographer>/[VIDEO/]filename
+  // Multi-component:   eventFolder/<comp>/<photographer>/[VIDEO/]filename
+  // In both cases the photographer segment is always parts[0] relative to baseDir.
+  function resolvePhotographer(filePath, baseDir) {
+    const rel   = path.relative(baseDir, filePath);
+    const parts = rel.split(path.sep);
+    const seg   = parts.length > 1 ? parts[0] : '';
+    return seg || fallbackPhotographer;
+  }
+
+  const groups      = [];
+  const copiedFiles = [];
+
+  if (!isMulti) {
+    const rawFiles = await scanMediaDir(eventFolderPath, 0);
+
+    if (savedMetaGroups) {
+      // Reconstruct per-tag groups from the persisted mapping so reapply writes
+      // the same keyword assignments that were chosen during the original import.
+      const relToTags = new Map();
+      for (const mg of savedMetaGroups) {
+        if (!Array.isArray(mg.metadataTags)) continue;
+        for (const relPath of (mg.relPaths || [])) {
+          relToTags.set(path.normalize(relPath), mg.metadataTags);
+        }
+      }
+      const buckets  = new Map(); // JSON(tags) → files[]
+      const noTagFiles = [];
+      for (const f of rawFiles) {
+        const rel  = path.normalize(path.relative(eventFolderPath, f));
+        const tags = relToTags.get(rel);
+        if (Array.isArray(tags)) {
+          const key = JSON.stringify(tags);
+          if (!buckets.has(key)) buckets.set(key, { tags, files: [] });
+          buckets.get(key).files.push(f);
+        } else {
+          noTagFiles.push(f);
+        }
+      }
+      let gid = 1;
+      for (const [, { tags, files }] of buckets) {
+        groups.push({ id: `meta-${gid++}`, subEventId: null, files, metadataTags: tags });
+      }
+      if (noTagFiles.length > 0) {
+        groups.push({ id: 'meta-untagged', subEventId: null, files: noTagFiles, metadataTags: null });
+      }
+    } else {
+      groups.push({ id: 'root', subEventId: null, files: rawFiles });
+    }
+
+    for (const f of rawFiles) {
+      copiedFiles.push({ src: f, dest: f, photographer: resolvePhotographer(f, eventFolderPath) });
+    }
+  } else {
+    for (const comp of components) {
+      if (!comp.folderName) continue;
+      const compDir  = path.join(eventFolderPath, comp.folderName);
+      const rawFiles = await scanMediaDir(compDir, 0);
+      if (rawFiles.length === 0) continue;
+      groups.push({ id: comp.folderName, subEventId: comp.folderName, files: rawFiles });
+      for (const f of rawFiles) {
+        copiedFiles.push({ src: f, dest: f, photographer: resolvePhotographer(f, compDir) });
+      }
+    }
+  }
+
+  if (copiedFiles.length === 0) {
+    return { ok: false, error: 'No eligible media files found in event folder' };
+  }
+
+  const batchId = `reapply-${Date.now().toString(36)}`;
+  const win     = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
+  const reapplyContext = {
+    photographer:   fallbackPhotographer,
+    eventName,
+    collName,
+    hijriDate,
+    groups,
+    diskComponents: components,
+  };
+  const reapplyEventJsonPath = path.join(eventFolderPath, 'event.json');
+  const baseEmit = win
+    ? (p) => { if (!win.isDestroyed()) win.webContents.send('metadata:progress', p); }
+    : null;
+  const emitFn = baseEmit
+    ? async (p) => {
+        if (p.event === 'batch_complete')
+          await _writeLastMetadataRun(reapplyEventJsonPath, p, reapplyContext.groups);
+        baseEmit(p);
+      }
+    : null;
+
+  exifService.applyBatch(batchId, copiedFiles, reapplyContext, emitFn);
+
+  return { ok: true, batchId };
 });
 
 // ── List manager ──────────────────────────────────────────────────────────────
@@ -1506,7 +1782,7 @@ ipcMain.handle('files:deleteFromSource', async (_event, files, sourceRoot) => {
       results.push({ src: String(f), deleted: false, error: 'Invalid entry' });
       continue;
     }
-    const { src, dest, size } = f;
+    const { src, dest, size, copyVerified } = f;
     if (!src || typeof src !== 'string') {
       results.push({ src: String(src), deleted: false, error: 'Invalid src path' });
       continue;
@@ -1540,6 +1816,12 @@ ipcMain.handle('files:deleteFromSource', async (_event, files, sourceRoot) => {
       continue;
     }
 
+    // ── Source file must be unchanged since copy ─────────────────────────────
+    if (typeof size === 'number' && srcStat.size !== size) {
+      results.push({ src, deleted: false, error: `Source file changed after import (expected ${size}, got ${srcStat.size})` });
+      continue;
+    }
+
     // ── Destination revalidation ──────────────────────────────────────────────
     if (!dest || typeof dest !== 'string') {
       results.push({ src, deleted: false, error: 'No destination path provided' });
@@ -1552,9 +1834,15 @@ ipcMain.handle('files:deleteFromSource', async (_event, files, sourceRoot) => {
       results.push({ src, deleted: false, error: 'Destination file not found — cannot confirm import' });
       continue;
     }
-    if (typeof size === 'number' && destStat.size !== size) {
+    // copyVerified entries may have a larger destination than the original source size
+    // because metadata tagging (exiftool) embeds EXIF after copy verification.
+    // Only block on destination size mismatch for entries without copy-time verification.
+    if (!copyVerified && typeof size === 'number' && destStat.size !== size) {
       results.push({ src, deleted: false, error: `Destination size mismatch (expected ${size}, got ${destStat.size})` });
       continue;
+    }
+    if (copyVerified && typeof size === 'number' && destStat.size !== size) {
+      log(`[sourceCleanup] ${path.basename(src)}: dest size changed after copy (${size} → ${destStat.size}), likely metadata update`);
     }
 
     // ── All checks passed — delete ────────────────────────────────────────────

@@ -63,6 +63,18 @@ All UI must follow these rules.
 - Same spacing system
 - Same header + body + footer structure
 - Same animation behavior
+- Multi-tab modals that share a shell class (e.g. `.emm-box`) must use a scoped `height` rule on the specific modal ID to pin the shell to a stable full height — `max-height` alone allows the shell to collapse when a tab renders short content, causing visual jumping across tab switches. The shared class must not be modified; always scope the fix to the modal's own ID selector.
+
+---
+
+### Action Row Token
+
+`.al-action-row` is the reusable spacing token for section-level action areas within panels and modal tabs (e.g. "Verify Integrity", "Re-apply Metadata").
+
+Rules:
+- Apply `margin-top`, `padding-top`, `padding-bottom`, and a `border-top` using `var(--border-subtle)` — this visually separates the action area from the content above
+- Use `.al-action-row` directly on new action areas; do not invent one-off rules
+- Existing named variants (`.al-verify-area`, `.al-reapply-area`) share the same rule block and are kept for backward compatibility
 
 ---
 

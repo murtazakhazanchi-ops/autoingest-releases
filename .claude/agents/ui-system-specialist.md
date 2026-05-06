@@ -400,6 +400,346 @@ Validation:
 - Confirm every cancel/dismiss/action button that is not a form submit has `type="button"`.
 - Grep renderer HTML for `<button` missing an explicit `type=` attribute before closing a UI task.
 
+### Modal open() Focus Fallback Must Target a Persistent Element
+
+Context:
+- Applies to any modal that sets programmatic focus in its `open()` function, particularly when removing or conditionally rendering elements that were previously used as focus targets.
+
+Rule:
+- The focus fallback in a modal's `open()` must always target an element that is unconditionally present when the modal is open.
+- Footer buttons (Back, Done) are reliable fallback targets. The modal X/close button is not — it may be conditionally absent.
+- When removing a modal button from HTML, grep for its ID across all renderer JS files before closing the task. Focus management references in `open()` functions are separate from click listeners and are easily missed.
+
+```js
+// Safe pattern: target a persistently rendered footer button
+const firstInput = container.querySelector('input, [tabindex="0"]');
+(firstInput || document.getElementById('emmBackBtn'))?.focus();
+
+// Unsafe pattern: target a conditionally rendered X button
+(firstInput || $closeBtn())?.focus();  // $closeBtn() returns null if X was removed
+```
+
+Avoid:
+- Using the modal X/close button as a focus fallback — it can be removed, leaving the fallback silently returning null.
+- Searching only HTML and click listeners when removing a modal DOM element. The element's ID may be used in `open()` focus management in the same or a related JS module.
+- Relying on optional chaining to mask a null fallback — focus is silently dropped, causing a keyboard accessibility regression.
+
+Validation:
+- After removing any modal DOM element, grep for its ID across all renderer JS files.
+- Confirm the `open()` focus fallback resolves to a non-null element when the modal opens.
+- Confirm focus lands on a visible, interactive element when the modal opens with no pre-filled input.
+
+### Async Form Prefill Requires Two Guards and a Preview Trigger
+
+Context:
+- Applies when replacing a synchronous form prefill with an async IPC call in any modal or panel that can be entered, exited, and re-entered by the user.
+
+Rule:
+- Two guards are required for correct async prefill:
+  1. Module-state guard: `if (moduleStateVar) return` before and inside the `.then()` — prevents duplicate IPC calls on re-entry and prevents clobbering user edits if IPC resolves after interaction.
+  2. DOM-value guard: `if (el && !el.value)` inside the `.then()` — prevents overwriting partial user input that arrived before IPC resolved.
+- Both guards are necessary. The module guard does not protect DOM values; the DOM guard does not prevent redundant IPC calls.
+- Call `_updateEventPreview()` (or equivalent preview/validation trigger) inside the `.then()` so the preview reflects the async-filled values.
+- All navigation-out paths must reset the module-state variable to `null` so the async prefill fires fresh on next entry.
+
+```js
+// Correct async prefill pattern
+function open() {
+  if (_prefillDate) {
+    _renderWithDate(_prefillDate);
+    return;
+  }
+  window.api.getTodayDate().then(date => {
+    if (_prefillDate) return;               // guard 1: re-entry or user already edited
+    if (yearEl && !yearEl.value) {          // guard 2: do not clobber partial input
+      yearEl.value = date.year;
+    }
+    _updateEventPreview();                  // sync preview after async fill
+  });
+}
+```
+
+Avoid:
+- Using only the module-state guard and assuming IPC will always resolve before user interaction.
+- Using only the DOM-value guard and allowing redundant IPC calls on every re-entry.
+- Forgetting to call the preview/validation trigger after the async write.
+- Leaving the module-state variable set across sessions (navigation-out paths must reset it).
+
+Validation:
+- Confirm both module-state and DOM-value guards are present.
+- Confirm `_updateEventPreview()` (or equivalent) is called inside the `.then()`.
+- Confirm all navigation-out paths reset the module-state variable to `null`.
+- Confirm re-entering the modal after editing the field does not clobber user input.
+
+### Data-Attribute CSS Tab Panel Visibility
+
+Context:
+- Applies when adding tabbed navigation to any modal or panel in the renderer (e.g., Activity Log filter tabs, multi-section drawers).
+
+Rule:
+- Use `data-active="<tab>"` on the container element and `data-tabs~="<tab>"` (whitespace-token attribute) on each panel.
+- CSS handles all visibility: `.al-tabs[data-active="tab"] .al-panel[data-tabs~="tab"] { display: block }`.
+- JS only updates `container.dataset.active = btn.dataset.tab` on button click. No per-panel class toggling.
+- This keeps the tab count from the panel count decoupled — adding a new tab or panel requires only HTML and CSS changes.
+
+```js
+// _wireAlTabs — the complete JS wiring
+function _wireAlTabs() {
+  const tabs = container.querySelector('.al-tabs');
+  if (!tabs) return;
+  tabs.querySelectorAll('.al-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      tabs.querySelectorAll('.al-tab-btn').forEach(b => b.classList.remove('al-tab-btn--active'));
+      btn.classList.add('al-tab-btn--active');
+      tabs.dataset.active = btn.dataset.tab;
+    });
+  });
+}
+```
+
+Avoid:
+- Toggling panel visibility with per-panel JS class changes on every tab click.
+- Using `display` inline styles in JS for tab panels.
+- Rebuilding the full modal body to switch tabs — only `dataset.active` needs to change.
+
+Validation:
+- Confirm tab container has `data-active` and each panel has `data-tabs~=` covering all its visible tabs.
+- Confirm switching tabs does not re-render the full modal body.
+- Confirm adding a new tab requires only HTML + CSS changes, no new JS toggle logic.
+
+### IPC Async Action Buttons — Disable-and-Wait Pattern
+
+Context:
+- Applies to any renderer button that triggers an async IPC call where results arrive via a separate IPC progress listener (e.g., Retry Failed metadata, Verify Integrity variants).
+
+Rule:
+- The click handler disables the button immediately (`btn.disabled = true`) and sets loading text.
+- The click handler must NOT re-enable the button on IPC return or in a `.catch()`.
+- The button's final state (re-enabled with new label, or removed) comes exclusively from the panel refresh triggered by the IPC progress listener (`batch_complete`, `batch_error`, or equivalent).
+- Include a `btn.disabled` guard at the top of the handler to prevent duplicate triggers if clicked twice before the listener fires.
+
+```js
+function _wireRetryBtn() {
+  const btn = document.getElementById('alRetryMetaBtn');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    if (!_metaBatchId || btn.disabled) return;   // duplicate-trigger guard
+    btn.disabled    = true;
+    btn.textContent = 'Retrying…';
+    try {
+      await window.api.retryMetadata(_metaBatchId);
+      // Do NOT re-enable here — batch_complete/batch_error listener refreshes the panel
+    } catch {
+      btn.disabled    = false;                   // only re-enable on hard IPC failure
+      btn.textContent = 'Retry Failed';
+    }
+  });
+}
+```
+
+Avoid:
+- Re-enabling the button in the IPC call's success path — the panel refresh triggered by `batch_complete` rebuilds the button in the correct state; a second re-enable races with it.
+- Omitting the `btn.disabled` guard — allows double-trigger if clicked before the listener fires.
+- Refreshing the full modal body in the click handler — use targeted panel refresh functions instead.
+
+Validation:
+- Confirm the button is disabled immediately on click and shows loading text.
+- Confirm the button is not re-enabled inside the IPC `.then()` or success path.
+- Confirm the `btn.disabled` guard at the top of the handler prevents double-trigger.
+- Confirm the progress listener (`batch_complete`/`batch_error`) triggers the panel refresh that rebuilds the button in the correct state.
+
+### Live Modal Panel Refresh via IPC Progress Listener
+
+Context:
+- Applies when an Activity Log or similar modal panel must reflect the live state of a background operation (metadata writes, cleanup, verification) that reports progress via an IPC listener.
+
+Rule:
+- Hook targeted panel refresh calls into the existing IPC progress listener branches (`batch_complete`, `batch_error`), not into the button click handler.
+- Guard every refresh function with `classList.contains('open')` before touching the DOM — the listener fires whether or not the modal is visible.
+- Cache any async data needed for refresh (e.g., import entries) in a module-level variable during the initial modal render so live refreshes are synchronous.
+- Replace only the affected panel's `innerHTML` (e.g., the metadata panel). Do not call `body.innerHTML = _renderActivityLogBody(...)` on every progress event — that resets tab state and re-renders all panels.
+
+```js
+function _refreshAlMetadataPanel() {
+  if (!document.getElementById('activityLogModal')?.classList.contains('open')) return;
+  // Use .al-panel--section to skip the shared-token header panel (see rule below).
+  const panel = document.getElementById('alBody')?.querySelector('.al-panel--section[data-tabs~="metadata"]');
+  if (!panel) return;
+  panel.innerHTML = `<p class="al-section-label">Metadata</p>${_buildMetadataSection()}`;
+  _wireAlRetryBtn();   // re-wire any interactive elements in the refreshed panel
+}
+
+// Hook in the existing progress listener
+if (progress.event === 'batch_complete') {
+  // ... update _metaBatch* state ...
+  _refreshAlMetadataPanel();
+}
+```
+
+Avoid:
+- Calling `body.innerHTML = _renderActivityLogBody(...)` on `file_done` events — resets all panels and tab state on every file completion.
+- Missing the `classList.contains('open')` guard — the listener fires when the modal is closed, causing silent DOM writes to an invisible element.
+- Requiring a full async re-read to refresh a panel — cache necessary data at render time.
+
+Validation:
+- Confirm the refresh function checks `classList.contains('open')` before modifying the DOM.
+- Confirm only the affected panel's `innerHTML` is replaced, not the full modal body.
+- Confirm tab state (active tab, scroll position) is preserved after a live refresh.
+- Confirm interactive elements inside the refreshed panel are re-wired after the `innerHTML` replacement.
+
+### Activity Log Refresh Selector Must Use `.al-panel--section`
+
+Context:
+- Applies to every Activity Log panel refresh function (`_refreshAlMetadataPanel`, `_refreshAlErrorsPanel`, and any future equivalents) that selects a tab-content panel by its `data-tabs~=` token.
+
+Rule:
+- The Activity Log header panel carries `data-tabs="all import metadata cleanup errors"` so that the event name row appears on every tab. This means it contains every tab's token.
+- `querySelector('.al-panel[data-tabs~="<tab>"]')` matches the header panel first (it appears first in DOM order) and writes section content into it, making that content visible on every tab that shows the header — including Import, Cleanup, and Errors.
+- All refresh functions must use `.al-panel--section[data-tabs~="<tab>"]`. The header panel does not carry the `al-panel--section` modifier class, so it is always skipped.
+
+```js
+// WRONG — matches the header panel first
+querySelector('.al-panel[data-tabs~="metadata"]')
+
+// CORRECT — skips header, targets the content panel
+querySelector('.al-panel--section[data-tabs~="metadata"]')
+querySelector('.al-panel--section[data-tabs~="errors"]')
+```
+
+Avoid:
+- Writing `.al-panel[data-tabs~="X"]` in any refresh function — this matches the header panel for all tab tokens.
+- Assuming the first matching panel is the content panel — the header panel always appears earlier in the DOM.
+
+Validation:
+- Confirm every Activity Log refresh function uses `.al-panel--section[data-tabs~="<tab>"]`, not `.al-panel[data-tabs~="<tab>"]`.
+- Grep `renderer.js` for `querySelector('.al-panel[data-tabs~=` — any match without `--section` is a bug.
+- Confirm metadata and errors content does not appear in the Import tab after a batch completes.
+
+### One `_build<X>Section()` Function Per Activity Log Tab
+
+Context:
+- Applies when adding or modifying any Activity Log tab's content in `_renderActivityLogBody()`.
+
+Rule:
+- Each tab's content must be produced by its own named builder function: `_buildImportSection(summary, issueCount)`, `_buildMetadataSection()`, `_buildSourceCleanupSection()`, `_buildErrorsSection(entries)`.
+- Inline section builds inside `_renderActivityLogBody()` make tab content boundaries invisible. It becomes impossible to quickly audit whether metadata, cleanup, or errors content is leaking into the import panel without reading 80+ lines of inline template code.
+- `_renderActivityLogBody()` should call the builder functions; it must not contain the section logic itself.
+
+```js
+// CORRECT — each tab section is explicit and auditable
+return `<div class="al-tabs" ...>
+  <div class="al-panel" data-tabs="all import">
+    ${_buildImportSection(summary, issueCount)}
+  </div>
+  <div class="al-panel al-panel--section" data-tabs="all metadata">
+    ${_buildMetadataSection()}
+  </div>
+  ...
+</div>`;
+```
+
+Avoid:
+- Building import section HTML inline inside `_renderActivityLogBody()` — auditing tab separation requires reading the full inline block.
+- Mixing section builder calls with inline HTML fragments in the same template.
+
+Validation:
+- Confirm `_renderActivityLogBody()` contains no inline `if (!summary) { ... } else { ... }` block for import panel content — it must call `_buildImportSection()`.
+- Confirm each tab section has a named `_build<X>Section()` function.
+
+### Derive Operation Status via Pure Function — Never Store Derived Status
+
+Context:
+- Applies to any renderer panel or modal that displays the status of a background operation (metadata writes, cleanup, verification, import) derived from multiple module-level state variables.
+
+Rule:
+- Operation status must be derived fresh on each render via a pure function that reads the underlying state variables. Never store derived status as its own module-level variable.
+- A stored status variable creates desync risk: if any of the underlying variables change and the stored status is not updated in every code path, the displayed status will be stale.
+- The pure function should cover all meaningful status combinations exhaustively: `running`, `applied`, `partial`, `failed`, `idle`.
+
+```js
+// Correct — derived on each call
+function _computeMetaStatus() {
+  if (_metaBatchRunning)         return 'running';
+  if (!_metaBatchTimestamp)      return 'idle';
+  if (_metaBatchFailed === 0)    return 'applied';
+  if (_metaBatchFailed < _metaBatchTotal) return 'partial';
+  return 'failed';
+}
+
+// Wrong — stored status can become stale
+let _metaStatus = 'idle'; // risks desync if not updated everywhere
+```
+
+Avoid:
+- Storing an operation's derived status as a module-level variable and updating it imperatively in each handler — misses code paths and produces stale status.
+- Conflating status derivation with side effects (e.g., writing to the DOM inside the pure function).
+
+Validation:
+- Confirm status is computed by a pure function that takes no arguments other than reading module-level state variables.
+- Confirm no separate `_metaStatus` (or equivalent) variable is stored and updated imperatively.
+- Confirm the function covers all meaningful state combinations.
+
+### Inline Confirm Pattern for Large-Operation Buttons
+
+Context:
+- Applies to any renderer panel action button that triggers a large or destructive operation (e.g., Reapply Metadata, Delete Source, Bulk Rename) and needs a confirm/cancel step without opening a modal overlay.
+
+Rule:
+- Swap the action area's `innerHTML` to display the confirm prompt and Cancel/Confirm buttons. Do not open a new modal overlay for simple confirmation flows within a panel.
+- The Cancel button must call the existing panel refresh function (e.g., `_refreshAlMetadataPanel()`) — not a hand-written restore — so the panel is always rebuilt from current state.
+- The Confirm button calls the action function directly (e.g., `_doReapply()`).
+- Estimate the operation size for the confirm prompt using available cached data (e.g., `_alLastImportEntries.reduce()`) rather than triggering a new IPC call.
+
+```js
+// Confirm prompt injected into the action area
+function _showReapplyConfirm(area) {
+  const estimated = _alLastImportEntries.reduce((n, e) => n + (e.fileCount || 0), 0);
+  area.innerHTML = `
+    <p class="al-confirm-text">Reapply metadata to ~${estimated} files?</p>
+    <div class="al-confirm-btns">
+      <button type="button" id="alReapplyCancel" class="sc-btn-cancel">Cancel</button>
+      <button type="button" id="alReapplyConfirm" class="al-reapply-btn">Reapply</button>
+    </div>`;
+  document.getElementById('alReapplyCancel').onclick  = () => _refreshAlMetadataPanel();
+  document.getElementById('alReapplyConfirm').onclick = () => _doReapply();
+}
+```
+
+Avoid:
+- Opening a new modal overlay for a simple confirm/cancel that belongs within an existing panel.
+- Manually restoring the pre-confirm HTML on Cancel instead of calling the panel refresh function — the refresh function keeps the state consistent, a manual restore can be stale.
+- Triggering a new IPC call to compute the operation size for the confirm prompt — use cached data already available from the last render.
+
+Validation:
+- Confirm the action area's `innerHTML` is swapped, not a new modal opened.
+- Confirm the Cancel handler calls the panel refresh function, not a hand-written HTML restore.
+- Confirm the Confirm handler calls the action function directly.
+- Confirm the file count estimate uses cached data and does not trigger a new IPC call.
+
+### CSS Custom Property Verification Before Shipping
+
+Context:
+- Applies to any new or modified CSS rule in the renderer that introduces a CSS custom property (CSS variable) reference.
+
+Rule:
+- Verify every `var(--token-name)` used in new or modified CSS rules exists in the actual theme file(s) before shipping.
+- Undefined CSS variables silently produce no-op behavior: transparent colors, missing borders, no-visible-state changes on hover/focus. The browser applies no error, making the defect invisible without visual inspection.
+- Check against `renderer/theme.css` (or the equivalent theme/token file) for the actual defined variable names.
+
+Common undefined token pitfalls in AutoIngest:
+- `--bg-tertiary` — not defined; use `--bg-secondary` or `--surface-subtle`.
+- `--border-hover` — not defined; use `--border-strong`.
+- `--text-muted` — verify definition before use; use `--text-secondary` if absent.
+
+Avoid:
+- Using CSS variable names that look plausible (`--bg-tertiary`, `--border-hover`) without confirming they exist in the theme.
+- Assuming a hover or focus state is working because it applies no error — test it visually.
+- Copying variable names from other projects or frameworks without checking AutoIngest's token vocabulary.
+
+Validation:
+- Before shipping any new CSS rule: grep `renderer/theme.css` (and any imported token files) to confirm every `var(--...)` reference is defined.
+- Visually confirm hover/focus/active states produce the intended visual change in both light and dark themes.
+
 ### Light/Dark and Viewport Compatibility
 
 Context:

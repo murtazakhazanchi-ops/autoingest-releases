@@ -366,7 +366,7 @@ async function copyFiles(filePaths, destination, onProgress) {
         completedBytes += fileSize;
         const { eta, speedBps } = getSpeedAndEta();
 
-        copiedFiles.push({ src: srcPath, dest: resolved.destPath, size: fileSize });
+        copiedFiles.push({ src: srcPath, dest: resolved.destPath, size: fileSize, copyVerified: true });
 
         if (resolved.action === 'rename') {
           skippedReasons.push(`Renamed: ${filename} — ${resolved.reason}`);
@@ -601,7 +601,7 @@ async function copyFileJobs(fileJobs, onProgress) {
         copied++;
         completedCount++;
         completedBytes += fileSize;
-        copiedFiles.push({ src: job.src, dest: resolved.destPath, size: fileSize });
+        copiedFiles.push({ src: job.src, dest: resolved.destPath, size: fileSize, copyVerified: true });
         const { eta, speedBps } = getSpeedAndEta();
 
         if (resolved.action === 'rename') {

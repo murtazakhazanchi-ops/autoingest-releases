@@ -248,6 +248,31 @@ Validation:
 - Confirm fix routes the value through `contextBridge` in `preload.js`.
 - Confirm the renderer now uses `window.api.<field>`.
 
+### Modal DOM Element Removal — Search All JS for Focus and Reference Uses
+
+Context:
+- Applies when a bug is traced to a modal behaving unexpectedly (silent focus drop, null reference, keyboard inaccessibility) after a DOM element was removed from the modal's HTML.
+
+Rule:
+- Removing a modal button from HTML and its click listener is insufficient. The element's ID may also be used as a focus fallback in the modal's `open()` function, as a programmatic target in keyboard handlers, or as a reference in any related JS module.
+- When diagnosing a silent focus failure or null-reference regression after a DOM element removal, grep for the element's ID across all renderer JS files before inspecting anything else.
+- The symptom of a missing focus fallback is: modal opens but no element receives focus, keyboard navigation is broken, and no JS error is thrown (optional chaining masks the null).
+
+Grep signal before closing any DOM-removal task:
+```
+grep -r "emmCloseBtn\|<element-id>" renderer/
+```
+
+Avoid:
+- Treating "modal focus is broken after removing X button" as a CSS or event-propagation issue.
+- Assuming all references to a removed element ID are click listeners — focus management references in `open()` functions are separate and commonly missed.
+- Relying on optional chaining masking a null fallback as proof that no regression exists.
+
+Validation:
+- Confirm the element ID was grepped across all renderer JS files after removal.
+- Confirm the `open()` focus fallback was updated to a persistently rendered element.
+- Confirm pressing Tab after the modal opens reaches a visible interactive element.
+
 ### Escape Key Swallowed by INPUT Guard — Keyboard Handler Diagnostic
 
 Context:
@@ -276,6 +301,35 @@ Validation:
 - Confirm the Escape branch appears before any form-field early-return guard.
 - Confirm pressing Escape while a text field inside the modal has focus dismisses the modal.
 - Confirm other shortcuts (Ctrl+A, arrow nav) still do not fire while typing.
+
+### EISDIR Silent Failure — Folder Path Passed to File-Expecting Persistence Function
+
+Context:
+- Applies when debugging a bug where fields expected in `event.json` after a successful operation are simply absent — no crash, no user-visible error, no thrown exception visible to the caller.
+
+Rule:
+- When a persistence function calls `fsp.readFile` or `fsp.writeFile` on a path that is actually a directory, Node throws `EISDIR`. If the persistence function wraps this in a try/catch with only a log line, the caller receives no error and the write silently does nothing.
+- The symptom is: an operation reports success (import, metadata run, etc.) but one or more expected `event.json` fields (`lastMetadataRun`, `metadataSummary`, etc.) remain absent after the operation.
+- The first thing to check: inspect the call site and confirm whether the variable passed to the persistence function is a **folder path** or a **file path**. A variable named `eventJsonPath` or `eventFolderPath` at the IPC handler level is typically the folder, not the file.
+- The fix is always at the call site: `path.join(folderPath, 'event.json')` must be constructed before the call, not inside the function.
+
+```js
+// Symptom: lastMetadataRun absent despite successful metadata run.
+// Wrong (passes folder):
+await _writeLastMetadataRun(eventJsonPath, p, groups);
+// Correct (passes file):
+await _writeLastMetadataRun(path.join(eventJsonPath, 'event.json'), p, groups);
+```
+
+Avoid:
+- Assuming all persistence failures are visible — EISDIR swallowed by try/catch produces no crash and no user error.
+- Debugging inside the persistence function (e.g., inspecting JSON parsing, schema checks) before verifying the path type at the call site.
+- Treating "fields absent from event.json" as a schema or validation bug before ruling out a wrong path type.
+
+Validation:
+- Confirm the variable passed to the persistence function is a file path (ends in `.json`), not a directory.
+- Add a log of `typeof path` and the path value at the persistence function entry to rule out EISDIR.
+- After the fix, open `event.json` directly and confirm the expected fields are present.
 
 ## Validation Checklist
 

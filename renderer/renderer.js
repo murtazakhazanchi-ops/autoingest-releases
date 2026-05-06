@@ -1302,6 +1302,432 @@ function _alClose() {
   document.getElementById('ovActivityLog')?.focus();
 }
 
+async function _loadDurableMetaRun(eventPath) {
+  if (!eventPath) { _metaDurableRun = null; _metaDurableRunPath = null; return; }
+  try {
+    const run = await window.api.getMetadataLastRun(eventPath);
+    _metaDurableRun = run || null;
+    _metaDurableRunPath = run ? eventPath : null;
+  } catch {
+    _metaDurableRun = null;
+    _metaDurableRunPath = null;
+  }
+}
+
+// eventPath: explicit scope (title bar passes active event); null → uses _alCurrentEventPath (AL).
+// When _metaBatchEventPath is falsy the batch is treated as unscoped (backward compat).
+function _computeMetaStatus(eventPath) {
+  const scope = eventPath ?? _alCurrentEventPath;
+
+  // Running — only for the event this batch was started for.
+  if (_metaBatchId && (!_metaBatchEventPath || _metaBatchEventPath === scope)) {
+    const processed = _metaBatchDone + _metaBatchFailed + _metaBatchSkipped;
+    if (processed < _metaBatchTotal) return 'running';
+  }
+  // Outdated overrides applied/partial/failed, scoped to the viewed/active event.
+  if (_metaOutdatedPath && scope === _metaOutdatedPath) return 'outdated';
+  // Fall back to durable disk state when no live batch or batch is for a different event.
+  const hasDurable = _metaDurableRun && _metaDurableRunPath === scope;
+  if (!_metaBatchId) return hasDurable ? _metaDurableRun.status : 'idle';
+  // Batch result is only meaningful when the batch ran for the scoped event.
+  if (_metaBatchEventPath && _metaBatchEventPath !== scope) return hasDurable ? _metaDurableRun.status : 'idle';
+  if (_metaBatchFailed === 0) return 'applied';
+  if (_metaBatchDone === 0 && _metaBatchSkipped === 0) return 'failed';
+  return 'partial';
+}
+
+function _buildImportSection(summary, issueCount) {
+  if (!summary) {
+    return `
+      <div class="al-empty">
+        <div class="al-empty-icon">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <div class="al-empty-title">No imports recorded yet</div>
+        <p>Imports will appear here after the first ingest.</p>
+      </div>`;
+  }
+
+  const mediaParts = [`${summary.totalPhotos} photo${summary.totalPhotos === 1 ? '' : 's'}`];
+  if (summary.totalVideos > 0) mediaParts.push(`${summary.totalVideos} video${summary.totalVideos === 1 ? '' : 's'}`);
+  const sessionCount = summary.entries.length;
+  const sessionLabel = `${sessionCount} import${sessionCount === 1 ? '' : 's'}`;
+  const lastOrWarn   = issueCount > 0
+    ? `<span class="al-summary-stat al-summary-warn">Check Imports</span>`
+    : (summary.lastImport
+        ? `<span class="al-summary-stat">${SVG.clock} Last by ${escapeHtml(summary.lastImport.photographer)} &middot; ${escapeHtml(formatDate(summary.lastImport.timestamp))}</span>`
+        : '');
+  const summaryHTML = `
+    <div class="al-summary-row">
+      <span class="al-summary-stat">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        ${mediaParts.join(' &bull; ')}
+      </span>
+      <span class="al-summary-stat">${escapeHtml(sessionLabel)}</span>
+      ${lastOrWarn}
+    </div>`;
+
+  const groups    = _groupEntriesByDate(summary.entries);
+  const groupsHTML = groups.map(({ date, entries }) => {
+    const entriesHTML = entries.map(entry => {
+      const counts    = mediaCountLabel(entry.photos, entry.videos);
+      const badgeHTML = _hasEntryIssue(entry)
+        ? `<span class="al-entry-badge al-entry-badge--warn">Check</span>`
+        : '';
+      const qParts = [];
+      if (entry.skipped    > 0) qParts.push(`${entry.skipped} skipped`);
+      if (entry.duplicates > 0) qParts.push(`${entry.duplicates} duplicate${entry.duplicates === 1 ? '' : 's'}`);
+      const qualityHTML = qParts.length > 0
+        ? `<div class="al-entry-quality">${escapeHtml(qParts.join(' • '))}</div>`
+        : '';
+      const sourceHTML     = `<div class="al-entry-source">Source: ${_formatImportSource(entry.source)}</div>`;
+      const importedByName = (entry.importedBy?.name && typeof entry.importedBy.name === 'string')
+        ? escapeHtml(entry.importedBy.name)
+        : 'Not recorded';
+      const importedByHTML = `<div class="al-entry-source">Imported by: ${importedByName}</div>`;
+      return `
+        <div class="al-entry">
+          <div class="al-entry-header">
+            <span class="al-entry-photographer">${escapeHtml(entry.photographer)}</span>
+            <span class="al-entry-time">${escapeHtml(formatDate(entry.timestamp))}</span>
+          </div>
+          <div class="al-entry-meta">
+            <span class="al-entry-component">${escapeHtml(entry.componentName)}</span>
+            ${badgeHTML}
+            <span class="al-entry-counts">${escapeHtml(counts)}</span>
+          </div>
+          ${qualityHTML}
+          ${sourceHTML}
+          ${importedByHTML}
+        </div>`;
+    }).join('');
+    return `
+      <div class="al-date-group">
+        <div class="al-date-label">${escapeHtml(date)}</div>
+        <div class="al-date-entries">${entriesHTML}</div>
+      </div>`;
+  }).join('');
+
+  return `
+    ${summaryHTML}
+    <div class="al-divider"></div>
+    <p class="al-section-label">Import History</p>
+    ${groupsHTML}
+    <div class="al-verify-area">
+      <button class="al-verify-btn" id="alVerifyBtn" type="button">Verify Integrity</button>
+      <div id="alVerifyResult"></div>
+    </div>`;
+}
+
+function _buildMetadataSection() {
+  const hasImports  = _alLastImportEntries.length > 0;
+  const reapplyArea = hasImports
+    ? `<div class="al-reapply-area" id="alReapplyArea"><button class="al-reapply-btn" id="alReapplyMetaBtn" type="button">Reapply Metadata</button></div>`
+    : '';
+
+  const status = _computeMetaStatus();
+
+  if (status === 'idle') {
+    return `<p class="al-inline-empty">No metadata activity yet.</p>${reapplyArea}`;
+  }
+
+  // Whether we're showing data from the durable disk record vs. the live session batch.
+  const scope = _alCurrentEventPath;
+  const isLiveBatch = !!_metaBatchId && (!_metaBatchEventPath || _metaBatchEventPath === scope);
+  const useDurable = !isLiveBatch && _metaDurableRun && _metaDurableRunPath === scope;
+
+  // ── Status card ────────────────────────────────────────────────────────────
+  let statusCard;
+  if (status === 'running') {
+    const processed = _metaBatchDone + _metaBatchFailed + _metaBatchSkipped;
+    statusCard = `
+      <div class="al-summary-row al-meta-status-card">
+        <span class="al-status-dot al-status-dot--running"></span>
+        <span class="al-status-label">Running</span>
+        <span class="al-summary-stat">${processed} / ${_metaBatchTotal} processed</span>
+      </div>`;
+  } else {
+    const dotMod   = { applied: 'al-status-dot--applied', partial: 'al-status-dot--partial', failed: 'al-status-dot--failed', outdated: 'al-status-dot--outdated' }[status] || 'al-status-dot--failed';
+    const labelTxt = { applied: 'Applied', partial: 'Partial', failed: 'Failed', outdated: 'Outdated' }[status] || 'Unknown';
+    let tsText, totalFiles, failedCount;
+    if (useDurable) {
+      tsText     = _metaDurableRun.timestamp ? new Date(_metaDurableRun.timestamp).toLocaleString(undefined, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;
+      totalFiles = (_metaDurableRun.processed || 0) + (_metaDurableRun.skipped || 0);
+      failedCount = _metaDurableRun.failed || 0;
+    } else {
+      tsText     = _metaBatchTimestamp ? new Date(_metaBatchTimestamp).toLocaleString(undefined, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;
+      totalFiles  = _metaBatchTotal;
+      failedCount = _metaBatchFailed;
+    }
+    const hintHtml = status === 'outdated'
+      ? `<p class="al-outdated-hint">Event details changed after last metadata run. Reapply metadata to update archived files.</p>`
+      : '';
+    statusCard = `
+      <div class="al-summary-row al-meta-status-card">
+        <span class="al-status-dot ${dotMod}"></span>
+        <span class="al-status-label">${escapeHtml(labelTxt)}</span>
+        ${tsText ? `<span class="al-summary-stat">Last run: <strong>${escapeHtml(tsText)}</strong></span>` : ''}
+        ${status !== 'outdated' ? `<span class="al-summary-stat">Files: <strong>${totalFiles}</strong> <span class="al-summary-muted">(incl. videos)</span></span>` : ''}
+        ${status !== 'outdated' ? `<span class="al-summary-stat${failedCount > 0 ? ' al-summary-warn' : ''}">Failed: <strong>${failedCount}</strong></span>` : ''}
+      </div>
+      ${hintHtml}`;
+  }
+
+  // ── Metadata grouping breakdown ───────────────────────────────────────────
+  let breakdownHtml = '';
+  if (useDurable && _metaDurableRun.metadataSummary) {
+    breakdownHtml = `<p class="al-section-sublabel">Metadata applied using grouping</p>
+       <div class="al-breakdown">
+         ${_metaDurableRun.metadataSummary.map(row =>
+           `<div class="al-breakdown-row">
+             <span class="al-breakdown-tag">${escapeHtml(row.tag)}</span>
+             <span class="al-breakdown-count">${row.fileCount} file${row.fileCount !== 1 ? 's' : ''}</span>
+           </div>`).join('')}
+       </div>`;
+  } else if (_metaBatchGroupsSnapshot) {
+    breakdownHtml = `<p class="al-section-sublabel">Metadata applied using grouping</p>
+       <div class="al-breakdown">
+         ${_metaBatchGroupsSnapshot.map(row => {
+           const tagLabel = row.metadataTags === null
+             ? '(default)'
+             : row.metadataTags.length === 0
+               ? 'No event keyword'
+               : escapeHtml(row.metadataTags.join(' + '));
+           return `<div class="al-breakdown-row">
+             <span class="al-breakdown-tag">${escapeHtml(row.label)}: ${tagLabel}</span>
+             <span class="al-breakdown-count">${row.fileCount} file${row.fileCount !== 1 ? 's' : ''}</span>
+           </div>`;
+         }).join('')}
+       </div>`;
+  }
+
+  // ── Failed file list — suppressed when outdated or showing durable (no per-file error detail stored) ──
+  const MAX_ERROR_ROWS = 20;
+  let failedRows = '';
+  if (!useDurable && status !== 'outdated') {
+    if (_metaBatchErrors.length > 0) {
+      const visible  = _metaBatchErrors.slice(0, MAX_ERROR_ROWS);
+      const overflow = _metaBatchErrors.length - visible.length;
+      failedRows = visible.map(e =>
+        `<div class="al-entry al-entry--error">
+          <div class="al-entry-header">
+            <span class="al-entry-photographer">${escapeHtml(e.file)}</span>
+            <span class="al-entry-badge al-entry-badge--warn">Failed</span>
+          </div>
+          <div class="al-entry-source">${escapeHtml(e.error || 'Unknown error')}</div>
+        </div>`).join('');
+      if (overflow > 0) failedRows += `<p class="al-inline-empty">…and ${overflow} more failed file${overflow === 1 ? '' : 's'}.</p>`;
+    } else if (_metaBatchFailed > 0) {
+      failedRows = `<p class="al-inline-empty">${_metaBatchFailed} file${_metaBatchFailed === 1 ? '' : 's'} failed — error detail unavailable.</p>`;
+    }
+  }
+
+  const retryBtnHtml = (!useDurable && status !== 'outdated' && _metaBatchId && _metaBatchFailed > 0)
+    ? `<button class="al-retry-btn" id="alRetryMetaBtn" type="button">Retry Failed</button>`
+    : '';
+
+  return `
+    ${statusCard}
+    ${breakdownHtml}
+    ${failedRows}
+    ${retryBtnHtml}
+    ${reapplyArea}`;
+}
+
+function _buildSourceCleanupSection() {
+  if (!_scLastBatch) return '<p class="al-inline-empty">No source cleanup activity this session.</p>';
+  const { deleted, failed, timestamp, errors } = _scLastBatch;
+  const statusText = failed > 0
+    ? `Completed with ${failed} error${failed === 1 ? '' : 's'}`
+    : `Completed — ${deleted} file${deleted === 1 ? '' : 's'} removed`;
+  const failedRows = errors.length > 0
+    ? errors.map(e =>
+        `<div class="al-entry al-entry--error">
+          <div class="al-entry-header">
+            <span class="al-entry-photographer">${escapeHtml(e.file)}</span>
+            <span class="al-entry-badge al-entry-badge--warn">Failed</span>
+          </div>
+          <div class="al-entry-source">${escapeHtml(e.error)}</div>
+        </div>`).join('')
+    : (failed > 0 ? `<p class="al-inline-empty">${failed} file${failed === 1 ? '' : 's'} failed — error detail unavailable.</p>` : '');
+  return `
+    <div class="al-meta-summary">
+      <span class="al-summary-stat">Removed: <strong>${deleted}</strong></span>
+      <span class="al-summary-stat${failed > 0 ? ' al-summary-warn' : ''}">Failed: <strong>${failed}</strong></span>
+      <span class="al-summary-stat">${SVG.clock} ${escapeHtml(formatDate(new Date(timestamp).toISOString()))}</span>
+    </div>
+    <div class="al-meta-status${failed > 0 ? ' al-meta-status--error' : ' al-meta-status--ok'}">${escapeHtml(statusText)}</div>
+    ${failedRows}`;
+}
+
+function _buildErrorsSection(importEntries) {
+  const importErrors  = (importEntries || []).filter(_hasEntryIssue);
+  const cleanupFailed = _scLastBatch?.failed || 0;
+  if (importErrors.length === 0 && _metaBatchFailed === 0 && cleanupFailed === 0) {
+    return '<p class="al-inline-empty">No errors recorded.</p>';
+  }
+  let html = '';
+  if (importErrors.length > 0) {
+    const rows = importErrors.map(entry => `
+      <div class="al-entry al-entry--error">
+        <div class="al-entry-header">
+          <span class="al-entry-photographer">${escapeHtml(entry.photographer)}</span>
+          <span class="al-entry-time">${escapeHtml(formatDate(entry.timestamp))}</span>
+        </div>
+        <div class="al-entry-meta">
+          <span class="al-entry-component">${escapeHtml(entry.componentName)}</span>
+          <span class="al-entry-badge al-entry-badge--warn">Check</span>
+          <span class="al-entry-counts">${escapeHtml(mediaCountLabel(entry.photos, entry.videos))}</span>
+        </div>
+      </div>`).join('');
+    html += `<p class="al-section-sublabel">Import Issues</p>${rows}`;
+  }
+  if (_metaBatchFailed > 0) {
+    const rows = _metaBatchErrors.length > 0
+      ? _metaBatchErrors.map(e =>
+          `<div class="al-entry al-entry--error">
+            <div class="al-entry-header">
+              <span class="al-entry-photographer">${escapeHtml(e.file)}</span>
+              <span class="al-entry-badge al-entry-badge--warn">Failed</span>
+            </div>
+            <div class="al-entry-source">${escapeHtml(e.error || 'Unknown error')}</div>
+          </div>`).join('')
+      : `<p class="al-inline-empty">${_metaBatchFailed} file${_metaBatchFailed === 1 ? '' : 's'} failed — error detail unavailable.</p>`;
+    html += `<p class="al-section-sublabel">Metadata Failures</p>${rows}`;
+  }
+  if (cleanupFailed > 0) {
+    const rows = (_scLastBatch?.errors || []).length > 0
+      ? _scLastBatch.errors.map(e =>
+          `<div class="al-entry al-entry--error">
+            <div class="al-entry-header">
+              <span class="al-entry-photographer">${escapeHtml(e.file)}</span>
+              <span class="al-entry-badge al-entry-badge--warn">Failed</span>
+            </div>
+            <div class="al-entry-source">${escapeHtml(e.error)}</div>
+          </div>`).join('')
+      : `<p class="al-inline-empty">${cleanupFailed} file${cleanupFailed === 1 ? '' : 's'} failed — error detail unavailable.</p>`;
+    html += `<p class="al-section-sublabel">Source Cleanup Failures</p>${rows}`;
+  }
+  return html;
+}
+
+function _wireAlTabs() {
+  const tabs = document.getElementById('alBody')?.querySelector('.al-tabs');
+  if (!tabs) return;
+  tabs.querySelectorAll('.al-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      tabs.querySelectorAll('.al-tab-btn').forEach(b => b.classList.remove('al-tab-btn--active'));
+      btn.classList.add('al-tab-btn--active');
+      tabs.dataset.active = btn.dataset.tab;
+    });
+  });
+}
+
+function _wireAlRetryBtn() {
+  const btn = document.getElementById('alRetryMetaBtn');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    if (!_metaBatchId || btn.disabled) return;
+    btn.disabled      = true;
+    btn.textContent   = 'Retrying…';
+    _metaRetryPending = true;
+    try {
+      await window.api.retryMetadata(_metaBatchId);
+    } catch {
+      _metaRetryPending = false;
+      btn.disabled    = false;
+      btn.textContent = 'Retry Failed';
+    }
+  });
+}
+
+function _wireAlReapplyBtn() {
+  const btn = document.getElementById('alReapplyMetaBtn');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    if (!_alCurrentEventPath || btn.disabled) return;
+    const estimatedFiles = _alLastImportEntries.reduce(
+      (sum, e) => sum + (e.photos || 0) + (e.videos || 0), 0
+    );
+    if (estimatedFiles > REAPPLY_CONFIRM_THRESHOLD) {
+      _showReapplyConfirm(estimatedFiles);
+    } else {
+      _doReapply();
+    }
+  });
+}
+
+function _showReapplyConfirm(estimatedFiles) {
+  const area = document.getElementById('alReapplyArea');
+  if (!area) return;
+  area.innerHTML = `
+    <p class="al-reapply-confirm-msg">Reapply metadata to ${estimatedFiles} file${estimatedFiles === 1 ? '' : 's'}? This will overwrite existing metadata fields managed by AutoIngest.</p>
+    <div class="al-reapply-confirm-btns">
+      <button class="al-reapply-confirm-cancel" id="alReapplyCancel" type="button">Cancel</button>
+      <button class="al-reapply-confirm-go" id="alReapplyConfirmGo" type="button">Reapply</button>
+    </div>`;
+  document.getElementById('alReapplyCancel')?.addEventListener('click', () => _refreshAlMetadataPanel());
+  document.getElementById('alReapplyConfirmGo')?.addEventListener('click', () => _doReapply());
+}
+
+async function _doReapply() {
+  if (!_alCurrentEventPath) return;
+  _metaReapplyPending = true;
+  const btn = document.getElementById('alReapplyMetaBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Applying…'; }
+  let res;
+  try {
+    res = await window.api.reapplyEventMetadata(_alCurrentEventPath);
+  } catch {
+    _metaReapplyPending = false;
+    _refreshAlMetadataPanel();
+    showMessage('Reapply failed — could not reach main process', 6000);
+    return;
+  }
+  if (!res?.ok) {
+    _metaReapplyPending = false;
+    _refreshAlMetadataPanel();
+    showMessage(`Reapply failed — ${res?.error || 'unknown error'}`, 6000);
+  }
+  // On success: leave pending; batch_complete/_refreshAlMetadataPanel resets the panel
+}
+
+function _refreshAlMetadataPanel() {
+  if (!document.getElementById('activityLogModal')?.classList.contains('open')) return;
+  const panel = document.getElementById('alBody')?.querySelector('.al-panel--section[data-tabs~="metadata"]');
+  if (!panel) return;
+  panel.innerHTML = `<p class="al-section-label">Metadata</p>${_buildMetadataSection()}`;
+  _wireAlRetryBtn();
+  _wireAlReapplyBtn();
+}
+
+function _refreshAlErrorBadge() {
+  const body = document.getElementById('alBody');
+  if (!body) return;
+  const btn = body.querySelector('.al-tab-btn[data-tab="errors"]');
+  if (!btn) return;
+  const issueCount = _getEventIssueCount(_alLastImportEntries);
+  const errorCount = issueCount + _metaBatchFailed + (_scLastBatch?.failed || 0);
+  const existing   = btn.querySelector('.al-tab-badge');
+  if (errorCount > 0) {
+    if (existing) {
+      existing.textContent = String(errorCount);
+    } else {
+      btn.insertAdjacentHTML('beforeend', ` <span class="al-tab-badge">${errorCount}</span>`);
+    }
+  } else {
+    existing?.remove();
+  }
+}
+
+function _refreshAlErrorsPanel() {
+  if (!document.getElementById('activityLogModal')?.classList.contains('open')) return;
+  const panel = document.getElementById('alBody')?.querySelector('.al-panel--section[data-tabs~="errors"]');
+  if (!panel) return;
+  panel.innerHTML = `<p class="al-section-label">Errors</p>${_buildErrorsSection(_alLastImportEntries)}`;
+  _refreshAlErrorBadge();
+}
+
 function _buildImportSourceMeta() {
   if (!activeSource) {
     return { type: 'unknown', label: 'Unknown source', path: '' };
@@ -1401,95 +1827,53 @@ function _renderActivityLogBody(ev, activeData, folderName) {
   const collRow = collName
     ? `<p class="al-coll-name">${escapeHtml(collName)}</p>`
     : '';
-  const headerHTML = `
-    <div class="al-event-header">
-      <p class="al-event-name">${escapeHtml(eventName)}</p>
-      ${collRow}
+  const headerPanel = `
+    <div class="al-panel" data-tabs="all import metadata cleanup errors">
+      <div class="al-event-header">
+        <p class="al-event-name">${escapeHtml(eventName)}</p>
+        ${collRow}
+      </div>
     </div>`;
 
-  const summary = getEventImportSummary(ev);
+  const summary    = getEventImportSummary(ev);
+  const issueCount = summary ? _getEventIssueCount(summary.entries) : 0;
+  const errorCount = issueCount + _metaBatchFailed + (_scLastBatch?.failed || 0);
+  const errorBadge = errorCount > 0
+    ? ` <span class="al-tab-badge">${errorCount}</span>`
+    : '';
 
-  if (!summary) {
-    return `${headerHTML}
-      <div class="al-empty">
-        <div class="al-empty-icon">
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        </div>
-        <div class="al-empty-title">No imports recorded yet</div>
-        <p>Imports will appear here after the first ingest.</p>
-      </div>`;
-  }
+  // ── Tab nav ────────────────────────────────────────────────────────────────
+  const tabNav = `
+    <nav class="al-tab-nav" role="tablist" aria-label="Activity filter">
+      <button class="al-tab-btn al-tab-btn--active" data-tab="all"      type="button" role="tab">All</button>
+      <button class="al-tab-btn"                    data-tab="import"   type="button" role="tab">Import</button>
+      <button class="al-tab-btn"                    data-tab="metadata" type="button" role="tab">Metadata</button>
+      <button class="al-tab-btn"                    data-tab="cleanup"  type="button" role="tab">Source Cleanup</button>
+      <button class="al-tab-btn"                    data-tab="errors"   type="button" role="tab">Errors${errorBadge}</button>
+    </nav>`;
 
-  const mediaParts = [`${summary.totalPhotos} photo${summary.totalPhotos === 1 ? '' : 's'}`];
-  if (summary.totalVideos > 0) mediaParts.push(`${summary.totalVideos} video${summary.totalVideos === 1 ? '' : 's'}`);
-  const sessionCount = summary.entries.length;
-  const sessionLabel = `${sessionCount} import${sessionCount === 1 ? '' : 's'}`;
-  const issueCount   = _getEventIssueCount(summary.entries);
-  const lastOrWarn   = issueCount > 0
-    ? `<span class="al-summary-stat al-summary-warn">Check Imports</span>`
-    : (summary.lastImport
-        ? `<span class="al-summary-stat">${SVG.clock} Last by ${escapeHtml(summary.lastImport.photographer)} &middot; ${escapeHtml(formatDate(summary.lastImport.timestamp))}</span>`
-        : '');
-  const summaryHTML = `
-    <div class="al-summary-row">
-      <span class="al-summary-stat">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-        ${mediaParts.join(' &bull; ')}
-      </span>
-      <span class="al-summary-stat">${escapeHtml(sessionLabel)}</span>
-      ${lastOrWarn}
-    </div>`;
+  const entriesForErrors = summary?.entries || [];
+  _alLastImportEntries   = entriesForErrors;
 
-  const groups = _groupEntriesByDate(summary.entries);
-  const groupsHTML = groups.map(({ date, entries }) => {
-    const entriesHTML = entries.map(entry => {
-      const counts    = mediaCountLabel(entry.photos, entry.videos);
-      const badgeHTML = _hasEntryIssue(entry)
-        ? `<span class="al-entry-badge al-entry-badge--warn">Check</span>`
-        : '';
-      const qParts = [];
-      if (entry.skipped    > 0) qParts.push(`${entry.skipped} skipped`);
-      if (entry.duplicates > 0) qParts.push(`${entry.duplicates} duplicate${entry.duplicates === 1 ? '' : 's'}`);
-      const qualityHTML = qParts.length > 0
-        ? `<div class="al-entry-quality">${escapeHtml(qParts.join(' • '))}</div>`
-        : '';
-      const sourceHTML = `<div class="al-entry-source">Source: ${_formatImportSource(entry.source)}</div>`;
-      const importedByName = (entry.importedBy?.name && typeof entry.importedBy.name === 'string')
-        ? escapeHtml(entry.importedBy.name)
-        : 'Not recorded';
-      const importedByHTML = `<div class="al-entry-source">Imported by: ${importedByName}</div>`;
-      return `
-        <div class="al-entry">
-          <div class="al-entry-header">
-            <span class="al-entry-photographer">${escapeHtml(entry.photographer)}</span>
-            <span class="al-entry-time">${escapeHtml(formatDate(entry.timestamp))}</span>
-          </div>
-          <div class="al-entry-meta">
-            <span class="al-entry-component">${escapeHtml(entry.componentName)}</span>
-            ${badgeHTML}
-            <span class="al-entry-counts">${escapeHtml(counts)}</span>
-          </div>
-          ${qualityHTML}
-          ${sourceHTML}
-          ${importedByHTML}
-        </div>`;
-    }).join('');
-    return `
-      <div class="al-date-group">
-        <div class="al-date-label">${escapeHtml(date)}</div>
-        <div class="al-date-entries">${entriesHTML}</div>
-      </div>`;
-  }).join('');
-
-  return `${headerHTML}
-    ${summaryHTML}
-    <div class="al-divider"></div>
-    <p class="al-section-label">Import History</p>
-    ${groupsHTML}
-    <div class="al-verify-area">
-      <button class="al-verify-btn" id="alVerifyBtn" type="button">Verify Integrity</button>
-      <div id="alVerifyResult"></div>
-    </div>`;
+  return `<div class="al-tabs" data-active="all">
+    ${tabNav}
+    ${headerPanel}
+    <div class="al-panel" data-tabs="all import">
+      ${_buildImportSection(summary, issueCount)}
+    </div>
+    <div class="al-panel al-panel--section" data-tabs="all metadata">
+      <p class="al-section-label">Metadata</p>
+      ${_buildMetadataSection()}
+    </div>
+    <div class="al-panel al-panel--section" data-tabs="all cleanup">
+      <p class="al-section-label">Source Cleanup</p>
+      ${_buildSourceCleanupSection()}
+    </div>
+    <div class="al-panel al-panel--section" data-tabs="all errors">
+      <p class="al-section-label">Errors</p>
+      ${_buildErrorsSection(entriesForErrors)}
+    </div>
+  </div>`;
 }
 
 function _renderAlPicker(events, activeFolder) {
@@ -1520,9 +1904,16 @@ async function _onAlPickerChange(e) {
   body.innerHTML = _renderActivityLogBody(ev, ctx, folderName);
   _alCurrentEventPath = _alMasterPath ? (_alMasterPath + '/' + folderName) : null;
   _wireAlVerifyBtn();
+  _wireAlTabs();
+  _wireAlRetryBtn();
+  _wireAlReapplyBtn();
+
+  if (_alCurrentEventPath) {
+    _loadDurableMetaRun(_alCurrentEventPath).then(() => _refreshAlMetadataPanel());
+  }
 }
 
-async function openActivityLogModal() {
+async function openActivityLogModal(opts = {}) {
   const overlay   = document.getElementById('activityLogModal');
   const body      = document.getElementById('alBody');
   const pickerRow = document.getElementById('alPickerRow');
@@ -1532,7 +1923,7 @@ async function openActivityLogModal() {
   document.body.style.overflow = 'hidden';
   body.innerHTML = '';
   if (pickerRow) pickerRow.innerHTML = '';
-  setTimeout(() => document.getElementById('alCloseBtn')?.focus(), 200);
+  setTimeout(() => document.getElementById('alCloseFooterBtn')?.focus(), 200);
 
   if (importMode !== 'event') {
     body.innerHTML = `
@@ -1593,6 +1984,25 @@ async function openActivityLogModal() {
   body.innerHTML = _renderActivityLogBody(currentEvent, activeData, activeFolder);
   _alCurrentEventPath = activeData.eventPath || null;
   _wireAlVerifyBtn();
+  _wireAlTabs();
+  _wireAlRetryBtn();
+  _wireAlReapplyBtn();
+
+  // Load durable metadata state from event.json and refresh the panel once loaded.
+  if (_alCurrentEventPath) {
+    _loadDurableMetaRun(_alCurrentEventPath).then(() => _refreshAlMetadataPanel());
+  }
+
+  // If caller requested a specific tab, activate it programmatically
+  if (opts.tab) {
+    const tabsEl = body.querySelector('.al-tabs');
+    const targetBtn = tabsEl?.querySelector(`.al-tab-btn[data-tab="${opts.tab}"]`);
+    if (tabsEl && targetBtn) {
+      tabsEl.querySelectorAll('.al-tab-btn').forEach(b => b.classList.remove('al-tab-btn--active'));
+      targetBtn.classList.add('al-tab-btn--active');
+      tabsEl.dataset.active = opts.tab;
+    }
+  }
 
   // Scan master for all events to populate picker
   if (!master?.path) return;
@@ -1717,7 +2127,6 @@ document.getElementById('ecBackBtn')?.addEventListener('click', () => {
   if (!EventCreator.navigateBack()) showLanding();
 });
 document.getElementById('emmBackBtn')?.addEventListener('click', () => EventMgmt.handleBack());
-document.getElementById('emmCloseBtn')?.addEventListener('click', () => EventMgmt.requestClose());
 document.getElementById('emmContinueBtn')?.addEventListener('click', async () => {
   const btn = document.getElementById('emmContinueBtn');
   if (!btn || btn.disabled) return;
@@ -1786,9 +2195,14 @@ document.addEventListener('eventcreator:listDeselect', () => {
 });
 document.addEventListener('eventmgmt:requestClose', showLanding);
 document.addEventListener('eventcreator:done', () => {
+  if (EventCreator.consumeMetaOutdated()) {
+    const _savedEventPath = EventCreator.getActiveEventData()?.eventPath || null;
+    if (_savedEventPath) _metaOutdatedPath = _savedEventPath;
+  }
   GroupManager.reset();
   renderGroupPanel();
   showLanding();
+  _renderMetaTitleIndicator();
 });
 document.getElementById('srcExtDriveBtn')?.addEventListener('click', selectExternalDrive);
 document.getElementById('srcLocalFolderBtn')?.addEventListener('click', selectLocalFolder);
@@ -1836,7 +2250,7 @@ document.getElementById('ovActivityLog')?.addEventListener('click', openActivity
 document.getElementById('ovActivityLog')?.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openActivityLogModal(); }
 });
-document.getElementById('alCloseBtn')?.addEventListener('click', _alClose);
+document.getElementById('metaTitleIndicator')?.addEventListener('click', () => openActivityLogModal({ tab: 'metadata' }));
 document.getElementById('alCloseFooterBtn')?.addEventListener('click', _alClose);
 
 // ════════════════════════════════════════════════════════════════
@@ -3886,41 +4300,111 @@ window.api.onImportProgress(updateProgress);
 
 // ── Metadata progress ─────────────────────────────────────────────────────────
 // Tracks the active metadata batch so the progress badge stays accurate.
-let _metaBatchId     = null;
-let _metaBatchTotal  = 0;
-let _metaBatchDone   = 0;
-let _metaBatchFailed = 0;
+let _metaBatchId        = null;
+let _metaBatchTotal     = 0;
+let _metaBatchDone      = 0;
+let _metaBatchFailed    = 0;
+let _metaBatchSkipped   = 0;
+let _metaBatchErrors    = [];   // [{file, error}] from last batch_error
+let _metaBatchTimestamp = null; // epoch ms — set on batch_complete, cleared on batch_start
+let _metaRetryPending   = false;  // true between retry click and its batch_complete/batch_error
+let _metaReapplyPending = false;  // true between reapply click and its batch_complete/batch_error
+let _metaOutdatedPath      = null;  // event path whose metadata is stale after an edit; null = not outdated
+let _metaBatchEventPath    = null;  // event path captured at batch_start; scopes status to that event
+let _autoMetadataEnabled   = true;  // fetched once at init; mirrors settings:getAutoMetadataEnabled
+let _mtiShowingCompleted   = false; // true for 4s after a fully-successful batch_complete
+
+// Prompt for confirmation when reapplying metadata to large events.
+const REAPPLY_CONFIRM_THRESHOLD = 50;
+
+let _scLastBatch             = null; // {deleted,failed,timestamp,errors:[{file,error}]} — set by cleanup handler
+let _alLastImportEntries     = [];   // cached on each AL render; used for errors-panel live refresh
+let _metaBatchGroupsSnapshot = null; // [{label, metadataTags, fileCount}] captured at batch_start for AL breakdown
+let _metaDurableRun          = null; // lastMetadataRun loaded from event.json {status,processed,failed,skipped,timestamp,metadataSummary}
+let _metaDurableRunPath      = null; // event path that _metaDurableRun was loaded for
 
 window.api.onMetadataProgress((progress) => {
   if (!progress || !progress.batchId) return;
 
   if (progress.event === 'batch_start') {
-    _metaBatchId     = progress.batchId;
-    _metaBatchTotal  = progress.total || 0;
-    _metaBatchDone   = 0;
-    _metaBatchFailed = 0;
+    _metaBatchId        = progress.batchId;
+    _metaBatchTotal     = progress.total || 0;
+    _metaBatchDone      = 0;
+    _metaBatchFailed    = 0;
+    _metaBatchSkipped   = 0;
+    _metaBatchErrors    = [];
+    _metaBatchTimestamp = null; // clear until batch_complete
+    _mtiShowingCompleted = false;
+    _metaBatchEventPath  = EventCreator.getActiveEventData()?.eventPath || null;
+    // Snapshot groups for AL breakdown before GroupManager state can change.
+    _metaBatchGroupsSnapshot = (isMetadataGroupingMode() && GroupManager.hasGroups())
+      ? GroupManager.getGroups().map(g => ({
+          label:        g.label,
+          metadataTags: g.metadataTags,
+          fileCount:    g.files.size,
+        }))
+      : null;
     _renderMetadataBadge();
+    _renderMetaTitleIndicator();
     return;
   }
 
   if (progress.batchId !== _metaBatchId) return;
 
   if (progress.event === 'file_done') {
-    _metaBatchDone   = progress.done   || 0;
-    _metaBatchFailed = progress.failed || 0;
+    _metaBatchDone    = progress.done    || 0;
+    _metaBatchFailed  = progress.failed  || 0;
+    _metaBatchSkipped = progress.skipped || 0;
     _renderMetadataBadge();
+    _renderMetaTitleIndicator();
     return;
   }
 
   if (progress.event === 'batch_complete') {
-    _metaBatchDone   = progress.done   || 0;
-    _metaBatchFailed = progress.failed || 0;
+    _metaBatchDone      = progress.done    || 0;
+    _metaBatchFailed    = progress.failed  || 0;
+    _metaBatchSkipped   = progress.skipped || 0;
+    _metaBatchTimestamp = Date.now();
+    _metaOutdatedPath   = null; // batch result replaces outdated state
     _renderMetadataBadge();
+    _refreshAlMetadataPanel();
+    // Refresh durable state from disk (main.js wrote lastMetadataRun before emitting this event).
+    if (_metaBatchEventPath) {
+      _loadDurableMetaRun(_metaBatchEventPath).then(() => _refreshAlMetadataPanel());
+    }
+    // Flash "Completed" in the title bar for 4s when all files succeeded
+    if (_metaBatchFailed === 0) {
+      _mtiShowingCompleted = true;
+      _renderMetaTitleIndicator();
+      setTimeout(() => { _mtiShowingCompleted = false; _renderMetaTitleIndicator(); }, 4000);
+    } else {
+      _renderMetaTitleIndicator();
+    }
+    // Show success toast only when all files passed — failures branch to batch_error below.
+    if (_metaReapplyPending && _metaBatchFailed === 0) {
+      _metaReapplyPending = false;
+      showMessage('Reapply completed — all files tagged', 6000);
+    } else if (_metaRetryPending && _metaBatchFailed === 0) {
+      _metaRetryPending = false;
+      showMessage('Retry completed — all files tagged', 6000);
+    }
     return;
   }
 
   if (progress.event === 'batch_error') {
-    showMessage(`Metadata failed for ${progress.failed} file(s) — see red badge above`, 8000);
+    _metaBatchErrors = progress.errors || [];
+    if (_metaReapplyPending) {
+      _metaReapplyPending = false;
+      showMessage(`Reapply completed — ${progress.failed} still failed`, 6000);
+    } else if (_metaRetryPending) {
+      _metaRetryPending = false;
+      showMessage(`Retry completed — ${progress.failed} still failed`, 6000);
+    } else {
+      showMessage(`Metadata failed for ${progress.failed} file(s) — see red badge above`, 8000);
+    }
+    _renderMetaTitleIndicator();
+    _refreshAlMetadataPanel();
+    _refreshAlErrorsPanel();
   }
 });
 
@@ -3958,6 +4442,81 @@ function _renderMetadataBadge() {
     badge.style.cursor  = '';
     badge.onclick       = null;
   }
+}
+
+function _renderMetaTitleIndicator() {
+  const el    = document.getElementById('metaTitleIndicator');
+  const label = document.getElementById('mtiLabel');
+  if (!el || !label) return;
+
+  if (!_autoMetadataEnabled) {
+    el.dataset.state = 'off';
+    label.textContent = 'Metadata: Off';
+    el.title = 'Metadata: Off. Click to view metadata details.';
+    return;
+  }
+
+  // Always scope to the currently active event, not the AL viewer's event.
+  const activeEventPath = EventCreator.getActiveEventData()?.eventPath || null;
+  const status = _computeMetaStatus(activeEventPath);
+
+  if (status === 'running') {
+    _mtiShowingCompleted = false;
+    const processed = _metaBatchDone + _metaBatchFailed + _metaBatchSkipped;
+    const pct = _metaBatchTotal > 0 ? Math.floor((processed / _metaBatchTotal) * 100) : 0;
+    el.dataset.state  = 'running';
+    label.textContent = `Metadata: ${pct}%`;
+    el.title = `Metadata: Processing ${pct}%. Click to view metadata details.`;
+    return;
+  }
+
+  if (status === 'outdated') {
+    el.dataset.state  = 'outdated';
+    label.textContent = 'Metadata: Outdated (event updated)';
+    el.title = 'Metadata: Outdated (event updated). Click to view metadata details.';
+    return;
+  }
+
+  // Resolve failed count from durable data if no live batch for this event.
+  const durableForActive = _metaDurableRun && _metaDurableRunPath === activeEventPath;
+  const failedCount = (durableForActive && (!_metaBatchId || _metaBatchEventPath !== activeEventPath))
+    ? (_metaDurableRun.failed || 0)
+    : _metaBatchFailed;
+
+  if (status === 'partial') {
+    _mtiShowingCompleted = false;
+    el.dataset.state  = 'partial';
+    label.textContent = `Metadata: Partial (${failedCount} failed)`;
+    el.title = `Metadata: Partial (${failedCount} failed). Click to view metadata details.`;
+    return;
+  }
+
+  if (status === 'failed') {
+    _mtiShowingCompleted = false;
+    el.dataset.state  = 'failed';
+    label.textContent = 'Metadata: Failed';
+    el.title = 'Metadata: Failed. Click to view metadata details.';
+    return;
+  }
+
+  // Only show "Completed" flash if this batch was for the active event.
+  if (_mtiShowingCompleted && _metaBatchEventPath === activeEventPath) {
+    el.dataset.state  = 'completed';
+    label.textContent = 'Metadata: Completed';
+    el.title = 'Metadata: Completed. Click to view metadata details.';
+    return;
+  }
+
+  if (status === 'applied') {
+    el.dataset.state  = 'applied';
+    label.textContent = 'Metadata: Applied';
+    el.title = 'Metadata: Applied. Click to view metadata details.';
+    return;
+  }
+
+  el.dataset.state  = 'idle';
+  label.textContent = 'Metadata: On';
+  el.title = 'Metadata: On. Click to view metadata details.';
 }
 
 window.api.onChecksumProgress(({ completed, total }) => {
@@ -4109,6 +4668,17 @@ async function _handleSourceDelete() {
       failCount++;
       return `<div class="cleanup-file-row cleanup-file-row--err"><span class="cleanup-icon cleanup-icon--err">${SVG.warn}</span><span>${escapeHtml(name)} — ${escapeHtml(r.error || 'Unknown')}</span></div>`;
     });
+
+    // Record result for Activity Log Source Cleanup panel (session-ephemeral)
+    _scLastBatch = {
+      deleted:   successCount,
+      failed:    failCount,
+      timestamp: Date.now(),
+      errors:    results.filter(r => !r.deleted).map(r => ({
+        file:  (r.src || '').split(/[\\/]/).pop(),
+        error: r.error || 'Unknown',
+      })),
+    };
 
     // Remove deleted rows from DOM and update eligible set
     const deletedSrcs = new Set(results.filter(r => r.deleted).map(r => r.src));
@@ -4511,6 +5081,29 @@ document.getElementById('importBtn').addEventListener('click', async () => {
         const proceed = await showDupSubEventModal(dupSubs);
         if (!proceed) return;
       }
+    } else if (isMetadataGroupingMode() && GroupManager.hasGroups()) {
+      // Single-component in metadata grouping mode — groups carry metadataTags for keyword assignment.
+      // Folder routing is unchanged (all files go to eventPath/photographer).
+      groups = [...GroupManager.getGroups()];
+
+      // Non-blocking toast: groups with no tag assignment will use default (suppression) behavior.
+      const untaggedGroups = groups.filter(g => g.metadataTags === null);
+      if (untaggedGroups.length > 0) {
+        showMessage(
+          `${untaggedGroups.length} group${untaggedGroups.length !== 1 ? 's' : ''} without keyword assignment — those files will use default tagging.`,
+          6000
+        );
+      }
+
+      // Non-blocking: selected files not in any group still get imported with default tagging.
+      const unassigned = GroupManager.getUnassignedFiles([...selectedFiles]);
+      if (unassigned.length > 0) {
+        const proceed = await showUnassignedWarningModal(unassigned.length);
+        if (!proceed) return;
+        // Explicit [] = no component keyword. null would re-enter the suppression branch
+        // which is fragile; [] is the deterministic "no keyword" contract.
+        groups = [...groups, { id: -1, files: new Set(unassigned), subEventId: null, metadataTags: [] }];
+      }
     } else {
       // Single-component: GroupManager not touched.
       // Files route to eventPath/photographer with no sub-event folder.
@@ -4554,6 +5147,7 @@ document.getElementById('importBtn').addEventListener('click', async () => {
       groups: groups.map(group => ({
         id: group.id,
         subEventId: group.subEventId,
+        metadataTags: group.metadataTags ?? null,
         files: [...group.files],
       })),
       source: _buildImportSourceMeta(),
@@ -4976,6 +5570,11 @@ async function initApp() {
   } catch (e) {
     console.error('Failed to load destination', e);
   }
+
+  try {
+    _autoMetadataEnabled = await window.api.getAutoMetadataEnabled();
+  } catch { /* non-critical — default true is fine */ }
+  _renderMetaTitleIndicator();
 
   updateHeaderDate();
   scheduleMidnightRefresh();
@@ -5870,7 +6469,7 @@ const Dropdown = (() => {
 
   // Outside-click dismissal (skip triggers — let trigger handler manage toggle)
   document.addEventListener('click', e => {
-    if (_menu && !_menu.contains(e.target) && !e.target.closest('.gc-sub-trigger')) close();
+    if (_menu && !_menu.contains(e.target) && !e.target.closest('.gc-sub-trigger') && !e.target.closest('.gc-meta-trigger')) close();
   });
 
   // Scroll repositions trigger but not the fixed menu, so close
@@ -5921,7 +6520,99 @@ document.addEventListener('click', e => {
   });
 });
 
+// Delegated handler for .gc-meta-trigger clicks (metadata grouping mode)
+document.addEventListener('click', e => {
+  const trigger = e.target.closest('.gc-meta-trigger[data-gid]');
+  if (!trigger) return;
+
+  const gid = Number(trigger.dataset.gid);
+  if (Dropdown.isOpen(gid)) { Dropdown.close(); return; }
+
+  const groups    = GroupManager.getGroups();
+  const thisGroup = groups.find(g => g.id === gid);
+  if (!thisGroup) return;
+
+  const metaTags   = _getMetaGroupingTags();
+  const groupIdx   = groups.findIndex(g => g.id === gid);
+  const groupColor = GroupManager.getGroupColor(groupIdx);
+  const current    = thisGroup.metadataTags; // null | string[]
+
+  const items = [
+    ...metaTags.map(t => ({
+      value:    JSON.stringify([t]),
+      label:    t,
+      current:  Array.isArray(current) && current.length === 1 && current[0] === t,
+      disabled: false,
+    })),
+  ];
+  // Combined option (all tags together) — only meaningful when 2+ tags
+  if (metaTags.length >= 2) {
+    items.push({
+      value:    JSON.stringify(metaTags),
+      label:    metaTags.join(' + '),
+      current:  Array.isArray(current) && current.length === metaTags.length && metaTags.every((t, i) => current[i] === t),
+      disabled: false,
+    });
+  }
+  // No-keyword option
+  items.push({
+    value:    JSON.stringify([]),
+    label:    'No event keyword',
+    current:  Array.isArray(current) && current.length === 0,
+    disabled: false,
+  });
+
+  Dropdown.open({
+    trigger,
+    gid,
+    items,
+    groupColor,
+    onSelect(value) {
+      if (value === '') {
+        GroupManager.setMetadataTags(gid, null);
+      } else {
+        try {
+          const tags = JSON.parse(value);
+          GroupManager.setMetadataTags(gid, Array.isArray(tags) ? tags : null);
+        } catch {
+          GroupManager.setMetadataTags(gid, null);
+        }
+      }
+      renderGroupPanel();
+    },
+  });
+});
+
 // ── Group panel renderer ───────────────────────────────────────────────────
+
+// Returns the comma-split tags for the single active component, or [] if not applicable.
+function _getMetaGroupingTags() {
+  const comps = EventCreator.getEventComps();
+  if (comps.length !== 1) return [];
+  return (comps[0].eventTypes || [])
+    .map(t => (typeof t === 'object' ? (t.label || '') : String(t)))
+    .join(',')
+    .split(',')
+    .map(t => t.trim())
+    .filter(Boolean);
+}
+
+// True when: event mode, single-component, component has 2+ comma-split event tags.
+function isMetadataGroupingMode() {
+  if (importMode !== 'event') return false;
+  return _getMetaGroupingTags().length > 1;
+}
+
+// Shows or hides the metadata grouping hint bar based on current mode and group state.
+function _updateMetaGroupHint() {
+  const hint = document.getElementById('metaGroupHint');
+  if (!hint) return;
+  if (isMetadataGroupingMode() && !GroupManager.hasGroups()) {
+    hint.classList.add('visible');
+  } else {
+    hint.classList.remove('visible');
+  }
+}
 
 function renderGroupPanel() {
   Dropdown.close(); // close any open portal menu before rebuilding innerHTML
@@ -5929,7 +6620,11 @@ function renderGroupPanel() {
   const panel = document.getElementById('groupPanel');
   if (!panel) return;
 
-  if ((EventCreator.getActiveEventData()?.event?.components?.length ?? 0) <= 1) {
+  _updateMetaGroupHint();
+
+  const metaMode = isMetadataGroupingMode();
+
+  if (!metaMode && (EventCreator.getActiveEventData()?.event?.components?.length ?? 0) <= 1) {
     panel.classList.remove('visible');
     panel.innerHTML = '';
     return;
@@ -5944,6 +6639,7 @@ function renderGroupPanel() {
 
   const groups   = GroupManager.getGroups();
   const subNames = EventCreator.getSubEventNames();
+  const metaTags = metaMode ? _getMetaGroupingTags() : [];
 
   // O(1) lookup for file metadata (name, modifiedAt) from the currently-loaded file list.
   const fileMetaMap = new Map((currentFiles || []).map(f => [f.path, f]));
@@ -5951,13 +6647,33 @@ function renderGroupPanel() {
   function _buildCardHtml(g, idx) {
     const color = GroupManager.getGroupColor(idx);
 
-    // Sub-event section — only for multi-component events
-    let subHtml = '';
-    if (subNames.length > 0) {
+    // Selector section — sub-event for multi-component, metadata tag for metadata mode
+    let selectorHtml = '';
+    if (metaMode) {
+      const assigned     = Array.isArray(g.metadataTags);
+      const assignedLabel = assigned
+        ? (g.metadataTags.length === 0 ? 'No event keyword' : g.metadataTags.join(' + '))
+        : null;
+      selectorHtml = `
+        <div class="gc-metatag-area">
+          <div class="gc-subevent-row">
+            <span class="gp-sl">Keyword</span>
+            <button class="gc-meta-trigger${assigned ? ' assigned' : ''}" data-gid="${g.id}" type="button">
+              <span class="gc-sub-value">${assigned ? _esc(assignedLabel) : '— select —'}</span>
+              <svg class="gc-sub-chevron" width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+                <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+          <div class="gc-status ${assigned ? 'ok' : 'warn'}">
+            ${assigned ? `${SVG.check} ${_esc(assignedLabel)}` : `${SVG.warn} Not assigned`}
+          </div>
+        </div>`;
+    } else if (subNames.length > 0) {
       const mapped      = g.subEventId !== null;
       const mappedEnt   = mapped ? subNames.find(s => s.id === g.subEventId) : null;
       const mappedLabel = mapped ? (mappedEnt?.name ?? g.subEventId) : null;
-      subHtml = `
+      selectorHtml = `
         <div class="gc-subevent">
           <div class="gc-subevent-row">
             <span class="gp-sl">Sub-Event</span>
@@ -5998,7 +6714,7 @@ function renderGroupPanel() {
           <span class="gc-label">${_esc(g.label)}</span>
           <span class="gc-count">${g.files.size} file${g.files.size !== 1 ? 's' : ''}</span>
         </div>
-        ${subHtml}
+        ${selectorHtml}
         <div class="gc-file-list">${fileRowsHtml}</div>
         <div class="gc-footer">
           <button class="gc-remove-btn" data-gid="${g.id}">✕ Remove ${_esc(g.label)}</button>
@@ -6006,8 +6722,14 @@ function renderGroupPanel() {
       </div>`;
   }
 
+  const headerTitle    = metaMode ? 'Metadata Groups' : 'Groups';
+  const subtitleHtml   = metaMode
+    ? '<div class="gp-subtitle">Use groups to assign keywords to files. This will not change folder structure.</div>'
+    : '';
+
   panel.innerHTML = `
-    <div class="gp-header">Groups</div>
+    <div class="gp-header">${headerTitle}</div>
+    ${subtitleHtml}
     <div class="gp-cards-container">
       ${groups.map((g, idx) => _buildCardHtml(g, idx)).join('')}
     </div>`;
@@ -6048,7 +6770,7 @@ document.getElementById('fileGrid').addEventListener('contextmenu', e => {
 });
 
 function _showCtxMenu(x, y, anchorPath) {
-  if ((EventCreator.getActiveEventData()?.event?.components?.length ?? 0) <= 1) return;
+  if ((EventCreator.getActiveEventData()?.event?.components?.length ?? 0) <= 1 && !isMetadataGroupingMode()) return;
   const menu    = document.getElementById('groupCtxMenu');
   const groups  = GroupManager.getGroups();
   const curGrp  = GroupManager.getGroupForFile(anchorPath);
@@ -6145,7 +6867,7 @@ document.addEventListener('keydown', e => {
 
   if ((e.metaKey || e.ctrlKey) && e.key === 'g') {
     e.preventDefault();
-    if ((EventCreator.getActiveEventData()?.event?.components?.length ?? 0) <= 1) return;
+    if ((EventCreator.getActiveEventData()?.event?.components?.length ?? 0) <= 1 && !isMetadataGroupingMode()) return;
     clearTimeout(_gChordTimer);
     _gChordActive = true;
     _gChordTimer  = setTimeout(() => {

@@ -74,11 +74,27 @@ event.json → logic → filesystem → UI
 - Operations must be idempotent
 - All selected files must be processed (copied, skipped, or errored)
 
+### Source Cleanup (deleteFromSource) Validation Order
+
+When deleting source files after import, validation must run in this exact order:
+
+1. Resolve `sourceRoot` realpath — block if unresolvable
+2. Resolve `src` realpath — block if unresolvable
+3. Containment check — `src` must be inside `sourceRoot`
+4. `srcStat.isFile()` — block if not a file
+5. `srcStat.size !== size` — BLOCK: source file was modified after import; do not delete
+6. Destination must exist — block if absent
+7. `!copyVerified && destStat.size !== size` — BLOCK: legacy entry without copy verification; size mismatch is unsafe
+8. `copyVerified && destStat.size !== size` — LOG only (non-blocking): destination grew due to EXIF/metadata write after copy; safe to delete source
+
+`copyVerified: true` is set on a `copiedFiles` entry only after `verifyFile()` passes during the copy phase. Skipped or failed entries never carry `copyVerified`. Entries without `copyVerified` (legacy in-memory entries) fall through to the blocking path (step 7).
+
 ### MUST NOT
 
 - Duplicate processing
 - partial imports
 - inconsistent routing
+- compare post-EXIF destination size against pre-EXIF copy size as a blocking condition when `copyVerified` is set
 
 ---
 

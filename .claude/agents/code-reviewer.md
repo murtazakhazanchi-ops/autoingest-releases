@@ -197,6 +197,22 @@ Validation:
 - Confirm docs match implemented behavior.
 - Confirm no duplicate or conflicting rules were introduced.
 
+### Activity Log Panel Refresh Selector Review
+
+Context:
+- Applies when reviewing any change to `_refreshAlMetadataPanel`, `_refreshAlErrorsPanel`, or any new Activity Log panel refresh function in `renderer.js`.
+
+Rule:
+- The Activity Log header panel carries `data-tabs="all import metadata cleanup errors"` (all tokens). A `querySelector('.al-panel[data-tabs~="<tab>"]')` will always match the header first, writing section content into it and making that content visible on every tab.
+- Refresh functions must use `.al-panel--section[data-tabs~="<tab>"]` — the header lacks the `al-panel--section` modifier class, so this selector correctly skips it.
+
+Avoid:
+- Approving refresh functions that use `.al-panel[data-tabs~="<tab>"]` without the `--section` modifier.
+
+Validation:
+- Grep `renderer.js` for `querySelector('.al-panel[data-tabs~=` — any match without `--section` is a bug.
+- Confirm the metadata, errors, and cleanup sections do not appear in the Import tab after a live batch completes.
+
 ## Validation Checklist
 
 Before giving a verdict, review:

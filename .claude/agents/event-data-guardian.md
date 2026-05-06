@@ -240,6 +240,57 @@ Validation:
 - Confirm when `_eventComps` is empty the recovery reads from disk via session-format API.
 - Confirm no code path passes raw disk-format components to session-format validation logic.
 
+### Blank-Placeholder Detection in EventCreator
+
+Context:
+- Applies to import guards, session-state validators, and any code that must distinguish a blank/unsaved placeholder from a real loaded event in `_eventComps`.
+
+Rule:
+- After creating a new event, `_tryCreateEvent()` calls `setEventState([_makeComp()])`, leaving `_eventComps` as a single blank placeholder component with `eventTypes: []`.
+- The reliable blank-placeholder signal is `every(c => !c.eventTypes?.length)` across all components. EventCreator's save-gate prevents any persisted event from having empty eventTypes — so this condition is only true for an unsaved placeholder.
+- `city === null` is NOT a reliable signal. `_makeComp()` copies `_globalCityVal` into the placeholder when a global city is set, so a blank placeholder can have a non-null city.
+- `_eventComps.length === 0` catches the empty case but misses the blank-placeholder case (length 1, empty types).
+
+```js
+// Correct blank-placeholder detection:
+const isBlankPlaceholder = comps.length > 0 &&
+  comps.every(c => !c.eventTypes?.length);
+if (!comps.length || isBlankPlaceholder) {
+  // reload from disk
+}
+```
+
+Avoid:
+- Using `city === null` as a placeholder signal — breaks when global city is set.
+- Using only `length === 0` — misses the post-create blank-placeholder state.
+- Treating a blank placeholder as a valid loaded event.
+
+Validation:
+- Create a new event, then immediately attempt import — confirm the import guard triggers a reload.
+- Set a global city, create a new event, then immediately attempt import — confirm the guard still triggers (not fooled by non-null city).
+- Load a real event from disk and confirm the guard does not trigger.
+
+### Folder-vs-File Path at Persistence Call Sites
+
+Context:
+- Applies whenever an IPC handler or caller passes a path variable to a persistence function that reads or writes `event.json`.
+
+Rule:
+- IPC handlers and callers that hold an event folder path (`eventFolderPath`, `eventJsonPath`) must construct the full file path with `path.join(folderPath, 'event.json')` before passing to any persistence function whose parameter is named `*FilePath` or `*JsonPath`.
+- The diagnostic signal for a mismatch is: expected fields are absent from `event.json` after a successful operation — no crash, no user-visible error. The persistence function received a directory, threw `EISDIR`, and the surrounding try/catch swallowed it silently.
+- All `event.json` writers must use the tmp/rename atomic pattern. Non-atomic `fsp.writeFile` is incorrect for any `event.json` mutation.
+
+Avoid:
+- Passing a folder path directly to a persistence function that expects a file path.
+- Relying on a try/catch log line to surface a persistence failure caused by a wrong path type.
+- Using `fsp.writeFile` in a new or modified `event.json` writer — use tmp/rename.
+
+Validation:
+- Confirm every call to a `*write*` / `*persist*` persistence function passes `path.join(folderPath, 'event.json')`, not the folder path itself.
+- Confirm the persistence function parameter is named `*FilePath` (not `*FolderPath`) to prevent re-introduction of the mismatch.
+- Confirm the writer uses the tmp/rename atomic pattern.
+- After a successful operation, inspect `event.json` directly to verify the expected fields were written.
+
 ### Documentation Follow-Up
 
 Context:

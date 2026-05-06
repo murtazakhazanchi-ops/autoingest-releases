@@ -119,6 +119,23 @@ Each entry in `imports[]` has the following shape:
 
 ---
 
+## copiedFiles In-Memory Entry Schema
+
+`copiedFiles` is an in-memory array built during a copy session. It is never persisted to event.json. Each entry has the following shape:
+
+```json
+{
+  "src":           "string (absolute source path)",
+  "dest":          "string (absolute destination path)",
+  "size":          "number (file size in bytes at copy time, verified equal to dest immediately after copy)",
+  "copyVerified":  "boolean (true only when verifyFile() passed; absent on skipped or failed entries)"
+}
+```
+
+`copyVerified` governs the `deleteFromSource` validation logic (see system-contracts.md Section 4). When `true`, a destination size larger than `size` is treated as a non-blocking metadata-growth condition (e.g. EXIF embedded after copy) rather than a mismatch error. Entries without `copyVerified` use the legacy blocking comparison.
+
+---
+
 ## Debugging Role
 
 event.json is the first point of inspection during debugging.
