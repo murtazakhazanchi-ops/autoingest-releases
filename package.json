@@ -1,6 +1,6 @@
 {
   "name": "auto-ingest",
-  "version": "0.8.3",
+  "version": "0.8.4",
   "description": "AutoIngest — Memory Card Importer",
   "main": "main/main.js",
   "scripts": {
@@ -61,6 +61,9 @@
       "!dist/**",
       "!**/*.md",
       "!**/.git/**"
+    ],
+    "asarUnpack": [
+      "main/exiftool-config.pl"
     ],
     "mac": {
       "target": [
