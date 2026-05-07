@@ -3,7 +3,19 @@
  *
  * Uses `drivelist` to enumerate all mounted drives, then checks each
  * mount point for a DCIM folder — the standard directory written by
- * cameras and camera phones. Returns only drives that pass that test.
+ * cameras and camera phones.
+ *
+ * Returns two arrays:
+ *   dcim      — drives with a DCIM folder (Memory Card card)
+ *   removable — mounted non-system volumes (External Drive card)
+ *
+ * NOTE: `removable` does NOT rely on drive.isRemovable.  USB-attached SSDs
+ * and many Thunderbolt drives report isRemovable:false on both macOS and
+ * Windows even though they are externally connected.  Classification is done
+ * by mountpoint path instead:
+ *   macOS   — any /Volumes/<name> that is not the system disk
+ *   Windows — any non-C: drive letter that is not the system disk
+ *   other   — falls back to drive.isRemovable
  *
  * Patch 37: async hasDCIM (fsp.stat instead of existsSync/statSync) +
  *           4-second drivelist timeout to prevent polling hangs.
@@ -28,6 +40,35 @@ async function hasDCIM(mountpoint) {
   } catch {
     return false;
   }
+}
+
+/**
+ * Returns true when the given mountpoint should appear in the External Drive card.
+ *
+ * We do not use drive.isRemovable because USB-attached SSDs and Thunderbolt drives
+ * commonly report isRemovable:false on macOS and Windows.
+ *
+ * macOS: anything under /Volumes/ is an externally mounted volume.  The system
+ *        disk's APFS sub-volumes (/, /System/Volumes/Data, /System/Volumes/Preboot,
+ *        etc.) mount under / or /System/Volumes/ — never under /Volumes/ — so the
+ *        prefix check is safe on macOS 10.15+.
+ * Windows: exclude the C: drive (covered by isSystem too, but belt-and-suspenders).
+ *          All other drive letters are treated as external.
+ * Other: fall back to isRemovable.
+ *
+ * @param {import('drivelist').Drive} drive
+ * @param {string} mountpoint
+ * @returns {boolean}
+ */
+function _isExternalMount(drive, mountpoint) {
+  if (!mountpoint) return false;
+  if (process.platform === 'darwin') {
+    return mountpoint.startsWith('/Volumes/');
+  }
+  if (process.platform === 'win32') {
+    return mountpoint.charAt(0).toUpperCase() !== 'C';
+  }
+  return drive.isRemovable;
 }
 
 function withTimeout(promise, ms, fallback) {
@@ -62,9 +103,10 @@ async function listAllDrives() {
           isCard:      drive.isCard      || false,
         } : null)
       );
-      if (drive.isRemovable) {
+      if (_isExternalMount(drive, mp.path)) {
         removable.push({
-          label:      drive.description || mp.label || 'Removable Drive',
+          // Prefer volume label (user-visible name, e.g. "PA1-2TBMK") over hardware description.
+          label:      mp.label || drive.description || 'External Drive',
           mountpoint: mp.path,
           size:       drive.size || 0,
           busType:    drive.busType || '',
