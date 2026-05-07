@@ -322,7 +322,8 @@ const EventCreator = (() => {
   let _navScreen           = 'masterStep'; // 'masterStep' | 'eventList' | 'eventForm' | 'previewStep'
   let _selectedListFolder  = null;         // Phase 2: folder name highlighted in SELECT mode
   let _listenersAttached   = false;        // Guard: delegated panel listeners registered only once
-  let _saveInProgress      = false;        // Guard: prevent concurrent save executions
+  let _saveInProgress          = false;        // Guard: prevent concurrent save executions
+  let _lastSaveWasMetaOutdated = false;        // Consumed once by renderer via consumeMetaOutdated()
 
   function _makeComp() {
     return { id: ++_compSeq, eventTypes: [], location: null, city: _globalCityVal ? { ..._globalCityVal } : null };
@@ -1430,6 +1431,7 @@ ${unparseable.map(ev => `
       hijriDate:    entry.hijriDate    || entry._eventJson?.hijriDate    || null,
       sequence:     entry.sequence     ?? entry._eventJson?.sequence     ?? null,
       isUnresolved: !!entry.isUnresolved,
+      components:   editable.map(c => ({ ...c, eventTypes: [...c.eventTypes] })),
     };
 
     // Guard: event identity must be complete before entering edit mode.
@@ -1479,12 +1481,22 @@ ${unparseable.map(ev => `
     body.scrollTop = 0; // Point 2: always start at top of the form.
 
     // M7: pre-fill hijri date fields for new events.
+    // Default to today's Hijri date on first render; preserve user-entered value on return.
     if (!_viewingExisting) {
       if (!_newEventDate) {
-        const coll = sessionCollections.find(c => c.name === selectedCollection);
-        _newEventDate = coll?.hijriDate || null;
-      }
-      if (_newEventDate) {
+        window.api.getTodayDate().then(today => {
+          if (_newEventDate) return; // Already set by another render or user input — don't clobber.
+          const { year, month, day } = today.hijri;
+          _newEventDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          const yEl = document.getElementById('evHijriYear');
+          const mEl = document.getElementById('evHijriMonth');
+          const dEl = document.getElementById('evHijriDay');
+          if (yEl && !yEl.value) yEl.value = String(year);
+          if (mEl && !mEl.value) mEl.value = String(month).padStart(2, '0');
+          if (dEl && !dEl.value) dEl.value = String(day).padStart(2, '0');
+          _updateEventPreview();
+        }).catch(() => {});
+      } else {
         const [y, m, d] = _newEventDate.split('-');
         const yEl = document.getElementById('evHijriYear');
         const mEl = document.getElementById('evHijriMonth');
@@ -1553,6 +1565,21 @@ ${unparseable.map(ev => `
     // Update title bar to match.
     const title = $ecTitle();
     if (title) title.textContent = _editMode ? 'Edit Event' : 'View Event';
+  }
+
+  // Returns true if any metadata-written fields (eventTypes, location, city) differ between snapshots.
+  function _metaFieldsChanged(oldComps, newComps) {
+    if (!Array.isArray(oldComps) || oldComps.length !== newComps.length) return true;
+    for (let i = 0; i < oldComps.length; i++) {
+      const o = oldComps[i];
+      const n = newComps[i];
+      const oTypes = (o.eventTypes || []).map(t => t.label).sort().join('|');
+      const nTypes = (n.eventTypes || []).map(t => t.label).sort().join('|');
+      if (oTypes !== nTypes) return true;
+      if ((o.location?.label ?? null) !== (n.location?.label ?? null)) return true;
+      if ((o.city?.label ?? null) !== (n.city?.label ?? null)) return true;
+    }
+    return false;
   }
 
   // M6: save edits to an existing event by renaming the folder on disk.
@@ -1663,6 +1690,11 @@ ${unparseable.map(ev => `
               components:    noRenameCompsForDisk,
             };
           }
+        }
+        // Flag outdated if metadata-relevant fields changed and the event has import history.
+        const _noRenameImports = (_cachedEntry?._eventJson?.imports || []).length > 0;
+        if (_noRenameImports && _metaFieldsChanged(_viewingExisting?.components, _eventComps)) {
+          _lastSaveWasMetaOutdated = true;
         }
       }
       _editMode = false;
@@ -1825,6 +1857,14 @@ ${unparseable.map(ev => `
         console.log('[Subfolder Sync] Completed', compsForDisk.length, 'components');
       } catch (err) {
         console.error('[Subfolder Sync] Error:', err);
+      }
+    }
+
+    // Flag outdated if metadata-relevant fields changed and the event has import history.
+    {
+      const _renameImports = (entry?._eventJson?.imports || []).length > 0;
+      if (_renameImports && _metaFieldsChanged(_viewingExisting?.components, _eventComps)) {
+        _lastSaveWasMetaOutdated = true;
       }
     }
 
@@ -2539,8 +2579,8 @@ ${unparseable.map(ev => `
       }
     }
 
-    setEventState([_makeComp()]);
-
+    const bannerEl = document.getElementById('ecEventError');
+    if (bannerEl) { clearTimeout(bannerEl._hideTimer); bannerEl.classList.remove('visible'); }
     _proceedToPreviewStep();
   }
 
@@ -3155,10 +3195,13 @@ ${unparseable.map(ev => `
     },
 
     /** Phase 3 — Create Event footer button: validates and creates the event, then closes the modal. */
-    tryCreateEvent() { _tryCreateEvent(); },
+    tryCreateEvent() { return _tryCreateEvent(); },
 
     /** Phase 4 — Save Changes footer button: validates, renames folder, then closes the modal. Returns Promise. */
     saveEditedEvent() { return _handleSaveEditedEvent(); },
+
+    /** Consume and reset the one-shot outdated flag set during saveEditedEvent(). */
+    consumeMetaOutdated() { const v = _lastSaveWasMetaOutdated; _lastSaveWasMetaOutdated = false; return v; },
 
     /** Phase 5 — Save & Repair footer button: validates, renames bad folder to valid name. Returns Promise. */
     tryRepairEvent() { return _tryRepairEvent(); },

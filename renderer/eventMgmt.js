@@ -13,7 +13,6 @@ const EventMgmt = (() => {
   // ── DOM refs ───────────────────────────────────────────────────────────────
   const $overlay     = () => document.getElementById('eventMgmtModal');
   const $collName    = () => document.getElementById('emmCollName');
-  const $closeBtn    = () => document.getElementById('emmCloseBtn');
   const $editBtn     = () => document.getElementById('emmEditBtn');
   const $continueBtn = () => document.getElementById('emmContinueBtn');
   const $createBtn   = () => document.getElementById('emmCreateBtn');
@@ -79,10 +78,11 @@ const EventMgmt = (() => {
     $overlay()?.classList.add('open');
     document.body.style.overflow = 'hidden'; // body scroll lock
 
-    // Move focus into the modal after the transition settles
+    // Move focus into the modal after the transition settles.
+    // Falls back to the Back button, which is always present in the footer.
     setTimeout(() => {
       const firstInput = document.getElementById('ecBody')?.querySelector('input, [tabindex="0"]');
-      (firstInput || $closeBtn())?.focus();
+      (firstInput || document.getElementById('emmBackBtn'))?.focus();
     }, 200);
   }
 

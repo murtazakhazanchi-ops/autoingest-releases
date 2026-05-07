@@ -268,4 +268,25 @@ async function setLastActiveUserId(value) {
   await _save();
 }
 
-module.exports = { init, getArchiveRoot, setArchiveRoot, getLastDestPath, setLastDestPath, getLastEvent, setLastEvent, getWindowBounds, setWindowBounds, setWindowBoundsSync, getLastActiveUserId, setLastActiveUserId };
+/**
+ * Returns whether automatic EXIF metadata writing is enabled (default: true).
+ * @returns {boolean}
+ */
+function getAutoMetadataEnabled() {
+  if (!_loaded) init();
+  const v = _state.autoMetadataEnabled;
+  return v === undefined ? true : Boolean(v);
+}
+
+/**
+ * Persists the autoMetadataEnabled preference.
+ * @param {boolean} value
+ * @returns {Promise<void>}
+ */
+async function setAutoMetadataEnabled(value) {
+  if (!_loaded) init();
+  _state.autoMetadataEnabled = Boolean(value);
+  await _save();
+}
+
+module.exports = { init, getArchiveRoot, setArchiveRoot, getLastDestPath, setLastDestPath, getLastEvent, setLastEvent, getWindowBounds, setWindowBounds, setWindowBoundsSync, getLastActiveUserId, setLastActiveUserId, getAutoMetadataEnabled, setAutoMetadataEnabled };

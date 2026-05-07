@@ -2140,12 +2140,12 @@ document.getElementById('emmContinueBtn')?.addEventListener('click', async () =>
     if (EventMgmt.isOpen()) btn.disabled = false;
   }
 });
-document.getElementById('emmCreateBtn')?.addEventListener('click', () => {
+document.getElementById('emmCreateBtn')?.addEventListener('click', async () => {
   const btn = document.getElementById('emmCreateBtn');
   if (!btn || btn.disabled) return;
   btn.disabled = true;
   try {
-    EventCreator.tryCreateEvent();
+    await EventCreator.tryCreateEvent();
     // On success, eventcreator:done fires → showLanding → modal closes. No re-enable needed.
   } finally {
     // Re-enable only if the modal is still open (validation failed or exception thrown).
@@ -5164,7 +5164,11 @@ document.getElementById('importBtn').addEventListener('click', async () => {
       try { globalImportIndex = await window.api.getImportIndex() || {}; } catch { /* non-critical */ }
       _renderHeroLastImportArea();
     } catch (err) {
-      document.getElementById('progressFilename').textContent = `Error: ${err.message}`;
+      console.error('[IMPORT] Fatal finalization error:', err);
+      // Strip the Electron IPC wrapper ("Error invoking remote method 'X': Error: Y") to expose the actual cause.
+      const rawMsg = err.message || String(err);
+      const actualCause = rawMsg.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') || rawMsg;
+      document.getElementById('progressFilename').textContent = `Import failed: ${actualCause}`;
       document.getElementById('progressDoneBtn').classList.add('visible');
       // Reset to 'created' so the event is not stuck in-progress after failure.
       if (_eventJsonPath) {

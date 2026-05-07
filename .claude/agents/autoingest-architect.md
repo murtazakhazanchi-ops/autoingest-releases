@@ -263,6 +263,44 @@ Validation:
 - Confirm any platform value needed by the renderer is exposed via `contextBridge` in `preload.js`.
 - Confirm the renderer accesses it via `window.api.<field>`.
 
+### Per-File Property Propagation on exifService Batch Objects
+
+Context:
+- Applies when extending `exifService.applyBatch()` (or any exifService batch function) to carry per-file metadata that differs across files in the same batch — such as per-file photographer, per-file location, or per-file operator.
+
+Rule:
+- A per-file property requires a three-point change:
+  1. Set the property on each `copiedFiles[i]` object before calling `applyBatch()`.
+  2. Store it in `fileStatuses[i]` during the batch-start handler so it survives async file processing.
+  3. Read it in `_processFile` with a context fallback: `file.photographer != null ? file.photographer : context.photographer`.
+- Must also propagate through `retryFailed()` — the retry path rebuilds file objects from `fileStatuses`; any per-file property stored there must be re-attached.
+- This pattern is backward-compatible: callers that do not set the per-file property continue to receive the context-level value via fallback.
+
+```js
+// 1. Set on batch input
+copiedFiles[i].photographer = resolvePhotographer(filePath, baseDir);
+
+// 2. Store in fileStatuses at batch-start
+fileStatuses[i] = { ..., photographer: file.photographer };
+
+// 3. Read in _processFile with fallback
+const photographer = file.photographer != null
+  ? file.photographer
+  : context.photographer;
+```
+
+Avoid:
+- Applying `context.photographer` (a single string) to all files in a reapply batch — this ignores per-file folder-structure attribution.
+- Setting the per-file property on `copiedFiles[]` but forgetting to store it in `fileStatuses[]` — it will be lost after the first async boundary.
+- Omitting the `retryFailed()` propagation — retried files will lose their per-file property and fall back to the wrong context value.
+
+Validation:
+- Confirm per-file property is set on the input `copiedFiles[]` before `applyBatch()` is called.
+- Confirm it is stored in `fileStatuses[]` in the batch-start handler.
+- Confirm `_processFile` uses the per-file value with a context fallback.
+- Confirm `retryFailed()` re-attaches the stored per-file property when rebuilding file objects.
+- Confirm a batch with mixed photographers applies the correct photographer to each file.
+
 ## Validation Checklist
 
 When invoked, return:

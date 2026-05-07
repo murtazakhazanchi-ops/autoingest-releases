@@ -701,7 +701,38 @@ ipcMain.handle('import:commitTransaction', async (event, {
       source,
       importedBy,
     };
-    const logs = buildAuditImportEntries(auditContext);
+    let logs;
+    try {
+      logs = buildAuditImportEntries(auditContext);
+    } catch (auditErr) {
+      console.error('[import:commitTransaction] buildAuditImportEntries failed:', auditErr.stack || auditErr.message);
+      logs = [];
+    }
+
+    // If audit entry creation failed or produced nothing, synthesize a minimal valid record.
+    // This guarantees imports[] / lastImport are never silently blank after a successful copy,
+    // keeping the Activity Log and metadata batchId consistent.
+    if (logs.length === 0 && result.copied > 0) {
+      let fbPhotos = 0, fbVideos = 0;
+      const _vidExts = new Set((require('../config/app.config').VIDEO_EXTENSIONS) || []);
+      for (const cf of (result.copiedFiles || [])) {
+        if (_vidExts.has(path.extname(cf.src || '').toLowerCase())) fbVideos++;
+        else fbPhotos++;
+      }
+      logs = [{
+        id:             `fb-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
+        seq:            Date.now(),
+        timestamp:      new Date().toISOString(),
+        photographer:   photographer || '',
+        componentIndex: 0,
+        componentName:  '',
+        counts:         { photos: fbPhotos, videos: fbVideos },
+        source:         normalizeImportSource(source),
+        importedBy:     (importedBy && typeof importedBy === 'object') ? importedBy : null,
+      }];
+      console.warn('[import:commitTransaction] Audit entry creation produced no records — fallback import record written.');
+    }
+
     result.auditLogs = logs;
 
     // Build metadataGroups for reapply: map dest-relative paths → metadataTags.
@@ -771,10 +802,18 @@ ipcMain.handle('import:commitTransaction', async (event, {
       const tmp = jsonPath + '.tmp';
       try {
         await fsp.writeFile(tmp, JSON.stringify(doc, null, 2), 'utf8');
-        await fsp.rename(tmp, jsonPath);
+        try {
+          await fsp.rename(tmp, jsonPath);
+        } catch (renameErr) {
+          if (renameErr.code !== 'EXDEV') throw renameErr;
+          // Cross-device rename (e.g. NAS or iCloud drive on different volume) — fall back to copy+unlink.
+          await fsp.copyFile(tmp, jsonPath);
+          await fsp.unlink(tmp).catch(() => {});
+        }
       } catch (err) {
-        try { await fsp.unlink(tmp); } catch {}
-        throw new Error(`Event finalization failed: ${err.message}`);
+        await fsp.unlink(tmp).catch(() => {});
+        console.error(`[import:commitTransaction] event.json write failed at ${jsonPath}:`, err.stack || err.message);
+        throw new Error(`Event finalization failed (${err.code || 'ERR'}): ${err.message}`);
       }
     }
 
@@ -809,6 +848,7 @@ ipcMain.handle('import:commitTransaction', async (event, {
 
     return result;
   } catch (err) {
+    console.error('[import:commitTransaction] finalization error:', err.stack || err.message);
     try {
       await restoreCreatedStatus();
     } catch (rollbackErr) {

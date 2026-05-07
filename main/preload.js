@@ -188,9 +188,11 @@ contextBridge.exposeInMainWorld('api', {
   setAutoMetadataEnabled:   (v)                      => ipcRenderer.invoke('settings:setAutoMetadataEnabled', v),
 
   // ── EXIF metadata service ──
-  getMetadataStatus:    (batchId)          => ipcRenderer.invoke('metadata:getStatus', batchId),
-  retryMetadata:        (batchId)          => ipcRenderer.invoke('metadata:retry', batchId),
-  onMetadataProgress:   (cb) => _register('metadata:progress', (_e, progress) => cb(progress)),
+  getMetadataStatus:      (batchId)            => ipcRenderer.invoke('metadata:getStatus',     batchId),
+  retryMetadata:          (batchId)            => ipcRenderer.invoke('metadata:retry',          batchId),
+  reapplyEventMetadata:   (eventFolderPath)    => ipcRenderer.invoke('metadata:reapplyEvent',   eventFolderPath),
+  getMetadataLastRun:     (eventFolderPath)    => ipcRenderer.invoke('metadata:getLastRun',     eventFolderPath),
+  onMetadataProgress:     (cb) => _register('metadata:progress', (_e, progress) => cb(progress)),
 
   // ── Event JSON (disk-backed event persistence) ──
   writeEventJson:   (eventFolderPath, eventData) => ipcRenderer.invoke('event:write',         eventFolderPath, eventData),

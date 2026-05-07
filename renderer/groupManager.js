@@ -36,7 +36,7 @@ const GroupManager = (() => {
 
   function createGroup() {
     const id = _groups.length + 1;
-    _groups.push({ id, label: `G${id}`, files: new Set(), subEventId: null });
+    _groups.push({ id, label: `G${id}`, files: new Set(), subEventId: null, metadataTags: null });
     _activeTabId = id;
     return id;
   }
@@ -150,6 +150,12 @@ const GroupManager = (() => {
     if (g) g.subEventId = (val === '' || val === null) ? null : String(val);
   }
 
+  /** tags: string[] of keyword tags, or null to clear the assignment. */
+  function setMetadataTags(groupId, tags) {
+    const g = _groups.find(x => x.id === groupId);
+    if (g) g.metadataTags = Array.isArray(tags) ? [...tags] : null;
+  }
+
   // ── Tab state ──────────────────────────────────────────────────────────────
 
   function getActiveTabId()   { return _activeTabId; }
@@ -172,6 +178,7 @@ const GroupManager = (() => {
     getGroupColor,
     getGroupIndex,
     setSubEvent,
+    setMetadataTags,
     getActiveTabId,
     setActiveTabId,
     reset,

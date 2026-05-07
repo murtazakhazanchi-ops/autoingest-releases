@@ -10,7 +10,7 @@
  *
  * RAW PREVIEW ORDER (CR2/CR3/NEF/ARW/DNG/RAF/…):
  *   macOS  → qlmanage QuickLook (OS camera-raw plugin, no descriptor risk)
- *   Windows → nativeImage (requires Microsoft RAW Image Extension)
+ *   Windows → nativeImage.createThumbnailFromPath (Shell/WIC — same path as File Explorer)
  *   Linux / fallback → RAW_PLACEHOLDER_DATA_URL
  *   exifr and sharp are NEVER used for RAW files.
  *
@@ -294,16 +294,31 @@ async function generateThumbnailDataUrl(srcPath, outputPath) {
       } catch {}
     }
 
-    // Windows: nativeImage — assumes "Microsoft RAW Image Extension" is
-    // installed (available free from the Microsoft Store). Falls back to the
-    // RAW placeholder if the codec is absent or the file is unreadable.
+    // Windows: Shell/WIC via nativeImage.createThumbnailFromPath.
+    // Routes through the Windows Shell IShellItemImageFactory (WIC-based), which
+    // is the same path Windows File Explorer uses. WIC codecs registered by the
+    // Microsoft RAW Image Extension are picked up automatically.
+    //
+    // IMPORTANT: createFromPath uses Chromium's own decoder (not WIC) and cannot
+    // decode RAW files even when the RAW Image Extension is installed.
+    // createThumbnailFromPath is the correct API here.
     if (process.platform === 'win32') {
       try {
-        const image = await withFileReadLimit(() => nativeImage.createFromPath(srcPath));
+        const t0    = Date.now();
+        const image = await withFileReadLimit(() =>
+          nativeImage.createThumbnailFromPath(srcPath, { width: THUMB_MAX_SIZE, height: THUMB_MAX_SIZE })
+        );
+        const elapsed = Date.now() - t0;
         if (!image.isEmpty()) {
-          return image.resize({ width: 180 }).toDataURL();
+          console.log(`[thumbnailer][win-raw] Shell/WIC hit | ${elapsed}ms | ${path.extname(srcPath)}`);
+          const buffer = image.toJPEG(THUMB_QUALITY);
+          if (await cacheThumbnailBuffer(outputPath, buffer)) return toFileUrl(outputPath);
+          return toDataUrl(buffer);
         }
-      } catch {}
+        console.error(`[thumbnailer][win-raw] empty — codec absent or file unreadable | ${elapsed}ms | ${path.extname(srcPath)} | ${srcPath}`);
+      } catch (e) {
+        console.error(`[thumbnailer][win-raw] Shell/WIC failed | ${path.extname(srcPath)} | ${e.message} | ${srcPath}`);
+      }
     }
 
     // Linux or OS preview unavailable → show RAW placeholder.

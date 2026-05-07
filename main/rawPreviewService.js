@@ -5,7 +5,9 @@
  *
  * Extracts a large-format preview from RAW camera files using:
  *   macOS   → QuickLook (qlmanage) at 1200px
- *   Windows → PowerShell + System.Drawing (requires OS RAW codec support)
+ *   Windows → Shell/WIC via nativeImage.createThumbnailFromPath
+ *             (uses the same IShellItemImageFactory path as File Explorer;
+ *              picks up the Microsoft RAW Image Extension WIC codec automatically)
  *
  * Returns a file:// URL on success, null on failure or unsupported platform.
  * The renderer falls back to getThumb() when null is returned.
@@ -14,7 +16,7 @@
  * Cache TTL: 30 days (stale entries evicted on next access)
  */
 
-const { app }           = require('electron');
+const { app, nativeImage } = require('electron');
 const path              = require('path');
 const fs                = require('fs');
 const fsp               = require('fs').promises;
@@ -27,7 +29,6 @@ const { RAW_EXTENSIONS }        = require('../config/app.config.js');
 
 const PREVIEW_SIZE_PX  = 1200;
 const QLMANAGE_TIMEOUT = 12_000;
-const WIN_PS_TIMEOUT   = 12_000;
 const MAX_CACHE_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 const MIN_VALID_BYTES  = 5_000;
 
@@ -85,72 +86,52 @@ async function extractViaQlmanage(srcPath) {
   });
 }
 
-// ── Windows: PowerShell + System.Drawing ────────────────────────────────────
-// Requires Windows RAW codec support (Microsoft Camera Codec Pack or OEM drivers).
-// Returns null without throwing when codecs are absent — renderer falls back to
-// getThumb() automatically.
+// ── Windows: Shell/WIC via nativeImage.createThumbnailFromPath ──────────────
+// createThumbnailFromPath routes through the Windows Shell IShellItemImageFactory,
+// which is fully WIC-based — the same code path Windows File Explorer uses.
+// WIC codecs registered by the Microsoft RAW Image Extension (or OEM camera
+// drivers) are picked up automatically.
 //
-// Paths are passed via environment variables (RAWPV_SRC / RAWPV_OUT), never
-// interpolated into the script string, so spaces, unicode, and special characters
-// in file paths cannot cause injection or quoting errors.
+// IMPORTANT: nativeImage.createFromPath uses Chromium's own image decoder,
+// which does NOT route through WIC.  Installed RAW codecs have no effect on
+// createFromPath.  createThumbnailFromPath is the correct API here.
+//
+// Returns a temp file path on success, null on failure or empty result.
+// The caller (getRawPreview) handles stat-check, minimum-size guard, and
+// copy to the persistent cache location.
 async function extractViaWin32(srcPath) {
-  const t0      = Date.now();
-  const hash    = crypto.createHash('sha1').update(srcPath).digest('hex').slice(0, 12);
-  const tmpDir  = path.join(os.tmpdir(), `autoingest-rawpv-${hash}`);
-  const outFile = path.join(tmpDir, `${path.basename(srcPath)}.png`);
-
+  const t0 = Date.now();
   try {
+    const img     = await nativeImage.createThumbnailFromPath(
+      srcPath,
+      { width: PREVIEW_SIZE_PX, height: PREVIEW_SIZE_PX }
+    );
+    const elapsed = Date.now() - t0;
+
+    if (!img || img.isEmpty()) {
+      console.error(`[rawPreview][win] empty — codec absent or file unreadable | ${elapsed}ms | ${path.extname(srcPath)} | ${srcPath}`);
+      return null;
+    }
+
+    const pngBuf = img.toPNG();
+    if (!pngBuf || pngBuf.length < MIN_VALID_BYTES) {
+      console.error(`[rawPreview][win] output too small (${pngBuf?.length ?? 0}B) | ${elapsed}ms | ${srcPath}`);
+      return null;
+    }
+
+    const hash    = crypto.createHash('sha1').update(srcPath).digest('hex').slice(0, 12);
+    const tmpDir  = path.join(os.tmpdir(), `autoingest-rawpv-${hash}`);
+    const outFile = path.join(tmpDir, `${path.basename(srcPath)}.png`);
     await fsp.mkdir(tmpDir, { recursive: true });
-  } catch {
+    await fsp.writeFile(outFile, pngBuf);
+
+    console.log(`[rawPreview][win] Shell/WIC extracted in ${elapsed}ms | ${path.basename(srcPath)}`);
+    return outFile;
+  } catch (err) {
+    const elapsed = Date.now() - t0;
+    console.error(`[rawPreview][win] Shell/WIC failed | ${elapsed}ms | ${path.extname(srcPath)} | ${err.message}`);
     return null;
   }
-
-  const psScript = [
-    'Add-Type -AssemblyName System.Drawing',
-    'try {',
-    '  $src = [System.Drawing.Image]::FromFile($env:RAWPV_SRC)',
-    '  $mx  = 1200',
-    '  $r   = [Math]::Min(1.0, [Math]::Min($mx / $src.Width, $mx / $src.Height))',
-    '  $w   = [Math]::Max(1, [int]($src.Width  * $r))',
-    '  $h   = [Math]::Max(1, [int]($src.Height * $r))',
-    '  $bmp = [System.Drawing.Bitmap]::new($w, $h)',
-    '  $g   = [System.Drawing.Graphics]::FromImage($bmp)',
-    '  $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic',
-    '  $g.DrawImage($src, 0, 0, $w, $h)',
-    '  $g.Dispose(); $src.Dispose()',
-    '  $bmp.Save($env:RAWPV_OUT, [System.Drawing.Imaging.ImageFormat]::Png)',
-    '  $bmp.Dispose()',
-    '  exit 0',
-    '} catch { exit 1 }',
-  ].join('\n');
-
-  return new Promise((resolve) => {
-    let settled = false;
-    const safeResolve = (val) => { if (settled) return; settled = true; resolve(val); };
-
-    let timer;
-    const proc = execFile(
-      'powershell.exe',
-      ['-NoProfile', '-NonInteractive', '-Command', psScript],
-      { env: { ...process.env, RAWPV_SRC: srcPath, RAWPV_OUT: outFile } },
-      (err) => {
-        clearTimeout(timer);
-        const elapsed = Date.now() - t0;
-        if (err) {
-          console.error(`[rawPreview][win] ${err.killed ? 'timeout' : 'codec-fail'} | ${elapsed}ms | ${srcPath}`);
-          safeResolve(null);
-          return;
-        }
-        console.log(`[rawPreview][win] extracted in ${elapsed}ms`);
-        safeResolve(outFile);
-      }
-    );
-
-    timer = setTimeout(() => {
-      proc.kill('SIGKILL');
-      safeResolve(null);
-    }, WIN_PS_TIMEOUT);
-  });
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
