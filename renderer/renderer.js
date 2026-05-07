@@ -148,6 +148,11 @@ let currentFolderTree = null;
 // existing behaviour for every pre-Commit-8 code path.
 let viewModeType = 'media';  // 'media' | 'folder'
 
+// Controls sidebar folder-click behaviour.
+// 'tree'  — memory-card mode: click uses pre-built tree in-memory (enterFolderView).
+// 'scan'  — external-drive/local-folder mode: click triggers non-recursive direct listing (browseFolderDirect).
+let _folderNavMode = 'tree';
+
 // Tracks what the folder view is currently showing. Populated in Commits 9-11.
 // isRoot=true means the folder view should render top-level folder cards;
 // isRoot=false means we are inside a specific folder and should render its files.
@@ -2257,36 +2262,14 @@ document.getElementById('alCloseFooterBtn')?.addEventListener('click', _alClose)
 // DRIVE METADATA HELPERS
 // ════════════════════════════════════════════════════════════════
 
-function _formatCapacity(bytes) {
+function formatDriveCapacity(bytes) {
   if (!bytes || bytes <= 0) return '';
+  const tb = bytes / (1024 ** 4);
+  if (tb >= 1) return `${+tb.toFixed(1)} TB`;
   const gb = bytes / (1024 ** 3);
   if (gb >= 1) return `${Math.round(gb)} GB`;
   const mb = bytes / (1024 ** 2);
   return `${Math.round(mb)} MB`;
-}
-
-function _inferCardType(drive) {
-  const bus  = (drive.busType    || '').toUpperCase();
-  const desc = (drive.description || '').toLowerCase();
-  if (bus === 'SD' || drive.isCard) {
-    if (desc.includes('sdxc')) return 'SDXC';
-    if (desc.includes('sdhc')) return 'SDHC';
-    if (desc.includes('sdsc') || desc.includes('sd ')) return 'SD';
-    return 'SD Card';
-  }
-  if (bus === 'USB') return 'USB';
-  if (bus === 'ATA' || bus === 'SATA') return 'SSD';
-  if (bus === 'NVME') return 'NVMe';
-  return '';
-}
-
-function _buildDeviceMeta(drive) {
-  const parts = [drive.mountpoint];
-  const cap  = _formatCapacity(drive.size);
-  if (cap) parts.push(cap);
-  const type = _inferCardType(drive);
-  if (type) parts.push(type);
-  return parts.join(' • '); // bullet separator
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -2355,7 +2338,7 @@ function renderDrives(cards) {
       <svg class="device-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h11v20H4V8z"/><path d="M9 14v5M12 14v5M15 14v5"/></svg>
       <div style="flex:1;min-width:0">
         <div class="src-device-item-name">${escapeHtml(c.label)}</div>
-        <div class="src-device-item-meta">${escapeHtml(_buildDeviceMeta(c))}</div>
+        ${formatDriveCapacity(c.size) ? `<div class="src-device-item-meta">${escapeHtml(formatDriveCapacity(c.size))}</div>` : ''}
       </div>
       <div class="src-device-check">${isSel ? SVG.check : ''}</div>
     </div>`;
@@ -2422,7 +2405,7 @@ function renderExtDrives(cards) {
       <svg class="device-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="17" cy="12" r="1.5"/><path d="M6 12h6"/></svg>
       <div style="flex:1;min-width:0">
         <div class="src-device-item-name">${escapeHtml(name)}</div>
-        <div class="src-device-item-meta">${escapeHtml(d.busType || 'USB')}</div>
+        ${formatDriveCapacity(d.size) ? `<div class="src-device-item-meta">${escapeHtml(formatDriveCapacity(d.size))}</div>` : ''}
       </div>
       <div class="src-device-check">${isSel ? SVG.check : ''}</div>
     </div>`;
@@ -2466,11 +2449,37 @@ async function selectSource({ type, path, label = null, driveObj = null }) {
   activeFolderPath = null;
 
   expandedFolders.clear(); dcimChildrenCache = []; cachedDcimPath = null;
+  currentFolderTree = null;
+  currentFolderContext = { path: null, files: [], isRoot: true, isLeaf: false };
   selectedFiles.clear(); currentFiles = []; lastClickedPath = null; _selectionAnchor = null; _prevFocusPath = null; tileMap = new Map();
   resetViewCache();
   GroupManager.reset();
   renderGroupPanel();
 
+  // ── External Drive / Local Folder: instant workspace, scan only on folder selection ──
+  // Large sources (2 TB SSDs, deep folder trees) can take minutes to fully scan.
+  // Show workspace immediately in Folder view so the UI is responsive from the start.
+  // The sidebar loads a shallow directory tree; media scans fire only when the user
+  // picks a specific folder, keeping IPC payloads small.
+  if (type === 'external-drive' || type === 'local-folder') {
+    _folderNavMode = 'scan';
+    isLoadingFiles = false;
+    if (viewModeType !== 'folder') {
+      viewModeType = 'folder';
+      document.getElementById('viewFolderBtn')?.classList.add('view-active');
+      document.getElementById('viewMediaBtn')?.classList.remove('view-active');
+      syncViewToggles();
+    }
+    document.getElementById('step1Panel').style.display = 'none';
+    document.getElementById('workspace').classList.add('visible');
+    updateSteps(); updateSelectionBar();
+    _updateContextBar();
+    _loadSourceFolderTree(path);
+    return;
+  }
+
+  // ── Memory Card: scan before workspace (unchanged) ───────────────────────────
+  _folderNavMode = 'tree';
   // Prepare workspace while still hidden — DOM updates on hidden elements are safe
   document.getElementById('folderList').innerHTML =
     `<div class="sidebar-empty">Loading folders…</div>`;
@@ -2510,6 +2519,7 @@ document.getElementById('changeDriveBtn').addEventListener('click', () => {
   hasSelectedDrive = false;
   isLoadingFiles   = false;
   currentFolder    = null;
+  _folderNavMode   = 'tree';
   fileLoadRequestId++;
   activeDrive = null; activeFolderPath = null; activeSource = null;
   expandedFolders.clear(); dcimChildrenCache = []; cachedDcimPath = null;
@@ -2547,6 +2557,7 @@ function resetAppState() {
   hasSelectedDrive  = false;
   isLoadingFiles    = false;
   currentFolder     = null;
+  _folderNavMode    = 'tree';
   fileLoadRequestId++;   // invalidate any in-flight file loads
 
   activeDrive      = null;
@@ -2831,10 +2842,35 @@ function wireFolderListClicks(list, opts) {
       const p = item.dataset.path;
       if (!p) return;
       if (opts.treeMode) {
-        // Tree mode: use pre-built tree; no rescan.
         if (p === opts.dcimPath) {
-          exitToFolderRoot();
+          // Root click.
+          if (_folderNavMode === 'scan') {
+            if (activeSource?.type === 'local-folder') {
+              // Local folder: re-show root's direct media when root label clicked.
+              browseFolderDirect(p);
+            } else {
+              // External drive: return to "Select a folder" prompt.
+              currentFolderContext = { path: null, files: [], isRoot: true, isLeaf: false };
+              currentFiles = [];
+              const sidebar = document.getElementById('sidebar');
+              if (sidebar) sidebar.style.display = '';
+              renderCurrentView();
+            }
+          } else {
+            exitToFolderRoot();
+          }
+        } else if (_folderNavMode === 'scan') {
+          if (viewModeType === 'media') {
+            // Media view active: recursively load the newly selected folder.
+            // _startMediaScan handles sidebar highlight, breadcrumb, context, and loading state.
+            _startMediaScan(p);
+          } else {
+            // Folder view: NON-RECURSIVE direct listing of selected folder.
+            // browseFolderDirect uses files:getDirect (readDirectory) — immediate children only.
+            browseFolderDirect(p);
+          }
         } else {
+          // Memory card: pure in-memory navigation from pre-built tree.
           enterFolderView(p);
         }
       } else {
@@ -2935,6 +2971,22 @@ function renderCurrentView() {
   }
 
   // Leaf folder: render its files through the existing pipeline.
+  // In scan-mode, show the folder-specific empty message rather than the generic
+  // renderFileArea one so it matches the message shown by browseFolderDirect.
+  if (_folderNavMode === 'scan' && currentFolderContext.files.length === 0) {
+    const _a = document.getElementById('fileGrid');
+    if (_a) {
+      _a.onscroll = null;
+      _a.className = '';
+      _a.innerHTML =
+          `<div class="panel-state">`
+        + `<span class="state-icon">${_SVG_FOLDER_LG}</span>`
+        + `<span>No media directly in this folder. Select a subfolder.</span>`
+        + `</div>`;
+    }
+    updateSelectionBar();
+    return;
+  }
   renderFileArea(currentFolderContext.files);
 }
 
@@ -3073,7 +3125,12 @@ document.getElementById('viewMediaBtn').addEventListener('click', () => {
   // Commit 14: reset scroll on view toggle so the user doesn't land mid-list.
   const fg = document.getElementById('fileGrid');
   if (fg) fg.scrollTop = 0;
-  renderCurrentView();
+  if (_folderNavMode === 'scan') {
+    // Scan mode: recursively aggregate media from the selected folder.
+    _startMediaScan(currentFolderContext.path);
+  } else {
+    renderCurrentView();
+  }
   syncViewToggles();
 });
 
@@ -3085,6 +3142,16 @@ document.getElementById('viewFolderBtn').addEventListener('click', () => {
   // Commit 14: reset scroll on view toggle so the user doesn't land mid-list.
   const fg = document.getElementById('fileGrid');
   if (fg) fg.scrollTop = 0;
+  if (_folderNavMode === 'scan') {
+    // Invalidate any in-flight _startMediaScan so it cannot overwrite Folder view
+    // even if the view guard races (belt-and-suspenders alongside the view guard).
+    fileLoadRequestId++;
+    // Restore direct-listing state so sort/selection operates on direct files.
+    currentFiles = currentFolderContext.files || [];
+    // Clear stale selection from Media view — selected paths may not exist in the
+    // direct-only listing that Folder view is about to render.
+    selectedFiles.clear(); lastClickedPath = null; _selectionAnchor = null; _prevFocusPath = null;
+  }
   renderCurrentView();
   syncViewToggles();
 });
@@ -3943,6 +4010,9 @@ function updateFileStatus(files, processed = null, total = null) {
 
 function applyFileBatch(batch) {
   if (batch.requestId !== fileLoadRequestId) return;
+  // In scan-mode, batch events come from recursive scans triggered by _startMediaScan.
+  // Discard if the user has switched to Folder view to prevent overwriting direct-listing state.
+  if (_folderNavMode === 'scan' && viewModeType !== 'media') return;
 
   const _bc1 = document.getElementById('breadcrumb'); if (_bc1) _bc1.textContent = batch.folderPath;
   activeFolderPath = batch.folderPath;
@@ -4027,6 +4097,261 @@ async function browseFolder(drivePath, folderPath) {
     document.getElementById('fileGrid').innerHTML =
       `<div class="panel-state"><span class="state-icon">${SVG.warn}</span><span>${escapeHtml(msg)}</span></div>`;
     return false;
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// FOLDER TREE LOADER (external-drive / local-folder entry)
+// Fetches a shallow directory tree without scanning any media files.
+// Called AFTER the workspace is already visible so the UI stays responsive
+// while the directory walk runs in the main process.
+// For flat sources (no subfolders), triggers a bounded media scan of the root.
+// ════════════════════════════════════════════════════════════════
+async function _loadSourceFolderTree(drivePath) {
+  const loadPath = drivePath;
+  const sourceType = activeSource?.type;
+
+  document.getElementById('folderList').innerHTML =
+    `<div class="sidebar-empty">Loading folders…</div>`;
+
+  const area = document.getElementById('fileGrid');
+  if (area) {
+    area.className = '';
+    area.innerHTML =
+        `<div class="panel-state">`
+      + `<span class="state-icon">${_SVG_FOLDER_LG}</span>`
+      + `<span>Select a folder to view its media.</span>`
+      + `</div>`;
+  }
+
+  let tree;
+  try {
+    tree = await window.api.getFolders(drivePath);
+  } catch {
+    if (activeSource?.path !== loadPath) return;
+    document.getElementById('folderList').innerHTML =
+      `<div class="sidebar-empty">Could not read folders</div>`;
+    return;
+  }
+
+  if (activeSource?.path !== loadPath) return;
+
+  const hasTree = tree && typeof tree === 'object' && !Array.isArray(tree);
+  currentFolderTree = hasTree ? tree : null;
+
+  const sidebar = document.getElementById('sidebar');
+
+  if (currentFolderTree && currentFolderTree.children && currentFolderTree.children.length > 0) {
+    // Source has subfolders: render sidebar tree and make it visible immediately.
+    // Bug #1 fix: renderFolders populates folderList content but does NOT show the
+    // sidebar element itself — that is only done by renderCurrentView(). We set it
+    // explicitly here so the sidebar appears without requiring a view toggle.
+    expandedFolders.add(currentFolderTree.path);
+    renderFolders(currentFolderTree, currentFolderTree.path);
+    if (sidebar) sidebar.style.display = '';
+
+    if (sourceType === 'local-folder') {
+      // Local folder: auto-load direct (non-recursive) media of root immediately.
+      // The user sees the folder tree on the left and root media on the right.
+      await browseFolderDirect(drivePath);
+    }
+    // External drive: leave "Select a folder" prompt in the main panel.
+  } else {
+    // Flat source (no subfolders): show folder as sidebar label and load direct media.
+    // Non-recursive: readDirectory only stats the single flat folder, no descent.
+    const parts = drivePath.replace(/[\\/]+$/, '').split(/[\\/]/);
+    const basename = parts[parts.length - 1] || drivePath;
+    document.getElementById('folderList').innerHTML =
+      `<div class="sidebar-empty">${escapeHtml(basename)}</div>`;
+    if (sidebar) sidebar.style.display = '';
+    if (area) {
+      area.innerHTML =
+          `<div class="panel-state">`
+        + `<span class="state-icon">${_SVG_FOLDER_LG}</span>`
+        + `<span>Scanning selected folder…</span>`
+        + `</div>`;
+    }
+    await browseFolderDirect(drivePath);
+  }
+}
+
+// Non-recursive direct-folder listing for external-drive / local-folder scan mode.
+// Fetches only the IMMEDIATE children of folderPath (direct media + direct subfolders).
+// Never calls scanMediaRecursive — prevents renderer overload on large nested trees.
+async function browseFolderDirect(folderPath) {
+  const requestId = ++fileLoadRequestId;
+  activeFolderPath = folderPath;
+  selectedFiles.clear(); currentFiles = []; lastClickedPath = null;
+  _selectionAnchor = null; _prevFocusPath = null;
+  resetViewCache();
+  currentFolder = folderPath;
+  updateSelectionBar(); updateSteps();
+
+  try {
+    const result = await window.api.getFilesDirect(folderPath);
+    if (requestId !== fileLoadRequestId) return;
+
+    // result: { files: [direct media], folders: [direct subfolders] }
+    currentFiles = result.files || [];
+    activeFolderPath = folderPath;
+
+    currentFolderContext = {
+      path:   folderPath,
+      files:  currentFiles,
+      isRoot: false,
+      isLeaf: true,  // scan-mode: always render direct content regardless of subfolders
+    };
+
+    const bc = document.getElementById('breadcrumb');
+    if (bc) bc.textContent = folderPath;
+
+    // Highlight the active sidebar row.
+    document.querySelectorAll('.folder-item').forEach(item =>
+      item.classList.toggle('active', item.dataset.path === folderPath));
+
+    await refreshDestCache();
+
+    if (currentFiles.length === 0) {
+      const area = document.getElementById('fileGrid');
+      if (area) {
+        area.onscroll = null;
+        area.className = '';
+        area.innerHTML =
+            `<div class="panel-state">`
+          + `<span class="state-icon">${_SVG_FOLDER_LG}</span>`
+          + `<span>No media directly in this folder. Select a subfolder.</span>`
+          + `</div>`;
+      }
+    } else {
+      renderFileArea(currentFiles);
+    }
+
+    updateSelectionBar(); updateSortButtons(); updateSteps();
+    updateFileStatus(currentFiles);
+    return true;
+
+  } catch (err) {
+    if (requestId !== fileLoadRequestId) return;
+    const msg = err?.message || String(err);
+    const area = document.getElementById('fileGrid');
+    if (area) {
+      area.onscroll = null;
+      area.className = '';
+      area.innerHTML =
+          `<div class="panel-state">`
+        + `<span class="state-icon">${SVG.warn}</span>`
+        + `<span>${escapeHtml(msg)}</span>`
+        + `</div>`;
+    }
+    return false;
+  }
+}
+
+// Recursive media aggregation for scan-mode Media view (external-drive / local-folder).
+// Scans scanPath recursively via files:get — never the whole drive root unless the user
+// explicitly selected the root.  Stale-guarded by fileLoadRequestId.
+// View-guarded: discards result if user switched back to Folder view during the scan.
+// Also fetches the direct listing in parallel so currentFolderContext.files stays accurate
+// for clean Folder view restore regardless of which call site triggered this function
+// (viewMediaBtn toggle or folder-click while Media view is active).
+async function _startMediaScan(scanPath) {
+  if (!scanPath) {
+    const area = document.getElementById('fileGrid');
+    if (area) {
+      area.onscroll = null;
+      area.className = '';
+      area.innerHTML =
+          `<div class="panel-state">`
+        + `<span class="state-icon">${_SVG_FOLDER_LG}</span>`
+        + `<span>Select a folder to view its media.</span>`
+        + `</div>`;
+    }
+    return;
+  }
+
+  const requestId = ++fileLoadRequestId;
+
+  // Update folder identity synchronously so sidebar and breadcrumb reflect the
+  // new path immediately — important when called from a folder-click in Media view.
+  currentFolder = scanPath;
+  activeFolderPath = scanPath;
+  selectedFiles.clear(); currentFiles = []; lastClickedPath = null;
+  _selectionAnchor = null; _prevFocusPath = null;
+  resetViewCache();
+  document.querySelectorAll('.folder-item').forEach(item =>
+    item.classList.toggle('active', item.dataset.path === scanPath));
+  const _bc = document.getElementById('breadcrumb');
+  if (_bc) _bc.textContent = scanPath;
+
+  // Show loading state before the async IPC calls so the UI is never frozen-blank.
+  const area = document.getElementById('fileGrid');
+  if (area) {
+    area.onscroll = null;
+    area.className = '';
+    area.innerHTML =
+        `<div class="panel-state">`
+      + `<span>Scanning media in this folder…</span>`
+      + `</div>`;
+  }
+  updateSelectionBar(); updateSteps();
+
+  try {
+    // Run direct listing and recursive scan in parallel.
+    // Direct listing (fast) populates currentFolderContext.files so that when the user
+    // switches back to Folder view the correct direct-only state is restored immediately.
+    const [directResult, result] = await Promise.all([
+      window.api.getFilesDirect(scanPath).catch(() => ({ files: [] })),
+      window.api.getFiles(activeSource.path, scanPath, requestId),
+    ]);
+
+    if (requestId !== fileLoadRequestId) return;   // stale: folder or source changed
+    if (viewModeType !== 'media') return;           // user switched back to Folder view
+
+    // Update context with direct files so Folder view restore is always clean.
+    currentFolderContext = {
+      path:   scanPath,
+      files:  directResult.files || [],
+      isRoot: false,
+      isLeaf: true,
+    };
+    const bc2 = document.getElementById('breadcrumb');
+    if (bc2) bc2.textContent = scanPath;
+
+    currentFiles = result.files || [];
+    await refreshDestCache();
+    if (requestId !== fileLoadRequestId) return;
+    if (viewModeType !== 'media') return;
+
+    if (currentFiles.length === 0) {
+      const a = document.getElementById('fileGrid');
+      if (a) {
+        a.onscroll = null;
+        a.className = '';
+        a.innerHTML =
+            `<div class="panel-state">`
+          + `<span class="state-icon">${_SVG_FOLDER_LG}</span>`
+          + `<span>No supported media files found in this folder tree.</span>`
+          + `</div>`;
+      }
+    } else {
+      renderFileArea(currentFiles);
+    }
+    updateSelectionBar(); updateSortButtons(); updateSteps();
+    updateFileStatus(currentFiles);
+  } catch (err) {
+    if (requestId !== fileLoadRequestId) return;
+    if (viewModeType !== 'media') return;
+    console.error('[_startMediaScan] error:', err);
+    const a = document.getElementById('fileGrid');
+    if (a) {
+      a.onscroll = null;
+      a.className = '';
+      a.innerHTML =
+          `<div class="panel-state">`
+        + `<span class="state-icon">${SVG.warn}</span>`
+        + `<span>${escapeHtml(err?.message || String(err))}</span>`
+        + `</div>`;
+    }
   }
 }
 

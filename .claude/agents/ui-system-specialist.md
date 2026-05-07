@@ -740,6 +740,26 @@ Validation:
 - Before shipping any new CSS rule: grep `renderer/theme.css` (and any imported token files) to confirm every `var(--...)` reference is defined.
 - Visually confirm hover/focus/active states produce the intended visual change in both light and dark themes.
 
+### Sidebar Element Visibility vs Sidebar List Content
+
+Context:
+- Applies to `#sidebar`, `#folderList`, `renderFolders()`, `renderCurrentView()`, and any code path that populates the folder navigation sidebar.
+
+Rule:
+- `renderFolders(tree, dcimPath)` writes to `folderList.innerHTML` (the list content) only. It does NOT touch the `#sidebar` element's `display` property.
+- `renderCurrentView()` is the ONLY function that controls `#sidebar` visibility: `sidebar.style.display = (viewModeType === 'folder') ? '' : 'none'`.
+- When calling `renderFolders()` from outside `renderCurrentView()` (e.g., `_loadSourceFolderTree`, a batch progress handler, or any async load path), always explicitly set `sidebar.style.display = ''` immediately after if folder mode is active. Populating the list content without showing the container leaves a populated but invisible sidebar.
+- The sidebar element starts hidden (`display: none`) during media-view initialization. Any code path that transitions into folder mode and populates the sidebar via `renderFolders()` directly is responsible for making the container visible.
+
+Avoid:
+- Assuming `renderFolders()` makes the sidebar visible — it does not.
+- Calling `renderCurrentView()` when you only need to populate the list content (it also triggers file-area renders).
+- Setting `sidebar.style.display` from any path that runs in media-view context.
+
+Validation:
+- After any `renderFolders()` call outside `renderCurrentView()`: confirm `#sidebar` is actually visible without requiring a view toggle.
+- Confirm sidebar remains hidden in media view and visible in folder view.
+
 ### Light/Dark and Viewport Compatibility
 
 Context:

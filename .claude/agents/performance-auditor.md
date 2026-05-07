@@ -244,6 +244,99 @@ Validation:
 - Confirm event selection loads only one event’s details.
 - Confirm Verify Integrity remains explicit/on-demand.
 
+### Source Entry Loading Performance
+
+Context:
+- Applies to external-drive and local-folder source selection in `selectSource()`, `_loadSourceFolderTree()`, and any future source-type entry path.
+
+Rule:
+- Workspace must be revealed BEFORE any media scan begins for external-drive and local-folder sources.
+- Populate the folder sidebar using a shallow directory-names-only walk (`folders:get` IPC → `getShallowFolderTree`) that reads only `readdir` + `withFileTypes` with no file stat calls, depth capped at 4, node count capped at 500.
+- Media scanning (`files:get` / `scanMediaRecursive`) must be deferred until the user explicitly selects a folder.
+- Memory card sources retain the existing behavior (scan before reveal) and must not be changed.
+- `_folderNavMode` ('tree' vs 'scan') must gate sidebar click behavior: 'scan' mode calls `browseFolderDirect(selectedPath)` per user selection; 'tree' mode calls `enterFolderView` from the pre-built in-memory tree.
+- Both `currentFolderTree` AND `currentFolderContext` must be reset in `selectSource()` state cleanup. Resetting only `currentFolderTree` leaves stale `isLeaf: true` from a prior source, which leaks into view-toggle renders on the new source.
+- External-drive and local-folder have different initial main-panel states: external-drive shows "Select a folder" prompt; local-folder immediately loads root's direct media via `browseFolderDirect(drivePath)`.
+- Flat sources (no subfolders) show the workspace immediately, then load direct (non-recursive) media via `browseFolderDirect(drivePath)`.
+
+Avoid:
+- Awaiting any recursive media scan before the workspace is shown for external or local sources.
+- Using `files:get` (recursive) for folder-click navigation in scan mode — that channel always calls `scanMediaRecursive` regardless of the `folderPath` argument.
+- Calling `enterFolderView` or `browseFolder` unconditionally in sidebar click handlers without checking `_folderNavMode`.
+- Treating a "faster" recursive scan as a substitute for a non-recursive listing on large drives.
+- Omitting the `fileLoadRequestId` stale-guard in any async folder load function.
+- Resetting `currentFolderTree` but not `currentFolderContext` in `selectSource()` cleanup.
+- Treating external-drive and local-folder as identical in `_loadSourceFolderTree` — they require different initial panel states.
+
+Validation:
+- Confirm workspace appears immediately (before any IPC media scan returns) for external-drive and local-folder sources.
+- Confirm memory card source behavior is unchanged.
+- Confirm sidebar populates with folder names only — no media scan triggered on source entry.
+- Confirm folder click uses `files:getDirect` (non-recursive) not `files:get` (recursive).
+- Confirm direct-folder listing shows only immediate children — no nested descendants.
+- Confirm external-drive initial panel = "Select a folder" prompt; local-folder initial panel = root direct media.
+- Confirm thumbnail pipeline is untouched: `requestThumbForImage`, `thumbObserver`, `drainThumbQueue` unchanged.
+- Confirm stale scan guard prevents old results from rendering after source switch.
+
+### Non-Recursive Folder Navigation IPC
+
+Context:
+- Applies to `browseFolderDirect()`, the `files:getDirect` IPC handler, and any scan-mode folder click in external-drive / local-folder sources.
+
+Rule:
+- `files:get` (recursive) and `files:getDirect` (non-recursive) serve different purposes and must never be conflated:
+  - `files:get` → `scanMediaRecursive(targetPath)` → full recursive descent through all nested directories → aggregates all descendant media. Used for memory-card full-card scans only.
+  - `files:getDirect` → `readDirectory(folderPath)` → one directory level only → returns immediate children (direct media + direct subfolders). Used for all external-drive/local-folder folder navigation.
+- `browseFolderDirect(folderPath)` is the correct renderer entry point for scan-mode folder clicks. It increments `fileLoadRequestId` for stale-guard, calls `window.api.getFilesDirect(folderPath)`, renders only `result.files` (direct media), and sets `currentFolderContext.isLeaf = true`.
+- `currentFolderContext.isLeaf: true` in scan mode is correct even if the folder has subfolders. It tells `renderCurrentView()` to render direct files — matching what the user sees. `isLeaf` in scan mode means "render this folder's direct content" not "has no children".
+- Empty direct-media result (folder contains only subfolders) must show: "No media directly in this folder. Select a subfolder." — not an error state.
+
+Avoid:
+- Calling `browseFolder(activeSource.path, p)` for scan-mode folder clicks — `browseFolder` uses `files:get` which is always recursive.
+- Setting `currentFolderContext.isLeaf: false` in `browseFolderDirect` — this causes `renderCurrentView()` to call `renderFolderOnly()` instead of showing the loaded files when the user toggles views.
+- Omitting the `currentFolderContext` update in `browseFolderDirect` — view-toggle correctness depends on it.
+- Showing an error state for a folder with no direct media but with subfolders — use the "Select a subfolder" empty state instead.
+
+Validation:
+- Clicking a folder with nested subfolders shows only direct media (no descendants).
+- Clicking a folder with only subfolders shows the "No media directly…" empty state, not an error.
+- Toggling Media↔Folder view after folder selection shows the same direct files in both modes.
+- `files:get` is not called during scan-mode navigation.
+- Memory card path (`files:get`) is not affected.
+
+### View-Mode Async State Safety
+
+Context:
+- Applies to any scan-mode operation in external-drive / local-folder sources where Media view and Folder view may be active simultaneously with in-flight IPC calls: `_startMediaScan`, `browseFolderDirect`, view-toggle handlers, and folder-click handlers.
+
+Rule:
+- **Double-guard every async view operation.** When switching away from a view that owns an in-flight async operation, both guards must be applied:
+  1. Increment `fileLoadRequestId` (stale request guard).
+  2. Rely on `viewModeType !== expectedMode` (view identity guard).
+  One guard alone leaves a race window; both together close it.
+- **Guard at every `await` boundary inside a stale-guarded async function.** Re-check both `fileLoadRequestId` AND `viewModeType` after each `await` — including awaits for operations like `refreshDestCache()` that appear incidental. Any unguarded `await` is a race window.
+- **Intercept empty-array cases before `renderFileArea` for view/mode-specific empty states.** `renderFileArea([])` always shows the generic empty state. When a specific view or mode requires a different empty message (e.g. "No media directly in this folder. Select a subfolder."), intercept the empty case in the caller (`renderCurrentView`) before delegating.
+- **Branch navigation actions on active view mode at the handler level.** A folder-click handler that must behave differently in Media vs Folder view must branch on `viewModeType` explicitly. Never default to one behavior that serves only one mode.
+- **Audit context completeness when a function gains a new call site.** When a function previously called from one entry point (e.g. view-toggle button) is promoted to also handle another (e.g. folder-click), synchronously initialize ALL state it must own BEFORE the first `await`: folder identity (`currentFolder`, `activeFolderPath`, `currentFolderContext`), UI identity (sidebar highlight, breadcrumb), selection state (`selectedFiles`, `lastClickedPath`, `_selectionAnchor`, `_prevFocusPath`), and view cache (`resetViewCache()`).
+- **Use `Promise.all` with `.catch()` fallback for parallel IPC fetches.** When a scan needs two independent data sets (e.g. direct listing + recursive listing), run both in parallel. Add `.catch(() => ({ files: [] }))` on the fast path so a failure there does not abort the slower scan.
+- **Clear selection state on cross-folder and cross-view navigation.** Whenever the user navigates to a different folder OR switches view modes in scan mode, clear: `selectedFiles.clear(); lastClickedPath = null; _selectionAnchor = null; _prevFocusPath = null;`. Stale selection causes incorrect counts in `updateSelectionBar()` and unexpected tile states.
+
+Avoid:
+- Incrementing `fileLoadRequestId` on entering Media view but not on leaving it (the request guard is asymmetric).
+- Delegating an empty-array result to `renderFileArea` from a context that requires a mode-specific empty state.
+- A folder-click handler that always calls `browseFolderDirect` regardless of `viewModeType`.
+- Promoting a function to a new call site without auditing all state it must initialize before its first `await`.
+- An `await` inside a stale-guarded function that has no stale-check immediately after it.
+- Leaving `selectedFiles` / `lastClickedPath` / `_selectionAnchor` / `_prevFocusPath` populated when switching folders or view modes.
+
+Validation:
+- Confirm `fileLoadRequestId++` is called in BOTH directions of every view toggle (entering AND leaving the scan).
+- Confirm both guards (`fileLoadRequestId` check AND `viewModeType` check) appear after every `await` in `_startMediaScan` and related async functions.
+- Confirm an empty direct-media result renders a folder-specific empty state, not the generic "No supported media files" message.
+- Confirm the folder-click handler branches on `viewModeType`: `_startMediaScan` for Media view, `browseFolderDirect` for Folder view.
+- Confirm `currentFolderContext`, sidebar highlight, breadcrumb, and selection state are all set synchronously before the first `await` when `_startMediaScan` is called from a folder-click.
+- Confirm selection fields are cleared when switching folders or view modes.
+
 ### Startup / Window Lifecycle Performance
 
 Context:

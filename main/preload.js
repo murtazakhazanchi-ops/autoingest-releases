@@ -73,6 +73,8 @@ contextBridge.exposeInMainWorld('api', {
   // ── File browser ──
   getFiles: (drivePath, folderPath = null, requestId = null) =>
     ipcRenderer.invoke('files:get', { drivePath, folderPath, requestId }),
+  getFolders:    (drivePath)   => ipcRenderer.invoke('folders:get',    { drivePath }),
+  getFilesDirect: (folderPath) => ipcRenderer.invoke('files:getDirect', { folderPath }),
   onFilesBatch: (cb) => _register('files:batch', (_e, batch) => cb(batch)),
 
   // ── Destination ──

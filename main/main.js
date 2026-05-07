@@ -5,7 +5,7 @@ const fs   = require('fs');
 const fsp  = require('fs').promises;
 const { execFile } = require('child_process');
 const { detectMemoryCards, listAllDrives } = require('./driveDetector');
-const { scanMediaRecursive, buildFolderTree } = require('./fileBrowser');
+const { scanMediaRecursive, buildFolderTree, getShallowFolderTree, readDirectory } = require('./fileBrowser');
 const { copyFiles, copyFileJobs, setPaused, getFileHash, abortCopy } = require('./fileManager');
 const { getThumbnail, shutdownWorkers } = require('../services/thumbnailer');
 const listManager  = require('./listManager');
@@ -349,6 +349,19 @@ ipcMain.handle('files:get', async (event, { drivePath, folderPath, requestId }) 
   // Commit 6: build folder tree once from the complete file list and ship it.
   const folderTree = buildFolderTree(files);
   return { dcimPath: dcimPathForUI, folderPath: targetPath, folders: folderTree, files };
+});
+
+// Shallow folder tree — directories only, no file scanning.
+// Used by external-drive/local-folder entry for instant workspace reveal.
+ipcMain.handle('folders:get', async (_event, { drivePath }) => {
+  return getShallowFolderTree(drivePath);
+});
+
+// Non-recursive direct listing — immediate children only (media files + subfolders).
+// Used by external-drive/local-folder folder navigation so clicking a folder
+// never triggers a recursive descent into nested directories.
+ipcMain.handle('files:getDirect', async (_event, { folderPath }) => {
+  return readDirectory(folderPath);
 });
 
 // Default destination path

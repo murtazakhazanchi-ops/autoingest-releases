@@ -9,12 +9,16 @@
  *   dcim      — drives with a DCIM folder (Memory Card card)
  *   removable — mounted non-system volumes (External Drive card)
  *
- * NOTE: `removable` does NOT rely on drive.isRemovable.  USB-attached SSDs
- * and many Thunderbolt drives report isRemovable:false on both macOS and
- * Windows even though they are externally connected.  Classification is done
- * by mountpoint path instead:
- *   macOS   — any /Volumes/<name> that is not the system disk
- *   Windows — any non-C: drive letter that is not the system disk
+ * NOTE: `removable` does NOT rely solely on drive.isRemovable.  USB-attached
+ * SSDs commonly report isRemovable:false on both macOS and Windows.
+ * Classification:
+ *   macOS   — any mountpoint under /Volumes/ (APFS system sub-volumes never
+ *              mount there, so the prefix check is safe on macOS 10.15+)
+ *   Windows — requires a positive external signal: isUSB, isRemovable,
+ *              isCard, or busType in {USB, SD, MMC, 1394, FIBRE}.
+ *              Known-internal busTypes (SATA, ATA, SCSI, …) are excluded.
+ *              Conservative: drives with no recognisable signal are excluded.
+ *              Thunderbolt drives fall in this gap; use Browse Manually.
  *   other   — falls back to drive.isRemovable
  *
  * Patch 37: async hasDCIM (fsp.stat instead of existsSync/statSync) +
@@ -43,17 +47,87 @@ async function hasDCIM(mountpoint) {
 }
 
 /**
- * Returns true when the given mountpoint should appear in the External Drive card.
+ * busType strings (from drivelist's STORAGE_ADAPTER_DESCRIPTOR) that positively
+ * identify an externally-connected device.
+ */
+const _EXTERNAL_BUS_TYPES = new Set(['USB', 'SD', 'MMC', '1394', 'FIBRE']);
+
+/**
+ * busType strings that positively identify an internally-connected device.
+ * Only applied when isUSB and isRemovable are both false, to avoid
+ * misclassifying UAS-over-USB drives (enumerator=SCSI, busType=USB).
+ */
+const _INTERNAL_BUS_TYPES = new Set(['SATA', 'ATA', 'ATAPI', 'SCSI', 'SAS', 'RAID', 'iSCSI']);
+
+/**
+ * Returns true when drivelist fields indicate the drive is externally connected.
+ * Checks: isUSB (enumerator-based), isRemovable (Windows removal policy),
+ * isCard (SD/MMC bus type), and busType from Storage Adapter Descriptor.
  *
- * We do not use drive.isRemovable because USB-attached SSDs and Thunderbolt drives
- * commonly report isRemovable:false on macOS and Windows.
+ * @param {import('drivelist').Drive} drive
+ * @returns {boolean}
+ */
+function _hasExternalSignal(drive) {
+  if (drive.isUSB)       return true;
+  if (drive.isRemovable) return true;
+  if (drive.isCard)      return true;
+  return _EXTERNAL_BUS_TYPES.has(drive.busType || '');
+}
+
+/**
+ * Returns true when drivelist fields indicate the drive is internally connected.
+ * The isUSB/isRemovable guard prevents false positives on UAS drives whose
+ * busType reports as "USB" even though their enumerator is "SCSI".
+ *
+ * @param {import('drivelist').Drive} drive
+ * @returns {boolean}
+ */
+function _hasInternalSignal(drive) {
+  if (drive.isVirtual) return true;
+  return _INTERNAL_BUS_TYPES.has(drive.busType || '') && !drive.isUSB && !drive.isRemovable;
+}
+
+/**
+ * Windows-specific external-mount check.
+ *
+ * A drive letter is classified as external only when there is a positive external
+ * signal (USB, SD/MMC, 1394, isRemovable, isCard).  Unknown non-C: drives with no
+ * recognisable signal are excluded by default (conservative) to avoid showing
+ * internal D:/E: recovery or data partitions.
+ *
+ * Thunderbolt drives (enumerator=SCSI, busType=SCSI, isUSB=false, isRemovable=false)
+ * will be excluded by this conservative default; users can reach them via Browse Manually.
+ *
+ * @param {import('drivelist').Drive} drive
+ * @param {string} mountpoint
+ * @returns {boolean}
+ */
+function _isWindowsExternalMount(drive, mountpoint) {
+  if (!mountpoint) return false;
+  if (drive.isSystem) return false;
+  if (mountpoint.charAt(0).toUpperCase() === 'C') return false;
+  if (_hasInternalSignal(drive)) return false;
+  if (_hasExternalSignal(drive)) return true;
+  if (process.env.DEBUG_DRIVES) {
+    console.log(
+      `[driveDetector][win] excluded (no external signal): busType=${drive.busType}` +
+      ` enumerator=${drive.enumerator} isUSB=${drive.isUSB}` +
+      ` isRemovable=${drive.isRemovable} mp=${mountpoint}`
+    );
+  }
+  return false;
+}
+
+/**
+ * Returns true when the given mountpoint should appear in the External Drive card.
  *
  * macOS: anything under /Volumes/ is an externally mounted volume.  The system
  *        disk's APFS sub-volumes (/, /System/Volumes/Data, /System/Volumes/Preboot,
  *        etc.) mount under / or /System/Volumes/ — never under /Volumes/ — so the
  *        prefix check is safe on macOS 10.15+.
- * Windows: exclude the C: drive (covered by isSystem too, but belt-and-suspenders).
- *          All other drive letters are treated as external.
+ * Windows: delegates to _isWindowsExternalMount, which requires a positive external
+ *          signal (USB, SD/MMC, isRemovable, isCard) and excludes known-internal
+ *          busTypes.  Conservative: drives with no recognised signal are excluded.
  * Other: fall back to isRemovable.
  *
  * @param {import('drivelist').Drive} drive
@@ -66,7 +140,7 @@ function _isExternalMount(drive, mountpoint) {
     return mountpoint.startsWith('/Volumes/');
   }
   if (process.platform === 'win32') {
-    return mountpoint.charAt(0).toUpperCase() !== 'C';
+    return _isWindowsExternalMount(drive, mountpoint);
   }
   return drive.isRemovable;
 }
@@ -106,10 +180,11 @@ async function listAllDrives() {
       if (_isExternalMount(drive, mp.path)) {
         removable.push({
           // Prefer volume label (user-visible name, e.g. "PA1-2TBMK") over hardware description.
-          label:      mp.label || drive.description || 'External Drive',
-          mountpoint: mp.path,
-          size:       drive.size || 0,
-          busType:    drive.busType || '',
+          label:       mp.label || drive.description || 'External Drive',
+          mountpoint:  mp.path,
+          size:        drive.size        || 0,
+          busType:     drive.busType     || '',
+          description: drive.description || '',
         });
       }
     }

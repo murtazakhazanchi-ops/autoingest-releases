@@ -464,6 +464,185 @@ Status:
 
 ---
 
+### 2026-05-07 — Large External Drive and Local Folder Source Entry Performance
+
+Task type:
+- Performance / Renderer / IPC / Filesystem / UI / Source Loading
+
+What happened:
+
+**Root cause — blocking scan before workspace reveal:**
+`selectSource()` always awaited `browseFolder(path, null)` before showing the workspace. `browseFolder` invokes `files:get` → `scanMediaRecursive(drivePath)` — a full recursive filesystem walk that stats every media file on the drive. For large SSDs with thousands of files, this blocked the renderer for seconds to minutes, causing a white-screen freeze. Memory cards were acceptable (bounded file count) but external drives and large local folders were not.
+
+**Fix — source-type branching in `selectSource()`:**
+External-drive and local-folder sources now: reveal the workspace immediately, set `_folderNavMode = 'scan'`, default to Folder view, and call `_loadSourceFolderTree(drivePath)` asynchronously after the workspace is visible. Memory card path is completely unchanged (still awaits `browseFolder` before reveal).
+
+**`_loadSourceFolderTree()` (new renderer function):**
+Calls `window.api.getFolders(drivePath)` → IPC `folders:get` → `getShallowFolderTree()` (new `fileBrowser.js` function). `getShallowFolderTree` reads directory entries only (no file stat calls), depth-capped at 4, node-count capped at 500. Returns within milliseconds even on a full SSD. Sidebar populates with folder names immediately. If source is flat (no subfolders), `_loadSourceFolderTree` shows "Scanning…" and triggers `browseFolder(drivePath, null)` after the workspace is already visible.
+
+**`_folderNavMode` state variable:**
+`'tree'` (memory card) — sidebar clicks call `enterFolderView(path)` from pre-built in-memory tree.
+`'scan'` (external/local) — sidebar clicks call `browseFolder(drivePath, selectedPath)`, scanning only the selected folder on-demand.
+
+**Stale scan protection:**
+`activeSource?.path !== loadPath` guard in `_loadSourceFolderTree` drops results if source changed. Existing `fileLoadRequestId` guard in `browseFolder` drops stale media scan results.
+
+**Thumbnail pipeline:** Untouched. No changes to `requestThumbForImage`, `thumbObserver`, `drainThumbQueue`, or any preview/cache behavior.
+
+Reusable lessons:
+
+1. **External/local source entry must reveal the workspace before any media scan.** The correct order is: reveal workspace → populate sidebar with cheap directory-names-only walk → scan only user-selected folder on-demand. The inverse order (scan → reveal) causes white-screen freezes on large drives.
+
+2. **A shallow folder tree IPC channel (`folders:get`) is structurally different from a media scan channel (`files:get`).** The shallow tree reads `readdir` + `withFileTypes`, skips all file stat calls, enforces depth and node caps, and returns within milliseconds. It is not a fast version of a media scan — it returns no files, only folder names and paths. Keep these two operations separate; never try to make a media scan "fast enough" to front-load it.
+
+3. **`_folderNavMode` ('tree' vs 'scan') must gate sidebar click behavior.** In 'scan' mode, every folder click calls `browseFolder(drivePath, selectedPath)` to scan on-demand. In 'tree' mode, every folder click calls `enterFolderView(path)` from a pre-built in-memory tree. These code paths must not cross. Any function that wires folder list click events must branch on `_folderNavMode`.
+
+4. **`currentFolderTree = null` must be reset in `selectSource()` state cleanup.** Failing to reset it allows a stale tree from the previous source to leak into the new source's initial render, causing incorrect sidebar population.
+
+5. **Flat local sources (no subfolders) require deferred scan, not pre-scan.** When `getShallowFolderTree` returns no children, the correct path is: show workspace → show "Scanning…" placeholder → trigger `browseFolder(drivePath, null)` asynchronously. This keeps the workspace visible and the renderer responsive while the scan runs.
+
+Common failure modes:
+- Awaiting a full recursive media scan before revealing the workspace for any source type.
+- Using the same IPC channel for folder navigation and media scanning.
+- Sidebar click handlers that ignore `_folderNavMode` and call `enterFolderView` or `browseFolder` unconditionally.
+- Missing `currentFolderTree = null` reset in the common state cleanup block of `selectSource()`.
+- Treating a "fast scan" as an alternative to a fundamentally deferred scan for large sources.
+
+Preferred patterns:
+- External/local source entry: `reveal workspace → getFolders(path) → populate sidebar → scan on folder select`.
+- Memory card source entry: unchanged (`browseFolder(path, null) → reveal workspace`).
+- Flat source detection: `tree.children.length === 0` → show "Scanning…" → `await browseFolder(drivePath, null)`.
+- Stale scan guard: `if (activeSource?.path !== loadPath) return;` before any DOM mutation in async load functions.
+
+Promote to agents:
+- performance-auditor.md (source entry loading — workspace-before-scan rule, shallow folder tree pattern)
+
+Status:
+- Promoted
+
+---
+
+### 2026-05-07 — Non-Recursive Folder Navigation for External Drive and Local Folder
+
+Task type:
+- Performance / UI / Renderer / Filesystem Navigation / IPC
+
+What happened:
+
+**Bug 1 — Sidebar invisible initially (renderer/renderer.js `_loadSourceFolderTree`):**
+`_loadSourceFolderTree` called `renderFolders()` after getting the shallow tree, which populates `folderList.innerHTML`. But the `#sidebar` element itself had `display: none` from initialization (`viewModeType === 'media'` at startup hides it). Only `renderCurrentView()` makes it visible via `sidebar.style.display = (viewModeType === 'folder') ? '' : 'none'`. `_loadSourceFolderTree` never called `renderCurrentView()`, so the sidebar container stayed hidden while its list content was correctly populated. Fix: explicitly set `sidebar.style.display = ''` immediately after `renderFolders()` in `_loadSourceFolderTree`.
+
+**Bug 2 — Recursive scan on folder click (renderer/renderer.js `wireFolderListClicks`):**
+Scan-mode folder click called `browseFolder(activeSource.path, p)` → IPC `files:get` → `scanMediaRecursive(targetPath)`. `scanMediaRecursive` recursively descends ALL nested subdirectories, aggregating every descendant file regardless of depth. Clicking a top-level folder on a 2TB SSD triggered a full recursive scan. Fix: added `files:getDirect` IPC handler using `readDirectory(folderPath)` (existing non-recursive function), new `browseFolderDirect()` renderer function, updated scan-mode click to call `browseFolderDirect(p)`.
+
+**Bug 3 — Local folder not auto-loading root media:**
+`_loadSourceFolderTree` treated external-drive and local-folder identically — both showed "Select a folder" prompt. Spec requires local-folder to immediately show root's direct media. Fix: in `_loadSourceFolderTree`, after populating sidebar, check `activeSource.type === 'local-folder'` and call `browseFolderDirect(drivePath)`.
+
+**Bug 4 — Stale `currentFolderContext` from prior source:**
+`selectSource()` common cleanup did not reset `currentFolderContext`. If a prior source left `isLeaf: true` with old files, toggling views on the new source would render those old files. Fix: added `currentFolderContext = { path: null, files: [], isRoot: true, isLeaf: false }` to the common cleanup block.
+
+**`browseFolderDirect` design:**
+Sets `currentFolderContext.isLeaf = true` always. This makes `renderCurrentView()` correctly call `renderFileArea(currentFolderContext.files)` when the user toggles views — without requiring any change to `renderCurrentView()` itself.
+
+**IPC added:**
+- `files:getDirect` → `readDirectory(folderPath)` (immediate children, no file-stat recursion)
+- `window.api.getFilesDirect(folderPath)` in preload
+
+Reusable lessons:
+
+1. **`renderFolders()` and `renderCurrentView()` are not equivalent for sidebar visibility.** `renderFolders()` only writes to `folderList.innerHTML` (list content). `renderCurrentView()` is the only function that sets `#sidebar` `display`. When calling `renderFolders()` outside `renderCurrentView()`, always follow it with `sidebar.style.display = ''` if folder mode is active.
+
+2. **`files:get` (recursive) and `files:getDirect` (non-recursive) must never be conflated.** `files:get` calls `scanMediaRecursive` — always full recursive descent, always aggregates all descendants. `files:getDirect` calls `readDirectory` — one directory level only, immediate children. Folder navigation in scan mode must use `files:getDirect`; media view full-card scans use `files:get`.
+
+3. **`currentFolderContext` must be reset in `selectSource()` common cleanup.** Resetting only `currentFolderTree` is insufficient. `currentFolderContext` (including `isLeaf`) must also be reset so view-toggle renders on the new source use the correct initial state.
+
+4. **External-drive and local-folder have different initial render contracts.** External-drive: show "Select a folder" prompt, wait for user selection. Local-folder: immediately load root's direct media via `browseFolderDirect(drivePath)`. Both use `_folderNavMode = 'scan'` and the same sidebar tree, but the initial main-panel content differs.
+
+5. **Setting `currentFolderContext.isLeaf = true` in scan-mode navigation is the correct pattern for view-toggle compatibility.** `renderCurrentView()` checks `isLeaf` to decide between `renderFolderOnly()` and `renderFileArea(currentFolderContext.files)`. In scan mode, `isLeaf: true` always (regardless of actual subfolders) ensures direct-listing content is preserved across view toggles without modifying `renderCurrentView()`.
+
+Common failure modes:
+- Calling `renderFolders()` and assuming the sidebar becomes visible — the sidebar element itself is controlled separately.
+- Using `browseFolder()` (recursive) for folder-click navigation on large external sources.
+- Omitting `currentFolderContext` from the common `selectSource()` state reset.
+- Treating external-drive and local-folder identically in initial load (they have different initial panel states).
+
+Preferred patterns:
+- Sidebar show after `renderFolders()`: `if (sidebar) sidebar.style.display = ''`.
+- Folder click in scan mode: `browseFolderDirect(p)` → `files:getDirect` → `readDirectory`.
+- State reset in `selectSource()`: `currentFolderContext = { path: null, files: [], isRoot: true, isLeaf: false }`.
+- Scan-mode `currentFolderContext` after folder load: `{ path, files: result.files, isRoot: false, isLeaf: true }`.
+
+Promote to agents:
+- performance-auditor.md (non-recursive folder navigation IPC; external vs local initial render; currentFolderContext reset)
+- ui-system-specialist.md (renderFolders vs sidebar element visibility)
+
+Status:
+- Promoted
+
+---
+
+### 2026-05-07 — View-Mode State Sync: Media↔Folder Toggle and Folder-Click in Media View
+
+Task type:
+- Renderer / Async State / View-Mode / IPC / Debugging
+
+What happened:
+
+**Bug 1 — Media → Folder Toggle (three root causes):**
+
+Root cause 1a: `viewFolderBtn` handler did not call `fileLoadRequestId++` when switching to Folder view. The view-guard (`viewModeType !== 'media'`) was the only protection against an in-flight `_startMediaScan` overwriting Folder view state. Adding `fileLoadRequestId++` provides a second, independent guard.
+
+Root cause 1b: `renderCurrentView()` → `renderFileArea([])` showed the generic "No supported media files found" message when folder context was empty. Folder view requires "No media directly in this folder. Select a subfolder." The empty-array case must be intercepted in `renderCurrentView()` before delegating to `renderFileArea`.
+
+Root cause 1c: `selectedFiles`, `lastClickedPath`, `_selectionAnchor`, `_prevFocusPath` were not cleared when switching from Media to Folder view. Stale selection state bled into the Folder view render and produced incorrect counts in `updateSelectionBar()`.
+
+**Bug 2 — Folder Click While Media View Active:**
+
+The folder-click handler in scan mode always called `browseFolderDirect(p)` regardless of `viewModeType`. When the user is in Media view, clicking another folder must call `_startMediaScan(p)` instead. The handler must branch on `viewModeType`.
+
+Secondary root cause: `_startMediaScan` was only ever called from the view-toggle button (where `currentFolderContext` was already populated). When promoted to also handle folder-click from Media view, it needed to update `currentFolderContext`, `currentFolder`, `activeFolderPath`, sidebar highlight, breadcrumb, and selection state — none of which it previously owned. These must be set synchronously BEFORE the first `await`.
+
+Reusable lessons:
+
+1. **Double-guard async view operations**: increment `fileLoadRequestId` AND check `viewModeType` at every stale-guard point. One guard alone leaves a race window.
+
+2. **Empty-state specificity before `renderFileArea`**: generic empty state is wrong for view/mode-specific contexts. Intercept the empty-array case in the caller before delegating to `renderFileArea`.
+
+3. **Branch navigation actions on active view mode**: a folder-click handler that must behave differently in Media vs Folder view must branch on `viewModeType` at the handler level. Never default to one behavior that only serves one mode.
+
+4. **Context completeness when a function gains new call sites**: audit all state a function must own (folder identity, UI identity, selection state, view cache) before the first `await`. Set synchronously at call-site entry, not inside the async body.
+
+5. **Promise.all for parallel IPC fetches with `.catch()` fallback**: when a scan needs two independent data sets (direct listing + recursive listing), run both in parallel and add a `.catch(() => ({ files: [] }))` on the fast path so it doesn't abort the slow path.
+
+6. **Guard at every `await` boundary**: re-check both `fileLoadRequestId` AND `viewModeType` guards after each `await` inside a stale-guarded async function. A previously unguarded `await` (e.g. `refreshDestCache()`) is a race window.
+
+7. **Selection clear on cross-folder and cross-view navigation**: always clear `selectedFiles`, `lastClickedPath`, `_selectionAnchor`, `_prevFocusPath` when navigating to a new folder or switching view modes in scan mode.
+
+Common failure modes:
+- Incrementing request ID when entering Media view but not when leaving it.
+- Delegating to `renderFileArea([])` from a view-mode-specific context that needs a custom empty state.
+- A folder-click handler that ignores `viewModeType` and always calls the Folder-view path.
+- Promoting a function to a new call site without auditing all state it must initialize.
+- A `await` inside a stale-guarded async function that has no guard after it.
+- Leaving selection state from a previous folder or view in place when the view switches.
+
+Preferred patterns:
+- View toggle: `fileLoadRequestId++; viewModeType = 'folder'; /* then check both guards after every await */`.
+- Empty-state intercept: `if (_folderNavMode === 'scan' && currentFolderContext.files.length === 0) { showEmptyState(); return; } renderFileArea(files)`.
+- Folder-click branch: `if (viewModeType === 'media') { _startMediaScan(p); } else { browseFolderDirect(p); }`.
+- Call-site promotion: set `currentFolder`, `activeFolderPath`, `currentFolderContext`, sidebar highlight, breadcrumb, selection clear synchronously before `await`.
+- Parallel IPC: `const [directResult, result] = await Promise.all([window.api.getFilesDirect(p).catch(() => ({ files: [] })), window.api.getFiles(...)]);`.
+- Guard template: `if (reqId !== fileLoadRequestId || viewModeType !== expectedMode) return;` after each `await`.
+- Selection clear: `selectedFiles.clear(); lastClickedPath = null; _selectionAnchor = null; _prevFocusPath = null;`.
+
+Promote to agents:
+- performance-auditor.md (view-mode async state safety; double-guard; per-await boundary guards; context completeness at new call sites; selection clear on navigation; parallel IPC fetch pattern)
+
+Status:
+- Promoted
+
+---
+
 ## Entry Template
 
 ### YYYY-MM-DD — Task Name

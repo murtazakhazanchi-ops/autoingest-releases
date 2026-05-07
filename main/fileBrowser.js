@@ -337,6 +337,42 @@ function buildFolderTree(files) {
 }
 
 /**
+ * Builds a shallow folder-only tree up to maxDepth levels deep.
+ * No file stat calls — extremely fast. Used for external-drive/local-folder
+ * entry so the workspace can reveal before any media scan begins.
+ * Total node count is capped at 500 to bound runtime on drives with many dirs.
+ *
+ * @param {string} dirPath
+ * @param {number} [maxDepth=4]
+ * @param {number} [depth=0]
+ * @param {{ count: number }} [_state]  Shared counter (internal — do not pass)
+ * @returns {Promise<{name:string,path:string,children:Array,files:Array}>}
+ */
+async function getShallowFolderTree(dirPath, maxDepth = 4, depth = 0, _state = { count: 0 }) {
+  const node = { name: path.basename(dirPath) || dirPath, path: dirPath, children: [], files: [] };
+  if (depth >= maxDepth || _state.count > 500) return node;
+  _state.count++;
+
+  let entries;
+  try {
+    entries = await fsp.readdir(dirPath, { withFileTypes: true });
+  } catch {
+    return node;
+  }
+
+  const subdirPaths = entries
+    .filter(e => e.isDirectory() && !e.name.startsWith('.') && !SKIP_DIRS.has(e.name))
+    .map(e => path.join(dirPath, e.name));
+
+  const children = await Promise.all(
+    subdirPaths.map(sub => getShallowFolderTree(sub, maxDepth, depth + 1, _state))
+  );
+
+  node.children = children.sort((a, b) => a.name.localeCompare(b.name));
+  return node;
+}
+
+/**
  * Scans known Sony PRIVATE folder video paths.
  * Only checks two specific subdirectories — never recurses the full PRIVATE tree.
  * Returns file objects compatible with readDirectory() output.
@@ -379,4 +415,4 @@ async function scanPrivateFolder(privatePath) {
   return results;
 }
 
-module.exports = { readDirectory, getDCIMPath, scanPrivateFolder, safeExists, scanMediaRecursive, buildFolderTree };
+module.exports = { readDirectory, getDCIMPath, scanPrivateFolder, safeExists, scanMediaRecursive, buildFolderTree, getShallowFolderTree };
