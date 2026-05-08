@@ -4574,7 +4574,7 @@ function updateProgress({ total, index, completedCount, filename, status, skipRe
   document.getElementById('progressFilename').innerHTML = labelHtml;
 }
 
-function showProgressSummary({ copied, skipped, errors, skippedReasons, failedFiles, duration, integrity, copiedFiles }) {
+function showProgressSummary({ copied, skipped, errors, skippedReasons, failedFiles, duration, integrity, copiedFiles }, importCleanupRoot = null) {
   _postImportSucceeded = (errors === 0); // gates the post-success chooser in the Done handler
   document.getElementById('progressFilename').textContent = 'Import complete.';
   document.getElementById('sumCopied').textContent  = copied;
@@ -4646,9 +4646,10 @@ function showProgressSummary({ copied, skipped, errors, skippedReasons, failedFi
   }
 
   // ── Clean Up Source button — only when files were copied ───────────────────
-  if (actLeft && !modal.querySelector('#scqOpenBtn') && copiedFiles && copiedFiles.length > 0 && activeSource?.path) {
+  const _cleanupRoot = importCleanupRoot || activeSource?.path || null;
+  if (actLeft && !modal.querySelector('#scqOpenBtn') && copiedFiles && copiedFiles.length > 0 && _cleanupRoot) {
     _csqEligibleFiles = copiedFiles;
-    _csqSourceRoot    = activeSource.path;
+    _csqSourceRoot    = _cleanupRoot;
     const cleanBtn = document.createElement('button');
     cleanBtn.id        = 'scqOpenBtn';
     cleanBtn.className = 'im-btn-secondary';
@@ -5517,11 +5518,12 @@ document.getElementById('importBtn').addEventListener('click', async () => {
       importedBy: _activeUser ? { id: _activeUser.id, name: _activeUser.name } : null,
     };
 
+    const _importCleanupRoot = activeSource?.path || null;
     try {
       const summary = await window.api.commitImportTransaction(fileJobs, _eventJsonPath, auditContext);
-      if (!activeSource) return;
+      if (!activeSource && !_importCleanupRoot) return;
 
-      showProgressSummary(summary);
+      showProgressSummary(summary, _importCleanupRoot);
       EventCreator.invalidateScannedEvents();
       await refreshDestCache();
       try { globalImportIndex = await window.api.getImportIndex() || {}; } catch { /* non-critical */ }
@@ -5569,12 +5571,13 @@ document.getElementById('importBtn').addEventListener('click', async () => {
   updateSelectionBar();
   showProgress();
 
+  const _importCleanupRoot = activeSource?.path || null;
   try {
     const summary = await window.api.importFiles(uniqueFiles, finalDest, {
       importedBy: _activeUser ? { id: _activeUser.id, name: _activeUser.name } : null,
     });
-    if (!activeSource) return; // workspace cleared (disconnect or eject) mid-import
-    showProgressSummary(summary);
+    if (!activeSource && !_importCleanupRoot) return; // workspace cleared (disconnect or eject) mid-import
+    showProgressSummary(summary, _importCleanupRoot);
     await refreshDestCache();
     try { globalImportIndex = await window.api.getImportIndex() || {}; } catch { /* non-critical */ }
   } catch (err) {

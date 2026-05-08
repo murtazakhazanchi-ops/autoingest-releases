@@ -173,6 +173,25 @@ Use this for:
 
 ---
 
+## v0.8.8 — Source Cleanup Root Stability
+
+### Changes
+- **Stable import-time cleanup root**: `showProgressSummary` now receives `importCleanupRoot` — `activeSource.path` captured synchronously before the first `await` in both Event Import and Quick Import paths. This eliminates a race window where drive-polling could null `activeSource` during the async IPC call, causing `_csqSourceRoot` to be set from a stale or null `activeSource` at summary time.
+- **Guard update**: Event Import and Quick Import early-return guards now check `!activeSource && !_importCleanupRoot`, allowing the summary (and cleanup button) to appear even when polling has transiently cleared `activeSource` during the import.
+- **`showProgressSummary` signature**: `importCleanupRoot = null` added as second parameter; `_csqSourceRoot = importCleanupRoot || activeSource?.path`. Falls back to live `activeSource.path` when no pre-captured root is available (no behavior change for normal flows).
+
+### System Impact
+- INGEST
+- STATE
+- UI
+
+### Notes
+- Root cause: `renderExtDrives` disconnect detection sets `activeSource = null` when `activeSource.path` (a dialog-chosen sub-folder) is not found in the polled drive mountpoint list. If this fires during the `commitImportTransaction` await, the post-import summary is skipped or `_csqSourceRoot` receives an undefined value — both manifesting as "Path outside source root" failures in cleanup.
+- Safety preserved: `realpath` containment check in `files:deleteFromSource` is unchanged. All source/destination/size/symlink validations intact.
+- No change to import copy logic, metadata pipeline, eject logic, or browsing behavior.
+
+---
+
 ## Usage
 
 When debugging:
