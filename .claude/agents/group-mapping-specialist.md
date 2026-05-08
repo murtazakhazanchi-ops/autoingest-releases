@@ -204,6 +204,30 @@ Validation:
 - Remove group.
 - Confirm badges, tabs, counts, file lists, and dropdown state remain aligned.
 
+### metadataTags Three-Value Contract
+
+Context:
+- Applies to any UI component, picker, or code path that reads or writes the `metadataTags` field on a group object.
+
+Rule:
+- `metadataTags` has exactly three valid states with distinct meanings:
+  - `null` — group was created but never assigned a keyword (user must be warned before import)
+  - `[]` — explicit "No event keyword" selection (no warning; user consciously chose no keyword)
+  - `string[]` — one or more assigned keywords
+- `createGroup()` is the ONLY producer of `null`. Any picker or assignment UI must always deliver `string[]` via its `onChange` callback — never `null` or `undefined`.
+- The unassigned-warning filter `groups.filter(g => g.metadataTags === null)` is the canonical check for unassigned groups. This filter must remain a strict `=== null` check; widening it to include `[]` would incorrectly block imports where the user explicitly chose no keyword.
+
+Avoid:
+- Picker `onChange` returning `null` or `undefined` instead of `[]` when no keyword is selected — this would either break the strict `=== null` filter or cause false unassigned warnings.
+- Treating `[]` as equivalent to `null` in import validation — they carry different user intent.
+- Producing `null` from any code path other than `createGroup()`.
+
+Validation:
+- Confirm picker `onChange` always delivers `string[]` (empty array `[]` when no keyword is selected, never `null`).
+- Confirm the unassigned import warning uses `g.metadataTags === null`, not a falsy check.
+- Confirm `createGroup()` initializes `metadataTags: null` and no other caller produces `null`.
+- Confirm explicit "No keyword" selection results in `metadataTags: []`, not `null`, after picker close.
+
 ### Grouping and Routing Boundary
 
 Context:

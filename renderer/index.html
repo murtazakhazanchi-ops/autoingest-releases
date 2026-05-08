@@ -1616,6 +1616,15 @@
       .im-actions-left { width: 100%; flex-wrap: wrap; }
       .im-actions-right { width: 100%; justify-content: flex-end; }
     }
+    /* ── Post-import action chooser (replaces .im-actions after success) ── */
+    .im-post-actions {
+      margin-top: 4px; padding-top: 16px;
+      border-top: 1px solid var(--border-subtle);
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .im-post-title { font-size: 0.9rem; font-weight: 700; color: var(--text); margin: 0; }
+    .im-post-msg   { font-size: 0.78rem; color: var(--subtext); margin: 0; }
+    .im-post-btns  { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
     .progress-controls { display: flex; gap: 8px; }
     #progressPauseBtn, #progressResumeBtn {
       display: flex; align-items: center; gap: 5px;
@@ -3650,6 +3659,7 @@
       color: var(--subtext); font-style: italic; font-size: 0.68rem;
       border-bottom: 1px solid var(--border-subtle); margin-bottom: 3px; padding-bottom: 8px;
     }
+    .gc-dropdown-clear.current { color: var(--text); }
 
     .gc-file-list {
       max-height: calc(5 * 34px); overflow-y: auto;

@@ -760,6 +760,150 @@ Validation:
 - After any `renderFolders()` call outside `renderCurrentView()`: confirm `#sidebar` is actually visible without requiring a view toggle.
 - Confirm sidebar remains hidden in media view and visible in folder view.
 
+### Two-Function Close Pattern for Portal IIFE Modules
+
+Context:
+- Applies to any portal component (appended to `#dropdown-root` or a fixed overlay root outside the main DOM tree) whose `onClose` callback triggers a panel re-render that in turn needs to close the portal.
+
+Rule:
+- Every portal IIFE must expose two close behaviors:
+  - `close()`: tears down the menu AND calls the `onClose` callback. Used by outside-click, Escape, and trigger re-click.
+  - `closeQuiet()`: tears down the menu WITHOUT calling the callback. Used by `renderGroupPanel()` and any panel-rebuild path to avoid re-entry.
+- Null the `_onClose` reference before invoking it inside `close()` to prevent re-entrant calls if the callback itself calls back into the portal.
+
+```js
+function close() {
+  const cb = _onClose;
+  _onClose = null;   // null before calling to prevent re-entry
+  _teardown();
+  if (cb) cb();
+}
+function closeQuiet() {
+  _onClose = null;
+  _teardown();
+}
+```
+
+- In `renderGroupPanel()` (and equivalent panel rebuild functions): call `closeQuiet()` on every open portal, not `close()`.
+
+Avoid:
+- Exposing only a single `close()` function when the `onClose` callback itself triggers a panel rebuild that calls `close()` again — this creates infinite recursion.
+- Calling `close()` from within a render/rebuild path that was itself triggered by `onClose`.
+
+Validation:
+- Confirm the portal module exposes both `close()` and `closeQuiet()`.
+- Confirm `renderGroupPanel()` (and any panel rebuild path) calls `closeQuiet()` on all open portals.
+- Confirm `_onClose` is nulled before the callback is invoked inside `close()`.
+- Confirm that toggling the picker trigger while the panel rebuilds does not trigger infinite re-entry.
+
+### In-Place Trigger Update for Multi-Select Picker Toggles
+
+Context:
+- Applies when a multi-select picker (checkbox-based, stays open across multiple selections) needs to keep the trigger button's label and badge in sync while the picker remains open.
+
+Rule:
+- Do NOT call `renderGroupPanel()` (or any full panel rebuild) on each picker toggle (checkbox click). A full rebuild destroys and recreates the DOM, closing the open picker and resetting the interaction.
+- Instead, update only the specific trigger button's label and status badge in-place via a targeted function: `querySelector('[data-gid="…"]')` or equivalent data attribute selector.
+- Call `renderGroupPanel()` exactly once: on picker close (via the `onClose` callback), not on each toggle.
+- The in-place update function (`_updateMetaTriggerInPlace(gid, newTags)`) must be called from the picker's `onChange` handler.
+
+Avoid:
+- Calling `renderGroupPanel()` inside the picker's `onChange` callback — destroys the open picker on each toggle.
+- Omitting the in-place update and allowing the trigger label to fall out of sync while the picker is open.
+
+Validation:
+- Confirm `onChange` calls the in-place trigger update, not `renderGroupPanel()`.
+- Confirm the picker stays open and interactive after each checkbox toggle.
+- Confirm `renderGroupPanel()` is called once on picker close.
+- Confirm the trigger button label and badge reflect the current selection after each toggle.
+
+### Dedicated Success Flag — Do Not Infer Post-Import UX From DOM State
+
+Context:
+- Applies to any modal or flow where success-path UI (action choosers, completion panels, secondary CTAs) must appear only after a confirmed successful operation.
+
+Rule:
+- Use a dedicated boolean flag set at the source-of-truth function (e.g., `_postImportSucceeded = (errors === 0)` inside `showProgressSummary()`).
+- Do not infer operation success from DOM state (presence of a CSS class, visibility of an element, innerHTML content). DOM state can be mutated independently and is not authoritative.
+- The flag is the single authoritative signal for branching Done-handler behavior.
+
+Avoid:
+- Checking whether `#progressSummary` has `visible` or `success` class to decide which Done path to take.
+- Deriving success from counting DOM children or checking rendered text.
+
+Validation:
+- Confirm the success flag is set in exactly one place, at the function where outcome is determined.
+- Confirm the Done handler branches on the flag, not on any DOM query.
+- Confirm the flag is reset at the start of each new operation so stale success state does not carry over.
+
+### Dynamically Injected Modal Panels Must Be Cleaned Up in Two Places
+
+Context:
+- Applies to any `<div>` or panel injected into a modal at runtime (e.g., `#postImportActions`, inline confirm prompts) rather than present in the initial HTML.
+
+Rule:
+- Remove the panel in BOTH:
+  1. The teardown/close function (`_closeProgressModal()` or equivalent) — the normal close path.
+  2. The re-entry/reset function at the start of a new operation (`showProgress()` or equivalent) — guards against abnormal flows (card disconnect, IPC abort) that bypass the normal close path.
+- Missing the re-entry cleanup leaves stale panels visible across new import sessions.
+
+Avoid:
+- Removing a dynamically injected panel only in the teardown function and assuming abnormal flows always hit teardown.
+- Injecting a panel without auditing all code paths that reset or restart the modal.
+
+Validation:
+- Confirm the panel removal appears in the teardown function.
+- Confirm the panel removal also appears in the operation re-entry/reset function.
+- Confirm a mid-operation source disconnect does not leave the panel stale in the next session.
+
+### Clear Transient State Before Calling a Shared Teardown That Syncs the UI
+
+Context:
+- Applies when an action needs to clear module-level transient state (e.g., `selectedFiles`) and then call a shared teardown function that itself runs a UI sync (e.g., `updateSelectionBar()`, `renderCurrentView()`).
+
+Rule:
+- Clear the transient state FIRST, then call the shared teardown.
+- The shared teardown's UI sync call sees the final, cleared state in one pass.
+- Clearing after the teardown call causes the sync to render an intermediate stale state, then correct itself — producing a duplicate DOM update.
+
+```js
+// Correct order
+selectedFiles.clear();
+_selectionAnchor = null;
+_closeProgressModal();    // calls updateSelectionBar() — sees cleared state
+
+// Wrong order
+_closeProgressModal();    // calls updateSelectionBar() — sees stale selectedFiles
+selectedFiles.clear();    // second clear produces no render
+```
+
+Avoid:
+- Calling the shared teardown before clearing the state it will sync.
+- Relying on a second cleanup call after teardown to correct the stale render.
+
+Validation:
+- Confirm transient state (selectedFiles, groups, etc.) is cleared before the shared teardown is called.
+- Confirm `updateSelectionBar()` or equivalent runs only once with the final state.
+
+### Delegate to ejectBtn.click() — Do Not Re-Implement the Eject Pipeline
+
+Context:
+- Applies when a post-import chooser, modal action, or any UI flow needs to trigger the eject sequence for a memory card or external drive.
+
+Rule:
+- Call `document.getElementById('ejectBtn')?.click()` to reuse the full 4-phase eject pipeline (I/O shutdown, OS flush, unmount, confirmation modal, `resetAppState()`).
+- Before triggering, close any blocking overlay (e.g., the progress modal) so the eject confirmation overlay can render unobstructed.
+- Never duplicate the eject pipeline inline in a modal action handler.
+
+Avoid:
+- Copying eject IPC calls and confirmation logic into a new handler instead of delegating to the existing eject button.
+- Triggering `ejectBtn.click()` while the progress overlay is still visible — the eject confirmation will render beneath it.
+
+Validation:
+- Confirm the eject action calls `ejectBtn.click()` and does not re-implement eject steps.
+- Confirm the progress modal (or any blocking overlay) is closed before `ejectBtn.click()` fires.
+- Confirm the eject confirmation modal renders correctly and the full 4-phase eject completes.
+
 ### Light/Dark and Viewport Compatibility
 
 Context:

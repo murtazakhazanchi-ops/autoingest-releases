@@ -167,7 +167,9 @@ let currentFiles     = [];          // flat list of all files in current folder
 let sortKey          = 'date';
 let sortDir          = 'desc';
 let destPath         = '';
-let importRunning    = false;
+let importRunning         = false;
+let _postImportSucceeded  = false; // true only after error-free import; gates the post-success chooser
+let _pendingSourcePath    = null;  // set during selectSource(); lets polling renders show the right card
 let viewMode         = 'icon';
 let importMode       = 'event'; // 'event' | 'quick'
 let lastClickedPath  = null;
@@ -2291,7 +2293,7 @@ function renderDrives(cards) {
       importRunning = false;
       document.getElementById('progressOverlay').classList.remove('visible');
       showMessage('Card disconnected. Import cancelled.');
-      resetAppState();
+      resetAppState({ preserveEvent: true });
       return;
     }
   }
@@ -2313,7 +2315,7 @@ function renderDrives(cards) {
 
   if (newKey === _prevDriveKeys) {
     // List unchanged — sync selection highlights only (prevents DOM-rebuild flicker)
-    const selectedPath = activeSource?.type === 'memory-card' ? activeSource.path : null;
+    const selectedPath = _pendingSourcePath ?? (activeSource?.type === 'memory-card' ? activeSource.path : null);
     list.querySelectorAll('.src-device-item').forEach(item => {
       const sel = item.dataset.mountpoint === selectedPath;
       item.classList.toggle('selected', sel);
@@ -2329,7 +2331,7 @@ function renderDrives(cards) {
     return;
   }
 
-  const selectedPath = activeSource?.type === 'memory-card' ? activeSource.path : null;
+  const selectedPath = _pendingSourcePath ?? (activeSource?.type === 'memory-card' ? activeSource.path : null);
   list.innerHTML = cards.map(c => {
     const isSel = c.mountpoint === selectedPath;
     return `<div class="src-device-item${isSel ? ' selected' : ''}"
@@ -2353,6 +2355,12 @@ function renderDrives(cards) {
         item.classList.toggle('selected', sel);
         const chk = item.querySelector('.src-device-check');
         if (chk) chk.innerHTML = sel ? SVG.check : '';
+      });
+      // Clear any ext-drive selection so both lists never show selected simultaneously
+      document.getElementById('srcExtDriveList')?.querySelectorAll('.src-device-item').forEach(item => {
+        item.classList.remove('selected');
+        const chk = item.querySelector('.src-device-check');
+        if (chk) chk.innerHTML = '';
       });
       // Confirmation pulse
       el.classList.add('just-selected');
@@ -2379,7 +2387,7 @@ function renderExtDrives(cards) {
 
   if (newKey === _prevExtKeys) {
     // List unchanged — sync selection highlights only
-    const selectedPath = activeSource?.type === 'external-drive' ? activeSource.path : null;
+    const selectedPath = _pendingSourcePath ?? (activeSource?.type === 'external-drive' ? activeSource.path : null);
     list.querySelectorAll('.src-device-item').forEach(item => {
       const sel = item.dataset.mountpoint === selectedPath;
       item.classList.toggle('selected', sel);
@@ -2395,7 +2403,7 @@ function renderExtDrives(cards) {
     return;
   }
 
-  const selectedPath = activeSource?.type === 'external-drive' ? activeSource.path : null;
+  const selectedPath = _pendingSourcePath ?? (activeSource?.type === 'external-drive' ? activeSource.path : null);
   list.innerHTML = filtered.map(d => {
     const name = d.label || d.device || d.mountpoint;
     const isSel = d.mountpoint === selectedPath;
@@ -2420,6 +2428,12 @@ function renderExtDrives(cards) {
         const chk = item.querySelector('.src-device-check');
         if (chk) chk.innerHTML = sel ? SVG.check : '';
       });
+      // Clear any memory-card selection so both lists never show selected simultaneously
+      document.getElementById('srcMemCardList')?.querySelectorAll('.src-device-item').forEach(item => {
+        item.classList.remove('selected');
+        const chk = item.querySelector('.src-device-check');
+        if (chk) chk.innerHTML = '';
+      });
       el.classList.add('just-selected');
       el.addEventListener('animationend', () => el.classList.remove('just-selected'), { once: true });
     });
@@ -2436,6 +2450,9 @@ async function selectSource({ type, path, label = null, driveObj = null }) {
   // browseFolder race. The first call's own ++fileLoadRequestId inside browseFolder
   // makes subsequent calls supersede it; guard here so only one proceeds at a time.
   if (isLoadingFiles) return;
+
+  _pendingSourcePath = path;
+  try {
 
   const parts = path.split(/[\\/]/);
   const name  = label || parts[parts.length - 1] || path;
@@ -2511,6 +2528,10 @@ async function selectSource({ type, path, label = null, driveObj = null }) {
   document.getElementById('workspace').classList.add('visible');
   updateSteps(); updateSelectionBar();
   _updateContextBar();
+
+  } finally {
+    _pendingSourcePath = null;
+  }
 }
 
 document.getElementById('changeDriveBtn').addEventListener('click', () => {
@@ -2548,8 +2569,10 @@ function hideSourceScanState() {
 /**
  * resetAppState — called after eject or device disconnect.
  * Clears all drive/file state and returns UI to the landing screen.
+ * Pass { preserveEvent: true } to keep the active event selection intact
+ * (used after post-import eject and unexpected disconnect).
  */
-function resetAppState() {
+function resetAppState({ preserveEvent = false } = {}) {
   hideSourceScanState();
   closePreview();
   _csqEligibleFiles = null;
@@ -2597,7 +2620,7 @@ function resetAppState() {
   // Hide workspace + event modal, show landing screen
   document.getElementById('workspace').classList.remove('visible');
   EventMgmt.close();
-  EventCreator.resetSelection();
+  if (!preserveEvent) EventCreator.resetSelection();
   document.getElementById('step1Panel').style.display = '';
   setRailMode('card');
 
@@ -2607,11 +2630,13 @@ function resetAppState() {
   renderHome();
 }
 
-document.getElementById('ejectBtn').addEventListener('click', async () => {
-  if (!activeDrive || isShuttingDown) return;
-
-  const mountpoint = activeDrive.mountpoint;
-
+/**
+ * _performEject(mountpoint) — shared eject mechanism.
+ * Stops all thumbnail I/O, waits for file handles to flush, calls the OS
+ * unmount, shows the confirmation modal, and resolves after the user clicks OK.
+ * The caller is responsible for resetting UI state after this resolves.
+ */
+async function _performEject(mountpoint) {
   // ── Phase 1: stop all thumbnail I/O immediately ───────────────
   // Set the flag first so drainThumbQueue and requestThumbForImage
   // both return early from this point forward.
@@ -2647,11 +2672,11 @@ document.getElementById('ejectBtn').addEventListener('click', async () => {
     ejected = false;
   }
 
-  // ── Phase 4: always reset UI, report outcome ──────────────────
-  // Commit 12c: show a confirmation modal before resetting UI. Previously a
-  // 4-second toast in the footer was routinely missed because the UI jumped
-  // back to the drive-list screen at the same moment. Reset only AFTER the
-  // user clicks OK.
+  // ── Phase 4: show confirmation modal, wait for user to dismiss ─
+  // Show a confirmation modal before resetting UI. Previously a 4-second
+  // toast in the footer was routinely missed because the UI jumped back to
+  // the drive-list screen at the same moment. Reset only AFTER the user
+  // clicks OK.
   const overlay = document.getElementById('ejectOverlay');
   const modal   = document.getElementById('ejectModal');
   const icon    = document.getElementById('ejectIcon');
@@ -2679,8 +2704,12 @@ document.getElementById('ejectBtn').addEventListener('click', async () => {
     if (overlay) overlay.classList.add('visible');
     if (okBtn)   okBtn.focus();
   });
+}
 
-  // NOW reset the UI and re-poll drives so the drive list is fresh.
+document.getElementById('ejectBtn').addEventListener('click', async () => {
+  if (!activeDrive || isShuttingDown) return;
+  const mountpoint = activeDrive.mountpoint;
+  await _performEject(mountpoint);
   resetAppState();  // clears isShuttingDown as its last step
   try { await window.api.getDrives(); } catch {}
 });
@@ -4498,6 +4527,14 @@ function formatSpeed(bps) {
 }
 
 function showProgress() {
+  // Clean up any leftover post-import panel from a prior session
+  _postImportSucceeded = false;
+  const _pm = document.getElementById('progressModal');
+  if (_pm) {
+    _pm.querySelector('#postImportActions')?.remove();
+    const _pa = _pm.querySelector('.im-actions');
+    if (_pa) _pa.style.display = '';
+  }
   document.getElementById('progressOverlay').classList.add('visible');
   document.getElementById('progressSummary').classList.remove('visible');
   document.getElementById('progressDoneBtn').classList.remove('visible');
@@ -4538,6 +4575,7 @@ function updateProgress({ total, index, completedCount, filename, status, skipRe
 }
 
 function showProgressSummary({ copied, skipped, errors, skippedReasons, failedFiles, duration, integrity, copiedFiles }) {
+  _postImportSucceeded = (errors === 0); // gates the post-success chooser in the Done handler
   document.getElementById('progressFilename').textContent = 'Import complete.';
   document.getElementById('sumCopied').textContent  = copied;
   document.getElementById('sumSkipped').textContent = skipped;
@@ -5822,24 +5860,136 @@ document.getElementById('progressResumeBtn').addEventListener('click', () => {
   document.getElementById('progressEta').textContent = 'Resuming…';
 });
 
-document.getElementById('progressDoneBtn').addEventListener('click', () => {
+// Closes the progress overlay and removes all per-import dynamic elements.
+// Safe to call from any post-import action (Done, Continue, Eject, Exit).
+function _closeProgressModal() {
   document.getElementById('progressOverlay').classList.remove('visible');
-  importRunning = false;
-  // Remove per-import buttons and rows so the next import gets a clean modal
-  const reportBtn   = document.getElementById('progressReportBtn');
-  if (reportBtn) reportBtn.remove();
-  const checksumBtn = document.getElementById('runChecksumBtn');
-  if (checksumBtn) checksumBtn.remove();
-  const integrityRow = document.getElementById('sumIntegrity');
-  if (integrityRow) integrityRow.remove();
-  const cleanupBtn = document.getElementById('scqOpenBtn');
-  if (cleanupBtn) cleanupBtn.remove();
+  importRunning        = false;
+  _postImportSucceeded = false;
+
+  // Remove per-import dynamic elements so the next import gets a clean modal
+  document.getElementById('progressReportBtn')?.remove();
+  document.getElementById('runChecksumBtn')?.remove();
+  document.getElementById('sumIntegrity')?.remove();
+  document.getElementById('scqOpenBtn')?.remove();
   _csqEligibleFiles = null;
   _csqSourceRoot    = null;
-  // PERF: sync badges in-place instead of re-rendering the entire grid
-  // This preserves scroll position and avoids image reload
+
+  // Restore main actions row; remove post-import chooser if present
+  const modal = document.getElementById('progressModal');
+  if (modal) {
+    modal.querySelector('#postImportActions')?.remove();
+    const actRow = modal.querySelector('.im-actions');
+    if (actRow) actRow.style.display = '';
+  }
+
+  // PERF: sync badges in-place — preserves scroll position and avoids image reload
   if (currentFiles.length) syncImportedBadges();
   updateSelectionBar();
+}
+
+// Shows the post-success action chooser inside the progress modal.
+// Called by progressDoneBtn when _postImportSucceeded is true.
+function _showPostImportActions() {
+  const modal = document.getElementById('progressModal');
+  if (!modal) return;
+
+  // Hide the main actions row
+  const actRow = modal.querySelector('.im-actions');
+  if (actRow) actRow.style.display = 'none';
+
+  // Remove any stale chooser from a prior session
+  modal.querySelector('#postImportActions')?.remove();
+
+  const srcType    = activeSource?.type;
+  const isEjectable = srcType === 'memory-card' || srcType === 'external-drive';
+
+  const panel = document.createElement('div');
+  panel.id        = 'postImportActions';
+  panel.className = 'im-post-actions';
+
+  const primaryBtn = isEjectable
+    ? `<button id="postEjectBtn"   class="im-btn-primary visible" type="button">Eject Source</button>`
+    : `<button id="postExitBtn"    class="im-btn-primary visible" type="button">Exit to Home</button>`;
+
+  panel.innerHTML = `
+    <p class="im-post-title">Import Complete</p>
+    <p class="im-post-msg">Would you like to continue importing from this source?</p>
+    <div class="im-post-btns">
+      ${primaryBtn}
+      <button id="postContinueBtn" class="im-btn-secondary" type="button">Continue Importing</button>
+      <button id="postCloseBtn"    class="im-btn-tertiary"  type="button">Close</button>
+    </div>
+  `;
+
+  modal.appendChild(panel);
+
+  panel.querySelector('#postContinueBtn')?.addEventListener('click', _continueImporting);
+  panel.querySelector('#postCloseBtn')?.addEventListener('click',    _closeProgressModal);
+
+  panel.querySelector('#postEjectBtn')?.addEventListener('click', async () => {
+    if (!activeDrive || isShuttingDown) return;
+    const mountpoint = activeDrive.mountpoint;
+    _closeProgressModal();
+    await _performEject(mountpoint);
+    resetAppState({ preserveEvent: true });
+    try { await window.api.getDrives(); } catch {}
+  });
+
+  panel.querySelector('#postExitBtn')?.addEventListener('click', () => {
+    _closeProgressModal();
+    _exitToHome();
+  });
+}
+
+// Continues importing from the same source: dissolves groups and clears selection
+// without ejecting, resetting the event, or returning to home.
+function _continueImporting() {
+  // Clear selection first so _closeProgressModal's updateSelectionBar reflects the cleared state
+  selectedFiles.clear();
+  lastClickedPath  = null;
+  _selectionAnchor = null;
+  _prevFocusPath   = null;
+
+  GroupManager.reset();
+  renderGroupPanel();
+
+  _closeProgressModal(); // closes overlay, syncs badges, updates selection bar
+}
+
+// Returns to the home screen while preserving the active event and imported files.
+// Used for local-folder "Exit to Home" — does NOT eject and does NOT clear the event.
+function _exitToHome() {
+  hideSourceScanState();
+  hasSelectedDrive  = false;
+  isLoadingFiles    = false;
+  currentFolder     = null;
+  _folderNavMode    = 'tree';
+  fileLoadRequestId++;
+
+  activeDrive = null; activeFolderPath = null; activeSource = null;
+  expandedFolders.clear(); dcimChildrenCache = []; cachedDcimPath = null;
+  selectedFiles.clear(); currentFiles = []; lastClickedPath = null;
+  _selectionAnchor = null; _prevFocusPath = null; tileMap = new Map();
+  resetViewCache();
+
+  GroupManager.reset();
+  renderGroupPanel();
+
+  document.getElementById('workspace').classList.remove('visible');
+  document.getElementById('step1Panel').style.display = '';
+  setRailMode('card');
+  updateSteps(); updateSelectionBar();
+  _updateContextBar();
+  renderHome();
+}
+
+document.getElementById('progressDoneBtn').addEventListener('click', () => {
+  if (_postImportSucceeded) {
+    _showPostImportActions();
+    return;
+  }
+  _closeProgressModal();
 });
 
 // ── Header date display ───────────────────────────────────────────────────────
@@ -6810,6 +6960,126 @@ const Dropdown = (() => {
   return { open, close, isOpen };
 })();
 
+// ── Multi-select keyword picker for metadata grouping mode ────────────────────
+const MetaPicker = (() => {
+  let _menu    = null;
+  let _gid     = null;
+  let _onClose = null;
+
+  function _teardown() {
+    if (_menu) { _menu.remove(); _menu = null; }
+    _gid = null;
+  }
+
+  function closeQuiet() {
+    _onClose = null;
+    _teardown();
+  }
+
+  function close() {
+    const cb = _onClose;
+    _onClose = null;
+    _teardown();
+    if (cb) cb();
+  }
+
+  function isOpen(gid) { return _gid === gid; }
+
+  function open({ trigger, gid, tags, currentTags, groupColor, onChange, onClose }) {
+    closeQuiet();
+    const root = document.getElementById('dropdown-root');
+    if (!root) return;
+
+    _gid     = gid;
+    _onClose = onClose || null;
+
+    const rect      = trigger.getBoundingClientRect();
+    const menuWidth = Math.max(rect.width, 200);
+    const approxH   = (tags.length + 1) * 34 + 16;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let top  = rect.bottom + 6;
+    if (top + approxH > vh - 8) top = Math.max(8, rect.top - approxH - 6);
+    let left = rect.left;
+    if (left + menuWidth > vw - 8) left = Math.max(8, vw - menuWidth - 8);
+
+    // Mutable set of selected tags; preserves order via tags array on commit
+    let selected = new Set(Array.isArray(currentTags) ? currentTags : []);
+
+    const menu = document.createElement('div');
+    menu.className = 'gc-dropdown';
+    menu.style.cssText = `top:${top}px;left:${left}px;width:${menuWidth}px;--group-color:${groupColor};`;
+
+    function _render() {
+      menu.innerHTML = '';
+
+      // "No event keyword" — acts as clear-all, marked current when nothing selected
+      const clearEl = document.createElement('div');
+      clearEl.className = 'gc-dropdown-item gc-dropdown-clear' + (selected.size === 0 ? ' current' : '');
+      clearEl.textContent = 'No event keyword';
+      clearEl.addEventListener('click', () => {
+        selected.clear();
+        onChange([]);
+        _render();
+      });
+      menu.appendChild(clearEl);
+
+      tags.forEach(tag => {
+        const el      = document.createElement('div');
+        const checked = selected.has(tag);
+        el.className  = 'gc-dropdown-item' + (checked ? ' current' : '');
+        el.textContent = tag;
+        el.addEventListener('click', () => {
+          if (selected.has(tag)) selected.delete(tag);
+          else selected.add(tag);
+          // Deliver tags in their original declaration order
+          const ordered = tags.filter(t => selected.has(t));
+          onChange(ordered);
+          _render();
+        });
+        menu.appendChild(el);
+      });
+    }
+
+    _render();
+    root.appendChild(menu);
+    _menu = menu;
+  }
+
+  document.addEventListener('click', e => {
+    if (_menu && !_menu.contains(e.target) && !e.target.closest('.gc-meta-trigger')) close();
+  });
+  document.addEventListener('scroll', close, true);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && _menu) close(); });
+
+  return { open, close, closeQuiet, isOpen };
+})();
+
+// Updates the keyword trigger button and status badge in place (no full panel re-render).
+function _updateMetaTriggerInPlace(gid, newTags) {
+  const assigned = Array.isArray(newTags);
+  const label    = assigned
+    ? (newTags.length === 0 ? 'No event keyword' : newTags.join(' + '))
+    : null;
+
+  const btn = document.querySelector(`.gc-meta-trigger[data-gid="${gid}"]`);
+  if (!btn) return;
+
+  const valueSpan = btn.querySelector('.gc-sub-value');
+  if (valueSpan) valueSpan.textContent = assigned ? label : '— select —';
+  btn.classList.toggle('assigned', assigned);
+
+  const area      = btn.closest('.gc-metatag-area');
+  if (!area) return;
+  const statusDiv = area.querySelector('.gc-status');
+  if (!statusDiv) return;
+
+  statusDiv.className = 'gc-status ' + (assigned ? 'ok' : 'warn');
+  statusDiv.innerHTML = assigned
+    ? `${SVG.check} ${_esc(label)}`
+    : `${SVG.warn} Not assigned`;
+}
+
 // Delegated handler for all .gc-sub-trigger clicks (survives innerHTML rebuilds)
 document.addEventListener('click', e => {
   const trigger = e.target.closest('.gc-sub-trigger[data-gid]');
@@ -6855,7 +7125,7 @@ document.addEventListener('click', e => {
   if (!trigger) return;
 
   const gid = Number(trigger.dataset.gid);
-  if (Dropdown.isOpen(gid)) { Dropdown.close(); return; }
+  if (MetaPicker.isOpen(gid)) { MetaPicker.close(); return; }
 
   const groups    = GroupManager.getGroups();
   const thisGroup = groups.find(g => g.id === gid);
@@ -6864,49 +7134,18 @@ document.addEventListener('click', e => {
   const metaTags   = _getMetaGroupingTags();
   const groupIdx   = groups.findIndex(g => g.id === gid);
   const groupColor = GroupManager.getGroupColor(groupIdx);
-  const current    = thisGroup.metadataTags; // null | string[]
 
-  const items = [
-    ...metaTags.map(t => ({
-      value:    JSON.stringify([t]),
-      label:    t,
-      current:  Array.isArray(current) && current.length === 1 && current[0] === t,
-      disabled: false,
-    })),
-  ];
-  // Combined option (all tags together) — only meaningful when 2+ tags
-  if (metaTags.length >= 2) {
-    items.push({
-      value:    JSON.stringify(metaTags),
-      label:    metaTags.join(' + '),
-      current:  Array.isArray(current) && current.length === metaTags.length && metaTags.every((t, i) => current[i] === t),
-      disabled: false,
-    });
-  }
-  // No-keyword option
-  items.push({
-    value:    JSON.stringify([]),
-    label:    'No event keyword',
-    current:  Array.isArray(current) && current.length === 0,
-    disabled: false,
-  });
-
-  Dropdown.open({
+  MetaPicker.open({
     trigger,
     gid,
-    items,
+    tags:        metaTags,
+    currentTags: thisGroup.metadataTags,
     groupColor,
-    onSelect(value) {
-      if (value === '') {
-        GroupManager.setMetadataTags(gid, null);
-      } else {
-        try {
-          const tags = JSON.parse(value);
-          GroupManager.setMetadataTags(gid, Array.isArray(tags) ? tags : null);
-        } catch {
-          GroupManager.setMetadataTags(gid, null);
-        }
-      }
+    onChange(newTags) {
+      GroupManager.setMetadataTags(gid, newTags);
+      _updateMetaTriggerInPlace(gid, newTags);
+    },
+    onClose() {
       renderGroupPanel();
     },
   });
@@ -6914,16 +7153,18 @@ document.addEventListener('click', e => {
 
 // ── Group panel renderer ───────────────────────────────────────────────────
 
-// Returns the comma-split tags for the single active component, or [] if not applicable.
+// Returns the normalized, de-duplicated comma-split tags for the single active component.
 function _getMetaGroupingTags() {
   const comps = EventCreator.getEventComps();
   if (comps.length !== 1) return [];
-  return (comps[0].eventTypes || [])
+  const raw = (comps[0].eventTypes || [])
     .map(t => (typeof t === 'object' ? (t.label || '') : String(t)))
     .join(',')
     .split(',')
     .map(t => t.trim())
     .filter(Boolean);
+  const seen = new Set();
+  return raw.filter(t => seen.has(t) ? false : (seen.add(t), true));
 }
 
 // True when: event mode, single-component, component has 2+ comma-split event tags.
@@ -6944,7 +7185,8 @@ function _updateMetaGroupHint() {
 }
 
 function renderGroupPanel() {
-  Dropdown.close(); // close any open portal menu before rebuilding innerHTML
+  Dropdown.close();        // close sub-event picker
+  MetaPicker.closeQuiet(); // close keyword picker without triggering re-render
 
   const panel = document.getElementById('groupPanel');
   if (!panel) return;
@@ -6986,7 +7228,7 @@ function renderGroupPanel() {
       selectorHtml = `
         <div class="gc-metatag-area">
           <div class="gc-subevent-row">
-            <span class="gp-sl">Keyword</span>
+            <span class="gp-sl">Keywords</span>
             <button class="gc-meta-trigger${assigned ? ' assigned' : ''}" data-gid="${g.id}" type="button">
               <span class="gc-sub-value">${assigned ? _esc(assignedLabel) : '— select —'}</span>
               <svg class="gc-sub-chevron" width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">

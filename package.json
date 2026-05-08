@@ -1,7 +1,7 @@
 {
   "name": "auto-ingest",
-  "version": "0.8.6",
-  "description": "AutoIngest — Memory Card Importer",
+  "version": "0.8.7",
+  "description": "AutoIngest — AJS Photo Archive Ingest System",
   "main": "main/main.js",
   "scripts": {
     "start": "electron .",

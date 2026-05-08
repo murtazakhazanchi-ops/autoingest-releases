@@ -643,6 +643,111 @@ Status:
 
 ---
 
+---
+
+### 2026-05-08 — Multi-Select MetaPicker Portal: Two-Function Close, In-Place Update, and metadataTags Contract
+
+Task type:
+- UI / Renderer / Portal Component / Group Mapping / Data Contract
+
+What happened:
+
+Replaced the single-select keyword dropdown on the group panel with a multi-select `MetaPicker` IIFE portal. The portal appends to `#dropdown-root` (outside the main DOM tree). Key patterns and contracts established:
+
+**Two-function close pattern:**
+A portal whose `onClose` callback triggers `renderGroupPanel()` cannot expose only one `close()` method, because `renderGroupPanel()` also needs to close the portal — creating an infinite loop: `close()` → `onClose()` → `renderGroupPanel()` → `close()` → ∞. Fix: separate `close()` (tears down + calls `onClose` callback) from `closeQuiet()` (tears down only, nulls callback, no callback invocation). `renderGroupPanel()` calls `closeQuiet()` on all open portals. Outside-click, Escape, and trigger re-click call `close()`.
+
+**In-place DOM update for multi-select picker toggles:**
+Each checkbox toggle inside an open picker must not call `renderGroupPanel()` — that would rebuild `innerHTML` and destroy the open picker. Instead, `_updateMetaTriggerInPlace(gid, newTags)` uses `querySelector('[data-gid="…"]')` to update only the trigger button's label and badge. `renderGroupPanel()` is called once on picker close (via the `onClose` callback).
+
+**Portal CSS reuse:**
+`MetaPicker` reuses `.gc-dropdown` class (glass morphism, animation, positioning) without duplicating CSS. Only delta CSS is added for behavioral differences.
+
+**`metadataTags` three-value contract:**
+- `null` = group was never assigned (warn before import)
+- `[]` = explicit "No event keyword" selection (no warn)
+- `string[]` = assigned keywords
+The picker's `onChange` always delivers `string[]` (never `null`). `createGroup()` is the only producer of `null`. The unassigned-warning filter `groups.filter(g => g.metadataTags === null)` stays correct because the picker cannot produce `null`.
+
+Reusable lessons:
+
+1. **Two-function close pattern for portal IIFE modules:** Any portal whose `onClose` callback re-renders the panel hosting the trigger must expose both `close()` (with callback) and `closeQuiet()` (without callback). The panel render path must call `closeQuiet()`.
+
+2. **In-place trigger update for open picker toggles:** Multi-select pickers that stay open across toggles must update only the trigger button label/badge in-place; `renderGroupPanel()` is called once on close, not on each toggle.
+
+3. **`metadataTags` three-value contract must be preserved through any picker change.** Picker `onChange` must always deliver `string[]`. Only `createGroup()` produces `null`. The `=== null` unassigned filter must not be widened to include `[]`.
+
+Common failure modes:
+- Calling `close()` from `renderGroupPanel()` when the portal's `onClose` fires `renderGroupPanel()` — creates infinite recursion.
+- Calling `renderGroupPanel()` on each picker toggle (checkbox click) instead of only on picker close.
+- Picker `onChange` returning `null` or `undefined` instead of `[]` when no keyword is selected — breaks the `=== null` unassigned filter.
+
+Promote to agents:
+- ui-system-specialist.md (two-function close pattern; in-place trigger update)
+- group-mapping-specialist.md (metadataTags three-value contract)
+
+Status:
+- Promoted
+
+---
+
+### 2026-05-08 — Post-Import Completion Flow: Source-Aware Action Chooser
+
+Task type:
+- UI / Renderer / Modal / State Management / Import Flow
+
+What happened:
+
+Replaced the old "Done closes modal" behavior with a source-aware action chooser shown after a successful import. The chooser offers Eject Source / Exit to Home / Continue Importing / Close depending on source type.
+
+**`_postImportSucceeded` flag gates post-import UX:**
+A boolean flag set only in `showProgressSummary()` when `errors === 0` gates the post-success chooser in the Done handler. Inferring success from DOM state (e.g., checking if `#progressSummary` has a class) was considered and rejected — DOM state is fragile and can be mutated independently. The flag is the authoritative signal set at the exact point where success is determined.
+
+**Dynamically injected panels need cleanup in two places:**
+`#postImportActions` is removed in `_closeProgressModal()` (normal close path) AND in `showProgress()` (re-entry path at the start of each new import). Missing the re-entry cleanup leaves stale panels after abnormal flows such as card disconnect or IPC abort mid-import.
+
+**State mutation order before shared teardown:**
+`_continueImporting()` clears `selectedFiles` BEFORE calling `_closeProgressModal()` (which calls `updateSelectionBar()`). Clearing transient state before calling a shared teardown that syncs the UI eliminates duplicate DOM updates and ensures the sync call sees the final state.
+
+**`resetAppState()` clears the active event — wrong for source-exit-only flows:**
+`resetAppState()` calls `EventCreator.resetSelection()`, which destroys the active event. For "Exit to Home" (local folder) and "Continue Importing", the event must be preserved. The correct pattern is a partial reset: clear source/files/groups/selection but do NOT call `EventCreator.resetSelection()`. This mirrors `changeDriveBtn` logic. Using `resetAppState()` in the wrong context silently destroys in-progress event state.
+
+**`ejectBtn.click()` delegation is safe and preferred:**
+To trigger the eject flow from the post-import chooser, calling `document.getElementById('ejectBtn')?.click()` reuses the full 4-phase eject pipeline (I/O shutdown, OS flush, unmount, confirmation modal, `resetAppState()`). The only prerequisite: close any blocking overlay (progress modal) before triggering, so the eject confirmation can render unobstructed.
+
+**`activeSource.type` is the canonical source-type dispatch key:**
+Values are `'memory-card' | 'external-drive' | 'local-folder'`. Source-type-specific post-import behavior (eject vs exit-to-home) is driven by this field. Quick Import always uses ejectable sources — no special Quick Import branch needed in the chooser.
+
+Reusable lessons:
+
+1. **Use a dedicated success flag, not DOM state inference, to gate post-import UX.** Set the flag at the source of truth (`showProgressSummary`). DOM state is fragile.
+
+2. **Dynamically injected modal panels must be cleaned up in two places:** the normal close/teardown function AND the re-entry/reset function at the start of a new operation.
+
+3. **Clear transient state before calling a shared teardown that syncs the UI.** Ensures the sync call sees the final state and eliminates duplicate DOM updates.
+
+4. **`resetAppState()` destroys the active event — never use it for source-exit-only or continue-importing flows.** Use a partial reset that mirrors `changeDriveBtn` logic.
+
+5. **Delegate to `ejectBtn.click()` to reuse the full eject pipeline.** Close blocking overlays first so the eject confirmation renders unobstructed.
+
+6. **`activeSource.type` is the canonical key for source-type dispatch in post-import UX.** Drive source-type-specific behavior from this field, not from Quick Import detection or UI labels.
+
+Common failure modes:
+- Inferring import success from DOM state (e.g., class presence) instead of a dedicated flag.
+- Removing `#postImportActions` only in the teardown path and omitting it from the re-entry path.
+- Calling `updateSelectionBar()` before clearing `selectedFiles`, producing a stale intermediate render.
+- Calling `resetAppState()` for a partial-exit flow, silently destroying the active event.
+- Re-implementing the eject pipeline inline instead of delegating to `ejectBtn.click()`.
+
+Promote to agents:
+- ui-system-specialist.md (lessons 1–5: flag-gated UX, two-place cleanup, mutation order, ejectBtn delegation)
+- ingestion-routing-specialist.md (lesson 4: resetAppState event destruction; lesson 6: activeSource.type dispatch)
+
+Status:
+- Promoted
+
+---
+
 ## Entry Template
 
 ### YYYY-MM-DD — Task Name

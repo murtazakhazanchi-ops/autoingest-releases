@@ -233,6 +233,47 @@ Validation:
 - Confirm UI remains responsive during large imports.
 - Confirm no validation or transaction checks were bypassed.
 
+### resetAppState() Destroys the Active Event — Forbidden for Partial-Exit Flows
+
+Context:
+- Applies to any post-import or source-exit flow that must return the user to a neutral state while preserving the active event selection (e.g., Continue Importing, Exit to Home for local-folder sources).
+
+Rule:
+- `resetAppState()` calls `EventCreator.resetSelection()`, which destroys the active event, clears the event session, and resets the event creator module.
+- For any flow that must preserve the active event, use a partial reset instead: clear source, files, groups, and selection state, but do NOT call `EventCreator.resetSelection()`.
+- The correct partial-reset pattern mirrors `changeDriveBtn` logic — reset source-related state only.
+- `resetAppState()` is only correct when the user explicitly intends to start over completely (full eject + source removal).
+
+Avoid:
+- Calling `resetAppState()` in Continue Importing, Exit to Home, or any mid-session partial-exit flow.
+- Assuming `resetAppState()` is a safe general-purpose cleanup — it silently destroys the active event and all event session state.
+
+Validation:
+- Confirm any partial-exit flow (Continue Importing, Exit to Home) does NOT call `resetAppState()`.
+- Confirm the active event remains accessible after the partial reset.
+- Confirm source/files/groups/selection state is cleared as intended.
+- Confirm the full eject flow (ejectBtn path) still calls `resetAppState()` correctly.
+
+### activeSource.type Is the Canonical Key for Source-Type Dispatch
+
+Context:
+- Applies to any post-import, source-exit, or UI flow that must vary behavior by the type of source currently active (memory card, external drive, local folder).
+
+Rule:
+- `activeSource.type` takes values `'memory-card' | 'external-drive' | 'local-folder'`.
+- Source-type-specific behavior (e.g., offer Eject vs offer Exit to Home) must be driven by `activeSource.type`, not inferred from UI labels, Quick Import flags, or filesystem paths.
+- Quick Import always uses ejectable sources (`'memory-card'` or `'external-drive'`) — no separate Quick Import branch is needed in source-type dispatch logic.
+
+Avoid:
+- Branching on Quick Import detection (`isQuickImport`, button labels) when the intent is to distinguish ejectable vs non-ejectable sources.
+- Reading `activeSource.label` or filesystem path to infer source type.
+
+Validation:
+- Confirm source-type UI variants branch on `activeSource.type`.
+- Confirm `'memory-card'` and `'external-drive'` both take the ejectable path.
+- Confirm `'local-folder'` takes the non-ejectable path (e.g., Exit to Home).
+- Confirm no Quick Import special-casing was added where `activeSource.type` already provides the distinction.
+
 ### Error Handling
 
 Context:

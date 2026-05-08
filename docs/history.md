@@ -130,6 +130,49 @@ Use this for:
 
 ---
 
+## v0.8.6 — Stabilization: IPC Memory, CSP, and Import State
+
+### Changes
+- `master:scanEvents` IPC handler strips `imports[]` from `_eventJson` before pushing to the IPC response; renderer now receives only scalar picker metadata — per-event history is loaded lazily on selection via `readEventJson`
+- Theme-detection IIFE moved from inline `<script>` in `index.html` to `renderer/theme-init.js`; `index.html` loads it via `<script src="theme-init.js">` to satisfy `script-src 'self'` CSP
+- `restoreLastEvent` stale-path branch now fully resets `selectedCollection`, `activeMaster`, `_viewingExisting`, and `_scannedEvents` before returning early — prevents partial state carry-over
+- `reloadForImport(eventPath)` added to EventCreator public API: reads fresh component state from disk via `loadEventFromDisk` → `setEventState`; replaces the previous session-store fallback in the import handler
+
+### System Impact
+- PERFORMANCE
+- IPC
+- UI
+- STATE
+- INGEST
+
+### Notes
+- Eliminates V8/Oilpan OOM crash on Activity Log open for archives with large import histories
+- Inline script removal is a CSP compliance fix; no UI behavior change
+- `reloadForImport` enforces the state-flow contract (event.json → logic → UI) after import; `liveComps` is always sourced from `getEventComps()`, never from a session-store workaround
+
+---
+
+## v0.8.7 — Post-Import UX, Multi-Select Keywords, and Source Selection Fixes
+
+### Changes
+- **Multi-select keyword picker**: Replaced the hardcoded combination dropdown (Tag A, Tag B, Tag A + Tag B) with a MetaPicker portal IIFE that lets users independently toggle any subset of event keywords. Each group stores `metadataTags: string[]` where `[]` = explicit no keyword, `null` = unassigned. Deduplication applied at source; declaration order preserved across toggles.
+- **Post-import action chooser**: Done button after a successful (zero-error) import now shows an inline chooser instead of immediately closing. Ejectable sources (memory card, external drive) show: Eject Source, Continue Importing, Close. Local folders show: Exit to Home, Continue Importing, Close. Continue Importing dissolves group state and selection but preserves source and event context. Exit to Home returns to landing without clearing the active event.
+- **Source card double-selection fix**: Clicking between source types (memory card ↔ external drive) previously left the old source type's checkmark visible until the next polling cycle. Each click handler now immediately clears the other list's checkmarks. Added `_pendingSourcePath` state so polling renders stay consistent during the async scan window in `selectSource()`.
+- **Post-import Eject Source preserves event**: Eject Source from the post-import chooser now returns Home with the active event intact. Refactored `_performEject(mountpoint)` as a shared eject-mechanism helper (I/O shutdown → hardware eject → confirmation modal → await OK); callers supply the post-eject reset. Normal eject-button path unchanged. `resetAppState()` gains a `{ preserveEvent }` option; unexpected card disconnect also uses it so the active event survives an unplanned disconnect.
+
+### System Impact
+- UI
+- STATE
+- INGEST
+
+### Notes
+- `metadataTags: null` still indicates unassigned (warning rendered); `[]` is explicit no-keyword (no warning). Import and metadata pipeline behavior unchanged.
+- `_continueImporting()` clears selection state before `_closeProgressModal()` to avoid a double `updateSelectionBar()` call.
+- `_performEject` extraction is non-breaking: the ejectBtn handler calls it identically to the old inline code. Only the post-import path and disconnect path use `preserveEvent: true`.
+- MetaPicker uses the same two-function close pattern (close / closeQuiet) as Dropdown to prevent re-render recursion.
+
+---
+
 ## Usage
 
 When debugging:
