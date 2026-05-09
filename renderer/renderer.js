@@ -2511,7 +2511,6 @@ function _msEnsurePreviewModal() {
           <div class="ms-pv-title" id="msPvTitle">Metadata Change Preview</div>
           <div class="ms-pv-subtitle" id="msPvSubtitle"></div>
         </div>
-        <button class="ms-pv-close" id="msPvCloseBtn" aria-label="Close preview">&#x2715;</button>
       </div>
       <div class="ms-pv-body" id="msPvBody"><div class="ms-pv-loading">Loading…</div></div>
       <div class="ms-pv-footer">
@@ -2522,7 +2521,6 @@ function _msEnsurePreviewModal() {
   document.body.appendChild(overlay);
 
   overlay.addEventListener('click', (e) => { if (e.target === overlay) _msClosePreview(); });
-  document.getElementById('msPvCloseBtn').addEventListener('click', _msClosePreview);
   document.getElementById('msPvCancelBtn').addEventListener('click', _msClosePreview);
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && overlay.style.display !== 'none') _msClosePreview();
@@ -2570,119 +2568,137 @@ async function _msOpenPreview(ev) {
 
   bodyEl.innerHTML = _msBuildPreviewHtml(result, ev.masterFolderName, ev.pendingReason);
 
+  // Wire expand/collapse toggles for group file lists
+  bodyEl.querySelectorAll('.ms-pv-files-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const list = document.getElementById(btn.dataset.target);
+      if (!list) return;
+      const nowExpanded = list.hidden;
+      list.hidden = !nowExpanded;
+      btn.textContent = nowExpanded ? 'Hide files' : 'View files';
+      btn.setAttribute('aria-expanded', String(nowExpanded));
+    });
+  });
+
   newBtn.disabled = false;
   newBtn.addEventListener('click', () => _msRunSyncFromPreview(ev.eventFolderPath, ev.folderName, newBtn));
+}
+
+function _msGroupFiles(files) {
+  const groupMap = new Map();
+  for (const f of files) {
+    const parts  = f.relPath.replace(/\\/g, '/').split('/');
+    const folder = parts.length > 1 ? parts[0] : '';
+    const fileName = parts[parts.length - 1];
+    const sig = [
+      f.type,
+      folder,
+      (f.willAdd         || []).map(k => k.label).sort().join('\0'),
+      (f.alreadyPresent  || []).map(k => k.label).sort().join('\0'),
+      (f.unknownKeywords || []).map(k => k.label).sort().join('\0'),
+      (f.protectedIdentityMatches || []).map(k => k.label).sort().join('\0'),
+    ].join('::');
+
+    if (!groupMap.has(sig)) {
+      groupMap.set(sig, {
+        type:           f.type,
+        folder,
+        filesTotal:     0,
+        filesPreview:   [],
+        existing:       f.alreadyPresent  || [],
+        additions:      f.willAdd         || [],
+        unknown:        f.unknownKeywords || [],
+        ignoredIdentity: f.protectedIdentityMatches || [],
+      });
+    }
+    const g = groupMap.get(sig);
+    g.filesTotal++;
+    if (g.filesPreview.length < 20) g.filesPreview.push(fileName);
+  }
+  return [...groupMap.values()];
+}
+
+function _msBuildGroupCard(g, idx) {
+  const typeLabel = g.type === 'embedded' ? 'JPEG' : 'XMP';
+  const typeCls   = g.type === 'embedded' ? 'ms-pv-file-type--embedded' : 'ms-pv-file-type--xmp';
+  const folderText = g.folder || 'Event Folder';
+  const countText  = `${g.filesTotal} file${g.filesTotal !== 1 ? 's' : ''}`;
+
+  const sections = [];
+  if (g.existing.length > 0) {
+    sections.push(`<div class="ms-pv-kw-group">
+      <div class="ms-pv-kw-label">Existing</div>
+      <div class="ms-pv-kw-chips">${g.existing.map(k => `<span class="ms-pv-kw-chip ms-pv-kw-chip--present">${escapeHtml(k.label)}</span>`).join('')}</div>
+    </div>`);
+  }
+  if (g.additions.length > 0) {
+    sections.push(`<div class="ms-pv-kw-group">
+      <div class="ms-pv-kw-label">Additions</div>
+      <div class="ms-pv-kw-chips">${g.additions.map(k => `<span class="ms-pv-kw-chip ms-pv-kw-chip--add">${escapeHtml(k.label)}</span>`).join('')}</div>
+    </div>`);
+  }
+  if (g.unknown.length > 0) {
+    sections.push(`<div class="ms-pv-kw-group">
+      <div class="ms-pv-kw-label">Unknown / Needs Review</div>
+      <div class="ms-pv-kw-chips">${g.unknown.map(k => `<span class="ms-pv-kw-chip ms-pv-kw-chip--unknown">${escapeHtml(k.label)}</span>`).join('')}</div>
+    </div>`);
+  }
+
+  const listId  = `ms-pv-files-${idx}`;
+  const moreHtml = g.filesTotal > 20
+    ? ` <span class="ms-pv-files-more">+${g.filesTotal - 20} more</span>`
+    : '';
+  const filesSection = `<div class="ms-pv-group-files">
+    <button class="ms-pv-files-toggle" data-target="${listId}" aria-expanded="false">View files</button>
+    <div class="ms-pv-files-list" id="${listId}" hidden>${g.filesPreview.map(n => escapeHtml(n)).join(', ')}${moreHtml}</div>
+  </div>`;
+
+  const ignoredNote = g.ignoredIdentity.length > 0
+    ? `<div class="ms-pv-ignored-note">Ignored event identity: ${g.ignoredIdentity.map(k => escapeHtml(k.label)).join(', ')}</div>`
+    : '';
+
+  return `<div class="ms-pv-group-card">
+    <div class="ms-pv-group-header">
+      <span class="ms-pv-file-type ${typeCls}">${escapeHtml(typeLabel)}</span>
+      <span class="ms-pv-group-folder">${escapeHtml(folderText)}</span>
+      <span class="ms-pv-group-count">${escapeHtml(countText)}</span>
+    </div>
+    <div class="ms-pv-group-body">
+      ${sections.join('')}
+      ${filesSection}
+      ${ignoredNote}
+    </div>
+  </div>`;
 }
 
 function _msBuildPreviewHtml(result, masterFolderName, pendingReason) {
   const s = result.summary || {};
 
-  // ── Summary chips ──
+  // Summary chips — operator-facing labels only, no "protected"
+  const filesChanged = s.filesChanged ?? 0;
   const chips = [];
-  if ((s.filesChanged ?? 0) > 0) chips.push(`<span class="ms-pv-summary-chip ms-pv-summary-chip--present">${s.filesChanged} file${s.filesChanged !== 1 ? 's' : ''}</span>`);
-  if (s.willAdd > 0)        chips.push(`<span class="ms-pv-summary-chip ms-pv-summary-chip--add">${s.willAdd} will add</span>`);
-  if (s.alreadyPresent > 0) chips.push(`<span class="ms-pv-summary-chip ms-pv-summary-chip--present">${s.alreadyPresent} already present</span>`);
-  if (s.unknown > 0)        chips.push(`<span class="ms-pv-summary-chip ms-pv-summary-chip--unknown">${s.unknown} unknown</span>`);
-  if (s.protected > 0)      chips.push(`<span class="ms-pv-summary-chip ms-pv-summary-chip--skip">${s.protected} protected</span>`);
-
-  const summaryHtml = chips.length ? `<div class="ms-pv-summary">${chips.join('')}</div>` : '';
-
-  // ── Event identity block ──
-  const identityKws = Array.isArray(result.eventIdentityKeywords) ? result.eventIdentityKeywords : [];
-  const identityHtml = identityKws.length > 0
-    ? `<div class="ms-pv-identity-block">
-        <span class="ms-pv-identity-label">Event Identity</span>
-        ${identityKws.map(k => `<span class="ms-pv-kw-chip ms-pv-kw-chip--identity">${escapeHtml(k.label)}</span>`).join('')}
-      </div>`
-    : '';
+  chips.push(`<span class="ms-pv-summary-chip ms-pv-summary-chip--present">${filesChanged} file${filesChanged !== 1 ? 's' : ''}</span>`);
+  if ((s.alreadyPresent ?? 0) > 0) chips.push(`<span class="ms-pv-summary-chip ms-pv-summary-chip--present">${s.alreadyPresent} existing</span>`);
+  if ((s.willAdd        ?? 0) > 0) chips.push(`<span class="ms-pv-summary-chip ms-pv-summary-chip--add">${s.willAdd} addition${s.willAdd !== 1 ? 's' : ''}</span>`);
+  if ((s.unknown        ?? 0) > 0) chips.push(`<span class="ms-pv-summary-chip ms-pv-summary-chip--unknown">${s.unknown} unknown</span>`);
+  const summaryHtml = `<div class="ms-pv-summary">${chips.join('')}</div>`;
 
   if (!Array.isArray(result.files) || result.files.length === 0) {
-    return `${summaryHtml}${identityHtml}<div class="ms-pv-empty">No keyword changes detected.</div>`;
+    return `${summaryHtml}<div class="ms-pv-empty">No keyword changes detected.</div>`;
   }
 
-  const shown = result.files.slice(0, 20);
+  const groups      = _msGroupFiles(result.files);
+  const shownGroups = groups.slice(0, 50);
+  const groupCards  = shownGroups.map((g, i) => _msBuildGroupCard(g, i)).join('');
 
-  const fileCards = shown.map(f => {
-    const typeLabel = f.type === 'embedded' ? 'JPEG' : 'XMP';
-    const typeCls   = f.type === 'embedded' ? 'ms-pv-file-type--embedded' : 'ms-pv-file-type--xmp';
-    const groups = [];
-
-    // Bridge Detected — all keywords annotated by matchStatus
-    if (Array.isArray(f.detectedBridgeKeywords) && f.detectedBridgeKeywords.length > 0) {
-      const statusCls = { 'will-add': '--add', 'already-present': '--present', 'unknown': '--unknown', 'protected-identity': '--identity' };
-      groups.push(`<div class="ms-pv-kw-group">
-        <div class="ms-pv-kw-label">Bridge</div>
-        <div class="ms-pv-kw-chips">${f.detectedBridgeKeywords.map(k => {
-          const cls = statusCls[k.matchStatus] || '--present';
-          return `<span class="ms-pv-kw-chip ms-pv-kw-chip${cls}" title="${escapeHtml(k.matchStatus)}">${escapeHtml(k.label)}</span>`;
-        }).join('')}</div>
-      </div>`);
-    }
-
-    // Existing Indexed — already in event.metadata.json for this file
-    if (Array.isArray(f.existingIndexedKeywords) && f.existingIndexedKeywords.length > 0) {
-      groups.push(`<div class="ms-pv-kw-group">
-        <div class="ms-pv-kw-label">Indexed</div>
-        <div class="ms-pv-kw-chips">${f.existingIndexedKeywords.map(k => `<span class="ms-pv-kw-chip ms-pv-kw-chip--indexed" title="${escapeHtml(k.source || '')}">${escapeHtml(k.label || k.keywordId)}</span>`).join('')}</div>
-      </div>`);
-    }
-
-    // Will Add
-    if (f.willAdd?.length > 0) {
-      groups.push(`<div class="ms-pv-kw-group">
-        <div class="ms-pv-kw-label">Will Add</div>
-        <div class="ms-pv-kw-chips">${f.willAdd.map(k => `<span class="ms-pv-kw-chip ms-pv-kw-chip--add">${escapeHtml(k.label)}</span>`).join('')}</div>
-      </div>`);
-    }
-
-    // Already Present
-    if (f.alreadyPresent?.length > 0) {
-      groups.push(`<div class="ms-pv-kw-group">
-        <div class="ms-pv-kw-label">Already Present</div>
-        <div class="ms-pv-kw-chips">${f.alreadyPresent.map(k => `<span class="ms-pv-kw-chip ms-pv-kw-chip--present">${escapeHtml(k.label)}</span>`).join('')}</div>
-      </div>`);
-    }
-
-    // Unknown
-    if (f.unknownKeywords?.length > 0) {
-      groups.push(`<div class="ms-pv-kw-group">
-        <div class="ms-pv-kw-label">Unknown</div>
-        <div class="ms-pv-kw-chips">${f.unknownKeywords.map(k => `<span class="ms-pv-kw-chip ms-pv-kw-chip--unknown">${escapeHtml(k.label)}</span>`).join('')}</div>
-      </div>`);
-    }
-
-    // Protected / Skipped — show each with reason
-    const allProtected = Array.isArray(f.protectedIdentityMatches) ? f.protectedIdentityMatches : [];
-    if (allProtected.length > 0) {
-      const protectedItems = allProtected.map(k =>
-        `<div class="ms-pv-protected-item">
-          <span class="ms-pv-kw-chip ms-pv-kw-chip--identity">${escapeHtml(k.label)}</span>
-          <div class="ms-pv-protected-reason">${escapeHtml(k.reason)}</div>
-        </div>`
-      ).join('');
-      groups.push(`<div class="ms-pv-kw-group">
-        <div class="ms-pv-kw-label">Protected / Skipped</div>
-        ${protectedItems}
-      </div>`);
-    }
-
-    return `<div class="ms-pv-file-card">
-      <div class="ms-pv-file-header">
-        <span class="ms-pv-file-type ${typeCls}">${escapeHtml(typeLabel)}</span>
-        <span>${escapeHtml(f.relPath)}</span>
-      </div>
-      <div class="ms-pv-file-body">${groups.join('')}</div>
-    </div>`;
-  }).join('');
-
-  const truncatedHtml = result.files.length > 20
-    ? `<div class="ms-pv-truncated">Showing 20 of ${result.files.length} files with changes</div>`
+  const truncatedHtml = groups.length > 50
+    ? `<div class="ms-pv-truncated">${groups.length - 50} more groups not shown</div>`
     : '';
   const scannedNote = result.truncated
     ? `<div class="ms-pv-truncated">Preview limited to first 200 metadata files</div>`
     : '';
 
-  return `${summaryHtml}${identityHtml}${fileCards}${truncatedHtml}${scannedNote}`;
+  return `${summaryHtml}${groupCards}${truncatedHtml}${scannedNote}`;
 }
 
 async function _msRunSyncFromPreview(eventFolderPath, folderName, updateBtn) {
