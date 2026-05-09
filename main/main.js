@@ -1967,6 +1967,11 @@ ipcMain.handle('keywords:updateFromBridgeTxt', async (_event, filePath, applyCha
   return metadataSyncService.updateRegistryFromBridgeTxt(filePath, userDataPath, applyChanges === true);
 });
 
+ipcMain.handle('keywords:repairIds', async () => {
+  const userDataPath = app.getPath('userData');
+  return metadataSyncService.repairOverrideIds(userDataPath);
+});
+
 ipcMain.handle('keywords:chooseBridgeTxt', async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
     title: 'Select Bridge Keyword Export (.txt)',

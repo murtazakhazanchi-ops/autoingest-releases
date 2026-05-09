@@ -240,5 +240,6 @@ contextBridge.exposeInMainWorld('api', {
   keywordsUpdateFromBridgeTxt: (filePath, apply) => ipcRenderer.invoke('keywords:updateFromBridgeTxt', filePath, apply),
   keywordsChooseBridgeTxt:     ()                => ipcRenderer.invoke('keywords:chooseBridgeTxt'),
   keywordsLoadRegistry:        ()                => ipcRenderer.invoke('keywords:loadRegistry'),
+  keywordsRepairIds:           ()                => ipcRenderer.invoke('keywords:repairIds'),
 
 });

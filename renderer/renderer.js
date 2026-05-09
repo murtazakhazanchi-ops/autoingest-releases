@@ -2487,22 +2487,57 @@ document.getElementById('msBridgeImportBtn')?.addEventListener('click', async ()
       return;
     }
 
-    const { newKeywords, unchangedCount, possibleMoves, possibleSpellingUpdates = [] } = result;
+    const { newKeywords, unchangedCount, possibleMoves, possibleSpellingUpdates = [], idCollisions = [] } = result;
+
+    const collisionHtml = idCollisions.length > 0 ? `
+      <div class="ms-collision-section">
+        <div class="ms-collision-title">Duplicate keyword IDs detected — imports are blocked until these collisions are resolved (${idCollisions.length})</div>
+        ${idCollisions.map(c => `
+          <div class="ms-collision-row">
+            <strong>ID:</strong> ${escapeHtml(c.id)}<br>
+            <strong>A:</strong> ${escapeHtml(c.labelA)} &mdash; <em>${escapeHtml(c.pathA)}</em><br>
+            <strong>B:</strong> ${escapeHtml(c.labelB)} &mdash; <em>${escapeHtml(c.pathB)}</em>
+          </div>`).join('')}
+      </div>` : '';
+
+    const spellingDetailHtml = possibleSpellingUpdates.length > 0 ? `
+      <div class="ms-spelling-section">
+        <div class="ms-spelling-section-title">Possible spelling/name updates — not applied (${possibleSpellingUpdates.length})</div>
+        <p class="ms-preview-row" style="color:var(--text-muted);font-size:11px;margin-bottom:8px">These were detected but not applied. Review before deciding whether to update the existing keyword, add it as a new keyword, or ignore.</p>
+        ${possibleSpellingUpdates.map(u => `
+          <div class="ms-spelling-detail-row">
+            <div class="ms-spelling-field"><span class="ms-spelling-field-label">Existing:</span><strong>${escapeHtml(u.existingLabel)}</strong></div>
+            <div class="ms-spelling-field"><span class="ms-spelling-field-label">ID:</span><span>${escapeHtml(u.existingId)}</span></div>
+            <div class="ms-spelling-field"><span class="ms-spelling-field-label">Existing path:</span><span>${escapeHtml(u.existingPath)}</span></div>
+            <div class="ms-spelling-field"><span class="ms-spelling-field-label">Candidate:</span><strong>${escapeHtml(u.candidateLabel)}</strong></div>
+            <div class="ms-spelling-field"><span class="ms-spelling-field-label">Candidate path:</span><span>${escapeHtml(u.candidatePath)}</span></div>
+            <div class="ms-spelling-field"><span class="ms-spelling-field-label">Parent path:</span><span>${escapeHtml(u.parentPath || '—')}</span></div>
+            <div class="ms-spelling-field"><span class="ms-spelling-field-label">Reason:</span><span>${escapeHtml(u.reason || '—')}</span></div>
+          </div>`).join('')}
+      </div>` : '';
+
     const previewHtml = `
       <div class="ms-preview-box">
         <p class="ms-preview-row"><strong>Preview</strong></p>
         <p class="ms-preview-row ms-preview-new">${newKeywords.length} new keyword${newKeywords.length !== 1 ? 's' : ''} found</p>
         <p class="ms-preview-row">${unchangedCount} keyword${unchangedCount !== 1 ? 's' : ''} already in registry</p>
         ${possibleSpellingUpdates.length > 0
-          ? `<p class="ms-preview-row ms-preview-spelling">${possibleSpellingUpdates.length} possible spelling/name update${possibleSpellingUpdates.length !== 1 ? 's' : ''} (require review — not auto-applied)</p>`
+          ? `<p class="ms-preview-row ms-preview-spelling">${possibleSpellingUpdates.length} possible spelling/name update${possibleSpellingUpdates.length !== 1 ? 's' : ''} require review</p>`
           : ''}
         ${possibleMoves.length > 0
           ? `<p class="ms-preview-row ms-preview-move">${possibleMoves.length} possible renamed/moved keyword${possibleMoves.length !== 1 ? 's' : ''} (will not be auto-merged)</p>`
           : ''}
-        ${newKeywords.length > 0
+        ${idCollisions.length > 0
+          ? `<p class="ms-preview-row ms-preview-collision">${idCollisions.length} ID collision${idCollisions.length !== 1 ? 's' : ''} detected — apply blocked</p>`
+          : ''}
+        ${idCollisions.length === 0 && newKeywords.length > 0
           ? `<button class="ms-preview-apply-btn" id="msApplyKeywordsBtn">Add ${newKeywords.length} Keyword${newKeywords.length !== 1 ? 's' : ''}</button>`
-          : '<p class="ms-preview-row" style="color:var(--text-muted);margin-top:6px">Nothing new to add.</p>'}
+          : idCollisions.length === 0
+            ? '<p class="ms-preview-row" style="color:var(--text-muted);margin-top:6px">Nothing new to add.</p>'
+            : ''}
         <p class="ms-preview-row" style="color:var(--text-muted);margin-top:8px;font-size:11px">New keywords are added safely. Existing keywords are never deleted. Possible spelling or naming changes require review.</p>
+        ${collisionHtml}
+        ${spellingDetailHtml}
       </div>
     `;
     previewBox.innerHTML = previewHtml;
@@ -2526,6 +2561,30 @@ document.getElementById('msBridgeImportBtn')?.addEventListener('click', async ()
     previewBox.innerHTML = `<div class="ms-preview-box"><p class="ms-preview-row" style="color:#dc2626">Error: ${escapeHtml(err.message)}</p></div>`;
   } finally {
     btn.disabled = false;
+  }
+});
+
+document.getElementById('msRepairIdsBtn')?.addEventListener('click', async () => {
+  const btn = document.getElementById('msRepairIdsBtn');
+  if (!btn) return;
+  btn.disabled = true;
+  btn.textContent = 'Regenerating…';
+  try {
+    const result = await window.api.keywordsRepairIds();
+    if (result.ok) {
+      btn.textContent = result.repairedCount > 0
+        ? `Done — ${result.repairedCount} ID${result.repairedCount !== 1 ? 's' : ''} regenerated`
+        : 'Done — no IDs needed repair';
+      _msRefreshRegistryStatus();
+    } else {
+      btn.textContent = 'Regenerate IDs from Stored Paths';
+      btn.disabled = false;
+      alert(`Repair failed: ${result.error || 'Unknown error'}`);
+    }
+  } catch (err) {
+    btn.textContent = 'Regenerate IDs from Stored Paths';
+    btn.disabled = false;
+    alert(`Repair failed: ${err.message}`);
   }
 });
 

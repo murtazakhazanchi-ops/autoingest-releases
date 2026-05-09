@@ -1114,6 +1114,20 @@
     .ms-preview-apply-btn:hover { opacity: 0.88; }
     .ms-preview-apply-btn:disabled { opacity: 0.4; cursor: not-allowed; }
     .ms-preview-spelling { color: #7c3aed; }
+    .ms-preview-collision { color: #dc2626; }
+    .ms-spelling-section { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border-subtle); }
+    .ms-spelling-section-title { font-size: 11px; font-weight: 600; color: #7c3aed; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+    .ms-spelling-detail-row {
+      margin-bottom: 10px; padding: 8px 10px;
+      background: var(--bg-tertiary,var(--bg-secondary)); border: 1px solid #ddd3f8;
+      border-radius: 7px; font-size: 11px; line-height: 1.55; color: var(--text-secondary);
+    }
+    .ms-spelling-detail-row strong { color: var(--text-primary); }
+    .ms-spelling-field { display: flex; gap: 6px; margin-bottom: 2px; }
+    .ms-spelling-field-label { color: var(--text-muted); min-width: 90px; flex-shrink: 0; }
+    .ms-collision-section { margin-top: 12px; padding: 10px 12px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; }
+    .ms-collision-title { font-size: 11px; font-weight: 600; color: #dc2626; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+    .ms-collision-row { font-size: 11px; color: #7f1d1d; margin-bottom: 6px; padding: 5px 8px; background: #fff; border-radius: 5px; border: 1px solid #fecaca; line-height: 1.5; }
     /* ── Metadata Sync tabs ─ */
     .ms-tabs {
       display: flex; align-items: flex-end; gap: 4px;
@@ -5507,6 +5521,10 @@
           <div class="ms-bridge-row">
             <div class="ms-bridge-info">Select your Bridge keyword export (.txt) to preview and add new keywords to the registry.</div>
             <button class="ms-bridge-btn" id="msBridgeImportBtn">Update Keyword List from Bridge TXT</button>
+          </div>
+          <div class="ms-bridge-row" style="margin-top:8px">
+            <div class="ms-bridge-info">Fix keyword IDs that were generated before numeric labels were preserved correctly. Re-runs ID generation from stored paths — does not touch event.json.</div>
+            <button class="ms-bridge-btn" id="msRepairIdsBtn">Regenerate IDs from Stored Paths</button>
           </div>
           <div id="msBridgePreview" style="display:none"></div>
         </div>

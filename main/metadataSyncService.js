@@ -82,10 +82,15 @@ function _stripOrderingPrefix(label) {
 
 function _generateKeywordId(pathSegments, category) {
   if (!pathSegments || pathSegments.length === 0) return '';
-  const root  = _CANONICAL_ROOT[category] || _slugify(pathSegments[0]);
-  const parts = [root];
+  const root    = _CANONICAL_ROOT[category] || _slugify(pathSegments[0]);
+  const parts   = [root];
+  const lastIdx = pathSegments.length - 1;
   for (let i = 1; i < pathSegments.length; i++) {
-    const slug = _slugify(_stripOrderingPrefix(pathSegments[i]));
+    // Leaf segment (the actual keyword label) preserves leading numbers.
+    // Only branch/group labels (ordering nodes) have their prefix stripped.
+    const isLeaf = (i === lastIdx);
+    const seg    = isLeaf ? pathSegments[i] : _stripOrderingPrefix(pathSegments[i]);
+    const slug   = _slugify(seg);
     if (slug) parts.push(slug);
   }
   return parts.join('.');
@@ -105,6 +110,27 @@ function _looksLikeSpellingUpdate(newLabel, existingLabel) {
   if (newNum && exNum && newNum[1] === exNum[1]) return true;
   if (nl.startsWith(el) || el.startsWith(nl)) return true;
   return false;
+}
+
+function _detectCollisions(parsedKeywords) {
+  const seen = new Map();
+  const collisions = [];
+  for (const kw of parsedKeywords) {
+    if (!kw.id) continue;
+    if (seen.has(kw.id)) {
+      const prev = seen.get(kw.id);
+      collisions.push({
+        id:    kw.id,
+        labelA: prev.label,
+        pathA:  _pathStr(prev.path),
+        labelB: kw.label,
+        pathB:  _pathStr(kw.path),
+      });
+    } else {
+      seen.set(kw.id, kw);
+    }
+  }
+  return collisions;
 }
 
 // ── Keyword registry ──────────────────────────────────────────────────────────
@@ -632,6 +658,9 @@ async function updateRegistryFromBridgeTxt(filePath, userDataPath, applyChanges)
 
     const parsed = _parseBridgeTxt(lines);
 
+    // Detect intra-import ID collisions before touching the registry
+    const idCollisions = _detectCollisions(parsed);
+
     // Build lookup maps from the currently loaded registry
     const existingById    = new Map();
     const existingByLabel = new Map();
@@ -655,7 +684,16 @@ async function updateRegistryFromBridgeTxt(filePath, userDataPath, applyChanges)
           unchangedCount++;  // same path, same label — truly unchanged
         } else {
           // Same path structure (ID), different label → possible spelling/name update
-          possibleSpellingUpdates.push({ incoming: kw, existing: idMatch });
+          possibleSpellingUpdates.push({
+            existingLabel: idMatch.label,
+            existingId:    idMatch.id,
+            existingPath:  _pathStr(idMatch.path),
+            candidateLabel: kw.label,
+            candidatePath:  _pathStr(kw.path),
+            parentId:      kw.parentId || null,
+            parentPath:    kw.path ? _pathStr(kw.path.slice(0, -1)) : null,
+            reason:        'same-id-different-label',
+          });
         }
       } else if (labelMatch) {
         const existingPathStr = labelMatch.path ? _pathStr(labelMatch.path) : null;
@@ -672,12 +710,26 @@ async function updateRegistryFromBridgeTxt(filePath, userDataPath, applyChanges)
             k => k.parentId === kw.parentId && _looksLikeSpellingUpdate(kw.label, k.label)
           );
           if (sibling) {
-            possibleSpellingUpdates.push({ incoming: kw, existing: sibling });
+            possibleSpellingUpdates.push({
+              existingLabel: sibling.label,
+              existingId:    sibling.id,
+              existingPath:  _pathStr(sibling.path),
+              candidateLabel: kw.label,
+              candidatePath:  _pathStr(kw.path),
+              parentId:      kw.parentId || null,
+              parentPath:    kw.path ? _pathStr(kw.path.slice(0, -1)) : null,
+              reason:        'same-parent-similar-label',
+            });
             continue;
           }
         }
         newKeywords.push(kw);
       }
+    }
+
+    // Block apply if intra-import collisions exist
+    if (applyChanges && idCollisions.length > 0) {
+      return { ok: false, newKeywords: [], unchangedCount: 0, possibleMoves: [], possibleSpellingUpdates: [], idCollisions, error: 'ID collisions detected — resolve before applying.' };
     }
 
     if (applyChanges && newKeywords.length > 0) {
@@ -701,10 +753,10 @@ async function updateRegistryFromBridgeTxt(filePath, userDataPath, applyChanges)
       log(`[metadataSyncService] Added ${newKeywords.length} keywords from Bridge TXT`);
     }
 
-    return { ok: true, newKeywords, unchangedCount, possibleMoves, possibleSpellingUpdates };
+    return { ok: true, newKeywords, unchangedCount, possibleMoves, possibleSpellingUpdates, idCollisions };
 
   } catch (err) {
-    return { ok: false, newKeywords: [], unchangedCount: 0, possibleMoves: [], possibleSpellingUpdates: [], error: err.message };
+    return { ok: false, newKeywords: [], unchangedCount: 0, possibleMoves: [], possibleSpellingUpdates: [], idCollisions: [], error: err.message };
   }
 }
 
@@ -794,6 +846,66 @@ async function loadRegistryFull(userDataPath) {
   return _loadRegistry(userDataPath);
 }
 
+/**
+ * Regenerates IDs for all keywords in keywords.override.json from their stored
+ * path arrays. Fixes any IDs that were generated by the old (buggy) threshold-based
+ * slug logic. Does NOT touch event.json.
+ */
+async function repairOverrideIds(userDataPath) {
+  const overridePath = path.join(userDataPath, 'keywords.override.json');
+  let overrideDoc;
+  try {
+    const raw = await fsp.readFile(overridePath, 'utf8');
+    overrideDoc = JSON.parse(raw);
+  } catch {
+    return { ok: false, error: 'keywords.override.json not found or unreadable' };
+  }
+
+  const keywords = overrideDoc.keywords || [];
+  if (keywords.length === 0) return { ok: true, repairedCount: 0 };
+
+  // Build an ID remap: oldId → newId (only where they differ)
+  const idRemap = new Map();
+  const now = new Date().toISOString();
+
+  const repaired = keywords.map(kw => {
+    if (!kw.path || !Array.isArray(kw.path)) return kw;
+    const category  = kw.category || _inferCategory(kw.path[0] || '');
+    const newId     = _generateKeywordId(kw.path, category);
+    const newParent = kw.path.length > 1
+      ? _generateKeywordId(kw.path.slice(0, -1), category)
+      : null;
+    if (newId && newId !== kw.id) idRemap.set(kw.id, newId);
+    return {
+      ...kw,
+      id:        newId || kw.id,
+      parentId:  newParent || kw.parentId || null,
+      updatedAt: now,
+    };
+  });
+
+  // Apply idRemap to parentId references so no dangling pointers remain
+  const fixed = repaired.map(kw => {
+    if (kw.parentId && idRemap.has(kw.parentId)) {
+      return { ...kw, parentId: idRemap.get(kw.parentId) };
+    }
+    return kw;
+  });
+
+  // Deduplicate by ID — keep the last entry if any collisions remain
+  const byId = new Map();
+  for (const kw of fixed) byId.set(kw.id, kw);
+  overrideDoc.keywords = Array.from(byId.values());
+
+  const tmp = overridePath + '.tmp';
+  await fsp.writeFile(tmp, JSON.stringify(overrideDoc, null, 2), 'utf-8');
+  await fsp.rename(tmp, overridePath);
+
+  _invalidateRegistry();
+  log(`[metadataSyncService] repairOverrideIds: ${idRemap.size} IDs regenerated`);
+  return { ok: true, repairedCount: idRemap.size };
+}
+
 // ── Exports ───────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -801,6 +913,7 @@ module.exports = {
   syncEventMetadata,
   getSyncStatus,
   updateRegistryFromBridgeTxt,
+  repairOverrideIds,
   getKeywordsByCategory,
   loadRegistryFull,
 };
