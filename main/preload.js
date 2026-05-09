@@ -231,4 +231,14 @@ contextBridge.exposeInMainWorld('api', {
   getPreviewUrl: (srcPath) => ipcRenderer.invoke('files:getPreviewUrl',   srcPath),
   getRawPreview: (srcPath) => ipcRenderer.invoke('preview:getRawPreview', srcPath),
 
+  // ── Metadata Sync ──
+  metadataSyncScanPending:    (masterPath)       => ipcRenderer.invoke('metadataSync:scanPending',  masterPath),
+  metadataSyncSyncEvent:      (eventFolderPath)  => ipcRenderer.invoke('metadataSync:syncEvent',    eventFolderPath),
+  metadataSyncSyncStatus:     (eventFolderPath)  => ipcRenderer.invoke('metadataSync:syncStatus',   eventFolderPath),
+
+  // ── Keyword Registry ──
+  keywordsUpdateFromBridgeTxt: (filePath, apply) => ipcRenderer.invoke('keywords:updateFromBridgeTxt', filePath, apply),
+  keywordsChooseBridgeTxt:     ()                => ipcRenderer.invoke('keywords:chooseBridgeTxt'),
+  keywordsLoadRegistry:        ()                => ipcRenderer.invoke('keywords:loadRegistry'),
+
 });

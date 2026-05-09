@@ -20,7 +20,8 @@ const autoUpdater   = require('../services/autoUpdater');
 const settings      = require('../services/settings');
 const userManager   = require('./userManager');
 const { validateEventJson } = require('./contracts/dataValidator');
-const exifService   = require('./exifService');
+const exifService         = require('./exifService');
+const metadataSyncService = require('./metadataSyncService');
 
 // ── Platform ─────────────────────────────────────────────────────────────────
 const isMac = process.platform === 'darwin';
@@ -1851,6 +1852,14 @@ ipcMain.handle('files:deleteFromSource', async (_event, files, sourceRoot) => {
     }
 
     // ── Containment check (after symlink resolution) ─────────────────────────
+    if (process.env.DEBUG_SOURCE_CLEANUP) {
+      console.log('[CSQ DEBUG] containment:', {
+        src, dest, realSrc, realRoot,
+        separator: JSON.stringify(path.sep),
+        relative: path.relative(realRoot, realSrc),
+        passes: realSrc.startsWith(realRoot + path.sep),
+      });
+    }
     if (!realSrc.startsWith(realRoot + path.sep)) {
       results.push({ src, deleted: false, error: 'Path outside source root' });
       continue;
@@ -1928,6 +1937,60 @@ ipcMain.handle('files:getPreviewUrl', async (_event, srcPath) => {
 ipcMain.handle('preview:getRawPreview', async (_event, srcPath) => {
   const { getRawPreview } = require('./rawPreviewService');
   return getRawPreview(srcPath);
+});
+
+// ── Metadata Sync ─────────────────────────────────────────────────────────────
+
+ipcMain.handle('metadataSync:scanPending', async (_event, masterPath) => {
+  if (!masterPath || typeof masterPath !== 'string') return [];
+  return metadataSyncService.scanPendingEvents(masterPath);
+});
+
+ipcMain.handle('metadataSync:syncEvent', async (_event, eventFolderPath) => {
+  if (!eventFolderPath || typeof eventFolderPath !== 'string') {
+    return { ok: false, error: 'Invalid event folder path' };
+  }
+  const userDataPath = app.getPath('userData');
+  return metadataSyncService.syncEventMetadata(eventFolderPath, userDataPath);
+});
+
+ipcMain.handle('metadataSync:syncStatus', async (_event, eventFolderPath) => {
+  if (!eventFolderPath || typeof eventFolderPath !== 'string') return null;
+  return metadataSyncService.getSyncStatus(eventFolderPath);
+});
+
+ipcMain.handle('keywords:updateFromBridgeTxt', async (_event, filePath, applyChanges) => {
+  if (!filePath || typeof filePath !== 'string') {
+    return { ok: false, error: 'No file path provided' };
+  }
+  const userDataPath = app.getPath('userData');
+  return metadataSyncService.updateRegistryFromBridgeTxt(filePath, userDataPath, applyChanges === true);
+});
+
+ipcMain.handle('keywords:chooseBridgeTxt', async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog({
+    title: 'Select Bridge Keyword Export (.txt)',
+    filters: [{ name: 'Text Files', extensions: ['txt'] }],
+    properties: ['openFile'],
+  });
+  return canceled ? null : filePaths[0];
+});
+
+ipcMain.handle('keywords:loadRegistry', async () => {
+  const userDataPath = app.getPath('userData');
+  // Expose the registry to the renderer (label list only — no internal caches)
+  const registryPath = require('path').join(__dirname, '..', 'data', 'keywords.registry.json');
+  const overridePath  = require('path').join(userDataPath, 'keywords.override.json');
+  const result = { base: { groups: [], keywords: [] }, overrides: [] };
+  try {
+    const raw = await fsp.readFile(registryPath, 'utf8');
+    result.base = JSON.parse(raw);
+  } catch {}
+  try {
+    const raw = await fsp.readFile(overridePath, 'utf8');
+    result.overrides = JSON.parse(raw).keywords || [];
+  } catch {}
+  return result;
 });
 
 ipcMain.handle('window:minimize', () => {

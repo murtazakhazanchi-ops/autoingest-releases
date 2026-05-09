@@ -2041,12 +2041,8 @@ function _renderInsightsBar() {
   const count = Object.keys(globalImportIndex || {}).length;
   const impEl = document.getElementById('ovImportsVal');
   if (impEl) impEl.textContent = count > 0 ? String(count) : '—';
-  const lastEntry = Object.values(globalImportIndex || {})
-    .sort((a, b) => (b.importedAt || 0) - (a.importedAt || 0))[0];
-  const lastEl = document.getElementById('ovLastImportVal');
-  if (lastEl) lastEl.textContent = lastEntry?.importedAt
-    ? new Date(lastEntry.importedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    : '—';
+  _refreshMetadataSyncCard();
+  _msScanBackground();  // async, non-blocking — populates pending count without opening modal
 }
 
 function _switchModeCard(toMode) {
@@ -2259,6 +2255,259 @@ document.getElementById('ovActivityLog')?.addEventListener('keydown', (e) => {
 });
 document.getElementById('metaTitleIndicator')?.addEventListener('click', () => openActivityLogModal({ tab: 'metadata' }));
 document.getElementById('alCloseFooterBtn')?.addEventListener('click', _alClose);
+
+// ════════════════════════════════════════════════════════════════
+// METADATA SYNC MODAL
+// ════════════════════════════════════════════════════════════════
+
+let _msSyncRunning      = new Set();  // eventFolderPaths currently syncing
+let _msScanBgBusy       = false;       // guard: one background scan at a time
+let _msLastBgScanAt     = 0;           // timestamp of last completed background scan
+const _MS_BG_SCAN_MIN_MS = 90_000;    // minimum interval between automatic background scans
+
+function _refreshMetadataSyncCard() {
+  const valEl   = document.getElementById('ovMetadataSyncVal');
+  const labelEl = document.getElementById('ovMetadataSyncLabel');
+  if (!valEl || !labelEl) return;
+
+  if (_msSyncRunning.size > 0) {
+    valEl.textContent   = 'Syncing…';
+    labelEl.textContent = 'METADATA UPDATE';
+    return;
+  }
+  // Pending count set by _msScanAndRender; default state shows "—"
+  const pending = parseInt(valEl.getAttribute('data-pending') || '0', 10);
+  if (pending > 0) {
+    valEl.textContent   = String(pending);
+    labelEl.textContent = 'EVENTS NEED METADATA SYNC';
+  } else {
+    valEl.textContent   = '—';
+    labelEl.textContent = 'METADATA UP TO DATE';
+  }
+}
+
+/**
+ * Fire-and-forget background scan that updates the Metadata Sync card pending count.
+ * Called from _renderInsightsBar on every home render.
+ *
+ * Throttled to at most once per _MS_BG_SCAN_MIN_MS to avoid repeated archive
+ * stat walks on large event sets. Pass { force: true } to bypass the throttle
+ * (not currently used — modal open goes directly through _msScanAndRender).
+ *
+ * Stores only a count integer — no event.json content cached (Renderer Memory Safety).
+ */
+async function _msScanBackground({ force = false } = {}) {
+  if (_msScanBgBusy) return;
+  if (!force && Date.now() - _msLastBgScanAt < _MS_BG_SCAN_MIN_MS) return;
+  _msScanBgBusy = true;
+  try {
+    const masterPath = EventCreator.getSessionArchiveRoot() || await window.api.getArchiveRootSetting();
+    if (!masterPath) return;
+    const pending = await window.api.metadataSyncScanPending(masterPath);
+    _msLastBgScanAt = Date.now();  // only update on success — failed scans don't block retry
+    const valEl = document.getElementById('ovMetadataSyncVal');
+    if (valEl) valEl.setAttribute('data-pending', String(pending.length));
+    _refreshMetadataSyncCard();
+  } catch (err) {
+    console.error('[MetadataSync] Background scan failed:', err.message);
+    // Card remains in its current state — safe fallback, no crash
+  } finally {
+    _msScanBgBusy = false;
+  }
+}
+
+function _reasonLabel(reason, lastSyncError) {
+  if (reason === 'sync-error')  return lastSyncError ? `Previous sync error: ${lastSyncError}` : 'Previous sync had an error';
+  if (reason === 'xmp-changed') return 'XMP updated since last sync';
+  return 'Never synced';
+}
+
+async function _msScanAndRender(masterPath) {
+  const listEl = document.getElementById('msEventList');
+  if (!listEl) return;
+  listEl.innerHTML = '<p class="ms-empty">Scanning…</p>';
+
+  let pending = [];
+  try {
+    pending = await window.api.metadataSyncScanPending(masterPath);
+  } catch (err) {
+    listEl.innerHTML = `<p class="ms-empty">Could not scan events: ${escapeHtml(err.message)}</p>`;
+    return;
+  }
+
+  // Update the card badge
+  const valEl = document.getElementById('ovMetadataSyncVal');
+  if (valEl) valEl.setAttribute('data-pending', String(pending.length));
+  _refreshMetadataSyncCard();
+
+  if (pending.length === 0) {
+    listEl.innerHTML = '<p class="ms-empty">All events are up to date. No metadata sync needed.</p>';
+    return;
+  }
+
+  listEl.innerHTML = pending.map(ev => {
+    const reasonText  = _reasonLabel(ev.pendingReason, ev.lastSyncError);
+    const reasonClass = ev.pendingReason === 'sync-error'  ? 'ms-event-status--reason-error'
+                      : ev.pendingReason === 'xmp-changed' ? 'ms-event-status--reason-changed'
+                      : '';
+    return `
+    <div class="ms-event-row" id="ms-row-${escapeHtml(ev.folderName)}">
+      <div class="ms-event-info">
+        <div class="ms-event-name" title="${escapeHtml(ev.eventFolderPath)}">${escapeHtml(ev.eventName || ev.folderName)}</div>
+        <div class="ms-event-status ${reasonClass}" id="ms-status-${escapeHtml(ev.folderName)}">${escapeHtml(reasonText)}</div>
+      </div>
+      <button class="ms-sync-btn" data-event-path="${escapeHtml(ev.eventFolderPath)}" data-folder-name="${escapeHtml(ev.folderName)}">Update Metadata</button>
+    </div>`;
+  }).join('');
+
+  listEl.querySelectorAll('.ms-sync-btn').forEach(btn => {
+    btn.addEventListener('click', () => _msRunSync(btn.dataset.eventPath, btn.dataset.folderName));
+  });
+}
+
+async function _msRunSync(eventFolderPath, folderName) {
+  if (_msSyncRunning.has(eventFolderPath)) return;
+  _msSyncRunning.add(eventFolderPath);
+  _refreshMetadataSyncCard();
+
+  const statusEl = document.getElementById(`ms-status-${CSS.escape(folderName)}`);
+  const btn = document.querySelector(`.ms-sync-btn[data-event-path="${CSS.escape(eventFolderPath)}"]`);
+  if (statusEl) { statusEl.textContent = 'Syncing…'; statusEl.className = 'ms-event-status ms-event-status--running'; }
+  if (btn) btn.disabled = true;
+
+  try {
+    const result = await window.api.metadataSyncSyncEvent(eventFolderPath);
+    if (result.ok) {
+      if (statusEl) {
+        statusEl.textContent = `Done — ${result.filesScanned} files scanned, ${result.filesUpdated} updated`;
+        statusEl.className   = 'ms-event-status ms-event-status--done';
+      }
+      // Remove the event from the pending count
+      const valEl = document.getElementById('ovMetadataSyncVal');
+      if (valEl) {
+        const cur = parseInt(valEl.getAttribute('data-pending') || '0', 10);
+        valEl.setAttribute('data-pending', String(Math.max(0, cur - 1)));
+      }
+    } else {
+      if (statusEl) {
+        statusEl.textContent = `Error: ${result.error || 'Unknown error'}`;
+        statusEl.className   = 'ms-event-status ms-event-status--error';
+      }
+      if (btn) btn.disabled = false;
+    }
+  } catch (err) {
+    if (statusEl) {
+      statusEl.textContent = `Error: ${escapeHtml(err.message)}`;
+      statusEl.className   = 'ms-event-status ms-event-status--error';
+    }
+    if (btn) btn.disabled = false;
+  } finally {
+    _msSyncRunning.delete(eventFolderPath);
+    _msLastBgScanAt = 0;  // invalidate throttle so next home render triggers a fresh count scan
+    _refreshMetadataSyncCard();
+  }
+}
+
+async function openMetadataSyncModal() {
+  const overlay = document.getElementById('metadataSyncModal');
+  if (!overlay) return;
+  overlay.classList.add('open');
+  setTimeout(() => document.getElementById('msCloseBtn')?.focus(), 150);
+
+  // Registry empty-check (fast — reads two JSON files)
+  const warnEl = document.getElementById('msRegistryWarning');
+  if (warnEl) {
+    try {
+      const reg   = await window.api.keywordsLoadRegistry();
+      const total = ((reg?.base?.keywords) || []).length + ((reg?.overrides) || []).length;
+      warnEl.style.display = total === 0 ? 'block' : 'none';
+    } catch {
+      warnEl.style.display = 'none';
+    }
+  }
+
+  // Scan pending events using current archive root
+  const masterPath = EventCreator.getSessionArchiveRoot() || await window.api.getArchiveRootSetting();
+  if (masterPath) {
+    await _msScanAndRender(masterPath);
+  } else {
+    const listEl = document.getElementById('msEventList');
+    if (listEl) listEl.innerHTML = '<p class="ms-empty">No archive root set. Please configure your archive location in Settings.</p>';
+  }
+}
+
+function _msClose() {
+  document.getElementById('metadataSyncModal')?.classList.remove('open');
+}
+
+// ── Bridge TXT keyword import ─────────────────────────────────────────────────
+
+document.getElementById('msBridgeImportBtn')?.addEventListener('click', async () => {
+  const previewBox = document.getElementById('msBridgePreview');
+  const btn        = document.getElementById('msBridgeImportBtn');
+  if (!previewBox || !btn) return;
+
+  btn.disabled    = true;
+  previewBox.style.display = 'none';
+
+  try {
+    const filePath = await window.api.keywordsChooseBridgeTxt();
+    if (!filePath) { btn.disabled = false; return; }
+
+    const result = await window.api.keywordsUpdateFromBridgeTxt(filePath, false);
+    if (!result.ok) {
+      previewBox.style.display = 'block';
+      previewBox.innerHTML = `<div class="ms-preview-box"><p class="ms-preview-row" style="color:#dc2626">Error: ${escapeHtml(result.error || 'Unknown error')}</p></div>`;
+      btn.disabled = false;
+      return;
+    }
+
+    const { newKeywords, unchangedCount, possibleMoves } = result;
+    const previewHtml = `
+      <div class="ms-preview-box">
+        <p class="ms-preview-row"><strong>Preview</strong></p>
+        <p class="ms-preview-row ms-preview-new">${newKeywords.length} new keyword${newKeywords.length !== 1 ? 's' : ''} found</p>
+        <p class="ms-preview-row">${unchangedCount} keyword${unchangedCount !== 1 ? 's' : ''} already in registry</p>
+        ${possibleMoves.length > 0
+          ? `<p class="ms-preview-row ms-preview-move">${possibleMoves.length} possible renamed/moved keyword${possibleMoves.length !== 1 ? 's' : ''} (will not be auto-merged)</p>`
+          : ''}
+        ${newKeywords.length > 0
+          ? `<button class="ms-preview-apply-btn" id="msApplyKeywordsBtn">Add ${newKeywords.length} Keyword${newKeywords.length !== 1 ? 's' : ''}</button>`
+          : '<p class="ms-preview-row" style="color:var(--text-muted);margin-top:6px">Nothing new to add.</p>'}
+      </div>
+    `;
+    previewBox.innerHTML = previewHtml;
+    previewBox.style.display = 'block';
+
+    document.getElementById('msApplyKeywordsBtn')?.addEventListener('click', async () => {
+      const applyBtn = document.getElementById('msApplyKeywordsBtn');
+      if (applyBtn) applyBtn.disabled = true;
+      const applyResult = await window.api.keywordsUpdateFromBridgeTxt(filePath, true);
+      if (applyResult.ok) {
+        previewBox.innerHTML = `<div class="ms-preview-box"><p class="ms-preview-row ms-preview-new">${applyResult.newKeywords.length} keyword${applyResult.newKeywords.length !== 1 ? 's' : ''} added to registry.</p></div>`;
+      } else {
+        if (applyBtn) applyBtn.disabled = false;
+        previewBox.innerHTML += `<p class="ms-preview-row" style="color:#dc2626">Error: ${escapeHtml(applyResult.error || 'Write failed')}</p>`;
+      }
+    });
+
+  } catch (err) {
+    previewBox.style.display = 'block';
+    previewBox.innerHTML = `<div class="ms-preview-box"><p class="ms-preview-row" style="color:#dc2626">Error: ${escapeHtml(err.message)}</p></div>`;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('msCloseBtn')?.addEventListener('click', _msClose);
+document.getElementById('msCloseFooterBtn')?.addEventListener('click', _msClose);
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && document.getElementById('metadataSyncModal')?.classList.contains('open')) _msClose();
+});
+document.getElementById('ovMetadataSync')?.addEventListener('click', openMetadataSyncModal);
+document.getElementById('ovMetadataSync')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMetadataSyncModal(); }
+});
 
 // ════════════════════════════════════════════════════════════════
 // DRIVE METADATA HELPERS
@@ -4647,6 +4896,9 @@ function showProgressSummary({ copied, skipped, errors, skippedReasons, failedFi
 
   // ── Clean Up Source button — only when files were copied ───────────────────
   const _cleanupRoot = importCleanupRoot || activeSource?.path || null;
+  if (window._DEBUG_SOURCE_CLEANUP) {
+    console.log('[CSQ DEBUG] showProgressSummary:', { importCleanupRoot, activeSourcePath: activeSource?.path ?? null, resolved: _cleanupRoot, copiedCount: copiedFiles?.length ?? 0 });
+  }
   if (actLeft && !modal.querySelector('#scqOpenBtn') && copiedFiles && copiedFiles.length > 0 && _cleanupRoot) {
     _csqEligibleFiles = copiedFiles;
     _csqSourceRoot    = _cleanupRoot;
@@ -5370,6 +5622,14 @@ document.getElementById('importBtn').addEventListener('click', async () => {
       return;
     }
 
+    // Capture source root synchronously before any await — renderExtDrives polling can null
+    // activeSource during user-facing modals (confirmation, warnings). Capturing here guarantees
+    // the cleanup root reflects the source that was active when the user initiated the import.
+    const _importCleanupRoot = activeSource?.path || null;
+    if (window._DEBUG_SOURCE_CLEANUP) {
+      console.log('[CSQ DEBUG] event-import capture:', { root: _importCleanupRoot, activeSource: activeSource ? { ...activeSource } : null });
+    }
+
     // If _eventComps was cleared (e.g. by resetToList while the event context remained),
     // or reset to a blank placeholder (e.g. _tryCreateEvent calls setEventState([_makeComp()])
     // to clear the form immediately after saving, before the user can trigger import),
@@ -5518,7 +5778,9 @@ document.getElementById('importBtn').addEventListener('click', async () => {
       importedBy: _activeUser ? { id: _activeUser.id, name: _activeUser.name } : null,
     };
 
-    const _importCleanupRoot = activeSource?.path || null;
+    if (window._DEBUG_SOURCE_CLEANUP) {
+      console.log('[CSQ DEBUG] event-import pre-commit:', { root: _importCleanupRoot, activeSourceNow: activeSource ? { ...activeSource } : null });
+    }
     try {
       const summary = await window.api.commitImportTransaction(fileJobs, _eventJsonPath, auditContext);
       if (!activeSource && !_importCleanupRoot) return;
@@ -5547,6 +5809,11 @@ document.getElementById('importBtn').addEventListener('click', async () => {
 
   // ── Quick Import path ────────────────────────────────────────────────────
   if (!selectedFiles.size || !destPath) return;
+  // Capture source root synchronously before any await — same race as event import path.
+  const _importCleanupRoot = activeSource?.path || null;
+  if (window._DEBUG_SOURCE_CLEANUP) {
+    console.log('[CSQ DEBUG] quick-import capture:', { root: _importCleanupRoot, activeSource: activeSource ? { ...activeSource } : null });
+  }
   let filePaths = [...selectedFiles];
 
   const { duplicates, clean } = detectDuplicates(filePaths);
@@ -5571,7 +5838,9 @@ document.getElementById('importBtn').addEventListener('click', async () => {
   updateSelectionBar();
   showProgress();
 
-  const _importCleanupRoot = activeSource?.path || null;
+  if (window._DEBUG_SOURCE_CLEANUP) {
+    console.log('[CSQ DEBUG] quick-import pre-import:', { root: _importCleanupRoot, activeSourceNow: activeSource ? { ...activeSource } : null });
+  }
   try {
     const summary = await window.api.importFiles(uniqueFiles, finalDest, {
       importedBy: _activeUser ? { id: _activeUser.id, name: _activeUser.name } : null,

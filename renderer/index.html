@@ -1040,6 +1040,80 @@
     .al-breakdown-tag { color: var(--text-primary); font-weight: 600; }
     .al-breakdown-count { color: var(--text-muted); flex-shrink: 0; }
 
+    /* ── METADATA SYNC TILE + MODAL ────────────────── */
+    .ov-tile-icon--sync svg { stroke: var(--accent-blue, var(--blue)); }
+    #metadataSyncModal .emm-box { height: calc(100vh - 80px); }
+    #msTitle { font-size: 18px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.01em; }
+    #msHelperText { font-size: 12.5px; color: var(--text-muted); margin: 0 0 16px; line-height: 1.5; }
+    #msBody {
+      flex: 1; overflow-y: auto; padding: 20px 20px 22px;
+      scroll-behavior: smooth; min-height: 180px;
+    }
+    .ms-empty { font-size: 13px; color: var(--text-muted); text-align: center; padding: 40px 0; }
+    .ms-event-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 10px 14px; margin-bottom: 8px;
+      background: var(--bg-secondary); border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+    }
+    .ms-event-info { flex: 1; min-width: 0; }
+    .ms-event-name { font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ms-event-status { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+    .ms-event-status--running        { color: var(--blue); }
+    .ms-event-status--done           { color: #15803d; }
+    .ms-event-status--error          { color: #dc2626; }
+    .ms-event-status--reason-changed { color: #a16207; }
+    .ms-event-status--reason-error   { color: #dc2626; }
+    #msRegistryWarning {
+      display: none; padding: 10px 14px; margin-bottom: 14px;
+      background: rgba(161,98,7,0.07); border: 1px solid rgba(161,98,7,0.22);
+      border-radius: 9px; font-size: 12.5px; color: #a16207; line-height: 1.5;
+    }
+    .ms-sync-btn {
+      flex-shrink: 0; padding: 5px 13px;
+      background: var(--accent-hover); border: 1px solid var(--border-strong);
+      border-radius: 7px; color: var(--text-secondary);
+      font-size: 12px; font-weight: 500; font-family: inherit;
+      cursor: pointer; white-space: nowrap;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+    }
+    .ms-sync-btn:hover:not(:disabled) { background: var(--accent-soft); color: var(--text-primary); border-color: var(--accent-border); }
+    .ms-sync-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .ms-divider { border: none; border-top: 1px solid var(--border-subtle); margin: 18px 0 16px; }
+    .ms-section-title { font-size: 11.5px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 10px; }
+    .ms-bridge-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 14px; border-radius: 10px;
+      border: 1px solid var(--border-subtle); background: var(--bg-secondary);
+    }
+    .ms-bridge-btn {
+      flex-shrink: 0; padding: 6px 14px;
+      background: var(--card-hover); border: 1px solid var(--border-strong);
+      border-radius: 8px; color: var(--text-secondary);
+      font-size: 12px; font-weight: 500; font-family: inherit;
+      cursor: pointer; white-space: nowrap;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+    }
+    .ms-bridge-btn:hover:not(:disabled) { background: var(--accent-soft); color: var(--text-primary); border-color: var(--accent-border); }
+    .ms-bridge-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .ms-bridge-info { flex: 1; min-width: 0; font-size: 12px; color: var(--text-muted); line-height: 1.45; }
+    .ms-preview-box {
+      margin-top: 12px; padding: 10px 14px;
+      background: var(--bg-secondary); border: 1px solid var(--border-subtle);
+      border-radius: 9px; font-size: 12px;
+    }
+    .ms-preview-row { margin-bottom: 5px; color: var(--text-secondary); }
+    .ms-preview-new   { color: #15803d; }
+    .ms-preview-move  { color: #a16207; }
+    .ms-preview-apply-btn {
+      margin-top: 10px; padding: 6px 15px;
+      background: var(--accent); border: none; border-radius: 8px;
+      color: #fff; font-size: 12px; font-weight: 600; font-family: inherit;
+      cursor: pointer; transition: opacity 0.12s;
+    }
+    .ms-preview-apply-btn:hover { opacity: 0.88; }
+    .ms-preview-apply-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
     /* ── WORKSPACE ─────────────────────────────── */
     #workspace { display: none; flex: 1; overflow: hidden; flex-direction: column; }
     #workspace.visible { display: flex; }
@@ -5277,14 +5351,15 @@
               <span class="ov-label">Unsynced Events</span>
             </div>
           </div>
-          <div class="ov-tile" id="ovLastImport">
-            <div class="ov-tile-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <div class="ov-tile ov-tile--action" id="ovMetadataSync" role="button" tabindex="0" aria-label="Open Metadata Sync">
+            <div class="ov-tile-icon ov-tile-icon--sync">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0115-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 01-15 6.7L3 16"/></svg>
             </div>
             <div class="ov-tile-body">
-              <span class="ov-value" id="ovLastImportVal">—</span>
-              <span class="ov-label">Last Import</span>
+              <span class="ov-value" id="ovMetadataSyncVal">—</span>
+              <span class="ov-label" id="ovMetadataSyncLabel">METADATA SYNC</span>
             </div>
+            <span class="ov-arrow">›</span>
           </div>
           <div class="ov-tile ov-tile--action" id="ovActivityLog" role="button" tabindex="0">
             <div class="ov-tile-icon">
@@ -5367,6 +5442,41 @@
         <div></div>
         <div class="emm-footer-right">
           <button class="emm-btn-secondary" id="alCloseFooterBtn">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- METADATA SYNC MODAL -->
+  <div id="metadataSyncModal" class="emm-overlay" role="dialog" aria-modal="true" aria-labelledby="msTitle">
+    <div class="emm-box">
+      <div class="emm-topbar">
+        <span class="emm-topbar-title">System Overview</span>
+      </div>
+      <div class="emm-header">
+        <span id="msTitle">Metadata Sync</span>
+        <button class="emm-close-btn" id="msCloseBtn" aria-label="Close Metadata Sync">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div id="msBody">
+        <p id="msHelperText">Review events with new or changed external metadata from Bridge/XMP and update event.json safely.</p>
+        <div id="msRegistryWarning">Keyword registry is empty. Import your Bridge keyword list before syncing for best results.</div>
+        <div id="msEventList"></div>
+        <hr class="ms-divider">
+        <p class="ms-section-title">Keyword Registry</p>
+        <div class="ms-bridge-row">
+          <div class="ms-bridge-info">
+            Import keywords from an Adobe Bridge keyword export (.txt) to expand the controlled vocabulary. New keywords are added safely — existing keywords are never deleted.
+          </div>
+          <button class="ms-bridge-btn" id="msBridgeImportBtn">Update Keyword List from Bridge TXT</button>
+        </div>
+        <div id="msBridgePreview" style="display:none"></div>
+      </div>
+      <div class="emm-footer">
+        <div></div>
+        <div class="emm-footer-right">
+          <button class="emm-btn-secondary" id="msCloseFooterBtn">Close</button>
         </div>
       </div>
     </div>

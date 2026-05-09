@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "groups": [
+    { "id": "01", "label": "01 Event",             "category": "event" },
+    { "id": "02", "label": "02 Location",           "category": "location" },
+    { "id": "03", "label": "03 City",               "category": "city" },
+    { "id": "04", "label": "04 Country",            "category": "country" },
+    { "id": "05", "label": "05 People",             "category": "people" },
+    { "id": "06", "label": "06 Action/Position",    "category": "action" },
+    { "id": "07", "label": "07 Attire/Accessories", "category": "attire" },
+    { "id": "08", "label": "08 Camera Angle",       "category": "cameraAngle" },
+    { "id": "09", "label": "09 Transport",          "category": "transport" },
+    { "id": "10", "label": "10 Misc",               "category": "misc" }
+  ],
+  "keywords": []
+}

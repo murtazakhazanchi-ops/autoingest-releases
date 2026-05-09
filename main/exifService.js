@@ -598,4 +598,14 @@ async function shutdown() {
   }
 }
 
-module.exports = { applyBatch, retryFailed, getBatchStatus, shutdown };
+/**
+ * Reads all ExifTool tags from a file or XMP sidecar.
+ * Reuses the existing ExifTool process pool — no extra processes spawned.
+ * @param {string} filePath
+ * @returns {Promise<object>}
+ */
+function readFileTags(filePath) {
+  return _getExifTool().read(filePath);
+}
+
+module.exports = { applyBatch, retryFailed, getBatchStatus, shutdown, readFileTags };
