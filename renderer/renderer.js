@@ -2400,9 +2400,17 @@ async function _msScanAndRender(masterPath) {
     const subfolderHtml = (ev.pendingReason === 'xmp-changed' && Array.isArray(ev.changedSubfolders) && ev.changedSubfolders.length > 0)
       ? `<div class="ms-event-subfolders">${ev.changedSubfolders.filter(s => s !== '.').map(s => `<span class="ms-event-subfolder">${escapeHtml(s)}</span>`).join('')}</div>`
       : '';
+    const masterHtml = ev.masterFolderName
+      ? `<div class="ms-event-master" title="Collection: ${escapeHtml(ev.masterFolderName)}">${escapeHtml(ev.masterFolderName)}</div>`
+      : '';
     return `
-    <div class="ms-event-row" id="ms-row-${escapeHtml(ev.folderName)}">
+    <div class="ms-event-row ms-event-row--clickable" id="ms-row-${escapeHtml(ev.folderName)}"
+         data-event-path="${escapeHtml(ev.eventFolderPath)}"
+         data-folder-name="${escapeHtml(ev.folderName)}"
+         data-master-name="${escapeHtml(ev.masterFolderName || '')}"
+         data-pending-reason="${escapeHtml(ev.pendingReason)}">
       <div class="ms-event-info">
+        ${masterHtml}
         <div class="ms-event-name" title="${escapeHtml(ev.eventFolderPath)}">${escapeHtml(ev.eventName || ev.folderName)}</div>
         <div class="ms-event-status ${reasonClass}" id="ms-status-${escapeHtml(ev.folderName)}">${escapeHtml(reasonText)}</div>
         ${subfolderHtml}
@@ -2412,7 +2420,22 @@ async function _msScanAndRender(masterPath) {
   }).join('');
 
   listEl.querySelectorAll('.ms-sync-btn').forEach(btn => {
-    btn.addEventListener('click', () => _msRunSync(btn.dataset.eventPath, btn.dataset.folderName));
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      _msRunSync(btn.dataset.eventPath, btn.dataset.folderName);
+    });
+  });
+
+  listEl.querySelectorAll('.ms-event-row--clickable').forEach(row => {
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('.ms-sync-btn')) return;
+      _msOpenPreview({
+        eventFolderPath: row.dataset.eventPath,
+        folderName:      row.dataset.folderName,
+        masterFolderName: row.dataset.masterName,
+        pendingReason:   row.dataset.pendingReason,
+      });
+    });
   });
 }
 
@@ -2471,6 +2494,163 @@ async function _msRunSync(eventFolderPath, folderName) {
     _msLastBgScanAt = 0;
     _refreshMetadataSyncCard();
   }
+}
+
+// ── Metadata Change Preview modal ─────────────────────────────────────────────
+
+function _msEnsurePreviewModal() {
+  if (document.getElementById('msPvOverlay')) return;
+  const overlay = document.createElement('div');
+  overlay.id = 'msPvOverlay';
+  overlay.className = 'ms-pv-overlay';
+  overlay.style.display = 'none';
+  overlay.innerHTML = `
+    <div class="ms-pv-box" role="dialog" aria-modal="true" aria-labelledby="msPvTitle">
+      <div class="ms-pv-header">
+        <div class="ms-pv-header-text">
+          <div class="ms-pv-title" id="msPvTitle">Metadata Change Preview</div>
+          <div class="ms-pv-subtitle" id="msPvSubtitle"></div>
+        </div>
+        <button class="ms-pv-close" id="msPvCloseBtn" aria-label="Close preview">&#x2715;</button>
+      </div>
+      <div class="ms-pv-body" id="msPvBody"><div class="ms-pv-loading">Loading…</div></div>
+      <div class="ms-pv-footer">
+        <button class="ms-pv-cancel-btn" id="msPvCancelBtn">Cancel</button>
+        <button class="ms-pv-update-btn" id="msPvUpdateBtn">Update Metadata</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) _msClosePreview(); });
+  document.getElementById('msPvCloseBtn').addEventListener('click', _msClosePreview);
+  document.getElementById('msPvCancelBtn').addEventListener('click', _msClosePreview);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && overlay.style.display !== 'none') _msClosePreview();
+  }, { passive: true });
+}
+
+function _msClosePreview() {
+  const overlay = document.getElementById('msPvOverlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+async function _msOpenPreview(ev) {
+  _msEnsurePreviewModal();
+  const overlay   = document.getElementById('msPvOverlay');
+  const titleEl   = document.getElementById('msPvTitle');
+  const subtitleEl = document.getElementById('msPvSubtitle');
+  const bodyEl    = document.getElementById('msPvBody');
+  const updateBtn = document.getElementById('msPvUpdateBtn');
+
+  titleEl.textContent    = ev.folderName || 'Metadata Change Preview';
+  subtitleEl.textContent = ev.masterFolderName ? `Collection: ${ev.masterFolderName}` : '';
+  bodyEl.innerHTML = '<div class="ms-pv-loading">Loading preview…</div>';
+  updateBtn.disabled = true;
+  updateBtn.textContent = 'Update Metadata';
+  overlay.style.display = 'flex';
+
+  // Wire update button (replace any prior handler by cloning)
+  const newBtn = updateBtn.cloneNode(true);
+  updateBtn.parentNode.replaceChild(newBtn, updateBtn);
+  newBtn.disabled = true;
+  newBtn.textContent = 'Update Metadata';
+
+  let result;
+  try {
+    result = await window.api.metadataSyncPreviewEvent(ev.eventFolderPath);
+  } catch (err) {
+    bodyEl.innerHTML = `<div class="ms-pv-error">Preview failed: ${escapeHtml(err.message)}</div>`;
+    return;
+  }
+
+  if (!result.ok) {
+    bodyEl.innerHTML = `<div class="ms-pv-error">${escapeHtml(result.error || 'Preview failed')}</div>`;
+    return;
+  }
+
+  bodyEl.innerHTML = _msBuildPreviewHtml(result, ev.masterFolderName, ev.pendingReason);
+
+  newBtn.disabled = false;
+  newBtn.addEventListener('click', () => _msRunSyncFromPreview(ev.eventFolderPath, ev.folderName, newBtn));
+}
+
+function _msBuildPreviewHtml(result, masterFolderName, pendingReason) {
+  const s = result.summary || {};
+  const chips = [];
+  if (s.willAdd > 0)        chips.push(`<span class="ms-pv-summary-chip ms-pv-summary-chip--add">${s.willAdd} will add</span>`);
+  if (s.alreadyPresent > 0) chips.push(`<span class="ms-pv-summary-chip ms-pv-summary-chip--present">${s.alreadyPresent} already present</span>`);
+  if (s.unknown > 0)        chips.push(`<span class="ms-pv-summary-chip ms-pv-summary-chip--unknown">${s.unknown} unknown</span>`);
+  if (s.skipped > 0)        chips.push(`<span class="ms-pv-summary-chip ms-pv-summary-chip--skip">${s.skipped} skipped</span>`);
+
+  const summaryHtml = chips.length
+    ? `<div class="ms-pv-summary">${chips.join('')}</div>`
+    : '';
+
+  if (!Array.isArray(result.files) || result.files.length === 0) {
+    const body = summaryHtml || '';
+    return `${body}<div class="ms-pv-empty">No keyword changes detected.</div>`;
+  }
+
+  const shown = result.files.slice(0, 20);
+  const fileCards = shown.map(f => {
+    const typeLabel = f.type === 'embedded' ? 'JPEG' : 'XMP';
+    const typeCls   = f.type === 'embedded' ? 'ms-pv-file-type--embedded' : 'ms-pv-file-type--xmp';
+
+    const groups = [];
+    if (f.willAdd?.length > 0) {
+      groups.push(`<div class="ms-pv-kw-group">
+        <div class="ms-pv-kw-label">Will add</div>
+        <div class="ms-pv-kw-chips">${f.willAdd.map(k => `<span class="ms-pv-kw-chip ms-pv-kw-chip--add">${escapeHtml(k.label)}</span>`).join('')}</div>
+      </div>`);
+    }
+    if (f.alreadyPresent?.length > 0) {
+      groups.push(`<div class="ms-pv-kw-group">
+        <div class="ms-pv-kw-label">Already present</div>
+        <div class="ms-pv-kw-chips">${f.alreadyPresent.map(k => `<span class="ms-pv-kw-chip ms-pv-kw-chip--present">${escapeHtml(k.label)}</span>`).join('')}</div>
+      </div>`);
+    }
+    if (f.unknownKeywords?.length > 0) {
+      groups.push(`<div class="ms-pv-kw-group">
+        <div class="ms-pv-kw-label">Unknown (not in registry)</div>
+        <div class="ms-pv-kw-chips">${f.unknownKeywords.map(k => `<span class="ms-pv-kw-chip ms-pv-kw-chip--unknown">${escapeHtml(k.label)}</span>`).join('')}</div>
+      </div>`);
+    }
+    if (f.skippedConflicts?.length > 0) {
+      groups.push(`<div class="ms-pv-kw-group">
+        <div class="ms-pv-kw-label">Skipped (identity conflict)</div>
+        <div class="ms-pv-kw-chips">${f.skippedConflicts.map(k => `<span class="ms-pv-kw-chip ms-pv-kw-chip--skip">${escapeHtml(k.label)}</span>`).join('')}</div>
+      </div>`);
+    }
+
+    return `<div class="ms-pv-file-card">
+      <div class="ms-pv-file-header">
+        <span class="ms-pv-file-type ${typeCls}">${escapeHtml(typeLabel)}</span>
+        <span>${escapeHtml(f.relPath)}</span>
+      </div>
+      <div class="ms-pv-file-body">${groups.join('')}</div>
+    </div>`;
+  }).join('');
+
+  const truncatedHtml = result.files.length > 20
+    ? `<div class="ms-pv-truncated">Showing 20 of ${result.files.length} files with changes</div>`
+    : '';
+  const scannedNote = result.truncated
+    ? `<div class="ms-pv-truncated">Preview limited to first 200 metadata files</div>`
+    : '';
+
+  return `${summaryHtml}${fileCards}${truncatedHtml}${scannedNote}`;
+}
+
+async function _msRunSyncFromPreview(eventFolderPath, folderName, updateBtn) {
+  if (_msSyncRunning.has(eventFolderPath)) return;
+
+  const bodyEl = document.getElementById('msPvBody');
+  updateBtn.disabled = true;
+  updateBtn.textContent = 'Syncing…';
+  if (bodyEl) bodyEl.innerHTML = '<div class="ms-pv-loading">Syncing…</div>';
+
+  await _msRunSync(eventFolderPath, folderName);
+  _msClosePreview();
 }
 
 function _msSetTab(tabId) {

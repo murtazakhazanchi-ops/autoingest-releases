@@ -1959,6 +1959,14 @@ ipcMain.handle('metadataSync:syncStatus', async (_event, eventFolderPath) => {
   return metadataSyncService.getSyncStatus(eventFolderPath);
 });
 
+ipcMain.handle('metadataSync:previewEvent', async (_event, eventFolderPath) => {
+  if (!eventFolderPath || typeof eventFolderPath !== 'string') {
+    return { ok: false, error: 'Invalid event folder path' };
+  }
+  const userDataPath = app.getPath('userData');
+  return metadataSyncService.previewEventMetadata(eventFolderPath, userDataPath);
+});
+
 ipcMain.handle('keywords:updateFromBridgeTxt', async (_event, filePath, applyChanges) => {
   if (!filePath || typeof filePath !== 'string') {
     return { ok: false, error: 'No file path provided' };

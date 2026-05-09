@@ -688,7 +688,118 @@ async function scanPendingEvents(masterPath) {
     }
   }
 
-  return pending;
+  const masterFolderName = path.basename(masterPath);
+  return pending.map(ev => ({ ...ev, masterFolderName }));
+}
+
+// ── Public: preview pending changes (read-only) ───────────────────────────────
+
+/**
+ * Read-only preview of what a metadata sync would change for one event.
+ * Shares classification logic with syncEventMetadata but writes nothing.
+ *
+ * @param {string} eventFolderPath
+ * @param {string} userDataPath
+ */
+async function previewEventMetadata(eventFolderPath, userDataPath) {
+  if (!eventFolderPath || typeof eventFolderPath !== 'string') {
+    return { ok: false, error: 'Invalid event folder path' };
+  }
+
+  try {
+    await _loadRegistry(userDataPath);
+
+    let doc;
+    try {
+      const raw = await fsp.readFile(path.join(eventFolderPath, 'event.json'), 'utf8');
+      doc = JSON.parse(raw);
+    } catch (err) {
+      return { ok: false, error: `Cannot read event.json: ${err.message}` };
+    }
+
+    let existingMetaDoc = null;
+    try {
+      const rawMeta = await fsp.readFile(path.join(eventFolderPath, 'event.metadata.json'), 'utf8');
+      existingMetaDoc = JSON.parse(rawMeta);
+    } catch { /* first sync or missing */ }
+
+    const components = Array.isArray(doc.components) ? doc.components : [];
+    const eventIdentity = {};
+    for (const comp of components) {
+      if (comp.eventTypes?.length === 1) eventIdentity.event    = comp.eventTypes[0];
+      if (comp.location)                  eventIdentity.location = comp.location;
+      if (comp.city?.label)              eventIdentity.city     = comp.city.label;
+      if (comp.country)                  eventIdentity.country  = comp.country;
+    }
+
+    const allMetadataFiles = await _scanXmpSidecars(eventFolderPath);
+    const MAX_PREVIEW = 200;
+    const metadataFiles = allMetadataFiles.slice(0, MAX_PREVIEW);
+
+    const files = [];
+    let totalWillAdd = 0, totalAlreadyPresent = 0, totalUnknown = 0, totalSkipped = 0;
+
+    for (const filePath of metadataFiles) {
+      const ext        = path.extname(filePath).toLowerCase();
+      const isEmbedded = EMBEDDED_EXTENSIONS.has(ext);
+
+      const foundKeywords = isEmbedded
+        ? await _readKeywordsFromJpeg(filePath)
+        : await _readKeywordsFromSidecar(filePath);
+
+      if (foundKeywords.length === 0) continue;
+
+      let relPath;
+      if (isEmbedded) {
+        relPath = path.relative(eventFolderPath, filePath);
+      } else {
+        const rawPeer = await _findRawPeer(filePath);
+        relPath = path.relative(eventFolderPath, rawPeer);
+      }
+
+      const existingFile    = existingMetaDoc?.files?.[relPath] || {};
+      const existingExtIds  = existingFile.externalKeywordIds || [];
+      const existingExtKws  = existingExtIds.map(id => existingMetaDoc?.keywords?.[id]).filter(Boolean);
+      const existingAutoIds = existingFile.autoKeywordIds || [];
+      const existingAutoKws = existingAutoIds.map(id => existingMetaDoc?.keywords?.[id]).filter(Boolean);
+
+      const existingExtLabels = new Set(existingExtKws.map(k => (k.label || '').toLowerCase()));
+
+      const { externalKeywords, unknownKeywords, skippedConflicts } = _classifyKeywords(
+        foundKeywords,
+        new Set(existingAutoKws.map(k => (k.label || '').toLowerCase())),
+        eventIdentity
+      );
+
+      const willAdd        = externalKeywords.filter(k => !existingExtLabels.has(k.label.toLowerCase()));
+      const alreadyPresent = externalKeywords.filter(k =>  existingExtLabels.has(k.label.toLowerCase()));
+
+      totalWillAdd        += willAdd.length;
+      totalAlreadyPresent += alreadyPresent.length;
+      totalUnknown        += unknownKeywords.length;
+      totalSkipped        += skippedConflicts.length;
+
+      if (willAdd.length > 0 || unknownKeywords.length > 0 || skippedConflicts.length > 0 || alreadyPresent.length > 0) {
+        files.push({ relPath, type: isEmbedded ? 'embedded' : 'xmp', willAdd, alreadyPresent, unknownKeywords, skippedConflicts });
+      }
+    }
+
+    return {
+      ok: true,
+      eventName:        doc.eventName || '',
+      eventId:          doc.eventId   || null,
+      eventPath:        eventFolderPath,
+      lastMetadataSync: doc.lastMetadataSync || null,
+      totalScanned:     metadataFiles.length,
+      truncated:        allMetadataFiles.length > MAX_PREVIEW,
+      files,
+      summary: { willAdd: totalWillAdd, alreadyPresent: totalAlreadyPresent, unknown: totalUnknown, skipped: totalSkipped },
+    };
+
+  } catch (err) {
+    log(`[metadataSyncService] Preview failed for ${eventFolderPath}: ${err.message}`);
+    return { ok: false, error: err.message };
+  }
 }
 
 // ── Public: sync one event ─────────────────────────────────────────────────────
@@ -1135,6 +1246,7 @@ async function repairOverrideIds(userDataPath) {
 
 module.exports = {
   scanPendingEvents,
+  previewEventMetadata,
   syncEventMetadata,
   getSyncStatus,
   updateRegistryFromBridgeTxt,

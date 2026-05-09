@@ -235,6 +235,7 @@ contextBridge.exposeInMainWorld('api', {
   metadataSyncScanPending:    (masterPath)       => ipcRenderer.invoke('metadataSync:scanPending',  masterPath),
   metadataSyncSyncEvent:      (eventFolderPath)  => ipcRenderer.invoke('metadataSync:syncEvent',    eventFolderPath),
   metadataSyncSyncStatus:     (eventFolderPath)  => ipcRenderer.invoke('metadataSync:syncStatus',   eventFolderPath),
+  metadataSyncPreviewEvent:   (eventFolderPath)  => ipcRenderer.invoke('metadataSync:previewEvent', eventFolderPath),
 
   // ── Keyword Registry ──
   keywordsUpdateFromBridgeTxt: (filePath, apply) => ipcRenderer.invoke('keywords:updateFromBridgeTxt', filePath, apply),
