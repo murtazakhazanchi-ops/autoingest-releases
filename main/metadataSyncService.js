@@ -732,12 +732,18 @@ async function previewEventMetadata(eventFolderPath, userDataPath) {
       if (comp.country)                  eventIdentity.country  = comp.country;
     }
 
+    // Build event identity keyword list for the UI
+    const eventIdentityKeywords = Object.entries(eventIdentity)
+      .filter(([, label]) => !!label)
+      .map(([category, label]) => ({ label, category, protected: true, source: 'autoingest-event' }));
+
     const allMetadataFiles = await _scanXmpSidecars(eventFolderPath);
     const MAX_PREVIEW = 200;
     const metadataFiles = allMetadataFiles.slice(0, MAX_PREVIEW);
 
     const files = [];
-    let totalWillAdd = 0, totalAlreadyPresent = 0, totalUnknown = 0, totalSkipped = 0;
+    let totalWillAdd = 0, totalAlreadyPresent = 0, totalUnknown = 0, totalSkipped = 0,
+        totalProtected = 0, totalDetected = 0;
 
     for (const filePath of metadataFiles) {
       const ext        = path.extname(filePath).toLowerCase();
@@ -765,6 +771,12 @@ async function previewEventMetadata(eventFolderPath, userDataPath) {
 
       const existingExtLabels = new Set(existingExtKws.map(k => (k.label || '').toLowerCase()));
 
+      // Existing indexed keywords (all currently stored for this file)
+      const existingIndexedKeywords = [
+        ...existingAutoKws.map(kw => ({ ...kw, source: 'auto' })),
+        ...existingExtKws.map(kw => ({ ...kw, source: 'bridge' })),
+      ];
+
       const { externalKeywords, unknownKeywords, skippedConflicts } = _classifyKeywords(
         foundKeywords,
         new Set(existingAutoKws.map(k => (k.label || '').toLowerCase())),
@@ -774,26 +786,84 @@ async function previewEventMetadata(eventFolderPath, userDataPath) {
       const willAdd        = externalKeywords.filter(k => !existingExtLabels.has(k.label.toLowerCase()));
       const alreadyPresent = externalKeywords.filter(k =>  existingExtLabels.has(k.label.toLowerCase()));
 
+      // Identity-category Bridge keywords (captured but never applied — protected)
+      const protectedIdentityMatches = [];
+      for (const label of foundKeywords) {
+        const kw = _lookupKeyword(label);
+        if (!kw) continue;
+        const category = kw.category || _getCategoryForGroup(kw.groupId) || 'misc';
+        if (!IDENTITY_CATEGORIES.has(category)) continue;
+        const identityValue = eventIdentity[category];
+        let reason;
+        if (identityValue) {
+          reason = identityValue.toLowerCase() === label.toLowerCase()
+            ? `${category} matches AutoIngest event identity`
+            : `${category} is controlled by AutoIngest (event: ${identityValue})`;
+        } else {
+          reason = `${category} is a protected identity field`;
+        }
+        protectedIdentityMatches.push({ label, category, reason });
+      }
+
+      // Full Bridge keyword list annotated with what will happen to each one
+      const detectedBridgeKeywords = foundKeywords.map(label => {
+        const kw = _lookupKeyword(label);
+        if (!kw) return { label, matchStatus: 'unknown' };
+        const category = kw.category || _getCategoryForGroup(kw.groupId) || 'misc';
+        if (IDENTITY_CATEGORIES.has(category)) {
+          return { label, category, keywordId: kw.id || null, matchStatus: 'protected-identity' };
+        }
+        if (existingExtLabels.has(label.toLowerCase())) {
+          return { label, category, keywordId: kw.id || null, matchStatus: 'already-present' };
+        }
+        return { label, category, keywordId: kw.id || null, matchStatus: 'will-add' };
+      });
+
       totalWillAdd        += willAdd.length;
       totalAlreadyPresent += alreadyPresent.length;
       totalUnknown        += unknownKeywords.length;
       totalSkipped        += skippedConflicts.length;
+      totalProtected      += protectedIdentityMatches.length;
+      totalDetected       += foundKeywords.length;
 
-      if (willAdd.length > 0 || unknownKeywords.length > 0 || skippedConflicts.length > 0 || alreadyPresent.length > 0) {
-        files.push({ relPath, type: isEmbedded ? 'embedded' : 'xmp', willAdd, alreadyPresent, unknownKeywords, skippedConflicts });
+      const hasChanges = willAdd.length > 0 || unknownKeywords.length > 0
+        || skippedConflicts.length > 0 || alreadyPresent.length > 0
+        || protectedIdentityMatches.length > 0;
+
+      if (hasChanges) {
+        files.push({
+          relPath,
+          type: isEmbedded ? 'embedded' : 'xmp',
+          existingIndexedKeywords,
+          detectedBridgeKeywords,
+          willAdd,
+          alreadyPresent,
+          unknownKeywords,
+          skippedConflicts,
+          protectedIdentityMatches,
+        });
       }
     }
 
     return {
       ok: true,
-      eventName:        doc.eventName || '',
-      eventId:          doc.eventId   || null,
-      eventPath:        eventFolderPath,
-      lastMetadataSync: doc.lastMetadataSync || null,
-      totalScanned:     metadataFiles.length,
-      truncated:        allMetadataFiles.length > MAX_PREVIEW,
+      eventName:             doc.eventName || '',
+      eventId:               doc.eventId   || null,
+      eventPath:             eventFolderPath,
+      lastMetadataSync:      doc.lastMetadataSync || null,
+      eventIdentityKeywords,
+      totalScanned:          metadataFiles.length,
+      truncated:             allMetadataFiles.length > MAX_PREVIEW,
       files,
-      summary: { willAdd: totalWillAdd, alreadyPresent: totalAlreadyPresent, unknown: totalUnknown, skipped: totalSkipped },
+      summary: {
+        willAdd:        totalWillAdd,
+        alreadyPresent: totalAlreadyPresent,
+        unknown:        totalUnknown,
+        skipped:        totalSkipped,
+        protected:      totalProtected,
+        detected:       totalDetected,
+        filesChanged:   files.length,
+      },
     };
 
   } catch (err) {

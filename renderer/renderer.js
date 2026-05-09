@@ -2576,49 +2576,93 @@ async function _msOpenPreview(ev) {
 
 function _msBuildPreviewHtml(result, masterFolderName, pendingReason) {
   const s = result.summary || {};
+
+  // ── Summary chips ──
   const chips = [];
+  if ((s.filesChanged ?? 0) > 0) chips.push(`<span class="ms-pv-summary-chip ms-pv-summary-chip--present">${s.filesChanged} file${s.filesChanged !== 1 ? 's' : ''}</span>`);
   if (s.willAdd > 0)        chips.push(`<span class="ms-pv-summary-chip ms-pv-summary-chip--add">${s.willAdd} will add</span>`);
   if (s.alreadyPresent > 0) chips.push(`<span class="ms-pv-summary-chip ms-pv-summary-chip--present">${s.alreadyPresent} already present</span>`);
   if (s.unknown > 0)        chips.push(`<span class="ms-pv-summary-chip ms-pv-summary-chip--unknown">${s.unknown} unknown</span>`);
-  if (s.skipped > 0)        chips.push(`<span class="ms-pv-summary-chip ms-pv-summary-chip--skip">${s.skipped} skipped</span>`);
+  if (s.protected > 0)      chips.push(`<span class="ms-pv-summary-chip ms-pv-summary-chip--skip">${s.protected} protected</span>`);
 
-  const summaryHtml = chips.length
-    ? `<div class="ms-pv-summary">${chips.join('')}</div>`
+  const summaryHtml = chips.length ? `<div class="ms-pv-summary">${chips.join('')}</div>` : '';
+
+  // ── Event identity block ──
+  const identityKws = Array.isArray(result.eventIdentityKeywords) ? result.eventIdentityKeywords : [];
+  const identityHtml = identityKws.length > 0
+    ? `<div class="ms-pv-identity-block">
+        <span class="ms-pv-identity-label">Event Identity</span>
+        ${identityKws.map(k => `<span class="ms-pv-kw-chip ms-pv-kw-chip--identity">${escapeHtml(k.label)}</span>`).join('')}
+      </div>`
     : '';
 
   if (!Array.isArray(result.files) || result.files.length === 0) {
-    const body = summaryHtml || '';
-    return `${body}<div class="ms-pv-empty">No keyword changes detected.</div>`;
+    return `${summaryHtml}${identityHtml}<div class="ms-pv-empty">No keyword changes detected.</div>`;
   }
 
   const shown = result.files.slice(0, 20);
+
   const fileCards = shown.map(f => {
     const typeLabel = f.type === 'embedded' ? 'JPEG' : 'XMP';
     const typeCls   = f.type === 'embedded' ? 'ms-pv-file-type--embedded' : 'ms-pv-file-type--xmp';
-
     const groups = [];
+
+    // Bridge Detected — all keywords annotated by matchStatus
+    if (Array.isArray(f.detectedBridgeKeywords) && f.detectedBridgeKeywords.length > 0) {
+      const statusCls = { 'will-add': '--add', 'already-present': '--present', 'unknown': '--unknown', 'protected-identity': '--identity' };
+      groups.push(`<div class="ms-pv-kw-group">
+        <div class="ms-pv-kw-label">Bridge</div>
+        <div class="ms-pv-kw-chips">${f.detectedBridgeKeywords.map(k => {
+          const cls = statusCls[k.matchStatus] || '--present';
+          return `<span class="ms-pv-kw-chip ms-pv-kw-chip${cls}" title="${escapeHtml(k.matchStatus)}">${escapeHtml(k.label)}</span>`;
+        }).join('')}</div>
+      </div>`);
+    }
+
+    // Existing Indexed — already in event.metadata.json for this file
+    if (Array.isArray(f.existingIndexedKeywords) && f.existingIndexedKeywords.length > 0) {
+      groups.push(`<div class="ms-pv-kw-group">
+        <div class="ms-pv-kw-label">Indexed</div>
+        <div class="ms-pv-kw-chips">${f.existingIndexedKeywords.map(k => `<span class="ms-pv-kw-chip ms-pv-kw-chip--indexed" title="${escapeHtml(k.source || '')}">${escapeHtml(k.label || k.keywordId)}</span>`).join('')}</div>
+      </div>`);
+    }
+
+    // Will Add
     if (f.willAdd?.length > 0) {
       groups.push(`<div class="ms-pv-kw-group">
-        <div class="ms-pv-kw-label">Will add</div>
+        <div class="ms-pv-kw-label">Will Add</div>
         <div class="ms-pv-kw-chips">${f.willAdd.map(k => `<span class="ms-pv-kw-chip ms-pv-kw-chip--add">${escapeHtml(k.label)}</span>`).join('')}</div>
       </div>`);
     }
+
+    // Already Present
     if (f.alreadyPresent?.length > 0) {
       groups.push(`<div class="ms-pv-kw-group">
-        <div class="ms-pv-kw-label">Already present</div>
+        <div class="ms-pv-kw-label">Already Present</div>
         <div class="ms-pv-kw-chips">${f.alreadyPresent.map(k => `<span class="ms-pv-kw-chip ms-pv-kw-chip--present">${escapeHtml(k.label)}</span>`).join('')}</div>
       </div>`);
     }
+
+    // Unknown
     if (f.unknownKeywords?.length > 0) {
       groups.push(`<div class="ms-pv-kw-group">
-        <div class="ms-pv-kw-label">Unknown (not in registry)</div>
+        <div class="ms-pv-kw-label">Unknown</div>
         <div class="ms-pv-kw-chips">${f.unknownKeywords.map(k => `<span class="ms-pv-kw-chip ms-pv-kw-chip--unknown">${escapeHtml(k.label)}</span>`).join('')}</div>
       </div>`);
     }
-    if (f.skippedConflicts?.length > 0) {
+
+    // Protected / Skipped — show each with reason
+    const allProtected = Array.isArray(f.protectedIdentityMatches) ? f.protectedIdentityMatches : [];
+    if (allProtected.length > 0) {
+      const protectedItems = allProtected.map(k =>
+        `<div class="ms-pv-protected-item">
+          <span class="ms-pv-kw-chip ms-pv-kw-chip--identity">${escapeHtml(k.label)}</span>
+          <div class="ms-pv-protected-reason">${escapeHtml(k.reason)}</div>
+        </div>`
+      ).join('');
       groups.push(`<div class="ms-pv-kw-group">
-        <div class="ms-pv-kw-label">Skipped (identity conflict)</div>
-        <div class="ms-pv-kw-chips">${f.skippedConflicts.map(k => `<span class="ms-pv-kw-chip ms-pv-kw-chip--skip">${escapeHtml(k.label)}</span>`).join('')}</div>
+        <div class="ms-pv-kw-label">Protected / Skipped</div>
+        ${protectedItems}
       </div>`);
     }
 
@@ -2638,7 +2682,7 @@ function _msBuildPreviewHtml(result, masterFolderName, pendingReason) {
     ? `<div class="ms-pv-truncated">Preview limited to first 200 metadata files</div>`
     : '';
 
-  return `${summaryHtml}${fileCards}${truncatedHtml}${scannedNote}`;
+  return `${summaryHtml}${identityHtml}${fileCards}${truncatedHtml}${scannedNote}`;
 }
 
 async function _msRunSyncFromPreview(eventFolderPath, folderName, updateBtn) {
