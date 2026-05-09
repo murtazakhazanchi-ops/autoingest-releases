@@ -2408,23 +2408,48 @@ async function _msRunSync(eventFolderPath, folderName) {
   }
 }
 
+function _msSetTab(tabId) {
+  ['msTabMetadata', 'msTabRegistry'].forEach(id => {
+    const panel = document.getElementById(id);
+    const btn   = document.querySelector(`[data-ms-tab="${id}"]`);
+    const active = id === tabId;
+    if (panel) panel.style.display = active ? '' : 'none';
+    if (btn) {
+      btn.classList.toggle('ms-tab-active', active);
+      btn.setAttribute('aria-selected', String(active));
+    }
+  });
+}
+
+async function _msRefreshRegistryStatus() {
+  const statusEl = document.getElementById('msRegistryStatus');
+  const warnEl   = document.getElementById('msRegistryWarning');
+  try {
+    const reg   = await window.api.keywordsLoadRegistry();
+    const total = ((reg?.base?.keywords) || []).length + ((reg?.overrides) || []).length;
+    if (statusEl) {
+      statusEl.innerHTML = total === 0
+        ? '<span>No keywords loaded yet.</span>'
+        : `<span class="ms-registry-count">${total}</span>&nbsp;<span>keyword${total !== 1 ? 's' : ''} in registry</span>`;
+    }
+    if (warnEl) warnEl.style.display = total === 0 ? 'block' : 'none';
+  } catch {
+    if (statusEl) statusEl.innerHTML = '<span>Registry status unavailable.</span>';
+    if (warnEl) warnEl.style.display = 'none';
+  }
+}
+
 async function openMetadataSyncModal() {
   const overlay = document.getElementById('metadataSyncModal');
   if (!overlay) return;
   overlay.classList.add('open');
-  setTimeout(() => document.getElementById('msCloseBtn')?.focus(), 150);
 
-  // Registry empty-check (fast — reads two JSON files)
-  const warnEl = document.getElementById('msRegistryWarning');
-  if (warnEl) {
-    try {
-      const reg   = await window.api.keywordsLoadRegistry();
-      const total = ((reg?.base?.keywords) || []).length + ((reg?.overrides) || []).length;
-      warnEl.style.display = total === 0 ? 'block' : 'none';
-    } catch {
-      warnEl.style.display = 'none';
-    }
-  }
+  // Default to Metadata Updates tab on each open
+  _msSetTab('msTabMetadata');
+  setTimeout(() => document.getElementById('msTab-metadata')?.focus(), 150);
+
+  // Load registry status (populates warning + registry tab count)
+  _msRefreshRegistryStatus();
 
   // Scan pending events using current archive root
   const masterPath = EventCreator.getSessionArchiveRoot() || await window.api.getArchiveRootSetting();
@@ -2462,18 +2487,22 @@ document.getElementById('msBridgeImportBtn')?.addEventListener('click', async ()
       return;
     }
 
-    const { newKeywords, unchangedCount, possibleMoves } = result;
+    const { newKeywords, unchangedCount, possibleMoves, possibleSpellingUpdates = [] } = result;
     const previewHtml = `
       <div class="ms-preview-box">
         <p class="ms-preview-row"><strong>Preview</strong></p>
         <p class="ms-preview-row ms-preview-new">${newKeywords.length} new keyword${newKeywords.length !== 1 ? 's' : ''} found</p>
         <p class="ms-preview-row">${unchangedCount} keyword${unchangedCount !== 1 ? 's' : ''} already in registry</p>
+        ${possibleSpellingUpdates.length > 0
+          ? `<p class="ms-preview-row ms-preview-spelling">${possibleSpellingUpdates.length} possible spelling/name update${possibleSpellingUpdates.length !== 1 ? 's' : ''} (require review — not auto-applied)</p>`
+          : ''}
         ${possibleMoves.length > 0
           ? `<p class="ms-preview-row ms-preview-move">${possibleMoves.length} possible renamed/moved keyword${possibleMoves.length !== 1 ? 's' : ''} (will not be auto-merged)</p>`
           : ''}
         ${newKeywords.length > 0
           ? `<button class="ms-preview-apply-btn" id="msApplyKeywordsBtn">Add ${newKeywords.length} Keyword${newKeywords.length !== 1 ? 's' : ''}</button>`
           : '<p class="ms-preview-row" style="color:var(--text-muted);margin-top:6px">Nothing new to add.</p>'}
+        <p class="ms-preview-row" style="color:var(--text-muted);margin-top:8px;font-size:11px">New keywords are added safely. Existing keywords are never deleted. Possible spelling or naming changes require review.</p>
       </div>
     `;
     previewBox.innerHTML = previewHtml;
@@ -2485,6 +2514,7 @@ document.getElementById('msBridgeImportBtn')?.addEventListener('click', async ()
       const applyResult = await window.api.keywordsUpdateFromBridgeTxt(filePath, true);
       if (applyResult.ok) {
         previewBox.innerHTML = `<div class="ms-preview-box"><p class="ms-preview-row ms-preview-new">${applyResult.newKeywords.length} keyword${applyResult.newKeywords.length !== 1 ? 's' : ''} added to registry.</p></div>`;
+        _msRefreshRegistryStatus();
       } else {
         if (applyBtn) applyBtn.disabled = false;
         previewBox.innerHTML += `<p class="ms-preview-row" style="color:#dc2626">Error: ${escapeHtml(applyResult.error || 'Write failed')}</p>`;
@@ -2499,11 +2529,14 @@ document.getElementById('msBridgeImportBtn')?.addEventListener('click', async ()
   }
 });
 
-document.getElementById('msCloseBtn')?.addEventListener('click', _msClose);
 document.getElementById('msCloseFooterBtn')?.addEventListener('click', _msClose);
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && document.getElementById('metadataSyncModal')?.classList.contains('open')) _msClose();
 });
+document.querySelectorAll('[data-ms-tab]').forEach(btn => {
+  btn.addEventListener('click', () => _msSetTab(btn.dataset.msTab));
+});
+document.getElementById('msOpenRegistryTabBtn')?.addEventListener('click', () => _msSetTab('msTabRegistry'));
 document.getElementById('ovMetadataSync')?.addEventListener('click', openMetadataSyncModal);
 document.getElementById('ovMetadataSync')?.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMetadataSyncModal(); }

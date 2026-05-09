@@ -1113,6 +1113,36 @@
     }
     .ms-preview-apply-btn:hover { opacity: 0.88; }
     .ms-preview-apply-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .ms-preview-spelling { color: #7c3aed; }
+    /* ── Metadata Sync tabs ─ */
+    .ms-tabs {
+      display: flex; align-items: flex-end; gap: 4px;
+      border-bottom: 1px solid var(--border-subtle);
+      margin-bottom: 18px;
+    }
+    .ms-tab {
+      padding: 6px 16px 8px; background: none; border: none;
+      border-bottom: 2px solid transparent; margin-bottom: -1px;
+      color: var(--text-muted); font-size: 13px; font-weight: 500;
+      font-family: inherit; cursor: pointer; border-radius: 6px 6px 0 0;
+      transition: color 0.12s, border-color 0.12s, background 0.12s; white-space: nowrap;
+    }
+    .ms-tab:hover { color: var(--text-secondary); background: var(--accent-hover); }
+    .ms-tab.ms-tab-active { color: var(--accent); border-bottom-color: var(--accent); }
+    .ms-warn-link {
+      display: inline; background: none; border: none; cursor: pointer;
+      color: inherit; font-size: inherit; font-family: inherit;
+      text-decoration: underline; padding: 0 0 0 5px; opacity: 0.9;
+    }
+    .ms-warn-link:hover { opacity: 1; }
+    .ms-tab-helper { font-size: 12.5px; color: var(--text-muted); margin: 0 0 14px; line-height: 1.5; }
+    .ms-registry-status {
+      display: flex; align-items: center; gap: 8px;
+      padding: 9px 14px; margin-bottom: 14px;
+      background: var(--bg-secondary); border: 1px solid var(--border-subtle);
+      border-radius: 9px; font-size: 12.5px; color: var(--text-muted);
+    }
+    .ms-registry-count { font-weight: 600; color: var(--text-secondary); font-size: 14px; }
 
     /* ── WORKSPACE ─────────────────────────────── */
     #workspace { display: none; flex: 1; overflow: hidden; flex-direction: column; }
@@ -5455,23 +5485,31 @@
       </div>
       <div class="emm-header">
         <span id="msTitle">Metadata Sync</span>
-        <button class="emm-close-btn" id="msCloseBtn" aria-label="Close Metadata Sync">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
       </div>
       <div id="msBody">
-        <p id="msHelperText">Review events with new or changed external metadata from Bridge/XMP and update event.json safely.</p>
-        <div id="msRegistryWarning">Keyword registry is empty. Import your Bridge keyword list before syncing for best results.</div>
-        <div id="msEventList"></div>
-        <hr class="ms-divider">
-        <p class="ms-section-title">Keyword Registry</p>
-        <div class="ms-bridge-row">
-          <div class="ms-bridge-info">
-            Import keywords from an Adobe Bridge keyword export (.txt) to expand the controlled vocabulary. New keywords are added safely — existing keywords are never deleted.
-          </div>
-          <button class="ms-bridge-btn" id="msBridgeImportBtn">Update Keyword List from Bridge TXT</button>
+        <!-- Tab bar -->
+        <div class="ms-tabs" role="tablist">
+          <button class="ms-tab ms-tab-active" id="msTab-metadata" role="tab" aria-selected="true" aria-controls="msTabMetadata" data-ms-tab="msTabMetadata">Metadata Updates</button>
+          <button class="ms-tab" id="msTab-registry" role="tab" aria-selected="false" aria-controls="msTabRegistry" data-ms-tab="msTabRegistry">Keyword Registry</button>
         </div>
-        <div id="msBridgePreview" style="display:none"></div>
+
+        <!-- Panel: Metadata Updates -->
+        <div id="msTabMetadata" role="tabpanel" aria-labelledby="msTab-metadata">
+          <p id="msHelperText">Review events with new or changed external metadata from Bridge/XMP and update event.json safely.</p>
+          <div id="msRegistryWarning">Keyword registry is empty. Import your Bridge keyword list before syncing for best results.<button class="ms-warn-link" id="msOpenRegistryTabBtn">Open Keyword Registry →</button></div>
+          <div id="msEventList"></div>
+        </div>
+
+        <!-- Panel: Keyword Registry -->
+        <div id="msTabRegistry" role="tabpanel" aria-labelledby="msTab-registry" style="display:none">
+          <p class="ms-tab-helper">Import keywords from an Adobe Bridge keyword export (.txt) to expand the controlled vocabulary. New keywords are added safely — existing keywords are never deleted. Possible spelling or naming changes require review.</p>
+          <div id="msRegistryStatus" class="ms-registry-status"></div>
+          <div class="ms-bridge-row">
+            <div class="ms-bridge-info">Select your Bridge keyword export (.txt) to preview and add new keywords to the registry.</div>
+            <button class="ms-bridge-btn" id="msBridgeImportBtn">Update Keyword List from Bridge TXT</button>
+          </div>
+          <div id="msBridgePreview" style="display:none"></div>
+        </div>
       </div>
       <div class="emm-footer">
         <div></div>

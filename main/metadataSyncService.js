@@ -48,6 +48,65 @@ const APPLIED_AS_MAP = {
 // Bridge keywords in these categories are never used to overwrite identity fields.
 const IDENTITY_CATEGORIES = new Set(['event', 'location', 'city', 'country']);
 
+// ── Canonical root mapping (category → stable ID prefix) ─────────────────────
+const _CANONICAL_ROOT = {
+  event:       'event',
+  location:    'location',
+  city:        'city',
+  country:     'country',
+  people:      'people',
+  action:      'action',
+  attire:      'attire',
+  cameraAngle: 'camera_angle',
+  transport:   'transport',
+  misc:        'misc',
+};
+
+function _slugify(str) {
+  return (str || '')
+    .toLowerCase().trim()
+    .replace(/[''`]/g, '')
+    .replace(/[^a-z0-9\s_]/g, '_')
+    .replace(/\s+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+// Strips leading sequential ordering prefix ("01 ", "04 " etc.) only for numbers ≤ 20.
+// Numbers like 51, 53 are meaningful reference identifiers and are preserved intact.
+function _stripOrderingPrefix(label) {
+  const m = (label || '').match(/^(\d{1,2})\s(.+)$/);
+  if (m && parseInt(m[1], 10) <= 20) return m[2];
+  return label;
+}
+
+function _generateKeywordId(pathSegments, category) {
+  if (!pathSegments || pathSegments.length === 0) return '';
+  const root  = _CANONICAL_ROOT[category] || _slugify(pathSegments[0]);
+  const parts = [root];
+  for (let i = 1; i < pathSegments.length; i++) {
+    const slug = _slugify(_stripOrderingPrefix(pathSegments[i]));
+    if (slug) parts.push(slug);
+  }
+  return parts.join('.');
+}
+
+function _pathStr(p) {
+  return Array.isArray(p) ? p.join(' > ') : (p || '');
+}
+
+function _looksLikeSpellingUpdate(newLabel, existingLabel) {
+  if (!newLabel || !existingLabel) return false;
+  const nl = newLabel.toLowerCase().trim();
+  const el = existingLabel.toLowerCase().trim();
+  if (nl === el) return false;
+  const newNum = nl.match(/^(\d+)\s/);
+  const exNum  = el.match(/^(\d+)\s/);
+  if (newNum && exNum && newNum[1] === exNum[1]) return true;
+  if (nl.startsWith(el) || el.startsWith(nl)) return true;
+  return false;
+}
+
 // ── Keyword registry ──────────────────────────────────────────────────────────
 
 let _registry = null;
@@ -79,13 +138,15 @@ async function _loadRegistry(userDataPath) {
 
   const groups = base.groups || [];
 
-  // Build a fast-lookup map: normalized label → keyword entry
+  // Build fast-lookup maps: by normalized label and by stable ID
   const byLabel = new Map();
+  const byId    = new Map();
   for (const kw of allKeywords) {
     if (kw.label) byLabel.set(kw.label.toLowerCase().trim(), kw);
+    if (kw.id)    byId.set(kw.id, kw);
   }
 
-  _registry = { groups, keywords: allKeywords, byLabel };
+  _registry = { groups, keywords: allKeywords, byLabel, byId };
   return _registry;
 }
 
@@ -564,32 +625,58 @@ async function getSyncStatus(eventFolderPath) {
  */
 async function updateRegistryFromBridgeTxt(filePath, userDataPath, applyChanges) {
   try {
-    const raw = await fsp.readFile(filePath, 'utf8');
+    const raw   = await fsp.readFile(filePath, 'utf8');
     const lines = raw.split(/\r?\n/);
 
     await _loadRegistry(userDataPath);
 
     const parsed = _parseBridgeTxt(lines);
-    const existing = _registry ? new Set(_registry.keywords.map(k => k.label.toLowerCase())) : new Set();
 
-    const newKeywords    = [];
-    let   unchangedCount = 0;
-    const possibleMoves  = [];
+    // Build lookup maps from the currently loaded registry
+    const existingById    = new Map();
+    const existingByLabel = new Map();
+    for (const kw of (_registry ? _registry.keywords : [])) {
+      if (kw.id)    existingById.set(kw.id, kw);
+      if (kw.label) existingByLabel.set(kw.label.toLowerCase(), kw);
+    }
+
+    const newKeywords             = [];
+    let   unchangedCount          = 0;
+    const possibleMoves           = [];
+    const possibleSpellingUpdates = [];
 
     for (const kw of parsed) {
-      const key = kw.label.toLowerCase();
-      if (existing.has(key)) {
-        unchangedCount++;
-      } else {
-        // Check if a keyword with same label exists under a different path (possible rename)
-        const duplicate = _registry?.keywords.find(
-          k => k.label.toLowerCase() === key && k.path !== kw.path
-        );
-        if (duplicate) {
-          possibleMoves.push({ incoming: kw, existing: duplicate });
+      const labelKey   = kw.label.toLowerCase();
+      const idMatch    = kw.id ? existingById.get(kw.id) : null;
+      const labelMatch = existingByLabel.get(labelKey);
+
+      if (idMatch) {
+        if (idMatch.label.toLowerCase() === labelKey) {
+          unchangedCount++;  // same path, same label — truly unchanged
         } else {
-          newKeywords.push(kw);
+          // Same path structure (ID), different label → possible spelling/name update
+          possibleSpellingUpdates.push({ incoming: kw, existing: idMatch });
         }
+      } else if (labelMatch) {
+        const existingPathStr = labelMatch.path ? _pathStr(labelMatch.path) : null;
+        const newPathStr      = _pathStr(kw.path);
+        if (existingPathStr && existingPathStr !== newPathStr) {
+          possibleMoves.push({ incoming: kw, existing: labelMatch });
+        } else {
+          unchangedCount++;
+        }
+      } else {
+        // No ID or label match — check for sibling spelling update under same parent
+        if (kw.parentId) {
+          const sibling = (_registry ? _registry.keywords : []).find(
+            k => k.parentId === kw.parentId && _looksLikeSpellingUpdate(kw.label, k.label)
+          );
+          if (sibling) {
+            possibleSpellingUpdates.push({ incoming: kw, existing: sibling });
+            continue;
+          }
+        }
+        newKeywords.push(kw);
       }
     }
 
@@ -603,52 +690,71 @@ async function updateRegistryFromBridgeTxt(filePath, userDataPath, applyChanges)
 
       const now = new Date().toISOString();
       for (const kw of newKeywords) {
-        overrideDoc.keywords.push({ ...kw, addedAt: now, source: 'bridge-txt-import' });
+        overrideDoc.keywords.push({ ...kw, importedAt: now, updatedAt: now, source: 'bridge-txt-import' });
       }
 
       const tmp = overridePath + '.tmp';
       await fsp.writeFile(tmp, JSON.stringify(overrideDoc, null, 2), 'utf-8');
       await fsp.rename(tmp, overridePath);
 
-      // Invalidate registry cache so next load picks up new keywords
       _invalidateRegistry();
       log(`[metadataSyncService] Added ${newKeywords.length} keywords from Bridge TXT`);
     }
 
-    return { ok: true, newKeywords, unchangedCount, possibleMoves };
+    return { ok: true, newKeywords, unchangedCount, possibleMoves, possibleSpellingUpdates };
 
   } catch (err) {
-    return { ok: false, newKeywords: [], unchangedCount: 0, possibleMoves: [], error: err.message };
+    return { ok: false, newKeywords: [], unchangedCount: 0, possibleMoves: [], possibleSpellingUpdates: [], error: err.message };
   }
 }
 
 /**
  * Parses Bridge keyword export TXT (tab-indented hierarchy).
- * Returns flat array of { label, path, category, groupLabel }.
+ * Returns flat array of keyword entries with stable IDs, category/root,
+ * path array, parentId, and depth — ready for the registry entry shape.
+ * Depth-0 entries (group headers) are skipped; they live in registry.groups.
  */
 function _parseBridgeTxt(lines) {
   const result = [];
-  const stack  = [];  // tracks current hierarchy path
+  const stack  = [];  // current hierarchy path labels
 
   for (const raw of lines) {
     const line = raw.replace(/\r$/, '');
     if (!line.trim()) continue;
 
-    // Count leading tabs to determine depth
     let depth = 0;
     while (depth < line.length && line[depth] === '\t') depth++;
     const label = line.slice(depth).trim();
     if (!label) continue;
 
-    // Trim stack to current depth
+    // Update stack at this depth
     stack.length = depth;
     stack[depth] = label;
 
-    const kwPath     = stack.slice(0, depth + 1).join(' > ');
+    // Depth 0 = group header; already represented in registry.groups, not a keyword itself
+    if (depth === 0) continue;
+
+    const pathArray  = stack.slice(0, depth + 1);
     const groupLabel = stack[0] || '';
     const category   = _inferCategory(groupLabel);
+    const id         = _generateKeywordId(pathArray, category);
+    // depth 1 items: parent is the root group (e.g. "event", "people")
+    const parentId   = _generateKeywordId(pathArray.slice(0, -1), category) || null;
 
-    result.push({ label, path: kwPath, groupLabel, category });
+    result.push({
+      id,
+      label,
+      category,
+      root:         _CANONICAL_ROOT[category] || category,
+      path:         [...pathArray],
+      parentId,
+      depth,
+      aliases:      [],
+      labelHistory: [],
+      status:       'active',
+      source:       'bridge-import',
+      groupLabel,
+    });
   }
 
   return result;
@@ -668,6 +774,26 @@ function _inferCategory(groupLabel) {
   return 'misc';
 }
 
+// ── Public: registry helpers ───────────────────────────────────────────────────
+
+/**
+ * Returns all active keywords for a given category.
+ * Supports future category-filtered views for Event Creator dropdowns,
+ * Additional Keywords, search, etc. — without any migration in this phase.
+ */
+async function getKeywordsByCategory(category, userDataPath) {
+  const reg = await _loadRegistry(userDataPath);
+  return (reg.keywords || []).filter(k => k.category === category && k.status !== 'deprecated');
+}
+
+/**
+ * Returns the fully-loaded registry object { groups, keywords, byLabel, byId }.
+ * For renderer-side registry diagnostics and status display.
+ */
+async function loadRegistryFull(userDataPath) {
+  return _loadRegistry(userDataPath);
+}
+
 // ── Exports ───────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -675,4 +801,6 @@ module.exports = {
   syncEventMetadata,
   getSyncStatus,
   updateRegistryFromBridgeTxt,
+  getKeywordsByCategory,
+  loadRegistryFull,
 };
