@@ -379,8 +379,10 @@ function _classifyKeywords(foundKeywords, autoKeywordSet, eventIdentity) {
 
     const appliedAs = APPLIED_AS_MAP[category] || 'descriptiveContext';
     externalKeywords.push({
+      keywordId: kw.id   || null,
       label,
       category,
+      root:      kw.root || category,
       path:      kw.path || kw.groupLabel || '',
       scope:     'file',
       appliedAs,
@@ -417,17 +419,64 @@ function _detectRemovedAutoKeywords(autoKeywords, foundKeywordsSet) {
 // ── Public: scan pending events ───────────────────────────────────────────────
 
 /**
+ * Resolves the most recent completed metadata sync timestamp from event.json.
+ * Prefers the current service's lastMetadataSync, then falls back to
+ * lastMetadataRun.timestamp (written by the older metadata-tagging system)
+ * when its status is 'applied'. Returns null if neither is available.
+ * @param {object} doc
+ * @returns {string|null}
+ */
+function _resolveLastSyncTs(doc) {
+  if (doc.lastMetadataSync) return doc.lastMetadataSync;
+  if (doc.lastMetadataRun?.status === 'applied' && doc.lastMetadataRun.timestamp) {
+    return doc.lastMetadataRun.timestamp;
+  }
+  return null;
+}
+
+/**
+ * Returns the immediate subdirectory names inside eventDir that contain at
+ * least one .xmp file with mtime strictly after sinceMs.
+ * Also adds '.' when a changed .xmp is found directly in eventDir itself.
+ * @param {string} eventDir
+ * @param {number} sinceMs
+ * @returns {Promise<string[]>}
+ */
+async function _findChangedXmpSubfolders(eventDir, sinceMs) {
+  const found = new Set();
+  let entries;
+  try { entries = await fsp.readdir(eventDir, { withFileTypes: true }); } catch { return []; }
+  for (const e of entries) {
+    if (e.name.startsWith('.')) continue;
+    const full = path.join(eventDir, e.name);
+    if (e.isDirectory()) {
+      if (await _hasXmpModifiedAfter(full, sinceMs, 0)) found.add(e.name);
+    } else if (e.isFile() && path.extname(e.name).toLowerCase() === '.xmp') {
+      try {
+        const st = await fsp.stat(full);
+        if (st.mtimeMs > sinceMs) found.add('.');
+      } catch { /* skip */ }
+    }
+  }
+  return [...found];
+}
+
+/**
  * Returns events in masterPath that need metadata sync.
- * Three cases:
- *   'never-synced'  — no lastMetadataSync timestamp
- *   'sync-error'    — no lastMetadataSync and lastMetadataSyncError is present
- *   'xmp-changed'   — has lastMetadataSync but at least one XMP sidecar was
- *                     modified after that timestamp
+ * Four cases:
+ *   'never-synced'  — no usable prior sync timestamp found
+ *   'sync-error'    — lastMetadataSyncError is present, or lastMetadataRun.status
+ *                     is 'error' or 'partial'
+ *   'xmp-changed'   — prior sync timestamp exists but at least one .xmp sidecar
+ *                     was modified after it
+ *
+ * Prior sync timestamp is resolved from lastMetadataSync (current service) or
+ * lastMetadataRun.timestamp (older metadata-tagging system, status='applied').
  *
  * Reads event.json for each event; XMP mtime check is stat-only, early-exit.
  *
- * @param {string} masterPath
- * @returns {Promise<Array<{folderName, eventFolderPath, eventName, pendingReason, lastSyncError}>>}
+ * @param {string} masterPath  — the master folder, one level above event folders
+ * @returns {Promise<Array<{folderName, eventFolderPath, eventName, pendingReason, lastSyncError, changedSubfolders?}>>}
  */
 async function scanPendingEvents(masterPath) {
   if (!masterPath || typeof masterPath !== 'string') return [];
@@ -452,7 +501,7 @@ async function scanPendingEvents(masterPath) {
       const doc = JSON.parse(raw);
       if (!doc) continue;
 
-      // A persisted sync error takes priority — surface it regardless of lastMetadataSync
+      // Persisted sync error (current service) takes priority
       if (doc.lastMetadataSyncError) {
         pending.push({
           folderName,
@@ -464,36 +513,47 @@ async function scanPendingEvents(masterPath) {
         continue;
       }
 
-      if (!doc.lastMetadataSync) {
+      // Old metadata-tagging system marked the run as error or partial
+      const oldRunStatus = doc.lastMetadataRun?.status;
+      if (oldRunStatus === 'error' || oldRunStatus === 'partial') {
         pending.push({
           folderName, eventFolderPath,
           eventName:     doc.eventName || folderName,
-          pendingReason: 'never-synced',
-          lastSyncError: null,
+          pendingReason: 'sync-error',
+          lastSyncError: `Previous metadata run status: ${oldRunStatus}`,
         });
         continue;
       }
 
-      // Synced before, no error — check if any XMP was modified after the last sync
-      const lastSyncMs = new Date(doc.lastMetadataSync).getTime();
-      if (isNaN(lastSyncMs)) {
-        pending.push({
-          folderName, eventFolderPath,
-          eventName:     doc.eventName || folderName,
-          pendingReason: 'never-synced',
-          lastSyncError: null,
-        });
+      // Resolve prior sync timestamp — current service first, then old system
+      const rawSyncTs = _resolveLastSyncTs(doc);
+      const lastSyncMs = rawSyncTs ? new Date(rawSyncTs).getTime() : NaN;
+
+      if (!rawSyncTs || isNaN(lastSyncMs)) {
+        // Only mark never-synced if the event actually has XMP sidecars to sync
+        const hasXmp = await _hasXmpModifiedAfter(eventFolderPath, 0, 0);
+        if (hasXmp) {
+          pending.push({
+            folderName, eventFolderPath,
+            eventName:     doc.eventName || folderName,
+            pendingReason: 'never-synced',
+            lastSyncError: null,
+          });
+        }
         continue;
       }
 
+      // Check if any XMP was modified after the resolved sync timestamp
       const hasChanged = await _hasXmpModifiedAfter(eventFolderPath, lastSyncMs, 0);
       if (hasChanged) {
+        const changedSubfolders = await _findChangedXmpSubfolders(eventFolderPath, lastSyncMs);
         pending.push({
           folderName,
           eventFolderPath,
           eventName:     doc.eventName || folderName,
           pendingReason: 'xmp-changed',
           lastSyncError: null,
+          changedSubfolders,
         });
       }
       // No XMP changed → event is up to date, omit from pending

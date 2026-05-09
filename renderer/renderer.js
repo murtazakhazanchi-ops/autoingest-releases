@@ -2301,7 +2301,7 @@ async function _msScanBackground({ force = false } = {}) {
   if (!force && Date.now() - _msLastBgScanAt < _MS_BG_SCAN_MIN_MS) return;
   _msScanBgBusy = true;
   try {
-    const masterPath = EventCreator.getSessionArchiveRoot() || await window.api.getArchiveRootSetting();
+    const masterPath = EventCreator.getActiveMaster()?.path;
     if (!masterPath) return;
     const pending = await window.api.metadataSyncScanPending(masterPath);
     _msLastBgScanAt = Date.now();  // only update on success — failed scans don't block retry
@@ -2350,11 +2350,15 @@ async function _msScanAndRender(masterPath) {
     const reasonClass = ev.pendingReason === 'sync-error'  ? 'ms-event-status--reason-error'
                       : ev.pendingReason === 'xmp-changed' ? 'ms-event-status--reason-changed'
                       : '';
+    const subfolderHtml = (ev.pendingReason === 'xmp-changed' && Array.isArray(ev.changedSubfolders) && ev.changedSubfolders.length > 0)
+      ? `<div class="ms-event-subfolders">${ev.changedSubfolders.filter(s => s !== '.').map(s => `<span class="ms-event-subfolder">${escapeHtml(s)}</span>`).join('')}</div>`
+      : '';
     return `
     <div class="ms-event-row" id="ms-row-${escapeHtml(ev.folderName)}">
       <div class="ms-event-info">
         <div class="ms-event-name" title="${escapeHtml(ev.eventFolderPath)}">${escapeHtml(ev.eventName || ev.folderName)}</div>
         <div class="ms-event-status ${reasonClass}" id="ms-status-${escapeHtml(ev.folderName)}">${escapeHtml(reasonText)}</div>
+        ${subfolderHtml}
       </div>
       <button class="ms-sync-btn" data-event-path="${escapeHtml(ev.eventFolderPath)}" data-folder-name="${escapeHtml(ev.folderName)}">Update Metadata</button>
     </div>`;
@@ -2451,13 +2455,13 @@ async function openMetadataSyncModal() {
   // Load registry status (populates warning + registry tab count)
   _msRefreshRegistryStatus();
 
-  // Scan pending events using current archive root
-  const masterPath = EventCreator.getSessionArchiveRoot() || await window.api.getArchiveRootSetting();
+  // Scan pending events using the active master folder
+  const masterPath = EventCreator.getActiveMaster()?.path;
   if (masterPath) {
     await _msScanAndRender(masterPath);
   } else {
     const listEl = document.getElementById('msEventList');
-    if (listEl) listEl.innerHTML = '<p class="ms-empty">No archive root set. Please configure your archive location in Settings.</p>';
+    if (listEl) listEl.innerHTML = '<p class="ms-empty">No master folder selected. Open or create a master folder first.</p>';
   }
 }
 
