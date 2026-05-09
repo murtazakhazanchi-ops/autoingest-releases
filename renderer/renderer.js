@@ -2318,7 +2318,7 @@ async function _msScanBackground({ force = false } = {}) {
 
 function _reasonLabel(reason, lastSyncError) {
   if (reason === 'sync-error')               return lastSyncError ? `Previous sync error: ${lastSyncError}` : 'Previous sync had an error';
-  if (reason === 'xmp-changed')              return 'XMP updated since last sync';
+  if (reason === 'xmp-changed')              return 'Metadata updated since last sync';
   if (reason === 'migration-needed')         return 'Metadata index migration needed';
   if (reason === 'metadata-index-missing')   return 'Metadata index file missing';
   if (reason === 'metadata-index-mismatch')  return 'Metadata index ID mismatch — review required';
@@ -2332,7 +2332,8 @@ function _msBuildResultHtml(result) {
       <div class="ms-result-detail">${escapeHtml(result.error || 'An unknown error occurred.')}</div>`;
   }
 
-  const xmpCount   = result.scannedXmp   ?? result.scannedFiles ?? 0;
+  const xmpCount      = result.scannedXmp      ?? result.scannedFiles ?? 0;
+  const embeddedCount = result.scannedEmbedded ?? 0;
   const updated    = result.updatedFiles ?? result.filesUpdated ?? 0;
   const extAdded   = result.externalKeywordsAdded ?? 0;
   const unknownKws = result.unknownKeywordsFound  ?? 0;
@@ -2341,13 +2342,14 @@ function _msBuildResultHtml(result) {
   const evJsonOk   = result.eventJsonUpdated        !== false;
   const elapsed    = typeof result.elapsedMs === 'number' ? ` (${result.elapsedMs}ms)` : '';
 
-  if (xmpCount === 0 && extAdded === 0 && unknownKws === 0) {
+  if (xmpCount === 0 && embeddedCount === 0 && extAdded === 0 && unknownKws === 0) {
     return `<div class="ms-result-title">Metadata Sync Complete</div>
       <div class="ms-result-detail">No new metadata changes found${elapsed}.</div>`;
   }
 
   const lines = [];
-  if (xmpCount > 0) lines.push(`${xmpCount} XMP sidecar${xmpCount !== 1 ? 's' : ''} scanned`);
+  if (xmpCount > 0)      lines.push(`${xmpCount} XMP sidecar${xmpCount !== 1 ? 's' : ''} scanned`);
+  if (embeddedCount > 0) lines.push(`${embeddedCount} embedded image${embeddedCount !== 1 ? 's' : ''} scanned`);
   if (updated > 0)  lines.push(`${updated} file${updated !== 1 ? 's' : ''} updated`);
   if (extAdded > 0) lines.push(`${extAdded} external keyword${extAdded !== 1 ? 's' : ''} added`);
   if (unknownKws > 0) lines.push(`${unknownKws} unknown keyword${unknownKws !== 1 ? 's' : ''} found`);

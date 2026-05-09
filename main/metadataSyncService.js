@@ -59,6 +59,15 @@ const _CANONICAL_ROOT = {
 // ── RAW extensions for sidecar peer lookup ────────────────────────────────────
 const RAW_EXTENSIONS = ['.cr2', '.cr3', '.raw', '.nef', '.arw', '.dng', '.orf', '.rw2'];
 
+// ── Embedded-metadata image extensions ───────────────────────────────────────
+// Bridge writes keywords directly into these files (no separate sidecar).
+const EMBEDDED_EXTENSIONS = new Set(['.jpg', '.jpeg']);
+
+function _isMetadataBearingFile(name) {
+  const ext = path.extname(name).toLowerCase();
+  return ext === '.xmp' || EMBEDDED_EXTENSIONS.has(ext);
+}
+
 // ── Slug / ID helpers ─────────────────────────────────────────────────────────
 
 function _slugify(str) {
@@ -201,7 +210,7 @@ async function _hasXmpModifiedAfter(dir, sinceMs, depth) {
     const full = path.join(dir, e.name);
     if (e.isDirectory()) {
       if (await _hasXmpModifiedAfter(full, sinceMs, depth + 1)) return true;
-    } else if (e.isFile() && path.extname(e.name).toLowerCase() === '.xmp') {
+    } else if (e.isFile() && _isMetadataBearingFile(e.name)) {
       try {
         const st = await fsp.stat(full);
         if (st.mtimeMs > sinceMs) return true;
@@ -222,7 +231,7 @@ async function _scanXmpSidecars(eventFolderPath) {
       const full = path.join(dir, e.name);
       if (e.isDirectory()) {
         await walk(full, depth + 1);
-      } else if (e.isFile() && path.extname(e.name).toLowerCase() === '.xmp') {
+      } else if (e.isFile() && _isMetadataBearingFile(e.name)) {
         sidecars.push(full);
       }
     }
@@ -263,6 +272,26 @@ async function _readKeywordsFromSidecar(xmpPath) {
       .filter(Boolean);
   } catch (err) {
     log(`[metadataSyncService] Could not read ${xmpPath}: ${err.message}`);
+    return [];
+  }
+}
+
+/**
+ * Reads keywords from the embedded XMP/IPTC metadata of a JPEG file.
+ * Bridge writes flat keywords to XMP-dc:Subject (read as 'Subject') and
+ * IPTC:Keywords (read as 'Keywords'). Both are unioned and deduplicated.
+ */
+async function _readKeywordsFromJpeg(jpegPath) {
+  try {
+    const tags = await readFileTags(jpegPath);
+    const all = new Set();
+    const addValues = (v) => (Array.isArray(v) ? v : (v ? [v] : []))
+      .forEach(k => { const t = String(k).trim(); if (t) all.add(t); });
+    addValues(tags.Subject  ?? tags['XMP-dc:Subject']);
+    addValues(tags.Keywords ?? tags['IPTC:Keywords']);
+    return [...all];
+  } catch (err) {
+    log(`[metadataSyncService] Could not read embedded metadata from ${jpegPath}: ${err.message}`);
     return [];
   }
 }
@@ -509,7 +538,7 @@ async function _findChangedXmpSubfolders(eventDir, sinceMs) {
     const full = path.join(eventDir, e.name);
     if (e.isDirectory()) {
       if (await _hasXmpModifiedAfter(full, sinceMs, 0)) found.add(e.name);
-    } else if (e.isFile() && path.extname(e.name).toLowerCase() === '.xmp') {
+    } else if (e.isFile() && _isMetadataBearingFile(e.name)) {
       try {
         const st = await fsp.stat(full);
         if (st.mtimeMs > sinceMs) found.add('.');
@@ -725,13 +754,14 @@ async function syncEventMetadata(eventFolderPath, userDataPath) {
       if (comp.country)                  eventIdentity.country  = comp.country;
     }
 
-    const sidecars = await _scanXmpSidecars(eventFolderPath);
-    const syncTs   = new Date().toISOString();
+    const metadataFiles = await _scanXmpSidecars(eventFolderPath);
+    const syncTs        = new Date().toISOString();
+    let scannedXmp = 0, scannedEmbedded = 0;
 
-    if (sidecars.length === 0) {
+    if (metadataFiles.length === 0) {
       const emptyMeta = _buildMetadataJsonDoc(existingMetaDoc, doc, {}, syncTs);
       await _writeMetadataAndEventJson(eventFolderPath, emptyMeta, syncTs);
-      return _makeOkResult(doc, eventFolderPath, 0, 0, 0, 0, 0, 0, 0, syncTs, startMs, [], [], []);
+      return _makeOkResult(doc, eventFolderPath, 0, 0, 0, 0, 0, 0, 0, 0, syncTs, startMs, [], [], []);
     }
 
     const fileSyncMap = {};
@@ -741,16 +771,32 @@ async function syncEventMetadata(eventFolderPath, userDataPath) {
     const allUnknownKeywords = [];
     const allConflicts      = [];
 
-    for (const sidecarPath of sidecars) {
-      const foundKeywords = await _readKeywordsFromSidecar(sidecarPath);
+    for (const filePath of metadataFiles) {
+      const ext        = path.extname(filePath).toLowerCase();
+      const isEmbedded = EMBEDDED_EXTENSIONS.has(ext);
+
+      const foundKeywords = isEmbedded
+        ? await _readKeywordsFromJpeg(filePath)
+        : await _readKeywordsFromSidecar(filePath);
+
+      if (isEmbedded) scannedEmbedded++;
+      else             scannedXmp++;
+
       if (foundKeywords.length === 0) continue;
 
       const foundSet = new Set(foundKeywords.map(k => k.toLowerCase()));
 
-      // Use RAW peer as the canonical file key (spec: prefer RAW over XMP relPath)
-      const rawPeer    = await _findRawPeer(sidecarPath);
-      const relPath    = path.relative(eventFolderPath, rawPeer);
-      const xmpRelPath = path.relative(eventFolderPath, sidecarPath);
+      let relPath, xmpRelPath;
+      if (isEmbedded) {
+        // JPEG IS the canonical key — no RAW peer lookup; sidecar path and relPath are the same
+        relPath    = path.relative(eventFolderPath, filePath);
+        xmpRelPath = relPath;
+      } else {
+        // XMP sidecar — use RAW peer as canonical key
+        const rawPeer = await _findRawPeer(filePath);
+        relPath    = path.relative(eventFolderPath, rawPeer);
+        xmpRelPath = path.relative(eventFolderPath, filePath);
+      }
 
       // Existing auto keyword labels from event.metadata.json
       const existingFile   = existingMetaDoc?.files?.[relPath] || existingMetaDoc?.files?.[xmpRelPath] || {};
@@ -787,10 +833,10 @@ async function syncEventMetadata(eventFolderPath, userDataPath) {
     const newMetaDoc = _buildMetadataJsonDoc(existingMetaDoc, doc, fileSyncMap, syncTs);
     await _writeMetadataAndEventJson(eventFolderPath, newMetaDoc, syncTs);
 
-    log(`[metadataSyncService] Synced ${eventFolderPath}: ${sidecars.length} XMP, ${filesUpdated} updated`);
+    log(`[metadataSyncService] Synced ${eventFolderPath}: ${scannedXmp} XMP, ${scannedEmbedded} embedded, ${filesUpdated} updated`);
     return _makeOkResult(
       doc, eventFolderPath,
-      sidecars.length, sidecars.length, filesUpdated,
+      metadataFiles.length, scannedXmp, scannedEmbedded, filesUpdated,
       totalExternal, totalUnknown, totalSkipped, totalRemoved,
       syncTs, startMs,
       allAddedKeywords, allUnknownKeywords, allConflicts
@@ -825,7 +871,7 @@ async function syncEventMetadata(eventFolderPath, userDataPath) {
   }
 }
 
-function _makeOkResult(doc, eventPath, scannedFiles, scannedXmp, updatedFiles,
+function _makeOkResult(doc, eventPath, scannedFiles, scannedXmp, scannedEmbedded, updatedFiles,
   externalAdded, unknownFound, skippedConflicts, removedInExt,
   syncTs, startMs, addedKeywords, unknownKeywords, conflicts) {
   return {
@@ -833,7 +879,7 @@ function _makeOkResult(doc, eventPath, scannedFiles, scannedXmp, updatedFiles,
     eventName:  doc.eventName || '',
     eventId:    doc.eventId   || null,
     eventPath,
-    scannedFiles, scannedXmp, updatedFiles,
+    scannedFiles, scannedXmp, scannedEmbedded, updatedFiles,
     externalKeywordsAdded:  externalAdded,
     unknownKeywordsFound:   unknownFound,
     skippedConflicts,
