@@ -863,6 +863,56 @@ Status:
 
 ---
 
+### 2026-05-09 — Metadata Sync Phase 1D: Keyword Registry ID Stabilization and Modal Tab Refinement
+
+Task type:
+- Metadata / Persistence / UI / Renderer / Data Model / Keyword Registry
+
+What happened:
+
+**Keyword ID generation (`metadataSyncService._generateKeywordId`):**
+Bridge TXT hierarchy uses leading numbers in two distinct ways: sequential ordering markers (01, 04 etc.) and meaningful reference identifiers (53, 114 etc.). A threshold of 20 was established: strip a leading numeric prefix only when the number ≤ 20 (section ordering), preserve it when > 20 (meaningful reference number). This produces stable, deterministic IDs: `["05 People","01 Duat Mutlaqin","53 SMS Syedna..."]` → `people.duat_mutlaqin.53_sms_syedna_...`.
+
+**Depth-0 Bridge TXT entries must be skipped in `_parseBridgeTxt`:**
+Group root labels (e.g. "01 Event", "05 People") at depth 0 live in `registry.groups` and are category/root references — not usable keywords. The original parser emitted them into the keywords array. Fix: `if (depth === 0) continue` after updating the stack.
+
+**Keyword ID deduplication order:**
+`updateRegistryFromBridgeTxt` now checks in this order: (1) by generated ID (same ID + same label = unchanged; same ID + different label = possible spelling update), then (2) by label match (same label + different path = possible move), then (3) by parentId sibling + `_looksLikeSpellingUpdate` for legacy entries without IDs. This order prevents false positives. Checking label first would incorrectly flag spelling updates as moves.
+
+**Metadata Sync modal tab structure:**
+Two-tab modal (Metadata Updates / Keyword Registry) was added. Pattern used: `data-ms-tab="panelId"` on each tab button, `querySelectorAll('[data-ms-tab]').forEach(...)` delegate, `_msSetTab(id)` iterates all known panel IDs to update display and `aria-selected`. This is distinct from the `data-active` container pattern (suited to large panel sets) — the `data-ms-tab` delegate is preferred for smaller two-tab modals where there is no wrapping tab-container element carrying state.
+
+**X button removal (Metadata Sync modal):**
+The Activity Log and Event Management modals have no top-right X button. The Metadata Sync modal now matches. Removal required deleting HTML, the click listener, and replacing `msCloseBtn.focus()` with `document.getElementById('msTab-metadata')?.focus()`.
+
+**Registry status fire-and-forget:**
+`_msRefreshRegistryStatus()` is called without `await` in `openMetadataSyncModal` so the modal opens immediately. The registry count/warning populates asynchronously. Matches the existing pattern for background status reads on modal open.
+
+**`possibleSpellingUpdates` are never auto-applied:**
+The service returns `possibleSpellingUpdates: []` on `applyChanges=true` (apply only writes `newKeywords`). The renderer shows the count in the preview with explicit "not auto-applied" copy. This is a feature-specific UX policy.
+
+Reusable lessons:
+
+1. **Keyword ID ordering-prefix stripping must use a ≤20 threshold.** Numbers ≤ 20 are section markers; numbers > 20 are meaningful reference identifiers that belong in the slug.
+2. **Depth-0 Bridge TXT entries (group headers) must be skipped; they belong in `registry.groups`, not keywords.**
+3. **Keyword registry deduplication must check by ID first, then label, then parentId sibling.** Wrong order produces false positives (spelling update treated as move).
+4. **`data-ms-tab` delegate pattern is preferred for two-tab modals without a wrapping tab container carrying `data-active` state.**
+
+Promote to agents:
+- `metadata-specialist.md` — lessons 1, 2 (keyword ID generation threshold; depth-0 skip rule)
+- `contract-debugger.md` — lesson 3 (deduplication order as a correctness contract)
+- `ui-system-specialist.md` — lesson 4 (data-ms-tab delegate as a variant tab pattern)
+
+Lessons NOT promoted:
+- X button removal convention — project-specific UI convention, not a reusable debugging or implementation rule.
+- Registry status fire-and-forget — already covered by the IPC async and live panel refresh rules.
+- `possibleSpellingUpdates` non-auto-apply — feature-specific UX policy; belongs in feature docs.
+
+Status:
+- Promoted
+
+---
+
 ## Entry Template
 
 ### YYYY-MM-DD — Task Name

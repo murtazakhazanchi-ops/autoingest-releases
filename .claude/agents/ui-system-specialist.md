@@ -507,6 +507,44 @@ Validation:
 - Confirm switching tabs does not re-render the full modal body.
 - Confirm adding a new tab requires only HTML + CSS changes, no new JS toggle logic.
 
+### data-ms-tab Delegate Pattern for Two-Tab Modals
+
+Context:
+- Applies when adding exactly two tabs to an existing modal that does not have a wrapping tab-container element carrying `data-active` state (i.e., the `data-active` container pattern is impractical because the modal was not designed for tabs from the start).
+
+Rule:
+- Add `data-ms-tab="panelId"` to each tab button.
+- Wire with `querySelectorAll('[data-ms-tab]').forEach(btn => btn.addEventListener('click', () => _msSetTab(btn.dataset.msTab)))`.
+- `_msSetTab(id)` iterates all known panel IDs to: set `display: block/none`, update `aria-selected` on each tab button, and toggle an active class (`ms-tab-active`).
+- Use `role="tablist"`, `role="tab"`, `role="tabpanel"`, and `aria-controls` on the tab elements for accessible semantics.
+- This pattern is appropriate for two-tab modals added to existing modal structures. For new modals with three or more tabs, prefer the `data-active` container pattern (see rule above).
+
+```js
+function _msSetTab(tabId) {
+  ['msTabMetadata', 'msTabRegistry'].forEach(id => {
+    const panel = document.getElementById(id + '-panel');
+    const btn   = document.querySelector(`[data-ms-tab="${id}"]`);
+    const isActive = id === tabId;
+    if (panel) panel.style.display = isActive ? '' : 'none';
+    if (btn)   { btn.classList.toggle('ms-tab-active', isActive); btn.setAttribute('aria-selected', String(isActive)); }
+  });
+}
+// Wiring
+document.querySelectorAll('[data-ms-tab]').forEach(btn =>
+  btn.addEventListener('click', () => _msSetTab(btn.dataset.msTab))
+);
+```
+
+Avoid:
+- Using per-panel `if/else` instead of an array iteration — adding a third tab requires editing the function body.
+- Omitting `aria-selected` updates — keyboard/screen reader tab state will be wrong.
+- Mixing this pattern with the `data-active` container pattern in the same modal.
+
+Validation:
+- Confirm clicking each tab sets `aria-selected="true"` on the active button and `aria-selected="false"` on inactive ones.
+- Confirm tab panel visibility switches correctly.
+- Confirm adding a third tab only requires adding one entry to the known-IDs array in `_msSetTab`.
+
 ### IPC Async Action Buttons — Disable-and-Wait Pattern
 
 Context:

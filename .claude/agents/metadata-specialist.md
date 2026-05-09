@@ -365,6 +365,48 @@ Validation:
 - Confirm `event.json` after a failed sync contains `lastMetadataSyncError` with `message` and `at` fields.
 - Confirm the error field is absent after a subsequent successful sync.
 
+### Keyword ID Generation — Ordering Prefix Strip Threshold
+
+Context:
+- Applies to `_generateKeywordId`, `_stripOrderingPrefix`, and any function that converts a Bridge TXT path segment into a slug for a stable keyword registry ID.
+
+Rule:
+- Strip a leading numeric prefix from a path segment ONLY when the number is ≤ 20.
+- Numbers ≤ 20 are sequential section-ordering markers in Bridge TXT hierarchies (e.g., "01 Event", "04 Majlis") and must be stripped to produce a clean slug.
+- Numbers > 20 are meaningful reference identifiers (e.g., "53 SMS Syedna Mufaddal Saifuddin") and must be preserved in the slug verbatim.
+- The resulting ID is joined with dots: `["05 People","01 Duat Mutlaqin","53 SMS Syedna..."]` → `people.duat_mutlaqin.53_sms_syedna_...`.
+- The root segment (depth 0 group) is mapped via `_CANONICAL_ROOT`, not slugified directly.
+
+Avoid:
+- Stripping all leading numeric prefixes regardless of value — destroys meaningful reference numbers.
+- Preserving all leading numeric prefixes — produces brittle ordering-dependent IDs that break when sections are reordered.
+- Deriving IDs from labels alone without traversing the full path array — produces collisions across categories.
+
+Validation:
+- Confirm a segment with a prefix ≤ 20 is stripped in the output ID.
+- Confirm a segment with a prefix > 20 retains the number in the output ID.
+- Confirm the root segment maps via `_CANONICAL_ROOT`, not slugification.
+- Run `_generateKeywordId` on spec examples and confirm they match expected output.
+
+### Depth-0 Bridge TXT Entries Must Not Become Keywords
+
+Context:
+- Applies to `_parseBridgeTxt` and any Bridge TXT parser that emits entries into a keyword array.
+
+Rule:
+- Entries at depth 0 in a Bridge TXT file are group header labels (e.g., "01 Event", "05 People"). These belong in `registry.groups` as category/root references — not in the keyword array.
+- Add `if (depth === 0) continue` (or equivalent guard) after updating the depth stack but before emitting a keyword entry.
+- Depth-0 entries emitted as keywords produce non-addressable, non-usable pseudo-keywords that pollute registry lookup and filtering.
+
+Avoid:
+- Emitting all parsed entries into the keyword array without a depth check.
+- Relying on downstream deduplication or filtering to remove depth-0 entries — filter at parse time.
+
+Validation:
+- Confirm group root labels ("01 Event", "05 People", etc.) are absent from `registry.keywords` after a Bridge TXT import.
+- Confirm they appear only in `registry.groups`.
+- Confirm actual keywords (depth ≥ 1) are unaffected.
+
 ### Documentation Follow-Up
 
 Context:

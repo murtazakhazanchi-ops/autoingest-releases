@@ -354,6 +354,29 @@ Validation:
 - Confirm the captured value is passed forward explicitly and not re-read from the module-level variable after the await.
 - Confirm the containment check remains unchanged.
 
+### Keyword Registry Deduplication Order — ID Before Label Before Sibling
+
+Context:
+- Applies when debugging or implementing keyword registry update logic (e.g., `updateRegistryFromBridgeTxt`) that must distinguish unchanged entries, spelling updates, and moved entries.
+
+Rule:
+- Deduplication must check in this order:
+  1. **By generated ID** — same ID + same label = unchanged (skip). Same ID + different label = probable spelling update (surface for review, do not auto-apply).
+  2. **By label match** — same label + different path = probable move (surface for review).
+  3. **By parentId sibling + similarity check** — for legacy entries without IDs, use `_looksLikeSpellingUpdate` on siblings under the same parent.
+- Reversing steps 1 and 2 (checking label first) causes false positives: a spelling update (same ID, new label) is incorrectly classified as a move (same label found nowhere) instead of a spelling change.
+- Each step must be exclusive: once an entry matches step 1, it must not also be evaluated against steps 2 and 3.
+
+Avoid:
+- Checking by label before checking by ID — misclassifies spelling updates as moves.
+- Evaluating an entry against multiple steps simultaneously.
+- Auto-applying spelling updates or moves detected in any step — always surface for review.
+
+Validation:
+- Confirm an entry with a known ID and a changed label is classified as a spelling update, not a move.
+- Confirm an entry with the same label at a different path (no ID match) is classified as a move.
+- Confirm an unchanged entry (same ID + same label) produces no output in possibleMoves or possibleSpellingUpdates.
+
 ## Validation Checklist
 
 Before debugging, read:
