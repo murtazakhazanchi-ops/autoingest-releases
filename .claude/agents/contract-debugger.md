@@ -354,6 +354,26 @@ Validation:
 - Confirm the captured value is passed forward explicitly and not re-read from the module-level variable after the await.
 - Confirm the containment check remains unchanged.
 
+### Two-File Write Order Violation — Child Must Be Written Before Parent
+
+Context:
+- Applies when debugging a bug where `event.metadata.json` is absent, corrupt, or claims sync succeeded while the companion child file is in a bad state, with no visible error thrown to the caller.
+
+Rule:
+- When a feature writes both `event.metadata.json` (child) and `event.json` (parent metadataIndex + lastMetadataSync), the write order is child-first, parent-second.
+- If the parent is written first and the child write then fails, the parent claims a sync completed while the child is missing or stale. The next scan will not re-trigger because `lastMetadataSync` is set.
+- Symptom: `event.json.metadataIndex` is present and `lastMetadataSync` is recent, but `event.metadata.json` is missing or has an older timestamp.
+- Diagnosis: find the write function and confirm whether it writes `event.json` before `event.metadata.json`. If yes, the order is reversed.
+
+Avoid:
+- Diagnosing "missing child file" as a write permission error or filesystem issue before verifying write order.
+- Assuming the atomic tmp→rename pattern alone is sufficient — it must be applied to both files, child first.
+
+Validation:
+- Confirm child file (`event.metadata.json`) tmp→rename occurs before parent file (`event.json`) update.
+- Confirm parent write is conditional: it runs only after child write succeeds.
+- Confirm a failed child write leaves `event.json` untouched.
+
 ### Keyword Registry Deduplication Order — ID Before Label Before Sibling
 
 Context:

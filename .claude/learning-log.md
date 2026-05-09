@@ -913,6 +913,56 @@ Status:
 
 ---
 
+### 2026-05-09 — Metadata Architecture Refactor (8 Parts, commit fa30cbb)
+
+Task type:
+- Architecture / Metadata / Persistence / IPC / UI / Data Model / Migration
+
+What happened:
+
+A major 8-part refactor extracted per-file metadata out of `event.json` into a companion `event.metadata.json` child file. Covered companion-file contract, write-order guarantee, RAW peer identity, auto-migration, rich sync result UI, pending reason expansion, and optional external ID.
+
+**1 — event.metadata.json child-index contract:**
+`event.json` grew large due to per-file `fileMeta` objects. New pattern: slim `event.json` (master, always authoritative) + companion `event.metadata.json` (child, keyed by `event.json.metadataIndex`). Child is only valid because parent points to it. Child must never be read on home screen or background scan — only on explicit sync. Keywords stored once in `event.metadata.json.keywords[keywordId]`; files carry only `externalKeywordIds[]`.
+
+**2 — Write-order guarantee for two-file atomic updates:**
+Always write CHILD file first (`event.metadata.json` via tmp→rename), then update PARENT (`event.json` metadataIndex + lastMetadataSync). If child write fails, parent is untouched (consistent). If parent update fails, child is safe and retry can recover. Never reverse this order.
+
+**3 — RAW peer lookup for file identity:**
+XMP sidecars are not canonical identity. Key `event.metadata.json.files` by the RAW peer path (CR2/NEF/ARW/DNG), falling back to XMP path only when no RAW peer exists. Use `fsp.access()` for cheap existence check. When migrating, check both RAW and XMP keys because old data used XMP keys.
+
+**4 — Auto-migration pattern for storage schema upgrades:**
+Detect migration needed in `scanPendingEvents` (`fileMeta && !metadataIndex` → reason `migration-needed`). Perform migration inside `syncEventMetadata` before the actual sync. Build initial `event.metadata.json` from old `fileMeta`, merge new sync results on top. After success: delete `fileMeta`, write `metadataIndex`. Must be idempotent.
+
+**5 — Rich sync result payload for UI feedback:**
+IPC sync handlers should return a structured result with stats, keyword chips, file write status, elapsed ms, and backward-compat aliases so the UI can show meaningful feedback without a second round-trip. UI pattern: disable button on click, show inline `.ms-result-panel` below the row (do not hide row), show success with chips + stats or failure with Retry; remove previous result panel before starting a new sync.
+
+**6 — Pending scan reasons extended:**
+New reasons added to `scanPendingEvents`: `migration-needed` (`fileMeta && !metadataIndex`), `metadata-index-missing` (`metadataIndex.status === 'missing'`), `metadata-index-mismatch` (`metadataIndex.eventId ≠ doc.eventId` when both present). `never-synced` must be gated on actual XMP sidecar presence (`_hasXmpModifiedAfter(dir, 0, 0)`) — without this gate, empty events flood the pending list.
+
+**7 — Optional external ID pattern:**
+Archive Registry ID stored as `event.json.eventId` + `eventRegistry { system, id, linkedAt }`. Must be optional — legacy events without it continue working. Must NOT be used for folder naming, import routing, or generated inside AutoIngest. Validate consistency between `event.json.eventId` and `event.metadata.json.eventId` only when both are present; skip entirely for legacy events.
+
+Reusable lessons:
+1. event.metadata.json child-index contract: parent owns authority, child is valid only via pointer, never read child on home/background scan.
+2. Two-file write order: child first (atomic), parent second. Never reverse.
+3. RAW peer is canonical file identity key; XMP sidecar is not.
+4. Lazy auto-migration on first sync click, triggered by `migration-needed` pending reason; must be idempotent.
+5. Rich IPC result payload enables one-round-trip UI feedback; inline result panel pattern for sync rows.
+6. `never-synced` must be gated on XMP presence; three new pending reasons: migration-needed, metadata-index-missing, metadata-index-mismatch.
+7. Optional external ID must not affect routing, folder naming, or be auto-generated; validate consistency only when both sides present.
+
+Promote to agents:
+- `metadata-specialist.md` — lessons 1, 2, 3, 4, 6
+- `contract-debugger.md` — lesson 2 (write-order as a diagnostic/correctness pattern)
+- `ui-system-specialist.md` — lesson 5 (rich sync result panel)
+- `ingestion-routing-specialist.md` — lesson 7 (optional external ID must not affect routing)
+
+Status:
+- Promoted
+
+---
+
 ## Entry Template
 
 ### YYYY-MM-DD — Task Name

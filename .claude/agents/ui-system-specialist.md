@@ -980,6 +980,31 @@ Validation:
 - Confirm the modal uses the standard `emm-*` structure.
 - Confirm no new modal layout class or overlay system was introduced.
 
+### Rich Sync Result Inline Panel Pattern
+
+Context:
+- Applies to any sync or batch-operation row in a modal or panel (e.g., Metadata Sync event rows) where the user triggers an operation and expects feedback inline without navigating away.
+
+Rule:
+- Change the trigger button to "Syncing…" and disable it immediately on click.
+- Show feedback in an inline `.ms-result-panel` appended below the row — do NOT hide the row itself.
+- Remove any previous `.ms-result-panel` for the same row before starting a new sync (stale result panels must not accumulate).
+- On success: show keyword chips + stat summary (files scanned, keywords added, elapsed ms) + file write status (`event.metadata.json updated`).
+- On failure: show a readable error message and change the button to "Retry" (re-enabled).
+- The IPC handler must return a structured result with enough fields for the UI to render without a second round-trip: `{ ok, eventName, scannedFiles, scannedXmp, updatedFiles, externalKeywordsAdded, unknownKeywordsFound, skippedConflicts, elapsedMs, addedKeywords[], unknownKeywords[], errors[] }` plus backward-compat aliases.
+
+Avoid:
+- Hiding the event row during sync — it must remain visible so the user knows which event is being processed.
+- Leaving a stale result panel visible from the previous sync when a new one starts.
+- Requiring a second IPC call to fetch result details after the sync completes.
+
+Validation:
+- Confirm the row stays visible during and after sync.
+- Confirm any previous `.ms-result-panel` is removed before the new sync starts.
+- Confirm success state shows stats and keyword chips.
+- Confirm failure state shows the error and re-enables the button as "Retry".
+- Confirm the IPC handler returns all required fields in a single response.
+
 ### Light/Dark and Viewport Compatibility
 
 Context:

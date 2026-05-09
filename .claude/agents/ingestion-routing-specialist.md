@@ -299,6 +299,28 @@ Validation:
 - Confirm the `realpath` containment check in `files:deleteFromSource` is unchanged.
 - Confirm cleanup succeeds for an external drive selected via dialog (sub-folder path, not mountpoint).
 
+### Optional External ID Must Never Affect Routing or Folder Structure
+
+Context:
+- Applies when an external registry ID (e.g., Archive Registry ID, `eventId`) is stored in `event.json` and could be mistaken for a routing input.
+
+Rule:
+- The external ID (`event.json.eventId`, `eventRegistry.id`) is an optional link to a third-party registry. It is metadata about the event, not an identity input for routing.
+- It must NOT be used for folder naming, import routing path computation, or any deterministic path derivation.
+- It must NOT be auto-generated inside AutoIngest — it is set only by an external system.
+- It must NOT be required — legacy events without `eventId` must continue to route and import identically.
+- Validate consistency between `event.json.eventId` and `event.metadata.json.eventId` only when both are present; skip the check entirely for legacy events.
+
+Avoid:
+- Using `event.json.eventId` as a routing key or folder name segment.
+- Requiring `eventId` for import validation or transaction build.
+- Auto-generating `eventId` on event creation.
+
+Validation:
+- Confirm routing derives only from `event.json` fields that have always governed routing (folderName, components, etc.).
+- Confirm an event without `eventId` imports identically to one with it.
+- Confirm `eventId` is not present in any path construction function.
+
 ### Error Handling
 
 Context:

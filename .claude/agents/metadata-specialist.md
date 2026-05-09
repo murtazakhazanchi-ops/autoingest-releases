@@ -407,6 +407,118 @@ Validation:
 - Confirm they appear only in `registry.groups`.
 - Confirm actual keywords (depth ≥ 1) are unaffected.
 
+### event.metadata.json Child-Index Contract
+
+Context:
+- Applies to any feature that reads, writes, or scans per-file metadata storage in AutoIngest.
+
+Rule:
+- `event.json` is the master event manifest — always authoritative, must remain slim.
+- `event.metadata.json` is the companion child file, keyed by `event.json.metadataIndex`. The child is valid ONLY because the parent points to it.
+- If `eventId` is present in both files, they must match. Legacy events without `eventId` skip this check entirely.
+- The child file must NEVER be read during home screen load or background scans. Read it only on explicit user-initiated operations (sync, metadata modal).
+- Keyword deduplication storage: store keyword details ONCE in `event.metadata.json.keywords[keywordId]`; each file record carries only `externalKeywordIds[]` (no repeated full keyword objects per file).
+
+Avoid:
+- Reading `event.metadata.json` during `renderHome`, background `scanPendingEvents`, or any polling path.
+- Treating `event.metadata.json` as authoritative if `event.json.metadataIndex` does not point to it.
+- Duplicating full keyword objects in every file record instead of referencing by ID.
+
+Validation:
+- Confirm `event.metadata.json` is read only in explicit sync or modal paths.
+- Confirm `event.json.metadataIndex` exists before trusting the child file.
+- Confirm eventId consistency check is skipped for legacy events that lack it.
+
+### Write-Order Guarantee for Two-File Atomic Updates
+
+Context:
+- Applies to `_writeMetadataAndEventJson` and any operation that must update both `event.metadata.json` and `event.json` in a single logical operation.
+
+Rule:
+- Write the CHILD file first (`event.metadata.json`, using tmp→rename).
+- Update the PARENT second (`event.json` — set `metadataIndex` + `lastMetadataSync`, using tmp→rename).
+- If the child write fails: parent is untouched, system is fully consistent; retry is safe.
+- If the parent update fails after child succeeds: child data is safe; next sync can recover by re-running.
+- NEVER reverse this order.
+
+Avoid:
+- Writing `event.json` first — if the child write then fails, the parent claims sync succeeded while the child is missing or corrupt.
+- Non-atomic writes for either file — always use tmp→rename.
+
+Validation:
+- Confirm child write is the first file operation in the function.
+- Confirm parent write is conditional on child write succeeding.
+- Confirm both writes use the tmp→rename atomic pattern.
+
+### RAW Peer Is Canonical File Identity Key
+
+Context:
+- Applies to `_findRawPeer` and any function that keys per-file records in `event.metadata.json.files`.
+
+Rule:
+- Use the RAW peer file (CR2, NEF, ARW, DNG, etc.) as the file key where possible. Fall back to the XMP path only if no RAW peer exists.
+- Use `fsp.access()` for cheap existence check — do not read file content.
+- Try common RAW extensions in both lowercase and uppercase.
+- When looking up existing file entries after migration, check BOTH `files[relPath]` (RAW key) AND `files[xmpRelPath]` (XMP key) because migrated data may use the old XMP keys.
+
+Avoid:
+- Keying file records by XMP sidecar path as the canonical key — XMP files can be regenerated and are not the archived asset.
+- Using `fsp.stat()` or reading file content for peer detection — `fsp.access()` is sufficient.
+
+Validation:
+- Confirm RAW peer is attempted before XMP fallback.
+- Confirm both lowercase and uppercase extensions are tried.
+- Confirm legacy XMP-keyed entries are found when both key lookups are performed.
+
+### Auto-Migration Pattern for Storage Schema Upgrades
+
+Context:
+- Applies to any migration from `event.json.fileMeta` (old per-file metadata format) to `event.metadata.json` (new companion file format), and generalizes to future schema migrations.
+
+Rule:
+- Detect migration needed in `scanPendingEvents`: `doc.fileMeta && !doc.metadataIndex` → reason `migration-needed`.
+- Perform migration inside `syncEventMetadata`, before the actual sync, on first "Update Metadata" click — not eagerly on app startup.
+- Build the initial `event.metadata.json` from old `fileMeta` data; merge new sync results on top in the same pass.
+- After successful write: delete `fileMeta` from `event.json`, add `metadataIndex`.
+- Migration must be idempotent: running twice must not duplicate entries.
+
+Avoid:
+- Migrating on app startup (blocks launch, risks partial migration under load).
+- Running migration and new sync as separate phases — they must be a single atomic two-file write.
+- A non-idempotent migration that can double-write entries on retry.
+
+Validation:
+- Confirm an event with `fileMeta && !metadataIndex` appears in the pending list with reason `migration-needed`.
+- Confirm after successful migration and sync: `fileMeta` is absent from `event.json`, `metadataIndex` is present.
+- Confirm running the sync a second time produces no duplicate keyword entries.
+
+### scanPendingEvents — Extended Pending Reasons and never-synced XMP Gate
+
+Context:
+- Extends the existing `scanPendingEvents Error Priority Order` rule with new reason codes and a required gate for the `never-synced` reason.
+
+Rule:
+- Complete priority order (highest to lowest):
+  1. `sync-error`: `doc.lastMetadataSyncError` present (regardless of `lastMetadataSync`)
+  2. `migration-needed`: `doc.fileMeta && !doc.metadataIndex`
+  3. `metadata-index-missing`: `doc.metadataIndex.status === 'missing'`
+  4. `metadata-index-mismatch`: `doc.metadataIndex.eventId !== doc.eventId` (when both present)
+  5. `never-synced`: no `doc.lastMetadataSync` AND the event has at least one XMP sidecar (`_hasXmpModifiedAfter(dir, 0, 0)`)
+  6. `xmp-changed`: XMP mtime newer than resolved sync timestamp
+  7. Not pending
+- `never-synced` MUST be gated on XMP presence. Without this gate, empty events with no sidecar files flood the pending list on every home screen load.
+
+Avoid:
+- Emitting `never-synced` for an event that has no XMP files.
+- Placing `migration-needed` after `never-synced` — migration must be resolved before sync state is evaluated.
+- Skipping the mismatch check when both `event.json.eventId` and `metadataIndex.eventId` are present.
+
+Validation:
+- Confirm an empty event (no XMP files, no prior sync) does NOT appear in the pending list.
+- Confirm an event with `fileMeta && !metadataIndex` appears with reason `migration-needed`.
+- Confirm `metadata-index-mismatch` fires when both eventIds are present and differ.
+- Confirm the existing `sync-error` priority (checked first, always) is unchanged.
+
 ### Documentation Follow-Up
 
 Context:
