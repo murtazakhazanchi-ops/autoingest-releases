@@ -331,6 +331,29 @@ Validation:
 - Add a log of `typeof path` and the path value at the persistence function entry to rule out EISDIR.
 - After the fix, open `event.json` directly and confirm the expected fields are present.
 
+### Async Race with Polling State — "Value Missing After Await"
+
+Context:
+- Applies when a post-import, post-async, or post-IPC handler uses a module-level renderer variable (e.g., `activeSource`, `_csqSourceRoot`, `activeMaster`) and the value is missing, null, or wrong even though it was set correctly before the async call.
+
+Rule:
+- Background polling loops (e.g., `renderExtDrives`) can mutate or null module-level renderer variables during any `await`. The variable may be correct before the await and wrong after it, with no explicit code change in between.
+- When a post-async flow produces wrong or missing state: check whether the affected variable is a module-level variable that any polling loop can write. If yes, the root cause is an async race — not a logic error in the post-async handler itself.
+- The canonical fix is to capture the value synchronously before the first `await` in the import/async path and pass it forward explicitly.
+
+Specific signal: `_csqSourceRoot` set from `activeSource?.path` after an await = unsafe. If `renderExtDrives` polling fired during the await and set `activeSource = null`, `_csqSourceRoot` will be `undefined`, causing every `realpath` containment check to fail with "Path outside source root" for entirely valid files.
+
+Avoid:
+- Treating "wrong value after await" as a logic bug in the post-async handler before checking whether a polling loop mutated the variable during the await.
+- Re-reading module-level state after an await and assuming it still reflects pre-await intent.
+- Removing the containment check to fix the false failure — always fix at the capture site instead.
+
+Validation:
+- Confirm the affected variable is module-level and writable by a polling loop.
+- Confirm the value is captured before the first `await` in the relevant async path.
+- Confirm the captured value is passed forward explicitly and not re-read from the module-level variable after the await.
+- Confirm the containment check remains unchanged.
+
 ## Validation Checklist
 
 Before debugging, read:

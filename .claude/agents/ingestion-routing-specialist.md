@@ -274,6 +274,31 @@ Validation:
 - Confirm `'local-folder'` takes the non-ejectable path (e.g., Exit to Home).
 - Confirm no Quick Import special-casing was added where `activeSource.type` already provides the distinction.
 
+### Capture Import-Time Source Root Before First Await
+
+Context:
+- Applies to any post-import flow that needs `activeSource.path` (or any other module-level source variable) for cleanup, containment validation, summary display, or eject logic.
+
+Rule:
+- `activeSource` is a module-level renderer variable that `renderExtDrives` polling can null during any `await`. If `activeSource.path` was assigned from a dialog-selected sub-folder (not a drive mountpoint), polling will falsely detect a disconnect on every cycle and set `activeSource = null`.
+- The import-time source root must be captured synchronously BEFORE the first `await` in the import path (e.g., `const _importCleanupRoot = activeSource?.path || null`).
+- Pass the captured root explicitly to any post-import function that needs it (e.g., `showProgressSummary(summary, _importCleanupRoot)`).
+- Do not re-read `activeSource?.path` after an await and use it as the cleanup root.
+
+Guard relaxation: when a captured fallback is added, update any early-return guards from `if (!activeSource) return` to `if (!activeSource && !capturedFallback) return` so the post-import summary still appears when polling has transiently cleared `activeSource` during the async call.
+
+Avoid:
+- Deriving the cleanup source root from `activeSource?.path` after any await.
+- Using the current UI folder context (e.g., `currentFolderContext.path`) as the cleanup root.
+- Weakening or removing the `realpath` containment check to fix false failures — the fix belongs at the capture site, not the check site.
+
+Validation:
+- Confirm `activeSource?.path` is captured synchronously before the first `await` in both Event Import and Quick Import paths.
+- Confirm the captured value (not the live module variable) is passed to `showProgressSummary`.
+- Confirm the early-return guard uses `!activeSource && !capturedFallback`.
+- Confirm the `realpath` containment check in `files:deleteFromSource` is unchanged.
+- Confirm cleanup succeeds for an external drive selected via dialog (sub-folder path, not mountpoint).
+
 ### Error Handling
 
 Context:

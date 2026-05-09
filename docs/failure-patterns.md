@@ -413,6 +413,38 @@ UI / IPC
 
 ---
 
+## 16. "Path Outside Source Root" on Cleanup After External Drive Import
+
+### Primary Layer
+INGEST / STATE
+
+### Likely Contract Violations
+- INGEST:PARTIAL_EXECUTION
+- STATE:DESYNC
+
+### Symptoms
+- Cleanup button visible but every file deletion fails with "Path outside source root"
+- Only occurs after importing from a dialog-chosen sub-folder of an external drive (e.g. `/Volumes/DRIVE/Photos`)
+- Does not occur when importing from a memory card or a local folder
+
+### Likely Causes
+- `activeSource` is a module-level renderer variable
+- `renderExtDrives` polling nulls `activeSource` when its `.path` (a sub-folder) is not found among polled drive mountpoints
+- If this fires during the `commitImportTransaction` await, the post-import summary reads `activeSource?.path` as null
+- `_csqSourceRoot` is set to null; the `realpath` containment check in `files:deleteFromSource` then rejects every source file as outside the root
+
+### First Check
+- Check whether `activeSource` is null at the time `showProgressSummary` is called (add a log before the call)
+- Confirm `activeSource.path` is a sub-folder path, not a drive mountpoint
+
+### Fix
+- Capture `_importCleanupRoot = activeSource?.path` synchronously before the first `await` in the import path
+- Pass it to `showProgressSummary(summary, _importCleanupRoot)` as the second argument
+- Change the early-return guard from `!activeSource` to `!activeSource && !_importCleanupRoot`
+- See `docs/system-contracts.md` Section 4 — Cleanup Root Capture Rule
+
+---
+
 ## Usage Rule
 
 This file is a guide, not a shortcut.

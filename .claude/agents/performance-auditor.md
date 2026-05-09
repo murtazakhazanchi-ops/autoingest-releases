@@ -337,6 +337,55 @@ Validation:
 - Confirm `currentFolderContext`, sidebar highlight, breadcrumb, and selection state are all set synchronously before the first `await` when `_startMediaScan` is called from a folder-click.
 - Confirm selection fields are cleared when switching folders or view modes.
 
+### Early-Exit Stat Walk for Lightweight Change Detection
+
+Context:
+- Applies to any background scan that only needs to know whether ANY file in a subtree was modified after a given timestamp (e.g., XMP sidecar change detection in a sync service).
+
+Rule:
+- Use an early-exit recursive stat walk rather than collecting all matching paths first.
+- Implementation shape:
+  - `fsp.readdir({ withFileTypes: true })` to avoid an extra stat per entry.
+  - `fsp.stat(full)` called only on files with the target extension (e.g., `.xmp`).
+  - Return `true` immediately on the first file whose `mtimeMs > threshold`. Do not continue the walk.
+  - Wrap each per-file `stat` in try/catch and skip on error — the file may disappear between `readdir` and `stat`.
+  - Enforce a depth cap (e.g., 8) to prevent runaway recursion on unexpected deep structures.
+- This is significantly more efficient for archives where most events have not changed since the last check.
+
+Avoid:
+- Collecting all matching paths into an array before checking timestamps — this reads the entire subtree before a single mtime is evaluated.
+- Letting a `stat` error on one file abort the entire walk.
+- Omitting a depth cap on a recursive directory walk.
+
+Validation:
+- Confirm the function returns `true` on the first modified file without continuing the walk.
+- Confirm a directory with no modified files returns `false` after visiting the whole tree.
+- Confirm a `stat` error on a single file does not throw and does not abort the walk.
+- Confirm the depth cap prevents unbounded recursion.
+
+### Fire-and-Forget Background Scan Busy Guard
+
+Context:
+- Applies when calling a slow IPC operation from a sync render function (e.g., `renderHome` triggering a pending-events scan), where overlapping calls must collapse without queuing.
+
+Rule:
+- Declare a module-level boolean guard (e.g., `_msScanBgBusy`).
+- In the async function: return early if the guard is already `true`; set it `true`; use try/finally to reset it on completion or error.
+- Call the async function without `await` from the sync trigger (fire-and-forget).
+- Store only lightweight primitive results from the scan (count, boolean) — never cache full event.json objects.
+- This pattern collapses overlapping calls to at most one in-flight call. It does NOT prevent re-entry after the previous call completes — that is intentional so the count stays fresh on each trigger.
+
+Avoid:
+- Queuing overlapping calls instead of collapsing them — the pending count only needs to reflect the latest scan result.
+- Storing full event objects or keyword arrays as the background scan result.
+- Using a try/catch without finally to reset the guard — a thrown error would permanently lock the guard.
+
+Validation:
+- Confirm a second call while one is in-flight returns immediately without starting a second IPC request.
+- Confirm the guard is reset in both success and error paths (try/finally).
+- Confirm re-entry is allowed after the first call completes.
+- Confirm only scalar results (count, boolean) are stored from the scan.
+
 ### Startup / Window Lifecycle Performance
 
 Context:

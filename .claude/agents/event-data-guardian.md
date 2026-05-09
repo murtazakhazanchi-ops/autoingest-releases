@@ -291,6 +291,45 @@ Validation:
 - Confirm the writer uses the tmp/rename atomic pattern.
 - After a successful operation, inspect `event.json` directly to verify the expected fields were written.
 
+### Per-Event Concurrency Lock Before Writing event.json in a Sync Service
+
+Context:
+- Applies to any service that processes multiple events concurrently and writes results to `event.json` (e.g., `metadataSyncService`, future batch processors).
+
+Rule:
+- Maintain a `_activeSyncs = new Map()` keyed by event folder path at module level.
+- Before beginning any write operation for an event, check the Map. If an entry exists for that event, abort the new request silently.
+- Remove the entry in all exit paths: success, error, and abort.
+- This prevents two concurrent service calls from racing on the tmp→rename write for the same `event.json`.
+
+Avoid:
+- Processing the same event concurrently with no coordination.
+- Using a single boolean flag to represent all in-progress events — per-event granularity is required.
+- Assuming IPC serialization eliminates the race — multiple renderer calls can queue before the first write completes.
+
+Validation:
+- Confirm the Map is checked before any write begins.
+- Confirm the Map entry is removed in all exit paths.
+- Confirm a second call for the same in-progress event is skipped without error.
+
+### IPC Result Field Initialization Must Match Runtime Type
+
+Context:
+- Applies whenever an IPC handler initializes a result object before a try/catch block that may overwrite it on success (e.g., `keywords:loadRegistry`, any handler with a `result.base` or `result.data` field).
+
+Rule:
+- Initialize result fields to match their success-path runtime type, not to a different container type that happens to have a safe-looking fallback.
+- If the success path writes `result.base = { groups: [], keywords: [] }`, initialize as `result.base = { groups: [], keywords: [] }` — not `result.base = []`.
+- A mismatch (e.g., initializing as `[]` but writing `{ groups, keywords }` on success) produces fragile fallback semantics: callers that never trigger success will read the wrong type, and partial results may silently produce wrong behavior.
+
+Avoid:
+- Initializing an IPC result field to `[]` when the success path assigns an object, or to `null` when the success path assigns an array.
+- Relying on callers to handle the mismatched initialization type via defensive optional chaining.
+
+Validation:
+- Confirm the type of the initialized value matches the type written in the success branch.
+- Confirm the caller reads a consistently-typed field regardless of whether the IPC call succeeded or failed.
+
 ### Documentation Follow-Up
 
 Context:

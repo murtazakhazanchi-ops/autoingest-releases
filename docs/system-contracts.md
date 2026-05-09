@@ -89,6 +89,14 @@ When deleting source files after import, validation must run in this exact order
 
 `copyVerified: true` is set on a `copiedFiles` entry only after `verifyFile()` passes during the copy phase. Skipped or failed entries never carry `copyVerified`. Entries without `copyVerified` (legacy in-memory entries) fall through to the blocking path (step 7).
 
+### Cleanup Root Capture Rule
+
+`sourceRoot` supplied to the cleanup summary MUST be captured from `activeSource.path` synchronously before the first `await` in the import path (Event Import and Quick Import). It must NOT be read from `activeSource` at post-import summary time.
+
+Rationale: `renderExtDrives` polling runs on a fixed interval and may set `activeSource = null` during any `await` (e.g., `commitImportTransaction`). If `sourceRoot` is resolved after that await, it will be null or undefined, causing the containment check in `files:deleteFromSource` to fail with "Path outside source root" for entirely valid imported files.
+
+The early-return guard in each import path must be `!activeSource && !_importCleanupRoot` — not `!activeSource` alone — so the post-import summary can proceed even when polling has transiently cleared `activeSource`.
+
 ### MUST NOT
 
 - Duplicate processing

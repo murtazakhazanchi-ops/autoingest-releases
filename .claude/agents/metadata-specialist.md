@@ -224,6 +224,147 @@ Validation:
 - Confirm ExifTool arguments are passed safely.
 - Confirm written metadata can be read back correctly.
 
+### Bridge/XMP Sync Is Input-Only — Identity Fields Must Never Be Applied
+
+Context:
+- Applies to any XMP sidecar reader, Bridge TXT importer, or external metadata sync service that reads keywords from third-party tools.
+
+Rule:
+- External keyword sources (Bridge TXT, XMP sidecars) are input-only for keyword enrichment.
+- Keywords that correspond to AutoIngest identity fields (event type, location, city, country) must be stored as `skippedConflicts` in `metadataDrift`, not applied to `effectiveKeywords`.
+- `autoKeywords` (AutoIngest-derived) always take precedence. Conflicts with external sources must never silently replace identity data.
+- Accepted external keywords land in `externalKeywords`; unknown ones land in `unknownKeywords`.
+
+Avoid:
+- Applying event type, location, city, or country keywords from Bridge/XMP to the effective keyword set.
+- Overwriting AutoIngest identity keywords with external values of the same conceptual field.
+- Treating all external keywords as equal enrichment — identity-conflicting ones require explicit conflict tracking.
+
+Validation:
+- Confirm keywords that match identity fields are written to `metadataDrift.skippedConflicts`, not `effectiveKeywords`.
+- Confirm `autoKeywords` are unchanged after a Bridge/XMP sync.
+- Confirm `externalKeywords` contains only non-conflicting enrichment.
+
+### Per-Event Concurrency Lock for Sync Service
+
+Context:
+- Applies to `metadataSyncService` or any service that writes to `event.json` for multiple events concurrently.
+
+Rule:
+- Maintain a `_activeSyncs = new Map()` (keyed by event folder path) at service module level.
+- Before running a sync for an event, check the Map. If the event is already being synced, abort the new request.
+- Remove the entry from the Map after the sync completes or fails.
+- This prevents concurrent writes to the same `event.json` without requiring a cross-process lock.
+
+Avoid:
+- Allowing two sync calls for the same event to proceed in parallel and race on the tmp→rename write.
+- Using a boolean flag shared across all events — each event needs its own lock entry.
+
+Validation:
+- Confirm the Map is checked before beginning any sync.
+- Confirm the Map entry is removed in all exit paths (success, error, abort).
+- Confirm a second sync call for the same event while the first is running is silently skipped.
+
+### Idempotent Keyword Merge via Set-Dedup on Normalized Label
+
+Context:
+- Applies to `_mergeSyncResult()` and any function that merges or appends keywords into an event's keyword arrays.
+
+Rule:
+- Keyword merge must use a Set deduplication on the lowercased label before writing. Never append a keyword whose normalized label already exists in the target array.
+- This ensures the operation is idempotent: running the same sync twice produces the same keyword set, not a doubled set.
+- The deduplication key is `keyword.label.toLowerCase()` (or equivalent normalized form), not the full keyword object.
+
+Avoid:
+- Appending keywords to an array without checking for existing labels — causes keyword duplication on each sync run.
+- Using object-identity comparison for dedup instead of normalized label comparison.
+
+Validation:
+- Run the same sync twice and confirm keyword arrays have no duplicates.
+- Confirm the deduplication key is the normalized label, not object reference.
+
+### ExifTool Pool Must Not Be Duplicated for Read-Only Operations
+
+Context:
+- Applies whenever a new service or module needs to read EXIF/XMP metadata from files in the main process.
+
+Rule:
+- Do not create a second ExifTool instance for read-only tag reads.
+- Add a `readFileTags(filePath, tags)` export to `exifService.js` that delegates to the existing shared pool (`maxProcs: 2`).
+- All callers — metadata writes, metadata reads, sync services — must share the same pool.
+- Creating a second ExifTool instance doubles startup cost, memory, and process count for no benefit.
+
+Avoid:
+- Instantiating `new ExifTool(...)` in any module other than `exifService.js`.
+- Passing an ExifTool instance across module boundaries instead of exporting a function from the service.
+
+Validation:
+- Confirm only one ExifTool instance exists in the main process at runtime.
+- Confirm read-only callers use the exported `readFileTags()` function from `exifService`.
+- Confirm the pool's `maxProcs` value is unchanged.
+
+### Atomic Sync Write Must Include `lastMetadataSync` Timestamp
+
+Context:
+- Applies to any sync service that writes keyword or metadata results to `event.json` and relies on a timestamp to determine if re-sync is needed.
+
+Rule:
+- After a successful sync, write `doc.lastMetadataSync = new Date().toISOString()` and `doc.updatedAt = Date.now()` in the same atomic tmp→rename write that writes the keyword arrays.
+- `scanPendingEvents()` uses `lastMetadataSync` to decide whether an event needs re-syncing. If the timestamp is not written atomically with the data, a partial write could leave events in a perpetually-stale state.
+- Never write the timestamp in a second separate `writeFile` call.
+
+Avoid:
+- Writing keyword arrays and `lastMetadataSync` in two separate file operations.
+- Using non-atomic `fsp.writeFile` for any `event.json` mutation (tmp→rename is always required).
+- Omitting `updatedAt` from the same write.
+
+Validation:
+- Confirm `doc.lastMetadataSync` and `doc.updatedAt` are set before the tmp→rename write.
+- Confirm `event.json` after a successful sync contains both fields.
+- Confirm `scanPendingEvents` returns the synced event as not-pending after the write.
+
+### scanPendingEvents Error Priority Order
+
+Context:
+- Applies to any function that classifies events as pending for metadata sync (e.g., `scanPendingEvents`).
+
+Rule:
+- `lastMetadataSyncError` takes priority over all other pending reasons, regardless of whether `lastMetadataSync` exists.
+- Classification priority order must be:
+  1. If `doc.lastMetadataSyncError` exists → reason `'sync-error'` (stop; do not proceed to XMP check)
+  2. Else if no `doc.lastMetadataSync` → reason `'never-synced'`
+  3. Else → check XMP mtime → reason `'xmp-changed'` or not pending
+- Checking `lastMetadataSyncError` only when `!doc.lastMetadataSync` silently hides failures for events that were previously synced successfully and then re-failed.
+
+Avoid:
+- Nesting the error check inside a `!lastMetadataSync` branch.
+- Treating `'xmp-changed'` as the reason when a sync error is present on the doc.
+
+Validation:
+- Confirm an event that succeeded, then failed on re-run, appears in the pending list with reason `'sync-error'`.
+- Confirm an event that succeeded and has no new XMP changes is not pending.
+- Confirm the three-step priority order is always respected.
+
+### Atomic Sync Error and Success Pair
+
+Context:
+- Applies to the sync service write at the end of a successful sync and the error write at the end of a failed sync.
+
+Rule:
+- When a sync succeeds: `delete doc.lastMetadataSyncError` and `doc.lastMetadataSync = new Date().toISOString()` must be in the same atomic tmp→rename write. They must never be split across two separate writes.
+- When a sync fails: persist `lastMetadataSyncError: { message, at }` atomically (best-effort, inner try/catch). If this write fails, the event will appear as `'never-synced'` or `'xmp-changed'` on the next scan — this is acceptable.
+- Never leave `lastMetadataSyncError` on a doc after a successful sync.
+
+Avoid:
+- Writing `lastMetadataSync` in one atomic write and deleting `lastMetadataSyncError` in a separate write.
+- Omitting `delete doc.lastMetadataSyncError` from the success write path.
+- Letting a failed error-persist crash the calling sync operation.
+
+Validation:
+- Confirm `event.json` after a successful sync contains `lastMetadataSync` and does NOT contain `lastMetadataSyncError`.
+- Confirm `event.json` after a failed sync contains `lastMetadataSyncError` with `message` and `at` fields.
+- Confirm the error field is absent after a subsequent successful sync.
+
 ### Documentation Follow-Up
 
 Context:

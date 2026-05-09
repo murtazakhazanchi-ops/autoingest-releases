@@ -17,6 +17,31 @@ Rules:
 
 ---
 
+### 2026-05-08 — v0.8.8 Source Cleanup Race Fix
+
+Task type:
+- Bug Fix / Ingestion / Async Safety / Renderer State
+
+What happened:
+- Source Cleanup was falsely rejecting legitimate imported files with "Path outside source root".
+- Root cause: `activeSource` is a module-level renderer variable that `renderExtDrives()` polling can null during any `await`. When the user selects an external drive via the dialog button, `activeSource.path` is the chosen sub-folder (e.g. `/Volumes/HITACHI/Photos`), which never matches a polled `c.mountpoint` (the drive root). So polling falsely treats the drive as disconnected and sets `activeSource = null` on every cycle.
+- If this fires during the long `commitImportTransaction` or `importFiles` await, the post-import handler finds `activeSource = null`. Either the early-return guard fires (cleanup never offered) or `activeSource?.path` resolves to `undefined` and `_csqSourceRoot` is set to `undefined`, making every `realpath` containment check fail.
+- Fix: capture `activeSource?.path` synchronously before the first `await` in both import paths; pass it to `showProgressSummary` as `importCleanupRoot`; relax guard from `if (!activeSource) return` to `if (!activeSource && !_importCleanupRoot) return`.
+
+Reusable lessons:
+1. **Capture volatile state before first await**: Any module-level variable that background polling can mutate must be captured synchronously before the first `await` in a long async flow. The captured value is the source of truth for all downstream use — do not re-read the module variable after an await and assume it still reflects import-time state.
+2. **Stable source root for post-import cleanup**: The cleanup containment root must come from import-time state, not from current UI/source state. Current state can change (polling, drive disconnect, folder navigation) between import start and import completion.
+3. **Guard relaxation pattern**: When a captured fallback is added, update guards from `if (!primaryVar) return` to `if (!primaryVar && !capturedFallback) return` so that the post-import summary is still shown when polling transiently clears the live variable.
+
+Promote to agents:
+- `contract-debugger.md` — async race with polling state as a debugging pattern
+- `ingestion-routing-specialist.md` — capture-before-await rule for post-import cleanup root
+
+Status:
+- Promoted
+
+---
+
 ### 2026-05-02 — Release v0.8.1 Preparation
 
 Task type:
@@ -742,6 +767,96 @@ Common failure modes:
 Promote to agents:
 - ui-system-specialist.md (lessons 1–5: flag-gated UX, two-place cleanup, mutation order, ejectBtn delegation)
 - ingestion-routing-specialist.md (lesson 4: resetAppState event destruction; lesson 6: activeSource.type dispatch)
+
+Status:
+- Promoted
+
+---
+
+### 2026-05-09 — Metadata Sync MVP
+
+Task type:
+- Feature / Metadata / Persistence / IPC / UI / Data Model
+
+What happened:
+
+New `metadataSyncService.js` reads XMP sidecar keywords and Bridge TXT keyword registries, merges them into `event.json` per-file metadata fields, and exposes 6 IPC handlers wired through `preload.js`. A clickable system overview tile and modal were added to the renderer.
+
+Key architectural decisions and contracts:
+
+1. **Bridge/XMP is input-only — identity fields are never overwritten.** Event type, location, city, and country keywords from Bridge/XMP must be stored as `skippedConflicts` if they differ from AutoIngest identity. They are never applied.
+
+2. **Four per-file metadata fields on event.json.** Each file record carries `autoKeywords`, `externalKeywords`, `unknownKeywords`, `effectiveKeywords`, plus `metadataDrift.removedInExternalTool` and `metadataDrift.skippedConflicts`.
+
+3. **Per-event concurrency lock via `_activeSyncs` Map.** Before writing a sync result, check the Map. If the event is already being synced, abort. This guards against concurrent writes to the same `event.json`.
+
+4. **Idempotent merge: Set-dedup on lowercased label.** `_mergeSyncResult()` uses a Set to deduplicate by lowercased label before writing. Never append a keyword that already exists by label.
+
+5. **ExifTool pool must not be duplicated for read-only operations.** Add a `readFileTags()` export to `exifService` so the existing pool (`maxProcs: 2`) is shared. Do not create a second ExifTool instance.
+
+6. **Atomic write with `lastMetadataSync` timestamp.** After a successful sync, always write `doc.lastMetadataSync = new Date().toISOString()` and `doc.updatedAt = Date.now()` in the same atomic tmp→rename write. `scanPendingEvents` uses `lastMetadataSync` to determine if re-sync is needed.
+
+7. **Clickable overview tile pattern.** Uses `ov-tile ov-tile--action` + `role="button" tabindex="0"` + both `click` and `keydown` (Enter/Space) listeners. The modal follows `emm-overlay/emm-box/emm-topbar/emm-header/emm-footer` structure.
+
+8. **Additional Keywords routing scope contract.** Scope must be `"event"` only when the tag applies to all files in the event; `"group"` or `"component"` for narrower scope. appliedAs values: `"additionalEventKeyword"`, `"additionalGroupKeyword"`, `"additionalComponentKeyword"`.
+
+9. **Bridge TXT import: append-only, no auto-rename/merge/delete.** Only append new entries. Duplicate labels under different paths are allowed. Always preview before applying.
+
+10. **Registry layering: `data/keywords.registry.json` (base) + `userData/keywords.override.json` (user extension).** Both are merged at load time; override takes precedence. Never modify the base registry at runtime.
+
+Reusable lessons:
+
+1. Bridge/XMP data is input-only for keyword enrichment; identity fields (event type, location, city, country) must be stored as `skippedConflicts`, not applied.
+2. Per-event concurrency lock (`_activeSyncs` Map) guards event.json against concurrent write races in a sync service.
+3. Idempotent keyword merge requires Set-dedup on normalized (lowercased) label, not append-always.
+4. ExifTool read-only operations must reuse the existing pool via a new export, never create a second instance.
+5. `lastMetadataSync` timestamp belongs in the same atomic write as the sync result — it is the signal for `scanPendingEvents`.
+6. Registry layering: a base registry file (read-only at runtime) + a user override file merged at load. Override wins.
+7. Bridge TXT import is append-only: no rename, no merge, no delete. Preview before apply.
+8. Scope contract for Additional Keywords: `"event"` only when the keyword applies to all files; narrower scope uses `"group"` or `"component"`.
+
+Promote to agents:
+- `metadata-specialist.md` — lessons 1, 2, 3, 4, 5 (sync service contracts: input-only Bridge, concurrency lock, idempotent merge, ExifTool pool reuse, atomic sync timestamp)
+- `event-data-guardian.md` — lesson 2 (per-event concurrency lock prevents concurrent event.json writes)
+- `ui-system-specialist.md` — lesson 7 (clickable overview tile pattern with role=button and dual keyboard listener)
+
+Lessons NOT promoted (too specific / belong in feature doc):
+- Registry layering detail (doc-level contract, not a recurring agent-level mistake)
+- Bridge TXT append-only rule (feature-specific policy, not a reusable architectural pattern beyond metadata-specialist)
+- Additional Keywords scope contract (feature-specific; already encapsulated in event-data-guardian's source-of-truth rule)
+
+Status:
+- Promoted
+
+---
+
+### 2026-05-09 — Metadata Sync Phase 1B Stabilization
+
+Task type:
+- Metadata / Persistence / IPC / Filesystem / Debugging
+
+What happened:
+
+Five stabilization bugs were fixed in the metadata sync service after the Phase 1 MVP was shipped:
+
+1. `scanPendingEvents` was checking `lastMetadataSyncError` only when `!doc.lastMetadataSync`. A re-run failure after a prior success set the error field but the event never appeared in the pending list — it silently appeared as `'xmp-changed'` or not pending at all.
+2. The XMP-change detection helper was walking the full subtree to collect matching paths before checking mtimes. Replaced with an early-exit stat walk that returns on the first modified `.xmp` file found.
+3. `renderHome` called the pending-scan IPC without any busy guard, triggering overlapping calls on fast navigation.
+4. `keywords:loadRegistry` initialized `result.base = []` (array) but overwrote it with `{ groups, keywords }` on success, creating a type mismatch between initialization and runtime shape.
+5. On a failed sync, `lastMetadataSyncError` was written correctly, but on a subsequent successful sync, `delete doc.lastMetadataSyncError` was in a separate write from `lastMetadataSync`. Error clearing and success timestamp must be a single atomic write.
+
+Reusable lessons:
+
+1. **`scanPendingEvents` error priority**: `lastMetadataSyncError` must be checked first, regardless of whether `lastMetadataSync` exists. Priority order: `sync-error` → `never-synced` → XMP mtime check → not pending.
+2. **Early-exit stat walk for change detection**: When only the existence of a single modified file is needed, use an early-exit recursive stat walk — call `fsp.stat` only on target files, return `true` immediately on first match, cap depth, skip `stat` errors without crash.
+3. **Fire-and-forget background scan busy guard**: Module-level boolean guard + try/finally reset collapses overlapping background IPC calls. Store only lightweight primitive results (count, boolean). Do not queue — do not prevent re-entry after completion.
+4. **IPC result initialization must match success-path type**: If a result field is `{ groups, keywords }` on success, initialize it as `{ groups: [], keywords: [] }`, not `[]`. Mismatched initialization type produces fragile fallback semantics.
+5. **Atomic sync error/success pair**: Clearing `lastMetadataSyncError` and writing `lastMetadataSync` must be a single atomic tmp→rename write. Never split them. Error persistence on failure is best-effort (inner try/catch) — if it fails the event appears as `never-synced` or `xmp-changed`, which is acceptable.
+
+Promote to agents:
+- `metadata-specialist.md` — lessons 1, 5 (scanPendingEvents priority order; atomic error/success pair)
+- `performance-auditor.md` — lessons 2, 3 (early-exit stat walk; fire-and-forget busy guard)
+- `event-data-guardian.md` — lesson 4 (IPC result initialization type must match runtime type)
 
 Status:
 - Promoted

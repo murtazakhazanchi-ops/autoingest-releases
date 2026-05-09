@@ -904,6 +904,44 @@ Validation:
 - Confirm the progress modal (or any blocking overlay) is closed before `ejectBtn.click()` fires.
 - Confirm the eject confirmation modal renders correctly and the full 4-phase eject completes.
 
+### Clickable Overview Tile Pattern
+
+Context:
+- Applies when adding a new actionable tile to the system overview dashboard (the `#overviewSection` tiles row), where clicking the tile opens a modal.
+
+Rule:
+- Use `class="ov-tile ov-tile--action"` on the tile element.
+- Add `role="button" tabindex="0"` for keyboard accessibility.
+- Wire both a `click` listener and a `keydown` listener that handles `Enter` and `Space` (`if (e.key === 'Enter' || e.key === ' ')`).
+- The modal opened by the tile must follow the standard `emm-overlay / emm-box / emm-topbar / emm-header / emm-footer` structure shared by all AutoIngest modals.
+- Reuse `.ov-tile` CSS; add only delta CSS for any new visual state specific to the tile.
+
+```html
+<div class="ov-tile ov-tile--action" id="ovMetadataSync"
+     role="button" tabindex="0"
+     aria-label="Open Metadata Sync">
+  <!-- tile content -->
+</div>
+```
+
+```js
+tile.addEventListener('click', openMetadataSyncModal);
+tile.addEventListener('keydown', e => {
+  if (e.key === 'Enter' || e.key === ' ') openMetadataSyncModal();
+});
+```
+
+Avoid:
+- Using a `<button>` element as a tile — it fights the existing tile sizing and glass styling.
+- Wiring only `click` without `keydown` — keyboard navigation bypasses click on non-button elements.
+- Creating a new modal structure instead of reusing `emm-overlay/emm-box/emm-topbar/emm-header/emm-footer`.
+
+Validation:
+- Confirm tile has `role="button"` and `tabindex="0"`.
+- Confirm both `click` and `keydown` (Enter/Space) open the modal.
+- Confirm the modal uses the standard `emm-*` structure.
+- Confirm no new modal layout class or overlay system was introduced.
+
 ### Light/Dark and Viewport Compatibility
 
 Context:
