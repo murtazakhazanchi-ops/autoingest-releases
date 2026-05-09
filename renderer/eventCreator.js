@@ -317,6 +317,7 @@ const EventCreator = (() => {
   let _repairMode      = false; // Phase 5: when true, form is repairing an unparseable folder
   let _repairFolderName = null; // Phase 5: original (bad) folder name being repaired
   let _newEventDate    = null;  // M7: hijri date string for new events ("YYYY-MM-DD"), null when viewing/editing
+  let _archiveEventId  = '';    // optional Archive Registry ID, persisted to event.json as eventId
   let _structureWarningPending = false; // prevents double-modal if save is triggered concurrently
   let _legacyModalOpen         = false; // prevents double-modal on fast double-click of Continue
   let _navScreen           = 'masterStep'; // 'masterStep' | 'eventList' | 'eventForm' | 'previewStep'
@@ -1951,6 +1952,18 @@ ${unparseable.map(ev => `
   </div>
   ` : ''}
 
+  <!-- Optional Archive Registry Event ID -->
+  <div class="ec-field" style="margin-top:16px">
+    <p class="ec-section-title">Archive Registry ID <span style="font-size:0.75rem;font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-muted)">— optional</span></p>
+    <input id="evArchiveEventId" type="text"
+           value="${esc(_viewingExisting?.eventId || _archiveEventId || '')}"
+           ${_viewingExisting && !_editMode ? 'disabled style="opacity:0.6"' : ''}
+           placeholder="Enter official Archive Registry ID (optional)"
+           aria-label="Archive Registry Event ID"
+           autocomplete="off" maxlength="128">
+    <span class="ec-hint">Official ID from the Archive Entry Form / Registry. Leave blank if not yet assigned.</span>
+  </div>
+
   <div class="ec-global-city">
     <p class="ec-section-title">Global City</p>
     <div id="ecGlobalCityDD"></div>
@@ -2140,7 +2153,8 @@ ${unparseable.map(ev => `
         _repairMode       = false;
         _repairFolderName = null;
         setEventState([]);
-        _newEventDate     = null;
+        _newEventDate    = null;
+        _archiveEventId  = '';
         _destroyEventDDs();
         showMasterStep();
         return;
@@ -2152,7 +2166,8 @@ ${unparseable.map(ev => `
         _editMode         = false;
         _repairMode       = false;
         _repairFolderName = null;
-        _newEventDate     = null;
+        _newEventDate    = null;
+        _archiveEventId  = '';
         setEventState([]);
         _destroyEventDDs();
         _renderEventList();
@@ -2240,6 +2255,9 @@ ${unparseable.map(ev => `
         if (id === 'evHijriYear'  && e.target.value.length === 4) document.getElementById('evHijriMonth')?.focus();
         if (id === 'evHijriMonth' && e.target.value.length === 2) document.getElementById('evHijriDay')?.focus();
         _onEvDateInput();
+      }
+      if (id === 'evArchiveEventId') {
+        _archiveEventId = e.target.value.trim();
       }
     });
 
@@ -2530,7 +2548,8 @@ ${unparseable.map(ev => `
         folderName:   buildFolderName(c, idx, allSameCity),
       }));
 
-      window.api.writeEventJson(eventFolderPath, {
+      const archiveId = document.getElementById('evArchiveEventId')?.value?.trim() || _archiveEventId || null;
+      const eventJsonPayload = {
         version:       1,
         hijriDate:     _newEventDate,
         sequence:      parseInt(seq, 10),
@@ -2541,7 +2560,16 @@ ${unparseable.map(ev => `
         status:        'created',
         createdAt:     Date.now(),
         updatedAt:     Date.now(),
-      }).then(result => {
+      };
+      if (archiveId) {
+        eventJsonPayload.eventId = archiveId;
+        eventJsonPayload.eventRegistry = {
+          system:    'archive-entry-form',
+          id:        archiveId,
+          linkedAt:  new Date().toISOString(),
+        };
+      }
+      window.api.writeEventJson(eventFolderPath, eventJsonPayload).then(result => {
         if (result?.alreadyExisted) {
           console.log('[EventCreator] event.json already existed; kept existing record:', name);
         }

@@ -2317,9 +2317,54 @@ async function _msScanBackground({ force = false } = {}) {
 }
 
 function _reasonLabel(reason, lastSyncError) {
-  if (reason === 'sync-error')  return lastSyncError ? `Previous sync error: ${lastSyncError}` : 'Previous sync had an error';
-  if (reason === 'xmp-changed') return 'XMP updated since last sync';
+  if (reason === 'sync-error')               return lastSyncError ? `Previous sync error: ${lastSyncError}` : 'Previous sync had an error';
+  if (reason === 'xmp-changed')              return 'XMP updated since last sync';
+  if (reason === 'migration-needed')         return 'Metadata index migration needed';
+  if (reason === 'metadata-index-missing')   return 'Metadata index file missing';
+  if (reason === 'metadata-index-mismatch')  return 'Metadata index ID mismatch — review required';
   return 'Never synced';
+}
+
+function _msBuildResultHtml(result) {
+  const ok = result.ok || result.success;
+  if (!ok) {
+    return `<div class="ms-result-title ms-result-title--error">Metadata Sync Failed</div>
+      <div class="ms-result-detail">${escapeHtml(result.error || 'An unknown error occurred.')}</div>`;
+  }
+
+  const xmpCount   = result.scannedXmp   ?? result.scannedFiles ?? 0;
+  const updated    = result.updatedFiles ?? result.filesUpdated ?? 0;
+  const extAdded   = result.externalKeywordsAdded ?? 0;
+  const unknownKws = result.unknownKeywordsFound  ?? 0;
+  const conflicts  = result.skippedConflicts      ?? 0;
+  const metaJsonOk = result.eventMetadataJsonUpdated !== false;
+  const evJsonOk   = result.eventJsonUpdated        !== false;
+  const elapsed    = typeof result.elapsedMs === 'number' ? ` (${result.elapsedMs}ms)` : '';
+
+  if (xmpCount === 0 && extAdded === 0 && unknownKws === 0) {
+    return `<div class="ms-result-title">Metadata Sync Complete</div>
+      <div class="ms-result-detail">No new metadata changes found${elapsed}.</div>`;
+  }
+
+  const lines = [];
+  if (xmpCount > 0) lines.push(`${xmpCount} XMP sidecar${xmpCount !== 1 ? 's' : ''} scanned`);
+  if (updated > 0)  lines.push(`${updated} file${updated !== 1 ? 's' : ''} updated`);
+  if (extAdded > 0) lines.push(`${extAdded} external keyword${extAdded !== 1 ? 's' : ''} added`);
+  if (unknownKws > 0) lines.push(`${unknownKws} unknown keyword${unknownKws !== 1 ? 's' : ''} found`);
+  if (conflicts > 0)  lines.push(`${conflicts} conflict${conflicts !== 1 ? 's' : ''} skipped`);
+
+  const statusParts = [];
+  if (metaJsonOk) statusParts.push('event.metadata.json updated');
+  if (evJsonOk)   statusParts.push('event.json metadataIndex updated');
+
+  const kwChips = Array.isArray(result.addedKeywords) && result.addedKeywords.length > 0
+    ? `<div class="ms-result-kw-list">${result.addedKeywords.map(k => `<span class="ms-result-kw-chip">${escapeHtml(k.label)}</span>`).join('')}</div>`
+    : '';
+
+  return `<div class="ms-result-title">Metadata Sync Complete</div>
+    <div class="ms-result-detail">${escapeHtml(lines.join('. '))}${elapsed}.</div>
+    ${statusParts.length ? `<div class="ms-result-status">${escapeHtml(statusParts.join(' · '))}</div>` : ''}
+    ${kwChips}`;
 }
 
 async function _msScanAndRender(masterPath) {
@@ -2374,40 +2419,54 @@ async function _msRunSync(eventFolderPath, folderName) {
   _msSyncRunning.add(eventFolderPath);
   _refreshMetadataSyncCard();
 
+  const rowEl    = document.getElementById(`ms-row-${CSS.escape(folderName)}`);
   const statusEl = document.getElementById(`ms-status-${CSS.escape(folderName)}`);
   const btn = document.querySelector(`.ms-sync-btn[data-event-path="${CSS.escape(eventFolderPath)}"]`);
+
   if (statusEl) { statusEl.textContent = 'Syncing…'; statusEl.className = 'ms-event-status ms-event-status--running'; }
-  if (btn) btn.disabled = true;
+  if (btn) { btn.textContent = 'Syncing…'; btn.disabled = true; }
+
+  // Remove any previous result panel from a prior attempt
+  rowEl?.nextElementSibling?.classList.contains('ms-result-panel') &&
+    rowEl.nextElementSibling.remove();
 
   try {
     const result = await window.api.metadataSyncSyncEvent(eventFolderPath);
-    if (result.ok) {
-      if (statusEl) {
-        statusEl.textContent = `Done — ${result.filesScanned} files scanned, ${result.filesUpdated} updated`;
-        statusEl.className   = 'ms-event-status ms-event-status--done';
+    const ok = result.ok || result.success;
+
+    if (ok) {
+      if (statusEl) { statusEl.textContent = 'Metadata Sync Complete'; statusEl.className = 'ms-event-status ms-event-status--done'; }
+      if (btn) { btn.textContent = 'Updated ✓'; btn.disabled = true; }
+
+      if (rowEl) {
+        const panel = document.createElement('div');
+        panel.className = 'ms-result-panel ms-result-panel--ok';
+        panel.innerHTML = _msBuildResultHtml(result);
+        rowEl.after(panel);
       }
-      // Remove the event from the pending count
+
       const valEl = document.getElementById('ovMetadataSyncVal');
       if (valEl) {
         const cur = parseInt(valEl.getAttribute('data-pending') || '0', 10);
         valEl.setAttribute('data-pending', String(Math.max(0, cur - 1)));
       }
     } else {
-      if (statusEl) {
-        statusEl.textContent = `Error: ${result.error || 'Unknown error'}`;
-        statusEl.className   = 'ms-event-status ms-event-status--error';
+      if (statusEl) { statusEl.textContent = `Failed — ${result.error || 'Unknown error'}`; statusEl.className = 'ms-event-status ms-event-status--error'; }
+      if (btn) { btn.textContent = 'Retry'; btn.disabled = false; }
+
+      if (rowEl) {
+        const panel = document.createElement('div');
+        panel.className = 'ms-result-panel ms-result-panel--error';
+        panel.innerHTML = _msBuildResultHtml(result);
+        rowEl.after(panel);
       }
-      if (btn) btn.disabled = false;
     }
   } catch (err) {
-    if (statusEl) {
-      statusEl.textContent = `Error: ${escapeHtml(err.message)}`;
-      statusEl.className   = 'ms-event-status ms-event-status--error';
-    }
-    if (btn) btn.disabled = false;
+    if (statusEl) { statusEl.textContent = `Error: ${escapeHtml(err.message)}`; statusEl.className = 'ms-event-status ms-event-status--error'; }
+    if (btn) { btn.textContent = 'Retry'; btn.disabled = false; }
   } finally {
     _msSyncRunning.delete(eventFolderPath);
-    _msLastBgScanAt = 0;  // invalidate throttle so next home render triggers a fresh count scan
+    _msLastBgScanAt = 0;
     _refreshMetadataSyncCard();
   }
 }
