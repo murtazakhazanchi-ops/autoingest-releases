@@ -519,6 +519,323 @@ Validation:
 - Confirm `metadata-index-mismatch` fires when both eventIds are present and differ.
 - Confirm the existing `sync-error` priority (checked first, always) is unchanged.
 
+### JPEG Files Are Canonical-Key Bearers — Never Route Through _findRawPeer
+
+Context:
+- Applies to `metadataSyncService` and any sync or preview function that determines the canonical file identity key for per-file metadata records.
+
+Rule:
+- JPEG files (.jpg, .jpeg) contain embedded IPTC/XMP keywords directly — no sidecar. Their canonical key in `event.metadata.json.files` is the JPEG relPath itself.
+- XMP sidecar files use `_findRawPeer()` to find the RAW file and key records by the RAW relPath (falling back to XMP only if no RAW peer exists).
+- Never pass a JPEG through `_findRawPeer()` — JPEG files have no RAW peer; this produces wrong keys and silently mis-stores metadata.
+- Read JPEG keywords via `readFileTags()` (existing ExifTool pool), unioning `tags.Subject`, `tags.Keywords`, and `tags.HierarchicalSubject`.
+- The routing branch must be: `if (EMBEDDED_EXTENSIONS.has(ext)) { /* use JPEG relPath as key */ } else if (ext === '.xmp') { /* findRawPeer */ }`.
+- This routing must be identical between preview and sync. If they diverge, preview will show one key and sync will write under a different key.
+
+Avoid:
+- Checking `ext === '.xmp'` as the sole gate for metadata-bearing files — omits JPEG.
+- Passing a JPEG file path to `_findRawPeer()`.
+- Routing JPEG and XMP through the same key-resolution path.
+
+Validation:
+- Confirm JPEG files are keyed by their own relPath in `event.metadata.json.files`.
+- Confirm XMP files are keyed by the RAW peer relPath (or XMP fallback).
+- Confirm `_findRawPeer()` is not called for JPEG files.
+- Confirm preview and sync use the same routing branch.
+
+### Preview Enrichment Must Be a Separate Pass — Never Modify _classifyKeywords
+
+Context:
+- Applies to `previewEventMetadata` and any future read-only preview/report function that needs to surface identity-category keywords suppressed by `_classifyKeywords`.
+
+Rule:
+- `_classifyKeywords` silently drops identity-category keywords with a `continue` — even keywords that MATCH the event's own identity value are discarded and never returned. This is correct behavior for sync; it must not be changed.
+- A preview function that wants to show users which Bridge keywords were detected but suppressed must run a SECOND pass over `foundKeywords` AFTER calling `_classifyKeywords` as-is.
+- The second pass builds `protectedIdentityMatches`: walk `foundKeywords`, look up each in the registry, check if its category is in `IDENTITY_CATEGORIES`, and attach the suppression reason (matched vs conflicted vs protected field).
+- Never add output fields to `_classifyKeywords` itself to fix preview visibility — that contaminates the sync path.
+
+Avoid:
+- Modifying `_classifyKeywords` to return identity matches alongside the normal output.
+- Skipping the second pass and leaving identity-matching keywords invisible in preview.
+- Running the second pass inside the sync path — it belongs only in the preview function.
+
+Validation:
+- Confirm `_classifyKeywords` is called unchanged in `previewEventMetadata`.
+- Confirm `protectedIdentityMatches` is built in a separate post-`_classifyKeywords` pass.
+- Confirm identity keywords that match the event value appear in `protectedIdentityMatches` in preview output.
+- Confirm the sync path (`syncEventMetadata`) is unmodified.
+
+### detectedBridgeKeywords Is the Single Source of Truth for Bridge Keyword Display
+
+Context:
+- Applies to `previewEventMetadata` and any preview UI that must show ALL keywords Bridge detected for a file, annotated by their disposition.
+
+Rule:
+- Build `detectedBridgeKeywords` by iterating ALL `foundKeywords` and annotating each with a `matchStatus`:
+  - `'will-add'` — non-identity keyword not yet in the index
+  - `'already-present'` — non-identity keyword already in the index
+  - `'protected-identity'` — identity-category keyword (suppressed by sync)
+  - `'unknown'` — label not found in the registry
+- `willAdd`, `alreadyPresent`, `skippedConflicts`, and `protectedIdentityMatches` are all subsets of `detectedBridgeKeywords`. They should be derived from the same foundation, not computed independently.
+- The Bridge section in preview UI renders from `detectedBridgeKeywords`. Other sections (Will Add, Already Present, etc.) filter from the same list.
+
+Avoid:
+- Building separate lists for Bridge display and for count summaries — they diverge and produce inconsistent previews.
+- Omitting the `'protected-identity'` match status — leaves matching identity keywords invisible to the user.
+
+Validation:
+- Confirm `detectedBridgeKeywords.length === foundKeywords.length` (one entry per detected keyword).
+- Confirm every `matchStatus` value is one of the four defined values.
+- Confirm `willAdd` items in `detectedBridgeKeywords` match the `willAdd` array.
+- Confirm identity-matching keywords appear with `matchStatus: 'protected-identity'`.
+
+### Post-Processing Map for Scan Result Enrichment
+
+Context:
+- Applies when adding a new computed field to every item returned by `scanPendingEvents` or any function that builds an array via multiple scattered `pending.push()` calls.
+
+Rule:
+- Add a single `.map()` at the end of the function to inject computed fields (e.g., `masterFolderName: path.basename(masterPath)`) rather than touching every `pending.push()` call site.
+- This pattern keeps the scan logic focused on classification and the enrichment step explicit and auditable.
+- Computed fields derived from each item's existing data (e.g., `path.basename(item.masterPath)`) are ideal candidates for post-processing map injection.
+
+Avoid:
+- Scattering computed field injection across every `pending.push()` call — adds noise to the classification logic and is easy to miss when a new push call is added later.
+- Adding enrichment inside the item-building helpers that produce the push arguments.
+
+Validation:
+- Confirm the scan function ends with a `.map()` or equivalent that injects the enrichment field.
+- Confirm adding a new pending push path (for a new reason code) automatically includes the enrichment field without additional changes.
+
+### Affected-Folder Chip List Uses Existence-Only Scan, Not Mtime Filter
+
+Context:
+- Applies to any pending-scan row that shows chips for which photographer/subfolder folders will be affected by a sync operation (e.g., `xmp-changed`, `never-synced` pending reasons).
+
+Rule:
+- Build the chip list using `_listMetadataSubfolders(eventDir)` which calls `_hasXmpModifiedAfter(full, 0, 0)` (sinceMs=0) — includes every subfolder that contains any metadata-bearing file, regardless of mtime.
+- Use the mtime-filtered `_findChangedXmpSubfolders()` ONLY for determining WHETHER an event is pending, never for determining WHICH folders to show in the chip list.
+- The preview scans all files regardless of mtime. If the chip list uses a mtime filter, it will show fewer folders than the preview processes, creating an inconsistent display.
+
+Avoid:
+- Passing the last-sync timestamp into the subfolder collection that feeds the chip list.
+- Reusing `_findChangedXmpSubfolders()` for both pending detection and chip display.
+
+Validation:
+- Confirm the chip list uses sinceMs=0 (existence-only) for subfolder collection.
+- Confirm the number of photographer chips in the pending row matches the number of folders the preview will process.
+- Confirm `_findChangedXmpSubfolders()` is still used (unchanged) for pending-event detection.
+
+### Changed/Removed Bridge Keywords Are a Pure Renderer Computation
+
+Context:
+- Applies to `_msGroupFiles()` and any preview function that must show which Bridge keywords were previously stored in `event.metadata.json` but are no longer detected by Bridge.
+
+Rule:
+- `removedKeywords` = `existingIndexedKeywords.filter(k => k.source === 'bridge')` whose lowercased label is absent from the `detectedBridgeKeywords` label set. This is computed entirely in the renderer — the backend does not need a new field or a new pass.
+- The data is already in the preview payload: `f.existingIndexedKeywords` (with source field) and `f.detectedBridgeKeywords` (with labels).
+- Include `removedKeywords` in the group change-signature so that groups that differ only in removed keywords are not merged into the same card.
+
+Avoid:
+- Assuming a "Changed / Removed" section requires a backend change — the renderer already has all necessary data.
+- Omitting `removedKeywords` from the change-signature — causes visually distinct groups to be incorrectly merged.
+
+Validation:
+- Confirm `removedKeywords` is derived from `existingIndexedKeywords` minus `detectedBridgeKeywords` in the renderer.
+- Confirm the change-signature string or hash includes the `removedKeywords` set.
+- Confirm no backend file was modified to surface removed keywords.
+
+### Summary Chip Counts Must Be Derived From Renderer Groups When Renderer Adds Computed Fields
+
+Context:
+- Applies to `_msBuildPreviewHtml()` and any preview summary chip row that reports counts of keyword categories.
+
+Rule:
+- When the renderer adds computed fields (such as `removedKeywords`) that the backend `summary` object does not contain, derive ALL summary chip counts from the renderer's grouped data — not from `result.summary.*`.
+- Pulling counts from `result.summary.*` misses any dimension the renderer computed after receiving the IPC result.
+
+Avoid:
+- Mixing summary counts: using `result.summary.alreadyPresent` for some chips and renderer-derived counts for others — the two sources diverge and produce inconsistent totals.
+- Assuming the backend summary is always complete once the renderer adds new per-file fields.
+
+Validation:
+- Confirm each summary chip count is derived from the renderer's grouped data structure.
+- Confirm removed-keywords count appears correctly in the summary row after adding the `removedKeywords` computation.
+- Confirm the totals in the summary row match the sum of items across all group cards.
+
+### Preview Classification Uses effectiveExistingLabels — Never Registry Category
+
+Context:
+- Applies to `previewEventMetadata` and any preview/report function that classifies Bridge-detected keywords as new additions vs already present.
+
+Rule:
+- Build `effectiveExistingLabels` = (a) labels of previously stored `externalKeywordIds` (lowercased) ∪ (b) labels of `autoKeywordIds` (lowercased) ∪ (c) current event identity label values (event type, location, city, country — lowercased).
+- A keyword is "already present" if its label is in `effectiveExistingLabels`; otherwise it is "will add".
+- This comparison is purely label-based. The keyword's registered category (e.g., `'misc'`, `'event'`, `'location'`) must never influence this decision.
+- Event identity label values from `event.json` must be included in `effectiveExistingLabels`. Without them, keywords like "Fajr Namaz" or "Surat" are classified as new additions even when they are the event's own type or city label.
+
+Avoid:
+- Using `IDENTITY_CATEGORIES.has(category)` or any category-based guard to decide whether a keyword should be counted as existing.
+- Building the existing-label set from only `existingExtLabels` without including auto-keyword labels and identity label values.
+
+Validation:
+- Confirm a keyword whose label matches the current event's type label appears as `alreadyPresent`, not `willAdd`.
+- Confirm `effectiveExistingLabels` is derived from all three sources before the classification loop.
+- Confirm no category field is read during the `willAdd`/`alreadyPresent` split.
+
+### Never Use Keyword Registry Category for Preview "Existing vs New" Classification
+
+Context:
+- Applies to `_classifyKeywords` and any caller that separates Bridge keywords into "will add" and "already present" for display.
+
+Rule:
+- Keyword registry category (e.g., `'misc'`, `'event'`, `'location'`, `'city'`, `'country'`) is unreliable as a proxy for functional role. A keyword like "Fajr Namaz" may have category `'misc'` even though it is the event-type value. Category-based guards produce false positives.
+- All registry-known Bridge keywords must pass through the classification loop unconditionally. The only decision point is whether the keyword's label is in `effectiveExistingLabels`.
+
+Avoid:
+- Adding `IDENTITY_CATEGORIES` constants and skipping keywords whose category matches — this is the root cause of the misclassification bug.
+- Treating category as a proxy for "this keyword is already handled by autoKeywords".
+
+Validation:
+- Confirm no `IDENTITY_CATEGORIES` or category-based guard exists in the `willAdd`/`alreadyPresent` classification path.
+- Confirm keywords with category `'event'`, `'location'`, `'city'`, `'country'`, or `'misc'` are all treated uniformly by the label comparison.
+
+### hasChanges in previewEventMetadata Must Reflect Real Pending Changes Only
+
+Context:
+- Applies to the `hasChanges` flag computed in `previewEventMetadata` and used to determine whether a file appears in the "changed" bucket of the preview UI.
+
+Rule:
+- `hasChanges = willAdd.length > 0 || unknownKeywords.length > 0`.
+- Do NOT include `alreadyPresent.length > 0` in the `hasChanges` condition.
+- Files where all Bridge keywords are already present have no pending change. Including `alreadyPresent.length > 0` causes such files to appear as changed when nothing needs operator review, creating noise.
+
+Avoid:
+- Setting `hasChanges = willAdd.length > 0 || alreadyPresent.length > 0 || unknownKeywords.length > 0`.
+- Treating "we confirmed keywords are already there" as a pending change.
+
+Validation:
+- Confirm a file whose Bridge keywords are all in `alreadyPresent` (and none in `willAdd` or `unknownKeywords`) does NOT appear in the changed bucket.
+- Confirm `hasChanges` is true only when `willAdd` or `unknownKeywords` is non-empty.
+
+### Do Not Conflate Sync Storage Decision With Preview Display Decision
+
+Context:
+- Applies when modifying `_classifyKeywords`, `previewEventMetadata`, or `syncEventMetadata` — all of which share or call the same classification helper.
+
+Rule:
+- `_classifyKeywords` is shared between preview and sync. In sync, all `externalKeywords` are stored in `externalKeywordIds` regardless of the `willAdd`/`alreadyPresent` split. The split is a display concern for preview only — it must not change what sync writes.
+- When adding display-only fields to preview output, add them in a separate post-pass after `_classifyKeywords` returns. Never modify `_classifyKeywords` to carry display state that sync would also inherit.
+
+Avoid:
+- Modifying `_classifyKeywords` to return different results based on whether the caller is a preview or a sync — the function must remain identical for both.
+- Using the `willAdd`/`alreadyPresent` split to decide what sync stores; sync always stores all external keywords regardless of this split.
+
+Validation:
+- Confirm `_classifyKeywords` is called with the same arguments in both `previewEventMetadata` and `syncEventMetadata`.
+- Confirm `syncEventMetadata` stores all external keywords, not just `willAdd` ones.
+- Confirm display-only enrichment (e.g., `alreadyPresent` chip counts) is computed only in preview paths.
+
+### source: 'bridge' Annotation on existingIndexedKeywords Is Load-Bearing
+
+Context:
+- Applies to any function that builds `existingIndexedKeywords` entries from stored keyword IDs, and to any renderer function that computes "Changed / Removed" keyword sets.
+
+Rule:
+- Every keyword entry in `existingIndexedKeywords` must carry a `source` field.
+- Bridge-stored keywords must use `source: 'bridge'`.
+- AutoIngest event identity keywords must use `source: 'auto-event'` (or equivalent non-bridge value).
+- The renderer's "Changed / Removed" computation filters `existingIndexedKeywords` by `source === 'bridge'` before subtracting from detected keywords. If event identity keywords carry `source: 'bridge'`, they will incorrectly appear as "removed" when Bridge does not repeat them in new XMP data.
+
+Avoid:
+- Setting `source: 'bridge'` on auto-generated event identity keywords.
+- Changing the `source` value of Bridge keywords without updating the renderer filter.
+- Omitting the `source` field — all entries need it for the filter to work correctly.
+
+Validation:
+- Confirm `existingIndexedKeywords` entries from `externalKeywordIds` carry `source: 'bridge'`.
+- Confirm entries from `autoKeywordIds` or event identity do NOT carry `source: 'bridge'`.
+- Confirm the renderer "Changed / Removed" filter `k.source === 'bridge'` produces the correct subtraction.
+
+### Display Data and Operation Data Must Share the Same Classification Path
+
+Context:
+- Applies when a pending row shows "affected folder" chips AND a detail modal shows "what will change" groups, both derived from the same scan — specifically in `_classifySubfolders`, `_checkEventPending`, and `previewEventMetadata`.
+
+Rule:
+- Both the chip list and the preview groups must derive from the same classification function (`effectiveExistingLabels + _classifyKeywords`). If the chip list uses a lighter path (presence-only scan), it will show folders the preview does not process — making the operator's expectation inconsistent.
+- A shared `_classifySubfolders` helper must be the single source for both chip population and preview grouping. Never use a separate "fast" scan to produce one display and a "full" scan to produce the other.
+
+Avoid:
+- Using `_listMetadataSubfolders` (presence-only) for chip display when the preview uses actionable-changes classification — they will diverge.
+- Introducing any intermediate scan function that answers a different question than the preview does.
+
+Validation:
+- Confirm the number of photographer folder chips in a pending row matches the number of photographer-folder groups the preview will show.
+- Confirm both chip population and preview grouping call `_classifySubfolders` (or the same classification equivalent), not separate scan helpers.
+
+### Two-Stage Mtime Gate for Per-Subfolder Classification Scans
+
+Context:
+- Applies to `_classifySubfolders` and any similar function that classifies multiple photographer subfolders to determine which ones have actionable changes — particularly in `scanPendingEvents` and `_checkEventPending`.
+
+Rule:
+- Structure the scan as two stages per subfolder:
+  1. **Stage 1 — mtime gate (cheap: stat-only)**: `readdir` the event folder top-level. For each subfolder, call `_hasXmpModifiedAfter(subdir, lastSyncMs, 0)`. If no file in the subfolder is newer than `lastSyncMs`, skip entirely — no content reads.
+  2. **Stage 2 — keyword classification (only for stale subfolders)**: `_scanXmpSidecars(subdir)` + read keywords + classify. Add `break` immediately after the first actionable file is found.
+- Thread `lastSyncMs` from `_checkEventPending` into `_classifySubfolders` so Stage 1 has a real timestamp. Events that were never synced pass `lastSyncMs = 0`, which disables the gate (all subfolders must be checked).
+
+Avoid:
+- Calling `_scanXmpSidecars(eventFolderPath)` upfront on all subfolders before checking mtimes — forces content reads on all unchanged subfolders.
+- Omitting the `break` after first actionable file — continues reading files in a subfolder after the verdict is already decided.
+- Hardcoding `sinceMs = 0` in `_classifySubfolders` — loses the benefit of skipping unchanged subfolders for recently-synced events.
+
+Validation:
+- Confirm that for a recently-synced event with no new XMP files, `_classifySubfolders` performs only stat calls and no `readFileTags` / `readKeywordsFromSidecar` calls.
+- Confirm that a never-synced event (lastSyncMs = 0) checks all subfolders.
+- Confirm that once the first actionable file is found in a subfolder, the inner loop breaks.
+
+### changedSubfolders Must Contain Only Actionably-Changed Subfolders
+
+Context:
+- Applies to the pending event object built in `_checkEventPending`, `scanPendingEvents`, and `scanSingleEventFolder` when populating the `changedSubfolders` field shown as chips in the pending list.
+
+Rule:
+- `changedSubfolders` must contain only subfolders that will appear as groups in the preview (i.e., subfolders with at least one `willAdd` or `unknownKeyword` file).
+- If a folder appears in `changedSubfolders`, it MUST also appear in the preview. If the preview will not show it, do not include it in `changedSubfolders`.
+- For error or migration cases where no classification runs, omit `changedSubfolders` entirely and display reason text in the renderer instead of chips.
+- If you need to track "all scanned folders" for diagnostics, use a separate field name (e.g., `scannedSubfolders`) — never render it as chips.
+
+Avoid:
+- Populating `changedSubfolders` from `_listMetadataSubfolders` (presence-only scan) — it includes folders with no actionable changes.
+- Using `changedSubfolders` as a broad "touched folders" list while the preview uses a narrower "actionable folders" list.
+
+Validation:
+- Confirm every folder in `changedSubfolders` appears in at least one group card in the preview modal.
+- Confirm no folder appears in the chips that does not appear in the preview.
+- Confirm error/migration pending rows show reason text instead of chips when no classification was performed.
+
+### userDataPath Must Flow to All Registry-Dependent Functions
+
+Context:
+- Applies to any new public function in `metadataSyncService.js` that calls `_loadRegistry` directly or calls `_classifyKeywords` or `_classifySubfolders` (which depend on the loaded registry).
+
+Rule:
+- `_loadRegistry` is a module-level singleton: O(1) on subsequent calls, but the first call requires `userDataPath` to locate `keywords.override.json`. If `userDataPath` is not threaded through, the first call uses `undefined` and the registry fails to load.
+- Add `userDataPath` as a parameter to any public function (`scanPendingEvents`, `scanSingleEventFolder`, etc.) that calls registry-dependent helpers.
+- IPC handlers in `main.js` always have access to `app.getPath('userData')` — pass it explicitly when calling these functions.
+- Do not assume the registry is already loaded from a previous call — always pass `userDataPath` down the call chain.
+
+Avoid:
+- Adding a new public function that calls `_classifyKeywords` or `_classifySubfolders` without accepting `userDataPath` as a parameter.
+- Relying on the singleton being pre-warmed by a prior IPC call.
+- Passing `userDataPath` through a global or module-level variable instead of as an explicit parameter.
+
+Validation:
+- Confirm every call to `_loadRegistry` has a non-undefined `userDataPath`.
+- Confirm the IPC handlers in `main.js` pass `app.getPath('userData')` to `scanPendingEvents` and `scanSingleEventFolder`.
+- Confirm adding a new public function that uses the registry adds `userDataPath` to its signature.
+
 ### Documentation Follow-Up
 
 Context:

@@ -1005,6 +1005,137 @@ Validation:
 - Confirm failure state shows the error and re-enables the button as "Retry".
 - Confirm the IPC handler returns all required fields in a single response.
 
+### Lazy Modal Injection Pattern for Infrequently Used Modals
+
+Context:
+- Applies when adding a modal (preview, detail panel, confirmation) that is triggered infrequently and should not pollute the static `index.html` with markup that is rarely visible.
+
+Rule:
+- Create the modal DOM once inside a `_msEnsurePreviewModal()` (or equivalent) guard function. On first call: build the HTML, append to `document.body`, wire persistent listeners (Escape, backdrop click, close button), and set a module-level flag. On subsequent calls: skip creation, the node already exists.
+- This pattern avoids bloating `index.html` with large modal templates that are only needed on demand.
+- Wire Escape, backdrop click, and the `×` button to the same close function so all dismiss paths are consistent.
+- Do not rely on `innerHTML` replacement inside a container to "inject" the modal — appending a full node to `document.body` is the correct pattern.
+
+Avoid:
+- Adding rarely-used modal HTML to `index.html` where it is always parsed and rendered by the browser even when never shown.
+- Creating the modal DOM inside the open function on every call — creates duplicate nodes and duplicate listeners.
+- Wiring Escape only to the overlay, and backdrop click only to the close button, etc. — inconsistent dismiss paths cause keyboard accessibility regressions.
+
+Validation:
+- Confirm the ensure function sets a module-level flag after first creation.
+- Confirm calling the ensure function a second time does not create a second modal node.
+- Confirm Escape, backdrop click, and `×` button all call the same close function.
+- Confirm `document.body` has exactly one instance of the modal node after multiple opens.
+
+### Row Click Guard When a Row Contains an Action Button
+
+Context:
+- Applies to any interactive table row or list row that contains a nested button (e.g., a Sync, Update, or Delete button), where the row itself is also clickable (e.g., opens a detail/preview panel).
+
+Rule:
+- The nested button handler must call `e.stopPropagation()` so the row's click handler does not also fire.
+- The row click handler must check `if (e.target.closest('.ms-sync-btn')) return;` (or equivalent selector) as an additional guard.
+- Both guards together are required. `stopPropagation()` alone does not protect against click events that arrive directly on the button via event delegation. The `closest()` check alone does not prevent double-fire when the button's own listener is wired separately and fires before the row listener.
+
+Avoid:
+- Relying on `stopPropagation()` alone in the button handler.
+- Relying on the `closest()` guard alone in the row handler.
+- Omitting the `closest()` guard because `stopPropagation()` "should be enough".
+
+Validation:
+- Confirm clicking the action button does not also trigger the row's detail/preview handler.
+- Confirm clicking anywhere else on the row (outside the button) does open the detail/preview.
+- Confirm the button handler calls `e.stopPropagation()`.
+- Confirm the row handler opens with `if (e.target.closest('.ms-sync-btn')) return;`.
+
+### Clone Button Nodes Before Re-Wiring to Prevent Stale Listener Accumulation
+
+Context:
+- Applies when a modal or panel is opened multiple times and a button inside it has an event listener wired programmatically on each open (e.g., an Update, Confirm, or Apply button whose handler depends on the current open context).
+
+Rule:
+- Before adding a new `addEventListener` to a button, replace the button node with a clone: `const fresh = btn.cloneNode(true); btn.parentNode.replaceChild(fresh, btn); btn = fresh;`.
+- This removes all previously attached listeners in one operation without requiring a corresponding `removeEventListener` call (which would require keeping a reference to the old function).
+- Only clone the button immediately before the new listener is added — do not clone on close or on modal hide, as the original node may be reused.
+
+Avoid:
+- Adding a new `addEventListener` on the same button node on each open without removing the old listener — stale handlers accumulate and fire multiple times per click after repeated opens.
+- Using `removeEventListener` without a stored reference to the original function — it silently no-ops and the old listener remains.
+- Cloning the entire modal on each open instead of only the button node.
+
+Validation:
+- Confirm the button node is cloned immediately before the new listener is added on each open.
+- Confirm clicking the button after three opens fires the handler exactly once, not three times.
+- Confirm the clone replaces the old node in the DOM (`replaceChild`) rather than being appended alongside it.
+
+### Preview UI Must Use Operator Language for Section Headings
+
+Context:
+- Applies to any preview modal or panel in the Metadata Sync feature (or any future sync/diff feature) that displays keyword change categories derived from backend classification results.
+
+Rule:
+- Section headings must use operator-facing language: "Existing Metadata", "New Additions", "Changed / Removed", "Needs Review".
+- Never expose backend field names or internal classification labels as visible section headings: `alreadyPresent`, `willAdd`, `unknownKeywords`, `protectedIdentityMatches`, `ignoredIdentity` must not appear as UI text.
+- Classification logic stays in the backend. Operator-friendly labels are applied only in the renderer. No backend change is needed to change what terminology the operator sees.
+
+Avoid:
+- Using `result.summary` field names directly as section headings.
+- Copying backend enum values or object keys into heading strings.
+- Requiring a backend change to rename a visible section label.
+
+Validation:
+- Confirm no section heading in the preview UI matches a backend object key or field name verbatim.
+- Confirm all four standard section labels ("Existing Metadata", "New Additions", "Changed / Removed", "Needs Review") are present where applicable.
+- Confirm the backend was not modified to change visible section label copy.
+
+### Compact Chip Row Truncation With +N More
+
+Context:
+- Applies to any compact row in the Metadata Sync pending list (or similar summary rows) that shows multiple chips (e.g., photographer/subfolder chips) inline.
+
+Rule:
+- Truncate visible chips at 4. When more than 4 chips exist, show only the first 4 and append a "+N more" chip.
+- The "+N more" chip must use a dashed border and italic text style to visually distinguish it from actionable or selectable chips.
+- This keeps rows scannable without hiding the existence of additional items.
+
+```javascript
+const MAX_SUB = 4;
+const moreSubCount = Math.max(0, subChips.length - MAX_SUB);
+const moreSubHtml = moreSubCount > 0
+  ? `<span class="ms-event-subfolder ms-event-subfolder--more">+${moreSubCount} more</span>`
+  : '';
+```
+
+Avoid:
+- Showing all chips inline with no truncation — rows become unscannably wide when many subfolders are present.
+- Using a solid or accent-color border for the "+N more" chip — it must not look like a selectable item.
+
+Validation:
+- Confirm rows with more than 4 chips show exactly 4 chips + a "+N more" chip.
+- Confirm rows with 4 or fewer chips show all chips with no "+N more" chip.
+- Confirm the "+N more" chip uses dashed border and italic style.
+
+### Metadata Sync Scope Picker — Visual Container and Two-Line Item Layout
+
+Context:
+- Applies when building or modifying the "Select Event…" picker or any multi-item scope selector within the Metadata Sync modal (`renderer/index.html` + `renderer/renderer.js`).
+
+Rule:
+- The picker container (`.ms-scope-picker`) must have a `border`, `padding`, and `background` so it reads as a distinct card section — not a floating borderless element overlapping the content below it.
+- The event list container (`.ms-scope-event-list`) must have its own `border`, `border-radius`, and `background` to form a clear scrollable region.
+- Each event item must display two lines of context: event name (`.ms-scope-event-name`) on the first line, master folder name (`.ms-scope-event-collection`) on the second. The master folder name is derived from `masterPath.split('/').pop()` in the renderer — the backend does not need to return it.
+- A `msScopeResultLabel` element must appear between the picker and the pending results to confirm which event's results are currently shown ("Results for: [event name]"). It is hidden until a scan completes.
+
+Avoid:
+- Rendering the scope picker without a bordered container — it merges visually with the results list below.
+- Showing only the event name with no collection/master context — operators cannot distinguish same-named events across different collections.
+- Omitting the result label — operators lose track of which event's data the pending list reflects.
+
+Validation:
+- Confirm `.ms-scope-picker` has a visible border and background that separates it from surrounding content.
+- Confirm each event item shows both the event name and the master folder name.
+- Confirm `msScopeResultLabel` is hidden on modal open and becomes visible after a scan completes, showing the scanned event's name.
+
 ### Light/Dark and Viewport Compatibility
 
 Context:

@@ -963,6 +963,199 @@ Status:
 
 ---
 
+### 2026-05-09 — JPEG Metadata Support, Preview Enrichment, and Row Interaction Patterns
+
+Task type:
+- Metadata / UI / Renderer / IPC / Feature / Sync Service
+
+What happened:
+
+**JPEG embedded metadata support:**
+`metadataSyncService.js` had four hardcoded `ext === '.xmp'` checks that made the entire pipeline blind to JPEG files. Adobe Bridge writes keywords as embedded IPTC/XMP directly into JPEGs — no sidecar. Fix: added `EMBEDDED_EXTENSIONS` Set and `_isMetadataBearingFile()` helper; replaced all 4 checks. Added `_readKeywordsFromJpeg()` that unions `tags.Subject`, `tags.Keywords`, and `tags.HierarchicalSubject` from the existing `readFileTags()` pool. Sync loop now routes by extension: JPEG uses itself as the canonical key; XMP uses `_findRawPeer()`. JPEG canonical key = JPEG relPath. XMP canonical key = RAW peer relPath. These must never be conflated.
+
+**Metadata Change Preview modal:**
+Read-only mirror of `syncEventMetadata`'s first half, capped at 200 files. Returns `willAdd`, `alreadyPresent`, `unknownKeywords`, `skippedConflicts` per file. Does NOT write any files. `masterFolderName` injected into each pending row via a single post-processing `.map()` at the end of `scanPendingEvents` — avoids touching every `pending.push()` call. Modal uses `_msEnsurePreviewModal()` lazy injection pattern: DOM created once, appended to `document.body` on first open.
+
+**Full Bridge keyword comparison in preview:**
+Root cause: `_classifyKeywords` silently drops identity-category keywords that match the event value (`continue` after checking IDENTITY_CATEGORIES — even a matching keyword is never returned). Preview must walk `foundKeywords` a second time after `_classifyKeywords` to build `protectedIdentityMatches`. Preview also builds `detectedBridgeKeywords` — a complete annotated list of all Bridge-detected keywords with `matchStatus` values (`will-add`, `already-present`, `protected-identity`, `unknown`). Event identity block rendered once above file cards as a purple chip row.
+
+**Row interaction patterns:**
+Row body has `data-event-path`, click opens preview. `.ms-sync-btn` inside the row must call `e.stopPropagation()`. Row click handler must check `if (e.target.closest('.ms-sync-btn')) return;`. Both guards are required. Update button handler cloned (`.cloneNode(true)`) before each open to remove stale listeners.
+
+Reusable lessons:
+
+1. **JPEG relPath is the canonical key for embedded-metadata files.** XMP canonical key = RAW peer relPath. Never conflate these two routing paths — they must be consistent between preview and sync.
+
+2. **`_classifyKeywords` silently drops identity-category keywords, including matching ones.** Preview functions must run a second pass over `foundKeywords` to surface these as `protectedIdentityMatches`. This second pass must not modify the sync path.
+
+3. **Preview enrichment must be a separate pass, not a modification of sync logic.** Call `_classifyKeywords` as-is for correctness, then annotate in additional passes for display only.
+
+4. **`detectedBridgeKeywords` annotation pattern.** Build a complete annotated list with `matchStatus`. This is the single source of truth for the Bridge section in preview UI. `willAdd`, `alreadyPresent`, `skippedConflicts` are subsets.
+
+5. **Post-processing `.map()` for scan result enrichment.** When adding a computed field (e.g., `masterFolderName`) to every item in a scan result, add one `.map()` at the end of the function. Avoids scattering the injection across every `pending.push()` call.
+
+6. **Lazy modal injection pattern.** `_msEnsurePreviewModal()` creates DOM once on first call, appends to `document.body`. Subsequent calls reuse the same node. Avoids polluting static HTML with rarely-used modal markup.
+
+7. **Row click guard when row contains a button.** Button handler calls `e.stopPropagation()`. Row handler checks `if (e.target.closest('.ms-sync-btn')) return;`. Both guards together are required — neither alone is sufficient.
+
+8. **Clone button nodes before re-wiring to prevent stale listener accumulation.** Use `btn.cloneNode(true)` and replace the old node before adding a new listener, so each modal open starts with a clean handler.
+
+Common failure modes:
+- Routing JPEG files through `_findRawPeer()` — JPEG has no RAW peer.
+- Modifying `_classifyKeywords` to surface identity matches instead of adding a separate preview pass — risks contaminating the sync path.
+- Adding `masterFolderName` inside every `pending.push()` call instead of a single post-processing map.
+- Stacking event listeners on the Update button by re-wiring without removing or cloning first.
+
+Promote to agents:
+- `metadata-specialist.md` — lessons 1, 2, 3, 4, 5
+- `ui-system-specialist.md` — lessons 6, 7, 8
+
+Status:
+- Promoted
+
+---
+
+### 2026-05-10 — Metadata Sync Modal: Affected-Folder Chips, Changed/Removed Preview Section, +N More Truncation
+
+Task type:
+- Metadata / UI / Renderer / Preview / Bug Fix
+
+What happened:
+
+**Bug 1 — Main modal showed only 1 affected photographer folder instead of all:**
+`_findChangedXmpSubfolders()` used `_hasXmpModifiedAfter(subfolder, lastSyncMs, 0)` to collect the `changedSubfolders` list. This mtime filter included only folders whose files were NEWER than `lastSyncMs`. But the preview scans ALL files and compares them against `event.metadata.json` — so it found more affected folders than the main modal showed. The two displays were inconsistent because they used different scoping rules.
+Fix: added `_listMetadataSubfolders(eventDir)` which calls `_hasXmpModifiedAfter(full, 0, 0)` (sinceMs=0 = existence-only) to collect all subfolders containing any metadata-bearing files. Used instead of `_findChangedXmpSubfolders` for building the chip list in `xmp-changed` and `never-synced` pending rows.
+
+Key distinction: the mtime check in `_findChangedXmpSubfolders` is CORRECT for determining IF an event is pending; it is WRONG for determining WHICH folders to show the operator in the affected-chip list.
+
+**Bug 2 — Preview showed internal classification language, no Changed/Removed section:**
+`_msBuildGroupCard()` used section labels "Existing", "Additions", "Unknown / Needs Review", "Ignored event identity" — internal backend field names visible to operators. "Changed / Removed" was not computed or shown at all. Summary chips pulled from backend `summary` object (`s.alreadyPresent`, `s.unknown`).
+
+Fix (renderer-only, no backend change):
+- Computed `removedKeywords` in `_msGroupFiles()` from data already in each file: `existingIndexedKeywords` (source='bridge') minus `detectedBridgeKeywords` labels.
+- Included `removedKeywords` in the change-signature so groups with different removals are correctly separated.
+- Renamed sections in `_msBuildGroupCard()`: Existing → "Existing Metadata", Additions → "New Additions", Unknown/Needs Review → "Needs Review"; added "Changed / Removed" section with `ms-pv-kw-chip--skip` chips; removed "Ignored event identity" note entirely.
+- Derived summary chip counts from renderer's grouped data (not from `result.summary.*`) so `removedKeywords` count appears correctly.
+
+**Part 3 — "+N more" truncation for photographer-folder chips:**
+Multiple photographer-folder chips in a compact row are now truncated at 4 visible chips with a "+N more" chip (dashed border, italic style) to keep rows scannable without hiding information.
+
+Reusable lessons:
+
+1. **Affected-folder chip list must use existence-only scan (sinceMs=0), not mtime-filtered scan.** Mtime filtering is correct for DETECTING if an event is pending; it is wrong for SHOWING the operator which folders are affected.
+
+2. **"Changed / Removed" bridge keywords are a pure renderer computation.** `existingIndexedKeywords.filter(k => k.source === 'bridge')` minus `detectedBridgeKeywords` labels. No backend change needed — the data is already in the preview payload.
+
+3. **Summary chip counts must be derived from the renderer's grouped data when the renderer adds computed fields the backend doesn't know about.** Pulling from `result.summary.*` misses any field the renderer computed.
+
+4. **Change-signature in `_msGroupFiles` must include ALL dimensions visible in the UI — including `removedKeywords`.** Missing a dimension causes visually different groups to be merged incorrectly.
+
+5. **Preview UI section labels must use operator language: "Existing Metadata", "New Additions", "Changed / Removed", "Needs Review".** Never expose backend field names (`alreadyPresent`, `willAdd`, `unknownKeywords`, `protectedIdentityMatches`, `ignoredIdentity`) as section headings.
+
+6. **When showing multiple compact chips in a pending row, truncate at 4 with a "+N more" chip (dashed border, italic) to keep rows scannable.**
+
+7. **Classification logic stays in the backend; operator-friendly labels are applied only in the renderer.** The backend never needs to be modified to change what terminology the operator sees.
+
+Common failure modes:
+- Using mtime-filtered subfolder scan to build the chip list shown to the operator — shows fewer folders than the preview will actually process.
+- Pulling summary chip counts from `result.summary.*` when the renderer adds fields that backend doesn't know about.
+- Omitting `removedKeywords` from the group change-signature — merges groups that differ only in removed keywords.
+- Using backend enum names or field names as visible section headings in preview UI.
+
+Promote to agents:
+- `metadata-specialist.md` — lessons 1, 2, 3, 4 (subfolder chip scoping; removedKeywords computation; summary derivation from renderer groups; change-signature completeness)
+- `ui-system-specialist.md` — lessons 5, 6, 7 (operator language for preview sections; +N more chip; backend/renderer label separation)
+
+Status:
+- Promoted
+
+---
+
+### 2026-05-10 — previewEventMetadata Classification Fix (commit 1464c85)
+
+Task type:
+- Metadata / Sync Service / Bug Fix / Preview / Classification
+
+What happened:
+
+`previewEventMetadata` in `main/metadataSyncService.js` was misclassifying keywords like "Fajr Namaz" or "Surat" as New Additions even when they were already the current event's type or city. Two compounding bugs:
+
+1. `_classifyKeywords` used the keyword's registry category (e.g., `'misc'`) to decide if it was an identity field. A keyword like "Fajr Namaz" with category `'misc'` bypassed the `IDENTITY_CATEGORIES` guard and landed in `willAdd` even though it was the event's event-type label.
+2. The `willAdd`/`alreadyPresent` split only compared against `existingExtLabels` (previously stored Bridge keywords). Event identity label values from `event.json` were never in that comparison set.
+
+Fix:
+- Removed `IDENTITY_CATEGORIES` constant and the category-based guard from `_classifyKeywords` — all registry-known Bridge keywords now pass through unconditionally.
+- Built `effectiveExistingLabels` = `existingExtLabels` ∪ `existingAutoLabels` ∪ event identity label values (lowercased).
+- Used `effectiveExistingLabels` for the `willAdd`/`alreadyPresent` split — purely label-based, never category-based.
+- Removed `protectedIdentityMatches` block and `protected-identity` matchStatus (dead concepts once category-based classification is removed).
+- Fixed `hasChanges` to exclude `alreadyPresent.length > 0` — files with only already-known keywords no longer appear as changed.
+
+Reusable lessons:
+
+1. **Preview classification must compare against effectiveExistingLabels, never keyword registry category.** Build `effectiveExistingLabels` from: (a) previously stored `externalKeywordIds` labels, (b) `autoKeywordIds` labels, (c) current event identity label values (lowercased). A keyword is "existing" if its label is in this set — regardless of its registered category.
+
+2. **Never use keyword registry category to decide "existing" vs "new addition" in preview.** Category membership (e.g., `IDENTITY_CATEGORIES.has(category)`) is unreliable: a keyword's functional role (event type, location) does not always match its registered category. Use label-exact comparison against the effective existing set instead.
+
+3. **`hasChanges` in `previewEventMetadata` must reflect real pending changes only.** Only `willAdd.length > 0 || unknownKeywords.length > 0` constitutes a pending change. Including `alreadyPresent.length > 0` creates noise: files with only already-known metadata appear as changed when nothing needs operator review.
+
+4. **`_classifyKeywords` is shared between preview and sync. Do not conflate the sync storage decision with the preview display decision.** In sync, all `externalKeywords` are stored in `externalKeywordIds` regardless of `willAdd`/`alreadyPresent` split. That split matters only for preview display; it must not affect sync storage.
+
+5. **The `source: 'bridge'` annotation on `existingIndexedKeywords` entries is load-bearing.** The renderer's "Changed/Removed" computation filters by `source === 'bridge'`. Event identity keywords carry `source: 'auto-event'` and are intentionally excluded from removal detection. Do not change these source values without updating the renderer filter.
+
+Promote to agents:
+- `metadata-specialist.md` — all 5 lessons
+
+Status:
+- Promoted
+
+---
+
+### 2026-05-10 — Metadata Sync Stabilization and Scan Performance Optimization
+
+Task type:
+- Metadata / Sync Service / Bug Fix / Performance / UI / Classification / IPC
+
+What happened:
+
+Three correctness bugs in the Metadata Sync modal were fixed, then collection-wide scanning performance was optimized. Work spanned `main/metadataSyncService.js`, `main/main.js`, `renderer/renderer.js`, and `renderer/index.html`.
+
+**Bug 1 — Display data and operation data used different classification logic:**
+Pending row chips showed "affected photographer folders" from `_listMetadataSubfolders` (presence-only scan). The Metadata Change Preview showed groups from `effectiveExistingLabels + _classifyKeywords` (actionable-changes-only scan). One folder appeared in chips but not in preview because the two paths used different definitions of "affected." Fix: replaced `_listMetadataSubfolders` with `_classifySubfolders` — a new helper sharing the same `effectiveExistingLabels + _classifyKeywords` logic as the preview. Both paths now share one definition of "actionable."
+
+**Bug 2 — `_classifySubfolders` performed a full recursive content scan on all subfolders upfront:**
+After fixing the classification divergence, `_classifySubfolders` called `_scanXmpSidecars(eventFolderPath)` on all subfolders, then called `_readKeywordsFromSidecar` / `_readKeywordsFromJpeg` for every file including unchanged ones. Fix: restructured into a two-stage per-subfolder loop. Stage 1: top-level `readdir` + `_hasXmpModifiedAfter(subdir, sinceMs, 0)` (stat-only, no content reads). If no file is newer than `lastSyncMs`, skip the subfolder. Stage 2 (only for stale subfolders): `_scanXmpSidecars + read keywords + classify`, with `break` on first actionable file. Also threaded `lastSyncMs` from `_checkEventPending` into `_classifySubfolders`.
+
+**Bug 3 — `eventIdentity is not defined` crash in `previewEventMetadata`:**
+A prior session renamed `eventIdentity` (object) → `eventIdentityLabelSet` (Set) but missed one call site: `_classifyKeywords(foundKeywords, autoKeywordSet, eventIdentity)`. Because the function declared but never used the third parameter internally, passing `undefined` didn't crash inside — it crashed at the call site where `eventIdentity` was the undefined variable. Fix: removed the undefined argument from both call sites and dropped the now-unused parameter from `_classifyKeywords`. Verified with `grep -n "\beventIdentity\b"`.
+
+**Semantic naming fix — `changedSubfolders` must mean "subfolders with actionable changes":**
+`changedSubfolders` was populated with "all subfolders containing any metadata-bearing files." After the classification fix, it now contains only subfolders with at least one actionable change — matching the preview exactly. If only broad scanned folders are available (error/migration cases), `changedSubfolders` is omitted and reason text is shown instead.
+
+**`userDataPath` must flow to registry-dependent functions:**
+`_classifySubfolders` calls `_loadRegistry(userDataPath)`. The registry is a module-level singleton — O(1) after first load, but the first call needs `userDataPath` to locate `keywords.override.json`. `scanPendingEvents` and `scanSingleEventFolder` did not accept `userDataPath` and did not pass it through. Fix: added `userDataPath` parameter to both functions; updated the two IPC handlers in `main.js` to pass `app.getPath('userData')`.
+
+**Select Event UI picker visual and context fixes:**
+The scope picker appeared as a borderless floating element. Fix: added `border`, `padding`, `background` to `.ms-scope-picker`; added `border`, `border-radius`, `background` to `.ms-scope-event-list`; each event item now shows two lines (event name + master folder name); `msScopeResultLabel` element added to confirm which event's results are shown.
+
+Reusable lessons:
+
+1. **Same classification path for display and operation**: When two UI surfaces show data derived from the same scan (pending chips AND preview groups), both must use identical classification logic. Never let a lighter scan produce display data that diverges from the heavier classification.
+2. **Two-stage mtime gate for per-subfolder scan**: For classify-per-group operations: (1) top-level readdir only, (2) per-subfolder stat-only mtime gate, (3) for stale subfolders only: content reads + `break` on first hit.
+3. **Stale variable reference at call site after rename**: After any variable rename, grep the old name across the whole file, especially at call sites. A function that accepts but ignores a parameter will not crash inside — the crash surfaces at the call site where the old name is used as the argument.
+4. **`changedSubfolders` semantic contract**: In the pending event object, `changedSubfolders` must contain only subfolders that will be visible in the preview. If a folder appears in chips, it MUST appear in the preview.
+5. **`userDataPath` must flow to all registry-dependent functions**: Any function calling `_loadRegistry` (directly or transitively) must accept `userDataPath`. IPC handlers always have `app.getPath('userData')` — wire it down the call chain.
+6. **Scope picker visual contract**: Any multi-item event/scope selector in the Metadata Sync modal needs a bordered container with background, two lines of context per item (name + collection/master), and a result label confirming which event's results are displayed.
+
+Promote to agents:
+- `metadata-specialist.md` — lessons 1, 2, 4, 5
+- `contract-debugger.md` — lesson 3
+- `ui-system-specialist.md` — lesson 6
+
+Status:
+- Promoted
+
+---
+
 ## Entry Template
 
 ### YYYY-MM-DD — Task Name

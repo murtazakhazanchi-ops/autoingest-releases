@@ -374,6 +374,35 @@ Validation:
 - Confirm parent write is conditional: it runs only after child write succeeds.
 - Confirm a failed child write leaves `event.json` untouched.
 
+### Stale Variable Reference at Call Site After Rename
+
+Context:
+- Applies when diagnosing a `ReferenceError: <name> is not defined` that occurs at a function call site (not inside the function body) after a variable was renamed across a file or module.
+
+Rule:
+- When a variable is renamed, the old name may survive undetected at call sites where it is passed as an argument. A function that accepts but never uses its parameter internally will not throw inside — it throws at the call site, where the old name is referenced as the argument expression.
+- Symptom: a `ReferenceError: <oldName> is not defined` crash with a stack trace pointing to the call site of a helper function, not to the function body itself.
+- Diagnosis: grep for the old variable name across the entire file (`grep -n "\b<oldName>\b"`). Every hit outside the old definition is a missed rename. Pay special attention to arguments in function calls — these are the most commonly missed sites.
+- Fix: remove the stale argument from all call sites. If the parameter was unused inside the function, remove it from the function signature as well.
+
+```js
+// Before rename: _classifyKeywords(foundKeywords, autoKeywordSet, eventIdentity)
+// After rename: eventIdentity was renamed to eventIdentityLabelSet
+// Bug: _classifyKeywords(foundKeywords, autoKeywordSet, eventIdentity)
+//       → ReferenceError: eventIdentity is not defined (at the call site)
+// Fix: _classifyKeywords(foundKeywords, autoKeywordSet)
+//       + remove unused third parameter from function signature
+```
+
+Avoid:
+- Assuming a rename is complete because the definition and primary usage were updated. Call sites that pass the old name as an argument are silently skipped by most "rename symbol" tooling if the parameter is unused.
+- Inspecting the function body for the old name when the crash trace points to the call site — the error is at the argument, not inside the function.
+
+Validation:
+- After any variable rename, run `grep -n "\b<oldName>\b"` across the file and inspect every remaining hit.
+- Confirm no call site passes the old name as a function argument.
+- Confirm that if the parameter was unused, it is removed from the function signature to prevent recurrence.
+
 ### Keyword Registry Deduplication Order — ID Before Label Before Sibling
 
 Context:
