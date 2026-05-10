@@ -1136,6 +1136,39 @@ Validation:
 - Confirm each event item shows both the event name and the master folder name.
 - Confirm `msScopeResultLabel` is hidden on modal open and becomes visible after a scan completes, showing the scanned event's name.
 
+### Stale-Result Prevention for Async UI Scans: _msScanCounter Pattern
+
+Context:
+- Applies to any renderer function that calls an async IPC and then updates a shared list element, modal content, or result area — particularly when the user can change scope (collection, event, filter) before the IPC resolves.
+
+Rule:
+- Maintain a module-level `let _msScanCounter = 0` counter.
+- At the start of the leaf scan function, capture `const thisScan = ++_msScanCounter`.
+- Before any DOM mutation after `await`, check `if (thisScan !== _msScanCounter) return;` and discard stale results.
+- The increment belongs ONLY to the leaf scan function. Wrapper functions or scope-selector paths that delegate to the leaf scan must NOT double-increment — they call the leaf scan which increments on their behalf. Non-collection branches that directly issue IPC calls themselves DO increment.
+
+```js
+let _msScanCounter = 0;                     // module-level
+
+async function _msScanAndRender(masterPath) {
+  const thisScan = ++_msScanCounter;         // only the leaf scan increments
+  _showLoadingState();
+  const results = await window.api.scanPending(masterPath);
+  if (thisScan !== _msScanCounter) return;   // stale — discard
+  _renderResults(results);
+}
+```
+
+Avoid:
+- Incrementing the counter in both the collection-scope wrapper AND the leaf scan — double-increment causes the leaf scan to always see a stale counter and discard valid results.
+- Rendering scan output without a counter guard when the user can change scope before the scan completes.
+- Using a boolean `_scanInProgress` flag instead of a counter — a boolean cannot distinguish "this scan" from "a different newer scan".
+
+Validation:
+- Confirm the counter is incremented exactly once per logical scan start, in the leaf scan function only.
+- Confirm `if (thisScan !== _msScanCounter) return` appears before every DOM mutation after each `await` in the scan path.
+- Confirm rapid scope changes (e.g., clicking a different collection before results arrive) do not overwrite the correct result with a stale one.
+
 ### Light/Dark and Viewport Compatibility
 
 Context:

@@ -426,6 +426,52 @@ Validation:
 - Confirm an entry with the same label at a different path (no ID match) is classified as a move.
 - Confirm an unchanged entry (same ID + same label) produces no output in possibleMoves or possibleSpellingUpdates.
 
+### Variable Scope for Multi-Layer Try/Catch: Declare Before the Outer Try
+
+Context:
+- Applies to any async function that has a multi-layer try/catch where the outer catch block needs data from a variable populated inside an inner try.
+
+Rule:
+- Declare the variable as `let doc = null` (or equivalent null sentinel) before the outer try block.
+- The outer catch block can then safely reference `doc?.eventName` or `doc?.eventId` to include identity context in the error result.
+- Without this, every error result shows empty strings for identity fields, making it impossible to determine which event failed in multi-event workflows.
+
+```js
+let doc = null;                      // accessible in outer catch
+try {
+  try { doc = JSON.parse(await fsp.readFile(...)); } catch (e) { return earlyError; }
+  // ... rest of function using doc ...
+} catch (err) {
+  return { eventName: doc?.eventName || '', eventId: doc?.eventId || null, ... };
+}
+```
+
+Avoid:
+- Declaring the variable inside the inner try only — renders it inaccessible to the outer catch.
+- Relying on partial error messages without identity fields when diagnosing failures across many events.
+
+Validation:
+- Confirm the variable is declared before the outer try in any function whose catch needs it for error identity.
+- Confirm error results in multi-event workflows include the event name or ID.
+
+### Silent Catch Blocks Affecting Downstream Behavior Must Log
+
+Context:
+- Applies to any catch block in service files (e.g., `metadataSyncService.js`, `main.js`) that discards an error affecting classification, persistence, or display.
+
+Rule:
+- Replace `catch { /* first sync or file missing */ }` with `catch (err) { log(`[module] Could not load <file> for <context>: ${err.message}`); }`.
+- Silent catches on file-read operations that determine whether an index (`existingMetaDoc`) is null are the most dangerous — they make "why was the index discarded?" unanswerable without a breakpoint.
+
+Avoid:
+- Using empty `catch {}` or comment-only catches on operations that affect downstream state.
+- Assuming file-not-found is the only cause of a catch firing — permission errors, malformed JSON, and disk-full also hit the same catch.
+
+Validation:
+- Confirm every catch block affecting whether `existingMetaDoc` (or equivalent state) is null produces a log line.
+- Confirm the log includes the file path and `err.message`.
+- Confirm the catch does not swallow errors that should propagate as fatal.
+
 ## Validation Checklist
 
 Before debugging, read:

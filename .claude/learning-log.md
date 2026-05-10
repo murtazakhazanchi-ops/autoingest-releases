@@ -1156,6 +1156,62 @@ Status:
 
 ---
 
+### 2026-05-10 — Metadata Sync Hardening: Sync Resilience and Scan Reliability (commit b14d5fd)
+
+Task type:
+- Metadata / Performance / Persistence / IPC / UI / Renderer / Reliability / Hardening
+
+What happened:
+
+**Lesson 1 — eventId mismatch validation required in every function that loads event.metadata.json:**
+Any function that reads `event.metadata.json` must compare the stored `eventId` against `doc.eventId` from `event.json` before trusting the index. Without this check, a stale or moved index file can contaminate keyword classification across events. Pattern applied in `syncEventMetadata`, `previewEventMetadata`, and `_classifySubfolders`. Must also be applied in any future function that loads the child index.
+
+**Lesson 2 — Variable scope for multi-layer try/catch: lift `let doc = null` outside outer try:**
+If a variable is declared inside the inner try block, the outer catch cannot access it. When error reporting needs the variable (e.g., to include `eventName` or `eventId` in the failure result), declare it as `let doc = null` before the outer try. Without this, every error result shows empty strings for event identity fields, making it impossible to identify which event failed.
+
+**Lesson 3 — Stale-result prevention for async UI scans: `_msScanCounter` pattern:**
+When a scan is async and the user can change scope before it completes, guard rendered output with a monotonically incrementing counter. The counter is incremented at the start of the leaf scan function; before rendering results, compare the local capture to the current counter value. Functions that delegate to the leaf scan (collection scope path) must NOT double-increment — only the leaf scan function increments. Non-collection branches that directly call IPC themselves DO increment.
+
+**Lesson 4 — All-keywords-removed case: load existing stored keywords BEFORE the empty-keywords skip check:**
+When a per-file loop skips files because `foundKeywords.length === 0`, it silently hides the "Changed / Removed" case: a file that previously had bridge keywords stored but now has none. Correct structure: (1) read current Bridge keywords, (2) fast-path skip only when no keywords AND no prior index (first sync), (3) compute relPath, (4) load stored bridge keywords, (5) skip only when both current AND stored are empty, (6) include file if `removedBridgeCount > 0`.
+
+**Lesson 5 — Fast-path placement in two-stage loops to preserve performance for the all-removed fix:**
+When restructuring a loop to compute `relPath` before the empty-keywords skip (needed for Lesson 4), add a fast-path guard `if (foundKeywords.length === 0 && !existingMetaDoc) continue` before the expensive relPath computation. This preserves the original skip rate for first-sync events where the all-removed case can never occur. Always pair the all-removed fix with this fast-path guard.
+
+**Lesson 6 — Silent catch blocks that affect downstream behavior must log:**
+Any `catch {}` block that discards an error affecting classification, persistence, or display must log the error. Replace silent catches with `catch (err) { log(...err.message...) }` so that "why was the index discarded?" is answerable from logs without a breakpoint.
+
+**Lesson 7 — Collection scan diagnostics: log timing and counts per run:**
+Any async function that walks a directory of events must log timing and outcome (events checked, pending count, elapsed ms, master folder name) after completion. Without this, a missing event due to wrong mtime, bad event.json, or wrong master path is completely invisible.
+
+Reusable lessons:
+1. eventId mismatch check required in every function loading event.metadata.json.
+2. Declare `let doc = null` outside outer try when the catch block needs doc for error identity fields.
+3. `_msScanCounter` monotonic counter guards async UI scan output; only the leaf scan function increments.
+4. Load existing stored bridge keywords before the empty-keywords skip to capture the all-removed case.
+5. Pair the all-removed fix with a fast-path `!existingMetaDoc` guard before expensive relPath computation.
+6. Silent catch blocks affecting classification or persistence must log the error.
+7. Collection scan functions must log timing and counts for diagnosability.
+
+Common failure modes:
+- Reading event.metadata.json without comparing its eventId to event.json — stale index silently contaminates classification.
+- Declaring doc inside the inner try, leaving error results with empty identity fields.
+- Incrementing `_msScanCounter` in the collection-scope branch when the leaf scan also increments — double-increment discards valid results.
+- Placing the empty-keywords skip before loading existing stored keywords — hides the all-removed case.
+- Adding the all-removed fix without the fast-path guard — triggers expensive stat calls on every file in first-sync events.
+- Using `catch { }` without logging in paths affecting downstream behavior.
+- Omitting timing/count logging from collection scan functions.
+
+Promote to agents:
+- `metadata-specialist.md` — lessons 1, 4, 5, 7 (eventId mismatch; all-removed case; fast-path pairing; scan diagnostics)
+- `contract-debugger.md` — lessons 2, 6 (variable scope for catch; silent catch logging)
+- `ui-system-specialist.md` — lesson 3 (stale-result counter pattern)
+
+Status:
+- Promoted
+
+---
+
 ## Entry Template
 
 ### YYYY-MM-DD — Task Name

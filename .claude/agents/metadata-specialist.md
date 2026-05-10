@@ -836,6 +836,95 @@ Validation:
 - Confirm the IPC handlers in `main.js` pass `app.getPath('userData')` to `scanPendingEvents` and `scanSingleEventFolder`.
 - Confirm adding a new public function that uses the registry adds `userDataPath` to its signature.
 
+### eventId Mismatch Validation Is Required in Every Function That Loads event.metadata.json
+
+Context:
+- Applies to `syncEventMetadata`, `previewEventMetadata`, `_classifySubfolders`, and any future function that reads the companion child index.
+
+Rule:
+- After loading `event.metadata.json`, compare its stored `eventId` against `doc.eventId` from `event.json`. If both are present and differ, discard the loaded index as stale before using any of its data.
+- Pattern:
+  ```js
+  if (existingMetaDoc && doc.eventId && existingMetaDoc.eventId && existingMetaDoc.eventId !== doc.eventId) {
+    log('...eventId mismatch — discarding stale index');
+    existingMetaDoc = null;
+  }
+  ```
+- Legacy events without `eventId` in either file skip this check entirely.
+
+Avoid:
+- Trusting `event.metadata.json` data without the eventId consistency check — stale or moved index files silently contaminate keyword classification.
+- Applying this check only in the sync path but not in the preview or classification paths.
+
+Validation:
+- Confirm the check runs in every function that loads `event.metadata.json`.
+- Confirm the check is skipped (not failing) when either file lacks `eventId`.
+- Confirm a mismatched index results in `existingMetaDoc = null` before any keyword comparison.
+
+### All-Keywords-Removed Case: Load Existing Stored Keywords Before the Empty-Keywords Skip
+
+Context:
+- Applies to `previewEventMetadata`, `_classifySubfolders`, and any future per-file classification loop with an early-exit for empty keywords.
+
+Rule:
+- Structure the per-file loop in this order:
+  1. Read current Bridge keywords from the file.
+  2. Fast-path skip: `if (foundKeywords.length === 0 && !existingMetaDoc) continue` — first sync, nothing to compare.
+  3. Compute `relPath` (required for existing-metadata lookup).
+  4. Load stored bridge keywords from `existingMetaDoc`.
+  5. Skip only when both current AND stored are empty: `if (foundKeywords.length === 0 && existingExtKws.length === 0) continue`.
+  6. Include the file if `removedBridgeCount > 0` (bridge keywords previously stored are now absent).
+- This structure captures the "Changed / Removed" case: a file that previously had bridge keywords but now has none must appear in preview output.
+
+Avoid:
+- Placing the empty-keywords skip before loading `existingMetaDoc` — the "all removed" case becomes invisible.
+- Using a single `if (foundKeywords.length === 0) continue` that disregards prior stored keywords.
+
+Validation:
+- Confirm a file with previously stored bridge keywords and `foundKeywords.length === 0` appears in classification output with `removedBridgeCount > 0`.
+- Confirm the fast-path (step 2) correctly skips first-sync files with no keywords and no prior index.
+- Confirm the pattern is applied consistently between preview and sync paths.
+
+### Fast-Path Guard Before Expensive relPath Computation (All-Removed Fix Companion)
+
+Context:
+- Applies whenever the all-keywords-removed fix is applied to a per-file loop that calls `_findRawPeer` or otherwise performs expensive relPath computation.
+
+Rule:
+- Add `if (foundKeywords.length === 0 && !existingMetaDoc) continue` BEFORE the `_findRawPeer` / relPath computation block.
+- This fast-path preserves the original skip rate for first-sync events (no `existingMetaDoc`), where the all-removed case can never occur.
+- The more expensive branch (relPath + existingExtKws check) runs only on subsequent syncs where prior bridge keywords could have been stored.
+
+Avoid:
+- Omitting the fast-path when restructuring the loop — triggers a `_findRawPeer` stat call for every no-keyword file on first sync, potentially thousands of extra stat calls.
+- Treating the all-removed fix and its fast-path guard as separable — always add them together.
+
+Validation:
+- Confirm a first-sync event with files that have no bridge keywords exits the loop early before `_findRawPeer` is called.
+- Confirm a re-sync event where some files previously had bridge keywords reaches the relPath computation path.
+
+### Collection Scan Diagnostics: Log Timing and Counts Per Run
+
+Context:
+- Applies to any async function that walks a directory of events (e.g., `scanPendingEvents`, `scanSingleEventFolder`, or any future collection-wide scanner).
+
+Rule:
+- Log timing and outcome at the end of every collection scan:
+  ```js
+  log(`[service] scanPendingEvents: ${eventsChecked} checked, ${pending.length} pending, ${Date.now() - t0}ms — ${masterFolderName}`);
+  ```
+- Use the project's existing `log` function, not `console.log`.
+- Variables to capture: events checked, pending count, elapsed ms, master folder identifier.
+
+Avoid:
+- Omitting timing/count logging from collection scan functions — makes missing events (wrong mtime, bad event.json, wrong master path) completely invisible without a debugger.
+- Using `console.log` instead of the project `log` service.
+
+Validation:
+- Confirm the log line appears after the scan loop completes.
+- Confirm it includes events checked, pending count, elapsed ms, and master folder identifier.
+- Confirm no `console.log` is used for this diagnostic.
+
 ### Documentation Follow-Up
 
 Context:
