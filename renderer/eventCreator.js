@@ -35,9 +35,17 @@ const EventCreator = (() => {
   function _normComps(components) {
     if (!Array.isArray(components)) return [];
     return components.map(c => ({
-      eventTypes: (c.types || c.eventTypes || []).map(t => ({ id: t, label: t })),
-      location:   c.location ? { id: c.location, label: c.location } : null,
-      city:       c.city    ? { id: c.city,     label: c.city     } : null,
+      eventTypes:         (c.types || c.eventTypes || []).map(t => ({ id: t, label: t })),
+      location:           c.location ? { id: c.location, label: c.location } : null,
+      city:               c.city     ? { id: c.city,     label: c.city     } : null,
+      country:            c.country  || '',
+      additionalKeywords: Array.isArray(c.additionalKeywords)
+        ? c.additionalKeywords.map(kw =>
+            typeof kw === 'string'
+              ? { label: kw, keywordId: null, useInFolderName: false }
+              : { label: kw.label || '', keywordId: kw.keywordId || null, useInFolderName: !!kw.useInFolderName }
+          )
+        : [],
     }));
   }
 
@@ -91,20 +99,36 @@ const EventCreator = (() => {
   }
 
   // Sourced from renderer/folderNameHelper.js — tested independently there.
-  // City is included only when allSameCity is false (mixed cities across components).
-  // The index encodes the sorted-by-id position and must not change after first write.
+  // City included only when allSameCity is false. Index must not change after first write.
+  // Folder-name keywords are interleaved within the event-tag section per folderPlacement.
   function buildFolderName(comp, idx, allSameCity) {
-    const indexPart    = String(idx + 1).padStart(2, '0');
-    const typePart     = sanitizeForFolder(
-      (comp.eventTypes || []).map(t => t.label).join('-')
-    );
-    const locationPart = comp.location?.label
-      ? '-' + sanitizeForFolder(comp.location.label)
-      : '';
-    const cityPart     = (!allSameCity && comp.city?.label)
-      ? '-' + sanitizeForFolder(comp.city.label)
-      : '';
-    return `${indexPart}-${typePart}${locationPart}${cityPart}`;
+    const indexPart  = String(idx + 1).padStart(2, '0');
+    const eventTypes = comp.eventTypes || [];
+    const locationPart = comp.location?.label ? '-' + sanitizeForFolder(comp.location.label) : '';
+    const cityPart     = (!allSameCity && comp.city?.label) ? '-' + sanitizeForFolder(comp.city.label) : '';
+
+    const kwToFolder = (comp.additionalKeywords || []).filter(k => k && k.useInFolderName);
+
+    if (kwToFolder.length === 0) {
+      return `${indexPart}-${sanitizeForFolder(eventTypes.map(t => t.label).join('-'))}${locationPart}${cityPart}`;
+    }
+
+    const byMode = (k, mode, ai) => {
+      const fp = k.folderPlacement;
+      if (!fp) return mode === 'end-of-event-tags';
+      return fp.mode === mode && (ai === undefined || fp.anchorIndex === ai);
+    };
+    const byOrder = (a, b) => (a.folderPlacement?.order || 0) - (b.folderPlacement?.order || 0);
+
+    const tokens = [];
+    for (let i = 0; i < eventTypes.length; i++) {
+      kwToFolder.filter(k => byMode(k, 'before-event-tag', i)).sort(byOrder).forEach(k => tokens.push(k.label));
+      tokens.push(eventTypes[i].label);
+      kwToFolder.filter(k => byMode(k, 'after-event-tag', i)).sort(byOrder).forEach(k => tokens.push(k.label));
+    }
+    kwToFolder.filter(k => byMode(k, 'end-of-event-tags')).sort(byOrder).forEach(k => tokens.push(k.label));
+
+    return `${indexPart}-${sanitizeForFolder(tokens.join('-'))}${locationPart}${cityPart}`;
   }
 
   function sanitizeEventName(name) {
@@ -149,7 +173,15 @@ const EventCreator = (() => {
         eventTypes: Array.isArray(c.types) ? c.types.map(t => ({ label: t })) : [],
         location:   c.location ? { label: c.location } : null,
         city:       c.city    ? { label: c.city }    : null,
+        country:    c.country || '',
         folderName: c.folderName ?? null,
+        additionalKeywords: Array.isArray(c.additionalKeywords)
+          ? c.additionalKeywords.map(kw =>
+              typeof kw === 'string'
+                ? { label: kw, keywordId: null, useInFolderName: false }
+                : { label: kw.label || '', keywordId: kw.keywordId || null, useInFolderName: !!kw.useInFolderName }
+            )
+          : [],
       }));
 
       console.log('[loadEventFromDisk] Loaded', normalized.length, 'components from', eventPath);
@@ -274,9 +306,11 @@ const EventCreator = (() => {
         : [],
       location: c.location ? { label: c.location.label } : null,
       city: c.city ? { label: c.city.label } : null,
+      country: c.country || '',
       // Preserve folderName threaded in by loadEventFromDisk.
       // Once set, folderName is never recomputed — it is the stable folder identity.
       folderName: c.folderName ?? null,
+      additionalKeywords: Array.isArray(c.additionalKeywords) ? c.additionalKeywords : [],
     }));
 
     if (normalized.some(c => !Array.isArray(c.eventTypes))) {
@@ -317,7 +351,7 @@ const EventCreator = (() => {
   let _repairMode      = false; // Phase 5: when true, form is repairing an unparseable folder
   let _repairFolderName = null; // Phase 5: original (bad) folder name being repaired
   let _newEventDate    = null;  // M7: hijri date string for new events ("YYYY-MM-DD"), null when viewing/editing
-  let _archiveEventId  = '';    // optional Archive Registry ID, persisted to event.json as eventId
+  let _collectionCode  = '';    // optional Collection Code, persisted to event.json as collectionCode
   let _structureWarningPending = false; // prevents double-modal if save is triggered concurrently
   let _legacyModalOpen         = false; // prevents double-modal on fast double-click of Continue
   let _navScreen           = 'masterStep'; // 'masterStep' | 'eventList' | 'eventForm' | 'previewStep'
@@ -325,9 +359,11 @@ const EventCreator = (() => {
   let _listenersAttached   = false;        // Guard: delegated panel listeners registered only once
   let _saveInProgress          = false;        // Guard: prevent concurrent save executions
   let _lastSaveWasMetaOutdated = false;        // Consumed once by renderer via consumeMetaOutdated()
+  let _kwRegistry              = null;         // Cached keyword registry for Additional Keywords search
+  let _kwRegistryPromise       = null;         // In-flight promise so we load at most once
 
   function _makeComp() {
-    return { id: ++_compSeq, eventTypes: [], location: null, city: _globalCityVal ? { ..._globalCityVal } : null };
+    return { id: ++_compSeq, eventTypes: [], location: null, city: _globalCityVal ? { ..._globalCityVal } : null, country: '', additionalKeywords: [] };
   }
 
   function _destroyEventDDs() {
@@ -1420,6 +1456,8 @@ ${unparseable.map(ev => `
       eventTypes: c.eventTypes.map(t => ({ label: t.label })),
       location:   c.location,
       city:       c.city,
+      country:    c.country || '',
+      additionalKeywords: Array.isArray(c.additionalKeywords) ? c.additionalKeywords : [],
     }));
 
     setEventState(editable);
@@ -1537,6 +1575,7 @@ ${unparseable.map(ev => `
       row.et?.setDisabled(locked);
       row.loc?.setDisabled(locked);
       row.city?.setDisabled(locked);
+      row.country?.setDisabled(locked);
     });
     // Show/hide chip-remove buttons.
     body.querySelectorAll('.ec-chip-x').forEach(btn => btn.style.display = locked ? 'none' : '');
@@ -1647,12 +1686,14 @@ ${unparseable.map(ev => `
       const _noRenameAllSameCity = _eventComps.length <= 1 ||
         _eventComps.every(c => c.city?.label === _eventComps[0].city?.label);
       const noRenameCompsForDisk = JSON.parse(JSON.stringify(_eventComps)).map((c, idx) => ({
-        id:           c.id,
-        types:        c.eventTypes.map(et => et.label),
-        location:     c.location?.label || null,
-        city:         c.city?.label     || '',
-        isUnresolved: false,
-        folderName:   c.folderName ?? buildFolderName(c, idx, _noRenameAllSameCity),
+        id:                 c.id,
+        types:              c.eventTypes.map(et => et.label),
+        location:           c.location?.label || null,
+        city:               c.city?.label     || '',
+        country:            c.country         || null,
+        additionalKeywords: Array.isArray(c.additionalKeywords) && c.additionalKeywords.length ? c.additionalKeywords : undefined,
+        isUnresolved:       false,
+        folderName:         c.folderName ?? buildFolderName(c, idx, _noRenameAllSameCity),
       }));
       if (activeMaster?.path) {
         const noRenamePath = activeMaster.path + '/' + oldName;
@@ -1777,13 +1818,15 @@ ${unparseable.map(ev => `
     const _renameAllSameCity = compsWithIds.length <= 1 ||
       compsWithIds.every(c => c.city?.label === compsWithIds[0].city?.label);
     const compsForDisk = compsWithIds.map((c, idx) => ({
-      id:           c.id,
-      types:        c.eventTypes.map(et => et.label),
-      location:     c.location?.label || null,
-      city:         c.city?.label     || '',
-      isUnresolved: false,
+      id:                 c.id,
+      types:              c.eventTypes.map(et => et.label),
+      location:           c.location?.label || null,
+      city:               c.city?.label     || '',
+      country:            c.country         || null,
+      additionalKeywords: Array.isArray(c.additionalKeywords) && c.additionalKeywords.length ? c.additionalKeywords : undefined,
+      isUnresolved:       false,
       // Preserve existing folderName (set once at creation — never recompute).
-      folderName:   c.folderName ?? buildFolderName(c, idx, _renameAllSameCity),
+      folderName:         c.folderName ?? buildFolderName(c, idx, _renameAllSameCity),
     }));
     if (!compsForDisk.every(c => typeof c.id === 'number')) {
       throw new Error('Invalid component structure: missing id');
@@ -1952,16 +1995,16 @@ ${unparseable.map(ev => `
   </div>
   ` : ''}
 
-  <!-- Optional Archive Registry Event ID -->
+  <!-- Optional Collection Code -->
   <div class="ec-field" style="margin-top:16px">
-    <p class="ec-section-title">Archive Registry ID <span style="font-size:0.75rem;font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-muted)">— optional</span></p>
-    <input id="evArchiveEventId" type="text"
-           value="${esc(_viewingExisting?.eventId || _archiveEventId || '')}"
+    <p class="ec-section-title">Collection Code <span style="font-size:0.75rem;font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-muted)">— optional</span></p>
+    <input id="evCollectionCode" type="text"
+           value="${esc(_viewingExisting?.collectionCode || _viewingExisting?.eventId || _collectionCode || '')}"
            ${_viewingExisting && !_editMode ? 'disabled style="opacity:0.6"' : ''}
-           placeholder="Enter official Archive Registry ID (optional)"
-           aria-label="Archive Registry Event ID"
+           placeholder="Optional archive collection reference"
+           aria-label="Collection Code"
            autocomplete="off" maxlength="128">
-    <span class="ec-hint">Official ID from the Archive Entry Form / Registry. Leave blank if not yet assigned.</span>
+    <span class="ec-hint">Optional archive collection reference. Leave blank if not yet assigned.</span>
   </div>
 
   <div class="ec-global-city">
@@ -2020,6 +2063,21 @@ ${unparseable.map(ev => `
       </div>
     </div>
     <div class="ec-comp-field">
+      <label class="ec-comp-field-label">Additional Keywords <span class="ec-opt">(metadata only)</span></label>
+      <div class="ec-kw-wrap">
+        <div class="ec-kw-chips" id="ecKwChips-${comp.id}">${(comp.additionalKeywords || []).map((kw, ki) => {
+          const label = kw.label || '';
+          const ro = _viewingExisting && !_editMode;
+          return `<span class="ec-chip ec-kw-chip">` +
+            `<span class="ec-chip-label">${esc(label)}</span>` +
+            `<button type="button" class="ec-kw-chip-x" data-comp="${comp.id}" data-idx="${ki}" aria-label="Remove ${esc(label)}"${ro ? ' disabled' : ''}>×</button>` +
+            `</span>`;
+        }).join('')}</div>
+        ${!(_viewingExisting && !_editMode) ? `<div class="ec-kw-add-row"><div class="ec-kw-search-wrap" data-comp-id="${comp.id}"><input type="text" id="ecKwInput-${comp.id}" class="ec-kw-input" placeholder="Search keyword registry…" autocomplete="off" maxlength="80" aria-label="Search keyword registry" aria-autocomplete="list" aria-controls="ecKwDD-${comp.id}" aria-expanded="false"><div class="ec-kw-dropdown" id="ecKwDD-${comp.id}" hidden role="listbox"></div></div></div>` : ''}
+        <div class="ec-kw-free-error" id="ecKwFreeErr-${comp.id}" hidden aria-live="polite">Select a keyword from the registry. To add a new keyword, update the Keyword Registry first.</div>
+      </div>
+    </div>
+    <div class="ec-comp-field">
       <label class="ec-comp-field-label">Location <span class="ec-opt">(optional)</span></label>
       <div id="ecLoc-${comp.id}"></div>
     </div>
@@ -2027,8 +2085,170 @@ ${unparseable.map(ev => `
       <label class="ec-comp-field-label">City <span class="ec-req">*</span></label>
       <div id="ecCity-${comp.id}"></div>
     </div>
+    <div class="ec-comp-field">
+      <label class="ec-comp-field-label">Country <span class="ec-opt">(metadata only)</span></label>
+      <div id="ecCountry-${comp.id}"></div>
+    </div>
+  </div>
+  <div class="ec-kw-adv" id="ecKwAdv-${comp.id}">
+    <button type="button" class="ec-kw-adv-toggle" data-comp-id="${comp.id}" aria-expanded="false" aria-controls="ecKwAdvBody-${comp.id}">Folder name options</button>
+    <div class="ec-kw-adv-body" id="ecKwAdvBody-${comp.id}" hidden>
+      <div class="ec-kw-adv-preview" id="ecKwAdvPreview-${comp.id}"></div>
+      <p class="ec-kw-adv-warn" id="ecKwAdvWarn-${comp.id}" hidden>Folder name is getting long. Consider keeping some keywords as metadata only.</p>
+      <div class="ec-kw-adv-rows" id="ecKwAdvRows-${comp.id}"></div>
+    </div>
   </div>
 </div>`;
+  }
+
+  // ── Keyword Registry helpers ───────────────────────────────────────────────
+
+  async function _getRegistry() {
+    if (_kwRegistry) return _kwRegistry;
+    if (!_kwRegistryPromise) {
+      _kwRegistryPromise = window.api.keywordsLoadRegistry()
+        .then(reg => { _kwRegistry = reg; return reg; })
+        .catch(() => null);
+    }
+    return _kwRegistryPromise;
+  }
+
+  function _kwRegistryItems(reg) {
+    if (!reg) return [];
+    const seen = new Set();
+    const result = [];
+    for (const kw of [...(reg.base?.keywords || []), ...(reg.overrides || [])]) {
+      if (!kw.label) continue;
+      const lo = kw.label.toLowerCase();
+      if (seen.has(lo)) continue;
+      seen.add(lo);
+      result.push({ id: kw.id || null, label: kw.label });
+    }
+    return result;
+  }
+
+  function _countryRegistryItems(reg) {
+    if (!reg) return [];
+    const countryGroups = new Set(
+      (reg.base?.groups || []).filter(g => g.category === 'country').map(g => g.id)
+    );
+    const seen = new Set();
+    const result = [];
+    for (const kw of [...(reg.base?.keywords || []), ...(reg.overrides || [])]) {
+      if (!kw.label) continue;
+      const lo = kw.label.toLowerCase();
+      if (seen.has(lo)) continue;
+      if (kw.category !== 'country' && !countryGroups.has(kw.groupId)) continue;
+      seen.add(lo);
+      result.push({ label: kw.label });
+    }
+    return result;
+  }
+
+  async function _showKwDropdown(inputEl, comp, query) {
+    const ddEl = document.getElementById(`ecKwDD-${comp.id}`);
+    if (!ddEl) return;
+    const q = (query || '').trim().toLowerCase();
+    if (!q) {
+      ddEl.hidden = true;
+      inputEl.setAttribute('aria-expanded', 'false');
+      return;
+    }
+    const reg = await _getRegistry();
+    const items = _kwRegistryItems(reg);
+    const existingLabels = new Set((comp.additionalKeywords || []).map(k => (k.label || '').toLowerCase()));
+    const matches = items
+      .filter(kw => kw.label.toLowerCase().includes(q) && !existingLabels.has(kw.label.toLowerCase()))
+      .slice(0, 8);
+    if (matches.length === 0) {
+      ddEl.innerHTML = `<div class="ec-kw-dd-empty">No matches in registry</div>`;
+      ddEl.hidden = false;
+      inputEl.setAttribute('aria-expanded', 'true');
+      return;
+    }
+    ddEl.innerHTML = matches.map(kw =>
+      `<div class="ec-kw-dd-item" data-label="${esc(kw.label)}" data-kid="${esc(kw.id || '')}" role="option" tabindex="-1">${esc(kw.label)}</div>`
+    ).join('');
+    ddEl.hidden = false;
+    inputEl.setAttribute('aria-expanded', 'true');
+  }
+
+  function _addKwToComp(comp, label, keywordId) {
+    if (!label) return false;
+    if (!Array.isArray(comp.additionalKeywords)) comp.additionalKeywords = [];
+    if (comp.additionalKeywords.some(k => (k.label || '').toLowerCase() === label.toLowerCase())) return false;
+    comp.additionalKeywords.push({ label, keywordId: keywordId || null, useInFolderName: false });
+    return true;
+  }
+
+  // ── Advanced folder-name panel ─────────────────────────────────────────────
+
+  function _buildPlacementSelect(comp, kw, ki) {
+    const types   = comp.eventTypes || [];
+    const fp      = kw.folderPlacement;
+    const cur     = fp ? (fp.mode === 'end-of-event-tags' ? 'end'
+                         : (fp.mode === 'before-event-tag' ? `before:${fp.anchorIndex}` : `after:${fp.anchorIndex}`))
+                       : 'end';
+    const ro      = _viewingExisting && !_editMode;
+    const opts    = [];
+    if (types.length > 0) {
+      opts.push(`<option value="before:0"${cur === 'before:0' ? ' selected' : ''}>Before ${esc(types[0].label)}</option>`);
+      for (let i = 0; i < types.length; i++) {
+        const v = `after:${i}`;
+        opts.push(`<option value="${v}"${cur === v ? ' selected' : ''}>After ${esc(types[i].label)}</option>`);
+      }
+    }
+    opts.push(`<option value="end"${cur === 'end' ? ' selected' : ''}>End of Event Tags</option>`);
+    return `<select class="ec-kw-adv-placement" data-comp="${comp.id}" data-idx="${ki}"${ro ? ' disabled' : ''}>${opts.join('')}</select>`;
+  }
+
+  function _refreshKwAdvanced(comp) {
+    const bodyEl = document.getElementById(`ecKwAdvBody-${comp.id}`);
+    if (!bodyEl || bodyEl.hidden) return;
+    const rowsEl = document.getElementById(`ecKwAdvRows-${comp.id}`);
+    const prevEl = document.getElementById(`ecKwAdvPreview-${comp.id}`);
+    const warnEl = document.getElementById(`ecKwAdvWarn-${comp.id}`);
+    if (!rowsEl) return;
+
+    const allSameCity = _eventComps.length <= 1 ||
+      _eventComps.every(c => c.city?.label === _eventComps[0].city?.label);
+    const compIdx  = _eventComps.findIndex(c => c.id === comp.id);
+    const folderName = buildFolderName(comp, compIdx >= 0 ? compIdx : 0, allSameCity);
+    if (prevEl) prevEl.innerHTML = `<span class="ec-kw-adv-prev-label">Preview</span><code class="ec-kw-adv-prev-code">${esc(folderName)}</code>`;
+    const kwInFolder = (comp.additionalKeywords || []).some(k => k.useInFolderName);
+    if (warnEl) warnEl.hidden = !(kwInFolder && folderName.length > 160);
+
+    const kws = comp.additionalKeywords || [];
+    const isReadonly = _viewingExisting && !_editMode;
+    if (kws.length === 0) {
+      rowsEl.innerHTML = '<p class="ec-kw-adv-empty">Add an additional keyword above to enable folder name options.</p>';
+      return;
+    }
+    rowsEl.innerHTML = kws.map((kw, ki) => {
+      const inFolder = !!kw.useInFolderName;
+      return `<div class="ec-kw-adv-row">` +
+        `<span class="ec-kw-adv-kw-name">${esc(kw.label || '')}</span>` +
+        `<label class="ec-kw-adv-include-label">` +
+          `<input type="checkbox" class="ec-kw-adv-check" data-comp="${comp.id}" data-idx="${ki}"${inFolder ? ' checked' : ''}${isReadonly ? ' disabled' : ''}>` +
+          `<span>Include in folder name</span>` +
+        `</label>` +
+        (inFolder ? `<div class="ec-kw-adv-placement-row"><span class="ec-kw-adv-placement-label">Placement:</span>${_buildPlacementSelect(comp, kw, ki)}</div>` : '') +
+        `</div>`;
+    }).join('');
+  }
+
+  function _refreshKwChips(comp) {
+    const el = document.getElementById(`ecKwChips-${comp.id}`);
+    if (!el) return;
+    const isReadonly = _viewingExisting && !_editMode;
+    el.innerHTML = (comp.additionalKeywords || []).map((kw, ki) => {
+      const label = kw.label || '';
+      return `<span class="ec-chip ec-kw-chip">` +
+        `<span class="ec-chip-label">${esc(label)}</span>` +
+        `<button type="button" class="ec-kw-chip-x" data-comp="${comp.id}" data-idx="${ki}" ` +
+          `aria-label="Remove ${esc(label)}"${isReadonly ? ' disabled' : ''}>×</button>` +
+        `</span>`;
+    }).join('');
   }
 
   // ── Dropdown mounting ──────────────────────────────────────────────────────
@@ -2098,7 +2318,164 @@ ${unparseable.map(ev => `
       if (comp.city) row.city.setValue(comp.city.id, comp.city.label);
     }
 
+    row.country = _mountCountryDD(comp);
+    if (comp.country) row.country?.setValue(comp.country);
+
     _compDDs[comp.id] = row;
+  }
+
+  // ── Country control (TreeAutocomplete-compatible, sourced from keyword registry) ──
+
+  function _mountCountryDD(comp) {
+    const container = document.getElementById(`ecCountry-${comp.id}`);
+    if (!container) return null;
+
+    container.innerHTML = '';
+
+    const wrap = document.createElement('div');
+    wrap.className = 'tac';
+
+    const rowEl = document.createElement('div');
+    rowEl.className = 'tac-row';
+
+    const inp = document.createElement('input');
+    inp.type         = 'text';
+    inp.className    = 'tac-inp';
+    inp.placeholder  = 'Country';
+    inp.autocomplete = 'off';
+    inp.spellcheck   = false;
+    inp.setAttribute('role', 'combobox');
+    inp.setAttribute('aria-autocomplete', 'list');
+    inp.setAttribute('aria-expanded', 'false');
+
+    const clearBtn = document.createElement('button');
+    clearBtn.type      = 'button';
+    clearBtn.className = 'tac-clear-btn';
+    clearBtn.textContent = '×';
+    clearBtn.hidden    = true;
+    clearBtn.setAttribute('tabindex', '-1');
+    clearBtn.setAttribute('aria-label', 'Clear country');
+
+    const chev = document.createElement('span');
+    chev.className = 'tac-chev';
+    chev.setAttribute('aria-hidden', 'true');
+
+    rowEl.append(inp, clearBtn, chev);
+
+    const dd = document.createElement('div');
+    dd.className = 'tac-dd';
+    dd.hidden    = true;
+    dd.setAttribute('role', 'listbox');
+
+    wrap.append(rowEl, dd);
+    container.append(wrap);
+
+    let _isOpen   = false;
+    let _selected = null;
+    let _items    = null;
+
+    async function _ensureItems() {
+      if (_items) return _items;
+      const reg = await _getRegistry();
+      _items = _countryRegistryItems(reg);
+      return _items;
+    }
+
+    function _render(query) {
+      dd.innerHTML = '';
+      const q       = (query || '').trim().toLowerCase();
+      const src     = _items || [];
+      const matches = q ? src.filter(c => c.label.toLowerCase().includes(q)) : src;
+
+      if (matches.length === 0) {
+        const empty = document.createElement('div');
+        empty.className   = 'tac-empty';
+        empty.textContent = src.length === 0
+          ? 'No countries found in keyword registry. Import your Bridge keyword list first.'
+          : 'No matches';
+        dd.append(empty);
+      } else {
+        matches.slice(0, 20).forEach(c => {
+          const el = document.createElement('div');
+          el.className = 'tac-item';
+          el.setAttribute('role', 'option');
+          el.textContent = c.label;
+          el.addEventListener('mousedown', e => { e.preventDefault(); _select(c.label); });
+          dd.append(el);
+        });
+      }
+    }
+
+    async function _open() {
+      if (_isOpen) return;
+      _isOpen = true;
+      dd.hidden = false;
+      wrap.dataset.open = '';
+      inp.setAttribute('aria-expanded', 'true');
+      await _ensureItems();
+      _render(inp.value);
+    }
+
+    function _close() {
+      if (!_isOpen) return;
+      _isOpen = false;
+      dd.hidden = true;
+      delete wrap.dataset.open;
+      inp.setAttribute('aria-expanded', 'false');
+      inp.value      = _selected || '';
+      clearBtn.hidden = !_selected;
+    }
+
+    function _select(label) {
+      _selected    = label;
+      comp.country = label;
+      inp.value    = label;
+      clearBtn.hidden = false;
+      _close();
+    }
+
+    function _clearVal() {
+      _selected    = null;
+      comp.country = '';
+      inp.value    = '';
+      clearBtn.hidden = true;
+      if (_isOpen) _render('');
+    }
+
+    inp.addEventListener('focus', () => _open());
+    inp.addEventListener('input', async () => {
+      clearBtn.hidden = !inp.value;
+      if (!_isOpen) {
+        _isOpen = true;
+        dd.hidden = false;
+        wrap.dataset.open = '';
+        inp.setAttribute('aria-expanded', 'true');
+      }
+      await _ensureItems();
+      _render(inp.value);
+    });
+    clearBtn.addEventListener('mousedown', e => { e.preventDefault(); _clearVal(); });
+
+    const _globalDown = e => { if (!wrap.contains(e.target)) _close(); };
+    document.addEventListener('mousedown', _globalDown, true);
+
+    return {
+      setValue(label) {
+        if (!label) return;
+        _selected       = label;
+        inp.value       = label;
+        clearBtn.hidden = false;
+      },
+      clear()       { _clearVal(); },
+      setDisabled(v) {
+        inp.disabled = v;
+        wrap.classList.toggle('tac-disabled', v);
+      },
+      destroy() {
+        document.removeEventListener('mousedown', _globalDown, true);
+        wrap.remove();
+      }
+    };
   }
 
   // ── Chip helpers ───────────────────────────────────────────────────────────
@@ -2154,7 +2531,7 @@ ${unparseable.map(ev => `
         _repairFolderName = null;
         setEventState([]);
         _newEventDate    = null;
-        _archiveEventId  = '';
+        _collectionCode  = '';
         _destroyEventDDs();
         showMasterStep();
         return;
@@ -2167,7 +2544,7 @@ ${unparseable.map(ev => `
         _repairMode       = false;
         _repairFolderName = null;
         _newEventDate    = null;
-        _archiveEventId  = '';
+        _collectionCode  = '';
         setEventState([]);
         _destroyEventDDs();
         _renderEventList();
@@ -2179,8 +2556,6 @@ ${unparseable.map(ev => `
         _eventComps.push(_makeComp());
         _refreshCompList();
         _updateEventPreview();
-        const last = _eventComps[_eventComps.length - 1];
-        document.getElementById(`ecET-${last.id}`)?.querySelector('input')?.focus();
         return;
       }
 
@@ -2224,7 +2599,7 @@ ${unparseable.map(ev => `
       if (removeBtn) {
         const id  = Number(removeBtn.dataset.compId);
         const row = _compDDs[id];
-        row?.et?.destroy(); row?.loc?.destroy(); row?.city?.destroy();
+        row?.et?.destroy(); row?.loc?.destroy(); row?.city?.destroy(); row?.country?.destroy();
         delete _compDDs[id];
         setEventState(_eventComps.filter(c => c.id !== id));
         _refreshCompList();
@@ -2245,9 +2620,87 @@ ${unparseable.map(ev => `
         }
         return;
       }
+
+      // .ec-kw-chip-x — remove an additional keyword chip
+      const kwChipX = e.target.closest('.ec-kw-chip-x');
+      if (kwChipX) {
+        const compId = Number(kwChipX.dataset.comp);
+        const idx    = Number(kwChipX.dataset.idx);
+        const comp   = _eventComps.find(c => c.id === compId);
+        if (comp) {
+          comp.additionalKeywords.splice(idx, 1);
+          _refreshKwChips(comp);
+          _updateEventPreview();
+        }
+        return;
+      }
+
+      // .ec-kw-toggle-folder — toggle useInFolderName on a keyword chip
+      const kwToggle = e.target.closest('.ec-kw-toggle-folder');
+      if (kwToggle) {
+        const compId = Number(kwToggle.dataset.comp);
+        const idx    = Number(kwToggle.dataset.idx);
+        const comp   = _eventComps.find(c => c.id === compId);
+        if (comp && comp.additionalKeywords[idx]) {
+          const newInFolder = !comp.additionalKeywords[idx].useInFolderName;
+          const types2 = comp.eventTypes || [];
+          const lastIdx2 = types2.length > 0 ? types2.length - 1 : -1;
+          const defFp = lastIdx2 >= 0
+            ? { mode: 'after-event-tag', anchorLabel: types2[lastIdx2].label, anchorIndex: lastIdx2, order: 0 }
+            : { mode: 'end-of-event-tags', anchorLabel: null, anchorIndex: -1, order: 0 };
+          comp.additionalKeywords[idx] = {
+            ...comp.additionalKeywords[idx],
+            useInFolderName: newInFolder,
+            folderPlacement: newInFolder && !comp.additionalKeywords[idx].folderPlacement
+              ? defFp
+              : comp.additionalKeywords[idx].folderPlacement
+          };
+          _refreshKwChips(comp);
+          _refreshKwAdvanced(comp);
+          _updateEventPreview();
+        }
+        return;
+      }
+
+      // .ec-kw-adv-toggle — open/close the advanced folder-name panel
+      const advToggle = e.target.closest('.ec-kw-adv-toggle');
+      if (advToggle) {
+        const compId = Number(advToggle.dataset.compId);
+        const comp   = _eventComps.find(c => c.id === compId);
+        const bodyEl = document.getElementById(`ecKwAdvBody-${compId}`);
+        if (!bodyEl) return;
+        const isOpen = !bodyEl.hidden;
+        bodyEl.hidden = isOpen;
+        advToggle.setAttribute('aria-expanded', String(!isOpen));
+        advToggle.classList.toggle('open', !isOpen);
+        if (!isOpen && comp) _refreshKwAdvanced(comp);
+        return;
+      }
+
+      // .ec-kw-dd-item — select a keyword from the search dropdown
+      const ddItem = e.target.closest('.ec-kw-dd-item');
+      if (ddItem) {
+        const wrap = ddItem.closest('.ec-kw-search-wrap');
+        if (!wrap) return;
+        const compId = Number(wrap.dataset.compId);
+        const comp   = _eventComps.find(c => c.id === compId);
+        if (!comp) return;
+        const label     = ddItem.dataset.label;
+        if (!label) return; // "No matches" placeholder — no data-label
+        const keywordId = ddItem.dataset.kid || null;
+        if (_addKwToComp(comp, label, keywordId)) {
+          _refreshKwChips(comp);
+          _updateEventPreview();
+        }
+        const inputEl = document.getElementById(`ecKwInput-${comp.id}`);
+        const ddEl    = document.getElementById(`ecKwDD-${comp.id}`);
+        if (inputEl) { inputEl.value = ''; inputEl.setAttribute('aria-expanded', 'false'); }
+        if (ddEl)    ddEl.hidden = true;
+        return;
+      }
     });
 
-    // ── Input delegation (hijri date fields) ────────────────────────────────
+    // ── Input delegation (hijri date fields + country) ──────────────────────
     body.addEventListener('input', e => {
       const id = e.target.id;
       if (id === 'evHijriYear' || id === 'evHijriMonth' || id === 'evHijriDay') {
@@ -2256,12 +2709,17 @@ ${unparseable.map(ev => `
         if (id === 'evHijriMonth' && e.target.value.length === 2) document.getElementById('evHijriDay')?.focus();
         _onEvDateInput();
       }
-      if (id === 'evArchiveEventId') {
-        _archiveEventId = e.target.value.trim();
+      if (id === 'evCollectionCode') {
+        _collectionCode = e.target.value.trim();
+      }
+      if (e.target.classList.contains('ec-kw-input')) {
+        const compId = Number(e.target.id.replace('ecKwInput-', ''));
+        const comp   = _eventComps.find(c => c.id === compId);
+        if (comp) _showKwDropdown(e.target, comp, e.target.value);
       }
     });
 
-    // ── Keydown delegation (hijri date navigation) ───────────────────────────
+    // ── Keydown delegation (hijri date navigation + keyword enter) ───────────
     body.addEventListener('keydown', e => {
       const { id, value } = e.target;
       if (id === 'evHijriMonth' && e.key === 'Backspace' && value === '') {
@@ -2275,6 +2733,93 @@ ${unparseable.map(ev => `
       } else if (id === 'evHijriDay'   && e.key === 'Enter') {
         document.getElementById('collLabel')?.focus();
       }
+      if (e.target.classList.contains('ec-kw-input')) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const compId = Number(id.replace('ecKwInput-', ''));
+          const kw     = value.trim();
+          if (!kw) return;
+          // Free text is not accepted — only registry items via dropdown click
+          const errEl = document.getElementById(`ecKwFreeErr-${compId}`);
+          if (errEl) {
+            errEl.hidden = false;
+            setTimeout(() => { if (errEl) errEl.hidden = true; }, 4000);
+          }
+          const ddEl = document.getElementById(`ecKwDD-${compId}`);
+          if (ddEl) { ddEl.hidden = true; e.target.setAttribute('aria-expanded', 'false'); }
+        } else if (e.key === 'Escape') {
+          const compId = Number(id.replace('ecKwInput-', ''));
+          const ddEl   = document.getElementById(`ecKwDD-${compId}`);
+          if (ddEl) { ddEl.hidden = true; e.target.setAttribute('aria-expanded', 'false'); }
+        }
+      }
+    });
+
+    // ── Change delegation — advanced folder-name panel (checkbox + placement) ──
+    body.addEventListener('change', e => {
+      const advCheck = e.target.closest('.ec-kw-adv-check');
+      if (advCheck) {
+        const compId = Number(advCheck.dataset.comp);
+        const idx    = Number(advCheck.dataset.idx);
+        const comp   = _eventComps.find(c => c.id === compId);
+        if (!comp || !comp.additionalKeywords[idx]) return;
+        const newInFolder = advCheck.checked;
+        const types = comp.eventTypes || [];
+        const lastTypeIdx = types.length > 0 ? types.length - 1 : -1;
+        const defaultPlacement = lastTypeIdx >= 0
+          ? { mode: 'after-event-tag', anchorLabel: types[lastTypeIdx].label, anchorIndex: lastTypeIdx, order: 0 }
+          : { mode: 'end-of-event-tags', anchorLabel: null, anchorIndex: -1, order: 0 };
+        comp.additionalKeywords[idx] = {
+          ...comp.additionalKeywords[idx],
+          useInFolderName: newInFolder,
+          folderPlacement: newInFolder && !comp.additionalKeywords[idx].folderPlacement
+            ? defaultPlacement
+            : comp.additionalKeywords[idx].folderPlacement
+        };
+        _refreshKwChips(comp);
+        _refreshKwAdvanced(comp);
+        _updateEventPreview();
+        return;
+      }
+      const advPlace = e.target.closest('.ec-kw-adv-placement');
+      if (advPlace) {
+        const compId = Number(advPlace.dataset.comp);
+        const idx    = Number(advPlace.dataset.idx);
+        const comp   = _eventComps.find(c => c.id === compId);
+        if (!comp || !comp.additionalKeywords[idx]) return;
+        const val    = advPlace.value;
+        let fp;
+        if (val === 'end') {
+          fp = { mode: 'end-of-event-tags', anchorLabel: null, anchorIndex: -1, order: 0 };
+        } else if (val.startsWith('before:')) {
+          const ai   = Number(val.replace('before:', ''));
+          fp = { mode: 'before-event-tag', anchorLabel: comp.eventTypes?.[ai]?.label || null, anchorIndex: ai, order: 0 };
+        } else if (val.startsWith('after:')) {
+          const ai   = Number(val.replace('after:', ''));
+          fp = { mode: 'after-event-tag', anchorLabel: comp.eventTypes?.[ai]?.label || null, anchorIndex: ai, order: 0 };
+        } else {
+          fp = { mode: 'end-of-event-tags', anchorLabel: null, anchorIndex: -1, order: 0 };
+        }
+        comp.additionalKeywords[idx] = { ...comp.additionalKeywords[idx], folderPlacement: fp };
+        _refreshKwAdvanced(comp);
+        _updateEventPreview();
+        return;
+      }
+    });
+
+    // ── Focusout delegation — close keyword/country dropdowns when focus leaves ─
+    body.addEventListener('focusout', e => {
+      if (e.target.classList.contains('ec-kw-input')) {
+        // Delay so a click on a dd-item fires first
+        setTimeout(() => {
+          const compId = Number(e.target.id.replace('ecKwInput-', ''));
+          const ddEl   = document.getElementById(`ecKwDD-${compId}`);
+          if (ddEl && !ddEl.hidden) {
+            ddEl.hidden = true;
+            e.target.setAttribute('aria-expanded', 'false');
+          }
+        }, 150);
+      }
     });
   }
 
@@ -2284,7 +2829,7 @@ ${unparseable.map(ev => `
 
     Object.keys(_compDDs).forEach(id => {
       const row = _compDDs[Number(id)];
-      row?.et?.destroy(); row?.loc?.destroy(); row?.city?.destroy();
+      row?.et?.destroy(); row?.loc?.destroy(); row?.city?.destroy(); row?.country?.destroy();
     });
     _compDDs = {};
 
@@ -2366,23 +2911,38 @@ ${unparseable.map(ev => `
   function _buildCompString(comps) {
     if (!Array.isArray(comps) || comps.length === 0) return '';
 
-    const normalized = comps;
-    if (!normalized.length) return '';
+    const firstCity   = comps[0]?.city?.label || '';
+    const allSameCity = comps.every(c => (c.city?.label || '') === firstCity);
 
-    const firstCity  = normalized[0]?.city?.label || '';
-    const allSameCity = normalized.every(c => (c.city?.label || '') === firstCity);
+    const byMode = (k, mode, ai) => {
+      const fp = k.folderPlacement;
+      if (!fp) return mode === 'end-of-event-tags';
+      return fp.mode === mode && (ai === undefined || fp.anchorIndex === ai);
+    };
+    const byOrder = (a, b) => (a.folderPlacement?.order || 0) - (b.folderPlacement?.order || 0);
 
     const parts = [];
-    normalized.forEach(comp => {
-      comp.eventTypes.forEach(et => { if (et.label) parts.push(et.label); });
+    comps.forEach(comp => {
+      const kwToFolder = (comp.additionalKeywords || []).filter(k => k && k.useInFolderName);
+      const eventTypes = comp.eventTypes || [];
+
+      if (kwToFolder.length === 0) {
+        eventTypes.forEach(et => { if (et.label) parts.push(et.label); });
+      } else {
+        for (let i = 0; i < eventTypes.length; i++) {
+          kwToFolder.filter(k => byMode(k, 'before-event-tag', i)).sort(byOrder).forEach(k => parts.push(k.label));
+          if (eventTypes[i].label) parts.push(eventTypes[i].label);
+          kwToFolder.filter(k => byMode(k, 'after-event-tag', i)).sort(byOrder).forEach(k => parts.push(k.label));
+        }
+        kwToFolder.filter(k => byMode(k, 'end-of-event-tags')).sort(byOrder).forEach(k => parts.push(k.label));
+      }
+
       if (comp.location?.label) parts.push(comp.location.label);
       if (!allSameCity && comp.city?.label) parts.push(comp.city.label);
     });
     if (allSameCity && firstCity) parts.push(firstCity);
 
-    const finalName = sanitizeEventName(parts.join('-'));
-    console.log('FINAL EVENT NAME:', finalName);
-    return finalName;
+    return sanitizeEventName(parts.join('-'));
   }
 
   // ── Live preview + continue-button gate ────────────────────────────────────
@@ -2541,14 +3101,16 @@ ${unparseable.map(ev => `
       const allSameCity = cleanComps.length <= 1 ||
         cleanComps.every(c => c.city?.label === cleanComps[0].city?.label);
       const compsForDisk = cleanComps.map((c, idx) => ({
-        types:        c.eventTypes.map(et => et.label),
-        location:     c.location?.label || null,
-        city:         c.city?.label     || '',
-        isUnresolved: false,
-        folderName:   buildFolderName(c, idx, allSameCity),
+        types:              c.eventTypes.map(et => et.label),
+        location:           c.location?.label || null,
+        city:               c.city?.label     || '',
+        country:            c.country         || null,
+        additionalKeywords: Array.isArray(c.additionalKeywords) && c.additionalKeywords.length ? c.additionalKeywords : undefined,
+        isUnresolved:       false,
+        folderName:         buildFolderName(c, idx, allSameCity),
       }));
 
-      const archiveId = document.getElementById('evArchiveEventId')?.value?.trim() || _archiveEventId || null;
+      const collectionCode = document.getElementById('evCollectionCode')?.value?.trim() || _collectionCode || null;
       const eventJsonPayload = {
         version:       1,
         hijriDate:     _newEventDate,
@@ -2561,12 +3123,12 @@ ${unparseable.map(ev => `
         createdAt:     Date.now(),
         updatedAt:     Date.now(),
       };
-      if (archiveId) {
-        eventJsonPayload.eventId = archiveId;
-        eventJsonPayload.eventRegistry = {
-          system:    'archive-entry-form',
-          id:        archiveId,
-          linkedAt:  new Date().toISOString(),
+      if (collectionCode) {
+        eventJsonPayload.collectionCode     = collectionCode;
+        eventJsonPayload.collectionCodeLink = {
+          system:   'archive-entry-form',
+          code:     collectionCode,
+          linkedAt: new Date().toISOString(),
         };
       }
       window.api.writeEventJson(eventFolderPath, eventJsonPayload).then(result => {

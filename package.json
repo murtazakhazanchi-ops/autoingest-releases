@@ -10,7 +10,8 @@
     "dist:win": "electron-builder --win",
     "build": "electron-builder",
     "build:mac": "electron-builder --mac",
-    "build:win": "electron-builder --win"
+    "build:win": "electron-builder --win",
+    "validate:metadata": "node scripts/validate-event-metadata.js"
   },
   "dependencies": {
     "drivelist": "^9.2.4",

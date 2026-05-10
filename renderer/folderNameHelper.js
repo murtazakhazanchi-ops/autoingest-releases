@@ -17,24 +17,49 @@ function sanitizeForFolder(name) {
  * Derive a component subfolder name from a UI-format component.
  * The result is deterministic for a given (comp, idx, allSameCity) triple.
  * City is included only when allSameCity is false (components have mixed cities).
+ * Additional keywords with useInFolderName:true are appended in array order.
  *
- * @param {{ eventTypes: {label:string}[], city: {label:string}|null, location: {label:string}|null }} comp
+ * @param {{ eventTypes: {label:string}[], city: {label:string}|null, location: {label:string}|null, additionalKeywords?: {label:string,useInFolderName:boolean}[] }} comp
  * @param {number} idx  0-based position in the sorted-by-id component list
  * @param {boolean} allSameCity
  * @returns {string}
  */
 export function buildFolderName(comp, idx, allSameCity = false) {
   const indexPart    = String(idx + 1).padStart(2, '0');
-  const typePart     = sanitizeForFolder(
-    (comp.eventTypes || []).map(t => t.label).join('-')
-  );
+  const eventTypes   = comp.eventTypes || [];
   const locationPart = comp.location?.label
     ? '-' + sanitizeForFolder(comp.location.label)
     : '';
   const cityPart     = (!allSameCity && comp.city?.label)
     ? '-' + sanitizeForFolder(comp.city.label)
     : '';
-  return `${indexPart}-${typePart}${locationPart}${cityPart}`;
+
+  const kwToFolder = (comp.additionalKeywords || []).filter(k => k && k.useInFolderName);
+
+  if (kwToFolder.length === 0) {
+    const typePart = sanitizeForFolder(eventTypes.map(t => t.label).join('-'));
+    return `${indexPart}-${typePart}${locationPart}${cityPart}`;
+  }
+
+  // Interleave folder keywords within the event-tag section per placement.
+  // Keywords without explicit placement default to end-of-event-tags.
+  const byMode = (k, mode, ai) => {
+    const fp = k.folderPlacement;
+    if (!fp) return mode === 'end-of-event-tags';
+    return fp.mode === mode && (ai === undefined || fp.anchorIndex === ai);
+  };
+  const byOrder = (a, b) => (a.folderPlacement?.order || 0) - (b.folderPlacement?.order || 0);
+
+  const tokens = [];
+  for (let i = 0; i < eventTypes.length; i++) {
+    kwToFolder.filter(k => byMode(k, 'before-event-tag', i)).sort(byOrder).forEach(k => tokens.push(k.label));
+    tokens.push(eventTypes[i].label);
+    kwToFolder.filter(k => byMode(k, 'after-event-tag', i)).sort(byOrder).forEach(k => tokens.push(k.label));
+  }
+  kwToFolder.filter(k => byMode(k, 'end-of-event-tags')).sort(byOrder).forEach(k => tokens.push(k.label));
+
+  const typeAndKwPart = sanitizeForFolder(tokens.join('-'));
+  return `${indexPart}-${typeAndKwPart}${locationPart}${cityPart}`;
 }
 
 /**

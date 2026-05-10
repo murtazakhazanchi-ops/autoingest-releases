@@ -2271,21 +2271,25 @@ let _msScanCounter      = 0;           // incremented on each user-triggered sca
 function _refreshMetadataSyncCard() {
   const valEl   = document.getElementById('ovMetadataSyncVal');
   const labelEl = document.getElementById('ovMetadataSyncLabel');
+  const tileEl  = document.getElementById('ovMetadataSync');
   if (!valEl || !labelEl) return;
 
   if (_msSyncRunning.size > 0) {
     valEl.textContent   = 'Syncing…';
     labelEl.textContent = 'METADATA UPDATE';
+    tileEl?.classList.remove('ov-tile--pending');
     return;
   }
   // Pending count set by _msScanAndRender; default state shows "—"
   const pending = parseInt(valEl.getAttribute('data-pending') || '0', 10);
   if (pending > 0) {
     valEl.textContent   = String(pending);
-    labelEl.textContent = 'EVENTS NEED METADATA SYNC';
+    labelEl.textContent = 'EVENTS NEED SYNC';
+    tileEl?.classList.add('ov-tile--pending');
   } else {
     valEl.textContent   = '—';
     labelEl.textContent = 'METADATA UP TO DATE';
+    tileEl?.classList.remove('ov-tile--pending');
   }
 }
 
@@ -2320,12 +2324,12 @@ async function _msScanBackground({ force = false } = {}) {
 }
 
 function _reasonLabel(reason, lastSyncError) {
-  if (reason === 'sync-error')               return lastSyncError ? `Previous sync error: ${lastSyncError}` : 'Previous sync had an error';
-  if (reason === 'xmp-changed')              return 'Metadata updated since last sync';
-  if (reason === 'migration-needed')         return 'Metadata index migration needed';
-  if (reason === 'metadata-index-missing')   return 'Metadata index file missing';
-  if (reason === 'metadata-index-mismatch')  return 'Metadata index ID mismatch — review required';
-  return 'Never synced';
+  if (reason === 'sync-error')               return lastSyncError ? `Sync error: ${lastSyncError}` : 'Previous sync failed — retry recommended';
+  if (reason === 'xmp-changed')              return 'New metadata available since last sync';
+  if (reason === 'migration-needed')         return 'Metadata index needs migration';
+  if (reason === 'metadata-index-missing')   return 'Metadata index missing — first sync required';
+  if (reason === 'metadata-index-mismatch')  return 'Metadata index mismatch — review required';
+  return 'Not yet synced';
 }
 
 function _msBuildResultHtml(result) {
@@ -2378,7 +2382,7 @@ async function _msScanAndRender(masterPath) {
   const thisScan = ++_msScanCounter;
   const listEl = document.getElementById('msEventList');
   if (!listEl) return;
-  listEl.innerHTML = '<p class="ms-empty">Scanning collection…</p>';
+  listEl.innerHTML = '<div class="ms-loading">Scanning for metadata changes…</div>';
 
   let pending = [];
   try {
@@ -2533,6 +2537,11 @@ async function _msOpenPreview(ev) {
 
   bodyEl.innerHTML = _msBuildPreviewHtml(result, ev.masterFolderName, ev.pendingReason);
 
+  // Sync row chips to match preview actionable groups exactly.
+  // The pending scan may have broader changedSubfolders (e.g. mtime-triggered folders
+  // whose keywords are already indexed). After classification, we know the true set.
+  _msUpdateRowChips(ev.folderName, result.files || []);
+
   // Wire expand/collapse toggles for group file lists
   bodyEl.querySelectorAll('.ms-pv-files-toggle').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -2547,6 +2556,39 @@ async function _msOpenPreview(ev) {
 
   newBtn.disabled = false;
   newBtn.addEventListener('click', () => _msRunSyncFromPreview(ev.eventFolderPath, ev.folderName, newBtn));
+}
+
+function _msUpdateRowChips(folderName, files) {
+  const rowEl = document.getElementById(`ms-row-${folderName}`);
+  if (!rowEl) return;
+
+  const actionableFolders = [...new Set(
+    files.map(f => {
+      const parts = (f.relPath || '').replace(/\\/g, '/').split('/');
+      return parts.length > 1 ? parts[0] : '';
+    }).filter(Boolean)
+  )];
+
+  const infoEl = rowEl.querySelector('.ms-event-info');
+  if (!infoEl) return;
+  const existing = infoEl.querySelector('.ms-event-subfolders');
+
+  if (actionableFolders.length === 0) {
+    if (existing) existing.remove();
+    return;
+  }
+
+  const MAX_SUB      = 4;
+  const moreCount    = Math.max(0, actionableFolders.length - MAX_SUB);
+  const moreHtml     = moreCount > 0 ? `<span class="ms-event-subfolder ms-event-subfolder--more">+${moreCount} more</span>` : '';
+  const chipsHtml    = actionableFolders.slice(0, MAX_SUB).map(s => `<span class="ms-event-subfolder">${escapeHtml(s)}</span>`).join('');
+  const newSubHtml   = `<div class="ms-event-subfolders">${chipsHtml}${moreHtml}</div>`;
+
+  if (existing) {
+    existing.outerHTML = newSubHtml;
+  } else {
+    infoEl.insertAdjacentHTML('beforeend', newSubHtml);
+  }
 }
 
 function _msGroupFiles(files) {
@@ -2692,7 +2734,7 @@ function _msBuildPreviewHtml(result, masterFolderName, pendingReason) {
     ? `<div class="ms-pv-truncated">${groups.length - 50} more groups not shown</div>`
     : '';
   const scannedNote = result.truncated
-    ? `<div class="ms-pv-truncated">Preview limited to first 200 metadata files</div>`
+    ? `<div class="ms-pv-truncated">Preview limited to first 200 metadata files. Update Metadata will still process the full event.</div>`
     : '';
 
   return `${summaryHtml}${groupCards}${truncatedHtml}${scannedNote}`;
@@ -2815,7 +2857,7 @@ async function _msScanForScope(scope, masterPath, eventFolderPath) {
 
   if (scope === 'collection') {
     if (!masterPath) {
-      listEl.innerHTML = '<p class="ms-empty">No master folder selected.</p>';
+      listEl.innerHTML = '<p class="ms-empty">No collection open. Open or create a master folder first.</p>';
       return;
     }
     // _msScanAndRender manages its own scanId — no separate counter increment here
@@ -2833,7 +2875,7 @@ async function _msScanForScope(scope, masterPath, eventFolderPath) {
       listEl.innerHTML = '<p class="ms-empty">No active event. Select an event first or choose a different scope.</p>';
       return;
     }
-    listEl.innerHTML = '<p class="ms-empty">Scanning…</p>';
+    listEl.innerHTML = '<div class="ms-loading">Scanning event…</div>';
     try {
       const pending = await window.api.metadataSyncScanEventFolder(currentEventPath);
       if (thisScan !== _msScanCounter) return;
@@ -2846,7 +2888,7 @@ async function _msScanForScope(scope, masterPath, eventFolderPath) {
   }
 
   if (scope === 'select' && eventFolderPath) {
-    listEl.innerHTML = '<p class="ms-empty">Scanning…</p>';
+    listEl.innerHTML = '<div class="ms-loading">Scanning event…</div>';
     try {
       const pending = await window.api.metadataSyncScanEventFolder(eventFolderPath);
       if (thisScan !== _msScanCounter) return;
@@ -2873,7 +2915,7 @@ async function _msScanForScope(scope, masterPath, eventFolderPath) {
       await _msScanAndRender(masterPath);
       return;
     }
-    listEl.innerHTML = '<p class="ms-empty">Scanning…</p>';
+    listEl.innerHTML = '<div class="ms-loading">Scanning event…</div>';
     try {
       const pending = await window.api.metadataSyncScanEventFolder(chosen);
       if (thisScan !== _msScanCounter) return;
@@ -2897,8 +2939,10 @@ function _msRenderPendingList(pending, listEl) {
 
   listEl.innerHTML = pending.map(ev => {
     const reasonText  = _reasonLabel(ev.pendingReason, ev.lastSyncError);
-    const reasonClass = ev.pendingReason === 'sync-error'  ? 'ms-event-status--reason-error'
-                      : ev.pendingReason === 'xmp-changed' ? 'ms-event-status--reason-changed'
+    const reasonClass = ev.pendingReason === 'sync-error'             ? 'ms-event-status--reason-error'
+                      : ev.pendingReason === 'xmp-changed'            ? 'ms-event-status--reason-changed'
+                      : ev.pendingReason === 'migration-needed'       ? 'ms-event-status--reason-changed'
+                      : ev.pendingReason === 'metadata-index-mismatch'? 'ms-event-status--reason-changed'
                       : '';
     const subChips = Array.isArray(ev.changedSubfolders) ? ev.changedSubfolders.filter(s => s !== '.') : [];
     const MAX_SUB  = 4;
