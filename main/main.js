@@ -1943,12 +1943,14 @@ ipcMain.handle('preview:getRawPreview', async (_event, srcPath) => {
 
 ipcMain.handle('metadataSync:scanPending', async (_event, masterPath) => {
   if (!masterPath || typeof masterPath !== 'string') return [];
-  return metadataSyncService.scanPendingEvents(masterPath);
+  const userDataPath = app.getPath('userData');
+  return metadataSyncService.scanPendingEvents(masterPath, userDataPath);
 });
 
 ipcMain.handle('metadataSync:scanEventFolder', async (_event, eventFolderPath) => {
   if (!eventFolderPath || typeof eventFolderPath !== 'string') return [];
-  return metadataSyncService.scanSingleEventFolder(eventFolderPath);
+  const userDataPath = app.getPath('userData');
+  return metadataSyncService.scanSingleEventFolder(eventFolderPath, userDataPath);
 });
 
 ipcMain.handle('metadataSync:listEventsInMaster', async (_event, masterPath) => {

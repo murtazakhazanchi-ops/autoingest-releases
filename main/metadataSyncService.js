@@ -557,6 +557,98 @@ async function _listMetadataSubfolders(eventDir) {
 }
 
 /**
+ * Walks all metadata-bearing files in eventFolderPath and returns only the
+ * top-level subfolder names that contain at least one file with actionable
+ * keyword changes (new additions or unknown/needs-review keywords).
+ *
+ * Uses the same classification logic as previewEventMetadata so the returned
+ * set exactly matches what the preview would show as actionable groups.
+ * Short-circuits per subfolder after the first actionable file is found.
+ *
+ * Registry must be loadable via _loadRegistry(userDataPath).
+ * If userDataPath is omitted and the registry is not yet loaded, unknown keywords
+ * are returned as-is (conservative: treats all unrecognised keywords as actionable).
+ *
+ * @param {string}  eventFolderPath
+ * @param {object}  doc            — parsed event.json
+ * @param {string}  [userDataPath]
+ * @returns {Promise<string[]>}    — subfolder names (never includes '.')
+ */
+async function _classifySubfolders(eventFolderPath, doc, userDataPath) {
+  if (userDataPath) await _loadRegistry(userDataPath);
+
+  let existingMetaDoc = null;
+  try {
+    const rawMeta = await fsp.readFile(path.join(eventFolderPath, 'event.metadata.json'), 'utf8');
+    existingMetaDoc = JSON.parse(rawMeta);
+  } catch { /* first sync or missing — no existing index */ }
+
+  // Build event-identity label set (mirrors previewEventMetadata exactly)
+  const components        = Array.isArray(doc.components) ? doc.components : [];
+  const isMultiComp       = components.length > 1;
+  const eventIdentityLabelSet = new Set();
+  for (const comp of components) {
+    const typeArr       = Array.isArray(comp.types) ? comp.types : [];
+    const allTags       = typeArr.join(',').split(',').map(t => t.trim()).filter(Boolean);
+    const tagsToInclude = isMultiComp ? allTags : (allTags.length === 1 ? allTags : []);
+    for (const tag of tagsToInclude) eventIdentityLabelSet.add(tag.toLowerCase());
+    if (typeof comp.location === 'string' && comp.location) eventIdentityLabelSet.add(comp.location.toLowerCase());
+    if (typeof comp.city     === 'string' && comp.city)     eventIdentityLabelSet.add(comp.city.toLowerCase());
+    if (typeof comp.country  === 'string' && comp.country)  eventIdentityLabelSet.add(comp.country.toLowerCase());
+  }
+
+  const allFiles     = await _scanXmpSidecars(eventFolderPath);
+  const actionableSet = new Set();
+
+  for (const filePath of allFiles) {
+    const relFromEvent = path.relative(eventFolderPath, filePath);
+    const parts        = relFromEvent.split(path.sep);
+    const topFolder    = parts.length > 1 ? parts[0] : '.';
+
+    if (actionableSet.has(topFolder)) continue;  // short-circuit: already actionable
+
+    const ext        = path.extname(filePath).toLowerCase();
+    const isEmbedded = EMBEDDED_EXTENSIONS.has(ext);
+    const foundKeywords = isEmbedded
+      ? await _readKeywordsFromJpeg(filePath)
+      : await _readKeywordsFromSidecar(filePath);
+
+    if (!foundKeywords || foundKeywords.length === 0) continue;
+
+    // For XMP files, use the RAW peer path to index into event.metadata.json
+    let relPath;
+    if (isEmbedded) {
+      relPath = relFromEvent;
+    } else {
+      const rawPeer = await _findRawPeer(filePath);
+      relPath = path.relative(eventFolderPath, rawPeer);
+    }
+
+    const existingFile    = existingMetaDoc?.files?.[relPath] || {};
+    const existingExtIds  = existingFile.externalKeywordIds || [];
+    const existingExtKws  = existingExtIds.map(id => existingMetaDoc?.keywords?.[id]).filter(Boolean);
+    const existingAutoIds = existingFile.autoKeywordIds || [];
+    const existingAutoKws = existingAutoIds.map(id => existingMetaDoc?.keywords?.[id]).filter(Boolean);
+
+    const existingExtLabels  = new Set(existingExtKws.map(k => (k.label || '').toLowerCase()));
+    const existingAutoLabels = new Set(existingAutoKws.map(k => (k.label || '').toLowerCase()));
+    const effectiveExistingLabels = new Set([...existingExtLabels, ...existingAutoLabels, ...eventIdentityLabelSet]);
+
+    const { externalKeywords, unknownKeywords } = _classifyKeywords(
+      foundKeywords,
+      new Set(existingAutoKws.map(k => (k.label || '').toLowerCase()))
+    );
+
+    const willAdd = externalKeywords.filter(k => !effectiveExistingLabels.has(k.label.toLowerCase()));
+    if (willAdd.length > 0 || unknownKeywords.length > 0) {
+      actionableSet.add(topFolder);
+    }
+  }
+
+  return [...actionableSet].filter(s => s !== '.');
+}
+
+/**
  * Returns events in masterPath that need metadata sync.
  *
  * Pending reasons:
@@ -571,7 +663,7 @@ async function _listMetadataSubfolders(eventDir) {
  */
 // Per-event pending check — shared by scanPendingEvents and scanSingleEventFolder.
 // Returns a pending-event object or null (not pending / unreadable).
-async function _checkEventPending(folderName, eventFolderPath) {
+async function _checkEventPending(folderName, eventFolderPath, userDataPath) {
   const jsonPath = path.join(eventFolderPath, 'event.json');
   try {
     const raw = await fsp.readFile(jsonPath, 'utf8');
@@ -645,7 +737,7 @@ async function _checkEventPending(folderName, eventFolderPath) {
           eventName:         doc.eventName || folderName,
           pendingReason:     'never-synced',
           lastSyncError:     null,
-          changedSubfolders: await _listMetadataSubfolders(eventFolderPath),
+          changedSubfolders: await _classifySubfolders(eventFolderPath, doc, userDataPath),
         };
       }
       return null;
@@ -653,13 +745,12 @@ async function _checkEventPending(folderName, eventFolderPath) {
 
     const hasChanged = await _hasXmpModifiedAfter(eventFolderPath, lastSyncMs, 0);
     if (hasChanged) {
-      const changedSubfolders = await _listMetadataSubfolders(eventFolderPath);
       return {
         folderName, eventFolderPath,
-        eventName:      doc.eventName || folderName,
-        pendingReason:  'xmp-changed',
-        lastSyncError:  null,
-        changedSubfolders,
+        eventName:         doc.eventName || folderName,
+        pendingReason:     'xmp-changed',
+        lastSyncError:     null,
+        changedSubfolders: await _classifySubfolders(eventFolderPath, doc, userDataPath),
       };
     }
 
@@ -669,7 +760,7 @@ async function _checkEventPending(folderName, eventFolderPath) {
   }
 }
 
-async function scanPendingEvents(masterPath) {
+async function scanPendingEvents(masterPath, userDataPath) {
   if (!masterPath || typeof masterPath !== 'string') return [];
 
   let entries;
@@ -686,18 +777,18 @@ async function scanPendingEvents(masterPath) {
     if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
     const folderName      = entry.name;
     const eventFolderPath = path.join(masterPath, folderName);
-    const result = await _checkEventPending(folderName, eventFolderPath);
+    const result = await _checkEventPending(folderName, eventFolderPath, userDataPath);
     if (result) pending.push({ ...result, masterFolderName });
   }
 
   return pending;
 }
 
-async function scanSingleEventFolder(eventFolderPath) {
+async function scanSingleEventFolder(eventFolderPath, userDataPath) {
   if (!eventFolderPath || typeof eventFolderPath !== 'string') return [];
   const folderName       = path.basename(eventFolderPath);
   const masterFolderName = path.basename(path.dirname(eventFolderPath));
-  const result = await _checkEventPending(folderName, eventFolderPath);
+  const result = await _checkEventPending(folderName, eventFolderPath, userDataPath);
   if (!result) return [];
   return [{ ...result, masterFolderName }];
 }
