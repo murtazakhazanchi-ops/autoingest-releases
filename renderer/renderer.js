@@ -2266,6 +2266,7 @@ let _msLastBgScanAt     = 0;           // timestamp of last completed background
 const _MS_BG_SCAN_MIN_MS = 90_000;    // minimum interval between automatic background scans
 let _msScopeEvents      = [];          // cached event list for "Select Event…" picker
 let _msScopeSelected    = null;        // currently selected event folder in picker
+let _msScanCounter      = 0;           // incremented on each user-triggered scan; guards against stale async results
 
 function _refreshMetadataSyncCard() {
   const valEl   = document.getElementById('ovMetadataSyncVal');
@@ -2340,11 +2341,12 @@ function _msBuildResultHtml(result) {
   const extAdded   = result.externalKeywordsAdded ?? 0;
   const unknownKws = result.unknownKeywordsFound  ?? 0;
   const conflicts  = result.skippedConflicts      ?? 0;
+  const removedKws = result.removedInExternalTool ?? 0;
   const metaJsonOk = result.eventMetadataJsonUpdated !== false;
   const evJsonOk   = result.eventJsonUpdated        !== false;
   const elapsed    = typeof result.elapsedMs === 'number' ? ` (${result.elapsedMs}ms)` : '';
 
-  if (xmpCount === 0 && embeddedCount === 0 && extAdded === 0 && unknownKws === 0) {
+  if (xmpCount === 0 && embeddedCount === 0 && extAdded === 0 && unknownKws === 0 && removedKws === 0) {
     return `<div class="ms-result-title">Metadata Sync Complete</div>
       <div class="ms-result-detail">No new metadata changes found${elapsed}.</div>`;
   }
@@ -2352,10 +2354,11 @@ function _msBuildResultHtml(result) {
   const lines = [];
   if (xmpCount > 0)      lines.push(`${xmpCount} XMP sidecar${xmpCount !== 1 ? 's' : ''} scanned`);
   if (embeddedCount > 0) lines.push(`${embeddedCount} embedded image${embeddedCount !== 1 ? 's' : ''} scanned`);
-  if (updated > 0)  lines.push(`${updated} file${updated !== 1 ? 's' : ''} updated`);
-  if (extAdded > 0) lines.push(`${extAdded} external keyword${extAdded !== 1 ? 's' : ''} added`);
-  if (unknownKws > 0) lines.push(`${unknownKws} unknown keyword${unknownKws !== 1 ? 's' : ''} found`);
-  if (conflicts > 0)  lines.push(`${conflicts} conflict${conflicts !== 1 ? 's' : ''} skipped`);
+  if (updated > 0)     lines.push(`${updated} file${updated !== 1 ? 's' : ''} updated`);
+  if (extAdded > 0)    lines.push(`${extAdded} external keyword${extAdded !== 1 ? 's' : ''} added`);
+  if (removedKws > 0)  lines.push(`${removedKws} keyword${removedKws !== 1 ? 's' : ''} removed/changed`);
+  if (unknownKws > 0)  lines.push(`${unknownKws} unknown keyword${unknownKws !== 1 ? 's' : ''} found`);
+  if (conflicts > 0)   lines.push(`${conflicts} conflict${conflicts !== 1 ? 's' : ''} skipped`);
 
   const statusParts = [];
   if (metaJsonOk) statusParts.push('event.metadata.json updated');
@@ -2372,6 +2375,7 @@ function _msBuildResultHtml(result) {
 }
 
 async function _msScanAndRender(masterPath) {
+  const thisScan = ++_msScanCounter;
   const listEl = document.getElementById('msEventList');
   if (!listEl) return;
   listEl.innerHTML = '<p class="ms-empty">Scanning collection…</p>';
@@ -2380,9 +2384,12 @@ async function _msScanAndRender(masterPath) {
   try {
     pending = await window.api.metadataSyncScanPending(masterPath);
   } catch (err) {
+    if (thisScan !== _msScanCounter) return;  // scope changed while awaiting — discard stale error
     listEl.innerHTML = `<p class="ms-empty">Could not scan collection: ${escapeHtml(err.message)}</p>`;
     return;
   }
+
+  if (thisScan !== _msScanCounter) return;  // scope changed while awaiting — discard stale results
 
   // Update the card badge (only collection scans update the global count)
   const valEl = document.getElementById('ovMetadataSyncVal');
@@ -2811,9 +2818,14 @@ async function _msScanForScope(scope, masterPath, eventFolderPath) {
       listEl.innerHTML = '<p class="ms-empty">No master folder selected.</p>';
       return;
     }
+    // _msScanAndRender manages its own scanId — no separate counter increment here
     await _msScanAndRender(masterPath);
     return;
   }
+
+  // For all non-collection scopes, capture a scan token before the first await.
+  // This ensures results from a previous scope's scan cannot overwrite a newer one.
+  const thisScan = ++_msScanCounter;
 
   if (scope === 'current') {
     const currentEventPath = EventCreator.getActiveEventData()?.eventPath;
@@ -2824,8 +2836,10 @@ async function _msScanForScope(scope, masterPath, eventFolderPath) {
     listEl.innerHTML = '<p class="ms-empty">Scanning…</p>';
     try {
       const pending = await window.api.metadataSyncScanEventFolder(currentEventPath);
+      if (thisScan !== _msScanCounter) return;
       _msRenderPendingList(pending, listEl);
     } catch (err) {
+      if (thisScan !== _msScanCounter) return;
       listEl.innerHTML = `<p class="ms-empty">Could not scan event: ${escapeHtml(err.message)}</p>`;
     }
     return;
@@ -2835,6 +2849,7 @@ async function _msScanForScope(scope, masterPath, eventFolderPath) {
     listEl.innerHTML = '<p class="ms-empty">Scanning…</p>';
     try {
       const pending = await window.api.metadataSyncScanEventFolder(eventFolderPath);
+      if (thisScan !== _msScanCounter) return;
       const resultLabel = document.getElementById('msScopeResultLabel');
       if (resultLabel) {
         const match  = _msScopeEvents.find(ev => ev.eventFolderPath === eventFolderPath);
@@ -2844,6 +2859,7 @@ async function _msScanForScope(scope, masterPath, eventFolderPath) {
       }
       _msRenderPendingList(pending, listEl);
     } catch (err) {
+      if (thisScan !== _msScanCounter) return;
       listEl.innerHTML = `<p class="ms-empty">Could not scan event: ${escapeHtml(err.message)}</p>`;
     }
     return;
@@ -2860,8 +2876,10 @@ async function _msScanForScope(scope, masterPath, eventFolderPath) {
     listEl.innerHTML = '<p class="ms-empty">Scanning…</p>';
     try {
       const pending = await window.api.metadataSyncScanEventFolder(chosen);
+      if (thisScan !== _msScanCounter) return;
       _msRenderPendingList(pending, listEl);
     } catch (err) {
+      if (thisScan !== _msScanCounter) return;
       listEl.innerHTML = `<p class="ms-empty">Could not scan folder: ${escapeHtml(err.message)}</p>`;
     }
     return;

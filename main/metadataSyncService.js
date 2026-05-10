@@ -602,6 +602,9 @@ async function _classifySubfolders(eventFolderPath, doc, userDataPath, lastSyncM
     const rawMeta = await fsp.readFile(path.join(eventFolderPath, 'event.metadata.json'), 'utf8');
     existingMetaDoc = JSON.parse(rawMeta);
   } catch { /* first sync or missing — no existing index */ }
+  if (existingMetaDoc && doc.eventId && existingMetaDoc.eventId && existingMetaDoc.eventId !== doc.eventId) {
+    existingMetaDoc = null;  // discard stale cross-event index
+  }
 
   // Build event-identity label set (mirrors previewEventMetadata exactly)
   const components        = Array.isArray(doc.components) ? doc.components : [];
@@ -645,7 +648,8 @@ async function _classifySubfolders(eventFolderPath, doc, userDataPath, lastSyncM
         ? await _readKeywordsFromJpeg(filePath)
         : await _readKeywordsFromSidecar(filePath);
 
-      if (!foundKeywords || foundKeywords.length === 0) continue;
+      // Fast-path: no keywords and no prior index means nothing actionable here.
+      if ((!foundKeywords || foundKeywords.length === 0) && !existingMetaDoc) continue;
 
       let relPath;
       if (isEmbedded) {
@@ -655,8 +659,17 @@ async function _classifySubfolders(eventFolderPath, doc, userDataPath, lastSyncM
         relPath = path.relative(eventFolderPath, rawPeer);
       }
 
-      const existingFile    = existingMetaDoc?.files?.[relPath] || {};
-      const existingExtIds  = existingFile.externalKeywordIds || [];
+      const existingFile   = existingMetaDoc?.files?.[relPath] || {};
+      const existingExtIds = existingFile.externalKeywordIds || [];
+
+      // File is actionable when all bridge keywords were removed: stored in index but absent now.
+      if ((!foundKeywords || foundKeywords.length === 0) && existingExtIds.length > 0) {
+        actionableSet.add(entry.name);
+        break;
+      }
+
+      if (!foundKeywords || foundKeywords.length === 0) continue;
+
       const existingExtKws  = existingExtIds.map(id => existingMetaDoc?.keywords?.[id]).filter(Boolean);
       const existingAutoIds = existingFile.autoKeywordIds || [];
       const existingAutoKws = existingAutoIds.map(id => existingMetaDoc?.keywords?.[id]).filter(Boolean);
@@ -805,15 +818,19 @@ async function scanPendingEvents(masterPath, userDataPath) {
 
   const masterFolderName = path.basename(masterPath);
   const pending = [];
+  const t0 = Date.now();
+  let eventsChecked = 0;
 
   for (const entry of entries) {
     if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
+    eventsChecked++;
     const folderName      = entry.name;
     const eventFolderPath = path.join(masterPath, folderName);
     const result = await _checkEventPending(folderName, eventFolderPath, userDataPath);
     if (result) pending.push({ ...result, masterFolderName });
   }
 
+  log(`[metadataSyncService] scanPendingEvents: ${eventsChecked} checked, ${pending.length} pending, ${Date.now() - t0}ms — ${masterFolderName}`);
   return pending;
 }
 
@@ -882,7 +899,11 @@ async function previewEventMetadata(eventFolderPath, userDataPath) {
     try {
       const rawMeta = await fsp.readFile(path.join(eventFolderPath, 'event.metadata.json'), 'utf8');
       existingMetaDoc = JSON.parse(rawMeta);
-    } catch { /* first sync or missing */ }
+    } catch { /* first sync or missing — acceptable */ }
+    if (existingMetaDoc && doc.eventId && existingMetaDoc.eventId && existingMetaDoc.eventId !== doc.eventId) {
+      log(`[metadataSyncService] eventId mismatch in event.metadata.json for preview — discarding stale index`);
+      existingMetaDoc = null;
+    }
 
     const components   = Array.isArray(doc.components) ? doc.components : [];
     const isMultiComp  = components.length > 1;
@@ -939,7 +960,9 @@ async function previewEventMetadata(eventFolderPath, userDataPath) {
         ? await _readKeywordsFromJpeg(filePath)
         : await _readKeywordsFromSidecar(filePath);
 
-      if (foundKeywords.length === 0) continue;
+      // Fast-path: no keywords and no prior index means nothing actionable to show.
+      // When existingMetaDoc is present we still need relPath to detect removed bridge keywords.
+      if (foundKeywords.length === 0 && !existingMetaDoc) continue;
 
       let relPath;
       if (isEmbedded) {
@@ -954,6 +977,9 @@ async function previewEventMetadata(eventFolderPath, userDataPath) {
       const existingExtKws  = existingExtIds.map(id => existingMetaDoc?.keywords?.[id]).filter(Boolean);
       const existingAutoIds = existingFile.autoKeywordIds || [];
       const existingAutoKws = existingAutoIds.map(id => existingMetaDoc?.keywords?.[id]).filter(Boolean);
+
+      // Skip only when truly nothing to report: no current keywords and no stored bridge keywords.
+      if (foundKeywords.length === 0 && existingExtKws.length === 0) continue;
 
       const existingExtLabels  = new Set(existingExtKws.map(k => (k.label || '').toLowerCase()));
       const existingAutoLabels = new Set(existingAutoKws.map(k => (k.label || '').toLowerCase()));
@@ -1002,7 +1028,14 @@ async function previewEventMetadata(eventFolderPath, userDataPath) {
       totalUnknown        += unknownKeywords.length;
       totalDetected       += foundKeywords.length;
 
-      const hasChanges = willAdd.length > 0 || unknownKeywords.length > 0;
+      // Detect bridge keywords that were stored in the index but are absent from the current
+      // Bridge metadata. These should appear in the Changed / Removed preview section.
+      const currentFoundLabels = new Set(foundKeywords.map(k => k.toLowerCase()));
+      const removedBridgeCount = existingExtKws.filter(
+        k => !currentFoundLabels.has((k.label || '').toLowerCase())
+      ).length;
+
+      const hasChanges = willAdd.length > 0 || unknownKeywords.length > 0 || removedBridgeCount > 0;
 
       if (hasChanges) {
         files.push({
@@ -1068,10 +1101,12 @@ async function syncEventMetadata(eventFolderPath, userDataPath) {
   }
   _activeSyncs.set(eventFolderPath, 'running');
 
+  // Lifted outside try so the catch block can reference it for error reporting.
+  let doc = null;
+
   try {
     await _loadRegistry(userDataPath);
 
-    let doc;
     try {
       const raw = await fsp.readFile(jsonPath, 'utf8');
       doc = JSON.parse(raw);
@@ -1085,7 +1120,14 @@ async function syncEventMetadata(eventFolderPath, userDataPath) {
     try {
       const rawMeta = await fsp.readFile(metaPath, 'utf8');
       existingMetaDoc = JSON.parse(rawMeta);
-    } catch { /* first sync or file missing */ }
+    } catch (metaErr) {
+      log(`[metadataSyncService] Could not load event.metadata.json for ${path.basename(eventFolderPath)}: ${metaErr.message}`);
+    }
+    // Discard stale index when eventId mismatches — prevents cross-event keyword contamination.
+    if (existingMetaDoc && doc.eventId && existingMetaDoc.eventId && existingMetaDoc.eventId !== doc.eventId) {
+      log(`[metadataSyncService] eventId mismatch in event.metadata.json for ${path.basename(eventFolderPath)} — discarding stale index`);
+      existingMetaDoc = null;
+    }
 
     // Auto-migration: if legacy fileMeta present, seed existingMetaDoc from it
     if (doc.fileMeta && !doc.metadataIndex) {
@@ -1210,7 +1252,7 @@ async function syncEventMetadata(eventFolderPath, userDataPath) {
     } catch { /* error recording failed — proceed */ }
     return {
       ok: false, success: false,
-      eventName: '', eventId: null, eventPath: eventFolderPath,
+      eventName: doc?.eventName || '', eventId: doc?.eventId || null, eventPath: eventFolderPath,
       scannedFiles: 0, scannedXmp: 0, updatedFiles: 0,
       externalKeywordsAdded: 0, unknownKeywordsFound: 0,
       skippedConflicts: 0, removedInExternalTool: 0,
