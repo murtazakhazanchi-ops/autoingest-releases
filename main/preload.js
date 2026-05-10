@@ -232,10 +232,13 @@ contextBridge.exposeInMainWorld('api', {
   getRawPreview: (srcPath) => ipcRenderer.invoke('preview:getRawPreview', srcPath),
 
   // ── Metadata Sync ──
-  metadataSyncScanPending:    (masterPath)       => ipcRenderer.invoke('metadataSync:scanPending',  masterPath),
-  metadataSyncSyncEvent:      (eventFolderPath)  => ipcRenderer.invoke('metadataSync:syncEvent',    eventFolderPath),
-  metadataSyncSyncStatus:     (eventFolderPath)  => ipcRenderer.invoke('metadataSync:syncStatus',   eventFolderPath),
-  metadataSyncPreviewEvent:   (eventFolderPath)  => ipcRenderer.invoke('metadataSync:previewEvent', eventFolderPath),
+  metadataSyncScanPending:        (masterPath)       => ipcRenderer.invoke('metadataSync:scanPending',        masterPath),
+  metadataSyncSyncEvent:          (eventFolderPath)  => ipcRenderer.invoke('metadataSync:syncEvent',          eventFolderPath),
+  metadataSyncSyncStatus:         (eventFolderPath)  => ipcRenderer.invoke('metadataSync:syncStatus',         eventFolderPath),
+  metadataSyncPreviewEvent:       (eventFolderPath)  => ipcRenderer.invoke('metadataSync:previewEvent',       eventFolderPath),
+  metadataSyncScanEventFolder:    (eventFolderPath)  => ipcRenderer.invoke('metadataSync:scanEventFolder',    eventFolderPath),
+  metadataSyncListEventsInMaster: (masterPath)       => ipcRenderer.invoke('metadataSync:listEventsInMaster', masterPath),
+  metadataSyncChooseEventFolder:  ()                 => ipcRenderer.invoke('metadataSync:chooseEventFolder'),
 
   // ── Keyword Registry ──
   keywordsUpdateFromBridgeTxt: (filePath, apply) => ipcRenderer.invoke('keywords:updateFromBridgeTxt', filePath, apply),

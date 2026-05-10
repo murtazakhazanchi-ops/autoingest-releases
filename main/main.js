@@ -1946,6 +1946,25 @@ ipcMain.handle('metadataSync:scanPending', async (_event, masterPath) => {
   return metadataSyncService.scanPendingEvents(masterPath);
 });
 
+ipcMain.handle('metadataSync:scanEventFolder', async (_event, eventFolderPath) => {
+  if (!eventFolderPath || typeof eventFolderPath !== 'string') return [];
+  return metadataSyncService.scanSingleEventFolder(eventFolderPath);
+});
+
+ipcMain.handle('metadataSync:listEventsInMaster', async (_event, masterPath) => {
+  if (!masterPath || typeof masterPath !== 'string') return [];
+  return metadataSyncService.listEventsInMaster(masterPath);
+});
+
+ipcMain.handle('metadataSync:chooseEventFolder', async () => {
+  const win = BrowserWindow.getFocusedWindow();
+  const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+    title:      'Choose Event Folder',
+    properties: ['openDirectory'],
+  });
+  return canceled ? null : filePaths[0];
+});
+
 ipcMain.handle('metadataSync:syncEvent', async (_event, eventFolderPath) => {
   if (!eventFolderPath || typeof eventFolderPath !== 'string') {
     return { ok: false, error: 'Invalid event folder path' };

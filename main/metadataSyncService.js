@@ -569,6 +569,106 @@ async function _listMetadataSubfolders(eventDir) {
  *
  * @param {string} masterPath  — the master folder, one level above event folders
  */
+// Per-event pending check — shared by scanPendingEvents and scanSingleEventFolder.
+// Returns a pending-event object or null (not pending / unreadable).
+async function _checkEventPending(folderName, eventFolderPath) {
+  const jsonPath = path.join(eventFolderPath, 'event.json');
+  try {
+    const raw = await fsp.readFile(jsonPath, 'utf8');
+    const doc = JSON.parse(raw);
+    if (!doc) return null;
+
+    if (doc.lastMetadataSyncError) {
+      return {
+        folderName, eventFolderPath,
+        eventName:     doc.eventName || folderName,
+        pendingReason: 'sync-error',
+        lastSyncError: doc.lastMetadataSyncError.message || null,
+      };
+    }
+
+    const oldRunStatus = doc.lastMetadataRun?.status;
+    if (oldRunStatus === 'error' || oldRunStatus === 'partial') {
+      return {
+        folderName, eventFolderPath,
+        eventName:     doc.eventName || folderName,
+        pendingReason: 'sync-error',
+        lastSyncError: `Previous metadata run status: ${oldRunStatus}`,
+      };
+    }
+
+    if (doc.fileMeta && !doc.metadataIndex) {
+      return {
+        folderName, eventFolderPath,
+        eventName:     doc.eventName || folderName,
+        pendingReason: 'migration-needed',
+        lastSyncError: null,
+      };
+    }
+
+    if (doc.metadataIndex) {
+      const idxStatus = doc.metadataIndex.status;
+      if (idxStatus === 'error' || idxStatus === 'partial') {
+        return {
+          folderName, eventFolderPath,
+          eventName:     doc.eventName || folderName,
+          pendingReason: 'sync-error',
+          lastSyncError: `Metadata index status: ${idxStatus}`,
+        };
+      }
+      if (idxStatus === 'missing') {
+        return {
+          folderName, eventFolderPath,
+          eventName:     doc.eventName || folderName,
+          pendingReason: 'metadata-index-missing',
+          lastSyncError: null,
+        };
+      }
+      if (doc.eventId && doc.metadataIndex.eventId && doc.metadataIndex.eventId !== doc.eventId) {
+        return {
+          folderName, eventFolderPath,
+          eventName:     doc.eventName || folderName,
+          pendingReason: 'metadata-index-mismatch',
+          lastSyncError: `Index eventId ${doc.metadataIndex.eventId} ≠ event ${doc.eventId}`,
+        };
+      }
+    }
+
+    const rawSyncTs  = _resolveLastSyncTs(doc);
+    const lastSyncMs = rawSyncTs ? new Date(rawSyncTs).getTime() : NaN;
+
+    if (!rawSyncTs || isNaN(lastSyncMs)) {
+      const hasXmp = await _hasXmpModifiedAfter(eventFolderPath, 0, 0);
+      if (hasXmp) {
+        return {
+          folderName, eventFolderPath,
+          eventName:         doc.eventName || folderName,
+          pendingReason:     'never-synced',
+          lastSyncError:     null,
+          changedSubfolders: await _listMetadataSubfolders(eventFolderPath),
+        };
+      }
+      return null;
+    }
+
+    const hasChanged = await _hasXmpModifiedAfter(eventFolderPath, lastSyncMs, 0);
+    if (hasChanged) {
+      const changedSubfolders = await _listMetadataSubfolders(eventFolderPath);
+      return {
+        folderName, eventFolderPath,
+        eventName:      doc.eventName || folderName,
+        pendingReason:  'xmp-changed',
+        lastSyncError:  null,
+        changedSubfolders,
+      };
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 async function scanPendingEvents(masterPath) {
   if (!masterPath || typeof masterPath !== 'string') return [];
 
@@ -579,129 +679,54 @@ async function scanPendingEvents(masterPath) {
     return [];
   }
 
+  const masterFolderName = path.basename(masterPath);
   const pending = [];
 
   for (const entry of entries) {
     if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
     const folderName      = entry.name;
     const eventFolderPath = path.join(masterPath, folderName);
-    const jsonPath        = path.join(eventFolderPath, 'event.json');
-
-    try {
-      const raw = await fsp.readFile(jsonPath, 'utf8');
-      const doc = JSON.parse(raw);
-      if (!doc) continue;
-
-      // Persisted sync error (current service)
-      if (doc.lastMetadataSyncError) {
-        pending.push({
-          folderName, eventFolderPath,
-          eventName:     doc.eventName || folderName,
-          pendingReason: 'sync-error',
-          lastSyncError: doc.lastMetadataSyncError.message || null,
-        });
-        continue;
-      }
-
-      // Old metadata-tagging system marked the run as error or partial
-      const oldRunStatus = doc.lastMetadataRun?.status;
-      if (oldRunStatus === 'error' || oldRunStatus === 'partial') {
-        pending.push({
-          folderName, eventFolderPath,
-          eventName:     doc.eventName || folderName,
-          pendingReason: 'sync-error',
-          lastSyncError: `Previous metadata run status: ${oldRunStatus}`,
-        });
-        continue;
-      }
-
-      // Migration needed: fileMeta present but metadataIndex not yet created
-      if (doc.fileMeta && !doc.metadataIndex) {
-        pending.push({
-          folderName, eventFolderPath,
-          eventName:     doc.eventName || folderName,
-          pendingReason: 'migration-needed',
-          lastSyncError: null,
-        });
-        continue;
-      }
-
-      // Metadata index status checks
-      if (doc.metadataIndex) {
-        const idxStatus = doc.metadataIndex.status;
-        if (idxStatus === 'error' || idxStatus === 'partial') {
-          pending.push({
-            folderName, eventFolderPath,
-            eventName:     doc.eventName || folderName,
-            pendingReason: 'sync-error',
-            lastSyncError: `Metadata index status: ${idxStatus}`,
-          });
-          continue;
-        }
-        if (idxStatus === 'missing') {
-          pending.push({
-            folderName, eventFolderPath,
-            eventName:     doc.eventName || folderName,
-            pendingReason: 'metadata-index-missing',
-            lastSyncError: null,
-          });
-          continue;
-        }
-        // eventId mismatch (only when both are present)
-        if (doc.eventId && doc.metadataIndex.eventId && doc.metadataIndex.eventId !== doc.eventId) {
-          pending.push({
-            folderName, eventFolderPath,
-            eventName:     doc.eventName || folderName,
-            pendingReason: 'metadata-index-mismatch',
-            lastSyncError: `Index eventId ${doc.metadataIndex.eventId} ≠ event ${doc.eventId}`,
-          });
-          continue;
-        }
-      }
-
-      // Resolve prior sync timestamp
-      const rawSyncTs  = _resolveLastSyncTs(doc);
-      const lastSyncMs = rawSyncTs ? new Date(rawSyncTs).getTime() : NaN;
-
-      if (!rawSyncTs || isNaN(lastSyncMs)) {
-        // Only mark never-synced if event actually has XMP sidecars
-        const hasXmp = await _hasXmpModifiedAfter(eventFolderPath, 0, 0);
-        if (hasXmp) {
-          pending.push({
-            folderName, eventFolderPath,
-            eventName:        doc.eventName || folderName,
-            pendingReason:    'never-synced',
-            lastSyncError:    null,
-            changedSubfolders: await _listMetadataSubfolders(eventFolderPath),
-          });
-        }
-        continue;
-      }
-
-      // Check if any XMP was modified after the resolved sync timestamp
-      const hasChanged = await _hasXmpModifiedAfter(eventFolderPath, lastSyncMs, 0);
-      if (hasChanged) {
-        // List ALL subfolders with metadata files (not mtime-filtered) so the
-        // operator sees every folder that will be touched, not just the one that
-        // triggered the pending detection.
-        const changedSubfolders = await _listMetadataSubfolders(eventFolderPath);
-        pending.push({
-          folderName,
-          eventFolderPath,
-          eventName:      doc.eventName || folderName,
-          pendingReason:  'xmp-changed',
-          lastSyncError:  null,
-          changedSubfolders,
-        });
-      }
-
-    } catch {
-      // No event.json or unreadable — skip
-    }
+    const result = await _checkEventPending(folderName, eventFolderPath);
+    if (result) pending.push({ ...result, masterFolderName });
   }
 
-  const masterFolderName = path.basename(masterPath);
-  return pending.map(ev => ({ ...ev, masterFolderName }));
+  return pending;
+}
+
+async function scanSingleEventFolder(eventFolderPath) {
+  if (!eventFolderPath || typeof eventFolderPath !== 'string') return [];
+  const folderName       = path.basename(eventFolderPath);
+  const masterFolderName = path.basename(path.dirname(eventFolderPath));
+  const result = await _checkEventPending(folderName, eventFolderPath);
+  if (!result) return [];
+  return [{ ...result, masterFolderName }];
+}
+
+async function listEventsInMaster(masterPath) {
+  if (!masterPath || typeof masterPath !== 'string') return [];
+  let entries;
+  try {
+    entries = await fsp.readdir(masterPath, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const events = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
+    const eventFolderPath = path.join(masterPath, entry.name);
+    try {
+      const raw = await fsp.readFile(path.join(eventFolderPath, 'event.json'), 'utf8');
+      const doc = JSON.parse(raw);
+      events.push({
+        folderName:     entry.name,
+        eventFolderPath,
+        eventName:      doc.eventName || entry.name,
+      });
+    } catch {
+      // no valid event.json — skip
+    }
+  }
+  return events;
 }
 
 // ── Public: preview pending changes (read-only) ───────────────────────────────
@@ -735,19 +760,45 @@ async function previewEventMetadata(eventFolderPath, userDataPath) {
       existingMetaDoc = JSON.parse(rawMeta);
     } catch { /* first sync or missing */ }
 
-    const components = Array.isArray(doc.components) ? doc.components : [];
-    const eventIdentity = {};
-    for (const comp of components) {
-      if (comp.eventTypes?.length === 1) eventIdentity.event    = comp.eventTypes[0];
-      if (comp.location)                  eventIdentity.location = comp.location;
-      if (comp.city?.label)              eventIdentity.city     = comp.city.label;
-      if (comp.country)                  eventIdentity.country  = comp.country;
-    }
+    const components   = Array.isArray(doc.components) ? doc.components : [];
+    const isMultiComp  = components.length > 1;
 
-    // Build event identity keyword list for the UI
-    const eventIdentityKeywords = Object.entries(eventIdentity)
-      .filter(([, label]) => !!label)
-      .map(([category, label]) => ({ label, category, protected: true, source: 'autoingest-event' }));
+    const eventIdentityLabelSet = new Set();
+    const eventIdentityKeywords = [];
+
+    for (const comp of components) {
+      const typeArr       = Array.isArray(comp.types) ? comp.types : [];
+      const allTags       = typeArr.join(',').split(',').map(t => t.trim()).filter(Boolean);
+      const tagsToInclude = isMultiComp ? allTags : (allTags.length === 1 ? allTags : []);
+      for (const tag of tagsToInclude) {
+        const lo = tag.toLowerCase();
+        if (!eventIdentityLabelSet.has(lo)) {
+          eventIdentityLabelSet.add(lo);
+          eventIdentityKeywords.push({ label: tag, category: 'event', protected: true, source: 'autoingest-event' });
+        }
+      }
+      if (typeof comp.location === 'string' && comp.location) {
+        const lo = comp.location.toLowerCase();
+        if (!eventIdentityLabelSet.has(lo)) {
+          eventIdentityLabelSet.add(lo);
+          eventIdentityKeywords.push({ label: comp.location, category: 'location', protected: true, source: 'autoingest-event' });
+        }
+      }
+      if (typeof comp.city === 'string' && comp.city) {
+        const lo = comp.city.toLowerCase();
+        if (!eventIdentityLabelSet.has(lo)) {
+          eventIdentityLabelSet.add(lo);
+          eventIdentityKeywords.push({ label: comp.city, category: 'city', protected: true, source: 'autoingest-event' });
+        }
+      }
+      if (typeof comp.country === 'string' && comp.country) {
+        const lo = comp.country.toLowerCase();
+        if (!eventIdentityLabelSet.has(lo)) {
+          eventIdentityLabelSet.add(lo);
+          eventIdentityKeywords.push({ label: comp.country, category: 'country', protected: true, source: 'autoingest-event' });
+        }
+      }
+    }
 
     const allMetadataFiles = await _scanXmpSidecars(eventFolderPath);
     const MAX_PREVIEW = 200;
@@ -788,7 +839,7 @@ async function previewEventMetadata(eventFolderPath, userDataPath) {
       const effectiveExistingLabels = new Set([
         ...existingExtLabels,
         ...existingAutoLabels,
-        ...Object.values(eventIdentity).filter(Boolean).map(v => v.toLowerCase().trim()),
+        ...eventIdentityLabelSet,
       ]);
 
       // Existing indexed keywords (all currently stored or identity-implied for this file).
@@ -921,14 +972,19 @@ async function syncEventMetadata(eventFolderPath, userDataPath) {
       log(`[metadataSyncService] Auto-migrating fileMeta for ${eventFolderPath}`);
     }
 
-    // Build event identity map from event.json components
-    const components    = Array.isArray(doc.components) ? doc.components : [];
-    const eventIdentity = {};
+    // Build event identity label set from event.json components (mirrors _buildKeywords logic)
+    const components        = Array.isArray(doc.components) ? doc.components : [];
+    const isMultiCompSync   = components.length > 1;
+    const eventIdentityLabelSet = new Set();
+
     for (const comp of components) {
-      if (comp.eventTypes?.length === 1) eventIdentity.event    = comp.eventTypes[0];
-      if (comp.location)                  eventIdentity.location = comp.location;
-      if (comp.city?.label)              eventIdentity.city     = comp.city.label;
-      if (comp.country)                  eventIdentity.country  = comp.country;
+      const typeArr       = Array.isArray(comp.types) ? comp.types : [];
+      const allTags       = typeArr.join(',').split(',').map(t => t.trim()).filter(Boolean);
+      const tagsToInclude = isMultiCompSync ? allTags : (allTags.length === 1 ? allTags : []);
+      for (const tag of tagsToInclude) eventIdentityLabelSet.add(tag.toLowerCase());
+      if (typeof comp.location === 'string' && comp.location) eventIdentityLabelSet.add(comp.location.toLowerCase());
+      if (typeof comp.city     === 'string' && comp.city)     eventIdentityLabelSet.add(comp.city.toLowerCase());
+      if (typeof comp.country  === 'string' && comp.country)  eventIdentityLabelSet.add(comp.country.toLowerCase());
     }
 
     const metadataFiles = await _scanXmpSidecars(eventFolderPath);
@@ -985,7 +1041,7 @@ async function syncEventMetadata(eventFolderPath, userDataPath) {
       const { externalKeywords, unknownKeywords, skippedConflicts } = _classifyKeywords(
         foundKeywords,
         new Set(existingAutoKws.map(k => (k.label || '').toLowerCase())),
-        eventIdentity
+        eventIdentityLabelSet
       );
 
       const removedInExternalTool = _detectRemovedAutoKeywords(existingAutoKws, foundSet);
@@ -1312,6 +1368,8 @@ async function repairOverrideIds(userDataPath) {
 
 module.exports = {
   scanPendingEvents,
+  scanSingleEventFolder,
+  listEventsInMaster,
   previewEventMetadata,
   syncEventMetadata,
   getSyncStatus,

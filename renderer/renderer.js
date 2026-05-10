@@ -2264,6 +2264,8 @@ let _msSyncRunning      = new Set();  // eventFolderPaths currently syncing
 let _msScanBgBusy       = false;       // guard: one background scan at a time
 let _msLastBgScanAt     = 0;           // timestamp of last completed background scan
 const _MS_BG_SCAN_MIN_MS = 90_000;    // minimum interval between automatic background scans
+let _msScopeEvents      = [];          // cached event list for "Select Event…" picker
+let _msScopeSelected    = null;        // currently selected event folder in picker
 
 function _refreshMetadataSyncCard() {
   const valEl   = document.getElementById('ovMetadataSyncVal');
@@ -2382,7 +2384,7 @@ async function _msScanAndRender(masterPath) {
     return;
   }
 
-  // Update the card badge
+  // Update the card badge (only collection scans update the global count)
   const valEl = document.getElementById('ovMetadataSyncVal');
   if (valEl) valEl.setAttribute('data-pending', String(pending.length));
   _refreshMetadataSyncCard();
@@ -2392,57 +2394,7 @@ async function _msScanAndRender(masterPath) {
     return;
   }
 
-  listEl.innerHTML = pending.map(ev => {
-    const reasonText  = _reasonLabel(ev.pendingReason, ev.lastSyncError);
-    const reasonClass = ev.pendingReason === 'sync-error'  ? 'ms-event-status--reason-error'
-                      : ev.pendingReason === 'xmp-changed' ? 'ms-event-status--reason-changed'
-                      : '';
-    const subChips = Array.isArray(ev.changedSubfolders) ? ev.changedSubfolders.filter(s => s !== '.') : [];
-    const MAX_SUB  = 4;
-    const moreSubCount = Math.max(0, subChips.length - MAX_SUB);
-    const moreSubHtml  = moreSubCount > 0
-      ? `<span class="ms-event-subfolder ms-event-subfolder--more">+${moreSubCount} more</span>`
-      : '';
-    const subfolderHtml = subChips.length > 0
-      ? `<div class="ms-event-subfolders">${subChips.slice(0, MAX_SUB).map(s => `<span class="ms-event-subfolder">${escapeHtml(s)}</span>`).join('')}${moreSubHtml}</div>`
-      : '';
-    const masterHtml = ev.masterFolderName
-      ? `<div class="ms-event-master" title="Collection: ${escapeHtml(ev.masterFolderName)}">${escapeHtml(ev.masterFolderName)}</div>`
-      : '';
-    return `
-    <div class="ms-event-row ms-event-row--clickable" id="ms-row-${escapeHtml(ev.folderName)}"
-         data-event-path="${escapeHtml(ev.eventFolderPath)}"
-         data-folder-name="${escapeHtml(ev.folderName)}"
-         data-master-name="${escapeHtml(ev.masterFolderName || '')}"
-         data-pending-reason="${escapeHtml(ev.pendingReason)}">
-      <div class="ms-event-info">
-        ${masterHtml}
-        <div class="ms-event-name" title="${escapeHtml(ev.eventFolderPath)}">${escapeHtml(ev.eventName || ev.folderName)}</div>
-        <div class="ms-event-status ${reasonClass}" id="ms-status-${escapeHtml(ev.folderName)}">${escapeHtml(reasonText)}</div>
-        ${subfolderHtml}
-      </div>
-      <button class="ms-sync-btn" data-event-path="${escapeHtml(ev.eventFolderPath)}" data-folder-name="${escapeHtml(ev.folderName)}">Update Metadata</button>
-    </div>`;
-  }).join('');
-
-  listEl.querySelectorAll('.ms-sync-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      _msRunSync(btn.dataset.eventPath, btn.dataset.folderName);
-    });
-  });
-
-  listEl.querySelectorAll('.ms-event-row--clickable').forEach(row => {
-    row.addEventListener('click', (e) => {
-      if (e.target.closest('.ms-sync-btn')) return;
-      _msOpenPreview({
-        eventFolderPath: row.dataset.eventPath,
-        folderName:      row.dataset.folderName,
-        masterFolderName: row.dataset.masterName,
-        pendingReason:   row.dataset.pendingReason,
-      });
-    });
-  });
+  _msRenderPendingList(pending, listEl);
 }
 
 async function _msRunSync(eventFolderPath, folderName) {
@@ -2794,7 +2746,13 @@ async function openMetadataSyncModal() {
   // Load registry status (populates warning + registry tab count)
   _msRefreshRegistryStatus();
 
-  // Scan pending events using the active master folder
+  // Reset scope selector to default
+  const scopeSelect = document.getElementById('msScopeSelect');
+  if (scopeSelect) scopeSelect.value = 'collection';
+  document.getElementById('msScopePicker')?.style?.setProperty('display', 'none');
+  _msScopeEvents   = [];
+  _msScopeSelected = null;
+
   const masterPath = EventCreator.getActiveMaster()?.path;
   if (masterPath) {
     await _msScanAndRender(masterPath);
@@ -2807,6 +2765,185 @@ async function openMetadataSyncModal() {
 function _msClose() {
   document.getElementById('metadataSyncModal')?.classList.remove('open');
 }
+
+// ── Scope selector logic ──────────────────────────────────────────────────────
+
+function _msRenderScopeEventList(filter) {
+  const listEl = document.getElementById('msScopeEventList');
+  if (!listEl) return;
+  const q = (filter || '').toLowerCase().trim();
+  const items = q
+    ? _msScopeEvents.filter(ev =>
+        ev.folderName.toLowerCase().includes(q) || ev.eventName.toLowerCase().includes(q))
+    : _msScopeEvents;
+
+  listEl.innerHTML = items.map(ev => {
+    const isActive = ev.eventFolderPath === _msScopeSelected;
+    return `<div class="ms-scope-event-item${isActive ? ' ms-scope-event-item--active' : ''}"
+                 role="option" aria-selected="${isActive}"
+                 data-event-path="${escapeHtml(ev.eventFolderPath)}"
+                 data-folder-name="${escapeHtml(ev.folderName)}">
+              ${escapeHtml(ev.eventName || ev.folderName)}
+            </div>`;
+  }).join('') || '<p class="ms-empty" style="margin:4px 10px">No events found.</p>';
+
+  listEl.querySelectorAll('.ms-scope-event-item').forEach(item => {
+    item.addEventListener('click', async () => {
+      _msScopeSelected = item.dataset.eventPath;
+      _msRenderScopeEventList(document.getElementById('msScopeSearch')?.value);
+      await _msScanForScope('select', EventCreator.getActiveMaster()?.path, _msScopeSelected);
+    });
+  });
+}
+
+async function _msScanForScope(scope, masterPath, eventFolderPath) {
+  const listEl = document.getElementById('msEventList');
+  if (!listEl) return;
+
+  if (scope === 'collection') {
+    if (!masterPath) {
+      listEl.innerHTML = '<p class="ms-empty">No master folder selected.</p>';
+      return;
+    }
+    await _msScanAndRender(masterPath);
+    return;
+  }
+
+  if (scope === 'current') {
+    const currentEventPath = EventCreator.getActiveEventData()?.eventPath;
+    if (!currentEventPath) {
+      listEl.innerHTML = '<p class="ms-empty">No active event. Select an event first or choose a different scope.</p>';
+      return;
+    }
+    listEl.innerHTML = '<p class="ms-empty">Scanning…</p>';
+    try {
+      const pending = await window.api.metadataSyncScanEventFolder(currentEventPath);
+      _msRenderPendingList(pending, listEl);
+    } catch (err) {
+      listEl.innerHTML = `<p class="ms-empty">Could not scan event: ${escapeHtml(err.message)}</p>`;
+    }
+    return;
+  }
+
+  if (scope === 'select' && eventFolderPath) {
+    listEl.innerHTML = '<p class="ms-empty">Scanning…</p>';
+    try {
+      const pending = await window.api.metadataSyncScanEventFolder(eventFolderPath);
+      _msRenderPendingList(pending, listEl);
+    } catch (err) {
+      listEl.innerHTML = `<p class="ms-empty">Could not scan event: ${escapeHtml(err.message)}</p>`;
+    }
+    return;
+  }
+
+  if (scope === 'folder') {
+    const chosen = await window.api.metadataSyncChooseEventFolder();
+    if (!chosen) {
+      const scopeSelect = document.getElementById('msScopeSelect');
+      if (scopeSelect) scopeSelect.value = 'collection';
+      await _msScanAndRender(masterPath);
+      return;
+    }
+    listEl.innerHTML = '<p class="ms-empty">Scanning…</p>';
+    try {
+      const pending = await window.api.metadataSyncScanEventFolder(chosen);
+      _msRenderPendingList(pending, listEl);
+    } catch (err) {
+      listEl.innerHTML = `<p class="ms-empty">Could not scan folder: ${escapeHtml(err.message)}</p>`;
+    }
+    return;
+  }
+
+  listEl.innerHTML = '<p class="ms-empty">Select a scope to begin.</p>';
+}
+
+function _msRenderPendingList(pending, listEl) {
+  // Update card badge only when scanning full collection (avoid lowering count for single-event scans)
+  if (pending.length === 0) {
+    listEl.innerHTML = '<p class="ms-empty">No pending metadata changes for this event.</p>';
+    return;
+  }
+
+  listEl.innerHTML = pending.map(ev => {
+    const reasonText  = _reasonLabel(ev.pendingReason, ev.lastSyncError);
+    const reasonClass = ev.pendingReason === 'sync-error'  ? 'ms-event-status--reason-error'
+                      : ev.pendingReason === 'xmp-changed' ? 'ms-event-status--reason-changed'
+                      : '';
+    const subChips = Array.isArray(ev.changedSubfolders) ? ev.changedSubfolders.filter(s => s !== '.') : [];
+    const MAX_SUB  = 4;
+    const moreSubCount = Math.max(0, subChips.length - MAX_SUB);
+    const moreSubHtml  = moreSubCount > 0 ? `<span class="ms-event-subfolder ms-event-subfolder--more">+${moreSubCount} more</span>` : '';
+    const subfolderHtml = subChips.length > 0
+      ? `<div class="ms-event-subfolders">${subChips.slice(0, MAX_SUB).map(s => `<span class="ms-event-subfolder">${escapeHtml(s)}</span>`).join('')}${moreSubHtml}</div>`
+      : '';
+    const masterHtml = ev.masterFolderName
+      ? `<div class="ms-event-master" title="Collection: ${escapeHtml(ev.masterFolderName)}">${escapeHtml(ev.masterFolderName)}</div>`
+      : '';
+    return `
+    <div class="ms-event-row ms-event-row--clickable" id="ms-row-${escapeHtml(ev.folderName)}"
+         data-event-path="${escapeHtml(ev.eventFolderPath)}"
+         data-folder-name="${escapeHtml(ev.folderName)}"
+         data-master-name="${escapeHtml(ev.masterFolderName || '')}"
+         data-pending-reason="${escapeHtml(ev.pendingReason)}">
+      <div class="ms-event-info">
+        ${masterHtml}
+        <div class="ms-event-name" title="${escapeHtml(ev.eventFolderPath)}">${escapeHtml(ev.eventName || ev.folderName)}</div>
+        <div class="ms-event-status ${reasonClass}" id="ms-status-${escapeHtml(ev.folderName)}">${escapeHtml(reasonText)}</div>
+        ${subfolderHtml}
+      </div>
+      <button class="ms-sync-btn" data-event-path="${escapeHtml(ev.eventFolderPath)}" data-folder-name="${escapeHtml(ev.folderName)}">Update Metadata</button>
+    </div>`;
+  }).join('');
+
+  listEl.querySelectorAll('.ms-sync-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      _msRunSync(btn.dataset.eventPath, btn.dataset.folderName);
+    });
+  });
+
+  listEl.querySelectorAll('.ms-event-row--clickable').forEach(row => {
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('.ms-sync-btn')) return;
+      _msOpenPreview({
+        eventFolderPath: row.dataset.eventPath,
+        folderName:      row.dataset.folderName,
+        masterFolderName: row.dataset.masterName,
+        pendingReason:   row.dataset.pendingReason,
+      });
+    });
+  });
+}
+
+document.getElementById('msScopeSelect')?.addEventListener('change', async (e) => {
+  const scope      = e.target.value;
+  const masterPath = EventCreator.getActiveMaster()?.path;
+  const pickerEl   = document.getElementById('msScopePicker');
+
+  if (scope === 'select') {
+    if (pickerEl) pickerEl.style.display = '';
+    _msScopeSelected = null;
+    document.getElementById('msEventList').innerHTML = '<p class="ms-empty">Choose an event from the list above.</p>';
+
+    if (_msScopeEvents.length === 0 && masterPath) {
+      document.getElementById('msScopeEventList').innerHTML = '<p class="ms-empty" style="margin:4px 10px">Loading…</p>';
+      try {
+        _msScopeEvents = await window.api.metadataSyncListEventsInMaster(masterPath);
+      } catch {
+        _msScopeEvents = [];
+      }
+    }
+    _msRenderScopeEventList('');
+  } else {
+    if (pickerEl) pickerEl.style.display = 'none';
+    _msScopeSelected = null;
+    await _msScanForScope(scope, masterPath, null);
+  }
+});
+
+document.getElementById('msScopeSearch')?.addEventListener('input', (e) => {
+  _msRenderScopeEventList(e.target.value);
+});
 
 // ── Bridge TXT keyword import ─────────────────────────────────────────────────
 

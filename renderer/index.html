@@ -1295,6 +1295,37 @@
     }
     .ms-warn-link:hover { opacity: 1; }
     .ms-tab-helper { font-size: 12.5px; color: var(--text-muted); margin: 0 0 14px; line-height: 1.5; }
+    .ms-scope-bar {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 12px; padding: 8px 12px;
+      background: var(--bg-secondary); border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+    }
+    .ms-scope-label { font-size: 12px; color: var(--text-muted); font-weight: 500; white-space: nowrap; }
+    .ms-scope-select {
+      flex: 1; font-size: 12.5px; color: var(--text-primary); background: var(--bg-primary);
+      border: 1px solid var(--border-subtle); border-radius: 6px;
+      padding: 4px 8px; font-family: inherit; cursor: pointer;
+    }
+    .ms-scope-select:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .ms-scope-picker { margin-bottom: 12px; }
+    .ms-scope-search {
+      width: 100%; box-sizing: border-box; padding: 6px 10px;
+      font-size: 12.5px; font-family: inherit; color: var(--text-primary);
+      background: var(--bg-secondary); border: 1px solid var(--border-subtle);
+      border-radius: 8px; margin-bottom: 6px;
+    }
+    .ms-scope-search:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .ms-scope-event-list { max-height: 180px; overflow-y: auto; }
+    .ms-scope-event-item {
+      padding: 6px 10px; border-radius: 6px; cursor: pointer;
+      font-size: 12.5px; color: var(--text-secondary);
+      transition: background 0.1s;
+    }
+    .ms-scope-event-item:hover { background: var(--accent-hover); }
+    .ms-scope-event-item.ms-scope-event-item--active {
+      background: var(--accent-hover); color: var(--accent); font-weight: 500;
+    }
     .ms-registry-status {
       display: flex; align-items: center; gap: 8px;
       padding: 9px 14px; margin-bottom: 14px;
@@ -5656,6 +5687,19 @@
         <div id="msTabMetadata" role="tabpanel" aria-labelledby="msTab-metadata">
           <p id="msHelperText">Review events with new or changed external metadata from Bridge/XMP and update event.json safely.</p>
           <div id="msRegistryWarning">Keyword registry is empty. Import your Bridge keyword list before syncing for best results.<button class="ms-warn-link" id="msOpenRegistryTabBtn">Open Keyword Registry →</button></div>
+          <div class="ms-scope-bar">
+            <label for="msScopeSelect" class="ms-scope-label">Scope</label>
+            <select id="msScopeSelect" class="ms-scope-select">
+              <option value="collection">All Events in Current Collection</option>
+              <option value="current">Current Event Only</option>
+              <option value="select">Select Event…</option>
+              <option value="folder">Choose Event Folder…</option>
+            </select>
+          </div>
+          <div id="msScopePicker" style="display:none" class="ms-scope-picker">
+            <input type="text" id="msScopeSearch" class="ms-scope-search" placeholder="Search events…" aria-label="Search events" />
+            <div id="msScopeEventList" class="ms-scope-event-list" role="listbox" aria-label="Event list"></div>
+          </div>
           <div id="msEventList"></div>
         </div>
 
