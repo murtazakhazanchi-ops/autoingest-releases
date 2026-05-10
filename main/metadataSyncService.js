@@ -462,12 +462,15 @@ function _classifyKeywords(foundKeywords, autoKeywordSet, eventIdentity) {
 
     const category = kw.category || _getCategoryForGroup(kw.groupId) || 'misc';
 
+    // Only skip if the label is an EXACT match for the current event identity value
+    // in this category. Non-matching identity-category keywords (e.g. a second
+    // location or city) are valid descriptive file-level metadata and must be
+    // passed through to externalKeywords.
     if (IDENTITY_CATEGORIES.has(category)) {
       const identityValue = eventIdentity[category];
-      if (identityValue && identityValue.toLowerCase() !== label.toLowerCase()) {
-        skippedConflicts.push({ label, category, reason: 'conflicts with AutoIngest identity', detectedAt: now });
+      if (identityValue && identityValue.toLowerCase() === label.toLowerCase()) {
+        continue; // redundant — already represented by the event identity, skip silently
       }
-      continue;
     }
 
     const appliedAs = APPLIED_AS_MAP[category] || 'descriptiveContext';
@@ -794,8 +797,11 @@ async function previewEventMetadata(eventFolderPath, userDataPath) {
 
       const existingExtLabels = new Set(existingExtKws.map(k => (k.label || '').toLowerCase()));
 
-      // Existing indexed keywords (all currently stored for this file)
+      // Existing indexed keywords (all currently stored or identity-implied for this file).
+      // Event identity keywords are included so they surface under Existing Metadata in
+      // the preview even though they are not stored per-file in event.metadata.json.
       const existingIndexedKeywords = [
+        ...eventIdentityKeywords.map(k => ({ label: k.label, source: 'auto-event' })),
         ...existingAutoKws.map(kw => ({ ...kw, source: 'auto' })),
         ...existingExtKws.map(kw => ({ ...kw, source: 'bridge' })),
       ];
@@ -809,7 +815,10 @@ async function previewEventMetadata(eventFolderPath, userDataPath) {
       const willAdd        = externalKeywords.filter(k => !existingExtLabels.has(k.label.toLowerCase()));
       const alreadyPresent = externalKeywords.filter(k =>  existingExtLabels.has(k.label.toLowerCase()));
 
-      // Identity-category Bridge keywords (captured but never applied — protected)
+      // Bridge keywords that exactly match the current event identity value for their
+      // category — these are skipped by _classifyKeywords (redundant) but recorded
+      // here for diagnostic purposes. Non-matching identity-category keywords are NOT
+      // included: they are correctly classified as regular external additions.
       const protectedIdentityMatches = [];
       for (const label of foundKeywords) {
         const kw = _lookupKeyword(label);
@@ -817,24 +826,23 @@ async function previewEventMetadata(eventFolderPath, userDataPath) {
         const category = kw.category || _getCategoryForGroup(kw.groupId) || 'misc';
         if (!IDENTITY_CATEGORIES.has(category)) continue;
         const identityValue = eventIdentity[category];
-        let reason;
-        if (identityValue) {
-          reason = identityValue.toLowerCase() === label.toLowerCase()
-            ? `${category} matches AutoIngest event identity`
-            : `${category} is controlled by AutoIngest (event: ${identityValue})`;
-        } else {
-          reason = `${category} is a protected identity field`;
-        }
-        protectedIdentityMatches.push({ label, category, reason });
+        if (!identityValue || identityValue.toLowerCase() !== label.toLowerCase()) continue;
+        protectedIdentityMatches.push({ label, category, reason: `${category} matches AutoIngest event identity` });
       }
 
-      // Full Bridge keyword list annotated with what will happen to each one
+      // Full Bridge keyword list annotated with what will happen to each one.
+      // 'protected-identity' is used ONLY for exact event identity matches that are
+      // silently skipped. Non-matching identity-category keywords get 'will-add' or
+      // 'already-present' just like any other keyword.
       const detectedBridgeKeywords = foundKeywords.map(label => {
         const kw = _lookupKeyword(label);
         if (!kw) return { label, matchStatus: 'unknown' };
         const category = kw.category || _getCategoryForGroup(kw.groupId) || 'misc';
         if (IDENTITY_CATEGORIES.has(category)) {
-          return { label, category, keywordId: kw.id || null, matchStatus: 'protected-identity' };
+          const identityValue = eventIdentity[category];
+          if (identityValue && identityValue.toLowerCase() === label.toLowerCase()) {
+            return { label, category, keywordId: kw.id || null, matchStatus: 'protected-identity' };
+          }
         }
         if (existingExtLabels.has(label.toLowerCase())) {
           return { label, category, keywordId: kw.id || null, matchStatus: 'already-present' };
@@ -850,8 +858,7 @@ async function previewEventMetadata(eventFolderPath, userDataPath) {
       totalDetected       += foundKeywords.length;
 
       const hasChanges = willAdd.length > 0 || unknownKeywords.length > 0
-        || skippedConflicts.length > 0 || alreadyPresent.length > 0
-        || protectedIdentityMatches.length > 0;
+        || alreadyPresent.length > 0;
 
       if (hasChanges) {
         files.push({

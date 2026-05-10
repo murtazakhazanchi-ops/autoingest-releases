@@ -2606,11 +2606,23 @@ function _msGroupFiles(files) {
       .filter(k => k.source === 'bridge' && !bridgeDetectedLabels.has((k.label || '').toLowerCase()))
       .map(k => ({ label: k.label || '' }));
 
+    // Build deduplicated existing-metadata list from the full existingIndexedKeywords
+    // (includes auto-event identity, auto-assigned, and already-stored Bridge keywords).
+    const seenExisting = new Set();
+    const existingForDisplay = (f.existingIndexedKeywords || [])
+      .filter(k => {
+        const lo = (k.label || '').toLowerCase();
+        if (seenExisting.has(lo)) return false;
+        seenExisting.add(lo);
+        return true;
+      })
+      .map(k => ({ label: k.label || '' }));
+
     const sig = [
       f.type,
       folder,
+      existingForDisplay.map(k => k.label).sort().join('\0'),
       (f.willAdd         || []).map(k => k.label).sort().join('\0'),
-      (f.alreadyPresent  || []).map(k => k.label).sort().join('\0'),
       (f.unknownKeywords || []).map(k => k.label).sort().join('\0'),
       removedKeywords.map(k => k.label).sort().join('\0'),
     ].join('::');
@@ -2621,7 +2633,7 @@ function _msGroupFiles(files) {
         folder,
         filesTotal:     0,
         filesPreview:   [],
-        existing:       f.alreadyPresent  || [],
+        existing:       existingForDisplay,
         additions:      f.willAdd         || [],
         unknown:        f.unknownKeywords || [],
         removedKeywords,
