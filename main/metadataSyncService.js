@@ -574,8 +574,28 @@ async function _listMetadataSubfolders(eventDir) {
  * @param {string}  [userDataPath]
  * @returns {Promise<string[]>}    — subfolder names (never includes '.')
  */
-async function _classifySubfolders(eventFolderPath, doc, userDataPath) {
+/**
+ * Classifies metadata-bearing files per top-level subfolder and returns only
+ * the subfolder names that contain at least one actionable change (willAdd > 0
+ * or unknownKeywords > 0).  Uses the same effectiveExistingLabels logic as
+ * previewEventMetadata so results match preview groups exactly.
+ *
+ * Two-stage per subfolder:
+ *   1. Mtime gate — if sinceMs > 0, skip subfolders with no file newer than
+ *      sinceMs using _hasXmpModifiedAfter (cheap: stat-only, no keyword reads).
+ *   2. Keyword classification — read & classify files only in subfolders that
+ *      pass the gate; break on first actionable file (no wasted reads).
+ *
+ * @param {string} eventFolderPath
+ * @param {object} doc           — parsed event.json
+ * @param {string} [userDataPath]
+ * @param {number} [lastSyncMs]  — epoch ms of last successful sync; 0 = never synced
+ */
+async function _classifySubfolders(eventFolderPath, doc, userDataPath, lastSyncMs) {
   if (userDataPath) await _loadRegistry(userDataPath);
+
+  // sinceMs > 0: enables per-subfolder mtime gate.  0 = never synced → scan all.
+  const sinceMs = (lastSyncMs && isFinite(lastSyncMs) && lastSyncMs > 0) ? lastSyncMs : 0;
 
   let existingMetaDoc = null;
   try {
@@ -597,55 +617,68 @@ async function _classifySubfolders(eventFolderPath, doc, userDataPath) {
     if (typeof comp.country  === 'string' && comp.country)  eventIdentityLabelSet.add(comp.country.toLowerCase());
   }
 
-  const allFiles     = await _scanXmpSidecars(eventFolderPath);
+  // Top-level readdir only — per-subfolder recursive walk deferred to Stage 2
+  let topEntries;
+  try {
+    topEntries = await fsp.readdir(eventFolderPath, { withFileTypes: true });
+  } catch { return []; }
+
   const actionableSet = new Set();
 
-  for (const filePath of allFiles) {
-    const relFromEvent = path.relative(eventFolderPath, filePath);
-    const parts        = relFromEvent.split(path.sep);
-    const topFolder    = parts.length > 1 ? parts[0] : '.';
+  for (const entry of topEntries) {
+    if (entry.name.startsWith('.') || !entry.isDirectory()) continue;
 
-    if (actionableSet.has(topFolder)) continue;  // short-circuit: already actionable
+    const subdir = path.join(eventFolderPath, entry.name);
 
-    const ext        = path.extname(filePath).toLowerCase();
-    const isEmbedded = EMBEDDED_EXTENSIONS.has(ext);
-    const foundKeywords = isEmbedded
-      ? await _readKeywordsFromJpeg(filePath)
-      : await _readKeywordsFromSidecar(filePath);
-
-    if (!foundKeywords || foundKeywords.length === 0) continue;
-
-    // For XMP files, use the RAW peer path to index into event.metadata.json
-    let relPath;
-    if (isEmbedded) {
-      relPath = relFromEvent;
-    } else {
-      const rawPeer = await _findRawPeer(filePath);
-      relPath = path.relative(eventFolderPath, rawPeer);
+    // Stage 1 — mtime gate (stat-only, no keyword I/O)
+    if (sinceMs > 0) {
+      const hasNewer = await _hasXmpModifiedAfter(subdir, sinceMs, 0);
+      if (!hasNewer) continue;
     }
 
-    const existingFile    = existingMetaDoc?.files?.[relPath] || {};
-    const existingExtIds  = existingFile.externalKeywordIds || [];
-    const existingExtKws  = existingExtIds.map(id => existingMetaDoc?.keywords?.[id]).filter(Boolean);
-    const existingAutoIds = existingFile.autoKeywordIds || [];
-    const existingAutoKws = existingAutoIds.map(id => existingMetaDoc?.keywords?.[id]).filter(Boolean);
+    // Stage 2 — classify keyword contents; break after first actionable file
+    const subFiles = await _scanXmpSidecars(subdir);
+    for (const filePath of subFiles) {
+      const ext        = path.extname(filePath).toLowerCase();
+      const isEmbedded = EMBEDDED_EXTENSIONS.has(ext);
+      const foundKeywords = isEmbedded
+        ? await _readKeywordsFromJpeg(filePath)
+        : await _readKeywordsFromSidecar(filePath);
 
-    const existingExtLabels  = new Set(existingExtKws.map(k => (k.label || '').toLowerCase()));
-    const existingAutoLabels = new Set(existingAutoKws.map(k => (k.label || '').toLowerCase()));
-    const effectiveExistingLabels = new Set([...existingExtLabels, ...existingAutoLabels, ...eventIdentityLabelSet]);
+      if (!foundKeywords || foundKeywords.length === 0) continue;
 
-    const { externalKeywords, unknownKeywords } = _classifyKeywords(
-      foundKeywords,
-      new Set(existingAutoKws.map(k => (k.label || '').toLowerCase()))
-    );
+      let relPath;
+      if (isEmbedded) {
+        relPath = path.relative(eventFolderPath, filePath);
+      } else {
+        const rawPeer = await _findRawPeer(filePath);
+        relPath = path.relative(eventFolderPath, rawPeer);
+      }
 
-    const willAdd = externalKeywords.filter(k => !effectiveExistingLabels.has(k.label.toLowerCase()));
-    if (willAdd.length > 0 || unknownKeywords.length > 0) {
-      actionableSet.add(topFolder);
+      const existingFile    = existingMetaDoc?.files?.[relPath] || {};
+      const existingExtIds  = existingFile.externalKeywordIds || [];
+      const existingExtKws  = existingExtIds.map(id => existingMetaDoc?.keywords?.[id]).filter(Boolean);
+      const existingAutoIds = existingFile.autoKeywordIds || [];
+      const existingAutoKws = existingAutoIds.map(id => existingMetaDoc?.keywords?.[id]).filter(Boolean);
+
+      const existingExtLabels  = new Set(existingExtKws.map(k => (k.label || '').toLowerCase()));
+      const existingAutoLabels = new Set(existingAutoKws.map(k => (k.label || '').toLowerCase()));
+      const effectiveExistingLabels = new Set([...existingExtLabels, ...existingAutoLabels, ...eventIdentityLabelSet]);
+
+      const { externalKeywords, unknownKeywords } = _classifyKeywords(
+        foundKeywords,
+        new Set(existingAutoKws.map(k => (k.label || '').toLowerCase()))
+      );
+
+      const willAdd = externalKeywords.filter(k => !effectiveExistingLabels.has(k.label.toLowerCase()));
+      if (willAdd.length > 0 || unknownKeywords.length > 0) {
+        actionableSet.add(entry.name);
+        break;  // short-circuit: confirmed actionable — skip remaining files in this subfolder
+      }
     }
   }
 
-  return [...actionableSet].filter(s => s !== '.');
+  return [...actionableSet];  // top-level dir names only; '.' excluded since we skip non-directories
 }
 
 /**
@@ -737,7 +770,7 @@ async function _checkEventPending(folderName, eventFolderPath, userDataPath) {
           eventName:         doc.eventName || folderName,
           pendingReason:     'never-synced',
           lastSyncError:     null,
-          changedSubfolders: await _classifySubfolders(eventFolderPath, doc, userDataPath),
+          changedSubfolders: await _classifySubfolders(eventFolderPath, doc, userDataPath, 0),
         };
       }
       return null;
@@ -750,7 +783,7 @@ async function _checkEventPending(folderName, eventFolderPath, userDataPath) {
         eventName:         doc.eventName || folderName,
         pendingReason:     'xmp-changed',
         lastSyncError:     null,
-        changedSubfolders: await _classifySubfolders(eventFolderPath, doc, userDataPath),
+        changedSubfolders: await _classifySubfolders(eventFolderPath, doc, userDataPath, lastSyncMs),
       };
     }
 

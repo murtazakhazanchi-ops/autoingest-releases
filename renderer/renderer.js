@@ -2374,13 +2374,13 @@ function _msBuildResultHtml(result) {
 async function _msScanAndRender(masterPath) {
   const listEl = document.getElementById('msEventList');
   if (!listEl) return;
-  listEl.innerHTML = '<p class="ms-empty">Scanning…</p>';
+  listEl.innerHTML = '<p class="ms-empty">Scanning collection…</p>';
 
   let pending = [];
   try {
     pending = await window.api.metadataSyncScanPending(masterPath);
   } catch (err) {
-    listEl.innerHTML = `<p class="ms-empty">Could not scan events: ${escapeHtml(err.message)}</p>`;
+    listEl.innerHTML = `<p class="ms-empty">Could not scan collection: ${escapeHtml(err.message)}</p>`;
     return;
   }
 
