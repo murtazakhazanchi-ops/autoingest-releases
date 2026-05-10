@@ -39,9 +39,6 @@ const APPLIED_AS_MAP = {
   misc:        'descriptiveContext',
 };
 
-// Categories that represent AutoIngest primary event identity.
-const IDENTITY_CATEGORIES = new Set(['event', 'location', 'city', 'country']);
-
 // ── Canonical root mapping ────────────────────────────────────────────────────
 const _CANONICAL_ROOT = {
   event:       'event',
@@ -462,17 +459,6 @@ function _classifyKeywords(foundKeywords, autoKeywordSet, eventIdentity) {
 
     const category = kw.category || _getCategoryForGroup(kw.groupId) || 'misc';
 
-    // Only skip if the label is an EXACT match for the current event identity value
-    // in this category. Non-matching identity-category keywords (e.g. a second
-    // location or city) are valid descriptive file-level metadata and must be
-    // passed through to externalKeywords.
-    if (IDENTITY_CATEGORIES.has(category)) {
-      const identityValue = eventIdentity[category];
-      if (identityValue && identityValue.toLowerCase() === label.toLowerCase()) {
-        continue; // redundant — already represented by the event identity, skip silently
-      }
-    }
-
     const appliedAs = APPLIED_AS_MAP[category] || 'descriptiveContext';
     externalKeywords.push({
       keywordId: kw.id   || null,
@@ -768,8 +754,7 @@ async function previewEventMetadata(eventFolderPath, userDataPath) {
     const metadataFiles = allMetadataFiles.slice(0, MAX_PREVIEW);
 
     const files = [];
-    let totalWillAdd = 0, totalAlreadyPresent = 0, totalUnknown = 0, totalSkipped = 0,
-        totalProtected = 0, totalDetected = 0;
+    let totalWillAdd = 0, totalAlreadyPresent = 0, totalUnknown = 0, totalDetected = 0;
 
     for (const filePath of metadataFiles) {
       const ext        = path.extname(filePath).toLowerCase();
@@ -795,7 +780,16 @@ async function previewEventMetadata(eventFolderPath, userDataPath) {
       const existingAutoIds = existingFile.autoKeywordIds || [];
       const existingAutoKws = existingAutoIds.map(id => existingMetaDoc?.keywords?.[id]).filter(Boolean);
 
-      const existingExtLabels = new Set(existingExtKws.map(k => (k.label || '').toLowerCase()));
+      const existingExtLabels  = new Set(existingExtKws.map(k => (k.label || '').toLowerCase()));
+      const existingAutoLabels = new Set(existingAutoKws.map(k => (k.label || '').toLowerCase()));
+
+      // Effective existing label set: previously synced Bridge keywords, auto-applied keywords,
+      // and current event identity values. Comparison is purely label-based — never category-based.
+      const effectiveExistingLabels = new Set([
+        ...existingExtLabels,
+        ...existingAutoLabels,
+        ...Object.values(eventIdentity).filter(Boolean).map(v => v.toLowerCase().trim()),
+      ]);
 
       // Existing indexed keywords (all currently stored or identity-implied for this file).
       // Event identity keywords are included so they surface under Existing Metadata in
@@ -806,45 +800,24 @@ async function previewEventMetadata(eventFolderPath, userDataPath) {
         ...existingExtKws.map(kw => ({ ...kw, source: 'bridge' })),
       ];
 
-      const { externalKeywords, unknownKeywords, skippedConflicts } = _classifyKeywords(
+      const { externalKeywords, unknownKeywords } = _classifyKeywords(
         foundKeywords,
         new Set(existingAutoKws.map(k => (k.label || '').toLowerCase())),
         eventIdentity
       );
 
-      const willAdd        = externalKeywords.filter(k => !existingExtLabels.has(k.label.toLowerCase()));
-      const alreadyPresent = externalKeywords.filter(k =>  existingExtLabels.has(k.label.toLowerCase()));
-
-      // Bridge keywords that exactly match the current event identity value for their
-      // category — these are skipped by _classifyKeywords (redundant) but recorded
-      // here for diagnostic purposes. Non-matching identity-category keywords are NOT
-      // included: they are correctly classified as regular external additions.
-      const protectedIdentityMatches = [];
-      for (const label of foundKeywords) {
-        const kw = _lookupKeyword(label);
-        if (!kw) continue;
-        const category = kw.category || _getCategoryForGroup(kw.groupId) || 'misc';
-        if (!IDENTITY_CATEGORIES.has(category)) continue;
-        const identityValue = eventIdentity[category];
-        if (!identityValue || identityValue.toLowerCase() !== label.toLowerCase()) continue;
-        protectedIdentityMatches.push({ label, category, reason: `${category} matches AutoIngest event identity` });
-      }
+      const willAdd        = externalKeywords.filter(k => !effectiveExistingLabels.has(k.label.toLowerCase()));
+      const alreadyPresent = externalKeywords.filter(k =>  effectiveExistingLabels.has(k.label.toLowerCase()));
 
       // Full Bridge keyword list annotated with what will happen to each one.
-      // 'protected-identity' is used ONLY for exact event identity matches that are
-      // silently skipped. Non-matching identity-category keywords get 'will-add' or
-      // 'already-present' just like any other keyword.
+      // Classification is purely state-based using effectiveExistingLabels:
+      // 'already-present' if the label is already known to AutoIngest (stored or event identity),
+      // 'will-add' if it is new, 'unknown' if it is not in the registry.
       const detectedBridgeKeywords = foundKeywords.map(label => {
         const kw = _lookupKeyword(label);
         if (!kw) return { label, matchStatus: 'unknown' };
         const category = kw.category || _getCategoryForGroup(kw.groupId) || 'misc';
-        if (IDENTITY_CATEGORIES.has(category)) {
-          const identityValue = eventIdentity[category];
-          if (identityValue && identityValue.toLowerCase() === label.toLowerCase()) {
-            return { label, category, keywordId: kw.id || null, matchStatus: 'protected-identity' };
-          }
-        }
-        if (existingExtLabels.has(label.toLowerCase())) {
+        if (effectiveExistingLabels.has(label.toLowerCase())) {
           return { label, category, keywordId: kw.id || null, matchStatus: 'already-present' };
         }
         return { label, category, keywordId: kw.id || null, matchStatus: 'will-add' };
@@ -853,12 +826,9 @@ async function previewEventMetadata(eventFolderPath, userDataPath) {
       totalWillAdd        += willAdd.length;
       totalAlreadyPresent += alreadyPresent.length;
       totalUnknown        += unknownKeywords.length;
-      totalSkipped        += skippedConflicts.length;
-      totalProtected      += protectedIdentityMatches.length;
       totalDetected       += foundKeywords.length;
 
-      const hasChanges = willAdd.length > 0 || unknownKeywords.length > 0
-        || alreadyPresent.length > 0;
+      const hasChanges = willAdd.length > 0 || unknownKeywords.length > 0;
 
       if (hasChanges) {
         files.push({
@@ -869,8 +839,6 @@ async function previewEventMetadata(eventFolderPath, userDataPath) {
           willAdd,
           alreadyPresent,
           unknownKeywords,
-          skippedConflicts,
-          protectedIdentityMatches,
         });
       }
     }
@@ -889,8 +857,6 @@ async function previewEventMetadata(eventFolderPath, userDataPath) {
         willAdd:        totalWillAdd,
         alreadyPresent: totalAlreadyPresent,
         unknown:        totalUnknown,
-        skipped:        totalSkipped,
-        protected:      totalProtected,
         detected:       totalDetected,
         filesChanged:   files.length,
       },
