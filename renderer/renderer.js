@@ -2750,6 +2750,8 @@ async function openMetadataSyncModal() {
   const scopeSelect = document.getElementById('msScopeSelect');
   if (scopeSelect) scopeSelect.value = 'collection';
   document.getElementById('msScopePicker')?.style?.setProperty('display', 'none');
+  const _msResultLabelEl = document.getElementById('msScopeResultLabel');
+  if (_msResultLabelEl) _msResultLabelEl.style.display = 'none';
   _msScopeEvents   = [];
   _msScopeSelected = null;
 
@@ -2778,14 +2780,18 @@ function _msRenderScopeEventList(filter) {
     : _msScopeEvents;
 
   listEl.innerHTML = items.map(ev => {
-    const isActive = ev.eventFolderPath === _msScopeSelected;
+    const isActive    = ev.eventFolderPath === _msScopeSelected;
+    const collLine    = ev.masterFolderName
+      ? `<div class="ms-scope-event-collection">${escapeHtml(ev.masterFolderName)}</div>`
+      : '';
     return `<div class="ms-scope-event-item${isActive ? ' ms-scope-event-item--active' : ''}"
                  role="option" aria-selected="${isActive}"
                  data-event-path="${escapeHtml(ev.eventFolderPath)}"
                  data-folder-name="${escapeHtml(ev.folderName)}">
-              ${escapeHtml(ev.eventName || ev.folderName)}
+              <div class="ms-scope-event-name">${escapeHtml(ev.eventName || ev.folderName)}</div>
+              ${collLine}
             </div>`;
-  }).join('') || '<p class="ms-empty" style="margin:4px 10px">No events found.</p>';
+  }).join('') || '<p class="ms-empty" style="margin:6px 10px">No events found.</p>';
 
   listEl.querySelectorAll('.ms-scope-event-item').forEach(item => {
     item.addEventListener('click', async () => {
@@ -2829,6 +2835,13 @@ async function _msScanForScope(scope, masterPath, eventFolderPath) {
     listEl.innerHTML = '<p class="ms-empty">Scanning…</p>';
     try {
       const pending = await window.api.metadataSyncScanEventFolder(eventFolderPath);
+      const resultLabel = document.getElementById('msScopeResultLabel');
+      if (resultLabel) {
+        const match  = _msScopeEvents.find(ev => ev.eventFolderPath === eventFolderPath);
+        const evName = match?.eventName || match?.folderName || eventFolderPath.split('/').pop();
+        resultLabel.textContent = `Results for: ${evName}`;
+        resultLabel.style.display = '';
+      }
       _msRenderPendingList(pending, listEl);
     } catch (err) {
       listEl.innerHTML = `<p class="ms-empty">Could not scan event: ${escapeHtml(err.message)}</p>`;
@@ -2926,9 +2939,11 @@ document.getElementById('msScopeSelect')?.addEventListener('change', async (e) =
     document.getElementById('msEventList').innerHTML = '<p class="ms-empty">Choose an event from the list above.</p>';
 
     if (_msScopeEvents.length === 0 && masterPath) {
-      document.getElementById('msScopeEventList').innerHTML = '<p class="ms-empty" style="margin:4px 10px">Loading…</p>';
+      document.getElementById('msScopeEventList').innerHTML = '<p class="ms-empty" style="margin:6px 10px">Loading…</p>';
       try {
-        _msScopeEvents = await window.api.metadataSyncListEventsInMaster(masterPath);
+        const masterFolderName = masterPath.split('/').pop() || '';
+        const raw = await window.api.metadataSyncListEventsInMaster(masterPath);
+        _msScopeEvents = raw.map(ev => ({ ...ev, masterFolderName }));
       } catch {
         _msScopeEvents = [];
       }
@@ -2937,6 +2952,8 @@ document.getElementById('msScopeSelect')?.addEventListener('change', async (e) =
   } else {
     if (pickerEl) pickerEl.style.display = 'none';
     _msScopeSelected = null;
+    const resultLabel = document.getElementById('msScopeResultLabel');
+    if (resultLabel) resultLabel.style.display = 'none';
     await _msScanForScope(scope, masterPath, null);
   }
 });

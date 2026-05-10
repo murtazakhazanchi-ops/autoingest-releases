@@ -443,7 +443,7 @@ function _migrateFileMetaInDoc(fileMeta) {
 
 // ── Per-file keyword classifier ───────────────────────────────────────────────
 
-function _classifyKeywords(foundKeywords, autoKeywordSet, eventIdentity) {
+function _classifyKeywords(foundKeywords, autoKeywordSet) {
   const now = new Date().toISOString();
   const externalKeywords  = [];
   const unknownKeywords   = [];
@@ -853,8 +853,7 @@ async function previewEventMetadata(eventFolderPath, userDataPath) {
 
       const { externalKeywords, unknownKeywords } = _classifyKeywords(
         foundKeywords,
-        new Set(existingAutoKws.map(k => (k.label || '').toLowerCase())),
-        eventIdentity
+        new Set(existingAutoKws.map(k => (k.label || '').toLowerCase()))
       );
 
       const willAdd        = externalKeywords.filter(k => !effectiveExistingLabels.has(k.label.toLowerCase()));
@@ -1040,8 +1039,7 @@ async function syncEventMetadata(eventFolderPath, userDataPath) {
 
       const { externalKeywords, unknownKeywords, skippedConflicts } = _classifyKeywords(
         foundKeywords,
-        new Set(existingAutoKws.map(k => (k.label || '').toLowerCase())),
-        eventIdentityLabelSet
+        new Set(existingAutoKws.map(k => (k.label || '').toLowerCase()))
       );
 
       const removedInExternalTool = _detectRemovedAutoKeywords(existingAutoKws, foundSet);
