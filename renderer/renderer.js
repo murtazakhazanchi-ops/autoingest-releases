@@ -2397,8 +2397,14 @@ async function _msScanAndRender(masterPath) {
     const reasonClass = ev.pendingReason === 'sync-error'  ? 'ms-event-status--reason-error'
                       : ev.pendingReason === 'xmp-changed' ? 'ms-event-status--reason-changed'
                       : '';
-    const subfolderHtml = (ev.pendingReason === 'xmp-changed' && Array.isArray(ev.changedSubfolders) && ev.changedSubfolders.length > 0)
-      ? `<div class="ms-event-subfolders">${ev.changedSubfolders.filter(s => s !== '.').map(s => `<span class="ms-event-subfolder">${escapeHtml(s)}</span>`).join('')}</div>`
+    const subChips = Array.isArray(ev.changedSubfolders) ? ev.changedSubfolders.filter(s => s !== '.') : [];
+    const MAX_SUB  = 4;
+    const moreSubCount = Math.max(0, subChips.length - MAX_SUB);
+    const moreSubHtml  = moreSubCount > 0
+      ? `<span class="ms-event-subfolder ms-event-subfolder--more">+${moreSubCount} more</span>`
+      : '';
+    const subfolderHtml = subChips.length > 0
+      ? `<div class="ms-event-subfolders">${subChips.slice(0, MAX_SUB).map(s => `<span class="ms-event-subfolder">${escapeHtml(s)}</span>`).join('')}${moreSubHtml}</div>`
       : '';
     const masterHtml = ev.masterFolderName
       ? `<div class="ms-event-master" title="Collection: ${escapeHtml(ev.masterFolderName)}">${escapeHtml(ev.masterFolderName)}</div>`
@@ -2587,16 +2593,26 @@ async function _msOpenPreview(ev) {
 function _msGroupFiles(files) {
   const groupMap = new Map();
   for (const f of files) {
-    const parts  = f.relPath.replace(/\\/g, '/').split('/');
-    const folder = parts.length > 1 ? parts[0] : '';
+    const parts    = f.relPath.replace(/\\/g, '/').split('/');
+    const folder   = parts.length > 1 ? parts[0] : '';
     const fileName = parts[parts.length - 1];
+
+    // Compute removed: bridge-sourced keywords stored in event.metadata.json
+    // but no longer present in the current Bridge metadata for this file.
+    const bridgeDetectedLabels = new Set(
+      (f.detectedBridgeKeywords || []).map(k => (k.label || '').toLowerCase())
+    );
+    const removedKeywords = (f.existingIndexedKeywords || [])
+      .filter(k => k.source === 'bridge' && !bridgeDetectedLabels.has((k.label || '').toLowerCase()))
+      .map(k => ({ label: k.label || '' }));
+
     const sig = [
       f.type,
       folder,
       (f.willAdd         || []).map(k => k.label).sort().join('\0'),
       (f.alreadyPresent  || []).map(k => k.label).sort().join('\0'),
       (f.unknownKeywords || []).map(k => k.label).sort().join('\0'),
-      (f.protectedIdentityMatches || []).map(k => k.label).sort().join('\0'),
+      removedKeywords.map(k => k.label).sort().join('\0'),
     ].join('::');
 
     if (!groupMap.has(sig)) {
@@ -2608,7 +2624,7 @@ function _msGroupFiles(files) {
         existing:       f.alreadyPresent  || [],
         additions:      f.willAdd         || [],
         unknown:        f.unknownKeywords || [],
-        ignoredIdentity: f.protectedIdentityMatches || [],
+        removedKeywords,
       });
     }
     const g = groupMap.get(sig);
@@ -2619,32 +2635,39 @@ function _msGroupFiles(files) {
 }
 
 function _msBuildGroupCard(g, idx) {
-  const typeLabel = g.type === 'embedded' ? 'JPEG' : 'XMP';
-  const typeCls   = g.type === 'embedded' ? 'ms-pv-file-type--embedded' : 'ms-pv-file-type--xmp';
+  const typeLabel  = g.type === 'embedded' ? 'JPEG' : 'XMP';
+  const typeCls    = g.type === 'embedded' ? 'ms-pv-file-type--embedded' : 'ms-pv-file-type--xmp';
   const folderText = g.folder || 'Event Folder';
   const countText  = `${g.filesTotal} file${g.filesTotal !== 1 ? 's' : ''}`;
+  const removed    = g.removedKeywords || [];
 
   const sections = [];
   if (g.existing.length > 0) {
     sections.push(`<div class="ms-pv-kw-group">
-      <div class="ms-pv-kw-label">Existing</div>
+      <div class="ms-pv-kw-label">Existing Metadata</div>
       <div class="ms-pv-kw-chips">${g.existing.map(k => `<span class="ms-pv-kw-chip ms-pv-kw-chip--present">${escapeHtml(k.label)}</span>`).join('')}</div>
     </div>`);
   }
   if (g.additions.length > 0) {
     sections.push(`<div class="ms-pv-kw-group">
-      <div class="ms-pv-kw-label">Additions</div>
+      <div class="ms-pv-kw-label">New Additions</div>
       <div class="ms-pv-kw-chips">${g.additions.map(k => `<span class="ms-pv-kw-chip ms-pv-kw-chip--add">${escapeHtml(k.label)}</span>`).join('')}</div>
+    </div>`);
+  }
+  if (removed.length > 0) {
+    sections.push(`<div class="ms-pv-kw-group">
+      <div class="ms-pv-kw-label">Changed / Removed</div>
+      <div class="ms-pv-kw-chips">${removed.map(k => `<span class="ms-pv-kw-chip ms-pv-kw-chip--skip">${escapeHtml(k.label)}</span>`).join('')}</div>
     </div>`);
   }
   if (g.unknown.length > 0) {
     sections.push(`<div class="ms-pv-kw-group">
-      <div class="ms-pv-kw-label">Unknown / Needs Review</div>
+      <div class="ms-pv-kw-label">Needs Review</div>
       <div class="ms-pv-kw-chips">${g.unknown.map(k => `<span class="ms-pv-kw-chip ms-pv-kw-chip--unknown">${escapeHtml(k.label)}</span>`).join('')}</div>
     </div>`);
   }
 
-  const listId  = `ms-pv-files-${idx}`;
+  const listId   = `ms-pv-files-${idx}`;
   const moreHtml = g.filesTotal > 20
     ? ` <span class="ms-pv-files-more">+${g.filesTotal - 20} more</span>`
     : '';
@@ -2652,10 +2675,6 @@ function _msBuildGroupCard(g, idx) {
     <button class="ms-pv-files-toggle" data-target="${listId}" aria-expanded="false">View files</button>
     <div class="ms-pv-files-list" id="${listId}" hidden>${g.filesPreview.map(n => escapeHtml(n)).join(', ')}${moreHtml}</div>
   </div>`;
-
-  const ignoredNote = g.ignoredIdentity.length > 0
-    ? `<div class="ms-pv-ignored-note">Ignored event identity: ${g.ignoredIdentity.map(k => escapeHtml(k.label)).join(', ')}</div>`
-    : '';
 
   return `<div class="ms-pv-group-card">
     <div class="ms-pv-group-header">
@@ -2666,7 +2685,6 @@ function _msBuildGroupCard(g, idx) {
     <div class="ms-pv-group-body">
       ${sections.join('')}
       ${filesSection}
-      ${ignoredNote}
     </div>
   </div>`;
 }
@@ -2674,22 +2692,30 @@ function _msBuildGroupCard(g, idx) {
 function _msBuildPreviewHtml(result, masterFolderName, pendingReason) {
   const s = result.summary || {};
 
-  // Summary chips — operator-facing labels only, no "protected"
-  const filesChanged = s.filesChanged ?? 0;
-  const chips = [];
-  chips.push(`<span class="ms-pv-summary-chip ms-pv-summary-chip--present">${filesChanged} file${filesChanged !== 1 ? 's' : ''}</span>`);
-  if ((s.alreadyPresent ?? 0) > 0) chips.push(`<span class="ms-pv-summary-chip ms-pv-summary-chip--present">${s.alreadyPresent} existing</span>`);
-  if ((s.willAdd        ?? 0) > 0) chips.push(`<span class="ms-pv-summary-chip ms-pv-summary-chip--add">${s.willAdd} addition${s.willAdd !== 1 ? 's' : ''}</span>`);
-  if ((s.unknown        ?? 0) > 0) chips.push(`<span class="ms-pv-summary-chip ms-pv-summary-chip--unknown">${s.unknown} unknown</span>`);
-  const summaryHtml = `<div class="ms-pv-summary">${chips.join('')}</div>`;
-
   if (!Array.isArray(result.files) || result.files.length === 0) {
-    return `${summaryHtml}<div class="ms-pv-empty">No keyword changes detected.</div>`;
+    const filesChanged = s.filesChanged ?? 0;
+    const emptySummary = `<div class="ms-pv-summary"><span class="ms-pv-summary-chip ms-pv-summary-chip--present">${filesChanged} file${filesChanged !== 1 ? 's' : ''}</span></div>`;
+    return `${emptySummary}<div class="ms-pv-empty">No keyword changes detected.</div>`;
   }
 
   const groups      = _msGroupFiles(result.files);
   const shownGroups = groups.slice(0, 50);
   const groupCards  = shownGroups.map((g, i) => _msBuildGroupCard(g, i)).join('');
+
+  // Summary counts derived from group data so removed keywords are included
+  const filesChanged  = s.filesChanged ?? result.files.length;
+  const totalExisting = groups.reduce((n, g) => n + g.existing.length,                  0);
+  const totalAdded    = groups.reduce((n, g) => n + g.additions.length,                 0);
+  const totalRemoved  = groups.reduce((n, g) => n + (g.removedKeywords || []).length,   0);
+  const totalUnknown  = groups.reduce((n, g) => n + g.unknown.length,                   0);
+
+  const chips = [];
+  chips.push(`<span class="ms-pv-summary-chip ms-pv-summary-chip--present">${filesChanged} file${filesChanged !== 1 ? 's' : ''}</span>`);
+  if (totalExisting > 0) chips.push(`<span class="ms-pv-summary-chip ms-pv-summary-chip--present">${totalExisting} existing</span>`);
+  if (totalAdded    > 0) chips.push(`<span class="ms-pv-summary-chip ms-pv-summary-chip--add">${totalAdded} new addition${totalAdded !== 1 ? 's' : ''}</span>`);
+  if (totalRemoved  > 0) chips.push(`<span class="ms-pv-summary-chip ms-pv-summary-chip--skip">${totalRemoved} changed/removed</span>`);
+  if (totalUnknown  > 0) chips.push(`<span class="ms-pv-summary-chip ms-pv-summary-chip--unknown">${totalUnknown} need${totalUnknown !== 1 ? '' : 's'} review</span>`);
+  const summaryHtml = `<div class="ms-pv-summary">${chips.join('')}</div>`;
 
   const truncatedHtml = groups.length > 50
     ? `<div class="ms-pv-truncated">${groups.length - 50} more groups not shown</div>`

@@ -548,6 +548,25 @@ async function _findChangedXmpSubfolders(eventDir, sinceMs) {
   return [...found];
 }
 
+// Returns all top-level subfolders of eventDir that contain any metadata-bearing files,
+// regardless of mtime — used for operator-facing "affected folders" display.
+async function _listMetadataSubfolders(eventDir) {
+  const found = new Set();
+  let entries;
+  try { entries = await fsp.readdir(eventDir, { withFileTypes: true }); } catch { return []; }
+  for (const e of entries) {
+    if (e.name.startsWith('.')) continue;
+    const full = path.join(eventDir, e.name);
+    if (e.isDirectory()) {
+      // sinceMs=0 → every file qualifies; effectively "does this subtree have metadata files?"
+      if (await _hasXmpModifiedAfter(full, 0, 0)) found.add(e.name);
+    } else if (e.isFile() && _isMetadataBearingFile(e.name)) {
+      found.add('.');
+    }
+  }
+  return [...found];
+}
+
 /**
  * Returns events in masterPath that need metadata sync.
  *
@@ -661,9 +680,10 @@ async function scanPendingEvents(masterPath) {
         if (hasXmp) {
           pending.push({
             folderName, eventFolderPath,
-            eventName:     doc.eventName || folderName,
-            pendingReason: 'never-synced',
-            lastSyncError: null,
+            eventName:        doc.eventName || folderName,
+            pendingReason:    'never-synced',
+            lastSyncError:    null,
+            changedSubfolders: await _listMetadataSubfolders(eventFolderPath),
           });
         }
         continue;
@@ -672,7 +692,10 @@ async function scanPendingEvents(masterPath) {
       // Check if any XMP was modified after the resolved sync timestamp
       const hasChanged = await _hasXmpModifiedAfter(eventFolderPath, lastSyncMs, 0);
       if (hasChanged) {
-        const changedSubfolders = await _findChangedXmpSubfolders(eventFolderPath, lastSyncMs);
+        // List ALL subfolders with metadata files (not mtime-filtered) so the
+        // operator sees every folder that will be touched, not just the one that
+        // triggered the pending detection.
+        const changedSubfolders = await _listMetadataSubfolders(eventFolderPath);
         pending.push({
           folderName,
           eventFolderPath,
