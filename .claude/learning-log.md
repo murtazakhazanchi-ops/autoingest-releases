@@ -1275,6 +1275,75 @@ Status:
 
 ---
 
+### 2026-05-11 — Phase 4: Modal Event Listener Cleanup via AbortController
+
+Task type:
+- UI / Renderer / Modal / Event Listeners / Cleanup
+
+What happened:
+
+Phase 4 added radio button `change` listeners inside the Promise executor of `showEventImportConfirmModal` (`renderer/renderer.js`, G5 section, ~line 6944). A code review flagged that these listeners were not cleaned up when the modal closed. The fix introduced `AbortController`: `const modeAbort = new AbortController()` is created before the listeners are added; `{ signal: modeAbort.signal }` is passed to each `addEventListener`; `modeAbort.abort()` is called at the top of the `close()` function, removing all tied listeners at once. `abort()` is idempotent, so calling it from both the cancel and confirm paths is safe.
+
+Reusable lesson:
+
+When a modal adds 3 or more `addEventListener` calls that must be removed on close, use an `AbortController` (`{ signal }` option) instead of storing named handler references. One `abort()` call tears down all listeners at once, is idempotent across cancel/confirm paths, and requires no per-listener bookkeeping.
+
+Common failure mode:
+- Adding multiple listeners inside a modal's Promise executor and omitting cleanup, leaving orphaned listeners after close.
+- Tracking named handler variables to call `removeEventListener` individually — one variable per listener, all of which must be correctly removed from every close path.
+
+Promote to agents:
+- `ui-system-specialist.md` — modal listener cleanup via AbortController
+
+Status:
+- Promoted
+
+---
+
+### 2026-05-11 — Phase 6: innerHTML Lookup-Table Fallback XSS and Busy-Guard Coverage Gaps
+
+Task type:
+- Security / Renderer / UI / Async Safety
+
+What happened (Lesson 1 — innerHTML lookup-table fallback XSS):
+- In `renderer/renderer.js`, `_sqJobRow(job)` built an innerHTML row for a sync queue job. A `statusLabel` lookup table mapped known status strings to display labels. The fallback `|| job.status` (for unknown statuses) was injected raw into innerHTML without calling `_sqEsc()`. The lookup-table success paths appeared safe because they returned hand-written string literals. The fallback path silently re-exposed the raw IPC value, which could be tampered via a crafted `archiveSyncQueue.json`.
+
+Reusable lesson (Lesson 1):
+- When building innerHTML strings, every string injected via template literal must be escaped — including fallback/default branches of conditional expressions and lookup-table misses.
+- The pattern `{ key: 'Safe Label' }[val] || val` is an XSS risk because the `|| val` branch injects the raw value.
+- Always wrap the full expression: `_esc({ key: 'Safe Label' }[val] || val)`.
+- Lookup table misses are easy to overlook during review because the table itself looks safe. The fallback is a silent raw passthrough.
+
+Common failure mode (Lesson 1):
+- Escaping the known/success paths in a lookup table, then leaving the `|| fallbackValue` branch unescaped because it appears to be a fallback, not a user value.
+
+Preferred pattern (Lesson 1):
+- `_sqEsc(STATUS_LABELS[job.status] || job.status)` — escape the whole expression, not just the known cases.
+
+What happened (Lesson 2 — busy-guard coverage gap):
+- `_refreshSyncQueueCard(fromCache)` used `_sqRefreshBusy` to prevent concurrent staging root filesystem scans during the startup double-call pattern. The `sqRefreshBtn` click handler performed its own `refreshSyncQueue()` IPC call without checking `_sqRefreshBusy`. During the startup window, clicking Refresh fired a second concurrent scan, with both writes landing on the same `archiveSyncQueue.json` file via concurrent tmp→rename. The file stayed structurally consistent but the second write could silently clobber the first's results.
+
+Reusable lesson (Lesson 2):
+- When a busy guard (`let _xBusy = false`) is introduced to protect an async operation, every call site that triggers the same underlying operation must check and apply the guard.
+- A guard that only covers one call site (the startup path) provides no meaningful protection — it leaves the user-triggered path (button click) unguarded.
+- Fix: set `_sqRefreshBusy = true` and check it at the top of the click handler before issuing any IPC.
+- This pattern recurs in this codebase — NAS events card, metadata sync, and sync queue all use busy guards. Each time a new tile/button is added that triggers the same scan, the guard must be applied to the new button explicitly.
+
+Common failure mode (Lesson 2):
+- Introducing a busy guard for one obvious call site (startup double-call) and assuming it is sufficient, without auditing all other entry points to the same async operation.
+
+Preferred pattern (Lesson 2):
+- After introducing any `_xBusy` guard, grep every call site of the protected IPC/async function and apply the guard at each one before closing the task.
+
+Promote to agents:
+- `ui-system-specialist.md` — innerHTML escape: all template branches, including lookup-table fallbacks, must be escaped
+- `ui-system-specialist.md` — busy-guard coverage: a guard applied to one call site is not sufficient; audit all call sites
+
+Status:
+- Promoted
+
+---
+
 ## Entry Template
 
 ### YYYY-MM-DD — Task Name

@@ -218,6 +218,27 @@ Validation:
 - Confirm dropdown positions correctly near viewport edges.
 - Confirm visual style matches existing modal/dropdown system.
 
+### Modal Listener Cleanup via AbortController
+
+Context:
+- Applies to any modal that adds 3 or more `addEventListener` calls inside a Promise executor or `open()` function that must all be removed when the modal closes (e.g., option radio groups, keyboard shortcut listeners, mode-change listeners).
+
+Rule:
+- Create `const modeAbort = new AbortController()` before registering the listeners.
+- Pass `{ signal: modeAbort.signal }` to every `addEventListener` that belongs to this group.
+- Call `modeAbort.abort()` at the top of the `close()` function — this removes all tied listeners in one operation, idempotently, regardless of which close path (cancel or confirm) is taken.
+- Do not store named handler references and call `removeEventListener` individually when three or more listeners need teardown together.
+
+Avoid:
+- Adding multiple listeners inside a modal's Promise executor and omitting cleanup — orphaned listeners survive after close.
+- Tracking one named-handler variable per listener to call `removeEventListener` on each — multiplies bookkeeping and is error-prone when close paths are added later.
+
+Validation:
+- Confirm `AbortController` is created before the listeners are added.
+- Confirm `{ signal: modeAbort.signal }` is present on every listener in the group.
+- Confirm `modeAbort.abort()` is called from all close paths (cancel and confirm).
+- Confirm `abort()` is called before any async work in `close()` so listeners cannot fire during teardown.
+
 ### No Inline Scripts in Renderer HTML
 
 Context:
@@ -1241,6 +1262,48 @@ Validation:
 - Confirm the counter is incremented exactly once per logical scan start, in the leaf scan function only.
 - Confirm `if (thisScan !== _msScanCounter) return` appears before every DOM mutation after each `await` in the scan path.
 - Confirm rapid scope changes (e.g., clicking a different collection before results arrive) do not overwrite the correct result with a stale one.
+
+### Escape All innerHTML Template Branches — Including Lookup-Table Fallbacks
+
+Context:
+- Applies to every template literal that injects dynamic data into innerHTML in the renderer (e.g., `_sqJobRow`, row builders, tile builders, modal content builders).
+
+Rule:
+- Every dynamic value injected into an innerHTML template literal must pass through the escape function — including the fallback/default branch of conditional expressions and lookup-table misses.
+- The pattern `{ key: 'Safe Label' }[val] || val` is an XSS risk because `|| val` injects the raw IPC/data value when the key is not found.
+- Always escape the full expression: `_esc({ key: 'Safe Label' }[val] || val)`.
+- Lookup-table success paths look safe because they return hand-written literals, but the fallback is a silent raw passthrough and must not be treated as safe by proximity.
+
+Avoid:
+- Escaping only the known/success entries in a lookup table and leaving `|| fallbackValue` unescaped.
+- Assuming a fallback value is safe because it "should only ever be a known string" — crafted IPC payloads or malformed persistence files can inject arbitrary values through the fallback path.
+
+Validation:
+- After writing any innerHTML template, grep for `||` or `?? ` adjacent to unescaped variable references inside template literals.
+- Confirm the full conditional expression (including its fallback) is wrapped in the escape call.
+- Confirm no `job.*`, `entry.*`, or IPC-derived field is injected into innerHTML without escaping.
+
+### Busy-Guard Coverage — Apply to All Call Sites, Not Only the Obvious One
+
+Context:
+- Applies whenever a `let _xBusy = false` guard is introduced to protect an async IPC operation or filesystem scan from concurrent execution (e.g., sync queue refresh, NAS events card refresh, metadata sync).
+
+Rule:
+- A busy guard applied to only one call site provides no meaningful protection — the user-triggered call site (button click handler, tile click) is typically not the same as the startup or polling call site where the guard was first introduced.
+- After introducing any busy guard, grep for every call site of the protected IPC/async function and apply the guard consistently at each one before closing the task.
+- The check must be at the top of the handler before any IPC call is issued: `if (_xBusy) return;`, followed immediately by `_xBusy = true` before the first await.
+- The guard must be cleared in a `finally` block so it resets even if the IPC call throws.
+
+Avoid:
+- Introducing a guard for the startup double-call pattern and assuming the button click path is also protected.
+- Checking `_xBusy` after already issuing the IPC call.
+- Clearing `_xBusy` only in the success path — a thrown error will leave the guard permanently set and the button permanently dead.
+
+Validation:
+- After adding a busy guard, grep for every function that calls the same underlying IPC handler and confirm the guard is checked at each call site.
+- Confirm the guard flag is cleared in a `finally` block.
+- Confirm clicking the action button rapidly does not issue multiple concurrent IPC calls.
+- Confirm a thrown IPC error does not leave the guard permanently set.
 
 ### Light/Dark and Viewport Compatibility
 
