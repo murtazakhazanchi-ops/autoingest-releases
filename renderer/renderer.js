@@ -2405,12 +2405,17 @@ document.getElementById('alocModeLocalFirst')?.addEventListener('click', () => {
 // Save
 document.getElementById('alocSaveBtn')?.addEventListener('click', async () => {
   const saves = [];
+  const nasRootChanged = _alocPendingNasRoot !== undefined;
   if (_alocPendingNasRoot !== undefined)     saves.push(window.api.setNasRoot(_alocPendingNasRoot));
   if (_alocPendingStagingRoot !== undefined) saves.push(window.api.setLocalStagingRoot(_alocPendingStagingRoot));
   if (_alocPendingImportMode !== undefined)  saves.push(window.api.setDefaultImportMode(_alocPendingImportMode));
   if (saves.length > 0) await Promise.all(saves);
   _alocClose();
   _updateSystemStatus();
+  if (nasRootChanged) {
+    await window.api.clearNasEventCache();
+    _refreshNasEventsCard(false);
+  }
 });
 
 // Cancel / close buttons
@@ -2452,6 +2457,106 @@ async function _updateSystemStatus() {
 
 // Run on startup
 _updateSystemStatus();
+
+// ────────────────────────────────────────────────────────────────
+// NAS EVENTS OVERVIEW TILE
+// ────────────────────────────────────────────────────────────────
+
+// Only aggregate counts are kept in renderer memory — never full event objects.
+// Per-event data is loaded lazily on demand (future phase).
+let _nasEventStats = null; // { totalEvents, totalCollections, source, refreshedAt } | null
+
+function _applyNasEventsCard(result) {
+  const valEl    = document.getElementById('ovNasEventsVal');
+  const labelEl  = document.getElementById('ovNasEventsLabel');
+  const badgeEl  = document.getElementById('ovNasCachedBadge');
+  const tileEl   = document.getElementById('ovNasEvents');
+  if (!valEl || !labelEl) return;
+
+  if (!result || result.status === 'nas-not-set') {
+    valEl.textContent    = '—';
+    labelEl.textContent  = 'NAS not configured';
+    if (badgeEl) badgeEl.hidden = true;
+    tileEl?.classList.remove('ov-tile--warn');
+    return;
+  }
+
+  if (result.status === 'nas-disconnected' || result.status === 'invalid-nas') {
+    valEl.textContent   = '—';
+    labelEl.textContent = result.status === 'nas-disconnected' ? 'NAS offline' : 'Invalid NAS';
+    if (badgeEl) badgeEl.hidden = true;
+    tileEl?.classList.add('ov-tile--warn');
+    return;
+  }
+
+  if (result.status === 'no-cache') {
+    valEl.textContent   = '—';
+    labelEl.textContent = 'No data yet';
+    if (badgeEl) badgeEl.hidden = true;
+    tileEl?.classList.remove('ov-tile--warn');
+    return;
+  }
+
+  // ready (live or cached)
+  const totalEvents      = (result.collections || []).reduce((n, c) => n + (c.events?.length || 0), 0);
+  const totalCollections = (result.collections || []).length;
+
+  valEl.textContent   = String(totalEvents);
+  labelEl.textContent = `NAS Event${totalEvents !== 1 ? 's' : ''} · ${totalCollections} collection${totalCollections !== 1 ? 's' : ''}`;
+
+  const isCache = result.source === 'cache';
+  if (badgeEl) badgeEl.hidden = !isCache;
+  tileEl?.classList.toggle('ov-tile--warn', isCache);
+
+  // Store lightweight stats only — no event objects in renderer memory
+  _nasEventStats = {
+    totalEvents,
+    totalCollections,
+    source:      result.source,
+    refreshedAt: result.refreshedAt || result.cachedAt || null,
+  };
+}
+
+let _nasRefreshBusy = false;
+
+async function _refreshNasEventsCard(fromCache = false) {
+  const btn = document.getElementById('ovNasRefreshBtn');
+  if (_nasRefreshBusy) return;
+  _nasRefreshBusy = true;
+  if (btn) btn.classList.add('spinning');
+
+  try {
+    let result;
+    if (fromCache) {
+      result = await window.api.getCachedNasEvents();
+    } else {
+      result = await window.api.scanNasEvents();
+      // If NAS is unreachable, fall back to cache for display
+      if (result.status !== 'ready') {
+        const cached = await window.api.getCachedNasEvents();
+        if (cached.status === 'ready') result = cached;
+      }
+    }
+    _applyNasEventsCard(result);
+  } catch {
+    // Non-critical — leave tile as-is
+  } finally {
+    _nasRefreshBusy = false;
+    if (btn) btn.classList.remove('spinning');
+  }
+}
+
+// Refresh button — explicit user request
+document.getElementById('ovNasRefreshBtn')?.addEventListener('click', () => _refreshNasEventsCard(false));
+
+// Startup: show cached data instantly, then fire background NAS scan without awaiting it.
+// The live scan must not block startup or first render.
+_refreshNasEventsCard(true).then(() => {
+  // _nasRefreshBusy is clear by now — fire-and-forget, swallow any rejection
+  _refreshNasEventsCard(false).catch(() => {});
+}).catch(() => {
+  _refreshNasEventsCard(false).catch(() => {});
+});
 
 // ════════════════════════════════════════════════════════════════
 // METADATA SYNC MODAL

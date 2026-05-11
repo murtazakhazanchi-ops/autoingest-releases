@@ -198,6 +198,12 @@ contextBridge.exposeInMainWorld('api', {
   setDefaultImportMode:       (v)   => ipcRenderer.invoke('archive:setDefaultImportMode', v),
   getDeviceIdentity:          ()    => ipcRenderer.invoke('archive:getDeviceIdentity'),
 
+  // ── Archive NAS Event List ──
+  scanNasEvents:      () => ipcRenderer.invoke('archive:scanNasEvents'),
+  refreshNasEvents:   () => ipcRenderer.invoke('archive:refreshNasEvents'),
+  getCachedNasEvents: () => ipcRenderer.invoke('archive:getCachedNasEvents'),
+  clearNasEventCache: () => ipcRenderer.invoke('archive:clearNasEventCache'),
+
   // ── EXIF metadata service ──
   getMetadataStatus:      (batchId)            => ipcRenderer.invoke('metadata:getStatus',     batchId),
   retryMetadata:          (batchId)            => ipcRenderer.invoke('metadata:retry',          batchId),

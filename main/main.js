@@ -17,7 +17,8 @@ const telemetry     = require('../services/telemetry');
 const crashReporter = require('../services/crashReporter');
 const perf          = require('../services/performanceMonitor');
 const autoUpdater   = require('../services/autoUpdater');
-const settings      = require('../services/settings');
+const settings        = require('../services/settings');
+const nasEventCache   = require('../services/nasEventCache');
 const userManager   = require('./userManager');
 const { validateEventJson } = require('./contracts/dataValidator');
 const exifService         = require('./exifService');
@@ -1661,6 +1662,198 @@ ipcMain.handle('archive:getOperationsStatus', async () => {
   }
 
   return { status: 'ready', nasRoot, localStagingRoot, defaultImportMode };
+});
+
+// ── Archive — NAS Event List ──────────────────────────────────────────────────
+
+// Dirs inside event folders that must not be classified as photographer folders
+// or treated as event sub-folders during scanning.
+const _NAS_SKIP_DIRS = new Set(['_Selected', '.autoingest', '__MACOSX']);
+
+/**
+ * Scan the NAS archive root for collections and their event subfolders.
+ *
+ * Classification rules:
+ *  - AutoIngest-managed event folder: contains a readable, valid event.json.
+ *  - External/manual folder:          does not contain a valid event.json.
+ *  - Skipped completely:              starts with "." or is in _NAS_SKIP_DIRS.
+ *
+ * IPC payload safety: imports[] is stripped before any event.json data is
+ * returned (mirrors master:scanEvents) to prevent renderer OOM on large archives.
+ *
+ * @param {string} nasRoot  Absolute path to the NAS archive root directory.
+ * @returns {Promise<{ status: string, refreshedAt: string, source: 'nas', collections: Array }>}
+ */
+async function _scanNasArchive(nasRoot) {
+  const refreshedAt = new Date().toISOString();
+
+  let collectionEntries;
+  try {
+    collectionEntries = await fsp.readdir(nasRoot, { withFileTypes: true });
+  } catch (err) {
+    const reason = (err.code === 'ENOENT' || err.code === 'ENOTCONN' || err.code === 'EIO')
+      ? 'nas-disconnected' : 'invalid-nas';
+    return { status: reason, refreshedAt, source: 'nas', collections: [] };
+  }
+
+  const lists = {
+    cities:     listManager.getList('cities'),
+    locations:  listManager.getList('locations'),
+    eventTypes: listManager.getList('event-types'),
+  };
+
+  const collections = [];
+
+  for (const collEntry of collectionEntries) {
+    if (!collEntry.isDirectory()) continue;
+    if (collEntry.name.startsWith('.') || _NAS_SKIP_DIRS.has(collEntry.name)) continue;
+
+    const collPath = path.join(nasRoot, collEntry.name);
+    const collection = { name: collEntry.name, path: collPath, events: [], externalFolders: [] };
+
+    let eventEntries;
+    try {
+      eventEntries = await fsp.readdir(collPath, { withFileTypes: true });
+    } catch {
+      // Unreadable collection — skip silently
+      collections.push(collection);
+      continue;
+    }
+
+    for (const evEntry of eventEntries) {
+      if (!evEntry.isDirectory()) continue;
+      if (evEntry.name.startsWith('.') || _NAS_SKIP_DIRS.has(evEntry.name)) continue;
+
+      const evPath      = path.join(collPath, evEntry.name);
+      const jsonPath    = path.join(evPath, 'event.json');
+
+      let eventJson = null;
+      let jsonCorrupt = false;
+      try {
+        const raw = await fsp.readFile(jsonPath, 'utf8');
+        const obj = normalizeEventJson(JSON.parse(raw));
+        if (isValidEventJson(obj)) {
+          eventJson = obj;
+        } else {
+          jsonCorrupt = true;
+        }
+      } catch (err) {
+        if (err.code !== 'ENOENT') jsonCorrupt = true;
+        // ENOENT = no event.json → external/manual folder
+      }
+
+      if (eventJson) {
+        // AutoIngest-managed event — strip imports[] before IPC payload
+        const { imports: _omit, ...meta } = eventJson;
+        const parsed = parseEventName(evEntry.name, lists);
+        const hijriDate = parsed.ok ? parsed.hijriDate : (eventJson.hijriDate || '');
+        const seqRaw    = parsed.ok ? parsed.sequence  : (eventJson.sequence  || '00');
+        const sequence  = typeof seqRaw === 'number'
+          ? String(seqRaw).padStart(2, '0')
+          : String(seqRaw);
+
+        collection.events.push({
+          name:          evEntry.name,
+          path:          evPath,
+          eventJsonPath: jsonPath,
+          eventId:       meta.id          || null,
+          eventName:     meta.eventName   || evEntry.name,
+          hijriDate,
+          sequence,
+          status:        'available',
+          isCorrupt:     false,
+        });
+      } else if (jsonCorrupt) {
+        // event.json present but unreadable — surface as corrupt managed event
+        const parsed = parseEventName(evEntry.name, lists);
+        collection.events.push({
+          name:          evEntry.name,
+          path:          evPath,
+          eventJsonPath: jsonPath,
+          eventId:       null,
+          eventName:     evEntry.name,
+          hijriDate:     parsed.ok ? parsed.hijriDate : '',
+          sequence:      parsed.ok ? String(parsed.sequence).padStart(2, '0') : '',
+          status:        'corrupt',
+          isCorrupt:     true,
+        });
+      } else {
+        // No event.json → external/manual folder
+        collection.externalFolders.push({
+          name: evEntry.name,
+          path: evPath,
+          type: 'external-folder',
+        });
+      }
+    }
+
+    // Sort events newest-first (matches master:scanEvents ordering)
+    collection.events.sort((a, b) => {
+      if (a.hijriDate !== b.hijriDate) return b.hijriDate.localeCompare(a.hijriDate);
+      return b.sequence.localeCompare(a.sequence);
+    });
+
+    collections.push(collection);
+  }
+
+  // Sort collections alphabetically
+  collections.sort((a, b) => a.name.localeCompare(b.name));
+
+  return { status: 'ready', refreshedAt, source: 'nas', collections };
+}
+
+async function _runNasScan() {
+  const nasRoot = settings.getNasRoot();
+  if (!nasRoot) {
+    return { status: 'nas-not-set', refreshedAt: new Date().toISOString(), source: 'nas', collections: [] };
+  }
+
+  // Validate the NAS root marker before scanning
+  try {
+    const markerPath = path.join(nasRoot, '.autoingest', 'root', 'archive-root.json');
+    const raw  = await fsp.readFile(markerPath, 'utf8');
+    const mark = JSON.parse(raw);
+    if (mark.type !== 'autoingest-nas-root') {
+      return { status: 'invalid-nas', refreshedAt: new Date().toISOString(), source: 'nas', collections: [] };
+    }
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      try {
+        await fsp.stat(nasRoot);
+        return { status: 'invalid-nas', refreshedAt: new Date().toISOString(), source: 'nas', collections: [] };
+      } catch {
+        return { status: 'nas-disconnected', refreshedAt: new Date().toISOString(), source: 'nas', collections: [] };
+      }
+    }
+    return { status: 'invalid-nas', refreshedAt: new Date().toISOString(), source: 'nas', collections: [] };
+  }
+
+  const result = await _scanNasArchive(nasRoot);
+
+  if (result.status === 'ready') {
+    await nasEventCache.save({ cachedAt: result.refreshedAt, collections: result.collections });
+  }
+
+  return result;
+}
+
+ipcMain.handle('archive:scanNasEvents',    async () => _runNasScan());
+ipcMain.handle('archive:refreshNasEvents', async () => _runNasScan());
+
+ipcMain.handle('archive:getCachedNasEvents', async () => {
+  const cached = await nasEventCache.load();
+  if (!cached) return { status: 'no-cache', source: 'cache', collections: [] };
+  return {
+    status:      'ready',
+    source:      'cache',
+    cachedAt:    cached.cachedAt,
+    refreshedAt: cached.cachedAt,
+    collections: cached.collections,
+  };
+});
+
+ipcMain.handle('archive:clearNasEventCache', async () => {
+  await nasEventCache.clear();
 });
 
 // ── EXIF metadata service ─────────────────────────────────────────────────────
