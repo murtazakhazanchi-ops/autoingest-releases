@@ -329,7 +329,8 @@
     #headerDateHijri { color: var(--text); opacity: 0.82; }
 
     /* Archive */
-    .header-section.archive { font-size: 13px; color: var(--subtext); padding: 0 16px; max-width: 240px; }
+    .header-section.archive { font-size: 13px; color: var(--subtext); padding: 0 16px; max-width: 240px; cursor: pointer; transition: opacity 0.15s; }
+    .header-section.archive:hover { opacity: 0.75; }
     .header-section.archive #archivePath { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; display: inline-block; }
 
     /* Status */
@@ -339,7 +340,9 @@
     .status-icon-wrap { grid-row: 1 / span 2; display: flex; align-items: center; }
     .status-icon { width: 14px; height: 14px; stroke-width: 1.8; opacity: 0.7; display: block; }
     .status-value { display: flex; align-items: center; gap: 6px; }
-    .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); flex-shrink: 0; transition: background 0.2s; }
+    .status-dot--warn  { background: var(--yellow, #f59e0b); }
+    .status-dot--error { background: var(--red,    #ef4444); }
     .status-text { font-size: 13px; font-weight: 500; color: var(--text); }
 
     /* Dividers */
@@ -830,6 +833,32 @@
 
     /* ── ACTIVITY LOG MODAL ──────────────────────── */
     #eventMgmtModal .emm-box { width: min(1320px, calc(100vw - 48px)); }
+
+    /* ── Archive Locations modal ── */
+    #archiveLocationsModal .emm-box { width: min(560px, calc(100vw - 48px)); }
+    .aloc-body { padding: 20px 24px 8px; display: flex; flex-direction: column; gap: 18px; }
+    .aloc-row { display: flex; flex-direction: column; gap: 6px; }
+    .aloc-label { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--subtext); }
+    .aloc-path-wrap { display: flex; align-items: center; gap: 8px; }
+    .aloc-path-display {
+      flex: 1; font-size: 13px; color: var(--text); background: var(--input-bg, rgba(255,255,255,0.05));
+      border: 1px solid var(--border); border-radius: 6px; padding: 7px 10px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+    }
+    .aloc-path-display.aloc-unset { color: var(--subtext); font-style: italic; }
+    .aloc-btn { font-size: 12px; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--btn-bg, rgba(255,255,255,0.07)); color: var(--text); cursor: pointer; white-space: nowrap; transition: opacity 0.15s; }
+    .aloc-btn:hover { opacity: 0.8; }
+    .aloc-validation { font-size: 12px; min-height: 18px; }
+    .aloc-validation.ok   { color: var(--green,  #22c55e); }
+    .aloc-validation.warn { color: var(--yellow, #f59e0b); }
+    .aloc-validation.err  { color: var(--red,    #ef4444); }
+    .aloc-mode-wrap { display: flex; gap: 10px; }
+    .aloc-mode-btn { flex: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--btn-bg, rgba(255,255,255,0.07)); color: var(--subtext); cursor: pointer; font-size: 13px; text-align: center; transition: all 0.15s; }
+    .aloc-mode-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(var(--accent-rgb, 99,102,241),0.1); }
+    .aloc-device-row { display: flex; align-items: center; gap: 8px; padding: 10px 0 4px; border-top: 1px solid var(--divider-color); margin-top: 4px; }
+    .aloc-device-label { font-size: 12px; color: var(--subtext); }
+    .aloc-device-name  { font-size: 12px; font-weight: 600; color: var(--text); }
+
     #activityLogModal .emm-box { height: calc(100vh - 80px); }
     #alTitle { font-size: 18px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.01em; }
     #alBody {
@@ -6652,6 +6681,67 @@
   </div>
 
   <!-- ── ADD OPERATOR MODAL ────────────────────────────────────────────── -->
+  <!-- Archive Locations Modal -->
+  <div id="archiveLocationsModal" class="emm-overlay" role="dialog" aria-modal="true" aria-labelledby="alocTitle">
+    <div class="emm-box">
+      <div class="emm-topbar">
+        <span class="emm-topbar-title" id="alocTitle">Archive Locations</span>
+        <button type="button" class="emm-close-btn" id="alocCloseBtn" aria-label="Close">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="aloc-body">
+
+        <!-- NAS Archive Root -->
+        <div class="aloc-row">
+          <span class="aloc-label">NAS Archive Root</span>
+          <div class="aloc-path-wrap">
+            <div class="aloc-path-display aloc-unset" id="alocNasPath">Not set</div>
+            <button type="button" class="aloc-btn" id="alocNasChooseBtn">Choose…</button>
+            <button type="button" class="aloc-btn" id="alocNasClearBtn">Clear</button>
+          </div>
+          <div class="aloc-validation" id="alocNasValidation"></div>
+        </div>
+
+        <!-- Local Staging Root -->
+        <div class="aloc-row">
+          <span class="aloc-label">Local Staging Root</span>
+          <div class="aloc-path-wrap">
+            <div class="aloc-path-display aloc-unset" id="alocStagingPath">Not set</div>
+            <button type="button" class="aloc-btn" id="alocStagingChooseBtn">Choose…</button>
+            <button type="button" class="aloc-btn" id="alocStagingClearBtn">Clear</button>
+          </div>
+          <div class="aloc-validation" id="alocStagingValidation"></div>
+        </div>
+
+        <!-- Default Import Mode -->
+        <div class="aloc-row">
+          <span class="aloc-label">Default Import Mode</span>
+          <div class="aloc-mode-wrap">
+            <button type="button" class="aloc-mode-btn active" id="alocModeDirectNas" data-mode="direct-nas">Direct to NAS</button>
+            <button type="button" class="aloc-mode-btn" id="alocModeLocalFirst" data-mode="local-first">Local First</button>
+          </div>
+        </div>
+
+        <!-- Device identity -->
+        <div class="aloc-device-row">
+          <span class="aloc-device-label">This device:</span>
+          <span class="aloc-device-name" id="alocDeviceName">—</span>
+        </div>
+
+      </div>
+
+      <div class="emm-footer">
+        <div></div>
+        <div class="emm-footer-right">
+          <button type="button" class="emm-btn-secondary" id="alocCancelBtn">Cancel</button>
+          <button type="button" class="emm-btn-primary" id="alocSaveBtn">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="addUserModal" role="dialog" aria-modal="true" aria-label="Add operator" style="display:none">
     <div class="au-modal-card">
       <div class="au-modal-title">Add operator</div>

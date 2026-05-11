@@ -289,4 +289,95 @@ async function setAutoMetadataEnabled(value) {
   await _save();
 }
 
-module.exports = { init, getArchiveRoot, setArchiveRoot, getLastDestPath, setLastDestPath, getLastEvent, setLastEvent, getWindowBounds, setWindowBounds, setWindowBoundsSync, getLastActiveUserId, setLastActiveUserId, getAutoMetadataEnabled, setAutoMetadataEnabled };
+// ─── Archive Operations settings ──────────────────────────────────────────────
+
+/**
+ * Returns the NAS archive root path, or null if never set.
+ * @returns {string | null}
+ */
+function getNasRoot() {
+  if (!_loaded) init();
+  const v = _state.nasRoot;
+  return (typeof v === 'string' && v.length > 0) ? v : null;
+}
+
+/**
+ * Persists the NAS archive root path. Pass null or '' to clear.
+ * @param {string | null} value
+ * @returns {Promise<void>}
+ */
+async function setNasRoot(value) {
+  if (!_loaded) init();
+  if (value === null || value === '') {
+    delete _state.nasRoot;
+  } else if (typeof value === 'string') {
+    _state.nasRoot = value;
+  } else {
+    throw new Error('setNasRoot: expected string or null');
+  }
+  await _save();
+}
+
+/**
+ * Returns the local staging root path, or null if never set.
+ * @returns {string | null}
+ */
+function getLocalStagingRoot() {
+  if (!_loaded) init();
+  const v = _state.localStagingRoot;
+  return (typeof v === 'string' && v.length > 0) ? v : null;
+}
+
+/**
+ * Persists the local staging root path. Pass null or '' to clear.
+ * @param {string | null} value
+ * @returns {Promise<void>}
+ */
+async function setLocalStagingRoot(value) {
+  if (!_loaded) init();
+  if (value === null || value === '') {
+    delete _state.localStagingRoot;
+  } else if (typeof value === 'string') {
+    _state.localStagingRoot = value;
+  } else {
+    throw new Error('setLocalStagingRoot: expected string or null');
+  }
+  await _save();
+}
+
+/**
+ * Returns the default import mode ('direct-nas' | 'local-first'). Defaults to 'direct-nas'.
+ * @returns {'direct-nas' | 'local-first'}
+ */
+function getDefaultImportMode() {
+  if (!_loaded) init();
+  const v = _state.defaultImportMode;
+  return v === 'local-first' ? 'local-first' : 'direct-nas';
+}
+
+/**
+ * Persists the default import mode.
+ * @param {'direct-nas' | 'local-first'} value
+ * @returns {Promise<void>}
+ */
+async function setDefaultImportMode(value) {
+  if (!_loaded) init();
+  if (value !== 'direct-nas' && value !== 'local-first') {
+    throw new Error("setDefaultImportMode: expected 'direct-nas' or 'local-first'");
+  }
+  _state.defaultImportMode = value;
+  await _save();
+}
+
+module.exports = {
+  init,
+  getArchiveRoot, setArchiveRoot,
+  getLastDestPath, setLastDestPath,
+  getLastEvent, setLastEvent,
+  getWindowBounds, setWindowBounds, setWindowBoundsSync,
+  getLastActiveUserId, setLastActiveUserId,
+  getAutoMetadataEnabled, setAutoMetadataEnabled,
+  getNasRoot, setNasRoot,
+  getLocalStagingRoot, setLocalStagingRoot,
+  getDefaultImportMode, setDefaultImportMode,
+};

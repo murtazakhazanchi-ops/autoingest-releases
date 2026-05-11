@@ -2257,6 +2257,203 @@ document.getElementById('metaTitleIndicator')?.addEventListener('click', () => o
 document.getElementById('alCloseFooterBtn')?.addEventListener('click', _alClose);
 
 // ════════════════════════════════════════════════════════════════
+// ARCHIVE LOCATIONS MODAL
+// ════════════════════════════════════════════════════════════════
+
+// Pending edits accumulated while the modal is open
+let _alocPendingNasRoot      = undefined; // undefined = no change pending
+let _alocPendingStagingRoot  = undefined;
+let _alocPendingImportMode   = undefined;
+
+function _alocClose() {
+  document.getElementById('archiveLocationsModal')?.classList.remove('open');
+  document.body.style.overflow = '';
+  _alocPendingNasRoot     = undefined;
+  _alocPendingStagingRoot = undefined;
+  _alocPendingImportMode  = undefined;
+}
+
+async function _alocOpen() {
+  const overlay = document.getElementById('archiveLocationsModal');
+  if (!overlay || overlay.classList.contains('open')) return;
+
+  // Fetch current state
+  const [status, identity] = await Promise.all([
+    window.api.getArchiveOperationsStatus(),
+    window.api.getDeviceIdentity(),
+  ]);
+
+  _alocPendingNasRoot     = undefined;
+  _alocPendingStagingRoot = undefined;
+  _alocPendingImportMode  = undefined;
+
+  // Populate NAS path
+  const nasEl = document.getElementById('alocNasPath');
+  if (nasEl) {
+    if (status.nasRoot) {
+      nasEl.textContent = status.nasRoot;
+      nasEl.classList.remove('aloc-unset');
+    } else {
+      nasEl.textContent = 'Not set';
+      nasEl.classList.add('aloc-unset');
+    }
+  }
+
+  // Populate staging path
+  const stagingEl = document.getElementById('alocStagingPath');
+  if (stagingEl) {
+    if (status.localStagingRoot) {
+      stagingEl.textContent = status.localStagingRoot;
+      stagingEl.classList.remove('aloc-unset');
+    } else {
+      stagingEl.textContent = 'Not set';
+      stagingEl.classList.add('aloc-unset');
+    }
+  }
+
+  // Validation hints
+  document.getElementById('alocNasValidation').textContent     = '';
+  document.getElementById('alocStagingValidation').textContent = '';
+
+  // Import mode buttons
+  const mode = status.defaultImportMode || 'direct-nas';
+  document.getElementById('alocModeDirectNas')?.classList.toggle('active', mode === 'direct-nas');
+  document.getElementById('alocModeLocalFirst')?.classList.toggle('active', mode === 'local-first');
+
+  // Device name
+  const devEl = document.getElementById('alocDeviceName');
+  if (devEl) devEl.textContent = identity?.deviceName || '—';
+
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+// Helper: display validation result in a validation element
+function _alocShowValidation(elId, result) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  if (!result) { el.textContent = ''; el.className = 'aloc-validation'; return; }
+  if (result.valid) {
+    el.textContent = result.archiveName ? `✓ ${result.archiveName}` : '✓ Valid';
+    el.className = 'aloc-validation ok';
+  } else {
+    const msgs = {
+      'no-path':          'No path specified',
+      'not-directory':    'Path is not a directory',
+      'no-marker':        'Not a valid archive root (marker missing)',
+      'wrong-marker-type':'Not a valid archive root (wrong marker)',
+      'no-access':        'Permission denied',
+      'not-found':        'Path not found',
+    };
+    el.textContent = '✗ ' + (msgs[result.reason] || result.message || 'Invalid');
+    el.className = 'aloc-validation err';
+  }
+}
+
+// NAS choose
+document.getElementById('alocNasChooseBtn')?.addEventListener('click', async () => {
+  const chosen = await window.api.chooseArchiveRoot();
+  if (!chosen) return;
+  const nasEl = document.getElementById('alocNasPath');
+  if (nasEl) { nasEl.textContent = chosen; nasEl.classList.remove('aloc-unset'); }
+  _alocPendingNasRoot = chosen;
+  const result = await window.api.validateNasRoot(chosen);
+  _alocShowValidation('alocNasValidation', result);
+});
+
+// NAS clear
+document.getElementById('alocNasClearBtn')?.addEventListener('click', () => {
+  const nasEl = document.getElementById('alocNasPath');
+  if (nasEl) { nasEl.textContent = 'Not set'; nasEl.classList.add('aloc-unset'); }
+  _alocPendingNasRoot = null;
+  document.getElementById('alocNasValidation').textContent = '';
+  document.getElementById('alocNasValidation').className   = 'aloc-validation';
+});
+
+// Staging choose
+document.getElementById('alocStagingChooseBtn')?.addEventListener('click', async () => {
+  const chosen = await window.api.chooseArchiveRoot();
+  if (!chosen) return;
+  const stagingEl = document.getElementById('alocStagingPath');
+  if (stagingEl) { stagingEl.textContent = chosen; stagingEl.classList.remove('aloc-unset'); }
+  _alocPendingStagingRoot = chosen;
+  const result = await window.api.validateLocalStagingRoot(chosen);
+  _alocShowValidation('alocStagingValidation', result);
+});
+
+// Staging clear
+document.getElementById('alocStagingClearBtn')?.addEventListener('click', () => {
+  const stagingEl = document.getElementById('alocStagingPath');
+  if (stagingEl) { stagingEl.textContent = 'Not set'; stagingEl.classList.add('aloc-unset'); }
+  _alocPendingStagingRoot = null;
+  document.getElementById('alocStagingValidation').textContent = '';
+  document.getElementById('alocStagingValidation').className   = 'aloc-validation';
+});
+
+// Import mode toggle
+document.getElementById('alocModeDirectNas')?.addEventListener('click', () => {
+  document.getElementById('alocModeDirectNas')?.classList.add('active');
+  document.getElementById('alocModeLocalFirst')?.classList.remove('active');
+  _alocPendingImportMode = 'direct-nas';
+});
+document.getElementById('alocModeLocalFirst')?.addEventListener('click', () => {
+  document.getElementById('alocModeLocalFirst')?.classList.add('active');
+  document.getElementById('alocModeDirectNas')?.classList.remove('active');
+  _alocPendingImportMode = 'local-first';
+});
+
+// Save
+document.getElementById('alocSaveBtn')?.addEventListener('click', async () => {
+  const saves = [];
+  if (_alocPendingNasRoot !== undefined)     saves.push(window.api.setNasRoot(_alocPendingNasRoot));
+  if (_alocPendingStagingRoot !== undefined) saves.push(window.api.setLocalStagingRoot(_alocPendingStagingRoot));
+  if (_alocPendingImportMode !== undefined)  saves.push(window.api.setDefaultImportMode(_alocPendingImportMode));
+  if (saves.length > 0) await Promise.all(saves);
+  _alocClose();
+  _updateSystemStatus();
+});
+
+// Cancel / close buttons
+document.getElementById('alocCancelBtn')?.addEventListener('click', _alocClose);
+document.getElementById('alocCloseBtn')?.addEventListener('click', _alocClose);
+document.getElementById('archiveLocationsModal')?.addEventListener('click', (e) => {
+  if (e.target === document.getElementById('archiveLocationsModal')) _alocClose();
+});
+
+// Header archive section click → open modal
+document.querySelector('.header-section.archive')?.addEventListener('click', _alocOpen);
+
+// Escape key
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && document.getElementById('archiveLocationsModal')?.classList.contains('open')) _alocClose();
+});
+
+// Update header status dot and text from archive operations status
+async function _updateSystemStatus() {
+  const dot  = document.querySelector('.status-dot');
+  const text = document.querySelector('.status-text');
+  if (!dot || !text) return;
+
+  let status;
+  try { status = await window.api.getArchiveOperationsStatus(); } catch { return; }
+
+  const map = {
+    'ready':                 { cls: '',                   label: 'Ready' },
+    'nas-not-set':           { cls: 'status-dot--warn',  label: 'NAS not set' },
+    'nas-disconnected':      { cls: 'status-dot--error', label: 'NAS offline' },
+    'invalid-nas':           { cls: 'status-dot--error', label: 'Invalid NAS' },
+    'local-staging-missing': { cls: 'status-dot--warn',  label: 'Staging missing' },
+  };
+  const entry = map[status.status] || { cls: 'status-dot--warn', label: status.status };
+
+  dot.className    = 'status-dot' + (entry.cls ? ' ' + entry.cls : '');
+  text.textContent = entry.label;
+}
+
+// Run on startup
+_updateSystemStatus();
+
+// ════════════════════════════════════════════════════════════════
 // METADATA SYNC MODAL
 // ════════════════════════════════════════════════════════════════
 

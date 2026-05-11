@@ -1564,6 +1564,105 @@ ipcMain.handle('settings:verifyLastEvent', async (_event, collectionPath, eventF
   return true;
 });
 
+// ── Archive Operations ────────────────────────────────────────────────────────
+
+ipcMain.handle('archive:getDeviceIdentity', () => ({ deviceName: os.hostname() }));
+
+ipcMain.handle('archive:setNasRoot', async (_event, value) => {
+  await settings.setNasRoot(value);
+});
+
+ipcMain.handle('archive:setLocalStagingRoot', async (_event, value) => {
+  await settings.setLocalStagingRoot(value);
+});
+
+ipcMain.handle('archive:setDefaultImportMode', async (_event, value) => {
+  await settings.setDefaultImportMode(value);
+});
+
+ipcMain.handle('archive:validateNasRoot', async (_event, dirPath) => {
+  if (!dirPath || typeof dirPath !== 'string') return { valid: false, reason: 'no-path' };
+  try {
+    const stat = await fsp.stat(dirPath);
+    if (!stat.isDirectory()) return { valid: false, reason: 'not-directory' };
+    const markerPath = path.join(dirPath, '.autoingest', 'root', 'archive-root.json');
+    const raw = await fsp.readFile(markerPath, 'utf8');
+    const marker = JSON.parse(raw);
+    if (marker.type !== 'autoingest-nas-root') return { valid: false, reason: 'wrong-marker-type' };
+    return { valid: true, archiveName: marker.archiveName || null };
+  } catch (err) {
+    if (err.code === 'ENOENT') return { valid: false, reason: 'no-marker' };
+    if (err.code === 'EACCES') return { valid: false, reason: 'no-access' };
+    return { valid: false, reason: 'error', message: err.message };
+  }
+});
+
+ipcMain.handle('archive:validateLocalStagingRoot', async (_event, dirPath) => {
+  if (!dirPath || typeof dirPath !== 'string') return { valid: false, reason: 'no-path' };
+  try {
+    const stat = await fsp.stat(dirPath);
+    if (!stat.isDirectory()) return { valid: false, reason: 'not-directory' };
+  } catch (err) {
+    if (err.code === 'ENOENT') return { valid: false, reason: 'not-found' };
+    if (err.code === 'EACCES' || err.code === 'EPERM') return { valid: false, reason: 'no-access' };
+    return { valid: false, reason: 'error', message: err.message };
+  }
+  // Write-access probe — always cleaned up via finally
+  const probe = path.join(dirPath, '.autoingest-probe-' + Date.now());
+  let written = false;
+  try {
+    await fsp.writeFile(probe, '');
+    written = true;
+    return { valid: true };
+  } catch (err) {
+    if (err.code === 'EACCES' || err.code === 'EPERM') return { valid: false, reason: 'no-access' };
+    return { valid: false, reason: 'error', message: err.message };
+  } finally {
+    if (written) fsp.unlink(probe).catch(() => {});
+  }
+});
+
+ipcMain.handle('archive:getOperationsStatus', async () => {
+  const nasRoot          = settings.getNasRoot();
+  const localStagingRoot = settings.getLocalStagingRoot();
+  const defaultImportMode = settings.getDefaultImportMode();
+
+  if (!nasRoot) {
+    return { status: 'nas-not-set', nasRoot, localStagingRoot, defaultImportMode };
+  }
+
+  // Quick reachability check (stat the root directory)
+  try {
+    const stat = await fsp.stat(nasRoot);
+    if (!stat.isDirectory()) {
+      return { status: 'invalid-nas', nasRoot, localStagingRoot, defaultImportMode };
+    }
+  } catch (err) {
+    if (err.code === 'ENOENT' || err.code === 'ENOTCONN' || err.code === 'EIO') {
+      return { status: 'nas-disconnected', nasRoot, localStagingRoot, defaultImportMode };
+    }
+    return { status: 'invalid-nas', nasRoot, localStagingRoot, defaultImportMode };
+  }
+
+  // Validate marker
+  try {
+    const markerPath = path.join(nasRoot, '.autoingest', 'root', 'archive-root.json');
+    const raw = await fsp.readFile(markerPath, 'utf8');
+    const marker = JSON.parse(raw);
+    if (marker.type !== 'autoingest-nas-root') {
+      return { status: 'invalid-nas', nasRoot, localStagingRoot, defaultImportMode };
+    }
+  } catch {
+    return { status: 'invalid-nas', nasRoot, localStagingRoot, defaultImportMode };
+  }
+
+  if (defaultImportMode === 'local-first' && !localStagingRoot) {
+    return { status: 'local-staging-missing', nasRoot, localStagingRoot, defaultImportMode };
+  }
+
+  return { status: 'ready', nasRoot, localStagingRoot, defaultImportMode };
+});
+
 // ── EXIF metadata service ─────────────────────────────────────────────────────
 
 ipcMain.handle('metadata:getStatus', (_event, batchId) => {

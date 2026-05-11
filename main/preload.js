@@ -189,6 +189,15 @@ contextBridge.exposeInMainWorld('api', {
   getAutoMetadataEnabled:   ()                       => ipcRenderer.invoke('settings:getAutoMetadataEnabled'),
   setAutoMetadataEnabled:   (v)                      => ipcRenderer.invoke('settings:setAutoMetadataEnabled', v),
 
+  // ── Archive Operations ──
+  getArchiveOperationsStatus: ()    => ipcRenderer.invoke('archive:getOperationsStatus'),
+  setNasRoot:                 (v)   => ipcRenderer.invoke('archive:setNasRoot', v),
+  validateNasRoot:            (v)   => ipcRenderer.invoke('archive:validateNasRoot', v),
+  setLocalStagingRoot:        (v)   => ipcRenderer.invoke('archive:setLocalStagingRoot', v),
+  validateLocalStagingRoot:   (v)   => ipcRenderer.invoke('archive:validateLocalStagingRoot', v),
+  setDefaultImportMode:       (v)   => ipcRenderer.invoke('archive:setDefaultImportMode', v),
+  getDeviceIdentity:          ()    => ipcRenderer.invoke('archive:getDeviceIdentity'),
+
   // ── EXIF metadata service ──
   getMetadataStatus:      (batchId)            => ipcRenderer.invoke('metadata:getStatus',     batchId),
   retryMetadata:          (batchId)            => ipcRenderer.invoke('metadata:retry',          batchId),
