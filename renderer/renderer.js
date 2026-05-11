@@ -5898,14 +5898,16 @@ async function _writeLocalFirstManifest(metadataStatus) {
   if (!pending) return;
   if (_metaBatchId !== pending.batchId) return;
   _pendingLfSyncManifest = null;
+  const payload = {
+    eventName:      pending.eventName,
+    collectionName: pending.collectionName,
+    importedAt:     pending.importedAt,
+    metadataStatus,
+    readyForSync:   metadataStatus === 'complete',
+  };
+  if (metadataStatus !== 'complete') payload.needsAttention = true;
   try {
-    await window.api.writeSyncManifest(pending.localEventPath, {
-      eventName:      pending.eventName,
-      collectionName: pending.collectionName,
-      importedAt:     pending.importedAt,
-      metadataStatus,
-      readyForSync:   metadataStatus === 'complete',
-    });
+    await window.api.writeSyncManifest(pending.localEventPath, payload);
   } catch (e) {
     console.error('[LF] Failed to write sync manifest:', e);
   }
@@ -6800,15 +6802,30 @@ document.getElementById('importBtn').addEventListener('click', async () => {
       if (!activeSource && !_importCleanupRoot) return;
 
       showProgressSummary(summary, _importCleanupRoot);
-      if (_eiSelectedImportMode === 'local-first' && summary.metadataBatchId) {
-        const _lfCollName = (eventData.collectionPath || '').replace(/\\/g, '/').replace(/\/$/, '').split('/').filter(Boolean).pop() || '';
-        _pendingLfSyncManifest = {
-          batchId:        summary.metadataBatchId,
-          localEventPath: _txEventPath,
-          eventName:      eventData.event?.name || '',
-          collectionName: _lfCollName,
-          importedAt:     Date.now(),
-        };
+      if (_eiSelectedImportMode === 'local-first') {
+        const _lfCollName  = (eventData.collectionPath || '').replace(/\\/g, '/').replace(/\/$/, '').split('/').filter(Boolean).pop() || '';
+        const _lfImportedAt = Date.now();
+        if (summary.metadataBatchId) {
+          // Metadata running — write manifest after batch_complete / batch_error
+          _pendingLfSyncManifest = {
+            batchId:        summary.metadataBatchId,
+            localEventPath: _txEventPath,
+            eventName:      eventData.event?.name || '',
+            collectionName: _lfCollName,
+            importedAt:     _lfImportedAt,
+          };
+        } else {
+          // Auto-metadata disabled — write manifest immediately
+          window.api.writeSyncManifest(_txEventPath, {
+            eventName:      eventData.event?.name || '',
+            collectionName: _lfCollName,
+            importedAt:     _lfImportedAt,
+            metadataStatus: 'skipped-disabled',
+            readyForSync:   false,
+            needsAttention: true,
+            reason:         'auto-metadata-disabled',
+          }).catch(e => console.error('[LF] Failed to write sync manifest (no-meta):', e));
+        }
       }
       EventCreator.invalidateScannedEvents();
       await refreshDestCache();
