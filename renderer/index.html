@@ -4583,6 +4583,42 @@
     .cm-level-4 { margin-left: 32px; }
     .cm-node-count { margin-left: 6px; opacity: 0.6; font-size: 11px; }
 
+    /* ── Import Method selector (G5 Phase 4) ─────────────────────────────── */
+    #eiImportMethod { margin-bottom: 16px; }
+    .im-options { display: flex; gap: 8px; margin: 6px 0 6px; }
+    .im-option {
+      display: flex; align-items: flex-start; gap: 8px;
+      padding: 8px 10px; border-radius: 9px;
+      border: 1px solid var(--border-subtle); cursor: pointer; flex: 1;
+      background: var(--glass-bg-1);
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .im-option input[type="radio"] { margin-top: 3px; flex-shrink: 0; accent-color: var(--green); }
+    .im-opt-body { display: flex; flex-direction: column; gap: 2px; }
+    .im-opt-name { font-size: 0.82rem; font-weight: 600; color: var(--text); }
+    .im-opt-desc { font-size: 0.73rem; color: var(--subtext); }
+    .im-option.im-selected {
+      border-color: var(--green);
+      background: color-mix(in srgb, var(--green) 8%, var(--glass-bg-1));
+    }
+    .im-status-row { font-size: 0.73rem; min-height: 16px; margin-top: 2px; padding: 0 2px; color: var(--subtext); }
+    .im-status-row.warn { color: var(--yellow, #f59e0b); }
+    .im-status-row.err  { color: var(--red); }
+    .im-dest-preview {
+      margin-top: 6px; padding: 8px 10px;
+      background: var(--glass-bg-1); border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+      font-size: 11px; line-height: 2;
+    }
+    .im-dest-row { display: flex; gap: 8px; align-items: baseline; }
+    .im-dest-lbl {
+      font-size: 0.68rem; font-weight: 700; color: var(--subtext);
+      text-transform: uppercase; letter-spacing: 0.05em; min-width: 36px;
+    }
+    .im-dest-path { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .im-dest-path.placeholder { color: var(--text-muted); font-style: italic; }
+
   /* ── Drag-and-drop grouping ─────────────────────────────────────────────── */
 
   /* Custom drag ghost — compact floating stack that follows the cursor */
@@ -6528,6 +6564,28 @@
       <div id="eiMappingSection">
         <div class="ei-label">Group assignments</div>
         <div id="eiMappingTable"></div>
+      </div>
+
+      <div id="eiImportMethod">
+        <div class="ei-label">Import Method</div>
+        <div class="im-options">
+          <label class="im-option" id="eiOptLocalFirst">
+            <input type="radio" name="eiImportMode" value="local-first" id="eiModeLocalFirst" />
+            <div class="im-opt-body">
+              <span class="im-opt-name">Local First</span>
+              <span class="im-opt-desc">Fast local copy. Syncs to NAS later.</span>
+            </div>
+          </label>
+          <label class="im-option" id="eiOptDirectNas">
+            <input type="radio" name="eiImportMode" value="direct-nas" id="eiModeDirectNas" />
+            <div class="im-opt-body">
+              <span class="im-opt-name">Direct NAS</span>
+              <span class="im-opt-desc">Copies straight to NAS.</span>
+            </div>
+          </label>
+        </div>
+        <div id="eiModeStatus" class="im-status-row"></div>
+        <div id="eiModeDestPreview" class="im-dest-preview" style="display:none"></div>
       </div>
 
       <div id="eiDestSection">

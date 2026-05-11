@@ -6874,7 +6874,8 @@ function showDupSubEventModal(dupSubEvents) {
 // G5: EVENT IMPORT CONFIRMATION MODAL
 // ════════════════════════════════════════════════════════════════
 
-let _eiPhotographerDD = null;
+let _eiPhotographerDD    = null;
+let _eiSelectedImportMode = 'direct-nas';
 
 /**
  * Opens the event import confirmation modal.
@@ -6940,7 +6941,11 @@ function _renderDestinationTree(groups, eventData, photographerName) {
   return rows.join('');
 }
 
-function showEventImportConfirmModal(groups, eventData) {
+async function showEventImportConfirmModal(groups, eventData) {
+  // Fetch archive status before opening so import method UI has current config.
+  let archiveStatus = {};
+  try { archiveStatus = await window.api.getArchiveOperationsStatus(); } catch { /* non-critical */ }
+
   return new Promise(resolve => {
     const overlay   = document.getElementById('eventImportOverlay');
     const importBtn = document.getElementById('eiImportBtn');
@@ -6967,6 +6972,7 @@ function showEventImportConfirmModal(groups, eventData) {
       onSelect:    ({ label }) => {
         importBtn.disabled = !label?.trim();
         _updateTree(label?.trim() || null);
+        _applyImportModeUI(_eiSelectedImportMode, label?.trim() || null);
       },
     });
 
@@ -6993,6 +6999,94 @@ function showEventImportConfirmModal(groups, eventData) {
     // Initial destination tree (no photographer selected yet)
     _updateTree(null);
 
+    // ── Import Method UI ─────────────────────────────────────────────────────
+    const nasStatus     = archiveStatus.status || '';
+    const nasRoot       = archiveStatus.nasRoot       || null;
+    const stagingRoot   = archiveStatus.localStagingRoot || null;
+    const nasUsable     = !!nasRoot && ['ready', 'local-staging-missing'].includes(nasStatus);
+    const stagingUsable = !!stagingRoot;
+
+    const lastSeg         = p => (p || '').replace(/\\/g, '/').replace(/\/$/, '').split('/').filter(Boolean).pop() || '';
+    const nasArchiveName  = nasRoot    ? lastSeg(nasRoot)    : '';
+    const stagingRootName = stagingRoot ? lastSeg(stagingRoot) : '';
+    const collName        = lastSeg(eventData.collectionPath);
+    const eventFolderName = lastSeg(eventData.eventPath);
+
+    const localFirstRadio = document.getElementById('eiModeLocalFirst');
+    const directNasRadio  = document.getElementById('eiModeDirectNas');
+    const modeStatusEl    = document.getElementById('eiModeStatus');
+    const modeDestEl      = document.getElementById('eiModeDestPreview');
+    const optLocalFirst   = document.getElementById('eiOptLocalFirst');
+    const optDirectNas    = document.getElementById('eiOptDirectNas');
+
+    function _modeStatus(mode) {
+      if (mode === 'direct-nas') {
+        if (!nasRoot || nasStatus === 'nas-not-set') return { text: 'NAS not configured',    cls: 'warn' };
+        if (nasStatus === 'nas-disconnected')         return { text: 'NAS not connected',     cls: 'err'  };
+        if (nasStatus === 'invalid-nas')              return { text: 'Invalid NAS root',      cls: 'err'  };
+        return { text: '', cls: '' };
+      }
+      if (mode === 'local-first') {
+        if (!stagingRoot) return { text: 'Set local staging first', cls: 'warn' };
+        return { text: '', cls: '' };
+      }
+      return { text: '', cls: '' };
+    }
+
+    function _destPreviewHTML(mode, photographerName) {
+      const ph     = !photographerName;
+      const phName = photographerName || '(photographer)';
+      const phCls  = ph ? ' placeholder' : '';
+
+      if (mode === 'direct-nas') {
+        if (!nasUsable) return '';
+        const p = [nasArchiveName, collName, eventFolderName, phName].filter(Boolean).join('/');
+        return `<div class="im-dest-row"><span class="im-dest-lbl">NAS</span><span class="im-dest-path${phCls}">${_esc(p + '/')}</span></div>`;
+      }
+
+      if (mode === 'local-first') {
+        const rows = [];
+        if (stagingUsable) {
+          const p = [stagingRootName, collName, eventFolderName, phName].filter(Boolean).join('/');
+          rows.push(`<div class="im-dest-row"><span class="im-dest-lbl">Local</span><span class="im-dest-path${phCls}">${_esc(p + '/')}</span></div>`);
+        }
+        if (nasUsable) {
+          const p = [nasArchiveName, collName, eventFolderName, phName].filter(Boolean).join('/');
+          rows.push(`<div class="im-dest-row"><span class="im-dest-lbl">NAS</span><span class="im-dest-path${phCls}">${_esc(p + '/')}</span></div>`);
+        }
+        return rows.join('');
+      }
+
+      return '';
+    }
+
+    function _applyImportModeUI(mode, photographerName) {
+      if (localFirstRadio) localFirstRadio.checked = (mode === 'local-first');
+      if (directNasRadio)  directNasRadio.checked  = (mode === 'direct-nas');
+      if (optLocalFirst)   optLocalFirst.classList.toggle('im-selected', mode === 'local-first');
+      if (optDirectNas)    optDirectNas.classList.toggle('im-selected',  mode === 'direct-nas');
+      const { text, cls } = _modeStatus(mode);
+      if (modeStatusEl) { modeStatusEl.textContent = text; modeStatusEl.className = `im-status-row ${cls}`.trim(); }
+      if (modeDestEl) {
+        const html = _destPreviewHTML(mode, photographerName);
+        modeDestEl.innerHTML = html;
+        modeDestEl.style.display = html ? '' : 'none';
+      }
+      _eiSelectedImportMode = mode;
+    }
+
+    // Init with saved default
+    _applyImportModeUI(archiveStatus.defaultImportMode || 'direct-nas', null);
+
+    const modeAbort = new AbortController();
+    if (localFirstRadio) localFirstRadio.addEventListener('change', () => {
+      if (localFirstRadio.checked) _applyImportModeUI('local-first', _eiPhotographerDD?.getValue()?.label?.trim() || null);
+    }, { signal: modeAbort.signal });
+    if (directNasRadio) directNasRadio.addEventListener('change', () => {
+      if (directNasRadio.checked) _applyImportModeUI('direct-nas', _eiPhotographerDD?.getValue()?.label?.trim() || null);
+    }, { signal: modeAbort.signal });
+    // ── end Import Method UI ─────────────────────────────────────────────────
+
     // File count summary
     const total = groups.reduce((s, g) => s + g.files.size, 0);
     document.getElementById('eiFileSummary').textContent =
@@ -7002,6 +7096,7 @@ function showEventImportConfirmModal(groups, eventData) {
 
     function close(result) {
       overlay.classList.remove('visible');
+      modeAbort.abort();
       document.getElementById('eiCancelBtn').removeEventListener('click', onCancel);
       importBtn.removeEventListener('click', onImport);
       if (_eiPhotographerDD) { _eiPhotographerDD.destroy(); _eiPhotographerDD = null; }
