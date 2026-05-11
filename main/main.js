@@ -18,7 +18,8 @@ const crashReporter = require('../services/crashReporter');
 const perf          = require('../services/performanceMonitor');
 const autoUpdater   = require('../services/autoUpdater');
 const settings        = require('../services/settings');
-const nasEventCache   = require('../services/nasEventCache');
+const nasEventCache       = require('../services/nasEventCache');
+const localMirrorService  = require('../services/localMirrorService');
 const userManager   = require('./userManager');
 const { validateEventJson } = require('./contracts/dataValidator');
 const exifService         = require('./exifService');
@@ -1855,6 +1856,12 @@ ipcMain.handle('archive:getCachedNasEvents', async () => {
 ipcMain.handle('archive:clearNasEventCache', async () => {
   await nasEventCache.clear();
 });
+
+// ── Local mirror service ──────────────────────────────────────────────────────
+
+ipcMain.handle('archive:previewLocalMirror',   async (_event, params) => localMirrorService.previewLocalMirror(params));
+ipcMain.handle('archive:ensureLocalMirror',    async (_event, params) => localMirrorService.ensureLocalMirror(params));
+ipcMain.handle('archive:getLocalMirrorStatus', async (_event, params) => localMirrorService.getLocalMirrorStatus(params));
 
 // ── EXIF metadata service ─────────────────────────────────────────────────────
 

@@ -204,6 +204,11 @@ contextBridge.exposeInMainWorld('api', {
   getCachedNasEvents: () => ipcRenderer.invoke('archive:getCachedNasEvents'),
   clearNasEventCache: () => ipcRenderer.invoke('archive:clearNasEventCache'),
 
+  // ── Local mirror service ──
+  previewLocalMirror:   (params) => ipcRenderer.invoke('archive:previewLocalMirror',   params),
+  ensureLocalMirror:    (params) => ipcRenderer.invoke('archive:ensureLocalMirror',    params),
+  getLocalMirrorStatus: (params) => ipcRenderer.invoke('archive:getLocalMirrorStatus', params),
+
   // ── EXIF metadata service ──
   getMetadataStatus:      (batchId)            => ipcRenderer.invoke('metadata:getStatus',     batchId),
   retryMetadata:          (batchId)            => ipcRenderer.invoke('metadata:retry',          batchId),
