@@ -263,6 +263,28 @@ Validation:
 - Confirm any platform value needed by the renderer is exposed via `contextBridge` in `preload.js`.
 - Confirm the renderer accesses it via `window.api.<field>`.
 
+### Cache-vs-Authoritative Distinction in IPC Responses
+
+Context:
+- Applies to any IPC handler that may return either a live-scanned result or a locally cached fallback (e.g., NAS event scan returning `nasEventCache.json` data on startup or when the NAS is unreachable).
+
+Rule:
+- Include `source: 'cache'` in the IPC response when the data comes from a local cache file, not from a live scan.
+- The renderer must label any cache-sourced display as stale (e.g., a CACHED badge) and must not treat it as authoritative.
+- The preferred pattern is: cache-first (instant display on load) → live scan runs in the background → renderer updates on success. Cache is fallback only.
+- Never treat a cached result as equivalent to a fresh scan for operational decisions. The cache exists for display-latency only.
+
+Avoid:
+- Returning cached data without distinguishing it from live data in the IPC response shape — the renderer cannot surface stale state without the `source` field.
+- Storing full event objects or large arrays in the cache — cache should contain only the aggregate counts or lightweight metadata needed for the display tile.
+- Using the cache as authoritative input for import routing, status validation, or any flow that affects `event.json`.
+
+Validation:
+- Confirm IPC responses that may return cached data include `source: 'cache'` when applicable and `source: 'live'` (or absent) for fresh scans.
+- Confirm the renderer uses the `source` field to conditionally show a CACHED badge or stale indicator.
+- Confirm the renderer triggers a live scan after showing cached data and updates the display on completion.
+- Confirm the cache file stores only lightweight data (aggregate counts, not full event objects).
+
 ### Per-File Property Propagation on exifService Batch Objects
 
 Context:

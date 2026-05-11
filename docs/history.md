@@ -173,6 +173,23 @@ Use this for:
 
 ---
 
+## v0.8.8 — Source Cleanup Root Stability + Event Creator Redesign
+
+### Additional Changes (same version)
+
+**Event Creator layout and UI fixes:**
+- Widened Event Creator modal to 1320px; component row switched from 3-column to 5-column grid (Event Type | Additional Keywords | Location | City | Country)
+- Country control replaced bespoke chip+input design with `_mountCountryDD()` using identical `.tac-*` TreeAutocomplete structure as City; Country excluded from folder name; saved/reloaded correctly
+- `buildFolderName` (`folderNameHelper.js`) now interleaves `additionalKeywords` with `useInFolderName: true` around event tags per `folderPlacement`; in-editor preview and final folder name share one source of truth
+- Dropdown overlay fix: `backdrop-filter` on `.ec-comp-row` creates per-row stacking contexts; active row elevated to `z-index: 100` via `:has(.tac[data-open])` selector
+- Removed auto-focus on new component after `+ Add Component` (TreeAutocomplete opens on focus unconditionally; programmatic focus was triggering dropdown on every new component)
+- Added `[hidden] { display: none !important; }` override to prevent Chromium UA sheet from showing hidden advanced-panel warnings when collapsed
+
+### System Impact (additional changes)
+- UI
+
+---
+
 ## v0.8.8 — Source Cleanup Root Stability
 
 ### Changes

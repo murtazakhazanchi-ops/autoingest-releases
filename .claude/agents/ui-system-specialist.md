@@ -942,6 +942,79 @@ Validation:
 - Confirm the progress modal (or any blocking overlay) is closed before `ejectBtn.click()` fires.
 - Confirm the eject confirmation modal renders correctly and the full 4-phase eject completes.
 
+### Pending-State Capture Before Modal Close
+
+Context:
+- Applies to any modal save handler that reads a pending field (`_pendingX !== undefined`) to decide whether to trigger a side-effect (IPC call, state update, re-scan) after the modal is closed.
+
+Rule:
+- Capture the boolean result of the pending-field check into a local variable BEFORE calling the close function.
+- The close function resets all pending fields to `undefined`. Any check performed after the close call will always evaluate false, silently suppressing the intended side-effect.
+
+```js
+// Correct — capture BEFORE close
+const nasRootChanged = _alocPendingNasRoot !== undefined;
+_alocClose();
+if (nasRootChanged) { triggerRescan(); }
+
+// Wrong — check AFTER close always evaluates false
+_alocClose();           // resets _alocPendingNasRoot to undefined
+if (_alocPendingNasRoot !== undefined) { ... }  // never runs
+```
+
+Avoid:
+- Reading any `_pending*` field after calling the modal close function.
+- Assuming the pending value survives a close call.
+
+Validation:
+- Confirm `const changed = _pendingX !== undefined` appears before the close call.
+- Confirm the conditional side-effect is guarded by the captured boolean, not the post-close field check.
+- Confirm the intended side-effect fires when the pending field was set before save.
+
+### Dual-Write DOM Ownership — One Element, One Writer
+
+Context:
+- Applies whenever two or more async functions in the renderer both write to the same DOM element (e.g., a status bar element, an archive path label, an overview tile count).
+
+Rule:
+- Each DOM element must have exactly one owning writer.
+- When two functions both update the same element, they silently clobber each other on each render cycle. The most recent render wins, which is non-deterministic in async contexts.
+- Assign ownership to the function that naturally controls the element's domain. Remove the competing write from any other function.
+
+Avoid:
+- Two functions (`_renderHomeContextBar` and `_updateSystemStatus`, for example) both writing the same element for separate concerns.
+- Assuming that "the last one to run" is an acceptable ownership strategy in async flows.
+
+Validation:
+- Confirm only one function writes to each DOM element.
+- Confirm removing the competing write does not cause a regression in the display path that was removed.
+
+### Re-Entry Guard for Async Modal Open Before First Await
+
+Context:
+- Applies to any `async function _open()` that `await`s an IPC call before showing or populating the modal.
+
+Rule:
+- Check `overlay.classList.contains('open')` before the first `await`. If the modal is already open, return immediately.
+- Without this guard, a double-click or rapid trigger fires two parallel IPC round-trips. The second one completes after the user has already started editing, resetting pending fields and destroying in-progress edits.
+
+```js
+async function _alocOpen() {
+  const overlay = document.getElementById('archiveLocationsModal');
+  if (overlay.classList.contains('open')) return;  // guard before first await
+  const status = await window.api.getArchiveOperationsStatus();
+  // ... populate and show modal
+}
+```
+
+Avoid:
+- Placing the re-entry check after the first `await` — the race window is between the trigger and the await resolution.
+- Relying only on a module-level flag set inside the async body — the flag is not set until after the first await, leaving the race window open.
+
+Validation:
+- Confirm `overlay.classList.contains('open')` (or equivalent guard) appears before the first `await` in the open function.
+- Confirm a double-click does not trigger two concurrent IPC calls and does not reset pending edits.
+
 ### Clickable Overview Tile Pattern
 
 Context:

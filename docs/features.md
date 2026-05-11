@@ -47,11 +47,17 @@ Use this as a reference before implementing or modifying any feature.
 **Description**
 - Builds event.json structure from user input
 - Component rows in the Create New Event panel support drag-to-reorder; dropping a row reorders `_eventComps` in-place and immediately refreshes the event name preview
+- Component row uses a 5-column grid: Event Type | Additional Keywords | Location | City | Country
+- Country control uses the same `.tac-*` TreeAutocomplete structure as City (selected-value / dropdown-arrow / clear-button); Country is excluded from the folder name
+- Additional Keywords with `useInFolderName: true` are interleaved around event tags in `buildFolderName` per `folderPlacement` (`before-event-tag` / `after-event-tag` / `end-of-event-tags`); the in-editor preview and the final folder name share one source of truth via `folderNameHelper.js`
+- Folder name options panel spans full width below the component grid row
+- Dropdown z-index: `backdrop-filter` on `.ec-comp-row` creates a per-row stacking context; the active row (`.ec-comp-row:has(.tac[data-open])`) is elevated to `z-index: 100` so its dropdown is never painted over by a later sibling row
 
 **System Impact**
 - DATA
 - ROUTING
 - VALIDATION
+- UI
 
 ---
 

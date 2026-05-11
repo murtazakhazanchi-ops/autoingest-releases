@@ -137,6 +137,19 @@ Rules:
 
 ---
 
+## 8b. Multi-Row Panels with Dropdowns and `backdrop-filter`
+
+`backdrop-filter` on a row element creates a CSS stacking context. In a multi-row panel (e.g., `.ec-comp-row` in the Event Creator), later sibling rows will paint over the dropdown of an earlier row because the stacking context is local to each row.
+
+Rules:
+- Always set `position: relative; z-index: 1` on the row element so it participates in the parent stacking context
+- Elevate the row whose dropdown is open via `:has(.tac[data-open]) { z-index: 100 }` (or equivalent open-state selector)
+- Do not rely solely on a high `z-index` inside the dropdown itself; the stacking context boundary prevents it from escaping the row
+
+This pattern applies to any multi-row panel where rows carry `backdrop-filter` and each row contains a dropdown or floating overlay.
+
+---
+
 ## 9. Forbidden
 
 - No emoji usage

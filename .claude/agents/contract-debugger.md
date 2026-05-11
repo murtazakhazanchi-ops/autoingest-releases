@@ -454,6 +454,45 @@ Validation:
 - Confirm the variable is declared before the outer try in any function whose catch needs it for error identity.
 - Confirm error results in multi-event workflows include the event name or ID.
 
+### Pending-State-Before-Close Bug — Side-Effect Silently Suppressed After Modal Save
+
+Context:
+- Applies when debugging a modal save handler where an expected side-effect (re-scan, IPC call, state update) never fires after the modal is closed, despite the pending field being correctly set before save.
+
+Rule:
+- The close function resets all pending fields to `undefined`. If the pending-field check (`_pendingX !== undefined`) is evaluated AFTER the close call, it always evaluates false and the side-effect is silently suppressed.
+- Symptom: save action completes without error, modal closes cleanly, but the expected follow-up action (e.g., triggering a NAS rescan) never occurs.
+- Diagnosis: find the save handler and check whether the pending-field read appears before or after the close call. If it appears after, this is the cause.
+- Fix: capture `const changed = _pendingX !== undefined` before the close call.
+
+Avoid:
+- Inspecting the pending-field setter or the close function in isolation — the bug is in the evaluation order at the save handler.
+- Treating "side-effect never fires" as an IPC or async failure before checking pending-field read order.
+
+Validation:
+- Confirm the pending-field check is captured as a boolean before the close call.
+- Confirm the side-effect fires after saving with the field set.
+- Confirm the side-effect does not fire when the field was never changed (saving without editing).
+
+### Write-Probe `finally` Cleanup — Temp File Left on Validation Error
+
+Context:
+- Applies when debugging a staging validation or write-access IPC handler that uses a temp probe file. The symptom is a stale `.tmp` or probe file left on disk after a validation failure.
+
+Rule:
+- When a validation handler writes a temp probe file to test write access, the `fsp.unlink` must be inside a `finally` block. A sequential unlink after the write leaves the probe on disk if any error occurs between the write and the unlink (e.g., permission check throws, JSON parse fails, etc.).
+- Correct pattern: `await fsp.writeFile(probe, '1'); try { /* validate */ } finally { await fsp.unlink(probe).catch(() => {}); }`.
+- The `.catch(() => {})` on the unlink is required so that a missing-file error from a partially completed write does not mask the original validation error.
+
+Avoid:
+- Sequential `writeFile` → `unlink` with no `finally` guard.
+- Assuming the `unlink` will always run if the validation code is synchronous — thrown errors in an async function skip all subsequent sequential statements.
+
+Validation:
+- Confirm `fsp.unlink(probe)` (or `fs.unlink`) is inside a `finally` block.
+- Confirm a validation error (e.g., thrown exception inside the try body) does not leave the probe file on disk.
+- Confirm `.catch(() => {})` on the unlink prevents masking the original error.
+
 ### Silent Catch Blocks Affecting Downstream Behavior Must Log
 
 Context:

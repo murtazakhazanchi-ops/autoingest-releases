@@ -863,6 +863,69 @@ Status:
 
 ---
 
+### 2026-05-11 — Archive Operations Layer: Phase 1 (Settings, IPC, Modal) and Phase 2 (NAS Event Scan, Cache)
+
+Task type:
+- Feature / IPC / Main Process / Renderer / Modal / Persistence / Async Safety
+
+What happened:
+
+**Phase 1 — Archive Settings, Validation IPC, Archive Locations Modal:**
+- Added `getNasRoot/setNasRoot`, `getLocalStagingRoot/setLocalStagingRoot`, `getDefaultImportMode/setDefaultImportMode` to `services/settings.js`.
+- Added 7 `archive:*` IPC handlers and 7 preload bridge methods.
+- NAS validation reads `.autoingest/root/archive-root.json` and checks `type === 'autoingest-nas-root'`.
+- Staging validation uses a write-probe temp file with a `finally` cleanup guard (not sequential unlink).
+- `archive:getOperationsStatus` returns one of: `ready | nas-not-set | nas-disconnected | invalid-nas | local-staging-missing`.
+- Added Archive Locations modal (`#archiveLocationsModal`) using `.emm-overlay` pattern.
+- Re-entry guard: `overlay.classList.contains('open')` checked before the first `await` inside `_alocOpen()`.
+- Pending-state pattern for all editable fields: capture `const nasRootChanged = _alocPendingNasRoot !== undefined` BEFORE calling `_alocClose()`, which resets all pending fields to `undefined`.
+- Bug caught by code-reviewer (Phase 1): `_alocPendingNasRoot` was read AFTER `_alocClose()` reset it. The check always evaluated false.
+
+**Phase 2 — NAS Event Scan Service and Cache:**
+- Created `services/nasEventCache.js` — atomic write/read/clear for `userData/nasEventCache.json`.
+- Added `_scanNasArchive(nasRoot)` in main: reads collections → event folders, classifies managed/external/corrupt events, skips `_Selected`/`.autoingest`/`__MACOSX`/dot-dirs.
+- IPC payload safety: `const { imports: _omit, ...meta } = eventJson` before pushing to the scan result — same pattern as `master:scanEvents`.
+- 4 IPC handlers + 4 preload methods: `archive:scanNasEvents`, `archive:refreshNasEvents`, `archive:getCachedNasEvents`, `archive:clearNasEventCache`.
+- Added `#ovNasEvents` overview tile and `_applyNasEventsCard()` / `_refreshNasEventsCard()`. Renderer stores only aggregate counts (`_nasEventStats`), never event objects (Layer 2b of performance-playbook.md).
+- Startup pattern: cache-first (instant display, `source: 'cache'` in IPC response) then live NAS scan (background update).
+- Bug caught by code-reviewer (Phase 2): same pending-state-before-close pattern — `_alocPendingNasRoot !== undefined` check was after `_alocClose()`. Fixed with the same capture-before-close pattern.
+
+Reusable lessons:
+
+1. **Pending-state-before-close**: When a modal save handler checks a pending field (`_pendingX !== undefined`) to decide whether to trigger a side-effect after closing the modal, it must capture the boolean BEFORE calling `_close()`. `_close()` resets all pending fields to `undefined`, so any check after close always evaluates false. Capture: `const changed = _pendingX !== undefined; _alocClose(); if (changed) { ... }`.
+
+2. **Dual-write DOM ownership**: Two async functions writing to the same DOM element produce silent clobbering. Each DOM element must have exactly one owning writer. When `_renderHomeContextBar()` and `_updateSystemStatus()` both update `#archivePath`, they overwrite each other on every navigation. Assign ownership to the natural writer and remove the competing write.
+
+3. **Re-entry guard before first await in async modal open**: Any `async function _open()` that `await`s before showing the modal must check `overlay.classList.contains('open')` before the first `await`. Without this guard, a double-click triggers two parallel IPC round-trips; the second one resets pending edits mid-flight.
+
+4. **`type="button"` on all `.emm-overlay` modal buttons**: All close/dismiss/action buttons inside `.emm-overlay` modals must carry `type="button"`. Missing this causes accidental form submission. (Already in ui-system-specialist.md — no promotion needed.)
+
+5. **IPC payload safety — `imports[]` stripping at scan source**: NAS archive scan follows the same pattern as `master:scanEvents`. Destructure `imports[]` out of `eventJson` before pushing to the IPC response. Passing full event objects with `imports[]` OOMs the renderer. (Already in performance-auditor.md — no promotion needed.)
+
+6. **Cache vs. authoritative distinction in IPC responses**: When returning cached data from a local file cache, include `source: 'cache'` in the IPC response so the renderer can label the display as stale. The cache is never authoritative — prefer live scan, fall back only on failure or first load. The UI must surface the stale state (e.g., CACHED badge).
+
+7. **Write-probe cleanup in `finally`**: When a validation IPC handler writes a temp probe file to test write access, the `fsp.unlink` must be inside a `finally` block. A sequential unlink after the write leaves the probe file if any error occurs between write and unlink. Pattern: `await fsp.writeFile(probe, '1'); try { /* validate */ } finally { await fsp.unlink(probe).catch(() => {}); }`.
+
+Common failure modes:
+- Reading a pending field after calling the close function that resets it.
+- Two functions owning the same DOM element, clobbering each other on each render cycle.
+- An async `_open()` that awaits before the re-entry check, allowing double-invocation.
+- Sequential file probe unlink that fails to clean up on error.
+
+Promote to agents:
+- `ui-system-specialist.md` — lessons 1 (pending-state-before-close), 2 (dual-write DOM ownership), 3 (re-entry guard for async modal open)
+- `contract-debugger.md` — lesson 1 (pending-state-before-close as a debugging pattern), lesson 7 (write-probe cleanup)
+- `autoingest-architect.md` — lesson 6 (cache vs. authoritative IPC response)
+
+Lessons NOT promoted:
+- Lesson 4 (`type="button"`): already in `ui-system-specialist.md`.
+- Lesson 5 (IPC payload stripping): already in `performance-auditor.md`.
+
+Status:
+- Promoted
+
+---
+
 ### 2026-05-09 — Metadata Sync Phase 1D: Keyword Registry ID Stabilization and Modal Tab Refinement
 
 Task type:
