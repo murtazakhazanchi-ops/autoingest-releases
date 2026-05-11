@@ -1,0 +1,182 @@
+'use strict';
+
+/**
+ * syncQueueService.js — Durable local sync queue for Local First imports.
+ *
+ * Discovers event.sync.json manifests under the configured Local Staging Root,
+ * builds a persistent queue index in userData, and surfaces summary counts to
+ * the renderer.
+ *
+ * Rules:
+ *  - Scans only the Local Staging Root (never NAS).
+ *  - Does NOT copy, sync, or write to NAS.
+ *  - Does NOT acquire locks.
+ *  - Persists across app restart (userData/archiveSyncQueue.json).
+ *  - Queue items reference manifest paths; large file lists are never stored.
+ *
+ * Scan depth: stagingRoot / CollectionName / EventName / .autoingest / event.sync.json
+ */
+
+const fsp    = require('fs').promises;
+const path   = require('path');
+const crypto = require('crypto');
+
+const QUEUE_FILE     = 'archiveSyncQueue.json';
+const MANIFEST_RELPATH = path.join('.autoingest', 'event.sync.json');
+
+let _queuePath = null;
+
+function _resolvePath() {
+  if (_queuePath) return _queuePath;
+  const { app } = require('electron');
+  _queuePath = path.join(app.getPath('userData'), QUEUE_FILE);
+  return _queuePath;
+}
+
+/** Stable deterministic ID for a local event path. */
+function _jobId(localEventPath) {
+  return crypto.createHash('sha1').update(localEventPath).digest('hex').slice(0, 16);
+}
+
+/** Derive queue status from manifest fields. */
+function _statusFromManifest(manifest) {
+  if (manifest.readyForSync === true && manifest.metadataStatus === 'complete') {
+    return 'ready-for-sync';
+  }
+  if (manifest.needsAttention === true) {
+    return 'needs-attention';
+  }
+  return 'blocked';
+}
+
+async function _loadRaw() {
+  try {
+    const raw = await fsp.readFile(_resolvePath(), 'utf8');
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.jobs)) return { jobs: [], refreshedAt: null };
+    return parsed;
+  } catch (err) {
+    if (err.code !== 'ENOENT') console.error('[syncQueueService] Load failed:', err.message);
+    return { jobs: [], refreshedAt: null };
+  }
+}
+
+async function _saveRaw(data) {
+  const p   = _resolvePath();
+  const tmp = p + '.tmp';
+  await fsp.writeFile(tmp, JSON.stringify(data, null, 2), 'utf8');
+  await fsp.rename(tmp, p);
+}
+
+/**
+ * Scan the Local Staging Root, build queue items from manifests, and persist.
+ * Called from IPC handler — never blocks the renderer directly.
+ *
+ * @returns {{ ok: boolean, jobs: Array, refreshedAt: number, reason?: string }}
+ */
+async function refreshQueue() {
+  const settings     = require('./settings');
+  const stagingRoot  = settings.getLocalStagingRoot();
+  if (!stagingRoot) return { ok: false, reason: 'No staging root configured', jobs: [], refreshedAt: null };
+
+  // Load existing queue to preserve externally-set statuses (synced / failed)
+  const existing     = await _loadRaw();
+  const existingMap  = Object.fromEntries((existing.jobs || []).map(j => [j.jobId, j]));
+
+  const jobs = [];
+  const now  = Date.now();
+
+  // Level 1 — collection dirs inside stagingRoot
+  let collDirs;
+  try {
+    const entries = await fsp.readdir(stagingRoot, { withFileTypes: true });
+    collDirs = entries.filter(e => e.isDirectory()).map(e => e.name);
+  } catch (err) {
+    return { ok: false, reason: `Cannot read staging root: ${err.message}`, jobs: [], refreshedAt: null };
+  }
+
+  // Level 2 — event dirs inside each collection
+  for (const collName of collDirs) {
+    const collPath = path.join(stagingRoot, collName);
+    let eventDirs;
+    try {
+      const entries = await fsp.readdir(collPath, { withFileTypes: true });
+      eventDirs = entries.filter(e => e.isDirectory()).map(e => e.name);
+    } catch { continue; }
+
+    for (const eventName of eventDirs) {
+      const localEventPath  = path.join(collPath, eventName);
+      const manifestPath    = path.join(localEventPath, MANIFEST_RELPATH);
+
+      let manifest;
+      try {
+        const raw = await fsp.readFile(manifestPath, 'utf8');
+        manifest  = JSON.parse(raw);
+        if (!manifest || typeof manifest !== 'object') continue;
+      } catch { continue; }
+
+      const jobId = _jobId(localEventPath);
+      const prev  = existingMap[jobId];
+
+      // Preserve externally-set terminal statuses across refreshes
+      const preserveStatus = prev && (prev.status === 'synced' || prev.status === 'failed');
+
+      jobs.push({
+        jobId,
+        batchId:        manifest.batchId         || null,
+        collection:     manifest.collectionName  || collName,
+        event:          manifest.eventName       || eventName,
+        localEventPath,
+        manifestPath,
+        metadataStatus: manifest.metadataStatus  || null,
+        readyForSync:   manifest.readyForSync    === true,
+        needsAttention: manifest.needsAttention  === true,
+        status:         preserveStatus ? prev.status : _statusFromManifest(manifest),
+        reason:         manifest.reason           || null,
+        importedAt:     manifest.importedAt       || null,
+        createdAt:      prev?.createdAt           || now,
+        updatedAt:      manifest.updatedAt        || manifest.importedAt || null,
+        lastSeenAt:     now,
+      });
+    }
+  }
+
+  const data = { jobs, refreshedAt: now };
+  await _saveRaw(data);
+  return { ok: true, jobs, refreshedAt: now };
+}
+
+/**
+ * Return the full persisted queue (cached; no re-scan).
+ * @returns {{ jobs: Array, refreshedAt: number|null }}
+ */
+async function getQueue() {
+  return _loadRaw();
+}
+
+/**
+ * Return lightweight summary counts only.
+ * @returns {{ ready: number, needsAttention: number, total: number, refreshedAt: number|null }}
+ */
+async function getSummary() {
+  const { jobs, refreshedAt } = await _loadRaw();
+  const arr = jobs || [];
+  return {
+    ready:          arr.filter(j => j.status === 'ready-for-sync').length,
+    needsAttention: arr.filter(j => j.status === 'needs-attention').length,
+    total:          arr.length,
+    refreshedAt,
+  };
+}
+
+/**
+ * Return a single queue job by its jobId.
+ * @param {string} jobId
+ * @returns {object|null}
+ */
+async function getJob(jobId) {
+  const { jobs } = await _loadRaw();
+  return (jobs || []).find(j => j.jobId === jobId) || null;
+}
+
+module.exports = { refreshQueue, getQueue, getSummary, getJob };

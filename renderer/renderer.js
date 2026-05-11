@@ -2559,6 +2559,186 @@ _refreshNasEventsCard(true).then(() => {
 });
 
 // ════════════════════════════════════════════════════════════════
+// SYNC QUEUE OVERVIEW TILE
+// ════════════════════════════════════════════════════════════════
+
+function _applySyncQueueTile(summary) {
+  const valEl   = document.getElementById('ovUnsyncedVal');
+  const labelEl = document.getElementById('ovUnsyncedLabel');
+  const tileEl  = document.getElementById('ovUnsynced');
+  if (!valEl) return;
+
+  const ready     = summary?.ready          || 0;
+  const attention = summary?.needsAttention || 0;
+  const total     = summary?.total          || 0;
+
+  valEl.textContent = String(total);
+
+  if (labelEl) {
+    if (total === 0) {
+      labelEl.textContent = 'Unsynced Events';
+    } else {
+      const parts = [];
+      if (ready > 0)     parts.push(`${ready} ready`);
+      if (attention > 0) parts.push(`${attention} needs attention`);
+      labelEl.textContent = parts.length ? parts.join(' · ') : 'Unsynced Events';
+    }
+  }
+
+  tileEl?.classList.toggle('ov-tile--warn', attention > 0);
+}
+
+let _sqRefreshBusy = false;
+
+async function _refreshSyncQueueCard(fromCache = false) {
+  if (_sqRefreshBusy) return;
+  _sqRefreshBusy = true;
+  try {
+    if (!fromCache) await window.api.refreshSyncQueue().catch(() => {});
+    const summary = await window.api.getSyncQueueSummary();
+    _applySyncQueueTile(summary);
+  } catch {
+    // Non-critical
+  } finally {
+    _sqRefreshBusy = false;
+  }
+}
+
+// Startup: load cache first, then refresh in background.
+_refreshSyncQueueCard(true).then(() => {
+  _refreshSyncQueueCard(false).catch(() => {});
+}).catch(() => {
+  _refreshSyncQueueCard(false).catch(() => {});
+});
+
+// ════════════════════════════════════════════════════════════════
+// SYNC ACTIVITY MODAL
+// ════════════════════════════════════════════════════════════════
+
+function _sqClose() {
+  document.getElementById('syncActivityModal')?.classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+async function _sqOpen() {
+  const overlay = document.getElementById('syncActivityModal');
+  if (!overlay || overlay.classList.contains('open')) return;
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  await _sqLoadQueue();
+}
+
+async function _sqLoadQueue() {
+  const listEl   = document.getElementById('sqJobList');
+  const summaryEl = document.getElementById('sqSummaryText');
+  if (listEl) listEl.innerHTML = '<div class="sq-empty">Loading…</div>';
+  try {
+    const data    = await window.api.getSyncQueue();
+    const jobs    = data.jobs || [];
+    const ready   = jobs.filter(j => j.status === 'ready-for-sync').length;
+    const attn    = jobs.filter(j => j.status === 'needs-attention').length;
+    if (summaryEl) {
+      summaryEl.textContent = jobs.length === 0
+        ? 'No Local First imports found'
+        : `${jobs.length} event${jobs.length !== 1 ? 's' : ''} · ${ready} ready · ${attn} needs attention`;
+    }
+    _sqRenderJobs(jobs);
+  } catch {
+    if (listEl) listEl.innerHTML = '<div class="sq-empty">Failed to load queue.</div>';
+  }
+}
+
+function _sqEsc(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function _sqJobRow(job) {
+  const statusLabel = {
+    'ready-for-sync':  'Ready',
+    'needs-attention': 'Attention',
+    'blocked':         'Blocked',
+    'synced':          'Synced',
+    'failed':          'Failed',
+  }[job.status] || job.status;
+
+  const reasonText = job.reason === 'auto-metadata-disabled'
+    ? 'Metadata disabled'
+    : _sqEsc(job.reason || '');
+
+  return `<div class="sq-row">
+    <div class="sq-cell sq-event">${_sqEsc(job.event)}</div>
+    <div class="sq-cell sq-coll">${_sqEsc(job.collection)}</div>
+    <div class="sq-cell sq-status sq-status--${_sqEsc(job.status)}">${_sqEsc(statusLabel)}</div>
+    <div class="sq-cell sq-reason">${reasonText}</div>
+  </div>`;
+}
+
+function _sqRenderJobs(jobs) {
+  const listEl = document.getElementById('sqJobList');
+  if (!listEl) return;
+
+  if (jobs.length === 0) {
+    listEl.innerHTML = '<div class="sq-empty">No Local First imports found in staging root.</div>';
+    return;
+  }
+
+  const ready   = jobs.filter(j => j.status === 'ready-for-sync');
+  const attn    = jobs.filter(j => j.status === 'needs-attention');
+  const other   = jobs.filter(j => j.status !== 'ready-for-sync' && j.status !== 'needs-attention');
+
+  let html = '';
+  if (ready.length) {
+    html += '<div class="sq-section-title">Ready for Sync</div>';
+    html += ready.map(_sqJobRow).join('');
+  }
+  if (attn.length) {
+    html += '<div class="sq-section-title sq-section-title--warn">Needs Attention</div>';
+    html += attn.map(_sqJobRow).join('');
+  }
+  if (other.length) {
+    html += '<div class="sq-section-title">Other</div>';
+    html += other.map(_sqJobRow).join('');
+  }
+
+  listEl.innerHTML = html;
+}
+
+// Click handler — tile opens modal
+document.getElementById('ovUnsynced')?.addEventListener('click', _sqOpen);
+document.getElementById('ovUnsynced')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); _sqOpen(); }
+});
+
+// Modal controls
+document.getElementById('sqCloseBtn')?.addEventListener('click', _sqClose);
+document.getElementById('sqDoneBtn')?.addEventListener('click', _sqClose);
+document.getElementById('syncActivityModal')?.addEventListener('click', (e) => {
+  if (e.target === document.getElementById('syncActivityModal')) _sqClose();
+});
+
+// Refresh button inside modal
+document.getElementById('sqRefreshBtn')?.addEventListener('click', async () => {
+  if (_sqRefreshBusy) return;
+  const btn = document.getElementById('sqRefreshBtn');
+  if (btn) btn.classList.add('spinning');
+  _sqRefreshBusy = true;
+  try {
+    await window.api.refreshSyncQueue().catch(() => {});
+    const summary = await window.api.getSyncQueueSummary();
+    _applySyncQueueTile(summary);
+    await _sqLoadQueue();
+  } catch { /* non-critical */ } finally {
+    _sqRefreshBusy = false;
+    if (btn) btn.classList.remove('spinning');
+  }
+});
+
+// Dismiss modal on Escape
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && document.getElementById('syncActivityModal')?.classList.contains('open')) _sqClose();
+});
+
+// ════════════════════════════════════════════════════════════════
 // METADATA SYNC MODAL
 // ════════════════════════════════════════════════════════════════
 

@@ -213,6 +213,12 @@ contextBridge.exposeInMainWorld('api', {
   writeSyncManifest: (localEventPath, manifest) => ipcRenderer.invoke('archive:writeSyncManifest', { localEventPath, manifest }),
   readSyncManifest:  (localEventPath)            => ipcRenderer.invoke('archive:readSyncManifest',  { localEventPath }),
 
+  // ── Durable sync queue ──
+  refreshSyncQueue:    ()       => ipcRenderer.invoke('archive:refreshSyncQueue'),
+  getSyncQueue:        ()       => ipcRenderer.invoke('archive:getSyncQueue'),
+  getSyncQueueSummary: ()       => ipcRenderer.invoke('archive:getSyncQueueSummary'),
+  readSyncJob:         (jobId)  => ipcRenderer.invoke('archive:readSyncJob', jobId),
+
   // ── EXIF metadata service ──
   getMetadataStatus:      (batchId)            => ipcRenderer.invoke('metadata:getStatus',     batchId),
   retryMetadata:          (batchId)            => ipcRenderer.invoke('metadata:retry',          batchId),

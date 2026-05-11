@@ -21,6 +21,7 @@ const settings        = require('../services/settings');
 const nasEventCache       = require('../services/nasEventCache');
 const localMirrorService  = require('../services/localMirrorService');
 const localSyncManifest   = require('../services/localSyncManifest');
+const syncQueueService    = require('../services/syncQueueService');
 const userManager   = require('./userManager');
 const { validateEventJson } = require('./contracts/dataValidator');
 const exifService         = require('./exifService');
@@ -1870,6 +1871,13 @@ ipcMain.handle('archive:writeSyncManifest', async (_event, { localEventPath, man
   localSyncManifest.writeManifest(localEventPath, manifest));
 ipcMain.handle('archive:readSyncManifest',  async (_event, { localEventPath }) =>
   localSyncManifest.readManifest(localEventPath));
+
+// ── Durable sync queue ────────────────────────────────────────────────────────
+
+ipcMain.handle('archive:refreshSyncQueue',    async () => syncQueueService.refreshQueue());
+ipcMain.handle('archive:getSyncQueue',        async () => syncQueueService.getQueue());
+ipcMain.handle('archive:getSyncQueueSummary', async () => syncQueueService.getSummary());
+ipcMain.handle('archive:readSyncJob',         async (_event, jobId) => syncQueueService.getJob(jobId));
 
 // ── EXIF metadata service ─────────────────────────────────────────────────────
 
