@@ -5891,6 +5891,25 @@ let _alLastImportEntries     = [];   // cached on each AL render; used for error
 let _metaBatchGroupsSnapshot = null; // [{label, metadataTags, fileCount}] captured at batch_start for AL breakdown
 let _metaDurableRun          = null; // lastMetadataRun loaded from event.json {status,processed,failed,skipped,timestamp,metadataSummary}
 let _metaDurableRunPath      = null; // event path that _metaDurableRun was loaded for
+let _pendingLfSyncManifest   = null; // { batchId, localEventPath, eventName, collectionName, importedAt } — set after Local First import; cleared on batch_complete/batch_error
+
+async function _writeLocalFirstManifest(metadataStatus) {
+  const pending = _pendingLfSyncManifest;
+  if (!pending) return;
+  if (_metaBatchId !== pending.batchId) return;
+  _pendingLfSyncManifest = null;
+  try {
+    await window.api.writeSyncManifest(pending.localEventPath, {
+      eventName:      pending.eventName,
+      collectionName: pending.collectionName,
+      importedAt:     pending.importedAt,
+      metadataStatus,
+      readyForSync:   metadataStatus === 'complete',
+    });
+  } catch (e) {
+    console.error('[LF] Failed to write sync manifest:', e);
+  }
+}
 
 window.api.onMetadataProgress((progress) => {
   if (!progress || !progress.batchId) return;
@@ -5957,6 +5976,7 @@ window.api.onMetadataProgress((progress) => {
       _metaRetryPending = false;
       showMessage('Retry completed — all files tagged', 6000);
     }
+    _pendingLfSyncManifest && _writeLocalFirstManifest('complete');
     return;
   }
 
@@ -5974,6 +5994,7 @@ window.api.onMetadataProgress((progress) => {
     _renderMetaTitleIndicator();
     _refreshAlMetadataPanel();
     _refreshAlErrorsPanel();
+    _pendingLfSyncManifest && _writeLocalFirstManifest('failed');
   }
 });
 
@@ -6707,13 +6728,53 @@ document.getElementById('importBtn').addEventListener('click', async () => {
     // Use path from getActiveEventData() — already validated above.
     const _eventJsonPath = eventData.eventPath;
 
+    // ── Local First routing override ──────────────────────────────────────────
+    let _txFileJobs  = fileJobs;
+    let _txEventPath = _eventJsonPath;
+
+    if (_eiSelectedImportMode === 'local-first') {
+      let archSt = {};
+      try { archSt = await window.api.getArchiveOperationsStatus(); } catch { /* non-critical */ }
+      const stagingRoot = archSt.localStagingRoot;
+      if (!stagingRoot) {
+        showMessage('Local staging root is not configured. Cannot use Local First mode.');
+        return;
+      }
+
+      const normCollPath    = (eventData.collectionPath || '').replace(/\\/g, '/').replace(/\/$/, '');
+      const normStagingRoot = stagingRoot.replace(/\\/g, '/').replace(/\/$/, '');
+      const collectionName  = normCollPath.split('/').filter(Boolean).pop() || '';
+      const eventFolderName = eventData.event?.name || '';
+
+      const mirrorResult = await window.api.ensureLocalMirror({
+        collectionName,
+        eventName:     eventFolderName,
+        eventPath:     eventData.eventPath,
+        eventJsonPath: eventData.eventPath.replace(/\\/g, '/').replace(/\/$/, '') + '/event.json',
+      });
+
+      if (!mirrorResult?.ok) {
+        showMessage(`Local staging setup failed: ${mirrorResult?.reason || 'unknown error'}`);
+        return;
+      }
+
+      _txEventPath = mirrorResult.localEventPath;
+      _txFileJobs  = fileJobs.map(job => {
+        const normDest = job.dest.replace(/\\/g, '/');
+        return normDest.startsWith(normCollPath + '/')
+          ? { ...job, dest: normStagingRoot + '/' + collectionName + normDest.slice(normCollPath.length) }
+          : job;
+      });
+    }
+    // ── End Local First routing override ──────────────────────────────────────
+
     importRunning = true;
     updateSelectionBar();
     showProgress();
 
     // Mark event as in-progress so an interrupted import is detectable on restart.
-    if (_eventJsonPath) {
-      await window.api.updateEventJson(_eventJsonPath, { status: 'in-progress' });
+    if (_txEventPath) {
+      await window.api.updateEventJson(_txEventPath, { status: 'in-progress' });
     }
 
     const auditContext = {
@@ -6735,10 +6796,20 @@ document.getElementById('importBtn').addEventListener('click', async () => {
       console.log('[CSQ DEBUG] event-import pre-commit:', { root: _importCleanupRoot, activeSourceNow: activeSource ? { ...activeSource } : null });
     }
     try {
-      const summary = await window.api.commitImportTransaction(fileJobs, _eventJsonPath, auditContext);
+      const summary = await window.api.commitImportTransaction(_txFileJobs, _txEventPath, auditContext);
       if (!activeSource && !_importCleanupRoot) return;
 
       showProgressSummary(summary, _importCleanupRoot);
+      if (_eiSelectedImportMode === 'local-first' && summary.metadataBatchId) {
+        const _lfCollName = (eventData.collectionPath || '').replace(/\\/g, '/').replace(/\/$/, '').split('/').filter(Boolean).pop() || '';
+        _pendingLfSyncManifest = {
+          batchId:        summary.metadataBatchId,
+          localEventPath: _txEventPath,
+          eventName:      eventData.event?.name || '',
+          collectionName: _lfCollName,
+          importedAt:     Date.now(),
+        };
+      }
       EventCreator.invalidateScannedEvents();
       await refreshDestCache();
       try { globalImportIndex = await window.api.getImportIndex() || {}; } catch { /* non-critical */ }
@@ -6751,8 +6822,8 @@ document.getElementById('importBtn').addEventListener('click', async () => {
       document.getElementById('progressFilename').textContent = `Import failed: ${actualCause}`;
       document.getElementById('progressDoneBtn').classList.add('visible');
       // Reset to 'created' so the event is not stuck in-progress after failure.
-      if (_eventJsonPath) {
-        await window.api.updateEventJson(_eventJsonPath, { status: 'created' });
+      if (_txEventPath) {
+        await window.api.updateEventJson(_txEventPath, { status: 'created' });
       }
     } finally {
       importRunning = false;

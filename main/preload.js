@@ -209,6 +209,10 @@ contextBridge.exposeInMainWorld('api', {
   ensureLocalMirror:    (params) => ipcRenderer.invoke('archive:ensureLocalMirror',    params),
   getLocalMirrorStatus: (params) => ipcRenderer.invoke('archive:getLocalMirrorStatus', params),
 
+  // ── Local sync manifest ──
+  writeSyncManifest: (localEventPath, manifest) => ipcRenderer.invoke('archive:writeSyncManifest', { localEventPath, manifest }),
+  readSyncManifest:  (localEventPath)            => ipcRenderer.invoke('archive:readSyncManifest',  { localEventPath }),
+
   // ── EXIF metadata service ──
   getMetadataStatus:      (batchId)            => ipcRenderer.invoke('metadata:getStatus',     batchId),
   retryMetadata:          (batchId)            => ipcRenderer.invoke('metadata:retry',          batchId),
