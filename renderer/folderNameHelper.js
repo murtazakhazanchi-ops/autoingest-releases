@@ -51,12 +51,14 @@ export function buildFolderName(comp, idx, allSameCity = false) {
   const byOrder = (a, b) => (a.folderPlacement?.order || 0) - (b.folderPlacement?.order || 0);
 
   const tokens = [];
+  const placed = new Set();
   for (let i = 0; i < eventTypes.length; i++) {
-    kwToFolder.filter(k => byMode(k, 'before-event-tag', i)).sort(byOrder).forEach(k => tokens.push(k.label));
+    kwToFolder.filter(k => byMode(k, 'before-event-tag', i)).sort(byOrder).forEach(k => { placed.add(k); tokens.push(k.label); });
     tokens.push(eventTypes[i].label);
-    kwToFolder.filter(k => byMode(k, 'after-event-tag', i)).sort(byOrder).forEach(k => tokens.push(k.label));
+    kwToFolder.filter(k => byMode(k, 'after-event-tag', i)).sort(byOrder).forEach(k => { placed.add(k); tokens.push(k.label); });
   }
-  kwToFolder.filter(k => byMode(k, 'end-of-event-tags')).sort(byOrder).forEach(k => tokens.push(k.label));
+  // Keywords whose anchorIndex is now out of range (event type was removed) fall through to here.
+  kwToFolder.filter(k => byMode(k, 'end-of-event-tags') || !placed.has(k)).sort(byOrder).forEach(k => tokens.push(k.label));
 
   const typeAndKwPart = sanitizeForFolder(tokens.join('-'));
   return `${indexPart}-${typeAndKwPart}${locationPart}${cityPart}`;

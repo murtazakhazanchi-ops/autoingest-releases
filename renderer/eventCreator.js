@@ -43,7 +43,7 @@ const EventCreator = (() => {
         ? c.additionalKeywords.map(kw =>
             typeof kw === 'string'
               ? { label: kw, keywordId: null, useInFolderName: false }
-              : { label: kw.label || '', keywordId: kw.keywordId || null, useInFolderName: !!kw.useInFolderName }
+              : { label: kw.label || '', keywordId: kw.keywordId || null, useInFolderName: !!kw.useInFolderName, folderPlacement: kw.folderPlacement || null }
           )
         : [],
     }));
@@ -121,12 +121,13 @@ const EventCreator = (() => {
     const byOrder = (a, b) => (a.folderPlacement?.order || 0) - (b.folderPlacement?.order || 0);
 
     const tokens = [];
+    const placed = new Set();
     for (let i = 0; i < eventTypes.length; i++) {
-      kwToFolder.filter(k => byMode(k, 'before-event-tag', i)).sort(byOrder).forEach(k => tokens.push(k.label));
+      kwToFolder.filter(k => byMode(k, 'before-event-tag', i)).sort(byOrder).forEach(k => { placed.add(k); tokens.push(k.label); });
       tokens.push(eventTypes[i].label);
-      kwToFolder.filter(k => byMode(k, 'after-event-tag', i)).sort(byOrder).forEach(k => tokens.push(k.label));
+      kwToFolder.filter(k => byMode(k, 'after-event-tag', i)).sort(byOrder).forEach(k => { placed.add(k); tokens.push(k.label); });
     }
-    kwToFolder.filter(k => byMode(k, 'end-of-event-tags')).sort(byOrder).forEach(k => tokens.push(k.label));
+    kwToFolder.filter(k => byMode(k, 'end-of-event-tags') || !placed.has(k)).sort(byOrder).forEach(k => tokens.push(k.label));
 
     return `${indexPart}-${sanitizeForFolder(tokens.join('-'))}${locationPart}${cityPart}`;
   }
@@ -179,7 +180,7 @@ const EventCreator = (() => {
           ? c.additionalKeywords.map(kw =>
               typeof kw === 'string'
                 ? { label: kw, keywordId: null, useInFolderName: false }
-                : { label: kw.label || '', keywordId: kw.keywordId || null, useInFolderName: !!kw.useInFolderName }
+                : { label: kw.label || '', keywordId: kw.keywordId || null, useInFolderName: !!kw.useInFolderName, folderPlacement: kw.folderPlacement || null }
             )
           : [],
       }));
@@ -2291,6 +2292,7 @@ ${unparseable.map(ev => `
           if (!comp.eventTypes.some(e => e.label === label)) {
             comp.eventTypes.push({ id, label });
             _refreshETChips(comp);
+            _refreshKwAdvanced(comp);
             _updateEventPreview();
           }
           etDD.clear();
@@ -2304,7 +2306,7 @@ ${unparseable.map(ev => `
     if (locEl) {
       row.loc = new TreeAutocomplete({
         container: locEl, type: 'locations', placeholder: 'Location… (optional)',
-        onSelect: ({ id, label }) => { comp.location = { id, label }; _updateEventPreview(); }
+        onSelect: ({ id, label }) => { comp.location = { id, label }; _refreshKwAdvanced(comp); _updateEventPreview(); }
       });
       if (comp.location) row.loc.setValue(comp.location.id, comp.location.label);
     }
@@ -2313,7 +2315,7 @@ ${unparseable.map(ev => `
     if (cityEl) {
       row.city = new TreeAutocomplete({
         container: cityEl, type: 'cities', placeholder: 'City…',
-        onSelect: ({ id, label }) => { comp.city = { id, label }; _updateEventPreview(); }
+        onSelect: ({ id, label }) => { comp.city = { id, label }; _refreshKwAdvanced(comp); _updateEventPreview(); }
       });
       if (comp.city) row.city.setValue(comp.city.id, comp.city.label);
     }
@@ -2616,6 +2618,7 @@ ${unparseable.map(ev => `
         if (comp) {
           comp.eventTypes.splice(idx, 1);
           _refreshETChips(comp);
+          _refreshKwAdvanced(comp);
           _updateEventPreview();
         }
         return;
@@ -2929,12 +2932,13 @@ ${unparseable.map(ev => `
       if (kwToFolder.length === 0) {
         eventTypes.forEach(et => { if (et.label) parts.push(et.label); });
       } else {
+        const placed = new Set();
         for (let i = 0; i < eventTypes.length; i++) {
-          kwToFolder.filter(k => byMode(k, 'before-event-tag', i)).sort(byOrder).forEach(k => parts.push(k.label));
+          kwToFolder.filter(k => byMode(k, 'before-event-tag', i)).sort(byOrder).forEach(k => { placed.add(k); parts.push(k.label); });
           if (eventTypes[i].label) parts.push(eventTypes[i].label);
-          kwToFolder.filter(k => byMode(k, 'after-event-tag', i)).sort(byOrder).forEach(k => parts.push(k.label));
+          kwToFolder.filter(k => byMode(k, 'after-event-tag', i)).sort(byOrder).forEach(k => { placed.add(k); parts.push(k.label); });
         }
-        kwToFolder.filter(k => byMode(k, 'end-of-event-tags')).sort(byOrder).forEach(k => parts.push(k.label));
+        kwToFolder.filter(k => byMode(k, 'end-of-event-tags') || !placed.has(k)).sort(byOrder).forEach(k => parts.push(k.label));
       }
 
       if (comp.location?.label) parts.push(comp.location.label);
