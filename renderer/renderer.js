@@ -84,6 +84,33 @@ function showMessage(msg, durationMs = 4000) {
   }, durationMs);
 }
 
+// Non-blocking archive notice — like showMessage but optionally clickable.
+// Clicking the status bar message opens the relevant modal (e.g. Sync & Activity).
+// The click handler and clickable styling auto-clear after durationMs.
+let _archiveNoticeClickOff = null;
+let _archiveNoticeTid      = null;  // stored at module scope so rapid calls can cancel the stale timer
+
+function _archiveNotice(msg, onClickFn, durationMs = 7000) {
+  const el = document.getElementById('statusMessage');
+  // Cancel stale timer and click binding from any prior in-flight notice
+  if (_archiveNoticeTid)      { clearTimeout(_archiveNoticeTid); _archiveNoticeTid = null; }
+  if (_archiveNoticeClickOff) { _archiveNoticeClickOff(); _archiveNoticeClickOff = null; }
+  showMessage(msg, durationMs);
+  if (!el || !onClickFn) return;
+  el.classList.add('sm--clickable');
+  const handler = () => { onClickFn(); teardown(); };
+  el.addEventListener('click', handler);
+  _archiveNoticeTid = setTimeout(teardown, durationMs);
+  function teardown() {
+    clearTimeout(_archiveNoticeTid);
+    _archiveNoticeTid = null;
+    el.removeEventListener('click', handler);
+    el.classList.remove('sm--clickable');
+    _archiveNoticeClickOff = null;
+  }
+  _archiveNoticeClickOff = teardown;
+}
+
 // Priority-based status bar messages: higher priority wins.
 // 3 = importing (highest), 2 = selection, 1 = info/filter, 0 = default
 const _statusMessages = {};
@@ -2646,7 +2673,7 @@ async function _sqLoadQueue() {
     const syncing = jobs.filter(j => j.status === 'syncing').length;
     if (summaryEl) {
       if (jobs.length === 0) {
-        summaryEl.textContent = 'No Local First imports found';
+        summaryEl.textContent = 'Queue empty';
       } else {
         const parts = [`${jobs.length} event${jobs.length !== 1 ? 's' : ''}`];
         if (syncing > 0) parts.push(`${syncing} syncing`);
@@ -2670,10 +2697,10 @@ function _sqEsc(s) {
 function _sqJobRow(job) {
   const statusLabel = {
     'ready-for-sync':  'Ready',
-    'needs-attention': 'Attention',
+    'needs-attention': 'Needs Attention',
     'blocked':         'Blocked',
     'synced':          'Synced',
-    'syncing':         'Syncing…',
+    'syncing':         'Syncing',
     'waiting-for-lock': 'Waiting',
     'sync-failed':     'Failed',
     'failed':          'Failed',
@@ -2701,6 +2728,8 @@ function _sqJobRow(job) {
   </div>`;
 }
 
+const _SQ_KNOWN_STATUSES = new Set(['syncing', 'ready-for-sync', 'sync-failed', 'waiting-for-lock', 'failed', 'needs-attention', 'synced']);
+
 function _sqRenderJobs(jobs) {
   const listEl = document.getElementById('sqJobList');
   if (!listEl) return;
@@ -2709,18 +2738,12 @@ function _sqRenderJobs(jobs) {
     listEl.innerHTML = '<div class="sq-empty">No Local First imports found in staging root.</div>';
     return;
   }
-
   const syncing  = jobs.filter(j => j.status === 'syncing');
   const ready    = jobs.filter(j => j.status === 'ready-for-sync');
-  const failed   = jobs.filter(j => j.status === 'sync-failed' || j.status === 'waiting-for-lock');
+  const failed   = jobs.filter(j => j.status === 'sync-failed' || j.status === 'waiting-for-lock' || j.status === 'failed');
   const attn     = jobs.filter(j => j.status === 'needs-attention');
-  const other    = jobs.filter(j =>
-    j.status !== 'syncing' &&
-    j.status !== 'ready-for-sync' &&
-    j.status !== 'sync-failed' &&
-    j.status !== 'waiting-for-lock' &&
-    j.status !== 'needs-attention'
-  );
+  const synced   = jobs.filter(j => j.status === 'synced');
+  const other    = jobs.filter(j => !_SQ_KNOWN_STATUSES.has(j.status));
 
   let html = '';
   if (syncing.length) {
@@ -2732,12 +2755,16 @@ function _sqRenderJobs(jobs) {
     html += ready.map(_sqJobRow).join('');
   }
   if (failed.length) {
-    html += '<div class="sq-section-title sq-section-title--err">Failed / Waiting</div>';
+    html += '<div class="sq-section-title sq-section-title--err">Failed · Waiting</div>';
     html += failed.map(_sqJobRow).join('');
   }
   if (attn.length) {
     html += '<div class="sq-section-title sq-section-title--warn">Needs Attention</div>';
     html += attn.map(_sqJobRow).join('');
+  }
+  if (synced.length) {
+    html += '<div class="sq-section-title">Synced</div>';
+    html += synced.map(_sqJobRow).join('');
   }
   if (other.length) {
     html += '<div class="sq-section-title">Other</div>';
@@ -2769,13 +2796,16 @@ document.getElementById('sqJobList')?.addEventListener('click', async (e) => {
   btn.disabled = true;
   btn.textContent = 'Starting…';
   try {
-    await window.api.syncJobNow(jobId);
+    const result = await window.api.syncJobNow(jobId);
     await _sqLoadQueue();
     const summary = await window.api.getSyncQueueSummary().catch(() => null);
     if (summary) _applySyncQueueTile(summary);
+    if (result?.ok === false) showMessage('Sync failed. Review needed.', 7000);
+    else showMessage('Sync complete.', 6000);
   } catch {
     btn.disabled = false;
     btn.textContent = btn.classList.contains('sq-sync-btn') ? 'Sync Now' : 'Retry';
+    showMessage('Sync failed. Review needed.', 7000);
   }
 });
 
@@ -2786,10 +2816,13 @@ document.getElementById('sqSyncAllBtn')?.addEventListener('click', async () => {
   btn.disabled = true;
   btn.textContent = 'Syncing…';
   try {
-    await window.api.syncAllReadyJobs();
+    const result = await window.api.syncAllReadyJobs();
     await _sqLoadQueue();
     const summary = await window.api.getSyncQueueSummary().catch(() => null);
     if (summary) _applySyncQueueTile(summary);
+    const anyFailed = result?.results?.some(r => r.status === 'sync-failed');
+    if (anyFailed) showMessage('Sync failed. Review needed.', 7000);
+    else if (result?.processed > 0) showMessage('Sync complete.', 6000);
   } finally {
     btn.disabled = false;
     btn.textContent = 'Sync All Ready';
@@ -2886,11 +2919,11 @@ async function _msScanBackground({ force = false } = {}) {
 }
 
 function _reasonLabel(reason, lastSyncError) {
-  if (reason === 'sync-error')               return lastSyncError ? `Sync error: ${lastSyncError}` : 'Previous sync failed — retry recommended';
-  if (reason === 'xmp-changed')              return 'New metadata available since last sync';
-  if (reason === 'migration-needed')         return 'Metadata index needs migration';
-  if (reason === 'metadata-index-missing')   return 'Metadata index missing — first sync required';
-  if (reason === 'metadata-index-mismatch')  return 'Metadata index mismatch — review required';
+  if (reason === 'sync-error')               return lastSyncError ? `Sync error: ${lastSyncError}` : 'Previous sync failed';
+  if (reason === 'xmp-changed')              return 'New metadata available';
+  if (reason === 'migration-needed')         return 'Migration needed';
+  if (reason === 'metadata-index-missing')   return 'First sync required';
+  if (reason === 'metadata-index-mismatch')  return 'Index mismatch — review needed';
   return 'Not yet synced';
 }
 
@@ -6168,6 +6201,9 @@ async function _writeLocalFirstManifest(metadataStatus) {
   if (metadataStatus !== 'complete') payload.needsAttention = true;
   try {
     await window.api.writeSyncManifest(pending.localEventPath, payload);
+    if (metadataStatus === 'complete') {
+      _archiveNotice('Local import complete. Ready for sync.', () => _sqOpen(), 8000);
+    }
   } catch (e) {
     console.error('[LF] Failed to write sync manifest:', e);
   }
@@ -7108,6 +7144,8 @@ document.getElementById('importBtn').addEventListener('click', async () => {
             readyForSync:   false,
             needsAttention: true,
             reason:         'auto-metadata-disabled',
+          }).then(() => {
+            _archiveNotice('Local import complete.', () => _sqOpen(), 7000);
           }).catch(e => console.error('[LF] Failed to write sync manifest (no-meta):', e));
         }
       }
