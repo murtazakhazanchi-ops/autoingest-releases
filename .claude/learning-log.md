@@ -1428,6 +1428,43 @@ Status:
 
 ---
 
+### 2026-05-12 — Phase 13A: Archive Diagnostics Service
+
+Task type:
+- Feature / IPC / Main Process / Renderer / Performance / Architecture / Contracts
+
+What happened:
+- New `services/archiveDiagnosticsService.js` — a read-only background scan service using the same fire-and-forget pattern as `transferImportService`: `runDiagnostics()` starts the background job and returns `{ ok, jobId }` immediately; `getDiagnosticsStatus()` polls state; `getDiagnosticsReport()` retrieves results. 3 IPC handlers + 3 preload bridge entries. Minimal HTML modal + renderer IIFE.
+- Architect reviewer flagged: renderer report `items[]` must live in local IIFE state only, not at module scope. Module-scope retention of diagnostic report arrays causes the same Renderer OOM pattern documented in failure-patterns.md § 12.
+- Performance auditor flagged: unbounded `fsp.access()` calls per queue item in `_scanSyncQueue` create O(N) stat syscalls. Pattern: add `MAX_X_ACCESS_CHECKS = 50` constant and a counter guard.
+- Scan depth contract established: collection → event level (depth 2) only. Photographer subdirs are never recursed for general diagnostic scans. Known-path reads (`.autoingest/locks/`, `.autoingest/event.sync.json`) are exceptions.
+- `_Selected` folder classification contract confirmed: `_Selected` is a valid external output folder. Scan services must classify it as `info` / `external-folder`, never as a missing-event.json anomaly.
+- Transfer Drive marker path confirmed: Transfer Drive is initialized when `{transferRoot}/.autoingest-transfer/transfer-root.json` exists and is valid JSON with `{ type: 'autoingest-transfer-root', createdAt, deviceName }`.
+
+Reusable lessons:
+1. **Read-only scan services follow the transferImportService background pattern.** `runX()` returns `{ ok, jobId }` immediately; background function does the work; `getXStatus()` polls; `getXReport()` retrieves. This pattern applies to both write operations (import/export) and read-only scans (diagnostics).
+2. **Renderer diagnostic/report items[] must not be cached at module scope.** They belong in local IIFE state only, released when modal closes. Module-scope retention causes Renderer OOM (failure-patterns.md § 12).
+3. **`fsp.access()` calls in scan loops must be capped.** Unbounded access checks per queue item are O(N) stat syscalls. Pattern: `MAX_X_ACCESS_CHECKS = 50` constant + counter guard in the loop.
+4. **Diagnostics scan depth: collection → event level only (depth 2).** Never recurse into photographer subdirs for general archive scans. Known-path reads (locks, manifests) are acceptable exceptions.
+5. **`_Selected` is always info, never error.** Any scan service that encounters a `_Selected` folder must classify it as `info` / `external-folder`. Do not flag it as a missing event.json or as an anomaly.
+6. **Transfer Drive marker path.** Transfer Drive valid state is determined by `{transferRoot}/.autoingest-transfer/transfer-root.json` existing and containing `{ type: 'autoingest-transfer-root', createdAt, deviceName }`. Any diagnostic or validation check for Transfer Drive state must read this specific path and structure.
+
+Common failure modes:
+- Caching large scan result arrays at renderer module scope — OOM risk.
+- Performing unbounded `fsp.access()` calls inside a scan loop — O(N) stat syscalls with no cap.
+- Recursing into photographer subdirs during a general archive scan — exceeds scan depth contract.
+- Classifying `_Selected` as a missing-event.json anomaly — it is a valid output folder.
+- Checking Transfer Drive state by path heuristics rather than reading the marker file.
+
+Promote to agents:
+- `autoingest-architect.md` — lessons 1, 4, 5, 6 (background scan service pattern; scan depth contract; _Selected classification; Transfer Drive marker)
+- `performance-auditor.md` — lessons 2, 3 (renderer report items IIFE-only; fsp.access() cap)
+
+Status:
+- Promoted
+
+---
+
 ## Entry Template
 
 ### YYYY-MM-DD — Task Name

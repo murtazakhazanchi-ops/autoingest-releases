@@ -386,6 +386,45 @@ Validation:
 - Confirm re-entry is allowed after the first call completes.
 - Confirm only scalar results (count, boolean) are stored from the scan.
 
+### Renderer Report Items Must Not Be Cached at Module Scope
+
+Context:
+- Applies to any renderer module that opens a diagnostic, scan result, or report modal with an `items[]` payload received from IPC.
+
+Rule:
+- Diagnostic and scan report `items[]` arrays must live in local IIFE state only.
+- They must be released when the modal closes (set to `null` or let go out of scope).
+- Do not assign report arrays to a module-level variable in the renderer — even temporarily.
+- This prevents the Renderer OOM pattern (failure-patterns.md § 12): structured-clone of a large IPC result lands in the renderer heap; if it is then cached at module scope it is never GC'd.
+
+Avoid:
+- `let _diagnosticsItems = null` at the renderer module top level.
+- Storing `result.items` in any variable that persists beyond the modal's open/close lifecycle.
+
+Validation:
+- Confirm report items are declared inside the modal IIFE or the open() function scope.
+- Confirm no module-level variable holds IPC report arrays.
+- Confirm modal close sets any local reference to null or exits the closure.
+
+### fsp.access() Calls in Scan Loops Must Be Capped
+
+Context:
+- Applies to any scan or diagnostic service that calls `fsp.access()` per item in a queue or list.
+
+Rule:
+- Unbounded `fsp.access()` calls per queue item create O(N) stat syscalls.
+- Add a `MAX_X_ACCESS_CHECKS` constant (e.g., `MAX_SYNC_QUEUE_ACCESS_CHECKS = 50`) and a counter guard in the loop.
+- Once the cap is reached, skip the access check and record the item as unchecked rather than continuing to stat.
+
+Avoid:
+- Calling `fsp.access(item.path)` inside a loop with no cap on the number of calls.
+- Treating access-check results as equivalent to a full filesystem scan.
+
+Validation:
+- Confirm the scan loop has a named constant defining the maximum access-check count.
+- Confirm a counter increments inside the loop and breaks or skips after reaching the cap.
+- Confirm items beyond the cap are handled gracefully (not silently dropped, not treated as errors).
+
 ### Startup / Window Lifecycle Performance
 
 Context:

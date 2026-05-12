@@ -324,6 +324,85 @@ Validation:
 - Confirm the new field appears in every one of them.
 - Confirm the renderer shows correct values for the new field when the handler takes each return path.
 
+### Background Scan Service Pattern (Read-Only and Write Operations)
+
+Context:
+- Applies when creating any new background scan, diagnostics, or operation service (read-only or write).
+
+Rule:
+- Follow the fire-and-forget pattern established by `transferImportService` and `archiveDiagnosticsService`:
+  - `runX(params)` starts the background function and returns `{ ok, jobId }` immediately.
+  - `getXStatus()` returns poll state (running / done / error).
+  - `getXReport()` retrieves the full result after done.
+- This pattern applies to both write operations (import, export) and read-only scans (diagnostics, integrity checks).
+- Do not block the IPC handler waiting for the background work to complete.
+
+Avoid:
+- Starting background work inside an `await` that the IPC handler waits on before returning.
+- Returning full result data from `runX()` — it must return only `{ ok, jobId }`.
+- Combining poll state and full report into a single channel — keep them separate.
+
+Validation:
+- Confirm `runX()` IPC handler returns `{ ok, jobId }` without awaiting the background scan.
+- Confirm a separate `getXStatus()` IPC handler exists for polling.
+- Confirm a separate `getXReport()` IPC handler exists for result retrieval.
+
+### Diagnostics Scan Depth Contract
+
+Context:
+- Applies to any general archive diagnostic or integrity scan.
+
+Rule:
+- Scan to collection → event level only (depth 2 from archive root).
+- Never recurse into photographer subdirectories during a general scan.
+- Known-path reads are exceptions: `.autoingest/locks/` and `.autoingest/event.sync.json` may be read directly when their paths are already known — they do not require a recursive descent.
+
+Avoid:
+- Recursing into photographer subdirs to detect anomalies in a general scan.
+- Treating a depth-exceeding recursive walk as equivalent to a bounded scan.
+
+Validation:
+- Confirm the scan loop iterates collections then events, stopping at depth 2.
+- Confirm no readdir call descends into photographer-level subdirectories.
+- Confirm known-path reads (locks, manifests) do not use recursive traversal.
+
+### _Selected Folder Classification — Always Info, Never Error
+
+Context:
+- Applies to any scan service, diagnostic, or validation check that traverses archive collection/event folders.
+
+Rule:
+- `_Selected` is a valid AutoIngest external output folder.
+- Any scan service that encounters a `_Selected` directory must classify it as `info` with label `external-folder`.
+- Do not flag `_Selected` as a missing `event.json`, missing marker, or archive anomaly.
+
+Avoid:
+- Treating `_Selected` as an unrecognized or corrupt event folder.
+- Producing an error or warning classification for a `_Selected` directory.
+
+Validation:
+- Confirm `_Selected` directories produce an `info` / `external-folder` result in any scan output.
+- Confirm no error or warning classification is emitted for `_Selected`.
+
+### Transfer Drive Marker Path
+
+Context:
+- Applies to any diagnostic, validation, or conditional logic that checks whether a Transfer Drive is initialized.
+
+Rule:
+- Transfer Drive valid state is determined by reading `{transferRoot}/.autoingest-transfer/transfer-root.json`.
+- The file must exist and be valid JSON with the shape `{ type: 'autoingest-transfer-root', createdAt, deviceName }`.
+- Any check for Transfer Drive state must read this specific marker file and validate its `type` field.
+- Do not infer Transfer Drive state from path heuristics, drive label, or filesystem presence alone.
+
+Avoid:
+- Checking for the `.autoingest-transfer/` directory existence without reading and validating the marker JSON.
+- Using path naming or volume label as a proxy for Transfer Drive identity.
+
+Validation:
+- Confirm the validation reads `transfer-root.json` and checks `type === 'autoingest-transfer-root'`.
+- Confirm a missing file, malformed JSON, or wrong `type` field all produce a negative result.
+
 ### Per-File Property Propagation on exifService Batch Objects
 
 Context:
