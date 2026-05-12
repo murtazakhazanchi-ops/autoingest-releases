@@ -1344,6 +1344,62 @@ Status:
 
 ---
 
+### 2026-05-12 — Phase 7.1: setInterval with Async Callback — Silent Failure Without .catch()
+
+Task type:
+- Async Safety / Service Layer / Background Operations / Lock Heartbeat
+
+What happened:
+- Phase 7.1 added a heartbeat timer to renew archive sync locks during long jobs. The heartbeat calls `renewLock()` (an async function) inside `setInterval`. Without an explicit `.catch()` on the returned promise, any I/O error during renewal (e.g. archive volume disconnect, lock file permission error) would become an unhandled promise rejection — invisible to the caller and to the sync operation.
+- The practical consequence: sync would continue writing files to the archive without a valid lock, defeating the entire purpose of the heartbeat.
+- Fix: attach `.catch(err => { abortSignal.aborted = true; clearInterval(timer); })` inside the interval callback so any renewal failure conservatively aborts the sync and clears the timer.
+
+Reusable lessons:
+1. **setInterval does not await its callback.** The promise returned by an async callback inside `setInterval` is discarded by the runtime. Rejections become unhandled promise rejections and produce no visible error unless `.catch()` is attached.
+2. **Always attach `.catch()` to async calls inside timers.** Either call `asyncFn().catch(handler)` directly, or wrap the callback body in an async IIFE with try/catch: `setInterval(() => { (async () => { try { await asyncFn(); } catch (err) { handle(err); } })(); }, ms)`.
+3. **Timer handles must be cleared in all exit paths.** Every completion path (success, error, cancel, abort) must call `clearInterval`. Use `try/finally` in the owning operation to guarantee cleanup even on unexpected throws.
+4. **Failure inside the timer must update operation state.** A silent timer failure that leaves an operation running with invalid state (e.g. writing to archive after lock expiry) is worse than a visible crash. The `.catch()` handler must propagate the failure into the owning operation (e.g. set `abortSignal.aborted = true`).
+
+Applies to:
+- Lock heartbeat timers
+- Background queue refresh timers
+- Polling loops that call async IPC or filesystem functions
+- Retry timers
+- Any renderer or main-process `setInterval` that invokes an async function
+
+Common failure mode:
+- Writing `setInterval(() => { asyncFn(); }, ms)` — the missing `await` and missing `.catch()` make this a silent fire-and-forget with no error handling.
+- Timer handle stored in a `let` variable but only cleared on the success path, not in the `finally` block or error path.
+
+Preferred pattern:
+```javascript
+let timer = setInterval(() => {
+  asyncFn()
+    .then(result => { /* handle success */ })
+    .catch(err => {
+      // propagate failure into owning operation
+      abortSignal.aborted = true;
+      clearInterval(timer);
+      timer = null;
+    });
+}, intervalMs);
+
+try {
+  await doWork(abortSignal);
+} finally {
+  clearInterval(timer);   // always clears, even on throw
+  timer = null;
+}
+```
+
+Promote to agents:
+- `contract-debugger.md` — async timer callback safety as a recurring Node.js pattern
+
+Status:
+- Promoted
+
+---
+
 ## Entry Template
 
 ### YYYY-MM-DD — Task Name

@@ -511,6 +511,48 @@ Validation:
 - Confirm the log includes the file path and `err.message`.
 - Confirm the catch does not swallow errors that should propagate as fatal.
 
+### setInterval with Async Callback — Always Attach .catch() to Prevent Silent Failures
+
+Context:
+- Applies to any `setInterval` (or `setTimeout`) callback that calls an async function: lock heartbeat timers, background queue refresh polling, retry timers, renderer or main-process interval loops.
+
+Rule:
+- `setInterval` does not await its callback. The promise returned by an async callback is discarded by the Node.js runtime. Rejections become unhandled promise rejections — no crash, no log line, no visible signal in the owning operation.
+- Always attach `.catch(handler)` to the async call inside the interval callback, or wrap the entire body in an async IIFE with `try/catch`.
+- The `.catch()` handler must propagate the failure into the owning operation (e.g. set an abort flag, update operation state) — a silent `.catch(() => {})` is not sufficient when the owning operation must stop on timer failure.
+- Timer handles must be cleared in **all** exit paths. Use `try/finally` in the owning operation so `clearInterval` always runs, even on unexpected throws.
+
+Avoid:
+- `setInterval(() => { asyncFn(); }, ms)` — missing `.catch()` makes rejection unobservable.
+- Clearing the timer only on the success path and leaving it active on throw or abort.
+- A `.catch()` that swallows the error without updating the owning operation's state.
+
+Preferred pattern:
+```javascript
+let timer = setInterval(() => {
+  asyncFn()
+    .then(result => { /* handle */ })
+    .catch(err => {
+      abortSignal.aborted = true;  // propagate into owning operation
+      clearInterval(timer);
+      timer = null;
+    });
+}, intervalMs);
+
+try {
+  await doWork(abortSignal);
+} finally {
+  clearInterval(timer);  // always clears, including on throw
+  timer = null;
+}
+```
+
+Validation:
+- Confirm every `setInterval` callback that calls an async function has `.catch()` or an async IIFE with `try/catch`.
+- Confirm `clearInterval` runs in a `finally` block in the owning operation, not only on the success path.
+- Confirm the `.catch()` handler updates operation state (abort flag, error result, status field) rather than silently swallowing the error.
+- Confirm no timer handle remains active after the owning operation exits.
+
 ## Validation Checklist
 
 Before debugging, read:
