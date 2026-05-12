@@ -1554,6 +1554,8 @@ ipcMain.handle('dir:hasContent', async (_event, dirPath) => {
     const entries = await fsp.readdir(dirPath);
     return entries.some(name =>
       name !== 'event.json' &&
+      name !== 'event.metadata.json' &&
+      name !== 'event.sync.json' &&
       !name.startsWith('.') &&
       name.trim() !== ''
     );
@@ -1569,6 +1571,8 @@ ipcMain.handle('dir:inspectContent', async (_event, dirPath) => {
     const entries = await fsp.readdir(dirPath, { withFileTypes: true });
     const filtered = entries.filter(e =>
       e.name !== 'event.json' &&
+      e.name !== 'event.metadata.json' &&
+      e.name !== 'event.sync.json' &&
       !e.name.startsWith('.') &&
       e.name.trim() !== ''
     );

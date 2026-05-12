@@ -23,6 +23,8 @@ const path   = require('path');
 const crypto = require('crypto');
 const os     = require('os');
 
+const { hidePathBestEffort } = require('./internalFileProtection');
+
 const LOCK_DIR_RELPATH       = path.join('.autoingest', 'locks');
 const LOCK_TTL_MS            = 30 * 60 * 1000; // 30 minutes
 const LOCK_HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes — must be < TTL
@@ -56,6 +58,7 @@ async function acquireLock(activeArchiveRoot, { collection, eventFolderName, pho
   const lockDir  = path.dirname(lockPath);
 
   await fsp.mkdir(lockDir, { recursive: true });
+  hidePathBestEffort(path.dirname(lockDir)).catch(() => {});
 
   const now       = Date.now();
   const expiresAt = now + LOCK_TTL_MS;

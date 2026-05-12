@@ -2,6 +2,8 @@
 const fsp  = require('fs').promises;
 const path = require('path');
 
+const { hidePathBestEffort } = require('./internalFileProtection');
+
 const AUTOINGEST_DIR = '.autoingest';
 const MANIFEST_FILE  = 'event.sync.json';
 
@@ -23,6 +25,7 @@ async function writeManifest(localEventPath, manifest) {
   const tmp      = filePath + '.tmp';
 
   await fsp.mkdir(dir, { recursive: true });
+  hidePathBestEffort(dir).catch(() => {});
 
   const data = { ...manifest, updatedAt: Date.now() };
   await fsp.writeFile(tmp, JSON.stringify(data, null, 2), 'utf8');

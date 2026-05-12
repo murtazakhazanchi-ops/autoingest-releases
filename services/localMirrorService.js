@@ -22,9 +22,9 @@
 
 const fsp  = require('fs').promises;
 const path = require('path');
-const { execFile } = require('child_process');
 
-const settings = require('./settings');
+const settings              = require('./settings');
+const { hidePathBestEffort } = require('./internalFileProtection');
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -87,28 +87,6 @@ function _resolveLocalPaths(stagingRoot, collectionName, eventName) {
   }
 
   return { localCollectionPath, localEventPath };
-}
-
-// ── Hidden-attribute helper ───────────────────────────────────────────────────
-
-/**
- * Apply platform-appropriate hidden/protected attributes to a file.
- * Non-fatal — if the operation fails the caller receives hiddenApplied: false.
- * @param {string} filePath
- * @returns {Promise<boolean>}
- */
-async function _applyHidden(filePath) {
-  return new Promise((resolve) => {
-    const platform = process.platform;
-    if (platform === 'darwin') {
-      execFile('chflags', ['hidden', filePath], (err) => resolve(!err));
-    } else if (platform === 'win32') {
-      execFile('attrib', ['+H', filePath], (err) => resolve(!err));
-    } else {
-      // Linux/other: no standard way to hide files; skip silently
-      resolve(false);
-    }
-  });
 }
 
 // ── File copy with conflict detection ─────────────────────────────────────────
@@ -378,7 +356,7 @@ async function ensureLocalMirror(params) {
   // Apply hidden attributes to internal files
   const filesToHide = [localEventJson];
   if (copiedMetadataJson) filesToHide.push(localMetadataJson);
-  const hiddenResults = await Promise.all(filesToHide.map(_applyHidden));
+  const hiddenResults = await Promise.all(filesToHide.map(hidePathBestEffort));
   const hiddenApplied = hiddenResults.every(Boolean);
 
   return {
