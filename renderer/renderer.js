@@ -10023,6 +10023,7 @@ document.addEventListener('keydown', e => {
     document.getElementById('archiveDiagnosticsModal')?.classList.remove('open');
     _stopPoll();
     _stopAdoptPoll();
+    _hideAdoptDetail();
   }
 
   function _startPoll() {
@@ -10198,6 +10199,7 @@ document.addEventListener('keydown', e => {
 
   let _adoptRunning = false;
   let _adoptPoll    = null;
+  let _adoptItems   = [];
 
   const READINESS_LABELS = {
     'ready-for-review':    'Ready',
@@ -10220,6 +10222,7 @@ document.addEventListener('keydown', e => {
     if (!listEl) return;
 
     const items = report && Array.isArray(report.items) ? report.items : [];
+    _adoptItems = items;
 
     if (statusEl) {
       let text = `${items.length} candidate${items.length !== 1 ? 's' : ''}`;
@@ -10246,6 +10249,7 @@ document.addEventListener('keydown', e => {
         <div>
           <div class="adopt-folder">${_esc(item.folderName)}</div>
           ${inferred.length ? `<div class="adopt-inferred">${_esc(inferred.join(' · '))}</div>` : ''}
+          <button type="button" class="adopt-detail-btn" data-item-id="${_esc(item.id)}">Details</button>
         </div>
         <div class="adopt-coll">${_esc(item.collectionName)}</div>
         <div><span class="adopt-badge adopt-badge--${_esc(item.readiness)}">${_esc(badge)}</span></div>
@@ -10270,6 +10274,126 @@ document.addEventListener('keydown', e => {
       if (statusEl) statusEl.textContent = `Scanning… ${status.itemCount} found so far.`;
     }
   }
+
+  function _hideAdoptDetail() {
+    const panel = document.getElementById('adoptDetailPanel');
+    if (panel) { panel.hidden = true; panel.innerHTML = ''; }
+  }
+
+  function _showAdoptDetail(itemId) {
+    const item  = _adoptItems.find(i => i.id === itemId);
+    const panel = document.getElementById('adoptDetailPanel');
+    if (!item || !panel) return;
+
+    const badge  = READINESS_LABELS[item.readiness] || item.readiness;
+    const inf    = item.inferred || {};
+    const tokens = Array.isArray(inf.eventTokens)         ? inf.eventTokens         : [];
+    const photos = Array.isArray(inf.photographerFolders) ? inf.photographerFolders : [];
+
+    const ROOT_LABELS = {
+      activeArchiveRoot: 'Active Archive Root',
+      mainArchiveRoot:   'Main Archive Root',
+      transferRoot:      'Transfer Root',
+    };
+
+    let wouldBecomeName = '';
+    if (inf.hijriDate && inf.sequence && tokens.length) {
+      wouldBecomeName = `${inf.hijriDate} ${inf.sequence} ${tokens.join(' ')}`;
+    } else if (inf.hijriDate && tokens.length) {
+      wouldBecomeName = `${inf.hijriDate} [sequence needed] ${tokens.join(' ')}`;
+    }
+
+    const reasonsHtml = (item.reasons || [])
+      .map(r => `<li>${_esc(r)}</li>`).join('');
+    const photosHtml = photos.length
+      ? `<ul class="adopt-detail-list">${photos.map(p => `<li>${_esc(p)}</li>`).join('')}</ul>`
+      : `<span class="adopt-detail-muted">None detected</span>`;
+
+    panel.innerHTML = `
+      <div class="adopt-detail-topbar">
+        <div class="adopt-detail-heading">
+          <span class="adopt-badge adopt-badge--${_esc(item.readiness)}">${_esc(badge)}</span>
+          <span class="adopt-detail-name">${_esc(item.folderName)}</span>
+        </div>
+        <button type="button" class="adopt-detail-back" id="adoptDetailBackBtn">&#8592; Back to list</button>
+      </div>
+      <div class="adopt-detail-body">
+        <div class="adopt-detail-section">
+          <div class="adopt-detail-section-title">Location</div>
+          <div class="adopt-detail-row">
+            <div class="adopt-detail-key">Root</div>
+            <div class="adopt-detail-val">${_esc(ROOT_LABELS[item.rootType] || item.rootType)}</div>
+          </div>
+          <div class="adopt-detail-row">
+            <div class="adopt-detail-key">Collection</div>
+            <div class="adopt-detail-val">${_esc(item.collectionName)}</div>
+          </div>
+          <div class="adopt-detail-row">
+            <div class="adopt-detail-key">Collection path</div>
+            <div class="adopt-detail-val adopt-detail-path">${_esc(item.collectionPath)}</div>
+          </div>
+          <div class="adopt-detail-row">
+            <div class="adopt-detail-key">Folder path</div>
+            <div class="adopt-detail-val adopt-detail-path">${_esc(item.folderPath)}</div>
+          </div>
+        </div>
+        <div class="adopt-detail-section">
+          <div class="adopt-detail-section-title">Inferred Fields</div>
+          <div class="adopt-detail-row">
+            <div class="adopt-detail-key">Hijri date</div>
+            <div class="adopt-detail-val">${inf.hijriDate ? _esc(inf.hijriDate) : '<span class="adopt-detail-muted">Not detected</span>'}</div>
+          </div>
+          <div class="adopt-detail-row">
+            <div class="adopt-detail-key">Sequence</div>
+            <div class="adopt-detail-val">${inf.sequence ? _esc(inf.sequence) : '<span class="adopt-detail-muted">Not detected</span>'}</div>
+          </div>
+          <div class="adopt-detail-row">
+            <div class="adopt-detail-key">Event tokens</div>
+            <div class="adopt-detail-val">${tokens.length ? _esc(tokens.join(', ')) : '<span class="adopt-detail-muted">None</span>'}</div>
+          </div>
+          <div class="adopt-detail-row">
+            <div class="adopt-detail-key">Content folders</div>
+            <div class="adopt-detail-val">${photosHtml}</div>
+          </div>
+          <div class="adopt-detail-row">
+            <div class="adopt-detail-key">_Selected present</div>
+            <div class="adopt-detail-val">${inf.hasSelectedFolder ? 'Yes' : 'No'}</div>
+          </div>
+        </div>
+        <div class="adopt-detail-section">
+          <div class="adopt-detail-section-title">Analysis</div>
+          <div class="adopt-detail-row">
+            <div class="adopt-detail-key">Category</div>
+            <div class="adopt-detail-val">${_esc(item.category || '—')}</div>
+          </div>
+          <div class="adopt-detail-row">
+            <div class="adopt-detail-key">Reasons</div>
+            <div class="adopt-detail-val"><ul class="adopt-detail-list">${reasonsHtml || '<li>—</li>'}</ul></div>
+          </div>
+          <div class="adopt-detail-row">
+            <div class="adopt-detail-key">Recommended</div>
+            <div class="adopt-detail-val">${_esc(item.recommendedAction || '—')}</div>
+          </div>
+        </div>
+        ${wouldBecomeName ? `<div class="adopt-detail-section">
+          <div class="adopt-detail-section-title">Would become</div>
+          <div class="adopt-detail-row">
+            <div class="adopt-detail-key">Folder name</div>
+            <div class="adopt-detail-val adopt-detail-path">${_esc(wouldBecomeName)}</div>
+          </div>
+        </div>` : ''}
+      </div>
+      <div class="adopt-detail-readonly-note">Read-only preview — no files will be changed.</div>
+    `;
+    panel.hidden = false;
+    panel.querySelector('#adoptDetailBackBtn')?.addEventListener('click', _hideAdoptDetail);
+  }
+
+  document.getElementById('adoptionList')?.addEventListener('click', e => {
+    const btn = e.target.closest('.adopt-detail-btn');
+    if (!btn) return;
+    _showAdoptDetail(btn.dataset.itemId);
+  });
 
   document.getElementById('diagAdoptBtn')?.addEventListener('click', async () => {
     if (_adoptRunning) return;
