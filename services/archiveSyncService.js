@@ -16,7 +16,12 @@ const fs     = require('fs');
 const path   = require('path');
 const crypto = require('crypto');
 
-const { acquireLock, releaseLock } = require('./archiveLockService');
+const {
+  acquireLock,
+  releaseLock,
+  renewLock,
+  LOCK_HEARTBEAT_INTERVAL_MS,
+} = require('./archiveLockService');
 
 const SKIP_DIRS  = new Set(['.autoingest', '__MACOSX']);
 const TMP_SUFFIX = '.autoingest-sync-tmp';
@@ -101,8 +106,13 @@ async function _copyFile(srcPath, destPath) {
  * Sync all files in localDir into archiveDir.
  * depth=0  → photographer folder (files + recurse into subdirs with depth=1)
  * depth=1  → subdir such as VIDEO (files only, no further recursion)
+ *
+ * abortSignal — optional { aborted: boolean, reason: string|null }.
+ * Checked before each entry; exits early without starting new file ops when set.
  */
-async function _syncDir(localDir, archiveDir, result, depth = 0) {
+async function _syncDir(localDir, archiveDir, result, depth = 0, abortSignal = null) {
+  if (abortSignal?.aborted) return;
+
   let entries;
   try {
     entries = await fsp.readdir(localDir, { withFileTypes: true });
@@ -112,12 +122,14 @@ async function _syncDir(localDir, archiveDir, result, depth = 0) {
   }
 
   for (const entry of entries) {
+    if (abortSignal?.aborted) return;
+
     const localPath   = path.join(localDir, entry.name);
     const archivePath = path.join(archiveDir, entry.name);
 
     if (entry.isDirectory()) {
       if (_skipDir(entry.name)) continue;
-      if (depth < 1) await _syncDir(localPath, archivePath, result, depth + 1);
+      if (depth < 1) await _syncDir(localPath, archivePath, result, depth + 1, abortSignal);
       continue;
     }
 
@@ -289,10 +301,40 @@ async function syncJob(job, { nasRoot, stagingRoot }) {
       continue;
     }
 
+    const abortSignal   = { aborted: false, reason: null };
+    const expectedOwner = {
+      jobId:      lockResult.lockData.jobId,
+      deviceName: lockResult.lockData.deviceName,
+    };
+
+    let heartbeatTimer = null;
+    heartbeatTimer = setInterval(() => {
+      renewLock(lockResult.lockPath, expectedOwner).then(r => {
+        if (!r.renewed) {
+          abortSignal.aborted = true;
+          abortSignal.reason  = r.reason;
+          clearInterval(heartbeatTimer);
+          heartbeatTimer = null;
+        }
+      }).catch(() => {
+        // I/O error on renewal — stop sync conservatively
+        abortSignal.aborted = true;
+        abortSignal.reason  = 'heartbeat-io-error';
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
+      });
+    }, LOCK_HEARTBEAT_INTERVAL_MS);
+
     try {
-      await _syncDir(localPhPath, archivePhPath, result);
+      await _syncDir(localPhPath, archivePhPath, result, 0, abortSignal);
     } finally {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
       await releaseLock(lockResult.lockPath);
+    }
+
+    if (abortSignal.aborted) {
+      result.errors.push(`Sync aborted for ${phFolderName}: lock lost (${abortSignal.reason})`);
     }
   }
 

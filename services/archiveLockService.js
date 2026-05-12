@@ -15,6 +15,7 @@
  *  - Stale locks (expiresAt past) may be overwritten.
  *  - Never delete another device's active lock.
  *  - Release is best-effort: ENOENT is not an error (already released).
+ *  - Heartbeat renews only locks owned by this job/device; never extends another's lock.
  */
 
 const fsp    = require('fs').promises;
@@ -22,8 +23,9 @@ const path   = require('path');
 const crypto = require('crypto');
 const os     = require('os');
 
-const LOCK_DIR_RELPATH = path.join('.autoingest', 'locks');
-const LOCK_TTL_MS      = 30 * 60 * 1000; // 30 minutes
+const LOCK_DIR_RELPATH       = path.join('.autoingest', 'locks');
+const LOCK_TTL_MS            = 30 * 60 * 1000; // 30 minutes
+const LOCK_HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes — must be < TTL
 
 /**
  * Deterministic lock key for a (collection, event, photographer) triple.
@@ -116,4 +118,53 @@ async function releaseLock(lockPath) {
   }
 }
 
-module.exports = { acquireLock, releaseLock };
+/**
+ * Renew a lock that this process already holds.
+ * Reads the current lock file, verifies ownership (jobId + deviceName), then
+ * writes an updated lastHeartbeatAt and expiresAt atomically.
+ *
+ * Returns { renewed: false } without throwing when:
+ *   - lock file is gone (ENOENT)          → reason: 'lock-missing'
+ *   - lock is no longer active            → reason: 'lock-inactive'
+ *   - jobId or deviceName does not match  → reason: 'ownership-mismatch'
+ *
+ * Throws only on unexpected I/O errors.
+ *
+ * @param {string} lockPath   Absolute path returned by acquireLock.
+ * @param {{ jobId: string, deviceName: string }} expectedOwner  Fields from lockData.
+ * @returns {Promise<{ renewed: boolean, reason?: string }>}
+ */
+async function renewLock(lockPath, { jobId, deviceName }) {
+  let existing;
+  try {
+    const raw = await fsp.readFile(lockPath, 'utf8');
+    existing  = JSON.parse(raw);
+  } catch (e) {
+    if (e.code === 'ENOENT') return { renewed: false, reason: 'lock-missing' };
+    throw e;
+  }
+
+  if (existing.status !== 'active') {
+    return { renewed: false, reason: 'lock-inactive' };
+  }
+  if (existing.jobId !== jobId || existing.deviceName !== deviceName) {
+    return { renewed: false, reason: 'ownership-mismatch' };
+  }
+
+  const now     = Date.now();
+  const renewed = { ...existing, lastHeartbeatAt: now, expiresAt: now + LOCK_TTL_MS };
+
+  const tmpPath = lockPath + '.tmp';
+  await fsp.writeFile(tmpPath, JSON.stringify(renewed, null, 2), 'utf8');
+  await fsp.rename(tmpPath, lockPath);
+
+  return { renewed: true };
+}
+
+module.exports = {
+  acquireLock,
+  releaseLock,
+  renewLock,
+  LOCK_TTL_MS,
+  LOCK_HEARTBEAT_INTERVAL_MS,
+};
