@@ -2570,6 +2570,8 @@ function _applySyncQueueTile(summary) {
 
   const ready     = summary?.ready          || 0;
   const attention = summary?.needsAttention || 0;
+  const failed    = summary?.failed         || 0;
+  const syncing   = summary?.syncing        || 0;
   const total     = summary?.total          || 0;
 
   valEl.textContent = String(total);
@@ -2579,13 +2581,15 @@ function _applySyncQueueTile(summary) {
       labelEl.textContent = 'Unsynced Events';
     } else {
       const parts = [];
+      if (syncing > 0)   parts.push(`${syncing} syncing`);
       if (ready > 0)     parts.push(`${ready} ready`);
       if (attention > 0) parts.push(`${attention} needs attention`);
+      if (failed > 0)    parts.push(`${failed} failed`);
       labelEl.textContent = parts.length ? parts.join(' · ') : 'Unsynced Events';
     }
   }
 
-  tileEl?.classList.toggle('ov-tile--warn', attention > 0);
+  tileEl?.classList.toggle('ov-tile--warn', attention > 0 || failed > 0);
 }
 
 let _sqRefreshBusy = false;
@@ -2629,19 +2633,30 @@ async function _sqOpen() {
 }
 
 async function _sqLoadQueue() {
-  const listEl   = document.getElementById('sqJobList');
+  const listEl    = document.getElementById('sqJobList');
   const summaryEl = document.getElementById('sqSummaryText');
+  const syncAllBtn = document.getElementById('sqSyncAllBtn');
   if (listEl) listEl.innerHTML = '<div class="sq-empty">Loading…</div>';
   try {
     const data    = await window.api.getSyncQueue();
     const jobs    = data.jobs || [];
     const ready   = jobs.filter(j => j.status === 'ready-for-sync').length;
     const attn    = jobs.filter(j => j.status === 'needs-attention').length;
+    const failed  = jobs.filter(j => j.status === 'sync-failed').length;
+    const syncing = jobs.filter(j => j.status === 'syncing').length;
     if (summaryEl) {
-      summaryEl.textContent = jobs.length === 0
-        ? 'No Local First imports found'
-        : `${jobs.length} event${jobs.length !== 1 ? 's' : ''} · ${ready} ready · ${attn} needs attention`;
+      if (jobs.length === 0) {
+        summaryEl.textContent = 'No Local First imports found';
+      } else {
+        const parts = [`${jobs.length} event${jobs.length !== 1 ? 's' : ''}`];
+        if (syncing > 0) parts.push(`${syncing} syncing`);
+        if (ready > 0)   parts.push(`${ready} ready`);
+        if (attn > 0)    parts.push(`${attn} needs attention`);
+        if (failed > 0)  parts.push(`${failed} failed`);
+        summaryEl.textContent = parts.join(' · ');
+      }
     }
+    if (syncAllBtn) syncAllBtn.style.display = ready > 0 ? 'block' : 'none';
     _sqRenderJobs(jobs);
   } catch {
     if (listEl) listEl.innerHTML = '<div class="sq-empty">Failed to load queue.</div>';
@@ -2658,6 +2673,9 @@ function _sqJobRow(job) {
     'needs-attention': 'Attention',
     'blocked':         'Blocked',
     'synced':          'Synced',
+    'syncing':         'Syncing…',
+    'waiting-for-lock': 'Waiting',
+    'sync-failed':     'Failed',
     'failed':          'Failed',
   }[job.status] || job.status;
 
@@ -2665,11 +2683,21 @@ function _sqJobRow(job) {
     ? 'Metadata disabled'
     : _sqEsc(job.reason || '');
 
+  let actionHtml = '<div class="sq-action"></div>';
+  if (job.status === 'ready-for-sync') {
+    actionHtml = `<div class="sq-action"><button type="button" class="sq-action-btn sq-sync-btn" data-jobid="${_sqEsc(job.jobId)}" aria-label="Sync now">Sync Now</button></div>`;
+  } else if (job.status === 'sync-failed' || job.status === 'waiting-for-lock') {
+    actionHtml = `<div class="sq-action"><button type="button" class="sq-action-btn sq-retry-btn" data-jobid="${_sqEsc(job.jobId)}" aria-label="Retry sync">Retry</button></div>`;
+  } else if (job.status === 'syncing') {
+    actionHtml = `<div class="sq-action"><button type="button" class="sq-action-btn" disabled>Syncing…</button></div>`;
+  }
+
   return `<div class="sq-row">
     <div class="sq-cell sq-event">${_sqEsc(job.event)}</div>
     <div class="sq-cell sq-coll">${_sqEsc(job.collection)}</div>
     <div class="sq-cell sq-status sq-status--${_sqEsc(job.status)}">${_sqEsc(statusLabel)}</div>
     <div class="sq-cell sq-reason">${reasonText}</div>
+    ${actionHtml}
   </div>`;
 }
 
@@ -2682,14 +2710,30 @@ function _sqRenderJobs(jobs) {
     return;
   }
 
-  const ready   = jobs.filter(j => j.status === 'ready-for-sync');
-  const attn    = jobs.filter(j => j.status === 'needs-attention');
-  const other   = jobs.filter(j => j.status !== 'ready-for-sync' && j.status !== 'needs-attention');
+  const syncing  = jobs.filter(j => j.status === 'syncing');
+  const ready    = jobs.filter(j => j.status === 'ready-for-sync');
+  const failed   = jobs.filter(j => j.status === 'sync-failed' || j.status === 'waiting-for-lock');
+  const attn     = jobs.filter(j => j.status === 'needs-attention');
+  const other    = jobs.filter(j =>
+    j.status !== 'syncing' &&
+    j.status !== 'ready-for-sync' &&
+    j.status !== 'sync-failed' &&
+    j.status !== 'waiting-for-lock' &&
+    j.status !== 'needs-attention'
+  );
 
   let html = '';
+  if (syncing.length) {
+    html += '<div class="sq-section-title">Syncing</div>';
+    html += syncing.map(_sqJobRow).join('');
+  }
   if (ready.length) {
     html += '<div class="sq-section-title">Ready for Sync</div>';
     html += ready.map(_sqJobRow).join('');
+  }
+  if (failed.length) {
+    html += '<div class="sq-section-title sq-section-title--err">Failed / Waiting</div>';
+    html += failed.map(_sqJobRow).join('');
   }
   if (attn.length) {
     html += '<div class="sq-section-title sq-section-title--warn">Needs Attention</div>';
@@ -2714,6 +2758,42 @@ document.getElementById('sqCloseBtn')?.addEventListener('click', _sqClose);
 document.getElementById('sqDoneBtn')?.addEventListener('click', _sqClose);
 document.getElementById('syncActivityModal')?.addEventListener('click', (e) => {
   if (e.target === document.getElementById('syncActivityModal')) _sqClose();
+});
+
+// Delegated click handler for Sync Now / Retry buttons
+document.getElementById('sqJobList')?.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.sq-sync-btn, .sq-retry-btn');
+  if (!btn || btn.disabled) return;
+  const jobId = btn.dataset.jobid;
+  if (!jobId) return;
+  btn.disabled = true;
+  btn.textContent = 'Starting…';
+  try {
+    await window.api.syncJobNow(jobId);
+    await _sqLoadQueue();
+    const summary = await window.api.getSyncQueueSummary().catch(() => null);
+    if (summary) _applySyncQueueTile(summary);
+  } catch {
+    btn.disabled = false;
+    btn.textContent = btn.classList.contains('sq-sync-btn') ? 'Sync Now' : 'Retry';
+  }
+});
+
+// Sync All Ready button
+document.getElementById('sqSyncAllBtn')?.addEventListener('click', async () => {
+  const btn = document.getElementById('sqSyncAllBtn');
+  if (!btn || btn.disabled) return;
+  btn.disabled = true;
+  btn.textContent = 'Syncing…';
+  try {
+    await window.api.syncAllReadyJobs();
+    await _sqLoadQueue();
+    const summary = await window.api.getSyncQueueSummary().catch(() => null);
+    if (summary) _applySyncQueueTile(summary);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Sync All Ready';
+  }
 });
 
 // Refresh button inside modal

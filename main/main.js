@@ -22,6 +22,7 @@ const nasEventCache       = require('../services/nasEventCache');
 const localMirrorService  = require('../services/localMirrorService');
 const localSyncManifest   = require('../services/localSyncManifest');
 const syncQueueService    = require('../services/syncQueueService');
+const archiveSyncService  = require('../services/archiveSyncService');
 const userManager   = require('./userManager');
 const { validateEventJson } = require('./contracts/dataValidator');
 const exifService         = require('./exifService');
@@ -33,6 +34,10 @@ const isMac = process.platform === 'darwin';
 // ── Constants ────────────────────────────────────────────────────────────────
 const POLL_INTERVAL_MS = 5000;
 const DEFAULT_DEST     = path.join(os.homedir(), 'Desktop', 'AutoIngestTest');
+
+// ── In-process sync guard ─────────────────────────────────────────────────────
+// Prevents duplicate concurrent syncJobNow calls for the same job.
+const _syncingJobIds = new Set();
 
 // ── Last imported file pairs for optional checksum verification ───────────────
 // Populated after each import; holds { src, dest } for every copied file.
@@ -1878,6 +1883,78 @@ ipcMain.handle('archive:refreshSyncQueue',    async () => syncQueueService.refre
 ipcMain.handle('archive:getSyncQueue',        async () => syncQueueService.getQueue());
 ipcMain.handle('archive:getSyncQueueSummary', async () => syncQueueService.getSummary());
 ipcMain.handle('archive:readSyncJob',         async (_event, jobId) => syncQueueService.getJob(jobId));
+
+// ── Background archive sync ───────────────────────────────────────────────────
+
+ipcMain.handle('archive:syncJobNow', async (_event, jobId) => {
+  if (!jobId || typeof jobId !== 'string') return { ok: false, error: 'Invalid jobId' };
+  if (_syncingJobIds.has(jobId)) return { ok: false, error: 'Already syncing' };
+
+  const job = await syncQueueService.getJob(jobId);
+  if (!job) return { ok: false, error: 'Job not found' };
+  if (job.status !== 'ready-for-sync' && job.status !== 'sync-failed' && job.status !== 'waiting-for-lock') {
+    return { ok: false, error: `Job not eligible for sync (status: ${job.status})` };
+  }
+
+  const nasRoot     = settings.getNasRoot();
+  const stagingRoot = settings.getLocalStagingRoot();
+  if (!nasRoot)     return { ok: false, error: 'Active Archive Root not configured' };
+  if (!stagingRoot) return { ok: false, error: 'Local Staging Root not configured' };
+
+  _syncingJobIds.add(jobId);
+  await syncQueueService.updateJob(jobId, { status: 'syncing', syncStartedAt: Date.now() });
+
+  try {
+    const syncResult = await archiveSyncService.syncJob(job, { nasRoot, stagingRoot });
+    await syncQueueService.updateJob(jobId, {
+      status:            syncResult.status,
+      syncResult,
+      syncedAt:          syncResult.syncedAt || null,
+      syncStartedAt:     syncResult.syncStartedAt,
+    });
+    return { ok: syncResult.ok, syncResult };
+  } catch (err) {
+    await syncQueueService.updateJob(jobId, { status: 'sync-failed', syncError: err.message });
+    return { ok: false, error: err.message };
+  } finally {
+    _syncingJobIds.delete(jobId);
+  }
+});
+
+ipcMain.handle('archive:syncAllReadyJobs', async () => {
+  const nasRoot     = settings.getNasRoot();
+  const stagingRoot = settings.getLocalStagingRoot();
+  if (!nasRoot)     return { ok: false, error: 'Active Archive Root not configured' };
+  if (!stagingRoot) return { ok: false, error: 'Local Staging Root not configured' };
+
+  const { jobs } = await syncQueueService.getQueue();
+  const eligible  = (jobs || []).filter(j => j.status === 'ready-for-sync');
+
+  const results = [];
+  for (const job of eligible) {
+    if (_syncingJobIds.has(job.jobId)) { results.push({ jobId: job.jobId, skipped: true }); continue; }
+
+    _syncingJobIds.add(job.jobId);
+    await syncQueueService.updateJob(job.jobId, { status: 'syncing', syncStartedAt: Date.now() });
+    try {
+      const syncResult = await archiveSyncService.syncJob(job, { nasRoot, stagingRoot });
+      await syncQueueService.updateJob(job.jobId, {
+        status:        syncResult.status,
+        syncResult,
+        syncedAt:      syncResult.syncedAt || null,
+        syncStartedAt: syncResult.syncStartedAt,
+      });
+      results.push({ jobId: job.jobId, status: syncResult.status });
+    } catch (err) {
+      await syncQueueService.updateJob(job.jobId, { status: 'sync-failed', syncError: err.message });
+      results.push({ jobId: job.jobId, status: 'sync-failed', error: err.message });
+    } finally {
+      _syncingJobIds.delete(job.jobId);
+    }
+  }
+
+  return { ok: true, processed: results.length, results };
+});
 
 // ── EXIF metadata service ─────────────────────────────────────────────────────
 

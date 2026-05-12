@@ -118,8 +118,9 @@ async function refreshQueue() {
       const jobId = _jobId(localEventPath);
       const prev  = existingMap[jobId];
 
-      // Preserve externally-set terminal statuses across refreshes
-      const preserveStatus = prev && (prev.status === 'synced' || prev.status === 'failed');
+      // Preserve terminal statuses set by sync operations; reset live-operation states
+      const TERMINAL = new Set(['synced', 'sync-failed', 'needs-attention']);
+      const preserveStatus = prev && TERMINAL.has(prev.status);
 
       jobs.push({
         jobId,
@@ -156,7 +157,7 @@ async function getQueue() {
 
 /**
  * Return lightweight summary counts only.
- * @returns {{ ready: number, needsAttention: number, total: number, refreshedAt: number|null }}
+ * @returns {{ ready: number, needsAttention: number, syncing: number, failed: number, total: number, refreshedAt: number|null }}
  */
 async function getSummary() {
   const { jobs, refreshedAt } = await _loadRaw();
@@ -164,6 +165,8 @@ async function getSummary() {
   return {
     ready:          arr.filter(j => j.status === 'ready-for-sync').length,
     needsAttention: arr.filter(j => j.status === 'needs-attention').length,
+    syncing:        arr.filter(j => j.status === 'syncing').length,
+    failed:         arr.filter(j => j.status === 'sync-failed').length,
     total:          arr.length,
     refreshedAt,
   };
@@ -179,4 +182,23 @@ async function getJob(jobId) {
   return (jobs || []).find(j => j.jobId === jobId) || null;
 }
 
-module.exports = { refreshQueue, getQueue, getSummary, getJob };
+/**
+ * Atomically update a job in the persisted queue.
+ * Merges `updates` into the matching job and saves.
+ * No-op if jobId not found.
+ *
+ * @param {string} jobId
+ * @param {object} updates  Partial job fields to merge
+ * @returns {Promise<boolean>}  true if job was found and saved
+ */
+async function updateJob(jobId, updates) {
+  const data = await _loadRaw();
+  const jobs = data.jobs || [];
+  const idx  = jobs.findIndex(j => j.jobId === jobId);
+  if (idx === -1) return false;
+  jobs[idx] = { ...jobs[idx], ...updates };
+  await _saveRaw({ ...data, jobs });
+  return true;
+}
+
+module.exports = { refreshQueue, getQueue, getSummary, getJob, updateJob };
