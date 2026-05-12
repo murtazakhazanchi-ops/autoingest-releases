@@ -24,8 +24,9 @@ const localSyncManifest   = require('../services/localSyncManifest');
 const syncQueueService    = require('../services/syncQueueService');
 const archiveSyncService  = require('../services/archiveSyncService');
 const archiveLockService      = require('../services/archiveLockService');
-const transferExportService   = require('../services/transferExportService');
-const transferImportService   = require('../services/transferImportService');
+const transferExportService      = require('../services/transferExportService');
+const transferImportService      = require('../services/transferImportService');
+const archiveDiagnosticsService  = require('../services/archiveDiagnosticsService');
 const userManager   = require('./userManager');
 const { validateEventJson } = require('./contracts/dataValidator');
 const exifService         = require('./exifService');
@@ -2677,6 +2678,12 @@ ipcMain.handle('archive:runTransferImport', async (_event, { scope, operatorName
 });
 
 ipcMain.handle('archive:getTransferImportStatus', () => transferImportService.getImportStatus());
+
+// ── Archive Diagnostics (Phase 13A — read-only) ───────────────────────────────
+
+ipcMain.handle('archive:runDiagnostics',       async (_event, { scope } = {}) => archiveDiagnosticsService.runDiagnostics(scope));
+ipcMain.handle('archive:getDiagnosticsStatus', ()                              => archiveDiagnosticsService.getDiagnosticsStatus());
+ipcMain.handle('archive:getDiagnosticsReport', ()                              => archiveDiagnosticsService.getDiagnosticsReport());
 
 ipcMain.handle('window:minimize', () => {
   BrowserWindow.getFocusedWindow()?.minimize();

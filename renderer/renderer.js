@@ -9950,3 +9950,203 @@ document.addEventListener('keydown', e => {
   document.getElementById('tiImportBtn')?.addEventListener('click', _tiStartImport);
 
 })();
+
+// ── Archive Diagnostics (Phase 13A — read-only) ──────────────────────────────
+(function () {
+  'use strict';
+
+  // No module-level report cache — report lives in local scope only (arch reviewer constraint)
+  let _diagRunning = false;
+  let _diagPoll    = null;
+
+  const CATEGORY_LABELS = {
+    'archive-root':    'Archive Root',
+    'event-structure': 'Event Structure',
+    'metadata-index':  'Metadata',
+    'locks':           'Locks',
+    'temp-files':      'Temp Files',
+    'sync-queue':      'Sync Queue',
+    'transfer':        'Transfer',
+    'external-folder': 'External Folders',
+  };
+  const CATEGORY_ORDER = [
+    'archive-root', 'event-structure', 'metadata-index',
+    'locks', 'temp-files', 'sync-queue', 'transfer', 'external-folder',
+  ];
+
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+
+  function _esc(s) {
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function _diagClose() {
+    document.getElementById('archiveDiagnosticsModal')?.classList.remove('open');
+    _stopPoll();
+  }
+
+  function _startPoll() {
+    if (_diagPoll) return;
+    _diagPoll = setInterval(_pollOnce, 1200);
+  }
+
+  function _stopPoll() {
+    if (_diagPoll) { clearInterval(_diagPoll); _diagPoll = null; }
+  }
+
+  // ── Rendering ───────────────────────────────────────────────────────────────
+
+  function _renderReport(status, report) {
+    const result = status.result || {};
+
+    const statusEl = document.getElementById('diagStatusText');
+    statusEl.className = 'diag-status-done';
+    statusEl.textContent = status.completedAt
+      ? `Completed at ${new Date(status.completedAt).toLocaleTimeString()}.`
+      : 'Complete.';
+
+    const bar = document.getElementById('diagSummaryBar');
+    bar.hidden = false;
+    document.getElementById('diagBadgeErrors').textContent   = `${result.errors   || 0} error${result.errors   !== 1 ? 's' : ''}`;
+    document.getElementById('diagBadgeWarnings').textContent = `${result.warnings || 0} warning${result.warnings !== 1 ? 's' : ''}`;
+    document.getElementById('diagBadgeInfos').textContent    = `${result.infos    || 0} info`;
+    document.getElementById('diagTruncatedNote').hidden      = !result.truncated;
+
+    const list = document.getElementById('diagList');
+    const items = report && Array.isArray(report.items) ? report.items : [];
+
+    if (items.length === 0) {
+      list.innerHTML = '<div class="sq-empty">No issues detected across all scanned roots.</div>';
+      return;
+    }
+
+    const groups = {};
+    for (const item of items) {
+      if (!groups[item.category]) groups[item.category] = [];
+      groups[item.category].push(item);
+    }
+
+    const orderedKeys = [
+      ...CATEGORY_ORDER.filter(k => groups[k]),
+      ...Object.keys(groups).filter(k => !CATEGORY_ORDER.includes(k)),
+    ];
+
+    let html = '';
+    for (const cat of orderedKeys) {
+      const catItems = groups[cat] || [];
+      const label = CATEGORY_LABELS[cat] || cat;
+      html += `<div class="diag-group-header">${_esc(label)} (${catItems.length})</div>`;
+      for (const item of catItems) {
+        const sevClass     = item.severity === 'error'   ? 'diag-item-error'
+                           : item.severity === 'warning' ? 'diag-item-warning'
+                           :                               'diag-item-info';
+        const sevTextClass = item.severity === 'error'   ? 'diag-item-sev-error'
+                           : item.severity === 'warning' ? 'diag-item-sev-warning'
+                           :                               'diag-item-sev-info';
+        html += `<div class="diag-item ${sevClass}">
+  <div class="diag-item-header">
+    <span class="diag-item-sev ${sevTextClass}">${_esc(item.severity)}</span>
+    <span class="diag-item-title">${_esc(item.title)}</span>
+  </div>
+  ${item.message           ? `<div class="diag-item-msg">${_esc(item.message)}</div>` : ''}
+  ${item.recommendedAction ? `<div class="diag-item-action">→ ${_esc(item.recommendedAction)}</div>` : ''}
+</div>`;
+      }
+    }
+    list.innerHTML = html;
+  }
+
+  // ── Polling ───────────────────────────────────────────────────────────────────
+
+  async function _pollOnce() {
+    const status = await window.api.getDiagnosticsStatus().catch(() => null);
+    if (!status) return;
+    if (!status.running) {
+      _diagRunning = false;
+      _stopPoll();
+      const report = await window.api.getDiagnosticsReport().catch(() => null);
+      _renderReport(status, report);
+      const btn = document.getElementById('diagRunBtn');
+      if (btn) { btn.disabled = false; btn.textContent = 'Run Diagnostics'; }
+    } else {
+      const statusEl = document.getElementById('diagStatusText');
+      if (statusEl) {
+        statusEl.className   = 'diag-status-running';
+        statusEl.textContent = `Scanning… ${status.itemCount} item${status.itemCount !== 1 ? 's' : ''} found so far.`;
+      }
+    }
+  }
+
+  // ── Open ──────────────────────────────────────────────────────────────────────
+
+  async function _diagOpen() {
+    document.getElementById('archiveDiagnosticsModal')?.classList.add('open');
+
+    const status = await window.api.getDiagnosticsStatus().catch(() => null);
+    if (!status) return;
+
+    if (status.running) {
+      _diagRunning = true;
+      const btn = document.getElementById('diagRunBtn');
+      if (btn) { btn.disabled = true; btn.textContent = 'Running…'; }
+      const statusEl = document.getElementById('diagStatusText');
+      if (statusEl) {
+        statusEl.className   = 'diag-status-running';
+        statusEl.textContent = `Scanning… ${status.itemCount} items found.`;
+      }
+      _startPoll();
+    } else if (status.completedAt && status.result) {
+      const report = await window.api.getDiagnosticsReport().catch(() => null);
+      _renderReport(status, report);
+    }
+  }
+
+  // ── Event listeners ───────────────────────────────────────────────────────────
+
+  document.getElementById('alocDiagnosticsBtn')?.addEventListener('click', () => {
+    _alocClose();
+    _diagOpen();
+  });
+
+  document.getElementById('diagRunBtn')?.addEventListener('click', async () => {
+    if (_diagRunning) return;
+    _diagRunning = true;
+
+    const btn      = document.getElementById('diagRunBtn');
+    const statusEl = document.getElementById('diagStatusText');
+    const list     = document.getElementById('diagList');
+    const bar      = document.getElementById('diagSummaryBar');
+
+    if (btn)      { btn.disabled = true; btn.textContent = 'Running…'; }
+    if (statusEl) { statusEl.className = 'diag-status-running'; statusEl.textContent = 'Starting scan…'; }
+    if (bar)      { bar.hidden = true; }
+    if (list)     { list.innerHTML = '<div class="sq-empty">Scanning…</div>'; }
+
+    const res = await window.api.runDiagnostics('allConfiguredRoots').catch(() => null);
+    if (!res || !res.ok) {
+      _diagRunning = false;
+      if (btn)      { btn.disabled = false; btn.textContent = 'Run Diagnostics'; }
+      if (statusEl) {
+        statusEl.className   = 'diag-status-done';
+        statusEl.textContent = (res && res.reason === 'busy')
+          ? 'A scan is already running.'
+          : 'Failed to start diagnostics.';
+      }
+      return;
+    }
+    _startPoll();
+  });
+
+  document.getElementById('diagCloseBtn')?.addEventListener('click', _diagClose);
+  document.getElementById('diagDoneBtn')?.addEventListener('click',  _diagClose);
+
+  document.getElementById('archiveDiagnosticsModal')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('archiveDiagnosticsModal')) _diagClose();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.getElementById('archiveDiagnosticsModal')?.classList.contains('open')) {
+      _diagClose();
+    }
+  });
+})();

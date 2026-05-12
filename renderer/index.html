@@ -897,6 +897,33 @@
     .tx-status-current { color: var(--subtext); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
     .tx-empty-note { font-size: 12px; color: var(--subtext); font-style: italic; padding: 4px 0; }
 
+    /* ── Archive Diagnostics modal (Phase 13A) ── */
+    #archiveDiagnosticsModal .emm-box { width: min(640px, calc(100vw - 48px)); height: calc(100vh - 120px); display: flex; flex-direction: column; }
+    .diag-body { flex: 1; overflow: hidden; display: flex; flex-direction: column; padding: 16px 24px 8px; gap: 12px; min-height: 0; }
+    .diag-status-row { font-size: 12px; color: var(--subtext); flex-shrink: 0; }
+    .diag-status-running { color: var(--accent, #6366f1); }
+    .diag-status-done    { color: var(--text); }
+    .diag-summary-bar    { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex-shrink: 0; }
+    .diag-badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; }
+    .diag-badge-error { background: rgba(239,68,68,0.12); color: #ef4444; }
+    .diag-badge-warn  { background: rgba(234,179,8,0.12);  color: #ca8a04; }
+    .diag-badge-info  { background: rgba(99,102,241,0.12); color: var(--accent, #6366f1); }
+    .diag-truncated-note { font-size: 11px; color: var(--subtext); opacity: 0.7; }
+    .diag-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; min-height: 0; padding-bottom: 4px; }
+    .diag-group-header { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--subtext); padding: 10px 2px 3px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .diag-item { display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; border-radius: 6px; background: var(--card-bg, rgba(255,255,255,0.03)); border: 1px solid var(--border); }
+    .diag-item-error   { border-left: 3px solid #ef4444; }
+    .diag-item-warning { border-left: 3px solid #eab308; }
+    .diag-item-info    { border-left: 3px solid var(--accent, #6366f1); }
+    .diag-item-header { display: flex; align-items: center; gap: 8px; }
+    .diag-item-sev { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; min-width: 52px; }
+    .diag-item-sev-error   { color: #ef4444; }
+    .diag-item-sev-warning { color: #ca8a04; }
+    .diag-item-sev-info    { color: var(--accent, #6366f1); }
+    .diag-item-title  { font-size: 13px; font-weight: 500; color: var(--text); }
+    .diag-item-msg    { font-size: 11px; color: var(--subtext); line-height: 1.45; word-break: break-all; }
+    .diag-item-action { font-size: 11px; color: var(--subtext); opacity: 0.7; font-style: italic; }
+
     #activityLogModal .emm-box { height: calc(100vh - 80px); }
     #alTitle { font-size: 18px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.01em; }
     #alBody {
@@ -6910,6 +6937,7 @@
         <div style="display:flex;gap:6px;margin-right:auto">
           <button type="button" class="emm-btn-secondary" id="alocTransferExportBtn">Transfer Export…</button>
           <button type="button" class="emm-btn-secondary" id="alocTransferImportBtn">Transfer Import…</button>
+          <button type="button" class="emm-btn-secondary" id="alocDiagnosticsBtn">Diagnostics…</button>
         </div>
         <div class="emm-footer-right">
           <button type="button" class="emm-btn-secondary" id="alocCancelBtn">Cancel</button>
@@ -7057,6 +7085,45 @@
           <button type="button" class="emm-btn-secondary" id="tiPreviewBtn">Preview</button>
           <button type="button" class="emm-btn-primary"   id="tiImportBtn" disabled>Import</button>
           <button type="button" class="emm-btn-secondary" id="tiDoneBtn">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Archive Diagnostics modal (Phase 13A — read-only) -->
+  <div id="archiveDiagnosticsModal" class="emm-overlay" role="dialog" aria-modal="true" aria-labelledby="diagTitle">
+    <div class="emm-box">
+      <div class="emm-topbar">
+        <span class="emm-topbar-title" id="diagTitle">Archive Diagnostics</span>
+        <button type="button" class="emm-close-btn" id="diagCloseBtn" aria-label="Close">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="diag-body">
+
+        <div class="diag-status-row">
+          <span id="diagStatusText">Idle — click Run Diagnostics to inspect all configured archive roots.</span>
+        </div>
+
+        <div id="diagSummaryBar" class="diag-summary-bar" hidden>
+          <span class="diag-badge diag-badge-error"   id="diagBadgeErrors">0 errors</span>
+          <span class="diag-badge diag-badge-warn"    id="diagBadgeWarnings">0 warnings</span>
+          <span class="diag-badge diag-badge-info"    id="diagBadgeInfos">0 info</span>
+          <span class="diag-truncated-note"           id="diagTruncatedNote" hidden>· Report truncated at 500 items</span>
+        </div>
+
+        <div id="diagList" class="diag-list">
+          <div class="sq-empty">Run diagnostics to inspect all configured archive roots.</div>
+        </div>
+
+      </div>
+
+      <div class="emm-footer">
+        <span class="sq-footer-note">Read-only inspection — no files are modified.</span>
+        <div class="emm-footer-right">
+          <button type="button" class="emm-btn-primary"    id="diagRunBtn">Run Diagnostics</button>
+          <button type="button" class="emm-btn-secondary"  id="diagDoneBtn">Done</button>
         </div>
       </div>
     </div>

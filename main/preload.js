@@ -239,6 +239,11 @@ contextBridge.exposeInMainWorld('api', {
   runTransferImport:           (scope, operatorName)     => ipcRenderer.invoke('archive:runTransferImport',      { scope, operatorName }),
   getTransferImportStatus:     ()                        => ipcRenderer.invoke('archive:getTransferImportStatus'),
 
+  // ── Archive Diagnostics ──
+  runDiagnostics:          (scope) => ipcRenderer.invoke('archive:runDiagnostics',       { scope }),
+  getDiagnosticsStatus:    ()      => ipcRenderer.invoke('archive:getDiagnosticsStatus'),
+  getDiagnosticsReport:    ()      => ipcRenderer.invoke('archive:getDiagnosticsReport'),
+
   // ── EXIF metadata service ──
   getMetadataStatus:      (batchId)            => ipcRenderer.invoke('metadata:getStatus',     batchId),
   retryMetadata:          (batchId)            => ipcRenderer.invoke('metadata:retry',          batchId),
