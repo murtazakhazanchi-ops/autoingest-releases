@@ -196,6 +196,8 @@ contextBridge.exposeInMainWorld('api', {
   setLocalStagingRoot:        (v)   => ipcRenderer.invoke('archive:setLocalStagingRoot', v),
   validateLocalStagingRoot:   (v)   => ipcRenderer.invoke('archive:validateLocalStagingRoot', v),
   setDefaultImportMode:       (v)   => ipcRenderer.invoke('archive:setDefaultImportMode', v),
+  setMainArchiveRoot:         (v)   => ipcRenderer.invoke('archive:setMainArchiveRoot', v),
+  validateMainArchiveRoot:    (v)   => ipcRenderer.invoke('archive:validateMainArchiveRoot', v),
   getDeviceIdentity:          ()    => ipcRenderer.invoke('archive:getDeviceIdentity'),
 
   // ── Archive NAS Event List ──

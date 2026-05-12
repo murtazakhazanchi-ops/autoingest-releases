@@ -1671,6 +1671,32 @@ ipcMain.handle('archive:setNasRoot', async (_event, value) => {
   await settings.setNasRoot(value);
 });
 
+ipcMain.handle('archive:setMainArchiveRoot', async (_event, value) => {
+  await settings.setMainArchiveRoot(value);
+});
+
+ipcMain.handle('archive:validateMainArchiveRoot', async (_event, dirPath) => {
+  if (!dirPath || typeof dirPath !== 'string') return { valid: false, reason: 'no-path' };
+  // Two-phase check: stat first (offline vs no-marker distinction)
+  try {
+    const stat = await fsp.stat(dirPath);
+    if (!stat.isDirectory()) return { valid: false, reason: 'not-directory' };
+  } catch (err) {
+    return { valid: false, reason: 'offline' };
+  }
+  // Directory reachable — check for archive marker
+  try {
+    const markerPath = path.join(dirPath, '.autoingest', 'root', 'archive-root.json');
+    const raw    = await fsp.readFile(markerPath, 'utf8');
+    const marker = JSON.parse(raw);
+    if (marker.type !== 'autoingest-nas-root') return { valid: false, reason: 'wrong-marker-type' };
+    return { valid: true, archiveName: marker.archiveName || null };
+  } catch (err) {
+    if (err.code === 'EACCES' || err.code === 'EPERM') return { valid: false, reason: 'no-access' };
+    return { valid: false, reason: 'no-marker' };
+  }
+});
+
 ipcMain.handle('archive:setLocalStagingRoot', async (_event, value) => {
   await settings.setLocalStagingRoot(value);
 });
@@ -1725,22 +1751,23 @@ ipcMain.handle('archive:getOperationsStatus', async () => {
   const nasRoot          = settings.getNasRoot();
   const localStagingRoot = settings.getLocalStagingRoot();
   const defaultImportMode = settings.getDefaultImportMode();
+  const mainArchiveRoot  = settings.getMainArchiveRoot();
 
   if (!nasRoot) {
-    return { status: 'nas-not-set', nasRoot, localStagingRoot, defaultImportMode };
+    return { status: 'nas-not-set', nasRoot, localStagingRoot, defaultImportMode, mainArchiveRoot };
   }
 
   // Quick reachability check (stat the root directory)
   try {
     const stat = await fsp.stat(nasRoot);
     if (!stat.isDirectory()) {
-      return { status: 'invalid-nas', nasRoot, localStagingRoot, defaultImportMode };
+      return { status: 'invalid-nas', nasRoot, localStagingRoot, defaultImportMode, mainArchiveRoot };
     }
   } catch (err) {
     if (err.code === 'ENOENT' || err.code === 'ENOTCONN' || err.code === 'EIO') {
-      return { status: 'nas-disconnected', nasRoot, localStagingRoot, defaultImportMode };
+      return { status: 'nas-disconnected', nasRoot, localStagingRoot, defaultImportMode, mainArchiveRoot };
     }
-    return { status: 'invalid-nas', nasRoot, localStagingRoot, defaultImportMode };
+    return { status: 'invalid-nas', nasRoot, localStagingRoot, defaultImportMode, mainArchiveRoot };
   }
 
   // Validate marker
@@ -1749,17 +1776,17 @@ ipcMain.handle('archive:getOperationsStatus', async () => {
     const raw = await fsp.readFile(markerPath, 'utf8');
     const marker = JSON.parse(raw);
     if (marker.type !== 'autoingest-nas-root') {
-      return { status: 'invalid-nas', nasRoot, localStagingRoot, defaultImportMode };
+      return { status: 'invalid-nas', nasRoot, localStagingRoot, defaultImportMode, mainArchiveRoot };
     }
   } catch {
-    return { status: 'invalid-nas', nasRoot, localStagingRoot, defaultImportMode };
+    return { status: 'invalid-nas', nasRoot, localStagingRoot, defaultImportMode, mainArchiveRoot };
   }
 
   if (defaultImportMode === 'local-first' && !localStagingRoot) {
-    return { status: 'local-staging-missing', nasRoot, localStagingRoot, defaultImportMode };
+    return { status: 'local-staging-missing', nasRoot, localStagingRoot, defaultImportMode, mainArchiveRoot };
   }
 
-  return { status: 'ready', nasRoot, localStagingRoot, defaultImportMode };
+  return { status: 'ready', nasRoot, localStagingRoot, defaultImportMode, mainArchiveRoot };
 });
 
 // ── Archive — NAS Event List ──────────────────────────────────────────────────

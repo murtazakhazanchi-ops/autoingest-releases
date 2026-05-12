@@ -2291,6 +2291,7 @@ document.getElementById('alCloseFooterBtn')?.addEventListener('click', _alClose)
 let _alocPendingNasRoot      = undefined; // undefined = no change pending
 let _alocPendingStagingRoot  = undefined;
 let _alocPendingImportMode   = undefined;
+let _alocPendingMainNasRoot  = undefined;
 
 function _alocClose() {
   document.getElementById('archiveLocationsModal')?.classList.remove('open');
@@ -2298,6 +2299,7 @@ function _alocClose() {
   _alocPendingNasRoot     = undefined;
   _alocPendingStagingRoot = undefined;
   _alocPendingImportMode  = undefined;
+  _alocPendingMainNasRoot = undefined;
 }
 
 async function _alocOpen() {
@@ -2313,6 +2315,7 @@ async function _alocOpen() {
   _alocPendingNasRoot     = undefined;
   _alocPendingStagingRoot = undefined;
   _alocPendingImportMode  = undefined;
+  _alocPendingMainNasRoot = undefined;
 
   // Populate NAS path
   const nasEl = document.getElementById('alocNasPath');
@@ -2323,6 +2326,18 @@ async function _alocOpen() {
     } else {
       nasEl.textContent = 'Not set';
       nasEl.classList.add('aloc-unset');
+    }
+  }
+
+  // Populate Main Archive Root path
+  const mainNasEl = document.getElementById('alocMainNasPath');
+  if (mainNasEl) {
+    if (status.mainArchiveRoot) {
+      mainNasEl.textContent = status.mainArchiveRoot;
+      mainNasEl.classList.remove('aloc-unset');
+    } else {
+      mainNasEl.textContent = 'Not set';
+      mainNasEl.classList.add('aloc-unset');
     }
   }
 
@@ -2339,8 +2354,19 @@ async function _alocOpen() {
   }
 
   // Validation hints
-  document.getElementById('alocNasValidation').textContent     = '';
-  document.getElementById('alocStagingValidation').textContent = '';
+  const alocNasVal     = document.getElementById('alocNasValidation');
+  const alocStagingVal = document.getElementById('alocStagingValidation');
+  const alocMainNasVal = document.getElementById('alocMainNasValidation');
+  if (alocNasVal)     alocNasVal.textContent     = '';
+  if (alocStagingVal) alocStagingVal.textContent = '';
+  if (alocMainNasVal) alocMainNasVal.textContent = '';
+
+  // Validate main archive root on open if path is saved (fire-and-forget)
+  if (status.mainArchiveRoot) {
+    window.api.validateMainArchiveRoot(status.mainArchiveRoot).then(result => {
+      _alocShowMainNasValidation('alocMainNasValidation', result);
+    }).catch(() => {});
+  }
 
   // Import mode buttons
   const mode = status.defaultImportMode || 'direct-nas';
@@ -2373,6 +2399,28 @@ function _alocShowValidation(elId, result) {
       'not-found':        'Path not found',
     };
     el.textContent = '✗ ' + (msgs[result.reason] || result.message || 'Invalid');
+    el.className = 'aloc-validation err';
+  }
+}
+
+// Helper: display Main Archive Root validation with status-string labels
+function _alocShowMainNasValidation(elId, result) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  if (!result) { el.textContent = ''; el.className = 'aloc-validation'; return; }
+  if (result.valid) {
+    el.textContent = result.archiveName ? `Connected — ${result.archiveName}` : 'Connected';
+    el.className = 'aloc-validation ok';
+  } else {
+    const msgs = {
+      'offline':           'Offline',
+      'no-marker':         'Invalid archive',
+      'wrong-marker-type': 'Invalid archive',
+      'not-directory':     'Invalid archive',
+      'no-access':         'No access',
+      'no-path':           'No path set',
+    };
+    el.textContent = msgs[result.reason] || 'Invalid archive';
     el.className = 'aloc-validation err';
   }
 }
@@ -2417,6 +2465,26 @@ document.getElementById('alocStagingClearBtn')?.addEventListener('click', () => 
   document.getElementById('alocStagingValidation').className   = 'aloc-validation';
 });
 
+// Main Archive Root choose
+document.getElementById('alocMainNasChooseBtn')?.addEventListener('click', async () => {
+  const chosen = await window.api.chooseArchiveRoot();
+  if (!chosen) return;
+  const mainNasEl = document.getElementById('alocMainNasPath');
+  if (mainNasEl) { mainNasEl.textContent = chosen; mainNasEl.classList.remove('aloc-unset'); }
+  _alocPendingMainNasRoot = chosen;
+  const result = await window.api.validateMainArchiveRoot(chosen);
+  _alocShowMainNasValidation('alocMainNasValidation', result);
+});
+
+// Main Archive Root clear
+document.getElementById('alocMainNasClearBtn')?.addEventListener('click', () => {
+  const mainNasEl = document.getElementById('alocMainNasPath');
+  if (mainNasEl) { mainNasEl.textContent = 'Not set'; mainNasEl.classList.add('aloc-unset'); }
+  _alocPendingMainNasRoot = null;
+  document.getElementById('alocMainNasValidation').textContent = '';
+  document.getElementById('alocMainNasValidation').className   = 'aloc-validation';
+});
+
 // Import mode toggle
 document.getElementById('alocModeDirectNas')?.addEventListener('click', () => {
   document.getElementById('alocModeDirectNas')?.classList.add('active');
@@ -2436,6 +2504,7 @@ document.getElementById('alocSaveBtn')?.addEventListener('click', async () => {
   if (_alocPendingNasRoot !== undefined)     saves.push(window.api.setNasRoot(_alocPendingNasRoot));
   if (_alocPendingStagingRoot !== undefined) saves.push(window.api.setLocalStagingRoot(_alocPendingStagingRoot));
   if (_alocPendingImportMode !== undefined)  saves.push(window.api.setDefaultImportMode(_alocPendingImportMode));
+  if (_alocPendingMainNasRoot !== undefined) saves.push(window.api.setMainArchiveRoot(_alocPendingMainNasRoot));
   if (saves.length > 0) await Promise.all(saves);
   _alocClose();
   _updateSystemStatus();

@@ -370,6 +370,33 @@ async function setDefaultImportMode(value) {
 }
 
 /**
+ * Returns the Main Archive Root path (permanent office archive), or null if never set.
+ * @returns {string | null}
+ */
+function getMainArchiveRoot() {
+  if (!_loaded) init();
+  const v = _state.mainArchiveRoot;
+  return (typeof v === 'string' && v.length > 0) ? v : null;
+}
+
+/**
+ * Persists the Main Archive Root path. Pass null or '' to clear.
+ * @param {string | null} value
+ * @returns {Promise<void>}
+ */
+async function setMainArchiveRoot(value) {
+  if (!_loaded) init();
+  if (value === null || value === '') {
+    delete _state.mainArchiveRoot;
+  } else if (typeof value === 'string') {
+    _state.mainArchiveRoot = value;
+  } else {
+    throw new Error('setMainArchiveRoot: expected string or null');
+  }
+  await _save();
+}
+
+/**
  * Returns the Transfer Drive root path, or null if never set.
  * @returns {string | null}
  */
@@ -407,5 +434,6 @@ module.exports = {
   getNasRoot, setNasRoot,
   getLocalStagingRoot, setLocalStagingRoot,
   getDefaultImportMode, setDefaultImportMode,
+  getMainArchiveRoot, setMainArchiveRoot,
   getTransferRoot, setTransferRoot,
 };

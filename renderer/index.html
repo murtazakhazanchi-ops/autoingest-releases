@@ -855,6 +855,7 @@
     .aloc-mode-wrap { display: flex; gap: 10px; }
     .aloc-mode-btn { flex: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--btn-bg, rgba(255,255,255,0.07)); color: var(--subtext); cursor: pointer; font-size: 13px; text-align: center; transition: all 0.15s; }
     .aloc-mode-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(var(--accent-rgb, 99,102,241),0.1); }
+    .aloc-helper { font-size: 12px; color: var(--subtext); }
     .aloc-device-row { display: flex; align-items: center; gap: 8px; padding: 10px 0 4px; border-top: 1px solid var(--divider-color); margin-top: 4px; }
     .aloc-device-label { font-size: 12px; color: var(--subtext); }
     .aloc-device-name  { font-size: 12px; font-weight: 600; color: var(--text); }
@@ -6862,6 +6863,18 @@
             <button type="button" class="aloc-btn" id="alocNasClearBtn">Clear</button>
           </div>
           <div class="aloc-validation" id="alocNasValidation"></div>
+        </div>
+
+        <!-- Main Archive Root -->
+        <div class="aloc-row">
+          <span class="aloc-label">Main Archive Root</span>
+          <span class="aloc-helper">Permanent archive — destination for transfer-drive import.</span>
+          <div class="aloc-path-wrap">
+            <div class="aloc-path-display aloc-unset" id="alocMainNasPath">Not set</div>
+            <button type="button" class="aloc-btn" id="alocMainNasChooseBtn">Choose…</button>
+            <button type="button" class="aloc-btn" id="alocMainNasClearBtn">Clear</button>
+          </div>
+          <div class="aloc-validation" id="alocMainNasValidation"></div>
         </div>
 
         <!-- Local Staging Root -->
