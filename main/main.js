@@ -27,6 +27,7 @@ const archiveLockService      = require('../services/archiveLockService');
 const transferExportService      = require('../services/transferExportService');
 const transferImportService      = require('../services/transferImportService');
 const archiveDiagnosticsService  = require('../services/archiveDiagnosticsService');
+const archiveRepairService       = require('../services/archiveRepairService');
 const userManager   = require('./userManager');
 const { validateEventJson } = require('./contracts/dataValidator');
 const exifService         = require('./exifService');
@@ -2694,6 +2695,19 @@ ipcMain.handle('archive:releaseStaleLock', async (_event, { lockPath } = {}) => 
   const configuredRoots = [nas, main].filter(Boolean);
   if (configuredRoots.length === 0) return { ok: false, reason: 'no-configured-roots' };
   return archiveLockService.releaseStaleLock(lockPath, configuredRoots);
+});
+
+// ── Archive Diagnostics — Temp File Cleanup (Phase 13B-2) ────────────────────
+
+ipcMain.handle('archive:cleanupTempFile', async (_event, { tempPath } = {}) => {
+  if (!tempPath || typeof tempPath !== 'string') return { ok: false, reason: 'invalid-path' };
+  const nas   = settings.getNasRoot();
+  const local = settings.getLocalStagingRoot();
+  const tx    = settings.getTransferRoot();
+  const main  = settings.getMainArchiveRoot();
+  const configuredRoots = [nas, local, tx, main].filter(Boolean);
+  if (configuredRoots.length === 0) return { ok: false, reason: 'outside-configured-root' };
+  return archiveRepairService.cleanupTempFile(tempPath, configuredRoots);
 });
 
 ipcMain.handle('window:minimize', () => {

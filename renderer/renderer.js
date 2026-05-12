@@ -9977,7 +9977,7 @@ document.addEventListener('keydown', e => {
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
   function _esc(s) {
-    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
   function _diagClose() {
@@ -10044,6 +10044,7 @@ document.addEventListener('keydown', e => {
                            : item.severity === 'warning' ? 'diag-item-sev-warning'
                            :                               'diag-item-sev-info';
         const isStaleLock = item.category === 'locks' && item.title === 'Stale archive lock' && item.path;
+        const isTempFile  = item.category === 'temp-files' && item.path;
         html += `<div class="diag-item ${sevClass}">
   <div class="diag-item-header">
     <span class="diag-item-sev ${sevTextClass}">${_esc(item.severity)}</span>
@@ -10052,6 +10053,7 @@ document.addEventListener('keydown', e => {
   ${item.message           ? `<div class="diag-item-msg">${_esc(item.message)}</div>` : ''}
   ${item.recommendedAction ? `<div class="diag-item-action">→ ${_esc(item.recommendedAction)}</div>` : ''}
   ${isStaleLock            ? `<button class="diag-release-btn" data-lock-path="${_esc(item.path)}">Release stale lock</button>` : ''}
+  ${isTempFile             ? `<button class="diag-cleanup-btn" data-temp-path="${_esc(item.path)}">Clean up temp file</button>` : ''}
 </div>`;
       }
     }
@@ -10149,6 +10151,54 @@ document.addEventListener('keydown', e => {
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && document.getElementById('archiveDiagnosticsModal')?.classList.contains('open')) {
       _diagClose();
+    }
+  });
+
+  // ── Temp file cleanup (Phase 13B-2) ──────────────────────────────────────────
+  // Separate event delegation on diagList for cleanup buttons.
+
+  document.getElementById('diagList')?.addEventListener('click', async e => {
+    const btn = e.target.closest('.diag-cleanup-btn');
+    if (!btn || btn.disabled) return;
+
+    const tempPath = btn.dataset.tempPath;
+    if (!tempPath) return;
+
+    const confirmed = window.confirm(
+      `Clean up this stale AutoIngest temp file?\n\n${tempPath}\n\nNo media or event data will be changed.`
+    );
+    if (!confirmed) return;
+
+    btn.disabled    = true;
+    btn.textContent = 'Cleaning…';
+
+    const result = await window.api.cleanupTempFile(tempPath).catch(() => ({ ok: false, reason: 'error' }));
+
+    if (result && result.ok) {
+      btn.textContent = 'Temp file cleaned.';
+      const runRes = await window.api.runDiagnostics('allConfiguredRoots').catch(() => null);
+      if (runRes && runRes.ok) {
+        _diagRunning = true;
+        const runBtnEl = document.getElementById('diagRunBtn');
+        const statusEl = document.getElementById('diagStatusText');
+        const listEl   = document.getElementById('diagList');
+        const barEl    = document.getElementById('diagSummaryBar');
+        if (runBtnEl) { runBtnEl.disabled = true; runBtnEl.textContent = 'Running…'; }
+        if (statusEl) { statusEl.className = 'diag-status-running'; statusEl.textContent = 'Refreshing after cleanup…'; }
+        if (barEl)    { barEl.hidden = true; }
+        if (listEl)   { listEl.innerHTML = '<div class="sq-empty">Scanning…</div>'; }
+        _startPoll();
+      }
+    } else {
+      btn.disabled    = false;
+      btn.textContent = 'Clean up temp file';
+      const reason = !result                                          ? 'Cleanup failed. Try running diagnostics again.'
+                   : result.reason === 'not-temp-file'               ? 'File is not a known AutoIngest temp file.'
+                   : result.reason === 'is-directory'                ? 'Path is a directory — cannot clean up.'
+                   : result.reason === 'outside-configured-root'     ? 'Path is outside configured roots.'
+                   : result.reason === 'invalid-path'                ? 'Invalid path — cannot clean up.'
+                   : 'Cleanup failed. Try running diagnostics again.';
+      window.alert(reason);
     }
   });
 
