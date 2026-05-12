@@ -224,6 +224,13 @@ contextBridge.exposeInMainWorld('api', {
   syncAllReadyJobs:       ()        => ipcRenderer.invoke('archive:syncAllReadyJobs'),
   checkDirectArchiveLocks: (payload) => ipcRenderer.invoke('archive:checkDirectArchiveLocks', payload),
 
+  // ── Transfer Export ──
+  chooseTransferRoot:      ()                            => ipcRenderer.invoke('archive:chooseTransferRoot'),
+  getTransferRoot:         ()                            => ipcRenderer.invoke('archive:getTransferRoot'),
+  previewTransferExport:   (scope)                       => ipcRenderer.invoke('archive:previewTransferExport',  { scope }),
+  runTransferExport:       (scope, operatorName)         => ipcRenderer.invoke('archive:runTransferExport',      { scope, operatorName }),
+  getTransferExportStatus: ()                            => ipcRenderer.invoke('archive:getTransferExportStatus'),
+
   // ── EXIF metadata service ──
   getMetadataStatus:      (batchId)            => ipcRenderer.invoke('metadata:getStatus',     batchId),
   retryMetadata:          (batchId)            => ipcRenderer.invoke('metadata:retry',          batchId),

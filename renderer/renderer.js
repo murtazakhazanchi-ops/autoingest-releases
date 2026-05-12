@@ -9285,3 +9285,294 @@ document.addEventListener('keydown', e => {
     }
   });
 })();
+
+// ────────────────────────────────────────────────────────────────────────────
+// TRANSFER EXPORT MODAL (Phase 11)
+// ────────────────────────────────────────────────────────────────────────────
+
+(function () {
+  // ── State ────────────────────────────────────────────────────────────────
+
+  let _txCollections = [];    // { name, path } from cached NAS scan
+  let _txPollTimer   = null;
+  let _txRunning     = false;
+
+  // ── Open / Close ─────────────────────────────────────────────────────────
+
+  function _txClose() {
+    document.getElementById('transferExportModal')?.classList.remove('open');
+    document.body.style.overflow = '';
+    _txStopPoll();
+    _txRunning = false;
+  }
+
+  async function _txOpen() {
+    const overlay = document.getElementById('transferExportModal');
+    if (!overlay || overlay.classList.contains('open')) return;
+
+    // Load current transfer root from settings
+    const savedRoot = await window.api.getTransferRoot().catch(() => null);
+    const driveEl   = document.getElementById('txDrivePath');
+    if (driveEl) {
+      if (savedRoot) {
+        driveEl.textContent = savedRoot;
+        driveEl.classList.remove('tx-unset');
+      } else {
+        driveEl.textContent = 'Not set';
+        driveEl.classList.add('tx-unset');
+      }
+    }
+
+    // Load cached NAS collections for scope selection
+    await _txLoadCollections();
+
+    // Restore last known export status (may be done from a previous run)
+    const status = await window.api.getTransferExportStatus().catch(() => null);
+    if (status && (status.running || status.result)) {
+      _txApplyStatus(status);
+      if (status.running) {
+        _txRunning = true;
+        _txStartPoll();
+      }
+    } else {
+      document.getElementById('txStatusBox')?.setAttribute('hidden', '');
+    }
+
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  // ── Scope list ────────────────────────────────────────────────────────────
+
+  async function _txLoadCollections() {
+    const listEl = document.getElementById('txScopeList');
+    if (!listEl) return;
+
+    let result;
+    try { result = await window.api.getCachedNasEvents(); } catch { result = null; }
+
+    const collections = (result && Array.isArray(result.collections)) ? result.collections : [];
+    _txCollections = collections.map(c => ({ name: c.name, path: c.path }));
+
+    if (_txCollections.length === 0) {
+      listEl.innerHTML = '<div class="tx-empty-note">No collections found. Scan the Active Archive first.</div>';
+      return;
+    }
+
+    listEl.innerHTML = _txCollections.map((c, i) => `
+      <label class="tx-scope-item">
+        <input type="checkbox" class="tx-coll-cb" data-idx="${i}" checked>
+        <span title="${c.path}">${c.name}</span>
+      </label>
+    `).join('');
+  }
+
+  function _txGetSelectedCollectionPaths() {
+    const checkboxes = document.querySelectorAll('.tx-coll-cb:checked');
+    return Array.from(checkboxes).map(cb => {
+      const idx = parseInt(cb.dataset.idx, 10);
+      return _txCollections[idx]?.path;
+    }).filter(Boolean);
+  }
+
+  // ── Preview ───────────────────────────────────────────────────────────────
+
+  async function _txPreview() {
+    const scope = { collectionPaths: _txGetSelectedCollectionPaths() };
+    if (scope.collectionPaths.length === 0) {
+      showMessage('Select at least one collection to preview.', 4000);
+      return;
+    }
+
+    const previewBtn = document.getElementById('txPreviewBtn');
+    const exportBtn  = document.getElementById('txExportBtn');
+    if (previewBtn) previewBtn.disabled = true;
+    if (exportBtn)  exportBtn.disabled  = true;
+
+    const previewBox = document.getElementById('txPreviewBox');
+    if (previewBox) {
+      previewBox.removeAttribute('hidden');
+      document.getElementById('txPvCollections').textContent = '…';
+      document.getElementById('txPvEvents').textContent      = '…';
+      document.getElementById('txPvExternal').textContent    = '…';
+      document.getElementById('txPvFiles').textContent       = '…';
+    }
+
+    let result;
+    try { result = await window.api.previewTransferExport(scope); } catch (e) {
+      showMessage('Preview failed: ' + e.message, 5000);
+      if (previewBtn) previewBtn.disabled = false;
+      return;
+    }
+
+    if (previewBtn) previewBtn.disabled = false;
+
+    if (!result.ok) {
+      const msgs = {
+        'nas-not-set':           'Active Archive Root is not set.',
+        'transfer-root-not-set': 'Transfer Drive is not set.',
+        'empty-scope':           'Select at least one collection.',
+        'scope-outside-nas-root':'Selected path is outside the Active Archive.',
+      };
+      showMessage(msgs[result.reason] || ('Preview error: ' + result.reason), 6000);
+      if (previewBox) previewBox.setAttribute('hidden', '');
+      return;
+    }
+
+    document.getElementById('txPvCollections').textContent = result.collections;
+    document.getElementById('txPvEvents').textContent      = result.events;
+    document.getElementById('txPvExternal').textContent    = result.externalFolders;
+    document.getElementById('txPvFiles').textContent       = result.files.toLocaleString();
+
+    if (exportBtn) exportBtn.disabled = (result.files === 0);
+  }
+
+  // ── Export ────────────────────────────────────────────────────────────────
+
+  async function _txStartExport() {
+    const scope = { collectionPaths: _txGetSelectedCollectionPaths() };
+    if (scope.collectionPaths.length === 0) {
+      showMessage('Select at least one collection to export.', 4000);
+      return;
+    }
+
+    const exportBtn  = document.getElementById('txExportBtn');
+    const previewBtn = document.getElementById('txPreviewBtn');
+    if (exportBtn)  exportBtn.disabled  = true;
+    if (previewBtn) previewBtn.disabled = true;
+
+    // Determine operator name from current user
+    let operatorName = null;
+    try {
+      const users = await window.api.listUsers();
+      const lastId = await window.api.getLastActiveUserId?.() ?? null;
+      const user = users?.find(u => u.id === lastId);
+      if (user) operatorName = user.name;
+    } catch {}
+
+    let result;
+    try { result = await window.api.runTransferExport(scope, operatorName); } catch (e) {
+      showMessage('Export failed to start: ' + e.message, 6000);
+      if (exportBtn)  exportBtn.disabled  = false;
+      if (previewBtn) previewBtn.disabled = false;
+      return;
+    }
+
+    if (!result.ok) {
+      const msgs = {
+        'busy':                  'An export is already running.',
+        'nas-not-set':           'Active Archive Root is not set.',
+        'transfer-root-not-set': 'Transfer Drive is not set.',
+        'empty-scope':           'Select at least one collection.',
+        'roots-overlap':         'Transfer Drive must not overlap with the Active Archive.',
+      };
+      showMessage(msgs[result.reason] || ('Export error: ' + result.reason), 6000);
+      if (exportBtn)  exportBtn.disabled  = false;
+      if (previewBtn) previewBtn.disabled = false;
+      return;
+    }
+
+    _txRunning = true;
+    _txStartPoll();
+  }
+
+  // ── Status polling ────────────────────────────────────────────────────────
+
+  function _txStartPoll() {
+    _txStopPoll();
+    _txPollTimer = setInterval(async () => {
+      const status = await window.api.getTransferExportStatus().catch(() => null);
+      if (!status) return;
+      _txApplyStatus(status);
+      if (!status.running) {
+        _txStopPoll();
+        _txRunning = false;
+        const exportBtn  = document.getElementById('txExportBtn');
+        const previewBtn = document.getElementById('txPreviewBtn');
+        if (exportBtn)  exportBtn.disabled  = false;
+        if (previewBtn) previewBtn.disabled = false;
+      }
+    }, 1000);
+  }
+
+  function _txStopPoll() {
+    if (_txPollTimer) { clearInterval(_txPollTimer); _txPollTimer = null; }
+  }
+
+  function _txApplyStatus(status) {
+    const box = document.getElementById('txStatusBox');
+    if (!box) return;
+    box.removeAttribute('hidden');
+    box.className = 'tx-status-box';
+    if (status.running) box.classList.add('tx-running');
+    else if (status.result?.ok)  box.classList.add('tx-done');
+    else if (status.result)      box.classList.add('tx-error');
+    else box.classList.add('tx-idle');
+
+    document.getElementById('txStCopied').textContent  = status.copied  ?? 0;
+    document.getElementById('txStSkipped').textContent = status.skipped ?? 0;
+    document.getElementById('txStRenamed').textContent = status.renamed ?? 0;
+    document.getElementById('txStErrors').textContent  = status.result?.errorCount ?? status.errors?.length ?? 0;
+
+    const currEl = document.getElementById('txStCurrent');
+    if (currEl) currEl.textContent = status.running ? (status.current || '…') : '';
+
+    const noteEl = document.getElementById('txFooterNote');
+    if (noteEl) {
+      if (status.running) {
+        noteEl.textContent = 'Export in progress…';
+      } else if (status.result?.ok) {
+        noteEl.textContent = status.result.status === 'partial'
+          ? 'Completed with errors.'
+          : 'Export complete.';
+      } else if (status.result) {
+        noteEl.textContent = 'Export failed.';
+      } else {
+        noteEl.textContent = 'Active Archive → Transfer Drive';
+      }
+    }
+  }
+
+  // ── Event listeners ───────────────────────────────────────────────────────
+
+  document.getElementById('alocTransferExportBtn')?.addEventListener('click', () => {
+    _alocClose();
+    _txOpen();
+  });
+
+  document.getElementById('txCloseBtn')?.addEventListener('click', _txClose);
+  document.getElementById('txDoneBtn')?.addEventListener('click', _txClose);
+
+  document.getElementById('transferExportModal')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('transferExportModal')) _txClose();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.getElementById('transferExportModal')?.classList.contains('open')) {
+      if (!_txRunning) _txClose();
+    }
+  });
+
+  document.getElementById('txChooseDriveBtn')?.addEventListener('click', async () => {
+    const chosen = await window.api.chooseTransferRoot();
+    if (!chosen) return;
+    const driveEl = document.getElementById('txDrivePath');
+    if (driveEl) { driveEl.textContent = chosen; driveEl.classList.remove('tx-unset'); }
+    // Reset preview and status after drive change
+    document.getElementById('txPreviewBox')?.setAttribute('hidden', '');
+    document.getElementById('txStatusBox')?.setAttribute('hidden', '');
+    document.getElementById('txExportBtn').disabled = true;
+  });
+
+  document.getElementById('txSelectAllBtn')?.addEventListener('click', () => {
+    document.querySelectorAll('.tx-coll-cb').forEach(cb => { cb.checked = true; });
+  });
+
+  document.getElementById('txSelectNoneBtn')?.addEventListener('click', () => {
+    document.querySelectorAll('.tx-coll-cb').forEach(cb => { cb.checked = false; });
+  });
+
+  document.getElementById('txPreviewBtn')?.addEventListener('click', _txPreview);
+  document.getElementById('txExportBtn')?.addEventListener('click', _txStartExport);
+
+})();

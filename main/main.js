@@ -23,7 +23,8 @@ const localMirrorService  = require('../services/localMirrorService');
 const localSyncManifest   = require('../services/localSyncManifest');
 const syncQueueService    = require('../services/syncQueueService');
 const archiveSyncService  = require('../services/archiveSyncService');
-const archiveLockService  = require('../services/archiveLockService');
+const archiveLockService      = require('../services/archiveLockService');
+const transferExportService   = require('../services/transferExportService');
 const userManager   = require('./userManager');
 const { validateEventJson } = require('./contracts/dataValidator');
 const exifService         = require('./exifService');
@@ -2583,6 +2584,42 @@ ipcMain.handle('keywords:loadRegistry', async () => {
   } catch {}
   return result;
 });
+
+// ── Transfer Export ───────────────────────────────────────────────────────────
+
+ipcMain.handle('archive:chooseTransferRoot', async () => {
+  const win    = BrowserWindow.getFocusedWindow();
+  const result = await dialog.showOpenDialog(win, {
+    title:      'Choose Transfer Drive',
+    properties: ['openDirectory', 'createDirectory'],
+  });
+  if (result.canceled) return null;
+  await settings.setTransferRoot(result.filePaths[0]);
+  return result.filePaths[0];
+});
+
+ipcMain.handle('archive:getTransferRoot', () => settings.getTransferRoot());
+
+ipcMain.handle('archive:previewTransferExport', async (_event, { scope } = {}) => {
+  const nasRoot      = settings.getNasRoot();
+  const transferRoot = settings.getTransferRoot();
+  if (!nasRoot)      return { ok: false, reason: 'nas-not-set' };
+  if (!transferRoot) return { ok: false, reason: 'transfer-root-not-set' };
+  return transferExportService.previewExport(nasRoot, transferRoot, scope);
+});
+
+ipcMain.handle('archive:runTransferExport', async (_event, { scope, operatorName } = {}) => {
+  const nasRoot      = settings.getNasRoot();
+  const transferRoot = settings.getTransferRoot();
+  if (!nasRoot)      return { ok: false, reason: 'nas-not-set' };
+  if (!transferRoot) return { ok: false, reason: 'transfer-root-not-set' };
+  return transferExportService.runExport(nasRoot, transferRoot, scope, {
+    operatorName: operatorName || null,
+    deviceName:   os.hostname(),
+  });
+});
+
+ipcMain.handle('archive:getTransferExportStatus', () => transferExportService.getExportStatus());
 
 ipcMain.handle('window:minimize', () => {
   BrowserWindow.getFocusedWindow()?.minimize();

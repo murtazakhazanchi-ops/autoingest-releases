@@ -859,6 +859,42 @@
     .aloc-device-label { font-size: 12px; color: var(--subtext); }
     .aloc-device-name  { font-size: 12px; font-weight: 600; color: var(--text); }
 
+    /* ── Transfer Export modal ── */
+    #transferExportModal .emm-box { width: min(580px, calc(100vw - 48px)); }
+    .tx-body { padding: 20px 24px 8px; display: flex; flex-direction: column; gap: 18px; }
+    .tx-section-label { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--subtext); margin-bottom: 2px; }
+    .tx-drive-wrap { display: flex; align-items: center; gap: 8px; }
+    .tx-drive-path {
+      flex: 1; font-size: 13px; color: var(--text);
+      background: var(--input-bg, rgba(255,255,255,0.05));
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 7px 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+    }
+    .tx-drive-path.tx-unset { color: var(--subtext); font-style: italic; }
+    .tx-scope-list { display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto; padding: 4px 0; }
+    .tx-scope-item { display: flex; align-items: center; gap: 10px; padding: 5px 2px; cursor: pointer; border-radius: 4px; }
+    .tx-scope-item:hover { background: var(--card-hover); }
+    .tx-scope-item input[type=checkbox] { width: 15px; height: 15px; flex-shrink: 0; cursor: pointer; accent-color: var(--accent); }
+    .tx-scope-item label { font-size: 13px; color: var(--text); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tx-scope-controls { display: flex; gap: 8px; }
+    .tx-scope-controls button { font-size: 11px; padding: 3px 10px; border-radius: 5px; border: 1px solid var(--border); background: none; color: var(--subtext); cursor: pointer; }
+    .tx-scope-controls button:hover { color: var(--text); }
+    .tx-preview-box { background: var(--card-bg, rgba(255,255,255,0.03)); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; font-size: 12px; color: var(--subtext); }
+    .tx-preview-row { display: flex; gap: 16px; flex-wrap: wrap; }
+    .tx-preview-stat { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+    .tx-preview-val { font-size: 18px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
+    .tx-preview-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--subtext); }
+    .tx-status-box { font-size: 12px; border-radius: 6px; padding: 10px 14px; display: flex; flex-direction: column; gap: 4px; }
+    .tx-status-box.tx-idle    { background: none; }
+    .tx-status-box.tx-running { background: rgba(99,102,241,0.07); border: 1px solid var(--accent-border, rgba(99,102,241,0.3)); }
+    .tx-status-box.tx-done    { background: rgba(34,197,94,0.06); border: 1px solid rgba(34,197,94,0.25); }
+    .tx-status-box.tx-error   { background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.25); }
+    .tx-status-row { display: flex; gap: 14px; flex-wrap: wrap; }
+    .tx-status-key { font-weight: 600; color: var(--subtext); }
+    .tx-status-val { color: var(--text); }
+    .tx-status-current { color: var(--subtext); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+    .tx-empty-note { font-size: 12px; color: var(--subtext); font-style: italic; padding: 4px 0; }
+
     #activityLogModal .emm-box { height: calc(100vh - 80px); }
     #alTitle { font-size: 18px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.01em; }
     #alBody {
@@ -6857,10 +6893,78 @@
       </div>
 
       <div class="emm-footer">
-        <div></div>
+        <button type="button" class="emm-btn-secondary" id="alocTransferExportBtn" style="margin-right:auto">Transfer Export…</button>
         <div class="emm-footer-right">
           <button type="button" class="emm-btn-secondary" id="alocCancelBtn">Cancel</button>
           <button type="button" class="emm-btn-primary" id="alocSaveBtn">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Transfer Export modal -->
+  <div id="transferExportModal" class="emm-overlay" role="dialog" aria-modal="true" aria-labelledby="txTitle">
+    <div class="emm-box">
+      <div class="emm-topbar">
+        <span class="emm-topbar-title" id="txTitle">Transfer Export</span>
+        <button type="button" class="emm-close-btn" id="txCloseBtn" aria-label="Close">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="tx-body">
+
+        <!-- Transfer Drive -->
+        <div>
+          <div class="tx-section-label">Transfer Drive</div>
+          <div class="tx-drive-wrap">
+            <div class="tx-drive-path tx-unset" id="txDrivePath">Not set</div>
+            <button type="button" class="aloc-btn" id="txChooseDriveBtn">Choose…</button>
+          </div>
+        </div>
+
+        <!-- Export Scope -->
+        <div>
+          <div class="tx-section-label">Export Scope</div>
+          <div id="txScopeList" class="tx-scope-list">
+            <div class="tx-empty-note">Load the Archive event list first.</div>
+          </div>
+          <div class="tx-scope-controls" style="margin-top:6px">
+            <button type="button" id="txSelectAllBtn">Select all</button>
+            <button type="button" id="txSelectNoneBtn">Select none</button>
+          </div>
+        </div>
+
+        <!-- Preview counts -->
+        <div id="txPreviewBox" class="tx-preview-box" hidden>
+          <div class="tx-section-label" style="margin-bottom:8px">Preview</div>
+          <div class="tx-preview-row">
+            <div class="tx-preview-stat"><span class="tx-preview-val" id="txPvCollections">—</span><span class="tx-preview-lbl">Collections</span></div>
+            <div class="tx-preview-stat"><span class="tx-preview-val" id="txPvEvents">—</span><span class="tx-preview-lbl">Events</span></div>
+            <div class="tx-preview-stat"><span class="tx-preview-val" id="txPvExternal">—</span><span class="tx-preview-lbl">External</span></div>
+            <div class="tx-preview-stat"><span class="tx-preview-val" id="txPvFiles">—</span><span class="tx-preview-lbl">Files</span></div>
+          </div>
+        </div>
+
+        <!-- Status -->
+        <div id="txStatusBox" class="tx-status-box tx-idle" hidden>
+          <div class="tx-status-row">
+            <span><span class="tx-status-key">Copied</span> <span class="tx-status-val" id="txStCopied">0</span></span>
+            <span><span class="tx-status-key">Skipped</span> <span class="tx-status-val" id="txStSkipped">0</span></span>
+            <span><span class="tx-status-key">Renamed</span> <span class="tx-status-val" id="txStRenamed">0</span></span>
+            <span><span class="tx-status-key">Errors</span> <span class="tx-status-val" id="txStErrors">0</span></span>
+          </div>
+          <div class="tx-status-current" id="txStCurrent"></div>
+        </div>
+
+      </div>
+
+      <div class="emm-footer">
+        <div id="txFooterNote" class="sq-footer-note">Active Archive → Transfer Drive</div>
+        <div class="emm-footer-right">
+          <button type="button" class="emm-btn-secondary" id="txPreviewBtn">Preview</button>
+          <button type="button" class="emm-btn-primary"   id="txExportBtn" disabled>Export</button>
+          <button type="button" class="emm-btn-secondary" id="txDoneBtn">Done</button>
         </div>
       </div>
     </div>

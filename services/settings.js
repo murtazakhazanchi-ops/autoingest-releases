@@ -369,6 +369,33 @@ async function setDefaultImportMode(value) {
   await _save();
 }
 
+/**
+ * Returns the Transfer Drive root path, or null if never set.
+ * @returns {string | null}
+ */
+function getTransferRoot() {
+  if (!_loaded) init();
+  const v = _state.transferRoot;
+  return (typeof v === 'string' && v.length > 0) ? v : null;
+}
+
+/**
+ * Persists the Transfer Drive root path. Pass null or '' to clear.
+ * @param {string | null} value
+ * @returns {Promise<void>}
+ */
+async function setTransferRoot(value) {
+  if (!_loaded) init();
+  if (value === null || value === '') {
+    delete _state.transferRoot;
+  } else if (typeof value === 'string') {
+    _state.transferRoot = value;
+  } else {
+    throw new Error('setTransferRoot: expected string or null');
+  }
+  await _save();
+}
+
 module.exports = {
   init,
   getArchiveRoot, setArchiveRoot,
@@ -380,4 +407,5 @@ module.exports = {
   getNasRoot, setNasRoot,
   getLocalStagingRoot, setLocalStagingRoot,
   getDefaultImportMode, setDefaultImportMode,
+  getTransferRoot, setTransferRoot,
 };
