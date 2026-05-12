@@ -245,6 +245,8 @@ contextBridge.exposeInMainWorld('api', {
   getDiagnosticsReport:    ()         => ipcRenderer.invoke('archive:getDiagnosticsReport'),
   releaseStaleLock:        (lockPath) => ipcRenderer.invoke('archive:releaseStaleLock',     { lockPath }),
   cleanupTempFile:         (tempPath) => ipcRenderer.invoke('archive:cleanupTempFile',      { tempPath }),
+  markSyncIssueReviewed:   (ref)      => ipcRenderer.invoke('archive:markSyncIssueReviewed', ref),
+  getSyncIssueReviews:     ()         => ipcRenderer.invoke('archive:getSyncIssueReviews'),
 
   // ── EXIF metadata service ──
   getMetadataStatus:      (batchId)            => ipcRenderer.invoke('metadata:getStatus',     batchId),

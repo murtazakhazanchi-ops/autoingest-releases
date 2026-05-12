@@ -28,6 +28,7 @@ const transferExportService      = require('../services/transferExportService');
 const transferImportService      = require('../services/transferImportService');
 const archiveDiagnosticsService  = require('../services/archiveDiagnosticsService');
 const archiveRepairService       = require('../services/archiveRepairService');
+const syncReviewService          = require('../services/syncReviewService');
 const userManager   = require('./userManager');
 const { validateEventJson } = require('./contracts/dataValidator');
 const exifService         = require('./exifService');
@@ -2696,6 +2697,17 @@ ipcMain.handle('archive:releaseStaleLock', async (_event, { lockPath } = {}) => 
   if (configuredRoots.length === 0) return { ok: false, reason: 'no-configured-roots' };
   return archiveLockService.releaseStaleLock(lockPath, configuredRoots);
 });
+
+// ── Sync Issue Review (Phase 13B-3) ──────────────────────────────────────────
+
+ipcMain.handle('archive:markSyncIssueReviewed', async (_event, { jobId, batchId, manifestPath, reason } = {}) => {
+  if (!jobId || typeof jobId !== 'string') return { ok: false, reason: 'invalid-jobId' };
+  const localStagingRoot = settings.getLocalStagingRoot();
+  if (!localStagingRoot) return { ok: false, reason: 'no-staging-root' };
+  return syncReviewService.markReviewed({ jobId, batchId, manifestPath, reason, localStagingRoot });
+});
+
+ipcMain.handle('archive:getSyncIssueReviews', async () => syncReviewService.getReviews());
 
 // ── Archive Diagnostics — Temp File Cleanup (Phase 13B-2) ────────────────────
 
