@@ -5973,11 +5973,11 @@
             <div class="ov-tile-body">
               <span class="ov-value" id="ovNasEventsVal">—</span>
               <div class="ov-nas-sub">
-                <span id="ovNasEventsLabel">NAS Events</span>
+                <span id="ovNasEventsLabel">Archive Events</span>
                 <span class="ov-nas-badge" id="ovNasCachedBadge" hidden>CACHED</span>
               </div>
             </div>
-            <button type="button" id="ovNasRefreshBtn" title="Refresh NAS event list" aria-label="Refresh NAS event list">
+            <button type="button" id="ovNasRefreshBtn" title="Refresh archive event list" aria-label="Refresh archive event list">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0115-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 01-15 6.7L3 16"/></svg>
             </button>
           </div>
@@ -6601,14 +6601,14 @@
             <input type="radio" name="eiImportMode" value="local-first" id="eiModeLocalFirst" />
             <div class="im-opt-body">
               <span class="im-opt-name">Local First</span>
-              <span class="im-opt-desc">Fast local copy. Syncs to NAS later.</span>
+              <span class="im-opt-desc">Fast local copy. Syncs to archive later.</span>
             </div>
           </label>
           <label class="im-option" id="eiOptDirectNas">
             <input type="radio" name="eiImportMode" value="direct-nas" id="eiModeDirectNas" />
             <div class="im-opt-body">
-              <span class="im-opt-name">Direct NAS</span>
-              <span class="im-opt-desc">Copies straight to NAS.</span>
+              <span class="im-opt-name">Direct Archive</span>
+              <span class="im-opt-desc">Copies straight to archive.</span>
             </div>
           </label>
         </div>
@@ -6803,9 +6803,9 @@
 
       <div class="aloc-body">
 
-        <!-- NAS Archive Root -->
+        <!-- Active Archive Root -->
         <div class="aloc-row">
-          <span class="aloc-label">NAS Archive Root</span>
+          <span class="aloc-label">Active Archive Root</span>
           <div class="aloc-path-wrap">
             <div class="aloc-path-display aloc-unset" id="alocNasPath">Not set</div>
             <button type="button" class="aloc-btn" id="alocNasChooseBtn">Choose…</button>
@@ -6829,7 +6829,7 @@
         <div class="aloc-row">
           <span class="aloc-label">Default Import Mode</span>
           <div class="aloc-mode-wrap">
-            <button type="button" class="aloc-mode-btn active" id="alocModeDirectNas" data-mode="direct-nas">Direct to NAS</button>
+            <button type="button" class="aloc-mode-btn active" id="alocModeDirectNas" data-mode="direct-nas">Direct to Archive</button>
             <button type="button" class="aloc-mode-btn" id="alocModeLocalFirst" data-mode="local-first">Local First</button>
           </div>
         </div>
@@ -6873,7 +6873,7 @@
         </div>
       </div>
       <div class="emm-footer">
-        <span class="sq-footer-note">Local First imports · Sync to NAS coming soon</span>
+        <span class="sq-footer-note">Local First imports · Sync to archive coming soon</span>
         <div class="emm-footer-right">
           <button type="button" class="emm-btn-secondary" id="sqDoneBtn">Done</button>
         </div>

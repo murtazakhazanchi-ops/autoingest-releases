@@ -2444,9 +2444,9 @@ async function _updateSystemStatus() {
 
   const map = {
     'ready':                 { cls: '',                   label: 'Ready' },
-    'nas-not-set':           { cls: 'status-dot--warn',  label: 'NAS not set' },
-    'nas-disconnected':      { cls: 'status-dot--error', label: 'NAS offline' },
-    'invalid-nas':           { cls: 'status-dot--error', label: 'Invalid NAS' },
+    'nas-not-set':           { cls: 'status-dot--warn',  label: 'Archive not set' },
+    'nas-disconnected':      { cls: 'status-dot--error', label: 'Archive offline' },
+    'invalid-nas':           { cls: 'status-dot--error', label: 'Invalid archive' },
     'local-staging-missing': { cls: 'status-dot--warn',  label: 'Staging missing' },
   };
   const entry = map[status.status] || { cls: 'status-dot--warn', label: status.status };
@@ -2475,7 +2475,7 @@ function _applyNasEventsCard(result) {
 
   if (!result || result.status === 'nas-not-set') {
     valEl.textContent    = '—';
-    labelEl.textContent  = 'NAS not configured';
+    labelEl.textContent  = 'Archive not set';
     if (badgeEl) badgeEl.hidden = true;
     tileEl?.classList.remove('ov-tile--warn');
     return;
@@ -2483,7 +2483,7 @@ function _applyNasEventsCard(result) {
 
   if (result.status === 'nas-disconnected' || result.status === 'invalid-nas') {
     valEl.textContent   = '—';
-    labelEl.textContent = result.status === 'nas-disconnected' ? 'NAS offline' : 'Invalid NAS';
+    labelEl.textContent = result.status === 'nas-disconnected' ? 'Archive offline' : 'Invalid archive';
     if (badgeEl) badgeEl.hidden = true;
     tileEl?.classList.add('ov-tile--warn');
     return;
@@ -2502,7 +2502,7 @@ function _applyNasEventsCard(result) {
   const totalCollections = (result.collections || []).length;
 
   valEl.textContent   = String(totalEvents);
-  labelEl.textContent = `NAS Event${totalEvents !== 1 ? 's' : ''} · ${totalCollections} collection${totalCollections !== 1 ? 's' : ''}`;
+  labelEl.textContent = `Archive Event${totalEvents !== 1 ? 's' : ''} · ${totalCollections} collection${totalCollections !== 1 ? 's' : ''}`;
 
   const isCache = result.source === 'cache';
   if (badgeEl) badgeEl.hidden = !isCache;
@@ -7289,9 +7289,9 @@ async function showEventImportConfirmModal(groups, eventData) {
 
     function _modeStatus(mode) {
       if (mode === 'direct-nas') {
-        if (!nasRoot || nasStatus === 'nas-not-set') return { text: 'NAS not configured',    cls: 'warn' };
-        if (nasStatus === 'nas-disconnected')         return { text: 'NAS not connected',     cls: 'err'  };
-        if (nasStatus === 'invalid-nas')              return { text: 'Invalid NAS root',      cls: 'err'  };
+        if (!nasRoot || nasStatus === 'nas-not-set') return { text: 'Archive not configured', cls: 'warn' };
+        if (nasStatus === 'nas-disconnected')         return { text: 'Archive not connected', cls: 'err'  };
+        if (nasStatus === 'invalid-nas')              return { text: 'Invalid archive root',  cls: 'err'  };
         return { text: '', cls: '' };
       }
       if (mode === 'local-first') {
@@ -7309,7 +7309,7 @@ async function showEventImportConfirmModal(groups, eventData) {
       if (mode === 'direct-nas') {
         if (!nasUsable) return '';
         const p = [nasArchiveName, collName, eventFolderName, phName].filter(Boolean).join('/');
-        return `<div class="im-dest-row"><span class="im-dest-lbl">NAS</span><span class="im-dest-path${phCls}">${_esc(p + '/')}</span></div>`;
+        return `<div class="im-dest-row"><span class="im-dest-lbl">Archive</span><span class="im-dest-path${phCls}">${_esc(p + '/')}</span></div>`;
       }
 
       if (mode === 'local-first') {
@@ -7320,7 +7320,7 @@ async function showEventImportConfirmModal(groups, eventData) {
         }
         if (nasUsable) {
           const p = [nasArchiveName, collName, eventFolderName, phName].filter(Boolean).join('/');
-          rows.push(`<div class="im-dest-row"><span class="im-dest-lbl">NAS</span><span class="im-dest-path${phCls}">${_esc(p + '/')}</span></div>`);
+          rows.push(`<div class="im-dest-row"><span class="im-dest-lbl">Archive</span><span class="im-dest-path${phCls}">${_esc(p + '/')}</span></div>`);
         }
         return rows.join('');
       }
