@@ -9609,11 +9609,11 @@ document.addEventListener('keydown', e => {
     _txOpen();
   });
 
-  document.getElementById('txCloseBtn')?.addEventListener('click', _txClose);
+  document.getElementById('txCloseBtn')?.addEventListener('click', () => { if (!_txRunning) _txClose(); });
   document.getElementById('txDoneBtn')?.addEventListener('click', _txClose);
 
   document.getElementById('transferExportModal')?.addEventListener('click', e => {
-    if (e.target === document.getElementById('transferExportModal')) _txClose();
+    if (e.target === document.getElementById('transferExportModal') && !_txRunning) _txClose();
   });
 
   document.addEventListener('keydown', e => {
