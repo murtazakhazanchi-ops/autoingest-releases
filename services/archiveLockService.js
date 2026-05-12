@@ -149,6 +149,69 @@ async function releaseLock(lockPath) {
 }
 
 /**
+ * Safely release a stale lock via the diagnostics repair UI.
+ *
+ * Safety rules:
+ *  1. lockPath must resolve inside <configuredRoot>/.autoingest/locks/ — no traversal.
+ *  2. lockPath must end with .json.
+ *  3. Re-reads the lock file immediately before deletion; aborts if the lock
+ *     has since become active (TOCTOU guard).
+ *  4. ENOENT on re-read is treated as already-missing (idempotent OK).
+ *
+ * @param {string}   lockPath         Absolute path to the candidate lock file.
+ * @param {string[]} configuredRoots  Archive roots from settings (nas + main).
+ * @returns {Promise<{ ok: boolean, reason: string }>}
+ */
+async function releaseStaleLock(lockPath, configuredRoots) {
+  if (!_isValidLockPath(lockPath, configuredRoots)) {
+    return { ok: false, reason: 'invalid-path' };
+  }
+
+  let lock;
+  try {
+    const raw = await fsp.readFile(lockPath, 'utf8');
+    lock = JSON.parse(raw);
+  } catch (e) {
+    if (e.code === 'ENOENT') return { ok: true, reason: 'already-missing' };
+    throw e;
+  }
+
+  const now = Date.now();
+  if (lock.status === 'active' && typeof lock.expiresAt === 'number' && lock.expiresAt > now) {
+    return { ok: false, reason: 'lock-active' };
+  }
+
+  try {
+    await fsp.unlink(lockPath);
+  } catch (e) {
+    if (e.code !== 'ENOENT') throw e;
+  }
+  return { ok: true, reason: 'released' };
+}
+
+/**
+ * @param {string}   lockPath
+ * @param {string[]} configuredRoots
+ * @returns {boolean}
+ */
+function _isValidLockPath(lockPath, configuredRoots) {
+  if (!lockPath || typeof lockPath !== 'string') return false;
+  const normalized = path.normalize(lockPath);
+  if (!normalized.endsWith('.json')) return false;
+  if (!Array.isArray(configuredRoots)) return false;
+  return configuredRoots.some(root => {
+    if (!root) return false;
+    const lockDir = path.join(root, '.autoingest', 'locks');
+    const rel = path.relative(lockDir, normalized);
+    // rel must be a flat filename inside lockDir — no subdirs, no traversal, no absolute path
+    return rel &&
+           !rel.startsWith('..') &&
+           !path.isAbsolute(rel) &&
+           !rel.includes(path.sep);
+  });
+}
+
+/**
  * Renew a lock that this process already holds.
  * Reads the current lock file, verifies ownership (jobId + deviceName), then
  * writes an updated lastHeartbeatAt and expiresAt atomically.
@@ -195,6 +258,7 @@ module.exports = {
   acquireLock,
   checkLock,
   releaseLock,
+  releaseStaleLock,
   renewLock,
   LOCK_TTL_MS,
   LOCK_HEARTBEAT_INTERVAL_MS,

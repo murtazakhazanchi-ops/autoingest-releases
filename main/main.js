@@ -2685,6 +2685,17 @@ ipcMain.handle('archive:runDiagnostics',       async (_event, { scope } = {}) =>
 ipcMain.handle('archive:getDiagnosticsStatus', ()                              => archiveDiagnosticsService.getDiagnosticsStatus());
 ipcMain.handle('archive:getDiagnosticsReport', ()                              => archiveDiagnosticsService.getDiagnosticsReport());
 
+// ── Archive Diagnostics — Stale Lock Release (Phase 13B-1) ───────────────────
+
+ipcMain.handle('archive:releaseStaleLock', async (_event, { lockPath } = {}) => {
+  if (!lockPath || typeof lockPath !== 'string') return { ok: false, reason: 'invalid-path' };
+  const nas  = settings.getNasRoot();
+  const main = settings.getMainArchiveRoot();
+  const configuredRoots = [nas, main].filter(Boolean);
+  if (configuredRoots.length === 0) return { ok: false, reason: 'no-configured-roots' };
+  return archiveLockService.releaseStaleLock(lockPath, configuredRoots);
+});
+
 ipcMain.handle('window:minimize', () => {
   BrowserWindow.getFocusedWindow()?.minimize();
 });

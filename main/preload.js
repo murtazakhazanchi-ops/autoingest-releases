@@ -240,9 +240,10 @@ contextBridge.exposeInMainWorld('api', {
   getTransferImportStatus:     ()                        => ipcRenderer.invoke('archive:getTransferImportStatus'),
 
   // ── Archive Diagnostics ──
-  runDiagnostics:          (scope) => ipcRenderer.invoke('archive:runDiagnostics',       { scope }),
-  getDiagnosticsStatus:    ()      => ipcRenderer.invoke('archive:getDiagnosticsStatus'),
-  getDiagnosticsReport:    ()      => ipcRenderer.invoke('archive:getDiagnosticsReport'),
+  runDiagnostics:          (scope)    => ipcRenderer.invoke('archive:runDiagnostics',       { scope }),
+  getDiagnosticsStatus:    ()         => ipcRenderer.invoke('archive:getDiagnosticsStatus'),
+  getDiagnosticsReport:    ()         => ipcRenderer.invoke('archive:getDiagnosticsReport'),
+  releaseStaleLock:        (lockPath) => ipcRenderer.invoke('archive:releaseStaleLock',     { lockPath }),
 
   // ── EXIF metadata service ──
   getMetadataStatus:      (batchId)            => ipcRenderer.invoke('metadata:getStatus',     batchId),

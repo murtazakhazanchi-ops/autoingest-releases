@@ -10043,6 +10043,7 @@ document.addEventListener('keydown', e => {
         const sevTextClass = item.severity === 'error'   ? 'diag-item-sev-error'
                            : item.severity === 'warning' ? 'diag-item-sev-warning'
                            :                               'diag-item-sev-info';
+        const isStaleLock = item.category === 'locks' && item.title === 'Stale archive lock' && item.path;
         html += `<div class="diag-item ${sevClass}">
   <div class="diag-item-header">
     <span class="diag-item-sev ${sevTextClass}">${_esc(item.severity)}</span>
@@ -10050,6 +10051,7 @@ document.addEventListener('keydown', e => {
   </div>
   ${item.message           ? `<div class="diag-item-msg">${_esc(item.message)}</div>` : ''}
   ${item.recommendedAction ? `<div class="diag-item-action">→ ${_esc(item.recommendedAction)}</div>` : ''}
+  ${isStaleLock            ? `<button class="diag-release-btn" data-lock-path="${_esc(item.path)}">Release stale lock</button>` : ''}
 </div>`;
       }
     }
@@ -10147,6 +10149,55 @@ document.addEventListener('keydown', e => {
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && document.getElementById('archiveDiagnosticsModal')?.classList.contains('open')) {
       _diagClose();
+    }
+  });
+
+  // ── Stale lock release (Phase 13B-1) ─────────────────────────────────────────
+  // Event delegation on diagList handles dynamically-rendered release buttons.
+
+  document.getElementById('diagList')?.addEventListener('click', async e => {
+    const btn = e.target.closest('.diag-release-btn');
+    if (!btn || btn.disabled) return;
+
+    const lockPath = btn.dataset.lockPath;
+    if (!lockPath) return;
+
+    const confirmed = window.confirm(
+      `Release stale lock?\n\n${lockPath}\n\nThis removes the expired lock file. Only stale (expired) locks can be released — active locks are protected.`
+    );
+    if (!confirmed) return;
+
+    btn.disabled    = true;
+    btn.textContent = 'Releasing…';
+
+    const result = await window.api.releaseStaleLock(lockPath).catch(() => ({ ok: false, reason: 'error' }));
+
+    if (result && result.ok) {
+      // Refresh diagnostics after release
+      const runRes = await window.api.runDiagnostics('allConfiguredRoots').catch(() => null);
+      if (runRes && runRes.ok) {
+        _diagRunning = true;
+        const runBtnEl = document.getElementById('diagRunBtn');
+        const statusEl = document.getElementById('diagStatusText');
+        const listEl   = document.getElementById('diagList');
+        const barEl    = document.getElementById('diagSummaryBar');
+        if (runBtnEl) { runBtnEl.disabled = true; runBtnEl.textContent = 'Running…'; }
+        if (statusEl) { statusEl.className = 'diag-status-running'; statusEl.textContent = 'Refreshing after lock release…'; }
+        if (barEl)    { barEl.hidden = true; }
+        if (listEl)   { listEl.innerHTML = '<div class="sq-empty">Scanning…</div>'; }
+        _startPoll();
+      } else {
+        btn.textContent = 'Released';
+      }
+    } else {
+      btn.disabled    = false;
+      btn.textContent = 'Release stale lock';
+      const reason = !result                              ? 'Release failed. Try running diagnostics again.'
+                   : result.reason === 'lock-active'     ? 'Lock is currently active — cannot release.'
+                   : result.reason === 'invalid-path'    ? 'Invalid lock path — cannot release.'
+                   : result.reason === 'no-configured-roots' ? 'No archive root is configured.'
+                   : 'Release failed. Try running diagnostics again.';
+      window.alert(reason);
     }
   });
 })();
