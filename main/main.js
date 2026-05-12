@@ -719,7 +719,9 @@ ipcMain.handle('import:commitTransaction', async (event, {
     }
 
     // Acquire per-photographer write locks for direct-nas imports.
-    // Locks wrap only the file-copy phase; event.json write and exif hook run after release.
+    // Locks remain active through exifService metadata writes — XMP sidecars and
+    // in-place writes both go to the same photographer folder on the Active Archive.
+    // Locks are released at batch_complete (or immediately when metadata is skipped).
     if (importMode === 'direct-nas') {
       const nasRoot = settings.getNasRoot();
       if (nasRoot) {
@@ -730,10 +732,7 @@ ipcMain.handle('import:commitTransaction', async (event, {
             ...scope, jobId, batchId: null,
           });
           if (!lockResult.acquired) {
-            for (const held of _directNasLocks) {
-              clearInterval(held.heartbeatTimer);
-              archiveLockService.releaseLock(held.lockPath).catch(() => {});
-            }
+            _releaseDirectNasLocks(_directNasLocks); // release any already-acquired locks
             throw new Error(`Archive folder is busy — locked by ${lockResult.lockedBy}. Please retry.`);
           }
           const expectedOwner  = { jobId: lockResult.lockData.jobId, deviceName: lockResult.lockData.deviceName };
@@ -751,12 +750,12 @@ ipcMain.handle('import:commitTransaction', async (event, {
     let result;
     try {
       result = await importFileJobs(event, fileJobs);
-    } finally {
-      for (const held of _directNasLocks) {
-        clearInterval(held.heartbeatTimer);
-        archiveLockService.releaseLock(held.lockPath).catch(() => {});
-      }
+    } catch (err) {
+      // Copy failed — no archive writes completed; release locks immediately.
+      _releaseDirectNasLocks(_directNasLocks);
+      throw err;
     }
+    // importFileJobs succeeded — keep locks active through metadata writes (direct-nas).
 
     const auditContext = {
       groups,
@@ -886,6 +885,19 @@ ipcMain.handle('import:commitTransaction', async (event, {
     // Post-import EXIF metadata hook — fire-and-forget; never blocks the response.
     // Context is derived from event.json (originalEventJson) + import results,
     // not from transient renderer UI state (liveComps is intentionally excluded).
+    //
+    // For direct-nas: metadata writes go to the same NAS photographer paths as the
+    // file copy, so locks must remain active until batch_complete fires.
+    // If metadata is disabled (or no files copied), release locks immediately below.
+    const _willWriteNasMetadata = _directNasLocks.length > 0
+      && settings.getAutoMetadataEnabled()
+      && (result.copiedFiles?.length > 0);
+
+    if (!_willWriteNasMetadata) {
+      // Metadata won't write to archive paths — safe to release locks now.
+      _releaseDirectNasLocks(_directNasLocks);
+    }
+
     if (settings.getAutoMetadataEnabled() && result.copiedFiles?.length > 0) {
       const batchId = result.auditLogs?.[0]?.id || Date.now().toString(36);
       const win = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
@@ -900,11 +912,17 @@ ipcMain.handle('import:commitTransaction', async (event, {
       const baseEmit = win
         ? (p) => { if (!win.isDestroyed()) win.webContents.send('metadata:progress', p); }
         : null;
-      const emitFn = baseEmit
+
+      // emitFn is non-null when a window is open OR when locks need deferred release.
+      // For direct-nas: release archive locks at batch_complete — all file writes are done.
+      const emitFn = (baseEmit || _willWriteNasMetadata)
         ? async (p) => {
+            if (_willWriteNasMetadata && p.event === 'batch_complete') {
+              _releaseDirectNasLocks(_directNasLocks);
+            }
             if (p.event === 'batch_complete' && eventJsonPath)
               await _writeLastMetadataRun(path.join(eventJsonPath, 'event.json'), p, metaContext.groups);
-            baseEmit(p);
+            if (baseEmit) baseEmit(p);
           }
         : null;
 
@@ -915,6 +933,8 @@ ipcMain.handle('import:commitTransaction', async (event, {
     return result;
   } catch (err) {
     console.error('[import:commitTransaction] finalization error:', err.stack || err.message);
+    // Release any remaining locks (e.g. event.json write failed after importFileJobs).
+    _releaseDirectNasLocks(_directNasLocks);
     try {
       await restoreCreatedStatus();
     } catch (rollbackErr) {
@@ -1924,6 +1944,22 @@ ipcMain.handle('archive:readSyncManifest',  async (_event, { localEventPath }) =
 
 // Must match config/app.config.js VIDEO_EXTENSIONS exactly.
 const _DIRECT_ARCHIVE_VIDEO_EXTS = new Set(['.mp4', '.mov']);
+
+/**
+ * Release all held direct-nas import locks and clear their heartbeat timers.
+ * Idempotent — empties the array after the first call, so duplicate calls are safe.
+ *
+ * @param {Array<{lockPath:string, heartbeatTimer:*}>} locks
+ */
+function _releaseDirectNasLocks(locks) {
+  for (const held of locks) {
+    clearInterval(held.heartbeatTimer);
+    archiveLockService.releaseLock(held.lockPath).catch(err =>
+      console.warn('[import:commitTransaction] Lock release error:', err.message)
+    );
+  }
+  locks.length = 0;
+}
 
 /**
  * Derive deduplicated photographer-level lock scopes from an array of fileJobs.
