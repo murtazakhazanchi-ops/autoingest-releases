@@ -285,6 +285,45 @@ Validation:
 - Confirm the renderer triggers a live scan after showing cached data and updates the display on completion.
 - Confirm the cache file stores only lightweight data (aggregate counts, not full event objects).
 
+### Two-Phase Archive-Root Validator
+
+Context:
+- Applies to any IPC handler that validates an archive root path (NAS, main archive, or future archive locations).
+
+Rule:
+- Use two separate try/catch blocks — do not merge directory-stat failure and marker-read failure into one catch.
+- Phase 1: `await fsp.stat(path)` in its own try/catch. Any failure (ENOENT, EACCES, network unreachable) → `{ valid: false, reason: 'offline' }`.
+- Phase 2: `await fsp.readFile(markerPath)` in a second try/catch. ENOENT → `{ valid: false, reason: 'no-marker' }`. Any access error → `{ valid: false, reason: 'no-access' }`. Success → `{ valid: true }`.
+- A single try/catch that conflates stat failure and readFile failure makes "Offline" and "Invalid archive" indistinguishable — both produce `reason: 'no-marker'`, masking network outages.
+
+Avoid:
+- A single try/catch wrapping both stat and marker-read — ENOENT from stat looks identical to ENOENT from readFile.
+- Returning `reason: 'no-marker'` when the real cause is that the directory is unreachable.
+
+Validation:
+- Confirm the stat call is in its own try/catch and returns `reason: 'offline'` on any failure.
+- Confirm the marker-read call is in a separate try/catch returning `reason: 'no-marker'` for ENOENT and `reason: 'no-access'` for permission errors.
+- Confirm `reason: 'offline'` is returned when the directory does not exist (not `reason: 'no-marker'`).
+
+### All Return Paths When Extending a Multi-Return IPC Handler
+
+Context:
+- Applies when adding a new field to an IPC handler that has multiple explicit return statements (e.g., early returns for error conditions, fallback returns, and the main success return).
+
+Rule:
+- Count every return statement in the handler before editing.
+- Add the new field to every return path — including early-return error paths and fallback returns, not only the primary success return.
+- A field present only in the success path produces `undefined` in the caller for all error/early-return scenarios, causing UI to display stale or blank values.
+
+Avoid:
+- Adding a new field to the obvious success return only and assuming it is covered.
+- Skipping early-return paths because they "should not happen" in normal use.
+
+Validation:
+- Count total return statements in the handler.
+- Confirm the new field appears in every one of them.
+- Confirm the renderer shows correct values for the new field when the handler takes each return path.
+
 ### Per-File Property Propagation on exifService Batch Objects
 
 Context:

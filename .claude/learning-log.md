@@ -1400,6 +1400,34 @@ Status:
 
 ---
 
+### 2026-05-12 — Phase 12A: Main Archive Root Setting and Validation Foundation
+
+Task type:
+- Contracts / UI / Renderer / Persistence / Architecture
+
+What happened:
+- Added `archive:validateMainArchiveRoot` IPC handler and `_alocShowMainNasValidation` UI helper as part of the Main Archive Root modal section.
+- The older `archive:validateNasRoot` handler conflates ENOENT-on-stat (directory unreachable) with ENOENT-on-readFile (marker absent): both return `reason: 'no-marker'`, making "Offline" and "Invalid archive" indistinguishable.
+- The new handler uses a two-phase try/catch: stat in its own try/catch (any failure → `reason: 'offline'`), then marker-read in a second try/catch (ENOENT → `reason: 'no-marker'`, access error → `reason: 'no-access'`).
+- A dedicated `_alocShowMainNasValidation` maps the four reason codes to operator-friendly status strings (Connected / Offline / Invalid archive / No access) rather than exposing raw codes or reusing the generic `_alocShowValidation` helper which shows ✓/✗ with technical message strings.
+- `mainArchiveRoot` was threaded through all 7 return paths of `getArchiveOperationsStatus`. Reviewer confirmed all paths were correct.
+- Modal open calls `validateMainArchiveRoot` as fire-and-forget (`.then(result => show(result)).catch(() => {})`) to avoid blocking modal open on a potentially slow filesystem stat.
+
+Reusable lessons:
+1. **Two-phase archive-root validator**: stat the path first (any error → `reason: 'offline'`), read the marker file second (ENOENT → `reason: 'no-marker'`, permission → `reason: 'no-access'`). Single try/catch conflates offline with invalid-archive.
+2. **Status-string UI helper for archive sections**: map machine reason codes to operator-facing status strings in a dedicated display function. Do not expose raw reason codes in the UI; do not reuse generic validation helpers that show technical messages.
+3. **All return paths when extending IPC handlers**: when a new field is added to a multi-return-path IPC handler, it must be added to every return path, not just the early-return path. Verify the total count of return paths before closing.
+4. **Fire-and-forget validation on modal open**: call `window.api.validateX(path).then(result => showResult(result)).catch(() => {})` in the modal open function — do not await, do not block open on filesystem access.
+
+Promote to agents:
+- `autoingest-architect.md` — two-phase archive validator pattern and all-return-paths rule
+- `ui-system-specialist.md` — status-string UI helper rule and fire-and-forget validation on modal open
+
+Status:
+- Promoted
+
+---
+
 ## Entry Template
 
 ### YYYY-MM-DD — Task Name

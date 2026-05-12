@@ -1305,6 +1305,43 @@ Validation:
 - Confirm clicking the action button rapidly does not issue multiple concurrent IPC calls.
 - Confirm a thrown IPC error does not leave the guard permanently set.
 
+### Status-String UI Helper for Archive Sections
+
+Context:
+- Applies to any modal section that displays the validation status of an archive root path (main archive, NAS, or future archive locations).
+
+Rule:
+- Create a dedicated display function per archive section (e.g., `_alocShowMainNasValidation`) that maps machine reason codes to four operator-facing status strings: Connected / Offline / Invalid archive / No access.
+- Do not expose raw IPC reason codes (`'offline'`, `'no-marker'`, `'no-access'`) directly in the UI.
+- Do not reuse the generic `_alocShowValidation` helper for archive-root sections — it shows ✓/✗ with technical message strings rather than meaningful operator status labels.
+
+Avoid:
+- Injecting raw reason codes as visible text in the modal.
+- Sharing one validation display helper across conceptually distinct sections when the display semantics differ.
+
+Validation:
+- Confirm the status label shows "Connected", "Offline", "Invalid archive", or "No access" — not a raw reason code or ✓/✗.
+- Confirm the helper is specific to its section and does not receive or display fields from a different section.
+
+### Fire-and-Forget Validation on Modal Open
+
+Context:
+- Applies to any modal open function that needs to display the current validation status for a saved path (archive root, NAS location, or similar) without blocking the modal from appearing.
+
+Rule:
+- Call validation as fire-and-forget: `window.api.validateX(path).then(result => showResult(result)).catch(() => {})`.
+- Do not `await` the validation in the modal open function — filesystem stat calls can be slow (especially over a network path), and blocking `open()` on them delays the modal render.
+- The `.catch(() => {})` is required to suppress unhandled rejections when the path is unreachable.
+
+Avoid:
+- `await window.api.validateX(path)` inside the modal open function — blocks open on a potentially slow stat.
+- Omitting `.catch(() => {})` on the fire-and-forget call — leaves an unhandled rejection if the IPC fails.
+
+Validation:
+- Confirm `await` is not used on the validation call inside the open function.
+- Confirm `.catch(() => {})` is present on the fire-and-forget call.
+- Confirm the modal opens immediately and status appears asynchronously when the validation resolves.
+
 ### Light/Dark and Viewport Compatibility
 
 Context:
