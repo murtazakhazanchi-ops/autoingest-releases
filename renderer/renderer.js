@@ -10280,6 +10280,166 @@ document.addEventListener('keydown', e => {
     if (panel) { panel.hidden = true; panel.innerHTML = ''; }
   }
 
+  // ── Adoption Plan Preview (Phase 13C-3 — read-only) ─────────────────────────
+
+  function _buildAdoptionPlan(item) {
+    const inf    = item.inferred || {};
+    const tokens = Array.isArray(inf.eventTokens)         ? inf.eventTokens         : [];
+    const photos = Array.isArray(inf.photographerFolders) ? inf.photographerFolders : [];
+
+    const canAdopt = item.readiness !== 'not-auto-adoptable';
+    const blockers = [];
+    const warnings = [];
+    const missing  = [];
+
+    if (!canAdopt) {
+      (item.reasons || ['Folder name not recognized as an AutoIngest adoption candidate']).forEach(r => blockers.push(r));
+    } else {
+      if (!inf.sequence) {
+        warnings.push('No sequence number — must be assigned before adoption');
+        missing.push({ field: 'Sequence number', note: 'Not detected — must be assigned manually' });
+      }
+      if (tokens.length === 0) {
+        warnings.push('No event name tokens found in folder name');
+        missing.push({ field: 'Event name / type', note: 'Not found in folder name' });
+      }
+      if (photos.length === 0 && !inf.hasSelectedFolder) {
+        warnings.push('No content subfolders or _Selected folder found');
+      }
+      if (!inf.hijriDate) {
+        missing.push({ field: 'Hijri date', note: 'Not detected — must be confirmed manually' });
+      }
+    }
+
+    const wouldPreserve = ['Existing folder name (no rename)'];
+    wouldPreserve.push('All media files remain in place');
+    if (photos.length) {
+      wouldPreserve.push(`Photographer folder${photos.length !== 1 ? 's' : ''}: ${photos.join(', ')}`);
+    }
+    if (inf.hasSelectedFolder) {
+      wouldPreserve.push('_Selected (external output folder — not a photographer folder)');
+    }
+
+    return {
+      candidateId: item.id,
+      readiness:   item.readiness,
+      canAdopt,
+      blockers,
+      warnings,
+      missing,
+      proposedEvent: {
+        collectionName:      item.collectionName,
+        eventFolderName:     item.folderName,
+        hijriDate:           inf.hijriDate || null,
+        sequence:            inf.sequence  || null,
+        eventTypes:          tokens,
+        photographerFolders: photos,
+        hasSelectedFolder:   !!inf.hasSelectedFolder,
+      },
+      wouldCreate:   ['event.json'],
+      wouldPreserve,
+      wouldNotDo: [
+        'No folder renamed',
+        'No media files moved or copied',
+        'No photographer folder renamed',
+        'No files deleted',
+        '_Selected not modified',
+      ],
+    };
+  }
+
+  function _renderAdoptionPlanHtml(plan) {
+    const ev = plan.proposedEvent;
+
+    const blockersHtml = plan.blockers.length
+      ? `<div class="adopt-plan-blocker">
+          <div class="adopt-plan-blocker-title">Cannot auto-adopt</div>
+          <ul class="adopt-plan-list">${plan.blockers.map(b => `<li>${_esc(b)}</li>`).join('')}</ul>
+        </div>`
+      : '';
+
+    const warningsHtml = plan.warnings.length
+      ? `<div class="adopt-plan-section">
+          <div class="adopt-plan-section-label">Warnings</div>
+          <ul class="adopt-plan-warn-list">${plan.warnings.map(w => `<li>${_esc(w)}</li>`).join('')}</ul>
+        </div>`
+      : '';
+
+    const eventSummaryHtml = plan.canAdopt
+      ? `<div class="adopt-plan-section">
+          <div class="adopt-plan-section-label">Proposed event.json summary</div>
+          <div class="adopt-plan-row">
+            <div class="adopt-plan-key">Collection</div>
+            <div class="adopt-plan-val">${_esc(ev.collectionName)}</div>
+          </div>
+          <div class="adopt-plan-row">
+            <div class="adopt-plan-key">Event folder</div>
+            <div class="adopt-plan-val">${_esc(ev.eventFolderName)}</div>
+          </div>
+          <div class="adopt-plan-row">
+            <div class="adopt-plan-key">Hijri date</div>
+            <div class="adopt-plan-val${ev.hijriDate ? '' : ' adopt-plan-val--missing'}">${ev.hijriDate ? _esc(ev.hijriDate) : 'Not detected'}</div>
+          </div>
+          <div class="adopt-plan-row">
+            <div class="adopt-plan-key">Sequence</div>
+            <div class="adopt-plan-val${ev.sequence ? '' : ' adopt-plan-val--missing'}">${ev.sequence ? _esc(ev.sequence) : 'Not detected'}</div>
+          </div>
+          <div class="adopt-plan-row">
+            <div class="adopt-plan-key">Event types</div>
+            <div class="adopt-plan-val${ev.eventTypes.length ? '' : ' adopt-plan-val--missing'}">${ev.eventTypes.length ? _esc(ev.eventTypes.join(', ')) : 'Not detected'}</div>
+          </div>
+          <div class="adopt-plan-row">
+            <div class="adopt-plan-key">Photographers</div>
+            <div class="adopt-plan-val${ev.photographerFolders.length ? '' : ' adopt-plan-val--missing'}">${ev.photographerFolders.length ? _esc(ev.photographerFolders.join(', ')) : 'None detected'}</div>
+          </div>
+          <div class="adopt-plan-row">
+            <div class="adopt-plan-key">_Selected</div>
+            <div class="adopt-plan-val">${ev.hasSelectedFolder ? 'Present (external output — preserved)' : 'Not present'}</div>
+          </div>
+        </div>`
+      : '';
+
+    const missingHtml = plan.missing.length
+      ? `<div class="adopt-plan-section">
+          <div class="adopt-plan-section-label">Fields needing review</div>
+          ${plan.missing.map(m => `<div class="adopt-plan-row">
+            <div class="adopt-plan-key">${_esc(m.field)}</div>
+            <div class="adopt-plan-val adopt-plan-val--missing">${_esc(m.note)}</div>
+          </div>`).join('')}
+        </div>`
+      : '';
+
+    const wouldCreateHtml = `<div class="adopt-plan-section">
+      <div class="adopt-plan-section-label">Would create</div>
+      <ul class="adopt-plan-list">${plan.wouldCreate.map(c => `<li>${_esc(c)}</li>`).join('')}</ul>
+    </div>`;
+
+    const wouldPreserveHtml = `<div class="adopt-plan-section">
+      <div class="adopt-plan-section-label">Would preserve</div>
+      <ul class="adopt-plan-list">${plan.wouldPreserve.map(p => `<li>${_esc(p)}</li>`).join('')}</ul>
+    </div>`;
+
+    const wouldNotDoHtml = `<div class="adopt-plan-section">
+      <div class="adopt-plan-section-label">Would not do</div>
+      <ul class="adopt-plan-list adopt-plan-list--muted">${plan.wouldNotDo.map(d => `<li>${_esc(d)}</li>`).join('')}</ul>
+    </div>`;
+
+    return `
+      <div class="adopt-plan-divider"></div>
+      <div class="adopt-plan-header">
+        <span class="adopt-plan-title">Adoption Plan Preview</span>
+        <span class="adopt-plan-readonly">read-only · no files will be changed</span>
+      </div>
+      ${blockersHtml}
+      ${warningsHtml}
+      ${eventSummaryHtml}
+      ${missingHtml}
+      ${wouldCreateHtml}
+      ${wouldPreserveHtml}
+      ${wouldNotDoHtml}
+    `;
+  }
+
   function _showAdoptDetail(itemId) {
     const item  = _adoptItems.find(i => i.id === itemId);
     const panel = document.getElementById('adoptDetailPanel');
@@ -10382,6 +10542,7 @@ document.addEventListener('keydown', e => {
             <div class="adopt-detail-val adopt-detail-path">${_esc(wouldBecomeName)}</div>
           </div>
         </div>` : ''}
+        ${_renderAdoptionPlanHtml(_buildAdoptionPlan(item))}
       </div>
       <div class="adopt-detail-readonly-note">Read-only preview — no files will be changed.</div>
     `;

@@ -968,6 +968,27 @@
     .adopt-detail-muted { color: var(--subtext); font-style: italic; }
     .adopt-detail-readonly-note { font-size: 11px; color: var(--subtext); font-style: italic; padding: 8px 20px; border-top: 1px solid var(--border-subtle); flex-shrink: 0; }
 
+    /* Adoption Plan Preview (Phase 13C-3) */
+    .adopt-plan-divider { height: 1px; background: var(--border); margin: 12px 0 10px; }
+    .adopt-plan-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .adopt-plan-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text); }
+    .adopt-plan-readonly { font-size: 10px; color: var(--subtext); font-style: italic; }
+    .adopt-plan-section { margin-bottom: 12px; }
+    .adopt-plan-section-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--subtext); margin-bottom: 5px; }
+    .adopt-plan-row { display: flex; gap: 8px; font-size: 11.5px; padding: 3px 0; border-bottom: 1px solid var(--border-subtle); }
+    .adopt-plan-row:last-child { border-bottom: none; }
+    .adopt-plan-key { min-width: 120px; flex-shrink: 0; color: var(--subtext); }
+    .adopt-plan-val { color: var(--text); word-break: break-word; }
+    .adopt-plan-val--missing { color: var(--yellow, #f59e0b); font-style: italic; }
+    .adopt-plan-list { margin: 2px 0 0; padding-left: 14px; font-size: 11.5px; }
+    .adopt-plan-list li { padding: 1px 0; color: var(--text); }
+    .adopt-plan-list--muted li { color: var(--subtext); }
+    .adopt-plan-blocker { background: color-mix(in srgb, #ef4444 8%, transparent); border: 1px solid color-mix(in srgb, #ef4444 20%, transparent); border-radius: 5px; padding: 7px 10px; margin-bottom: 8px; }
+    .adopt-plan-blocker-title { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #ef4444; margin-bottom: 4px; }
+    .adopt-plan-blocker .adopt-plan-list li { color: #ef4444; }
+    .adopt-plan-warn-list { margin: 2px 0 0; padding-left: 14px; font-size: 11.5px; }
+    .adopt-plan-warn-list li { padding: 1px 0; color: var(--yellow, #f59e0b); }
+
     #activityLogModal .emm-box { height: calc(100vh - 80px); }
     #alTitle { font-size: 18px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.01em; }
     #alBody {
