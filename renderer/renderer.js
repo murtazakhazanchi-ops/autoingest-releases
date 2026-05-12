@@ -9645,3 +9645,308 @@ document.addEventListener('keydown', e => {
   document.getElementById('txExportBtn')?.addEventListener('click', _txStartExport);
 
 })();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Transfer Import modal
+// ─────────────────────────────────────────────────────────────────────────────
+
+(function () {
+  // ── State ────────────────────────────────────────────────────────────────
+
+  let _tiCollections = [];    // { name, path } from Transfer Drive scan
+  let _tiPollTimer   = null;
+  let _tiRunning     = false;
+
+  // ── Open / Close ─────────────────────────────────────────────────────────
+
+  function _tiClose() {
+    document.getElementById('transferImportModal')?.classList.remove('open');
+    document.body.style.overflow = '';
+    _tiStopPoll();
+    _tiRunning = false;
+  }
+
+  async function _tiOpen() {
+    const overlay = document.getElementById('transferImportModal');
+    if (!overlay || overlay.classList.contains('open')) return;
+
+    // Populate Transfer Drive path (read-only display)
+    const savedTransferRoot = await window.api.getTransferRoot().catch(() => null);
+    const driveEl = document.getElementById('tiDrivePath');
+    if (driveEl) {
+      if (savedTransferRoot) {
+        driveEl.textContent = savedTransferRoot;
+        driveEl.classList.remove('tx-unset');
+      } else {
+        driveEl.textContent = 'Not set';
+        driveEl.classList.add('tx-unset');
+      }
+    }
+
+    // Populate Main Archive Root path (read-only display)
+    const status = await window.api.getArchiveOperationsStatus().catch(() => null);
+    const mainEl = document.getElementById('tiMainArchivePath');
+    if (mainEl) {
+      const mar = status?.mainArchiveRoot;
+      if (mar) {
+        mainEl.textContent = mar;
+        mainEl.classList.remove('tx-unset');
+      } else {
+        mainEl.textContent = 'Not set';
+        mainEl.classList.add('tx-unset');
+      }
+    }
+
+    // Load Transfer Drive collections for scope selection
+    await _tiLoadCollections();
+
+    // Restore last known import status (may be a running or completed import)
+    const importStatus = await window.api.getTransferImportStatus().catch(() => null);
+    if (importStatus && (importStatus.running || importStatus.result)) {
+      _tiApplyStatus(importStatus);
+      if (importStatus.running) {
+        _tiRunning = true;
+        _tiStartPoll();
+      }
+    } else {
+      document.getElementById('tiStatusBox')?.setAttribute('hidden', '');
+    }
+
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  // ── Scope list ────────────────────────────────────────────────────────────
+
+  async function _tiLoadCollections() {
+    const listEl = document.getElementById('tiScopeList');
+    if (!listEl) return;
+
+    let result;
+    try { result = await window.api.getTransferDriveCollections(); } catch { result = null; }
+
+    if (!result || !result.ok) {
+      const msgs = {
+        'transfer-root-not-set':    'Set a Transfer Drive first.',
+        'transfer-root-unreadable': 'Transfer Drive is offline or unreadable.',
+      };
+      const reason = result?.reason || '';
+      listEl.innerHTML = `<div class="tx-empty-note">${msgs[reason] || 'No collections found.'}</div>`;
+      _tiCollections = [];
+      return;
+    }
+
+    _tiCollections = result.collections || [];
+
+    if (_tiCollections.length === 0) {
+      listEl.innerHTML = '<div class="tx-empty-note">No collections found on Transfer Drive.</div>';
+      return;
+    }
+
+    listEl.innerHTML = _tiCollections.map((c, i) => `
+      <label class="tx-scope-item">
+        <input type="checkbox" class="ti-coll-cb" data-idx="${i}" checked>
+        <span title="${c.path}">${c.name}</span>
+      </label>
+    `).join('');
+  }
+
+  function _tiGetSelectedCollectionPaths() {
+    const checkboxes = document.querySelectorAll('.ti-coll-cb:checked');
+    return Array.from(checkboxes).map(cb => {
+      const idx = parseInt(cb.dataset.idx, 10);
+      return _tiCollections[idx]?.path;
+    }).filter(Boolean);
+  }
+
+  // ── Preview ───────────────────────────────────────────────────────────────
+
+  async function _tiPreview() {
+    const scope = { collectionPaths: _tiGetSelectedCollectionPaths() };
+    if (scope.collectionPaths.length === 0) {
+      showMessage('Select at least one collection to preview.', 4000);
+      return;
+    }
+
+    const previewBtn = document.getElementById('tiPreviewBtn');
+    const importBtn  = document.getElementById('tiImportBtn');
+    if (previewBtn) previewBtn.disabled = true;
+    if (importBtn)  importBtn.disabled  = true;
+
+    const previewBox = document.getElementById('tiPreviewBox');
+    if (previewBox) {
+      previewBox.removeAttribute('hidden');
+      document.getElementById('tiPvCollections').textContent = '…';
+      document.getElementById('tiPvEvents').textContent      = '…';
+      document.getElementById('tiPvExternal').textContent    = '…';
+      document.getElementById('tiPvFiles').textContent       = '…';
+    }
+
+    let result;
+    try { result = await window.api.previewTransferImport(scope); } catch (e) {
+      showMessage('Preview failed: ' + e.message, 5000);
+      if (previewBtn) previewBtn.disabled = false;
+      return;
+    }
+
+    if (previewBtn) previewBtn.disabled = false;
+
+    if (!result.ok) {
+      const msgs = {
+        'transfer-root-not-set':       'Transfer Drive is not set.',
+        'main-archive-not-set':        'Main Archive Root is not set.',
+        'empty-scope':                 'Select at least one collection.',
+        'scope-outside-transfer-root': 'Selected path is outside the Transfer Drive.',
+        'roots-overlap':               'Transfer Drive must not overlap with Main Archive Root.',
+      };
+      showMessage(msgs[result.reason] || ('Preview error: ' + result.reason), 6000);
+      if (previewBox) previewBox.setAttribute('hidden', '');
+      return;
+    }
+
+    document.getElementById('tiPvCollections').textContent = result.collections;
+    document.getElementById('tiPvEvents').textContent      = result.events;
+    document.getElementById('tiPvExternal').textContent    = result.externalFolders;
+    document.getElementById('tiPvFiles').textContent       = result.files.toLocaleString();
+
+    if (importBtn) importBtn.disabled = (result.files === 0);
+  }
+
+  // ── Import ────────────────────────────────────────────────────────────────
+
+  async function _tiStartImport() {
+    const scope = { collectionPaths: _tiGetSelectedCollectionPaths() };
+    if (scope.collectionPaths.length === 0) {
+      showMessage('Select at least one collection to import.', 4000);
+      return;
+    }
+
+    const importBtn  = document.getElementById('tiImportBtn');
+    const previewBtn = document.getElementById('tiPreviewBtn');
+    if (importBtn)  importBtn.disabled  = true;
+    if (previewBtn) previewBtn.disabled = true;
+
+    let operatorName = null;
+    try {
+      const users  = await window.api.listUsers();
+      const lastId = await window.api.getLastActiveUserId?.() ?? null;
+      const user   = users?.find(u => u.id === lastId);
+      if (user) operatorName = user.name;
+    } catch {}
+
+    let result;
+    try { result = await window.api.runTransferImport(scope, operatorName); } catch (e) {
+      showMessage('Import failed to start: ' + e.message, 6000);
+      if (importBtn)  importBtn.disabled  = false;
+      if (previewBtn) previewBtn.disabled = false;
+      return;
+    }
+
+    if (!result.ok) {
+      const msgs = {
+        'busy':                        'An import is already running.',
+        'transfer-root-not-set':       'Transfer Drive is not set.',
+        'main-archive-not-set':        'Main Archive Root is not set.',
+        'empty-scope':                 'Select at least one collection.',
+        'roots-overlap':               'Transfer Drive must not overlap with Main Archive Root.',
+        'scope-outside-transfer-root': 'A selected collection is outside the Transfer Drive.',
+      };
+      showMessage(msgs[result.reason] || ('Import error: ' + result.reason), 6000);
+      if (importBtn)  importBtn.disabled  = false;
+      if (previewBtn) previewBtn.disabled = false;
+      return;
+    }
+
+    _tiRunning = true;
+    _tiStartPoll();
+  }
+
+  // ── Status polling ────────────────────────────────────────────────────────
+
+  function _tiStartPoll() {
+    _tiStopPoll();
+    _tiPollTimer = setInterval(async () => {
+      const status = await window.api.getTransferImportStatus().catch(() => null);
+      if (!status) return;
+      _tiApplyStatus(status);
+      if (!status.running) {
+        _tiStopPoll();
+        _tiRunning = false;
+        const importBtn  = document.getElementById('tiImportBtn');
+        const previewBtn = document.getElementById('tiPreviewBtn');
+        if (importBtn)  importBtn.disabled  = false;
+        if (previewBtn) previewBtn.disabled = false;
+      }
+    }, 1000);
+  }
+
+  function _tiStopPoll() {
+    if (_tiPollTimer) { clearInterval(_tiPollTimer); _tiPollTimer = null; }
+  }
+
+  function _tiApplyStatus(status) {
+    const box = document.getElementById('tiStatusBox');
+    if (!box) return;
+    box.removeAttribute('hidden');
+    box.className = 'tx-status-box';
+    if (status.running)        box.classList.add('tx-running');
+    else if (status.result?.ok) box.classList.add('tx-done');
+    else if (status.result)    box.classList.add('tx-error');
+    else                       box.classList.add('tx-idle');
+
+    document.getElementById('tiStCopied').textContent  = status.copied  ?? 0;
+    document.getElementById('tiStSkipped').textContent = status.skipped ?? 0;
+    document.getElementById('tiStRenamed').textContent = status.renamed ?? 0;
+    document.getElementById('tiStErrors').textContent  = status.result?.errorCount ?? status.errors?.length ?? 0;
+
+    const currEl = document.getElementById('tiStCurrent');
+    if (currEl) currEl.textContent = status.running ? (status.current || '…') : '';
+
+    const noteEl = document.getElementById('tiFooterNote');
+    if (noteEl) {
+      if (status.running) {
+        noteEl.textContent = 'Import in progress…';
+      } else if (status.result?.ok) {
+        noteEl.textContent = status.result.status === 'partial'
+          ? 'Completed with errors.'
+          : 'Import complete.';
+      } else if (status.result) {
+        noteEl.textContent = 'Import failed.';
+      } else {
+        noteEl.textContent = 'Transfer Drive → Main Archive Root';
+      }
+    }
+  }
+
+  // ── Event listeners ───────────────────────────────────────────────────────
+
+  document.getElementById('alocTransferImportBtn')?.addEventListener('click', () => {
+    _alocClose();
+    _tiOpen();
+  });
+
+  document.getElementById('tiCloseBtn')?.addEventListener('click', () => { if (!_tiRunning) _tiClose(); });
+  document.getElementById('tiDoneBtn')?.addEventListener('click', _tiClose);
+
+  document.getElementById('transferImportModal')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('transferImportModal') && !_tiRunning) _tiClose();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.getElementById('transferImportModal')?.classList.contains('open')) {
+      if (!_tiRunning) _tiClose();
+    }
+  });
+
+  document.getElementById('tiSelectAllBtn')?.addEventListener('click', () => {
+    document.querySelectorAll('.ti-coll-cb').forEach(cb => { cb.checked = true; });
+  });
+
+  document.getElementById('tiSelectNoneBtn')?.addEventListener('click', () => {
+    document.querySelectorAll('.ti-coll-cb').forEach(cb => { cb.checked = false; });
+  });
+
+  document.getElementById('tiPreviewBtn')?.addEventListener('click', _tiPreview);
+  document.getElementById('tiImportBtn')?.addEventListener('click', _tiStartImport);
+
+})();

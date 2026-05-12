@@ -233,6 +233,12 @@ contextBridge.exposeInMainWorld('api', {
   runTransferExport:       (scope, operatorName)         => ipcRenderer.invoke('archive:runTransferExport',      { scope, operatorName }),
   getTransferExportStatus: ()                            => ipcRenderer.invoke('archive:getTransferExportStatus'),
 
+  // ── Transfer Import ──
+  getTransferDriveCollections: ()                        => ipcRenderer.invoke('archive:getTransferDriveCollections'),
+  previewTransferImport:       (scope)                   => ipcRenderer.invoke('archive:previewTransferImport',  { scope }),
+  runTransferImport:           (scope, operatorName)     => ipcRenderer.invoke('archive:runTransferImport',      { scope, operatorName }),
+  getTransferImportStatus:     ()                        => ipcRenderer.invoke('archive:getTransferImportStatus'),
+
   // ── EXIF metadata service ──
   getMetadataStatus:      (batchId)            => ipcRenderer.invoke('metadata:getStatus',     batchId),
   retryMetadata:          (batchId)            => ipcRenderer.invoke('metadata:retry',          batchId),

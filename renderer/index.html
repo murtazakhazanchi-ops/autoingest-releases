@@ -860,8 +860,9 @@
     .aloc-device-label { font-size: 12px; color: var(--subtext); }
     .aloc-device-name  { font-size: 12px; font-weight: 600; color: var(--text); }
 
-    /* ── Transfer Export modal ── */
-    #transferExportModal .emm-box { width: min(580px, calc(100vw - 48px)); }
+    /* ── Transfer Export / Import modals ── */
+    #transferExportModal .emm-box,
+    #transferImportModal .emm-box { width: min(580px, calc(100vw - 48px)); }
     .tx-body { padding: 20px 24px 8px; display: flex; flex-direction: column; gap: 18px; }
     .tx-section-label { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--subtext); margin-bottom: 2px; }
     .tx-drive-wrap { display: flex; align-items: center; gap: 8px; }
@@ -6906,7 +6907,10 @@
       </div>
 
       <div class="emm-footer">
-        <button type="button" class="emm-btn-secondary" id="alocTransferExportBtn" style="margin-right:auto">Transfer Export…</button>
+        <div style="display:flex;gap:6px;margin-right:auto">
+          <button type="button" class="emm-btn-secondary" id="alocTransferExportBtn">Transfer Export…</button>
+          <button type="button" class="emm-btn-secondary" id="alocTransferImportBtn">Transfer Import…</button>
+        </div>
         <div class="emm-footer-right">
           <button type="button" class="emm-btn-secondary" id="alocCancelBtn">Cancel</button>
           <button type="button" class="emm-btn-primary" id="alocSaveBtn">Save</button>
@@ -6978,6 +6982,81 @@
           <button type="button" class="emm-btn-secondary" id="txPreviewBtn">Preview</button>
           <button type="button" class="emm-btn-primary"   id="txExportBtn" disabled>Export</button>
           <button type="button" class="emm-btn-secondary" id="txDoneBtn">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Transfer Import modal -->
+  <div id="transferImportModal" class="emm-overlay" role="dialog" aria-modal="true" aria-labelledby="tiTitle">
+    <div class="emm-box">
+      <div class="emm-topbar">
+        <span class="emm-topbar-title" id="tiTitle">Transfer Import</span>
+        <button type="button" class="emm-close-btn" id="tiCloseBtn" aria-label="Close">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="tx-body">
+
+        <!-- Source: Transfer Drive -->
+        <div>
+          <div class="tx-section-label">Transfer Drive (source)</div>
+          <div class="tx-drive-wrap">
+            <div class="tx-drive-path tx-unset" id="tiDrivePath">Not set</div>
+          </div>
+        </div>
+
+        <!-- Destination: Main Archive Root -->
+        <div>
+          <div class="tx-section-label">Main Archive Root (destination)</div>
+          <div class="tx-drive-wrap">
+            <div class="tx-drive-path tx-unset" id="tiMainArchivePath">Not set</div>
+          </div>
+        </div>
+
+        <!-- Import Scope -->
+        <div>
+          <div class="tx-section-label">Import Scope</div>
+          <div id="tiScopeList" class="tx-scope-list">
+            <div class="tx-empty-note">Set a Transfer Drive to load collections.</div>
+          </div>
+          <div class="tx-scope-controls" style="margin-top:6px">
+            <button type="button" id="tiSelectAllBtn">Select all</button>
+            <button type="button" id="tiSelectNoneBtn">Select none</button>
+          </div>
+        </div>
+
+        <!-- Preview counts -->
+        <div id="tiPreviewBox" class="tx-preview-box" hidden>
+          <div class="tx-section-label" style="margin-bottom:8px">Preview</div>
+          <div class="tx-preview-row">
+            <div class="tx-preview-stat"><span class="tx-preview-val" id="tiPvCollections">—</span><span class="tx-preview-lbl">Collections</span></div>
+            <div class="tx-preview-stat"><span class="tx-preview-val" id="tiPvEvents">—</span><span class="tx-preview-lbl">Events</span></div>
+            <div class="tx-preview-stat"><span class="tx-preview-val" id="tiPvExternal">—</span><span class="tx-preview-lbl">External</span></div>
+            <div class="tx-preview-stat"><span class="tx-preview-val" id="tiPvFiles">—</span><span class="tx-preview-lbl">Files</span></div>
+          </div>
+        </div>
+
+        <!-- Status -->
+        <div id="tiStatusBox" class="tx-status-box tx-idle" hidden>
+          <div class="tx-status-row">
+            <span><span class="tx-status-key">Copied</span> <span class="tx-status-val" id="tiStCopied">0</span></span>
+            <span><span class="tx-status-key">Skipped</span> <span class="tx-status-val" id="tiStSkipped">0</span></span>
+            <span><span class="tx-status-key">Renamed</span> <span class="tx-status-val" id="tiStRenamed">0</span></span>
+            <span><span class="tx-status-key">Errors</span> <span class="tx-status-val" id="tiStErrors">0</span></span>
+          </div>
+          <div class="tx-status-current" id="tiStCurrent"></div>
+        </div>
+
+      </div>
+
+      <div class="emm-footer">
+        <div id="tiFooterNote" class="sq-footer-note">Transfer Drive → Main Archive Root</div>
+        <div class="emm-footer-right">
+          <button type="button" class="emm-btn-secondary" id="tiPreviewBtn">Preview</button>
+          <button type="button" class="emm-btn-primary"   id="tiImportBtn" disabled>Import</button>
+          <button type="button" class="emm-btn-secondary" id="tiDoneBtn">Done</button>
         </div>
       </div>
     </div>

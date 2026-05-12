@@ -25,6 +25,7 @@ const syncQueueService    = require('../services/syncQueueService');
 const archiveSyncService  = require('../services/archiveSyncService');
 const archiveLockService      = require('../services/archiveLockService');
 const transferExportService   = require('../services/transferExportService');
+const transferImportService   = require('../services/transferImportService');
 const userManager   = require('./userManager');
 const { validateEventJson } = require('./contracts/dataValidator');
 const exifService         = require('./exifService');
@@ -2647,6 +2648,35 @@ ipcMain.handle('archive:runTransferExport', async (_event, { scope, operatorName
 });
 
 ipcMain.handle('archive:getTransferExportStatus', () => transferExportService.getExportStatus());
+
+// ── Transfer Import ───────────────────────────────────────────────────────────
+
+ipcMain.handle('archive:getTransferDriveCollections', async () => {
+  const transferRoot = settings.getTransferRoot();
+  if (!transferRoot) return { ok: false, reason: 'transfer-root-not-set' };
+  return transferImportService.scanCollections(transferRoot);
+});
+
+ipcMain.handle('archive:previewTransferImport', async (_event, { scope } = {}) => {
+  const transferRoot    = settings.getTransferRoot();
+  const mainArchiveRoot = settings.getMainArchiveRoot();
+  if (!transferRoot)    return { ok: false, reason: 'transfer-root-not-set' };
+  if (!mainArchiveRoot) return { ok: false, reason: 'main-archive-not-set' };
+  return transferImportService.previewImport(transferRoot, mainArchiveRoot, scope);
+});
+
+ipcMain.handle('archive:runTransferImport', async (_event, { scope, operatorName } = {}) => {
+  const transferRoot    = settings.getTransferRoot();
+  const mainArchiveRoot = settings.getMainArchiveRoot();
+  if (!transferRoot)    return { ok: false, reason: 'transfer-root-not-set' };
+  if (!mainArchiveRoot) return { ok: false, reason: 'main-archive-not-set' };
+  return transferImportService.runImport(transferRoot, mainArchiveRoot, scope, {
+    operatorName: operatorName || null,
+    deviceName:   os.hostname(),
+  });
+});
+
+ipcMain.handle('archive:getTransferImportStatus', () => transferImportService.getImportStatus());
 
 ipcMain.handle('window:minimize', () => {
   BrowserWindow.getFocusedWindow()?.minimize();
