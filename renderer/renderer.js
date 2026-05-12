@@ -7030,6 +7030,29 @@ document.getElementById('importBtn').addEventListener('click', async () => {
     }
     // ── End Local First routing override ──────────────────────────────────────
 
+    // Advisory pre-check: warn if a background sync holds any photographer lock
+    // that would conflict with a direct-nas import. This runs before the progress
+    // screen so the user can cancel or switch mode without starting the copy.
+    if (_eiSelectedImportMode === 'direct-nas') {
+      let _archSt = {};
+      try { _archSt = await window.api.getArchiveOperationsStatus(); } catch { /* non-critical */ }
+      if (_archSt.nasRoot) {
+        let _lockCheckPending = true;
+        while (_lockCheckPending) {
+          const lockCheck = await window.api.checkDirectArchiveLocks({ fileJobs });
+          if (!lockCheck.blocked?.length) { _lockCheckPending = false; break; }
+          const choice = await _showDirectArchiveBusyDialog(lockCheck.blocked);
+          if (choice === 'cancel') return;
+          if (choice === 'switch') {
+            _applyImportModeUI('local-first', null);
+            showMessage('Switched to Local First mode. Please try importing again.');
+            return;
+          }
+          // choice === 'refresh' — re-check in next loop iteration
+        }
+      }
+    }
+
     importRunning = true;
     updateSelectionBar();
     showProgress();
@@ -7052,6 +7075,7 @@ document.getElementById('importBtn').addEventListener('click', async () => {
       })),
       source: _buildImportSourceMeta(),
       importedBy: _activeUser ? { id: _activeUser.id, name: _activeUser.name } : null,
+      importMode: _eiSelectedImportMode,
     };
 
     if (window._DEBUG_SOURCE_CLEANUP) {
@@ -7287,6 +7311,46 @@ function _renderDestinationTree(groups, eventData, photographerName) {
   }
 
   return rows.join('');
+}
+
+/**
+ * Show a modal when a direct-nas import conflicts with an active background sync lock.
+ * Returns 'switch' (use local-first instead), 'refresh' (re-check locks), or 'cancel'.
+ *
+ * @param {Array<{collection:string, eventFolderName:string, photographerFolderName:string, lockedBy:string}>} blocked
+ * @returns {Promise<'switch'|'refresh'|'cancel'>}
+ */
+function _showDirectArchiveBusyDialog(blocked) {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'ec-modal-overlay';
+
+    const names    = blocked.map(b => escapeHtml(b.photographerFolderName)).join(', ');
+    const lockedBy = escapeHtml(blocked[0]?.lockedBy || 'another device');
+
+    overlay.innerHTML = `
+      <div class="ec-modal-box" style="max-width:440px">
+        <div class="ec-modal-title">Archive Busy</div>
+        <div class="ec-modal-body">
+          <strong>${names}</strong> ${blocked.length === 1 ? 'is' : 'are'} currently being
+          synced to the archive by <strong>${lockedBy}</strong>.<br><br>
+          Importing now may cause file conflicts. You can wait and re-check, switch to
+          Local&nbsp;First mode, or cancel.
+        </div>
+        <div class="ec-modal-actions">
+          <button class="ec-outline-btn dab-cancel-btn">Cancel</button>
+          <button class="ec-outline-btn dab-refresh-btn">Re-check</button>
+          <button class="ec-continue-btn dab-switch-btn">Use Local First</button>
+        </div>
+      </div>`;
+
+    const done = (choice) => { document.body.removeChild(overlay); resolve(choice); };
+    overlay.querySelector('.dab-cancel-btn').addEventListener('click',  () => done('cancel'));
+    overlay.querySelector('.dab-refresh-btn').addEventListener('click', () => done('refresh'));
+    overlay.querySelector('.dab-switch-btn').addEventListener('click',  () => done('switch'));
+
+    document.body.appendChild(overlay);
+  });
 }
 
 async function showEventImportConfirmModal(groups, eventData) {

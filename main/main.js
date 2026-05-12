@@ -23,6 +23,7 @@ const localMirrorService  = require('../services/localMirrorService');
 const localSyncManifest   = require('../services/localSyncManifest');
 const syncQueueService    = require('../services/syncQueueService');
 const archiveSyncService  = require('../services/archiveSyncService');
+const archiveLockService  = require('../services/archiveLockService');
 const userManager   = require('./userManager');
 const { validateEventJson } = require('./contracts/dataValidator');
 const exifService         = require('./exifService');
@@ -681,6 +682,7 @@ ipcMain.handle('import:commitTransaction', async (event, {
   collName,
   source,
   importedBy,
+  importMode,   // 'direct-nas' | 'local-first' | undefined
 }) => {
   let originalEventJson = null;
 
@@ -705,6 +707,9 @@ ipcMain.handle('import:commitTransaction', async (event, {
     }
   };
 
+  // Declared before the outer try so it is reachable by both the inner finally and outer catch.
+  const _directNasLocks = [];
+
   try {
     if (eventJsonPath) {
       try {
@@ -713,7 +718,45 @@ ipcMain.handle('import:commitTransaction', async (event, {
       } catch { /* rollback falls back to status-only patch */ }
     }
 
-    const result = await importFileJobs(event, fileJobs);
+    // Acquire per-photographer write locks for direct-nas imports.
+    // Locks wrap only the file-copy phase; event.json write and exif hook run after release.
+    if (importMode === 'direct-nas') {
+      const nasRoot = settings.getNasRoot();
+      if (nasRoot) {
+        const scopes = _extractPhotographerLockScopes(fileJobs, nasRoot);
+        const jobId  = `direct-${Date.now().toString(36)}`;
+        for (const scope of scopes) {
+          const lockResult = await archiveLockService.acquireLock(nasRoot, {
+            ...scope, jobId, batchId: null,
+          });
+          if (!lockResult.acquired) {
+            for (const held of _directNasLocks) {
+              clearInterval(held.heartbeatTimer);
+              archiveLockService.releaseLock(held.lockPath).catch(() => {});
+            }
+            throw new Error(`Archive folder is busy — locked by ${lockResult.lockedBy}. Please retry.`);
+          }
+          const expectedOwner  = { jobId: lockResult.lockData.jobId, deviceName: lockResult.lockData.deviceName };
+          const heartbeatTimer = setInterval(() => {
+            archiveLockService.renewLock(lockResult.lockPath, expectedOwner).catch(err => {
+              console.error('[import:commitTransaction] Lock heartbeat renewal failed:', err.message);
+              clearInterval(heartbeatTimer);
+            });
+          }, archiveLockService.LOCK_HEARTBEAT_INTERVAL_MS);
+          _directNasLocks.push({ lockPath: lockResult.lockPath, heartbeatTimer });
+        }
+      }
+    }
+
+    let result;
+    try {
+      result = await importFileJobs(event, fileJobs);
+    } finally {
+      for (const held of _directNasLocks) {
+        clearInterval(held.heartbeatTimer);
+        archiveLockService.releaseLock(held.lockPath).catch(() => {});
+      }
+    }
 
     const auditContext = {
       groups,
@@ -1877,6 +1920,47 @@ ipcMain.handle('archive:writeSyncManifest', async (_event, { localEventPath, man
 ipcMain.handle('archive:readSyncManifest',  async (_event, { localEventPath }) =>
   localSyncManifest.readManifest(localEventPath));
 
+// ── Direct-archive lock helpers ───────────────────────────────────────────────
+
+// Must match config/app.config.js VIDEO_EXTENSIONS exactly.
+const _DIRECT_ARCHIVE_VIDEO_EXTS = new Set(['.mp4', '.mov']);
+
+/**
+ * Derive deduplicated photographer-level lock scopes from an array of fileJobs.
+ *
+ * Routing structure (from importRouter.js):
+ *   single:  nasRoot/collection/eventName/photographer/[VIDEO/]file
+ *   multi:   nasRoot/collection/eventName/subEventId/photographer/[VIDEO/]file
+ *
+ * VIDEO strip: only strip the VIDEO segment when the file has a video extension
+ * AND the immediate parent dir name is literally "VIDEO".
+ * photographerFolderName = segments[segments.length - 1] (last segment only),
+ * which matches Phase 7 lock keys that use phEntry.name.
+ *
+ * @param {Array<{src:string, dest:string}>} fileJobs
+ * @param {string} nasRoot
+ * @returns {Array<{collection:string, eventFolderName:string, photographerFolderName:string}>}
+ */
+function _extractPhotographerLockScopes(fileJobs, nasRoot) {
+  const seen = new Map();
+  for (const job of fileJobs) {
+    let parentDir = path.dirname(job.dest);
+    const ext = path.extname(job.dest).toLowerCase();
+    if (_DIRECT_ARCHIVE_VIDEO_EXTS.has(ext) && path.basename(parentDir) === 'VIDEO') {
+      parentDir = path.dirname(parentDir);
+    }
+    const rel      = path.relative(nasRoot, parentDir);
+    const segments = rel.split(path.sep).filter(Boolean);
+    if (segments.length < 3) continue;
+    const collection             = segments[0];
+    const eventFolderName        = segments[1];
+    const photographerFolderName = segments[segments.length - 1];
+    const key = `${collection}\x00${eventFolderName}\x00${photographerFolderName}`;
+    if (!seen.has(key)) seen.set(key, { collection, eventFolderName, photographerFolderName });
+  }
+  return Array.from(seen.values());
+}
+
 // ── Durable sync queue ────────────────────────────────────────────────────────
 
 ipcMain.handle('archive:refreshSyncQueue',    async () => syncQueueService.refreshQueue());
@@ -1954,6 +2038,25 @@ ipcMain.handle('archive:syncAllReadyJobs', async () => {
   }
 
   return { ok: true, processed: results.length, results };
+});
+
+// ── Direct archive lock check (advisory pre-flight) ──────────────────────────
+
+ipcMain.handle('archive:checkDirectArchiveLocks', async (_event, { fileJobs } = {}) => {
+  const nasRoot = settings.getNasRoot();
+  if (!nasRoot) return { ok: true, blocked: [] };
+
+  const scopes  = _extractPhotographerLockScopes(fileJobs || [], nasRoot);
+  const blocked = [];
+  for (const scope of scopes) {
+    try {
+      const r = await archiveLockService.checkLock(nasRoot, scope);
+      if (r.blocked) blocked.push({ ...scope, lockedBy: r.lockedBy, expiresAt: r.expiresAt });
+    } catch (err) {
+      console.warn('[archive:checkDirectArchiveLocks] checkLock I/O error (treating as not blocked):', scope.photographerFolderName, err.message);
+    }
+  }
+  return { ok: true, blocked };
 });
 
 // ── EXIF metadata service ─────────────────────────────────────────────────────

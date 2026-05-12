@@ -104,6 +104,33 @@ async function acquireLock(activeArchiveRoot, { collection, eventFolderName, pho
 }
 
 /**
+ * Non-acquiring advisory check — does an active, non-stale lock exist?
+ * Returns { blocked: true, lockedBy, expiresAt } or { blocked: false }.
+ * ENOENT or stale lock → not blocked.
+ * Never acquires or modifies any lock file.
+ *
+ * @param {string} activeArchiveRoot
+ * @param {{ collection: string, eventFolderName: string, photographerFolderName: string }} params
+ * @returns {Promise<{ blocked: boolean, lockedBy?: string, expiresAt?: number }>}
+ */
+async function checkLock(activeArchiveRoot, { collection, eventFolderName, photographerFolderName }) {
+  const lockPath = _lockPath(activeArchiveRoot, collection, eventFolderName, photographerFolderName);
+  let existing = null;
+  try {
+    const raw = await fsp.readFile(lockPath, 'utf8');
+    existing  = JSON.parse(raw);
+  } catch (e) {
+    if (e.code === 'ENOENT') return { blocked: false };
+    throw e;
+  }
+  const now = Date.now();
+  if (existing && existing.status === 'active' && typeof existing.expiresAt === 'number' && existing.expiresAt > now) {
+    return { blocked: true, lockedBy: existing.deviceName || 'unknown', expiresAt: existing.expiresAt };
+  }
+  return { blocked: false };
+}
+
+/**
  * Release a lock by its absolute path.
  * ENOENT is not an error — lock was already released.
  *
@@ -163,6 +190,7 @@ async function renewLock(lockPath, { jobId, deviceName }) {
 
 module.exports = {
   acquireLock,
+  checkLock,
   releaseLock,
   renewLock,
   LOCK_TTL_MS,

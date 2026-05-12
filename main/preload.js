@@ -220,8 +220,9 @@ contextBridge.exposeInMainWorld('api', {
   readSyncJob:         (jobId)  => ipcRenderer.invoke('archive:readSyncJob', jobId),
 
   // ── Background archive sync ──
-  syncJobNow:          (jobId)  => ipcRenderer.invoke('archive:syncJobNow',        jobId),
-  syncAllReadyJobs:    ()       => ipcRenderer.invoke('archive:syncAllReadyJobs'),
+  syncJobNow:             (jobId)   => ipcRenderer.invoke('archive:syncJobNow',            jobId),
+  syncAllReadyJobs:       ()        => ipcRenderer.invoke('archive:syncAllReadyJobs'),
+  checkDirectArchiveLocks: (payload) => ipcRenderer.invoke('archive:checkDirectArchiveLocks', payload),
 
   // ── EXIF metadata service ──
   getMetadataStatus:      (batchId)            => ipcRenderer.invoke('metadata:getStatus',     batchId),
