@@ -707,8 +707,9 @@ ipcMain.handle('import:commitTransaction', async (event, {
     }
   };
 
-  // Declared before the outer try so it is reachable by both the inner finally and outer catch.
-  const _directNasLocks = [];
+  // Declared before the outer try so both are reachable by the inner catch and outer catch.
+  const _directNasLocks      = [];
+  const heartbeatAbortSignal = { aborted: false, reason: null };
 
   try {
     if (eventJsonPath) {
@@ -737,9 +738,20 @@ ipcMain.handle('import:commitTransaction', async (event, {
           }
           const expectedOwner  = { jobId: lockResult.lockData.jobId, deviceName: lockResult.lockData.deviceName };
           const heartbeatTimer = setInterval(() => {
-            archiveLockService.renewLock(lockResult.lockPath, expectedOwner).catch(err => {
-              console.error('[import:commitTransaction] Lock heartbeat renewal failed:', err.message);
+            archiveLockService.renewLock(lockResult.lockPath, expectedOwner).then(r => {
+              if (!r.renewed) {
+                // Lock gone, stolen, or ownership mismatch — stop the copy.
+                heartbeatAbortSignal.aborted = true;
+                heartbeatAbortSignal.reason  = r.reason;
+                clearInterval(heartbeatTimer);
+                abortCopy(); // signals copyFileJobs to skip remaining files
+              }
+            }).catch(err => {
+              console.error('[import:commitTransaction] Lock heartbeat I/O error:', err.message);
+              heartbeatAbortSignal.aborted = true;
+              heartbeatAbortSignal.reason  = 'heartbeat-io-error';
               clearInterval(heartbeatTimer);
+              abortCopy();
             });
           }, archiveLockService.LOCK_HEARTBEAT_INTERVAL_MS);
           _directNasLocks.push({ lockPath: lockResult.lockPath, heartbeatTimer });
@@ -756,6 +768,16 @@ ipcMain.handle('import:commitTransaction', async (event, {
       throw err;
     }
     // importFileJobs succeeded — keep locks active through metadata writes (direct-nas).
+
+    // If a heartbeat failure fired abortCopy() mid-copy, copyFileJobs drained without
+    // writing remaining files. The lock was lost; do not commit a partial import.
+    if (heartbeatAbortSignal.aborted) {
+      _releaseDirectNasLocks(_directNasLocks);
+      throw new Error(
+        `Direct Archive import stopped: archive lock lost during copy (${heartbeatAbortSignal.reason}). ` +
+        `Retry to complete the import.`
+      );
+    }
 
     const auditContext = {
       groups,
