@@ -2757,6 +2757,7 @@ async function _sqLoadQueue() {
     }
     if (syncAllBtn) syncAllBtn.style.display = ready > 0 ? 'block' : 'none';
     _sqRenderJobs(jobs, reviews);
+    _applySyncQueueTile({ total: jobs.length, ready, needsAttention: attn, failed, syncing });
   } catch {
     if (listEl) listEl.innerHTML = '<div class="sq-empty">Failed to load queue.</div>';
   }
@@ -2883,8 +2884,6 @@ document.getElementById('sqJobList')?.addEventListener('click', async (e) => {
   try {
     const result = await window.api.syncJobNow(jobId);
     await _sqLoadQueue();
-    const summary = await window.api.getSyncQueueSummary().catch(() => null);
-    if (summary) _applySyncQueueTile(summary);
     if (result?.ok === false) showMessage('Sync failed. Review needed.', 7000);
     else showMessage('Sync complete.', 6000);
   } catch {
@@ -2913,8 +2912,6 @@ document.getElementById('sqJobList')?.addEventListener('click', async (e) => {
       return;
     }
     await _sqLoadQueue();
-    const summary = await window.api.getSyncQueueSummary().catch(() => null);
-    if (summary) _applySyncQueueTile(summary);
   } catch {
     btn.disabled    = false;
     btn.textContent = 'Mark reviewed';
@@ -2931,8 +2928,6 @@ document.getElementById('sqSyncAllBtn')?.addEventListener('click', async () => {
   try {
     const result = await window.api.syncAllReadyJobs();
     await _sqLoadQueue();
-    const summary = await window.api.getSyncQueueSummary().catch(() => null);
-    if (summary) _applySyncQueueTile(summary);
     const anyFailed = result?.results?.some(r => r.status === 'sync-failed');
     if (anyFailed) showMessage('Sync failed. Review needed.', 7000);
     else if (result?.processed > 0) showMessage('Sync complete.', 6000);
