@@ -930,6 +930,21 @@
     .diag-cleanup-btn:hover:not(:disabled) { background: rgba(255,255,255,0.09); color: var(--text); }
     .diag-cleanup-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
+    /* Adoption Preview (Phase 13C-1) */
+    .adopt-section { flex-shrink: 0; max-height: 260px; overflow-y: auto; border-top: 1px solid var(--border-subtle); }
+    .adopt-header { padding: 8px 2px 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--subtext); }
+    .adopt-col-header { display: grid; grid-template-columns: 2fr 1fr 1.2fr 2fr; gap: 6px; padding: 4px 6px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--subtext); border-bottom: 1px solid var(--border); }
+    .adopt-row { display: grid; grid-template-columns: 2fr 1fr 1.2fr 2fr; gap: 6px; padding: 6px; border-bottom: 1px solid var(--border-subtle); font-size: 11.5px; align-items: start; }
+    .adopt-row:last-child { border-bottom: none; }
+    .adopt-folder { font-weight: 500; word-break: break-word; }
+    .adopt-inferred { font-size: 10px; color: var(--subtext); margin-top: 2px; }
+    .adopt-coll { color: var(--subtext); font-size: 11px; word-break: break-word; }
+    .adopt-badge { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 3px; white-space: nowrap; display: inline-block; }
+    .adopt-badge--ready-for-review      { background: color-mix(in srgb, var(--green,  #22c55e) 12%, transparent); color: var(--green,  #22c55e); }
+    .adopt-badge--needs-manual-review   { background: color-mix(in srgb, var(--yellow, #f59e0b) 12%, transparent); color: var(--yellow, #f59e0b); }
+    .adopt-badge--not-auto-adoptable    { background: color-mix(in srgb, var(--subtext) 8%, transparent); color: var(--subtext); }
+    .adopt-reasons { color: var(--subtext); font-size: 11px; }
+
     #activityLogModal .emm-box { height: calc(100vh - 80px); }
     #alTitle { font-size: 18px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.01em; }
     #alBody {
@@ -7128,12 +7143,20 @@
           <div class="sq-empty">Run diagnostics to inspect all configured archive roots.</div>
         </div>
 
+        <div id="adoptionSection" class="adopt-section" hidden>
+          <div class="adopt-header">
+            <span id="adoptStatusText">Adoption Candidates</span>
+          </div>
+          <div id="adoptionList" class="adopt-list"></div>
+        </div>
+
       </div>
 
       <div class="emm-footer">
         <span class="sq-footer-note">Read-only inspection — no files are modified.</span>
         <div class="emm-footer-right">
           <button type="button" class="emm-btn-primary"    id="diagRunBtn">Run Diagnostics</button>
+          <button type="button" class="emm-btn-secondary"  id="diagAdoptBtn">Preview Adoptions</button>
           <button type="button" class="emm-btn-secondary"  id="diagDoneBtn">Done</button>
         </div>
       </div>

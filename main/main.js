@@ -29,6 +29,7 @@ const transferImportService      = require('../services/transferImportService');
 const archiveDiagnosticsService  = require('../services/archiveDiagnosticsService');
 const archiveRepairService       = require('../services/archiveRepairService');
 const syncReviewService          = require('../services/syncReviewService');
+const adoptionPreviewService     = require('../services/adoptionPreviewService');
 const userManager   = require('./userManager');
 const { validateEventJson } = require('./contracts/dataValidator');
 const exifService         = require('./exifService');
@@ -2708,6 +2709,12 @@ ipcMain.handle('archive:markSyncIssueReviewed', async (_event, { jobId, batchId,
 });
 
 ipcMain.handle('archive:getSyncIssueReviews', async () => syncReviewService.getReviews());
+
+// ── Adoption Preview (Phase 13C-1 — read-only) ───────────────────────────────
+
+ipcMain.handle('archive:runAdoptionPreview',       async (_event, { scope } = {}) => adoptionPreviewService.runAdoptionPreview(scope));
+ipcMain.handle('archive:getAdoptionPreviewStatus', ()                              => adoptionPreviewService.getAdoptionPreviewStatus());
+ipcMain.handle('archive:getAdoptionPreviewReport', ()                              => adoptionPreviewService.getAdoptionPreviewReport());
 
 // ── Archive Diagnostics — Temp File Cleanup (Phase 13B-2) ────────────────────
 

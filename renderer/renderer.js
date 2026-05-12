@@ -10022,6 +10022,7 @@ document.addEventListener('keydown', e => {
   function _diagClose() {
     document.getElementById('archiveDiagnosticsModal')?.classList.remove('open');
     _stopPoll();
+    _stopAdoptPoll();
   }
 
   function _startPoll() {
@@ -10191,6 +10192,111 @@ document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && document.getElementById('archiveDiagnosticsModal')?.classList.contains('open')) {
       _diagClose();
     }
+  });
+
+  // ── Adoption Preview (Phase 13C-1 — read-only) ───────────────────────────────
+
+  let _adoptRunning = false;
+  let _adoptPoll    = null;
+
+  const READINESS_LABELS = {
+    'ready-for-review':    'Ready',
+    'needs-manual-review': 'Needs review',
+    'not-auto-adoptable':  'Not adoptable',
+  };
+
+  function _startAdoptPoll() {
+    if (_adoptPoll) return;
+    _adoptPoll = setInterval(_pollAdoptOnce, 1200);
+  }
+
+  function _stopAdoptPoll() {
+    if (_adoptPoll) { clearInterval(_adoptPoll); _adoptPoll = null; }
+  }
+
+  function _renderAdoptionReport(report) {
+    const listEl   = document.getElementById('adoptionList');
+    const statusEl = document.getElementById('adoptStatusText');
+    if (!listEl) return;
+
+    const items = report && Array.isArray(report.items) ? report.items : [];
+
+    if (statusEl) {
+      let text = `${items.length} candidate${items.length !== 1 ? 's' : ''}`;
+      if (report?.truncated) text += ' (capped at 200)';
+      statusEl.textContent = text;
+    }
+
+    if (items.length === 0) {
+      listEl.innerHTML = '<div class="sq-empty">No adoption candidates found — all folders either have event.json or were excluded.</div>';
+      return;
+    }
+
+    let html = `<div class="adopt-col-header">
+      <div>Folder</div><div>Collection</div><div>Readiness</div><div>Reason</div>
+    </div>`;
+
+    for (const item of items) {
+      const badge     = READINESS_LABELS[item.readiness] || item.readiness;
+      const reasonStr = (item.reasons || []).join(' · ');
+      const inferred  = [];
+      if (item.inferred?.hijriDate) inferred.push(item.inferred.hijriDate);
+      if (item.inferred?.sequence)  inferred.push(`#${item.inferred.sequence}`);
+      html += `<div class="adopt-row">
+        <div>
+          <div class="adopt-folder">${_esc(item.folderName)}</div>
+          ${inferred.length ? `<div class="adopt-inferred">${_esc(inferred.join(' · '))}</div>` : ''}
+        </div>
+        <div class="adopt-coll">${_esc(item.collectionName)}</div>
+        <div><span class="adopt-badge adopt-badge--${_esc(item.readiness)}">${_esc(badge)}</span></div>
+        <div class="adopt-reasons">${_esc(reasonStr)}</div>
+      </div>`;
+    }
+    listEl.innerHTML = html;
+  }
+
+  async function _pollAdoptOnce() {
+    const status = await window.api.getAdoptionPreviewStatus().catch(() => null);
+    if (!status) return;
+    if (!status.running) {
+      _adoptRunning = false;
+      _stopAdoptPoll();
+      const report = await window.api.getAdoptionPreviewReport().catch(() => null);
+      _renderAdoptionReport(report);
+      const btn = document.getElementById('diagAdoptBtn');
+      if (btn) { btn.disabled = false; btn.textContent = 'Preview Adoptions'; }
+    } else {
+      const statusEl = document.getElementById('adoptStatusText');
+      if (statusEl) statusEl.textContent = `Scanning… ${status.itemCount} found so far.`;
+    }
+  }
+
+  document.getElementById('diagAdoptBtn')?.addEventListener('click', async () => {
+    if (_adoptRunning) return;
+    _adoptRunning = true;
+
+    const btn      = document.getElementById('diagAdoptBtn');
+    const section  = document.getElementById('adoptionSection');
+    const statusEl = document.getElementById('adoptStatusText');
+    const listEl   = document.getElementById('adoptionList');
+
+    if (btn)      { btn.disabled = true; btn.textContent = 'Scanning…'; }
+    if (section)  { section.hidden = false; }
+    if (statusEl) { statusEl.textContent = 'Scanning for adoption candidates…'; }
+    if (listEl)   { listEl.innerHTML = '<div class="sq-empty">Scanning…</div>'; }
+
+    const res = await window.api.runAdoptionPreview('allConfiguredRoots').catch(() => null);
+    if (!res || !res.ok) {
+      _adoptRunning = false;
+      if (btn)      { btn.disabled = false; btn.textContent = 'Preview Adoptions'; }
+      if (statusEl) {
+        statusEl.textContent = (res && res.reason === 'busy')
+          ? 'A preview scan is already running.'
+          : 'Failed to start adoption preview.';
+      }
+      return;
+    }
+    _startAdoptPoll();
   });
 
   // ── Temp file cleanup (Phase 13B-2) ──────────────────────────────────────────
