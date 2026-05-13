@@ -1465,6 +1465,44 @@ Status:
 
 ---
 
+### 2026-05-13 — Phase 13C-5: Dry-Run Check List Completeness
+
+Task type:
+- Feature / Service Layer / Validation / Diagnostics / Code Review
+
+What happened:
+- `services/adoptionDryRunService.js` runs a fixed set of named checks and returns a `checks[]` array.
+- The B4 "Folder name pattern" check had two branches: `if (KNOWN_EXTERNAL_NAMES.has(folderName))` → fail, `else if (parseLevel !== 'none')` → pass.
+- When `parseLevel === 'none'` AND the folder name was not in KNOWN_EXTERNAL_NAMES, neither branch ran. The check entry was silently absent from the output array.
+- code-reviewer agent caught this as a low-severity issue during Phase 13C-5 review.
+- Fix: added an explicit `else` path that calls `addCheck('Folder name pattern', 'skip', 'Skipped — folder name not in AutoIngest format')`, making the report structurally complete.
+
+Reusable lesson:
+- In any multi-check validation or diagnostic service that returns a fixed-length `checks[]` array, every check category must produce an entry regardless of parse outcome. If a check depends on a prerequisite (e.g., folder name parsed successfully), add an explicit `skip` path for the case where the prerequisite is not met. Without the skip path, check entries are silently absent — the report has a gap and the reviewer gets an inconsistent result count.
+
+Common failure mode:
+- Writing a check as `if (prereq_met) { pass_or_fail } else if (other_condition) { pass_or_fail }` with no final `else` — the check is silently absent when neither branch is entered, not skipped.
+
+Preferred pattern:
+```javascript
+if (failCondition) {
+  addCheck('Check name', 'fail', 'reason');
+} else if (passCondition) {
+  addCheck('Check name', 'pass', 'reason');
+} else {
+  addCheck('Check name', 'skip', 'Skipped — prerequisite not met');
+}
+```
+
+Promote to agents:
+- `contract-debugger.md` — silent absence from a checks[] array as a diagnostic pattern
+- `code-reviewer.md` — validation check for check-list completeness in diagnostic/dry-run services
+
+Status:
+- Promoted
+
+---
+
 ## Entry Template
 
 ### YYYY-MM-DD — Task Name

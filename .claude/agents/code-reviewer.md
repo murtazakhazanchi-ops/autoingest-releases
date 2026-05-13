@@ -213,6 +213,25 @@ Validation:
 - Grep `renderer.js` for `querySelector('.al-panel[data-tabs~=` — any match without `--section` is a bug.
 - Confirm the metadata, errors, and cleanup sections do not appear in the Import tab after a live batch completes.
 
+### Diagnostic / Dry-Run Check List Completeness Review
+
+Context:
+- Applies when reviewing any service that runs a fixed set of named checks and returns a `checks[]` array (e.g., adoption dry-run, pre-import validation, archive diagnostics).
+
+Rule:
+- Every named check category must produce exactly one entry in `checks[]` regardless of the input data shape.
+- A check that depends on a prerequisite (e.g., folder name parsed, file accessible) must emit a `skip` entry when the prerequisite is not met — not be silently omitted.
+- The output array length must be deterministic: callers should be able to assert a fixed count.
+
+Avoid:
+- Approving a check implementation that has pass and fail branches but no `else` / skip path — a missing else means the entry is absent when neither branch fires.
+- Assuming the omission will surface as an error; callers that iterate `checks[]` by index see one fewer item with no indication of which category was dropped.
+
+Validation:
+- For each named check in the service, confirm at least three output paths exist: pass, fail, skip.
+- Confirm that running the service against edge-case input (unparseable name, missing prerequisite data) still returns the full set of named check categories.
+- Grep for `addCheck` calls in the service and confirm every check name appears in at least one `else` / default branch.
+
 ## Validation Checklist
 
 Before giving a verdict, review:

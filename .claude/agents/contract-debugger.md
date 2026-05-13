@@ -511,6 +511,37 @@ Validation:
 - Confirm the log includes the file path and `err.message`.
 - Confirm the catch does not swallow errors that should propagate as fatal.
 
+### Checks Array Completeness — Silent Absent Entry vs. Explicit Skip
+
+Context:
+- Applies when debugging a diagnostic or dry-run service that returns a `checks[]` array with one entry per named check category, and the caller reports a missing or inconsistent result count.
+
+Rule:
+- Every check category in a fixed-check-set service must produce an entry in `checks[]` regardless of parse or prerequisite outcome.
+- If a check can only run after a prerequisite is satisfied (e.g., folder name parsed successfully), the check must still emit a `skip` entry when the prerequisite is not met — not be silently omitted.
+- Symptom: report has fewer entries than expected; a reviewer comparing expected vs. actual check categories finds a gap with no log or error.
+- Diagnosis: find the check's conditional branches and look for the case where no branch fires. That is the missing `else` / skip path.
+
+```javascript
+// Correct pattern:
+if (failCondition) {
+  addCheck('Folder name pattern', 'fail', 'reason');
+} else if (passCondition) {
+  addCheck('Folder name pattern', 'pass', 'reason');
+} else {
+  addCheck('Folder name pattern', 'skip', 'Skipped — prerequisite not met');
+}
+```
+
+Avoid:
+- Writing a check as two branches with no `else` — when neither branch fires the entry is silently absent, not skipped.
+- Assuming that a missing check entry will surface as an error — callers that iterate `checks[]` by index simply see one fewer item with no indication of which category was dropped.
+
+Validation:
+- Confirm every named check has at least three output paths: pass, fail, and skip.
+- Confirm the output array length is deterministic regardless of input data shape.
+- Confirm a dry run on unparseable / edge-case input still returns the full set of check categories.
+
 ### setInterval with Async Callback — Always Attach .catch() to Prevent Silent Failures
 
 Context:
