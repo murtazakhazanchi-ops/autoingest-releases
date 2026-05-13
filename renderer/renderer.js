@@ -10647,10 +10647,28 @@ document.addEventListener('keydown', e => {
           <div id="adoptDryRunResult"></div>
           <button type="button" class="adopt-dryrun-btn" id="adoptDryRunBtn">Run Dry-run Validation</button>
         </div>
+        <div id="adoptActionSection" class="adopt-action-section" hidden>
+          <div class="adopt-plan-divider"></div>
+          <div class="adopt-action-area">
+            <div class="adopt-action-desc">AutoIngest will create event.json only. No media files or folders will be moved, renamed, or deleted.</div>
+            <div id="adoptActionFeedback"></div>
+            <div id="adoptInitialRow">
+              <button type="button" class="adopt-action-btn" id="adoptActionBtn">Adopt Folder</button>
+            </div>
+            <div id="adoptConfirmRow" hidden>
+              <div class="adopt-action-confirm-text">Confirm: event.json will be created in this folder. No files, folders, or media will be moved, renamed, or deleted.</div>
+              <div class="adopt-action-confirm-btns">
+                <button type="button" class="adopt-action-confirm-btn" id="adoptConfirmBtn">Confirm Adoption</button>
+                <button type="button" class="adopt-action-cancel-btn" id="adoptCancelBtn">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="adopt-detail-readonly-note">Read-only preview — no files will be changed.</div>
     `;
     panel.hidden = false;
+    const adoptActionSection = panel.querySelector('#adoptActionSection');
     panel.querySelector('#adoptDetailBackBtn')?.addEventListener('click', _hideAdoptDetail);
 
     const dryRunBtn = panel.querySelector('#adoptDryRunBtn');
@@ -10671,6 +10689,85 @@ document.addEventListener('keydown', e => {
         if (resultEl) resultEl.innerHTML = _renderDryRunHtml(res);
         dryRunBtn.disabled    = false;
         dryRunBtn.textContent = 'Re-run Validation';
+
+        if (adoptActionSection) {
+          const eligible = res && res.ok && res.okForFutureAdoption
+            && (!res.blockers || res.blockers.length === 0)
+            && item.readiness === 'ready-to-adopt-later';
+          adoptActionSection.hidden = !eligible;
+          if (eligible) {
+            const o = res.proposedEventJsonOutline || {};
+            adoptActionSection.dataset.hijriDate = o.hijriDate       || '';
+            adoptActionSection.dataset.sequence  = String(o.sequence || '');
+          }
+        }
+      });
+    }
+
+    const adoptActionBtn  = panel.querySelector('#adoptActionBtn');
+    const adoptConfirmBtn = panel.querySelector('#adoptConfirmBtn');
+    const adoptCancelBtn  = panel.querySelector('#adoptCancelBtn');
+
+    if (adoptActionBtn) {
+      adoptActionBtn.addEventListener('click', () => {
+        panel.querySelector('#adoptInitialRow').hidden = true;
+        panel.querySelector('#adoptConfirmRow').hidden = false;
+      });
+    }
+
+    if (adoptCancelBtn) {
+      adoptCancelBtn.addEventListener('click', () => {
+        panel.querySelector('#adoptConfirmRow').hidden = true;
+        panel.querySelector('#adoptInitialRow').hidden = false;
+      });
+    }
+
+    if (adoptConfirmBtn) {
+      adoptConfirmBtn.addEventListener('click', async () => {
+        if (!adoptActionSection || adoptActionSection.hidden) return;
+
+        const hijriDate  = adoptActionSection.dataset.hijriDate || '';
+        const seqInt     = parseInt(adoptActionSection.dataset.sequence || '', 10);
+        const feedbackEl = panel.querySelector('#adoptActionFeedback');
+
+        if (!hijriDate || !Number.isInteger(seqInt) || seqInt < 1) {
+          if (feedbackEl) feedbackEl.innerHTML = '<div class="adopt-action-error">Cannot adopt: parsed date or sequence missing from dry-run result.</div>';
+          panel.querySelector('#adoptConfirmRow').hidden = true;
+          panel.querySelector('#adoptInitialRow').hidden = false;
+          return;
+        }
+
+        panel.querySelector('#adoptConfirmRow').hidden = true;
+        if (feedbackEl) feedbackEl.innerHTML = '<div class="adopt-action-running">Adopting…</div>';
+
+        const result = await window.api.adoptManualFolder({
+          candidateId:    item.id,
+          folderPath:     item.folderPath,
+          collectionPath: item.collectionPath,
+          rootType:       item.rootType,
+          operatorConfirmation: {
+            hijriDate,
+            sequence:                     seqInt,
+            photographerFoldersConfirmed: true,
+            selectedFolderConfirmed:      true,
+            noMediaChangeConfirmed:       true,
+            manualReviewNotes:            [],
+          },
+        }).catch(err => ({ ok: false, reason: err.message }));
+
+        if (result.ok) {
+          const warnHtml = (result.warnings || []).length
+            ? `<div class="adopt-action-warnings">${result.warnings.map(w => `<div>⚠ ${_esc(w)}</div>`).join('')}</div>`
+            : '';
+          if (feedbackEl) feedbackEl.innerHTML = `<div class="adopt-action-success">Folder adopted. event.json created.</div>${warnHtml}`;
+          setTimeout(() => {
+            _hideAdoptDetail();
+            if (!_adoptRunning) document.getElementById('diagAdoptBtn')?.click();
+          }, 2000);
+        } else {
+          if (feedbackEl) feedbackEl.innerHTML = `<div class="adopt-action-error">Adoption failed: ${_esc(result.reason || 'unknown error')}</div>`;
+          panel.querySelector('#adoptInitialRow').hidden = false;
+        }
       });
     }
   }

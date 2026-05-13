@@ -31,6 +31,7 @@ const archiveRepairService       = require('../services/archiveRepairService');
 const syncReviewService          = require('../services/syncReviewService');
 const adoptionPreviewService     = require('../services/adoptionPreviewService');
 const adoptionDryRunService      = require('../services/adoptionDryRunService');
+const adoptionWriteService       = require('../services/adoptionWriteService');
 const userManager   = require('./userManager');
 const { validateEventJson } = require('./contracts/dataValidator');
 const exifService         = require('./exifService');
@@ -2724,6 +2725,16 @@ ipcMain.handle('archive:dryRunAdoptionCandidate', async (_event, params = {}) =>
   if (!folderPath     || typeof folderPath     !== 'string') return { ok: false, reason: 'invalid-params' };
   if (!collectionPath || typeof collectionPath !== 'string') return { ok: false, reason: 'invalid-params' };
   return adoptionDryRunService.runAdoptionDryRun({ folderPath, collectionPath, rootType, candidateId });
+});
+
+// ── Adoption Write (Phase 13C-7) ──────────────────────────────────────────────
+
+ipcMain.handle('archive:adoptManualFolder', async (_event, input = {}) => {
+  const { folderPath, collectionPath } = input;
+  if (!folderPath     || typeof folderPath     !== 'string') return { ok: false, reason: 'invalid-params' };
+  if (!collectionPath || typeof collectionPath !== 'string') return { ok: false, reason: 'invalid-params' };
+  const activeUser = userManager.getActiveUser();
+  return adoptionWriteService.adoptFolder(input, isValidEventJson, activeUser);
 });
 
 // ── Archive Diagnostics — Temp File Cleanup (Phase 13B-2) ────────────────────

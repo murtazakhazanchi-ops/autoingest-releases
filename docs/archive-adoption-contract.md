@@ -38,7 +38,7 @@ This document covers:
 ## A. Future Adoption IPC Input Shape
 
 ```
-IPC channel: archive:adoptCandidate    (Phase 13C-7+, not yet registered)
+IPC channel: archive:adoptManualFolder    (registered in Phase 13C-7)
 ```
 
 ```javascript
@@ -294,19 +294,24 @@ These rules apply to all phases from 13C-6 onwards and must never be relaxed:
 
 ---
 
-## K. What Phase 13C-7 Must Implement
+## K. Phase 13C-7 Implementation (Completed)
 
-When the actual adoption write is implemented (Phase 13C-7+):
+Phase 13C-7 implemented the adoption write as follows:
 
-1. Register `archive:adoptCandidate` IPC handler in `main/main.js`.
-2. Expose `adoptCandidate(input)` in `main/preload.js`.
-3. In the handler: run validation sequence (Section B) in full, using helpers from `adoptionWriteContract.js`.
-4. Build payload via `buildAdoptionEventJson()`.
-5. Validate via `isValidEventJson()`.
-6. Write atomically.
-7. Return `{ ok: true, data }` or `{ ok: false, reason }`.
-8. Renderer triggers post-write refresh (Section G).
-9. Add Adopt button to detail panel UI only after all H gates are satisfied.
+1. Registered `archive:adoptManualFolder` IPC handler in `main/main.js`.
+2. Exposed `adoptManualFolder(input)` in `main/preload.js`.
+3. New service `services/adoptionWriteService.js` — `adoptFolder(input, isValidEventJsonFn, activeUser)`:
+   - 16-step validation sequence (Section B) — isValidEventJsonFn injected from main.js to avoid circular dep.
+   - Steps: type checks → `validateAdoptionInput` → rootType → path containment → stat → event.json absence (CRITICAL) → protected names → collection parent → FULL_RE parse → sequence ≥ 1 → cross-checks (warn) → duplicate scan → child folder re-read → build payload → validate payload → atomic write (tmp + second access check + rename).
+4. Payload built via `buildAdoptionEventJson()`.
+5. Validated via injected `isValidEventJson()`.
+6. Written atomically (tmp → second absence check → rename).
+7. Returns `{ ok: true, data, warnings }` or `{ ok: false, reason }`.
+8. Renderer shows Adopt button only after dry-run returns `okForFutureAdoption: true` and `item.readiness === 'ready-to-adopt-later'`.
+9. In-app two-step confirmation UI (no OS `confirm()` dialog — unreliable under `sandbox:true`).
+10. On success: refreshes adoption candidate list via `diagAdoptBtn.click()`.
+
+**Note:** The managed event list is not automatically refreshed after adoption — the operator must manually refresh the archive event view to see the newly adopted event.
 
 ---
 
