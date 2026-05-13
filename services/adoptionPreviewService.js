@@ -26,6 +26,12 @@ const MAX_PHOTOGRAPHER_FOLDERS = 20;
 const SKIP_DIRS   = new Set(['.autoingest', '.autoingest-transfer', '__MACOSX']);
 const OUTPUT_DIRS = new Set(['_Selected', '_Metadata', '_Stills', '_Exports']);
 
+// Folder names that indicate known external/non-event directories
+const KNOWN_EXTERNAL_NAMES = new Set([
+  'To-Give', 'To Give', 'Department Exports', 'Exports',
+  'External', 'Clients', 'Client Copies',
+]);
+
 // Full AutoIngest folder name: YYYY-MM-DD SEQ rest  (SEQ is 1–3 digits)
 const FULL_RE    = /^(\d{4}-\d{2}-\d{2})\s+(\d{1,3})\s+([\s\S]+)$/;
 // Partial: YYYY-MM-DD rest (no numeric sequence immediately follows date)
@@ -112,33 +118,53 @@ async function _inspectFolder(collPath, collName, evName, rootType) {
     }
   }
 
-  const parsed = _parseFolderName(evName);
+  const parsed   = _parseFolderName(evName);
+  const blockers = [];
+  const warnings = [];
+  const reasons  = [];
   let readiness, category;
-  const reasons = [];
+
+  // Check for known external/non-event folder names
+  if (KNOWN_EXTERNAL_NAMES.has(evName)) {
+    blockers.push('Folder name matches a known external or non-event folder pattern');
+  }
 
   if (parsed.parseLevel === 'full') {
     category = 'adoption-candidate';
     reasons.push('Folder name matches AutoIngest date + sequence format');
-    if (photographerFolders.length > 0) {
-      reasons.push(`${photographerFolders.length} content subfolder${photographerFolders.length !== 1 ? 's' : ''} detected`);
-      readiness = 'ready-for-review';
-    } else if (hasSelectedFolder) {
-      reasons.push('_Selected output folder present');
-      readiness = 'ready-for-review';
-    } else {
-      reasons.push('No content subfolders — manual inspection recommended');
+
+    if (blockers.length > 0) {
+      readiness = 'blocked';
+    } else if (parsed.sequence === '00') {
       readiness = 'needs-manual-review';
+      warnings.push('Sequence 00 may indicate a highlights or compilation folder — manual review required');
+      reasons.push('Sequence 00 detected — highlights-style folder');
+    } else if (photographerFolders.length > 0) {
+      readiness = 'ready-to-adopt-later';
+      reasons.push(`${photographerFolders.length} content subfolder${photographerFolders.length !== 1 ? 's' : ''} detected`);
+    } else if (hasSelectedFolder) {
+      readiness = 'ready-to-adopt-later';
+      reasons.push('_Selected output folder present');
+      warnings.push('No photographer folders found — only _Selected present; verify content structure before adoption');
+    } else {
+      readiness = 'needs-manual-review';
+      warnings.push('No content subfolders or _Selected folder found — folder may be empty');
+      reasons.push('No content subfolders — manual inspection recommended');
     }
   } else if (parsed.parseLevel === 'partial') {
     category  = 'legacy-event-folder';
-    readiness = 'needs-manual-review';
+    readiness = blockers.length > 0 ? 'blocked' : 'needs-manual-review';
     reasons.push('Folder has Hijri date but no sequence number');
+    warnings.push('No sequence number — must be assigned before adoption');
     if (photographerFolders.length > 0) {
       reasons.push(`${photographerFolders.length} content subfolder${photographerFolders.length !== 1 ? 's' : ''} detected`);
     }
   } else {
-    category  = 'manual-folder';
-    readiness = 'not-auto-adoptable';
+    category = 'manual-folder';
+    if (!blockers.length) {
+      blockers.push('Folder name cannot be parsed as an AutoIngest event folder');
+    }
+    readiness = 'blocked';
     reasons.push('No recognizable Hijri date or sequence in folder name');
   }
 
@@ -161,10 +187,14 @@ async function _inspectFolder(collPath, collName, evName, rootType) {
     },
     readiness,
     category,
+    blockers,
+    warnings,
     reasons,
-    recommendedAction: readiness === 'not-auto-adoptable'
-      ? 'External or manual folder — no action required'
-      : 'Review folder contents before adoption',
+    recommendedAction: readiness === 'blocked'
+      ? 'Folder cannot be adopted — see blockers for details'
+      : readiness === 'ready-to-adopt-later'
+      ? 'Ready for adoption review — content structure looks correct'
+      : 'Manual review required before adoption',
   };
 }
 

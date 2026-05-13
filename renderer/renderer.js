@@ -10202,9 +10202,11 @@ document.addEventListener('keydown', e => {
   let _adoptItems   = [];
 
   const READINESS_LABELS = {
-    'ready-for-review':    'Ready',
-    'needs-manual-review': 'Needs review',
-    'not-auto-adoptable':  'Not adoptable',
+    'ready-to-adopt-later': 'Ready',
+    'ready-for-review':     'Ready',         // legacy compat
+    'needs-manual-review':  'Needs review',
+    'blocked':              'Blocked',
+    'not-auto-adoptable':   'Not adoptable', // legacy compat
   };
 
   function _startAdoptPoll() {
@@ -10287,24 +10289,22 @@ document.addEventListener('keydown', e => {
     const tokens = Array.isArray(inf.eventTokens)         ? inf.eventTokens         : [];
     const photos = Array.isArray(inf.photographerFolders) ? inf.photographerFolders : [];
 
-    const canAdopt = item.readiness !== 'not-auto-adoptable';
-    const blockers = [];
-    const warnings = [];
+    const canAdopt = item.readiness !== 'not-auto-adoptable' && item.readiness !== 'blocked';
+    // Use service-provided blockers/warnings directly; fall back for legacy items
+    const blockers = Array.isArray(item.blockers) ? [...item.blockers] : [];
+    const warnings = Array.isArray(item.warnings) ? [...item.warnings] : [];
     const missing  = [];
 
-    if (!canAdopt) {
-      (item.reasons || ['Folder name not recognized as an AutoIngest adoption candidate']).forEach(r => blockers.push(r));
-    } else {
+    if (!canAdopt && !blockers.length) {
+      blockers.push('Folder is not adoptable — see readiness classification');
+    }
+
+    if (canAdopt) {
       if (!inf.sequence) {
-        warnings.push('No sequence number — must be assigned before adoption');
         missing.push({ field: 'Sequence number', note: 'Not detected — must be assigned manually' });
       }
       if (tokens.length === 0) {
-        warnings.push('No event name tokens found in folder name');
         missing.push({ field: 'Event name / type', note: 'Not found in folder name' });
-      }
-      if (photos.length === 0 && !inf.hasSelectedFolder) {
-        warnings.push('No content subfolders or _Selected folder found');
       }
       if (!inf.hijriDate) {
         missing.push({ field: 'Hijri date', note: 'Not detected — must be confirmed manually' });
@@ -10526,6 +10526,14 @@ document.addEventListener('keydown', e => {
             <div class="adopt-detail-key">Category</div>
             <div class="adopt-detail-val">${_esc(item.category || '—')}</div>
           </div>
+          ${(item.blockers || []).length ? `<div class="adopt-detail-row">
+            <div class="adopt-detail-key">Blockers</div>
+            <div class="adopt-detail-val"><ul class="adopt-detail-list adopt-detail-blockers">${(item.blockers || []).map(b => `<li>${_esc(b)}</li>`).join('')}</ul></div>
+          </div>` : ''}
+          ${(item.warnings || []).length ? `<div class="adopt-detail-row">
+            <div class="adopt-detail-key">Warnings</div>
+            <div class="adopt-detail-val"><ul class="adopt-detail-list adopt-detail-warnings">${(item.warnings || []).map(w => `<li>${_esc(w)}</li>`).join('')}</ul></div>
+          </div>` : ''}
           <div class="adopt-detail-row">
             <div class="adopt-detail-key">Reasons</div>
             <div class="adopt-detail-val"><ul class="adopt-detail-list">${reasonsHtml || '<li>—</li>'}</ul></div>
