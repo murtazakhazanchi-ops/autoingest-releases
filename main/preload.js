@@ -246,6 +246,7 @@ contextBridge.exposeInMainWorld('api', {
   runAdoptionPreview:        (scope)  => ipcRenderer.invoke('archive:runAdoptionPreview',        { scope }),
   getAdoptionPreviewStatus:  ()       => ipcRenderer.invoke('archive:getAdoptionPreviewStatus'),
   getAdoptionPreviewReport:  ()       => ipcRenderer.invoke('archive:getAdoptionPreviewReport'),
+  dryRunAdoptionCandidate:   (params) => ipcRenderer.invoke('archive:dryRunAdoptionCandidate',   params),
   releaseStaleLock:        (lockPath) => ipcRenderer.invoke('archive:releaseStaleLock',     { lockPath }),
   cleanupTempFile:         (tempPath) => ipcRenderer.invoke('archive:cleanupTempFile',      { tempPath }),
   markSyncIssueReviewed:   (ref)      => ipcRenderer.invoke('archive:markSyncIssueReviewed', ref),

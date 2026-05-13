@@ -30,6 +30,7 @@ const archiveDiagnosticsService  = require('../services/archiveDiagnosticsServic
 const archiveRepairService       = require('../services/archiveRepairService');
 const syncReviewService          = require('../services/syncReviewService');
 const adoptionPreviewService     = require('../services/adoptionPreviewService');
+const adoptionDryRunService      = require('../services/adoptionDryRunService');
 const userManager   = require('./userManager');
 const { validateEventJson } = require('./contracts/dataValidator');
 const exifService         = require('./exifService');
@@ -2715,6 +2716,15 @@ ipcMain.handle('archive:getSyncIssueReviews', async () => syncReviewService.getR
 ipcMain.handle('archive:runAdoptionPreview',       async (_event, { scope } = {}) => adoptionPreviewService.runAdoptionPreview(scope));
 ipcMain.handle('archive:getAdoptionPreviewStatus', ()                              => adoptionPreviewService.getAdoptionPreviewStatus());
 ipcMain.handle('archive:getAdoptionPreviewReport', ()                              => adoptionPreviewService.getAdoptionPreviewReport());
+
+// ── Adoption Dry-run Validation (Phase 13C-5 — read-only) ────────────────────
+
+ipcMain.handle('archive:dryRunAdoptionCandidate', async (_event, params = {}) => {
+  const { folderPath, collectionPath, rootType, candidateId } = params;
+  if (!folderPath     || typeof folderPath     !== 'string') return { ok: false, reason: 'invalid-params' };
+  if (!collectionPath || typeof collectionPath !== 'string') return { ok: false, reason: 'invalid-params' };
+  return adoptionDryRunService.runAdoptionDryRun({ folderPath, collectionPath, rootType, candidateId });
+});
 
 // ── Archive Diagnostics — Temp File Cleanup (Phase 13B-2) ────────────────────
 

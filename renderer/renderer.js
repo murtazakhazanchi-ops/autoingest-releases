@@ -10440,6 +10440,93 @@ document.addEventListener('keydown', e => {
     `;
   }
 
+  // ── Adoption Dry-run Validation (Phase 13C-5 — read-only) ─────────────────
+
+  function _renderDryRunHtml(result) {
+    if (!result || !result.ok) {
+      return '<div class="adopt-dryrun-error">Dry-run failed — could not contact main process.</div>';
+    }
+
+    const VERDICT_LABELS = {
+      'adoption-possible': 'Adoption possible',
+      'needs-review':      'Needs review',
+      'blocked':           'Blocked',
+    };
+    const VERDICT_CLASS = {
+      'adoption-possible': 'adopt-badge--ready-to-adopt-later',
+      'needs-review':      'adopt-badge--needs-manual-review',
+      'blocked':           'adopt-badge--blocked',
+    };
+    const STATUS_ICON = { pass: '✓', warning: '⚠', fail: '✗', skip: '—' };
+    const STATUS_CLASS = {
+      pass:    'adopt-dryrun-pass',
+      warning: 'adopt-dryrun-warn',
+      fail:    'adopt-dryrun-fail',
+      skip:    'adopt-dryrun-skip',
+    };
+
+    const verdictLabel = VERDICT_LABELS[result.readiness] || _esc(result.readiness);
+    const verdictClass = VERDICT_CLASS[result.readiness]  || '';
+
+    const checksHtml = (result.checks || []).map(c => `
+      <div class="adopt-dryrun-check ${_esc(STATUS_CLASS[c.status] || '')}">
+        <span class="adopt-dryrun-check-icon">${_esc(STATUS_ICON[c.status] || '?')}</span>
+        <span class="adopt-dryrun-check-name">${_esc(c.name)}</span>
+        <span class="adopt-dryrun-check-msg">${_esc(c.message)}</span>
+      </div>`).join('');
+
+    const manualHtml = (result.manualReviewFields || []).length
+      ? `<div class="adopt-dryrun-subsection">
+          <div class="adopt-dryrun-subsection-label">Manual review required</div>
+          ${result.manualReviewFields.map(f => `
+            <div class="adopt-plan-row">
+              <div class="adopt-plan-key">${_esc(f.field)}</div>
+              <div class="adopt-plan-val adopt-plan-val--missing">${_esc(f.note)}</div>
+            </div>`).join('')}
+        </div>`
+      : '';
+
+    const o = result.proposedEventJsonOutline || {};
+    const outlineRows = [
+      ['Collection',       o.collectionName     || '—'],
+      ['Event folder',     o.eventFolderName    || '—'],
+      ['Hijri date',       o.hijriDate          || '—'],
+      ['Sequence',         o.sequence           || '—'],
+      ['Event tokens',     o.componentsPreview  || '—'],
+      ['Content folders',  (o.photographerFolders || []).length ? o.photographerFolders.join(', ') : 'None detected'],
+      ['_Selected',        o.hasSelectedFolder ? 'Present (output — preserved)' : 'Not present'],
+      ['External folders', (o.externalFolders  || []).length ? o.externalFolders.join(', ') : 'None'],
+    ];
+    const outlineHtml = `<div class="adopt-dryrun-subsection">
+      <div class="adopt-dryrun-subsection-label">Proposed event.json outline (preview only)</div>
+      ${outlineRows.map(([k, v]) => `
+        <div class="adopt-plan-row">
+          <div class="adopt-plan-key">${_esc(k)}</div>
+          <div class="adopt-plan-val">${_esc(v)}</div>
+        </div>`).join('')}
+      <div class="adopt-dryrun-outline-note">Read-only preview — no event.json will be written.</div>
+    </div>`;
+
+    const guaranteesHtml = `<div class="adopt-dryrun-subsection">
+      <div class="adopt-dryrun-subsection-label">No-change guarantees</div>
+      <ul class="adopt-plan-list adopt-plan-list--muted">
+        ${(result.noChangeGuarantees || []).map(g => `<li>${_esc(g)}</li>`).join('')}
+      </ul>
+    </div>`;
+
+    const ts = result.generatedAt ? new Date(result.generatedAt).toLocaleTimeString() : '';
+    return `
+      <div class="adopt-dryrun-verdict-row">
+        <span class="adopt-badge ${_esc(verdictClass)}">${_esc(verdictLabel)}</span>
+        <span class="adopt-dryrun-ts">${_esc(ts)}</span>
+      </div>
+      <div class="adopt-dryrun-checks">${checksHtml}</div>
+      ${manualHtml}
+      ${outlineHtml}
+      ${guaranteesHtml}
+    `;
+  }
+
   function _showAdoptDetail(itemId) {
     const item  = _adoptItems.find(i => i.id === itemId);
     const panel = document.getElementById('adoptDetailPanel');
@@ -10551,11 +10638,41 @@ document.addEventListener('keydown', e => {
           </div>
         </div>` : ''}
         ${_renderAdoptionPlanHtml(_buildAdoptionPlan(item))}
+        <div class="adopt-dryrun-section">
+          <div class="adopt-plan-divider"></div>
+          <div class="adopt-dryrun-header">
+            <span class="adopt-dryrun-title">Dry-run Validation</span>
+            <span class="adopt-plan-readonly">read-only · no files will be changed</span>
+          </div>
+          <div id="adoptDryRunResult"></div>
+          <button type="button" class="adopt-dryrun-btn" id="adoptDryRunBtn">Run Dry-run Validation</button>
+        </div>
       </div>
       <div class="adopt-detail-readonly-note">Read-only preview — no files will be changed.</div>
     `;
     panel.hidden = false;
     panel.querySelector('#adoptDetailBackBtn')?.addEventListener('click', _hideAdoptDetail);
+
+    const dryRunBtn = panel.querySelector('#adoptDryRunBtn');
+    if (dryRunBtn) {
+      dryRunBtn.addEventListener('click', async () => {
+        dryRunBtn.disabled    = true;
+        dryRunBtn.textContent = 'Validating…';
+        const resultEl = panel.querySelector('#adoptDryRunResult');
+        if (resultEl) resultEl.innerHTML = '<div class="adopt-dryrun-running">Running dry-run validation…</div>';
+
+        const res = await window.api.dryRunAdoptionCandidate({
+          folderPath:     item.folderPath,
+          collectionPath: item.collectionPath,
+          rootType:       item.rootType,
+          candidateId:    item.id,
+        }).catch(() => null);
+
+        if (resultEl) resultEl.innerHTML = _renderDryRunHtml(res);
+        dryRunBtn.disabled    = false;
+        dryRunBtn.textContent = 'Re-run Validation';
+      });
+    }
   }
 
   document.getElementById('adoptionList')?.addEventListener('click', e => {
