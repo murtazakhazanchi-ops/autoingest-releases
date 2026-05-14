@@ -403,6 +403,26 @@ Validation:
 - Confirm the validation reads `transfer-root.json` and checks `type === 'autoingest-transfer-root'`.
 - Confirm a missing file, malformed JSON, or wrong `type` field all produce a negative result.
 
+### Sidecar XMP Conflict — needs-attention, Not Rename
+
+Context:
+- Applies to any task touching `archiveSyncService.js`, archive sync behavior, or documentation of the Local First sync conflict model.
+
+Rule:
+- When `archiveSyncService._syncDir()` encounters a sidecar file (`.xmp`) with a size or content mismatch at the destination, it increments `sidecarConflicts` and the event's sync status becomes `needs-attention`.
+- No `_safeRenamedPath()` is called for sidecar conflicts. This is intentional — sidecar mismatches require human review, not a quiet secondary copy.
+- Regular non-sidecar file conflicts still use `_safeRenamedPath()` to produce a renamed copy.
+
+Avoid:
+- Applying the safe-rename pattern to sidecar files.
+- Treating sidecar `needs-attention` as a bug — it is the intended behavior.
+- Documenting sidecar conflicts as producing a renamed `.xmp_1` copy.
+
+Validation:
+- Confirm sidecar conflicts set `sidecarConflicts++` and result in `needs-attention` status.
+- Confirm `_safeRenamedPath()` is NOT called for sidecar conflicts.
+- Confirm regular file conflicts still use the rename pattern.
+
 ### Per-File Property Propagation on exifService Batch Objects
 
 Context:

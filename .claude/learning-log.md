@@ -17,6 +17,35 @@ Rules:
 
 ---
 
+### 2026-05-14 — Phase 14A: Full Archive Operations Beta Validation
+
+Task type:
+- Read-Only Static Code Review / Beta Validation / Documentation Audit
+
+What happened:
+- Reviewed all Archive Operations Layer services (archiveConsistencyService, archiveCompletenessService, archiveDiagnosticsService, archiveAuditTimelineService, archiveSyncService, archiveLockService, archiveRepairService, adoptionWriteService, transferExportService, transferImportService, syncQueueService, internalFileProtection) by static code inspection.
+- Validation table covering 10 areas: archive root configuration, lock lifecycle, sync pipeline, transfer export/import, repair service, adoption write, internal file protection, completeness/readiness, audit timeline, IPC surface.
+- Discovered MEDIUM documentation bug: `docs/archive-operations-layer.md` and `docs/release-notes-archive-operations.md` (created in Phase 13D-6) document "Phase 13D-3 — Final Readiness Summary" with `archiveReadinessService.js` as the service file. This service does NOT exist. `archiveCompletenessService.js` is internally Phase 13D-3 and already produces a `readiness` verdict — no separate aggregation service was implemented. The docs must be corrected.
+- Discovered LOW gap: Transfer root has no `archive:validateTransferRoot` IPC handler. Three other roots (NAS, Local Staging, Main Archive) each have `archive:validate*` handlers. Transfer root only has `archive:chooseTransferRoot` (path-picker dialog with immediate write, no programmatic validation).
+- Sidecar conflict behavior in `archiveSyncService.js`: when a `.xmp` sidecar has a size/content mismatch at the destination, `sidecarConflicts++` is incremented and status becomes `needs-attention`. No safe-rename is performed. This is intentionally different from regular file conflicts (which use `_safeRenamedPath()`).
+- Beta readiness verdict: PASS for code correctness; MEDIUM documentation fix required; LOW validation gap noted.
+
+Reusable lessons:
+1. **Verify documented service exists before writing milestone docs**: When creating documentation for a multi-phase milestone, verify each service file actually exists (Glob check) and each documented IPC channel is registered in `main/main.js` and exposed in `main/preload.js`. Documenting a non-existent service is a MEDIUM documentation bug that misleads future readers and agents.
+2. **Sidecar XMP conflict → needs-attention, not rename**: In `archiveSyncService`, sidecar conflicts (size/content mismatch at destination) increment `sidecarConflicts` and produce `needs-attention` status — no `_safeRenamedPath()` is called. This is architecturally intentional: sidecar mismatches require human review, not a quiet secondary copy. Regular file conflicts still use the safe-rename pattern.
+3. **Phase numbering must be validated against file docstrings**: When creating milestone docs that assign phase numbers to services, cross-check the label against the actual docstring inside each service file. A service may be internally labeled as a different phase than assumed from implementation order.
+
+Promote to agents:
+- `release-docs-writer.md` — Verify service existence before documenting
+- `documentation-update-specialist.md` — Verify service existence before documenting
+- `autoingest-architect.md` — Sidecar XMP conflict needs-attention behavior
+- `ingestion-routing-specialist.md` — Sidecar XMP conflict needs-attention behavior
+
+Status:
+- Promoted
+
+---
+
 ### 2026-05-14 — Phase 13D-6: Archive Operations Layer Documentation
 
 Task type:

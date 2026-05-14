@@ -238,6 +238,24 @@ Avoid:
 Validation:
 - After staging, run `git status --short` to confirm intended files are staged before committing.
 
+### Verify Service Existence Before Documenting
+
+Context:
+- Applies when writing or reviewing documentation that names service files, IPC channels, or method references.
+
+Rule:
+- Before adding or preserving any reference to a service file or IPC channel in documentation, confirm the file exists in `services/` and the channel is registered in `main/main.js`.
+- If a doc names `services/X.js` and the file does not exist, flag it as a documentation bug and do not propagate the stale reference.
+
+Avoid:
+- Copying service file names or IPC channel names from session context or prior docs without verifying they exist in the codebase.
+- Leaving stale service references in place "for historical accuracy."
+
+Validation:
+- Glob `services/<name>.js` for each service referenced in docs.
+- Grep `main.js` for each IPC channel referenced in docs.
+- If a service or channel is absent, mark the documentation entry as incorrect and flag for correction.
+
 ### Milestone Docs Pattern
 
 Context:

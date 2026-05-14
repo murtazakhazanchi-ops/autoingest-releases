@@ -87,6 +87,26 @@ Validation:
 - Import same filename with different size and confirm rename.
 - Confirm summary counts copied/skipped/errored correctly.
 
+### Sidecar XMP Conflict — needs-attention, Not Rename
+
+Context:
+- Applies to `archiveSyncService.js` and any code review or documentation touching Local First archive sync conflict behavior.
+
+Rule:
+- When a sidecar `.xmp` file has a size or content mismatch at the destination during `_syncDir()`, `sidecarConflicts` is incremented and the sync job's status becomes `needs-attention`. No `_safeRenamedPath()` is called.
+- Regular non-sidecar file conflicts use `_safeRenamedPath()` to produce a renamed copy.
+- These two behaviors are intentionally different: sidecar mismatches require human review; a quiet secondary copy would silently discard XMP metadata.
+
+Avoid:
+- Applying the safe-rename pattern to sidecar files.
+- Treating sidecar `needs-attention` as a bug.
+- Documenting sidecar conflicts as producing a renamed `.xmp_1` copy.
+
+Validation:
+- Confirm sidecar conflicts set `sidecarConflicts++` and result in `needs-attention` status.
+- Confirm `_safeRenamedPath()` is NOT called for sidecar conflicts.
+- Confirm regular file conflicts still use the rename pattern.
+
 ### Transaction Integrity
 
 Context:
