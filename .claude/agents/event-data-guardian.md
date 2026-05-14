@@ -430,6 +430,38 @@ Validation:
 - Confirm non-adopted events (no `adoption` key) are unaffected by the spread guard.
 - Confirm the field is captured in the session state object (`_viewingExisting`) and included in all save payloads.
 
+### Save-Gate Conditions Must Cover All Valid Adopted Event States
+
+Context:
+- Applies whenever a save-gate condition in `_handleSaveEditedEvent` (or any equivalent save handler) branches on component count, event structure, or event history.
+- Applies when auditing existing save-gate conditions after any new valid event state is introduced.
+
+Rule:
+- Save-gate conditions written for normal events may silently not-fire for adopted pre-completion events. Adopted events start with `components:[]` (length 0), while normal single-component gates use `length === 1`. These are not the same.
+- When adding or auditing save gates, explicitly check each condition against the adopted pre-completion state.
+- Adopted pre-completion detection in `_viewingExisting`: `!!_viewingExisting?.adoption && (_viewingExisting?.components || []).length === 0`. This is the correct renderer-side signal — `_viewingExisting.adoption` is captured at edit-open time and not mutated; `_viewingExisting.components` reflects the original array at session start.
+- Adopted pre-completion gates (`components.length === 0`) and single-component gates (`components.length === 1`) are mutually exclusive by definition.
+- When adopted pre-completion events warrant a save-gate warning, no `_hasExistingData` check is needed — the warning is about defining the event structure for the first time, not about reorganizing existing imported data.
+
+```javascript
+// Correct: distinct gate for adopted 0→multi
+const _wasAdoptedPreCompletion = !!_viewingExisting?.adoption &&
+  (_viewingExisting?.components || []).length === 0;
+if (_wasAdoptedPreCompletion && _isNowMulti && !_structureWarningPending) {
+  // warn — no existing-data check required
+}
+```
+
+Avoid:
+- Assuming `_wasSingle = (length === 1)` covers adopted events — it does not.
+- Checking adopted state from `_origEntry._eventJson.components` instead of `_viewingExisting.components` — the scan cache is a different object and may be stale.
+- Adding a `_hasExistingData` requirement to the adopted 0→multi gate when the warning is advisory regardless of data.
+
+Validation:
+- After any change to save-gate conditions: test an adopted pre-completion event (components:[]) going 0→single (no warning expected) and 0→multi (warning expected).
+- Confirm the conditions are mutually exclusive (both length-0 and length-1 gates cannot fire for the same event in the same save call).
+- Confirm `_viewingExisting.adoption` and `_viewingExisting.components` are read (not from disk) and not mutated between edit-open and save.
+
 ### Documentation Follow-Up
 
 Context:

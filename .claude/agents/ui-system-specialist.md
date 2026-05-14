@@ -1436,6 +1436,46 @@ Validation:
 - Confirm every early-return branch in the import flow calls `showMessage` (or equivalent) before returning.
 - Confirm the message text is actionable — it identifies the reason and what the operator should do.
 
+### Extend Warning Modals via opts Rather Than Duplicating
+
+Context:
+- Applies when a new scenario needs the same warning modal structure (overlay, icon, title, Cancel/Proceed buttons, keyboard handler, focus management) but with different body text.
+
+Rule:
+- Add `opts = {}` as a second parameter with a `bodyHtml` property instead of creating a duplicate modal function.
+- Compute `bodyContent = opts.bodyHtml != null ? opts.bodyHtml : defaultBodyHtml` before the `return new Promise` block, where `defaultBodyHtml` is the original hardcoded body (preserving existing behavior exactly when no override is passed).
+- Replace the hardcoded body block in the innerHTML template with `${bodyContent}`.
+- The existing call site passes no second arg — `opts` defaults to `{}`, `opts.bodyHtml` is `undefined`, `undefined != null` is false → original body used. Non-breaking.
+
+```javascript
+function showStructureChangeWarningModal(diskInfo = null, opts = {}) {
+  // ... disk summary build unchanged ...
+  const bodyContent = opts.bodyHtml != null ? opts.bodyHtml
+    : `<p>Original default body...</p>${diskSummaryHtml}<p>...</p>`;
+  return new Promise(resolve => {
+    overlay.innerHTML = `...
+  <div class="ec-struct-modal-body">
+    ${bodyContent}
+  </div>...`;
+  });
+}
+
+// New call site for different scenario:
+await showStructureChangeWarningModal(null, {
+  bodyHtml: `<p>Scenario-specific text with ${dynamicValue} interpolated.</p>`,
+});
+```
+
+Avoid:
+- Duplicating the entire modal function (40-70 lines) for a one-paragraph body difference.
+- Making the `bodyHtml` argument required — always default to `opts = {}` so existing callers are unchanged.
+- Inlining unsafe dynamic values into `bodyHtml` — only numbers and pre-validated strings are safe.
+
+Validation:
+- Confirm the existing call site (no second arg) still receives the original body text unchanged.
+- Confirm the new call site receives the override body text.
+- Confirm keyboard handler (Escape/Enter), button wiring, overlay teardown, and focus remain shared and functional for both paths.
+
 ### All Paths to _renderEventForm() Must Transition EventMgmt Mode First
 
 Context:

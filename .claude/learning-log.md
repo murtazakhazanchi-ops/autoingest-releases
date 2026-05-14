@@ -17,6 +17,31 @@ Rules:
 
 ---
 
+### 2026-05-14 — Phase 13C-11: Adopted Event 0→Multi Component Structure Warning
+
+Task type:
+- Feature / Renderer / EventCreator / Adopted Event Hardening
+
+What happened:
+- Adopted pre-completion events (event.json has adoption block + components:[]) bypassed the existing single→multi structure-change warning. The existing gate was `_wasSingle = (components.length === 1)`. For adopted events, original length is 0, so `_wasSingle` was always false — 0→multi transition never warned.
+- Fix: added `_wasAdoptedPreCompletion = !!_viewingExisting?.adoption && (_viewingExisting?.components || []).length === 0` inside the existing warning block. When `_wasAdoptedPreCompletion && _isNowMulti`, the same warning modal fires with adopted-specific body text.
+- Reused `showStructureChangeWarningModal` by adding `opts = {}` second parameter with `bodyHtml` override. Existing single→multi call site passes no second arg → unchanged behavior.
+- No disk check needed for the adopted case (warning fires unconditionally for 0→multi). Conditions are mutually exclusive with `_wasSingle` (one requires length 0, other requires length 1).
+
+Reusable lessons:
+1. **Save-gate conditions must cover all valid event states**: When a new valid state is introduced (e.g., adopted pre-completion with components:[]), audit every existing save-gate condition that branches on component count. A gate written for single-component events will silently miss events with 0 components.
+2. **Adopted pre-completion detection in renderer save gates**: `!!_viewingExisting?.adoption && (_viewingExisting?.components || []).length === 0` is the correct renderer-side signal for adopted pre-completion state. `_viewingExisting.adoption` is captured at edit-open time and not mutated. `_viewingExisting.components` reflects the original components array at session start.
+3. **Extend modal body via opts rather than duplicating**: When a warning modal needs custom body text for a new scenario, add `opts = {}` with a `bodyHtml` override to the existing function. The Promise structure, overlay, keyboard handler, button wiring, and focus management are shared; only the body content differs.
+
+Promote to agents:
+- `event-data-guardian.md` — save-gate condition coverage + adopted pre-completion detection pattern
+- `ui-system-specialist.md` — warning modal opts extension pattern
+
+Status:
+- Promoted
+
+---
+
 ### 2026-05-14 — Phase 13C-10: EventMgmt SELECT Guard Blocks _renderEventForm in Redirect Paths
 
 Task type:
