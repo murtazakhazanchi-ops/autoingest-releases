@@ -284,6 +284,26 @@ Validation:
 - Confirm the entry follows the established format: `## vX.Y.Z — Title` / `### Changes` / `### System Impact` / `### Notes`.
 - Confirm the entry is included in the staged release commit, not in a follow-up commit.
 
+### Validation Checklist in Milestone Release Notes
+
+Context:
+- Applies when writing release notes for a significant technical milestone (multi-phase feature, new service layer, major workflow addition).
+
+Rule:
+- Include a dedicated **Validation Checklist** section at the end of the release notes document.
+- The checklist lists what must be verified before treating the milestone as production-ready: filesystem behavior on real hardware, modal open/close state isolation, source-error visibility, edge-case reads (large files, missing files, network mount errors), and accessibility.
+- This checklist belongs in `release-notes-*.md`, not in `docs/history.md`. Keep `history.md` clean — it records stable shipped behavior, not pre-release QA lists.
+
+Avoid:
+- Omitting the validation checklist from technical milestone release notes.
+- Adding QA checklists to `history.md`.
+- Conflating the per-phase implementation notes with the checklist.
+
+Validation:
+- Confirm the release notes include a clearly marked Validation Checklist section.
+- Confirm `history.md` does not contain the checklist.
+- Confirm each checklist item is actionable (can be checked off by a QA operator or developer).
+
 ## Validation Checklist
 
 Before writing, read:

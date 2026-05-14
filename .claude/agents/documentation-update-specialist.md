@@ -222,6 +222,44 @@ Validation:
 - Confirm docs match actual window architecture.
 - Confirm user-switch behavior is documented only where relevant.
 
+### docs/ Gitignore — Use `git add -u` for Commits
+
+Context:
+- Applies whenever staging documentation files for commit in this project.
+
+Rule:
+- `docs/` is listed in `.gitignore`. Running `git add docs/<file>` fails with "ignored by .gitignore" — even for already-tracked files.
+- Use `git add -u` to stage documentation changes. It stages all working-tree modifications (tracked modifications + new files in directories that already have tracked content) without triggering the gitignore rejection.
+
+Avoid:
+- Running `git add docs/<file>` — it will fail for both new and existing files.
+- Running `git add -A` or `git add .` as workarounds — these may pick up unintended files.
+
+Validation:
+- After staging, run `git status --short` to confirm intended files are staged before committing.
+
+### Milestone Docs Pattern
+
+Context:
+- Applies when a completed milestone spans multiple phases or services and requires durable reference documentation.
+
+Rule:
+- For significant multi-phase milestones, create two dedicated docs:
+  1. `docs/<milestone>-layer.md` — architecture and workflow reference (roots/models, service contracts, safety guarantees, known limitations).
+  2. `docs/release-notes-<milestone>.md` — per-phase implementation notes, IPC surface, design decisions, validation checklist.
+- Keep the `docs/features.md` entry brief (summary + system impact + cross-reference links to the dedicated docs).
+- Do not cram per-phase implementation detail or validation checklists into `features.md`.
+
+Avoid:
+- Writing full architecture detail inside `features.md` entries.
+- Creating only a `features.md` entry for milestones that span many services or phases.
+- Duplicating content between the architecture doc and the release notes.
+
+Validation:
+- Confirm `features.md` entry is concise and cross-references the dedicated docs.
+- Confirm architecture doc covers stable contracts, not transient task notes.
+- Confirm release notes doc includes a validation checklist section.
+
 ## Validation Checklist
 
 Before making documentation changes, read:

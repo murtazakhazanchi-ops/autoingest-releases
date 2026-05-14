@@ -17,6 +17,32 @@ Rules:
 
 ---
 
+### 2026-05-14 — Phase 13D-6: Archive Operations Layer Documentation
+
+Task type:
+- Documentation-Only / Milestone Documentation / New Docs / Feature Status Update
+
+What happened:
+- Created `docs/archive-operations-layer.md` — end-to-end architecture and workflow reference: three-root model, Local First and Direct Archive import workflows, transfer workflow, all five reporting services with their service contracts, safety guarantees, and known limitations.
+- Created `docs/release-notes-archive-operations.md` — per-phase implementation notes for 13D-1 through 13D-5, full IPC channel table, key design decisions for the audit timeline, and a validation checklist for production sign-off.
+- Updated `docs/features.md` with Feature 14 (Archive Operations Layer) as a brief summary entry with cross-references to the dedicated docs.
+- Added a single cross-reference link to `docs/archive-adoption-workflow.md` Related Documentation section.
+- `docs/` is listed in `.gitignore`. Running `git add docs/<file>` fails with "ignored by .gitignore" even for tracked files. `git add -u` correctly stages both modified tracked files and new files within gitignored directories that already contain tracked content.
+
+Reusable lessons:
+1. **`docs/` gitignore: use `git add -u` not `git add <path>`**: When `docs/` is in `.gitignore`, `git add docs/<file>` fails for every file in docs/ — including already-tracked ones. `git add -u` stages all working-tree changes (tracked modifications + new files in directories that already have tracked content) and bypasses the gitignore check.
+2. **Milestone docs pattern**: For significant multi-phase milestones, create a dedicated `docs/<milestone>-layer.md` (architecture and workflow reference) and `docs/release-notes-<milestone>.md` (per-phase implementation notes and validation checklist). Keep the `docs/features.md` entry brief with cross-reference links to the dedicated docs. Do not cram per-phase implementation detail into `features.md`.
+3. **Validation checklist belongs in release notes, not history**: For technical milestones, include a validation checklist section (what to verify before production sign-off) in `release-notes-*.md`. Keep `docs/history.md` clean — it records stable shipped behavior, not QA checklists.
+
+Promote to agents:
+- `documentation-update-specialist.md` — `git add -u` pattern for gitignored docs/; milestone docs creation pattern
+- `release-docs-writer.md` — validation checklist in milestone release notes
+
+Status:
+- Promoted
+
+---
+
 ### 2026-05-14 — Phase 13D-5: Archive Operations Audit Timeline
 
 Task type:
