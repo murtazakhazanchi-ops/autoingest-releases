@@ -1162,7 +1162,7 @@ const EventCreator = (() => {
     const unparseable = _scannedEvents.filter(e => !e.isParseable);
 
     const resolvedHTML = resolved.map(ev => {
-      const isLegacy = !ev._eventJson || !Array.isArray(ev._eventJson.components) || ev._eventJson.components.length === 0;
+      const isLegacy = ev.isLegacy === true;
       const warnBadge = ev.isUnresolved
         ? `<span class="ec-evl-warn" title="Some tokens in this event don't match the controlled lists yet. You can still view or edit."><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>`
         : '';
@@ -3821,7 +3821,7 @@ ${unparseable.map(ev => `
       // JSON file that is missing the components array. This is a recoverable
       // state: the user should open Edit to configure it. Do NOT treat it as
       // corruption — the reload below would also return null and silently exit.
-      const _isLegacyEntry = !entry._eventJson || !Array.isArray(entry._eventJson?.components) || entry._eventJson.components.length === 0;
+      const _isLegacyEntry = entry.isLegacy === true;
       if (_isLegacyEntry) {
         console.warn('[LEGACY] Event has no valid event.json, redirecting to edit:', entry.folderName);
         if (_legacyModalOpen) return false;
@@ -3859,6 +3859,13 @@ ${unparseable.map(ev => `
       } catch (err) {
         console.error('[adoptSelectedEvent] Failed to read event.json:', err);
       }
+      // Adopted event: components:[] is intentional — redirect to edit so the operator
+      // can define components before importing. Not a corruption case.
+      if (json && !json._corrupt && Array.isArray(json.components) && json.components.length === 0 && json.adoption) {
+        await openEventForEdit(entry, { skipAutoRepair: true });
+        return false;
+      }
+
       if (!json || json._corrupt || !Array.isArray(json.components) || json.components.length === 0) {
         // Unexpected: the entry passed the legacy check (had valid _eventJson) but the
         // fresh disk read failed. Not a legacy event — treat as non-recoverable corruption.

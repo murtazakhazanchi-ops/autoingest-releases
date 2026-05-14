@@ -7038,6 +7038,7 @@ document.getElementById('importBtn').addEventListener('click', async () => {
 
     if (!liveComps.length) {
       console.error('[IMPORT] No components available');
+      showMessage('This event has no components defined — open it in EventCreator to set up import routing before importing.');
       return;
     }
 
