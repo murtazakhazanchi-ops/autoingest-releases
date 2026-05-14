@@ -1578,3 +1578,25 @@ Avoid:
 Validation:
 - Confirm every `window.api.*` call in modal open/init functions is awaited.
 - Confirm synchronous-only usage is reserved for values that genuinely never touch IPC (e.g., pure renderer-local state).
+
+### Zero-Default vs Null-Default Sections in Read-Only Report Modals
+
+Context:
+- Applies to any renderer modal that displays a multi-section report from an aggregation service where individual sections may be unavailable.
+
+Rule:
+- When a report section fails and its service fallback is a **zero-valued object** (e.g., `{ ready: 0, syncing: 0, total: 0 }`), the UI must show an explicit "Unavailable" label for that section. Displaying zeros looks like real operational data (e.g., "0 sync jobs") and misleads the operator.
+- When a report section fails and its service fallback is **null** (e.g., `managed: null`, `errors: null`), existing null-display helpers (such as `_crNum(null)` → `—`) already communicate absence. A top-level banner noting partial failure is sufficient; no per-section label is needed.
+- Use a `sectionErrors[]` array in the report payload (see `autoingest-architect.md — Read-Only Aggregation Service Pattern`) to drive both the banner and per-section unavailability rendering.
+- In the renderer, look up section errors by exact key match only: `errs.some(e => e.section === key)`. Do not use `startsWith` — a child-section error (`sync.reviews`) would otherwise collapse the parent section (`sync`) even when the parent data is valid.
+
+Avoid:
+- Showing zeroed section data when the service actually failed — zeros are indistinguishable from "no jobs / no locks" to the operator.
+- Adding per-section "Unavailable" labels to null-default sections — the `—` from null helpers already communicates absence; duplicate labels clutter the UI.
+- Using `startsWith` for section-error key lookup — cascades child failures to collapse the parent section.
+
+Validation:
+- Confirm sections with zero defaults show "Unavailable" when their service failed.
+- Confirm sections with null defaults rely on `—` rendering and the top-level banner.
+- Confirm section-error lookup uses exact match (`e.section === key`).
+- Confirm the banner is suppressed when `sectionErrors` is empty or absent (backward-compat with old cached reports).

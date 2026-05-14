@@ -17,6 +17,32 @@ Rules:
 
 ---
 
+### 2026-05-14 — Phase 13D-2: Consistency Report Section-Failure Visibility
+
+Task type:
+- Status/Visibility Polish / Aggregation Service / Renderer UI / Read-Only
+
+What happened:
+- Phase 13D-1 left 8 empty `catch` blocks in `archiveConsistencyService.js`. Section failures were silent — the report returned null/zero defaults with no indication of what failed.
+- Fix: replaced each empty catch with `catch (err)` that pushes `{ section, message }` to a local `sectionErrors[]` array and logs `console.error` with a `[ConsistencyReport]` prefix.
+- `sectionErrors` is included in the assembled report payload. The catastrophic-fallback report also gets `sectionErrors: []`.
+- Renderer reads `sectionErrors` and: (a) shows a compact yellow banner when any section failed; (b) for Sync Queue and Locks sections (which default to zeros), replaces the data grid with "Unavailable" — zeros would otherwise look like real data; (c) for Events and Diagnostics (which default to null), the existing `—` rendering from `_crNum(null)` is sufficient, banner alone covers it; (d) for Transfer, shows inline "Unavailable" text.
+- Code reviewer flagged that `_hasErr` used `startsWith` — a `sync.reviews`-only failure would collapse the entire Sync Queue section. Fixed to exact match.
+
+Reusable lessons:
+1. **sectionErrors pattern extends read-only aggregation service**: When adding failure visibility to an aggregation service, push `{ section, message }` to a local `sectionErrors[]` array in each source's catch block, log to console.error with a service prefix, and include the array in the report payload. Catastrophic-fallback report gets `sectionErrors: []`. Renderer uses the array for banner + per-section unavailability display.
+2. **Zero-default sections need explicit "Unavailable"; null-default sections do not**: Sections where the fallback value is zero (e.g., sync counts, lock counts) must show an explicit "Unavailable" label in the UI when they fail — zeros look like real operational data. Sections where the fallback is null already render `—` via null-display helpers, so a top-level banner is sufficient.
+3. **Section-error key lookup must use exact match, not startsWith**: A `_hasErr` helper that uses `startsWith(key + '.')` causes a child-section error (e.g., `sync.reviews`) to collapse the parent section (`sync`). Use exact match (`e.section === key`) so parent and child failures are independent.
+
+Promote to agents:
+- `autoingest-architect.md` — update aggregation service pattern with sectionErrors addition + exact-match lookup rule
+- `ui-system-specialist.md` — zero-default vs null-default section unavailability display rule
+
+Status:
+- Promoted
+
+---
+
 ### 2026-05-14 — Phase 13D-1: Read-Only Archive Consistency Report
 
 Task type:

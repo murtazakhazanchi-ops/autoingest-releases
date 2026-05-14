@@ -451,6 +451,7 @@ Rule:
 - Declare a module-level `_inFlight` boolean guard. If `generateReport()` is called while already running, return the last report or a `{ busy: true }` sentinel immediately. Clear `_inFlight` in both the success path and the catch path.
 - The function must never throw to the IPC layer. Wrap the entire body in a top-level `try/catch` that returns a zeroed/null report on catastrophic failure.
 - Store only the last report for synchronous access via `getLastReport()`. Do not cache per-source data separately.
+- For failure visibility: collect a `sectionErrors[]` array inside `generateReport()`. In each source `catch (err)`, push `{ section: 'key', message: 'human-readable reason' }` and log `console.error('[ServiceName] key section failed:', err.message)`. Include `sectionErrors` in the assembled report. Include `sectionErrors: []` in the catastrophic-fallback report. The renderer reads this array to show a banner and per-section unavailability labels.
 
 ```js
 let _lastReport = null;
@@ -460,16 +461,23 @@ async function generateReport() {
   if (_inFlight) return _lastReport || { generatedAt: new Date().toISOString(), busy: true };
   _inFlight = true;
   try {
+    const sectionErrors = [];
     let sectionA = null;
-    try { sectionA = await serviceA.getSummary(); } catch { /* leave null */ }
+    try { sectionA = await serviceA.getSummary(); } catch (err) {
+      sectionErrors.push({ section: 'sectionA', message: 'Could not load section A' });
+      console.error('[MyService] sectionA failed:', err.message);
+    }
     let sectionB = null;
-    try { sectionB = await serviceB.getStatus(); } catch { /* leave null */ }
-    const report = { generatedAt: new Date().toISOString(), sectionA, sectionB };
+    try { sectionB = await serviceB.getStatus(); } catch (err) {
+      sectionErrors.push({ section: 'sectionB', message: 'Could not load section B' });
+      console.error('[MyService] sectionB failed:', err.message);
+    }
+    const report = { generatedAt: new Date().toISOString(), sectionErrors, sectionA, sectionB };
     _lastReport = report;
     _inFlight   = false;
     return report;
   } catch (err) {
-    const report = { generatedAt: new Date().toISOString(), error: err.message, sectionA: null, sectionB: null };
+    const report = { generatedAt: new Date().toISOString(), error: err.message, sectionErrors: [], sectionA: null, sectionB: null };
     _lastReport = report;
     _inFlight   = false;
     return report;
@@ -477,17 +485,23 @@ async function generateReport() {
 }
 ```
 
+- When checking `sectionErrors` in the renderer, use exact-match lookup (`e.section === key`). Do not use `startsWith(key + '.')` — a child-section error (`sync.reviews`) would collapse the parent section (`sync`) even when the parent data is valid.
+
 Avoid:
 - A single try/catch wrapping all sources — one source failure aborts the whole report.
 - Omitting the `_inFlight` guard — concurrent calls race over `_lastReport`.
 - Using `_inFlight = false` outside a try/finally or equivalent — a thrown error permanently locks the guard.
 - Throwing from `generateReport()` to the IPC layer.
+- Empty `catch` blocks — silent failures make partial reports indistinguishable from complete ones.
+- Using `startsWith` in renderer section-error lookup — cascades child failures to the parent section.
 
 Validation:
-- Confirm each data source is wrapped in its own try/catch and returns null on failure.
+- Confirm each data source is wrapped in its own `catch (err)` that pushes to `sectionErrors`.
 - Confirm `_inFlight` is cleared in both the success and the catch paths.
 - Confirm `generateReport()` never throws — the top-level catch returns a valid report object.
 - Confirm `getLastReport()` returns the last generated report synchronously.
+- Confirm `sectionErrors: []` is present in the catastrophic-fallback report.
+- Confirm renderer section-error lookup uses exact match (`e.section === key`).
 
 ### nasEventCache Field Limitation — Adoption Block Not Preserved
 
