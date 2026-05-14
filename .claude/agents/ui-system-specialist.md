@@ -1274,14 +1274,18 @@ Rule:
 - Always escape the full expression: `_esc({ key: 'Safe Label' }[val] || val)`.
 - Lookup-table success paths look safe because they return hand-written literals, but the fallback is a silent raw passthrough and must not be treated as safe by proximity.
 
+- Injecting `sectionErrors[].message` (or `sourceErrors[].message`) into innerHTML — these strings carry raw `err.message` from filesystem errors and may contain user-controlled path fragments (e.g., the archive path that triggered the error). Only the `.source` field (a hardcoded string constant) is safe to pass through `_esc()`. The `.message` field must be silently dropped from all rendered output.
+
 Avoid:
 - Escaping only the known/success entries in a lookup table and leaving `|| fallbackValue` unescaped.
 - Assuming a fallback value is safe because it "should only ever be a known string" — crafted IPC payloads or malformed persistence files can inject arbitrary values through the fallback path.
+- Assuming `err.message` is safe to inject into innerHTML — it may contain user-supplied path components from the filesystem error context.
 
 Validation:
 - After writing any innerHTML template, grep for `||` or `?? ` adjacent to unescaped variable references inside template literals.
 - Confirm the full conditional expression (including its fallback) is wrapped in the escape call.
 - Confirm no `job.*`, `entry.*`, or IPC-derived field is injected into innerHTML without escaping.
+- Confirm `sectionErrors[].message` / `sourceErrors[].message` is not rendered into any innerHTML template — only `.source` (a hardcoded constant) may be used after `_esc()`.
 
 ### Busy-Guard Coverage — Apply to All Call Sites, Not Only the Obvious One
 

@@ -17,6 +17,36 @@ Rules:
 
 ---
 
+### 2026-05-14 — Phase 13D-5: Archive Operations Audit Timeline
+
+Task type:
+- New Feature / Read-Only Aggregation Service / Multi-Source History / IPC / Modal UI
+
+What happened:
+- Added `archiveAuditTimelineService.js` — a new read-only service that aggregates recent operational history from 5 sources (transfer-export JSONL, transfer-import JSONL, sync queue terminal states, diagnostics run history, in-memory session state) into a single timeline modal.
+- `_readJsonlTail` opens a file descriptor to tail large JSONL files (last 4MB). Code reviewer caught a missing `try/finally` around `fd.read` — if the read threw (ESTALE on NFS/SMB, I/O error), `fd.close()` was never called, leaking file descriptors in the long-running Electron main process.
+- Each of the 5 collectors wraps its entire body in `try/catch` returning `[]` on failure, pushing `{ source, message }` to a shared `sourceErrors[]`. All async collectors run via `Promise.all` (no ordering dependency). This ensures one failing source never blocks the rest.
+- Timeline deliberately skips `event.json` entirely. Import history is sourced from dedicated JSONL audit files and in-memory session state. Parsing `imports[]` arrays for all events would be prohibitively expensive on large archives.
+- `syncQueueService.getQueue()` returns all jobs; only terminal states (`synced`, `sync-failed`, `needs-attention`) are included in the timeline — `ready-for-sync` and `blocked` are current queue states, not historical events.
+- `sourceErrors[].message` carries `err.message` from filesystem errors, which may contain user-controlled path fragments. In the renderer, only `e.source` (a hardcoded constant) is injected into innerHTML via `_esc()`. `e.message` is silently dropped.
+
+Reusable lessons:
+1. **JSONL fd tail-read must use try/finally to close the file descriptor**: When reading the tail of a JSONL file by opening an `fs.promises.open` fd, wrap all `fd.read()` calls in `try/finally { await fd.close() }`. A thrown ESTALE, I/O error, or any exception leaves the fd open permanently in a long-running main process.
+2. **Promise.all for independent multi-source aggregation**: When a timeline/history aggregation service collects from N independent sources (no ordering dependency), run all async collectors via `Promise.all` rather than sequential awaits. Each collector wraps its own body in `try/catch`. This preserves per-source isolation while avoiding N sequential latencies.
+3. **Never parse event.json imports[] for history or timeline features**: Import history for audit timelines must come from dedicated JSONL audit files and in-memory session state — not from `event.json`'s `imports[]` arrays. Reading `imports[]` for all events is O(N events) and prohibitively expensive on large archives.
+4. **Sync queue terminal states only for history display**: Filter sync queue jobs to terminal states (`synced`, `sync-failed`, `needs-attention`) before including in timeline or history entries. `ready-for-sync` and `blocked` are current operational queue states, not historical events.
+5. **sourceErrors message field must be dropped before innerHTML injection**: `sectionErrors[].message` (or `sourceErrors[].message`) carries raw `err.message` strings from filesystem errors and may contain user-controlled path fragments. Only the `source` field (a hardcoded string constant) is safe to pass through `_esc()` into innerHTML. The `message` field must be silently omitted from rendered output.
+
+Promote to agents:
+- `performance-auditor.md` — JSONL fd tail-read try/finally rule; Promise.all for parallel multi-source reads
+- `autoingest-architect.md` — Never parse event.json imports[] for history/timeline; sync queue terminal-states-only rule; Promise.all addition to aggregation service pattern
+- `ui-system-specialist.md` — sourceErrors.message field must not enter innerHTML (extension of XSS escape rule)
+
+Status:
+- Promoted
+
+---
+
 ### 2026-05-14 — Phase 13D-2: Consistency Report Section-Failure Visibility
 
 Task type:

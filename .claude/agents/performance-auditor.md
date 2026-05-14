@@ -446,6 +446,64 @@ Validation:
 - Confirm a counter increments inside the loop and breaks or skips after reaching the cap.
 - Confirm items beyond the cap are handled gracefully (not silently dropped, not treated as errors).
 
+### JSONL Tail-Read File Descriptor Must Be Closed in try/finally
+
+Context:
+- Applies to any main-process function that opens an `fs.promises.open` file descriptor to read the tail of a JSONL file (or any file) in the long-running Electron main process.
+
+Rule:
+- Wrap all `fd.read()` calls in `try/finally { await fd.close(); }` so the file descriptor is always released.
+- An exception thrown during `fd.read()` (ESTALE on NFS/SMB, I/O error, unexpected EOF behavior) will skip any `fd.close()` call that is not in a `finally` block, permanently leaking the file descriptor.
+- File descriptor leaks accumulate silently in a long-running Electron process — the OS limit is finite and eventual exhaustion produces cryptic `EMFILE` failures across unrelated operations.
+
+```js
+const fd = await fsp.open(filePath, 'r');
+try {
+  const buf = Buffer.alloc(READ_SIZE);
+  const { bytesRead } = await fd.read(buf, 0, READ_SIZE, readPos);
+  // ... process bytesRead bytes ...
+} finally {
+  await fd.close();
+}
+```
+
+Avoid:
+- `await fd.close()` after `fd.read()` without a `finally` block — any exception before the close call leaves the fd leaked.
+- Opening fds in a loop without a `finally` guard — one transient I/O error starts an fd leak accumulation.
+
+Validation:
+- Confirm every `fsp.open()` call for tail-reads has a corresponding `fd.close()` inside a `finally` block.
+- Confirm the `finally` block is reached even when `fd.read()` throws.
+- Confirm no `fd.close()` call appears only in the success path.
+
+### Promise.all for Independent Multi-Source Aggregation Reads
+
+Context:
+- Applies to any read-only aggregation service (timeline, history, report) that collects data from N independent async sources with no ordering dependency.
+
+Rule:
+- Run independent async collectors via `Promise.all` rather than sequential `await` calls.
+- Each collector must still be individually wrapped in `try/catch` returning an empty result on failure (not inside `Promise.all`'s catch) so a single-source failure does not cancel the other collectors.
+- The correct pattern is: each collector is an async function with its own `try/catch` that returns `[]` or `null` on failure; `Promise.all([collectorA(), collectorB(), collectorC()])` awaits all in parallel.
+
+```js
+const [exportEvents, importEvents, syncEvents, diagEvents] = await Promise.all([
+  _collectExportHistory().catch(() => []),
+  _collectImportHistory().catch(() => []),
+  _collectSyncTerminalStates().catch(() => []),
+  _collectDiagnosticsHistory().catch(() => []),
+]);
+```
+
+Avoid:
+- Sequential `await collectorA(); await collectorB(); ...` when sources are independent — accumulates N×latency unnecessarily on slow NFS/archive paths.
+- A single `Promise.all` `.catch()` that catches all collector failures together — a failure in one source would set all results to the catch value.
+
+Validation:
+- Confirm independent collectors run via `Promise.all`.
+- Confirm each collector has its own `.catch(() => [])` (or equivalent) so one failure does not cancel others.
+- Confirm total latency is bounded by the slowest single collector, not the sum.
+
 ### Startup / Window Lifecycle Performance
 
 Context:

@@ -486,6 +486,7 @@ async function generateReport() {
 ```
 
 - When checking `sectionErrors` in the renderer, use exact-match lookup (`e.section === key`). Do not use `startsWith(key + '.')` — a child-section error (`sync.reviews`) would collapse the parent section (`sync`) even when the parent data is valid.
+- When all collectors are independent (no ordering dependency), run them via `Promise.all([collectorA().catch(() => null), collectorB().catch(() => null), ...])`. Each collector must still have its own `.catch` so a single-source failure does not cancel the others.
 
 Avoid:
 - A single try/catch wrapping all sources — one source failure aborts the whole report.
@@ -494,6 +495,7 @@ Avoid:
 - Throwing from `generateReport()` to the IPC layer.
 - Empty `catch` blocks — silent failures make partial reports indistinguishable from complete ones.
 - Using `startsWith` in renderer section-error lookup — cascades child failures to the parent section.
+- Sequential `await` for independent collectors — accumulates N×latency on slow NFS/archive paths when `Promise.all` is available.
 
 Validation:
 - Confirm each data source is wrapped in its own `catch (err)` that pushes to `sectionErrors`.
@@ -502,6 +504,7 @@ Validation:
 - Confirm `getLastReport()` returns the last generated report synchronously.
 - Confirm `sectionErrors: []` is present in the catastrophic-fallback report.
 - Confirm renderer section-error lookup uses exact match (`e.section === key`).
+- Confirm independent collectors run via `Promise.all` with individual `.catch` fallbacks, not sequential awaits.
 
 ### Mirror Service Constants Locally for Display-Only Use
 
@@ -549,6 +552,43 @@ Validation:
 - Confirm any `events.adopted` field in a cache-based report is `null`, not `0`.
 - Confirm the code comment explains why the count is unavailable.
 - Confirm adoption state is only read from a live `event.json` read, not from cache.
+
+### Import History Source for Timeline and History Features
+
+Context:
+- Applies to any audit timeline, activity log, or import history feature that needs to display past import events.
+
+Rule:
+- Import history must be sourced from dedicated JSONL audit files (transfer-export, transfer-import) and in-memory session state.
+- Never read `event.json`'s `imports[]` array across all events to build a timeline or history view.
+- `imports[]` is a per-event array that can be arbitrarily large. Reading it for all events is O(N events) with full file reads — prohibitively expensive on large archives with hundreds of events.
+
+Avoid:
+- Iterating the archive to open each `event.json` and parse `imports[]` for timeline or history display.
+- Treating `imports[]` as a log or audit trail — it is a record embedded in the event's source of truth, not a queryable history index.
+
+Validation:
+- Confirm timeline/history collectors read only JSONL audit files and in-memory state.
+- Confirm no code path opens multiple `event.json` files to build a history or timeline view.
+- Confirm the JSONL tail-read approach is used for large audit files rather than full file reads.
+
+### Sync Queue Terminal States for Timeline and History Display
+
+Context:
+- Applies when including sync queue data in a timeline, history, audit report, or any display that represents past operational events.
+
+Rule:
+- `syncQueueService.getQueue()` returns all jobs regardless of state. For timeline and history display, filter to terminal states only: `synced`, `sync-failed`, `needs-attention`.
+- `ready-for-sync` and `blocked` are current operational queue states — they represent pending or in-progress work, not completed historical events.
+- Including non-terminal states in a timeline pollutes it with events that have not yet concluded and may change state before the operator views them.
+
+Avoid:
+- Including `ready-for-sync` or `blocked` jobs in timeline or history aggregations.
+- Assuming all queue states are equivalent for display purposes.
+
+Validation:
+- Confirm timeline/history collectors filter sync queue jobs to terminal states before inclusion.
+- Confirm `ready-for-sync` and `blocked` states are excluded from timeline entries.
 
 ## Validation Checklist
 
