@@ -511,6 +511,27 @@ Validation:
 - Confirm the log includes the file path and `err.message`.
 - Confirm the catch does not swallow errors that should propagate as fatal.
 
+### Renderer Flag Re-Derivation — Main-Process Classification Must Be Consumed Directly
+
+Context:
+- Applies when debugging a bug where a UI badge, modal gate, or branch condition in the renderer produces an incorrect result for a newly introduced event state (adopted, repaired, migrated, etc.).
+
+Rule:
+- When the main-process scanner provides a classified flag (`isLegacy`, `isFromJson`, `isUnresolved`, `isAdopted`, etc.) on an event or entry object, the renderer must consume that field directly.
+- Re-deriving the flag from raw data fields (e.g. `components.length === 0` to imply `isLegacy`) is incidentally correct only until a new valid state is introduced that satisfies the raw condition without being that state.
+- Adoption introduced the first valid `event.json` with `components: []`. Any renderer path that derived `isLegacy` from this condition then incorrectly flagged adopted events as legacy.
+- Diagnostic signal: a newly introduced event state (e.g. adopted) causes existing badges, modals, or gate conditions to fire incorrectly. First check whether the affected renderer code re-derives a flag that the main process already classifies authoritatively.
+
+Avoid:
+- `ev._eventJson.components.length === 0` as a proxy for `ev.isLegacy` in any renderer branch.
+- Any renderer expression that re-computes a field the IPC scan result already provides as a named property.
+- Treating the re-derivation as correct because it worked before the new state existed.
+
+Validation:
+- Confirm the renderer reads `ev.isLegacy === true` (or the equivalent named field) directly.
+- Confirm no renderer branch re-derives the same classification from raw data fields.
+- After any new event state is introduced, grep renderer files for raw-field proxies of existing scanner flags.
+
 ### Checks Array Completeness — Silent Absent Entry vs. Explicit Skip
 
 Context:

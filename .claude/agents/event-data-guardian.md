@@ -370,6 +370,31 @@ Validation:
 - Confirm no separate audit file is created by the write service.
 - Confirm all audit fields (`adoptedAt`, `operatorId`, etc.) are written inside `event.json`.
 
+### Adopted Event State — `components: []` Is Valid, Not Corruption or Legacy
+
+Context:
+- Applies to any code path that inspects `event.json.components` and branches on an empty array — including event list rendering, modal gate conditions, import handlers, and validation services.
+
+Rule:
+- An adopted event intentionally has `components: []` at adoption time. This is a distinct, valid state — not corruption and not legacy.
+- Before treating `components: []` as an error condition, check whether `event.json.adoption` is present.
+- Discrimination order when `components` is empty:
+  1. `json.adoption` present → adopted state (redirect to edit flow, do not show error)
+  2. `json._corrupt === true` → corruption (show corruption message)
+  3. `json.isLegacy === true` (from scanner) → legacy (show legacy modal)
+  4. Otherwise → treat as normal empty event
+- The authoritative `isLegacy` and `isAdopted` classification comes from the main-process scanner field on the event object, not from re-deriving it in the renderer from `components.length === 0`.
+
+Avoid:
+- Treating `components: []` as corruption without first checking `json.adoption`.
+- Re-deriving `isLegacy` from `components.length === 0` in the renderer — this incorrectly flags adopted events as legacy.
+- Checking `_corrupt` or `isLegacy` before checking `adoption` — the discrimination order matters.
+
+Validation:
+- Confirm any branch that reads `components.length === 0` also checks `json.adoption` first.
+- Confirm adopted events do not trigger corruption messages or legacy modals.
+- Confirm the renderer consumes `ev.isLegacy` from the IPC scan result rather than recomputing it.
+
 ### Documentation Follow-Up
 
 Context:

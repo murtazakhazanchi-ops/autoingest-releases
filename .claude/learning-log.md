@@ -1546,6 +1546,50 @@ Status:
 
 ---
 
+### 2026-05-14 — Phase 13C-8: Post-Adoption Managed Event Integration Validation
+
+Task type:
+- Feature / Renderer / Validation / State Classification / Bug Fix
+
+What happened:
+
+Six clean validation checks passed (isValidEventJson, normalizeEventJson, scanEvents, adoptionPreviewService, adoptionDryRunService, dataValidator). Two bugs were found and fixed.
+
+**Root cause (single):** The renderer re-derived `isLegacy` from `components.length === 0` instead of using the authoritative `isLegacy` field supplied by the main-process scanner. Before adoption, no valid event.json could have empty components — the re-derivation was incidentally correct. Adoption introduced the first valid event.json with `components: []`, breaking the assumption.
+
+**Bugs fixed:**
+
+1. (HIGH) Event list badge in `eventCreator.js` derived `isLegacy` from `ev._eventJson.components.length === 0`, incorrectly showing LEGACY badge on adopted events. Fix: `const isLegacy = ev.isLegacy === true`.
+
+2. (HIGH) `adoptSelectedEvent` legacy gate re-derived from `entry._eventJson.components.length === 0`, triggering the legacy modal with "no valid event.json" text — factually wrong for adopted events. Fix: `const _isLegacyEntry = entry.isLegacy === true`.
+
+3. (HIGH follow-on) After fixing the legacy gate, adopted events fell into the existing corruption check (`json.components.length === 0` → "non-recoverable corruption"). Fix: insert a guard before the corruption check: if `json && !json._corrupt && Array.isArray(json.components) && json.components.length === 0 && json.adoption`, redirect silently to `openEventForEdit` instead of showing an error.
+
+4. (MEDIUM) Import handler had a silent `return` when `liveComps.length === 0`. Added `showMessage(...)` before the return so the operator receives actionable feedback.
+
+Reusable lessons:
+
+1. **Renderer must not re-derive main-process classified flags from raw data fields.** When the main-process scanner provides a classified flag (`isLegacy`, `isFromJson`, `isUnresolved`, etc.), the renderer must consume it directly. Re-deriving from raw fields (e.g. `components.length === 0`) is incidentally correct until a new valid state is introduced that breaks the assumption. The main-process flag is always the authoritative classification.
+
+2. **`components: []` is a valid post-adoption state — not corruption and not legacy.** Any code path that treats empty components as corruption or legacy must first check for `json.adoption`. An adopted event intentionally has no components yet. Discrimination order: `adoption` → `_corrupt` → `legacy` → normal.
+
+3. **Silent early-return guards in import handlers must surface feedback.** An early return in the import flow without a `showMessage` (or equivalent user-facing message) is a UX trap. The operator has no signal that the import was blocked and why.
+
+Common failure modes:
+- Re-deriving `isLegacy` (or any scanner classification) from `components.length === 0` in the renderer rather than consuming the main-process field.
+- Treating `components: []` as corruption without first checking the `adoption` field.
+- Adding an early-return guard in the import flow without a preceding user-facing message.
+
+Promote to agents:
+- contract-debugger.md — renderer flag re-derivation as a debugging/failure class
+- event-data-guardian.md — adopted state is distinct (components:[] valid); discrimination order
+- ui-system-specialist.md — silent early-return guard in import handlers must surface feedback
+
+Status:
+- Promoted
+
+---
+
 ### 2026-05-14 — Phase 13C-7.1: Refresh Event List After Adoption
 
 Task type:

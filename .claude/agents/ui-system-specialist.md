@@ -1405,6 +1405,37 @@ Validation:
 - Confirm a refresh failure does not propagate as a write failure or surface an error to the operator.
 - Confirm the refresh function's internal busy guard prevents concurrent scans.
 
+### Silent Early-Return Guards in Import Handlers Must Surface Feedback
+
+Context:
+- Applies to any early-return guard added to the import flow (renderer import handler, import modal, pre-import validation) that blocks or bypasses the import without an operator-facing message.
+
+Rule:
+- Every early-return guard in the import path that blocks the import must emit a user-facing message (`showMessage`, toast, modal text) before returning.
+- A silent `return` gives the operator no indication that the import was blocked, why it was blocked, or what action to take.
+- The guard itself is correct; the omission is the missing `showMessage` call before it.
+
+```js
+// Correct pattern
+if (liveComps.length === 0) {
+  showMessage('No event components available. Open the event and complete setup before importing.');
+  return;
+}
+
+// Incorrect — silent trap
+if (liveComps.length === 0) {
+  return;
+}
+```
+
+Avoid:
+- Adding import guards that return silently without any operator-facing feedback.
+- Assuming the operator will notice the import did not start without an explicit message.
+
+Validation:
+- Confirm every early-return branch in the import flow calls `showMessage` (or equivalent) before returning.
+- Confirm the message text is actionable — it identifies the reason and what the operator should do.
+
 ### Light/Dark and Viewport Compatibility
 
 Context:
