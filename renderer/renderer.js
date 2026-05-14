@@ -10370,16 +10370,50 @@ document.addEventListener('keydown', e => {
     }
   }
 
-  function _clReadinessBadge(readiness) {
-    const cls   = readiness === 'ready'           ? 'cl-readiness-ready'
-                : readiness === 'needs-attention' ? 'cl-readiness-attention'
-                : readiness === 'blocked'         ? 'cl-readiness-blocked'
-                : 'cl-readiness-unknown';
-    const label = readiness === 'ready'           ? '✓ Ready'
-                : readiness === 'needs-attention' ? '⚠ Needs Attention'
-                : readiness === 'blocked'         ? '✗ Blocked'
-                : 'Unknown';
-    return `<div class="cl-readiness ${cls}">${_esc(label)}</div>`;
+  function _clReadinessSummary(checklist) {
+    const readiness = checklist.readiness;
+    const cls      = readiness === 'ready'           ? 'cl-readiness-ready'
+                   : readiness === 'needs-attention' ? 'cl-readiness-attention'
+                   : readiness === 'blocked'         ? 'cl-readiness-blocked'
+                   : 'cl-readiness-unknown';
+    const icon     = readiness === 'ready'           ? '✓'
+                   : readiness === 'needs-attention' ? '⚠'
+                   : readiness === 'blocked'         ? '✗'
+                   : '?';
+    const headline = readiness === 'ready'           ? 'Archive Operations Ready'
+                   : readiness === 'needs-attention' ? 'Archive Operations Need Attention'
+                   : readiness === 'blocked'         ? 'Archive Operations Blocked'
+                   : 'Archive Operations Status Unknown';
+    const sub      = readiness === 'ready'           ? 'All required checks have passed.'
+                   : readiness === 'needs-attention' ? 'Review warnings before live use.'
+                   : readiness === 'blocked'         ? 'Resolve failed checks before live use.'
+                   : '';
+
+    const _CRITICAL_IDS = new Set(['root.active','root.main','sync.failed','sync.unreviewed','diag.errors']);
+    const allItems   = checklist.items || [];
+    const critFails  = allItems.filter(i => i.status === 'fail'    && _CRITICAL_IDS.has(i.id));
+    const otherFails = allItems.filter(i => i.status === 'fail'    && !_CRITICAL_IDS.has(i.id));
+    const warnings   = allItems.filter(i => i.status === 'warning');
+    const topReasons = [...critFails, ...otherFails, ...warnings].slice(0, 3);
+
+    const reasonsHtml = topReasons.length
+      ? `<div class="cl-readiness-reasons">${topReasons.map(i =>
+          `<div class="cl-readiness-reason">${_clIcon(i.status)}<span>${_esc(i.label)}</span></div>`
+        ).join('')}</div>`
+      : '';
+    const subHtml  = sub ? `<div class="cl-readiness-sub">${_esc(sub)}</div>` : '';
+    const nextText = readiness === 'blocked'         ? 'Fix blocked items to restore operations.'
+                   : readiness === 'needs-attention' ? 'Open checklist items for details.'
+                   : null;
+    const nextHtml = (nextText && topReasons.length)
+      ? `<div class="cl-readiness-next">→ ${_esc(nextText)}</div>`
+      : '';
+
+    return `
+      <div class="cl-readiness ${cls}">
+        <div class="cl-readiness-headline">${icon} ${_esc(headline)}</div>
+        ${subHtml}${reasonsHtml}${nextHtml}
+      </div>`;
   }
 
   function _clRenderItem(item) {
@@ -10420,7 +10454,7 @@ document.addEventListener('keydown', e => {
       .join('');
 
     const ts = checklist.generatedAt ? `<div class="cr-ts">Generated: ${_esc(_crTs(checklist.generatedAt))}</div>` : '';
-    return `${_clReadinessBadge(checklist.readiness)}${summaryHtml}${sectionsHtml}${ts}`;
+    return `${_clReadinessSummary(checklist)}${summaryHtml}${sectionsHtml}${ts}`;
   }
 
   async function _clOpen() {
