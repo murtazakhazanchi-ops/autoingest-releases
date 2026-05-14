@@ -1487,6 +1487,9 @@ ${unparseable.map(ev => `
     }
 
     _editMode = true;
+    // Transition EventMgmt out of SELECT mode so _renderEventForm's SELECT guard
+    // does not block navigation. Same pattern as the legacy skipAutoRepair path above.
+    if (typeof EventMgmt !== 'undefined' && EventMgmt.isOpen()) EventMgmt.setMode('edit');
 
     console.log('[openEventForEdit] Ready for editing:', editable.length, 'components');
 
