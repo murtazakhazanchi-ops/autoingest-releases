@@ -10651,7 +10651,7 @@ document.addEventListener('keydown', e => {
         <div id="adoptActionSection" class="adopt-action-section" hidden>
           <div class="adopt-plan-divider"></div>
           <div class="adopt-action-area">
-            <div class="adopt-action-desc">AutoIngest will create event.json only. No media files or folders will be moved, renamed, or deleted.</div>
+            <div class="adopt-action-desc">AutoIngest will create event.json only. No media files or folders will be moved, renamed, or deleted. After adoption, open the event in Event Creator to add components and complete setup.</div>
             <div id="adoptActionFeedback"></div>
             <div id="adoptInitialRow">
               <button type="button" class="adopt-action-btn" id="adoptActionBtn">Adopt Folder</button>
@@ -10760,7 +10760,7 @@ document.addEventListener('keydown', e => {
           const warnHtml = (result.warnings || []).length
             ? `<div class="adopt-action-warnings">${result.warnings.map(w => `<div>⚠ ${_esc(w)}</div>`).join('')}</div>`
             : '';
-          if (feedbackEl) feedbackEl.innerHTML = `<div class="adopt-action-success">Folder adopted. event.json created.</div>${warnHtml}`;
+          if (feedbackEl) feedbackEl.innerHTML = `<div class="adopt-action-success">Folder adopted. event.json created. Open the event in Event Creator to add components and complete setup.</div>${warnHtml}`;
           setTimeout(() => {
             _hideAdoptDetail();
             if (!_adoptRunning) document.getElementById('diagAdoptBtn')?.click();
