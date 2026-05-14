@@ -499,7 +499,7 @@ const EventCreator = (() => {
     });
   }
 
-  function showStructureChangeWarningModal(diskInfo = null) {
+  function showStructureChangeWarningModal(diskInfo = null, opts = {}) {
     // Build the disk summary block when we have real data from disk.
     let diskSummaryHtml = '';
     if (diskInfo && diskInfo.hasContent) {
@@ -523,6 +523,12 @@ const EventCreator = (() => {
 </div>`;
     }
 
+    const bodyContent = opts.bodyHtml != null ? opts.bodyHtml
+      : `<p>This event was originally a <strong>single-component event</strong>. Existing photos are stored directly in the event folder and will not be automatically reorganized into sub-events.</p>
+    ${diskSummaryHtml}
+    <p>New imports will follow the multi-component structure.</p>
+    <p>You can reorganize existing photos manually if needed.</p>`;
+
     return new Promise(resolve => {
       const overlay = document.createElement('div');
       overlay.className = 'ec-modal-overlay';
@@ -540,10 +546,7 @@ const EventCreator = (() => {
     <p class="ec-struct-modal-title">Event Structure Change Detected</p>
   </div>
   <div class="ec-struct-modal-body">
-    <p>This event was originally a <strong>single-component event</strong>. Existing photos are stored directly in the event folder and will not be automatically reorganized into sub-events.</p>
-    ${diskSummaryHtml}
-    <p>New imports will follow the multi-component structure.</p>
-    <p>You can reorganize existing photos manually if needed.</p>
+    ${bodyContent}
   </div>
   <div class="ec-struct-modal-actions">
     <button class="ec-outline-btn" data-val="cancel">Cancel</button>
@@ -1673,6 +1676,23 @@ ${unparseable.map(ev => `
         _structureWarningPending = true;
         try {
           const proceed = await showStructureChangeWarningModal(_diskInfo);
+          if (!proceed) return;
+        } finally {
+          _structureWarningPending = false;
+        }
+      }
+      // Adopted pre-completion: event.json had adoption block and originally had 0 components.
+      // Going 0→multi always warrants a warning — no existing-data check needed.
+      const _wasAdoptedPreCompletion = !!_viewingExisting?.adoption &&
+        (_viewingExisting?.components || []).length === 0;
+      if (_wasAdoptedPreCompletion && _isNowMulti && !_structureWarningPending) {
+        _structureWarningPending = true;
+        try {
+          const proceed = await showStructureChangeWarningModal(null, {
+            bodyHtml: `<p>This is an <strong>adopted event</strong> with no previously defined components.</p>
+    <p>Saving with ${_eventComps.length} components will define it as a <strong>multi-component event</strong>.</p>
+    <p>Existing folders in this event will not be reorganized automatically. Review routing before importing.</p>`,
+          });
           if (!proceed) return;
         } finally {
           _structureWarningPending = false;
