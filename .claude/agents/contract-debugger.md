@@ -664,6 +664,28 @@ Validation:
 - Confirm the `.catch()` handler updates operation state (abort flag, error result, status field) rather than silently swallowing the error.
 - Confirm no timer handle remains active after the owning operation exits.
 
+### Redirect Path Inherits Caller Modal State — Callee Must Be Defensive
+
+Context:
+- Applies when debugging a modal flow where a new redirect path (function A → function B) is introduced to handle a new event state, and function B calls a guarded UI render that silently no-ops when caller pre-conditions are not met.
+
+Rule:
+- When function A redirects to function B, function B inherits whatever modal state (e.g., EventMgmt mode = 'select') the caller was in. If function B contains a guard that silently no-ops under that state, the failure is invisible.
+- The canonical example: `emmContinueBtn` calls `adoptSelectedEvent` (stays in SELECT mode) → redirects to `openEventForEdit` → calls `_renderEventForm()` which has `if (EventMgmt.getMode() === 'select') return`. Because mode was never transitioned, the guard fires silently.
+- Symptom: a button click completes without error, the button re-enables, but the modal renders nothing. The IPC call succeeds, data is correct — only the modal state machine is wrong.
+- Diagnosis: trace from the button click backward. Check whether the click handler transitions modal state. Check whether the handler delegates to a function that itself transitions modal state. If neither does, find the silent guard in the render path.
+- Fix: make the callee defensive — add the state transition inside the function, not only in the caller. `setMode('edit')` when already in 'edit' mode is idempotent; adding it to all code paths that lead to `_renderEventForm()` has no side effects.
+
+Avoid:
+- Treating "modal renders nothing after click" as data, IPC, or state-machine logic failure before checking whether a silent render guard blocked the render.
+- Assuming a new redirect path satisfies all the pre-conditions that the original direct path satisfied.
+- Debugging inside the render function or data layer when the call never reached the render stage.
+
+Validation:
+- Confirm all distinct call paths to the guarded render function explicitly set the required pre-condition (EventMgmt mode, etc.).
+- Confirm the silent guard is the only failure mode — there is no error or log to alert to the problem.
+- After fix, confirm the previously inert button click now renders the expected UI.
+
 ## Validation Checklist
 
 Before debugging, read:

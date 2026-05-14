@@ -17,6 +17,33 @@ Rules:
 
 ---
 
+### 2026-05-14 — Phase 13C-10: EventMgmt SELECT Guard Blocks _renderEventForm in Redirect Paths
+
+Task type:
+- Bug Fix / Renderer / Modal State Machine / Adoption Workflow
+
+What happened:
+- Pre-completion adopted events (components: []) could not enter component-completion mode via the EventMgmt "Continue" button. The modal appeared frozen: button clicked, re-enabled, nothing happened.
+- Root cause: `emmContinueBtn` click handler calls `EventCreator.adoptSelectedEvent()` without calling `EventMgmt.setMode('edit')` first (unlike `emmEditBtn`, which does call `setMode('edit')` before delegating). When `adoptSelectedEvent` detects a pre-completion adopted event (`components:[] && adoption`), it redirects to `openEventForEdit(entry, { skipAutoRepair: true })`. Inside `openEventForEdit`, the main path sets `_editMode = true` but does not call `EventMgmt.setMode('edit')`. `_renderEventForm()` has a hard guard: `if (EventMgmt.getMode() === 'select') return;`. With mode still at 'select', the guard fires and returns silently — no UI renders.
+- The legacy path (also inside `openEventForEdit`, for `skipAutoRepair && !components`) already had `EventMgmt.setMode('edit')` before `_renderEventForm()`. The main path did not.
+- Fix: one line added to the main path of `openEventForEdit` (between `_editMode = true` and `_renderEventForm()`):
+  `if (typeof EventMgmt !== 'undefined' && EventMgmt.isOpen()) EventMgmt.setMode('edit');`
+- `setMode('edit')` when already in 'edit' mode is idempotent — plain setter + sync footer + sync coll bar. No regressions.
+
+Reusable lessons:
+1. **All _renderEventForm() paths must set EventMgmt mode first**: `_renderEventForm()` has a hard SELECT-mode guard that silently returns without error. Any code path that leads to `_renderEventForm()` must ensure EventMgmt is NOT in 'select' mode. Because the guard is silent (no log, no exception), the failure is invisible — the modal simply does nothing.
+2. **Redirect paths inherit caller's modal state**: When `adoptSelectedEvent` redirects to `openEventForEdit`, it carries the caller's modal state (SELECT). The callee must be defensive and transition the modal state explicitly rather than relying on the caller to have done so. Never assume the caller has pre-transitioned state when the function is reached via a redirect.
+3. **Pattern audit when new call sites added**: Whenever a function gains a new call site (a redirect that was not there before), audit whether the function assumes pre-conditions that the original caller satisfied but the new caller does not. The original `emmEditBtn` path satisfied the mode-transition pre-condition; the new `emmContinueBtn` → `adoptSelectedEvent` redirect path did not.
+
+Promote to agents:
+- `ui-system-specialist.md` — all paths to _renderEventForm() must transition EventMgmt mode first
+- `contract-debugger.md` — redirect paths inherit caller modal state; callee must be defensive
+
+Status:
+- Promoted
+
+---
+
 ### 2026-05-08 — v0.8.8 Source Cleanup Race Fix
 
 Task type:

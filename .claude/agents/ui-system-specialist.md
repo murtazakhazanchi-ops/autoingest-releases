@@ -1436,6 +1436,29 @@ Validation:
 - Confirm every early-return branch in the import flow calls `showMessage` (or equivalent) before returning.
 - Confirm the message text is actionable — it identifies the reason and what the operator should do.
 
+### All Paths to _renderEventForm() Must Transition EventMgmt Mode First
+
+Context:
+- Applies to any renderer code path (direct call, redirect, or delegated call) that leads to `_renderEventForm()` in `renderer/eventCreator.js`.
+
+Rule:
+- `_renderEventForm()` has a hard guard: `if (EventMgmt.getMode() === 'select') return`. This guard fires silently — no log, no exception, no error. The modal simply does nothing, making the failure invisible.
+- Every code path that calls `_renderEventForm()` must ensure EventMgmt is NOT in SELECT mode before the call. The pattern is: `if (typeof EventMgmt !== 'undefined' && EventMgmt.isOpen()) EventMgmt.setMode('edit');` placed immediately before `_renderEventForm()`.
+- This applies to direct paths AND to redirect/delegate paths. When function A redirects to function B which calls `_renderEventForm()`, function B must be defensive and set the mode — it cannot rely on function A to have done so.
+
+Why it fails silently:
+- `setMode('edit')` when already in 'edit' mode is idempotent (plain setter + sync footer + sync collbar), so adding the guard to all paths has no side-effects. The silent SELECT guard is the only failure mode — there is no other indication.
+
+Avoid:
+- Assuming the caller pre-transitioned EventMgmt mode before reaching `_renderEventForm()`.
+- Adding new call paths to `_renderEventForm()` without verifying EventMgmt mode is set first in that path.
+- Treating "modal does nothing after click" as an IPC, state, or data bug before checking whether `_renderEventForm()` was blocked by the SELECT guard.
+
+Validation:
+- Grep for all call sites of `_renderEventForm()`. For each one, confirm `EventMgmt.setMode('edit')` (or equivalent) is called first in that path.
+- Confirm the modal renders component-completion UI when reached via each distinct call path (direct button, redirect, adopt-flow delegate).
+- Confirm `setMode('edit')` when already in 'edit' does not cause regression (it is idempotent).
+
 ### Light/Dark and Viewport Compatibility
 
 Context:
