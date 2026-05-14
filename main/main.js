@@ -1434,6 +1434,7 @@ async function updateEventJson(eventFolderPath, payload) {
       safeEventName: payload.safeEventName,
       status:        payload.status ?? 'created',
       components:    payload.components,
+      ...(payload.adoption != null ? { adoption: payload.adoption } : {}),
       updatedAt:     payload.updatedAt ?? Date.now(),
     };
   } else {

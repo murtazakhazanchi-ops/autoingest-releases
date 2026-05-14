@@ -1472,6 +1472,7 @@ ${unparseable.map(ev => `
       sequence:     entry.sequence     ?? entry._eventJson?.sequence     ?? null,
       isUnresolved: !!entry.isUnresolved,
       components:   editable.map(c => ({ ...c, eventTypes: [...c.eventTypes] })),
+      adoption:     entry._eventJson?.adoption ?? null,
     };
 
     // Guard: event identity must be complete before entering edit mode.
@@ -1705,6 +1706,7 @@ ${unparseable.map(ev => `
           sequence:      _viewingExisting.sequence,
           components:    noRenameCompsForDisk,
           status:        'created',
+          ...(_viewingExisting.adoption != null ? { adoption: _viewingExisting.adoption } : {}),
         };
         try {
           await window.api.updateEventJson(noRenamePath, noRenamePayload);
@@ -1864,6 +1866,7 @@ ${unparseable.map(ev => `
         sequence:      _viewingExisting.sequence,
         components:    compsForDisk,
         status:        'created',
+        ...(_viewingExisting.adoption != null ? { adoption: _viewingExisting.adoption } : {}),
       };
       try {
         await window.api.updateEventJson(newEventPath, renamePayload);
