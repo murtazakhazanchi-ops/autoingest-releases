@@ -17,6 +17,33 @@ Rules:
 
 ---
 
+### 2026-05-14 — Phase 13D-1: Read-Only Archive Consistency Report
+
+Task type:
+- New Feature / Service Architecture / IPC / Renderer / Read-Only Aggregation
+
+What happened:
+- Added `archiveConsistencyService.js` — a new read-only aggregation service that collects root status, managed event count, sync queue summary, reviewed issue count, active/stale lock count, transfer status, and last diagnostics summary into a single compact report.
+- Code reviewer found one HIGH bug: `_crOpen()` called `window.api.getConsistencyReport?.()` synchronously and tested `if (existing && !existing.error)`. But `ipcRenderer.invoke()` always returns a Promise — truthy, `.error` undefined, so `_renderConsistencyReport(existing)` was called with a Promise object instead of a report object, producing a TypeError on every property access.
+- Fix: added `async` to `_crOpen`, changed the call to `await window.api.getConsistencyReport?.().catch(() => null)`.
+- Additionally: `nasEventCache` entries do not preserve the `adoption` block (only specific fields are stored per event entry). Count of "adopted events" is not computable from the cache — returns `null` in the report.
+- Service uses per-source try/catch isolation so any single data source failure returns null fields without aborting the whole report. An `_inFlight` guard prevents concurrent generation calls from racing.
+
+Reusable lessons:
+1. **`ipcRenderer.invoke()` always returns a Promise — modal open functions must await window.api calls**: Even when the IPC handler body is synchronous (e.g. `getLastReport()` returns an in-memory object), the preload wrapper always wraps it in `ipcRenderer.invoke()` which is always async. Any renderer function that calls `window.api.*` and tests the return value synchronously will receive a Promise, not the result. This is especially dangerous in modal open functions that conditionally render content.
+2. **Read-only aggregation service: per-source isolation + in-flight guard + never-throw contract**: When building a new reporting/aggregation service that reads multiple sources, each source must be wrapped in its own try/catch returning null fields on failure. The service must never throw to the IPC layer (wrap the entire `generateReport()` body in try/catch). An `_inFlight` boolean prevents concurrent calls from racing over module-level state.
+3. **nasEventCache does not preserve the adoption block**: The NAS scan pushes only `{name, path, eventJsonPath, eventId, eventName, hijriDate, sequence, status, isCorrupt}` per event entry — the `adoption` block is stripped. Any attempt to count "adopted events" from the cache will always fail. A NAS re-scan is required to determine adopted vs. unmanaged event status.
+
+Promote to agents:
+- `ui-system-specialist.md` — always-await rule for window.api calls in modal open functions
+- `autoingest-architect.md` — read-only aggregation service pattern + nasEventCache field limitations
+- `performance-auditor.md` — nasEventCache field limitations (OOM/cache field awareness)
+
+Status:
+- Promoted
+
+---
+
 ### 2026-05-14 — Phase 13C-11: Adopted Event 0→Multi Component Structure Warning
 
 Task type:

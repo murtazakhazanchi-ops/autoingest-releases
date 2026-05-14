@@ -1560,3 +1560,21 @@ Output:
 - Backend/state contract impact, if any
 - Risks
 - Commit message
+
+### window.api Calls in Modal Open Functions Must Always Be Awaited
+
+Context:
+- Applies to any renderer modal open function that calls `window.api.*` to load initial content (cached reports, last status, prior state).
+
+Rule:
+- `ipcRenderer.invoke()` always returns a Promise regardless of whether the main-process handler body is synchronous.
+- Any renderer function that calls `window.api.*` and tests or uses the return value MUST `await` it.
+- Modal open functions that need to render prior data must be declared `async` and use `await window.api.getX?.().catch(() => null)`.
+
+Avoid:
+- Calling `window.api.*` synchronously and testing the result: `const r = window.api.getX?.(); if (r && !r.error) render(r);` — `r` is a Promise, always truthy, `.error` is undefined.
+- Passing a Promise to a render function — every property access will be `undefined`, causing silent rendering failure or a TypeError.
+
+Validation:
+- Confirm every `window.api.*` call in modal open/init functions is awaited.
+- Confirm synchronous-only usage is reserved for values that genuinely never touch IPC (e.g., pure renderer-local state).

@@ -406,6 +406,27 @@ Validation:
 - Confirm no module-level variable holds IPC report arrays.
 - Confirm modal close sets any local reference to null or exits the closure.
 
+### nasEventCache Stores Only a Field Whitelist — Adoption Block Is Stripped
+
+Context:
+- Applies to any performance analysis that considers using `nasEventCache` data to avoid a live NAS scan (e.g., counting adopted events, checking event readiness, building aggregate reports).
+
+Rule:
+- `nasEventCache` stores only: `{name, path, eventJsonPath, eventId, eventName, hijriDate, sequence, status, isCorrupt}` per event entry.
+- The `adoption` block from `event.json` is stripped when the NAS scan writes cache entries. Adopted event count is not derivable from the cache.
+- Do not propose replacing a NAS scan with cache-based logic for any feature that requires the adoption block, photographer list, or import history.
+- If a report or display feature needs "adopted events" count, it must trigger a live NAS scan — the cache cannot serve as a substitute.
+
+Avoid:
+- Suggesting the cache can supply adoption state as a performance optimization.
+- Counting `null` adoption fields as `0` — this produces a misleading metric.
+- Storing the full `event.json` object in the cache to work around field limitations — this defeats the lightweight-cache performance principle.
+
+Validation:
+- Confirm any cache-based count for adoption-related fields returns `null`, not a computed value.
+- Confirm live NAS scan is required for adoption state.
+- Confirm the cache is not expanded with heavyweight fields to avoid a scan.
+
 ### fsp.access() Calls in Scan Loops Must Be Capped
 
 Context:

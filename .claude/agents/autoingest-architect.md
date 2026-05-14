@@ -441,6 +441,75 @@ Validation:
 - Confirm `retryFailed()` re-attaches the stored per-file property when rebuilding file objects.
 - Confirm a batch with mixed photographers applies the correct photographer to each file.
 
+### Read-Only Aggregation Service Pattern
+
+Context:
+- Applies when creating a new service that aggregates status data from multiple existing services for display (e.g., a consistency report, health check, or operator dashboard) without mutating any system state.
+
+Rule:
+- Each data source must be isolated in its own `try/catch`. A failure in one source must not abort collection of the remaining sources — return `null` for the failed section and continue.
+- Declare a module-level `_inFlight` boolean guard. If `generateReport()` is called while already running, return the last report or a `{ busy: true }` sentinel immediately. Clear `_inFlight` in both the success path and the catch path.
+- The function must never throw to the IPC layer. Wrap the entire body in a top-level `try/catch` that returns a zeroed/null report on catastrophic failure.
+- Store only the last report for synchronous access via `getLastReport()`. Do not cache per-source data separately.
+
+```js
+let _lastReport = null;
+let _inFlight   = false;
+
+async function generateReport() {
+  if (_inFlight) return _lastReport || { generatedAt: new Date().toISOString(), busy: true };
+  _inFlight = true;
+  try {
+    let sectionA = null;
+    try { sectionA = await serviceA.getSummary(); } catch { /* leave null */ }
+    let sectionB = null;
+    try { sectionB = await serviceB.getStatus(); } catch { /* leave null */ }
+    const report = { generatedAt: new Date().toISOString(), sectionA, sectionB };
+    _lastReport = report;
+    _inFlight   = false;
+    return report;
+  } catch (err) {
+    const report = { generatedAt: new Date().toISOString(), error: err.message, sectionA: null, sectionB: null };
+    _lastReport = report;
+    _inFlight   = false;
+    return report;
+  }
+}
+```
+
+Avoid:
+- A single try/catch wrapping all sources — one source failure aborts the whole report.
+- Omitting the `_inFlight` guard — concurrent calls race over `_lastReport`.
+- Using `_inFlight = false` outside a try/finally or equivalent — a thrown error permanently locks the guard.
+- Throwing from `generateReport()` to the IPC layer.
+
+Validation:
+- Confirm each data source is wrapped in its own try/catch and returns null on failure.
+- Confirm `_inFlight` is cleared in both the success and the catch paths.
+- Confirm `generateReport()` never throws — the top-level catch returns a valid report object.
+- Confirm `getLastReport()` returns the last generated report synchronously.
+
+### nasEventCache Field Limitation — Adoption Block Not Preserved
+
+Context:
+- Applies to any feature, report, or diagnostic that attempts to count or classify adopted events using `nasEventCache`.
+
+Rule:
+- `nasEventCache.js` stores a fixed whitelist of fields per event entry: `{name, path, eventJsonPath, eventId, eventName, hijriDate, sequence, status, isCorrupt}`.
+- The `adoption` block from `event.json` is NOT written to the cache. The adopted/unadopted classification is not available from cache data alone.
+- Any attempt to count "adopted events" from the cache must return `null` (not `0`) and include a comment explaining that the count requires a live NAS scan.
+- The cache exists for display-latency only (quick tile rendering). It must not be used as an authoritative source for adoption status, routing, or operational decisions.
+
+Avoid:
+- Computing an adopted event count from `nasEventCache` entries — the field does not exist in the cache shape.
+- Returning `0` adopted events from a cache-based report — `0` implies the scan ran and found none; `null` correctly signals the data is unavailable.
+- Using cache adoption state to gate import or routing decisions.
+
+Validation:
+- Confirm any `events.adopted` field in a cache-based report is `null`, not `0`.
+- Confirm the code comment explains why the count is unavailable.
+- Confirm adoption state is only read from a live `event.json` read, not from cache.
+
 ## Validation Checklist
 
 When invoked, return:
