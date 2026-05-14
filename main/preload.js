@@ -252,8 +252,10 @@ contextBridge.exposeInMainWorld('api', {
   cleanupTempFile:         (tempPath) => ipcRenderer.invoke('archive:cleanupTempFile',      { tempPath }),
   markSyncIssueReviewed:   (ref)      => ipcRenderer.invoke('archive:markSyncIssueReviewed', ref),
   getSyncIssueReviews:     ()         => ipcRenderer.invoke('archive:getSyncIssueReviews'),
-  generateConsistencyReport: ()       => ipcRenderer.invoke('archive:generateConsistencyReport'),
-  getConsistencyReport:      ()       => ipcRenderer.invoke('archive:getConsistencyReport'),
+  generateConsistencyReport:   ()     => ipcRenderer.invoke('archive:generateConsistencyReport'),
+  getConsistencyReport:        ()     => ipcRenderer.invoke('archive:getConsistencyReport'),
+  generateCompletenessChecklist: ()   => ipcRenderer.invoke('archive:generateCompletenessChecklist'),
+  getCompletenessChecklist:      ()   => ipcRenderer.invoke('archive:getCompletenessChecklist'),
 
   // ── EXIF metadata service ──
   getMetadataStatus:      (batchId)            => ipcRenderer.invoke('metadata:getStatus',     batchId),

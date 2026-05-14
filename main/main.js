@@ -29,6 +29,7 @@ const transferImportService      = require('../services/transferImportService');
 const archiveDiagnosticsService  = require('../services/archiveDiagnosticsService');
 const archiveRepairService          = require('../services/archiveRepairService');
 const archiveConsistencyService     = require('../services/archiveConsistencyService');
+const archiveCompletenessService    = require('../services/archiveCompletenessService');
 const syncReviewService             = require('../services/syncReviewService');
 const adoptionPreviewService        = require('../services/adoptionPreviewService');
 const adoptionDryRunService      = require('../services/adoptionDryRunService');
@@ -2759,6 +2760,14 @@ ipcMain.handle('archive:generateConsistencyReport', async () =>
 
 ipcMain.handle('archive:getConsistencyReport', () =>
   archiveConsistencyService.getLastReport());
+
+// ── Archive Completeness Checklist (Phase 13D-3 — read-only) ─────────────────
+
+ipcMain.handle('archive:generateCompletenessChecklist', async () =>
+  archiveCompletenessService.generateChecklist());
+
+ipcMain.handle('archive:getCompletenessChecklist', () =>
+  archiveCompletenessService.getLastChecklist());
 
 ipcMain.handle('window:minimize', () => {
   BrowserWindow.getFocusedWindow()?.minimize();

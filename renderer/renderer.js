@@ -10348,6 +10348,132 @@ document.addEventListener('keydown', e => {
     }
   });
 
+  // ── Archive Completeness Checklist (Phase 13D-3 — read-only) ────────────────
+
+  const _CL_CATEGORY_LABELS = {
+    roots:       'Archive Roots',
+    sync:        'Sync Queue',
+    locks:       'Locks & Temp Files',
+    transfer:    'Transfer',
+    adoption:    'Adoption',
+    diagnostics: 'Diagnostics',
+  };
+  const _CL_CATEGORY_ORDER = ['roots', 'sync', 'locks', 'transfer', 'adoption', 'diagnostics'];
+
+  function _clIcon(status) {
+    switch (status) {
+      case 'pass':          return '<span class="cl-item-icon cl-icon-pass">✓</span>';
+      case 'warning':       return '<span class="cl-item-icon cl-icon-warn">⚠</span>';
+      case 'fail':          return '<span class="cl-item-icon cl-icon-fail">✗</span>';
+      case 'not-available': return '<span class="cl-item-icon cl-icon-na">—</span>';
+      default:              return '<span class="cl-item-icon cl-icon-na">?</span>';
+    }
+  }
+
+  function _clReadinessBadge(readiness) {
+    const cls   = readiness === 'ready'           ? 'cl-readiness-ready'
+                : readiness === 'needs-attention' ? 'cl-readiness-attention'
+                : readiness === 'blocked'         ? 'cl-readiness-blocked'
+                : 'cl-readiness-unknown';
+    const label = readiness === 'ready'           ? '✓ Ready'
+                : readiness === 'needs-attention' ? '⚠ Needs Attention'
+                : readiness === 'blocked'         ? '✗ Blocked'
+                : 'Unknown';
+    return `<div class="cl-readiness ${cls}">${_esc(label)}</div>`;
+  }
+
+  function _clRenderItem(item) {
+    const msgHtml    = item.message           ? `<div class="cl-item-msg">${_esc(item.message)}</div>` : '';
+    const actionHtml = item.recommendedAction ? `<div class="cl-item-action">→ ${_esc(item.recommendedAction)}</div>` : '';
+    return `
+      <div class="cl-item">
+        ${_clIcon(item.status)}
+        <div class="cl-item-content">
+          <div class="cl-item-label">${_esc(item.label)}</div>
+          ${msgHtml}${actionHtml}
+        </div>
+      </div>`;
+  }
+
+  function _clRenderChecklist(checklist) {
+    const s = checklist.summary || {};
+    const summaryHtml = `
+      <div class="cl-summary">
+        <span class="cl-summary-pass">✓ ${s.pass ?? 0} pass</span>
+        <span class="cl-summary-warn">⚠ ${s.warning ?? 0} warning</span>
+        <span class="cl-summary-fail">✗ ${s.fail ?? 0} fail</span>
+        <span>&nbsp;${s.notAvailable ?? 0} n/a</span>
+      </div>`;
+
+    const itemsByCategory = {};
+    for (const item of (checklist.items || [])) {
+      (itemsByCategory[item.category] = itemsByCategory[item.category] || []).push(item);
+    }
+
+    const sectionsHtml = _CL_CATEGORY_ORDER
+      .filter(cat => itemsByCategory[cat]?.length)
+      .map(cat => `
+        <div class="cl-section">
+          <div class="cl-section-title">${_esc(_CL_CATEGORY_LABELS[cat] || cat)}</div>
+          ${itemsByCategory[cat].map(_clRenderItem).join('')}
+        </div>`)
+      .join('');
+
+    const ts = checklist.generatedAt ? `<div class="cr-ts">Generated: ${_esc(_crTs(checklist.generatedAt))}</div>` : '';
+    return `${_clReadinessBadge(checklist.readiness)}${summaryHtml}${sectionsHtml}${ts}`;
+  }
+
+  async function _clOpen() {
+    document.getElementById('archiveChecklistModal')?.classList.add('open');
+    const existing = await window.api.getCompletenessChecklist?.().catch(() => null);
+    if (existing && !existing.error && !existing.busy) {
+      const bodyEl = document.getElementById('clBody');
+      if (bodyEl) bodyEl.innerHTML = _clRenderChecklist(existing);
+    }
+  }
+
+  function _clClose() {
+    document.getElementById('archiveChecklistModal')?.classList.remove('open');
+  }
+
+  document.getElementById('diagChecklistBtn')?.addEventListener('click', _clOpen);
+  document.getElementById('clCloseBtn')?.addEventListener('click', _clClose);
+  document.getElementById('clDoneBtn')?.addEventListener('click',  _clClose);
+
+  document.getElementById('archiveChecklistModal')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('archiveChecklistModal')) _clClose();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.getElementById('archiveChecklistModal')?.classList.contains('open')) {
+      _clClose();
+    }
+  });
+
+  document.getElementById('clGenerateBtn')?.addEventListener('click', async () => {
+    const btn      = document.getElementById('clGenerateBtn');
+    const statusEl = document.getElementById('clStatusText');
+    const bodyEl   = document.getElementById('clBody');
+
+    if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
+    if (statusEl) { statusEl.className = 'cr-status-row cr-status-running'; statusEl.textContent = 'Checking archive readiness…'; }
+
+    const checklist = await window.api.generateCompletenessChecklist().catch(() => null);
+
+    if (btn) { btn.disabled = false; btn.textContent = 'Refresh'; }
+
+    if (!checklist || checklist.error) {
+      if (statusEl) {
+        statusEl.className = 'cr-status-row';
+        statusEl.textContent = checklist?.error ? `Error: ${checklist.error}` : 'Failed to generate checklist.';
+      }
+      return;
+    }
+
+    if (statusEl) { statusEl.className = 'cr-status-row'; statusEl.textContent = ''; }
+    if (bodyEl) bodyEl.innerHTML = _clRenderChecklist(checklist);
+  });
+
   // ── Adoption Preview (Phase 13C-1 — read-only) ───────────────────────────────
 
   let _adoptRunning = false;
