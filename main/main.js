@@ -30,6 +30,7 @@ const archiveDiagnosticsService  = require('../services/archiveDiagnosticsServic
 const archiveRepairService          = require('../services/archiveRepairService');
 const archiveConsistencyService     = require('../services/archiveConsistencyService');
 const archiveCompletenessService    = require('../services/archiveCompletenessService');
+const archiveAuditTimelineService   = require('../services/archiveAuditTimelineService');
 const syncReviewService             = require('../services/syncReviewService');
 const adoptionPreviewService        = require('../services/adoptionPreviewService');
 const adoptionDryRunService      = require('../services/adoptionDryRunService');
@@ -2768,6 +2769,14 @@ ipcMain.handle('archive:generateCompletenessChecklist', async () =>
 
 ipcMain.handle('archive:getCompletenessChecklist', () =>
   archiveCompletenessService.getLastChecklist());
+
+// ── Archive Audit Timeline (Phase 13D-5 — read-only) ─────────────────────────
+
+ipcMain.handle('archive:generateAuditTimeline', async () =>
+  archiveAuditTimelineService.generateTimeline());
+
+ipcMain.handle('archive:getAuditTimeline', () =>
+  archiveAuditTimelineService.getLastTimeline());
 
 ipcMain.handle('window:minimize', () => {
   BrowserWindow.getFocusedWindow()?.minimize();

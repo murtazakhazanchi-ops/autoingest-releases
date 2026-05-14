@@ -256,6 +256,8 @@ contextBridge.exposeInMainWorld('api', {
   getConsistencyReport:        ()     => ipcRenderer.invoke('archive:getConsistencyReport'),
   generateCompletenessChecklist: ()   => ipcRenderer.invoke('archive:generateCompletenessChecklist'),
   getCompletenessChecklist:      ()   => ipcRenderer.invoke('archive:getCompletenessChecklist'),
+  generateAuditTimeline:         ()   => ipcRenderer.invoke('archive:generateAuditTimeline'),
+  getAuditTimeline:              ()   => ipcRenderer.invoke('archive:getAuditTimeline'),
 
   // ── EXIF metadata service ──
   getMetadataStatus:      (batchId)            => ipcRenderer.invoke('metadata:getStatus',     batchId),

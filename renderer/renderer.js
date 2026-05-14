@@ -10508,6 +10508,122 @@ document.addEventListener('keydown', e => {
     if (bodyEl) bodyEl.innerHTML = _clRenderChecklist(checklist);
   });
 
+  // ── Archive Audit Timeline (Phase 13D-5 — read-only) ────────────────────────
+
+  const _AT_TYPE_LABELS = {
+    'transfer-export':       'Transfer Export',
+    'transfer-import':       'Transfer Import',
+    'archive-sync':          'Archive Sync',
+    'sync-review':           'Sync Review',
+    'diagnostics':           'Diagnostics',
+    'consistency-report':    'Consistency',
+    'completeness-checklist':'Checklist',
+  };
+
+  function _atIcon(status) {
+    switch (status) {
+      case 'success':  return '<span class="at-icon at-icon-success">✓</span>';
+      case 'warning':  return '<span class="at-icon at-icon-warning">⚠</span>';
+      case 'failed':   return '<span class="at-icon at-icon-failed">✗</span>';
+      case 'reviewed': return '<span class="at-icon at-icon-reviewed">✔</span>';
+      default:         return '<span class="at-icon at-icon-info">·</span>';
+    }
+  }
+
+  function _atRenderEntry(e) {
+    const typeLabel = _esc(_AT_TYPE_LABELS[e.type] || e.type);
+    const tsStr     = e.timestamp ? _esc(_crTs(e.timestamp)) : '';
+    const msgHtml   = e.message   ? `<div class="at-msg">${_esc(e.message)}</div>` : '';
+    const metaParts = [];
+    if (tsStr)       metaParts.push(`<span class="at-ts">${tsStr}</span>`);
+    if (e.operator)  metaParts.push(`<span>${_esc(e.operator)}</span>`);
+    if (e.deviceName)metaParts.push(`<span>${_esc(e.deviceName)}</span>`);
+    const metaHtml = metaParts.length
+      ? `<div class="at-meta">${metaParts.join('')}</div>`
+      : '';
+    return `
+      <div class="at-entry">
+        ${_atIcon(e.status)}
+        <div class="at-body-col">
+          <div class="at-title">
+            <span class="at-type-badge">${typeLabel}</span>
+            &nbsp;${_esc(e.title)}
+          </div>
+          ${msgHtml}${metaHtml}
+        </div>
+      </div>`;
+  }
+
+  function _atRenderTimeline(timeline) {
+    const parts = [];
+    if (timeline.sourceErrors?.length) {
+      const errs = timeline.sourceErrors.map(e => _esc(e.source)).join(', ');
+      parts.push(`<div class="at-source-warn">⚠ Some sources unavailable: ${errs}</div>`);
+    }
+    if (!timeline.entries?.length) {
+      parts.push('<div class="at-empty">No operations recorded yet.</div>');
+    } else {
+      for (const entry of timeline.entries) {
+        parts.push(_atRenderEntry(entry));
+      }
+    }
+    if (timeline.generatedAt) {
+      parts.push(`<div class="cr-ts" style="margin-top:8px">Generated: ${_esc(_crTs(timeline.generatedAt))}</div>`);
+    }
+    return parts.join('');
+  }
+
+  async function _atOpen() {
+    document.getElementById('archiveAuditModal')?.classList.add('open');
+    const existing = await window.api.getAuditTimeline?.().catch(() => null);
+    if (existing && !existing.error && !existing.busy) {
+      const bodyEl = document.getElementById('atBody');
+      if (bodyEl) bodyEl.innerHTML = _atRenderTimeline(existing);
+    }
+  }
+
+  function _atClose() {
+    document.getElementById('archiveAuditModal')?.classList.remove('open');
+  }
+
+  document.getElementById('diagAuditBtn')?.addEventListener('click', _atOpen);
+  document.getElementById('atCloseBtn')?.addEventListener('click',   _atClose);
+  document.getElementById('atDoneBtn')?.addEventListener('click',    _atClose);
+
+  document.getElementById('archiveAuditModal')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('archiveAuditModal')) _atClose();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.getElementById('archiveAuditModal')?.classList.contains('open')) {
+      _atClose();
+    }
+  });
+
+  document.getElementById('atGenerateBtn')?.addEventListener('click', async () => {
+    const btn      = document.getElementById('atGenerateBtn');
+    const statusEl = document.getElementById('atStatusText');
+    const bodyEl   = document.getElementById('atBody');
+
+    if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
+    if (statusEl) { statusEl.className = 'cr-status-row cr-status-running'; statusEl.textContent = 'Reading archive operation history…'; }
+
+    const timeline = await window.api.generateAuditTimeline().catch(() => null);
+
+    if (btn) { btn.disabled = false; btn.textContent = 'Refresh'; }
+
+    if (!timeline || timeline.error) {
+      if (statusEl) {
+        statusEl.className  = 'cr-status-row';
+        statusEl.textContent = timeline?.error ? `Error: ${timeline.error}` : 'Failed to load timeline.';
+      }
+      return;
+    }
+
+    if (statusEl) { statusEl.className = 'cr-status-row'; statusEl.textContent = ''; }
+    if (bodyEl) bodyEl.innerHTML = _atRenderTimeline(timeline);
+  });
+
   // ── Adoption Preview (Phase 13C-1 — read-only) ───────────────────────────────
 
   let _adoptRunning = false;
