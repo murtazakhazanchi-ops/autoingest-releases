@@ -2307,9 +2307,10 @@ async function _alocOpen() {
   if (!overlay || overlay.classList.contains('open')) return;
 
   // Fetch current state
-  const [status, identity] = await Promise.all([
+  const [status, identity, transferRoot] = await Promise.all([
     window.api.getArchiveOperationsStatus(),
     window.api.getDeviceIdentity(),
+    window.api.getTransferRoot(),
   ]);
 
   _alocPendingNasRoot     = undefined;
@@ -2353,18 +2354,39 @@ async function _alocOpen() {
     }
   }
 
+  // Populate Transfer Drive Root path
+  const transferEl = document.getElementById('alocTransferPath');
+  if (transferEl) {
+    if (transferRoot) {
+      transferEl.textContent = transferRoot;
+      transferEl.classList.remove('aloc-unset');
+    } else {
+      transferEl.textContent = 'Not set';
+      transferEl.classList.add('aloc-unset');
+    }
+  }
+
   // Validation hints
-  const alocNasVal     = document.getElementById('alocNasValidation');
-  const alocStagingVal = document.getElementById('alocStagingValidation');
-  const alocMainNasVal = document.getElementById('alocMainNasValidation');
-  if (alocNasVal)     alocNasVal.textContent     = '';
-  if (alocStagingVal) alocStagingVal.textContent = '';
-  if (alocMainNasVal) alocMainNasVal.textContent = '';
+  const alocNasVal      = document.getElementById('alocNasValidation');
+  const alocStagingVal  = document.getElementById('alocStagingValidation');
+  const alocMainNasVal  = document.getElementById('alocMainNasValidation');
+  const alocTransferVal = document.getElementById('alocTransferValidation');
+  if (alocNasVal)      alocNasVal.textContent      = '';
+  if (alocStagingVal)  alocStagingVal.textContent  = '';
+  if (alocMainNasVal)  alocMainNasVal.textContent  = '';
+  if (alocTransferVal) alocTransferVal.textContent = '';
 
   // Validate main archive root on open if path is saved (fire-and-forget)
   if (status.mainArchiveRoot) {
     window.api.validateMainArchiveRoot(status.mainArchiveRoot).then(result => {
       _alocShowMainNasValidation('alocMainNasValidation', result);
+    }).catch(() => {});
+  }
+
+  // Validate transfer root on open if path is set (fire-and-forget)
+  if (transferRoot) {
+    window.api.validateTransferRoot(transferRoot).then(result => {
+      _alocShowTransferValidation('alocTransferValidation', result);
     }).catch(() => {});
   }
 
@@ -2424,6 +2446,42 @@ function _alocShowMainNasValidation(elId, result) {
     el.className = 'aloc-validation err';
   }
 }
+
+// Helper: display Transfer Drive Root validation
+function _alocShowTransferValidation(elId, result) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  if (!result) { el.textContent = ''; el.className = 'aloc-validation'; return; }
+  if (result.valid) {
+    if (result.initialized) {
+      el.textContent = result.deviceName ? `Ready — ${result.deviceName}` : 'Ready';
+      el.className = 'aloc-validation ok';
+    } else {
+      el.textContent = 'Uninitialized — export will initialize';
+      el.className = 'aloc-validation warn';
+    }
+  } else {
+    const msgs = {
+      'not-set':          'No path set',
+      'offline':          'Drive offline',
+      'not-directory':    'Path is not a directory',
+      'no-access':        'Permission denied',
+      'metadata-invalid': 'Invalid transfer metadata',
+    };
+    el.textContent = msgs[result.reason] || 'Invalid';
+    el.className = 'aloc-validation err';
+  }
+}
+
+// Transfer Drive Root choose
+document.getElementById('alocTransferChooseBtn')?.addEventListener('click', async () => {
+  const chosen = await window.api.chooseTransferRoot();
+  if (!chosen) return;
+  const transferEl = document.getElementById('alocTransferPath');
+  if (transferEl) { transferEl.textContent = chosen; transferEl.classList.remove('aloc-unset'); }
+  const result = await window.api.validateTransferRoot(chosen);
+  _alocShowTransferValidation('alocTransferValidation', result);
+});
 
 // NAS choose
 document.getElementById('alocNasChooseBtn')?.addEventListener('click', async () => {
