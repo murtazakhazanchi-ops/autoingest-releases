@@ -310,8 +310,9 @@ Phase 13C-7 implemented the adoption write as follows:
 8. Renderer shows Adopt button only after dry-run returns `okForFutureAdoption: true` and `item.readiness === 'ready-to-adopt-later'`.
 9. In-app two-step confirmation UI (no OS `confirm()` dialog — unreliable under `sandbox:true`).
 10. On success: refreshes adoption candidate list via `diagAdoptBtn.click()`.
+11. On success (Phase 13C-7.1): calls `_refreshNasEventsCard(false)` to refresh the Active Archive overview tile. Refresh errors are swallowed — they do not affect adoption success.
 
-**Note:** The managed event list is not automatically refreshed after adoption — the operator must manually refresh the archive event view to see the newly adopted event.
+**Note:** The Active Archive overview tile auto-refreshes after a successful adoption (Phase 13C-7.1). No manual refresh is required for that surface.
 
 ---
 

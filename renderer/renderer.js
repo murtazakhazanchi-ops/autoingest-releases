@@ -10763,6 +10763,7 @@ document.addEventListener('keydown', e => {
           setTimeout(() => {
             _hideAdoptDetail();
             if (!_adoptRunning) document.getElementById('diagAdoptBtn')?.click();
+            _refreshNasEventsCard(false).catch(() => {});
           }, 2000);
         } else {
           if (feedbackEl) feedbackEl.innerHTML = `<div class="adopt-action-error">Adoption failed: ${_esc(result.reason || 'unknown error')}</div>`;
