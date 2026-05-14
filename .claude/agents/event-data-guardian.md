@@ -395,6 +395,41 @@ Validation:
 - Confirm adopted events do not trigger corruption messages or legacy modals.
 - Confirm the renderer consumes `ev.isLegacy` from the IPC scan result rather than recomputing it.
 
+### Full-Payload Write Path Must Explicitly Pass Through Advisory/Audit Fields
+
+Context:
+- Applies to `updateEventJson` (and any equivalent write function) that has both a partial-patch path and a full-payload path.
+- Applies whenever a new advisory or audit field (e.g., `adoption`) is added to `event.json`.
+
+Rule:
+- The partial-patch path (spread existing + merge payload) preserves all existing fields automatically.
+- The full-payload path constructs `dataToWrite` from a hardcoded field list. Any field not in that list is silently dropped on every save through that path.
+- Advisory/audit fields (e.g., `adoption`) must be explicitly spread from the incoming payload in the full-payload path using a `!= null` guard.
+- The session capture object (`_viewingExisting` or equivalent) must read the advisory field from `entry._eventJson` so the field is present in the edit-save payload.
+
+Guard pattern:
+```javascript
+// In the full-payload path of updateEventJson:
+...(payload.adoption != null ? { adoption: payload.adoption } : {})
+// In the session capture:
+adoption: entry._eventJson?.adoption ?? null
+// In the save payload construction:
+...(_viewingExisting.adoption != null ? { adoption: _viewingExisting.adoption } : {})
+```
+
+The `!= null` check covers both `null` and `undefined`, leaving non-adopted events (where `adoption` is absent) unaffected.
+
+Avoid:
+- Adding a new advisory field to the initial-write path only, without updating the full-payload update path.
+- A session capture object that does not read the advisory field from `entry._eventJson`.
+- Assuming the field will survive all write paths because it survived the partial-patch path.
+
+Validation:
+- Confirm the advisory field is present in `event.json` immediately after the initial write.
+- Edit the event (rename, component change, or any save) and confirm the advisory field is still present in `event.json` after the save.
+- Confirm non-adopted events (no `adoption` key) are unaffected by the spread guard.
+- Confirm the field is captured in the session state object (`_viewingExisting`) and included in all save payloads.
+
 ### Documentation Follow-Up
 
 Context:

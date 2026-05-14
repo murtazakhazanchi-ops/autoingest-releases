@@ -1621,6 +1621,53 @@ Status:
 
 ---
 
+### 2026-05-14 — Phase 13C-9: Adoption Block Silent Drop on Full-Payload Save
+
+Task type:
+- Persistence / Event System / Bug Fix / Data Model / event.json
+
+What happened:
+
+The `adoption` block was silently erased from `event.json` on every full-payload save from `eventCreator.js`.
+
+`updateEventJson` has two paths:
+- **Partial-patch path**: spreads existing `event.json` then merges the incoming payload — all existing fields survive automatically.
+- **Full-payload path**: constructs `dataToWrite` from a hardcoded field list (`version`, `hijriDate`, `sequence`, `eventName`, `safeEventName`, `status`, `components`, `updatedAt`). Only fields explicitly listed survive.
+
+`_handleSaveEditedEvent` uses the full-payload path for both the no-rename save and the rename save. `adoption` was not in the hardcoded list. Every edit+save cycle silently erased it.
+
+Three-layer fix:
+1. `_viewingExisting` session object now captures `adoption: entry._eventJson?.adoption ?? null` so it survives the editing session.
+2. Both no-rename and rename `_handleSaveEditedEvent` payloads include `...(adoption != null ? { adoption } : {})`.
+3. `updateEventJson` full-payload path passes `adoption` through: `...(payload.adoption != null ? { adoption: payload.adoption } : {})`.
+
+The `!= null` guard (covering both `null` and `undefined`) ensures non-adopted events (where `adoption` is absent) are unaffected.
+
+Reusable lessons:
+
+1. **Full-payload write paths must explicitly pass through all advisory/audit fields.** Any path in `updateEventJson` (or equivalent) that constructs `dataToWrite` from a hardcoded field list will silently drop any field not in that list. Advisory fields (`adoption`, future audit blocks) must be explicitly spread from the payload with a `!= null` guard.
+
+2. **Session state that feeds a full-payload write must capture all fields needed to reconstruct the payload.** `_viewingExisting` is the source for the edit-save payload. If it does not capture `adoption` (or any advisory field) from `entry._eventJson`, that field cannot be included in the write and will be silently dropped.
+
+3. **Diagnostic signal for this class of bug**: advisory field is present immediately after initial adoption write; silently absent after the next edit+save cycle. The field survives partial-patch writes but is erased by any full-payload write that constructs `dataToWrite` from a hardcoded list.
+
+Common failure modes:
+- Adding a new advisory/audit field to `event.json` only in the initial-write path, without updating the full-payload update path.
+- `_viewingExisting` (or equivalent session capture) not reading the new field from `entry._eventJson`, preventing it from flowing into the edit-save payload.
+- Relying on the partial-patch path as evidence that a field will survive all writes — the full-payload path is a separate code path with its own field list.
+
+Preferred guard pattern:
+- `...(payload.adoption != null ? { adoption: payload.adoption } : {})` — `!= null` covers both `null` and `undefined`, so non-adopted events with no `adoption` key are unaffected.
+
+Promote to agents:
+- `event-data-guardian.md` — full-payload path field pass-through; session state field capture; `!= null` spread guard
+- `contract-debugger.md` — advisory field silent-drop diagnostic signal (present after initial write, absent after edit+save)
+
+Status:
+- Promoted
+
+---
+
 ## Entry Template
 
 ### YYYY-MM-DD — Task Name

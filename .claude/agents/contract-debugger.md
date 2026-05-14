@@ -600,6 +600,28 @@ Validation:
 - Before closing a task, grep the codebase for the IPC channel name from the contract. If no match, the contract must be updated.
 - Confirm the IPC handler registration in `main.js`, the preload entry, and the renderer call all use the same channel name.
 
+### Advisory Field Silent Drop — Full-Payload Write Path Diagnostic
+
+Context:
+- Applies when debugging a bug where an `event.json` field (e.g., `adoption`, an audit block) is present immediately after the initial write but silently absent after a subsequent edit+save cycle.
+
+Rule:
+- When the symptom is "field present after initial write, absent after edit+save," suspect a full-payload write path that constructs `dataToWrite` from a hardcoded field list.
+- Write services often have two paths: (1) a partial-patch path that spreads existing `event.json` and merges the payload — advisory fields survive automatically; and (2) a full-payload path that constructs `dataToWrite` field-by-field — only explicitly listed fields survive.
+- The edit+save path (`_handleSaveEditedEvent` or equivalent) typically uses the full-payload path. If the field is not explicitly included in both the session capture object and the save payload, it is silently dropped.
+- Diagnosis: inspect `updateEventJson` (or equivalent). Find the full-payload branch. Check whether the advisory field is in the hardcoded field list. If not, it will be dropped on every save.
+
+Avoid:
+- Treating a silent field drop after edit+save as a validation failure or schema rejection — there is no error. The field is simply absent from the hardcoded list.
+- Debugging inside the partial-patch path when the symptom occurs after edit+save — the issue is in the full-payload path.
+- Assuming a field survives all write paths because it survived one write path.
+
+Validation:
+- Confirm the field survives the initial adoption/creation write (partial-patch or dedicated write path).
+- Confirm the field is also present in `event.json` after the first edit+save cycle.
+- If it disappears after edit+save: inspect the full-payload `dataToWrite` construction and confirm the field is not in the hardcoded list.
+- Fix: add an explicit `!= null` spread guard in the full-payload path and in the session capture object.
+
 ### setInterval with Async Callback — Always Attach .catch() to Prevent Silent Failures
 
 Context:
