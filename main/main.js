@@ -2638,6 +2638,31 @@ ipcMain.handle('archive:chooseTransferRoot', async () => {
 
 ipcMain.handle('archive:getTransferRoot', () => settings.getTransferRoot());
 
+ipcMain.handle('archive:validateTransferRoot', async (_event, dirPath) => {
+  if (!dirPath || typeof dirPath !== 'string') return { valid: false, reason: 'not-set' };
+  // Phase 1: confirm directory exists and is reachable
+  try {
+    const stat = await fsp.stat(dirPath);
+    if (!stat.isDirectory()) return { valid: false, reason: 'not-directory' };
+  } catch {
+    return { valid: false, reason: 'offline' };
+  }
+  // Phase 2: read transfer marker — missing marker means uninitialized, not invalid
+  const markerPath = path.join(dirPath, '.autoingest-transfer', 'transfer-root.json');
+  try {
+    const raw    = await fsp.readFile(markerPath, 'utf8');
+    const marker = JSON.parse(raw);
+    if (!marker || marker.type !== 'autoingest-transfer-root') {
+      return { valid: false, reason: 'metadata-invalid' };
+    }
+    return { valid: true, initialized: true, deviceName: marker.deviceName || null };
+  } catch (err) {
+    if (err.code === 'ENOENT') return { valid: true, initialized: false, reason: 'uninitialized' };
+    if (err.code === 'EACCES' || err.code === 'EPERM') return { valid: false, reason: 'no-access' };
+    return { valid: false, reason: 'metadata-invalid' };
+  }
+});
+
 ipcMain.handle('archive:previewTransferExport', async (_event, { scope } = {}) => {
   const nasRoot      = settings.getNasRoot();
   const transferRoot = settings.getTransferRoot();

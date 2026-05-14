@@ -194,7 +194,7 @@ Use this as a reference before implementing or modifying any feature.
 ### 14. Archive Operations Layer
 
 **Description**
-- Five read-only reporting and audit surfaces for archive health: Consistency Report, Completeness Checklist, Final Readiness Summary, Archive Diagnostics, and Audit Timeline
+- Four read-only reporting and audit surfaces for archive health: Consistency Report, Completeness Checklist (with readiness verdict), Archive Diagnostics, and Audit Timeline
 - Three-root model: Active Archive Root (portable NAS), Local Staging Root (operator SSD), Main Archive Root (permanent office)
 - Two import workflows: Local First (staging → sync) and Direct Archive (direct to active archive with photographer-level lock)
 - Transfer workflow: Active Archive Root → Transfer Drive Export → Transfer Drive → Main Archive Root Import

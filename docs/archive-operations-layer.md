@@ -1,6 +1,6 @@
 # Archive Operations Layer
 
-End-to-end architecture and workflow documentation for the AutoIngest archive operations layer (Phases 13D-1 through 13D-5).
+End-to-end architecture and workflow documentation for the AutoIngest archive operations layer (Phases 13D-1, 13D-2, 13D-4, and 13D-5).
 
 ---
 
@@ -106,7 +106,7 @@ Main Archive Root
 
 ## Reporting Layer
 
-Five reporting surfaces expose archive health. All are read-only — they do not mutate any file or service state.
+Four reporting surfaces expose archive health. All are read-only — they do not mutate any file or service state.
 
 ### 1. Consistency Report (Phase 13D-1)
 
@@ -118,21 +118,13 @@ Checks structural consistency of the active archive: event.json presence, folder
 
 ### 2. Completeness Checklist (Phase 13D-2)
 
-Evaluates readiness of the active archive for transfer or long-term storage. Checks metadata completeness, sync status, pending imports, and unreviewed issues.
+Evaluates readiness of the active archive for transfer or long-term storage. Checks metadata completeness, sync status, pending imports, and unreviewed issues. Produces an overall readiness verdict (`ready` / `needs-attention` / `blocked`) used as the go / no-go signal before initiating a transfer. There is no separate readiness service — the verdict is derived entirely within this checklist.
 
 - IPC: `archive:generateCompletenessChecklist`, `archive:getCompletenessChecklist`
 - Backed by: `archiveCompletenessService.js`
-- Output: checklist with per-item status; overall readiness (`ready` / `needs-attention` / `blocked`)
+- Output: checklist with per-item status; overall readiness verdict (`ready` / `needs-attention` / `blocked`)
 
-### 3. Final Readiness Summary (Phase 13D-3)
-
-Aggregates the consistency report and completeness checklist into a single operator-facing readiness verdict. Used as the "go / no-go" signal before initiating a transfer.
-
-- IPC: `archive:generateReadinessSummary`, `archive:getReadinessSummary`
-- Backed by: `archiveReadinessService.js`
-- Output: summary with overall status and key blocking items
-
-### 4. Archive Diagnostics (Phase 13D-4)
+### 3. Archive Diagnostics (Phase 13D-4)
 
 Deep structural diagnostics: cross-validates event.json against filesystem, checks for stale locks, verifies sidecar integrity, and reports anomalies not surfaced by the consistency report.
 
@@ -140,7 +132,7 @@ Deep structural diagnostics: cross-validates event.json against filesystem, chec
 - Backed by: `archiveDiagnosticsService.js`
 - Output: error/warning counts with per-check detail
 
-### 5. Audit Timeline (Phase 13D-5)
+### 4. Audit Timeline (Phase 13D-5)
 
 Aggregates recent operational history across the archive operations layer into a chronological timeline. Covers transfer exports, transfer imports, sync queue terminal states, sync review acknowledgements, and in-memory session state from diagnostics/consistency/completeness.
 

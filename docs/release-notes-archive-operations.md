@@ -1,12 +1,12 @@
 # Release Notes — Archive Operations Layer
 
-Milestone release notes for the Archive Operations Layer (Phases 13D-1 through 13D-5).
+Milestone release notes for the Archive Operations Layer (Phases 13D-1, 13D-2, 13D-4, and 13D-5).
 
 ---
 
 ## Archive Operations Layer — Phase 13D
 
-This milestone introduces the full archive operations reporting layer: five read-only diagnostic and audit surfaces that give operators visibility into archive health before transfer, during validation, and after operations complete.
+This milestone introduces the full archive operations reporting layer: four read-only diagnostic and audit surfaces that give operators visibility into archive health before transfer, during validation, and after operations complete.
 
 No ingestion behavior was changed. No file-copy or routing logic was modified. The changes are additive: new services, new IPC handlers, new preload entries, and new UI modals attached to the existing diagnostics modal footer.
 
@@ -38,22 +38,6 @@ Evaluates archive readiness for transfer. Checks metadata completeness, sync sta
 
 **Modified files:**
 - `main/main.js` — IPC handlers: `archive:generateCompletenessChecklist`, `archive:getCompletenessChecklist`
-- `main/preload.js` — contextBridge entries
-- `renderer/index.html` — modal HTML + CSS
-- `renderer/renderer.js` — modal open/close/render logic
-
----
-
-### Phase 13D-3 — Final Readiness Summary
-
-**What it does:**
-Aggregates the consistency report and completeness checklist into a single operator-facing readiness summary. Provides a clear go / no-go signal before initiating a transfer operation. Blocking items are surfaced prominently.
-
-**New files:**
-- `services/archiveReadinessService.js`
-
-**Modified files:**
-- `main/main.js` — IPC handlers: `archive:generateReadinessSummary`, `archive:getReadinessSummary`
 - `main/preload.js` — contextBridge entries
 - `renderer/index.html` — modal HTML + CSS
 - `renderer/renderer.js` — modal open/close/render logic
@@ -104,7 +88,7 @@ Aggregates recent operational history across the archive operations layer into a
 
 ### Service pattern
 
-All five reporting services follow the same contract:
+All four reporting services follow the same contract:
 
 - `generate*()` is async, never throws to the IPC layer, wraps top-level logic in try/catch.
 - `getLast*()` is synchronous, returns the most recent result or `null`.
@@ -120,8 +104,6 @@ archive:generateConsistencyReport   → archiveConsistencyService.generateReport
 archive:getConsistencyReport        → archiveConsistencyService.getLastReport()
 archive:generateCompletenessChecklist → archiveCompletenessService.generateChecklist()
 archive:getCompletenessChecklist    → archiveCompletenessService.getLastChecklist()
-archive:generateReadinessSummary    → archiveReadinessService.generateSummary()
-archive:getReadinessSummary         → archiveReadinessService.getLastSummary()
 archive:runDiagnostics              → archiveDiagnosticsService.runDiagnostics()
 archive:getDiagnosticsStatus        → archiveDiagnosticsService.getDiagnosticsStatus()
 archive:generateAuditTimeline       → archiveAuditTimelineService.generateTimeline()
@@ -149,7 +131,7 @@ Before treating this milestone as production-ready:
 
 - [ ] Consistency report runs to completion on a real NAS archive (not just local filesystem)
 - [ ] Completeness checklist correctly identifies events with missing metadata
-- [ ] Readiness summary correctly blocks when the consistency report has errors
+- [ ] Completeness checklist readiness verdict correctly reports `blocked` when the consistency report has errors
 - [ ] Diagnostics modal opens and closes without state leak across sessions
 - [ ] Audit timeline renders all five source types when all sources have data
 - [ ] Audit timeline renders gracefully when one or more sources are unavailable

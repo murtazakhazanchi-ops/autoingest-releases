@@ -229,6 +229,7 @@ contextBridge.exposeInMainWorld('api', {
   // ── Transfer Export ──
   chooseTransferRoot:      ()                            => ipcRenderer.invoke('archive:chooseTransferRoot'),
   getTransferRoot:         ()                            => ipcRenderer.invoke('archive:getTransferRoot'),
+  validateTransferRoot:    (v)                           => ipcRenderer.invoke('archive:validateTransferRoot', v),
   previewTransferExport:   (scope)                       => ipcRenderer.invoke('archive:previewTransferExport',  { scope }),
   runTransferExport:       (scope, operatorName)         => ipcRenderer.invoke('archive:runTransferExport',      { scope, operatorName }),
   getTransferExportStatus: ()                            => ipcRenderer.invoke('archive:getTransferExportStatus'),
