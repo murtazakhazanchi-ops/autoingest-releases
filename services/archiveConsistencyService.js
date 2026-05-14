@@ -101,6 +101,8 @@ async function generateReport() {
     const txDrive    = settings.getTransferRoot();
     const mainRoot   = settings.getMainArchiveRoot();
 
+    const sectionErrors = [];
+
     // ── Roots ──────────────────────────────────────────────────────────────────
     const [activeRoot, localRoot, transferRoot, mainArchRoot] = await Promise.all([
       _checkRootStatus(nasPath),
@@ -121,7 +123,10 @@ async function generateReport() {
         );
         cacheAge = cache.cachedAt || null;
       }
-    } catch { /* leave null */ }
+    } catch (err) {
+      sectionErrors.push({ section: 'events', message: 'Could not load event cache' });
+      console.error('[ConsistencyReport] events section failed:', err.message);
+    }
 
     // ── Adoption candidates from in-memory preview state (no new scan) ─────────
     let adoptionCandidates = null;
@@ -132,7 +137,10 @@ async function generateReport() {
         adoptionCandidates = previewReport.items.length;
         blockedCandidates  = previewReport.items.filter(i => i.readiness === 'blocked').length;
       }
-    } catch { /* leave null */ }
+    } catch (err) {
+      sectionErrors.push({ section: 'adoption', message: 'Could not load adoption preview' });
+      console.error('[ConsistencyReport] adoption section failed:', err.message);
+    }
 
     // ── Sync queue summary ─────────────────────────────────────────────────────
     let sync = { ready: 0, syncing: 0, needsAttention: 0, reviewed: 0, failed: 0, total: 0, refreshedAt: null };
@@ -148,14 +156,23 @@ async function generateReport() {
       try {
         const reviews = await syncReviewService.getReviews();
         sync.reviewed = Object.keys(reviews).length;
-      } catch { /* leave 0 */ }
-    } catch { /* leave zeroed */ }
+      } catch (err) {
+        sectionErrors.push({ section: 'sync.reviews', message: 'Could not load review count' });
+        console.error('[ConsistencyReport] sync.reviews section failed:', err.message);
+      }
+    } catch (err) {
+      sectionErrors.push({ section: 'sync', message: 'Could not load sync queue' });
+      console.error('[ConsistencyReport] sync section failed:', err.message);
+    }
 
     // ── Active archive locks ───────────────────────────────────────────────────
     let locks = { active: 0, stale: 0, scannedRoot: 'activeArchiveRoot' };
     try {
       locks = await _countLocks(nasPath);
-    } catch { /* leave zeroed */ }
+    } catch (err) {
+      sectionErrors.push({ section: 'locks', message: 'Could not load archive locks' });
+      console.error('[ConsistencyReport] locks section failed:', err.message);
+    }
 
     // ── Transfer status (in-memory, synchronous; strip operational fields) ─────
     let exportSummary = { running: false, completedAt: null };
@@ -166,14 +183,20 @@ async function generateReport() {
         running:     !!es.running,
         completedAt: es.result?.completedAt || null,
       };
-    } catch { /* leave defaults */ }
+    } catch (err) {
+      sectionErrors.push({ section: 'transfer.export', message: 'Could not load export status' });
+      console.error('[ConsistencyReport] transfer.export section failed:', err.message);
+    }
     try {
       const is = transferImportService.getImportStatus();
       importSummary = {
         running:     !!is.running,
         completedAt: is.result?.completedAt || null,
       };
-    } catch { /* leave defaults */ }
+    } catch (err) {
+      sectionErrors.push({ section: 'transfer.import', message: 'Could not load import status' });
+      console.error('[ConsistencyReport] transfer.import section failed:', err.message);
+    }
 
     // ── Diagnostics summary (in-memory, synchronous) ──────────────────────────
     let diagnostics = { errors: null, warnings: null, infos: null, completedAt: null };
@@ -188,11 +211,15 @@ async function generateReport() {
           completedAt: dr.generatedAt,
         };
       }
-    } catch { /* leave null */ }
+    } catch (err) {
+      sectionErrors.push({ section: 'diagnostics', message: 'Could not load diagnostics' });
+      console.error('[ConsistencyReport] diagnostics section failed:', err.message);
+    }
 
     // ── Assemble ───────────────────────────────────────────────────────────────
     const report = {
       generatedAt: new Date().toISOString(),
+      sectionErrors,
       roots: {
         activeArchiveRoot: activeRoot,
         localStagingRoot:  localRoot,
@@ -222,8 +249,9 @@ async function generateReport() {
   } catch (err) {
     // Catastrophic failure guard — must never throw to IPC layer
     const report = {
-      generatedAt: new Date().toISOString(),
-      error:       err.message,
+      generatedAt:   new Date().toISOString(),
+      error:         err.message,
+      sectionErrors: [],
       roots: {
         activeArchiveRoot: { path: null, status: 'error' },
         localStagingRoot:  { path: null, status: 'error' },

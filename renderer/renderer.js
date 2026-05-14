@@ -10223,11 +10223,15 @@ document.addEventListener('keydown', e => {
   }
 
   function _renderConsistencyReport(report) {
-    const r = report;
+    const r    = report;
+    const errs = Array.isArray(r.sectionErrors) ? r.sectionErrors : [];
+    const _hasErr = key => errs.some(e => e.section === key);
     const syncedCount = r.sync.total - r.sync.ready - r.sync.syncing - r.sync.needsAttention - r.sync.failed;
 
     return `
       <div class="cr-ts">Generated: ${_esc(_crTs(r.generatedAt))}</div>
+
+      ${errs.length ? '<div class="cr-status-row cr-val-warn">Some report sections could not be loaded.</div>' : ''}
 
       <div class="cr-section">
         <div class="cr-section-title">Roots</div>
@@ -10252,29 +10256,33 @@ document.addEventListener('keydown', e => {
       <div class="cr-section">
         <div class="cr-section-title">Sync Queue</div>
         <div class="cr-grid">
+          ${_hasErr('sync') ? '<div class="cr-unavail">Unavailable</div>' : `
           <div class="cr-row"><span class="cr-key">Ready for sync</span><span class="cr-val">${r.sync.ready}</span></div>
           <div class="cr-row"><span class="cr-key">Needs attention</span><span class="cr-val ${r.sync.needsAttention > 0 ? 'cr-val-warn' : ''}">${r.sync.needsAttention}</span></div>
           <div class="cr-row"><span class="cr-key">Syncing</span><span class="cr-val">${r.sync.syncing}</span></div>
           <div class="cr-row"><span class="cr-key">Failed</span><span class="cr-val ${r.sync.failed > 0 ? 'cr-val-error' : ''}">${r.sync.failed}</span></div>
           <div class="cr-row"><span class="cr-key">Synced / other</span><span class="cr-val">${Math.max(0, syncedCount)}</span></div>
-          <div class="cr-row"><span class="cr-key">Issues reviewed</span><span class="cr-val">${r.sync.reviewed}</span></div>
+          <div class="cr-row"><span class="cr-key">Issues reviewed</span><span class="cr-val">${r.sync.reviewed}${_hasErr('sync.reviews') ? '<span class="cr-val-warn" title="Review count unavailable"> *</span>' : ''}</span></div>
           <div class="cr-row"><span class="cr-key">Total jobs</span><span class="cr-val">${r.sync.total}</span></div>
+          `}
         </div>
       </div>
 
       <div class="cr-section">
         <div class="cr-section-title">Active Archive Locks</div>
         <div class="cr-grid">
+          ${_hasErr('locks') ? '<div class="cr-unavail">Unavailable</div>' : `
           <div class="cr-row"><span class="cr-key">Active locks</span><span class="cr-val">${r.locks.active}</span></div>
           <div class="cr-row"><span class="cr-key">Stale locks</span><span class="cr-val ${r.locks.stale > 0 ? 'cr-val-warn' : ''}">${r.locks.stale}</span></div>
+          `}
         </div>
       </div>
 
       <div class="cr-section">
         <div class="cr-section-title">Transfer</div>
         <div class="cr-grid">
-          <div class="cr-row"><span class="cr-key">Last export</span><span class="cr-val-muted">${r.transfer.export.running ? 'Running…' : (r.transfer.export.completedAt ? _esc(_crTs(r.transfer.export.completedAt)) : '—')}</span></div>
-          <div class="cr-row"><span class="cr-key">Last import</span><span class="cr-val-muted">${r.transfer.import.running ? 'Running…' : (r.transfer.import.completedAt ? _esc(_crTs(r.transfer.import.completedAt)) : '—')}</span></div>
+          <div class="cr-row"><span class="cr-key">Last export</span><span class="cr-val-muted">${_hasErr('transfer.export') ? 'Unavailable' : r.transfer.export.running ? 'Running…' : (r.transfer.export.completedAt ? _esc(_crTs(r.transfer.export.completedAt)) : '—')}</span></div>
+          <div class="cr-row"><span class="cr-key">Last import</span><span class="cr-val-muted">${_hasErr('transfer.import') ? 'Unavailable' : r.transfer.import.running ? 'Running…' : (r.transfer.import.completedAt ? _esc(_crTs(r.transfer.import.completedAt)) : '—')}</span></div>
         </div>
       </div>
 
