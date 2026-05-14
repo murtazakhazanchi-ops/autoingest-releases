@@ -17,6 +17,34 @@ Rules:
 
 ---
 
+### 2026-05-14 — Phase 14B-2: Transfer Root Validation UI Integration
+
+Task type:
+- UI Wiring / Modal Extension / Read-Only Validation Display
+
+What happened:
+- Extended Archive Locations modal to show a Transfer Drive Root row: path display, Choose button, and `.aloc-validation` status element.
+- `_alocOpen()` fetches `getTransferRoot()` in the initial Promise.all; populates path display; clears validation element; fire-and-forget `validateTransferRoot()` on open.
+- `_alocShowTransferValidation()` maps IPC result to three display states: ok (Ready / Ready — deviceName), warn (Uninitialized — export will initialize), err (offline / no-access / not-directory / metadata-invalid).
+- Transfer root Choose handler calls `chooseTransferRoot()` (immediate-save — no pending var needed) then validates and shows result.
+- IPC/preload contract established in Phase 14B-1 was reused unchanged. No main.js, preload.js, or service files were modified.
+
+Reusable lessons:
+1. **Foundation IPC reuse in UI wiring phase**: The UI wiring phase must reuse the IPC/preload contract from the prior foundation phase without touching main/preload/services. The contract is the boundary; the UI wiring only consumes it.
+2. **Transfer Root UI status semantics**: `uninitialized` (ENOENT on marker, valid=true) → warn display ("Uninitialized — export will initialize"). `metadata-invalid` (bad JSON, wrong type, valid=false) → err display. These must not be conflated in the UI.
+3. **Archive Root modal persistence is not uniform**: Active Archive / Local Staging / Main Archive use pending vars + Save button. Transfer Root saves immediately through `chooseTransferRoot()`. UI wiring must follow the existing persistence contract for each root individually.
+4. **Validation status display is informational by default**: `.aloc-validation` status is informational only. It does not block Save, disable controls, or prevent transfer flow. Only block workflows when the task explicitly requires it.
+
+Promote to agents:
+- `ui-system-specialist.md` — lessons 2, 3, 4 (archive root persistence patterns, transfer root validation display semantics, informational-only validation status)
+- `contract-debugger.md` — extend "Transfer Root: Uninitialized vs Invalid" rule with UI display mapping note (lesson 2)
+- `autoingest-architect.md` — extend "Foundation-Only IPC" rule with UI wiring reuse principle (lesson 1)
+
+Status:
+- Promoted
+
+---
+
 ### 2026-05-14 — Phase 14B-1: Fix Phase 14A Beta Validation Findings
 
 Task type:

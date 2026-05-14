@@ -705,6 +705,7 @@ Validation:
 - Confirm `archive:validateTransferRoot` returns `valid: true, initialized: false` for a directory with no `.autoingest-transfer/transfer-root.json`.
 - Confirm operational services (export preview, diagnostics) still treat missing marker as "drive not configured."
 - Confirm only malformed JSON or wrong `type` field triggers `metadata-invalid`.
+- Confirm the UI maps `valid: true, initialized: false` to a warn display (amber "Uninitialized — export will initialize"), not an err display — a new drive is validly uninitialized and must not appear broken to the operator.
 
 ## Validation Checklist
 

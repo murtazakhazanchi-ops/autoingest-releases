@@ -426,21 +426,20 @@ Validation:
 ### Foundation-Only IPC — Defer UI Wiring When Explicitly Phased
 
 Context:
-- Applies when a task specifies "IPC/preload foundation only — UI integration deferred."
+- Applies when a task specifies "IPC/preload foundation only — UI integration deferred," and when the subsequent UI wiring phase arrives.
 
 Rule:
-- Adding a new IPC handler in `main/main.js` and exposing it in `main/preload.js` is sufficient for a fix or foundation phase that explicitly defers UI wiring.
-- The preload entry enables future renderer use without requiring it now.
-- Do not add renderer-side calls, modal state changes, or UI display logic unless the task explicitly requires it in this phase.
+- **Foundation phase**: Adding a new IPC handler in `main/main.js` and exposing it in `main/preload.js` is sufficient. The preload entry enables future renderer use without requiring it now. Do not add renderer-side calls, modal state changes, or UI display logic unless the task explicitly requires it.
+- **UI wiring phase**: Reuse the existing IPC handler and preload entry unchanged. Do not re-add, duplicate, or modify `main.js`, `preload.js`, or service files unless a concrete bug in the foundation is found. The contract was established in the prior phase; the wiring phase only consumes it.
 
 Avoid:
 - Expanding a foundation IPC task into UI wiring without explicit instruction.
-- Deferring the IPC/preload addition to a "later" UI phase — the contract should be established first.
+- Deferring the IPC/preload addition to the UI wiring phase — the contract must be established first.
+- Modifying `main.js` or `preload.js` in a UI wiring phase when the IPC contract was already established and is functioning correctly.
 
 Validation:
-- Confirm the IPC handler exists in `main.js` and the preload entry is exposed.
-- Confirm no renderer files were modified if the task explicitly deferred UI integration.
-- Confirm the foundation can be tested independently (e.g., via IPC invocation from DevTools).
+- **Foundation**: Confirm the IPC handler exists in `main.js` and the preload entry is exposed. Confirm no renderer files were modified.
+- **UI wiring**: Confirm no `main.js`, `preload.js`, or service files were modified unless a concrete foundation bug was found and documented. Confirm the renderer calls the preload method established in the prior phase.
 
 ### Sidecar XMP Conflict — needs-attention, Not Rename
 

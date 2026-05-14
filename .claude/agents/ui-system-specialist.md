@@ -1522,6 +1522,76 @@ Validation:
 - Check overflow, alignment, spacing, and text contrast.
 - Check both relevant visual states if theme/appearance is affected.
 
+### Archive Root Modal Persistence Contracts Are Not Uniform
+
+Context:
+- Applies when adding or wiring a new archive root row to the Archive Locations modal, or when auditing existing root handlers.
+
+Rule:
+- Each archive root has its own persistence contract — do not assume all roots follow the same save pattern:
+  - **Active Archive Root**: pending var `_alocPendingNasRoot` — written on Save button click.
+  - **Local Staging Root**: pending var `_alocPendingStagingRoot` — written on Save button click.
+  - **Main Archive Root**: pending var `_alocPendingMainNasRoot` — written on Save button click.
+  - **Transfer Drive Root**: immediate-save — `chooseTransferRoot()` writes the setting directly on choose; no pending var exists or is needed.
+- When wiring a new root, read the existing persistence path for that root before writing any handler. Do not impose the pending-var pattern on Transfer Root, and do not convert pending roots to immediate-save.
+
+Avoid:
+- Adding `_alocPendingTransferRoot` and requiring Save to persist the transfer root — `chooseTransferRoot()` already saves immediately.
+- Changing Active Archive / Staging / Main roots to immediate-save to match Transfer Root.
+- Adding a Clear button for Transfer Root without first confirming the service supports clearing it.
+
+Validation:
+- Confirm Transfer Drive Root handler calls `chooseTransferRoot()` and shows validation immediately — no pending var.
+- Confirm Active Archive / Local Staging / Main Archive handlers accumulate into `_alocPendingX` and persist on Save button click.
+- Confirm the Save handler does not include a Transfer Root save step (already persisted by `chooseTransferRoot()`).
+
+### Transfer Root Validation Status Display Semantics
+
+Context:
+- Applies to `_alocShowTransferValidation()` and any UI that renders `archive:validateTransferRoot` results.
+
+Rule:
+- Map IPC result states to operator-facing labels:
+  - `valid: true, initialized: true` → ok class, "Ready" or "Ready — {deviceName}"
+  - `valid: true, initialized: false, reason: 'uninitialized'` → warn class, "Uninitialized — export will initialize"
+  - `valid: false, reason: 'offline'` → err class, "Drive offline"
+  - `valid: false, reason: 'not-directory'` → err class, "Path is not a directory"
+  - `valid: false, reason: 'no-access'` → err class, "Permission denied"
+  - `valid: false, reason: 'metadata-invalid'` → err class, "Invalid transfer metadata"
+- The `uninitialized` state must show as warn (amber), not err (red). A newly selected drive is legitimately uninitialized — export will initialize it.
+- Never render raw IPC reason codes (`uninitialized`, `offline`, `metadata-invalid`) as visible text.
+
+Avoid:
+- Treating `uninitialized` as an error — it is a valid expected state for a new drive.
+- Conflating `uninitialized` (missing marker, `valid: true`) with `metadata-invalid` (bad JSON, `valid: false`).
+- Displaying raw reason codes directly in the UI.
+
+Validation:
+- Confirm an uninitialized drive shows amber "Uninitialized — export will initialize", not red.
+- Confirm an initialized drive shows green "Ready" or "Ready — deviceName".
+- Confirm an offline path shows red "Drive offline".
+- Confirm raw IPC reason codes do not appear as visible text.
+
+### Validation Status Display Is Informational Unless Explicitly Blocking
+
+Context:
+- Applies to inline validation status elements (`.aloc-validation`) in the Archive Locations modal and any modal that shows path validation results alongside actionable controls.
+
+Rule:
+- Validation status display is informational by default.
+- A warn or err validation status must NOT disable Save, disable Choose, or prevent any other workflow unless the task explicitly requires blocking behavior.
+- If a blocking gate is needed, it must be specified in the task and implemented as a separate guard on the specific action button.
+
+Avoid:
+- Disabling the Save button when any validation element shows warn or err — that is not the default contract.
+- Making a validation helper (`_alocShowTransferValidation`, `_alocShowValidation`, etc.) a side-effect that mutates Save button state.
+- Inferring "blocking the action" from "showing a validation error."
+
+Validation:
+- Confirm Save button remains enabled when any validation element shows warn or err.
+- Confirm the operator can proceed even when a path is uninitialized or offline.
+- Confirm blocking behavior is only present when explicitly required and scoped to the specific action it gates.
+
 ## Validation Checklist
 
 Before making changes, read:
