@@ -114,3 +114,4 @@ Adoption can be undone manually by deleting the `event.json` file that was creat
 - Technical contract and validation rules: `docs/archive-adoption-contract.md`
 - Event data model: `docs/data-model.md`
 - Import routing: `docs/ingestion-flow.md`
+- Archive operations layer (consistency, completeness, diagnostics, audit): `docs/archive-operations-layer.md`

@@ -191,6 +191,29 @@ Use this as a reference before implementing or modifying any feature.
 
 ---
 
+### 14. Archive Operations Layer
+
+**Description**
+- Five read-only reporting and audit surfaces for archive health: Consistency Report, Completeness Checklist, Final Readiness Summary, Archive Diagnostics, and Audit Timeline
+- Three-root model: Active Archive Root (portable NAS), Local Staging Root (operator SSD), Main Archive Root (permanent office)
+- Two import workflows: Local First (staging → sync) and Direct Archive (direct to active archive with photographer-level lock)
+- Transfer workflow: Active Archive Root → Transfer Drive Export → Transfer Drive → Main Archive Root Import
+- All reporting services follow a never-throw-to-IPC, per-source-isolated, `_inFlight`-guarded contract
+- JSONL audit files written by transfer export and import; tail-read with 4 MB cap to support large archives
+- Audit timeline aggregates all five sources into a single chronological modal (newest-first, capped at 150 entries)
+
+**System Impact**
+- FILESYSTEM (read-only reporting; no writes during reporting)
+- UI
+- ARCHIVE
+
+**Notes**
+- See `docs/archive-operations-layer.md` for full architecture and workflow details
+- See `docs/release-notes-archive-operations.md` for per-phase implementation notes
+- Additive only — no ingestion, routing, or metadata-sync behavior changed
+
+---
+
 ## Planned Features
 
 ### 1. Metadata Tagging
