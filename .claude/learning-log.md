@@ -1503,6 +1503,80 @@ Status:
 
 ---
 
+### 2026-05-13 — Phase 13C-7: Manual Folder Adoption Write
+
+Task type:
+- Feature / Service Layer / Persistence / UI / Renderer / Contracts / Architecture
+
+What happened:
+- Implemented `services/adoptionWriteService.js` — a 16-step validation + atomic write service that adopts an unmanaged folder into AutoIngest by creating `event.json` inside it.
+- `isValidEventJson` validator lives inline in `main.js` and cannot be imported by the service (circular dep). Injected as a function parameter: `adoptFolder(input, isValidEventJsonFn, activeUser)`. IPC handler passes `isValidEventJson` directly.
+- Atomic write: `writeFile(tmp)` → second absence check → `rename`. The second absence check (step 16, immediately before `fsp.rename`) minimises the TOCTOU window. The first check (step 6) is a fast-fail at start; the second is a race guard before commit.
+- Renderer uses an in-app two-step confirm/cancel UI row. `window.confirm()` was NOT used — it is unreliable under Electron `sandbox: true`.
+- Adopt button gated on TWO independent sources: `item.readiness === 'ready-to-adopt-later'` (preview scan) AND `res.ok && res.okForFutureAdoption && res.blockers.length === 0` (live dry-run). One alone is insufficient.
+- Contract Phase 13C-6 specified channel name `archive:adoptCandidate`; implementation used `archive:adoptManualFolder`. Contract documentation updated to match implementation.
+- No separate audit file: contract Section F explicitly says event.json itself is the audit record. Adding a `.jsonl` audit file would introduce a second partial source of truth.
+
+Reusable lessons:
+1. **confirm() is unreliable in Electron sandbox:true.** OS-level confirm/alert/prompt dialogs can be silently suppressed or return false under sandbox:true. Operator confirmation in Electron must use in-app UI (confirm row, modal overlay), never window.confirm().
+2. **event.json is the audit record — no separate audit file.** When a contract explicitly designates event.json as the audit record, adding a separate file introduces a second partial source of truth. The adoption block in event.json IS the audit entry.
+3. **isValidEventJson injection pattern.** When a service cannot import main.js (circular dep), inject the validator as a function parameter. The IPC handler in main.js passes `isValidEventJson` directly. Avoids exporting the validator to a shared module prematurely.
+4. **Double absence check for adoption writes.** For any service writing event.json into an EXISTING unmanaged folder (adoption, repair), the absence check must happen twice: (1) fast-fail before building the payload; (2) immediately before fsp.rename to catch the TOCTOU window. The normal event:write handler only checks once (new-folder creation) — adoption into existing folders requires the second check.
+5. **Adoption button eligibility requires dual-gate.** Gate the Adopt button on both the preview scan readiness classification (`readiness === 'ready-to-adopt-later'`) AND the live dry-run result. One alone is insufficient: the preview may be stale; the dry-run alone does not carry readiness classification.
+6. **IPC channel names in contracts must match implementation.** When the implementation uses a different channel name than the contract specified, update the contract documentation before closing the task. Future agents reading the contract must not encounter a channel name that does not exist.
+
+Common failure modes:
+- Using window.confirm() for operator confirmation in an Electron app with sandbox:true — dialog is silently suppressed or returns false without showing.
+- Adding a .jsonl or separate file to log adoption history when event.json is the contract-designated record.
+- Calling isValidEventJson from a service that imports main.js — creates a circular dependency.
+- Checking event.json absence only once before the write — leaves a TOCTOU window between writing the tmp file and renaming it.
+- Gating the Adopt button on dry-run result alone — the dry-run does not carry the readiness classification.
+- Leaving a contract document with a channel name that was renamed at implementation time.
+
+Promote to agents:
+- ui-system-specialist.md — Lesson 1 (no window.confirm() in Electron sandbox:true; use in-app UI)
+- ui-system-specialist.md — Lesson 5 (dual-gate adoption button eligibility)
+- event-data-guardian.md — Lesson 2 (event.json as the audit record; no separate audit file)
+- event-data-guardian.md — Lesson 4 (double absence check for adoption writes to existing folders)
+- event-data-guardian.md — Lesson 6 (IPC channel name drift: update contract to match implementation)
+- contract-debugger.md — Lesson 3 (isValidEventJson injection pattern to avoid circular dependency)
+
+Status:
+- Promoted
+
+---
+
+### 2026-05-14 — Phase 13C-7.1: Refresh Event List After Adoption
+
+Task type:
+- Feature / Renderer / State Flow / Architecture / Contracts
+
+What happened:
+- After a successful `archive:adoptManualFolder` IPC call, the NAS events card must reflect the newly adopted folder.
+- Added `_refreshNasEventsCard(false).catch(() => {})` inside the adoption success `setTimeout` callback in the renderer.
+- The write handler (`adoptionWriteService.js`) was intentionally NOT given a scan trigger. The contract (Section G of `archive-adoption-contract.md`) states the write handler must return only `{ ok, data, warnings }`. Scan triggering is the caller's responsibility.
+- The internal `_nasRefreshBusy` guard inside `_refreshNasEventsCard` prevents concurrent scans if the IPC resolves while another scan is already running.
+- Contract Section K was updated to document the auto-refresh behaviour for future reference.
+
+Reusable lessons:
+1. **Post-write scan trigger belongs in the caller, not the write handler.** A persistence service (write handler, IPC handler) must return `{ ok, data, warnings }` only. Triggering UI refreshes or scan events from inside the write handler couples persistence to UI refresh timing and violates the state-flow contract. The renderer or IPC caller is responsible for triggering follow-up refreshes.
+2. **Fire-and-forget refresh pattern for best-effort post-write UI sync.** Use `_refreshNasEventsCard(false).catch(() => {})` (or equivalent) for a post-write refresh that must not affect the outcome of the primary operation. The `.catch(() => {})` swallows refresh errors; an internal busy guard prevents concurrent scans. This pattern is correct when: (a) refresh failure is not fatal, (b) a concurrent refresh guard already exists in the refresh function, and (c) the primary write outcome must remain unaffected.
+
+Common failure modes:
+- Baking a `scanEvents()` call or equivalent UI-refresh trigger inside a persistence write handler — couples persistence to UI timing, violates the write handler's contract boundary.
+- Awaiting the refresh call from the adoption success handler — if the refresh fails, it surfaces as an adoption failure.
+- Omitting `.catch(() => {})` on the fire-and-forget refresh — leaves an unhandled promise rejection if the refresh IPC fails.
+- Skipping the refresh entirely and expecting the operator to manually trigger a rescan after adoption.
+
+Promote to agents:
+- ingestion-routing-specialist.md — Lesson 1 (write handler must not bake scan trigger; caller is responsible)
+- ui-system-specialist.md — Lesson 2 (fire-and-forget refresh pattern with .catch guard)
+
+Status:
+- Promoted
+
+---
+
 ## Entry Template
 
 ### YYYY-MM-DD — Task Name

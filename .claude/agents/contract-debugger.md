@@ -542,6 +542,43 @@ Validation:
 - Confirm the output array length is deterministic regardless of input data shape.
 - Confirm a dry run on unparseable / edge-case input still returns the full set of check categories.
 
+### Injected Validator Pattern — Avoid Circular Dependency with main.js
+
+Context:
+- Applies when a service (e.g., `adoptionWriteService.js`) needs to call a validation function (`isValidEventJson`) that lives in `main.js` and cannot be imported without creating a circular dependency.
+
+Rule:
+- Inject the validator as a function parameter: `adoptFolder(input, isValidEventJsonFn, activeUser)`.
+- The IPC handler in `main.js` passes `isValidEventJson` directly at the call site.
+- This keeps the service testable in isolation and avoids exporting the validator to a shared module prematurely.
+
+Avoid:
+- Importing `main.js` from a service module — creates a circular dependency.
+- Moving `isValidEventJson` to a shared utility file as a first response — adds coupling before the need is confirmed.
+
+Validation:
+- Confirm the service receives the validator as a parameter, not via `require`.
+- Confirm the IPC handler passes the validator function directly when calling the service.
+- Confirm the service can be unit tested by passing a mock validator without requiring `main.js`.
+
+### IPC Channel Name Drift — Contract Must Match Implementation
+
+Context:
+- Applies when a contract document specifies an IPC channel name and the implementation uses a different name.
+
+Rule:
+- When a channel name changes during implementation, update the contract documentation before closing the task.
+- Future agents and engineers reading the contract must find a channel name that actually exists in the codebase.
+- The contract is the source of truth for what the system does — a mismatched name makes the contract unreliable as a reference.
+
+Avoid:
+- Closing a task with a contract document that specifies `archive:adoptCandidate` when the implementation uses `archive:adoptManualFolder`.
+- Leaving the discrepancy for a later cleanup pass — it will be read as fact by the next agent that uses the contract.
+
+Validation:
+- Before closing a task, grep the codebase for the IPC channel name from the contract. If no match, the contract must be updated.
+- Confirm the IPC handler registration in `main.js`, the preload entry, and the renderer call all use the same channel name.
+
 ### setInterval with Async Callback — Always Attach .catch() to Prevent Silent Failures
 
 Context:

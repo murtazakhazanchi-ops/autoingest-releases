@@ -321,6 +321,25 @@ Validation:
 - Confirm an event without `eventId` imports identically to one with it.
 - Confirm `eventId` is not present in any path construction function.
 
+### Write Handler Must Not Own Scan or UI Refresh Triggers
+
+Context:
+- Applies to any persistence service (adoption write, import transaction, repair write) whose result is consumed by a renderer IPC caller that may need to trigger a follow-up UI refresh or scan.
+
+Rule:
+- A persistence write handler (service function, IPC handler) must return only `{ ok, data, warnings }`.
+- Triggering UI refreshes (e.g., `_refreshNasEventsCard`, `scanEvents`) or scan events from inside the write handler couples persistence to UI refresh timing and violates the state-flow contract.
+- The renderer or IPC caller is responsible for triggering any follow-up refresh based on the write result.
+
+Avoid:
+- Calling `scanEvents()`, `_refreshNasEventsCard()`, or any equivalent UI refresh from inside a write service or IPC write handler.
+- Conditionally baking a scan trigger inside the write handler "for convenience" — it makes the handler non-deterministic and hard to test.
+
+Validation:
+- Confirm the write service returns `{ ok, data, warnings }` only — no side-effect calls to scan or refresh functions.
+- Confirm the renderer success callback is responsible for triggering any follow-up refresh.
+- Confirm the write service can be unit tested without mocking UI refresh functions.
+
 ### Error Handling
 
 Context:

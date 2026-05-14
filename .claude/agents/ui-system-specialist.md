@@ -1342,6 +1342,69 @@ Validation:
 - Confirm `.catch(() => {})` is present on the fire-and-forget call.
 - Confirm the modal opens immediately and status appears asynchronously when the validation resolves.
 
+### No window.confirm() in Electron Under sandbox:true
+
+Context:
+- Applies to any destructive or irreversible renderer action (adoption, deletion, bulk operation) that requires operator confirmation.
+
+Rule:
+- `window.confirm()`, `window.alert()`, and `window.prompt()` are unreliable under Electron `sandbox: true`. They can be silently suppressed or return `false` without displaying a dialog.
+- Operator confirmation must use in-app UI: a two-step confirm/cancel row, an inline confirm prompt, or a modal overlay.
+- The two-step in-app pattern: show a confirm row with a Cancel and a Confirm button, then act only on explicit Confirm click.
+
+Avoid:
+- Using `window.confirm()` for any confirmation in an Electron renderer that uses `sandbox: true`.
+- Assuming `window.confirm()` works because it worked in a browser context — Electron sandbox behavior is different.
+
+Validation:
+- Confirm no renderer confirmation path uses `window.confirm()`, `window.alert()`, or `window.prompt()`.
+- Confirm destructive actions are gated on an explicit in-app UI interaction (button click, confirm row).
+- Confirm the confirm UI is visible and accessible, not hidden behind a layout collapse.
+
+### Dual-Gate Adoption Button Eligibility
+
+Context:
+- Applies to any renderer button that triggers an irreversible write operation (adoption, overwrite, repair) where eligibility depends on both a preview scan classification and a live dry-run result.
+
+Rule:
+- Gate the action button on TWO independent sources:
+  1. A preview scan classification (e.g., `item.readiness === 'ready-to-adopt-later'`).
+  2. A live dry-run result (e.g., `res.ok && res.okForFutureAdoption && res.blockers.length === 0`).
+- One gate alone is insufficient: the preview scan may be stale by the time the user clicks; the dry-run result does not carry the readiness classification.
+- Both conditions must be true for the button to be shown and enabled.
+
+Avoid:
+- Gating the adopt button on dry-run result alone — the dry-run does not include readiness classification.
+- Gating the adopt button on preview scan classification alone — the preview may be stale when the user attempts adoption.
+- Showing the adopt section unconditionally and relying on the write handler to reject invalid adoption attempts.
+
+Validation:
+- Confirm the adopt section is shown only when both `readiness === 'ready-to-adopt-later'` AND the dry-run returns eligible state.
+- Confirm disabling or hiding the adopt section when either gate fails.
+- Confirm the write handler still validates internally (defense in depth), even with a dual-gate UI.
+
+### Fire-and-Forget Refresh After Write Operations
+
+Context:
+- Applies to any renderer success handler that triggers a best-effort UI refresh after a write operation completes, where refresh failure must not affect the primary operation's reported outcome.
+
+Rule:
+- Use `_refreshNasEventsCard(false).catch(() => {})` (or the equivalent refresh function with `.catch(() => {})`) as the pattern for a fire-and-forget post-write refresh.
+- The `.catch(() => {})` suppresses unhandled rejections if the refresh IPC fails.
+- This pattern is correct only when: (a) the refresh function has an internal busy guard preventing concurrent execution, (b) refresh failure is not fatal to the primary operation, and (c) the user experience is acceptable with an async refresh.
+- Do NOT await the refresh in the adoption/write success path — it would make refresh failure appear as a write failure.
+
+Avoid:
+- `await _refreshNasEventsCard(false)` in the primary write success handler — surfaces refresh errors as write errors.
+- Omitting `.catch(() => {})` — leaves an unhandled rejection if the refresh IPC fails.
+- Calling the refresh from inside the write handler (service layer) — the write service must not own UI refresh responsibility.
+
+Validation:
+- Confirm `.catch(() => {})` is present on the fire-and-forget refresh call.
+- Confirm the refresh call is in the renderer success callback, not inside the write service.
+- Confirm a refresh failure does not propagate as a write failure or surface an error to the operator.
+- Confirm the refresh function's internal busy guard prevents concurrent scans.
+
 ### Light/Dark and Viewport Compatibility
 
 Context:

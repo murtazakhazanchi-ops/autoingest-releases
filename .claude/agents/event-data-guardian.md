@@ -330,6 +330,46 @@ Validation:
 - Confirm the type of the initialized value matches the type written in the success branch.
 - Confirm the caller reads a consistently-typed field regardless of whether the IPC call succeeded or failed.
 
+### Adoption Writes Into Existing Folders — Double Absence Check for TOCTOU
+
+Context:
+- Applies to any service that writes `event.json` into a pre-existing unmanaged folder (adoption, repair) rather than a newly created folder.
+
+Rule:
+- The absence check for `event.json` must happen twice:
+  1. Fast-fail at the start of the function, before building the payload (Step 6 pattern).
+  2. Immediately before `fsp.rename` to close the TOCTOU window between writing the tmp file and completing the atomic rename (Step 16 pattern).
+- If either check finds the file present, unlink the tmp file and return `event-json-appeared`.
+- The normal event create handler checks only once (the folder is new and empty by definition). Adoption into existing folders requires the second check because external processes can create `event.json` in the window between the first check and the rename.
+
+Avoid:
+- Checking for `event.json` presence only at the start and relying on `fsp.rename` to fail as a race guard — `rename` does not fail on EEXIST in all Node configurations.
+- Skipping the tmp unlink when the second check fires — leaves a stale tmp file on disk.
+
+Validation:
+- Confirm absence check occurs before payload build (Step 6 position).
+- Confirm absence check occurs immediately before `fsp.rename` (Step 16 position).
+- Confirm the tmp file is unlinked and an `event-json-appeared` error is returned if either check fails.
+
+### event.json as the Audit Record — No Separate Audit File
+
+Context:
+- Applies when a contract explicitly designates `event.json` as the audit record for an operation (e.g., folder adoption, repair).
+
+Rule:
+- The `adoption` block (or equivalent operation block) inside `event.json` IS the audit entry.
+- Fields such as `adoptedAt`, `operatorId`, `photographerFolders` live inside `event.json` itself.
+- Adding a separate `.jsonl`, `.log`, or audit file introduces a second partial source of truth that can drift from `event.json`.
+
+Avoid:
+- Adding an audit sidecar file alongside `event.json` when the contract designates `event.json` as the record.
+- Duplicating audit fields in both `event.json` and a separate file.
+
+Validation:
+- Confirm the contract section that designates `event.json` as the audit record was read before implementation.
+- Confirm no separate audit file is created by the write service.
+- Confirm all audit fields (`adoptedAt`, `operatorId`, etc.) are written inside `event.json`.
+
 ### Documentation Follow-Up
 
 Context:
