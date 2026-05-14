@@ -1579,6 +1579,35 @@ Validation:
 - Confirm every `window.api.*` call in modal open/init functions is awaited.
 - Confirm synchronous-only usage is reserved for values that genuinely never touch IPC (e.g., pure renderer-local state).
 
+### Suppress Contextual Action Hints When the Supporting List Is Empty
+
+Context:
+- Applies to any result-state summary panel, readiness badge, or completion block that displays a "next action" hint (e.g., "Fix blocked items", "Complete setup", "Review warnings") alongside a list of reasons, blockers, or items.
+
+Rule:
+- Gate the action hint on `reasons.length > 0` (or equivalent list length). Do not render a "next action" instruction when the supporting reasons list is empty.
+- An action hint with no accompanying reasons confuses the operator — the instruction is visible but there is nothing to act on.
+- This applies to inline result badges, modal readiness summaries, and any UI block that conditionally shows a recommended action based on a derived list.
+
+```js
+// Correct — hint only rendered when reasons exist
+const nextHtml = topReasons.length > 0
+  ? `<div class="cl-readiness-next">${nextLabel}</div>`
+  : '';
+
+// Wrong — hint shown even when list is empty
+const nextHtml = `<div class="cl-readiness-next">${nextLabel}</div>`;
+```
+
+Avoid:
+- Rendering an action hint unconditionally when the reasons list is derived and may be empty.
+- Assuming the hint is harmless when the list is empty — an orphaned instruction damages operator trust in the UI.
+
+Validation:
+- Confirm the action hint element is only rendered when the reasons list has at least one item.
+- Confirm the result block renders cleanly with no orphaned instruction text when all checks pass (empty reasons list).
+- Confirm the hint appears correctly when at least one reason exists.
+
 ### Zero-Default vs Null-Default Sections in Read-Only Report Modals
 
 Context:

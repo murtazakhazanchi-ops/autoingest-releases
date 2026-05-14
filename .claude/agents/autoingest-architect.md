@@ -503,6 +503,32 @@ Validation:
 - Confirm `sectionErrors: []` is present in the catastrophic-fallback report.
 - Confirm renderer section-error lookup uses exact match (`e.section === key`).
 
+### Mirror Service Constants Locally for Display-Only Use
+
+Context:
+- Applies when the renderer needs a small constant set (e.g., a Set of critical-fail IDs) that originates in a service module, but the renderer's use is exclusively for display ordering or prioritisation — not for routing, validation, or any decision affecting system state.
+
+Rule:
+- Mirror the constant as a local renderer variable with a comment identifying the source and stating that it is display-only.
+- Do NOT add an IPC handler, preload bridge method, or service export to expose the constant — that coupling is wrong when the renderer's need is purely presentational.
+- If the service constant changes, the renderer mirror must be updated in the same commit. The comment is the reminder to do so.
+
+```js
+// renderer.js — local mirror of archiveCompletenessService._CRITICAL_FAIL_IDS
+// Used only to prioritise display order in the readiness summary. Has no effect on system state.
+const _CRITICAL_IDS = new Set(['missing-event-json', 'duplicate-event-id', 'corrupt-metadata']);
+```
+
+Avoid:
+- Adding an IPC round-trip to fetch a constant the renderer only needs for sorting display output.
+- Exporting service internals (`_CRITICAL_FAIL_IDS`, internal enums) from a service module to satisfy a renderer display need.
+- Omitting the source comment — future readers need to know where the mirror came from and when to update it.
+
+Validation:
+- Confirm the mirrored constant is used only for display ordering or prioritisation (no routing, no validation, no state mutation).
+- Confirm no new IPC handler, preload method, or service export was added to support the renderer's use.
+- Confirm a comment in the renderer identifies the service source and states the display-only intent.
+
 ### nasEventCache Field Limitation — Adoption Block Not Preserved
 
 Context:

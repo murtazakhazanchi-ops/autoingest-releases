@@ -1773,6 +1773,49 @@ Status:
 
 ---
 
+### 2026-05-14 — Phase 13D-4: Archive Completeness Checklist — Rich Readiness Summary
+
+Task type:
+- UI / Renderer / Modal / Feature
+
+What happened:
+
+Replaced the one-line `_clReadinessBadge` with a structured `_clReadinessSummary` block in the Archive Completeness Checklist modal. The summary derives entirely from `checklist.readiness` + `checklist.items[]` — no new IPC, no new service, no new preload entry.
+
+Key decisions:
+
+1. **Renderer mirrors service critical-fail IDs for display only.** `_clReadinessSummary` contains a local `_CRITICAL_IDS` Set that mirrors `_CRITICAL_FAIL_IDS` from `archiveCompletenessService.js`. The mirror is used solely to sort the top-3 reasons list (critical fails first). It has no effect on any system state or routing logic. Adding an IPC round-trip or leaking service internals to expose these IDs would have been incorrect.
+
+2. **Next-action hint suppressed when reasons list is empty.** `nextHtml` is only rendered when `topReasons.length > 0`. Showing "Fix blocked items" with an empty reasons list would confuse the operator with an action hint that has nothing to act on.
+
+3. **Structured readiness block** — `cl-readiness-headline` + `cl-readiness-sub` + `cl-readiness-reasons` (top 3, prioritised) + `cl-readiness-next`. Uses `flex-direction: column`; children use opacity (0.85, 0.8) for visual hierarchy without separate colour tokens. Colour inherited from parent modifier class.
+
+4. **`_clReadinessBadge` fully removed**; its single call site in `_clRenderChecklist` updated.
+
+Reusable lessons:
+
+1. **Suppress contextual action hints when the supporting list is empty.** A "next action" hint (e.g., "Fix blocked items") rendered alongside an empty reasons list is misleading — the operator sees an instruction but no context. Gate the hint on `reasons.length > 0` (or equivalent list length).
+
+2. **Mirror service constants in the renderer only for display prioritisation.** When the renderer needs a small constant set from a service exclusively to order or prioritise display output (not to make routing or state decisions), mirror it as a local renderer constant with a comment identifying the source. Do not add an IPC round-trip or export service internals to satisfy a pure display-sorting need.
+
+Common failure modes:
+- Rendering a "next action" instruction block when `topReasons` is empty — the hint has no actionable context.
+- Adding an IPC handler or preload method to expose a service constant that the renderer only needs for display sorting — unnecessary coupling.
+- Removing `_clReadinessBadge` without auditing all its call sites first.
+
+Promote to agents:
+- `ui-system-specialist.md` — lesson 1 (suppress action hints when reasons list is empty)
+- `autoingest-architect.md` — lesson 2 (mirror service constants locally for display-only use)
+
+Lessons NOT promoted:
+- `flex-direction: column` + opacity hierarchy — CSS-level visual detail, not a reusable architectural or UI-system rule.
+- Structured headline/sub/reasons/next block composition — feature-specific badge shape, too narrow to be a durable rule.
+
+Status:
+- Promoted
+
+---
+
 ## Entry Template
 
 ### YYYY-MM-DD — Task Name
