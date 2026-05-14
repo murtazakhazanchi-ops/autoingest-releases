@@ -10196,6 +10196,150 @@ document.addEventListener('keydown', e => {
     }
   });
 
+  // ── Archive Consistency Report (Phase 13D-1 — read-only) ─────────────────────
+
+  function _crRootRow(label, info) {
+    const statusClass = info.status === 'ready'     ? 'cr-val-ready'
+                      : info.status === 'not-set'   ? 'cr-val-muted'
+                      : info.status === 'not-found' ? 'cr-val-warn'
+                      :                               'cr-val-error';
+    const statusLabel = info.status === 'ready'     ? 'Ready'
+                      : info.status === 'not-set'   ? 'Not configured'
+                      : info.status === 'not-found' ? 'Not found'
+                      :                               'Error';
+    return `<div class="cr-row">
+      <span class="cr-key">${_esc(label)}</span>
+      <span class="cr-val ${statusClass}">${statusLabel}</span>
+    </div>`;
+  }
+
+  function _crNum(n) {
+    return n == null ? '<span class="cr-val-muted">—</span>' : `<span>${_esc(String(n))}</span>`;
+  }
+
+  function _crTs(iso) {
+    if (!iso) return '';
+    try { return new Date(iso).toLocaleString(); } catch { return iso; }
+  }
+
+  function _renderConsistencyReport(report) {
+    const r = report;
+    const syncedCount = r.sync.total - r.sync.ready - r.sync.syncing - r.sync.needsAttention - r.sync.failed;
+
+    return `
+      <div class="cr-ts">Generated: ${_esc(_crTs(r.generatedAt))}</div>
+
+      <div class="cr-section">
+        <div class="cr-section-title">Roots</div>
+        <div class="cr-grid">
+          ${_crRootRow('Active Archive Root', r.roots.activeArchiveRoot)}
+          ${_crRootRow('Local Staging Root',  r.roots.localStagingRoot)}
+          ${_crRootRow('Transfer Drive Root', r.roots.transferDriveRoot)}
+          ${_crRootRow('Main Archive Root',   r.roots.mainArchiveRoot)}
+        </div>
+      </div>
+
+      <div class="cr-section">
+        <div class="cr-section-title">Events</div>
+        <div class="cr-grid">
+          <div class="cr-row"><span class="cr-key">Managed events</span>${_crNum(r.events.managed)}</div>
+          <div class="cr-row"><span class="cr-key">Adoption candidates</span>${_crNum(r.events.adoptionCandidates)}</div>
+          <div class="cr-row"><span class="cr-key">Blocked candidates</span>${_crNum(r.events.blockedCandidates)}</div>
+          <div class="cr-row"><span class="cr-key">Cache age</span><span class="cr-val-muted">${r.events.cacheAge ? _esc(_crTs(r.events.cacheAge)) : '—'}</span></div>
+        </div>
+      </div>
+
+      <div class="cr-section">
+        <div class="cr-section-title">Sync Queue</div>
+        <div class="cr-grid">
+          <div class="cr-row"><span class="cr-key">Ready for sync</span><span class="cr-val">${r.sync.ready}</span></div>
+          <div class="cr-row"><span class="cr-key">Needs attention</span><span class="cr-val ${r.sync.needsAttention > 0 ? 'cr-val-warn' : ''}">${r.sync.needsAttention}</span></div>
+          <div class="cr-row"><span class="cr-key">Syncing</span><span class="cr-val">${r.sync.syncing}</span></div>
+          <div class="cr-row"><span class="cr-key">Failed</span><span class="cr-val ${r.sync.failed > 0 ? 'cr-val-error' : ''}">${r.sync.failed}</span></div>
+          <div class="cr-row"><span class="cr-key">Synced / other</span><span class="cr-val">${Math.max(0, syncedCount)}</span></div>
+          <div class="cr-row"><span class="cr-key">Issues reviewed</span><span class="cr-val">${r.sync.reviewed}</span></div>
+          <div class="cr-row"><span class="cr-key">Total jobs</span><span class="cr-val">${r.sync.total}</span></div>
+        </div>
+      </div>
+
+      <div class="cr-section">
+        <div class="cr-section-title">Active Archive Locks</div>
+        <div class="cr-grid">
+          <div class="cr-row"><span class="cr-key">Active locks</span><span class="cr-val">${r.locks.active}</span></div>
+          <div class="cr-row"><span class="cr-key">Stale locks</span><span class="cr-val ${r.locks.stale > 0 ? 'cr-val-warn' : ''}">${r.locks.stale}</span></div>
+        </div>
+      </div>
+
+      <div class="cr-section">
+        <div class="cr-section-title">Transfer</div>
+        <div class="cr-grid">
+          <div class="cr-row"><span class="cr-key">Last export</span><span class="cr-val-muted">${r.transfer.export.running ? 'Running…' : (r.transfer.export.completedAt ? _esc(_crTs(r.transfer.export.completedAt)) : '—')}</span></div>
+          <div class="cr-row"><span class="cr-key">Last import</span><span class="cr-val-muted">${r.transfer.import.running ? 'Running…' : (r.transfer.import.completedAt ? _esc(_crTs(r.transfer.import.completedAt)) : '—')}</span></div>
+        </div>
+      </div>
+
+      <div class="cr-section">
+        <div class="cr-section-title">Last Diagnostics Run</div>
+        <div class="cr-grid">
+          <div class="cr-row"><span class="cr-key">Errors</span><span class="cr-val ${(r.diagnostics.errors ?? 0) > 0 ? 'cr-val-error' : ''}">${_crNum(r.diagnostics.errors)}</span></div>
+          <div class="cr-row"><span class="cr-key">Warnings</span><span class="cr-val ${(r.diagnostics.warnings ?? 0) > 0 ? 'cr-val-warn' : ''}">${_crNum(r.diagnostics.warnings)}</span></div>
+          <div class="cr-row"><span class="cr-key">Info</span>${_crNum(r.diagnostics.infos)}</div>
+          <div class="cr-row"><span class="cr-key">Completed</span><span class="cr-val-muted">${r.diagnostics.completedAt ? _esc(_crTs(r.diagnostics.completedAt)) : '—'}</span></div>
+        </div>
+      </div>
+    `;
+  }
+
+  async function _crOpen() {
+    document.getElementById('archiveConsistencyModal')?.classList.add('open');
+    const existing = await window.api.getConsistencyReport?.().catch(() => null);
+    if (existing && !existing.error) {
+      const bodyEl = document.getElementById('crBody');
+      if (bodyEl) bodyEl.innerHTML = _renderConsistencyReport(existing);
+    }
+  }
+
+  function _crClose() {
+    document.getElementById('archiveConsistencyModal')?.classList.remove('open');
+  }
+
+  document.getElementById('diagConsistencyBtn')?.addEventListener('click', _crOpen);
+  document.getElementById('crCloseBtn')?.addEventListener('click', _crClose);
+  document.getElementById('crDoneBtn')?.addEventListener('click',  _crClose);
+
+  document.getElementById('archiveConsistencyModal')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('archiveConsistencyModal')) _crClose();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.getElementById('archiveConsistencyModal')?.classList.contains('open')) {
+      _crClose();
+    }
+  });
+
+  document.getElementById('crGenerateBtn')?.addEventListener('click', async () => {
+    const btn      = document.getElementById('crGenerateBtn');
+    const statusEl = document.getElementById('crStatusText');
+    const bodyEl   = document.getElementById('crBody');
+
+    if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
+    if (statusEl) { statusEl.className = 'cr-status-row cr-status-running'; statusEl.textContent = 'Collecting archive data…'; }
+
+    const report = await window.api.generateConsistencyReport().catch(() => null);
+
+    if (btn) { btn.disabled = false; btn.textContent = 'Refresh'; }
+
+    if (!report || report.error) {
+      if (statusEl) { statusEl.className = 'cr-status-row'; statusEl.textContent = report?.error ? `Error: ${report.error}` : 'Failed to generate report.'; }
+      return;
+    }
+
+    if (statusEl) { statusEl.className = 'cr-status-row'; statusEl.textContent = ''; }
+    if (bodyEl) {
+      bodyEl.innerHTML = _renderConsistencyReport(report);
+    }
+  });
+
   // ── Adoption Preview (Phase 13C-1 — read-only) ───────────────────────────────
 
   let _adoptRunning = false;

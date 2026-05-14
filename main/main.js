@@ -27,9 +27,10 @@ const archiveLockService      = require('../services/archiveLockService');
 const transferExportService      = require('../services/transferExportService');
 const transferImportService      = require('../services/transferImportService');
 const archiveDiagnosticsService  = require('../services/archiveDiagnosticsService');
-const archiveRepairService       = require('../services/archiveRepairService');
-const syncReviewService          = require('../services/syncReviewService');
-const adoptionPreviewService     = require('../services/adoptionPreviewService');
+const archiveRepairService          = require('../services/archiveRepairService');
+const archiveConsistencyService     = require('../services/archiveConsistencyService');
+const syncReviewService             = require('../services/syncReviewService');
+const adoptionPreviewService        = require('../services/adoptionPreviewService');
 const adoptionDryRunService      = require('../services/adoptionDryRunService');
 const adoptionWriteService       = require('../services/adoptionWriteService');
 const userManager   = require('./userManager');
@@ -2750,6 +2751,14 @@ ipcMain.handle('archive:cleanupTempFile', async (_event, { tempPath } = {}) => {
   if (configuredRoots.length === 0) return { ok: false, reason: 'outside-configured-root' };
   return archiveRepairService.cleanupTempFile(tempPath, configuredRoots);
 });
+
+// ── Archive Consistency Report (Phase 13D-1 — read-only) ─────────────────────
+
+ipcMain.handle('archive:generateConsistencyReport', async () =>
+  archiveConsistencyService.generateReport());
+
+ipcMain.handle('archive:getConsistencyReport', () =>
+  archiveConsistencyService.getLastReport());
 
 ipcMain.handle('window:minimize', () => {
   BrowserWindow.getFocusedWindow()?.minimize();

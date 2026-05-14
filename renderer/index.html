@@ -1039,6 +1039,23 @@
     .adopt-action-error { font-size: 11px; color: #ef4444; padding: 4px 0 2px; }
     .adopt-action-warnings { font-size: 10.5px; color: var(--yellow, #f59e0b); padding: 3px 0 0; }
 
+    /* ── Archive Consistency Report modal (Phase 13D-1) ── */
+    #archiveConsistencyModal .emm-box { width: min(580px, calc(100vw - 48px)); max-height: calc(100vh - 100px); display: flex; flex-direction: column; }
+    .cr-body { flex: 1; overflow-y: auto; padding: 16px 24px 12px; display: flex; flex-direction: column; gap: 14px; }
+    .cr-section { display: flex; flex-direction: column; gap: 5px; }
+    .cr-section-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--subtext); padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+    .cr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
+    .cr-row { display: flex; align-items: baseline; gap: 6px; }
+    .cr-key { font-size: 11.5px; color: var(--subtext); flex: 1; min-width: 0; }
+    .cr-val { font-size: 11.5px; font-weight: 500; color: var(--text); white-space: nowrap; }
+    .cr-val-ready   { color: var(--green, #22c55e); }
+    .cr-val-warn    { color: var(--yellow, #f59e0b); }
+    .cr-val-error   { color: #ef4444; }
+    .cr-val-muted   { color: var(--subtext); font-style: italic; }
+    .cr-status-row  { font-size: 11px; color: var(--subtext); }
+    .cr-status-running { color: var(--accent, #6366f1); }
+    .cr-ts { font-size: 10px; color: var(--subtext); opacity: 0.65; margin-top: -4px; }
+
     #activityLogModal .emm-box { height: calc(100vh - 80px); }
     #alTitle { font-size: 18px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.01em; }
     #alBody {
@@ -7251,11 +7268,34 @@
         <div class="emm-footer-right">
           <button type="button" class="emm-btn-primary"    id="diagRunBtn">Run Diagnostics</button>
           <button type="button" class="emm-btn-secondary"  id="diagAdoptBtn">Preview Adoptions</button>
+          <button type="button" class="emm-btn-secondary"  id="diagConsistencyBtn">Consistency Report</button>
           <button type="button" class="emm-btn-secondary"  id="diagDoneBtn">Done</button>
         </div>
       </div>
 
       <div id="adoptDetailPanel" hidden></div>
+    </div>
+  </div>
+
+  <!-- Archive Consistency Report modal (Phase 13D-1 — read-only) -->
+  <div id="archiveConsistencyModal" class="emm-overlay" role="dialog" aria-modal="true" aria-labelledby="crTitle">
+    <div class="emm-box">
+      <div class="emm-topbar">
+        <span class="emm-topbar-title" id="crTitle">Archive Consistency Report</span>
+        <button type="button" class="emm-close-btn" id="crCloseBtn" aria-label="Close">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="cr-body" id="crBody">
+        <div class="cr-status-row" id="crStatusText">Click Generate to produce a snapshot of archive health.</div>
+      </div>
+      <div class="emm-footer">
+        <span class="sq-footer-note">Read-only snapshot — no files are modified.</span>
+        <div class="emm-footer-right">
+          <button type="button" class="emm-btn-primary"   id="crGenerateBtn">Generate</button>
+          <button type="button" class="emm-btn-secondary" id="crDoneBtn">Done</button>
+        </div>
+      </div>
     </div>
   </div>
 
