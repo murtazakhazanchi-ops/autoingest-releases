@@ -401,7 +401,46 @@ Avoid:
 
 Validation:
 - Confirm the validation reads `transfer-root.json` and checks `type === 'autoingest-transfer-root'`.
-- Confirm a missing file, malformed JSON, or wrong `type` field all produce a negative result.
+- For **operational identity checks** (e.g., diagnostics, export preview): confirm missing file, malformed JSON, or wrong `type` all produce a negative result.
+- For **drive selection validation** (`archive:validateTransferRoot`): confirm missing marker returns `{ valid: true, initialized: false, reason: 'uninitialized' }` — a new drive may be initialized later by export. Only malformed JSON or wrong `type` produces `metadata-invalid`.
+
+### Derived Readiness Verdict — No Separate Service
+
+Context:
+- Applies when designing or documenting a feature that exposes a readiness or status verdict as a distinct UI section.
+
+Rule:
+- A UI section that presents a derived verdict (e.g., `ready`/`needs-attention`/`blocked`) does not imply a separate backend service or separate IPC channels.
+- Before specifying or documenting a new service for this, confirm whether the verdict is already a field in an existing service's output.
+- In AutoIngest, the completeness checklist readiness verdict is produced by `archiveCompletenessService.generateChecklist()` as the `readiness` field — there is no `archiveReadinessService`.
+
+Avoid:
+- Creating a new service whose sole job is to call an existing service and re-expose its output.
+- Documenting IPC channels for a separate readiness aggregator that does not exist.
+- Assuming a UI panel labelled "Readiness Summary" requires its own backend service.
+
+Validation:
+- Before adding a new service, confirm the verdict cannot be added as a field to an existing service's output.
+- Confirm no duplicate IPC channels are created for data already available through an existing channel.
+
+### Foundation-Only IPC — Defer UI Wiring When Explicitly Phased
+
+Context:
+- Applies when a task specifies "IPC/preload foundation only — UI integration deferred."
+
+Rule:
+- Adding a new IPC handler in `main/main.js` and exposing it in `main/preload.js` is sufficient for a fix or foundation phase that explicitly defers UI wiring.
+- The preload entry enables future renderer use without requiring it now.
+- Do not add renderer-side calls, modal state changes, or UI display logic unless the task explicitly requires it in this phase.
+
+Avoid:
+- Expanding a foundation IPC task into UI wiring without explicit instruction.
+- Deferring the IPC/preload addition to a "later" UI phase — the contract should be established first.
+
+Validation:
+- Confirm the IPC handler exists in `main.js` and the preload entry is exposed.
+- Confirm no renderer files were modified if the task explicitly deferred UI integration.
+- Confirm the foundation can be tested independently (e.g., via IPC invocation from DevTools).
 
 ### Sidecar XMP Conflict — needs-attention, Not Rename
 

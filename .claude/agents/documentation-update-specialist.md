@@ -246,15 +246,18 @@ Context:
 Rule:
 - Before adding or preserving any reference to a service file or IPC channel in documentation, confirm the file exists in `services/` and the channel is registered in `main/main.js`.
 - If a doc names `services/X.js` and the file does not exist, flag it as a documentation bug and do not propagate the stale reference.
+- A UI section that presents a distinct readiness or status verdict does not imply a separate backend service. Check whether the verdict is already a field in an existing service's output (e.g., `readiness` from `archiveCompletenessService.generateChecklist()`) before documenting or implying a new service. Documenting a non-existent aggregation service is the most common way this rule is violated in milestone docs.
 
 Avoid:
 - Copying service file names or IPC channel names from session context or prior docs without verifying they exist in the codebase.
 - Leaving stale service references in place "for historical accuracy."
+- Assuming a distinct UI section (e.g., "Readiness Summary") requires a distinct backend service.
 
 Validation:
 - Glob `services/<name>.js` for each service referenced in docs.
 - Grep `main.js` for each IPC channel referenced in docs.
 - If a service or channel is absent, mark the documentation entry as incorrect and flag for correction.
+- If a verdict or summary section exists in the UI, confirm whether its source is an existing service field before adding a new service entry.
 
 ### Milestone Docs Pattern
 

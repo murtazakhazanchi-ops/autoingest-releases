@@ -315,16 +315,19 @@ Rule:
   - The IPC handler is registered in `main/main.js` (grep for the channel name).
   - The channel is exposed in `main/preload.js` (grep for the method name).
 - If the file or handler does not exist, mark the feature as Planned or Not Implemented — do not document it as shipped.
+- A UI section that presents a distinct verdict (e.g., "Readiness Summary", "Final Status") does not imply a separate backend service. Before writing a new service into the release notes, confirm the verdict is not already a field in an existing service's output. This is the most common way milestone phase docs are inflated with non-existent services.
 
 Avoid:
 - Documenting `services/archiveFooService.js` as Phase X without confirming the file exists.
 - Writing IPC channel tables that include channels not registered in `main.js`.
 - Assuming a service was implemented because it was planned in a prior phase specification.
+- Inferring a new backend service from a distinct UI presentation of a derived verdict.
 
 Validation:
 - Before finalising milestone docs: glob `services/<serviceName>.js` and grep `main.js` for each documented channel.
 - Confirm each documented service file exists.
 - Confirm each documented IPC channel is registered and exposed in `preload.js`.
+- If a verdict or summary panel exists in the UI, confirm its data source before adding a new service to the release notes.
 
 ## Validation Checklist
 

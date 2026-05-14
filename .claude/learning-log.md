@@ -17,6 +17,34 @@ Rules:
 
 ---
 
+### 2026-05-14 — Phase 14B-1: Fix Phase 14A Beta Validation Findings
+
+Task type:
+- Documentation Correction / Read-Only IPC Contract Addition / Beta-Readiness Fix
+
+What happened:
+- Fixed MEDIUM documentation bug: removed fake "Phase 13D-3 — Final Readiness Summary" section from `docs/archive-operations-layer.md` and `docs/release-notes-archive-operations.md`. No `archiveReadinessService.js`, no `archive:generateReadinessSummary`/`archive:getReadinessSummary` IPC channels exist. The readiness verdict (`ready`/`needs-attention`/`blocked`) is produced entirely by `archiveCompletenessService.js` as part of the Completeness Checklist output.
+- Updated `docs/features.md` Feature 14 to "four reporting surfaces" (not five), removing "Final Readiness Summary" from the list.
+- Added `archive:validateTransferRoot` IPC handler in `main/main.js` and exposed `validateTransferRoot(v)` in `main/preload.js` to close the LOW gap (no explicit transfer root validation parity with NAS/Staging/Main archive validators). Read-only two-phase pattern: stat → marker read. Missing `.autoingest-transfer/transfer-root.json` = uninitialized, not invalid — a new drive may be selected before export initializes it. UI wiring explicitly deferred per task scope.
+- Code review passed (no CRITICAL/HIGH issues).
+
+Reusable lessons:
+1. **Verify service existence before documenting** (confirmed from Phase 14A — rule already promoted): The Phase 14B-1 fix validated that removing a non-existent service section and clarifying that the readiness verdict lives inside an existing service is the correct correction pattern. No re-promotion needed; agents already have this rule.
+2. **Readiness verdict from existing service — no separate service needed**: When a feature exposes a derived verdict (e.g., `ready`/`needs-attention`/`blocked`) as a UI-distinct section, check whether an existing service already produces that verdict as part of its output before documenting or implementing a new service. A UI section for readiness does not imply a separate backend service; the verdict can be an output field of the Completeness Checklist service.
+3. **Transfer Root missing marker = uninitialized, not invalid**: `archive:validateTransferRoot` returns `{ valid: true, initialized: false, reason: 'uninitialized' }` on ENOENT — because a new transfer drive may be selected before export initializes it. This is different from the identity check used by operational services (e.g., diagnostics, export preview), where missing marker means the path is not a configured transfer drive. The distinction is: selection-time validation vs. operational identity check.
+4. **Foundation-only IPC additions — defer UI wiring when explicitly phased**: Adding an IPC handler and preload entry is sufficient for a fix phase that explicitly defers UI integration. The IPC/preload foundation enables future UI work without requiring the UI in the same commit. Do not expand scope to wire the renderer unless explicitly asked.
+
+Promote to agents:
+- `documentation-update-specialist.md` — extend "Verify Service Existence" rule with lesson 2 note
+- `release-docs-writer.md` — extend "Verify Service Existence" rule with lesson 2 note
+- `autoingest-architect.md` — lesson 2 (derived readiness rule), update "Transfer Drive Marker Path" with lesson 3 nuance, lesson 4 (foundation IPC phasing)
+- `contract-debugger.md` — lesson 3 (transfer root uninitialized vs invalid validation contract)
+
+Status:
+- Promoted
+
+---
+
 ### 2026-05-14 — Phase 14A: Full Archive Operations Beta Validation
 
 Task type:

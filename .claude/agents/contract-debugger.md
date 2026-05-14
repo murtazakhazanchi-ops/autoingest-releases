@@ -686,6 +686,26 @@ Validation:
 - Confirm the silent guard is the only failure mode — there is no error or log to alert to the problem.
 - After fix, confirm the previously inert button click now renders the expected UI.
 
+### Transfer Root: Uninitialized vs Invalid — Selection vs Identity Check
+
+Context:
+- Applies when debugging or reviewing validation behavior involving the Transfer Drive Root path (`archive:validateTransferRoot`, diagnostics, export preview, or any code that checks whether a path is a configured transfer drive).
+
+Rule:
+- There are two distinct validation contexts for the transfer root marker (`.autoingest-transfer/transfer-root.json`):
+  1. **Drive selection validation** (`archive:validateTransferRoot`): a missing marker (`ENOENT`) means the directory is a valid but uninitialized transfer drive — `{ valid: true, initialized: false, reason: 'uninitialized' }`. A new drive may be selected before export initializes it. Only malformed JSON or wrong `type` field produces `metadata-invalid`.
+  2. **Operational identity check** (export preview, diagnostics, transfer-dependent services): missing marker means the path is not yet a configured transfer drive — this is a negative/blocking result. Services that depend on an initialized transfer drive must treat missing marker as "not ready."
+- Do not apply the operational identity check semantics to the selection validator, or vice versa.
+
+Avoid:
+- Returning `{ valid: false }` from `archive:validateTransferRoot` when the marker is merely absent — a directory without a marker is a valid but uninitialized target.
+- Allowing operational transfer services (export, import) to proceed when the marker is absent, treating it as uninitialized-but-valid.
+
+Validation:
+- Confirm `archive:validateTransferRoot` returns `valid: true, initialized: false` for a directory with no `.autoingest-transfer/transfer-root.json`.
+- Confirm operational services (export preview, diagnostics) still treat missing marker as "drive not configured."
+- Confirm only malformed JSON or wrong `type` field triggers `metadata-invalid`.
+
 ## Validation Checklist
 
 Before debugging, read:
