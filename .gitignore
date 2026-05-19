@@ -12,8 +12,17 @@ config/service-account-key.json
 # Generated documentation helpers (not tracked)
 CODE_BUNDLE.md
 
+# Graphify developer tooling artifacts (never committed)
+graphify-out/
+.graphify/
+
 # Separate tooling repos (not part of AutoIngest)
 everything-claude-code/
 pixel-agents/
-docs/
 .agent/skills/
+
+# Ignore untracked docs by default, but allow selected project docs/tools
+docs/*
+!docs/CLAUDE.md
+!docs/dev-tools/
+!docs/dev-tools/graphify.md

@@ -1,0 +1,52 @@
+# Graphify ignore rules for AutoIngest
+# Excludes heavy/generated/runtime/private folders
+# Keeps source and documentation visible
+
+# Dependencies and build output
+node_modules/
+dist/
+build/
+out/
+release/
+coverage/
+
+# Version control
+.git/
+
+# Graphify own output (prevent circular inclusion)
+graphify-out/
+.graphify/
+
+# Runtime-generated / private data
+userData/
+data/importIndex.json
+data/syncQueue.json
+reports/
+temp/
+tmp/
+
+# Logs and caches
+*.log
+*.cache
+.DS_Store
+Thumbs.db
+
+# Generated bundles
+CODE_BUNDLE.md
+
+# External tooling repos (not part of AutoIngest source)
+everything-claude-code/
+pixel-agents/
+.agent/
+
+# Patterns to keep visible (do not add these as excludes):
+# main/
+# renderer/
+# services/
+# scripts/
+# config/
+# data/
+# docs/
+# .claude/
+# CLAUDE.md (in docs/)
+# package.json

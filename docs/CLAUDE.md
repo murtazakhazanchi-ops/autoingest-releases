@@ -381,6 +381,24 @@ For metadata-specific bugs:
 
 ---
 
+## Developer Tooling — Graphify
+
+Graphify may be used for **read-only architecture orientation** only. It is a developer tool — not an Electron dependency, npm dependency, app runtime feature, or source of truth.
+
+Before architecture, refactor, or debugging tasks, Claude may consult `graphify-out/GRAPH_REPORT.md` or run Graphify queries **if `graphify-out/` exists locally**. If it does not exist, proceed without it.
+
+### Rules
+
+- Graphify output must be treated as **advisory**. It does not authorize code changes.
+- Do not allow Graphify to override permanent rules, routed docs, `event.json` contracts, the Electron security model, file-copy rules, metadata rules, or any source-of-truth rule.
+- Do not make runtime app changes only because Graphify suggests them.
+- If Graphify contradicts `CLAUDE.md` or routed docs, **stop and report the conflict** before proceeding.
+- Graphify artifacts (`graphify-out/`, `.graphify/`) are excluded from git.
+
+See `docs/dev-tools/graphify.md` for install instructions, recommended queries, and full rules of use.
+
+---
+
 ## Enforcement
 
 If any rule or contract is violated:
