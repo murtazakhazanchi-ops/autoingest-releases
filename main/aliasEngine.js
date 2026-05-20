@@ -55,7 +55,15 @@ function loadAliases(listName) {
 
 function saveAliases(listName, map) {
   fs.mkdirSync(userDataDir, { recursive: true });
-  fs.writeFileSync(aliasPath(listName), JSON.stringify(map, null, 2), 'utf8');
+  const filePath = aliasPath(listName);
+  const tmp = filePath + '.tmp';
+  try {
+    fs.writeFileSync(tmp, JSON.stringify(map, null, 2), 'utf8');
+    fs.renameSync(tmp, filePath);
+  } catch (err) {
+    try { fs.unlinkSync(tmp); } catch {}
+    throw err;
+  }
 }
 
 // ── Tree flattening ───────────────────────────────────────────────────────────
