@@ -2071,8 +2071,40 @@ ipcMain.handle('archive:getLocalMirrorStatus', async (_event, params) => localMi
 
 // ── Local sync manifest ───────────────────────────────────────────────────────
 
-ipcMain.handle('archive:writeSyncManifest', async (_event, { localEventPath, manifest }) =>
-  localSyncManifest.writeManifest(localEventPath, manifest));
+ipcMain.handle('archive:writeSyncManifest', async (_event, { localEventPath, manifest }) => {
+  if (!localEventPath || typeof localEventPath !== 'string') {
+    return { ok: false, reason: 'Invalid localEventPath.' };
+  }
+
+  const stagingRoot = settings.getLocalStagingRoot();
+  if (!stagingRoot) return { ok: false, reason: 'Local Staging Root not configured.' };
+
+  let realRoot;
+  try {
+    realRoot = await fsp.realpath(stagingRoot);
+  } catch {
+    return { ok: false, reason: 'Local Staging Root not accessible.' };
+  }
+
+  // localEventPath should exist after a completed import, but resolve parent as fallback.
+  let realEventPath;
+  try {
+    realEventPath = await fsp.realpath(localEventPath);
+  } catch {
+    try {
+      const parentReal = await fsp.realpath(path.dirname(localEventPath));
+      realEventPath = path.join(parentReal, path.basename(localEventPath));
+    } catch (err) {
+      return { ok: false, reason: `localEventPath not accessible: ${err.message}` };
+    }
+  }
+
+  if (!realEventPath.startsWith(realRoot + path.sep)) {
+    return { ok: false, reason: 'localEventPath is outside the configured Local Staging Root.' };
+  }
+
+  return localSyncManifest.writeManifest(localEventPath, manifest);
+});
 ipcMain.handle('archive:readSyncManifest',  async (_event, { localEventPath }) =>
   localSyncManifest.readManifest(localEventPath));
 
