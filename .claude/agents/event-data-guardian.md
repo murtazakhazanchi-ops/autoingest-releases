@@ -462,6 +462,60 @@ Validation:
 - Confirm the conditions are mutually exclusive (both length-0 and length-1 gates cannot fire for the same event in the same save call).
 - Confirm `_viewingExisting.adoption` and `_viewingExisting.components` are read (not from disk) and not mutated between edit-open and save.
 
+### `event:write` Does Not Call Schema Validation Before Creating event.json
+
+Context:
+- Applies when reviewing or implementing the initial `event.json` creation path (`event:write` IPC handler).
+
+Rule:
+- The `event:write` handler checks only for `ENOENT` (file not already present) before writing. It does NOT call `isValidEventJson` on the creation payload.
+- This means a structurally invalid `event.json` can be persisted through this path if the caller passes a malformed payload.
+- Any implementation that adds a new event creation flow must explicitly call `isValidEventJson` on the payload before the write, even for initial creation.
+
+Avoid:
+- Assuming event creation is guarded by the same schema validation as event updates.
+- Relying on the ENOENT check alone as a sufficient write guard for the create path.
+
+Validation:
+- Confirm `isValidEventJson` is called on the payload before any `event:write` operation in a new create flow.
+- Confirm the handler rejects an invalid payload with a clear error before writing.
+
+### `event:update` Partial-Patch Accepts Arbitrary Renderer Keys
+
+Context:
+- Applies to `updateEventJson()` and any review of the `event:update` IPC handler.
+
+Rule:
+- The partial-patch path in `updateEventJson` (triggered by `event:update`) does `{...existing, ...payload}` with no field-level validation. Arbitrary renderer-supplied keys silently persist into `event.json` and survive future reads and writes through the partial-patch path.
+- The only validation on the partial-patch path is type checks on the payload itself, not field-level schema enforcement.
+- When reviewing a change that sends a new field through `event:update`, confirm the field is intentional and belongs in `event.json`. Accidental key leakage from UI state can add invisible junk fields to the source of truth.
+
+Avoid:
+- Sending UI-only or transient renderer state fields through `event:update` — they will persist into `event.json`.
+- Assuming the partial-patch path is schema-safe because it preserves existing fields — it merges the entire payload, including unvalidated new keys.
+
+Validation:
+- Confirm any new field sent through `event:update` is an explicitly intended addition to the `event.json` data model.
+- Confirm no transient renderer state (e.g., selection flags, display toggles) is included in a partial-patch payload.
+
+### `master:scanEvents` Has a WRITE Side-Effect — Resets In-Progress Status
+
+Context:
+- Applies to any caller that treats `master:scanEvents` as a pure read-only scan, and to any review of scan-triggered event mutations.
+
+Rule:
+- `master:scanEvents` resets any event with `status === 'in-progress'` to `'created'` during every scan. This is Patch 3 crash-recovery behavior — it ensures that an import interrupted mid-transaction does not leave an event permanently stuck in `'in-progress'`.
+- This write side-effect is invisible to callers who treat the scan as read-only. A scan triggered by a UI refresh or polling loop can silently mutate `event.json` files on disk.
+- When diagnosing unexpected `status` transitions from `'in-progress'` to `'created'` without a completed import, `master:scanEvents` is the first thing to check.
+
+Avoid:
+- Assuming `master:scanEvents` is a safe read-only operation that can be called freely without side effects.
+- Treating an unexpected `status: 'created'` after an incomplete import as data corruption before confirming the scan fired.
+
+Validation:
+- Confirm any flow that depends on `status === 'in-progress'` persisting across a scan is aware of the reset behavior.
+- Confirm the crash-recovery reset is intentional in the context of the change being reviewed.
+
 ### Documentation Follow-Up
 
 Context:

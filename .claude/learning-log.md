@@ -17,6 +17,98 @@ Rules:
 
 ---
 
+### 2026-05-20 — dir:rename IPC Safety Fix: Containment + Collision Guard Implementation
+
+Task type:
+- Surgical IPC Handler Fix / Security Patch
+
+What happened:
+- Replaced the bare `fsp.rename` handler in `main/main.js` `dir:rename` with a 63-line hardened implementation.
+- Added multi-root archive containment validation, realpath symlink-escape protection, offline-root graceful skip, `path.dirname` trick for non-existent destination, and collision guard matching `master:renameEvent` semantics.
+- `node --check main/main.js` passed clean. Only `main/main.js` changed in the diff.
+
+Reusable lessons:
+1. **Four archive roots, not three**: Containment must check `getNasRoot()`, `getArchiveRoot()`, `getMainArchiveRoot()`, AND `getLocalStagingRoot()`. LocalStagingRoot must be included for local-first import mode where eventCreator operates on staging paths. `getTransferRoot()` is excluded — transfer drives are for export operations only.
+2. **`path.dirname` trick for non-existent destinations**: A rename destination may not exist yet and cannot be realpath'd. Resolve the parent directory instead: `fsp.realpath(path.dirname(newPath))`. Then containment-check the resolved parent.
+3. **Offline-root graceful skip**: When collecting realpath'd archive roots, catch `fsp.realpath` errors per-root and skip unavailable ones. Fail only if zero roots resolve. Do not fail when some roots are offline (e.g., NAS unmounted while local archive is accessible).
+4. **Containment separator guard**: Use `resolved === r || resolved.startsWith(r + path.sep)` not just `resolved.startsWith(r)`. Without the separator guard, `/archive-extra` would incorrectly match `/archive`. The exact-equals branch covers the edge where the path IS the root directory itself.
+
+Promote to agents:
+- `autoingest-architect.md` — all four lessons (canonical multi-root containment pattern for future IPC handlers)
+- `code-reviewer.md` — lessons 1, 2, 4 (what to verify when reviewing any new containment check)
+- `contract-debugger.md` — lesson 1 (four-root rule for containment failures), lesson 2 (`path.dirname` trick as canonical fix pattern)
+
+Status:
+- Promoted
+
+---
+
+### 2026-05-20 — Write-Safety Triage: Verification of 8 Graphify Findings
+
+Task type:
+- Read-Only Static Code Verification / Risk Triage / First-Patch Planning
+
+What happened:
+- Verified all 8 Graphify write-safety findings directly against source code.
+- 6 confirmed as genuine gaps; 2 confirmed as intentional design with explicit code comments.
+- Finding 2 (ExifTool -overwrite_original): intentional — the exifService.js docstring documents this explicitly. Not a write-safety bug.
+- Finding 3 (files:deleteFromSource copyVerified): intentional — the IPC handler has an explicit code comment explaining that ExifTool expands destination size after copy, so size mismatch for copyVerified entries is expected and should not block deletion.
+- Produced a first-patch plan for dir:rename (containment + collision guard). No files modified.
+
+Reusable lessons:
+1. **`dir:rename` also lacks a collision check**: In addition to having no containment validation, `dir:rename` performs no pre-rename collision stat. `master:renameEvent` (which HAS a collision check) is the correct reference. A complete fix must add both: containment validation AND collision guard.
+2. **ExifTool `-overwrite_original` is documented intentional design — not a gap**: The `exifService.js` docstring explicitly states "Images → write directly (-overwrite_original)." Flagging this as a write-safety bug is incorrect. It is the intended metadata write approach for JPEG/PNG/TIFF. Do not recommend "fixing" it without understanding it is documented and intentional.
+3. **`files:deleteFromSource` `copyVerified` pass-through is documented intentional design**: The IPC handler (lines 2495–2504) has an explicit comment: "copyVerified entries may have a larger destination because metadata tagging embeds EXIF after copy verification." The behavior — log-only for copyVerified size mismatch, block for non-copyVerified — is correct by design. Do not flag this as an unblocked deletion bug.
+4. **Write-safety triage ordering**: When multiple write-safety gaps exist, fix the broadest generic mutation path first (e.g., `dir:rename` before event.json schema validation). Batch-fixing all issues in one commit increases regression surface and makes rollback harder.
+5. **`event:write` is idempotent — schema gap is lower risk than it appears**: `event:write` returns existing data unmodified if event.json already exists. The schema validation gap (no `isValidEventJson` before write) only applies to initial creation, which is a narrow path with well-formed callers. Still a real gap, but lower urgency than a handler that can overwrite.
+
+Promote to agents:
+- `contract-debugger.md` — lesson 1 (extend existing dir:rename rule with collision guard gap)
+- `autoingest-architect.md` — lesson 1 (extend dir:rename rule with collision guard), lesson 4 (write-safety triage ordering)
+- `metadata-specialist.md` — lesson 2 (ExifTool -overwrite_original is documented intentional design)
+- `ingestion-routing-specialist.md` — lesson 3 (files:deleteFromSource copyVerified pass-through is intentional)
+- `code-reviewer.md` — extend write-safety checklist point 2 with collision guard for dir:rename
+
+Status:
+- Promoted
+
+---
+
+### 2026-05-20 — Write-Safety Map: Full IPC Write-Surface Audit
+
+Task type:
+- Read-Only Static Code Review / Write-Safety Analysis / Risk Mapping
+
+What happened:
+- Audited all IPC handlers and service functions in `main/main.js`, `services/`, and `main/` that write, rename, move, delete, copy, or modify files or JSON state.
+- Mapped 31 write flows: entry point, IPC channel, function, what is written, validation before write, atomic write pattern, event.json impact, media file impact, risk level.
+- Found 3 HIGH-risk and 5 MEDIUM-risk gaps.
+- No files were modified. Analysis only.
+
+Reusable lessons:
+1. **`dir:rename` has no containment validation**: `dir:rename` calls `fsp.rename(oldPath, newPath)` on arbitrary renderer-supplied paths with no archive-root containment check and no lock acquisition. This is the highest-risk IPC handler — it can move files to arbitrary paths or clobber protected targets.
+2. **ExifTool `-overwrite_original` is non-atomic and non-reversible**: `exifService.js` uses ExifTool's `-overwrite_original` flag, which modifies JPEG/PNG/TIFF files in-place. A crash or error during the ExifTool write corrupts the media file with no recovery path. This fires automatically post-import when `autoMetadataEnabled` is set.
+3. **`files:deleteFromSource` `copyVerified` branch does not block on size mismatch**: When the destination file size differs from the source (e.g., ExifTool modified the dest post-copy), the handler logs a warning but proceeds with deleting the source original. This is HIGH RISK for data loss when ExifTool is active.
+4. **`event:write` skips schema validation on create**: The `event:write` IPC handler checks only for ENOENT before creating `event.json`. It does NOT call `isValidEventJson`. An event.json with an invalid shape can be persisted through this path.
+5. **`event:update` partial-patch accepts arbitrary keys**: The partial-patch path in `updateEventJson()` does `{...existing, ...payload}` with no field-level validation. Arbitrary renderer-supplied keys silently persist into `event.json`.
+6. **`master:scanEvents` has an undocumented WRITE side-effect**: It resets any event with `status === 'in-progress'` to `'created'` during every scan. This is crash-recovery behavior (Patch 3) but is invisible to callers treating it as a read-only scan.
+7. **EXDEV cross-device fallback is not atomic on the destination**: In `import:commitTransaction`, when `fsp.rename(tmp, final)` fails with EXDEV, the fallback is `copyFile(tmp, final) → unlink(tmp)`. The copy step is not atomic — a crash between `copyFile` and `unlink` leaves the tmp file behind but the final destination is complete.
+8. **`files:import` is NOT the transactional import path**: `files:import` copies files directly — no lock, no rollback, no event.json update, no audit trail. Only `import:commitTransaction` is the full transactional handler with lock, atomic merge, and exif trigger.
+9. **`listManager` and `aliasEngine` use non-atomic writes**: Both use `fs.writeFileSync` without tmp-rename, inconsistent with all other write paths. A crash during write corrupts the file.
+10. **`archive:writeSyncManifest` lacks staging root containment check**: `localSyncManifest.writeManifest` does not validate that `localEventPath` is inside the configured Local Staging Root before writing.
+
+Promote to agents:
+- `contract-debugger.md` — lessons 1, 3, 7, 8 (dir:rename containment gap, deleteFromSource size-mismatch gap, EXDEV fallback atomicity, files:import vs commitTransaction distinction)
+- `event-data-guardian.md` — lessons 4, 5, 6 (event:write no schema on create, event:update partial-patch arbitrary keys, master:scanEvents write side-effect)
+- `ingestion-routing-specialist.md` — lessons 7, 8 (EXDEV fallback, files:import vs commitTransaction)
+- `autoingest-architect.md` — lessons 1, 2, 10 (dir:rename containment requirement, ExifTool non-atomic overwrite risk, writeSyncManifest staging root gap)
+- `code-reviewer.md` — write-safety checklist additions (lessons 1–3, 9)
+
+Status:
+- Promoted
+
+---
+
 ### 2026-05-14 — Phase 14B-2: Transfer Root Validation UI Integration
 
 Task type:

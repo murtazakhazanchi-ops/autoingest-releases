@@ -944,6 +944,27 @@ Validation:
 - Confirm metadata docs are referenced rather than copied into CLAUDE.md.
 - Confirm only durable metadata rules are documented.
 
+### ExifTool `-overwrite_original` Is Intentional Design — Not a Write-Safety Bug
+
+Context:
+- Applies when reviewing `exifService.js`, auditing write-safety, or evaluating proposals to change the metadata write approach for image files.
+
+Rule:
+- `exifService.js` uses ExifTool's `-overwrite_original` flag for JPEG/PNG/TIFF files. This is documented explicitly in the service docstring: "Images → write directly (-overwrite_original)." It is the intended, approved metadata write approach — not a gap or oversight.
+- RAW files use a `.xmp` sidecar (never modifies the original). Videos are skipped entirely.
+- Do NOT flag `-overwrite_original` as an unguarded write-safety risk in code review or triage. It is inherently non-atomic (ExifTool writes a temp file internally then renames), which is the safest available in-place approach for this use case.
+- Any proposal to change to a backup-before-write approach would require architectural review, storage budget consideration (doubles media on every import), and explicit approval — it is not a local patch.
+
+Avoid:
+- Recommending removal of `-overwrite_original` as a bug fix.
+- Treating ExifTool image writes as equivalent to unguarded `writeFileSync` — ExifTool handles its own internal tmp→rename.
+- Conflating "non-atomic from AutoIngest's perspective" with "incorrect" — the risk is accepted and documented.
+
+Validation:
+- When reviewing `exifService.js`: confirm the docstring documents in-place write behavior.
+- Confirm RAW files use sidecar path only (`isRaw` branch in `_writeMetadata`).
+- Confirm any architectural change to the write approach is explicitly approved before implementation.
+
 ## Validation Checklist
 
 Before making changes, read:

@@ -213,6 +213,32 @@ Validation:
 - Grep `renderer.js` for `querySelector('.al-panel[data-tabs~=` — any match without `--section` is a bug.
 - Confirm the metadata, errors, and cleanup sections do not appear in the Import tab after a live batch completes.
 
+### Write-Safety Checklist for File and State Mutations
+
+Context:
+- Applies when reviewing any code change that introduces or modifies file writes, renames, deletions, or JSON state mutations.
+
+Rule:
+- Every new write flow must be checked against the following before approval:
+  1. **Atomic write pattern**: JSON state writes must use `writeFile(tmp) → rename`, not `writeFile(final)` directly. `listManager.addToList()` and `aliasEngine.learnAlias()` are the known non-atomic exceptions and are MEDIUM-risk gaps.
+  2. **Containment check + collision guard**: Any `fsp.rename`, `fsp.unlink`, or `fsp.writeFile` operating on archive-located paths must validate that the target path is inside the expected archive root via `realpath` containment. Canonical pattern: collect all four archive roots (`getNasRoot`, `getArchiveRoot`, `getMainArchiveRoot`, `getLocalStagingRoot`; exclude `getTransferRoot`), realpath each with offline-skip, then check `resolved === r || resolved.startsWith(r + path.sep)`. For destinations that may not exist yet, realpath `path.dirname(newPath)` instead of the path itself. `dir:rename` was hardened with this pattern — confirm the handler remains intact. `master:renameEvent` stats the target before rename; any rename handler must do the same.
+  3. **Lock acquisition**: Flows that modify event folder structure (rename, move, add files) must acquire the per-photographer archive lock before proceeding. `master:renameEvent` is a known gap.
+  4. **Schema validation before create**: `event:write` (initial `event.json` creation) does not call `isValidEventJson`. Any new event creation path must add explicit schema validation before the write.
+  5. **Partial-patch key hygiene**: Fields sent through `event:update` (the partial-patch path) persist into `event.json` unconditionally. Confirm no UI-only or transient renderer state is included in a partial-patch payload.
+  6. **ExifTool non-atomic awareness**: ExifTool `-overwrite_original` modifies JPEG/PNG/TIFF files in-place with no tmp/rename. Any new ExifTool write path must document this and confirm it is acceptable for the target file type.
+  7. **deleteFromSource size gate**: After ExifTool post-processing, destination size will differ from source — the `copyVerified` check logs but does not block deletion. Reviews of delete-after-import flows must account for this.
+
+Avoid:
+- Approving a new write, rename, or delete handler without checking containment, lock acquisition, and atomic pattern.
+- Using `resolved.startsWith(root)` without a `path.sep` suffix — partial directory name collisions cause false containment matches.
+- Omitting `getLocalStagingRoot()` from the containment root list — staging paths are valid archive content in local-first mode.
+- Approving `event:update` payloads that carry renderer-internal state keys.
+
+Validation:
+- For every new write/rename/delete flow: confirm atomic pattern, containment check, and lock use.
+- For `event:write` additions: confirm `isValidEventJson` is called before write.
+- For `event:update` additions: confirm payload contains only `event.json` data model fields.
+
 ### Diagnostic / Dry-Run Check List Completeness Review
 
 Context:

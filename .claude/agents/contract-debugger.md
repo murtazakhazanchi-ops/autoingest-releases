@@ -707,6 +707,82 @@ Validation:
 - Confirm only malformed JSON or wrong `type` field triggers `metadata-invalid`.
 - Confirm the UI maps `valid: true, initialized: false` to a warn display (amber "Uninitialized — export will initialize"), not an err display — a new drive is validly uninitialized and must not appear broken to the operator.
 
+### `dir:rename` Containment + Collision Guard — Patched Handler and Regression Signals
+
+Context:
+- Applies when reviewing or debugging any flow that calls `dir:rename`, or when considering a new feature that relies on this handler.
+
+Rule:
+- `dir:rename` was originally unguarded: it called `fsp.rename(oldPath, newPath)` on arbitrary renderer-supplied paths with no containment check, no collision guard, and no lock acquisition.
+- It was hardened (commit `fix(ipc): constrain dir rename to archive roots`) with: (1) multi-root containment via `realpath` against all four archive roots (`getNasRoot`, `getArchiveRoot`, `getMainArchiveRoot`, `getLocalStagingRoot`; `getTransferRoot` excluded), (2) offline-root graceful skip (per-root realpath catch), (3) `path.dirname(newPath)` + realpath for the destination parent (since newPath may not exist yet), (4) separator-guarded prefix check (`resolved === r || resolved.startsWith(r + path.sep)`), and (5) a collision stat before rename — matching `master:renameEvent` semantics.
+- If the handler regresses to a bare `fsp.rename` call without these guards, it immediately becomes the highest-risk mutation path in the IPC surface.
+- `master:renameEvent` (event folder rename) acquires no lock before the rename — a separate known gap for concurrent import safety.
+
+Avoid:
+- Assuming `dir:rename` is safe to call without first confirming the hardened handler is in place.
+- Fixing `dir:rename` containment without also adding the collision guard — both are required.
+- Using `resolved.startsWith(root)` without `path.sep` suffix — partial directory name collisions produce false containment matches.
+
+Validation:
+- Confirm the handler collects all four archive roots and skips offline roots via per-root realpath catch.
+- Confirm `path.dirname(newPath)` is used to realpath the destination side.
+- Confirm `newPath` is statted before rename; `{ ok: false, reason: 'collision' }` returned if it already exists.
+- Confirm containment uses `resolved === r || resolved.startsWith(r + path.sep)`.
+
+### `files:deleteFromSource` Size-Mismatch Does Not Block Deletion
+
+Context:
+- Applies when debugging unexpected source-file deletion, or reviewing any change to `files:deleteFromSource` or the post-import ExifTool flow.
+
+Rule:
+- `files:deleteFromSource` verifies that the source and destination file sizes match (the `copyVerified` check) before deleting the source original. However, when ExifTool has modified the destination post-copy (writing EXIF/IPTC/XMP metadata in-place), the destination size will differ from the source size.
+- The handler currently logs a warning for this size mismatch but does NOT block deletion. This is HIGH RISK for data loss: if ExifTool modifies the destination after copy, the source original is still deleted even though the copy round-trip cannot be verified by size.
+- When `autoMetadataEnabled` is true and `files:deleteFromSource` is called after a completed import, this scenario is the common case for photos with metadata applied.
+
+Avoid:
+- Treating the `copyVerified` path as a reliable safety gate when ExifTool post-processing is active.
+- Assuming "no crash = verified" in this flow.
+
+Validation:
+- Confirm whether `autoMetadataEnabled` is active in the reproduction scenario before attributing unexpected source deletion to another cause.
+- Confirm the destination file size after ExifTool write and compare with source — a mismatch is expected and will pass through to deletion.
+
+### EXDEV Cross-Device Fallback in `import:commitTransaction` Is Not Atomic on Destination
+
+Context:
+- Applies when debugging import corruption or tmp-file residue on cross-device archive setups (e.g., NAS destination, USB staging source).
+
+Rule:
+- `import:commitTransaction` copies each file to a `.autoingest-tx-tmp` temp file, then calls `fsp.rename(tmp, final)`. On cross-device (EXDEV) errors, it falls back to `copyFile(tmp, final) → unlink(tmp)`.
+- The `copyFile(tmp, final)` step in the fallback is not atomic on the destination side — a crash or power loss between `copyFile` completing and `unlink(tmp)` removes the tmp but leaves the final destination complete. The tmp file survives as residue and is not cleaned up automatically.
+- This is distinct from a true atomic rename. A crash at the `copyFile` step also leaves the destination in a partial state.
+
+Avoid:
+- Treating EXDEV fallback as equivalent to the atomic rename path.
+- Assuming no tmp-file residue is possible on cross-device imports.
+
+Validation:
+- Confirm `archiveRepairService.cleanupTempFile()` can be used to clean `.autoingest-tx-tmp` residue.
+- Confirm that a recovered (partially copied) final destination file is intact if `copyFile` completed before the crash.
+
+### `files:import` Is Not the Transactional Import Path
+
+Context:
+- Applies when debugging Activity Log gaps, missing event.json updates, or missing audit entries after an import appears to succeed.
+
+Rule:
+- `files:import` is a lightweight file-copy IPC handler: it copies files to a destination directory but does NOT acquire a lock, does NOT update `event.json`, does NOT write `imports[]` or `lastImport`, and has NO rollback. It is not an audited transactional operation.
+- Only `import:commitTransaction` is the full transactional path: it acquires an archive lock, copies files atomically (tmp→rename or EXDEV fallback), writes the import record into `event.json` via an atomic merge, and triggers the ExifTool post-import batch.
+- If Activity Log entries are missing after a file copy, or `lastImport` is not updated, confirm whether the import used `files:import` (no audit) or `import:commitTransaction` (full audit).
+
+Avoid:
+- Assuming any IPC handler that copies files also writes an audit trail.
+- Debugging missing `imports[]` or `lastImport` entries by inspecting the transaction merge code if the import went through `files:import`.
+
+Validation:
+- Confirm the import flow in question uses `import:commitTransaction` for all event-import operations that must be audited.
+- Confirm `files:import` is only used for non-event copy operations where no audit trail is needed.
+
 ## Validation Checklist
 
 Before debugging, read:

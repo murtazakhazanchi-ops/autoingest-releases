@@ -360,6 +360,66 @@ Validation:
 - Confirm the renderer success callback is responsible for triggering any follow-up refresh.
 - Confirm the write service can be unit tested without mocking UI refresh functions.
 
+### `files:deleteFromSource` copyVerified Size Pass-Through Is Intentional Design
+
+Context:
+- Applies when reviewing `files:deleteFromSource`, auditing source-cleanup safety, or triaging write-safety findings involving source deletion.
+
+Rule:
+- `files:deleteFromSource` (`main/main.js:2495–2504`) has two distinct size-mismatch branches for destination validation:
+  1. `!copyVerified && destStat.size !== size` → blocks deletion (returns error, `continue`).
+  2. `copyVerified && destStat.size !== size` → logs only, proceeds with deletion.
+- This is intentional and documented in an explicit code comment: "copyVerified entries may have a larger destination than the original source size because metadata tagging (exiftool) embeds EXIF after copy verification."
+- `copyVerified` means size was confirmed correct at copy time. ExifTool subsequently embeds metadata into the destination, changing its size. Blocking on this post-ExifTool size difference would permanently break source cleanup for `autoMetadataEnabled` imports.
+- Do NOT flag the `copyVerified` log-only branch as an unblocked deletion bug. It is correct behavior with documented rationale.
+
+Avoid:
+- Treating the `copyVerified` size pass-through as an unguarded safety gap.
+- "Fixing" this by adding a size block for `copyVerified` entries — this would break source cleanup after every metadata-annotated import.
+- Confusing the destination size check with the source size check (line 2478–2480), which still guards against source file modification after copy.
+
+Validation:
+- Confirm the code comment at line 2496 is present and explains the ExifTool rationale.
+- Confirm `!copyVerified` entries still block on destination size mismatch.
+- Confirm source-changed detection (srcStat.size !== size) is unaffected.
+
+### `files:import` Is Not the Transactional Import Path
+
+Context:
+- Applies to any debugging or review of import flows, Activity Log gaps, or missing event.json audit entries.
+
+Rule:
+- `files:import` copies files to a destination directory but does NOT acquire a lock, does NOT update `event.json`, does NOT write `imports[]` or `lastImport`, and has no rollback. It is not an audited transactional operation.
+- Only `import:commitTransaction` is the full transactional path: it acquires an archive lock, copies files atomically (tmp→rename, or EXDEV fallback), performs an atomic merge-write of the import record into `event.json`, and triggers the ExifTool post-import batch.
+- If import audit entries are missing after a file copy, confirm whether the import used `files:import` (no audit) or `import:commitTransaction` (full audit).
+
+Avoid:
+- Routing event imports through `files:import` — use `import:commitTransaction` for all event-import operations that must produce an audit trail.
+- Debugging missing `imports[]` or `lastImport` entries by inspecting the transaction merge when the import may have gone through the non-transactional handler.
+
+Validation:
+- Confirm event-import operations use `import:commitTransaction`.
+- Confirm `files:import` is restricted to non-event copy operations where no audit trail is required.
+
+### EXDEV Cross-Device Fallback Is Not Atomic on the Destination Side
+
+Context:
+- Applies to cross-device archive setups (e.g., NAS destination, USB staging source) where `fsp.rename` fails with EXDEV.
+
+Rule:
+- `import:commitTransaction` copies each file to a `.autoingest-tx-tmp` temp file, then calls `fsp.rename(tmp, final)`. On EXDEV (cross-device link error), it falls back to `copyFile(tmp, final) → unlink(tmp)`.
+- The `copyFile` step in the fallback is not atomic on the destination side. A crash between `copyFile` completing and `unlink(tmp)` leaves a `.autoingest-tx-tmp` residue file but the final destination copy is complete.
+- A crash during `copyFile` itself leaves the destination in a partial state.
+- The `archiveRepairService.cleanupTempFile()` handler can clean `.autoingest-tx-tmp` residue safely (whitelist-based, PROTECTED_NAMES guarded).
+
+Avoid:
+- Treating the EXDEV fallback as equivalent safety to the atomic rename path.
+- Assuming no tmp-file residue is possible on cross-device imports.
+
+Validation:
+- Confirm `.autoingest-tx-tmp` residue is cleanable via `archiveRepairService.cleanupTempFile()`.
+- Confirm the final destination file is intact if `copyFile` completed before a crash on the EXDEV path.
+
 ### Error Handling
 
 Context:

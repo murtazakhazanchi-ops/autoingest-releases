@@ -630,6 +630,86 @@ Validation:
 - Confirm no code path opens multiple `event.json` files to build a history or timeline view.
 - Confirm the JSONL tail-read approach is used for large audit files rather than full file reads.
 
+### `dir:rename` Requires Containment Validation AND Collision Guard — Cannot Be Used Unchecked
+
+Context:
+- Applies to any new feature or workflow that relies on the `dir:rename` IPC handler, or any review of code that calls it.
+
+Rule:
+- `dir:rename` calls `fsp.rename(oldPath, newPath)` on arbitrary renderer-supplied paths with no archive-root containment check, no collision guard, and no lock acquisition. It is the highest-risk IPC handler in the codebase.
+- The correct reference pattern is `master:renameEvent`, which (1) stats `newPath` before rename to block collisions, and (2) returns `{ ok: false, reason: 'collision' }` if the target already exists. `dir:rename` has neither of these guards.
+- A complete fix requires both: containment validation (both paths must be inside configured archive roots via `realpath`) AND a pre-rename collision stat. Fixing only containment leaves the silent overwrite risk on POSIX.
+- `master:renameEvent` (event folder rename) also acquires no lock before calling rename — a separate known gap for concurrent import safety.
+
+Avoid:
+- Designing a feature that relies on `dir:rename` as-is without adding both containment and collision validation.
+- Fixing only the containment gap and treating the collision gap as low priority — both are structural IPC boundary failures.
+
+Validation:
+- Confirm both `oldPath` and `newPath` are validated against configured archive roots via `realpath`.
+- Confirm `newPath` is statted before rename; collision returns `{ ok: false, reason: 'collision' }`.
+- Confirm the handler behavior matches `master:renameEvent` as the reference for collision semantics.
+
+### Multi-Root Archive Containment — Canonical IPC Containment Check Pattern
+
+Context:
+- Applies when implementing or reviewing any IPC handler that must validate filesystem paths against configured archive roots.
+
+Rule:
+- Any IPC handler that performs filesystem mutations on archive paths must validate against ALL four archive roots: `settings.getNasRoot()`, `settings.getArchiveRoot()`, `settings.getMainArchiveRoot()`, and `settings.getLocalStagingRoot()`. `getTransferRoot()` is explicitly excluded — transfer drives are for export operations, not archive content.
+- Because some roots may be offline or unmounted, collect resolved roots by catching `fsp.realpath` errors per-root and skipping unavailable ones. Fail only if zero roots resolve.
+- For a rename destination that does not exist yet, `fsp.realpath` on the path itself will throw. Resolve the parent directory instead: `fsp.realpath(path.dirname(newPath))`, then containment-check the resolved parent.
+- Use `resolved === r || resolved.startsWith(r + path.sep)` for containment. The `+ path.sep` guard prevents false positives (e.g., `/archive-extra` matching `/archive`). The exact-equals branch covers the edge where the checked path IS the root directory itself.
+
+Avoid:
+- Checking containment against only 2–3 roots and omitting `getLocalStagingRoot()` — staging paths are valid archive content locations in local-first mode.
+- Using `resolved.startsWith(root)` without the separator suffix — partial directory name collisions produce false containment matches.
+- Calling `fsp.realpath(newPath)` for a rename destination before confirming it exists — realpath throws if the path is absent.
+- Treating an offline root as a global failure — skip unavailable roots and check against the roots that are accessible.
+
+Validation:
+- Confirm all four archive roots are included (`getNasRoot`, `getArchiveRoot`, `getMainArchiveRoot`, `getLocalStagingRoot`; `getTransferRoot` excluded).
+- Confirm the containment check uses `resolved === r || resolved.startsWith(r + path.sep)`.
+- Confirm non-existent destination paths use `path.dirname(newPath)` + realpath.
+- Confirm the realpath loop skips offline roots rather than failing the entire operation.
+
+### ExifTool `-overwrite_original` Is Non-Atomic and Non-Reversible
+
+Context:
+- Applies to any architectural decision involving ExifTool post-import metadata writes or media file modification.
+
+Rule:
+- `exifService.js` uses ExifTool's `-overwrite_original` flag, which modifies JPEG/PNG/TIFF files in-place with no tmp-rename and no pre-write backup.
+- A crash or ExifTool error during the write corrupts the media file with no recovery path. This is architecturally non-reversible.
+- This fires automatically post-import when `autoMetadataEnabled` is set (`ipcMain.handle('import:commitTransaction', ...)` triggers `exifService.applyBatch` after the transaction completes).
+- Any feature that extends ExifTool writes or changes the trigger timing must account for the non-atomic nature of in-place metadata writes.
+- RAW files use a sidecar `.xmp` approach (safe — sidecar is separate from the original); only direct image files (JPEG/PNG/TIFF) are modified in-place.
+
+Avoid:
+- Treating ExifTool post-import writes as equivalent in safety to the tmp→rename atomic write pattern used for JSON state.
+- Designing a recovery flow that assumes the original media file is available after a failed ExifTool write.
+
+Validation:
+- Confirm any new ExifTool write path documents whether it uses `-overwrite_original` (in-place, non-atomic) or a sidecar approach.
+- Confirm that `autoMetadataEnabled` behavior is preserved — ExifTool fires post-import, not during transaction.
+
+### `archive:writeSyncManifest` Lacks Local Staging Root Containment Check
+
+Context:
+- Applies to `localSyncManifest.writeManifest()` and any future change to sync manifest writes.
+
+Rule:
+- `localSyncManifest.writeManifest(localEventPath, data)` does not validate that `localEventPath` is inside the configured Local Staging Root before writing. It writes `{localEventPath}/.autoingest/event.sync.json` to wherever `localEventPath` points.
+- This is inconsistent with `archiveRepairService`, `archiveLockService`, and `syncReviewService`, all of which use `realpath` + containment checks before writing.
+- Any future change to sync manifest writes must add a containment check against `settings.getLocalStagingRoot()` before the write proceeds.
+
+Avoid:
+- Extending sync manifest writes without first adding the missing containment check.
+- Treating the absence of a containment check as intentional — it is a gap, not a design decision.
+
+Validation:
+- Confirm `localEventPath` is inside `settings.getLocalStagingRoot()` via `realpath` containment check before any manifest write.
+
 ### Sync Queue Terminal States for Timeline and History Display
 
 Context:
@@ -647,6 +727,26 @@ Avoid:
 Validation:
 - Confirm timeline/history collectors filter sync queue jobs to terminal states before inclusion.
 - Confirm `ready-for-sync` and `blocked` states are excluded from timeline entries.
+
+### Write-Safety Triage Ordering — Fix Broadest Generic Path First
+
+Context:
+- Applies when multiple write-safety gaps are identified in a triage pass and a fix sequence must be chosen.
+
+Rule:
+- Fix the broadest generic filesystem mutation path first (e.g., an IPC handler that accepts arbitrary paths with no guards), before addressing narrower gaps like event.json schema validation or userData file atomicity.
+- Rationale: a handler with no containment check can affect any path; handlers that operate on predictable, narrow paths have lower blast radius even without schema guards.
+- Do not batch-fix all write-safety issues in a single patch. Each fix changes a write path and carries its own regression surface. One gap per commit allows clean rollback.
+- For `dir:rename` specifically: the correct fix addresses both the containment gap and the collision gap together (they are both IPC-boundary failures in the same handler). Do not fix only one.
+
+Avoid:
+- Choosing a narrow, lower-risk fix first because it is easier, leaving the broadest mutation path unguarded.
+- Batching high-risk and low-risk fixes into a single commit "for efficiency."
+
+Validation:
+- Confirm the first patch addresses only the highest-risk/broadest handler.
+- Confirm each subsequent fix has its own commit.
+- Confirm no adjacent systems are touched by the first patch.
 
 ## Validation Checklist
 
