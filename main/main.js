@@ -1690,11 +1690,52 @@ ipcMain.handle('master:renameEvent', async (_event, masterPath, oldName, newName
   } catch (err) {
     if (err.code !== 'ENOENT') return { ok: false, reason: `Cannot check target: ${err.message}` };
   }
+  // Acquire per-photographer archive locks before renaming the event folder.
+  // Prevents rename from orphaning in-flight import/sync lock keys that are
+  // keyed by (collection, eventFolderName, photographerFolderName).
+  // Two-level walk covers both archive layouts without full recursion:
+  //   single-component: event/photographer/file
+  //   multi-component:  event/subEventId/photographer/file
+  const nasRoot    = path.dirname(masterPath);
+  const collection = path.basename(masterPath);
+  const heldLocks  = [];
   try {
+    const photographerNames = new Set();
+    const level1 = await fsp.readdir(oldPath, { withFileTypes: true });
+    for (const l1 of level1) {
+      if (!l1.isDirectory() || l1.name.startsWith('.') || _NAS_SKIP_DIRS.has(l1.name) || l1.name === 'VIDEO') continue;
+      photographerNames.add(l1.name);
+      let level2;
+      try { level2 = await fsp.readdir(path.join(oldPath, l1.name), { withFileTypes: true }); } catch { continue; }
+      for (const l2 of level2) {
+        if (l2.isDirectory() && !l2.name.startsWith('.') && !_NAS_SKIP_DIRS.has(l2.name) && l2.name !== 'VIDEO') {
+          photographerNames.add(l2.name);
+        }
+      }
+    }
+    const jobId = `rename-${Date.now().toString(36)}`;
+    for (const photographerFolderName of photographerNames) {
+      const lockResult = await archiveLockService.acquireLock(nasRoot, {
+        collection,
+        eventFolderName:        oldName,
+        photographerFolderName,
+        jobId,
+        batchId:                null,
+      });
+      if (!lockResult.acquired) {
+        return { ok: false, reason: 'locked' };
+      }
+      heldLocks.push(lockResult.lockPath);
+    }
     await fsp.rename(oldPath, newPath);
     return { ok: true };
   } catch (err) {
     return { ok: false, reason: `Rename failed: ${err.message}` };
+  } finally {
+    for (const lockPath of heldLocks) {
+      archiveLockService.releaseLock(lockPath).catch(() => {});
+    }
+    heldLocks.length = 0;
   }
 });
 
