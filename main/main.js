@@ -1361,6 +1361,9 @@ ipcMain.handle('event:write', async (_event, eventFolderPath, eventData) => {
   } catch (err) {
     if (err.code !== 'ENOENT') return { ok: false, reason: `Read check failed: ${err.message}` };
   }
+  if (!isValidEventJson(eventData)) {
+    return { ok: false, reason: 'eventData failed schema validation.' };
+  }
   const tmp = jsonPath + '.tmp';
   try {
     await fsp.writeFile(tmp, JSON.stringify(eventData, null, 2), 'utf8');
@@ -1440,6 +1443,9 @@ async function updateEventJson(eventFolderPath, payload) {
       ...(payload.adoption != null ? { adoption: payload.adoption } : {}),
       updatedAt:     payload.updatedAt ?? Date.now(),
     };
+    if (!isValidEventJson(dataToWrite)) {
+      return { ok: false, reason: 'event.json full payload failed schema validation.' };
+    }
   } else {
     // Status-only / partial-patch path — read existing, merge, write back.
     let existing = {};
@@ -1448,7 +1454,12 @@ async function updateEventJson(eventFolderPath, payload) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') existing = parsed;
     } catch { /* no file yet — partial write will be best-effort */ }
-    dataToWrite = { ...existing, ...payload, updatedAt: Date.now() };
+    const PATCH_ALLOWLIST = new Set(['status']);
+    const safePatch = {};
+    for (const [k, v] of Object.entries(payload)) {
+      if (PATCH_ALLOWLIST.has(k)) safePatch[k] = v;
+    }
+    dataToWrite = { ...existing, ...safePatch, updatedAt: Date.now() };
   }
 
   const tmp = jsonPath + '.tmp';
