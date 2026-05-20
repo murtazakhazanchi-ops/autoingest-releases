@@ -124,6 +124,9 @@ Debugging / stabilization
 → docs/failure-patterns.md  
 → docs/contract-aware-debugging.md
 
+Archive operations / local mirror / sync review / archive repair  
+→ docs/archive-operations-layer.md
+
 New feature planning  
 → docs/features.md  
 → docs/workflows.md  

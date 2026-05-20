@@ -1,18 +1,18 @@
 'use strict';
 
 /**
- * adoptionWriteContract.js — Phase 13C-6: Adoption Write Contract Design.
+ * adoptionWriteContract.js — Phase 13C-7: Adoption Write Contract (Implemented).
  *
  * Pure module. No filesystem access. No IPC. No writes.
  *
- * Defines the exact contract that a future adoption write (Phase 13C-7+) MUST
- * follow. Exports:
+ * Defines the contract followed by adoptionWriteService.js
+ * (archive:adoptManualFolder IPC handler). Exports:
  *  - Constants: blocked conditions, required/manual fields, post-write actions
  *  - validateAdoptionInput() — validate operator confirmation before any write
  *  - buildAdoptionEventJson() — construct the event.json payload (pure, no I/O)
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * MANDATORY RULES FOR THE FUTURE WRITE PATH
+ * RULES FOLLOWED BY adoptionWriteService.js (archive:adoptManualFolder IPC)
  * ─────────────────────────────────────────────────────────────────────────────
  *
  *  1. The write IPC handler MUST run entirely in the main process.

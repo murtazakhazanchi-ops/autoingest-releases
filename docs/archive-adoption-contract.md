@@ -1,6 +1,6 @@
 # Archive Adoption Write Contract
 
-**Phase 13C-6 — Design Only. No writes until Phase 13C-7+.**
+**Phase 13C-7 — Implemented. Adoption write contract is complete.**
 
 This document defines the exact contract that a future adoption write must satisfy before any event.json is created. It is the authoritative reference for all adoption implementation work.
 
@@ -38,7 +38,8 @@ This document covers:
 ## A. Future Adoption IPC Input Shape
 
 ```
-IPC channel: archive:adoptManualFolder    (registered in Phase 13C-7)
+IPC channel: archive:adoptManualFolder        (Phase 13C-7, adoptionWriteService.js)
+Dry-run IPC: archive:dryRunAdoptionCandidate  (Phase 13C-5, adoptionDryRunService.js)
 ```
 
 ```javascript
