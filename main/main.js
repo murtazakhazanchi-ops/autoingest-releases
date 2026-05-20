@@ -1599,6 +1599,66 @@ ipcMain.handle('dir:inspectContent', async (_event, dirPath) => {
 ipcMain.handle('dir:rename', async (_event, oldPath, newPath) => {
   if (!oldPath || !newPath) return { ok: false, reason: 'Missing paths.' };
   if (oldPath === newPath) return { ok: true };
+
+  // ── Collect configured archive roots ─────────────────────────────────
+  const configuredRoots = [
+    settings.getNasRoot(),
+    settings.getArchiveRoot(),
+    settings.getMainArchiveRoot(),
+    settings.getLocalStagingRoot(),
+  ].filter(Boolean);
+
+  if (!configuredRoots.length) {
+    return { ok: false, reason: 'Archive root not configured.' };
+  }
+
+  // Resolve symlinks on each root; skip roots that are offline or missing.
+  const realRoots = [];
+  for (const root of configuredRoots) {
+    try { realRoots.push(await fsp.realpath(root)); } catch { /* offline — skip */ }
+  }
+  if (!realRoots.length) {
+    return { ok: false, reason: 'Archive root not configured.' };
+  }
+
+  const _isInsideRoot = (resolved) =>
+    realRoots.some(r => resolved === r || resolved.startsWith(r + path.sep));
+
+  const _isDescendantOfRoot = (resolved) =>
+    realRoots.some(r => resolved.startsWith(r + path.sep));
+
+  // ── Resolve oldPath and confirm containment ───────────────────────────
+  let realOld;
+  try {
+    realOld = await fsp.realpath(oldPath);
+  } catch (err) {
+    return { ok: false, reason: `Source not found: ${err.message}` };
+  }
+  if (!_isDescendantOfRoot(realOld)) {
+    return { ok: false, reason: 'Source path outside configured archive roots.' };
+  }
+
+  // ── Resolve newPath parent and confirm containment ────────────────────
+  // newPath may not exist yet — resolve its parent directory instead.
+  let realNewParent;
+  try {
+    realNewParent = await fsp.realpath(path.dirname(newPath));
+  } catch (err) {
+    return { ok: false, reason: `Destination parent not accessible: ${err.message}` };
+  }
+  if (!_isInsideRoot(realNewParent)) {
+    return { ok: false, reason: 'Destination path outside configured archive roots.' };
+  }
+
+  // ── Collision guard (matches master:renameEvent behavior) ─────────────
+  try {
+    await fsp.stat(newPath);
+    return { ok: false, reason: 'collision' };
+  } catch (err) {
+    if (err.code !== 'ENOENT') return { ok: false, reason: `Cannot check target: ${err.message}` };
+  }
+
+  // ── Rename ────────────────────────────────────────────────────────────
   try {
     await fsp.rename(oldPath, newPath);
     return { ok: true };
