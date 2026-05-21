@@ -6508,6 +6508,7 @@ async function _writeLocalFirstManifest(metadataStatus) {
   if (metadataStatus !== 'complete') payload.needsAttention = true;
   try {
     await window.api.writeSyncManifest(pending.localEventPath, payload);
+    _refreshSyncQueueCard(false).catch(() => {});
     if (metadataStatus === 'complete') {
       _archiveNotice('Local import complete. Ready for sync.', () => _sqOpen(), 8000);
     }

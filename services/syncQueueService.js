@@ -118,9 +118,18 @@ async function refreshQueue() {
       const jobId = _jobId(localEventPath);
       const prev  = existingMap[jobId];
 
-      // Preserve terminal statuses set by sync operations; reset live-operation states
-      const TERMINAL = new Set(['synced', 'sync-failed', 'needs-attention']);
-      const preserveStatus = prev && TERMINAL.has(prev.status);
+      // Preserve terminal statuses set by sync operations; reset live-operation states.
+      // 'synced' is only preserved when the manifest has not been updated since sync completed —
+      // a newer manifest.updatedAt means a subsequent import occurred and the event needs re-sync.
+      const TERMINAL = new Set(['sync-failed', 'needs-attention']);
+      const isSynced            = prev?.status === 'synced';
+      const syncedAt            = isSynced ? (prev.syncedAt || 0) : 0;
+      const manifestUpdatedAt   = manifest.updatedAt || 0;
+      const manifestNewerThanSync = isSynced && manifestUpdatedAt > syncedAt;
+      const preserveStatus = prev && (
+        TERMINAL.has(prev.status) ||
+        (isSynced && !manifestNewerThanSync)
+      );
 
       jobs.push({
         jobId,
