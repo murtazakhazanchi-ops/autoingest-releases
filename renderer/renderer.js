@@ -2224,6 +2224,7 @@ document.addEventListener('eventcreator:listDeselect', () => {
   if (edit) edit.style.display = 'none';
 });
 document.addEventListener('eventmgmt:requestClose', showLanding);
+document.addEventListener('eventcreator:openArchiveLocations', () => _alocOpen());
 document.addEventListener('eventcreator:done', () => {
   if (EventCreator.consumeMetaOutdated()) {
     const _savedEventPath = EventCreator.getActiveEventData()?.eventPath || null;
@@ -2375,6 +2376,8 @@ async function _alocOpen() {
   if (alocStagingVal)  alocStagingVal.textContent  = '';
   if (alocMainNasVal)  alocMainNasVal.textContent  = '';
   if (alocTransferVal) alocTransferVal.textContent = '';
+  document.getElementById('alocNasInitBtn')?.setAttribute('hidden', '');
+  document.getElementById('alocMainNasInitBtn')?.setAttribute('hidden', '');
 
   // Validate main archive root on open if path is saved (fire-and-forget)
   if (status.mainArchiveRoot) {
@@ -2407,21 +2410,32 @@ async function _alocOpen() {
 function _alocShowValidation(elId, result) {
   const el = document.getElementById(elId);
   if (!el) return;
-  if (!result) { el.textContent = ''; el.className = 'aloc-validation'; return; }
+  const initBtn = document.getElementById('alocNasInitBtn');
+  if (!result) {
+    el.textContent = ''; el.className = 'aloc-validation';
+    initBtn?.setAttribute('hidden', '');
+    return;
+  }
   if (result.valid) {
-    el.textContent = result.archiveName ? `✓ ${result.archiveName}` : '✓ Valid';
+    const stagingLabel = elId === 'alocStagingValidation' ? '✓ Valid staging folder' : '✓ Valid archive root';
+    el.textContent = result.archiveName ? `✓ ${result.archiveName}` : stagingLabel;
     el.className = 'aloc-validation ok';
-  } else {
-    const msgs = {
-      'no-path':          'No path specified',
-      'not-directory':    'Path is not a directory',
-      'no-marker':        'Not a valid archive root (marker missing)',
-      'wrong-marker-type':'Not a valid archive root (wrong marker)',
-      'no-access':        'Permission denied',
-      'not-found':        'Path not found',
-    };
-    el.textContent = '✗ ' + (msgs[result.reason] || result.message || 'Invalid');
+    initBtn?.setAttribute('hidden', '');
+  } else if (result.reason === 'no-marker') {
+    el.textContent = 'This folder is not set up as an AutoIngest archive yet.';
+    el.className = 'aloc-validation warn';
+    initBtn?.removeAttribute('hidden');
+  } else if (result.reason === 'wrong-marker-type') {
+    el.textContent = 'This folder is already set up for a different AutoIngest purpose and cannot be used as an archive root.';
     el.className = 'aloc-validation err';
+    initBtn?.setAttribute('hidden', '');
+  } else if (result.reason === 'no-path') {
+    el.textContent = ''; el.className = 'aloc-validation';
+    initBtn?.setAttribute('hidden', '');
+  } else {
+    el.textContent = 'Folder is offline or cannot be accessed.';
+    el.className = 'aloc-validation err';
+    initBtn?.setAttribute('hidden', '');
   }
 }
 
@@ -2429,21 +2443,31 @@ function _alocShowValidation(elId, result) {
 function _alocShowMainNasValidation(elId, result) {
   const el = document.getElementById(elId);
   if (!el) return;
-  if (!result) { el.textContent = ''; el.className = 'aloc-validation'; return; }
+  const initBtn = document.getElementById('alocMainNasInitBtn');
+  if (!result) {
+    el.textContent = ''; el.className = 'aloc-validation';
+    initBtn?.setAttribute('hidden', '');
+    return;
+  }
   if (result.valid) {
-    el.textContent = result.archiveName ? `Connected — ${result.archiveName}` : 'Connected';
+    el.textContent = result.archiveName ? `Connected — ${result.archiveName}` : 'Valid archive root';
     el.className = 'aloc-validation ok';
-  } else {
-    const msgs = {
-      'offline':           'Offline',
-      'no-marker':         'Invalid archive',
-      'wrong-marker-type': 'Invalid archive',
-      'not-directory':     'Invalid archive',
-      'no-access':         'No access',
-      'no-path':           'No path set',
-    };
-    el.textContent = msgs[result.reason] || 'Invalid archive';
+    initBtn?.setAttribute('hidden', '');
+  } else if (result.reason === 'no-marker') {
+    el.textContent = 'This folder is not set up as an AutoIngest archive yet.';
+    el.className = 'aloc-validation warn';
+    initBtn?.removeAttribute('hidden');
+  } else if (result.reason === 'wrong-marker-type') {
+    el.textContent = 'This folder is already set up for a different AutoIngest purpose and cannot be used as an archive root.';
     el.className = 'aloc-validation err';
+    initBtn?.setAttribute('hidden', '');
+  } else if (result.reason === 'no-path') {
+    el.textContent = ''; el.className = 'aloc-validation';
+    initBtn?.setAttribute('hidden', '');
+  } else {
+    el.textContent = 'Folder is offline or cannot be accessed.';
+    el.className = 'aloc-validation err';
+    initBtn?.setAttribute('hidden', '');
   }
 }
 
@@ -2473,9 +2497,21 @@ function _alocShowTransferValidation(elId, result) {
   }
 }
 
+// Normalizes folder picker results across IPC handlers with inconsistent return shapes.
+// Returns a path string, or null on cancel / empty / invalid result.
+function normalizePickedPath(result) {
+  if (!result) return null;
+  if (typeof result === 'string') return result || null;
+  if (result.canceled) return null;
+  if (typeof result.path === 'string') return result.path || null;
+  if (typeof result.filePath === 'string') return result.filePath || null;
+  if (Array.isArray(result.filePaths) && result.filePaths.length > 0) return result.filePaths[0] || null;
+  return null;
+}
+
 // Transfer Drive Root choose
 document.getElementById('alocTransferChooseBtn')?.addEventListener('click', async () => {
-  const chosen = await window.api.chooseTransferRoot();
+  const chosen = normalizePickedPath(await window.api.chooseTransferRoot());
   if (!chosen) return;
   const transferEl = document.getElementById('alocTransferPath');
   if (transferEl) { transferEl.textContent = chosen; transferEl.classList.remove('aloc-unset'); }
@@ -2485,7 +2521,7 @@ document.getElementById('alocTransferChooseBtn')?.addEventListener('click', asyn
 
 // NAS choose
 document.getElementById('alocNasChooseBtn')?.addEventListener('click', async () => {
-  const chosen = await window.api.chooseArchiveRoot();
+  const chosen = normalizePickedPath(await window.api.chooseArchiveRoot());
   if (!chosen) return;
   const nasEl = document.getElementById('alocNasPath');
   if (nasEl) { nasEl.textContent = chosen; nasEl.classList.remove('aloc-unset'); }
@@ -2501,11 +2537,12 @@ document.getElementById('alocNasClearBtn')?.addEventListener('click', () => {
   _alocPendingNasRoot = null;
   document.getElementById('alocNasValidation').textContent = '';
   document.getElementById('alocNasValidation').className   = 'aloc-validation';
+  document.getElementById('alocNasInitBtn')?.setAttribute('hidden', '');
 });
 
 // Staging choose
 document.getElementById('alocStagingChooseBtn')?.addEventListener('click', async () => {
-  const chosen = await window.api.chooseArchiveRoot();
+  const chosen = normalizePickedPath(await window.api.chooseArchiveRoot());
   if (!chosen) return;
   const stagingEl = document.getElementById('alocStagingPath');
   if (stagingEl) { stagingEl.textContent = chosen; stagingEl.classList.remove('aloc-unset'); }
@@ -2525,7 +2562,7 @@ document.getElementById('alocStagingClearBtn')?.addEventListener('click', () => 
 
 // Main Archive Root choose
 document.getElementById('alocMainNasChooseBtn')?.addEventListener('click', async () => {
-  const chosen = await window.api.chooseArchiveRoot();
+  const chosen = normalizePickedPath(await window.api.chooseArchiveRoot());
   if (!chosen) return;
   const mainNasEl = document.getElementById('alocMainNasPath');
   if (mainNasEl) { mainNasEl.textContent = chosen; mainNasEl.classList.remove('aloc-unset'); }
@@ -2541,6 +2578,7 @@ document.getElementById('alocMainNasClearBtn')?.addEventListener('click', () => 
   _alocPendingMainNasRoot = null;
   document.getElementById('alocMainNasValidation').textContent = '';
   document.getElementById('alocMainNasValidation').className   = 'aloc-validation';
+  document.getElementById('alocMainNasInitBtn')?.setAttribute('hidden', '');
 });
 
 // Import mode toggle
@@ -2563,18 +2601,104 @@ document.getElementById('alocSaveBtn')?.addEventListener('click', async () => {
   if (_alocPendingStagingRoot !== undefined) saves.push(window.api.setLocalStagingRoot(_alocPendingStagingRoot));
   if (_alocPendingImportMode !== undefined)  saves.push(window.api.setDefaultImportMode(_alocPendingImportMode));
   if (_alocPendingMainNasRoot !== undefined) saves.push(window.api.setMainArchiveRoot(_alocPendingMainNasRoot));
-  if (saves.length > 0) await Promise.all(saves);
+  if (saves.length > 0) {
+    try {
+      await Promise.all(saves);
+    } catch (_err) {
+      const saveBtn = document.getElementById('alocSaveBtn');
+      if (saveBtn) {
+        const origText = saveBtn.textContent;
+        saveBtn.textContent = 'Save failed — try again';
+        saveBtn.disabled = false;
+        setTimeout(() => { if (saveBtn) saveBtn.textContent = origText; }, 3000);
+      }
+      return;
+    }
+  }
+  // Capture before _alocClose() clears the pending values
+  const committedNasRoot = _alocPendingNasRoot;
   _alocClose();
   _updateSystemStatus();
   if (nasRootChanged) {
     await window.api.clearNasEventCache();
     _refreshNasEventsCard(false);
+    // Align EventCreator's sessionArchiveRoot with the newly saved NAS root.
+    // This keeps the header, step 1 LOCATION, and activeMaster in sync
+    // without requiring an app restart.
+    const syncRoot = (typeof committedNasRoot === 'string') ? committedNasRoot : null;
+    EventCreator.setSessionArchiveRoot(syncRoot);
+    _renderHomeContextBar();
+    // Keep settings.archiveRoot in sync so primeFromSettings() reads the
+    // correct value on the next app launch.
+    window.api.setArchiveRootSetting(syncRoot ?? '')
+      .catch(err => console.error('[aloc] archiveRoot sync failed:', err));
+  }
+});
+
+// Set Up Archive Root — Active Archive Root
+document.getElementById('alocNasInitBtn')?.addEventListener('click', async () => {
+  const folderPath = document.getElementById('alocNasPath')?.textContent;
+  if (!folderPath || folderPath === 'Not set') return;
+  const btn = document.getElementById('alocNasInitBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Setting up…'; }
+  const initResult = await window.api.initArchiveRoot(folderPath);
+  if (btn) { btn.disabled = false; btn.textContent = 'Set Up Archive Root'; }
+  if (initResult.ok) {
+    btn?.setAttribute('hidden', '');
+    const validation = await window.api.validateNasRoot(folderPath);
+    _alocShowValidation('alocNasValidation', validation);
+    _alocPendingNasRoot = folderPath;
+  } else {
+    const errMsgs = {
+      'already-initialized': 'Already initialized.',
+      'incompatible-type':   'This folder is configured for a different archive type.',
+      'not-found':           'Folder not found.',
+      'not-directory':       'Path is not a folder.',
+      'no-access':           'Cannot write to this folder.',
+    };
+    const valEl = document.getElementById('alocNasValidation');
+    if (valEl) { valEl.textContent = errMsgs[initResult.reason] || 'Setup failed.'; valEl.className = 'aloc-validation err'; }
+    btn?.setAttribute('hidden', '');
+  }
+});
+
+// Set Up Archive Root — Main Archive Root
+document.getElementById('alocMainNasInitBtn')?.addEventListener('click', async () => {
+  const folderPath = document.getElementById('alocMainNasPath')?.textContent;
+  if (!folderPath || folderPath === 'Not set') return;
+  const btn = document.getElementById('alocMainNasInitBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Setting up…'; }
+  const initResult = await window.api.initArchiveRoot(folderPath);
+  if (btn) { btn.disabled = false; btn.textContent = 'Set Up Archive Root'; }
+  if (initResult.ok) {
+    btn?.setAttribute('hidden', '');
+    const validation = await window.api.validateMainArchiveRoot(folderPath);
+    _alocShowMainNasValidation('alocMainNasValidation', validation);
+    _alocPendingMainNasRoot = folderPath;
+  } else {
+    const errMsgs = {
+      'already-initialized': 'Already initialized.',
+      'incompatible-type':   'This folder is configured for a different archive type.',
+      'not-found':           'Folder not found.',
+      'not-directory':       'Path is not a folder.',
+      'no-access':           'Cannot write to this folder.',
+    };
+    const valEl = document.getElementById('alocMainNasValidation');
+    if (valEl) { valEl.textContent = errMsgs[initResult.reason] || 'Setup failed.'; valEl.className = 'aloc-validation err'; }
+    btn?.setAttribute('hidden', '');
   }
 });
 
 // Cancel / close buttons
 document.getElementById('alocCancelBtn')?.addEventListener('click', _alocClose);
-document.getElementById('alocCloseBtn')?.addEventListener('click', _alocClose);
+// Recheck Status — re-scans archive and updates System Overview card
+document.getElementById('alocRecheckBtn')?.addEventListener('click', async () => {
+  if (_nasRefreshBusy) return;
+  const btn = document.getElementById('alocRecheckBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Checking…'; }
+  await _refreshNasEventsCard(false).catch(() => {});
+  if (btn) { btn.disabled = false; btn.textContent = 'Recheck Status'; }
+});
 document.getElementById('archiveLocationsModal')?.addEventListener('click', (e) => {
   if (e.target === document.getElementById('archiveLocationsModal')) _alocClose();
 });
@@ -2674,10 +2798,8 @@ function _applyNasEventsCard(result) {
 let _nasRefreshBusy = false;
 
 async function _refreshNasEventsCard(fromCache = false) {
-  const btn = document.getElementById('ovNasRefreshBtn');
   if (_nasRefreshBusy) return;
   _nasRefreshBusy = true;
-  if (btn) btn.classList.add('spinning');
 
   try {
     let result;
@@ -2696,12 +2818,14 @@ async function _refreshNasEventsCard(fromCache = false) {
     // Non-critical — leave tile as-is
   } finally {
     _nasRefreshBusy = false;
-    if (btn) btn.classList.remove('spinning');
   }
 }
 
-// Refresh button — explicit user request
-document.getElementById('ovNasRefreshBtn')?.addEventListener('click', () => _refreshNasEventsCard(false));
+// Archive tile — open Archive Locations modal
+document.getElementById('ovNasEvents')?.addEventListener('click', () => _alocOpen());
+document.getElementById('ovNasEvents')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); _alocOpen(); }
+});
 
 // Startup: show cached data instantly, then fire background NAS scan without awaiting it.
 // The live scan must not block startup or first render.
@@ -7975,6 +8099,22 @@ async function initApp() {
     console.error('Failed to prime archive root', e);
   }
 
+  // Sync EventCreator with the Archive Locations nasRoot.
+  // nasRoot (set via Archive Locations) is the authoritative source.
+  // This handles first-launch migration where nasRoot was set before
+  // archiveRoot was kept in sync, as well as any restart after a Save.
+  try {
+    const _archStatus = await window.api.getArchiveOperationsStatus();
+    const _nasRoot = _archStatus?.nasRoot || null;
+    if (_nasRoot && _nasRoot !== EventCreator.getSessionArchiveRoot()) {
+      EventCreator.setSessionArchiveRoot(_nasRoot);
+      window.api.setArchiveRootSetting(_nasRoot)
+        .catch(err => console.error('[initApp] archiveRoot sync failed:', err));
+    }
+  } catch (e) {
+    console.error('[initApp] nasRoot sync failed:', e);
+  }
+
   // Restore last active event — all logic delegated to EventCreator.
   await EventCreator.restoreLastEvent();
 
@@ -9721,7 +9861,7 @@ document.addEventListener('keydown', e => {
   });
 
   document.getElementById('txChooseDriveBtn')?.addEventListener('click', async () => {
-    const chosen = await window.api.chooseTransferRoot();
+    const chosen = normalizePickedPath(await window.api.chooseTransferRoot());
     if (!chosen) return;
     const driveEl = document.getElementById('txDrivePath');
     if (driveEl) { driveEl.textContent = chosen; driveEl.classList.remove('tx-unset'); }

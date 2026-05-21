@@ -683,14 +683,8 @@ const EventCreator = (() => {
     ${buildNewFormHTML()}
   </div>
 
-  <!-- Select Existing Master CTA ──────────────────────────────────────── -->
-  <button id="ecSelectExistingBtn" class="ec-select-existing-btn">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
-    Select Existing Master…
-  </button>
-
-  <!-- Location row (only shown once archive root is set) ───────────────── -->
-  ${sessionArchiveRoot ? buildLocationRowHTML() : ''}
+  <!-- Archive Root row (always shown) ────────────────────────────────── -->
+  ${buildArchiveRootRowHTML()}
 
   <!-- Error banner ─────────────────────────────────────────────────────── -->
   <div id="ecMasterError" class="ec-master-error" role="alert" aria-live="polite"></div>
@@ -703,15 +697,23 @@ const EventCreator = (() => {
 </div>`;
   }
 
-  function buildLocationRowHTML() {
+  function buildArchiveRootRowHTML() {
+    if (!sessionArchiveRoot) {
+      return `
+<div class="ec-location-display ec-location-no-root" id="ecLocationDisplay">
+  <span class="ec-location-label">Archive Root</span>
+  <span class="ec-location-path ec-location-unset">Not set — create a collection requires an Active Archive Root</span>
+  <button class="ec-location-change-link" id="ecChangeLocation">Open Archive Locations</button>
+</div>`;
+    }
     const displayPath = sessionArchiveRoot.length > 55
       ? '…' + sessionArchiveRoot.slice(-52)
       : sessionArchiveRoot;
     return `
 <div class="ec-location-display" id="ecLocationDisplay">
-  <span class="ec-location-label">Location</span>
+  <span class="ec-location-label">Archive Root</span>
   <span class="ec-location-path" title="${esc(sessionArchiveRoot)}">${esc(displayPath)}</span>
-  <button class="ec-location-change-link" id="ecChangeLocation">Change Location</button>
+  <button class="ec-location-change-link" id="ecChangeLocation">Change Archive Location</button>
 </div>`;
   }
 
@@ -839,11 +841,8 @@ const EventCreator = (() => {
     document.getElementById('ecMasterContinue')
       ?.addEventListener('click', _fireTryCreate);
 
-    document.getElementById('ecSelectExistingBtn')
-      ?.addEventListener('click', () => handleSelectExistingMaster().catch(err => showBanner(err.message, 'error')));
-
     document.getElementById('ecChangeLocation')
-      ?.addEventListener('click', () => changeArchiveLocationInternal().catch(err => showBanner(err.message, 'error')));
+      ?.addEventListener('click', () => changeArchiveLocationInternal());
   }
 
   function _fireTryCreate() {
@@ -998,15 +997,11 @@ const EventCreator = (() => {
     const name      = buildCollectionName(y, m, d, l);
     const hijriDate = `${y}-${pad2(m)}-${pad2(d)}`;
 
-    // Ensure we have an archive root (prompts once, then persists forever)
+    // Active Archive Root must come from Archive Locations — block if not set.
     if (!sessionArchiveRoot) {
-      const pick = await window.api.chooseArchiveRoot();
-      if (!pick) return; // user canceled → stay on Step 1
-      sessionArchiveRoot = pick.path;
-      // Auto-migrate: persist on first selection so we never re-prompt.
-      // Non-blocking; failure is logged but doesn't abort the flow.
-      window.api.setArchiveRootSetting(pick.path)
-        .catch(err => console.error('[settings] persist archiveRoot failed:', err));
+      showBanner('Set an Active Archive Root in Archive Locations before creating a collection.', 'error');
+      document.dispatchEvent(new CustomEvent('eventcreator:openArchiveLocations'));
+      return;
     }
 
     // Disk is the source of truth — always check existence regardless of
@@ -1039,43 +1034,10 @@ const EventCreator = (() => {
     proceedToEventStep();
   }
 
-  // ── Select Existing Master ─────────────────────────────────────────────────
-
-  async function handleSelectExistingMaster() {
-    // M2: pass sessionArchiveRoot so the picker defaults to inside the archive.
-    // User can still navigate elsewhere — this is a soft nudge, not a restriction.
-    const pick = await window.api.chooseExistingMaster(sessionArchiveRoot);
-    if (!pick) return; // canceled
-
-    const folderPath = pick.path;
-    const { valid, reason } = await window.api.validateMasterAccessible(folderPath);
-    if (!valid) {
-      await showErrorModal(`Cannot use this folder: ${reason}`);
-      return;
-    }
-
-    const name = pathBasename(folderPath);
-    activeMaster = { name, path: folderPath };
-    selectedCollection = name;
-
-    // Add stub to sessionCollections if not present
-    if (!sessionCollections.some(c => c.name === name)) {
-      sessionCollections.push({ name, hijriDate: '', label: name, events: [], _masterPath: folderPath });
-    }
-
-    proceedToEventStep();
-  }
-
   // ── Change archive location ────────────────────────────────────────────────
 
-  async function changeArchiveLocationInternal() {
-    const pick = await window.api.chooseArchiveRoot();
-    if (!pick) return; // canceled → keep current root
-    sessionArchiveRoot = pick.path;
-    // Persist the new choice. Non-blocking; failure is logged.
-    window.api.setArchiveRootSetting(pick.path)
-      .catch(err => console.error('[settings] persist archiveRoot failed:', err));
-    showMasterStep(); // re-render to update location row
+  function changeArchiveLocationInternal() {
+    document.dispatchEvent(new CustomEvent('eventcreator:openArchiveLocations'));
   }
 
   // ── Error / info banner ────────────────────────────────────────────────────
@@ -3531,7 +3493,33 @@ ${unparseable.map(ev => `
     /** Returns the session-scoped archive root path, or null if not yet chosen. */
     getSessionArchiveRoot() { return sessionArchiveRoot; },
 
-    /** Opens picker to change archive location; re-renders Step 1 if open. */
+    /**
+     * Called by renderer after Archive Locations Save (and at startup during
+     * nasRoot migration) to synchronise sessionArchiveRoot with the authoritative
+     * nasRoot setting.  Clears any activeMaster/selectedCollection/sessionCollections
+     * that no longer belong to the new root so stale paths are never used.
+     * @param {string|null} path
+     */
+    setSessionArchiveRoot(path) {
+      const root = (typeof path === 'string' && path.length > 0) ? path : null;
+      sessionArchiveRoot = root;
+      // Clear activeMaster if it no longer lives under the new root
+      if (activeMaster && (!root || !activeMaster.path.startsWith(root + '/'))) {
+        activeMaster        = null;
+        selectedCollection  = null;
+        _scannedEvents      = null;
+        _viewingExisting    = null;
+        _editMode           = false;
+        _selectedListFolder = null;
+      }
+      // Clear cached session collections from a different root — step 1 re-scans on next open
+      if (sessionCollections.length > 0) {
+        const allFromNewRoot = root && sessionCollections.every(c => c._masterPath?.startsWith(root + '/'));
+        if (!allFromNewRoot) sessionCollections.length = 0;
+      }
+    },
+
+    /** Opens Archive Locations modal to change the Active Archive Root. */
     changeArchiveLocation:  changeArchiveLocationInternal,
 
     /**
