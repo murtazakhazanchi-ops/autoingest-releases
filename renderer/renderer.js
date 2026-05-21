@@ -1176,6 +1176,23 @@ function _esc(s) {
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+function _midTruncPath(full, maxLen) {
+  if (typeof maxLen !== 'number') maxLen = 60;
+  if (!full || full.length <= maxLen) return full;
+  const trailing   = (full.endsWith('/') || full.endsWith('\\')) ? '/' : '';
+  const normalised = full.replace(/\\/g, '/').replace(/\/$/, '');
+  const lastSlash  = normalised.lastIndexOf('/');
+  const tail       = lastSlash >= 0 ? normalised.slice(lastSlash + 1) : normalised;
+  const headFull   = lastSlash >= 0 ? normalised.slice(0, lastSlash) : '';
+  const sep        = '/…/';
+  const rootEnd    = headFull.indexOf('/', headFull.startsWith('/') ? 1 : 0);
+  const rootSeg    = rootEnd >= 0 ? headFull.slice(0, rootEnd) : headFull;
+  const budget     = maxLen - sep.length - tail.length - trailing.length;
+  if (budget <= rootSeg.length) return rootSeg + sep + tail + trailing;
+  const head       = normalised.slice(0, budget).replace(/\/$/, '');
+  return head + sep + tail + trailing;
+}
+
 function _renderLandingEventCard() {
   const card = document.getElementById('heroCard');
   if (!card) return;
@@ -7782,18 +7799,18 @@ async function showEventImportConfirmModal(groups, eventData) {
       if (mode === 'direct-nas') {
         if (!nasUsable) return '';
         const p = [nasArchiveName, collName, eventFolderName, phName].filter(Boolean).join('/');
-        return `<div class="im-dest-row"><span class="im-dest-lbl">Archive</span><span class="im-dest-path${phCls}">${_esc(p + '/')}</span></div>`;
+        return `<div class="im-dest-row"><span class="im-dest-lbl">Archive</span><span class="im-dest-path${phCls}" title="${_esc(p + '/')}">${_esc(_midTruncPath(p + '/'))}</span></div>`;
       }
 
       if (mode === 'local-first') {
         const rows = [];
         if (stagingUsable) {
           const p = [stagingRootName, collName, eventFolderName, phName].filter(Boolean).join('/');
-          rows.push(`<div class="im-dest-row"><span class="im-dest-lbl">Local</span><span class="im-dest-path${phCls}">${_esc(p + '/')}</span></div>`);
+          rows.push(`<div class="im-dest-row"><span class="im-dest-lbl">Local</span><span class="im-dest-path${phCls}" title="${_esc(p + '/')}">${_esc(_midTruncPath(p + '/'))}</span></div>`);
         }
         if (nasUsable) {
           const p = [nasArchiveName, collName, eventFolderName, phName].filter(Boolean).join('/');
-          rows.push(`<div class="im-dest-row"><span class="im-dest-lbl">Archive</span><span class="im-dest-path${phCls}">${_esc(p + '/')}</span></div>`);
+          rows.push(`<div class="im-dest-row"><span class="im-dest-lbl">Archive</span><span class="im-dest-path${phCls}" title="${_esc(p + '/')}">${_esc(_midTruncPath(p + '/'))}</span></div>`);
         }
         return rows.join('');
       }
