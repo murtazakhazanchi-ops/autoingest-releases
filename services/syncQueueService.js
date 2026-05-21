@@ -118,6 +118,13 @@ async function refreshQueue() {
       const jobId = _jobId(localEventPath);
       const prev  = existingMap[jobId];
 
+      // Scan for photographer subdirectory names (display only — non-critical)
+      let photographers = [];
+      try {
+        const phEntries = await fsp.readdir(localEventPath, { withFileTypes: true });
+        photographers   = phEntries.filter(e => e.isDirectory() && !e.name.startsWith('.')).map(e => e.name);
+      } catch { /* ignore */ }
+
       // Preserve terminal statuses set by sync operations; reset live-operation states.
       // 'synced' is only preserved when the manifest has not been updated since sync completed —
       // a newer manifest.updatedAt means a subsequent import occurred and the event needs re-sync.
@@ -147,6 +154,9 @@ async function refreshQueue() {
         createdAt:      prev?.createdAt           || now,
         updatedAt:      manifest.updatedAt        || manifest.importedAt || null,
         lastSeenAt:     now,
+        photographers,
+        syncedAt:       prev?.syncedAt            ?? null,
+        syncResult:     prev?.syncResult          ?? null,
       });
     }
   }

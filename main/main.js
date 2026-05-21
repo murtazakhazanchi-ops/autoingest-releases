@@ -1845,6 +1845,58 @@ ipcMain.handle('archive:validateNasRoot', async (_event, dirPath) => {
   }
 });
 
+ipcMain.handle('archive:initArchiveRoot', async (_event, dirPath) => {
+  if (!dirPath || typeof dirPath !== 'string') return { ok: false, reason: 'not-found' };
+
+  // Phase 1: confirm directory exists and is reachable
+  let stat;
+  try {
+    stat = await fsp.stat(dirPath);
+  } catch (err) {
+    if (err.code === 'ENOENT') return { ok: false, reason: 'not-found' };
+    if (err.code === 'EACCES' || err.code === 'EPERM') return { ok: false, reason: 'no-access' };
+    return { ok: false, reason: 'error', message: err.message };
+  }
+  if (!stat.isDirectory()) return { ok: false, reason: 'not-directory' };
+
+  // Phase 2: confirm write access via temp-file probe (create + delete)
+  const probe = path.join(dirPath, '.autoingest-probe-' + Date.now());
+  try {
+    await fsp.writeFile(probe, '', 'utf8');
+    await fsp.unlink(probe);
+  } catch {
+    return { ok: false, reason: 'no-access' };
+  }
+
+  // Phase 3: check for an existing marker — do not overwrite a valid or incompatible one
+  const markerDir  = path.join(dirPath, '.autoingest', 'root');
+  const markerPath = path.join(markerDir, 'archive-root.json');
+  try {
+    const raw    = await fsp.readFile(markerPath, 'utf8');
+    const marker = JSON.parse(raw);
+    if (marker && marker.type === 'autoingest-nas-root') return { ok: false, reason: 'already-initialized' };
+    if (marker && marker.type)                           return { ok: false, reason: 'incompatible-type' };
+    // Unparseable / missing type — treat as corrupt, fall through to write
+  } catch (err) {
+    if (err.code !== 'ENOENT') {
+      // Exists but unreadable or corrupt — fall through to overwrite
+    }
+    // ENOENT means no marker yet — proceed to write
+  }
+
+  // Phase 4: write the marker
+  try {
+    await fsp.mkdir(markerDir, { recursive: true });
+    await fsp.writeFile(markerPath, JSON.stringify({
+      type:      'autoingest-nas-root',
+      createdAt: new Date().toISOString(),
+    }, null, 2), 'utf8');
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: 'error', message: err.message };
+  }
+});
+
 ipcMain.handle('archive:validateLocalStagingRoot', async (_event, dirPath) => {
   if (!dirPath || typeof dirPath !== 'string') return { valid: false, reason: 'no-path' };
   try {
@@ -2260,6 +2312,7 @@ ipcMain.handle('archive:syncAllReadyJobs', async () => {
   const eligible  = (jobs || []).filter(j => j.status === 'ready-for-sync');
 
   const results = [];
+  const totals  = { copiedToArchive: 0, skippedDuplicates: 0, renamedConflicts: 0, errors: 0 };
   for (const job of eligible) {
     if (_syncingJobIds.has(job.jobId)) { results.push({ jobId: job.jobId, skipped: true }); continue; }
 
@@ -2273,16 +2326,21 @@ ipcMain.handle('archive:syncAllReadyJobs', async () => {
         syncedAt:      syncResult.syncedAt || null,
         syncStartedAt: syncResult.syncStartedAt,
       });
+      totals.copiedToArchive   += syncResult.copiedToArchive   || 0;
+      totals.skippedDuplicates += syncResult.skippedDuplicates || 0;
+      totals.renamedConflicts  += syncResult.renamedConflicts  || 0;
+      totals.errors            += syncResult.errors?.length    || 0;
       results.push({ jobId: job.jobId, status: syncResult.status });
     } catch (err) {
       await syncQueueService.updateJob(job.jobId, { status: 'sync-failed', syncError: err.message });
+      totals.errors++;
       results.push({ jobId: job.jobId, status: 'sync-failed', error: err.message });
     } finally {
       _syncingJobIds.delete(job.jobId);
     }
   }
 
-  return { ok: true, processed: results.length, results };
+  return { ok: true, processed: results.length, results, totals };
 });
 
 // ── Direct archive lock check (advisory pre-flight) ──────────────────────────

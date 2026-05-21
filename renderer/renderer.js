@@ -2966,21 +2966,46 @@ function _sqEsc(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+function _sqMidTrunc(s, max) {
+  s = String(s || '');
+  if (s.length <= max) return s;
+  const half = Math.floor((max - 1) / 2);
+  return s.slice(0, half) + '…' + s.slice(s.length - half);
+}
+
+function _sqFmtTime(ts) {
+  if (!ts) return '';
+  try {
+    const d = new Date(ts);
+    if (Date.now() - ts < 22 * 60 * 60 * 1000) {
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  } catch { return ''; }
+}
+
 function _sqJobRow(job, reviewEntry) {
   const statusLabel = {
-    'ready-for-sync':  'Ready',
-    'needs-attention': 'Needs Attention',
-    'blocked':         'Blocked',
-    'synced':          'Synced',
-    'syncing':         'Syncing',
+    'ready-for-sync':   'Pending',
+    'needs-attention':  'Partial',
+    'blocked':          'Blocked',
+    'synced':           'Synced',
+    'syncing':          'Syncing',
     'waiting-for-lock': 'Waiting',
-    'sync-failed':     'Failed',
-    'failed':          'Failed',
+    'sync-failed':      'Failed',
+    'failed':           'Failed',
   }[job.status] || job.status;
 
-  const reasonText = job.reason === 'auto-metadata-disabled'
+  // Build detail line: photographers · imported HH:MM · synced HH:MM
+  const photographers = Array.isArray(job.photographers) ? job.photographers : [];
+  const phJoined      = photographers.join(', ');
+  const importedText  = job.importedAt ? 'imported ' + _sqFmtTime(job.importedAt) : '';
+  const syncedText    = job.syncedAt   ? 'synced '   + _sqFmtTime(job.syncedAt)   : '';
+  const reasonFallback = job.reason === 'auto-metadata-disabled'
     ? 'Metadata disabled'
-    : _sqEsc(job.reason || '');
+    : (job.reason || '');
+  const detailParts   = [phJoined, importedText, syncedText].filter(Boolean);
+  const detailPlain   = detailParts.join(' · ') || reasonFallback;
 
   let actionHtml = '<div class="sq-action"></div>';
   if (job.status === 'ready-for-sync') {
@@ -2993,15 +3018,16 @@ function _sqJobRow(job, reviewEntry) {
     actionHtml = `<div class="sq-action"><button type="button" class="sq-action-btn sq-review-btn" data-jobid="${_sqEsc(job.jobId)}" data-manifestpath="${_sqEsc(job.manifestPath || '')}" data-batchid="${_sqEsc(job.batchId || '')}" aria-label="Mark reviewed">Mark reviewed</button></div>`;
   }
 
-  const isReviewed  = (job.status === 'needs-attention' && !!reviewEntry);
-  const statusClass = isReviewed ? 'sq-status--reviewed' : `sq-status--${_sqEsc(job.status)}`;
+  const isReviewed   = (job.status === 'needs-attention' && !!reviewEntry);
+  const statusClass  = isReviewed ? 'sq-status--reviewed' : `sq-status--${_sqEsc(job.status)}`;
   const displayLabel = isReviewed ? 'Reviewed' : statusLabel;
+  const eventDisplay = _sqMidTrunc(job.event || '', 45);
 
   return `<div class="sq-row">
-    <div class="sq-cell sq-event">${_sqEsc(job.event)}</div>
+    <div class="sq-cell sq-event" title="${_sqEsc(job.event || '')}">${_sqEsc(eventDisplay)}</div>
     <div class="sq-cell sq-coll">${_sqEsc(job.collection)}</div>
     <div class="sq-cell sq-status ${statusClass}">${_sqEsc(displayLabel)}</div>
-    <div class="sq-cell sq-reason">${reasonText}</div>
+    <div class="sq-cell sq-reason" title="${_sqEsc(detailPlain)}">${_sqEsc(detailPlain)}</div>
     ${actionHtml}
   </div>`;
 }
@@ -3083,8 +3109,18 @@ document.getElementById('sqJobList')?.addEventListener('click', async (e) => {
   try {
     const result = await window.api.syncJobNow(jobId);
     await _sqLoadQueue();
-    if (result?.ok === false) showMessage('Sync failed. Review needed.', 7000);
-    else showMessage('Sync complete.', 6000);
+    if (result?.ok === false) {
+      showMessage('Sync failed. Review needed.', 7000);
+    } else {
+      const sr    = result?.syncResult;
+      const parts = [];
+      if (sr?.copiedToArchive  > 0) parts.push(`${sr.copiedToArchive} copied`);
+      if (sr?.skippedDuplicates > 0) parts.push(`${sr.skippedDuplicates} skipped`);
+      if (sr?.renamedConflicts  > 0) parts.push(`${sr.renamedConflicts} renamed`);
+      if (sr?.errors?.length    > 0) parts.push(`${sr.errors.length} error${sr.errors.length !== 1 ? 's' : ''}`);
+      const summary = parts.length > 0 ? parts.join(' · ') : 'Already up to date';
+      showMessage(`Sync complete — ${summary}`, 7000);
+    }
   } catch {
     btn.disabled = false;
     btn.textContent = btn.classList.contains('sq-sync-btn') ? 'Sync Now' : 'Retry';
@@ -3128,8 +3164,18 @@ document.getElementById('sqSyncAllBtn')?.addEventListener('click', async () => {
     const result = await window.api.syncAllReadyJobs();
     await _sqLoadQueue();
     const anyFailed = result?.results?.some(r => r.status === 'sync-failed');
-    if (anyFailed) showMessage('Sync failed. Review needed.', 7000);
-    else if (result?.processed > 0) showMessage('Sync complete.', 6000);
+    if (anyFailed) {
+      showMessage('Sync failed. Review needed.', 7000);
+    } else if (result?.processed > 0) {
+      const t     = result?.totals || {};
+      const parts = [];
+      if (t.copiedToArchive  > 0) parts.push(`${t.copiedToArchive} copied`);
+      if (t.skippedDuplicates > 0) parts.push(`${t.skippedDuplicates} skipped`);
+      if (t.renamedConflicts  > 0) parts.push(`${t.renamedConflicts} renamed`);
+      if (t.errors            > 0) parts.push(`${t.errors} error${t.errors !== 1 ? 's' : ''}`);
+      const summary = parts.length > 0 ? parts.join(' · ') : 'Already up to date';
+      showMessage(`Sync complete — ${summary}`, 7000);
+    }
   } finally {
     btn.disabled = false;
     btn.textContent = 'Sync All Ready';
