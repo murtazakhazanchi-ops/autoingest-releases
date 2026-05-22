@@ -2134,6 +2134,18 @@ ${unparseable.map(ev => `
     return result;
   }
 
+  function _lookupCityCountry(reg, cityLabel) {
+    if (!reg || !cityLabel) return null;
+    const lo = cityLabel.toLowerCase();
+    for (const kw of [...(reg.base?.keywords || []), ...(reg.overrides || [])]) {
+      if (kw.category === 'city' && typeof kw.label === 'string' &&
+          kw.label.toLowerCase() === lo && kw.country) {
+        return kw.country;
+      }
+    }
+    return null;
+  }
+
   async function _showKwDropdown(inputEl, comp, query) {
     const ddEl = document.getElementById(`ecKwDD-${comp.id}`);
     if (!ddEl) return;
@@ -2249,12 +2261,22 @@ ${unparseable.map(ev => `
         container: gcEl,
         type: 'cities',
         placeholder: 'Search city…',
-        onSelect: ({ id, label }) => {
+        onSelect: async ({ id, label }) => {
           _globalCityVal = { id, label };
+          // Lookup country for this global city
+          const reg = await _getRegistry();
+          const country = _lookupCityCountry(reg, label);
           _eventComps.forEach(c => {
             if (!c.city) {
               c.city = { id, label };
               _compDDs[c.id]?.city?.setValue(id, label);
+            }
+            // Auto-fill country on components that don't have a manually-set country
+            if (country) {
+              const compDD = _compDDs[c.id];
+              if (compDD?.country && !compDD.country.isManuallySet()) {
+                compDD.country.setValueAuto(country);
+              }
             }
           });
           _updateEventPreview();
@@ -2303,13 +2325,34 @@ ${unparseable.map(ev => `
     if (cityEl) {
       row.city = new TreeAutocomplete({
         container: cityEl, type: 'cities', placeholder: 'City…',
-        onSelect: ({ id, label }) => { comp.city = { id, label }; _refreshKwAdvanced(comp); _updateEventPreview(); }
+        onSelect: async ({ id, label }) => {
+          comp.city = { id, label };
+          _refreshKwAdvanced(comp);
+          _updateEventPreview();
+          // Auto-fill country from city-country association if not manually overridden
+          const compDD = _compDDs[comp.id];
+          if (compDD?.country && !compDD.country.isManuallySet()) {
+            const reg = await _getRegistry();
+            const country = _lookupCityCountry(reg, label);
+            if (country) compDD.country.setValueAuto(country);
+          }
+        }
       });
       if (comp.city) row.city.setValue(comp.city.id, comp.city.label);
     }
 
     row.country = _mountCountryDD(comp);
     if (comp.country) row.country?.setValue(comp.country);
+
+    // Auto-fill country for components that already have a city but no country set
+    if (comp.city?.label && !comp.country) {
+      _getRegistry().then(reg => {
+        const country = _lookupCityCountry(reg, comp.city.label);
+        if (country && row.country && !row.country.isManuallySet()) {
+          row.country.setValueAuto(country);
+        }
+      }).catch(() => {});
+    }
 
     _compDDs[comp.id] = row;
   }
@@ -2360,15 +2403,23 @@ ${unparseable.map(ev => `
     wrap.append(rowEl, dd);
     container.append(wrap);
 
-    let _isOpen   = false;
-    let _selected = null;
-    let _items    = null;
+    let _isOpen      = false;
+    let _selected    = null;
+    let _items       = null;
+    let _activeIdx   = -1;
+    let _manuallySet = false;
 
     async function _ensureItems() {
       if (_items) return _items;
       const reg = await _getRegistry();
       _items = _countryRegistryItems(reg);
       return _items;
+    }
+
+    function _syncActive() {
+      const nav = [...dd.querySelectorAll('.tac-item')];
+      nav.forEach((el, i) => el.classList.toggle('tac-active', i === _activeIdx));
+      nav[_activeIdx]?.scrollIntoView({ block: 'nearest' });
     }
 
     function _render(query) {
@@ -2385,9 +2436,9 @@ ${unparseable.map(ev => `
           : 'No matches';
         dd.append(empty);
       } else {
-        matches.slice(0, 20).forEach(c => {
+        matches.slice(0, 20).forEach((c, i) => {
           const el = document.createElement('div');
-          el.className = 'tac-item';
+          el.className = 'tac-item' + (i === _activeIdx ? ' tac-active' : '');
           el.setAttribute('role', 'option');
           el.textContent = c.label;
           el.addEventListener('mousedown', e => { e.preventDefault(); _select(c.label); });
@@ -2409,6 +2460,7 @@ ${unparseable.map(ev => `
     function _close() {
       if (!_isOpen) return;
       _isOpen = false;
+      _activeIdx = -1;
       dd.hidden = true;
       delete wrap.dataset.open;
       inp.setAttribute('aria-expanded', 'false');
@@ -2417,24 +2469,33 @@ ${unparseable.map(ev => `
     }
 
     function _select(label) {
+      _manuallySet = true;
       _selected    = label;
       comp.country = label;
       inp.value    = label;
       clearBtn.hidden = false;
       _close();
+      // Learn city-country association if a city is set on this component
+      if (comp.city?.label) {
+        window.api.keywordsSaveCityCountry(comp.city.label, label)
+          .then(() => { _kwRegistry = null; _kwRegistryPromise = null; })
+          .catch(err => console.warn('[country] saveCityCountry failed:', err));
+      }
     }
 
     function _clearVal() {
+      _manuallySet = false;
       _selected    = null;
       comp.country = '';
       inp.value    = '';
       clearBtn.hidden = true;
-      if (_isOpen) _render('');
+      if (_isOpen) { _activeIdx = -1; _render(''); }
     }
 
     inp.addEventListener('focus', () => _open());
     inp.addEventListener('input', async () => {
       clearBtn.hidden = !inp.value;
+      _activeIdx = -1;
       if (!_isOpen) {
         _isOpen = true;
         dd.hidden = false;
@@ -2444,6 +2505,30 @@ ${unparseable.map(ev => `
       await _ensureItems();
       _render(inp.value);
     });
+
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (!_isOpen) { _open(); return; }
+        const nav = [...dd.querySelectorAll('.tac-item')];
+        if (nav.length === 0) return;
+        _activeIdx = e.key === 'ArrowDown'
+          ? Math.min(_activeIdx + 1, nav.length - 1)
+          : Math.max(_activeIdx - 1, 0);
+        _syncActive();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (!_isOpen) { _open(); return; }
+        const nav = [...dd.querySelectorAll('.tac-item')];
+        if (_activeIdx >= 0 && nav[_activeIdx]) {
+          nav[_activeIdx].dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        _close();
+      }
+    });
+
     clearBtn.addEventListener('mousedown', e => { e.preventDefault(); _clearVal(); });
 
     const _globalDown = e => { if (!wrap.contains(e.target)) _close(); };
@@ -2452,11 +2537,20 @@ ${unparseable.map(ev => `
     return {
       setValue(label) {
         if (!label) return;
+        _manuallySet    = true;
         _selected       = label;
         inp.value       = label;
         clearBtn.hidden = false;
       },
-      clear()       { _clearVal(); },
+      setValueAuto(label) {
+        if (!label) return;
+        _selected       = label;
+        comp.country    = label;
+        inp.value       = label;
+        clearBtn.hidden = false;
+      },
+      isManuallySet() { return _manuallySet; },
+      clear()        { _clearVal(); },
       setDisabled(v) {
         inp.disabled = v;
         wrap.classList.toggle('tac-disabled', v);
@@ -3542,7 +3636,34 @@ ${unparseable.map(ev => `
      */
     async restoreLastEvent() {
       try {
-        const last = await window.api.getLastEvent();
+        let last = await window.api.getLastEvent();
+
+        // lastEvent may have been cleared by a previous offline restart.
+        // If archive is now offline, try to reconstruct from the sync queue's
+        // most-recently-seen job — it carries collection name, event folder name,
+        // and the archive nasRoot path we need to persist for reconnect.
+        if (!last) {
+          try {
+            const opsStatus = await window.api.getArchiveOperationsStatus();
+            const isOffline = opsStatus?.status === 'nas-disconnected' || opsStatus?.status === 'invalid-nas';
+            if (isOffline && opsStatus?.nasRoot) {
+              const queueData = await window.api.getSyncQueue();
+              const candidate = (queueData?.jobs || [])
+                .filter(j => j.localEventPath && j.collection && j.event)
+                .sort((a, b) => (b.lastSeenAt || 0) - (a.lastSeenAt || 0))[0];
+              if (candidate) {
+                last = {
+                  collectionPath: opsStatus.nasRoot + '/' + candidate.collection,
+                  collectionName: candidate.collection,
+                  eventName:      candidate.event,
+                };
+                console.log('[restoreLastEvent] queue rescue — reconstructed lastEvent from sync queue:', candidate.localEventPath);
+              }
+            }
+          } catch (qErr) {
+            console.warn('[restoreLastEvent] queue rescue failed:', qErr);
+          }
+        }
 
         if (!last || !last.collectionPath || !last.collectionName) {
           console.log('[restoreLastEvent] No previous event');
@@ -3552,21 +3673,57 @@ ${unparseable.map(ev => `
         const safeName  = last.safeEventName || sanitizeForPath(last.eventName || '');
         const eventPath = safeName ? (last.collectionPath + '/' + safeName) : null;
 
+        let resolvedCollPath   = last.collectionPath;
+        let resolvedEventPath  = eventPath;
+        let isOfflineLocalCopy = false;
+
         const valid = await window.api.verifyLastEvent(last.collectionPath, eventPath);
         if (!valid) {
-          console.warn('[restoreLastEvent] stale path detected, clearing:', eventPath || last.collectionPath);
-          window.api.setLastEvent(null).catch(() => {});
-          selectedCollection  = null;
-          activeMaster        = null;
-          _viewingExisting    = null;
-          _scannedEvents      = null;
-          setEventState([]);
-          return;
+          // Before clearing, attempt fallback to local staging copy (archive may be offline).
+          let stagingResolved = false;
+          let archiveOffline  = false;
+          try {
+            const opsStatus   = await window.api.getArchiveOperationsStatus();
+            archiveOffline    = opsStatus?.status === 'nas-disconnected' || opsStatus?.status === 'invalid-nas';
+            const stagingRoot = opsStatus?.localStagingRoot;
+            if (stagingRoot && last.collectionName && safeName) {
+              const sCollPath  = stagingRoot + '/' + last.collectionName;
+              const sEventPath = sCollPath   + '/' + safeName;
+              const stagingValid = await window.api.verifyLastEvent(sCollPath, sEventPath);
+              if (stagingValid) {
+                resolvedCollPath   = sCollPath;
+                resolvedEventPath  = sEventPath;
+                isOfflineLocalCopy = true;
+                stagingResolved    = true;
+                console.log('[restoreLastEvent] archive offline — restoring from local staging:', sEventPath);
+              }
+            }
+          } catch (err) {
+            console.warn('[restoreLastEvent] staging fallback check failed:', err);
+          }
+
+          if (!stagingResolved) {
+            if (archiveOffline) {
+              // Archive is offline and no staging copy found — preserve lastEvent so it
+              // can be used on the next restart when the archive reconnects.
+              console.warn('[restoreLastEvent] archive offline, no staging copy found — preserving lastEvent');
+              return;
+            }
+            // Archive is online but path no longer exists — truly stale, clear it.
+            console.warn('[restoreLastEvent] stale path detected, clearing:', eventPath || last.collectionPath);
+            window.api.setLastEvent(null).catch(() => {});
+            selectedCollection  = null;
+            activeMaster        = null;
+            _viewingExisting    = null;
+            _scannedEvents      = null;
+            setEventState([]);
+            return;
+          }
         }
 
-        console.log('[restoreLastEvent] path:', eventPath);
+        console.log('[restoreLastEvent] path:', resolvedEventPath);
 
-        const components = await loadEventFromDisk(eventPath);
+        const components = await loadEventFromDisk(resolvedEventPath);
 
         if (!components) {
           console.error('[restoreLastEvent] Failed to load event');
@@ -3576,7 +3733,7 @@ ${unparseable.map(ev => `
         // Read identity from disk — getLastEvent() doesn't persist hijriDate/sequence.
         let _restoredHijriDate = null, _restoredSequence = null;
         try {
-          const ejson = await window.api.readEventJson(eventPath);
+          const ejson = await window.api.readEventJson(resolvedEventPath);
           if (ejson && ejson.hijriDate) {
             _restoredHijriDate = ejson.hijriDate;
             _restoredSequence  = ejson.sequence ?? null;
@@ -3584,15 +3741,32 @@ ${unparseable.map(ev => `
         } catch {}
 
         // Restore session state so landing card and resetToList() work correctly.
+        // coll._masterPath uses resolvedCollPath so getActiveEventData().eventPath points
+        // to the staging copy while offline (archive path is preserved in activeMaster).
         let coll = sessionCollections.find(c => c.name === last.collectionName);
         if (!coll) {
-          coll = { name: last.collectionName, hijriDate: '', events: [], _masterPath: last.collectionPath };
+          coll = { name: last.collectionName, hijriDate: '', events: [], _masterPath: resolvedCollPath };
           sessionCollections.push(coll);
-        } else if (!coll._masterPath) {
-          coll._masterPath = last.collectionPath;
+        } else {
+          coll._masterPath = resolvedCollPath;
         }
 
+        // Always persist archive path in activeMaster so settings reconnect correctly on next launch.
         activeMaster = { name: last.collectionName, path: last.collectionPath };
+
+        // If last event was reconstructed from the sync queue (not from settings), write it
+        // back so the next restart can use the normal path without needing a queue scan.
+        if (isOfflineLocalCopy && safeName) {
+          window.api.getLastEvent().then(existing => {
+            if (!existing) {
+              window.api.setLastEvent({
+                collectionPath: last.collectionPath,
+                collectionName: last.collectionName,
+                eventName:      last.eventName || safeName,
+              }).catch(() => {});
+            }
+          }).catch(() => {});
+        }
 
         const displayName = last.eventName || safeName;
         let eventIdx = coll.events.findIndex(e => e.name === safeName);
@@ -3611,11 +3785,12 @@ ${unparseable.map(ev => `
         _compSeq = components.length;
 
         _viewingExisting = {
-          folderName:   safeName,
-          displayName:  last.eventName || safeName,
-          hijriDate:    _restoredHijriDate,
-          sequence:     _restoredSequence,
-          isUnresolved: false,
+          folderName:        safeName,
+          displayName:       last.eventName || safeName,
+          hijriDate:         _restoredHijriDate,
+          sequence:          _restoredSequence,
+          isUnresolved:      false,
+          isOfflineLocalCopy,
         };
 
         if (!Array.isArray(_eventComps) || _eventComps.length === 0) {
@@ -3623,9 +3798,10 @@ ${unparseable.map(ev => `
         }
 
         console.log('[restoreLastEvent] Restored', components.length, 'components', {
-          folderName: safeName,
-          hijriDate:  _restoredHijriDate,
-          sequence:   _restoredSequence,
+          folderName:        safeName,
+          hijriDate:         _restoredHijriDate,
+          sequence:          _restoredSequence,
+          isOfflineLocalCopy,
           comps: components.map(c => ({ id: c.id, eventTypes: c.eventTypes.map(t => t.label), city: c.city?.label })),
         });
       } catch (err) {
@@ -3651,6 +3827,40 @@ ${unparseable.map(ev => `
         collectionPath: coll._masterPath || null,
         eventPath: coll._masterPath ? (coll._masterPath + '/' + event.name) : null,
       };
+    },
+
+    /** Returns true when the current event was restored from local staging due to offline archive. */
+    isOfflineLocalCopy() {
+      return _viewingExisting?.isOfflineLocalCopy === true;
+    },
+
+    /**
+     * Called when the archive comes back online in the same session.
+     * Re-checks whether the archive event path is now accessible.
+     * If so: updates coll._masterPath to the archive path and clears isOfflineLocalCopy.
+     * If not: leaves staging copy in place — no state cleared.
+     * Returns true if the resolve succeeded (caller should refresh hero display).
+     */
+    async resolveOfflineLocalCopyToArchive() {
+      if (!_viewingExisting?.isOfflineLocalCopy) return false;
+      if (!activeMaster?.path || !_viewingExisting.folderName) return false;
+
+      const archiveCollPath  = activeMaster.path;
+      const archiveEventPath = archiveCollPath + '/' + _viewingExisting.folderName;
+
+      try {
+        const valid = await window.api.verifyLastEvent(archiveCollPath, archiveEventPath);
+        if (!valid) return false;
+
+        const coll = sessionCollections.find(c => c.name === selectedCollection);
+        if (coll) coll._masterPath = archiveCollPath;
+
+        _viewingExisting.isOfflineLocalCopy = false;
+        console.log('[resolveOfflineLocalCopyToArchive] resolved to archive:', archiveEventPath);
+        return true;
+      } catch {
+        return false;
+      }
     },
 
     /** Returns a snapshot of the current live components (_eventComps). */

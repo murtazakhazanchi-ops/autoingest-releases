@@ -2833,6 +2833,55 @@ ipcMain.handle('keywords:loadRegistry', async () => {
   return result;
 });
 
+ipcMain.handle('keywords:saveCityCountry', async (_event, cityLabel, countryLabel) => {
+  if (!cityLabel || typeof cityLabel !== 'string') return { ok: false };
+  if (!countryLabel || typeof countryLabel !== 'string') return { ok: false };
+  const userDataPath = app.getPath('userData');
+  const overridePath = require('path').join(userDataPath, 'keywords.override.json');
+  try {
+    const raw  = await fsp.readFile(overridePath, 'utf8');
+    const data = JSON.parse(raw);
+    const keywords = Array.isArray(data.keywords) ? data.keywords : [];
+    const idx  = keywords.findIndex(
+      kw => kw.category === 'city' && typeof kw.label === 'string' &&
+            kw.label.toLowerCase() === cityLabel.toLowerCase()
+    );
+    if (idx >= 0) {
+      // City already in override file — update or no-op
+      if (keywords[idx].country === countryLabel) return { ok: true };
+      keywords[idx] = { ...keywords[idx], country: countryLabel, updatedAt: new Date().toISOString() };
+    } else {
+      // City exists only in the base flat list — create a minimal keyword entry
+      // so the association is stored in the single keyword registry source of truth.
+      const slug = cityLabel.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      const now  = new Date().toISOString();
+      keywords.push({
+        id:           `city.${slug}`,
+        label:        cityLabel,
+        category:     'city',
+        root:         'city',
+        path:         ['03 City', cityLabel],
+        parentId:     'city',
+        groupLabel:   '03 City',
+        depth:        1,
+        aliases:      [],
+        labelHistory: [],
+        status:       'active',
+        source:       'city-country-learn',
+        country:      countryLabel,
+        importedAt:   now,
+        updatedAt:    now,
+      });
+    }
+    data.keywords = keywords;
+    await fsp.writeFile(overridePath, JSON.stringify(data, null, 2), 'utf8');
+    return { ok: true };
+  } catch (err) {
+    console.error('[keywords:saveCityCountry] failed:', err);
+    return { ok: false, reason: err.message };
+  }
+});
+
 // ── Transfer Export ───────────────────────────────────────────────────────────
 
 ipcMain.handle('archive:chooseTransferRoot', async () => {

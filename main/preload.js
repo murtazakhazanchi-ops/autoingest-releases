@@ -198,6 +198,7 @@ contextBridge.exposeInMainWorld('api', {
   setDefaultImportMode:       (v)   => ipcRenderer.invoke('archive:setDefaultImportMode', v),
   setMainArchiveRoot:         (v)   => ipcRenderer.invoke('archive:setMainArchiveRoot', v),
   validateMainArchiveRoot:    (v)   => ipcRenderer.invoke('archive:validateMainArchiveRoot', v),
+  initArchiveRoot:            (v)   => ipcRenderer.invoke('archive:initArchiveRoot', v),
   getDeviceIdentity:          ()    => ipcRenderer.invoke('archive:getDeviceIdentity'),
 
   // ── Archive NAS Event List ──
@@ -316,5 +317,6 @@ contextBridge.exposeInMainWorld('api', {
   keywordsChooseBridgeTxt:     ()                => ipcRenderer.invoke('keywords:chooseBridgeTxt'),
   keywordsLoadRegistry:        ()                => ipcRenderer.invoke('keywords:loadRegistry'),
   keywordsRepairIds:           ()                => ipcRenderer.invoke('keywords:repairIds'),
+  keywordsSaveCityCountry:     (cityLabel, countryLabel) => ipcRenderer.invoke('keywords:saveCityCountry', cityLabel, countryLabel),
 
 });

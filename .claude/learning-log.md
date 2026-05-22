@@ -2049,6 +2049,182 @@ Status:
 
 ---
 
+### 2026-05-20 — v0.8.8 RC UI Simplification: Archive Locations Modal and System Overview Card
+
+Task type:
+- UI / Renderer / Modal / Feature / Design System
+
+What happened:
+
+Three UI fixes applied to `renderer/index.html` and `renderer/renderer.js` as v0.8.8 RC beta blockers:
+
+**Fix 1 — Removed X close icons from Archive Locations and Sync & Activity modals.**
+Both modals had `emm-close-btn` X buttons in their topbars. These were removed to align with the AutoIngest modal convention (dismiss via Cancel/Close footer button, Escape key, or backdrop click). All three close paths remain intact. JS listeners using `?.` guard safely when the element is absent — no error, no broken behavior.
+
+**Fix 2 — Archive Locations modal restructure.**
+Previous layout: a flat list of four path rows with three action buttons in the footer (Transfer Export, Transfer Import, Diagnostics) alongside Save/Cancel.
+New layout:
+- Four labelled sections: Current Working Archive / Transfer & Sync Locations / Default Import Mode / Advanced Archive Operations.
+- Clear buttons demoted from `aloc-btn` to `aloc-btn--ghost` (background: none, transparent border, muted subtext color) — visually subordinate to Choose.
+- Advanced Operations section added to the modal body as the last section. The three operational buttons (Transfer Export, Transfer Import, Diagnostics) moved out of the footer and into a `aloc-advanced-row` flex row inside this section.
+- Footer simplified to: "Recheck Status" (ghost, footer-left) + Cancel + Save.
+
+**Fix 3 — System Overview archive card: removed ambiguous refresh icon, added to Archive Locations as labeled button.**
+`ovNasRefreshBtn` (icon-only inline refresh on the archive tile) removed. The refresh scan (`_refreshNasEventsCard(false)`) was moved to the Archive Locations modal footer as "Recheck Status" — a labeled button with clear affordance. The tile click guard that prevented the nested refresh button from propagating to the parent tile was also removed (no longer needed).
+
+Reusable lessons:
+
+1. **Section-based settings modal layout.** Settings-style modals with multiple conceptual groups must use labelled sections. Convention: most-essential first, advanced/destructive last. Advanced operations must never be in the footer alongside Save/Cancel — they belong in a named body section.
+
+2. **Modal footer content rule.** `emm-footer` contains primary workflow actions only (Cancel + Save, or Close). At most one ghost utility action is permitted, placed footer-left. Operational tool buttons (export, import, diagnostics) belong in a named body section, not the footer.
+
+3. **Control visual hierarchy within action rows.** When a settings row has a primary action (Choose) and a subordinate reversible action (Clear), they must not have equal visual weight. Clear should use a ghost modifier: `background: none; border-color: transparent; color: var(--subtext)`. Hover restores subtle visibility. Clear is never a danger/red button — it is reversible.
+
+4. **Single-behavior actionable tiles.** An overview tile that acts as a navigation entry point (clicks → opens a modal) must not contain competing icon-only sub-controls. The visual ambiguity confuses the operator: does clicking the tile navigate or does clicking the icon perform an action? Move labeled utility actions to the target modal instead.
+
+Common failure modes:
+- Placing Advanced Operations or diagnostic buttons in the footer alongside Save/Cancel.
+- Using equal button weight for Choose and Clear on the same row (both look like primary actions).
+- Adding an icon-only refresh/action button to a nav-entry tile — competing affordances on the same target.
+- Forgetting that a removed modal DOM element may also be referenced in `open()` focus fallback (not just click listeners) — grep all renderer JS files for the ID before closing the task.
+
+Preferred patterns:
+- Section grouping: `<div class="aloc-section"><span class="aloc-section-title">…</span> … rows … </div>`
+- Ghost subordinate button: `<button class="aloc-btn aloc-btn--ghost">Clear</button>`
+- Footer: `<button class="emm-btn-ghost">Recheck Status</button>` on footer-left; `<button class="emm-btn-secondary">Cancel</button><button class="emm-btn-primary">Save</button>` on footer-right.
+- Utility action on nav-entry tile: remove inline icon; wire the utility to a labeled footer button in the modal opened by the tile.
+
+Promote to agents:
+- ui-system-specialist.md — lessons 1–4
+
+Status:
+- Promoted
+
+---
+
+### 2026-05-21 — v0.8.8 RC: Folder Picker Return Shape Normalization and Archive Diagnostics UX
+
+Task type:
+- IPC Contract / Renderer / UI / Debugging / CSS Hygiene
+
+What happened:
+
+**Fix A — System-wide folder picker result normalization (`main/main.js`, `renderer/renderer.js`):**
+`master:chooseArchiveRoot` was the only picker IPC handler that returned `{ path: string }` — an object. Every other picker handler in the same file (`dest:choose`, `archive:chooseTransferRoot`, `metadataSync:chooseEventFolder`, `keywords:chooseBridgeTxt`) returns a plain string or null. The renderer called `.textContent = chosen` on the result (displaying `[object Object]`) and passed the object to `validateNasRoot()` which returned `{ valid: false, reason: 'not-set' }` because `typeof dirPath !== 'string'`. Fixed by returning `result.filePaths[0]` from lines 1093 and 1108, matching the other handlers. Also added `normalizePickedPath(result)` helper in `renderer.js` to handle heterogeneous shapes at call sites defensively.
+
+Debugging trace that applies across picker bugs:
+1. `[object Object]` in a path display field → picker IPC returned an object, not a string.
+2. "No path specified" or `not-set` from validation immediately → validate function received an object; `typeof dirPath !== 'string'` branch fired.
+3. Audit: check `preload.js` for exposed API → check `main.js` handler return → compare with other handlers in the same file for consistency.
+
+**Fix C — Dead CSS removal (`renderer/index.html`):**
+After removing all 6 `emm-close-btn` HTML elements in the prior session, the `.emm-close-btn` CSS rules (3 lines) were not removed. Applied the rule: after removing all usages of a CSS class from HTML, remove the CSS rule.
+
+**Fix D — Archive Diagnostics UX (`renderer/index.html`):**
+- `.diag-actions #diagRunBtn { width: 100%; }` removed — making a single primary action button full-width creates a banner appearance that dominates the modal; content-width is the correct default.
+- Tool navigation buttons in `.diag-actions-tools` given `font-size: 11px; padding: 4px 10px` to visually de-emphasize them relative to the primary action.
+- Added helper text paragraph above the Run button to orient the operator.
+
+Reusable lessons:
+
+1. **IPC picker return shape inconsistency diagnostic pattern.** When a path field shows `[object Object]` and/or validation immediately returns `not-set`, the root cause is an IPC handler returning an object while the renderer expects a plain string. Audit: `preload.js` → `main.js` handler → compare return shape with all other handlers of the same type in the same file. The fix is always at the IPC handler (return the string directly) and optionally at renderer call sites (normalization helper for defense-in-depth).
+2. **Dead CSS must be removed after removing all usages of a class.** When all HTML elements using a CSS class are removed, the corresponding CSS rules become dead and must be removed in the same session or explicitly noted as cleanup debt.
+3. **A single primary action button must not be full-width in a modal.** Full-width styling for a primary action button creates a banner-like visual dominance inconsistent with AutoIngest modal design. Use content-width and let the design system control button sizing.
+
+Common failure modes:
+- Assuming all IPC handlers of the same type (picker dialogs) return the same shape — one handler out of five returning an object while the others return a string causes subtle failures in string-only validation code.
+- Removing all HTML usages of a CSS class without removing the now-dead CSS rules.
+- Setting `width: 100%` on a primary action button to make it "stand out" — it over-dominates and looks like a banner.
+
+Promote to agents:
+- `contract-debugger.md` — lesson 1 (IPC picker return shape diagnostic pattern)
+- `ui-system-specialist.md` — lesson 2 (dead CSS removal after class usage removed), lesson 3 (no full-width on single primary action button)
+
+Lessons NOT promoted:
+- Tool navigation de-emphasis styling — too specific to the Diagnostics modal layout; covered by existing visual hierarchy rules.
+- `normalizePickedPath` defensive helper at call sites — implementation detail for defense-in-depth; the root cause fix is at the IPC handler.
+- Helper text paragraph above Run button — one-off copy decision; not a reusable rule.
+
+Status:
+- Promoted
+
+---
+
+### 2026-05-21 — v0.8.8 RC: Settings Atomic-Write Race, Save Error Handling, Staging Wording
+
+Task type:
+- Persistence / Debugging / UI / Renderer
+
+What happened:
+- `alocSaveBtn` handler used `Promise.all(saves)` to fire up to 4 concurrent IPC calls (setNasRoot, setMainArchiveRoot, setLocalStagingRoot, setDefaultImportMode). Each IPC handler called `settings._save()`, which wrote to the same `settings.json.tmp` file then renamed it. With concurrent callers, the first rename succeeded and deleted the `.tmp`; the remaining callers tried to rename a file that no longer existed → `ENOENT: rename`.
+- No `try-catch` around `Promise.all(saves)` in the Save handler → unhandled rejection, modal closed silently without feedback.
+- `_alocShowValidation` was shared for both archive root and local staging elements. The `valid` branch fallback text was `'✓ Valid archive root'` — shown for staging too because `validateLocalStagingRoot` returns `{ valid: true }` with no `archiveName`.
+
+Reusable lessons:
+1. **Concurrent `_save()` calls racing on a shared `.tmp`**: any service where multiple setters call the same atomic-write helper concurrently must serialize those writes via a promise queue (`_saveQueue = _saveQueue.then(_doSave, _doSave)`). The queue re-reads `_state` at execution time, so all queued writes produce the correct final state.
+2. **Directory creation before tmp write**: the atomic `writeFile(tmp)→rename()` pattern assumes the parent directory exists. First-launch or deleted-userData scenarios break it silently. Add `fsp.mkdir(path.dirname(p), { recursive: true })` before `writeFile` in every atomic writer.
+3. **`Promise.all` over multiple settings IPC saves is a concurrent race hazard**: renderer Save handlers that batch independent settings saves with `Promise.all` create a race if the underlying service uses a shared tmp file. The fix is either to serialize the saves in the renderer (`await` each one) or — preferably — fix the service-layer writer to serialize internally.
+4. **`Promise.all` errors need try-catch in modal Save handlers**: if any save step throws, the error must be caught, shown briefly on the Save button (or equivalent), and the modal must remain open. Silent rejection and immediate close are both incorrect.
+5. **Shared validation helpers need element-ID disambiguation for wording**: when a single validation function is reused for multiple semantically different elements (archive root vs staging root), the fallback success text must be selected based on `elId`, not hardcoded.
+
+Common failure modes:
+- Assuming `ENOENT: rename` means the directory doesn't exist — it can mean the `.tmp` was already consumed by a concurrent rename from another `_save()` call.
+- Using `Promise.all` to batch settings saves without checking whether the underlying writer is safe for concurrent use.
+- Letting `Promise.all` rejections go unhandled in async modal event listeners.
+- Reusing a validation display helper across different root types and assuming the fallback text is correct for all callers.
+
+Preferred patterns:
+- Serialize all writes to a shared tmp path via a module-level promise chain queue.
+- Add `mkdir({ recursive: true })` before every atomic tmp write.
+- Wrap `Promise.all(saves)` in try-catch; on failure, update Save button text, stay open, return.
+- In shared validation helpers, gate fallback text on `elId` when different element types have different semantics.
+
+Promote to agents:
+- event-data-guardian.md (concurrent-save queue pattern, mkdir before write)
+- contract-debugger.md (ENOENT-on-rename race diagnosis, Promise.all concurrent-save hazard)
+- ui-system-specialist.md (modal Save error handling, shared validator wording)
+
+Status:
+- Promoted
+
+---
+
+### 2026-05-23 — EventCreator: Country Keyboard Nav and City-Country Auto-Fill + Learning
+
+Task type:
+- Feature / Renderer / EventCreator / Keyboard Accessibility / Metadata / IPC
+
+What happened:
+
+**Issue 1 — Country field had no keyboard navigation:**
+`_mountCountryDD` in `renderer/eventCreator.js` was a custom dropdown with no `keydown` listener. All other metadata fields (City, EventType, Location) use `TreeAutocomplete`, which implements full keyboard nav (`_onKey`). Country had none. Fix: added `_activeIdx` tracking, `_syncActive()` helper, `.tac-active` class application in `_render()`, and a `keydown` listener for ArrowDown/Up/Enter/Escape.
+
+**Issue 2 — City selection did not auto-fill or learn country:**
+No city-country association existed. Fix (A): added `_lookupCityCountry(reg, cityLabel)` helper checking `kw.country` on city keyword entries. Fix (B): city `onSelect` callbacks now async-lookup country and call `row.country.setValueAuto(country)` if not manually overridden (`isManuallySet()` guard). Fix (C): when the user actively selects a country while a city is already set, `window.api.keywordsSaveCityCountry(cityLabel, countryLabel)` persists `country` onto the city entry in `keywords.override.json`. `_kwRegistry` cache is invalidated after the write. Fix (D): `_mountCompDDs` does an async country lookup after mount for components that already have a city but no country.
+
+Files changed: `renderer/eventCreator.js`, `main/main.js`, `main/preload.js`.
+
+Reusable lessons:
+
+1. **Custom dropdown implementations must mirror the `TreeAutocomplete` keyboard contract.** When a bespoke dropdown is added alongside or in place of `TreeAutocomplete`, it must implement the same keyboard contract: ArrowDown/Up (`_activeIdx` tracking + `.tac-active` class), Enter (trigger active item's mousedown), Escape (close). Failing to do this creates keyboard-workflow inconsistency.
+
+2. **Auto-fill guard: `isManuallySet()` on receiving field before overwriting.** When one field auto-fills a dependent field (e.g., city selection fills country), the receiving field needs an `isManuallySet()` method. Auto-fill only fires if `!isManuallySet()`. This prevents silent overwrite of deliberate prior choices, including disk-loaded values from a previously saved session.
+
+3. **Disk-loaded values must be treated as manually set.** When a field is populated via `setValue` from persisted data (event re-opened, component inherited), the instance's `_manuallySet` flag must be set to `true`. Without this, a subsequent auto-fill from city selection would silently overwrite a value the user deliberately chose in a prior session.
+
+4. **City-country association pattern: store `country` on the city keyword entry.** The correct place to persist city-country associations is as a `country` property on the city entry in `keywords.override.json`. This uses the existing registry system without creating a parallel source of truth. IPC pattern: `keywords:saveCityCountry(cityLabel, countryLabel)` finds the city entry by label and writes/updates the `country` field.
+
+5. **Registry cache must be invalidated after any IPC that mutates the override file.** After calling `saveCityCountry` (or any IPC mutating `keywords.override.json`), invalidate the renderer-side cache: `_kwRegistry = null; _kwRegistryPromise = null`. Without this, lookups continue to return stale pre-write data until the next explicit registry reload.
+
+Promote to agents:
+- `ui-system-specialist.md` — lessons 1, 2, 3 (custom dropdown keyboard contract; auto-fill `isManuallySet()` guard; disk-loaded values must be marked manually set)
+- `metadata-specialist.md` — lessons 4, 5 (city-country storage pattern; registry cache invalidation after write)
+
+Status:
+- Promoted
+
+---
+
 ## Entry Template
 
 ### YYYY-MM-DD — Task Name

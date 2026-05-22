@@ -925,6 +925,28 @@ Validation:
 - Confirm it includes events checked, pending count, elapsed ms, and master folder identifier.
 - Confirm no `console.log` is used for this diagnostic.
 
+### City-Country Association Storage Pattern
+
+Context:
+- Applies when implementing or debugging any feature that persists a city-country relationship for use in EventCreator auto-fill or future metadata enrichment.
+
+Rule:
+- Store the city-country association as a `country` property on the city's keyword entry in `keywords.override.json`. Do not create a separate lookup file or a parallel data structure.
+- The correct IPC pattern is: `keywords:saveCityCountry(cityLabel, countryLabel)` — finds the city entry by label in the override file and writes/updates the `country` field in place.
+- This uses the existing keyword registry system as the single source of truth and avoids maintaining two separate files for the same data.
+- After any write to the override file, invalidate the renderer-side registry cache (`_kwRegistry = null; _kwRegistryPromise = null`) so subsequent lookups return fresh data.
+
+Avoid:
+- Creating a separate `city-country.json` or equivalent side file — this duplicates system state and requires independent sync.
+- Storing the association as a top-level key in `keywords.override.json` outside the keywords array — it is not a keyword and belongs on the city entry.
+- Forgetting to invalidate the renderer registry cache after the IPC write.
+
+Validation:
+- Confirm the `country` property is written onto the city keyword entry in `keywords.override.json`.
+- Confirm subsequent `_lookupCityCountry(reg, cityLabel)` calls return the stored country immediately after a write (not from stale cache).
+- Confirm no separate side file for city-country associations exists.
+- Confirm the IPC handler finds the city entry by label (case-insensitive or exact per project convention) and writes `entry.country = countryLabel`.
+
 ### Documentation Follow-Up
 
 Context:

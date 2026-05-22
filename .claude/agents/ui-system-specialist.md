@@ -58,6 +58,44 @@ You protect the UI as a reflection layer while keeping the visual system consist
 
 ## Learned Rules
 
+### Modal Save Handlers: Catch Async Errors, Keep Modal Open
+
+Context:
+- Applies to any modal Save button handler that fires one or more async IPC calls (settings saves, validation calls, archive root writes, etc.).
+
+Rule:
+- Wrap `await Promise.all(saves)` (or any multi-step async save) in a `try-catch`.
+- On failure: update the Save button text with a brief error message (`'Save failed — try again'`), re-enable the button, reset the text after ~3 seconds, and `return` without closing the modal.
+- Never let an async save handler reject without a user-visible response — unhandled rejections in `async` event listeners produce no UI feedback and may silently close the modal.
+
+Avoid:
+- Letting `await Promise.all(saves)` throw without catch — the modal closes silently and the save is lost.
+- Creating a new notification/toast system for modal save errors — use the existing Save button as the feedback surface.
+- Disabling the Save button permanently on failure — the user must be able to retry.
+
+Validation:
+- Confirm every modal async save handler has a try-catch around the await.
+- Confirm the modal remains open and the button is re-enabled on error.
+- Confirm no unhandled promise rejection is possible in the save flow.
+
+### Shared Validation Helpers: Use elId to Disambiguate Success Wording
+
+Context:
+- Applies when a single validation display helper (`_alocShowValidation`, or any future equivalent) is reused for multiple semantically different root types (archive root, staging root, transfer root, etc.).
+
+Rule:
+- The `valid` branch fallback text must be selected based on `elId`, not hardcoded.
+- A staging element (`alocStagingValidation`) must show `'✓ Valid staging folder'`, not `'✓ Valid archive root'`.
+- When adding a new root type that reuses an existing validation helper, always audit the fallback text to confirm it is correct for the new element.
+
+Avoid:
+- Hardcoding a single fallback label in a shared function and assuming it applies to all callers.
+- Assuming the `archiveName` field will always be populated — plain folders (staging, transfer) may return `{ valid: true }` with no name, always hitting the fallback.
+
+Validation:
+- Confirm the success fallback text matches the root type for every element that calls the shared helper.
+- Confirm staging shows "Valid staging folder", archive roots show "Valid archive root".
+
 ### UI as Reflection Layer
 
 Context:
@@ -1592,6 +1630,45 @@ Validation:
 - Confirm the operator can proceed even when a path is uninitialized or offline.
 - Confirm blocking behavior is only present when explicitly required and scoped to the specific action it gates.
 
+### Remove Dead CSS Rules When Removing All Usages of a Class
+
+Context:
+- Applies whenever all HTML elements using a CSS class are removed from `renderer/index.html` (or any renderer HTML file), whether as part of a feature removal, modal cleanup, or element audit.
+
+Rule:
+- When every HTML element that uses a CSS class is removed, the corresponding CSS rule(s) become dead code and must be removed in the same session.
+- Do not leave dead CSS rules as cleanup debt — they add ambiguity about whether the class is still in use elsewhere, and they pollute the stylesheet.
+- Before removing rules, grep the full codebase for any dynamic `classList.add/remove` or JS string reference to the class name — some classes are added programmatically and would not appear in static HTML.
+
+Avoid:
+- Removing HTML elements and leaving their CSS rules behind on the assumption they will be cleaned up later.
+- Assuming a class is unused just because it does not appear in HTML — check for programmatic usage first.
+
+Validation:
+- After removing a CSS class from all HTML: grep `renderer/` for the class name to confirm no programmatic usage remains.
+- Confirm the CSS rule(s) for the removed class are also deleted.
+- Confirm no visual regressions appear in areas that used the removed class.
+
+### Primary Action Button Must Not Be Full-Width in a Modal
+
+Context:
+- Applies to any modal in AutoIngest where a single primary action button (Run, Apply, Start, Export, etc.) is the main call-to-action, distinct from footer Save/Cancel buttons.
+
+Rule:
+- Do not apply `width: 100%` to a standalone primary action button inside a modal body or action row.
+- Full-width styling makes a single button appear as a banner that dominates the modal visually, inconsistent with AutoIngest modal design.
+- Content-width (intrinsic size driven by padding and label) is the correct default. The design system handles button sizing through padding, not explicit width.
+- If emphasis is needed, use a background color, icon, or helper text above the button — not full-width expansion.
+
+Avoid:
+- `.diag-actions #diagRunBtn { width: 100%; }` or equivalent — makes the button fill the container width.
+- Treating full-width as a way to make a primary action "stand out" — it over-dominates and breaks visual hierarchy.
+
+Validation:
+- Confirm no standalone primary action button in a modal body has `width: 100%` or equivalent.
+- Confirm the button renders at content-width, visually consistent with other primary action buttons in AutoIngest.
+- Confirm helper text or section context (if needed) is placed above the button, not expressed through button width.
+
 ## Validation Checklist
 
 Before making changes, read:
@@ -1681,6 +1758,174 @@ Validation:
 - Confirm the action hint element is only rendered when the reasons list has at least one item.
 - Confirm the result block renders cleanly with no orphaned instruction text when all checks pass (empty reasons list).
 - Confirm the hint appears correctly when at least one reason exists.
+
+### Section-Based Settings Modal Layout
+
+Context:
+- Applies to any settings-style modal in AutoIngest (Archive Locations, preferences, configuration panels) that contains multiple conceptually distinct groups of controls.
+
+Rule:
+- Group settings into labelled sections using `.aloc-section` / `.aloc-section-title` (or equivalent section/section-title pattern).
+- Section ordering convention: most-essential section first (e.g., "Current Working Archive"), supporting/dependent sections next, advanced or infrequently used operations last.
+- Advanced operations must be the last section in the modal body — never in the footer, and never before essential settings.
+- Section title style must be visually subordinate to the modal header: uppercase, small (`10px`), spaced (`letter-spacing: 0.08em`), muted opacity, with a bottom border separating the label from the rows below it.
+
+Avoid:
+- A flat unstructured list of settings rows with no visual grouping.
+- Advanced or operational buttons in the footer alongside Save/Cancel.
+- Sections ordered by implementation convenience rather than conceptual importance.
+
+Validation:
+- Confirm each conceptual group has a labelled section.
+- Confirm advanced/operational sections appear last in the modal body, not in the footer.
+- Confirm section title style is visually distinct from and subordinate to the modal header.
+
+### Modal Footer Content Rule
+
+Context:
+- Applies to `emm-footer` in all AutoIngest modals — settings modals, confirmation modals, activity modals.
+
+Rule:
+- The modal footer contains primary workflow actions only: Cancel + Save (for settings), or Close (for read-only modals).
+- At most one ghost utility action is permitted, placed on the footer-left side (e.g., "Recheck Status"). This must be a lightweight, non-destructive utility — not an operational tool button.
+- Operational tool buttons (Transfer Export, Transfer Import, Diagnostics, etc.) belong in a named body section, not the footer.
+- Layout: `emm-btn-ghost` on footer-left; `emm-footer-right` contains Cancel (`emm-btn-secondary`) then Save/Close (`emm-btn-primary`).
+
+Avoid:
+- Multiple operational buttons in the footer — they crowd Save/Cancel and destroy action priority clarity.
+- Destructive or infrequently used operations (export, import, diagnostics) in the footer.
+- Ghost utility actions on the footer-right — they must be left-aligned to remain visually subordinate.
+
+Validation:
+- Confirm footer-right contains only Cancel/Save or just Close.
+- Confirm at most one ghost utility is present in the footer, placed footer-left.
+- Confirm all operational tool buttons are inside a named body section.
+
+### Control Visual Hierarchy Within Action Rows
+
+Context:
+- Applies to any settings row that contains a primary action (Choose) and a subordinate reversible action (Clear) on the same path-control row.
+
+Rule:
+- The primary action (Choose, Set) uses the standard primary row button style (`aloc-btn` or equivalent).
+- The subordinate reversible action (Clear, Remove) uses a ghost modifier: `background: none; border-color: transparent; color: var(--subtext); font-size: 11px; padding: 4px 8px`.
+- Hover restores subtle visibility: `color: var(--text-primary); background: var(--card-hover); border-color: var(--border-subtle)`.
+- Clear is never styled as a danger/red button — it is a reversible unset, not a destructive action.
+
+Avoid:
+- Both Choose and Clear having equal visual weight — they are not equivalent-priority actions.
+- Styling Clear as a danger/destructive button.
+- Omitting Clear from non-Transfer roots (operators must be able to unset archive paths without choosing a replacement).
+
+Validation:
+- Confirm the primary action (Choose) uses the standard button style.
+- Confirm the subordinate action (Clear) uses the ghost modifier style.
+- Confirm the ghost hover state is visually subordinate to the primary button style.
+- Confirm Clear triggers only a path unset, not any destructive data operation.
+
+### Single-Behavior Actionable Tiles
+
+Context:
+- Applies to any overview tile (`.ov-tile--action`) that acts as a navigation entry point — clicking the tile opens a modal or navigates to a detail view.
+
+Rule:
+- A navigation-entry tile must not contain competing icon-only sub-controls (e.g., an inline refresh icon, an edit icon, a settings icon inside the tile body).
+- The visual ambiguity is harmful: the operator cannot tell whether clicking the tile navigates or whether clicking the icon performs an action. These two affordances on the same tap target conflict.
+- Move any labeled utility action (e.g., Recheck Status, Refresh Archive) to the target modal as a labeled button (preferably footer-left ghost button).
+- The tile itself is a single action: open. Everything else happens inside the opened modal.
+
+Avoid:
+- Adding an icon-only sub-control to a tile that is already a clickable navigation element.
+- Using click-propagation guards to make a nested button co-exist with a tile click handler — this is a symptom that a utility action does not belong on the tile.
+- Putting a scan/refresh trigger on the tile when it belongs as a labeled action inside the modal.
+
+Validation:
+- Confirm the tile body contains no nested interactive icon buttons.
+- Confirm any utility that was previously inline on the tile now exists as a labeled button inside the modal opened by the tile.
+- Confirm clicking any part of the tile (except tile chrome/text) opens the modal — no competing click targets.
+
+### Custom Dropdowns Must Mirror the TreeAutocomplete Keyboard Contract
+
+Context:
+- Applies whenever a bespoke dropdown is added to the EventCreator (or any other renderer panel) alongside or as a replacement for a `TreeAutocomplete` field.
+
+Rule:
+- Custom dropdowns must implement the same keyboard contract as `TreeAutocomplete`:
+  - ArrowDown / ArrowUp: move `_activeIdx` through visible items and apply `.tac-active` to the corresponding list item.
+  - Enter: trigger the active item's mousedown (equivalent to clicking it).
+  - Escape: close the dropdown.
+- Add a `_syncActive()` helper that removes `.tac-active` from all items then re-applies it to the item at `_activeIdx`.
+- Add a `keydown` listener on the input or the dropdown trigger; ensure the listener fires before the INPUT/TEXTAREA guard (see separate rule on Escape key placement).
+
+Avoid:
+- Shipping a custom dropdown with no keyboard listener — keyboard-only workflows that navigate City/EventType/Location via `TreeAutocomplete` will break at the Country step.
+- Only implementing arrow navigation without Enter handling — users cannot confirm a selection without a mouse.
+- Using different active-item CSS class names than `.tac-active` — mixing class names creates inconsistent focus styling.
+
+Validation:
+- Confirm ArrowDown/Up move the active indicator through the dropdown list.
+- Confirm Enter selects the active item (same result as a mouse click on it).
+- Confirm Escape closes the dropdown.
+- Confirm the keyboard behavior is visually identical to adjacent `TreeAutocomplete` fields.
+
+### Auto-Fill Guard: isManuallySet() on Dependent Dropdown Fields
+
+Context:
+- Applies when one EventCreator field auto-fills a dependent field based on the user's selection (e.g., City selection auto-fills Country).
+
+Rule:
+- The receiving field (the auto-filled field) needs an `isManuallySet()` method on its dropdown instance that returns `true` if the user has ever explicitly selected a value from the dropdown.
+- Auto-fill only fires if `!receivingField.isManuallySet()`. This prevents silent overwrite of a value the user deliberately chose.
+- Disk-loaded values from a previously saved session must also be treated as manually set: when `setValue()` is called to populate a field from persisted data (event reopened, component inherited), set the `_manuallySet` flag to `true` as part of that call. Without this, a subsequent auto-fill from a city selection would silently overwrite a value the user chose in a prior session.
+- Also add a `setValueAuto(value)` method that populates the field WITHOUT setting `_manuallySet`, exclusively for programmatic auto-fill paths.
+
+```js
+// Inside a DD instance
+_mountCountryDD(container, opts) {
+  let _manuallySet = false;
+  // Programmatic setter — marks field as manually set (used for disk-loaded values)
+  function setValue(v) { /* set value */ _manuallySet = true; }
+  // Auto-fill setter — does NOT mark as manually set
+  function setValueAuto(v) { if (_manuallySet) return; /* set value */ }
+  function isManuallySet() { return _manuallySet; }
+  // User selection path
+  item.addEventListener('mousedown', () => { /* set value */ _manuallySet = true; });
+}
+```
+
+Avoid:
+- Implementing auto-fill without an `isManuallySet()` guard — every city selection overwrites a country the user explicitly chose.
+- Treating `setValue()` (disk-load path) as a non-manually-set write — a prior saved selection is just as deliberate as a live click.
+- Having only `setValue()` with no `setValueAuto()` — without a separate auto-fill method there is no way to distinguish programmatic fill from user selection.
+
+Validation:
+- Confirm auto-fill does not overwrite a value the user set by clicking the dropdown.
+- Confirm auto-fill does not overwrite a value loaded from disk (event reopened).
+- Confirm `setValueAuto()` does populate the field when `isManuallySet()` is false.
+- Confirm that after auto-fill via `setValueAuto()`, the field is not marked as manually set (a subsequent city change can still update it).
+
+### Registry Cache Invalidation After Keywords Override Write
+
+Context:
+- Applies to any renderer path that calls a `keywords:*` IPC that mutates `keywords.override.json` (e.g., `keywords:saveCityCountry`, any future `keywords:save*` handler).
+
+Rule:
+- After an IPC that writes to the keywords override file, invalidate the renderer-side registry cache immediately:
+  ```js
+  _kwRegistry = null;
+  _kwRegistryPromise = null;
+  ```
+- Without invalidation, all subsequent lookups (`_lookupCityCountry`, keyword label checks, etc.) continue to serve stale pre-write data until the next explicit reload, producing incorrect or missing auto-fill results.
+- This applies even if the cache normally has a long TTL — a deliberate user-triggered write must take immediate effect.
+
+Avoid:
+- Assuming the cache self-invalidates after a write IPC returns.
+- Invalidating only `_kwRegistry` but leaving `_kwRegistryPromise` set — the in-flight promise will re-populate the cache with stale data before the invalidated null is replaced.
+
+Validation:
+- Confirm both `_kwRegistry = null` and `_kwRegistryPromise = null` are set immediately after the write IPC resolves.
+- Confirm a lookup performed immediately after the write returns fresh data (the newly saved association).
+- Confirm no stale auto-fill values are served to newly mounted components after the invalidation.
 
 ### Zero-Default vs Null-Default Sections in Read-Only Report Modals
 
