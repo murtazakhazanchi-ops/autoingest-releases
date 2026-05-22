@@ -21,6 +21,7 @@ const path = require('path');
 const fsp  = require('fs').promises;
 const { log } = require('../services/logger');
 const { readFileTags } = require('./exifService');
+const { hidePathBestEffort } = require('../services/internalFileProtection');
 
 // ── Paths ─────────────────────────────────────────────────────────────────────
 
@@ -403,6 +404,7 @@ async function _writeMetadataAndEventJson(eventFolderPath, metaDoc, syncTs) {
   try {
     await fsp.writeFile(tmp1, JSON.stringify(metaDoc, null, 2), 'utf-8');
     await fsp.rename(tmp1, metaPath);
+    hidePathBestEffort(metaPath).catch(() => {});
   } catch (err) {
     try { await fsp.unlink(tmp1); } catch {}
     throw new Error(`event.metadata.json write failed: ${err.message}`);
@@ -432,6 +434,7 @@ async function _writeMetadataAndEventJson(eventFolderPath, metaDoc, syncTs) {
   try {
     await fsp.writeFile(tmp2, JSON.stringify(doc2, null, 2), 'utf-8');
     await fsp.rename(tmp2, jsonPath);
+    hidePathBestEffort(jsonPath).catch(() => {});
   } catch (err) {
     try { await fsp.unlink(tmp2); } catch {}
     throw new Error(`event.json metadataIndex update failed: ${err.message}`);

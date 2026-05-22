@@ -17,6 +17,7 @@
 
 const fsp  = require('fs').promises;
 const path = require('path');
+const { hidePathBestEffort } = require('./internalFileProtection');
 
 const settings = require('./settings');
 const {
@@ -246,6 +247,7 @@ async function adoptFolder(input, isValidEventJsonFn, activeUser) {
 
   try {
     await fsp.rename(tmpPath, jsonPath);
+    hidePathBestEffort(jsonPath).catch(() => {});
   } catch (err) {
     try { await fsp.unlink(tmpPath); } catch {}
     return { ok: false, reason: `rename-failed: ${err.message}` };

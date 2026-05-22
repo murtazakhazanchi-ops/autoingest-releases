@@ -35,6 +35,7 @@ const syncReviewService             = require('../services/syncReviewService');
 const adoptionPreviewService        = require('../services/adoptionPreviewService');
 const adoptionDryRunService      = require('../services/adoptionDryRunService');
 const adoptionWriteService       = require('../services/adoptionWriteService');
+const { hidePathBestEffort }     = require('../services/internalFileProtection');
 const userManager   = require('./userManager');
 const { validateEventJson } = require('./contracts/dataValidator');
 const exifService         = require('./exifService');
@@ -709,6 +710,7 @@ ipcMain.handle('import:commitTransaction', async (event, {
         'utf-8'
       );
       await fsp.rename(tmp, jsonPath);
+      hidePathBestEffort(jsonPath).catch(() => {});
       return;
     }
 
@@ -908,6 +910,7 @@ ipcMain.handle('import:commitTransaction', async (event, {
           await fsp.copyFile(tmp, jsonPath);
           await fsp.unlink(tmp).catch(() => {});
         }
+        hidePathBestEffort(jsonPath).catch(() => {});
       } catch (err) {
         await fsp.unlink(tmp).catch(() => {});
         console.error(`[import:commitTransaction] event.json write failed at ${jsonPath}:`, err.stack || err.message);
@@ -1193,6 +1196,7 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
           const tmp = jsonPath + '.tmp';
           await fsp.writeFile(tmp, JSON.stringify(eventJson, null, 2), 'utf8');
           await fsp.rename(tmp, jsonPath);
+          hidePathBestEffort(jsonPath).catch(() => {});
         }
       } else {
         jsonCorrupt = true;
@@ -1368,6 +1372,7 @@ ipcMain.handle('event:write', async (_event, eventFolderPath, eventData) => {
   try {
     await fsp.writeFile(tmp, JSON.stringify(eventData, null, 2), 'utf8');
     await fsp.rename(tmp, jsonPath);
+    hidePathBestEffort(jsonPath).catch(() => {});
     return { ok: true, alreadyExisted: false, data: eventData };
   } catch (err) {
     try { await fsp.unlink(tmp); } catch {}
@@ -1466,6 +1471,7 @@ async function updateEventJson(eventFolderPath, payload) {
   try {
     await fsp.writeFile(tmp, JSON.stringify(dataToWrite, null, 2), 'utf-8');
     await fsp.rename(tmp, jsonPath);
+    hidePathBestEffort(jsonPath).catch(() => {});
     return { ok: true };
   } catch (err) {
     try { await fsp.unlink(tmp); } catch {}
@@ -1535,6 +1541,7 @@ ipcMain.handle('event:appendImports', async (_event, eventFolderPath, entries) =
   try {
     await fsp.writeFile(tmp, JSON.stringify(doc, null, 2), 'utf8');
     await fsp.rename(tmp, jsonPath);
+    hidePathBestEffort(jsonPath).catch(() => {});
     return { ok: true, count: incomingSafe.length };
   } catch (err) {
     try { await fsp.unlink(tmp); } catch {}
@@ -1891,6 +1898,7 @@ ipcMain.handle('archive:initArchiveRoot', async (_event, dirPath) => {
       type:      'autoingest-nas-root',
       createdAt: new Date().toISOString(),
     }, null, 2), 'utf8');
+    hidePathBestEffort(path.join(dirPath, '.autoingest')).catch(() => {});
     return { ok: true };
   } catch (err) {
     return { ok: false, reason: 'error', message: err.message };

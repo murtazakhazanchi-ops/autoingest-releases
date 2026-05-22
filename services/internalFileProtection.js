@@ -10,7 +10,8 @@
  * Platform behaviour:
  *   macOS  : chflags hidden  (best-effort, non-fatal)
  *   Windows: attrib +H       (best-effort, non-fatal)
- *   Linux/NAS: no-op         (no standard hidden attribute)
+ *   Linux/NAS: maintain .hidden file in the same directory listing the filename
+ *              (GNOME Nautilus and compatible file managers honour this file)
  *
  * _Selected is NOT internal — it must remain visible.
  */
@@ -66,19 +67,40 @@ function shouldExcludeFromMediaBrowser(name) {
  * Best-effort: returns false without throwing when the OS command fails
  * (e.g. permission denied on a NAS mount).
  *
+ * Platform behaviour:
+ *   macOS  : chflags hidden <path>
+ *   Windows: attrib +H <path>
+ *   Linux/other: append the basename to .hidden in the same directory
+ *                (Nautilus/compatible file managers honour this convention)
+ *
  * @param {string} filePath  Absolute path to file or directory.
  * @returns {Promise<boolean>}  true if the attribute was applied.
  */
-function hidePathBestEffort(filePath) {
-  return new Promise((resolve) => {
-    if (process.platform === 'darwin') {
-      execFile('chflags', ['hidden', filePath], (err) => resolve(!err));
-    } else if (process.platform === 'win32') {
-      execFile('attrib', ['+H', filePath], (err) => resolve(!err));
-    } else {
-      resolve(false);
+async function hidePathBestEffort(filePath) {
+  if (process.platform === 'darwin') {
+    return new Promise(resolve => execFile('chflags', ['hidden', filePath], err => resolve(!err)));
+  }
+  if (process.platform === 'win32') {
+    return new Promise(resolve => execFile('attrib', ['+H', filePath], err => resolve(!err)));
+  }
+  // Linux/other: maintain .hidden file in the same directory.
+  // Files/dirs starting with '.' are already hidden by convention; only non-dot
+  // names need an explicit .hidden entry.
+  const name = path.basename(filePath);
+  if (name.startsWith('.')) return false;
+  const hiddenFile = path.join(path.dirname(filePath), '.hidden');
+  try {
+    let existing = '';
+    try { existing = await fsp.readFile(hiddenFile, 'utf8'); } catch {}
+    const lines = existing.split('\n').map(l => l.trim()).filter(Boolean);
+    if (!lines.includes(name)) {
+      lines.push(name);
+      await fsp.writeFile(hiddenFile, lines.join('\n') + '\n', 'utf8');
     }
-  });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // ── Bulk hiding ───────────────────────────────────────────────────────────────
