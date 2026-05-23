@@ -1187,6 +1187,7 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
       const obj = normalizeEventJson(JSON.parse(raw));
       if (isValidEventJson(obj)) {
         eventJson = obj;
+        hidePathBestEffort(jsonPath).catch(() => {});
         // Patch 3: crash recovery — reset stuck in-progress status on next startup.
         // An event left as 'in-progress' means the app crashed or was force-quit
         // mid-import. Reset to 'created' so the user can retry cleanly.
@@ -1361,6 +1362,7 @@ ipcMain.handle('event:write', async (_event, eventFolderPath, eventData) => {
   // Check if already exists — don't overwrite
   try {
     const existing = await fsp.readFile(jsonPath, 'utf8');
+    hidePathBestEffort(jsonPath).catch(() => {});
     return { ok: true, alreadyExisted: true, data: JSON.parse(existing) };
   } catch (err) {
     if (err.code !== 'ENOENT') return { ok: false, reason: `Read check failed: ${err.message}` };
@@ -2147,6 +2149,38 @@ async function _runNasScan() {
 
 ipcMain.handle('archive:scanNasEvents',    async () => _runNasScan());
 ipcMain.handle('archive:refreshNasEvents', async () => _runNasScan());
+
+// Scan Local Staging Root for master collections — used when Active Archive Root is offline.
+// Does not require or validate an archive-root marker. Returns basic collection + event stubs.
+ipcMain.handle('archive:scanStagingCollections', async (_event, stagingRoot) => {
+  if (!stagingRoot || typeof stagingRoot !== 'string') return { ok: false, collections: [] };
+  let entries;
+  try {
+    entries = await fsp.readdir(stagingRoot, { withFileTypes: true });
+  } catch {
+    return { ok: false, collections: [] };
+  }
+  const collections = [];
+  for (const collEntry of entries) {
+    if (!collEntry.isDirectory()) continue;
+    if (collEntry.name.startsWith('.') || _NAS_SKIP_DIRS.has(collEntry.name)) continue;
+    const collPath = path.join(stagingRoot, collEntry.name);
+    const events = [];
+    try {
+      const evEntries = await fsp.readdir(collPath, { withFileTypes: true });
+      for (const evEntry of evEntries) {
+        if (!evEntry.isDirectory() || evEntry.name.startsWith('.')) continue;
+        try {
+          await fsp.access(path.join(collPath, evEntry.name, 'event.json'));
+          events.push({ name: evEntry.name });
+        } catch { /* no event.json — skip */ }
+      }
+    } catch { /* unreadable collection — include with 0 events */ }
+    collections.push({ name: collEntry.name, path: collPath, events });
+  }
+  collections.sort((a, b) => a.name.localeCompare(b.name));
+  return { ok: true, collections };
+});
 
 ipcMain.handle('archive:getCachedNasEvents', async () => {
   const cached = await nasEventCache.load();

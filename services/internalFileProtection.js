@@ -78,10 +78,16 @@ function shouldExcludeFromMediaBrowser(name) {
  */
 async function hidePathBestEffort(filePath) {
   if (process.platform === 'darwin') {
-    return new Promise(resolve => execFile('chflags', ['hidden', filePath], err => resolve(!err)));
+    return new Promise(resolve => execFile('chflags', ['hidden', filePath], err => {
+      if (err) console.warn('[hidePathBestEffort] chflags hidden failed:', filePath, '—', err.message);
+      resolve(!err);
+    }));
   }
   if (process.platform === 'win32') {
-    return new Promise(resolve => execFile('attrib', ['+H', filePath], err => resolve(!err)));
+    return new Promise(resolve => execFile('attrib', ['+H', filePath], err => {
+      if (err) console.warn('[hidePathBestEffort] attrib +H failed:', filePath, '—', err.message);
+      resolve(!err);
+    }));
   }
   // Linux/other: maintain .hidden file in the same directory.
   // Files/dirs starting with '.' are already hidden by convention; only non-dot
@@ -98,7 +104,8 @@ async function hidePathBestEffort(filePath) {
       await fsp.writeFile(hiddenFile, lines.join('\n') + '\n', 'utf8');
     }
     return true;
-  } catch {
+  } catch (err) {
+    console.warn('[hidePathBestEffort] .hidden write failed:', filePath, '—', err.message);
     return false;
   }
 }

@@ -328,7 +328,9 @@ const EventCreator = (() => {
   let sessionArchiveRoot = null;  // string | null — cache of persisted settings.archiveRoot; primed by primeFromSettings(), auto-migrates on create/change
   let activeMaster       = null;  // { name, path } | null — the on-disk master folder in use
   const sessionCollections = [];  // { name, hijriDate, label, events[], _masterPath }[]
-  let   selectedCollection = null; // string (folder name) or null
+  let   selectedCollection  = null; // string (folder name) or null
+  let _offlineStagingMode   = false; // true when archive is offline and staging collections are shown
+  let _effectiveStagingRoot = null;  // staging root to use for collection create/check when offline
 
   // ── Internal step tracker ──────────────────────────────────────────────────
   let currentStep = 1;
@@ -653,6 +655,69 @@ const EventCreator = (() => {
         if (dEl) dEl.value = String(today.hijri.day).padStart(2, '0');
       }
     }).catch(() => {});
+
+    // Async: detect offline + scan staging root; re-renders when results arrive.
+    _loadStagingCollectionsIfOffline().catch(err => {
+      console.warn('[EventCreator] staging collection scan failed:', err);
+    });
+  }
+
+  // Re-renders Step 1 in place — used after async staging scan completes.
+  function _refreshMasterStep() {
+    if (_navScreen !== 'masterStep') return;
+    const body = $ecBody();
+    if (!body) return;
+    body.innerHTML = buildMasterHTML();
+    attachMasterListeners();
+  }
+
+  // Checks archive status; if offline + staging available, scans staging root for
+  // master collections and merges them into sessionCollections, then re-renders Step 1.
+  async function _loadStagingCollectionsIfOffline() {
+    let opsStatus;
+    try { opsStatus = await window.api.getArchiveOperationsStatus(); } catch { return; }
+
+    const isOffline   = opsStatus?.status === 'nas-disconnected' || opsStatus?.status === 'invalid-nas';
+    const stagingRoot = opsStatus?.localStagingRoot;
+
+    if (!isOffline || !stagingRoot) {
+      if (_offlineStagingMode) {
+        _offlineStagingMode   = false;
+        _effectiveStagingRoot = null;
+        _refreshMasterStep();
+      }
+      return;
+    }
+
+    const wasAlreadyOffline = _offlineStagingMode;
+    _offlineStagingMode   = true;
+    _effectiveStagingRoot = stagingRoot;
+
+    let result;
+    try { result = await window.api.scanStagingCollections(stagingRoot); } catch {
+      if (!wasAlreadyOffline) _refreshMasterStep();
+      return;
+    }
+
+    if (result?.ok && Array.isArray(result.collections)) {
+      for (const sc of result.collections) {
+        if (sessionCollections.find(c => c.name === sc.name)) continue;
+        sessionCollections.push({ name: sc.name, hijriDate: '', label: '', events: sc.events || [], _masterPath: sc.path });
+      }
+    }
+
+    _refreshMasterStep();
+  }
+
+  // Returns the effective on-disk path for the current collection.
+  // While archive is offline, returns staging path (coll._masterPath).
+  // activeMaster.path always holds the intended NAS archive path for setLastEvent/reconnect.
+  function _effectiveCollPath() {
+    if (_offlineStagingMode && selectedCollection) {
+      const coll = sessionCollections.find(c => c.name === selectedCollection);
+      if (coll?._masterPath) return coll._masterPath;
+    }
+    return activeMaster?.path || null;
   }
 
   // ── HTML builders ──────────────────────────────────────────────────────────
@@ -661,9 +726,12 @@ const EventCreator = (() => {
     const hasExisting = sessionCollections.length > 0;
     const formOpen    = !hasExisting;
 
+    const offlineLabel = _offlineStagingMode ? 'Create New (Local Staging)' : (hasExisting ? 'Create New Collection' : 'New Collection');
+
     return `
 <div class="ec-master-wrap">
 
+  ${_offlineStagingMode && !hasExisting ? `<p class="ec-subtext" style="margin-bottom:12px">Archive offline — no Local Staging collections found.</p>` : ''}
   ${hasExisting ? buildExistingCardsHTML() : ''}
 
   <!-- New collection expander ──────────────────────────────────────────── -->
@@ -674,7 +742,7 @@ const EventCreator = (() => {
     aria-controls="ecNewForm"
   >
     <span class="ec-new-plus" aria-hidden="true">＋</span>
-    <span>${hasExisting ? 'Create New Collection' : 'New Collection'}</span>
+    <span>${offlineLabel}</span>
     <span class="ec-new-arrow" aria-hidden="true"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
   </button>
 
@@ -709,17 +777,20 @@ const EventCreator = (() => {
     const displayPath = sessionArchiveRoot.length > 55
       ? '…' + sessionArchiveRoot.slice(-52)
       : sessionArchiveRoot;
+    const rootLabel = _offlineStagingMode ? 'Archive Root (offline)' : 'Archive Root';
     return `
 <div class="ec-location-display" id="ecLocationDisplay">
-  <span class="ec-location-label">Archive Root</span>
+  <span class="ec-location-label">${rootLabel}</span>
   <span class="ec-location-path" title="${esc(sessionArchiveRoot)}">${esc(displayPath)}</span>
   <button class="ec-location-change-link" id="ecChangeLocation">Change Archive Location</button>
 </div>`;
   }
 
   function buildExistingCardsHTML() {
+    const sectionTitle = _offlineStagingMode ? 'Local Staging Collections' : 'Existing Collections';
     return `
-<p class="ec-section-title">Existing Collections</p>
+<p class="ec-section-title">${sectionTitle}</p>
+${_offlineStagingMode ? '<p class="ec-subtext">Archive offline — showing collections from Local Staging</p>' : ''}
 <div class="ec-collection-cards" id="ecCollList" role="listbox" aria-label="Existing collections">
   ${sessionCollections.map(c => `
   <div
@@ -893,7 +964,12 @@ const EventCreator = (() => {
     selectedCollection = name;
     const coll = sessionCollections.find(c => c.name === name);
     if (coll?._masterPath) {
-      activeMaster = { name, path: coll._masterPath };
+      // activeMaster.path always holds the intended archive path for setLastEvent/reconnect.
+      // Effective disk I/O uses _effectiveCollPath() which returns coll._masterPath when offline.
+      const archivePath = (_offlineStagingMode && sessionArchiveRoot)
+        ? sessionArchiveRoot + '/' + name
+        : coll._masterPath;
+      activeMaster = { name, path: archivePath };
     }
     document.querySelectorAll('.ec-coll-card').forEach(c => {
       const sel = c.dataset.name === name;
@@ -997,8 +1073,9 @@ const EventCreator = (() => {
     const name      = buildCollectionName(y, m, d, l);
     const hijriDate = `${y}-${pad2(m)}-${pad2(d)}`;
 
-    // Active Archive Root must come from Archive Locations — block if not set.
-    if (!sessionArchiveRoot) {
+    // When offline, create under Local Staging Root; otherwise require Active Archive Root.
+    const effectiveRoot = (_offlineStagingMode && _effectiveStagingRoot) ? _effectiveStagingRoot : sessionArchiveRoot;
+    if (!effectiveRoot) {
       showBanner('Set an Active Archive Root in Archive Locations before creating a collection.', 'error');
       document.dispatchEvent(new CustomEvent('eventcreator:openArchiveLocations'));
       return;
@@ -1008,7 +1085,7 @@ const EventCreator = (() => {
     // whether the name appears in sessionCollections. This makes in-session
     // duplicates, prior-session duplicates, and externally-created folders
     // all trigger the same modal flow.
-    const { exists, fullPath } = await window.api.checkMasterExists(sessionArchiveRoot, name);
+    const { exists, fullPath } = await window.api.checkMasterExists(effectiveRoot, name);
     let masterPath;
 
     if (exists) {
@@ -1016,7 +1093,7 @@ const EventCreator = (() => {
       if (!useIt) return; // user chose No → stay on Step 1
       masterPath = fullPath;
     } else {
-      const created = await window.api.createMaster(sessionArchiveRoot, name);
+      const created = await window.api.createMaster(effectiveRoot, name);
       masterPath = created.path;
     }
 
@@ -1029,7 +1106,12 @@ const EventCreator = (() => {
       sessionCollections.push(collection);
     }
     selectedCollection = name;
-    activeMaster = { name, path: masterPath };
+    // When offline, activeMaster.path stays the NAS path so _tryCreateEvent triggers the
+    // NAS-fail → staging-fallback path, and setLastEvent stores the archive path for reconnect.
+    activeMaster = {
+      name,
+      path: (_offlineStagingMode && sessionArchiveRoot) ? (sessionArchiveRoot + '/' + name) : masterPath,
+    };
 
     proceedToEventStep();
   }
@@ -1105,7 +1187,8 @@ const EventCreator = (() => {
   }
 
   async function _scanAndRenderEventList() {
-    _scannedEvents = await window.api.scanMasterEvents(activeMaster.path);
+    const _scanPath = _effectiveCollPath() || activeMaster?.path;
+    _scannedEvents = await window.api.scanMasterEvents(_scanPath);
     if (!_scannedEvents) _scannedEvents = [];
     // Always render the list — empty state shows "No resolvable events yet" + "+ Create New Event".
     // Never auto-open the create form; the user must click the button explicitly.
@@ -1329,12 +1412,12 @@ ${unparseable.map(ev => `
     const entry = (_scannedEvents || []).find(e => e.folderName === folderName && e.isParseable);
     if (!entry) return;
 
-    if (!activeMaster?.path) {
+    if (!activeMaster?.path && !_effectiveCollPath()) {
       console.error('[_openExistingEvent] No activeMaster path');
       return;
     }
 
-    const eventPath = activeMaster.path + '/' + entry.folderName;
+    const eventPath = (_effectiveCollPath() || activeMaster.path) + '/' + entry.folderName;
 
     let components = await loadEventFromDisk(eventPath);
 
@@ -1352,18 +1435,19 @@ ${unparseable.map(ev => `
     _compSeq = components.length;
 
     _viewingExisting = {
-      folderName:   entry.folderName,
-      displayName:  entry._eventJson?.eventName || entry.folderName,
-      hijriDate:    entry.hijriDate    || entry._eventJson?.hijriDate    || null,
-      sequence:     entry.sequence     ?? entry._eventJson?.sequence     ?? null,
-      isUnresolved: !!entry.isUnresolved,
+      folderName:         entry.folderName,
+      displayName:        entry._eventJson?.eventName || entry.folderName,
+      hijriDate:          entry.hijriDate    || entry._eventJson?.hijriDate    || null,
+      sequence:           entry.sequence     ?? entry._eventJson?.sequence     ?? null,
+      isUnresolved:       !!entry.isUnresolved,
+      isOfflineLocalCopy: _offlineStagingMode,
     };
 
     _renderEventForm();
   }
 
   async function openEventForEdit(entry, { skipAutoRepair = false } = {}) {
-    const eventPath = activeMaster.path + '/' + entry.folderName;
+    const eventPath = (_effectiveCollPath() || activeMaster?.path) + '/' + entry.folderName;
 
     if (!eventPath) {
       console.error('[openEventForEdit] Missing event path');
@@ -1621,9 +1705,10 @@ ${unparseable.map(ev => `
       let _diskInfo        = null;
       let _hasExistingData = false;
       if (_wasSingle && _isNowMulti) {
-        if (activeMaster?.path && oldName) {
+        const _effPath = _effectiveCollPath() || activeMaster?.path;
+        if (_effPath && oldName) {
           _diskChecked = true;
-          const _eventDiskPath = activeMaster.path + '/' + oldName;
+          const _eventDiskPath = _effPath + '/' + oldName;
           const _pathExists    = await window.api.dirExists(_eventDiskPath);
           if (_pathExists) {
             _diskInfo        = await window.api.dirInspectContent(_eventDiskPath);
@@ -1682,8 +1767,9 @@ ${unparseable.map(ev => `
         isUnresolved:       false,
         folderName:         c.folderName ?? buildFolderName(c, idx, _noRenameAllSameCity),
       }));
-      if (activeMaster?.path) {
-        const noRenamePath = activeMaster.path + '/' + oldName;
+      const _noRenameEffPath = _effectiveCollPath() || activeMaster?.path;
+      if (_noRenameEffPath) {
+        const noRenamePath = _noRenameEffPath + '/' + oldName;
         const noRenamePayload = {
           eventName:     newName,
           safeEventName: safeNewName,
@@ -1753,7 +1839,8 @@ ${unparseable.map(ev => `
     }
 
     // Call IPC to rename on disk using the filesystem-safe name.
-    const result = await window.api.renameEvent(activeMaster.path, oldName, safeNewName);
+    const _renameEffPath = _effectiveCollPath() || activeMaster?.path;
+    const result = await window.api.renameEvent(_renameEffPath, oldName, safeNewName);
     if (!result.ok) {
       if (result.reason === 'collision') {
         _showEventBanner(`A folder named "${safeNewName}" already exists.`, 'error');
@@ -1842,8 +1929,9 @@ ${unparseable.map(ev => `
     }
 
     // Update (or create for legacy events) event.json at the new safe path.
-    if (activeMaster?.path) {
-      const newEventPath = activeMaster.path + '/' + safeNewName;
+    const _newEvEffPath = _effectiveCollPath() || activeMaster?.path;
+    if (_newEvEffPath) {
+      const newEventPath = _newEvEffPath + '/' + safeNewName;
       const renamePayload = {
         eventName:     newName,
         safeEventName: safeNewName,
@@ -3085,7 +3173,7 @@ ${unparseable.map(ev => `
       return false;
     }
 
-    const eventPath = activeMaster.path + '/' + entry.folderName;
+    const eventPath = (_effectiveCollPath() || activeMaster?.path) + '/' + entry.folderName;
 
     const components = await loadEventFromDisk(eventPath);
     if (!components) {
@@ -3097,12 +3185,13 @@ ${unparseable.map(ev => `
     _compSeq = _eventComps.length;
 
     _viewingExisting = {
-      folderName:   entry.folderName,
-      displayName:  entry.displayName || entry._eventJson?.eventName || entry.folderName,
-      hijriDate:    entry.hijriDate    || entry._eventJson?.hijriDate    || null,
-      sequence:     entry.sequence     ?? entry._eventJson?.sequence     ?? null,
-      isUnresolved: !!entry.isUnresolved,
-      components:   _eventComps.map(c => ({ ...c, eventTypes: [...c.eventTypes] })),
+      folderName:         entry.folderName,
+      displayName:        entry.displayName || entry._eventJson?.eventName || entry.folderName,
+      hijriDate:          entry.hijriDate    || entry._eventJson?.hijriDate    || null,
+      sequence:           entry.sequence     ?? entry._eventJson?.sequence     ?? null,
+      isUnresolved:       !!entry.isUnresolved,
+      components:         _eventComps.map(c => ({ ...c, eventTypes: [...c.eventTypes] })),
+      isOfflineLocalCopy: _offlineStagingMode,
     };
 
     if (!_viewingExisting.hijriDate || _viewingExisting.sequence == null) {
@@ -3217,17 +3306,69 @@ ${unparseable.map(ev => `
           linkedAt: new Date().toISOString(),
         };
       }
-      window.api.writeEventJson(eventFolderPath, eventJsonPayload).then(result => {
-        if (result?.alreadyExisted) {
+      // Await write so a NAS failure can be detected and routed to local staging.
+      const _writeResult = await window.api.writeEventJson(eventFolderPath, eventJsonPayload);
+      if (_writeResult?.ok) {
+        if (_writeResult.alreadyExisted) {
           console.log('[EventCreator] event.json already existed; kept existing record:', name);
         }
-      }).catch(err => console.error('[EventCreator] writeEventJson failed:', err));
+        // When archive is offline and activeMaster.path was already the staging path
+        // (e.g. user selected an existing staging collection), the write succeeds directly.
+        // Mark the event as a local staging copy so the hero shows the offline badge.
+        if (_offlineStagingMode) {
+          _viewingExisting = {
+            folderName:         safe,
+            displayName:        name,
+            hijriDate:          _newEventDate,
+            sequence:           parseInt(seq, 10),
+            isUnresolved:       false,
+            isOfflineLocalCopy: true,
+          };
+        }
+      } else {
+        // Archive write failed — check if offline; if so, fall back to local staging.
+        let _stagingOk = false;
+        try {
+          const _opsStatus   = await window.api.getArchiveOperationsStatus();
+          const _isOffline   = _opsStatus?.status === 'nas-disconnected' || _opsStatus?.status === 'invalid-nas';
+          const _stagingRoot = _opsStatus?.localStagingRoot;
+          if (_isOffline && _stagingRoot) {
+            const _collName        = activeMaster.path.replace(/\\/g, '/').split('/').filter(Boolean).pop() || selectedCollection;
+            const _stagingCollPath = _stagingRoot.replace(/\\/g, '/').replace(/\/$/, '') + '/' + _collName;
+            const _stagingEvPath   = _stagingCollPath + '/' + safe;
+            const _stagingWrite    = await window.api.writeEventJson(_stagingEvPath, eventJsonPayload);
+            if (_stagingWrite?.ok) {
+              coll._masterPath = _stagingCollPath;
+              // Mark new offline event so hero shows the local-staging badge.
+              _viewingExisting = {
+                folderName:         safe,
+                displayName:        name,
+                hijriDate:          _newEventDate,
+                sequence:           parseInt(seq, 10),
+                isUnresolved:       false,
+                isOfflineLocalCopy: true,
+              };
+              console.log('[EventCreator] archive offline — event.json written to local staging:', _stagingEvPath);
+              _stagingOk = true;
+            }
+          }
+        } catch (_fallbackErr) {
+          console.error('[EventCreator] staging fallback failed:', _fallbackErr);
+        }
+        if (!_stagingOk) {
+          _showEventBanner('Failed to create event — archive is offline and local staging is unavailable.', 'error');
+          coll.events.pop();
+          _activeEventIdx = Math.max(0, _activeEventIdx - 1);
+          return;
+        }
+      }
 
       // Create one subfolder per component — only for multi-component events.
       // Single-component events route files directly into the event folder.
       if (compsForDisk.length > 1) {
         try {
-          const basePath = activeMaster.path + '/' + safe;
+          // Use effective working collection path — staging when offline, archive when online.
+          const basePath = (coll._masterPath || activeMaster.path) + '/' + safe;
 
           // folderName was already computed and persisted into compsForDisk above.
           // Use those names directly so disk folders match event.json exactly.
@@ -3673,9 +3814,10 @@ ${unparseable.map(ev => `
         const safeName  = last.safeEventName || sanitizeForPath(last.eventName || '');
         const eventPath = safeName ? (last.collectionPath + '/' + safeName) : null;
 
-        let resolvedCollPath   = last.collectionPath;
-        let resolvedEventPath  = eventPath;
-        let isOfflineLocalCopy = false;
+        let resolvedCollPath      = last.collectionPath;
+        let resolvedEventPath     = eventPath;
+        let isOfflineLocalCopy    = false;
+        let _resolvedStagingRoot  = null;
 
         const valid = await window.api.verifyLastEvent(last.collectionPath, eventPath);
         if (!valid) {
@@ -3686,16 +3828,56 @@ ${unparseable.map(ev => `
             const opsStatus   = await window.api.getArchiveOperationsStatus();
             archiveOffline    = opsStatus?.status === 'nas-disconnected' || opsStatus?.status === 'invalid-nas';
             const stagingRoot = opsStatus?.localStagingRoot;
-            if (stagingRoot && last.collectionName && safeName) {
+            if (stagingRoot && last.collectionName) {
               const sCollPath  = stagingRoot + '/' + last.collectionName;
-              const sEventPath = sCollPath   + '/' + safeName;
-              const stagingValid = await window.api.verifyLastEvent(sCollPath, sEventPath);
+              const sEventPath = safeName ? (sCollPath + '/' + safeName) : null;
+              console.log('[restoreLastEvent] staging fallback — checking:', { sCollPath, sEventPath, safeName });
+              const stagingValid = sEventPath ? await window.api.verifyLastEvent(sCollPath, sEventPath) : false;
               if (stagingValid) {
-                resolvedCollPath   = sCollPath;
-                resolvedEventPath  = sEventPath;
-                isOfflineLocalCopy = true;
-                stagingResolved    = true;
-                console.log('[restoreLastEvent] archive offline — restoring from local staging:', sEventPath);
+                resolvedCollPath      = sCollPath;
+                resolvedEventPath     = sEventPath;
+                isOfflineLocalCopy    = true;
+                stagingResolved       = true;
+                _resolvedStagingRoot  = stagingRoot;
+                console.log('[restoreLastEvent] archive offline — restoring from local staging (exact):', sEventPath);
+              } else {
+                // Exact path check failed — scan the staging collection for a matching event folder.
+                try {
+                  const scanResult = await window.api.scanStagingCollections(stagingRoot);
+                  const matchColl  = scanResult?.collections?.find(c => c.name === last.collectionName);
+                  console.log('[restoreLastEvent] staging scan — collection:',
+                    matchColl ? matchColl.name : 'NOT FOUND',
+                    '| available:', scanResult?.collections?.map(c => c.name) ?? []);
+                  if (matchColl && matchColl.events.length > 0) {
+                    const targetName = safeName || sanitizeForPath(last.eventName || '');
+                    const matchEvent = matchColl.events.find(e => e.name === targetName)
+                      || matchColl.events.find(e => e.name === sanitizeForPath(last.eventName || ''));
+                    console.log('[restoreLastEvent] staging scan — looking for:', targetName,
+                      '| found:', matchEvent ? matchEvent.name : 'NOT FOUND',
+                      '| events:', matchColl.events.map(e => e.name));
+                    if (matchEvent) {
+                      const scannedEventPath = matchColl.path + '/' + matchEvent.name;
+                      const scannedValid = await window.api.verifyLastEvent(matchColl.path, scannedEventPath);
+                      if (scannedValid) {
+                        resolvedCollPath      = matchColl.path;
+                        resolvedEventPath     = scannedEventPath;
+                        isOfflineLocalCopy    = true;
+                        stagingResolved       = true;
+                        _resolvedStagingRoot  = stagingRoot;
+                        console.log('[restoreLastEvent] archive offline — restoring from local staging (scan):', scannedEventPath);
+                      } else {
+                        console.warn('[restoreLastEvent] staging scan: event folder found but verifyLastEvent failed:', scannedEventPath);
+                      }
+                    }
+                  } else if (!matchColl) {
+                    console.warn('[restoreLastEvent] staging scan: collection not found in staging root:', last.collectionName,
+                      '| staging root:', stagingRoot);
+                  } else {
+                    console.warn('[restoreLastEvent] staging scan: collection found but no events with event.json:', matchColl.name);
+                  }
+                } catch (scanErr) {
+                  console.warn('[restoreLastEvent] staging scan failed:', scanErr);
+                }
               }
             }
           } catch (err) {
@@ -3753,6 +3935,15 @@ ${unparseable.map(ev => `
 
         // Always persist archive path in activeMaster so settings reconnect correctly on next launch.
         activeMaster = { name: last.collectionName, path: last.collectionPath };
+
+        // When restored from local staging, activate offline staging mode so that
+        // _effectiveCollPath() returns the staging collection path (not the offline NAS path).
+        // This makes _scanAndRenderEventList() scan the correct local path when the user
+        // opens Event Management while the archive is disconnected.
+        if (isOfflineLocalCopy && _resolvedStagingRoot) {
+          _offlineStagingMode   = true;
+          _effectiveStagingRoot = _resolvedStagingRoot;
+        }
 
         // If last event was reconstructed from the sync queue (not from settings), write it
         // back so the next restart can use the normal path without needing a queue scan.
@@ -3856,6 +4047,22 @@ ${unparseable.map(ev => `
         if (coll) coll._masterPath = archiveCollPath;
 
         _viewingExisting.isOfflineLocalCopy = false;
+
+        // Archive is confirmed online — exit staging mode and invalidate the cached event
+        // list so the next Event Management open rescans from the archive path, not the
+        // stale Local Staging scan.
+        _offlineStagingMode   = false;
+        _effectiveStagingRoot = null;
+        _scannedEvents        = null;
+
+        // If Event Management is already open in the list view, rescan immediately so
+        // the displayed event count reflects the archive, not Local Staging.
+        if (typeof EventMgmt !== 'undefined' && EventMgmt.isOpen() && EventMgmt.getMode() === 'select') {
+          _scanAndRenderEventList().catch(err => {
+            console.error('[resolveOfflineLocalCopyToArchive] rescan failed:', err);
+          });
+        }
+
         console.log('[resolveOfflineLocalCopyToArchive] resolved to archive:', archiveEventPath);
         return true;
       } catch {
@@ -3950,7 +4157,11 @@ ${unparseable.map(ev => `
       if (!activeMaster) {
         const coll = sessionCollections.find(c => c.name === selectedCollection);
         if (coll?._masterPath) {
-          activeMaster = { name: selectedCollection, path: coll._masterPath };
+          // activeMaster.path must always be the NAS archive path for setLastEvent/reconnect.
+          const archivePath = (_offlineStagingMode && sessionArchiveRoot)
+            ? sessionArchiveRoot + '/' + selectedCollection
+            : coll._masterPath;
+          activeMaster = { name: selectedCollection, path: archivePath };
           console.log('[EventCreator] resetToList → reconstructed activeMaster from _masterPath');
         }
       }
@@ -4034,11 +4245,12 @@ ${unparseable.map(ev => `
       if (!entry) return false;
 
       // event.json is the ONLY source — no entry.components fallback.
-      if (!activeMaster?.path) {
+      const _adoptEffPath = _effectiveCollPath() || activeMaster?.path;
+      if (!_adoptEffPath) {
         console.error('[adoptSelectedEvent] No activeMaster path — cannot read event.json');
         return false;
       }
-      const eventPath = activeMaster.path + '/' + entry.folderName;
+      const eventPath = _adoptEffPath + '/' + entry.folderName;
 
       // ── Legacy check — must come before the corrupt/reload guard ────────────
       // A legacy event has no event.json on disk (_eventJson is null) or has a
