@@ -23,6 +23,8 @@ const {
   LOCK_HEARTBEAT_INTERVAL_MS,
 } = require('./archiveLockService');
 
+const { hidePathBestEffort } = require('./internalFileProtection');
+
 const SKIP_DIRS  = new Set(['.autoingest', '__MACOSX']);
 const TMP_SUFFIX = '.autoingest-sync-tmp';
 
@@ -206,6 +208,85 @@ async function _syncDir(localDir, archiveDir, result, depth = 0, abortSignal = n
 }
 
 /**
+ * Sync event.json from the staging event folder to the archive event folder.
+ * Called at every successful sync exit point.
+ *
+ * Case A — archive event.json absent: copy staging version wholesale.
+ * Case B — archive event.json present: merge new imports[] entries only.
+ *   Only imports, lastImport, status, updatedAt are updated; all other archive
+ *   fields (components, hijriDate, metadata) remain authoritative in the archive.
+ *
+ * Non-fatal: logs a warning and continues on any error.
+ */
+async function _copyEventJsonIfNeeded(localEventPath, archiveEventPath) {
+  const localJsonPath   = path.join(localEventPath,  'event.json');
+  const archiveJsonPath = path.join(archiveEventPath, 'event.json');
+
+  let localDoc;
+  try {
+    localDoc = JSON.parse(await fsp.readFile(localJsonPath, 'utf8'));
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      console.warn('[syncJob] event.json not found in staging event folder:', localEventPath);
+    } else {
+      console.warn('[syncJob] event.json parse failed in staging folder:', err.message);
+    }
+    return;
+  }
+
+  let archiveDoc;
+  try {
+    archiveDoc = JSON.parse(await fsp.readFile(archiveJsonPath, 'utf8'));
+  } catch (err) {
+    if (err.code !== 'ENOENT') {
+      console.warn('[syncJob] Cannot read archive event.json:', err.message);
+      return;
+    }
+    // Case A: archive has no event.json — copy staging version
+    try {
+      await fsp.mkdir(path.dirname(archiveJsonPath), { recursive: true });
+      await _copyFile(localJsonPath, archiveJsonPath);
+      hidePathBestEffort(archiveJsonPath).catch(() => {});
+    } catch (copyErr) {
+      console.warn('[syncJob] event.json copy to archive failed:', copyErr.message);
+    }
+    return;
+  }
+
+  // Case B: archive already has event.json — merge imports by id-deduplication
+  const localImports   = Array.isArray(localDoc.imports)   ? localDoc.imports   : [];
+  const archiveImports = Array.isArray(archiveDoc.imports) ? archiveDoc.imports : [];
+
+  if (localImports.length === 0) return; // nothing to merge
+
+  const mergedMap = new Map();
+  [...archiveImports, ...localImports].forEach(entry => {
+    if (entry && typeof entry.id === 'string') mergedMap.set(entry.id, entry);
+  });
+  const merged = Array.from(mergedMap.values());
+
+  if (merged.length === archiveImports.length) return; // no new entries added
+
+  const updated = {
+    ...archiveDoc,
+    imports:    merged,
+    lastImport: localDoc.lastImport ?? archiveDoc.lastImport,
+    status:     localDoc.status     ?? archiveDoc.status,
+    updatedAt:  localDoc.updatedAt  ?? archiveDoc.updatedAt,
+  };
+
+  const tmpPath = archiveJsonPath + '.tmp';
+  try {
+    await fsp.writeFile(tmpPath, JSON.stringify(updated, null, 2), 'utf8');
+    await fsp.rename(tmpPath, archiveJsonPath);
+    hidePathBestEffort(archiveJsonPath).catch(() => {});
+  } catch (err) {
+    try { await fsp.unlink(tmpPath); } catch {}
+    console.warn('[syncJob] event.json import merge to archive failed:', err.message);
+  }
+}
+
+/**
  * Sync one Local First job to the Active Archive.
  *
  * @param {{ jobId: string, batchId: string|null, collection: string, localEventPath: string }} job
@@ -268,6 +349,7 @@ async function syncJob(job, { nasRoot, stagingRoot }) {
   }
 
   if (photographerEntries.length === 0) {
+    await _copyEventJsonIfNeeded(localEventPath, archiveEventPath);
     result.ok      = true;
     result.status  = 'synced';
     result.syncedAt = Date.now();
@@ -350,6 +432,8 @@ async function syncJob(job, { nasRoot, stagingRoot }) {
     result.status = 'sync-failed';
     return result;
   }
+
+  await _copyEventJsonIfNeeded(localEventPath, archiveEventPath);
 
   if (result.sidecarConflicts > 0) {
     result.ok      = true;

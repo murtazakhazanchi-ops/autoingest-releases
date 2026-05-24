@@ -202,10 +202,11 @@ contextBridge.exposeInMainWorld('api', {
   getDeviceIdentity:          ()    => ipcRenderer.invoke('archive:getDeviceIdentity'),
 
   // ── Archive NAS Event List ──
-  scanNasEvents:      () => ipcRenderer.invoke('archive:scanNasEvents'),
-  refreshNasEvents:   () => ipcRenderer.invoke('archive:refreshNasEvents'),
-  getCachedNasEvents: () => ipcRenderer.invoke('archive:getCachedNasEvents'),
-  clearNasEventCache: () => ipcRenderer.invoke('archive:clearNasEventCache'),
+  scanNasEvents:            ()            => ipcRenderer.invoke('archive:scanNasEvents'),
+  refreshNasEvents:         ()            => ipcRenderer.invoke('archive:refreshNasEvents'),
+  getCachedNasEvents:       ()            => ipcRenderer.invoke('archive:getCachedNasEvents'),
+  clearNasEventCache:       ()            => ipcRenderer.invoke('archive:clearNasEventCache'),
+  scanStagingCollections:   (stagingRoot) => ipcRenderer.invoke('archive:scanStagingCollections', stagingRoot),
 
   // ── Local mirror service ──
   previewLocalMirror:   (params) => ipcRenderer.invoke('archive:previewLocalMirror',   params),

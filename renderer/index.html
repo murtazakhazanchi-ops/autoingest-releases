@@ -542,6 +542,7 @@
     #heroCard.has-event .hero-event-name { font-family: 'SF Mono','Cascadia Code',ui-monospace,monospace; font-size: 1.05rem; font-weight: 600; color: var(--text-primary); letter-spacing: -0.02em; line-height: 1.3; }
     .hero-collection { font-size: 0.72rem; color: var(--subtext); margin-top: 2px; }
     .hero-coll-label { font-size: 0.57rem; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; color: var(--subtext); opacity: 0.5; margin-right: 4px; }
+    .hero-offline-badge { display: inline-flex; align-items: center; margin-left: 7px; padding: 1px 7px; border-radius: 4px; font-size: 0.58rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; background: color-mix(in srgb, var(--yellow, #e5c06d) 18%, transparent); color: var(--yellow, #e5c06d); vertical-align: middle; }
     .hero-mode-badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 6px; font-size: 0.61rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 6px; align-self: flex-start; }
     .hero-mode-badge.single { background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--blue); }
     .hero-mode-badge.multi  { background: color-mix(in srgb, var(--mauve) 10%, transparent); color: var(--mauve); }
@@ -785,15 +786,6 @@
       font-size: 18px; font-weight: 600; color: var(--text-primary);
       letter-spacing: -0.01em;
     }
-    .emm-close-btn {
-      width: 28px; height: 28px; border-radius: 7px;
-      background: transparent; border: 1px solid transparent;
-      color: var(--text-muted); cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      transition: background 0.15s, color 0.15s, border-color 0.15s;
-    }
-    .emm-close-btn:hover { background: var(--card-hover); color: var(--text-primary); border-color: var(--border-subtle); }
-    .emm-close-btn svg { width: 14px; height: 14px; }
     #ecBody {
       flex: 1; overflow-y: auto; padding: 20px 20px 22px;
       scroll-behavior: smooth; min-height: 320px;
@@ -836,7 +828,10 @@
 
     /* ── Archive Locations modal ── */
     #archiveLocationsModal .emm-box { width: min(560px, calc(100vw - 48px)); }
-    .aloc-body { padding: 20px 24px 8px; display: flex; flex-direction: column; gap: 18px; }
+    .aloc-body { padding: 20px 24px 8px; display: flex; flex-direction: column; gap: 18px; flex: 1; overflow-y: auto; }
+    .aloc-section { display: flex; flex-direction: column; gap: 12px; }
+    .aloc-section-title { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--subtext); opacity: 0.7; padding-bottom: 6px; border-bottom: 1px solid var(--border-subtle); }
+    .aloc-advanced-row { display: flex; gap: 8px; flex-wrap: wrap; }
     .aloc-row { display: flex; flex-direction: column; gap: 6px; }
     .aloc-label { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--subtext); }
     .aloc-path-wrap { display: flex; align-items: center; gap: 8px; }
@@ -848,10 +843,15 @@
     .aloc-path-display.aloc-unset { color: var(--subtext); font-style: italic; }
     .aloc-btn { font-size: 12px; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--btn-bg, rgba(255,255,255,0.07)); color: var(--text); cursor: pointer; white-space: nowrap; transition: opacity 0.15s; }
     .aloc-btn:hover { opacity: 0.8; }
+    .aloc-btn--ghost { background: none; border-color: transparent; color: var(--subtext); font-size: 11px; padding: 4px 8px; }
+    .aloc-btn--ghost:hover { color: var(--text-primary); background: var(--card-hover); border-color: var(--border-subtle); opacity: 1; }
     .aloc-validation { font-size: 12px; min-height: 18px; }
     .aloc-validation.ok   { color: var(--green,  #22c55e); }
     .aloc-validation.warn { color: var(--yellow, #f59e0b); }
     .aloc-validation.err  { color: var(--red,    #ef4444); }
+    .aloc-init-btn { margin-top: 4px; font-size: 11.5px; font-weight: 600; padding: 4px 12px; border-radius: 6px; border: 1px solid var(--accent-border); color: var(--accent); background: var(--accent-soft); cursor: pointer; transition: background 0.15s, color 0.15s; }
+    .aloc-init-btn:hover:not(:disabled) { background: var(--accent-hover); color: var(--text); }
+    .aloc-init-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .aloc-mode-wrap { display: flex; gap: 10px; }
     .aloc-mode-btn { flex: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--btn-bg, rgba(255,255,255,0.07)); color: var(--subtext); cursor: pointer; font-size: 13px; text-align: center; transition: all 0.15s; }
     .aloc-mode-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(var(--accent-rgb, 99,102,241),0.1); }
@@ -929,6 +929,10 @@
     .diag-cleanup-btn { margin-top: 5px; align-self: flex-start; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 4px; border: 1px solid var(--border); color: var(--subtext); background: rgba(255,255,255,0.04); cursor: pointer; }
     .diag-cleanup-btn:hover:not(:disabled) { background: rgba(255,255,255,0.09); color: var(--text); }
     .diag-cleanup-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .diag-actions { flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+    .diag-actions-tools { display: flex; gap: 6px; flex-wrap: wrap; }
+    .diag-actions-tools button { font-size: 11px; padding: 4px 10px; }
+    .diag-helper { font-size: 11.5px; color: var(--subtext); margin-bottom: 2px; line-height: 1.45; }
 
     /* Adoption Preview (Phase 13C-1) */
     .adopt-section { flex-shrink: 0; max-height: 260px; overflow-y: auto; border-top: 1px solid var(--border-subtle); }
@@ -1323,29 +1327,35 @@
     .ov-tile-icon--nas svg { stroke: var(--accent, #6366f1); }
     #ovNasEvents .ov-nas-sub { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--subtext); white-space: nowrap; overflow: hidden; }
     #ovNasEvents .ov-nas-badge { font-size: 10px; padding: 1px 5px; border-radius: 3px; font-weight: 600; background: color-mix(in srgb, var(--yellow) 12%, transparent); color: var(--yellow, #f59e0b); flex-shrink: 0; }
-    #ovNasRefreshBtn { flex-shrink: 0; background: none; border: none; padding: 4px; cursor: pointer; color: var(--subtext); border-radius: 4px; line-height: 0; transition: opacity 0.15s; }
-    #ovNasRefreshBtn:hover { opacity: 0.7; }
-    #ovNasRefreshBtn.spinning svg { animation: nas-spin 0.8s linear infinite; }
     @keyframes nas-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
     /* ── SYNC ACTIVITY MODAL ────────────────────────── */
     #syncActivityModal .emm-box { width: min(760px, calc(100vw - 48px)); height: calc(100vh - 100px); }
     #sqBody { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
-    .sq-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px 8px; border-bottom: 1px solid var(--border-subtle); flex-shrink: 0; }
     .sq-toolbar-summary { font-size: 12px; color: var(--subtext); }
     #sqRefreshBtn { background: none; border: none; padding: 4px; cursor: pointer; color: var(--subtext); border-radius: 4px; line-height: 0; transition: opacity 0.15s; }
     #sqRefreshBtn:hover { opacity: 0.7; }
     #sqRefreshBtn.spinning svg { animation: nas-spin 0.8s linear infinite; }
-    #sqJobList { flex: 1; padding: 8px 0; }
+    #sqJobList { flex: 1; display: flex; flex-direction: column; padding: 8px 0; }
+    #sqJobList .sq-empty { flex: 1; display: flex; align-items: center; justify-content: center; }
     .sq-empty { padding: 40px 20px; text-align: center; color: var(--subtext); font-size: 13px; }
     .sq-section-title { padding: 10px 20px 6px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--subtext); border-top: 1px solid var(--border-subtle); margin-top: 4px; }
     .sq-section-title:first-child { border-top: none; margin-top: 0; }
     .sq-section-title--warn { color: var(--yellow, #f59e0b); }
-    .sq-row { display: grid; grid-template-columns: 1fr 1fr auto auto auto; align-items: center; gap: 8px; padding: 7px 20px; transition: background 0.1s; }
-    .sq-row:hover { background: var(--card-hover); }
-    .sq-cell { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-    .sq-event { color: var(--text-primary); font-weight: 500; }
-    .sq-coll  { color: var(--subtext); }
+    .sq-card { display: flex; flex-direction: column; gap: 5px; padding: 12px 20px; border-bottom: 1px solid var(--border-subtle); transition: background 0.1s; }
+    .sq-card:last-child { border-bottom: none; }
+    .sq-card:hover { background: var(--card-hover); }
+    .sq-card-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .sq-card-event { flex: 1; font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .sq-card-meta { display: flex; flex-wrap: wrap; align-items: center; column-gap: 14px; row-gap: 2px; }
+    .sq-card-meta-pair { display: flex; align-items: center; gap: 4px; font-size: 11.5px; }
+    .sq-card-meta-label { color: var(--subtext); opacity: 0.65; }
+    .sq-card-meta-val { color: var(--subtext); }
+    .sq-card-ph { display: flex; align-items: flex-start; gap: 6px; flex-wrap: wrap; }
+    .sq-card-ph-label { font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--subtext); opacity: 0.6; flex-shrink: 0; padding-top: 2px; }
+    .sq-card-ph-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+    .sq-card-ph-chip { font-size: 11px; color: var(--subtext); border: 1px solid var(--border-subtle); border-radius: 4px; padding: 1px 7px; white-space: nowrap; }
+    .sq-card-path { font-size: 10.5px; color: var(--subtext); opacity: 0.5; }
     .sq-status { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 4px; white-space: nowrap; }
     .sq-status--ready-for-sync    { background: color-mix(in srgb, var(--green,  #22c55e) 12%, transparent); color: var(--green,  #22c55e); }
     .sq-status--needs-attention   { background: color-mix(in srgb, var(--yellow, #f59e0b) 12%, transparent); color: var(--yellow, #f59e0b); }
@@ -1357,8 +1367,6 @@
     .sq-status--waiting-for-lock  { background: color-mix(in srgb, var(--yellow, #f59e0b) 10%, transparent); color: var(--yellow, #f59e0b); }
     .sq-status--sync-failed       { background: color-mix(in srgb, var(--red, #ef4444) 12%, transparent); color: var(--red, #ef4444); }
     .sq-status--failed            { background: color-mix(in srgb, var(--red, #ef4444) 12%, transparent); color: var(--red, #ef4444); }
-    .sq-reason { font-size: 11px; color: var(--subtext); white-space: nowrap; }
-    .sq-action { display: flex; justify-content: flex-end; }
     .sq-action-btn { font-size: 11px; font-weight: 500; padding: 2px 9px; border-radius: 4px; border: 1px solid var(--border-subtle); background: var(--bg-secondary); color: var(--text-primary); cursor: pointer; white-space: nowrap; transition: background 0.1s; }
     .sq-action-btn:hover { background: var(--card-hover); }
     .sq-action-btn:disabled { opacity: 0.4; cursor: default; }
@@ -4087,6 +4095,21 @@
       margin-left: 6px;
       flex-shrink: 0;
     }
+    .ec-evl-badge--pending {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 7px;
+      border-radius: 5px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
+      color: var(--accent);
+      border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+      margin-left: 6px;
+      flex-shrink: 0;
+    }
     .ec-evl-warn {
       color: var(--yellow);
       display: flex; align-items: center;
@@ -6233,7 +6256,7 @@
             </div>
             <span class="ov-arrow">›</span>
           </div>
-          <div class="ov-tile" id="ovNasEvents">
+          <div class="ov-tile ov-tile--action" id="ovNasEvents" role="button" tabindex="0" aria-label="Open Archive Locations">
             <div class="ov-tile-icon ov-tile-icon--nas">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/></svg>
             </div>
@@ -6244,9 +6267,7 @@
                 <span class="ov-nas-badge" id="ovNasCachedBadge" hidden>CACHED</span>
               </div>
             </div>
-            <button type="button" id="ovNasRefreshBtn" title="Refresh archive event list" aria-label="Refresh archive event list">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0115-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 01-15 6.7L3 16"/></svg>
-            </button>
+            <span class="ov-arrow">›</span>
           </div>
           <div class="ov-tile ov-tile--action" id="ovMetadataSync" role="button" tabindex="0" aria-label="Open Metadata Sync">
             <div class="ov-tile-icon ov-tile-icon--sync">
@@ -6987,7 +7008,104 @@
   <script src="eventMgmt.js"></script>
   <script src="groupManager.js"></script>
   <script src="importRouter.js"></script>
-  <script src="renderer.js"></script>
+  <!-- ── ARCHIVE LOCATIONS MODAL ──────────────────────────────────────── -->
+  <div id="archiveLocationsModal" class="emm-overlay" role="dialog" aria-modal="true" aria-labelledby="alocTitle">
+    <div class="emm-box">
+      <div class="emm-topbar">
+        <span class="emm-topbar-title" id="alocTitle">Archive Locations</span>
+      </div>
+
+      <div class="aloc-body">
+
+        <!-- Section 1: Current Working Archive -->
+        <div class="aloc-section">
+          <span class="aloc-section-title">Current Working Archive</span>
+          <div class="aloc-row">
+            <span class="aloc-label">Active Archive Root</span>
+            <span class="aloc-helper">Working archive used on-location. Required for imports.</span>
+            <div class="aloc-path-wrap">
+              <div class="aloc-path-display aloc-unset" id="alocNasPath">Not set</div>
+              <button type="button" class="aloc-btn" id="alocNasChooseBtn">Choose…</button>
+              <button type="button" class="aloc-btn aloc-btn--ghost" id="alocNasClearBtn">Clear</button>
+            </div>
+            <div class="aloc-validation" id="alocNasValidation"></div>
+            <button type="button" class="aloc-init-btn" id="alocNasInitBtn" hidden>Set Up Archive Root</button>
+          </div>
+        </div>
+
+        <!-- Section 2: Transfer & Sync Locations -->
+        <div class="aloc-section">
+          <span class="aloc-section-title">Transfer &amp; Sync Locations</span>
+          <div class="aloc-row">
+            <span class="aloc-label">Main Archive Root</span>
+            <span class="aloc-helper">Permanent archive — destination for transfer-drive import.</span>
+            <div class="aloc-path-wrap">
+              <div class="aloc-path-display aloc-unset" id="alocMainNasPath">Not set</div>
+              <button type="button" class="aloc-btn" id="alocMainNasChooseBtn">Choose…</button>
+              <button type="button" class="aloc-btn aloc-btn--ghost" id="alocMainNasClearBtn">Clear</button>
+            </div>
+            <div class="aloc-validation" id="alocMainNasValidation"></div>
+            <button type="button" class="aloc-init-btn" id="alocMainNasInitBtn" hidden>Set Up Archive Root</button>
+          </div>
+          <div class="aloc-row">
+            <span class="aloc-label">Local Staging Root</span>
+            <span class="aloc-helper">Local staging area for Local First imports before archive sync.</span>
+            <div class="aloc-path-wrap">
+              <div class="aloc-path-display aloc-unset" id="alocStagingPath">Not set</div>
+              <button type="button" class="aloc-btn" id="alocStagingChooseBtn">Choose…</button>
+              <button type="button" class="aloc-btn aloc-btn--ghost" id="alocStagingClearBtn">Clear</button>
+            </div>
+            <div class="aloc-validation" id="alocStagingValidation"></div>
+          </div>
+          <div class="aloc-row">
+            <span class="aloc-label">Transfer Drive Root</span>
+            <span class="aloc-helper">Carrier drive for Active Archive → Main Archive transfer.</span>
+            <div class="aloc-path-wrap">
+              <div class="aloc-path-display aloc-unset" id="alocTransferPath">Not set</div>
+              <button type="button" class="aloc-btn" id="alocTransferChooseBtn">Choose…</button>
+            </div>
+            <div class="aloc-validation" id="alocTransferValidation"></div>
+          </div>
+        </div>
+
+        <!-- Section 3: Default Import Mode -->
+        <div class="aloc-section">
+          <span class="aloc-section-title">Default Import Mode</span>
+          <div class="aloc-mode-wrap">
+            <button type="button" class="aloc-mode-btn active" id="alocModeDirectNas" data-mode="direct-nas">Direct to Archive</button>
+            <button type="button" class="aloc-mode-btn" id="alocModeLocalFirst" data-mode="local-first">Local First</button>
+          </div>
+        </div>
+
+        <!-- Section 4: Advanced Archive Operations -->
+        <div class="aloc-section">
+          <span class="aloc-section-title">Advanced Archive Operations</span>
+          <div class="aloc-advanced-row">
+            <button type="button" class="aloc-btn" id="alocTransferExportBtn">Transfer Export…</button>
+            <button type="button" class="aloc-btn" id="alocTransferImportBtn">Transfer Import…</button>
+            <button type="button" class="aloc-btn" id="alocDiagnosticsBtn">Diagnostics…</button>
+          </div>
+        </div>
+
+        <!-- Device identity -->
+        <div class="aloc-device-row">
+          <span class="aloc-device-label">This device:</span>
+          <span class="aloc-device-name" id="alocDeviceName">—</span>
+        </div>
+
+      </div>
+
+      <div class="emm-footer">
+        <button type="button" class="emm-btn-ghost" id="alocRecheckBtn">Recheck Status</button>
+        <div class="emm-footer-right">
+          <button type="button" class="emm-btn-secondary" id="alocCancelBtn">Cancel</button>
+          <button type="button" class="emm-btn-primary" id="alocSaveBtn">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js" defer></script>
 
   <!-- ── STARTUP LOGIN SPLASH ───────────────────────────────────────────── -->
   <div id="loginSplash" role="dialog" aria-modal="true" aria-label="Operator sign-in" style="display:none">
@@ -7057,103 +7175,11 @@
     </button>
   </div>
 
-  <!-- ── ADD OPERATOR MODAL ────────────────────────────────────────────── -->
-  <!-- Archive Locations Modal -->
-  <div id="archiveLocationsModal" class="emm-overlay" role="dialog" aria-modal="true" aria-labelledby="alocTitle">
-    <div class="emm-box">
-      <div class="emm-topbar">
-        <span class="emm-topbar-title" id="alocTitle">Archive Locations</span>
-        <button type="button" class="emm-close-btn" id="alocCloseBtn" aria-label="Close">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-      </div>
-
-      <div class="aloc-body">
-
-        <!-- Active Archive Root -->
-        <div class="aloc-row">
-          <span class="aloc-label">Active Archive Root</span>
-          <div class="aloc-path-wrap">
-            <div class="aloc-path-display aloc-unset" id="alocNasPath">Not set</div>
-            <button type="button" class="aloc-btn" id="alocNasChooseBtn">Choose…</button>
-            <button type="button" class="aloc-btn" id="alocNasClearBtn">Clear</button>
-          </div>
-          <div class="aloc-validation" id="alocNasValidation"></div>
-        </div>
-
-        <!-- Main Archive Root -->
-        <div class="aloc-row">
-          <span class="aloc-label">Main Archive Root</span>
-          <span class="aloc-helper">Permanent archive — destination for transfer-drive import.</span>
-          <div class="aloc-path-wrap">
-            <div class="aloc-path-display aloc-unset" id="alocMainNasPath">Not set</div>
-            <button type="button" class="aloc-btn" id="alocMainNasChooseBtn">Choose…</button>
-            <button type="button" class="aloc-btn" id="alocMainNasClearBtn">Clear</button>
-          </div>
-          <div class="aloc-validation" id="alocMainNasValidation"></div>
-        </div>
-
-        <!-- Local Staging Root -->
-        <div class="aloc-row">
-          <span class="aloc-label">Local Staging Root</span>
-          <div class="aloc-path-wrap">
-            <div class="aloc-path-display aloc-unset" id="alocStagingPath">Not set</div>
-            <button type="button" class="aloc-btn" id="alocStagingChooseBtn">Choose…</button>
-            <button type="button" class="aloc-btn" id="alocStagingClearBtn">Clear</button>
-          </div>
-          <div class="aloc-validation" id="alocStagingValidation"></div>
-        </div>
-
-        <!-- Transfer Drive Root -->
-        <div class="aloc-row">
-          <span class="aloc-label">Transfer Drive Root</span>
-          <span class="aloc-helper">Carrier drive for Active Archive → Main Archive transfer.</span>
-          <div class="aloc-path-wrap">
-            <div class="aloc-path-display aloc-unset" id="alocTransferPath">Not set</div>
-            <button type="button" class="aloc-btn" id="alocTransferChooseBtn">Choose…</button>
-          </div>
-          <div class="aloc-validation" id="alocTransferValidation"></div>
-        </div>
-
-        <!-- Default Import Mode -->
-        <div class="aloc-row">
-          <span class="aloc-label">Default Import Mode</span>
-          <div class="aloc-mode-wrap">
-            <button type="button" class="aloc-mode-btn active" id="alocModeDirectNas" data-mode="direct-nas">Direct to Archive</button>
-            <button type="button" class="aloc-mode-btn" id="alocModeLocalFirst" data-mode="local-first">Local First</button>
-          </div>
-        </div>
-
-        <!-- Device identity -->
-        <div class="aloc-device-row">
-          <span class="aloc-device-label">This device:</span>
-          <span class="aloc-device-name" id="alocDeviceName">—</span>
-        </div>
-
-      </div>
-
-      <div class="emm-footer">
-        <div style="display:flex;gap:6px;margin-right:auto">
-          <button type="button" class="emm-btn-secondary" id="alocTransferExportBtn">Transfer Export…</button>
-          <button type="button" class="emm-btn-secondary" id="alocTransferImportBtn">Transfer Import…</button>
-          <button type="button" class="emm-btn-secondary" id="alocDiagnosticsBtn">Diagnostics…</button>
-        </div>
-        <div class="emm-footer-right">
-          <button type="button" class="emm-btn-secondary" id="alocCancelBtn">Cancel</button>
-          <button type="button" class="emm-btn-primary" id="alocSaveBtn">Save</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- Transfer Export modal -->
   <div id="transferExportModal" class="emm-overlay" role="dialog" aria-modal="true" aria-labelledby="txTitle">
     <div class="emm-box">
       <div class="emm-topbar">
         <span class="emm-topbar-title" id="txTitle">Transfer Export</span>
-        <button type="button" class="emm-close-btn" id="txCloseBtn" aria-label="Close">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
       </div>
 
       <div class="tx-body">
@@ -7219,9 +7245,6 @@
     <div class="emm-box">
       <div class="emm-topbar">
         <span class="emm-topbar-title" id="tiTitle">Transfer Import</span>
-        <button type="button" class="emm-close-btn" id="tiCloseBtn" aria-label="Close">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
       </div>
 
       <div class="tx-body">
@@ -7294,12 +7317,20 @@
     <div class="emm-box">
       <div class="emm-topbar">
         <span class="emm-topbar-title" id="diagTitle">Archive Diagnostics</span>
-        <button type="button" class="emm-close-btn" id="diagCloseBtn" aria-label="Close">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
       </div>
 
       <div class="diag-body">
+
+        <div class="diag-actions">
+          <p class="diag-helper">Run checks across configured archive roots and review related archive operation reports.</p>
+          <button type="button" class="emm-btn-primary" id="diagRunBtn">Run Diagnostics</button>
+          <div class="diag-actions-tools">
+            <button type="button" class="emm-btn-secondary" id="diagAdoptBtn">Preview Adoptions</button>
+            <button type="button" class="emm-btn-secondary" id="diagAuditBtn">Audit Timeline</button>
+            <button type="button" class="emm-btn-secondary" id="diagChecklistBtn">Checklist</button>
+            <button type="button" class="emm-btn-secondary" id="diagConsistencyBtn">Consistency Report</button>
+          </div>
+        </div>
 
         <div class="diag-status-row">
           <span id="diagStatusText">Idle — click Run Diagnostics to inspect all configured archive roots.</span>
@@ -7328,12 +7359,7 @@
       <div class="emm-footer">
         <span class="sq-footer-note">Read-only inspection — no files are modified.</span>
         <div class="emm-footer-right">
-          <button type="button" class="emm-btn-primary"    id="diagRunBtn">Run Diagnostics</button>
-          <button type="button" class="emm-btn-secondary"  id="diagAdoptBtn">Preview Adoptions</button>
-          <button type="button" class="emm-btn-secondary"  id="diagAuditBtn">Audit Timeline</button>
-          <button type="button" class="emm-btn-secondary"  id="diagChecklistBtn">Checklist</button>
-          <button type="button" class="emm-btn-secondary"  id="diagConsistencyBtn">Consistency Report</button>
-          <button type="button" class="emm-btn-secondary"  id="diagDoneBtn">Done</button>
+          <button type="button" class="emm-btn-secondary" id="diagDoneBtn">Close</button>
         </div>
       </div>
 
@@ -7346,9 +7372,6 @@
     <div class="emm-box">
       <div class="emm-topbar">
         <span class="emm-topbar-title" id="crTitle">Archive Consistency Report</span>
-        <button type="button" class="emm-close-btn" id="crCloseBtn" aria-label="Close">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
       </div>
       <div class="cr-body" id="crBody">
         <div class="cr-status-row" id="crStatusText">Click Generate to produce a snapshot of archive health.</div>
@@ -7368,9 +7391,6 @@
     <div class="emm-box">
       <div class="emm-topbar">
         <span class="emm-topbar-title" id="clTitle">Archive Completeness Checklist</span>
-        <button type="button" class="emm-close-btn" id="clCloseBtn" aria-label="Close">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
       </div>
       <div class="cl-body" id="clBody">
         <div class="cr-status-row" id="clStatusText">Click Generate to check archive readiness.</div>
@@ -7390,9 +7410,6 @@
     <div class="emm-box">
       <div class="emm-topbar">
         <span class="emm-topbar-title" id="atTitle">Archive Operations Audit Timeline</span>
-        <button type="button" class="emm-close-btn" id="atCloseBtn" aria-label="Close">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
       </div>
       <div class="at-body" id="atBody">
         <div class="cr-status-row" id="atStatusText">Click Generate to load recent archive operations.</div>
@@ -7407,18 +7424,16 @@
     </div>
   </div>
 
-  <!-- Sync & Activity modal (Phase 6 foundation — no sync actions yet) -->
+  <!-- Sync & Activity modal -->
   <div id="syncActivityModal" class="emm-overlay" role="dialog" aria-modal="true" aria-labelledby="sqTitle">
     <div class="emm-box">
       <div class="emm-topbar">
-        <span class="emm-topbar-title" id="sqTitle">Sync &amp; Activity</span>
-        <button type="button" class="emm-close-btn" id="sqCloseBtn" aria-label="Close">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
+        <span class="emm-topbar-title">System Overview</span>
       </div>
-      <div class="sq-toolbar">
-        <span class="sq-toolbar-summary" id="sqSummaryText">—</span>
+      <div class="emm-header">
+        <span id="sqTitle">Sync &amp; Activity</span>
         <div style="display:flex;align-items:center;gap:8px;">
+          <span class="sq-toolbar-summary" id="sqSummaryText"></span>
           <button type="button" id="sqSyncAllBtn" aria-label="Sync all ready jobs">Sync All Ready</button>
           <button type="button" id="sqRefreshBtn" title="Refresh queue" aria-label="Refresh sync queue">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0115-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 01-15 6.7L3 16"/></svg>
@@ -7433,7 +7448,7 @@
       <div class="emm-footer">
         <span class="sq-footer-note">Local First imports · Background sync to Active Archive</span>
         <div class="emm-footer-right">
-          <button type="button" class="emm-btn-secondary" id="sqDoneBtn">Done</button>
+          <button type="button" class="emm-btn-secondary" id="sqDoneBtn">Close</button>
         </div>
       </div>
     </div>

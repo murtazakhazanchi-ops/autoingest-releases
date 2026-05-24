@@ -205,17 +205,23 @@ async function previewLocalMirror(params) {
     alreadyExists = stat.isDirectory();
   } catch { /* ENOENT = not yet created */ }
 
-  // Check NAS event.json readability
-  try {
-    await fsp.access(params.eventJsonPath);
-  } catch {
-    return { valid: false, reason: 'NAS event.json is not accessible' };
+  // If local event.json already exists, skip the NAS accessibility check.
+  const localEventJson = path.join(localEventPath, EVENT_JSON);
+  let _localJsonExists = false;
+  try { await fsp.access(localEventJson); _localJsonExists = true; } catch { /* ENOENT */ }
+
+  if (!_localJsonExists) {
+    // Check NAS event.json readability
+    try {
+      await fsp.access(params.eventJsonPath);
+    } catch {
+      return { valid: false, reason: 'NAS event.json is not accessible' };
+    }
   }
 
   // Determine copy/conflict state for event.json
-  let eventJsonWillCopy   = true;
-  let eventJsonConflict   = false;
-  const localEventJson = path.join(localEventPath, EVENT_JSON);
+  let eventJsonWillCopy = !_localJsonExists;
+  let eventJsonConflict = false;
   try {
     const [srcBuf, dstBuf] = await Promise.all([
       fsp.readFile(params.eventJsonPath),
@@ -227,7 +233,7 @@ async function previewLocalMirror(params) {
       eventJsonWillCopy = false;
       eventJsonConflict = true;  // differs — would conflict
     }
-  } catch { /* local doesn't exist yet — will copy */ }
+  } catch { /* NAS inaccessible or local absent — retain defaults */ }
 
   // Determine copy/conflict state for event.metadata.json
   let metadataJsonWillCopy = false;
@@ -309,11 +315,20 @@ async function ensureLocalMirror(params) {
     return { ok: false, reason: err.message };
   }
 
-  // Verify NAS event.json is readable
-  try {
-    await fsp.access(params.eventJsonPath);
-  } catch {
-    return { ok: false, reason: 'NAS event.json is not accessible' };
+  // If local event.json already exists in staging, NAS access is not required.
+  // This handles offline-created events (event.json written to staging at creation)
+  // and idempotent re-runs after a prior successful mirror.
+  const localEventJson = path.join(localEventPath, EVENT_JSON);
+  let _localJsonExists = false;
+  try { await fsp.access(localEventJson); _localJsonExists = true; } catch { /* ENOENT */ }
+
+  if (!_localJsonExists) {
+    // Verify NAS event.json is readable before creating any folders
+    try {
+      await fsp.access(params.eventJsonPath);
+    } catch {
+      return { ok: false, reason: 'NAS event.json is not accessible' };
+    }
   }
 
   // Create folders
@@ -323,35 +338,39 @@ async function ensureLocalMirror(params) {
     return { ok: false, reason: `Failed to create local event folder: ${err.message}` };
   }
 
-  // Copy event.json
-  const localEventJson = path.join(localEventPath, EVENT_JSON);
+  // Copy event.json from NAS only when local copy is absent
   let copiedEventJson    = false;
   let eventJsonConflict  = false;
-  try {
-    const result = await _copyFileIfNotConflict(params.eventJsonPath, localEventJson);
-    copiedEventJson   = result.copied;
-    eventJsonConflict = result.conflict;
-  } catch (err) {
-    return { ok: false, reason: err.message };
+  if (!_localJsonExists) {
+    try {
+      const result = await _copyFileIfNotConflict(params.eventJsonPath, localEventJson);
+      copiedEventJson   = result.copied;
+      eventJsonConflict = result.conflict;
+    } catch (err) {
+      return { ok: false, reason: err.message };
+    }
   }
 
-  // Copy event.metadata.json if present on NAS
+  // Copy event.metadata.json only when mirroring from NAS (local event absent).
+  // Skipped when local event.json already exists to avoid unnecessary NAS access.
   const nasMetadataPath    = path.join(params.eventPath, EVENT_METADATA_JSON);
   const localMetadataJson  = path.join(localEventPath, EVENT_METADATA_JSON);
   let copiedMetadataJson    = false;
   let metadataJsonConflict  = false;
-  try {
-    await fsp.access(nasMetadataPath);
-    // NAS metadata exists — copy
+  if (!_localJsonExists) {
     try {
-      const result = await _copyFileIfNotConflict(nasMetadataPath, localMetadataJson);
-      copiedMetadataJson   = result.copied;
-      metadataJsonConflict = result.conflict;
-    } catch (err) {
-      // Non-fatal — log but don't fail the whole operation
-      console.error('[localMirrorService] event.metadata.json copy failed:', err.message);
-    }
-  } catch { /* NAS metadata absent — nothing to copy */ }
+      await fsp.access(nasMetadataPath);
+      // NAS metadata exists — copy
+      try {
+        const result = await _copyFileIfNotConflict(nasMetadataPath, localMetadataJson);
+        copiedMetadataJson   = result.copied;
+        metadataJsonConflict = result.conflict;
+      } catch (err) {
+        // Non-fatal — log but don't fail the whole operation
+        console.error('[localMirrorService] event.metadata.json copy failed:', err.message);
+      }
+    } catch { /* NAS metadata absent — nothing to copy */ }
+  }
 
   // Apply hidden attributes to internal files
   const filesToHide = [localEventJson];

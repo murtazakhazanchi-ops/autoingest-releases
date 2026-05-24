@@ -1190,6 +1190,50 @@ ${_offlineStagingMode ? '<p class="ec-subtext">Archive offline — showing colle
     const _scanPath = _effectiveCollPath() || activeMaster?.path;
     _scannedEvents = await window.api.scanMasterEvents(_scanPath);
     if (!_scannedEvents) _scannedEvents = [];
+
+    // When archive is online, augment the list with Local Staging events that are
+    // pending sync. These events were created while offline and exist only in Local
+    // Staging — the archive scan above will not find them.
+    if (!_offlineStagingMode && selectedCollection) {
+      try {
+        const queueData = await window.api.getSyncQueue();
+        const pending = (queueData?.jobs || []).filter(
+          j => j.collection === selectedCollection && j.status !== 'synced' && j.localEventPath
+        );
+        if (pending.length > 0) {
+          const archiveNames = new Set(_scannedEvents.map(e => e.folderName));
+          for (const job of pending) {
+            if (archiveNames.has(job.event)) continue; // already in archive (shouldn't happen for non-synced, but guard anyway)
+            const m = job.event.match(/^(\d{4}-\d{2}-\d{2}) _(\d{2})-/);
+            _scannedEvents.push({
+              folderName:      job.event,
+              hijriDate:       m ? m[1] : '',
+              sequence:        m ? m[2] : '00',
+              components:      [],
+              isFromJson:      false,
+              isParseable:     true,
+              isUnresolved:    false,
+              isLegacy:        false,
+              isCorrupt:       false,
+              isPendingSync:   true,
+              _localEventPath: job.localEventPath,
+              _eventJson:      null,
+            });
+          }
+          // Re-sort parseable entries newest-first; unparseable stay at the end.
+          const parseable   = _scannedEvents.filter(e => e.isParseable);
+          const unparseable = _scannedEvents.filter(e => !e.isParseable);
+          parseable.sort((a, b) => {
+            if (a.hijriDate !== b.hijriDate) return b.hijriDate.localeCompare(a.hijriDate);
+            return b.sequence.localeCompare(a.sequence);
+          });
+          _scannedEvents = [...parseable, ...unparseable];
+        }
+      } catch (err) {
+        console.warn('[_scanAndRenderEventList] pending-sync augment failed:', err);
+      }
+    }
+
     // Always render the list — empty state shows "No resolvable events yet" + "+ Create New Event".
     // Never auto-open the create form; the user must click the button explicitly.
     _renderEventList();
@@ -1217,6 +1261,9 @@ ${_offlineStagingMode ? '<p class="ec-subtext">Archive offline — showing colle
       const legacyBadge = isLegacy
         ? `<span class="ec-evl-badge--legacy">LEGACY</span>`
         : '';
+      const pendingBadge = ev.isPendingSync
+        ? `<span class="ec-evl-badge--pending" title="Created while archive was offline — waiting to sync to archive">Pending sync</span>`
+        : '';
       const displayName = ev._eventJson?.eventName || ev.folderName;
       return `
 <div class="ec-evl-item" data-folder="${esc(ev.folderName)}" tabindex="0" role="option" aria-selected="false">
@@ -1224,7 +1271,7 @@ ${_offlineStagingMode ? '<p class="ec-subtext">Archive offline — showing colle
     <div class="ec-evl-name" title="${esc(displayName)}">${esc(displayName)}</div>
     <div class="ec-evl-date">${esc(ev.hijriDate)}</div>
   </div>
-  ${legacyBadge}${warnBadge}
+  ${legacyBadge}${warnBadge}${pendingBadge}
 </div>`;
     }).join('');
 
@@ -4011,18 +4058,28 @@ ${unparseable.map(ev => `
       const idx   = Math.min(_activeEventIdx, coll.events.length - 1);
       const event = coll.events[idx];
       if (!event) return null;
+      // For pending-local events, route imports to Local Staging (not archive) so
+      // files land in the correct staging folder that will be synced later.
+      const collPath = (_viewingExisting?.isPendingSync && _viewingExisting?._stagingCollPath)
+        ? _viewingExisting._stagingCollPath
+        : (coll._masterPath || null);
       return {
         coll,
         event,
         idx,
-        collectionPath: coll._masterPath || null,
-        eventPath: coll._masterPath ? (coll._masterPath + '/' + event.name) : null,
+        collectionPath: collPath,
+        eventPath: collPath ? (collPath + '/' + event.name) : null,
       };
     },
 
     /** Returns true when the current event was restored from local staging due to offline archive. */
     isOfflineLocalCopy() {
       return _viewingExisting?.isOfflineLocalCopy === true;
+    },
+
+    /** Returns true when the current event exists only in Local Staging and is pending sync to archive. */
+    isPendingSync() {
+      return _viewingExisting?.isPendingSync === true;
     },
 
     /**
@@ -4245,12 +4302,19 @@ ${unparseable.map(ev => `
       if (!entry) return false;
 
       // event.json is the ONLY source — no entry.components fallback.
-      const _adoptEffPath = _effectiveCollPath() || activeMaster?.path;
-      if (!_adoptEffPath) {
-        console.error('[adoptSelectedEvent] No activeMaster path — cannot read event.json');
-        return false;
+      // Pending-local events live in Local Staging, not on the archive yet — use their
+      // stored local path directly instead of constructing from _effectiveCollPath().
+      let eventPath;
+      if (entry.isPendingSync && entry._localEventPath) {
+        eventPath = entry._localEventPath;
+      } else {
+        const _adoptEffPath = _effectiveCollPath() || activeMaster?.path;
+        if (!_adoptEffPath) {
+          console.error('[adoptSelectedEvent] No activeMaster path — cannot read event.json');
+          return false;
+        }
+        eventPath = _adoptEffPath + '/' + entry.folderName;
       }
-      const eventPath = _adoptEffPath + '/' + entry.folderName;
 
       // ── Legacy check — must come before the corrupt/reload guard ────────────
       // A legacy event has no event.json on disk (_eventJson is null) or has a
@@ -4328,13 +4392,22 @@ ${unparseable.map(ev => `
       }
       assertValidComponents(_eventComps, 'adoptSelectedEvent');
       deepFreeze(_eventComps);
+      // For pending-local events: mark as local copy so the hero badge shows correctly
+      // and getActiveEventData() routes imports to Local Staging. The staging collection
+      // path is the parent of _localEventPath (strip trailing /folderName).
+      const _isPendingLocal = !!entry.isPendingSync && !!entry._localEventPath;
       _viewingExisting = {
-        folderName:   entry.folderName,
-        displayName:  json.eventName || entry.folderName,
-        hijriDate:    entry.hijriDate,
-        sequence:     entry.sequence,
-        isUnresolved: entry.isUnresolved,
-        components:   _eventComps.map(c => ({ ...c, eventTypes: [...c.eventTypes] })),
+        folderName:      entry.folderName,
+        displayName:     json.eventName || entry.folderName,
+        hijriDate:       entry.hijriDate,
+        sequence:        entry.sequence,
+        isUnresolved:    entry.isUnresolved,
+        isOfflineLocalCopy: _isPendingLocal,
+        isPendingSync:   _isPendingLocal,
+        _stagingCollPath: _isPendingLocal
+          ? entry._localEventPath.slice(0, -(entry.folderName.length + 1))
+          : null,
+        components:      _eventComps.map(c => ({ ...c, eventTypes: [...c.eventTypes] })),
       };
 
       const coll = sessionCollections.find(c => c.name === selectedCollection);

@@ -26,9 +26,10 @@ const fs   = require('fs');
 const fsp  = require('fs').promises;
 const path = require('path');
 
-let _path   = null;   // resolved lazily because app may not be ready
-let _state  = {};     // in-memory cache of the settings object
-let _loaded = false;  // true once init() has run
+let _path      = null;              // resolved lazily because app may not be ready
+let _state     = {};                // in-memory cache of the settings object
+let _loaded    = false;             // true once init() has run
+let _saveQueue = Promise.resolve(); // serialises concurrent _save() calls
 
 function _resolvePath() {
   if (_path) return _path;
@@ -63,10 +64,24 @@ function init() {
 }
 
 /**
- * Persist the current in-memory state to disk atomically (async).
+ * Enqueue a settings flush. Concurrent callers chain on _saveQueue so they
+ * never race on the same .tmp file. Each flush reads _state at execution time,
+ * so all queued flushes after a burst of setX() calls write the final state.
  */
 async function _save() {
+  // Chain onto the queue; use the same handler for resolve and reject so a
+  // prior failure does not prevent subsequent saves from running.
+  _saveQueue = _saveQueue.then(_doSave, _doSave);
+  return _saveQueue;
+}
+
+/**
+ * Actual disk write — called only via _save()'s serialisation queue.
+ * Ensures the settings directory exists before writing.
+ */
+async function _doSave() {
   const p   = _resolvePath();
+  await fsp.mkdir(path.dirname(p), { recursive: true });
   const tmp = p + '.tmp';
   try {
     await fsp.writeFile(tmp, JSON.stringify(_state, null, 2), 'utf8');
@@ -163,7 +178,12 @@ function getLastEvent() {
   if (typeof v.collectionPath !== 'string' || !v.collectionPath.length) return null;
   if (typeof v.collectionName !== 'string' || !v.collectionName.length) return null;
   if (typeof v.eventName !== 'string' || !v.eventName.length) return null;
-  return { collectionPath: v.collectionPath, collectionName: v.collectionName, eventName: v.eventName };
+  return {
+    collectionPath: v.collectionPath,
+    collectionName: v.collectionName,
+    eventName:      v.eventName,
+    ...(typeof v.safeEventName === 'string' && v.safeEventName ? { safeEventName: v.safeEventName } : {}),
+  };
 }
 
 /**
@@ -186,6 +206,7 @@ async function setLastEvent(value) {
       collectionPath: value.collectionPath,
       collectionName: value.collectionName,
       eventName:      value.eventName,
+      ...(typeof value.safeEventName === 'string' && value.safeEventName ? { safeEventName: value.safeEventName } : {}),
     };
   } else {
     throw new Error('setLastEvent: expected { collectionPath, collectionName, eventName } or null');

@@ -1244,7 +1244,7 @@ function _renderLandingEventCard() {
       </svg>
     </div>
     <div class="hero-body">
-      <div class="hero-pretitle">Current Event</div>
+      <div class="hero-pretitle">Current Event${EventCreator.isPendingSync() ? '<span class="hero-offline-badge">Local staging copy · Pending sync</span>' : EventCreator.isOfflineLocalCopy() ? '<span class="hero-offline-badge">Archive offline · Local staging copy</span>' : ''}</div>
       ${eventDisplay}
       <div class="hero-collection">
         <span class="hero-coll-label">Collection</span>${_esc(coll.name)}
@@ -2754,6 +2754,55 @@ async function _updateSystemStatus() {
 _updateSystemStatus();
 
 // ────────────────────────────────────────────────────────────────
+// ARCHIVE RECONNECT DETECTION
+// Hooks into the existing 5-second drive poll to detect archive
+// offline → online transitions. Refreshes UI and notifies the
+// operator when staged Local First imports are ready to sync.
+// ────────────────────────────────────────────────────────────────
+
+let _lastKnownArchiveStatus = null;  // null = not yet primed
+
+async function _checkArchiveStatusTransition() {
+  let status;
+  try { status = await window.api.getArchiveOperationsStatus(); } catch { return; }
+  const curr = status.status;
+  const prev = _lastKnownArchiveStatus;
+  _lastKnownArchiveStatus = curr;
+
+  if (prev === null) return;  // First call — prime state only, no notification
+  if (prev === curr) return;  // No change
+
+  _updateSystemStatus();  // Refresh header dot on any transition
+
+  const wasOffline = prev === 'nas-disconnected' || prev === 'invalid-nas';
+  const nowOnline  = curr === 'ready';
+  if (!wasOffline || !nowOnline) return;
+
+  // Archive came back online — refresh sync queue and NAS events tile.
+  await _refreshSyncQueueCard(false).catch(() => {});
+  _refreshNasEventsCard(false).catch(() => {});
+
+  // If the current event was restored from local staging while offline,
+  // re-verify the archive event path now and clear the offline badge if valid.
+  const offlineResolved = await EventCreator.resolveOfflineLocalCopyToArchive().catch(() => false);
+  if (offlineResolved) _renderLandingEventCard();
+
+  // Notify if staged Local First imports are waiting to sync.
+  try {
+    const summary = await window.api.getSyncQueueSummary();
+    const pending  = (summary?.ready || 0) + (summary?.needsAttention || 0) + (summary?.failed || 0);
+    if (pending > 0) {
+      _archiveNotice(
+        `Archive reconnected — ${pending} event${pending !== 1 ? 's' : ''} ready to sync.`,
+        () => _sqOpen(),
+        8000
+      );
+    }
+    // No staged work — silent status update only (no noisy notification)
+  } catch { /* non-critical */ }
+}
+
+// ────────────────────────────────────────────────────────────────
 // NAS EVENTS OVERVIEW TILE
 // ────────────────────────────────────────────────────────────────
 
@@ -2761,7 +2810,7 @@ _updateSystemStatus();
 // Per-event data is loaded lazily on demand (future phase).
 let _nasEventStats = null; // { totalEvents, totalCollections, source, refreshedAt } | null
 
-function _applyNasEventsCard(result) {
+function _applyNasEventsCard(result, archiveOffline = false, hasLocalCopy = false) {
   const valEl    = document.getElementById('ovNasEventsVal');
   const labelEl  = document.getElementById('ovNasEventsLabel');
   const badgeEl  = document.getElementById('ovNasCachedBadge');
@@ -2792,18 +2841,36 @@ function _applyNasEventsCard(result) {
     return;
   }
 
-  // ready (live or cached)
+  // ready — live or cache fallback
   const totalEvents      = (result.collections || []).reduce((n, c) => n + (c.events?.length || 0), 0);
   const totalCollections = (result.collections || []).length;
 
+  // Archive is offline — show degraded state, badge reflects local staging availability.
+  if (result.source === 'cache' && archiveOffline) {
+    valEl.textContent   = '—';
+    labelEl.textContent = 'Archive offline';
+    if (badgeEl) {
+      if (hasLocalCopy) {
+        badgeEl.textContent = 'Local copy';
+        badgeEl.hidden = false;
+      } else {
+        badgeEl.hidden = true;
+      }
+    }
+    if (tileEl) tileEl.title = hasLocalCopy
+      ? 'Archive is offline. Local staging copy is available.'
+      : 'Archive is offline. Reconnect to refresh live archive events.';
+    tileEl?.classList.add('ov-tile--warn');
+    _nasEventStats = { totalEvents, totalCollections, source: 'cache', refreshedAt: result.refreshedAt || result.cachedAt || null };
+    return;
+  }
+
   valEl.textContent   = String(totalEvents);
-  labelEl.textContent = `Archive Event${totalEvents !== 1 ? 's' : ''} · ${totalCollections} collection${totalCollections !== 1 ? 's' : ''}`;
+  labelEl.textContent = 'Archive Events';
+  if (tileEl) tileEl.title = '';  // clear any stale offline tooltip
+  if (badgeEl) badgeEl.hidden = true;
+  tileEl?.classList.toggle('ov-tile--warn', result.source === 'cache');
 
-  const isCache = result.source === 'cache';
-  if (badgeEl) badgeEl.hidden = !isCache;
-  tileEl?.classList.toggle('ov-tile--warn', isCache);
-
-  // Store lightweight stats only — no event objects in renderer memory
   _nasEventStats = {
     totalEvents,
     totalCollections,
@@ -2820,17 +2887,27 @@ async function _refreshNasEventsCard(fromCache = false) {
 
   try {
     let result;
+    let archiveOffline = false;
+
     if (fromCache) {
-      result = await window.api.getCachedNasEvents();
+      // Load cache and check archive status in parallel so the tile shows the
+      // correct offline state immediately on startup.
+      const [cached, opsStatus] = await Promise.all([
+        window.api.getCachedNasEvents(),
+        window.api.getArchiveOperationsStatus().catch(() => null),
+      ]);
+      result = cached;
+      archiveOffline = opsStatus?.status === 'nas-disconnected' || opsStatus?.status === 'invalid-nas';
     } else {
       result = await window.api.scanNasEvents();
       // If NAS is unreachable, fall back to cache for display
       if (result.status !== 'ready') {
+        archiveOffline = true;
         const cached = await window.api.getCachedNasEvents();
         if (cached.status === 'ready') result = cached;
       }
     }
-    _applyNasEventsCard(result);
+    _applyNasEventsCard(result, archiveOffline, EventCreator.isOfflineLocalCopy());
   } catch {
     // Non-critical — leave tile as-is
   } finally {
@@ -2857,7 +2934,7 @@ _refreshNasEventsCard(true).then(() => {
 // SYNC QUEUE OVERVIEW TILE
 // ════════════════════════════════════════════════════════════════
 
-function _applySyncQueueTile(summary) {
+function _applySyncQueueTile(summary, archiveOffline = false) {
   const valEl   = document.getElementById('ovUnsyncedVal');
   const labelEl = document.getElementById('ovUnsyncedLabel');
   const tileEl  = document.getElementById('ovUnsynced');
@@ -2867,13 +2944,15 @@ function _applySyncQueueTile(summary) {
   const attention = summary?.needsAttention || 0;
   const failed    = summary?.failed         || 0;
   const syncing   = summary?.syncing        || 0;
-  const total     = summary?.total          || 0;
 
-  valEl.textContent = String(total);
+  const unsynced = ready + syncing + attention + failed;
+  valEl.textContent = String(unsynced);
 
   if (labelEl) {
-    if (total === 0) {
+    if (unsynced === 0) {
       labelEl.textContent = 'Unsynced Events';
+    } else if (archiveOffline) {
+      labelEl.textContent = `${unsynced} staged · archive offline`;
     } else {
       const parts = [];
       if (syncing > 0)   parts.push(`${syncing} syncing`);
@@ -2884,7 +2963,7 @@ function _applySyncQueueTile(summary) {
     }
   }
 
-  tileEl?.classList.toggle('ov-tile--warn', attention > 0 || failed > 0);
+  tileEl?.classList.toggle('ov-tile--warn', attention > 0 || failed > 0 || (archiveOffline && unsynced > 0));
 }
 
 let _sqRefreshBusy = false;
@@ -2894,8 +2973,12 @@ async function _refreshSyncQueueCard(fromCache = false) {
   _sqRefreshBusy = true;
   try {
     if (!fromCache) await window.api.refreshSyncQueue().catch(() => {});
-    const summary = await window.api.getSyncQueueSummary();
-    _applySyncQueueTile(summary);
+    const [summary, opsStatus] = await Promise.all([
+      window.api.getSyncQueueSummary(),
+      window.api.getArchiveOperationsStatus().catch(() => null),
+    ]);
+    const archiveOffline = opsStatus?.status === 'nas-disconnected' || opsStatus?.status === 'invalid-nas';
+    _applySyncQueueTile(summary, archiveOffline);
   } catch {
     // Non-critical
   } finally {
@@ -2933,10 +3016,12 @@ async function _sqLoadQueue() {
   const syncAllBtn = document.getElementById('sqSyncAllBtn');
   if (listEl) listEl.innerHTML = '<div class="sq-empty">Loading…</div>';
   try {
-    const [data, reviews] = await Promise.all([
+    const [data, reviews, opsStatus] = await Promise.all([
       window.api.getSyncQueue(),
       window.api.getSyncIssueReviews().catch(() => ({})),
+      window.api.getArchiveOperationsStatus().catch(() => null),
     ]);
+    const archiveOffline = opsStatus?.status === 'nas-disconnected' || opsStatus?.status === 'invalid-nas';
     const jobs    = data.jobs || [];
     const ready   = jobs.filter(j => j.status === 'ready-for-sync').length;
     const attn    = jobs.filter(j => j.status === 'needs-attention' && !reviews[j.jobId]).length;
@@ -2944,19 +3029,22 @@ async function _sqLoadQueue() {
     const syncing = jobs.filter(j => j.status === 'syncing').length;
     if (summaryEl) {
       if (jobs.length === 0) {
-        summaryEl.textContent = 'Queue empty';
+        summaryEl.textContent = archiveOffline ? 'Archive offline' : 'Queue empty';
       } else {
         const parts = [`${jobs.length} event${jobs.length !== 1 ? 's' : ''}`];
-        if (syncing > 0) parts.push(`${syncing} syncing`);
-        if (ready > 0)   parts.push(`${ready} ready`);
-        if (attn > 0)    parts.push(`${attn} needs attention`);
-        if (failed > 0)  parts.push(`${failed} failed`);
+        if (archiveOffline) parts.push('archive offline');
+        else {
+          if (syncing > 0) parts.push(`${syncing} syncing`);
+          if (ready > 0)   parts.push(`${ready} ready`);
+          if (attn > 0)    parts.push(`${attn} needs attention`);
+          if (failed > 0)  parts.push(`${failed} failed`);
+        }
         summaryEl.textContent = parts.join(' · ');
       }
     }
-    if (syncAllBtn) syncAllBtn.style.display = ready > 0 ? 'block' : 'none';
-    _sqRenderJobs(jobs, reviews);
-    _applySyncQueueTile({ total: jobs.length, ready, needsAttention: attn, failed, syncing });
+    if (syncAllBtn) syncAllBtn.style.display = (ready > 0 && !archiveOffline) ? 'block' : 'none';
+    _sqRenderJobs(jobs, reviews, archiveOffline);
+    _applySyncQueueTile({ total: jobs.length, ready, needsAttention: attn, failed, syncing }, archiveOffline);
   } catch {
     if (listEl) listEl.innerHTML = '<div class="sq-empty">Failed to load queue.</div>';
   }
@@ -2984,7 +3072,7 @@ function _sqFmtTime(ts) {
   } catch { return ''; }
 }
 
-function _sqJobRow(job, reviewEntry) {
+function _sqJobRow(job, reviewEntry, archiveOffline) {
   const statusLabel = {
     'ready-for-sync':   'Pending',
     'needs-attention':  'Partial',
@@ -2996,45 +3084,63 @@ function _sqJobRow(job, reviewEntry) {
     'failed':           'Failed',
   }[job.status] || job.status;
 
-  // Build detail line: photographers · imported HH:MM · synced HH:MM
   const photographers = Array.isArray(job.photographers) ? job.photographers : [];
-  const phJoined      = photographers.join(', ');
-  const importedText  = job.importedAt ? 'imported ' + _sqFmtTime(job.importedAt) : '';
-  const syncedText    = job.syncedAt   ? 'synced '   + _sqFmtTime(job.syncedAt)   : '';
-  const reasonFallback = job.reason === 'auto-metadata-disabled'
-    ? 'Metadata disabled'
-    : (job.reason || '');
-  const detailParts   = [phJoined, importedText, syncedText].filter(Boolean);
-  const detailPlain   = detailParts.join(' · ') || reasonFallback;
+  const importedText  = job.importedAt ? _sqFmtTime(job.importedAt) : '';
+  const syncedText    = job.syncedAt   ? _sqFmtTime(job.syncedAt)   : '';
 
-  let actionHtml = '<div class="sq-action"></div>';
+  let actionHtml = '';
   if (job.status === 'ready-for-sync') {
-    actionHtml = `<div class="sq-action"><button type="button" class="sq-action-btn sq-sync-btn" data-jobid="${_sqEsc(job.jobId)}" aria-label="Sync now">Sync Now</button></div>`;
+    if (archiveOffline) {
+      actionHtml = `<button type="button" class="sq-action-btn" disabled title="Reconnect archive to sync">Reconnect to sync</button>`;
+    } else {
+      actionHtml = `<button type="button" class="sq-action-btn sq-sync-btn" data-jobid="${_sqEsc(job.jobId)}" aria-label="Sync now">Sync Now</button>`;
+    }
   } else if (job.status === 'sync-failed' || job.status === 'waiting-for-lock') {
-    actionHtml = `<div class="sq-action"><button type="button" class="sq-action-btn sq-retry-btn" data-jobid="${_sqEsc(job.jobId)}" aria-label="Retry sync">Retry</button></div>`;
+    actionHtml = `<button type="button" class="sq-action-btn sq-retry-btn" data-jobid="${_sqEsc(job.jobId)}" aria-label="Retry sync">Retry</button>`;
   } else if (job.status === 'syncing') {
-    actionHtml = `<div class="sq-action"><button type="button" class="sq-action-btn" disabled>Syncing…</button></div>`;
+    actionHtml = `<button type="button" class="sq-action-btn" disabled>Syncing…</button>`;
   } else if (job.status === 'needs-attention' && !reviewEntry) {
-    actionHtml = `<div class="sq-action"><button type="button" class="sq-action-btn sq-review-btn" data-jobid="${_sqEsc(job.jobId)}" data-manifestpath="${_sqEsc(job.manifestPath || '')}" data-batchid="${_sqEsc(job.batchId || '')}" aria-label="Mark reviewed">Mark reviewed</button></div>`;
+    actionHtml = `<button type="button" class="sq-action-btn sq-review-btn" data-jobid="${_sqEsc(job.jobId)}" data-manifestpath="${_sqEsc(job.manifestPath || '')}" data-batchid="${_sqEsc(job.batchId || '')}" aria-label="Mark reviewed">Mark reviewed</button>`;
   }
 
   const isReviewed   = (job.status === 'needs-attention' && !!reviewEntry);
   const statusClass  = isReviewed ? 'sq-status--reviewed' : `sq-status--${_sqEsc(job.status)}`;
   const displayLabel = isReviewed ? 'Reviewed' : statusLabel;
-  const eventDisplay = _sqMidTrunc(job.event || '', 45);
+  const eventDisplay = _sqMidTrunc(job.event || '', 70);
 
-  return `<div class="sq-row">
-    <div class="sq-cell sq-event" title="${_sqEsc(job.event || '')}">${_sqEsc(eventDisplay)}</div>
-    <div class="sq-cell sq-coll">${_sqEsc(job.collection)}</div>
-    <div class="sq-cell sq-status ${statusClass}">${_sqEsc(displayLabel)}</div>
-    <div class="sq-cell sq-reason" title="${_sqEsc(detailPlain)}">${_sqEsc(detailPlain)}</div>
+  let metaHtml = `<div class="sq-card-meta-pair"><span class="sq-card-meta-label">Collection</span><span class="sq-card-meta-val">${_sqEsc(job.collection)}</span></div>`;
+  if (importedText) {
+    metaHtml += `<div class="sq-card-meta-pair"><span class="sq-card-meta-label">Imported</span><span class="sq-card-meta-val">${_sqEsc(importedText)}</span></div>`;
+  }
+  if (syncedText) {
+    metaHtml += `<div class="sq-card-meta-pair"><span class="sq-card-meta-label">Synced</span><span class="sq-card-meta-val">${_sqEsc(syncedText)}</span></div>`;
+  }
+  const reasonNote = job.reason === 'auto-metadata-disabled' ? 'Metadata disabled' : (job.reason || '');
+  if (reasonNote && !importedText && !syncedText) {
+    metaHtml += `<div class="sq-card-meta-pair"><span class="sq-card-meta-label">Note</span><span class="sq-card-meta-val">${_sqEsc(reasonNote)}</span></div>`;
+  }
+
+  let phHtml = '';
+  if (photographers.length > 0) {
+    const chips = photographers.map(p => `<span class="sq-card-ph-chip">${_sqEsc(p)}</span>`).join('');
+    phHtml = `<div class="sq-card-ph"><span class="sq-card-ph-label">Photographers</span><div class="sq-card-ph-chips">${chips}</div></div>`;
+  }
+
+  return `<div class="sq-card">
+  <div class="sq-card-top">
+    <div class="sq-card-event" title="${_sqEsc(job.event || '')}">${_sqEsc(eventDisplay)}</div>
+    <div class="sq-status ${statusClass}">${_sqEsc(displayLabel)}</div>
     ${actionHtml}
-  </div>`;
+  </div>
+  <div class="sq-card-meta">${metaHtml}</div>
+  ${phHtml}
+  <div class="sq-card-path">Local Staging → Active Archive</div>
+</div>`;
 }
 
 const _SQ_KNOWN_STATUSES = new Set(['syncing', 'ready-for-sync', 'sync-failed', 'waiting-for-lock', 'failed', 'needs-attention', 'synced']);
 
-function _sqRenderJobs(jobs, reviews) {
+function _sqRenderJobs(jobs, reviews, archiveOffline) {
   reviews = reviews || {};
   const listEl = document.getElementById('sqJobList');
   if (!listEl) return;
@@ -3055,31 +3161,31 @@ function _sqRenderJobs(jobs, reviews) {
   let html = '';
   if (syncing.length) {
     html += '<div class="sq-section-title">Syncing</div>';
-    html += syncing.map(j => _sqJobRow(j)).join('');
+    html += syncing.map(j => _sqJobRow(j, null, archiveOffline)).join('');
   }
   if (ready.length) {
     html += '<div class="sq-section-title">Ready for Sync</div>';
-    html += ready.map(j => _sqJobRow(j)).join('');
+    html += ready.map(j => _sqJobRow(j, null, archiveOffline)).join('');
   }
   if (failed.length) {
     html += '<div class="sq-section-title sq-section-title--err">Failed · Waiting</div>';
-    html += failed.map(j => _sqJobRow(j)).join('');
+    html += failed.map(j => _sqJobRow(j, null, archiveOffline)).join('');
   }
   if (attn.length) {
     html += '<div class="sq-section-title sq-section-title--warn">Needs Attention</div>';
-    html += attn.map(j => _sqJobRow(j, null)).join('');
+    html += attn.map(j => _sqJobRow(j, null, archiveOffline)).join('');
   }
   if (reviewed.length) {
     html += '<div class="sq-section-title sq-section-title--reviewed">Reviewed</div>';
-    html += reviewed.map(j => _sqJobRow(j, reviews[j.jobId])).join('');
+    html += reviewed.map(j => _sqJobRow(j, reviews[j.jobId], archiveOffline)).join('');
   }
   if (synced.length) {
     html += '<div class="sq-section-title">Synced</div>';
-    html += synced.map(j => _sqJobRow(j)).join('');
+    html += synced.map(j => _sqJobRow(j, null, archiveOffline)).join('');
   }
   if (other.length) {
     html += '<div class="sq-section-title">Other</div>';
-    html += other.map(j => _sqJobRow(j)).join('');
+    html += other.map(j => _sqJobRow(j, null, archiveOffline)).join('');
   }
 
   listEl.innerHTML = html;
@@ -3190,8 +3296,6 @@ document.getElementById('sqRefreshBtn')?.addEventListener('click', async () => {
   _sqRefreshBusy = true;
   try {
     await window.api.refreshSyncQueue().catch(() => {});
-    const summary = await window.api.getSyncQueueSummary();
-    _applySyncQueueTile(summary);
     await _sqLoadQueue();
   } catch { /* non-critical */ } finally {
     _sqRefreshBusy = false;
@@ -7427,6 +7531,10 @@ document.getElementById('importBtn').addEventListener('click', async () => {
     if (_eiSelectedImportMode === 'direct-nas') {
       let _archSt = {};
       try { _archSt = await window.api.getArchiveOperationsStatus(); } catch { /* non-critical */ }
+      if (_archSt.status === 'nas-disconnected' || _archSt.status === 'invalid-nas') {
+        showMessage('Archive offline — switch to Local First mode to import while disconnected.', 6000);
+        return;
+      }
       if (_archSt.nasRoot) {
         let _lockCheckPending = true;
         while (_lockCheckPending) {
@@ -7880,8 +7988,16 @@ async function showEventImportConfirmModal(groups, eventData) {
       _eiSelectedImportMode = mode;
     }
 
-    // Init with saved default
-    _applyImportModeUI(archiveStatus.defaultImportMode || 'direct-nas', null);
+    // For pending-local events: force local-first and block direct archive to prevent
+    // a split state where files land on archive before the event is synced.
+    const _isPendingLocal = EventCreator.isPendingSync();
+    if (_isPendingLocal) {
+      _applyImportModeUI('local-first', null);
+      if (directNasRadio) directNasRadio.disabled = true;
+      if (optDirectNas)   { optDirectNas.title = 'Direct archive import is blocked until this event is synced'; optDirectNas.style.opacity = '0.45'; }
+    } else {
+      _applyImportModeUI(archiveStatus.defaultImportMode || 'direct-nas', null);
+    }
 
     const modeAbort = new AbortController();
     if (localFirstRadio) localFirstRadio.addEventListener('change', () => {
@@ -7902,6 +8018,11 @@ async function showEventImportConfirmModal(groups, eventData) {
     function close(result) {
       overlay.classList.remove('visible');
       modeAbort.abort();
+      // Restore direct archive radio if it was disabled for a pending-local event.
+      if (_isPendingLocal) {
+        if (directNasRadio) directNasRadio.disabled = false;
+        if (optDirectNas)   { optDirectNas.title = ''; optDirectNas.style.opacity = ''; }
+      }
       document.getElementById('eiCancelBtn').removeEventListener('click', onCancel);
       importBtn.removeEventListener('click', onImport);
       if (_eiPhotographerDD) { _eiPhotographerDD.destroy(); _eiPhotographerDD = null; }
@@ -8207,6 +8328,7 @@ async function initApp() {
   window.api.onFilesBatch(applyFileBatch);
   window.api.onDrivesUpdated(renderDrives);
   window.api.onAllDrivesUpdated(renderExtDrives);
+  window.api.onAllDrivesUpdated(() => { _checkArchiveStatusTransition().catch(() => {}); });
 
   window.api.getDrives().then(renderDrives).catch(err => {
     const list = document.getElementById('srcMemCardList');
