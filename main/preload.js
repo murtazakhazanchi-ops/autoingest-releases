@@ -153,8 +153,10 @@ contextBridge.exposeInMainWorld('api', {
   // ── Checksum verification ──
   runChecksumVerification: () => ipcRenderer.invoke('checksum:run'),
   cancelChecksum: () => ipcRenderer.send('checksum:cancel'),
-  onChecksumProgress: (cb) => _register('checksum:progress', (_e, data) => cb(data)),
-  onChecksumComplete: (cb) => _register('checksum:complete', (_e, data) => cb(data)),
+  onChecksumProgress:      (cb) => _register('checksum:progress',      (_e, data) => cb(data)),
+  onChecksumComplete:      (cb) => _register('checksum:complete',      (_e, data) => cb(data)),
+  onSyncJobProgress:       (cb) => _register('sync:jobProgress',       (_e, data) => cb(data)),
+  onSyncChecksumProgress:  (cb) => _register('sync:checksumProgress',  (_e, data) => cb(data)),
 
   // ── What's New ──
   getLastUpdateInfo: () => ipcRenderer.invoke('getLastUpdateInfo'),
@@ -227,6 +229,8 @@ contextBridge.exposeInMainWorld('api', {
   // ── Background archive sync ──
   syncJobNow:             (jobId)   => ipcRenderer.invoke('archive:syncJobNow',            jobId),
   syncAllReadyJobs:       ()        => ipcRenderer.invoke('archive:syncAllReadyJobs'),
+  pauseJob:               (jobId)   => ipcRenderer.invoke('archive:pauseJob',              jobId),
+  verifyJobChecksum:      (jobId)   => ipcRenderer.invoke('archive:verifyJobChecksum',     jobId),
   checkDirectArchiveLocks: (payload) => ipcRenderer.invoke('archive:checkDirectArchiveLocks', payload),
 
   // ── Transfer Export ──

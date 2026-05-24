@@ -176,6 +176,9 @@ async function refreshQueue() {
             isLegacy:       false,
             syncedAt:       prev?.syncedAt       ?? null,
             syncResult:     prev?.syncResult     ?? null,
+            syncError:      prev?.syncError      ?? null,
+            checksumStatus: prev?.checksumStatus ?? null,
+            checksumResult: prev?.checksumResult ?? null,
           });
         }
       } else {

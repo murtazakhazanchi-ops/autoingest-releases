@@ -114,11 +114,15 @@ async function _copyFile(srcPath, destPath) {
  * depth=0  → photographer folder (files + recurse into subdirs with depth=1)
  * depth=1  → subdir such as VIDEO (files only, no further recursion)
  *
- * abortSignal — optional { aborted: boolean, reason: string|null }.
- * Checked before each entry; exits early without starting new file ops when set.
+ * abortSignal  — optional { aborted: boolean, reason: string|null }
+ *                Checked before each entry; exits early without starting new file ops when set.
+ * pauseSignal  — optional { paused: boolean }
+ *                Checked before each entry; exits loop cleanly so the job can resume later.
+ * onFileProgress — optional (filename: string, action: 'copied'|'skipped'|'failed') => void
  */
-async function _syncDir(localDir, archiveDir, result, depth = 0, abortSignal = null) {
+async function _syncDir(localDir, archiveDir, result, depth = 0, abortSignal = null, pauseSignal = null, onFileProgress = null) {
   if (abortSignal?.aborted) return;
+  if (pauseSignal?.paused)  return;
 
   let entries;
   try {
@@ -130,13 +134,14 @@ async function _syncDir(localDir, archiveDir, result, depth = 0, abortSignal = n
 
   for (const entry of entries) {
     if (abortSignal?.aborted) return;
+    if (pauseSignal?.paused)  return;
 
     const localPath   = path.join(localDir, entry.name);
     const archivePath = path.join(archiveDir, entry.name);
 
     if (entry.isDirectory()) {
       if (_skipDir(entry.name)) continue;
-      if (depth < 1) await _syncDir(localPath, archivePath, result, depth + 1, abortSignal);
+      if (depth < 1) await _syncDir(localPath, archivePath, result, depth + 1, abortSignal, pauseSignal, onFileProgress);
       continue;
     }
 
@@ -159,8 +164,10 @@ async function _syncDir(localDir, archiveDir, result, depth = 0, abortSignal = n
         if (_isSidecar(entry.name)) result.sidecarsCopied++;
         else result.copiedToArchive++;
         if (wasRenamed) result.renamedConflicts++;
+        onFileProgress?.(entry.name, 'copied');
       } catch (err) {
         result.errors.push(`Copy failed ${entry.name}: ${err.message}`);
+        onFileProgress?.(entry.name, 'failed');
       }
       continue;
     }
@@ -171,20 +178,24 @@ async function _syncDir(localDir, archiveDir, result, depth = 0, abortSignal = n
       srcStat = await fsp.stat(localPath);
     } catch (err) {
       result.errors.push(`Stat failed ${localPath}: ${err.message}`);
+      onFileProgress?.(entry.name, 'failed');
       continue;
     }
 
     if (srcStat.size !== destStat.size) {
       if (_isSidecar(entry.name)) {
         result.sidecarConflicts++;
+        onFileProgress?.(entry.name, 'skipped');
       } else {
         try {
           const safeDest = await _safeRenamedPath(archivePath);
           await _copyFile(localPath, safeDest);
           result.renamedConflicts++;
           result.copiedToArchive++;
+          onFileProgress?.(entry.name, 'copied');
         } catch (err) {
           result.errors.push(`Conflict-rename failed ${entry.name}: ${err.message}`);
+          onFileProgress?.(entry.name, 'failed');
         }
       }
       continue;
@@ -198,16 +209,20 @@ async function _syncDir(localDir, archiveDir, result, depth = 0, abortSignal = n
       ]);
       if (srcHash === destHash) {
         result.skippedDuplicates++;
+        onFileProgress?.(entry.name, 'skipped');
       } else if (_isSidecar(entry.name)) {
         result.sidecarConflicts++;
+        onFileProgress?.(entry.name, 'skipped');
       } else {
         const safeDest = await _safeRenamedPath(archivePath);
         await _copyFile(localPath, safeDest);
         result.renamedConflicts++;
         result.copiedToArchive++;
+        onFileProgress?.(entry.name, 'copied');
       }
     } catch (err) {
       result.errors.push(`Checksum/copy failed ${entry.name}: ${err.message}`);
+      onFileProgress?.(entry.name, 'failed');
     }
   }
 }
@@ -216,8 +231,10 @@ async function _syncDir(localDir, archiveDir, result, depth = 0, abortSignal = n
  * Apply the full no-overwrite / size / checksum / sidecar-conflict rules to one file.
  * Returns without throwing; errors are recorded in result.errors.
  * Lock acquisition is the caller's responsibility.
+ *
+ * onFileProgress — optional (filename: string, action: 'copied'|'skipped'|'failed') => void
  */
-async function _syncOneFile(localPath, archivePath, filename, result, abortSignal = null) {
+async function _syncOneFile(localPath, archivePath, filename, result, abortSignal = null, onFileProgress = null) {
   if (abortSignal?.aborted) return;
 
   let destStat = null;
@@ -236,8 +253,10 @@ async function _syncOneFile(localPath, archivePath, filename, result, abortSigna
       if (_isSidecar(filename)) result.sidecarsCopied++;
       else result.copiedToArchive++;
       if (wasRenamed) result.renamedConflicts++;
+      onFileProgress?.(filename, 'copied');
     } catch (err) {
       result.errors.push(`Copy failed ${filename}: ${err.message}`);
+      onFileProgress?.(filename, 'failed');
     }
     return;
   }
@@ -247,20 +266,24 @@ async function _syncOneFile(localPath, archivePath, filename, result, abortSigna
     srcStat = await fsp.stat(localPath);
   } catch (err) {
     result.errors.push(`Stat failed ${localPath}: ${err.message}`);
+    onFileProgress?.(filename, 'failed');
     return;
   }
 
   if (srcStat.size !== destStat.size) {
     if (_isSidecar(filename)) {
       result.sidecarConflicts++;
+      onFileProgress?.(filename, 'skipped');
     } else {
       try {
         const safeDest = await _safeRenamedPath(archivePath);
         await _copyFile(localPath, safeDest);
         result.renamedConflicts++;
         result.copiedToArchive++;
+        onFileProgress?.(filename, 'copied');
       } catch (err) {
         result.errors.push(`Conflict-rename failed ${filename}: ${err.message}`);
+        onFileProgress?.(filename, 'failed');
       }
     }
     return;
@@ -273,16 +296,20 @@ async function _syncOneFile(localPath, archivePath, filename, result, abortSigna
     ]);
     if (srcHash === destHash) {
       result.skippedDuplicates++;
+      onFileProgress?.(filename, 'skipped');
     } else if (_isSidecar(filename)) {
       result.sidecarConflicts++;
+      onFileProgress?.(filename, 'skipped');
     } else {
       const safeDest = await _safeRenamedPath(archivePath);
       await _copyFile(localPath, safeDest);
       result.renamedConflicts++;
       result.copiedToArchive++;
+      onFileProgress?.(filename, 'copied');
     }
   } catch (err) {
     result.errors.push(`Checksum/copy failed ${filename}: ${err.message}`);
+    onFileProgress?.(filename, 'failed');
   }
 }
 
@@ -294,17 +321,15 @@ async function _syncOneFile(localPath, archivePath, filename, result, abortSigna
  * local staging. XMPs are written by metadata processing after import commit, so they are
  * never included in files[] — expansion happens here at sync time instead.
  *
- * Lock acquisition is the caller's responsibility.
+ * pauseSignal  — optional { paused: boolean } — checked between files.
+ * onFileProgress — optional (filename, action) => void
  *
  * @param {string[]} relPaths  Paths relative to localEventPath, using '/' separator.
- * @param {string}   localEventPath
- * @param {string}   archiveEventPath
- * @param {object}   result   Mutable result counters.
- * @param {{ aborted: boolean, reason: string|null }|null} abortSignal
  */
-async function _syncFileList(relPaths, localEventPath, archiveEventPath, result, abortSignal = null) {
+async function _syncFileList(relPaths, localEventPath, archiveEventPath, result, abortSignal = null, pauseSignal = null, onFileProgress = null) {
   for (const relPath of relPaths) {
     if (abortSignal?.aborted) return;
+    if (pauseSignal?.paused)  return;
     if (typeof relPath !== 'string' || !relPath) continue;
 
     const segments    = relPath.split('/').filter(Boolean);
@@ -312,10 +337,9 @@ async function _syncFileList(relPaths, localEventPath, archiveEventPath, result,
     const archivePath = path.join(archiveEventPath, ...segments);
     const filename    = segments[segments.length - 1] || '';
 
-    await _syncOneFile(localPath, archivePath, filename, result, abortSignal);
+    await _syncOneFile(localPath, archivePath, filename, result, abortSignal, onFileProgress);
 
     // Companion XMP expansion: for RAW files, attempt to sync a same-folder .xmp sidecar.
-    // Generated after import by metadata processing — not in files[] — discovered at sync time.
     const ext = path.extname(filename).toLowerCase();
     if (_RAW_EXTS.has(ext)) {
       const base        = filename.slice(0, filename.length - ext.length);
@@ -324,7 +348,7 @@ async function _syncFileList(relPaths, localEventPath, archiveEventPath, result,
       const xmpArchive  = path.join(path.dirname(archivePath), xmpFilename);
       try {
         await fsp.access(xmpLocal);
-        await _syncOneFile(xmpLocal, xmpArchive, xmpFilename, result, abortSignal);
+        await _syncOneFile(xmpLocal, xmpArchive, xmpFilename, result, abortSignal, onFileProgress);
       } catch {
         // XMP absent or inaccessible — non-fatal, skip silently
       }
@@ -412,13 +436,47 @@ async function _copyEventJsonIfNeeded(localEventPath, archiveEventPath) {
 }
 
 /**
+ * Collect [{ localPath, archivePath, filename }] pairs by scanning a local dir.
+ * Used by verifyJobChecksum for jobs without a files[] list.
+ * Depth matches _syncDir: photographer dir + one level of subdirs.
+ */
+async function _collectFilePairs(localDir, archiveDir, depth = 0) {
+  const pairs = [];
+  let entries;
+  try {
+    entries = await fsp.readdir(localDir, { withFileTypes: true });
+  } catch { return pairs; }
+
+  for (const entry of entries) {
+    if (_skipDir(entry.name)) continue;
+    if (entry.isDirectory() && depth < 1) {
+      const sub = await _collectFilePairs(
+        path.join(localDir,   entry.name),
+        path.join(archiveDir, entry.name),
+        depth + 1,
+      );
+      pairs.push(...sub);
+      continue;
+    }
+    if (!entry.isFile()) continue;
+    pairs.push({
+      localPath:   path.join(localDir,   entry.name),
+      archivePath: path.join(archiveDir, entry.name),
+      filename:    entry.name,
+    });
+  }
+  return pairs;
+}
+
+/**
  * Sync one Local First job to the Active Archive.
  *
  * @param {{ jobId: string, batchId: string|null, collection: string, localEventPath: string }} job
  * @param {{ nasRoot: string, stagingRoot?: string }} options
+ * @param {{ progressCallback?: Function, pauseSignal?: { paused: boolean } }} [runtimeOpts]
  * @returns {Promise<{
  *   ok: boolean,
- *   status: 'synced'|'sync-failed'|'needs-attention'|'waiting-for-lock',
+ *   status: 'synced'|'sync-failed'|'needs-attention'|'waiting-for-lock'|'paused',
  *   copiedToArchive: number,
  *   skippedDuplicates: number,
  *   renamedConflicts: number,
@@ -431,7 +489,7 @@ async function _copyEventJsonIfNeeded(localEventPath, archiveEventPath) {
  *   waitingForLock: boolean,
  * }>}
  */
-async function syncJob(job, { nasRoot, stagingRoot }) {
+async function syncJob(job, { nasRoot, stagingRoot }, { progressCallback, pauseSignal: externalPauseSignal } = {}) {
   const syncStartedAt = Date.now();
   const result = {
     ok:                false,
@@ -507,9 +565,37 @@ async function syncJob(job, { nasRoot, stagingRoot }) {
     return result;
   }
 
+  // Per-file progress tracking (totalFiles is approximate for Strategy A — excludes XMP companions)
+  const totalFiles = hasFilesHint ? job.files.length : null;
+  let completedFiles = 0;
+  let copiedFiles    = 0;
+  let skippedFiles   = 0;
+  let failedFiles    = 0;
+
+  const onFileProgress = progressCallback ? (filename, action) => {
+    completedFiles++;
+    if (action === 'copied')       copiedFiles++;
+    else if (action === 'skipped') skippedFiles++;
+    else if (action === 'failed')  failedFiles++;
+    try {
+      progressCallback({
+        phase:          'syncing',
+        totalFiles,
+        completedFiles,
+        copiedFiles,
+        skippedFiles,
+        failedFiles,
+        currentFile:    filename,
+      });
+    } catch { /* progress push is non-critical; never abort sync on callback error */ }
+  } : null;
+
   let anyLockBlocked = false;
 
   for (const phEntry of photographerEntries) {
+    // Check pause before acquiring lock for next photographer folder
+    if (externalPauseSignal?.paused) break;
+
     const phFolderName  = phEntry.name;
     const localPhPath   = path.join(localEventPath, phFolderName);
     const archivePhPath = path.join(archiveEventPath, phFolderName);
@@ -566,10 +652,12 @@ async function syncJob(job, { nasRoot, stagingRoot }) {
           archiveEventPath,
           result,
           abortSignal,
+          externalPauseSignal,
+          onFileProgress,
         );
       } else {
         // Strategy B or C: sync entire photographer folder
-        await _syncDir(localPhPath, archivePhPath, result, 0, abortSignal);
+        await _syncDir(localPhPath, archivePhPath, result, 0, abortSignal, externalPauseSignal, onFileProgress);
       }
     } finally {
       clearInterval(heartbeatTimer);
@@ -582,6 +670,15 @@ async function syncJob(job, { nasRoot, stagingRoot }) {
     }
   }
 
+  // Pause takes precedence: job was cleanly interrupted after the current file.
+  // Lock is already released in the finally block. Files already copied are preserved.
+  // Resume via syncJobNow — existing no-overwrite/checksum logic skips completed files.
+  if (externalPauseSignal?.paused) {
+    result.ok     = true;
+    result.status = 'paused';
+    return result;
+  }
+
   const hasErrors = result.errors.length > 0;
 
   if (anyLockBlocked && !hasErrors) {
@@ -591,7 +688,14 @@ async function syncJob(job, { nasRoot, stagingRoot }) {
   }
 
   if (hasErrors) {
-    result.status = 'sync-failed';
+    const anySuccess = result.copiedToArchive > 0 || result.skippedDuplicates > 0;
+    if (anySuccess) {
+      result.ok      = true;
+      result.status  = 'needs-attention';
+      result.syncedAt = Date.now();
+    } else {
+      result.status = 'sync-failed';
+    }
     return result;
   }
 
@@ -610,4 +714,143 @@ async function syncJob(job, { nasRoot, stagingRoot }) {
   return result;
 }
 
-module.exports = { syncJob };
+/**
+ * Verify checksums for a completed sync job.
+ * Compares local staging source files against archive destination files.
+ * Includes companion XMP sidecar expansion (same logic as _syncFileList).
+ *
+ * Does not re-copy files. Reports only. Safe to run at any time after sync.
+ *
+ * @param {{ progressCallback?: Function }} [opts]
+ * @returns {Promise<{
+ *   ok: boolean,
+ *   status: 'verified'|'failed'|'partial'|'error',
+ *   verifiedCount: number,
+ *   failedCount: number,
+ *   missingCount: number,
+ *   totalCount: number,
+ *   errors: string[],
+ *   verifiedAt: number|null,
+ * }>}
+ */
+async function verifyJobChecksum(job, { nasRoot, stagingRoot, progressCallback } = {}) {
+  const result = {
+    ok:            false,
+    status:        'error',
+    verifiedCount: 0,
+    failedCount:   0,
+    missingCount:  0,
+    totalCount:    0,
+    errors:        [],
+    verifiedAt:    null,
+  };
+
+  const { localEventPath } = job;
+  if (!localEventPath || !nasRoot) {
+    result.errors.push('Missing localEventPath or nasRoot');
+    return result;
+  }
+
+  const collectionFolderName = path.basename(path.dirname(localEventPath));
+  const eventFolderName      = path.basename(localEventPath);
+  const archiveEventPath     = path.join(nasRoot, collectionFolderName, eventFolderName);
+
+  // Build file pairs: Strategy A (files[]) or Strategy B (photographer folder scan)
+  let filePairs = [];
+
+  if (Array.isArray(job.files) && job.files.length > 0) {
+    // Strategy A: exact file list + XMP sidecar expansion (matches _syncFileList logic)
+    for (const relPath of job.files) {
+      if (typeof relPath !== 'string' || !relPath) continue;
+      const segments    = relPath.split('/').filter(Boolean);
+      const localPath   = path.join(localEventPath,   ...segments);
+      const archivePath = path.join(archiveEventPath, ...segments);
+      const filename    = segments[segments.length - 1] || '';
+      filePairs.push({ localPath, archivePath, filename });
+
+      const ext = path.extname(filename).toLowerCase();
+      if (_RAW_EXTS.has(ext)) {
+        const base        = filename.slice(0, filename.length - ext.length);
+        const xmpFilename = base + '.xmp';
+        const xmpLocal    = path.join(path.dirname(localPath),   xmpFilename);
+        const xmpArchive  = path.join(path.dirname(archivePath), xmpFilename);
+        try {
+          await fsp.access(xmpLocal);
+          filePairs.push({ localPath: xmpLocal, archivePath: xmpArchive, filename: xmpFilename });
+        } catch { /* XMP absent — skip */ }
+      }
+    }
+  } else if (typeof job.photographer === 'string' && job.photographer.trim()) {
+    // Strategy B: scan single photographer folder
+    const phName    = job.photographer.trim();
+    const localPh   = path.join(localEventPath,   phName);
+    const archivePh = path.join(archiveEventPath, phName);
+    filePairs = await _collectFilePairs(localPh, archivePh);
+  } else {
+    result.errors.push('No files list and no photographer — cannot verify legacy job');
+    return result;
+  }
+
+  result.totalCount = filePairs.length;
+
+  for (let i = 0; i < filePairs.length; i++) {
+    const { localPath, archivePath, filename } = filePairs[i];
+
+    progressCallback?.({
+      phase:          'verifying',
+      totalFiles:     result.totalCount,
+      completedFiles: i,
+      currentFile:    filename,
+    });
+
+    let archiveStat;
+    try {
+      archiveStat = await fsp.stat(archivePath);
+    } catch (e) {
+      if (e.code === 'ENOENT') {
+        result.missingCount++;
+        result.errors.push(`Missing in archive: ${filename}`);
+      } else {
+        result.failedCount++;
+        result.errors.push(`Stat error: ${filename}: ${e.message}`);
+      }
+      continue;
+    }
+
+    try {
+      const [localHash, archiveHash] = await Promise.all([
+        _streamChecksum(localPath),
+        _streamChecksum(archivePath),
+      ]);
+      if (localHash === archiveHash) {
+        result.verifiedCount++;
+      } else {
+        result.failedCount++;
+        result.errors.push(`Mismatch: ${filename}`);
+      }
+    } catch (err) {
+      result.failedCount++;
+      result.errors.push(`Checksum error: ${filename}: ${err.message}`);
+    }
+  }
+
+  progressCallback?.({
+    phase:          'verifying',
+    totalFiles:     result.totalCount,
+    completedFiles: result.totalCount,
+    currentFile:    null,
+  });
+
+  result.verifiedAt = Date.now();
+  result.ok         = true;
+
+  if (result.failedCount > 0 || result.missingCount > 0) {
+    result.status = result.verifiedCount === 0 ? 'failed' : 'partial';
+  } else {
+    result.status = 'verified';
+  }
+
+  return result;
+}
+
+module.exports = { syncJob, verifyJobChecksum };

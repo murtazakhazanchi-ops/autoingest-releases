@@ -2967,6 +2967,8 @@ function _applySyncQueueTile(summary, archiveOffline = false) {
 }
 
 let _sqRefreshBusy = false;
+// In-memory per-job progress; survives modal close/reopen during active sync.
+const _sqJobProgress = new Map();
 
 async function _refreshSyncQueueCard(fromCache = false) {
   if (_sqRefreshBusy) return;
@@ -3027,6 +3029,7 @@ async function _sqLoadQueue() {
     const attn    = jobs.filter(j => j.status === 'needs-attention' && !reviews[j.jobId]).length;
     const failed  = jobs.filter(j => j.status === 'sync-failed').length;
     const syncing = jobs.filter(j => j.status === 'syncing').length;
+    const paused  = jobs.filter(j => j.status === 'paused').length;
     if (summaryEl) {
       if (jobs.length === 0) {
         summaryEl.textContent = archiveOffline ? 'Archive offline' : 'Queue empty';
@@ -3038,6 +3041,7 @@ async function _sqLoadQueue() {
         else {
           if (syncing > 0) parts.push(`${syncing} syncing`);
           if (ready > 0)   parts.push(`${ready} ready`);
+          if (paused > 0)  parts.push(`${paused} paused`);
           if (attn > 0)    parts.push(`${attn} needs attention`);
           if (failed > 0)  parts.push(`${failed} failed`);
         }
@@ -3046,7 +3050,7 @@ async function _sqLoadQueue() {
     }
     if (syncAllBtn) syncAllBtn.style.display = (ready > 0 && !archiveOffline) ? 'block' : 'none';
     _sqRenderJobs(jobs, reviews, archiveOffline);
-    _applySyncQueueTile({ total: jobs.length, ready, needsAttention: attn, failed, syncing }, archiveOffline);
+    _applySyncQueueTile({ total: jobs.length, ready, needsAttention: attn, failed, syncing, paused }, archiveOffline);
   } catch {
     if (listEl) listEl.innerHTML = '<div class="sq-empty">Failed to load queue.</div>';
   }
@@ -3081,6 +3085,7 @@ function _sqJobRow(job, reviewEntry, archiveOffline) {
     'blocked':          'Blocked',
     'synced':           'Synced',
     'syncing':          'Syncing',
+    'paused':           'Paused',
     'waiting-for-lock': 'Waiting',
     'sync-failed':      'Failed',
     'failed':           'Failed',
@@ -3103,7 +3108,13 @@ function _sqJobRow(job, reviewEntry, archiveOffline) {
   } else if (job.status === 'sync-failed' || job.status === 'waiting-for-lock') {
     actionHtml = `<button type="button" class="sq-action-btn sq-retry-btn" data-jobid="${_sqEsc(job.jobId)}" aria-label="Retry sync">Retry</button>`;
   } else if (job.status === 'syncing') {
-    actionHtml = `<button type="button" class="sq-action-btn" disabled>Syncing…</button>`;
+    actionHtml = `<button type="button" class="sq-action-btn sq-pause-btn" data-jobid="${_sqEsc(job.jobId)}" aria-label="Pause sync">Pause</button>`;
+  } else if (job.status === 'paused') {
+    if (archiveOffline) {
+      actionHtml = `<button type="button" class="sq-action-btn" disabled title="Reconnect archive to resume">Reconnect to resume</button>`;
+    } else {
+      actionHtml = `<button type="button" class="sq-action-btn sq-resume-btn" data-jobid="${_sqEsc(job.jobId)}" aria-label="Resume sync">Resume</button>`;
+    }
   } else if (job.status === 'needs-attention') {
     if (archiveOffline) {
       actionHtml = `<button type="button" class="sq-action-btn" disabled title="Reconnect archive to sync">Reconnect to sync</button>`;
@@ -3113,6 +3124,13 @@ function _sqJobRow(job, reviewEntry, archiveOffline) {
       if (!reviewEntry) {
         actionHtml += `<button type="button" class="sq-action-btn sq-review-btn" data-jobid="${_sqEsc(job.jobId)}" data-manifestpath="${_sqEsc(job.manifestPath || '')}" data-batchid="${_sqEsc(job.batchId || '')}" aria-label="Mark reviewed">Mark reviewed</button>`;
       }
+      if (job.checksumStatus !== 'running') {
+        actionHtml += `<button type="button" class="sq-action-btn sq-verify-btn" data-jobid="${_sqEsc(job.jobId)}" aria-label="Verify checksum">Verify</button>`;
+      }
+    }
+  } else if (job.status === 'synced') {
+    if (job.checksumStatus !== 'running') {
+      actionHtml = `<button type="button" class="sq-action-btn sq-verify-btn" data-jobid="${_sqEsc(job.jobId)}" aria-label="Verify checksum">Verify checksum</button>`;
     }
   }
 
@@ -3135,6 +3153,24 @@ function _sqJobRow(job, reviewEntry, archiveOffline) {
   if (reasonNote && !importedText && !syncedText) {
     metaHtml += `<div class="sq-card-meta-pair"><span class="sq-card-meta-label">Note</span><span class="sq-card-meta-val">${_sqEsc(reasonNote)}</span></div>`;
   }
+  // Sync failure reason — covers both exception path (syncError) and per-file error path (syncResult.errors)
+  if (job.status === 'sync-failed' || job.status === 'needs-attention') {
+    const syncErrList = Array.isArray(job.syncResult?.errors) ? job.syncResult.errors : [];
+    const firstErr    = (job.syncError || syncErrList[0] || '').slice(0, 160);
+    if (firstErr) {
+      const moreCount = syncErrList.length > 1 ? ` (+${syncErrList.length - 1} more)` : '';
+      const allErrs   = syncErrList.length ? syncErrList.join('\n') : (job.syncError || '');
+      metaHtml += `<div class="sq-card-meta-pair"><span class="sq-card-meta-label">Reason</span><span class="sq-card-meta-val sq-meta-fail" title="${_sqEsc(allErrs)}">${_sqEsc(firstErr)}${_sqEsc(moreCount)}</span></div>`;
+    }
+    // Partial sync counts (needs-attention from partial copy)
+    const sr = job.syncResult;
+    if (sr && typeof sr.copiedToArchive === 'number') {
+      const parts = [`${sr.copiedToArchive} copied`];
+      if ((sr.skippedDuplicates || 0) > 0) parts.push(`${sr.skippedDuplicates} skipped`);
+      if (syncErrList.length          > 0) parts.push(`${syncErrList.length} failed`);
+      metaHtml += `<div class="sq-card-meta-pair"><span class="sq-card-meta-label">Sync</span><span class="sq-card-meta-val">${parts.join(' · ')}</span></div>`;
+    }
+  }
   // Show metadata status separately so archive-sync state and metadata state are visually distinct.
   if (job.metadataStatus && job.metadataStatus !== 'complete' && job.metadataStatus !== 'skipped-disabled') {
     const metaNote = job.metadataStatus === 'failed'  ? 'Metadata: failed'
@@ -3143,25 +3179,65 @@ function _sqJobRow(job, reviewEntry, archiveOffline) {
     metaHtml += `<div class="sq-card-meta-pair"><span class="sq-card-meta-label">Metadata</span><span class="sq-card-meta-val sq-meta-warn">${_sqEsc(metaNote)}</span></div>`;
   }
 
+  // Progress bar — shown when syncing or when in-memory progress data exists for this job
+  let progressHtml = '';
+  const progress = _sqJobProgress.get(job.jobId);
+  if (job.status === 'syncing' || progress) {
+    const p   = progress || {};
+    const pct = (p.totalFiles > 0) ? Math.min(100, Math.round((p.completedFiles / p.totalFiles) * 100)) : 0;
+    const fileText = p.totalFiles
+      ? `${p.completedFiles || 0} / ${p.totalFiles} files`
+      : `${p.completedFiles || 0} files`;
+    const nameText = p.currentFile ? ` · ${_sqEsc(p.currentFile)}` : '';
+    const widthStyle = (p.completedFiles > 0 || pct > 0) ? `width:${pct}%` : 'width:0%';
+    progressHtml = `<div class="sq-card-progress"><div class="sq-progress-bar"><div class="sq-progress-fill" style="${widthStyle}"></div></div><div class="sq-progress-text">${fileText}${nameText}</div></div>`;
+  }
+
+  // Checksum status line
+  let checksumHtml = '';
+  if (job.checksumStatus && job.checksumStatus !== 'not-run') {
+    const csLabel = {
+      'running':  'Verifying…',
+      'verified': 'Verified',
+      'failed':   'Failed',
+      'partial':  'Partial',
+      'error':    'Error',
+    }[job.checksumStatus] || job.checksumStatus;
+    const csClass = job.checksumStatus === 'verified' ? 'sq-checksum--ok'
+                  : job.checksumStatus === 'failed'   ? 'sq-checksum--fail'
+                  : job.checksumStatus === 'partial'  ? 'sq-checksum--warn'
+                  : '';
+    let csDetail = '';
+    const cr = job.checksumResult;
+    if (cr && typeof cr.verifiedCount === 'number') {
+      csDetail = ` ${cr.verifiedCount} ok`;
+      if (cr.failedCount  > 0) csDetail += ` · ${cr.failedCount} failed`;
+      if (cr.missingCount > 0) csDetail += ` · ${cr.missingCount} missing`;
+    }
+    checksumHtml = `<div class="sq-card-checksum ${csClass}">Checksum: ${_sqEsc(csLabel)}${_sqEsc(csDetail)}</div>`;
+  }
+
   let phHtml = '';
   if (photographers.length > 0) {
     const chips = photographers.map(p => `<span class="sq-card-ph-chip">${_sqEsc(p)}</span>`).join('');
     phHtml = `<div class="sq-card-ph"><span class="sq-card-ph-label">Photographers</span><div class="sq-card-ph-chips">${chips}</div></div>`;
   }
 
-  return `<div class="sq-card">
+  return `<div class="sq-card" data-jobid="${_sqEsc(job.jobId)}">
   <div class="sq-card-top">
     <div class="sq-card-event" title="${_sqEsc(job.event || '')}">${_sqEsc(eventDisplay)}</div>
     <div class="sq-status ${statusClass}">${_sqEsc(displayLabel)}</div>
     ${actionHtml}
   </div>
   <div class="sq-card-meta">${metaHtml}</div>
+  ${progressHtml}
+  ${checksumHtml}
   ${phHtml}
   <div class="sq-card-path">Local Staging → Active Archive</div>
 </div>`;
 }
 
-const _SQ_KNOWN_STATUSES = new Set(['syncing', 'ready-for-sync', 'sync-failed', 'waiting-for-lock', 'failed', 'needs-attention', 'synced']);
+const _SQ_KNOWN_STATUSES = new Set(['syncing', 'ready-for-sync', 'sync-failed', 'waiting-for-lock', 'failed', 'needs-attention', 'synced', 'paused']);
 
 function _sqRenderJobs(jobs, reviews, archiveOffline) {
   reviews = reviews || {};
@@ -3174,11 +3250,13 @@ function _sqRenderJobs(jobs, reviews, archiveOffline) {
   }
   const syncing    = jobs.filter(j => j.status === 'syncing');
   const ready      = jobs.filter(j => j.status === 'ready-for-sync');
+  const paused     = jobs.filter(j => j.status === 'paused');
   const failed     = jobs.filter(j => j.status === 'sync-failed' || j.status === 'waiting-for-lock' || j.status === 'failed');
   const attnAll    = jobs.filter(j => j.status === 'needs-attention');
   const attn       = attnAll.filter(j => !reviews[j.jobId]);
   const reviewed   = attnAll.filter(j =>  reviews[j.jobId]);
-  const synced     = jobs.filter(j => j.status === 'synced');
+  const synced     = jobs.filter(j => j.status === 'synced')
+    .sort((a, b) => (b.syncedAt || b.importedAt || 0) - (a.syncedAt || a.importedAt || 0));
   const other      = jobs.filter(j => !_SQ_KNOWN_STATUSES.has(j.status));
 
   let html = '';
@@ -3189,6 +3267,10 @@ function _sqRenderJobs(jobs, reviews, archiveOffline) {
   if (ready.length) {
     html += '<div class="sq-section-title">Ready for Sync</div>';
     html += ready.map(j => _sqJobRow(j, null, archiveOffline)).join('');
+  }
+  if (paused.length) {
+    html += '<div class="sq-section-title sq-section-title--paused">Paused</div>';
+    html += paused.map(j => _sqJobRow(j, null, archiveOffline)).join('');
   }
   if (failed.length) {
     html += '<div class="sq-section-title sq-section-title--err">Failed · Waiting</div>';
@@ -3333,6 +3415,128 @@ document.getElementById('sqRefreshBtn')?.addEventListener('click', async () => {
 // Dismiss modal on Escape
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && document.getElementById('syncActivityModal')?.classList.contains('open')) _sqClose();
+});
+
+// ── Pause / Resume click handler ─────────────────────────────────────────────
+document.getElementById('sqJobList')?.addEventListener('click', async (e) => {
+  const pauseBtn = e.target.closest('.sq-pause-btn');
+  if (pauseBtn && !pauseBtn.disabled) {
+    const jobId = pauseBtn.dataset.jobid;
+    if (!jobId) return;
+    pauseBtn.disabled    = true;
+    pauseBtn.textContent = 'Pausing…';
+    await window.api.pauseJob(jobId).catch(() => {});
+    return;
+  }
+
+  const resumeBtn = e.target.closest('.sq-resume-btn');
+  if (resumeBtn && !resumeBtn.disabled) {
+    const jobId = resumeBtn.dataset.jobid;
+    if (!jobId) return;
+    resumeBtn.disabled    = true;
+    resumeBtn.textContent = 'Resuming…';
+    try {
+      const result = await window.api.syncJobNow(jobId);
+      await _sqLoadQueue();
+      const _pendingResolved = await EventCreator.resolvePendingLocalCopyToArchive().catch(() => false);
+      if (_pendingResolved) _renderLandingEventCard();
+      if (result?.ok === false) {
+        showMessage('Resume failed. Review needed.', 7000);
+      } else {
+        const sr    = result?.syncResult;
+        const parts = [];
+        if (sr?.copiedToArchive   > 0) parts.push(`${sr.copiedToArchive} copied`);
+        if (sr?.skippedDuplicates > 0) parts.push(`${sr.skippedDuplicates} skipped`);
+        if (sr?.errors?.length    > 0) parts.push(`${sr.errors.length} error${sr.errors.length !== 1 ? 's' : ''}`);
+        showMessage(`Sync complete — ${parts.length > 0 ? parts.join(' · ') : 'up to date'}`, 6000);
+      }
+    } catch {
+      resumeBtn.disabled    = false;
+      resumeBtn.textContent = 'Resume';
+      showMessage('Resume failed.', 5000);
+    }
+  }
+});
+
+// ── Verify checksum click handler ────────────────────────────────────────────
+document.getElementById('sqJobList')?.addEventListener('click', async (e) => {
+  const verifyBtn = e.target.closest('.sq-verify-btn');
+  if (!verifyBtn || verifyBtn.disabled) return;
+  const jobId = verifyBtn.dataset.jobid;
+  if (!jobId) return;
+  verifyBtn.disabled    = true;
+  verifyBtn.textContent = 'Verifying…';
+
+  // Optimistic checksum status update
+  const card = document.querySelector(`.sq-card[data-jobid="${jobId}"]`);
+  if (card) {
+    let csEl = card.querySelector('.sq-card-checksum');
+    if (!csEl) {
+      csEl = document.createElement('div');
+      csEl.className = 'sq-card-checksum';
+      const pathEl = card.querySelector('.sq-card-path');
+      if (pathEl) pathEl.before(csEl); else card.appendChild(csEl);
+    }
+    csEl.className   = 'sq-card-checksum';
+    csEl.textContent = 'Checksum: Verifying…';
+  }
+
+  try {
+    const result = await window.api.verifyJobChecksum(jobId);
+    await _sqLoadQueue();
+    const r = result?.result;
+    if (r?.status === 'verified') {
+      showMessage(`Checksum verified — all ${r.verifiedCount} files match.`, 6000);
+    } else if (r?.status === 'partial') {
+      showMessage(`Checksum partial — ${r.failedCount} failed, ${r.missingCount} missing.`, 8000);
+    } else if (r?.status === 'failed') {
+      showMessage(`Checksum failed — ${r.failedCount} mismatches, ${r.missingCount} missing.`, 8000);
+    } else {
+      showMessage('Verification complete.', 5000);
+    }
+  } catch {
+    verifyBtn.disabled    = false;
+    verifyBtn.textContent = 'Verify checksum';
+    showMessage('Verification failed.', 5000);
+  }
+});
+
+// ── Live progress push from main process ─────────────────────────────────────
+window.api.onSyncJobProgress((data) => {
+  const { jobId, completedFiles, totalFiles, currentFile, copiedFiles, skippedFiles, failedFiles } = data;
+  _sqJobProgress.set(jobId, { completedFiles, totalFiles, currentFile, copiedFiles, skippedFiles, failedFiles });
+
+  // Update card DOM in-place if it is currently visible
+  const card = document.querySelector(`.sq-card[data-jobid="${jobId}"]`);
+  if (!card) return;
+
+  // Ensure progress bar section exists
+  let progressEl = card.querySelector('.sq-card-progress');
+  if (!progressEl) {
+    progressEl = document.createElement('div');
+    progressEl.className = 'sq-card-progress';
+    progressEl.innerHTML = '<div class="sq-progress-bar"><div class="sq-progress-fill"></div></div><div class="sq-progress-text"></div>';
+    const anchor = card.querySelector('.sq-card-checksum') || card.querySelector('.sq-card-ph') || card.querySelector('.sq-card-path');
+    if (anchor) anchor.before(progressEl); else card.appendChild(progressEl);
+  }
+  const pct    = (totalFiles > 0) ? Math.min(100, Math.round((completedFiles / totalFiles) * 100)) : 0;
+  const fillEl = progressEl.querySelector('.sq-progress-fill');
+  if (fillEl) fillEl.style.width = `${pct}%`;
+  const textEl = progressEl.querySelector('.sq-progress-text');
+  if (textEl) {
+    const fileText = totalFiles ? `${completedFiles} / ${totalFiles} files` : `${completedFiles} files`;
+    textEl.textContent = currentFile ? `${fileText} · ${currentFile}` : fileText;
+  }
+});
+
+window.api.onSyncChecksumProgress((data) => {
+  const { jobId, completedFiles, totalFiles, currentFile } = data;
+  const card = document.querySelector(`.sq-card[data-jobid="${jobId}"]`);
+  if (!card) return;
+  const csEl = card.querySelector('.sq-card-checksum');
+  if (!csEl) return;
+  const pct = (totalFiles > 0) ? Math.round((completedFiles / totalFiles) * 100) : 0;
+  csEl.textContent = `Checksum: Verifying… ${completedFiles}/${totalFiles} (${pct}%)`;
 });
 
 // ════════════════════════════════════════════════════════════════

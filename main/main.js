@@ -50,7 +50,11 @@ const DEFAULT_DEST     = path.join(os.homedir(), 'Desktop', 'AutoIngestTest');
 
 // ── In-process sync guard ─────────────────────────────────────────────────────
 // Prevents duplicate concurrent syncJobNow calls for the same job.
-const _syncingJobIds = new Set();
+const _syncingJobIds   = new Set();
+// Per-job pause signals; set to { paused: true } to stop after the current file.
+const _jobPauseSignals = new Map();
+// Prevents duplicate concurrent verifyJobChecksum calls for the same job.
+const _verifyingJobIds = new Set();
 
 // ── Last imported file pairs for optional checksum verification ───────────────
 // Populated after each import; holds { src, dest } for every copied file.
@@ -2351,8 +2355,10 @@ ipcMain.handle('archive:syncJobNow', async (_event, jobId) => {
   const job = await syncQueueService.getJob(jobId);
   if (!job) return { ok: false, error: 'Job not found' };
   // 'needs-attention' is eligible: a metadata failure must not block archive file copy.
+  // 'paused' is eligible: resume continues from where it left off.
   if (job.status !== 'ready-for-sync' && job.status !== 'sync-failed' &&
-      job.status !== 'waiting-for-lock' && job.status !== 'needs-attention') {
+      job.status !== 'waiting-for-lock' && job.status !== 'needs-attention' &&
+      job.status !== 'paused') {
     return { ok: false, error: `Job not eligible for sync (status: ${job.status})` };
   }
 
@@ -2376,13 +2382,27 @@ ipcMain.handle('archive:syncJobNow', async (_event, jobId) => {
     } catch { /* non-fatal — fall back to folder-level sync */ }
   }
 
+  // Fresh pause signal for this run; injected into archiveSyncService so it can
+  // exit cleanly between files when archive:pauseJob is called.
+  const pauseSignal = { paused: false };
+  _jobPauseSignals.set(jobId, pauseSignal);
+
+  const progressCallback = (progress) => {
+    const w = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
+    if (w) w.webContents.send('sync:jobProgress', { jobId, ...progress });
+  };
+
   try {
-    const syncResult = await archiveSyncService.syncJob({ ...job, files: jobFiles }, { nasRoot, stagingRoot });
+    const syncResult = await archiveSyncService.syncJob(
+      { ...job, files: jobFiles },
+      { nasRoot, stagingRoot },
+      { progressCallback, pauseSignal },
+    );
     await syncQueueService.updateJob(jobId, {
-      status:            syncResult.status,
+      status:        syncResult.status,
       syncResult,
-      syncedAt:          syncResult.syncedAt || null,
-      syncStartedAt:     syncResult.syncStartedAt,
+      syncedAt:      syncResult.syncedAt  || null,
+      syncStartedAt: syncResult.syncStartedAt,
     });
     return { ok: syncResult.ok, syncResult };
   } catch (err) {
@@ -2390,6 +2410,67 @@ ipcMain.handle('archive:syncJobNow', async (_event, jobId) => {
     return { ok: false, error: err.message };
   } finally {
     _syncingJobIds.delete(jobId);
+    _jobPauseSignals.delete(jobId);
+  }
+});
+
+ipcMain.handle('archive:pauseJob', async (_event, jobId) => {
+  if (!jobId || typeof jobId !== 'string') return { ok: false, error: 'Invalid jobId' };
+  if (!_syncingJobIds.has(jobId))          return { ok: false, error: 'Job not currently syncing' };
+  const signal = _jobPauseSignals.get(jobId);
+  if (!signal) return { ok: false, error: 'No pause signal for job' };
+  signal.paused = true;
+  return { ok: true };
+});
+
+ipcMain.handle('archive:verifyJobChecksum', async (_event, jobId) => {
+  if (!jobId || typeof jobId !== 'string') return { ok: false, error: 'Invalid jobId' };
+  if (_verifyingJobIds.has(jobId))         return { ok: false, error: 'Already verifying' };
+
+  const job = await syncQueueService.getJob(jobId);
+  if (!job) return { ok: false, error: 'Job not found' };
+
+  const nasRoot     = settings.getNasRoot();
+  const stagingRoot = settings.getLocalStagingRoot();
+  if (!nasRoot) return { ok: false, error: 'Active Archive Root not configured' };
+
+  // Load files[] from manifest for exact-file verification.
+  let verifyFiles = null;
+  if (job.importId && job.localEventPath) {
+    try {
+      const manifest = await localSyncManifest.readManifest(job.localEventPath);
+      const mJob = Array.isArray(manifest?.jobs)
+        ? manifest.jobs.find(j => j.importId === job.importId)
+        : null;
+      if (Array.isArray(mJob?.files) && mJob.files.length > 0) verifyFiles = mJob.files;
+    } catch { /* non-fatal — fall back to photographer folder scan */ }
+  }
+
+  await syncQueueService.updateJob(jobId, { checksumStatus: 'running' });
+  _verifyingJobIds.add(jobId);
+
+  const progressCallback = (progress) => {
+    const w = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
+    if (w) w.webContents.send('sync:checksumProgress', { jobId, ...progress });
+  };
+
+  try {
+    const verifyJob = verifyFiles ? { ...job, files: verifyFiles } : job;
+    const verifyResult = await archiveSyncService.verifyJobChecksum(
+      verifyJob,
+      { nasRoot, stagingRoot, progressCallback },
+    );
+    await syncQueueService.updateJob(jobId, {
+      checksumStatus:     verifyResult.status,
+      checksumResult:     verifyResult,
+      checksumVerifiedAt: verifyResult.verifiedAt,
+    });
+    return { ok: verifyResult.ok, result: verifyResult };
+  } catch (err) {
+    await syncQueueService.updateJob(jobId, { checksumStatus: 'error', checksumError: err.message });
+    return { ok: false, error: err.message };
+  } finally {
+    _verifyingJobIds.delete(jobId);
   }
 });
 
@@ -2418,8 +2499,18 @@ ipcMain.handle('archive:syncAllReadyJobs', async () => {
         if (Array.isArray(_mj?.files) && _mj.files.length > 0) _jobFiles = _mj.files;
       } catch { /* non-fatal */ }
     }
+    const _batchPause = { paused: false };
+    _jobPauseSignals.set(job.jobId, _batchPause);
+    const _batchProgress = (progress) => {
+      const w = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
+      if (w) w.webContents.send('sync:jobProgress', { jobId: job.jobId, ...progress });
+    };
     try {
-      const syncResult = await archiveSyncService.syncJob({ ...job, files: _jobFiles }, { nasRoot, stagingRoot });
+      const syncResult = await archiveSyncService.syncJob(
+        { ...job, files: _jobFiles },
+        { nasRoot, stagingRoot },
+        { progressCallback: _batchProgress, pauseSignal: _batchPause },
+      );
       await syncQueueService.updateJob(job.jobId, {
         status:        syncResult.status,
         syncResult,
@@ -2437,6 +2528,7 @@ ipcMain.handle('archive:syncAllReadyJobs', async () => {
       results.push({ jobId: job.jobId, status: 'sync-failed', error: err.message });
     } finally {
       _syncingJobIds.delete(job.jobId);
+      _jobPauseSignals.delete(job.jobId);
     }
   }
 
