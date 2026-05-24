@@ -3141,7 +3141,12 @@ function _sqJobRow(job, reviewEntry, archiveOffline) {
 
   let metaHtml = `<div class="sq-card-meta-pair"><span class="sq-card-meta-label">Collection</span><span class="sq-card-meta-val">${_sqEsc(job.collection)}</span></div>`;
   if (job.fileCount != null) {
-    metaHtml += `<div class="sq-card-meta-pair"><span class="sq-card-meta-label">Files</span><span class="sq-card-meta-val">${_sqEsc(job.fileCount)}</span></div>`;
+    const _sr = job.syncResult;
+    const _totalSyncItems = _sr ? ((_sr.copiedToArchive || 0) + (_sr.skippedDuplicates || 0)) : 0;
+    const _filesVal = _totalSyncItems > job.fileCount
+      ? `${job.fileCount} media · ${_totalSyncItems} items`
+      : job.fileCount;
+    metaHtml += `<div class="sq-card-meta-pair"><span class="sq-card-meta-label">Files</span><span class="sq-card-meta-val">${_sqEsc(_filesVal)}</span></div>`;
   }
   if (importedText) {
     metaHtml += `<div class="sq-card-meta-pair"><span class="sq-card-meta-label">Imported</span><span class="sq-card-meta-val">${_sqEsc(importedText)}</span></div>`;
@@ -3183,11 +3188,13 @@ function _sqJobRow(job, reviewEntry, archiveOffline) {
   let progressHtml = '';
   const progress = _sqJobProgress.get(job.jobId);
   if (job.status === 'syncing' || progress) {
-    const p   = progress || {};
-    const pct = (p.totalFiles > 0) ? Math.min(100, Math.round((p.completedFiles / p.totalFiles) * 100)) : 0;
-    const fileText = p.totalFiles
-      ? `${p.completedFiles || 0} / ${p.totalFiles} files`
-      : `${p.completedFiles || 0} files`;
+    const p          = progress || {};
+    const _completed = p.completedFiles || 0;
+    const _dTotal    = Math.max(p.totalFiles || 0, _completed);
+    const pct        = _dTotal > 0 ? Math.min(100, Math.round((_completed / _dTotal) * 100)) : 0;
+    const fileText   = _dTotal > 0
+      ? `${_completed} / ${_dTotal} items`
+      : `${_completed} items`;
     const nameText = p.currentFile ? ` · ${_sqEsc(p.currentFile)}` : '';
     const widthStyle = (p.completedFiles > 0 || pct > 0) ? `width:${pct}%` : 'width:0%';
     progressHtml = `<div class="sq-card-progress"><div class="sq-progress-bar"><div class="sq-progress-fill" style="${widthStyle}"></div></div><div class="sq-progress-text">${fileText}${nameText}</div></div>`;
@@ -3210,7 +3217,7 @@ function _sqJobRow(job, reviewEntry, archiveOffline) {
     let csDetail = '';
     const cr = job.checksumResult;
     if (cr && typeof cr.verifiedCount === 'number') {
-      csDetail = ` ${cr.verifiedCount} ok`;
+      csDetail = ` ${cr.verifiedCount} items`;
       if (cr.failedCount  > 0) csDetail += ` · ${cr.failedCount} failed`;
       if (cr.missingCount > 0) csDetail += ` · ${cr.missingCount} missing`;
     }
@@ -3519,12 +3526,13 @@ window.api.onSyncJobProgress((data) => {
     const anchor = card.querySelector('.sq-card-checksum') || card.querySelector('.sq-card-ph') || card.querySelector('.sq-card-path');
     if (anchor) anchor.before(progressEl); else card.appendChild(progressEl);
   }
-  const pct    = (totalFiles > 0) ? Math.min(100, Math.round((completedFiles / totalFiles) * 100)) : 0;
+  const _liveTotal = Math.max(totalFiles || 0, completedFiles);
+  const pct    = _liveTotal > 0 ? Math.min(100, Math.round((completedFiles / _liveTotal) * 100)) : 0;
   const fillEl = progressEl.querySelector('.sq-progress-fill');
   if (fillEl) fillEl.style.width = `${pct}%`;
   const textEl = progressEl.querySelector('.sq-progress-text');
   if (textEl) {
-    const fileText = totalFiles ? `${completedFiles} / ${totalFiles} files` : `${completedFiles} files`;
+    const fileText = _liveTotal > 0 ? `${completedFiles} / ${_liveTotal} items` : `${completedFiles} items`;
     textEl.textContent = currentFile ? `${fileText} · ${currentFile}` : fileText;
   }
 });
