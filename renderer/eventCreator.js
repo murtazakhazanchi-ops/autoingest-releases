@@ -3952,10 +3952,62 @@ ${unparseable.map(ev => `
 
         console.log('[restoreLastEvent] path:', resolvedEventPath);
 
-        const components = await loadEventFromDisk(resolvedEventPath);
+        let components = await loadEventFromDisk(resolvedEventPath);
+
+        // Archive event folder exists (verifyLastEvent passed) but event.json is missing —
+        // typical of a partial sync that copied media but didn't write event.json.
+        // Try local staging copy and mark as pending sync (not offline — archive IS online).
+        let _pendingSync        = false;
+        let _pendingStagingColl = null;
+        if (!components && !isOfflineLocalCopy) {
+          try {
+            const opsStatus   = await window.api.getArchiveOperationsStatus();
+            const stagingRoot = opsStatus?.localStagingRoot;
+            if (stagingRoot && last.collectionName && safeName) {
+              const sCollPath  = stagingRoot + '/' + last.collectionName;
+              const sEventPath = sCollPath + '/' + safeName;
+              const stgComps   = await loadEventFromDisk(sEventPath);
+              if (stgComps) {
+                components          = stgComps;
+                resolvedCollPath    = sCollPath;
+                resolvedEventPath   = sEventPath;
+                _pendingSync        = true;
+                _pendingStagingColl = sCollPath;
+                console.log('[restoreLastEvent] archive event.json missing — staging fallback (pending sync):', sEventPath);
+              } else {
+                // Exact staging path failed — scan the staging collection for a match.
+                try {
+                  const scanResult = await window.api.scanStagingCollections(stagingRoot);
+                  const matchColl  = scanResult?.collections?.find(c => c.name === last.collectionName);
+                  if (matchColl) {
+                    const targetName = safeName || sanitizeForPath(last.eventName || '');
+                    const matchEvent = matchColl.events.find(e => e.name === targetName)
+                      || matchColl.events.find(e => e.name === sanitizeForPath(last.eventName || ''));
+                    if (matchEvent) {
+                      const scannedEventPath = matchColl.path + '/' + matchEvent.name;
+                      const scannedComps     = await loadEventFromDisk(scannedEventPath);
+                      if (scannedComps) {
+                        components          = scannedComps;
+                        resolvedCollPath    = matchColl.path;
+                        resolvedEventPath   = scannedEventPath;
+                        _pendingSync        = true;
+                        _pendingStagingColl = matchColl.path;
+                        console.log('[restoreLastEvent] archive event.json missing — staging scan fallback (pending sync):', scannedEventPath);
+                      }
+                    }
+                  }
+                } catch (scanErr) {
+                  console.warn('[restoreLastEvent] staging scan after load-fail:', scanErr);
+                }
+              }
+            }
+          } catch (err) {
+            console.warn('[restoreLastEvent] staging fallback after load-fail:', err);
+          }
+        }
 
         if (!components) {
-          console.error('[restoreLastEvent] Failed to load event');
+          console.error('[restoreLastEvent] Failed to load event — archive event.json missing, no staging copy found');
           return;
         }
 
@@ -4029,6 +4081,9 @@ ${unparseable.map(ev => `
           sequence:          _restoredSequence,
           isUnresolved:      false,
           isOfflineLocalCopy,
+          isPendingSync:        _pendingSync,
+          _stagingCollPath:     _pendingSync ? _pendingStagingColl : undefined,
+          wasLocalStagingEvent: _pendingSync,
         };
 
         if (!Array.isArray(_eventComps) || _eventComps.length === 0) {
@@ -4082,6 +4137,11 @@ ${unparseable.map(ev => `
       return _viewingExisting?.isPendingSync === true;
     },
 
+    /** Returns true when this session started (or adopted) a Local First staging event — persists after resolve. */
+    wasLocalStagingEvent() {
+      return _viewingExisting?.wasLocalStagingEvent === true;
+    },
+
     /**
      * Called when the archive comes back online in the same session.
      * Re-checks whether the archive event path is now accessible.
@@ -4121,6 +4181,50 @@ ${unparseable.map(ev => `
         }
 
         console.log('[resolveOfflineLocalCopyToArchive] resolved to archive:', archiveEventPath);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+
+    /**
+     * Called after a successful Sync Now / Sync All Ready in the same session.
+     * If the current event was a pending local staging copy (isPendingSync), checks
+     * whether the archive event.json has now been written by the sync. If so, switches
+     * the active path to the archive copy and clears the pending badge.
+     * Returns true if the resolve succeeded (caller should refresh hero display).
+     * Does NOT clear the badge if archive event.json is still missing — sync may have failed.
+     */
+    async resolvePendingLocalCopyToArchive() {
+      if (!_viewingExisting?.isPendingSync) return false;
+      if (!activeMaster?.path || !_viewingExisting.folderName) return false;
+
+      const archiveCollPath  = activeMaster.path;
+      const archiveEventPath = archiveCollPath + '/' + _viewingExisting.folderName;
+
+      try {
+        // Must verify event.json is present — verifyLastEvent only stats the directory.
+        const archiveComponents = await loadEventFromDisk(archiveEventPath);
+        if (!archiveComponents) return false;
+
+        const coll = sessionCollections.find(c => c.name === selectedCollection);
+        if (coll) coll._masterPath = archiveCollPath;
+
+        _viewingExisting.isPendingSync    = false;
+        _viewingExisting._stagingCollPath = undefined;
+        // wasLocalStagingEvent intentionally preserved: import mode defaults to local-first
+        // for the rest of this session so subsequent imports don't silently go to archive.
+
+        // Invalidate event list cache so Event Management rescans from archive.
+        _scannedEvents = null;
+
+        if (typeof EventMgmt !== 'undefined' && EventMgmt.isOpen() && EventMgmt.getMode() === 'select') {
+          _scanAndRenderEventList().catch(err => {
+            console.error('[resolvePendingLocalCopyToArchive] rescan failed:', err);
+          });
+        }
+
+        console.log('[resolvePendingLocalCopyToArchive] resolved to archive:', archiveEventPath);
         return true;
       } catch {
         return false;
@@ -4407,6 +4511,7 @@ ${unparseable.map(ev => `
         _stagingCollPath: _isPendingLocal
           ? entry._localEventPath.slice(0, -(entry.folderName.length + 1))
           : null,
+        wasLocalStagingEvent: _isPendingLocal,
         components:      _eventComps.map(c => ({ ...c, eventTypes: [...c.eventTypes] })),
       };
 

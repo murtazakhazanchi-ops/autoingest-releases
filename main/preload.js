@@ -216,6 +216,7 @@ contextBridge.exposeInMainWorld('api', {
   // ── Local sync manifest ──
   writeSyncManifest: (localEventPath, manifest) => ipcRenderer.invoke('archive:writeSyncManifest', { localEventPath, manifest }),
   readSyncManifest:  (localEventPath)            => ipcRenderer.invoke('archive:readSyncManifest',  { localEventPath }),
+  appendSyncJob:     (localEventPath, job)       => ipcRenderer.invoke('archive:appendSyncJob',     { localEventPath, job }),
 
   // ── Durable sync queue ──
   refreshSyncQueue:    ()       => ipcRenderer.invoke('archive:refreshSyncQueue'),

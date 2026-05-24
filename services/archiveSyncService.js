@@ -208,6 +208,105 @@ async function _syncDir(localDir, archiveDir, result, depth = 0, abortSignal = n
 }
 
 /**
+ * Apply the full no-overwrite / size / checksum / sidecar-conflict rules to one file.
+ * Returns without throwing; errors are recorded in result.errors.
+ * Lock acquisition is the caller's responsibility.
+ */
+async function _syncOneFile(localPath, archivePath, filename, result, abortSignal = null) {
+  if (abortSignal?.aborted) return;
+
+  let destStat = null;
+  try {
+    destStat = await fsp.stat(archivePath);
+  } catch (e) {
+    if (e.code !== 'ENOENT') {
+      result.errors.push(`Stat failed ${archivePath}: ${e.message}`);
+      return;
+    }
+  }
+
+  if (destStat === null) {
+    try {
+      const { wasRenamed } = await _copyFile(localPath, archivePath);
+      if (_isSidecar(filename)) result.sidecarsCopied++;
+      else result.copiedToArchive++;
+      if (wasRenamed) result.renamedConflicts++;
+    } catch (err) {
+      result.errors.push(`Copy failed ${filename}: ${err.message}`);
+    }
+    return;
+  }
+
+  let srcStat;
+  try {
+    srcStat = await fsp.stat(localPath);
+  } catch (err) {
+    result.errors.push(`Stat failed ${localPath}: ${err.message}`);
+    return;
+  }
+
+  if (srcStat.size !== destStat.size) {
+    if (_isSidecar(filename)) {
+      result.sidecarConflicts++;
+    } else {
+      try {
+        const safeDest = await _safeRenamedPath(archivePath);
+        await _copyFile(localPath, safeDest);
+        result.renamedConflicts++;
+        result.copiedToArchive++;
+      } catch (err) {
+        result.errors.push(`Conflict-rename failed ${filename}: ${err.message}`);
+      }
+    }
+    return;
+  }
+
+  try {
+    const [srcHash, destHash] = await Promise.all([
+      _streamChecksum(localPath),
+      _streamChecksum(archivePath),
+    ]);
+    if (srcHash === destHash) {
+      result.skippedDuplicates++;
+    } else if (_isSidecar(filename)) {
+      result.sidecarConflicts++;
+    } else {
+      const safeDest = await _safeRenamedPath(archivePath);
+      await _copyFile(localPath, safeDest);
+      result.renamedConflicts++;
+      result.copiedToArchive++;
+    }
+  } catch (err) {
+    result.errors.push(`Checksum/copy failed ${filename}: ${err.message}`);
+  }
+}
+
+/**
+ * Sync a specific list of files (relative paths from localEventPath) to archiveEventPath.
+ * Same no-overwrite / checksum / sidecar rules as _syncDir.
+ * Lock acquisition is the caller's responsibility.
+ *
+ * @param {string[]} relPaths  Paths relative to localEventPath, using '/' separator.
+ * @param {string}   localEventPath
+ * @param {string}   archiveEventPath
+ * @param {object}   result   Mutable result counters.
+ * @param {{ aborted: boolean, reason: string|null }|null} abortSignal
+ */
+async function _syncFileList(relPaths, localEventPath, archiveEventPath, result, abortSignal = null) {
+  for (const relPath of relPaths) {
+    if (abortSignal?.aborted) return;
+    if (typeof relPath !== 'string' || !relPath) continue;
+
+    const segments    = relPath.split('/').filter(Boolean);
+    const localPath   = path.join(localEventPath,   ...segments);
+    const archivePath = path.join(archiveEventPath, ...segments);
+    const filename    = segments[segments.length - 1] || '';
+
+    await _syncOneFile(localPath, archivePath, filename, result, abortSignal);
+  }
+}
+
+/**
  * Sync event.json from the staging event folder to the archive event folder.
  * Called at every successful sync exit point.
  *
@@ -339,13 +438,39 @@ async function syncJob(job, { nasRoot, stagingRoot }) {
   const archiveEventPath     = path.join(nasRoot, collectionFolderName, eventFolderName);
   result.archiveEventPath    = archiveEventPath;
 
-  let photographerEntries;
-  try {
-    const entries = await fsp.readdir(localEventPath, { withFileTypes: true });
-    photographerEntries = entries.filter(e => e.isDirectory() && !_skipDir(e.name));
-  } catch (err) {
-    result.errors.push(`Cannot read event dir: ${err.message}`);
-    return result;
+  // Determine sync strategy:
+  //   A — job.files[]  : copy exactly those files (grouped by top-level dir for locking)
+  //   B — job.photographer (no files): sync that one photographer folder only
+  //   C — legacy       : scan all photographer dirs under localEventPath
+  const hasFilesHint   = Array.isArray(job.files) && job.files.length > 0;
+  const targetPh       = (typeof job.photographer === 'string' && job.photographer.trim()) || null;
+
+  let photographerEntries;          // [{ name: string }]
+  let filesByPhotographer = null;   // Map<string, string[]> — only for Strategy A
+
+  if (hasFilesHint) {
+    // Strategy A: group relative paths by their top-level directory
+    filesByPhotographer = new Map();
+    for (const f of job.files) {
+      if (typeof f !== 'string' || !f) continue;
+      const ph = f.includes('/') ? f.split('/')[0] : null;
+      if (!ph || _skipDir(ph)) continue;
+      if (!filesByPhotographer.has(ph)) filesByPhotographer.set(ph, []);
+      filesByPhotographer.get(ph).push(f);
+    }
+    photographerEntries = [...filesByPhotographer.keys()].map(name => ({ name }));
+  } else if (targetPh) {
+    // Strategy B: single photographer folder
+    photographerEntries = [{ name: targetPh }];
+  } else {
+    // Strategy C: legacy — scan all photographer dirs
+    try {
+      const entries = await fsp.readdir(localEventPath, { withFileTypes: true });
+      photographerEntries = entries.filter(e => e.isDirectory() && !_skipDir(e.name));
+    } catch (err) {
+      result.errors.push(`Cannot read event dir: ${err.message}`);
+      return result;
+    }
   }
 
   if (photographerEntries.length === 0) {
@@ -399,7 +524,6 @@ async function syncJob(job, { nasRoot, stagingRoot }) {
           heartbeatTimer = null;
         }
       }).catch(() => {
-        // I/O error on renewal — stop sync conservatively
         abortSignal.aborted = true;
         abortSignal.reason  = 'heartbeat-io-error';
         clearInterval(heartbeatTimer);
@@ -408,7 +532,19 @@ async function syncJob(job, { nasRoot, stagingRoot }) {
     }, LOCK_HEARTBEAT_INTERVAL_MS);
 
     try {
-      await _syncDir(localPhPath, archivePhPath, result, 0, abortSignal);
+      if (filesByPhotographer) {
+        // Strategy A: sync only the exact files listed for this photographer
+        await _syncFileList(
+          filesByPhotographer.get(phFolderName) || [],
+          localEventPath,
+          archiveEventPath,
+          result,
+          abortSignal,
+        );
+      } else {
+        // Strategy B or C: sync entire photographer folder
+        await _syncDir(localPhPath, archivePhPath, result, 0, abortSignal);
+      }
     } finally {
       clearInterval(heartbeatTimer);
       heartbeatTimer = null;

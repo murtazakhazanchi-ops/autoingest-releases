@@ -33,14 +33,22 @@ function _resolvePath() {
   return _queuePath;
 }
 
-/** Stable deterministic ID for a local event path. */
+/** Stable deterministic ID for a local event path (legacy event-level). */
 function _jobId(localEventPath) {
   return crypto.createHash('sha1').update(localEventPath).digest('hex').slice(0, 16);
 }
 
-/** Derive queue status from manifest fields. */
+/** Stable deterministic ID for a per-import job (localEventPath + importId). */
+function _importJobId(localEventPath, importId) {
+  return crypto.createHash('sha1').update(localEventPath + '|' + importId).digest('hex').slice(0, 16);
+}
+
+/** Derive queue status from manifest fields.
+ * Archive sync readiness is independent of metadata status — a metadata failure
+ * must not prevent files from being copied to the archive.
+ */
 function _statusFromManifest(manifest) {
-  if (manifest.readyForSync === true && manifest.metadataStatus === 'complete') {
+  if (manifest.readyForSync === true) {
     return 'ready-for-sync';
   }
   if (manifest.needsAttention === true) {
@@ -115,49 +123,112 @@ async function refreshQueue() {
         if (!manifest || typeof manifest !== 'object') continue;
       } catch { continue; }
 
-      const jobId = _jobId(localEventPath);
-      const prev  = existingMap[jobId];
+      const manifestJobs = Array.isArray(manifest.jobs) && manifest.jobs.length > 0
+        ? manifest.jobs
+        : null;
 
-      // Scan for photographer subdirectory names (display only — non-critical)
-      let photographers = [];
-      try {
-        const phEntries = await fsp.readdir(localEventPath, { withFileTypes: true });
-        photographers   = phEntries.filter(e => e.isDirectory() && !e.name.startsWith('.')).map(e => e.name);
-      } catch { /* ignore */ }
+      if (manifestJobs) {
+        // Per-import job cards: one queue item per manifest job entry.
+        for (const mJob of manifestJobs) {
+          if (!mJob || !mJob.importId) continue;
 
-      // Preserve terminal statuses set by sync operations; reset live-operation states.
-      // 'synced' is only preserved when the manifest has not been updated since sync completed —
-      // a newer manifest.updatedAt means a subsequent import occurred and the event needs re-sync.
-      const TERMINAL = new Set(['sync-failed', 'needs-attention']);
-      const isSynced            = prev?.status === 'synced';
-      const syncedAt            = isSynced ? (prev.syncedAt || 0) : 0;
-      const manifestUpdatedAt   = manifest.updatedAt || 0;
-      const manifestNewerThanSync = isSynced && manifestUpdatedAt > syncedAt;
-      const preserveStatus = prev && (
-        TERMINAL.has(prev.status) ||
-        (isSynced && !manifestNewerThanSync)
-      );
+          const jobId = _importJobId(localEventPath, mJob.importId);
+          const prev  = existingMap[jobId];
 
-      jobs.push({
-        jobId,
-        batchId:        manifest.batchId         || null,
-        collection:     manifest.collectionName  || collName,
-        event:          manifest.eventName       || eventName,
-        localEventPath,
-        manifestPath,
-        metadataStatus: manifest.metadataStatus  || null,
-        readyForSync:   manifest.readyForSync    === true,
-        needsAttention: manifest.needsAttention  === true,
-        status:         preserveStatus ? prev.status : _statusFromManifest(manifest),
-        reason:         manifest.reason           || null,
-        importedAt:     manifest.importedAt       || null,
-        createdAt:      prev?.createdAt           || now,
-        updatedAt:      manifest.updatedAt        || manifest.importedAt || null,
-        lastSeenAt:     now,
-        photographers,
-        syncedAt:       prev?.syncedAt            ?? null,
-        syncResult:     prev?.syncResult          ?? null,
-      });
+          const TERMINAL = new Set(['sync-failed']);
+          const isSynced         = prev?.status === 'synced';
+          const isNeedsAttention = prev?.status === 'needs-attention';
+          const syncedAt         = isSynced        ? (prev.syncedAt  || 0) : 0;
+          const prevUpdatedAt    = isNeedsAttention ? (prev.updatedAt || 0) : 0;
+          const jobUpdatedAt     = mJob.updatedAt  || 0;
+          const jobNewerThanSync      = isSynced         && jobUpdatedAt > syncedAt;
+          const jobNewerThanAttention = isNeedsAttention && jobUpdatedAt > prevUpdatedAt;
+          const preserveStatus = prev && (
+            TERMINAL.has(prev.status) ||
+            (isSynced         && !jobNewerThanSync) ||
+            (isNeedsAttention && !jobNewerThanAttention)
+          );
+
+          const jobManifest = {
+            readyForSync:   mJob.readyForSync   === true,
+            needsAttention: mJob.needsAttention === true,
+          };
+
+          jobs.push({
+            jobId,
+            importId:       mJob.importId,
+            batchId:        mJob.batchId         || null,
+            collection:     manifest.collectionName || collName,
+            event:          manifest.eventName      || eventName,
+            localEventPath,
+            manifestPath,
+            photographer:   mJob.photographer    || '',
+            fileCount:      mJob.fileCount       ?? null,
+            metadataStatus: mJob.metadataStatus  || null,
+            readyForSync:   mJob.readyForSync    === true,
+            needsAttention: mJob.needsAttention  === true,
+            status:         preserveStatus ? prev.status : _statusFromManifest(jobManifest),
+            reason:         mJob.reason          || null,
+            importedAt:     mJob.importedAt      || null,
+            createdAt:      prev?.createdAt      || now,
+            updatedAt:      mJob.updatedAt       || mJob.importedAt || null,
+            lastSeenAt:     now,
+            isLegacy:       false,
+            syncedAt:       prev?.syncedAt       ?? null,
+            syncResult:     prev?.syncResult     ?? null,
+          });
+        }
+      } else {
+        // Legacy: flat manifest without jobs[] → synthesize one event-level card.
+        const jobId = _jobId(localEventPath);
+        const prev  = existingMap[jobId];
+
+        // Scan for photographer subdirectory names (display only — non-critical)
+        let photographers = [];
+        try {
+          const phEntries = await fsp.readdir(localEventPath, { withFileTypes: true });
+          photographers   = phEntries.filter(e => e.isDirectory() && !e.name.startsWith('.')).map(e => e.name);
+        } catch { /* ignore */ }
+
+        const TERMINAL = new Set(['sync-failed']);
+        const isSynced           = prev?.status === 'synced';
+        const isNeedsAttention   = prev?.status === 'needs-attention';
+        const syncedAt           = isSynced        ? (prev.syncedAt  || 0) : 0;
+        const prevUpdatedAt      = isNeedsAttention ? (prev.updatedAt || 0) : 0;
+        const manifestUpdatedAt  = manifest.updatedAt || 0;
+        const manifestNewerThanSync      = isSynced         && manifestUpdatedAt > syncedAt;
+        const manifestNewerThanAttention = isNeedsAttention && manifestUpdatedAt > prevUpdatedAt;
+        const preserveStatus = prev && (
+          TERMINAL.has(prev.status) ||
+          (isSynced         && !manifestNewerThanSync) ||
+          (isNeedsAttention && !manifestNewerThanAttention)
+        );
+
+        jobs.push({
+          jobId,
+          importId:       null,
+          batchId:        manifest.batchId         || null,
+          collection:     manifest.collectionName  || collName,
+          event:          manifest.eventName       || eventName,
+          localEventPath,
+          manifestPath,
+          photographer:   '',
+          fileCount:      null,
+          metadataStatus: manifest.metadataStatus  || null,
+          readyForSync:   manifest.readyForSync    === true,
+          needsAttention: manifest.needsAttention  === true,
+          status:         preserveStatus ? prev.status : _statusFromManifest(manifest),
+          reason:         manifest.reason           || null,
+          importedAt:     manifest.importedAt       || null,
+          createdAt:      prev?.createdAt           || now,
+          updatedAt:      manifest.updatedAt        || manifest.importedAt || null,
+          lastSeenAt:     now,
+          isLegacy:       true,
+          photographers,
+          syncedAt:       prev?.syncedAt            ?? null,
+          syncResult:     prev?.syncResult          ?? null,
+        });
+      }
     }
   }
 

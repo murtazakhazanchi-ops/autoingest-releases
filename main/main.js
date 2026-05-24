@@ -675,6 +675,7 @@ async function _writeLastMetadataRun(eventJsonFilePath, batchStats, contextGroup
     try {
       await fsp.writeFile(tmp, JSON.stringify(doc, null, 2), 'utf8');
       await fsp.rename(tmp, eventJsonFilePath);
+      hidePathBestEffort(eventJsonFilePath).catch(() => {});
     } catch (writeErr) {
       try { await fsp.unlink(tmp); } catch {}
       throw writeErr;
@@ -2243,6 +2244,40 @@ ipcMain.handle('archive:writeSyncManifest', async (_event, { localEventPath, man
 ipcMain.handle('archive:readSyncManifest',  async (_event, { localEventPath }) =>
   localSyncManifest.readManifest(localEventPath));
 
+ipcMain.handle('archive:appendSyncJob', async (_event, { localEventPath, job }) => {
+  if (!localEventPath || typeof localEventPath !== 'string') {
+    return { ok: false, reason: 'Invalid localEventPath.' };
+  }
+
+  const stagingRoot = settings.getLocalStagingRoot();
+  if (!stagingRoot) return { ok: false, reason: 'Local Staging Root not configured.' };
+
+  let realRoot;
+  try {
+    realRoot = await fsp.realpath(stagingRoot);
+  } catch {
+    return { ok: false, reason: 'Local Staging Root not accessible.' };
+  }
+
+  let realEventPath;
+  try {
+    realEventPath = await fsp.realpath(localEventPath);
+  } catch {
+    try {
+      const parentReal = await fsp.realpath(path.dirname(localEventPath));
+      realEventPath = path.join(parentReal, path.basename(localEventPath));
+    } catch (err) {
+      return { ok: false, reason: `localEventPath not accessible: ${err.message}` };
+    }
+  }
+
+  if (!realEventPath.startsWith(realRoot + path.sep)) {
+    return { ok: false, reason: 'localEventPath is outside the configured Local Staging Root.' };
+  }
+
+  return localSyncManifest.appendJob(localEventPath, job);
+});
+
 // ── Direct-archive lock helpers ───────────────────────────────────────────────
 
 // Must match config/app.config.js VIDEO_EXTENSIONS exactly.
@@ -2315,7 +2350,9 @@ ipcMain.handle('archive:syncJobNow', async (_event, jobId) => {
 
   const job = await syncQueueService.getJob(jobId);
   if (!job) return { ok: false, error: 'Job not found' };
-  if (job.status !== 'ready-for-sync' && job.status !== 'sync-failed' && job.status !== 'waiting-for-lock') {
+  // 'needs-attention' is eligible: a metadata failure must not block archive file copy.
+  if (job.status !== 'ready-for-sync' && job.status !== 'sync-failed' &&
+      job.status !== 'waiting-for-lock' && job.status !== 'needs-attention') {
     return { ok: false, error: `Job not eligible for sync (status: ${job.status})` };
   }
 
@@ -2327,8 +2364,20 @@ ipcMain.handle('archive:syncJobNow', async (_event, jobId) => {
   _syncingJobIds.add(jobId);
   await syncQueueService.updateJob(jobId, { status: 'syncing', syncStartedAt: Date.now() });
 
+  // Load per-job files[] from manifest so syncJob can target exactly those files.
+  let jobFiles = null;
+  if (job.importId && job.localEventPath) {
+    try {
+      const manifest = await localSyncManifest.readManifest(job.localEventPath);
+      const mJob = Array.isArray(manifest?.jobs)
+        ? manifest.jobs.find(j => j.importId === job.importId)
+        : null;
+      if (Array.isArray(mJob?.files) && mJob.files.length > 0) jobFiles = mJob.files;
+    } catch { /* non-fatal — fall back to folder-level sync */ }
+  }
+
   try {
-    const syncResult = await archiveSyncService.syncJob(job, { nasRoot, stagingRoot });
+    const syncResult = await archiveSyncService.syncJob({ ...job, files: jobFiles }, { nasRoot, stagingRoot });
     await syncQueueService.updateJob(jobId, {
       status:            syncResult.status,
       syncResult,
@@ -2360,8 +2409,17 @@ ipcMain.handle('archive:syncAllReadyJobs', async () => {
 
     _syncingJobIds.add(job.jobId);
     await syncQueueService.updateJob(job.jobId, { status: 'syncing', syncStartedAt: Date.now() });
+    // Load per-job files[] from manifest for targeted sync.
+    let _jobFiles = null;
+    if (job.importId && job.localEventPath) {
+      try {
+        const _m = await localSyncManifest.readManifest(job.localEventPath);
+        const _mj = Array.isArray(_m?.jobs) ? _m.jobs.find(j => j.importId === job.importId) : null;
+        if (Array.isArray(_mj?.files) && _mj.files.length > 0) _jobFiles = _mj.files;
+      } catch { /* non-fatal */ }
+    }
     try {
-      const syncResult = await archiveSyncService.syncJob(job, { nasRoot, stagingRoot });
+      const syncResult = await archiveSyncService.syncJob({ ...job, files: _jobFiles }, { nasRoot, stagingRoot });
       await syncQueueService.updateJob(job.jobId, {
         status:        syncResult.status,
         syncResult,

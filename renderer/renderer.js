@@ -3031,7 +3031,9 @@ async function _sqLoadQueue() {
       if (jobs.length === 0) {
         summaryEl.textContent = archiveOffline ? 'Archive offline' : 'Queue empty';
       } else {
-        const parts = [`${jobs.length} event${jobs.length !== 1 ? 's' : ''}`];
+        const hasPerImport = jobs.some(j => !j.isLegacy);
+        const unit = hasPerImport ? 'import' : 'event';
+        const parts = [`${jobs.length} ${unit}${jobs.length !== 1 ? 's' : ''}`];
         if (archiveOffline) parts.push('archive offline');
         else {
           if (syncing > 0) parts.push(`${syncing} syncing`);
@@ -3084,7 +3086,10 @@ function _sqJobRow(job, reviewEntry, archiveOffline) {
     'failed':           'Failed',
   }[job.status] || job.status;
 
-  const photographers = Array.isArray(job.photographers) ? job.photographers : [];
+  // Per-import jobs have a single photographer; legacy event-level jobs have an array.
+  const photographers = job.photographer
+    ? [job.photographer]
+    : (Array.isArray(job.photographers) ? job.photographers : []);
   const importedText  = job.importedAt ? _sqFmtTime(job.importedAt) : '';
   const syncedText    = job.syncedAt   ? _sqFmtTime(job.syncedAt)   : '';
 
@@ -3099,8 +3104,16 @@ function _sqJobRow(job, reviewEntry, archiveOffline) {
     actionHtml = `<button type="button" class="sq-action-btn sq-retry-btn" data-jobid="${_sqEsc(job.jobId)}" aria-label="Retry sync">Retry</button>`;
   } else if (job.status === 'syncing') {
     actionHtml = `<button type="button" class="sq-action-btn" disabled>Syncing…</button>`;
-  } else if (job.status === 'needs-attention' && !reviewEntry) {
-    actionHtml = `<button type="button" class="sq-action-btn sq-review-btn" data-jobid="${_sqEsc(job.jobId)}" data-manifestpath="${_sqEsc(job.manifestPath || '')}" data-batchid="${_sqEsc(job.batchId || '')}" aria-label="Mark reviewed">Mark reviewed</button>`;
+  } else if (job.status === 'needs-attention') {
+    if (archiveOffline) {
+      actionHtml = `<button type="button" class="sq-action-btn" disabled title="Reconnect archive to sync">Reconnect to sync</button>`;
+    } else {
+      // Sync Now is the primary action — metadata failure must not block archive file copy.
+      actionHtml = `<button type="button" class="sq-action-btn sq-sync-btn" data-jobid="${_sqEsc(job.jobId)}" aria-label="Sync now">Sync Now</button>`;
+      if (!reviewEntry) {
+        actionHtml += `<button type="button" class="sq-action-btn sq-review-btn" data-jobid="${_sqEsc(job.jobId)}" data-manifestpath="${_sqEsc(job.manifestPath || '')}" data-batchid="${_sqEsc(job.batchId || '')}" aria-label="Mark reviewed">Mark reviewed</button>`;
+      }
+    }
   }
 
   const isReviewed   = (job.status === 'needs-attention' && !!reviewEntry);
@@ -3109,6 +3122,9 @@ function _sqJobRow(job, reviewEntry, archiveOffline) {
   const eventDisplay = _sqMidTrunc(job.event || '', 70);
 
   let metaHtml = `<div class="sq-card-meta-pair"><span class="sq-card-meta-label">Collection</span><span class="sq-card-meta-val">${_sqEsc(job.collection)}</span></div>`;
+  if (job.fileCount != null) {
+    metaHtml += `<div class="sq-card-meta-pair"><span class="sq-card-meta-label">Files</span><span class="sq-card-meta-val">${_sqEsc(job.fileCount)}</span></div>`;
+  }
   if (importedText) {
     metaHtml += `<div class="sq-card-meta-pair"><span class="sq-card-meta-label">Imported</span><span class="sq-card-meta-val">${_sqEsc(importedText)}</span></div>`;
   }
@@ -3118,6 +3134,13 @@ function _sqJobRow(job, reviewEntry, archiveOffline) {
   const reasonNote = job.reason === 'auto-metadata-disabled' ? 'Metadata disabled' : (job.reason || '');
   if (reasonNote && !importedText && !syncedText) {
     metaHtml += `<div class="sq-card-meta-pair"><span class="sq-card-meta-label">Note</span><span class="sq-card-meta-val">${_sqEsc(reasonNote)}</span></div>`;
+  }
+  // Show metadata status separately so archive-sync state and metadata state are visually distinct.
+  if (job.metadataStatus && job.metadataStatus !== 'complete' && job.metadataStatus !== 'skipped-disabled') {
+    const metaNote = job.metadataStatus === 'failed'  ? 'Metadata: failed'
+                   : job.metadataStatus === 'partial' ? 'Metadata: partial'
+                   : `Metadata: ${job.metadataStatus}`;
+    metaHtml += `<div class="sq-card-meta-pair"><span class="sq-card-meta-label">Metadata</span><span class="sq-card-meta-val sq-meta-warn">${_sqEsc(metaNote)}</span></div>`;
   }
 
   let phHtml = '';
@@ -3215,6 +3238,8 @@ document.getElementById('sqJobList')?.addEventListener('click', async (e) => {
   try {
     const result = await window.api.syncJobNow(jobId);
     await _sqLoadQueue();
+    const _pendingResolved = await EventCreator.resolvePendingLocalCopyToArchive().catch(() => false);
+    if (_pendingResolved) _renderLandingEventCard();
     if (result?.ok === false) {
       showMessage('Sync failed. Review needed.', 7000);
     } else {
@@ -3269,6 +3294,8 @@ document.getElementById('sqSyncAllBtn')?.addEventListener('click', async () => {
   try {
     const result = await window.api.syncAllReadyJobs();
     await _sqLoadQueue();
+    const _pendingResolved = await EventCreator.resolvePendingLocalCopyToArchive().catch(() => false);
+    if (_pendingResolved) _renderLandingEventCard();
     const anyFailed = result?.results?.some(r => r.status === 'sync-failed');
     if (anyFailed) {
       showMessage('Sync failed. Review needed.', 7000);
@@ -3438,7 +3465,14 @@ async function _msScanAndRender(masterPath) {
 
   let pending = [];
   try {
-    pending = await window.api.metadataSyncScanPending(masterPath);
+    // Race against a 30-second timeout — NAS filesystem calls have no built-in Node.js timeout
+    // and a stale/unresponsive mount will block fsp.readdir/stat indefinitely without this guard.
+    pending = await Promise.race([
+      window.api.metadataSyncScanPending(masterPath),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Scan timed out — check archive connection')), 30_000)
+      ),
+    ]);
   } catch (err) {
     if (thisScan !== _msScanCounter) return;  // scope changed while awaiting — discard stale error
     listEl.innerHTML = `<p class="ms-empty">Could not scan collection: ${escapeHtml(err.message)}</p>`;
@@ -6641,29 +6675,37 @@ let _alLastImportEntries     = [];   // cached on each AL render; used for error
 let _metaBatchGroupsSnapshot = null; // [{label, metadataTags, fileCount}] captured at batch_start for AL breakdown
 let _metaDurableRun          = null; // lastMetadataRun loaded from event.json {status,processed,failed,skipped,timestamp,metadataSummary}
 let _metaDurableRunPath      = null; // event path that _metaDurableRun was loaded for
-let _pendingLfSyncManifest   = null; // { batchId, localEventPath, eventName, collectionName, importedAt } — set after Local First import; cleared on batch_complete/batch_error
+let _pendingLfSyncManifest   = null; // { batchId, importId, photographer, fileCount, localEventPath, eventName, collectionName, importedAt } — set after Local First import; cleared on batch_complete/batch_error
 
 async function _writeLocalFirstManifest(metadataStatus) {
   const pending = _pendingLfSyncManifest;
   if (!pending) return;
   if (_metaBatchId !== pending.batchId) return;
   _pendingLfSyncManifest = null;
-  const payload = {
-    eventName:      pending.eventName,
-    collectionName: pending.collectionName,
-    importedAt:     pending.importedAt,
-    metadataStatus,
-    readyForSync:   metadataStatus === 'complete',
-  };
-  if (metadataStatus !== 'complete') payload.needsAttention = true;
+  // Files are always ready for archive copy after a local import, regardless of metadata
+  // result. needsAttention flags the metadata issue separately so the operator is informed
+  // but is not blocked from syncing files to the archive.
+  const metadataComplete = metadataStatus === 'complete';
   try {
-    await window.api.writeSyncManifest(pending.localEventPath, payload);
+    await window.api.appendSyncJob(pending.localEventPath, {
+      importId:       pending.importId,
+      batchId:        pending.batchId,
+      eventName:      pending.eventName,
+      collectionName: pending.collectionName,
+      photographer:   pending.photographer,
+      fileCount:      pending.fileCount,
+      files:          pending.files ?? null,
+      importedAt:     pending.importedAt,
+      metadataStatus,
+      readyForSync:   true,
+      needsAttention: !metadataComplete,
+    });
     _refreshSyncQueueCard(false).catch(() => {});
     if (metadataStatus === 'complete') {
       _archiveNotice('Local import complete. Ready for sync.', () => _sqOpen(), 8000);
     }
   } catch (e) {
-    console.error('[LF] Failed to write sync manifest:', e);
+    console.error('[LF] Failed to append sync job:', e);
   }
 }
 
@@ -7586,22 +7628,42 @@ document.getElementById('importBtn').addEventListener('click', async () => {
 
       showProgressSummary(summary, _importCleanupRoot);
       if (_eiSelectedImportMode === 'local-first') {
-        const _lfCollName  = (eventData.collectionPath || '').replace(/\\/g, '/').replace(/\/$/, '').split('/').filter(Boolean).pop() || '';
+        const _lfCollName   = (eventData.collectionPath || '').replace(/\\/g, '/').replace(/\/$/, '').split('/').filter(Boolean).pop() || '';
         const _lfImportedAt = Date.now();
+        const _lfImportId   = summary.metadataBatchId || _lfImportedAt.toString(36);
+        const _lfFileCount  = summary.copied || 0;
+
+        // Build relative file paths (relative to localEventPath) for per-job targeting.
+        // Uses string manipulation — path module not available in renderer context.
+        const _lfEventPrefix = _txEventPath.replace(/\\/g, '/').replace(/\/$/, '') + '/';
+        const _lfRelFiles = (summary.copiedFiles || []).map(cf => {
+          const norm = (cf.dest || '').replace(/\\/g, '/');
+          return norm.startsWith(_lfEventPrefix) ? norm.slice(_lfEventPrefix.length) : null;
+        }).filter(Boolean);
+
         if (summary.metadataBatchId) {
-          // Metadata running — write manifest after batch_complete / batch_error
+          // Metadata running — write manifest job after batch_complete / batch_error
           _pendingLfSyncManifest = {
             batchId:        summary.metadataBatchId,
+            importId:       _lfImportId,
+            photographer:   photographer || '',
+            fileCount:      _lfFileCount,
+            files:          _lfRelFiles.length > 0 ? _lfRelFiles : null,
             localEventPath: _txEventPath,
             eventName:      eventData.event?.name || '',
             collectionName: _lfCollName,
             importedAt:     _lfImportedAt,
           };
         } else {
-          // Auto-metadata disabled — write manifest immediately
-          window.api.writeSyncManifest(_txEventPath, {
+          // Auto-metadata disabled — write manifest job immediately
+          window.api.appendSyncJob(_txEventPath, {
+            importId:       _lfImportId,
+            batchId:        null,
             eventName:      eventData.event?.name || '',
             collectionName: _lfCollName,
+            photographer:   photographer || '',
+            fileCount:      _lfFileCount,
+            files:          _lfRelFiles.length > 0 ? _lfRelFiles : null,
             importedAt:     _lfImportedAt,
             metadataStatus: 'skipped-disabled',
             readyForSync:   false,
@@ -7609,7 +7671,7 @@ document.getElementById('importBtn').addEventListener('click', async () => {
             reason:         'auto-metadata-disabled',
           }).then(() => {
             _archiveNotice('Local import complete.', () => _sqOpen(), 7000);
-          }).catch(e => console.error('[LF] Failed to write sync manifest (no-meta):', e));
+          }).catch(e => console.error('[LF] Failed to append sync job (no-meta):', e));
         }
       }
       EventCreator.invalidateScannedEvents();
@@ -7882,7 +7944,9 @@ async function showEventImportConfirmModal(groups, eventData) {
       container,
       type:        'photographers',
       placeholder: 'Search photographer…',
-      onSelect:    ({ label }) => {
+      onSelect:    (v) => {
+        // v is {id, label} on selection or null on clear — guard before destructuring
+        const label = v?.label ?? null;
         importBtn.disabled = !label?.trim();
         _updateTree(label?.trim() || null);
         _applyImportModeUI(_eiSelectedImportMode, label?.trim() || null);
@@ -7990,11 +8054,15 @@ async function showEventImportConfirmModal(groups, eventData) {
 
     // For pending-local events: force local-first and block direct archive to prevent
     // a split state where files land on archive before the event is synced.
-    const _isPendingLocal = EventCreator.isPendingSync();
+    // After resolve: default to local-first (wasLocalStagingEvent) without blocking the radio.
+    const _isPendingLocal  = EventCreator.isPendingSync();
+    const _wasLocalStaging = EventCreator.wasLocalStagingEvent();
     if (_isPendingLocal) {
       _applyImportModeUI('local-first', null);
       if (directNasRadio) directNasRadio.disabled = true;
       if (optDirectNas)   { optDirectNas.title = 'Direct archive import is blocked until this event is synced'; optDirectNas.style.opacity = '0.45'; }
+    } else if (_wasLocalStaging) {
+      _applyImportModeUI('local-first', null);
     } else {
       _applyImportModeUI(archiveStatus.defaultImportMode || 'direct-nas', null);
     }
@@ -8061,7 +8129,7 @@ function showQuickImportConfirmModal(fileCount, destPath) {
       container,
       type:        'photographers',
       placeholder: 'Search photographer…',
-      onSelect:    ({ label }) => { importBtn.disabled = !label?.trim(); },
+      onSelect:    (v) => { importBtn.disabled = !(v?.label?.trim()); },
     });
 
     overlay.classList.add('visible');
