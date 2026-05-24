@@ -24,9 +24,14 @@ const {
 } = require('./archiveLockService');
 
 const { hidePathBestEffort } = require('./internalFileProtection');
+const config = require('../config/app.config');
 
 const SKIP_DIRS  = new Set(['.autoingest', '__MACOSX']);
 const TMP_SUFFIX = '.autoingest-sync-tmp';
+
+// RAW extension set for companion XMP discovery at sync time.
+// Sourced from the authoritative config list so it stays in sync with the rest of the app.
+const _RAW_EXTS = new Set(config.RAW_EXTENSIONS);
 
 function _isSidecar(filename) {
   return path.extname(filename).toLowerCase() === '.xmp';
@@ -284,6 +289,11 @@ async function _syncOneFile(localPath, archivePath, filename, result, abortSigna
 /**
  * Sync a specific list of files (relative paths from localEventPath) to archiveEventPath.
  * Same no-overwrite / checksum / sidecar rules as _syncDir.
+ *
+ * For each RAW file in relPaths, also syncs its companion .xmp sidecar if one exists in
+ * local staging. XMPs are written by metadata processing after import commit, so they are
+ * never included in files[] — expansion happens here at sync time instead.
+ *
  * Lock acquisition is the caller's responsibility.
  *
  * @param {string[]} relPaths  Paths relative to localEventPath, using '/' separator.
@@ -303,6 +313,22 @@ async function _syncFileList(relPaths, localEventPath, archiveEventPath, result,
     const filename    = segments[segments.length - 1] || '';
 
     await _syncOneFile(localPath, archivePath, filename, result, abortSignal);
+
+    // Companion XMP expansion: for RAW files, attempt to sync a same-folder .xmp sidecar.
+    // Generated after import by metadata processing — not in files[] — discovered at sync time.
+    const ext = path.extname(filename).toLowerCase();
+    if (_RAW_EXTS.has(ext)) {
+      const base        = filename.slice(0, filename.length - ext.length);
+      const xmpFilename = base + '.xmp';
+      const xmpLocal    = path.join(path.dirname(localPath),   xmpFilename);
+      const xmpArchive  = path.join(path.dirname(archivePath), xmpFilename);
+      try {
+        await fsp.access(xmpLocal);
+        await _syncOneFile(xmpLocal, xmpArchive, xmpFilename, result, abortSignal);
+      } catch {
+        // XMP absent or inaccessible — non-fatal, skip silently
+      }
+    }
   }
 }
 
