@@ -35,7 +35,8 @@ const CHECKPOINT_JSON    = 'export-checkpoint.json';
 const TX_TMP_SUFFIX      = '.autoingest-tx-tmp';
 const MAX_ERRORS         = 200;
 
-const _SKIP_SRC_DIRS = new Set(['.autoingest', '.autoingest-transfer', '__MACOSX']);
+const _SKIP_SRC_DIRS     = new Set(['.autoingest', '.autoingest-transfer', '__MACOSX']);
+const _CONTROL_FILE_NAMES = new Set(['event.json', 'event.metadata.json', 'event.sync.json']);
 
 // ── Module-scope state ────────────────────────────────────────────────────────
 
@@ -86,6 +87,10 @@ function _skipFile(name) {
   if (name.endsWith(TX_TMP_SUFFIX)) return true;
   if (name.endsWith('.autoingest-sync-tmp')) return true;
   return false;
+}
+
+function _skipControlFile(name) {
+  return _CONTROL_FILE_NAMES.has(name);
 }
 
 async function _findSafeConflictPath(destPath) {
@@ -144,20 +149,23 @@ async function _copyFileSafe(srcPath, destPath, stats) {
   return outcome;
 }
 
-async function _walkAndCopy(srcDir, destDir, stats) {
+async function _walkAndCopy(srcDir, destDir, stats, opts = {}) {
   let entries;
   try { entries = await fsp.readdir(srcDir, { withFileTypes: true }); } catch { return; }
 
   for (const entry of entries) {
     if (entry.isDirectory()) {
       if (_skipDir(entry.name)) continue;
+      if (opts.rootFilesOnly) continue;
       await _walkAndCopy(
         path.join(srcDir, entry.name),
         path.join(destDir, entry.name),
-        stats
+        stats,
+        opts
       );
     } else if (entry.isFile()) {
       if (_skipFile(entry.name)) continue;
+      if (opts.skipControlFiles && _skipControlFile(entry.name)) continue;
       if (stats.errors.length >= MAX_ERRORS) continue;
 
       await _waitIfPaused();
@@ -180,16 +188,18 @@ async function _walkAndCopy(srcDir, destDir, stats) {
   }
 }
 
-async function _countFiles(dir) {
+async function _countFiles(dir, opts = {}) {
   let count = 0;
   let entries;
   try { entries = await fsp.readdir(dir, { withFileTypes: true }); } catch { return 0; }
   for (const entry of entries) {
     if (entry.isDirectory()) {
       if (_skipDir(entry.name)) continue;
-      count += await _countFiles(path.join(dir, entry.name));
+      if (opts.rootFilesOnly) continue;
+      count += await _countFiles(path.join(dir, entry.name), opts);
     } else if (entry.isFile()) {
       if (_skipFile(entry.name)) continue;
+      if (opts.skipControlFiles && _skipControlFile(entry.name)) continue;
       count++;
     }
   }
@@ -254,6 +264,13 @@ async function _clearCheckpointFile(transferRoot) {
   try { await fsp.unlink(dest); } catch {}
 }
 
+async function _cleanExternalSharingMeta(transferRoot) {
+  const metaDir = path.join(transferRoot, TRANSFER_META_DIR);
+  try { await fsp.rm(metaDir, { recursive: true, force: true }); } catch (e) {
+    console.error('[transferExport] external-sharing meta cleanup failed:', e.message);
+  }
+}
+
 // ── Three-level tree scan for UI ──────────────────────────────────────────────
 
 async function scanExportTree(nasRoot) {
@@ -291,11 +308,7 @@ async function scanExportTree(nasRoot) {
         }
       }
 
-      if (hasRootFiles) {
-        folders.unshift({ name: '(event root files)', path: evPath, isEventRoot: true });
-      }
-
-      events.push({ name: evEntry.name, path: evPath, folders });
+      events.push({ name: evEntry.name, path: evPath, folders, hasEventRootFiles: hasRootFiles });
     }
 
     tree.push({ name: collEntry.name, path: collPath, events });
@@ -322,7 +335,8 @@ function _fileHash(filePath) {
 
 async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
   const startedAt = new Date().toISOString();
-  const { collectionPaths = [], folderPaths = null } = scope || {};
+  const { collectionPaths = [], folderPaths = null, eventRootPaths = null, purpose = 'archive-transfer' } = scope || {};
+  const copyOpts = { skipControlFiles: purpose === 'external-sharing' };
 
   try {
     await _initTransferMeta(transferRoot, meta.deviceName);
@@ -339,10 +353,26 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
     batches           = resumeBatches;
     _state.total      = batches.reduce((s, b) => s + (b.fileCount || 0), 0);
     _state.batchCount = batches.length;
-  } else if (folderPaths && folderPaths.length > 0) {
-    // Photographer-folder-level batches from explicit selection
+  } else if ((folderPaths && folderPaths.length > 0) || (eventRootPaths && eventRootPaths.length > 0)) {
     batches = [];
-    for (const fp of folderPaths) {
+    for (const ep of (eventRootPaths || [])) {
+      const rel   = path.relative(nasRoot, ep);
+      const parts = rel.split(path.sep);
+      batches.push({
+        batchIdx:       batches.length,
+        collectionName: parts[0] || '',
+        eventName:      parts[1] || '',
+        folderName:     '',
+        batchLabel:     parts.join(' / ') + ' (root)',
+        srcDir:         ep,
+        destDir:        path.join(transferRoot, rel),
+        rootFilesOnly:  true,
+        fileCount:      0,
+        status:         'pending',
+        copied: 0, skipped: 0, renamed: 0, errors: 0,
+      });
+    }
+    for (const fp of (folderPaths || [])) {
       const rel   = path.relative(nasRoot, fp);
       const parts = rel.split(path.sep);
       batches.push({
@@ -353,6 +383,7 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
         batchLabel:     parts.join(' / '),
         srcDir:         fp,
         destDir:        path.join(transferRoot, rel),
+        rootFilesOnly:  false,
         fileCount:      0,
         status:         'pending',
         copied: 0, skipped: 0, renamed: 0, errors: 0,
@@ -361,7 +392,7 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
 
     let totalFiles = 0;
     for (const batch of batches) {
-      batch.fileCount = await _countFiles(batch.srcDir);
+      batch.fileCount = await _countFiles(batch.srcDir, { ...copyOpts, rootFilesOnly: !!batch.rootFilesOnly });
       totalFiles += batch.fileCount;
     }
     _state.total      = totalFiles;
@@ -392,7 +423,7 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
 
     let totalFiles = 0;
     for (const batch of batches) {
-      batch.fileCount = await _countFiles(batch.srcDir);
+      batch.fileCount = await _countFiles(batch.srcDir, copyOpts);
       totalFiles += batch.fileCount;
     }
     _state.total      = totalFiles;
@@ -405,7 +436,9 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
     nasRoot,
     transferRoot,
     collectionPaths,
-    folderPaths:     folderPaths || null,
+    folderPaths:     folderPaths     || null,
+    eventRootPaths:  eventRootPaths  || null,
+    exportPurpose:   purpose,
     createdAt:       startedAt,
     status:          'running',
     batches,
@@ -443,7 +476,7 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
     const beforeRenamed = stats.renamed;
     const beforeErrors  = stats.errors.length;
 
-    await _walkAndCopy(batch.srcDir, batch.destDir, stats);
+    await _walkAndCopy(batch.srcDir, batch.destDir, stats, { ...copyOpts, rootFilesOnly: !!batch.rootFilesOnly });
 
     batch.copied  = stats.copied  - beforeCopied;
     batch.skipped = stats.skipped - beforeSkipped;
@@ -456,7 +489,9 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
       nasRoot,
       transferRoot,
       collectionPaths,
-      folderPaths:     folderPaths || null,
+      folderPaths:     folderPaths    || null,
+      eventRootPaths:  eventRootPaths || null,
+      exportPurpose:   purpose,
       createdAt:       startedAt,
       status:          _state.paused ? 'paused' : 'running',
       batches,
@@ -473,27 +508,29 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
   const finalStatus = stats.errors.length === 0 ? 'ok' : 'partial';
 
   await _writeCheckpoint(transferRoot, {
-    exportId:     meta.batchId,
+    exportId:       meta.batchId,
     nasRoot,
     transferRoot,
     collectionPaths,
-    folderPaths:  folderPaths || null,
-    createdAt:    startedAt,
+    folderPaths:    folderPaths    || null,
+    eventRootPaths: eventRootPaths || null,
+    exportPurpose:  purpose,
+    createdAt:      startedAt,
     completedAt,
-    status:       'complete',
+    status:         'complete',
     batches,
-    totalFiles:   _state.total,
-    totalCopied:  stats.copied,
-    totalSkipped: stats.skipped,
-    totalRenamed: stats.renamed,
-    totalErrors:  stats.errors.length,
+    totalFiles:     _state.total,
+    totalCopied:    stats.copied,
+    totalSkipped:   stats.skipped,
+    totalRenamed:   stats.renamed,
+    totalErrors:    stats.errors.length,
   });
 
   const auditEntry = {
     batchId:      meta.batchId,
     nasRoot,
     transferRoot,
-    scope:        { collectionPaths, folderPaths: folderPaths || null },
+    scope:        { collectionPaths, folderPaths: folderPaths || null, eventRootPaths: eventRootPaths || null },
     operatorName: meta.operatorName || null,
     deviceName:   meta.deviceName,
     startedAt,
@@ -523,6 +560,10 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
     completedAt,
     status:     finalStatus,
   };
+
+  if (purpose === 'external-sharing') {
+    await _cleanExternalSharingMeta(transferRoot);
+  }
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -566,9 +607,10 @@ async function previewExport(nasRoot, transferRoot, scope) {
   if (nasRoot === transferRoot || _isInsideDir(nasRoot, transferRoot) || _isInsideDir(transferRoot, nasRoot)) {
     return { ok: false, reason: 'roots-overlap' };
   }
-  const hasFoldPaths = Array.isArray(scope?.folderPaths) && scope.folderPaths.length > 0;
-  const hasCollPaths = Array.isArray(scope?.collectionPaths) && scope.collectionPaths.length > 0;
-  if (!scope || (!hasCollPaths && !hasFoldPaths)) {
+  const hasFoldPaths  = Array.isArray(scope?.folderPaths)     && scope.folderPaths.length > 0;
+  const hasEvRtPaths  = Array.isArray(scope?.eventRootPaths)  && scope.eventRootPaths.length > 0;
+  const hasCollPaths  = Array.isArray(scope?.collectionPaths) && scope.collectionPaths.length > 0;
+  if (!scope || (!hasCollPaths && !hasFoldPaths && !hasEvRtPaths)) {
     return { ok: false, reason: 'empty-scope' };
   }
 
@@ -578,20 +620,33 @@ async function previewExport(nasRoot, transferRoot, scope) {
     }
   }
 
-  // Folder-level preview (photographer-folder selection)
-  if (scope.folderPaths && scope.folderPaths.length > 0) {
-    for (const fp of scope.folderPaths) {
+  const purpose  = scope.purpose  || 'archive-transfer';
+  const fileOpts = { skipControlFiles: purpose === 'external-sharing' };
+
+  // Folder-level preview (photographer-folder + optional event-root selection)
+  if (hasFoldPaths || hasEvRtPaths) {
+    for (const fp of (scope.folderPaths || [])) {
       if (!_isInsideDir(nasRoot, fp)) return { ok: false, reason: 'scope-outside-nas-root', path: fp };
+    }
+    for (const ep of (scope.eventRootPaths || [])) {
+      if (!_isInsideDir(nasRoot, ep)) return { ok: false, reason: 'scope-outside-nas-root', path: ep };
     }
     const collectionSet = new Set(), eventSet = new Set();
     let folders = 0, files = 0;
-    for (const fp of scope.folderPaths) {
+    for (const fp of (scope.folderPaths || [])) {
       const rel   = path.relative(nasRoot, fp);
       const parts = rel.split(path.sep);
       if (parts[0]) collectionSet.add(parts[0]);
       if (parts[0] && parts[1]) eventSet.add(parts[0] + '/' + parts[1]);
       folders++;
-      files += await _countFiles(fp);
+      files += await _countFiles(fp, fileOpts);
+    }
+    for (const ep of (scope.eventRootPaths || [])) {
+      const rel   = path.relative(nasRoot, ep);
+      const parts = rel.split(path.sep);
+      if (parts[0]) collectionSet.add(parts[0]);
+      if (parts[0] && parts[1]) eventSet.add(parts[0] + '/' + parts[1]);
+      files += await _countFiles(ep, { ...fileOpts, rootFilesOnly: true });
     }
     return { ok: true, nasRoot, transferRoot, scope,
       collections: collectionSet.size, events: eventSet.size,
@@ -612,7 +667,7 @@ async function previewExport(nasRoot, transferRoot, scope) {
       let hasEventJson = false;
       try { await fsp.access(path.join(evPath, 'event.json')); hasEventJson = true; } catch {}
       if (hasEventJson) events++; else externalFolders++;
-      files += await _countFiles(evPath);
+      files += await _countFiles(evPath, fileOpts);
     }
   }
 
@@ -623,9 +678,10 @@ async function runExport(nasRoot, transferRoot, scope, meta = {}) {
   if (_state.running) return { ok: false, reason: 'busy' };
 
   if (!nasRoot || !transferRoot) return { ok: false, reason: 'missing-roots' };
-  const hasFoldPaths = Array.isArray(scope?.folderPaths) && scope.folderPaths.length > 0;
-  const hasCollPaths = Array.isArray(scope?.collectionPaths) && scope.collectionPaths.length > 0;
-  if (!scope || (!hasCollPaths && !hasFoldPaths)) {
+  const hasFoldPaths  = Array.isArray(scope?.folderPaths)     && scope.folderPaths.length > 0;
+  const hasEvRtPaths  = Array.isArray(scope?.eventRootPaths)  && scope.eventRootPaths.length > 0;
+  const hasCollPaths  = Array.isArray(scope?.collectionPaths) && scope.collectionPaths.length > 0;
+  if (!scope || (!hasCollPaths && !hasFoldPaths && !hasEvRtPaths)) {
     return { ok: false, reason: 'empty-scope' };
   }
   for (const cp of (scope.collectionPaths || [])) {
@@ -692,7 +748,12 @@ async function resumeExportFromCheckpoint(nasRoot, transferRoot, meta = {}) {
 
   _doExport(
     nasRoot, transferRoot,
-    { collectionPaths: checkpoint.collectionPaths || [], folderPaths: checkpoint.folderPaths || null },
+    {
+      collectionPaths: checkpoint.collectionPaths || [],
+      folderPaths:     checkpoint.folderPaths     || null,
+      eventRootPaths:  checkpoint.eventRootPaths  || null,
+      purpose:         checkpoint.exportPurpose   || 'archive-transfer',
+    },
     { ...meta, batchId, deviceName },
     checkpoint.batches
   ).catch(e => {
@@ -706,6 +767,9 @@ async function resumeExportFromCheckpoint(nasRoot, transferRoot, meta = {}) {
 async function verifyExport(nasRoot, transferRoot, scope) {
   if (!nasRoot || !transferRoot || !scope) return { ok: false, reason: 'missing-params' };
 
+  const verifyPurpose  = scope.purpose || 'archive-transfer';
+  const verifyOpts     = { skipControlFiles: verifyPurpose === 'external-sharing' };
+
   _state.verifyStatus  = 'verifying';
   _state.verifyTotal   = 0;
   _state.verifyDone    = 0;
@@ -716,15 +780,17 @@ async function verifyExport(nasRoot, transferRoot, scope) {
 
   const results = { verified: 0, failed: 0, missing: 0, errors: [] };
 
-  async function verifyDir(srcDir, destDir) {
+  async function verifyDir(srcDir, destDir, dirOpts = {}) {
     let entries;
     try { entries = await fsp.readdir(srcDir, { withFileTypes: true }); } catch { return; }
     for (const entry of entries) {
       if (entry.isDirectory()) {
         if (_skipDir(entry.name)) continue;
+        if (dirOpts.rootFilesOnly) continue;
         await verifyDir(path.join(srcDir, entry.name), path.join(destDir, entry.name));
       } else if (entry.isFile()) {
         if (_skipFile(entry.name)) continue;
+        if (verifyOpts.skipControlFiles && _skipControlFile(entry.name)) continue;
         _state.verifyTotal++;
         _state.verifyCurrent = entry.name;
 
@@ -789,9 +855,13 @@ async function verifyExport(nasRoot, transferRoot, scope) {
     }
   }
 
-  // Folder-level verify (photographer-folder selection)
-  if (scope.folderPaths && scope.folderPaths.length > 0) {
-    for (const fp of scope.folderPaths) {
+  // Folder-level verify (photographer-folder and/or event-root selection)
+  if ((scope.folderPaths?.length > 0) || (scope.eventRootPaths?.length > 0)) {
+    for (const ep of (scope.eventRootPaths || [])) {
+      const rel = path.relative(nasRoot, ep);
+      await verifyDir(ep, path.join(transferRoot, rel), { rootFilesOnly: true });
+    }
+    for (const fp of (scope.folderPaths || [])) {
       const rel = path.relative(nasRoot, fp);
       await verifyDir(fp, path.join(transferRoot, rel));
     }

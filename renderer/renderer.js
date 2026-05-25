@@ -10066,11 +10066,12 @@ document.addEventListener('keydown', e => {
 (function () {
   // ── State ────────────────────────────────────────────────────────────────
 
-  let _txTree         = [];   // [{ name, path, events: [{ name, path, folders: [{ name, path, isEventRoot? }] }] }]
+  let _txTree         = [];   // [{ name, path, events: [{ name, path, hasEventRootFiles, folders: [{ name, path }] }] }]
   let _txPollTimer    = null;
   let _txRunning      = false;
   let _txLastScope    = null;
   let _txVerifying    = false;
+  let _txPurpose      = 'archive-transfer';
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -10098,6 +10099,13 @@ document.addEventListener('keydown', e => {
       _txEl('txSelectAllBtn').disabled  = locked;
       _txEl('txSelectNoneBtn').disabled = locked;
     }
+
+    // Lock purpose radios during active operation
+    const purposeGroup = _txEl('txPurposeGroup');
+    if (purposeGroup) {
+      const locked = phase === 'running' || phase === 'paused';
+      purposeGroup.querySelectorAll('input[type=radio]').forEach(r => { r.disabled = locked; });
+    }
   }
 
   // ── Open / Close ─────────────────────────────────────────────────────────
@@ -10122,6 +10130,10 @@ document.addEventListener('keydown', e => {
     }
 
     await _txLoadTree();
+
+    _txPurpose = 'archive-transfer';
+    const archiveRadio = _txEl('txPurposeArchive');
+    if (archiveRadio) archiveRadio.checked = true;
 
     // Check for incomplete checkpoint
     _txEl('txResumeOffer')?.setAttribute('hidden', '');
@@ -10200,12 +10212,11 @@ document.addEventListener('keydown', e => {
         );
 
         ev.folders.forEach((fold, fi) => {
-          const nameClass = fold.isEventRoot ? 'tx-tree-name tx-tree-event-root' : 'tx-tree-name';
           html.push(
             `<div class="tx-tree-row tx-tree-row-fold">` +
             `<input type="checkbox" class="tx-cb-fold" data-ci="${ci}" data-ei="${ei}" data-fi="${fi}" data-path="${_esc(fold.path)}" checked>` +
             `<span class="tx-tree-arrow"> </span>` +
-            `<span class="${nameClass}" title="${_esc(fold.path)}">${_esc(fold.name)}</span>` +
+            `<span class="tx-tree-name" title="${_esc(fold.path)}">${_esc(fold.name)}</span>` +
             `</div>`
           );
         });
@@ -10315,26 +10326,38 @@ document.addEventListener('keydown', e => {
     _txEl('txVerifyResult')?.setAttribute('hidden', '');
   }
 
-  function _txGetSelectedFolderPaths() {
+  function _txBuildScope() {
     const treeEl = _txEl('txScopeTree');
-    if (!treeEl) return [];
-    return Array.from(treeEl.querySelectorAll('.tx-cb-fold:checked')).map(cb => {
+    if (!treeEl) return { folderPaths: [], eventRootPaths: [] };
+
+    const folderPaths = Array.from(treeEl.querySelectorAll('.tx-cb-fold:checked')).map(cb => {
       const ci = parseInt(cb.dataset.ci, 10);
       const ei = parseInt(cb.dataset.ei, 10);
       const fi = parseInt(cb.dataset.fi, 10);
       return _txTree[ci]?.events[ei]?.folders[fi]?.path;
     }).filter(Boolean);
+
+    const eventRootPaths = [];
+    treeEl.querySelectorAll('.tx-cb-ev').forEach(evCb => {
+      if (!evCb.checked || evCb.indeterminate) return;
+      const ci = parseInt(evCb.dataset.ci, 10);
+      const ei = parseInt(evCb.dataset.ei, 10);
+      const ev = _txTree[ci]?.events[ei];
+      if (ev?.hasEventRootFiles) eventRootPaths.push(ev.path);
+    });
+
+    return { folderPaths, eventRootPaths };
   }
 
   // ── Preview ───────────────────────────────────────────────────────────────
 
   async function _txPreview() {
-    const folderPaths = _txGetSelectedFolderPaths();
-    if (folderPaths.length === 0) {
+    const { folderPaths, eventRootPaths } = _txBuildScope();
+    if (folderPaths.length === 0 && eventRootPaths.length === 0) {
       showMessage('Select at least one folder to preview.', 4000);
       return;
     }
-    const scope = { folderPaths };
+    const scope = { folderPaths, eventRootPaths, purpose: _txPurpose };
 
     const previewBtn = _txEl('txPreviewBtn');
     const exportBtn  = _txEl('txExportBtn');
@@ -10376,6 +10399,16 @@ document.addEventListener('keydown', e => {
     _txEl('txPvFolders').textContent     = result.folders ?? result.externalFolders ?? '—';
     _txEl('txPvFiles').textContent       = result.files.toLocaleString();
 
+    const pvNote = _txEl('txPvNote');
+    if (pvNote) {
+      if (_txPurpose === 'external-sharing') {
+        pvNote.textContent = 'event.json and control files excluded (external sharing mode)';
+        pvNote.removeAttribute('hidden');
+      } else {
+        pvNote.setAttribute('hidden', '');
+      }
+    }
+
     _txLastScope = scope;
     if (exportBtn) exportBtn.disabled = (result.files === 0);
   }
@@ -10383,12 +10416,12 @@ document.addEventListener('keydown', e => {
   // ── Export ────────────────────────────────────────────────────────────────
 
   async function _txStartExport() {
-    const folderPaths = _txGetSelectedFolderPaths();
-    if (folderPaths.length === 0) {
+    const { folderPaths, eventRootPaths } = _txBuildScope();
+    if (folderPaths.length === 0 && eventRootPaths.length === 0) {
       showMessage('Select at least one folder to export.', 4000);
       return;
     }
-    const scope = { folderPaths };
+    const scope = { folderPaths, eventRootPaths, purpose: _txPurpose };
 
     const exportBtn  = _txEl('txExportBtn');
     const previewBtn = _txEl('txPreviewBtn');
@@ -10689,6 +10722,13 @@ document.addEventListener('keydown', e => {
     _txInvalidatePreview();
   });
 
+  _txEl('txPurposeGroup')?.addEventListener('change', e => {
+    if (e.target.name === 'txPurpose') {
+      _txPurpose = e.target.value;
+      _txInvalidatePreview();
+    }
+  });
+
   _txEl('txPreviewBtn')?.addEventListener('click',      _txPreview);
   _txEl('txExportBtn')?.addEventListener('click',       _txStartExport);
   _txEl('txPauseBtn')?.addEventListener('click',        _txPause);
@@ -10812,6 +10852,16 @@ document.addEventListener('keydown', e => {
     }
 
     _tiCollections = result.collections || [];
+
+    const importNote = _tiEl('tiImportNote');
+    if (importNote) {
+      if (result.exportPurpose === 'external-sharing') {
+        importNote.textContent = 'This drive was exported in external sharing mode — event.json and control files are not present.';
+        importNote.removeAttribute('hidden');
+      } else {
+        importNote.setAttribute('hidden', '');
+      }
+    }
 
     if (_tiCollections.length === 0) {
       listEl.innerHTML = '<div class="tx-empty-note">No collections found on Transfer Drive.</div>';

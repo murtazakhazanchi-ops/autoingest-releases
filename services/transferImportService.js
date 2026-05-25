@@ -425,7 +425,16 @@ async function scanCollections(transferRoot) {
     if (_skipDir(entry.name)) continue;
     collections.push({ name: entry.name, path: path.join(transferRoot, entry.name) });
   }
-  return { ok: true, collections };
+
+  let exportPurpose = 'archive-transfer';
+  try {
+    const cpPath = path.join(transferRoot, '.autoingest-transfer', 'export-checkpoint.json');
+    const raw    = await fsp.readFile(cpPath, 'utf8');
+    const cp     = JSON.parse(raw);
+    if (cp.exportPurpose) exportPurpose = cp.exportPurpose;
+  } catch {}
+
+  return { ok: true, collections, exportPurpose };
 }
 
 function getImportStatus() {
