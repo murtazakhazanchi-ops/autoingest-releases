@@ -40,6 +40,8 @@ const userManager   = require('./userManager');
 const { validateEventJson } = require('./contracts/dataValidator');
 const exifService         = require('./exifService');
 const metadataSyncService = require('./metadataSyncService');
+const realtimeOps              = require('../services/realtimeOperationsService');
+const offlineCollectionRegistry = require('../services/offlineCollectionRegistryService');
 
 // ── Platform ─────────────────────────────────────────────────────────────────
 const isMac = process.platform === 'darwin';
@@ -228,6 +230,7 @@ app.whenReady().then(() => {
   log('App started');
   loadImportIndex();
   settings.init();
+  realtimeOps.init();
   listManager.init(app.getPath('userData'));
   aliasEngine.init(app.getPath('userData'));
   telemetry.init();
@@ -247,6 +250,7 @@ app.on('window-all-closed', () => {
   telemetry.flush().catch(() => {});
   shutdownWorkers();
   exifService.shutdown().catch(() => {});
+  realtimeOps.shutdown();
   if (pollHandle) clearInterval(pollHandle);
   if (process.platform !== 'darwin') app.quit();
 });
@@ -971,6 +975,15 @@ ipcMain.handle('import:commitTransaction', async (event, {
       result.metadataBatchId = batchId;
     }
 
+    // Realtime: broadcast import completed summary (advisory only, non-blocking).
+    realtimeOps.emitImportCompleted({
+      collectionName:  collName   || null,
+      eventFolderName: eventJsonPath ? path.basename(eventJsonPath) : null,
+      photographer:    photographer || null,
+      completedFiles:  result.copied || 0,
+      totalFiles:      (result.copied || 0) + (result.skipped || 0) + (result.errors || 0),
+    });
+
     return result;
   } catch (err) {
     console.error('[import:commitTransaction] finalization error:', err.stack || err.message);
@@ -1010,7 +1023,12 @@ ipcMain.handle('thumbnail:getVideoThumb', async (_event, srcPath) => {
 ipcMain.handle('users:list',      async ()         => userManager.listUsers());
 ipcMain.handle('users:create',    async (_e, p)    => userManager.createUser(p));
 ipcMain.handle('users:getActive', async ()         => userManager.getActiveUser());
-ipcMain.handle('users:setActive', async (_e, id)   => userManager.setActiveUser(id));
+ipcMain.handle('users:setActive', async (_e, id) => {
+  const result = await userManager.setActiveUser(id);
+  const user   = await userManager.getActiveUser().catch(() => null);
+  if (user?.name) realtimeOps.setOperatorName(user.name);
+  return result;
+});
 
 // Pause / Resume / Abort copy pipeline
 ipcMain.on('copy:pause',  () => setPaused(true));
@@ -1141,6 +1159,19 @@ ipcMain.handle('master:checkExists', async (_event, basePath, folderName) => {
 ipcMain.handle('master:create', async (_event, basePath, folderName) => {
   const fullPath = path.join(basePath, folderName);
   await fsp.mkdir(fullPath, { recursive: true });
+  realtimeOps.emitCollectionVisible({ collectionName: folderName });
+  // Emit full registry entry so other devices can prepare locally
+  const _nasRoot = settings.getNasRoot();
+  const _isNasPath = _nasRoot && (
+    path.resolve(basePath) === path.resolve(_nasRoot) ||
+    path.resolve(basePath).startsWith(path.resolve(_nasRoot) + path.sep)
+  );
+  realtimeOps.emitRegistryCollection({
+    collectionName:      folderName,
+    nasCollectionPath:   _isNasPath ? fullPath : null,
+    origin:              _isNasPath ? 'archive-available' : 'remote-created',
+    createdByDeviceName: settings.getDeviceDisplayName() || null,
+  });
   return { path: fullPath, created: true };
 });
 
@@ -1380,6 +1411,34 @@ ipcMain.handle('event:write', async (_event, eventFolderPath, eventData) => {
     await fsp.writeFile(tmp, JSON.stringify(eventData, null, 2), 'utf8');
     await fsp.rename(tmp, jsonPath);
     hidePathBestEffort(jsonPath).catch(() => {});
+    realtimeOps.emitEventVisible({
+      eventFolderName:  path.basename(eventFolderPath),
+      eventDisplayName: eventData.folderName || path.basename(eventFolderPath),
+    });
+    // Emit full registry entry so other devices can prepare the same event locally
+    const _evCollName = path.basename(path.dirname(eventFolderPath));
+    const _nasRoot3   = settings.getNasRoot();
+    const _isNasEv    = _nasRoot3 && eventFolderPath.startsWith(_nasRoot3);
+    const _jsonShell  = {
+      version:      eventData.version || 1,
+      hijriDate:    eventData.hijriDate,
+      sequence:     typeof eventData.sequence === 'number' ? eventData.sequence : parseInt(eventData.sequence, 10),
+      eventName:    eventData.eventName,
+      safeEventName:eventData.safeEventName || eventData.eventName,
+      status:       'created',
+      components:   eventData.components,
+      updatedAt:    Date.now(),
+    };
+    realtimeOps.emitRegistryEvent({
+      collectionName:      _evCollName,
+      eventFolderName:     path.basename(eventFolderPath),
+      eventDisplayName:    eventData.eventName || path.basename(eventFolderPath),
+      eventJsonShell:      _jsonShell,
+      nasCollectionPath:   _isNasEv ? path.dirname(eventFolderPath) : null,
+      nasEventPath:        _isNasEv ? eventFolderPath : null,
+      origin:              _isNasEv ? 'archive-available' : 'remote-created',
+      createdByDeviceName: settings.getDeviceDisplayName() || null,
+    });
     return { ok: true, alreadyExisted: false, data: eventData };
   } catch (err) {
     try { await fsp.unlink(tmp); } catch {}
@@ -2157,6 +2216,7 @@ ipcMain.handle('archive:refreshNasEvents', async () => _runNasScan());
 
 // Scan Local Staging Root for master collections — used when Active Archive Root is offline.
 // Does not require or validate an archive-root marker. Returns basic collection + event stubs.
+// Each collection entry is augmented with linkData and linkStatus from collection.link.json.
 ipcMain.handle('archive:scanStagingCollections', async (_event, stagingRoot) => {
   if (!stagingRoot || typeof stagingRoot !== 'string') return { ok: false, collections: [] };
   let entries;
@@ -2165,6 +2225,13 @@ ipcMain.handle('archive:scanStagingCollections', async (_event, stagingRoot) => 
   } catch {
     return { ok: false, collections: [] };
   }
+
+  const nasRoot  = settings.getNasRoot();
+  let   nasOnline = false;
+  if (nasRoot) {
+    try { await fsp.access(nasRoot); nasOnline = true; } catch { /* offline */ }
+  }
+
   const collections = [];
   for (const collEntry of entries) {
     if (!collEntry.isDirectory()) continue;
@@ -2181,7 +2248,12 @@ ipcMain.handle('archive:scanStagingCollections', async (_event, stagingRoot) => 
         } catch { /* no event.json — skip */ }
       }
     } catch { /* unreadable collection — include with 0 events */ }
-    collections.push({ name: collEntry.name, path: collPath, events });
+
+    const { ok: hasLink, link } = await offlineCollectionRegistry.readLink(collPath);
+    const linkData   = (hasLink && link) ? link : null;
+    const linkStatus = offlineCollectionRegistry.deriveStatus(linkData, nasRoot, nasOnline);
+
+    collections.push({ name: collEntry.name, path: collPath, events, linkData, linkStatus });
   }
   collections.sort((a, b) => a.name.localeCompare(b.name));
   return { ok: true, collections };
@@ -2367,8 +2439,32 @@ ipcMain.handle('archive:syncJobNow', async (_event, jobId) => {
   if (!nasRoot)     return { ok: false, error: 'Active Archive Root not configured' };
   if (!stagingRoot) return { ok: false, error: 'Local Staging Root not configured' };
 
+  // Block provisional and stale-link collections before touching sync state.
+  // Legacy collections with no link file are allowed (name-identity fallback).
+  if (job.localEventPath) {
+    const collPath = path.dirname(job.localEventPath);
+    try {
+      const { ok: hasLink, link } = await offlineCollectionRegistry.readLink(collPath);
+      if (hasLink && link) {
+        if (link.status === 'provisional') {
+          return { ok: false, error: 'provisional-needs-match', provisionalBlocked: true };
+        }
+        if (link.nasRoot && nasRoot && link.nasRoot !== nasRoot) {
+          return { ok: false, error: 'stale-link-needs-rematch', staleLinkBlocked: true };
+        }
+      }
+    } catch { /* non-fatal — allow sync to proceed */ }
+  }
+
   _syncingJobIds.add(jobId);
   await syncQueueService.updateJob(jobId, { status: 'syncing', syncStartedAt: Date.now() });
+  realtimeOps.emitSyncStatus({
+    jobId,
+    collectionName:  job.localEventPath ? path.basename(path.dirname(job.localEventPath)) : null,
+    eventFolderName: job.localEventPath ? path.basename(job.localEventPath) : null,
+    photographer:    job.photographer || null,
+    status:          'syncing',
+  });
 
   // Load per-job files[] from manifest so syncJob can target exactly those files.
   let jobFiles = null;
@@ -2404,9 +2500,23 @@ ipcMain.handle('archive:syncJobNow', async (_event, jobId) => {
       syncedAt:      syncResult.syncedAt  || null,
       syncStartedAt: syncResult.syncStartedAt,
     });
+    realtimeOps.emitSyncStatus({
+      jobId,
+      collectionName:  job.localEventPath ? path.basename(path.dirname(job.localEventPath)) : null,
+      eventFolderName: job.localEventPath ? path.basename(job.localEventPath) : null,
+      photographer:    job.photographer || null,
+      status:          syncResult.status || 'synced',
+    });
     return { ok: syncResult.ok, syncResult };
   } catch (err) {
     await syncQueueService.updateJob(jobId, { status: 'sync-failed', syncError: err.message });
+    realtimeOps.emitSyncStatus({
+      jobId,
+      collectionName:  job?.localEventPath ? path.basename(path.dirname(job.localEventPath)) : null,
+      eventFolderName: job?.localEventPath ? path.basename(job.localEventPath) : null,
+      photographer:    job?.photographer || null,
+      status:          'sync-failed',
+    });
     return { ok: false, error: err.message };
   } finally {
     _syncingJobIds.delete(jobId);
@@ -3319,6 +3429,321 @@ ipcMain.handle('archive:generateAuditTimeline', async () =>
 
 ipcMain.handle('archive:getAuditTimeline', () =>
   archiveAuditTimelineService.getLastTimeline());
+
+// ── Offline Collection Registry ───────────────────────────────────────────────
+// Manages collection.link.json — the authoritative staging-collection-to-NAS
+// link file. Advisory soft-conflict warnings are still handled by the realtime
+// layer; this layer enforces the hard sync block for provisional collections.
+
+ipcMain.handle('collection:prepareOffline', async (_event, { nasCollectionPath, collectionName } = {}) => {
+  if (!nasCollectionPath || typeof nasCollectionPath !== 'string') {
+    return { ok: false, reason: 'nasCollectionPath required' };
+  }
+  if (!collectionName || typeof collectionName !== 'string') {
+    return { ok: false, reason: 'collectionName required' };
+  }
+
+  const nasRoot     = settings.getNasRoot();
+  const stagingRoot = settings.getLocalStagingRoot();
+  if (!nasRoot)     return { ok: false, reason: 'Active Archive Root not configured' };
+  if (!stagingRoot) return { ok: false, reason: 'Local Staging Root not configured' };
+
+  // nasCollectionPath must be inside the current nasRoot
+  const realNasRoot = path.resolve(nasRoot);
+  const realNasColl = path.resolve(nasCollectionPath);
+  if (!realNasColl.startsWith(realNasRoot + path.sep) && realNasColl !== realNasRoot) {
+    return { ok: false, reason: 'nasCollectionPath is outside the configured Archive Root' };
+  }
+
+  // Verify NAS is accessible right now
+  try { await fsp.access(nasCollectionPath); } catch {
+    return { ok: false, reason: 'NAS collection path is not accessible — archive may be offline' };
+  }
+
+  const localCollectionPath = path.join(stagingRoot, collectionName);
+  await fsp.mkdir(localCollectionPath, { recursive: true });
+
+  const deviceId = settings.getDeviceId ? settings.getDeviceId() : null;
+  const result   = await offlineCollectionRegistry.writeLink(localCollectionPath, {
+    collectionName,
+    nasRoot:                    nasRoot,
+    nasCollectionPath:          nasCollectionPath,
+    localStagingCollectionPath: localCollectionPath,
+    preparedAt:                 Date.now(),
+    deviceId,
+    operator:                   null,
+    status:                     'linked',
+  });
+
+  return { ok: result.ok, localCollectionPath, reason: result.reason };
+});
+
+ipcMain.handle('collection:readLink', async (_event, { localCollectionPath } = {}) => {
+  if (!localCollectionPath || typeof localCollectionPath !== 'string') {
+    return { ok: false, reason: 'localCollectionPath required' };
+  }
+  const stagingRoot = settings.getLocalStagingRoot();
+  if (stagingRoot) {
+    const rel = path.relative(stagingRoot, localCollectionPath);
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
+      return { ok: false, reason: 'localCollectionPath is outside staging root' };
+    }
+  }
+  const nasRoot  = settings.getNasRoot();
+  let   nasOnline = false;
+  if (nasRoot) { try { await fsp.access(nasRoot); nasOnline = true; } catch { /* offline */ } }
+  const { ok, link, reason } = await offlineCollectionRegistry.readLink(localCollectionPath);
+  const linkStatus = offlineCollectionRegistry.deriveStatus(ok ? link : null, nasRoot, nasOnline);
+  return { ok, link: ok ? link : null, linkStatus, reason };
+});
+
+ipcMain.handle('collection:matchToNas', async (_event, { localCollectionPath, nasCollectionPath } = {}) => {
+  if (!localCollectionPath || !nasCollectionPath) {
+    return { ok: false, reason: 'localCollectionPath and nasCollectionPath required' };
+  }
+  const nasRoot = settings.getNasRoot();
+  if (!nasRoot) return { ok: false, reason: 'Active Archive Root not configured' };
+
+  const realNasRoot = path.resolve(nasRoot);
+  const realNasColl = path.resolve(nasCollectionPath);
+  if (!realNasColl.startsWith(realNasRoot + path.sep) && realNasColl !== realNasRoot) {
+    return { ok: false, reason: 'nasCollectionPath is outside the configured Archive Root' };
+  }
+
+  const collectionName = path.basename(localCollectionPath);
+  const { ok: hasLink, link: existing } = await offlineCollectionRegistry.readLink(localCollectionPath);
+
+  const deviceId = settings.getDeviceId ? settings.getDeviceId() : null;
+  const result   = await offlineCollectionRegistry.writeLink(localCollectionPath, {
+    collectionName:             existing?.collectionName || collectionName,
+    nasRoot,
+    nasCollectionPath,
+    localStagingCollectionPath: localCollectionPath,
+    preparedAt:                 (hasLink && existing?.preparedAt) ? existing.preparedAt : Date.now(),
+    deviceId:                   (hasLink && existing?.deviceId)   ? existing.deviceId   : deviceId,
+    operator:                   (hasLink && existing?.operator)   ? existing.operator   : null,
+    status:                     'linked',
+  });
+
+  return { ok: result.ok, reason: result.reason };
+});
+
+ipcMain.handle('collection:listProvisional', async () => {
+  const stagingRoot = settings.getLocalStagingRoot();
+  if (!stagingRoot) return { ok: false, reason: 'Local Staging Root not configured', collections: [] };
+  let entries;
+  try { entries = await fsp.readdir(stagingRoot, { withFileTypes: true }); } catch {
+    return { ok: false, reason: 'Cannot read staging root', collections: [] };
+  }
+  const provisional = [];
+  for (const e of entries) {
+    if (!e.isDirectory() || e.name.startsWith('.') || _NAS_SKIP_DIRS.has(e.name)) continue;
+    const collPath = path.join(stagingRoot, e.name);
+    const { ok, link } = await offlineCollectionRegistry.readLink(collPath);
+    if (ok && link?.status === 'provisional') {
+      provisional.push({ name: e.name, localCollectionPath: collPath });
+    }
+  }
+  return { ok: true, collections: provisional };
+});
+
+ipcMain.handle('collection:writeProvisionalLink', async (_event, { localCollectionPath, collectionName, operator } = {}) => {
+  if (!localCollectionPath || typeof localCollectionPath !== 'string') {
+    return { ok: false, reason: 'localCollectionPath required' };
+  }
+  const stagingRoot = settings.getLocalStagingRoot();
+  if (stagingRoot) {
+    const rel = path.relative(stagingRoot, localCollectionPath);
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
+      return { ok: false, reason: 'localCollectionPath is outside staging root' };
+    }
+  }
+  const deviceId = settings.getDeviceId ? settings.getDeviceId() : null;
+  const result   = await offlineCollectionRegistry.writeLink(localCollectionPath, {
+    collectionName:             collectionName || path.basename(localCollectionPath),
+    nasRoot:                    null,
+    nasCollectionPath:          null,
+    localStagingCollectionPath: localCollectionPath,
+    preparedAt:                 Date.now(),
+    deviceId,
+    operator:                   operator || null,
+    status:                     'provisional',
+  });
+  return { ok: result.ok, reason: result.reason };
+});
+
+// ── Online Collection/Event Registry ─────────────────────────────────────────
+// Advisory registry sourced from realtime service. All preparation actions
+// write to local staging only — no authoritative files are touched by registry.
+
+ipcMain.handle('registry:getAll', () => {
+  return { ok: true, entries: realtimeOps.getRegistry() };
+});
+
+ipcMain.handle('collection:prepareFromRegistry', async (_event, { entry } = {}) => {
+  if (!entry || typeof entry !== 'object') {
+    return { ok: false, reason: 'Invalid registry entry' };
+  }
+  const { collectionName, nasCollectionPath, registryId } = entry;
+  if (!collectionName || typeof collectionName !== 'string') {
+    return { ok: false, reason: 'collectionName required' };
+  }
+
+  const stagingRoot = settings.getLocalStagingRoot();
+  if (!stagingRoot) return { ok: false, reason: 'Local Staging Root not configured' };
+
+  const localCollectionPath = path.join(stagingRoot, collectionName);
+  try {
+    await fsp.mkdir(localCollectionPath, { recursive: true });
+  } catch (err) {
+    return { ok: false, reason: `Failed to create collection folder: ${err.message}` };
+  }
+
+  // Validate nasCollectionPath against current nasRoot to prevent path traversal
+  const nasRoot = settings.getNasRoot();
+  let validatedNasPath = null;
+  if (nasCollectionPath && typeof nasCollectionPath === 'string' && nasRoot) {
+    const realNasRoot = path.resolve(nasRoot);
+    const realNasColl = path.resolve(nasCollectionPath);
+    if (realNasColl.startsWith(realNasRoot + path.sep) || realNasColl === realNasRoot) {
+      validatedNasPath = nasCollectionPath;
+    }
+  }
+
+  const hasNasTarget = !!validatedNasPath;
+  const deviceId     = settings.getDeviceId ? settings.getDeviceId() : null;
+  const result       = await offlineCollectionRegistry.writeLink(localCollectionPath, {
+    collectionName,
+    registryId:                 registryId || null,
+    nasRoot:                    hasNasTarget ? nasRoot : null,
+    nasCollectionPath:          validatedNasPath,
+    localStagingCollectionPath: localCollectionPath,
+    preparedAt:                 Date.now(),
+    deviceId,
+    operator:                   null,
+    status:                     hasNasTarget ? 'linked' : 'provisional',
+  });
+
+  return { ok: result.ok, localCollectionPath, reason: result.reason };
+});
+
+ipcMain.handle('event:prepareFromRegistry', async (_event, { entry } = {}) => {
+  if (!entry || typeof entry !== 'object') {
+    return { ok: false, reason: 'Invalid registry entry' };
+  }
+  const { collectionName, eventFolderName, eventJsonShell, nasCollectionPath, registryId } = entry;
+  if (!collectionName || typeof collectionName !== 'string') {
+    return { ok: false, reason: 'collectionName required' };
+  }
+  if (!eventFolderName || typeof eventFolderName !== 'string') {
+    return { ok: false, reason: 'eventFolderName required' };
+  }
+  if (!eventJsonShell || typeof eventJsonShell !== 'object') {
+    return { ok: false, reason: 'missing-event-shell', message: 'This item cannot be prepared yet because event details are missing from the registry.' };
+  }
+  if (!isValidEventJson(eventJsonShell)) {
+    return { ok: false, reason: 'invalid-event-shell', message: 'This item cannot be prepared yet because event details are incomplete or invalid.' };
+  }
+
+  const stagingRoot = settings.getLocalStagingRoot();
+  if (!stagingRoot) return { ok: false, reason: 'Local Staging Root not configured' };
+
+  const localCollectionPath = path.join(stagingRoot, collectionName);
+  const localEventPath      = path.join(localCollectionPath, eventFolderName);
+
+  try {
+    await fsp.mkdir(localCollectionPath, { recursive: true });
+  } catch (err) {
+    return { ok: false, reason: `Failed to create collection folder: ${err.message}` };
+  }
+
+  // Validate nasCollectionPath
+  const nasRoot = settings.getNasRoot();
+  let validatedNasPath = null;
+  if (nasCollectionPath && typeof nasCollectionPath === 'string' && nasRoot) {
+    const realNasRoot = path.resolve(nasRoot);
+    const realNasColl = path.resolve(nasCollectionPath);
+    if (realNasColl.startsWith(realNasRoot + path.sep) || realNasColl === realNasRoot) {
+      validatedNasPath = nasCollectionPath;
+    }
+  }
+  const hasNasTarget = !!validatedNasPath;
+  const deviceId     = settings.getDeviceId ? settings.getDeviceId() : null;
+
+  // Write/update collection.link.json
+  await offlineCollectionRegistry.writeLink(localCollectionPath, {
+    collectionName,
+    registryId:                 registryId || null,
+    nasRoot:                    hasNasTarget ? nasRoot : null,
+    nasCollectionPath:          validatedNasPath,
+    localStagingCollectionPath: localCollectionPath,
+    preparedAt:                 Date.now(),
+    deviceId,
+    operator:                   null,
+    status:                     hasNasTarget ? 'linked' : 'provisional',
+  });
+
+  try {
+    await fsp.mkdir(localEventPath, { recursive: true });
+  } catch (err) {
+    return { ok: false, reason: `Failed to create event folder: ${err.message}` };
+  }
+
+  // Write event.json — no-overwrite if already exists
+  const jsonPath = path.join(localEventPath, 'event.json');
+  try {
+    await fsp.access(jsonPath);
+    return { ok: true, alreadyExisted: true, localCollectionPath, localEventPath };
+  } catch { /* ENOENT — proceed */ }
+
+  const shell = {
+    version:      eventJsonShell.version || 1,
+    hijriDate:    eventJsonShell.hijriDate,
+    sequence:     typeof eventJsonShell.sequence === 'number' ? eventJsonShell.sequence : parseInt(eventJsonShell.sequence, 10),
+    eventName:    eventJsonShell.eventName,
+    safeEventName:eventJsonShell.safeEventName || eventJsonShell.eventName,
+    status:       'created',
+    components:   eventJsonShell.components,
+    updatedAt:    Date.now(),
+  };
+
+  const tmp = jsonPath + '.tmp';
+  try {
+    await fsp.writeFile(tmp, JSON.stringify(shell, null, 2), 'utf8');
+    await fsp.rename(tmp, jsonPath);
+    hidePathBestEffort(jsonPath).catch(() => {});
+  } catch (err) {
+    try { await fsp.unlink(tmp); } catch {}
+    return { ok: false, reason: `Failed to write event.json: ${err.message}` };
+  }
+
+  return { ok: true, alreadyExisted: false, localCollectionPath, localEventPath };
+});
+
+// ── Realtime Operations Layer ─────────────────────────────────────────────────
+// Advisory live-awareness layer. Never writes event.json, sync manifests,
+// archive folders, metadata files, or any authoritative state.
+
+ipcMain.handle('realtime:getStatus', () => realtimeOps.getStatus());
+
+ipcMain.handle('realtime:getKnownNames', () => realtimeOps.getKnownNames());
+
+ipcMain.handle('realtime:configure', async (_event, cfg) => {
+  if (!cfg || typeof cfg !== 'object') return { ok: false, error: 'Invalid config' };
+  const { enabled, serverUrl, deviceDisplayName, operatorName } = cfg;
+  if (typeof enabled === 'boolean')          await settings.setRealtimeEnabled(enabled);
+  if (serverUrl !== undefined)               await settings.setRealtimeServerUrl(typeof serverUrl === 'string' ? serverUrl : null);
+  if (typeof deviceDisplayName === 'string') await settings.setDeviceDisplayName(deviceDisplayName || null);
+  if (typeof operatorName === 'string')      realtimeOps.setOperatorName(operatorName || null);
+  const newEnabled = settings.getRealtimeEnabled();
+  const newUrl     = settings.getRealtimeServerUrl();
+  if (newEnabled && newUrl) {
+    realtimeOps.connect(newUrl);
+  } else {
+    realtimeOps.disconnect();
+  }
+  return { ok: true, status: realtimeOps.getStatus() };
+});
 
 ipcMain.handle('window:minimize', () => {
   BrowserWindow.getFocusedWindow()?.minimize();

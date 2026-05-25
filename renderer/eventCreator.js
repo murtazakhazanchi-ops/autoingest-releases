@@ -365,6 +365,11 @@ const EventCreator = (() => {
   let _kwRegistry              = null;         // Cached keyword registry for Additional Keywords search
   let _kwRegistryPromise       = null;         // In-flight promise so we load at most once
 
+  // ── Online Registry state (advisory — separate from filesystem truth) ───────
+  let _activeTab       = 'current-device'; // 'current-device' | 'online-registry'
+  let _registryEntries = [];               // advisory registry entries from realtime service
+  let _registryLoading = false;
+
   function _makeComp() {
     return { id: ++_compSeq, eventTypes: [], location: null, city: _globalCityVal ? { ..._globalCityVal } : null, country: '', additionalKeywords: [] };
   }
@@ -701,8 +706,16 @@ const EventCreator = (() => {
 
     if (result?.ok && Array.isArray(result.collections)) {
       for (const sc of result.collections) {
-        if (sessionCollections.find(c => c.name === sc.name)) continue;
-        sessionCollections.push({ name: sc.name, hijriDate: '', label: '', events: sc.events || [], _masterPath: sc.path });
+        const existing = sessionCollections.find(c => c.name === sc.name);
+        if (existing) {
+          existing._linkStatus = sc.linkStatus || null;
+          existing._linkData   = sc.linkData   || null;
+        } else {
+          sessionCollections.push({
+            name: sc.name, hijriDate: '', label: '', events: sc.events || [],
+            _masterPath: sc.path, _linkStatus: sc.linkStatus || null, _linkData: sc.linkData || null,
+          });
+        }
       }
     }
 
@@ -722,15 +735,23 @@ const EventCreator = (() => {
 
   // ── HTML builders ──────────────────────────────────────────────────────────
 
+  function buildTabBarHTML() {
+    const cdActive  = _activeTab === 'current-device';
+    const orActive  = _activeTab === 'online-registry';
+    return `
+<div class="ec-tab-bar" role="tablist" aria-label="Event source">
+  <button class="ec-tab${cdActive ? ' ec-tab--active' : ''}" data-tab="current-device" role="tab" aria-selected="${cdActive}" tabindex="${cdActive ? '0' : '-1'}">Current Device</button>
+  <button class="ec-tab${orActive ? ' ec-tab--active' : ''}" data-tab="online-registry" role="tab" aria-selected="${orActive}" tabindex="${orActive ? '0' : '-1'}">Online Registry</button>
+</div>`;
+  }
+
   function buildMasterHTML() {
     const hasExisting = sessionCollections.length > 0;
     const formOpen    = !hasExisting;
 
     const offlineLabel = _offlineStagingMode ? 'Create New (Local Staging)' : (hasExisting ? 'Create New Collection' : 'New Collection');
 
-    return `
-<div class="ec-master-wrap">
-
+    const currentDevicePanel = `
   ${_offlineStagingMode && !hasExisting ? `<p class="ec-subtext" style="margin-bottom:12px">Archive offline — no Local Staging collections found.</p>` : ''}
   ${hasExisting ? buildExistingCardsHTML() : ''}
 
@@ -760,8 +781,11 @@ const EventCreator = (() => {
   <!-- Continue button ──────────────────────────────────────────────────── -->
   <button id="ecMasterContinue" class="ec-continue-btn" disabled>
     ${hasExisting ? 'Create & Continue →' : 'Create & Continue →'}
-  </button>
+  </button>`;
 
+    return `
+<div class="ec-master-wrap">
+${currentDevicePanel}
 </div>`;
   }
 
@@ -786,6 +810,266 @@ const EventCreator = (() => {
 </div>`;
   }
 
+  // ── Online Registry HTML builders ──────────────────────────────────────────
+
+  function buildOnlineRegistryHTML() {
+    if (_registryLoading) {
+      return `<div class="ec-reg-empty"><p class="ec-reg-empty-sub">Loading registry…</p></div>`;
+    }
+
+    const collEntries = _registryEntries.filter(e => e.entryType === 'collection');
+    const evEntries   = _registryEntries.filter(e => e.entryType === 'event');
+
+    if (collEntries.length === 0 && evEntries.length === 0) {
+      return `
+<div class="ec-reg-empty">
+  <p class="ec-reg-empty-title">No registry entries</p>
+  <p class="ec-reg-empty-sub">Collections and events published by other connected devices will appear here.</p>
+</div>`;
+    }
+
+    const parts = [];
+    if (collEntries.length > 0) {
+      parts.push(`<p class="ec-section-title">Collections</p>`);
+      parts.push(`<div class="ec-collection-cards">${collEntries.map(buildRegistryCardHTML).join('')}</div>`);
+    }
+    if (evEntries.length > 0) {
+      parts.push(`<p class="ec-section-title"${collEntries.length > 0 ? ' style="margin-top:20px"' : ''}>Events</p>`);
+      parts.push(`<div class="ec-collection-cards">${evEntries.map(buildRegistryCardHTML).join('')}</div>`);
+    }
+    return parts.join('\n');
+  }
+
+  function buildEventListRegistryHTML() {
+    if (_registryLoading) {
+      return `<div class="ec-reg-empty"><p class="ec-reg-empty-sub">Loading registry…</p></div>`;
+    }
+
+    const evEntries = _registryEntries.filter(e => e.entryType === 'event');
+
+    if (evEntries.length === 0) {
+      return `
+<div class="ec-reg-empty">
+  <p class="ec-reg-empty-title">No events in registry</p>
+  <p class="ec-reg-empty-sub">Events created by other connected devices will appear here.</p>
+</div>`;
+    }
+
+    const matching = selectedCollection
+      ? evEntries.filter(e => e.collectionName === selectedCollection)
+      : evEntries;
+    const others   = selectedCollection
+      ? evEntries.filter(e => e.collectionName !== selectedCollection)
+      : [];
+
+    const parts = [];
+    if (matching.length > 0) {
+      if (selectedCollection && others.length > 0) {
+        parts.push(`<p class="ec-section-title">This collection</p>`);
+      }
+      parts.push(`<div class="ec-collection-cards">${matching.map(buildRegistryCardHTML).join('')}</div>`);
+    }
+    if (others.length > 0) {
+      parts.push(`<p class="ec-section-title"${matching.length > 0 ? ' style="margin-top:20px"' : ''}>Other collections</p>`);
+      parts.push(`<div class="ec-collection-cards">${others.map(buildRegistryCardHTML).join('')}</div>`);
+    }
+    return parts.join('\n');
+  }
+
+  function _getRegistryLocalStatus(entry) {
+    if (entry.entryType === 'collection') {
+      if (sessionCollections.some(c => c.name === entry.collectionName)) return 'ready';
+    } else {
+      const coll = sessionCollections.find(c => c.name === entry.collectionName);
+      if (coll?.events?.some(ev => ev.name === entry.eventFolderName)) return 'ready';
+    }
+    return entry.nasCollectionPath ? 'available' : 'needs-setup';
+  }
+
+  function _getRegistryStatusPillHTML(status) {
+    const map = {
+      'available':   ['ec-reg-pill--available',   'Available'],
+      'ready':       ['ec-reg-pill--ready',        'Ready'],
+      'needs-setup': ['ec-reg-pill--needs-setup',  'Needs setup'],
+      'issue':       ['ec-reg-pill--issue',        'Issue'],
+    };
+    const [cls, label] = map[status] || map['available'];
+    return `<span class="ec-reg-pill ${cls}">${esc(label)}</span>`;
+  }
+
+  function _getRegistryOriginText(entry) {
+    if (entry.origin === 'archive-available') return 'From archive';
+    const name = entry.createdByDeviceName || entry.createdByDeviceId;
+    return name ? `From ${esc(name)}` : 'From another device';
+  }
+
+  function buildRegistryCardHTML(entry) {
+    const status    = _getRegistryLocalStatus(entry);
+    const isEvent   = entry.entryType === 'event';
+    const icon      = isEvent
+      ? '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>'
+      : '<path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>';
+    const nameText  = isEvent ? esc(entry.eventFolderName || '') : esc(entry.collectionName || '');
+    const subText   = isEvent && entry.collectionName ? `<div class="ec-coll-subname">in ${esc(entry.collectionName)}</div>` : '';
+    const typeLabel = isEvent ? 'Event' : 'Collection';
+    const metaText  = `${typeLabel} · ${_getRegistryOriginText(entry)}`;
+    const regId     = esc(entry.registryId);
+
+    let actionHTML = '';
+    if (status !== 'ready') {
+      const act   = isEvent ? 'prepare-event' : 'prepare-collection';
+      actionHTML  = `<div class="ec-coll-actions"><button class="ec-coll-action-btn ec-coll-action-btn--primary" data-reg-action="${act}" data-registry-id="${regId}">Prepare Locally</button></div>`;
+    }
+
+    return `
+<div class="ec-reg-card" data-registry-id="${regId}" tabindex="0">
+  <span class="ec-coll-icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${icon}</svg></span>
+  <div class="ec-coll-info">
+    <div class="ec-coll-name">${nameText}</div>
+    ${subText}
+    <div class="ec-coll-card-footer">
+      <span class="ec-coll-meta">${esc(metaText)}</span>
+      ${_getRegistryStatusPillHTML(status)}
+      ${actionHTML}
+    </div>
+  </div>
+</div>`;
+  }
+
+  // ── Registry data loading + preparation ────────────────────────────────────
+
+  function _refreshEventListRegistryPanel() {
+    if (_navScreen !== 'eventList') return;
+    const panel = document.querySelector('[data-panel="online-registry"]');
+    if (!panel) return;
+    panel.innerHTML = buildEventListRegistryHTML();
+    _attachRegistryListeners();
+  }
+
+  async function _loadRegistryEntries() {
+    if (!window.api.registryGetAll) return;
+    _registryLoading = true;
+    _refreshEventListRegistryPanel();
+    try {
+      const result = await window.api.registryGetAll();
+      if (result?.ok && Array.isArray(result.entries)) {
+        _registryEntries = result.entries;
+      }
+    } catch (err) {
+      console.warn('[EventCreator] registry load failed:', err);
+    } finally {
+      _registryLoading = false;
+    }
+    _refreshEventListRegistryPanel();
+  }
+
+  function _attachRegistryListeners() {
+    document.querySelectorAll('.ec-coll-action-btn[data-reg-action]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const regId  = btn.dataset.registryId;
+        const action = btn.dataset.regAction;
+        const entry  = _registryEntries.find(r => r.registryId === regId);
+        if (!entry) return;
+        if (action === 'prepare-collection') {
+          _doPrepareCollFromRegistry(entry).catch(err => showBanner(err.message || 'Preparation failed.', 'error'));
+        } else if (action === 'prepare-event') {
+          _doPrepareEventFromRegistry(entry).catch(err => showBanner(err.message || 'Preparation failed.', 'error'));
+        }
+      });
+    });
+  }
+
+  async function _doPrepareCollFromRegistry(entry) {
+    if (!window.api.prepareCollectionFromRegistry) {
+      showBanner('Collection preparation not available.', 'error');
+      return;
+    }
+    const result = await window.api.prepareCollectionFromRegistry({ entry });
+    if (!result?.ok) {
+      showBanner(`Could not prepare collection: ${result?.reason || 'unknown error'}`, 'error');
+      return;
+    }
+    if (!sessionCollections.find(c => c.name === entry.collectionName)) {
+      sessionCollections.push({
+        name: entry.collectionName, hijriDate: '', label: '', events: [],
+        _masterPath: result.localCollectionPath,
+        _linkStatus: entry.nasCollectionPath ? 'linked' : 'provisional',
+        _linkData: null,
+      });
+    }
+    _activeTab = 'current-device';
+    _renderEventList();
+    showBanner(`"${entry.collectionName}" is now available on this device.`, 'success');
+  }
+
+  async function _doPrepareEventFromRegistry(entry) {
+    if (!window.api.prepareEventFromRegistry) {
+      showBanner('Event preparation not available.', 'error');
+      return;
+    }
+    const result = await window.api.prepareEventFromRegistry({ entry });
+    if (!result?.ok) {
+      const msg = result?.message || result?.reason || 'unknown error';
+      showBanner(`Could not prepare event: ${msg}`, 'error');
+      return;
+    }
+    let coll = sessionCollections.find(c => c.name === entry.collectionName);
+    if (!coll) {
+      coll = {
+        name: entry.collectionName, hijriDate: '', label: '', events: [],
+        _masterPath: result.localCollectionPath,
+        _linkStatus: entry.nasCollectionPath ? 'linked' : 'provisional',
+        _linkData: null,
+      };
+      sessionCollections.push(coll);
+    }
+    if (entry.eventFolderName && !coll.events.find(ev => ev.name === entry.eventFolderName)) {
+      coll.events.push({ name: entry.eventFolderName });
+    }
+    _activeTab = 'current-device';
+    _scannedEvents = null;
+    showBanner(`Event is now available on this device.`, 'success');
+    _scanAndRenderEventList().catch(err => {
+      console.error('[EventCreator] rescan after prepare failed:', err);
+      _scannedEvents = [];
+      _renderEventList();
+    });
+  }
+
+  function _getLinkBadgeHTML(linkStatus) {
+    const map = {
+      'linked':          ['ec-link-badge--linked',         'Linked'],
+      'offline-ready':   ['ec-link-badge--offline-ready',  'Offline-ready'],
+      'provisional':     ['ec-link-badge--provisional',    'Provisional · Needs archive match'],
+      'stale-link':      ['ec-link-badge--stale-link',     'Stale link · Needs re-match'],
+      'unlinked-legacy': ['ec-link-badge--unlinked-legacy','Unlinked · Verify link recommended'],
+    };
+    if (!linkStatus || !map[linkStatus]) return '';
+    const [cls, label] = map[linkStatus];
+    return `<span class="ec-link-badge ${cls}">${esc(label)}</span>`;
+  }
+
+  function _getCardActionHTML(c) {
+    const status = c._linkStatus;
+    if (!_offlineStagingMode && !status) return '';
+    const actions = [];
+
+    if (_offlineStagingMode) {
+      if (status === 'provisional' || status === 'stale-link') {
+        actions.push(`<button class="ec-coll-action-btn ec-coll-action-btn--primary" data-action="match-nas" data-name="${esc(c.name)}">Match to NAS</button>`);
+      }
+    } else {
+      if (!status || status === 'unlinked-legacy') {
+        actions.push(`<button class="ec-coll-action-btn ec-coll-action-btn--primary" data-action="prepare-offline" data-name="${esc(c.name)}">Prepare Offline</button>`);
+      } else if (status === 'stale-link') {
+        actions.push(`<button class="ec-coll-action-btn ec-coll-action-btn--primary" data-action="prepare-offline" data-name="${esc(c.name)}">Re-link</button>`);
+      }
+    }
+
+    return actions.length ? `<div class="ec-coll-actions">${actions.join('')}</div>` : '';
+  }
+
   function buildExistingCardsHTML() {
     const sectionTitle = _offlineStagingMode ? 'Local Staging Collections' : 'Existing Collections';
     return `
@@ -804,7 +1088,11 @@ ${_offlineStagingMode ? '<p class="ec-subtext">Archive offline — showing colle
     <span class="ec-coll-icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></span>
     <div class="ec-coll-info">
       <div class="ec-coll-name">${esc(c.name)}</div>
-      <div class="ec-coll-meta">${esc(c.events.length)} event${c.events.length === 1 ? '' : 's'}</div>
+      <div class="ec-coll-card-footer">
+        <span class="ec-coll-meta">${esc(c.events.length)} event${c.events.length === 1 ? '' : 's'}</span>
+        ${_getLinkBadgeHTML(c._linkStatus)}
+        ${_getCardActionHTML(c)}
+      </div>
     </div>
     <span class="ec-coll-check" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
   </div>`).join('')}
@@ -868,6 +1156,20 @@ ${_offlineStagingMode ? '<p class="ec-subtext">Archive offline — showing colle
       });
     });
 
+    // Collection action buttons (Prepare Offline / Match to NAS / Re-link)
+    document.querySelectorAll('.ec-coll-action-btn[data-action]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation(); // do not select the card
+        const name   = btn.dataset.name;
+        const action = btn.dataset.action;
+        if (action === 'prepare-offline') {
+          _doPrepareOffline(name).catch(err => showBanner(err.message || 'Prepare Offline failed.', 'error'));
+        } else if (action === 'match-nas') {
+          _doMatchToNas(name).catch(err => showBanner(err.message || 'Match to NAS failed.', 'error'));
+        }
+      });
+    });
+
     // Toggle new form
     const toggle = document.getElementById('ecNewToggle');
     const form   = document.getElementById('ecNewForm');
@@ -918,6 +1220,51 @@ ${_offlineStagingMode ? '<p class="ec-subtext">Archive offline — showing colle
 
   function _fireTryCreate() {
     tryCreateCollection().catch(err => showBanner(err.message, 'error'));
+  }
+
+  async function _doPrepareOffline(collectionName) {
+    const coll = sessionCollections.find(c => c.name === collectionName);
+    if (!coll) return;
+    const nasCollectionPath = coll._masterPath;
+    if (!nasCollectionPath) {
+      showBanner('Cannot prepare offline — no NAS path found for this collection.', 'error');
+      return;
+    }
+    const result = await window.api.prepareOffline({ nasCollectionPath, collectionName });
+    if (!result?.ok) {
+      showBanner(`Prepare Offline failed: ${result?.reason || 'unknown error'}`, 'error');
+      return;
+    }
+    coll._linkStatus = 'linked';
+    _refreshMasterStep();
+    showBanner(`"${collectionName}" is now prepared for offline use.`, 'success');
+  }
+
+  async function _doMatchToNas(collectionName) {
+    const coll = sessionCollections.find(c => c.name === collectionName);
+    if (!coll) return;
+
+    // Let the user pick the NAS collection folder via system dialog
+    const picked = await window.api.chooseExistingMaster(sessionArchiveRoot || undefined);
+    if (!picked?.path) return; // user cancelled
+
+    const localCollectionPath = coll._masterPath;
+    if (!localCollectionPath) {
+      showBanner('Cannot match — no local staging path found for this collection.', 'error');
+      return;
+    }
+
+    const result = await window.api.matchCollectionToNas({
+      localCollectionPath,
+      nasCollectionPath: picked.path,
+    });
+    if (!result?.ok) {
+      showBanner(`Match to NAS failed: ${result?.reason || 'unknown error'}`, 'error');
+      return;
+    }
+    coll._linkStatus = 'linked';
+    _refreshMasterStep();
+    showBanner(`"${collectionName}" is now linked to the selected NAS collection.`, 'success');
   }
 
   // ── Input helpers ──────────────────────────────────────────────────────────
@@ -1093,16 +1440,45 @@ ${_offlineStagingMode ? '<p class="ec-subtext">Archive offline — showing colle
       if (!useIt) return; // user chose No → stay on Step 1
       masterPath = fullPath;
     } else {
+      // Advisory: check remote-visible collection names before creating locally.
+      // Non-blocking — failure to check never prevents creation.
+      if (window.api.getRealtimeKnownNames && typeof checkRealtimeNameConflict === 'function') {
+        try {
+          await window.api.getRealtimeKnownNames().then(rtNames => {
+            if (rtNames?.collections?.includes(name)) {
+              window._rtConflictHint = `"${name}" is already visible from another device. Continue creating it locally?`;
+            } else {
+              window._rtConflictHint = null;
+            }
+          });
+        } catch { window._rtConflictHint = null; }
+        if (window._rtConflictHint) {
+          const proceed = window.confirm(`Advisory: ${window._rtConflictHint}\n\nThis does not block creation — it is only a visibility notice.`);
+          window._rtConflictHint = null;
+          if (!proceed) return;
+        }
+      }
       const created = await window.api.createMaster(effectiveRoot, name);
       masterPath = created.path;
+
+      // When creating offline (in staging root), write a provisional link so
+      // the sync layer knows this collection has no NAS link yet.
+      if (_offlineStagingMode && window.api.writeProvisionalLink) {
+        window.api.writeProvisionalLink({ localCollectionPath: masterPath, collectionName: name })
+          .catch(err => console.warn('[EventCreator] provisional link write failed:', err));
+      }
     }
 
     // Register in session state — update existing entry if present, else push
     let collection = sessionCollections.find(c => c.name === name);
     if (collection) {
-      collection._masterPath = masterPath;
+      collection._masterPath  = masterPath;
+      if (_offlineStagingMode) collection._linkStatus = 'provisional';
     } else {
-      collection = { name, hijriDate, label: l, events: [], _masterPath: masterPath };
+      collection = {
+        name, hijriDate, label: l, events: [], _masterPath: masterPath,
+        _linkStatus: _offlineStagingMode ? 'provisional' : null, _linkData: null,
+      };
       sessionCollections.push(collection);
     }
     selectedCollection = name;
@@ -1298,23 +1674,58 @@ ${unparseable.map(ev => `
 
   <button id="ecNewEventFromList" class="ec-new-event-btn">+ Create New Event</button>
 
-  <p class="ec-section-title">Existing Events <span class="ec-hint" style="font-weight:normal">(${resolved.length})</span></p>
-  ${resolved.length > 0 ? '<input type="search" id="ecEvlSearch" class="ec-evl-search" placeholder="Search events…" autocomplete="off">' : ''}
-  <div class="ec-evl-list" id="ecEvlList" role="listbox" aria-label="Events">
-    ${resolvedHTML || '<p class="ec-hint">No resolvable events yet.</p>'}
+  ${buildTabBarHTML()}
+
+  <div class="ec-tab-panel" data-panel="current-device"${_activeTab !== 'current-device' ? ' hidden' : ''}>
+    <p class="ec-section-title">Existing Events <span class="ec-hint" style="font-weight:normal">(${resolved.length})</span></p>
+    ${resolved.length > 0 ? '<input type="search" id="ecEvlSearch" class="ec-evl-search" placeholder="Search events…" autocomplete="off">' : ''}
+    <div class="ec-evl-list" id="ecEvlList" role="listbox" aria-label="Events">
+      ${resolvedHTML || '<p class="ec-hint">No resolvable events yet.</p>'}
+    </div>
+    ${unparseableHTML}
   </div>
-  ${unparseableHTML}
+
+  <div class="ec-tab-panel" data-panel="online-registry"${_activeTab !== 'online-registry' ? ' hidden' : ''}>
+    ${buildEventListRegistryHTML()}
+  </div>
 
 </div>`;
 
     // Scroll reset so the list always starts at the top.
     body.scrollTop = 0;
 
+    // Tab switching for event-list screen.
+    document.querySelectorAll('.ec-tab[data-tab]').forEach(tabBtn => {
+      tabBtn.addEventListener('click', () => {
+        const tab = tabBtn.dataset.tab;
+        if (_activeTab === tab) return;
+        _activeTab = tab;
+        document.querySelectorAll('.ec-tab[data-tab]').forEach(t => {
+          const active = t.dataset.tab === tab;
+          t.classList.toggle('ec-tab--active', active);
+          t.setAttribute('aria-selected', String(active));
+          t.setAttribute('tabindex', active ? '0' : '-1');
+        });
+        document.querySelectorAll('[data-panel]').forEach(p => {
+          p.hidden = (p.dataset.panel !== tab);
+        });
+        if (tab === 'online-registry') {
+          _registryLoading = true;
+          _refreshEventListRegistryPanel();
+          _loadRegistryEntries().catch(() => {});
+        }
+      });
+    });
+
+    // Registry action buttons (Prepare Locally) in Online Registry panel.
+    _attachRegistryListeners();
+
     // Collection bar: Change → go back to master step.
     document.getElementById('ecChangeCollection')?.addEventListener('click', () => {
       _scannedEvents = null;
       _viewingExisting = null;
       _selectedListFolder = null;
+      _activeTab = 'current-device';
       showMasterStep();
     });
 
@@ -3353,6 +3764,21 @@ ${unparseable.map(ev => `
           linkedAt: new Date().toISOString(),
         };
       }
+      // Advisory: check remote-visible event names before writing locally.
+      // Non-blocking — failure to check never prevents creation.
+      if (window.api.getRealtimeKnownNames) {
+        try {
+          const rtNames = await window.api.getRealtimeKnownNames();
+          const remoteMatch = rtNames?.events?.find(e => e.eventFolderName === safe);
+          if (remoteMatch) {
+            const proceed = window.confirm(
+              `Advisory: "${safe}" is already visible from another device.\n\nThis does not block creation — it is only a visibility notice. Continue?`
+            );
+            if (!proceed) return;
+          }
+        } catch { /* advisory only — never block on failure */ }
+      }
+
       // Await write so a NAS failure can be detected and routed to local staging.
       const _writeResult = await window.api.writeEventJson(eventFolderPath, eventJsonPayload);
       if (_writeResult?.ok) {
@@ -4584,6 +5010,24 @@ ${unparseable.map(ev => `
     },
 
     getNavScreen() { return _navScreen; },
+
+    /**
+     * Called by renderer when a realtime:registry:entry push arrives.
+     * Updates the advisory registry cache and refreshes the Online Registry
+     * tab if it is currently active.
+     */
+    onRegistryEntry(entry) {
+      if (!entry || typeof entry !== 'object' || !entry.registryId) return;
+      const idx = _registryEntries.findIndex(r => r.registryId === entry.registryId);
+      if (idx >= 0) {
+        _registryEntries[idx] = entry;
+      } else {
+        _registryEntries.push(entry);
+      }
+      if (_activeTab === 'online-registry' && _navScreen === 'eventList') {
+        _refreshEventListRegistryPanel();
+      }
+    },
   };
 
 })();

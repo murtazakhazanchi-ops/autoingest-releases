@@ -338,4 +338,24 @@ contextBridge.exposeInMainWorld('api', {
   keywordsRepairIds:           ()                => ipcRenderer.invoke('keywords:repairIds'),
   keywordsSaveCityCountry:     (cityLabel, countryLabel) => ipcRenderer.invoke('keywords:saveCityCountry', cityLabel, countryLabel),
 
+  // ── Offline Collection Registry ──
+  prepareOffline:              (params) => ipcRenderer.invoke('collection:prepareOffline',       params),
+  readCollectionLink:          (params) => ipcRenderer.invoke('collection:readLink',              params),
+  matchCollectionToNas:        (params) => ipcRenderer.invoke('collection:matchToNas',           params),
+  listProvisionalCollections:  ()       => ipcRenderer.invoke('collection:listProvisional'),
+  writeProvisionalLink:        (params) => ipcRenderer.invoke('collection:writeProvisionalLink', params),
+
+  // ── Online Registry (advisory — prepare local shells from remote registry entries) ──
+  registryGetAll:                ()       => ipcRenderer.invoke('registry:getAll'),
+  prepareCollectionFromRegistry: (params) => ipcRenderer.invoke('collection:prepareFromRegistry', params),
+  prepareEventFromRegistry:      (params) => ipcRenderer.invoke('event:prepareFromRegistry',      params),
+  onRealtimeRegistryEntry:       (cb)     => _register('realtime:registry:entry', (_e, ev) => cb(ev)),
+
+  // ── Realtime Operations (advisory only — never writes authoritative files) ──
+  getRealtimeStatus:        ()    => ipcRenderer.invoke('realtime:getStatus'),
+  configureRealtime:        (cfg) => ipcRenderer.invoke('realtime:configure', cfg),
+  getRealtimeKnownNames:    ()    => ipcRenderer.invoke('realtime:getKnownNames'),
+  onRealtimeStatus:         (cb)  => _register('realtime:statusChanged', (_e, s) => cb(s)),
+  onRealtimeEvent:          (cb)  => _register('realtime:event',         (_e, ev) => cb(ev)),
+
 });

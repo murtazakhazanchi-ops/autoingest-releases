@@ -2800,6 +2800,21 @@ async function _checkArchiveStatusTransition() {
     }
     // No staged work — silent status update only (no noisy notification)
   } catch { /* non-critical */ }
+
+  // Advisory: check for provisional local collections that need a NAS match before sync.
+  try {
+    if (window.api.listProvisionalCollections) {
+      const provResult = await window.api.listProvisionalCollections();
+      const n = provResult?.collections?.length || 0;
+      if (n > 0) {
+        _archiveNotice(
+          `${n} local collection${n !== 1 ? 's' : ''} ${n !== 1 ? 'need' : 'needs'} a NAS match before syncing.`,
+          null,
+          10000
+        );
+      }
+    }
+  } catch { /* non-critical */ }
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -8610,6 +8625,26 @@ async function initApp() {
   window.api.onAllDrivesUpdated(renderExtDrives);
   window.api.onAllDrivesUpdated(() => { _checkArchiveStatusTransition().catch(() => {}); });
 
+  // ── Realtime operations (advisory only) ──────────────────────
+  if (window.api.onRealtimeStatus) {
+    window.api.onRealtimeStatus(_renderRealtimeStatus);
+  }
+  if (window.api.onRealtimeEvent) {
+    window.api.onRealtimeEvent(_onRealtimeEvent);
+  }
+  if (window.api.onRealtimeRegistryEntry) {
+    window.api.onRealtimeRegistryEntry(entry => {
+      if (typeof EventCreator !== 'undefined' && EventCreator.onRegistryEntry) {
+        EventCreator.onRegistryEntry(entry);
+      }
+    });
+  }
+  if (window.api.getRealtimeStatus) {
+    window.api.getRealtimeStatus()
+      .then(s => { if (s) _renderRealtimeStatus(s); })
+      .catch(() => {});
+  }
+
   window.api.getDrives().then(renderDrives).catch(err => {
     const list = document.getElementById('srcMemCardList');
     if (list) list.innerHTML = `<div class="src-device-empty-row"><span class="empty-icon">${SVG.warn}</span><span>${escapeHtml(err.message)}</span></div>`;
@@ -8625,6 +8660,84 @@ async function initApp() {
   // first paint so the user sees the flat-list-only layout from the start.
   const sidebar = document.getElementById('sidebar');
   if (sidebar && viewModeType === 'media') sidebar.style.display = 'none';
+}
+
+// ════════════════════════════════════════════════════════════════
+// REALTIME OPERATIONS — advisory live-awareness layer
+// Never writes authoritative state. Advisory/display only.
+// ════════════════════════════════════════════════════════════════
+
+// In-memory advisory cache of remotely-visible names (not authoritative).
+// Updated by incoming realtime:event pushes from the main process.
+const _rtRemoteNames = { collections: [], events: [] };
+
+/**
+ * Returns conflict info for a collection or event name against the remote cache.
+ * Advisory only — never blocks local creation.
+ * @param {'collection'|'event'} type
+ * @param {string} name  — collectionName for 'collection', eventFolderName for 'event'
+ * @param {string} [collectionName]  — required for type 'event' to scope the check
+ * @returns {{ conflict: boolean, hint: string }}
+ */
+function checkRealtimeNameConflict(type, name, collectionName) {
+  if (!name) return { conflict: false, hint: '' };
+  if (type === 'collection') {
+    const found = _rtRemoteNames.collections.includes(name);
+    return { conflict: found, hint: found ? `"${name}" is already visible from another device.` : '' };
+  }
+  if (type === 'event') {
+    const key   = `${collectionName || ''}/${name}`;
+    const found = _rtRemoteNames.events.some(e => e.key === key || e.eventFolderName === name);
+    return { conflict: found, hint: found ? `"${name}" is already visible from another device.` : '' };
+  }
+  return { conflict: false, hint: '' };
+}
+
+/** Updates the realtime status badge in the header. */
+function _renderRealtimeStatus({ status, devicesOnline } = {}) {
+  const section = document.getElementById('realtimeSection');
+  const dot     = document.getElementById('rtDot');
+  const label   = document.getElementById('rtLabel');
+  if (!section || !dot || !label) return;
+
+  if (!status || status === 'disabled') {
+    section.style.display = 'none';
+    return;
+  }
+
+  section.style.display = '';
+  dot.className = 'rt-dot' + (status === 'connected'    ? ' rt-dot--connected'
+                            : status === 'connecting'   ? ' rt-dot--connecting'
+                            : status === 'reconnecting' ? ' rt-dot--reconnecting'
+                            : status === 'offline'      ? ' rt-dot--offline'
+                            : '');
+
+  const countStr = (typeof devicesOnline === 'number' && devicesOnline > 0) ? ` · ${devicesOnline}` : '';
+  label.textContent = status === 'connected'    ? `RT${countStr}`
+                    : status === 'connecting'   ? 'RT…'
+                    : status === 'reconnecting' ? 'RT…'
+                    : status === 'offline'      ? 'RT off'
+                    : 'RT';
+}
+
+/** Handles incoming advisory realtime events from main process. */
+function _onRealtimeEvent(ev) {
+  if (!ev || typeof ev !== 'object') return;
+  if (ev.type === 'collection:visible' && ev.collectionName) {
+    if (!_rtRemoteNames.collections.includes(ev.collectionName)) {
+      _rtRemoteNames.collections = [..._rtRemoteNames.collections, ev.collectionName].slice(-500);
+    }
+  } else if (ev.type === 'event:visible' && ev.eventFolderName) {
+    const key = `${ev.collectionName || ''}/${ev.eventFolderName}`;
+    if (!_rtRemoteNames.events.find(e => e.key === key)) {
+      _rtRemoteNames.events = [
+        ..._rtRemoteNames.events,
+        { key, collectionName: ev.collectionName || null, eventFolderName: ev.eventFolderName, eventDisplayName: ev.eventDisplayName || ev.eventFolderName },
+      ].slice(-500);
+    }
+  }
+  // import:progress, import:completed, sync:status, conflict:warning, dashboard:update:
+  // no further renderer action needed beyond the cache update above.
 }
 
 // ════════════════════════════════════════════════════════════════
