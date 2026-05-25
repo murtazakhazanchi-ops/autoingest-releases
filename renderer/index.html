@@ -881,6 +881,18 @@
     .tx-scope-controls { display: flex; gap: 8px; }
     .tx-scope-controls button { font-size: 11px; padding: 3px 10px; border-radius: 5px; border: 1px solid var(--border); background: none; color: var(--subtext); cursor: pointer; }
     .tx-scope-controls button:hover { color: var(--text); }
+    /* ── Export scope tree ── */
+    .tx-scope-tree { max-height: 240px; overflow-y: auto; padding: 2px 0; }
+    .tx-tree-row { display: flex; align-items: center; gap: 6px; padding: 3px 2px; border-radius: 4px; cursor: default; }
+    .tx-tree-row:hover { background: var(--card-hover); }
+    .tx-tree-row input[type=checkbox] { width: 14px; height: 14px; flex-shrink: 0; cursor: pointer; accent-color: var(--accent); }
+    .tx-tree-arrow { width: 12px; flex-shrink: 0; font-size: 9px; color: var(--subtext); cursor: pointer; user-select: none; text-align: center; }
+    .tx-tree-name { font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; cursor: pointer; }
+    .tx-tree-name.tx-tree-event-root { color: var(--subtext); font-style: italic; }
+    .tx-tree-row-coll { padding-left: 2px; }
+    .tx-tree-row-ev   { padding-left: 18px; }
+    .tx-tree-row-fold { padding-left: 34px; }
+    .tx-tree-children.tx-collapsed { display: none; }
     .tx-preview-box { background: var(--card-bg, rgba(255,255,255,0.03)); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; font-size: 12px; color: var(--subtext); }
     .tx-preview-row { display: flex; gap: 16px; flex-wrap: wrap; }
     .tx-preview-stat { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
@@ -896,6 +908,20 @@
     .tx-status-val { color: var(--text); }
     .tx-status-current { color: var(--subtext); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
     .tx-empty-note { font-size: 12px; color: var(--subtext); font-style: italic; padding: 4px 0; }
+    .tx-batch-info { font-size: 11px; color: var(--subtext); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tx-progress-wrap { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .tx-progress-bar { flex: 1; height: 6px; background: rgba(99,102,241,0.15); border-radius: 3px; overflow: hidden; }
+    .tx-progress-fill { height: 100%; background: var(--accent, #6366f1); border-radius: 3px; transition: width 0.4s ease; width: 0%; }
+    .tx-progress-label { font-size: 10px; color: var(--subtext); white-space: nowrap; min-width: 60px; text-align: right; }
+    .tx-status-box.tx-paused { background: rgba(234,179,8,0.07); border: 1px solid rgba(234,179,8,0.3); }
+    .tx-status-box.tx-verified { background: rgba(34,197,94,0.06); border: 1px solid rgba(34,197,94,0.25); }
+    .tx-status-box.tx-verify-fail { background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.25); }
+    .tx-verify-result { font-size: 11px; margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(128,128,128,0.15); color: var(--subtext); white-space: pre-line; }
+    .tx-verify-result.ok { color: #16a34a; }
+    .tx-verify-result.fail { color: #dc2626; }
+    .tx-resume-offer { background: rgba(234,179,8,0.08); border: 1px solid rgba(234,179,8,0.3); border-radius: 6px; padding: 10px 14px; margin-bottom: 8px; font-size: 12px; }
+    .tx-resume-msg { color: var(--text); }
+    .tx-resume-actions { display: flex; gap: 8px; margin-top: 8px; }
 
     /* ── Archive Diagnostics modal (Phase 13A) ── */
     #archiveDiagnosticsModal .emm-box { width: min(640px, calc(100vw - 48px)); height: calc(100vh - 120px); display: flex; flex-direction: column; position: relative; overflow: hidden; }
@@ -7209,7 +7235,7 @@
         <!-- Export Scope -->
         <div>
           <div class="tx-section-label">Export Scope</div>
-          <div id="txScopeList" class="tx-scope-list">
+          <div id="txScopeTree" class="tx-scope-tree">
             <div class="tx-empty-note">Load the Archive event list first.</div>
           </div>
           <div class="tx-scope-controls" style="margin-top:6px">
@@ -7224,13 +7250,27 @@
           <div class="tx-preview-row">
             <div class="tx-preview-stat"><span class="tx-preview-val" id="txPvCollections">—</span><span class="tx-preview-lbl">Collections</span></div>
             <div class="tx-preview-stat"><span class="tx-preview-val" id="txPvEvents">—</span><span class="tx-preview-lbl">Events</span></div>
-            <div class="tx-preview-stat"><span class="tx-preview-val" id="txPvExternal">—</span><span class="tx-preview-lbl">External</span></div>
-            <div class="tx-preview-stat"><span class="tx-preview-val" id="txPvFiles">—</span><span class="tx-preview-lbl">Files</span></div>
+            <div class="tx-preview-stat"><span class="tx-preview-val" id="txPvFolders">—</span><span class="tx-preview-lbl">Folders</span></div>
+            <div class="tx-preview-stat"><span class="tx-preview-val" id="txPvFiles">—</span><span class="tx-preview-lbl">Items</span></div>
+          </div>
+        </div>
+
+        <!-- Resume offer (shown when incomplete checkpoint detected) -->
+        <div id="txResumeOffer" class="tx-resume-offer" hidden>
+          <span class="tx-resume-msg" id="txResumeMsg">A previous export was interrupted.</span>
+          <div class="tx-resume-actions">
+            <button type="button" class="emm-btn-primary"   id="txResumeBtn">Resume Export</button>
+            <button type="button" class="emm-btn-secondary" id="txStartFreshBtn">Start Fresh</button>
           </div>
         </div>
 
         <!-- Status -->
         <div id="txStatusBox" class="tx-status-box tx-idle" hidden>
+          <div class="tx-batch-info" id="txBatchInfo"></div>
+          <div class="tx-progress-wrap" id="txProgressWrap" hidden>
+            <div class="tx-progress-bar"><div class="tx-progress-fill" id="txProgressFill"></div></div>
+            <span class="tx-progress-label" id="txProgressLabel">0 / 0</span>
+          </div>
           <div class="tx-status-row">
             <span><span class="tx-status-key">Copied</span> <span class="tx-status-val" id="txStCopied">0</span></span>
             <span><span class="tx-status-key">Skipped</span> <span class="tx-status-val" id="txStSkipped">0</span></span>
@@ -7238,6 +7278,7 @@
             <span><span class="tx-status-key">Errors</span> <span class="tx-status-val" id="txStErrors">0</span></span>
           </div>
           <div class="tx-status-current" id="txStCurrent"></div>
+          <div class="tx-verify-result" id="txVerifyResult" hidden></div>
         </div>
 
       </div>
@@ -7246,7 +7287,10 @@
         <div id="txFooterNote" class="sq-footer-note">Active Archive → Transfer Drive</div>
         <div class="emm-footer-right">
           <button type="button" class="emm-btn-secondary" id="txPreviewBtn">Preview</button>
-          <button type="button" class="emm-btn-primary"   id="txExportBtn" disabled>Export</button>
+          <button type="button" class="emm-btn-primary"   id="txExportBtn"  disabled>Export</button>
+          <button type="button" class="emm-btn-secondary" id="txPauseBtn"   hidden>Pause</button>
+          <button type="button" class="emm-btn-secondary" id="txResumeInlineBtn" hidden>Resume</button>
+          <button type="button" class="emm-btn-secondary" id="txVerifyBtn"  hidden>Verify Checksum</button>
           <button type="button" class="emm-btn-secondary" id="txDoneBtn">Done</button>
         </div>
       </div>
@@ -7301,8 +7345,22 @@
           </div>
         </div>
 
+        <!-- Resume offer (shown when incomplete checkpoint detected) -->
+        <div id="tiResumeOffer" class="tx-resume-offer" hidden>
+          <span class="tx-resume-msg" id="tiResumeMsg">A previous import was interrupted.</span>
+          <div class="tx-resume-actions">
+            <button type="button" class="emm-btn-primary"   id="tiResumeBtn">Resume Import</button>
+            <button type="button" class="emm-btn-secondary" id="tiStartFreshBtn">Start Fresh</button>
+          </div>
+        </div>
+
         <!-- Status -->
         <div id="tiStatusBox" class="tx-status-box tx-idle" hidden>
+          <div class="tx-batch-info" id="tiBatchInfo"></div>
+          <div class="tx-progress-wrap" id="tiProgressWrap" hidden>
+            <div class="tx-progress-bar"><div class="tx-progress-fill" id="tiProgressFill"></div></div>
+            <span class="tx-progress-label" id="tiProgressLabel">0 / 0</span>
+          </div>
           <div class="tx-status-row">
             <span><span class="tx-status-key">Copied</span> <span class="tx-status-val" id="tiStCopied">0</span></span>
             <span><span class="tx-status-key">Skipped</span> <span class="tx-status-val" id="tiStSkipped">0</span></span>
@@ -7310,6 +7368,7 @@
             <span><span class="tx-status-key">Errors</span> <span class="tx-status-val" id="tiStErrors">0</span></span>
           </div>
           <div class="tx-status-current" id="tiStCurrent"></div>
+          <div class="tx-verify-result" id="tiVerifyResult" hidden></div>
         </div>
 
       </div>
@@ -7318,7 +7377,10 @@
         <div id="tiFooterNote" class="sq-footer-note">Transfer Drive → Main Archive Root</div>
         <div class="emm-footer-right">
           <button type="button" class="emm-btn-secondary" id="tiPreviewBtn">Preview</button>
-          <button type="button" class="emm-btn-primary"   id="tiImportBtn" disabled>Import</button>
+          <button type="button" class="emm-btn-primary"   id="tiImportBtn"  disabled>Import</button>
+          <button type="button" class="emm-btn-secondary" id="tiPauseBtn"   hidden>Pause</button>
+          <button type="button" class="emm-btn-secondary" id="tiResumeInlineBtn" hidden>Resume</button>
+          <button type="button" class="emm-btn-secondary" id="tiVerifyBtn"  hidden>Verify Checksum</button>
           <button type="button" class="emm-btn-secondary" id="tiDoneBtn">Done</button>
         </div>
       </div>

@@ -10060,115 +10060,294 @@ document.addEventListener('keydown', e => {
 })();
 
 // ────────────────────────────────────────────────────────────────────────────
-// TRANSFER EXPORT MODAL (Phase 11)
+// TRANSFER EXPORT MODAL (Phase 11 — staggered batch export with pause/resume)
 // ────────────────────────────────────────────────────────────────────────────
 
 (function () {
   // ── State ────────────────────────────────────────────────────────────────
 
-  let _txCollections = [];    // { name, path } from cached NAS scan
-  let _txPollTimer   = null;
-  let _txRunning     = false;
+  let _txTree         = [];   // [{ name, path, events: [{ name, path, folders: [{ name, path, isEventRoot? }] }] }]
+  let _txPollTimer    = null;
+  let _txRunning      = false;
+  let _txLastScope    = null;
+  let _txVerifying    = false;
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  function _txEl(id) { return document.getElementById(id); }
+
+  function _txSetButtonPhase(phase) {
+    // phase: 'idle' | 'running' | 'paused' | 'done' | 'failed'
+    const exportBtn     = _txEl('txExportBtn');
+    const pauseBtn      = _txEl('txPauseBtn');
+    const resumeInline  = _txEl('txResumeInlineBtn');
+    const verifyBtn     = _txEl('txVerifyBtn');
+    if (!exportBtn) return;
+
+    exportBtn.hidden    = phase !== 'idle';
+    exportBtn.disabled  = phase !== 'idle';
+    pauseBtn.hidden     = phase !== 'running';
+    resumeInline.hidden = phase !== 'paused';
+    verifyBtn.hidden    = phase !== 'done';
+
+    // Lock tree during active operation to prevent scope drift
+    const treeEl = _txEl('txScopeTree');
+    if (treeEl) {
+      const locked = phase === 'running' || phase === 'paused';
+      treeEl.querySelectorAll('input[type=checkbox]').forEach(cb => { cb.disabled = locked; });
+      _txEl('txSelectAllBtn').disabled  = locked;
+      _txEl('txSelectNoneBtn').disabled = locked;
+    }
+  }
 
   // ── Open / Close ─────────────────────────────────────────────────────────
 
   function _txClose() {
-    document.getElementById('transferExportModal')?.classList.remove('open');
+    _txEl('transferExportModal')?.classList.remove('open');
     document.body.style.overflow = '';
     _txStopPoll();
-    _txRunning = false;
+    _txRunning   = false;
+    _txVerifying = false;
   }
 
   async function _txOpen() {
-    const overlay = document.getElementById('transferExportModal');
+    const overlay = _txEl('transferExportModal');
     if (!overlay || overlay.classList.contains('open')) return;
 
-    // Load current transfer root from settings
     const savedRoot = await window.api.getTransferRoot().catch(() => null);
-    const driveEl   = document.getElementById('txDrivePath');
+    const driveEl   = _txEl('txDrivePath');
     if (driveEl) {
-      if (savedRoot) {
-        driveEl.textContent = savedRoot;
-        driveEl.classList.remove('tx-unset');
-      } else {
-        driveEl.textContent = 'Not set';
-        driveEl.classList.add('tx-unset');
-      }
+      driveEl.textContent = savedRoot || 'Not set';
+      driveEl.classList.toggle('tx-unset', !savedRoot);
     }
 
-    // Load cached NAS collections for scope selection
-    await _txLoadCollections();
+    await _txLoadTree();
 
-    // Restore last known export status (may be done from a previous run)
+    // Check for incomplete checkpoint
+    _txEl('txResumeOffer')?.setAttribute('hidden', '');
+    const checkpoint = await window.api.getTransferExportCheckpoint().catch(() => null);
+    if (checkpoint && checkpoint.status !== 'complete') {
+      const done    = checkpoint.batches?.filter(b => b.status === 'complete').length ?? 0;
+      const total   = checkpoint.batches?.length ?? 0;
+      const msgEl   = _txEl('txResumeMsg');
+      if (msgEl) msgEl.textContent = `A previous export was interrupted (${done} / ${total} batches done).`;
+      _txEl('txResumeOffer')?.removeAttribute('hidden');
+    }
+
     const status = await window.api.getTransferExportStatus().catch(() => null);
-    if (status && (status.running || status.result)) {
+    if (status && (status.running || status.paused || status.result)) {
       _txApplyStatus(status);
-      if (status.running) {
+      if (status.running && !status.paused) {
         _txRunning = true;
         _txStartPoll();
       }
     } else {
-      document.getElementById('txStatusBox')?.setAttribute('hidden', '');
+      _txEl('txStatusBox')?.setAttribute('hidden', '');
+      _txSetButtonPhase('idle');
     }
 
     overlay.classList.add('open');
     document.body.style.overflow = 'hidden';
   }
 
-  // ── Scope list ────────────────────────────────────────────────────────────
+  // ── Scope tree ────────────────────────────────────────────────────────────
 
-  async function _txLoadCollections() {
-    const listEl = document.getElementById('txScopeList');
-    if (!listEl) return;
+  async function _txLoadTree() {
+    const treeEl = _txEl('txScopeTree');
+    if (!treeEl) return;
+
+    treeEl.innerHTML = '<div class="tx-empty-note">Loading…</div>';
 
     let result;
-    try { result = await window.api.getCachedNasEvents(); } catch { result = null; }
+    try { result = await window.api.getTransferExportTree(); } catch { result = null; }
 
-    const collections = (result && Array.isArray(result.collections)) ? result.collections : [];
-    _txCollections = collections.map(c => ({ name: c.name, path: c.path }));
-
-    if (_txCollections.length === 0) {
-      listEl.innerHTML = '<div class="tx-empty-note">No collections found. Scan the Active Archive first.</div>';
+    if (!result || !result.ok || !result.tree || result.tree.length === 0) {
+      const reason = result?.reason;
+      const msg = reason === 'nas-not-set'
+        ? 'Active Archive Root is not set.'
+        : reason === 'nas-unreadable'
+        ? 'Active Archive is offline or unreadable.'
+        : 'No collections found. Scan the Active Archive first.';
+      treeEl.innerHTML = `<div class="tx-empty-note">${msg}</div>`;
+      _txTree = [];
       return;
     }
 
-    listEl.innerHTML = _txCollections.map((c, i) => `
-      <label class="tx-scope-item">
-        <input type="checkbox" class="tx-coll-cb" data-idx="${i}" checked>
-        <span title="${c.path}">${c.name}</span>
-      </label>
-    `).join('');
+    _txTree = result.tree;
+    const html = [];
+
+    _txTree.forEach((coll, ci) => {
+      html.push(
+        `<div class="tx-tree-node" data-coll="${ci}">` +
+        `<div class="tx-tree-row tx-tree-row-coll">` +
+        `<input type="checkbox" class="tx-cb-coll" data-ci="${ci}" checked>` +
+        `<span class="tx-tree-arrow" data-ci="${ci}">▼</span>` +
+        `<span class="tx-tree-name" title="${_esc(coll.path)}">${_esc(coll.name)}</span>` +
+        `</div>` +
+        `<div class="tx-tree-children" data-coll-children="${ci}">`
+      );
+
+      coll.events.forEach((ev, ei) => {
+        const hasFolders = ev.folders.length > 0;
+        html.push(
+          `<div class="tx-tree-node" data-coll="${ci}" data-ev="${ei}">` +
+          `<div class="tx-tree-row tx-tree-row-ev">` +
+          `<input type="checkbox" class="tx-cb-ev" data-ci="${ci}" data-ei="${ei}" checked>` +
+          `<span class="tx-tree-arrow" data-ci="${ci}" data-ei="${ei}">${hasFolders ? '▼' : ' '}</span>` +
+          `<span class="tx-tree-name" title="${_esc(ev.path)}">${_esc(ev.name)}</span>` +
+          `</div>` +
+          `<div class="tx-tree-children" data-ev-children="${ci}-${ei}">`
+        );
+
+        ev.folders.forEach((fold, fi) => {
+          const nameClass = fold.isEventRoot ? 'tx-tree-name tx-tree-event-root' : 'tx-tree-name';
+          html.push(
+            `<div class="tx-tree-row tx-tree-row-fold">` +
+            `<input type="checkbox" class="tx-cb-fold" data-ci="${ci}" data-ei="${ei}" data-fi="${fi}" data-path="${_esc(fold.path)}" checked>` +
+            `<span class="tx-tree-arrow"> </span>` +
+            `<span class="${nameClass}" title="${_esc(fold.path)}">${_esc(fold.name)}</span>` +
+            `</div>`
+          );
+        });
+
+        html.push('</div></div>');
+      });
+
+      html.push('</div></div>');
+    });
+
+    treeEl.innerHTML = html.join('');
+    _txBindTreeEvents(treeEl);
   }
 
-  function _txGetSelectedCollectionPaths() {
-    const checkboxes = document.querySelectorAll('.tx-coll-cb:checked');
-    return Array.from(checkboxes).map(cb => {
-      const idx = parseInt(cb.dataset.idx, 10);
-      return _txCollections[idx]?.path;
+  function _esc(s) {
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function _txBindTreeEvents(treeEl) {
+    // Arrow collapse/expand
+    treeEl.querySelectorAll('.tx-tree-arrow').forEach(arrow => {
+      arrow.addEventListener('click', () => {
+        const ci = arrow.dataset.ci;
+        const ei = arrow.dataset.ei;
+        const key   = ei !== undefined ? `${ci}-${ei}` : null;
+        const childrenEl = key
+          ? treeEl.querySelector(`[data-ev-children="${key}"]`)
+          : treeEl.querySelector(`[data-coll-children="${ci}"]`);
+        if (!childrenEl) return;
+        const collapsed = childrenEl.classList.toggle('tx-collapsed');
+        arrow.textContent = collapsed ? '▶' : '▼';
+      });
+    });
+
+    // Folder checkbox → update parent event + collection
+    treeEl.querySelectorAll('.tx-cb-fold').forEach(cb => {
+      cb.addEventListener('change', () => {
+        _txUpdateEvState(treeEl, cb.dataset.ci, cb.dataset.ei);
+        _txUpdateCollState(treeEl, cb.dataset.ci);
+        _txInvalidatePreview();
+      });
+    });
+
+    // Event checkbox → check/uncheck all folders, update collection
+    treeEl.querySelectorAll('.tx-cb-ev').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const checked = cb.checked;
+        treeEl.querySelectorAll(`.tx-cb-fold[data-ci="${cb.dataset.ci}"][data-ei="${cb.dataset.ei}"]`)
+          .forEach(f => { f.checked = checked; f.indeterminate = false; });
+        cb.indeterminate = false;
+        _txUpdateCollState(treeEl, cb.dataset.ci);
+        _txInvalidatePreview();
+      });
+    });
+
+    // Collection checkbox → check/uncheck all events and folders
+    treeEl.querySelectorAll('.tx-cb-coll').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const checked = cb.checked;
+        const ci = cb.dataset.ci;
+        treeEl.querySelectorAll(`.tx-cb-ev[data-ci="${ci}"]`)
+          .forEach(e => { e.checked = checked; e.indeterminate = false; });
+        treeEl.querySelectorAll(`.tx-cb-fold[data-ci="${ci}"]`)
+          .forEach(f => { f.checked = checked; f.indeterminate = false; });
+        cb.indeterminate = false;
+        _txInvalidatePreview();
+      });
+    });
+  }
+
+  function _txUpdateEvState(treeEl, ci, ei) {
+    const folds = Array.from(treeEl.querySelectorAll(`.tx-cb-fold[data-ci="${ci}"][data-ei="${ei}"]`));
+    if (folds.length === 0) return;
+    const evCb = treeEl.querySelector(`.tx-cb-ev[data-ci="${ci}"][data-ei="${ei}"]`);
+    if (!evCb) return;
+    const checkedCount = folds.filter(f => f.checked).length;
+    if (checkedCount === 0)           { evCb.checked = false; evCb.indeterminate = false; }
+    else if (checkedCount === folds.length) { evCb.checked = true;  evCb.indeterminate = false; }
+    else                              { evCb.checked = false; evCb.indeterminate = true;  }
+  }
+
+  function _txUpdateCollState(treeEl, ci) {
+    const evCbs = Array.from(treeEl.querySelectorAll(`.tx-cb-ev[data-ci="${ci}"]`));
+    if (evCbs.length === 0) return;
+    const collCb = treeEl.querySelector(`.tx-cb-coll[data-ci="${ci}"]`);
+    if (!collCb) return;
+    const checkedCount     = evCbs.filter(e => e.checked && !e.indeterminate).length;
+    const indeterminateAny = evCbs.some(e => e.indeterminate || (e.checked && checkedCount < evCbs.length));
+    if (checkedCount === evCbs.length && !indeterminateAny) {
+      collCb.checked = true;  collCb.indeterminate = false;
+    } else if (checkedCount === 0 && !indeterminateAny) {
+      collCb.checked = false; collCb.indeterminate = false;
+    } else {
+      collCb.checked = false; collCb.indeterminate = true;
+    }
+  }
+
+  function _txInvalidatePreview() {
+    // Changing selection resets preview/export state
+    _txLastScope = null;
+    const exportBtn = _txEl('txExportBtn');
+    if (exportBtn && !_txRunning) {
+      exportBtn.disabled = true;
+      exportBtn.hidden   = false;
+    }
+    _txEl('txPreviewBox')?.setAttribute('hidden', '');
+    _txEl('txVerifyResult')?.setAttribute('hidden', '');
+  }
+
+  function _txGetSelectedFolderPaths() {
+    const treeEl = _txEl('txScopeTree');
+    if (!treeEl) return [];
+    return Array.from(treeEl.querySelectorAll('.tx-cb-fold:checked')).map(cb => {
+      const ci = parseInt(cb.dataset.ci, 10);
+      const ei = parseInt(cb.dataset.ei, 10);
+      const fi = parseInt(cb.dataset.fi, 10);
+      return _txTree[ci]?.events[ei]?.folders[fi]?.path;
     }).filter(Boolean);
   }
 
   // ── Preview ───────────────────────────────────────────────────────────────
 
   async function _txPreview() {
-    const scope = { collectionPaths: _txGetSelectedCollectionPaths() };
-    if (scope.collectionPaths.length === 0) {
-      showMessage('Select at least one collection to preview.', 4000);
+    const folderPaths = _txGetSelectedFolderPaths();
+    if (folderPaths.length === 0) {
+      showMessage('Select at least one folder to preview.', 4000);
       return;
     }
+    const scope = { folderPaths };
 
-    const previewBtn = document.getElementById('txPreviewBtn');
-    const exportBtn  = document.getElementById('txExportBtn');
+    const previewBtn = _txEl('txPreviewBtn');
+    const exportBtn  = _txEl('txExportBtn');
     if (previewBtn) previewBtn.disabled = true;
     if (exportBtn)  exportBtn.disabled  = true;
 
-    const previewBox = document.getElementById('txPreviewBox');
+    const previewBox = _txEl('txPreviewBox');
     if (previewBox) {
       previewBox.removeAttribute('hidden');
-      document.getElementById('txPvCollections').textContent = '…';
-      document.getElementById('txPvEvents').textContent      = '…';
-      document.getElementById('txPvExternal').textContent    = '…';
-      document.getElementById('txPvFiles').textContent       = '…';
+      _txEl('txPvCollections').textContent = '…';
+      _txEl('txPvEvents').textContent      = '…';
+      _txEl('txPvFolders').textContent     = '…';
+      _txEl('txPvFiles').textContent       = '…';
     }
 
     let result;
@@ -10182,44 +10361,45 @@ document.addEventListener('keydown', e => {
 
     if (!result.ok) {
       const msgs = {
-        'nas-not-set':           'Active Archive Root is not set.',
-        'transfer-root-not-set': 'Transfer Drive is not set.',
-        'empty-scope':           'Select at least one collection.',
-        'scope-outside-nas-root':'Selected path is outside the Active Archive.',
+        'nas-not-set':            'Active Archive Root is not set.',
+        'transfer-root-not-set':  'Transfer Drive is not set.',
+        'empty-scope':            'Select at least one folder.',
+        'scope-outside-nas-root': 'Selected path is outside the Active Archive.',
       };
       showMessage(msgs[result.reason] || ('Preview error: ' + result.reason), 6000);
       if (previewBox) previewBox.setAttribute('hidden', '');
       return;
     }
 
-    document.getElementById('txPvCollections').textContent = result.collections;
-    document.getElementById('txPvEvents').textContent      = result.events;
-    document.getElementById('txPvExternal').textContent    = result.externalFolders;
-    document.getElementById('txPvFiles').textContent       = result.files.toLocaleString();
+    _txEl('txPvCollections').textContent = result.collections;
+    _txEl('txPvEvents').textContent      = result.events;
+    _txEl('txPvFolders').textContent     = result.folders ?? result.externalFolders ?? '—';
+    _txEl('txPvFiles').textContent       = result.files.toLocaleString();
 
+    _txLastScope = scope;
     if (exportBtn) exportBtn.disabled = (result.files === 0);
   }
 
   // ── Export ────────────────────────────────────────────────────────────────
 
   async function _txStartExport() {
-    const scope = { collectionPaths: _txGetSelectedCollectionPaths() };
-    if (scope.collectionPaths.length === 0) {
-      showMessage('Select at least one collection to export.', 4000);
+    const folderPaths = _txGetSelectedFolderPaths();
+    if (folderPaths.length === 0) {
+      showMessage('Select at least one folder to export.', 4000);
       return;
     }
+    const scope = { folderPaths };
 
-    const exportBtn  = document.getElementById('txExportBtn');
-    const previewBtn = document.getElementById('txPreviewBtn');
+    const exportBtn  = _txEl('txExportBtn');
+    const previewBtn = _txEl('txPreviewBtn');
     if (exportBtn)  exportBtn.disabled  = true;
     if (previewBtn) previewBtn.disabled = true;
 
-    // Determine operator name from current user
     let operatorName = null;
     try {
-      const users = await window.api.listUsers();
+      const users  = await window.api.listUsers();
       const lastId = await window.api.getLastActiveUserId?.() ?? null;
-      const user = users?.find(u => u.id === lastId);
+      const user   = users?.find(u => u.id === lastId);
       if (user) operatorName = user.name;
     } catch {}
 
@@ -10236,7 +10416,7 @@ document.addEventListener('keydown', e => {
         'busy':                  'An export is already running.',
         'nas-not-set':           'Active Archive Root is not set.',
         'transfer-root-not-set': 'Transfer Drive is not set.',
-        'empty-scope':           'Select at least one collection.',
+        'empty-scope':           'Select at least one folder.',
         'roots-overlap':         'Transfer Drive must not overlap with the Active Archive.',
       };
       showMessage(msgs[result.reason] || ('Export error: ' + result.reason), 6000);
@@ -10245,8 +10425,136 @@ document.addEventListener('keydown', e => {
       return;
     }
 
+    _txLastScope = scope;
+    _txEl('txResumeOffer')?.setAttribute('hidden', '');
     _txRunning = true;
+    _txSetButtonPhase('running');
     _txStartPoll();
+  }
+
+  // ── Resume from checkpoint ────────────────────────────────────────────────
+
+  async function _txResumeFromCheckpoint() {
+    _txEl('txResumeOffer')?.setAttribute('hidden', '');
+
+    let operatorName = null;
+    try {
+      const users  = await window.api.listUsers();
+      const lastId = await window.api.getLastActiveUserId?.() ?? null;
+      const user   = users?.find(u => u.id === lastId);
+      if (user) operatorName = user.name;
+    } catch {}
+
+    let result;
+    try { result = await window.api.resumeTransferExportFromCheckpoint(operatorName); } catch (e) {
+      showMessage('Resume failed: ' + e.message, 6000);
+      return;
+    }
+
+    if (!result || !result.ok) {
+      showMessage('Could not resume: ' + (result?.reason || 'unknown'), 6000);
+      return;
+    }
+
+    _txRunning = true;
+    _txSetButtonPhase('running');
+    _txStartPoll();
+  }
+
+  async function _txStartFresh() {
+    _txEl('txResumeOffer')?.setAttribute('hidden', '');
+    await window.api.clearTransferExportCheckpoint().catch(() => {});
+    _txSetButtonPhase('idle');
+  }
+
+  // ── Pause / Resume inline ─────────────────────────────────────────────────
+
+  async function _txPause() {
+    await window.api.pauseTransferExport().catch(() => {});
+  }
+
+  async function _txResumeInline() {
+    await window.api.resumeTransferExport().catch(() => {});
+    _txSetButtonPhase('running');
+  }
+
+  // ── Verify checksum ───────────────────────────────────────────────────────
+
+  async function _txVerify() {
+    if (_txVerifying) return;
+    const scope = _txLastScope;
+    if (!scope) { showMessage('Run a preview first to set the scope.', 4000); return; }
+
+    _txVerifying = true;
+    const verifyBtn     = _txEl('txVerifyBtn');
+    const verifyEl      = _txEl('txVerifyResult');
+    const progressWrap  = _txEl('txProgressWrap');
+    const progressFill  = _txEl('txProgressFill');
+    const progressLabel = _txEl('txProgressLabel');
+
+    if (verifyBtn) { verifyBtn.disabled = true; verifyBtn.textContent = 'Verifying…'; }
+
+    // Reset progress bar for checksum use
+    if (progressWrap) {
+      progressWrap.removeAttribute('hidden');
+      if (progressFill)  progressFill.style.width = '0%';
+      if (progressLabel) progressLabel.textContent = 'Checksum 0 / 0';
+    }
+
+    if (verifyEl) {
+      verifyEl.removeAttribute('hidden');
+      verifyEl.className   = 'tx-verify-result';
+      verifyEl.textContent = 'Checksum verification\nStarting…';
+    }
+
+    // Poll verify progress while the IPC call runs (await does not block setInterval)
+    const verifyPoll = setInterval(async () => {
+      const st = await window.api.getTransferExportStatus().catch(() => null);
+      if (!st || st.verifyStatus !== 'verifying') return;
+      if (!verifyEl) return;
+      const done    = st.verifyDone    || 0;
+      const total   = st.verifyTotal   || 0;
+      const failed  = st.verifyFailed  || 0;
+      const missing = st.verifyMissing || 0;
+
+      const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
+      if (progressFill)  progressFill.style.width = pct + '%';
+      if (progressLabel) progressLabel.textContent = `Checksum ${done.toLocaleString()} / ${total.toLocaleString()}`;
+
+      let text = `Checksum verification\n${done.toLocaleString()} / ${total.toLocaleString()} selected files verified`;
+      if (st.verifyCurrent) text += `\nCurrent: ${st.verifyCurrent}`;
+      text += `\nFailed: ${failed} · Missing: ${missing}`;
+      verifyEl.className   = 'tx-verify-result';
+      verifyEl.textContent = text;
+    }, 800);
+
+    let result;
+    try { result = await window.api.verifyTransferExport(scope); } catch (e) {
+      result = { ok: false, error: e.message };
+    }
+
+    clearInterval(verifyPoll);
+    _txVerifying = false;
+    if (verifyBtn) { verifyBtn.disabled = false; verifyBtn.textContent = 'Verify Checksum'; }
+    if (progressWrap) progressWrap.setAttribute('hidden', '');
+
+    if (!verifyEl) return;
+    verifyEl.removeAttribute('hidden');
+
+    if (!result || !result.ok) {
+      verifyEl.className   = 'tx-verify-result fail';
+      verifyEl.textContent = 'Checksum error: ' + (result?.error || result?.reason || 'unknown');
+      return;
+    }
+
+    const totalFiles = (result.verified || 0) + (result.failed || 0) + (result.missing || 0);
+    if (result.status === 'verified') {
+      verifyEl.className   = 'tx-verify-result ok';
+      verifyEl.textContent = `Checksum: Verified — ${result.verified.toLocaleString()} / ${totalFiles.toLocaleString()} selected files`;
+    } else {
+      verifyEl.className   = 'tx-verify-result fail';
+      verifyEl.textContent = `Checksum: Partial — ${result.verified.toLocaleString()} verified · ${result.failed} failed · ${result.missing} missing`;
+    }
   }
 
   // ── Status polling ────────────────────────────────────────────────────────
@@ -10260,12 +10568,8 @@ document.addEventListener('keydown', e => {
       if (!status.running) {
         _txStopPoll();
         _txRunning = false;
-        const exportBtn  = document.getElementById('txExportBtn');
-        const previewBtn = document.getElementById('txPreviewBtn');
-        if (exportBtn)  exportBtn.disabled  = false;
-        if (previewBtn) previewBtn.disabled = false;
       }
-    }, 1000);
+    }, 800);
   }
 
   function _txStopPoll() {
@@ -10273,36 +10577,70 @@ document.addEventListener('keydown', e => {
   }
 
   function _txApplyStatus(status) {
-    const box = document.getElementById('txStatusBox');
+    const box = _txEl('txStatusBox');
     if (!box) return;
     box.removeAttribute('hidden');
+
+    // Box class
     box.className = 'tx-status-box';
-    if (status.running) box.classList.add('tx-running');
-    else if (status.result?.ok)  box.classList.add('tx-done');
-    else if (status.result)      box.classList.add('tx-error');
-    else box.classList.add('tx-idle');
+    if (status.paused)          box.classList.add('tx-paused');
+    else if (status.running)    box.classList.add('tx-running');
+    else if (status.result?.ok) box.classList.add('tx-done');
+    else if (status.result)     box.classList.add('tx-error');
+    else                        box.classList.add('tx-idle');
 
-    document.getElementById('txStCopied').textContent  = status.copied  ?? 0;
-    document.getElementById('txStSkipped').textContent = status.skipped ?? 0;
-    document.getElementById('txStRenamed').textContent = status.renamed ?? 0;
-    document.getElementById('txStErrors').textContent  = status.result?.errorCount ?? status.errors?.length ?? 0;
-
-    const currEl = document.getElementById('txStCurrent');
-    if (currEl) currEl.textContent = status.running ? (status.current || '…') : '';
-
-    const noteEl = document.getElementById('txFooterNote');
-    if (noteEl) {
-      if (status.running) {
-        noteEl.textContent = 'Export in progress…';
-      } else if (status.result?.ok) {
-        noteEl.textContent = status.result.status === 'partial'
-          ? 'Completed with errors.'
-          : 'Export complete.';
-      } else if (status.result) {
-        noteEl.textContent = 'Export failed.';
+    // Batch info
+    const batchInfoEl = _txEl('txBatchInfo');
+    if (batchInfoEl) {
+      if (status.running && status.batchCount > 0) {
+        batchInfoEl.textContent = `Batch ${status.batchIndex + 1} / ${status.batchCount}: ${status.batchName || ''}`;
       } else {
-        noteEl.textContent = 'Active Archive → Transfer Drive';
+        batchInfoEl.textContent = '';
       }
+    }
+
+    // Progress bar
+    const progressWrap = _txEl('txProgressWrap');
+    const progressFill = _txEl('txProgressFill');
+    const progressLabel = _txEl('txProgressLabel');
+    if (progressWrap && status.total > 0) {
+      progressWrap.removeAttribute('hidden');
+      const done = (status.copied || 0) + (status.skipped || 0) + (status.renamed || 0);
+      const pct  = Math.min(100, Math.round((done / status.total) * 100));
+      if (progressFill)  progressFill.style.width = pct + '%';
+      if (progressLabel) progressLabel.textContent = `${done.toLocaleString()} / ${status.total.toLocaleString()}`;
+    } else if (progressWrap) {
+      progressWrap.setAttribute('hidden', '');
+    }
+
+    // Counters
+    _txEl('txStCopied').textContent  = status.copied  ?? 0;
+    _txEl('txStSkipped').textContent = status.skipped ?? 0;
+    _txEl('txStRenamed').textContent = status.renamed ?? 0;
+    _txEl('txStErrors').textContent  = status.result?.errorCount ?? status.errors?.length ?? 0;
+
+    // Current file
+    const currEl = _txEl('txStCurrent');
+    if (currEl) currEl.textContent = (status.running || status.paused) ? (status.current || '…') : '';
+
+    // Footer note + button phase
+    const noteEl = _txEl('txFooterNote');
+    if (status.paused) {
+      if (noteEl) noteEl.textContent = 'Export paused.';
+      _txSetButtonPhase('paused');
+    } else if (status.running) {
+      if (noteEl) noteEl.textContent = 'Export in progress…';
+      _txSetButtonPhase('running');
+    } else if (status.result?.ok) {
+      const isPartial = status.result.status === 'partial';
+      if (noteEl) noteEl.textContent = isPartial ? 'Completed with errors.' : 'Export complete.';
+      _txSetButtonPhase(isPartial ? 'failed' : 'done');
+    } else if (status.result) {
+      if (noteEl) noteEl.textContent = 'Export failed.';
+      _txSetButtonPhase('failed');
+    } else {
+      if (noteEl) noteEl.textContent = 'Active Archive → Transfer Drive';
+      _txSetButtonPhase('idle');
     }
   }
 
@@ -10313,107 +10651,140 @@ document.addEventListener('keydown', e => {
     _txOpen();
   });
 
-  document.getElementById('txCloseBtn')?.addEventListener('click', () => { if (!_txRunning) _txClose(); });
-  document.getElementById('txDoneBtn')?.addEventListener('click', _txClose);
+  _txEl('txCloseBtn')?.addEventListener('click', () => { if (!_txRunning) _txClose(); });
+  _txEl('txDoneBtn')?.addEventListener('click', _txClose);
 
-  document.getElementById('transferExportModal')?.addEventListener('click', e => {
-    if (e.target === document.getElementById('transferExportModal') && !_txRunning) _txClose();
+  _txEl('transferExportModal')?.addEventListener('click', e => {
+    if (e.target === _txEl('transferExportModal') && !_txRunning) _txClose();
   });
 
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && document.getElementById('transferExportModal')?.classList.contains('open')) {
+    if (e.key === 'Escape' && _txEl('transferExportModal')?.classList.contains('open')) {
       if (!_txRunning) _txClose();
     }
   });
 
-  document.getElementById('txChooseDriveBtn')?.addEventListener('click', async () => {
+  _txEl('txChooseDriveBtn')?.addEventListener('click', async () => {
     const chosen = normalizePickedPath(await window.api.chooseTransferRoot());
     if (!chosen) return;
-    const driveEl = document.getElementById('txDrivePath');
+    const driveEl = _txEl('txDrivePath');
     if (driveEl) { driveEl.textContent = chosen; driveEl.classList.remove('tx-unset'); }
-    // Reset preview and status after drive change
-    document.getElementById('txPreviewBox')?.setAttribute('hidden', '');
-    document.getElementById('txStatusBox')?.setAttribute('hidden', '');
-    document.getElementById('txExportBtn').disabled = true;
+    _txEl('txPreviewBox')?.setAttribute('hidden', '');
+    _txEl('txStatusBox')?.setAttribute('hidden', '');
+    _txEl('txResumeOffer')?.setAttribute('hidden', '');
+    _txEl('txExportBtn').disabled = true;
+    _txLastScope = null;
   });
 
-  document.getElementById('txSelectAllBtn')?.addEventListener('click', () => {
-    document.querySelectorAll('.tx-coll-cb').forEach(cb => { cb.checked = true; });
+  _txEl('txSelectAllBtn')?.addEventListener('click', () => {
+    const treeEl = _txEl('txScopeTree');
+    if (!treeEl) return;
+    treeEl.querySelectorAll('.tx-cb-coll,.tx-cb-ev,.tx-cb-fold').forEach(cb => { cb.checked = true; cb.indeterminate = false; });
+    _txInvalidatePreview();
+  });
+  _txEl('txSelectNoneBtn')?.addEventListener('click', () => {
+    const treeEl = _txEl('txScopeTree');
+    if (!treeEl) return;
+    treeEl.querySelectorAll('.tx-cb-coll,.tx-cb-ev,.tx-cb-fold').forEach(cb => { cb.checked = false; cb.indeterminate = false; });
+    _txInvalidatePreview();
   });
 
-  document.getElementById('txSelectNoneBtn')?.addEventListener('click', () => {
-    document.querySelectorAll('.tx-coll-cb').forEach(cb => { cb.checked = false; });
-  });
-
-  document.getElementById('txPreviewBtn')?.addEventListener('click', _txPreview);
-  document.getElementById('txExportBtn')?.addEventListener('click', _txStartExport);
+  _txEl('txPreviewBtn')?.addEventListener('click',      _txPreview);
+  _txEl('txExportBtn')?.addEventListener('click',       _txStartExport);
+  _txEl('txPauseBtn')?.addEventListener('click',        _txPause);
+  _txEl('txResumeInlineBtn')?.addEventListener('click', _txResumeInline);
+  _txEl('txVerifyBtn')?.addEventListener('click',       _txVerify);
+  _txEl('txResumeBtn')?.addEventListener('click',       _txResumeFromCheckpoint);
+  _txEl('txStartFreshBtn')?.addEventListener('click',   _txStartFresh);
 
 })();
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Transfer Import modal
+// Transfer Import modal (Phase 11 — staggered batch import with pause/resume)
 // ─────────────────────────────────────────────────────────────────────────────
 
 (function () {
   // ── State ────────────────────────────────────────────────────────────────
 
-  let _tiCollections = [];    // { name, path } from Transfer Drive scan
+  let _tiCollections = [];
   let _tiPollTimer   = null;
   let _tiRunning     = false;
+  let _tiLastScope   = null;
+  let _tiVerifying   = false;
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  function _tiEl(id) { return document.getElementById(id); }
+
+  function _tiSetButtonPhase(phase) {
+    // phase: 'idle' | 'running' | 'paused' | 'done' | 'failed'
+    const importBtn     = _tiEl('tiImportBtn');
+    const pauseBtn      = _tiEl('tiPauseBtn');
+    const resumeInline  = _tiEl('tiResumeInlineBtn');
+    const verifyBtn     = _tiEl('tiVerifyBtn');
+    if (!importBtn) return;
+
+    importBtn.hidden    = phase !== 'idle';
+    importBtn.disabled  = phase !== 'idle';
+    pauseBtn.hidden     = phase !== 'running';
+    resumeInline.hidden = phase !== 'paused';
+    verifyBtn.hidden    = phase !== 'done';
+  }
 
   // ── Open / Close ─────────────────────────────────────────────────────────
 
   function _tiClose() {
-    document.getElementById('transferImportModal')?.classList.remove('open');
+    _tiEl('transferImportModal')?.classList.remove('open');
     document.body.style.overflow = '';
     _tiStopPoll();
-    _tiRunning = false;
+    _tiRunning   = false;
+    _tiVerifying = false;
   }
 
   async function _tiOpen() {
-    const overlay = document.getElementById('transferImportModal');
+    const overlay = _tiEl('transferImportModal');
     if (!overlay || overlay.classList.contains('open')) return;
 
     // Populate Transfer Drive path (read-only display)
     const savedTransferRoot = await window.api.getTransferRoot().catch(() => null);
-    const driveEl = document.getElementById('tiDrivePath');
+    const driveEl = _tiEl('tiDrivePath');
     if (driveEl) {
-      if (savedTransferRoot) {
-        driveEl.textContent = savedTransferRoot;
-        driveEl.classList.remove('tx-unset');
-      } else {
-        driveEl.textContent = 'Not set';
-        driveEl.classList.add('tx-unset');
-      }
+      driveEl.textContent = savedTransferRoot || 'Not set';
+      driveEl.classList.toggle('tx-unset', !savedTransferRoot);
     }
 
     // Populate Main Archive Root path (read-only display)
-    const status = await window.api.getArchiveOperationsStatus().catch(() => null);
-    const mainEl = document.getElementById('tiMainArchivePath');
+    const opsStatus = await window.api.getArchiveOperationsStatus().catch(() => null);
+    const mainEl = _tiEl('tiMainArchivePath');
     if (mainEl) {
-      const mar = status?.mainArchiveRoot;
-      if (mar) {
-        mainEl.textContent = mar;
-        mainEl.classList.remove('tx-unset');
-      } else {
-        mainEl.textContent = 'Not set';
-        mainEl.classList.add('tx-unset');
-      }
+      const mar = opsStatus?.mainArchiveRoot;
+      mainEl.textContent = mar || 'Not set';
+      mainEl.classList.toggle('tx-unset', !mar);
     }
 
-    // Load Transfer Drive collections for scope selection
     await _tiLoadCollections();
 
-    // Restore last known import status (may be a running or completed import)
+    // Check for incomplete checkpoint
+    _tiEl('tiResumeOffer')?.setAttribute('hidden', '');
+    const checkpoint = await window.api.getTransferImportCheckpoint().catch(() => null);
+    if (checkpoint && checkpoint.status !== 'complete') {
+      const done  = checkpoint.batches?.filter(b => b.status === 'complete').length ?? 0;
+      const total = checkpoint.batches?.length ?? 0;
+      const msgEl = _tiEl('tiResumeMsg');
+      if (msgEl) msgEl.textContent = `A previous import was interrupted (${done} / ${total} batches done).`;
+      _tiEl('tiResumeOffer')?.removeAttribute('hidden');
+    }
+
     const importStatus = await window.api.getTransferImportStatus().catch(() => null);
-    if (importStatus && (importStatus.running || importStatus.result)) {
+    if (importStatus && (importStatus.running || importStatus.paused || importStatus.result)) {
       _tiApplyStatus(importStatus);
-      if (importStatus.running) {
+      if (importStatus.running && !importStatus.paused) {
         _tiRunning = true;
         _tiStartPoll();
       }
     } else {
-      document.getElementById('tiStatusBox')?.setAttribute('hidden', '');
+      _tiEl('tiStatusBox')?.setAttribute('hidden', '');
+      _tiSetButtonPhase('idle');
     }
 
     overlay.classList.add('open');
@@ -10423,7 +10794,7 @@ document.addEventListener('keydown', e => {
   // ── Scope list ────────────────────────────────────────────────────────────
 
   async function _tiLoadCollections() {
-    const listEl = document.getElementById('tiScopeList');
+    const listEl = _tiEl('tiScopeList');
     if (!listEl) return;
 
     let result;
@@ -10456,11 +10827,9 @@ document.addEventListener('keydown', e => {
   }
 
   function _tiGetSelectedCollectionPaths() {
-    const checkboxes = document.querySelectorAll('.ti-coll-cb:checked');
-    return Array.from(checkboxes).map(cb => {
-      const idx = parseInt(cb.dataset.idx, 10);
-      return _tiCollections[idx]?.path;
-    }).filter(Boolean);
+    return Array.from(document.querySelectorAll('.ti-coll-cb:checked'))
+      .map(cb => _tiCollections[parseInt(cb.dataset.idx, 10)]?.path)
+      .filter(Boolean);
   }
 
   // ── Preview ───────────────────────────────────────────────────────────────
@@ -10472,18 +10841,18 @@ document.addEventListener('keydown', e => {
       return;
     }
 
-    const previewBtn = document.getElementById('tiPreviewBtn');
-    const importBtn  = document.getElementById('tiImportBtn');
+    const previewBtn = _tiEl('tiPreviewBtn');
+    const importBtn  = _tiEl('tiImportBtn');
     if (previewBtn) previewBtn.disabled = true;
     if (importBtn)  importBtn.disabled  = true;
 
-    const previewBox = document.getElementById('tiPreviewBox');
+    const previewBox = _tiEl('tiPreviewBox');
     if (previewBox) {
       previewBox.removeAttribute('hidden');
-      document.getElementById('tiPvCollections').textContent = '…';
-      document.getElementById('tiPvEvents').textContent      = '…';
-      document.getElementById('tiPvExternal').textContent    = '…';
-      document.getElementById('tiPvFiles').textContent       = '…';
+      _tiEl('tiPvCollections').textContent = '…';
+      _tiEl('tiPvEvents').textContent      = '…';
+      _tiEl('tiPvExternal').textContent    = '…';
+      _tiEl('tiPvFiles').textContent       = '…';
     }
 
     let result;
@@ -10508,11 +10877,12 @@ document.addEventListener('keydown', e => {
       return;
     }
 
-    document.getElementById('tiPvCollections').textContent = result.collections;
-    document.getElementById('tiPvEvents').textContent      = result.events;
-    document.getElementById('tiPvExternal').textContent    = result.externalFolders;
-    document.getElementById('tiPvFiles').textContent       = result.files.toLocaleString();
+    _tiEl('tiPvCollections').textContent = result.collections;
+    _tiEl('tiPvEvents').textContent      = result.events;
+    _tiEl('tiPvExternal').textContent    = result.externalFolders;
+    _tiEl('tiPvFiles').textContent       = result.files.toLocaleString();
 
+    _tiLastScope = scope;
     if (importBtn) importBtn.disabled = (result.files === 0);
   }
 
@@ -10525,8 +10895,8 @@ document.addEventListener('keydown', e => {
       return;
     }
 
-    const importBtn  = document.getElementById('tiImportBtn');
-    const previewBtn = document.getElementById('tiPreviewBtn');
+    const importBtn  = _tiEl('tiImportBtn');
+    const previewBtn = _tiEl('tiPreviewBtn');
     if (importBtn)  importBtn.disabled  = true;
     if (previewBtn) previewBtn.disabled = true;
 
@@ -10561,8 +10931,100 @@ document.addEventListener('keydown', e => {
       return;
     }
 
+    _tiLastScope = scope;
+    _tiEl('tiResumeOffer')?.setAttribute('hidden', '');
     _tiRunning = true;
+    _tiSetButtonPhase('running');
     _tiStartPoll();
+  }
+
+  // ── Resume from checkpoint ────────────────────────────────────────────────
+
+  async function _tiResumeFromCheckpoint() {
+    _tiEl('tiResumeOffer')?.setAttribute('hidden', '');
+
+    let operatorName = null;
+    try {
+      const users  = await window.api.listUsers();
+      const lastId = await window.api.getLastActiveUserId?.() ?? null;
+      const user   = users?.find(u => u.id === lastId);
+      if (user) operatorName = user.name;
+    } catch {}
+
+    let result;
+    try { result = await window.api.resumeTransferImportFromCheckpoint(operatorName); } catch (e) {
+      showMessage('Resume failed: ' + e.message, 6000);
+      return;
+    }
+
+    if (!result || !result.ok) {
+      showMessage('Could not resume: ' + (result?.reason || 'unknown'), 6000);
+      return;
+    }
+
+    _tiRunning = true;
+    _tiSetButtonPhase('running');
+    _tiStartPoll();
+  }
+
+  async function _tiStartFresh() {
+    _tiEl('tiResumeOffer')?.setAttribute('hidden', '');
+    await window.api.clearTransferImportCheckpoint().catch(() => {});
+    _tiSetButtonPhase('idle');
+  }
+
+  // ── Pause / Resume inline ─────────────────────────────────────────────────
+
+  async function _tiPause() {
+    await window.api.pauseTransferImport().catch(() => {});
+  }
+
+  async function _tiResumeInline() {
+    await window.api.resumeTransferImport().catch(() => {});
+    _tiSetButtonPhase('running');
+  }
+
+  // ── Verify checksum ───────────────────────────────────────────────────────
+
+  async function _tiVerify() {
+    if (_tiVerifying) return;
+    const scope = _tiLastScope;
+    if (!scope) { showMessage('Run a preview first to set the scope.', 4000); return; }
+
+    _tiVerifying = true;
+    const verifyBtn = _tiEl('tiVerifyBtn');
+    if (verifyBtn) { verifyBtn.disabled = true; verifyBtn.textContent = 'Verifying…'; }
+
+    const verifyEl = _tiEl('tiVerifyResult');
+    if (verifyEl) { verifyEl.removeAttribute('hidden'); verifyEl.className = 'tx-verify-result'; verifyEl.textContent = 'Comparing checksums…'; }
+
+    let result;
+    try { result = await window.api.verifyTransferImport(scope); } catch (e) {
+      result = { ok: false, error: e.message };
+    }
+
+    _tiVerifying = false;
+    if (verifyBtn) { verifyBtn.disabled = false; verifyBtn.textContent = 'Verify Checksum'; }
+
+    if (!verifyEl) return;
+    verifyEl.removeAttribute('hidden');
+
+    if (!result || !result.ok) {
+      verifyEl.className   = 'tx-verify-result fail';
+      verifyEl.textContent = 'Verification error: ' + (result?.error || result?.reason || 'unknown');
+      return;
+    }
+
+    if (result.status === 'verified') {
+      verifyEl.className   = 'tx-verify-result ok';
+      verifyEl.textContent = `Verified — ${result.verified.toLocaleString()} files matched.`;
+    } else {
+      verifyEl.className   = 'tx-verify-result fail';
+      const parts = [];
+      if (result.failed  > 0) parts.push(`${result.failed} failed`);
+      if (result.missing > 0) parts.push(`${result.missing} missing`);
+      verifyEl.textContent = `Verification issues: ${parts.join(', ')} (${result.verified} ok).`;
+    }
   }
 
   // ── Status polling ────────────────────────────────────────────────────────
@@ -10573,15 +11035,11 @@ document.addEventListener('keydown', e => {
       const status = await window.api.getTransferImportStatus().catch(() => null);
       if (!status) return;
       _tiApplyStatus(status);
-      if (!status.running) {
+      if (!status.running && !status.paused) {
         _tiStopPoll();
         _tiRunning = false;
-        const importBtn  = document.getElementById('tiImportBtn');
-        const previewBtn = document.getElementById('tiPreviewBtn');
-        if (importBtn)  importBtn.disabled  = false;
-        if (previewBtn) previewBtn.disabled = false;
       }
-    }, 1000);
+    }, 800);
   }
 
   function _tiStopPoll() {
@@ -10589,36 +11047,70 @@ document.addEventListener('keydown', e => {
   }
 
   function _tiApplyStatus(status) {
-    const box = document.getElementById('tiStatusBox');
+    const box = _tiEl('tiStatusBox');
     if (!box) return;
     box.removeAttribute('hidden');
+
+    // Box class
     box.className = 'tx-status-box';
-    if (status.running)        box.classList.add('tx-running');
+    if (status.paused)          box.classList.add('tx-paused');
+    else if (status.running)    box.classList.add('tx-running');
     else if (status.result?.ok) box.classList.add('tx-done');
-    else if (status.result)    box.classList.add('tx-error');
-    else                       box.classList.add('tx-idle');
+    else if (status.result)     box.classList.add('tx-error');
+    else                        box.classList.add('tx-idle');
 
-    document.getElementById('tiStCopied').textContent  = status.copied  ?? 0;
-    document.getElementById('tiStSkipped').textContent = status.skipped ?? 0;
-    document.getElementById('tiStRenamed').textContent = status.renamed ?? 0;
-    document.getElementById('tiStErrors').textContent  = status.result?.errorCount ?? status.errors?.length ?? 0;
-
-    const currEl = document.getElementById('tiStCurrent');
-    if (currEl) currEl.textContent = status.running ? (status.current || '…') : '';
-
-    const noteEl = document.getElementById('tiFooterNote');
-    if (noteEl) {
-      if (status.running) {
-        noteEl.textContent = 'Import in progress…';
-      } else if (status.result?.ok) {
-        noteEl.textContent = status.result.status === 'partial'
-          ? 'Completed with errors.'
-          : 'Import complete.';
-      } else if (status.result) {
-        noteEl.textContent = 'Import failed.';
+    // Batch info
+    const batchInfoEl = _tiEl('tiBatchInfo');
+    if (batchInfoEl) {
+      if (status.running && status.batchCount > 0) {
+        batchInfoEl.textContent = `Batch ${status.batchIndex + 1} / ${status.batchCount}: ${status.batchName || ''}`;
       } else {
-        noteEl.textContent = 'Transfer Drive → Main Archive Root';
+        batchInfoEl.textContent = '';
       }
+    }
+
+    // Progress bar
+    const progressWrap  = _tiEl('tiProgressWrap');
+    const progressFill  = _tiEl('tiProgressFill');
+    const progressLabel = _tiEl('tiProgressLabel');
+    if (progressWrap && status.total > 0) {
+      progressWrap.removeAttribute('hidden');
+      const done = (status.copied || 0) + (status.skipped || 0) + (status.renamed || 0);
+      const pct  = Math.min(100, Math.round((done / status.total) * 100));
+      if (progressFill)  progressFill.style.width = pct + '%';
+      if (progressLabel) progressLabel.textContent = `${done.toLocaleString()} / ${status.total.toLocaleString()}`;
+    } else if (progressWrap) {
+      progressWrap.setAttribute('hidden', '');
+    }
+
+    // Counters
+    _tiEl('tiStCopied').textContent  = status.copied  ?? 0;
+    _tiEl('tiStSkipped').textContent = status.skipped ?? 0;
+    _tiEl('tiStRenamed').textContent = status.renamed ?? 0;
+    _tiEl('tiStErrors').textContent  = status.result?.errorCount ?? status.errors?.length ?? 0;
+
+    // Current file
+    const currEl = _tiEl('tiStCurrent');
+    if (currEl) currEl.textContent = (status.running || status.paused) ? (status.current || '…') : '';
+
+    // Footer note + button phase
+    const noteEl = _tiEl('tiFooterNote');
+    if (status.paused) {
+      if (noteEl) noteEl.textContent = 'Import paused.';
+      _tiSetButtonPhase('paused');
+    } else if (status.running) {
+      if (noteEl) noteEl.textContent = 'Import in progress…';
+      _tiSetButtonPhase('running');
+    } else if (status.result?.ok) {
+      const isPartial = status.result.status === 'partial';
+      if (noteEl) noteEl.textContent = isPartial ? 'Completed with errors.' : 'Import complete.';
+      _tiSetButtonPhase(isPartial ? 'failed' : 'done');
+    } else if (status.result) {
+      if (noteEl) noteEl.textContent = 'Import failed.';
+      _tiSetButtonPhase('failed');
+    } else {
+      if (noteEl) noteEl.textContent = 'Transfer Drive → Main Archive Root';
+      _tiSetButtonPhase('idle');
     }
   }
 
@@ -10629,29 +11121,29 @@ document.addEventListener('keydown', e => {
     _tiOpen();
   });
 
-  document.getElementById('tiCloseBtn')?.addEventListener('click', () => { if (!_tiRunning) _tiClose(); });
-  document.getElementById('tiDoneBtn')?.addEventListener('click', _tiClose);
+  _tiEl('tiCloseBtn')?.addEventListener('click', () => { if (!_tiRunning) _tiClose(); });
+  _tiEl('tiDoneBtn')?.addEventListener('click', _tiClose);
 
-  document.getElementById('transferImportModal')?.addEventListener('click', e => {
-    if (e.target === document.getElementById('transferImportModal') && !_tiRunning) _tiClose();
+  _tiEl('transferImportModal')?.addEventListener('click', e => {
+    if (e.target === _tiEl('transferImportModal') && !_tiRunning) _tiClose();
   });
 
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && document.getElementById('transferImportModal')?.classList.contains('open')) {
+    if (e.key === 'Escape' && _tiEl('transferImportModal')?.classList.contains('open')) {
       if (!_tiRunning) _tiClose();
     }
   });
 
-  document.getElementById('tiSelectAllBtn')?.addEventListener('click', () => {
-    document.querySelectorAll('.ti-coll-cb').forEach(cb => { cb.checked = true; });
-  });
+  _tiEl('tiSelectAllBtn')?.addEventListener('click',  () => { document.querySelectorAll('.ti-coll-cb').forEach(cb => { cb.checked = true;  }); });
+  _tiEl('tiSelectNoneBtn')?.addEventListener('click', () => { document.querySelectorAll('.ti-coll-cb').forEach(cb => { cb.checked = false; }); });
 
-  document.getElementById('tiSelectNoneBtn')?.addEventListener('click', () => {
-    document.querySelectorAll('.ti-coll-cb').forEach(cb => { cb.checked = false; });
-  });
-
-  document.getElementById('tiPreviewBtn')?.addEventListener('click', _tiPreview);
-  document.getElementById('tiImportBtn')?.addEventListener('click', _tiStartImport);
+  _tiEl('tiPreviewBtn')?.addEventListener('click',        _tiPreview);
+  _tiEl('tiImportBtn')?.addEventListener('click',         _tiStartImport);
+  _tiEl('tiPauseBtn')?.addEventListener('click',          _tiPause);
+  _tiEl('tiResumeInlineBtn')?.addEventListener('click',   _tiResumeInline);
+  _tiEl('tiVerifyBtn')?.addEventListener('click',         _tiVerify);
+  _tiEl('tiResumeBtn')?.addEventListener('click',         _tiResumeFromCheckpoint);
+  _tiEl('tiStartFreshBtn')?.addEventListener('click',     _tiStartFresh);
 
 })();
 

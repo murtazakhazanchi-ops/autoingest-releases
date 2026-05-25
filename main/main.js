@@ -3106,6 +3106,12 @@ ipcMain.handle('archive:validateTransferRoot', async (_event, dirPath) => {
   }
 });
 
+ipcMain.handle('archive:getTransferExportTree', async () => {
+  const nasRoot = settings.getNasRoot();
+  if (!nasRoot) return { ok: false, reason: 'nas-not-set' };
+  return transferExportService.scanExportTree(nasRoot);
+});
+
 ipcMain.handle('archive:previewTransferExport', async (_event, { scope } = {}) => {
   const nasRoot      = settings.getNasRoot();
   const transferRoot = settings.getTransferRoot();
@@ -3126,6 +3132,40 @@ ipcMain.handle('archive:runTransferExport', async (_event, { scope, operatorName
 });
 
 ipcMain.handle('archive:getTransferExportStatus', () => transferExportService.getExportStatus());
+
+ipcMain.handle('archive:pauseTransferExport',  () => transferExportService.pauseExport());
+ipcMain.handle('archive:resumeTransferExport', () => transferExportService.resumeExport());
+
+ipcMain.handle('archive:getTransferExportCheckpoint', async () => {
+  const transferRoot = settings.getTransferRoot();
+  if (!transferRoot) return null;
+  return transferExportService.getExportCheckpoint(transferRoot);
+});
+
+ipcMain.handle('archive:clearTransferExportCheckpoint', async () => {
+  const transferRoot = settings.getTransferRoot();
+  if (!transferRoot) return { ok: false, reason: 'transfer-root-not-set' };
+  return transferExportService.clearExportCheckpoint(transferRoot);
+});
+
+ipcMain.handle('archive:resumeTransferExportFromCheckpoint', async (_event, { operatorName } = {}) => {
+  const nasRoot      = settings.getNasRoot();
+  const transferRoot = settings.getTransferRoot();
+  if (!nasRoot)      return { ok: false, reason: 'nas-not-set' };
+  if (!transferRoot) return { ok: false, reason: 'transfer-root-not-set' };
+  return transferExportService.resumeExportFromCheckpoint(nasRoot, transferRoot, {
+    operatorName: operatorName || null,
+    deviceName:   os.hostname(),
+  });
+});
+
+ipcMain.handle('archive:verifyTransferExport', async (_event, { scope } = {}) => {
+  const nasRoot      = settings.getNasRoot();
+  const transferRoot = settings.getTransferRoot();
+  if (!nasRoot)      return { ok: false, reason: 'nas-not-set' };
+  if (!transferRoot) return { ok: false, reason: 'transfer-root-not-set' };
+  return transferExportService.verifyExport(nasRoot, transferRoot, scope);
+});
 
 // ── Transfer Import ───────────────────────────────────────────────────────────
 
@@ -3155,6 +3195,40 @@ ipcMain.handle('archive:runTransferImport', async (_event, { scope, operatorName
 });
 
 ipcMain.handle('archive:getTransferImportStatus', () => transferImportService.getImportStatus());
+
+ipcMain.handle('archive:pauseTransferImport',  () => transferImportService.pauseImport());
+ipcMain.handle('archive:resumeTransferImport', () => transferImportService.resumeImport());
+
+ipcMain.handle('archive:getTransferImportCheckpoint', async () => {
+  const mainArchiveRoot = settings.getMainArchiveRoot();
+  if (!mainArchiveRoot) return null;
+  return transferImportService.getImportCheckpoint(mainArchiveRoot);
+});
+
+ipcMain.handle('archive:clearTransferImportCheckpoint', async () => {
+  const mainArchiveRoot = settings.getMainArchiveRoot();
+  if (!mainArchiveRoot) return { ok: false, reason: 'main-archive-not-set' };
+  return transferImportService.clearImportCheckpoint(mainArchiveRoot);
+});
+
+ipcMain.handle('archive:resumeTransferImportFromCheckpoint', async (_event, { operatorName } = {}) => {
+  const transferRoot    = settings.getTransferRoot();
+  const mainArchiveRoot = settings.getMainArchiveRoot();
+  if (!transferRoot)    return { ok: false, reason: 'transfer-root-not-set' };
+  if (!mainArchiveRoot) return { ok: false, reason: 'main-archive-not-set' };
+  return transferImportService.resumeImportFromCheckpoint(transferRoot, mainArchiveRoot, {
+    operatorName: operatorName || null,
+    deviceName:   os.hostname(),
+  });
+});
+
+ipcMain.handle('archive:verifyTransferImport', async (_event, { scope } = {}) => {
+  const transferRoot    = settings.getTransferRoot();
+  const mainArchiveRoot = settings.getMainArchiveRoot();
+  if (!transferRoot)    return { ok: false, reason: 'transfer-root-not-set' };
+  if (!mainArchiveRoot) return { ok: false, reason: 'main-archive-not-set' };
+  return transferImportService.verifyImport(transferRoot, mainArchiveRoot, scope);
+});
 
 // ── Archive Diagnostics (Phase 13A — read-only) ───────────────────────────────
 
