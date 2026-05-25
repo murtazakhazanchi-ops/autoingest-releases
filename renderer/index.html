@@ -345,6 +345,55 @@
     .status-dot--error { background: var(--red,    #ef4444); }
     .status-text { font-size: 13px; font-weight: 500; color: var(--text); }
 
+    /* ── Collection link status badges ── */
+    .ec-link-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; padding: 2px 7px; border-radius: 4px; white-space: nowrap; }
+    .ec-link-badge--linked        { background: rgba(34,197,94,0.15);  color: var(--green,  #22c55e); }
+    .ec-link-badge--offline-ready { background: rgba(34,197,94,0.12);  color: var(--green,  #22c55e); }
+    .ec-link-badge--provisional   { background: rgba(245,158,11,0.15); color: var(--yellow, #f59e0b); }
+    .ec-link-badge--stale-link    { background: rgba(239,68,68,0.12);  color: var(--red,    #ef4444); }
+    .ec-link-badge--unlinked-legacy { background: rgba(136,136,136,0.12); color: var(--subtext, #888); }
+    .ec-coll-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
+    .ec-coll-actions { display: flex; gap: 6px; align-items: center; }
+    .ec-coll-action-btn { font-size: 10px; font-weight: 600; letter-spacing: 0.03em; padding: 3px 9px; border-radius: 4px; border: 1px solid var(--border, #333); background: transparent; color: var(--subtext, #888); cursor: pointer; transition: background 0.15s, color 0.15s; white-space: nowrap; }
+    .ec-coll-action-btn:hover { background: var(--hover, rgba(255,255,255,0.06)); color: var(--text, #fff); }
+    .ec-coll-action-btn--primary { border-color: var(--accent, #3b82f6); color: var(--accent, #3b82f6); }
+    .ec-coll-action-btn--primary:hover { background: rgba(59,130,246,0.12); }
+
+    /* ── Event source tab bar (Create or Select Event modal) ── */
+    .ec-tab-bar { display: flex; gap: 2px; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border-subtle); flex-shrink: 0; }
+    .ec-tab { background: none; border: none; padding: 5px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); cursor: pointer; transition: color 0.12s, background 0.12s; letter-spacing: 0.02em; font-family: inherit; }
+    .ec-tab:hover { color: var(--text-secondary); background: var(--border-subtle); }
+    .ec-tab.ec-tab--active { color: var(--text-primary); background: var(--border-subtle); }
+    .ec-tab-panel[hidden] { display: none !important; }
+
+    /* ── Online Registry card (same shape as .ec-coll-card, distinct class) ── */
+    .ec-reg-card { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border-subtle); background: var(--card-bg); cursor: default; transition: border-color 0.12s, background 0.12s; }
+    .ec-reg-card:focus { outline: none; border-color: var(--accent-border); }
+
+    /* Sub-name line inside a registry event card */
+    .ec-coll-subname { font-size: 0.68rem; color: var(--text-muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* ── Registry status pills ── */
+    .ec-reg-pill { display: inline-flex; align-items: center; font-size: 10px; font-weight: 600; letter-spacing: 0.02em; padding: 2px 7px; border-radius: 10px; white-space: nowrap; }
+    .ec-reg-pill--available   { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
+    .ec-reg-pill--ready       { background: var(--success-soft); color: var(--success); }
+    .ec-reg-pill--needs-setup { background: rgba(249,226,175,0.14); color: var(--yellow); }
+    .ec-reg-pill--issue       { background: rgba(243,139,168,0.14); color: var(--red); }
+
+    /* ── Registry empty / loading states ── */
+    .ec-reg-empty { padding: 28px 0; text-align: center; }
+    .ec-reg-empty-title { font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; }
+    .ec-reg-empty-sub { font-size: 0.72rem; color: var(--text-muted); line-height: 1.5; }
+
+    /* ── Realtime status badge ── */
+    .header-section.realtime { padding: 0 12px; gap: 6px; flex-shrink: 0; }
+    .rt-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--subtext, #888); flex-shrink: 0; transition: background 0.3s; }
+    .rt-dot--connected    { background: var(--green,  #22c55e); }
+    .rt-dot--connecting   { background: var(--yellow, #f59e0b); }
+    .rt-dot--reconnecting { background: var(--yellow, #f59e0b); }
+    .rt-dot--offline      { background: var(--red,    #ef4444); }
+    .rt-label { font-size: 10px; font-weight: 500; color: var(--subtext); letter-spacing: 0.03em; text-transform: uppercase; white-space: nowrap; }
+
     /* Dividers */
     .hdr-divider { width: 1px; height: 24px; background: var(--divider-color); flex-shrink: 0; }
 
@@ -824,7 +873,7 @@
     /* drive-card-large and #noDriveMsg styled in landing dashboard section above */
 
     /* ── ACTIVITY LOG MODAL ──────────────────────── */
-    #eventMgmtModal .emm-box { width: min(1320px, calc(100vw - 48px)); }
+    #eventMgmtModal .emm-box { width: min(1320px, calc(100vw - 48px)); min-height: min(740px, calc(100vh - 80px)); }
 
     /* ── Archive Locations modal ── */
     #archiveLocationsModal .emm-box { width: min(560px, calc(100vw - 48px)); }
@@ -1079,14 +1128,14 @@
     .adopt-action-warnings { font-size: 10.5px; color: var(--yellow, #f59e0b); padding: 3px 0 0; }
 
     /* ── Archive Consistency Report modal (Phase 13D-1) ── */
-    #archiveConsistencyModal .emm-box { width: min(580px, calc(100vw - 48px)); max-height: calc(100vh - 100px); display: flex; flex-direction: column; }
+    #archiveConsistencyModal .emm-box { width: min(580px, calc(100vw - 48px)); max-height: calc(100vh - 100px); min-height: min(380px, calc(100vh - 100px)); display: flex; flex-direction: column; }
     .cr-body { flex: 1; overflow-y: auto; padding: 16px 24px 12px; display: flex; flex-direction: column; gap: 14px; }
     .cr-section { display: flex; flex-direction: column; gap: 5px; }
     .cr-section-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--subtext); padding-bottom: 4px; border-bottom: 1px solid var(--border); }
     .cr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
 
     /* ── Archive Completeness Checklist modal (Phase 13D-3) ── */
-    #archiveChecklistModal .emm-box { width: min(600px, calc(100vw - 48px)); max-height: calc(100vh - 100px); display: flex; flex-direction: column; }
+    #archiveChecklistModal .emm-box { width: min(600px, calc(100vw - 48px)); max-height: calc(100vh - 100px); min-height: min(380px, calc(100vh - 100px)); display: flex; flex-direction: column; }
     .cl-body { flex: 1; overflow-y: auto; padding: 16px 24px 12px; display: flex; flex-direction: column; gap: 12px; }
     .cl-readiness { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 12px; border-radius: 6px; }
     .cl-readiness-ready     { background: rgba(16,185,129,0.12); color: var(--green,  #10b981); }
@@ -1127,7 +1176,7 @@
     .cr-unavail { grid-column: 1 / -1; font-size: 11px; color: var(--yellow, #f59e0b); font-style: italic; }
 
     /* ── Archive Audit Timeline modal (Phase 13D-5) ── */
-    #archiveAuditModal .emm-box { width: min(620px, calc(100vw - 48px)); max-height: calc(100vh - 100px); display: flex; flex-direction: column; }
+    #archiveAuditModal .emm-box { width: min(620px, calc(100vw - 48px)); max-height: calc(100vh - 100px); min-height: min(380px, calc(100vh - 100px)); display: flex; flex-direction: column; }
     .at-body { flex: 1; overflow-y: auto; padding: 12px 20px 12px; display: flex; flex-direction: column; gap: 2px; }
     .at-source-warn { font-size: 11px; color: var(--yellow, #f59e0b); padding: 4px 0 6px; font-style: italic; }
     .at-empty { font-size: 11px; color: var(--subtext); padding: 8px 0; }
@@ -6124,6 +6173,12 @@
           <span class="operator-name-text" id="operatorName">—</span>
         </div>
         <button id="operatorSwitchBtn" class="operator-switch-btn" title="Switch operator">Switch</button>
+      </div>
+
+      <!-- REALTIME STATUS (hidden until realtime is configured) -->
+      <div class="header-section realtime" id="realtimeSection" style="display:none" aria-label="Realtime status">
+        <span class="rt-dot" id="rtDot" aria-hidden="true"></span>
+        <span class="rt-label" id="rtLabel">RT</span>
       </div>
 
     </div><!-- #dashHeader -->
