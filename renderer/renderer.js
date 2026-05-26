@@ -1451,6 +1451,8 @@ const TL_STALE_MS       = 2 * 60 * 1000; // 2 min → Inactive
 const TL_VERY_STALE_MS  = 5 * 60 * 1000; // 5 min → Recently Seen section
 let   _tlRefreshTimer   = null;
 let   _tlSlotStatus     = null;      // last known sync slot status from server
+let   _tlInnerTab       = 'activity'; // 'activity' | 'sync' | 'readiness' | 'devices'
+let   _realtimeStatus   = null;       // last known realtime connection status string
 const _slotWaiting      = new Map(); // jobId → { position } — renderer slot wait state
 
 function _alClose() {
@@ -1462,6 +1464,7 @@ function _alClose() {
   _alMasterPath       = null;
   _alCurrentEventPath = null;
   _alActiveMode       = 'local';
+  _tlInnerTab         = 'activity';
   const pickerRow = document.getElementById('alPickerRow');
   if (pickerRow) { pickerRow.innerHTML = ''; pickerRow.style.display = ''; }
   document.getElementById('ovActivityLog')?.focus();
@@ -1494,7 +1497,9 @@ function _wireAlModeTabs() {
 
 function _refreshTeamLivePanel() {
   const panel = document.getElementById('alTeamPanel');
-  if (panel) panel.innerHTML = _renderTeamLiveBody();
+  if (!panel) return;
+  panel.innerHTML = _renderTeamLiveBody();
+  _wireTeamLiveInnerTabs();
 }
 
 function _startTeamLiveTimer() {
@@ -1627,10 +1632,198 @@ function _tlDeviceCard(d, stale) {
     </div>`;
 }
 
-function _renderReadiness() {
+function _renderTeamLiveInnerTabs() {
+  const tabs = [
+    { id: 'activity',  label: 'Team Activity' },
+    { id: 'sync',      label: 'Sync Queue' },
+    { id: 'readiness', label: 'Event Readiness' },
+    { id: 'devices',   label: 'Devices' },
+  ];
+  return `
+    <div class="tl-inner-tabs" role="tablist" aria-label="Team Live sections">
+      ${tabs.map(t => `<button class="tl-inner-tab${_tlInnerTab === t.id ? ' tl-inner-tab--active' : ''}"
+        data-tl-tab="${t.id}" role="tab" aria-selected="${_tlInnerTab === t.id}">${t.label}</button>`).join('')}
+    </div>`;
+}
+
+function _wireTeamLiveInnerTabs() {
+  const panel = document.getElementById('alTeamPanel');
+  if (!panel) return;
+  panel.querySelectorAll('.tl-inner-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.dataset.tlTab;
+      if (!tab || _tlInnerTab === tab) return;
+      _tlInnerTab = tab;
+      _refreshTeamLivePanel();
+    });
+  });
+}
+
+function _renderTlSummaryBar() {
+  const now      = Date.now();
+  const devices  = Array.from(_teamDevices.values());
+  const active   = devices.filter(d => (now - new Date(d.updatedAt || 0).getTime()) < TL_STALE_MS);
+  const syncing  = active.filter(d => d.mode === 'syncing').length;
+  const waiting  = _tlSlotStatus?.queue?.length || 0;
+  const localVer = window._tlLocalAppVersion || null;
+  const versions = new Set();
+  if (localVer) versions.add(localVer);
+  for (const h of _teamDeviceHealth.values()) { if (h.appVersion) versions.add(h.appVersion); }
+  const versionMismatch = versions.size > 1;
+
+  if (devices.length === 0) return '';
+
+  const parts = [`Online: ${active.length}`];
+  if (syncing > 0) parts.push(`Syncing: ${syncing}`);
+  if (waiting > 0) parts.push(`Waiting: ${waiting}`);
+
+  return `
+    <div class="tl-summary-bar">
+      <span class="tl-summary-info">${escapeHtml(parts.join(' · '))}</span>
+      ${versionMismatch ? `<span class="tl-version-warn">Update recommended</span>` : ''}
+    </div>`;
+}
+
+function _renderTeamActivityTab() {
+  const now     = Date.now();
+  const devices = Array.from(_teamDevices.values());
+
+  if (devices.length === 0) {
+    return `<div class="tl-tab-empty">No team activity yet.<br><span>Connected devices will appear here.</span></div>`;
+  }
+
+  const active    = devices.filter(d => (now - new Date(d.updatedAt || 0).getTime()) < TL_STALE_MS);
+  const stale     = devices.filter(d => { const age = now - new Date(d.updatedAt || 0).getTime(); return age >= TL_STALE_MS && age < TL_VERY_STALE_MS; });
+  const veryStale = devices.filter(d => (now - new Date(d.updatedAt || 0).getTime()) >= TL_VERY_STALE_MS);
+
+  const activeHTML = `
+    <p class="tl-section-label">Active Now</p>
+    ${active.length > 0
+      ? `<div class="tl-device-list">${active.map(d => _tlDeviceCard(d, false)).join('')}</div>`
+      : `<p class="tl-empty-sub" style="padding:8px 0 14px">No active devices right now.</p>`}`;
+
+  const staleHTML = stale.length > 0
+    ? `<div class="tl-device-list">${stale.map(d => _tlDeviceCard(d, true)).join('')}</div>` : '';
+
+  const veryStaleHTML = veryStale.length > 0 ? `
+    <div class="tl-recently-seen">
+      <p class="tl-recently-seen-label">Recently Seen</p>
+      <div class="tl-device-list">${veryStale.map(d => _tlDeviceCard(d, true)).join('')}</div>
+    </div>` : '';
+
+  const recentItems = _teamActivity.slice(0, 15);
+  const feedHTML = recentItems.length > 0 ? `
+    <div class="tl-feed">
+      <p class="tl-feed-label">Recent Team Activity</p>
+      ${recentItems.map(item => `
+        <div class="tl-feed-item">
+          <span class="tl-feed-device">${escapeHtml(item.deviceDisplayName || '?')}</span>
+          <span class="tl-feed-action">${_tlActivityLabel(item)}</span>
+          <span class="tl-feed-time">${_tlRelativeTime(item.ts)}</span>
+        </div>`).join('')}
+    </div>` : '';
+
+  return activeHTML + staleHTML + veryStaleHTML + feedHTML;
+}
+
+function _renderSyncQueueTab() {
+  const now     = Date.now();
+  const devices = Array.from(_teamDevices.values());
+  const slots   = _tlSlotStatus?.slots        || [];
+  const queue   = _tlSlotStatus?.queue        || [];
+  const maxC    = _tlSlotStatus?.maxConcurrent || 1;
+
+  const syncing = devices.filter(d =>
+    (now - new Date(d.updatedAt || 0).getTime()) < TL_STALE_MS && d.mode === 'syncing'
+  );
+
+  const withWork = Array.from(_teamDeviceHealth.values()).filter(h => {
+    const dev = _teamDevices.get(h.deviceId);
+    const activelySyncing = dev && dev.mode === 'syncing'
+      && (now - new Date(dev.updatedAt || 0).getTime()) < TL_STALE_MS;
+    return !activelySyncing && (h.pendingSyncCount > 0 || h.failedSyncCount > 0);
+  });
+
+  if (syncing.length === 0 && queue.length === 0 && withWork.length === 0) {
+    return `<div class="tl-tab-empty">No pending sync work.</div>`;
+  }
+
+  let html = '';
+
+  if (syncing.length > 0) {
+    html += `<p class="tl-section-label">Currently Syncing</p><div class="tl-sync-list">`;
+    for (const d of syncing) {
+      const name        = d.deviceDisplayName || d.operatorName || 'Unknown';
+      const hasProgress = typeof d.progressTotal === 'number' && d.progressTotal > 0;
+      const detail      = hasProgress ? `${d.progressCurrent || 0} / ${d.progressTotal} files` : '';
+      html += `<div class="tl-sync-row">
+        <span class="tl-sync-name">${escapeHtml(name)}</span>
+        ${detail ? `<span class="tl-sync-detail">${escapeHtml(detail)}</span>` : ''}
+        <span class="tl-sync-status tl-sync-status--syncing">Syncing</span>
+      </div>`;
+    }
+    html += `</div>`;
+  }
+
+  if (queue.length > 0) {
+    html += `<p class="tl-section-label">Waiting for Slot</p><div class="tl-sync-list">`;
+    for (let i = 0; i < queue.length; i++) {
+      const entry = queue[i];
+      const name  = entry.deviceName || 'Device';
+      html += `<div class="tl-sync-row">
+        <span class="tl-sync-pos">${i + 1}</span>
+        <span class="tl-sync-name">${escapeHtml(name)}</span>
+        <span class="tl-sync-status tl-sync-status--waiting">Waiting</span>
+      </div>`;
+    }
+    html += `</div>`;
+  }
+
+  const failed  = withWork.filter(h => h.failedSyncCount > 0);
+  const pending = withWork.filter(h => h.failedSyncCount === 0);
+
+  if (failed.length > 0) {
+    html += `<p class="tl-section-label">Sync Issues</p><div class="tl-sync-list">`;
+    for (const h of failed) {
+      const dev  = _teamDevices.get(h.deviceId);
+      const name = dev?.deviceDisplayName || dev?.operatorName || 'Unknown';
+      html += `<div class="tl-sync-row">
+        <span class="tl-sync-name">${escapeHtml(name)}</span>
+        <span class="tl-sync-detail">${h.failedSyncCount} failed</span>
+        <span class="tl-sync-status tl-sync-status--issue">Issue</span>
+      </div>`;
+    }
+    html += `</div>`;
+  }
+
+  if (pending.length > 0) {
+    html += `<p class="tl-section-label">Pending Sync</p><div class="tl-sync-list">`;
+    for (const h of pending) {
+      const dev  = _teamDevices.get(h.deviceId);
+      const name = dev?.deviceDisplayName || dev?.operatorName || 'Unknown';
+      html += `<div class="tl-sync-row">
+        <span class="tl-sync-name">${escapeHtml(name)}</span>
+        <span class="tl-sync-detail">${h.pendingSyncCount} pending</span>
+        <span class="tl-sync-status tl-sync-status--pending">Pending</span>
+      </div>`;
+    }
+    html += `</div>`;
+  }
+
+  if (_tlSlotStatus) {
+    html += `<p class="tl-sync-note">Sync scheduling · max ${maxC} concurrent · ${slots.length} active · ${queue.length} queued</p>`;
+  }
+
+  return html;
+}
+
+function _renderEventReadinessTab() {
   const activeData = (typeof EventCreator !== 'undefined' && EventCreator.getActiveEventData)
     ? EventCreator.getActiveEventData() : null;
-  if (!activeData?.event?.name) return '';
+
+  if (!activeData?.event?.name) {
+    return `<div class="tl-tab-empty">No active event selected.<br><span>Select an event to see readiness across devices.</span></div>`;
+  }
 
   const localColl  = activeData.coll?.name  || null;
   const localEvent = activeData.event?.name || null;
@@ -1639,27 +1832,29 @@ function _renderReadiness() {
   const inEvent = Array.from(_teamDevices.values()).filter(d =>
     d.collectionName === localColl && d.eventFolderName === localEvent
   );
-  if (inEvent.length === 0) return '';
+
+  if (inEvent.length === 0) {
+    return `
+      <p class="tl-section-label">Event: ${escapeHtml(localEvent)}</p>
+      <div class="tl-tab-empty">No other devices active in this event.</div>`;
+  }
+
+  let pendingN = 0, issueN = 0, unknownN = 0;
 
   const rows = inEvent.map(d => {
-    const age      = now - new Date(d.updatedAt || 0).getTime();
-    const isStale  = age >= TL_VERY_STALE_MS;
-    const health   = _teamDeviceHealth.get(d.deviceId);
-    const name     = [d.operatorName, d.deviceDisplayName].filter(Boolean).join(' · ') || 'Unknown';
+    const age     = now - new Date(d.updatedAt || 0).getTime();
+    const isStale = age >= TL_VERY_STALE_MS;
+    const health  = _teamDeviceHealth.get(d.deviceId);
+    const name    = [d.operatorName, d.deviceDisplayName].filter(Boolean).join(' · ') || 'Unknown';
 
-    let readiness;
-    if (isStale)                          readiness = 'Offline';
-    else if (health?.failedSyncCount > 0) readiness = 'Sync issue';
-    else if (health?.pendingSyncCount > 0) readiness = `Pending sync: ${health.pendingSyncCount}`;
-    else if (d.mode === 'syncing')         readiness = 'Syncing';
-    else if (d.mode === 'importing')       readiness = 'Importing';
-    else if (!health)                      readiness = 'Unknown';
-    else                                   readiness = 'Complete';
-
-    const cls = readiness === 'Complete' ? 'tl-ready--ok'
-              : readiness === 'Unknown'  ? 'tl-ready--unknown'
-              : readiness === 'Offline'  ? 'tl-ready--offline'
-              : 'tl-ready--pending';
+    let readiness, cls;
+    if (isStale)                            { readiness = 'Offline';             cls = 'tl-ready--offline';  unknownN++; }
+    else if (health?.failedSyncCount > 0)   { readiness = 'Sync issue';          cls = 'tl-ready--pending';  issueN++; }
+    else if (health?.pendingSyncCount > 0)  { readiness = `Pending: ${health.pendingSyncCount}`; cls = 'tl-ready--pending'; pendingN++; }
+    else if (d.mode === 'syncing')          { readiness = 'Syncing';             cls = 'tl-ready--pending';  pendingN++; }
+    else if (d.mode === 'importing')        { readiness = 'Importing';           cls = 'tl-ready--pending';  pendingN++; }
+    else if (!health)                       { readiness = 'Unknown';             cls = 'tl-ready--unknown';  unknownN++; }
+    else                                    { readiness = 'Complete';            cls = 'tl-ready--ok'; }
 
     return `<div class="tl-readiness-row">
       <span class="tl-ready-device">${escapeHtml(name)}</span>
@@ -1667,87 +1862,107 @@ function _renderReadiness() {
     </div>`;
   }).join('');
 
+  const summaryParts = [];
+  if (pendingN > 0) summaryParts.push(`Pending on ${pendingN}`);
+  if (issueN   > 0) summaryParts.push(`Issues on ${issueN}`);
+  if (unknownN > 0) summaryParts.push(`Unknown on ${unknownN}`);
+  const summaryNote = summaryParts.length > 0
+    ? `<p class="tl-readiness-summary">${escapeHtml(summaryParts.join(' · '))}</p>` : '';
+
   return `
-    <div class="tl-readiness">
-      <p class="tl-section-label">Current Event Readiness</p>
-      <div class="tl-readiness-rows">${rows}</div>
+    <p class="tl-section-label">Event: ${escapeHtml(localEvent)}</p>
+    ${summaryNote}
+    <div class="tl-readiness-rows">${rows}</div>
+    <p class="tl-ready-advisory">Advisory only — does not write to event.json.</p>`;
+}
+
+function _renderDevicesTab() {
+  const now      = Date.now();
+  const devices  = Array.from(_teamDevices.values());
+  const localVer = window._tlLocalAppVersion || null;
+
+  if (devices.length === 0) {
+    return `<div class="tl-tab-empty">No other devices online.</div>`;
+  }
+
+  const rows = devices.map(d => {
+    const age       = now - new Date(d.updatedAt || 0).getTime();
+    const isOffline = age >= TL_VERY_STALE_MS;
+    const health    = _teamDeviceHealth.get(d.deviceId);
+    const name      = d.deviceDisplayName || 'Unknown device';
+    const op        = d.operatorName || null;
+    const ver       = health?.appVersion || null;
+    const verMismatch = localVer && ver && ver !== localVer;
+
+    const healthParts = [];
+    if (!isOffline && health) {
+      if (health.failedSyncCount  > 0) healthParts.push(`${health.failedSyncCount} sync failed`);
+      else if (health.pendingSyncCount > 0) healthParts.push(`${health.pendingSyncCount} pending`);
+      if (!health.nasConnected)        healthParts.push('Archive disconnected');
+    }
+
+    return `<div class="tl-device-card${isOffline ? ' tl-device-card--stale' : ''}">
+      <div class="tl-device-avatar">${escapeHtml(_tlInitials(name))}</div>
+      <div class="tl-device-info">
+        <p class="tl-device-name">${escapeHtml(name)}</p>
+        ${op ? `<p class="tl-device-operator">${escapeHtml(op)}</p>` : ''}
+        <div class="tl-device-status">
+          <span class="tl-status-dot tl-status-dot--${isOffline ? 'idle' : 'viewing'}"></span>
+          <span class="tl-status-label">${isOffline ? 'Offline' : 'Online'}</span>
+          ${ver ? `<span class="tl-status-sep">·</span><span class="tl-status-label">v${escapeHtml(ver)}</span>` : ''}
+          ${verMismatch ? `<span class="tl-version-warn tl-version-warn--inline">Update recommended</span>` : ''}
+        </div>
+        ${healthParts.length > 0 ? `<p class="tl-device-health">${escapeHtml(healthParts.join(' · '))}</p>` : ''}
+      </div>
+      <div class="tl-device-time">${_tlRelativeTime(d.updatedAt)}</div>
     </div>`;
+  }).join('');
+
+  return `<div class="tl-device-list">${rows}</div>`;
 }
 
 function _renderTeamLiveBody() {
-  const now     = Date.now();
-  const devices = Array.from(_teamDevices.values());
+  // Disabled state — realtime not configured
+  if (!_realtimeStatus || _realtimeStatus === 'disabled') {
+    return `
+      <div class="tl-empty">
+        <div class="tl-empty-icon">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <div class="tl-empty-title">Realtime is disabled</div>
+        <p class="tl-empty-sub">Enable Team Live &amp; Online Registry in Settings.</p>
+      </div>`;
+  }
 
-  if (devices.length === 0) {
+  // Disconnected with no cached data yet
+  if ((_realtimeStatus === 'offline' || _realtimeStatus === 'connecting' || _realtimeStatus === 'reconnecting')
+      && _teamDevices.size === 0) {
     return `
       <div class="tl-empty">
         <div class="tl-empty-icon">
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.56 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
         </div>
-        <div class="tl-empty-title">No team devices online</div>
-        <p class="tl-empty-sub">Other devices connected to the same realtime server will appear here when active.</p>
+        <div class="tl-empty-title">Team Live unavailable</div>
+        <p class="tl-empty-sub">AutoIngest will continue working normally.</p>
       </div>`;
   }
 
-  const active    = devices.filter(d => (now - new Date(d.updatedAt || 0).getTime()) < TL_STALE_MS);
-  const stale     = devices.filter(d => { const age = now - new Date(d.updatedAt || 0).getTime(); return age >= TL_STALE_MS && age < TL_VERY_STALE_MS; });
-  const veryStale = devices.filter(d => (now - new Date(d.updatedAt || 0).getTime()) >= TL_VERY_STALE_MS);
+  const summaryBar = _renderTlSummaryBar();
+  const innerTabs  = _renderTeamLiveInnerTabs();
 
-  // Top summary bar
-  const syncingCount   = active.filter(d => d.mode === 'syncing').length;
-  const waitingCount   = _tlSlotStatus?.queue?.length || 0;
-  const versions       = new Set(devices.map(d => d.appVersion).filter(Boolean));
-  const localVer       = window._tlLocalAppVersion || null;
-  if (localVer) versions.add(localVer);
-  const versionMismatch = versions.size > 1;
-
-  const summaryParts = [`${devices.length} device${devices.length !== 1 ? 's' : ''} online`];
-  if (syncingCount > 0) summaryParts.push(`${syncingCount} syncing`);
-  if (waitingCount > 0) summaryParts.push(`${waitingCount} waiting`);
-  const summaryBar = `
-    <div class="tl-summary-bar">
-      <span class="tl-summary-info">${escapeHtml(summaryParts.join(' · '))}</span>
-      ${versionMismatch ? `<span class="tl-version-warn">Update recommended</span>` : ''}
-    </div>`;
-
-  const activeHTML = active.length > 0
-    ? `<p class="tl-section-label">Active Now</p>
-       <div class="tl-device-list">${active.map(d => _tlDeviceCard(d, false)).join('')}</div>`
-    : `<p class="tl-section-label">Active Now</p>
-       <p class="tl-empty-sub" style="padding:12px 0 4px">No active devices right now.</p>`;
-
-  const staleHTML = stale.length > 0
-    ? `<div class="tl-device-list">${stale.map(d => _tlDeviceCard(d, true)).join('')}</div>`
-    : '';
-
-  const veryStaleHTML = veryStale.length > 0 ? `
-    <div class="tl-recently-seen">
-      <p class="tl-recently-seen-label">Recently Seen</p>
-      <div class="tl-device-list">${veryStale.map(d => _tlDeviceCard(d, true)).join('')}</div>
-    </div>` : '';
-
-  const readinessHTML = _renderReadiness();
-
-  const recentItems = _teamActivity.slice(0, 20);
-  const feedHTML = recentItems.length > 0 ? `
-    <div class="tl-feed">
-      <p class="tl-feed-label">Recent Team Activity</p>
-      ${recentItems.map(item => `
-        <div class="tl-feed-item">
-          <span class="tl-feed-device">${escapeHtml(item.deviceDisplayName || item.deviceId || '?')}</span>
-          <span class="tl-feed-action">${_tlActivityLabel(item)}</span>
-          <span class="tl-feed-time">${_tlRelativeTime(item.ts)}</span>
-        </div>`).join('')}
-    </div>` : '';
+  let content;
+  switch (_tlInnerTab) {
+    case 'sync':       content = _renderSyncQueueTab();      break;
+    case 'readiness':  content = _renderEventReadinessTab(); break;
+    case 'devices':    content = _renderDevicesTab();        break;
+    default:           content = _renderTeamActivityTab();   break;
+  }
 
   return `
     <div class="tl-wrap">
       ${summaryBar}
-      ${activeHTML}
-      ${staleHTML}
-      ${veryStaleHTML}
-      ${readinessHTML}
-      ${feedHTML}
+      ${innerTabs}
+      <div class="tl-inner-content">${content}</div>
     </div>`;
 }
 
@@ -2460,6 +2675,7 @@ async function openActivityLogModal(opts = {}) {
 
   _wireAlModeTabs();
   document.getElementById('alTeamPanel').innerHTML = _renderTeamLiveBody();
+  _wireTeamLiveInnerTabs();
 
   const localPanel = document.getElementById('alLocalPanel');
 
@@ -9190,6 +9406,7 @@ function checkRealtimeNameConflict(type, name, collectionName) {
 
 /** Updates the realtime status badge in the header. */
 function _renderRealtimeStatus({ status, devicesOnline } = {}) {
+  _realtimeStatus = status || null;
   if (document.getElementById('settingsModal')?.classList.contains('visible')) {
     _rtUpdateSettingsStatus({ status });
   }
