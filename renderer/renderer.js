@@ -1564,7 +1564,7 @@ function _tlDeviceCard(d, stale) {
     <div class="tl-device-card${isStale ? ' tl-device-card--stale' : ''}">
       <div class="tl-device-avatar">${escapeHtml(initials)}</div>
       <div class="tl-device-info">
-        <p class="tl-device-name">${escapeHtml(d.deviceDisplayName || d.deviceId || 'Unknown')}</p>
+        <p class="tl-device-name">${escapeHtml(d.deviceDisplayName || 'Unknown')}</p>
         ${d.operatorName ? `<p class="tl-device-operator">${escapeHtml(d.operatorName)}</p>` : ''}
         <div class="tl-device-status">
           <span class="tl-status-dot tl-status-dot--${dotMode}"></span>

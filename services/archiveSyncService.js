@@ -24,6 +24,7 @@ const {
 } = require('./archiveLockService');
 
 const { hidePathBestEffort } = require('./internalFileProtection');
+const offlineRegistry = require('./offlineCollectionRegistryService');
 const config = require('../config/app.config');
 
 const SKIP_DIRS  = new Set(['.autoingest', '__MACOSX']);
@@ -519,8 +520,43 @@ async function syncJob(job, { nasRoot, stagingRoot }, { progressCallback, pauseS
 
   const collectionFolderName = path.basename(path.dirname(localEventPath));
   const eventFolderName      = path.basename(localEventPath);
-  const archiveEventPath     = path.join(nasRoot, collectionFolderName, eventFolderName);
-  result.archiveEventPath    = archiveEventPath;
+  const localCollectionPath  = path.dirname(localEventPath);
+
+  // Resolve the NAS archive target via the collection link file.
+  // Routing rules (strict precedence — no fallback once a link file is present):
+  //   1. No link file (legacy/unlinked)  → name-identity fallback, backward compatible.
+  //   2. status: provisional             → BLOCK. User must match to NAS first.
+  //   3. nasRoot mismatch (stale link)   → BLOCK. Never fall back to name-identity.
+  //   4. nasCollectionPath missing       → BLOCK. Treat as incomplete provisional.
+  //   5. Linked + nasRoot matches        → use link.nasCollectionPath.
+  let archiveEventPath;
+  try {
+    const { ok: hasLink, link } = await offlineRegistry.readLink(localCollectionPath);
+    if (!hasLink || !link) {
+      // No link file — legacy collection; name-identity fallback (no regression).
+      archiveEventPath = path.join(nasRoot, collectionFolderName, eventFolderName);
+    } else if (link.status === 'provisional') {
+      result.errors.push('Collection is provisional — match it to a NAS collection before syncing.');
+      result.status = 'provisional-needs-match';
+      return result;
+    } else if (link.nasRoot && link.nasRoot !== nasRoot) {
+      // Stale link: stored NAS root no longer matches. Block — do not fall back.
+      result.errors.push(`Stale collection link — stored NAS root does not match current. Re-link this collection before syncing.`);
+      result.status = 'stale-link-needs-rematch';
+      return result;
+    } else if (!link.nasCollectionPath) {
+      // Link file present but no NAS path stored — treat as incomplete provisional.
+      result.errors.push('Collection link is incomplete (no NAS collection path) — match it to a NAS collection before syncing.');
+      result.status = 'provisional-needs-match';
+      return result;
+    } else {
+      archiveEventPath = path.join(link.nasCollectionPath, eventFolderName);
+    }
+  } catch {
+    // Registry read error — fall back to name-identity (unreadable ≠ provisional).
+    archiveEventPath = path.join(nasRoot, collectionFolderName, eventFolderName);
+  }
+  result.archiveEventPath = archiveEventPath;
 
   // Determine sync strategy:
   //   A — job.files[]  : copy exactly those files (grouped by top-level dir for locking)
@@ -537,10 +573,12 @@ async function syncJob(job, { nasRoot, stagingRoot }, { progressCallback, pauseS
     filesByPhotographer = new Map();
     for (const f of job.files) {
       if (typeof f !== 'string' || !f) continue;
-      const ph = f.includes('/') ? f.split('/')[0] : null;
+      // Normalize platform separator → forward slash so split('/') works on Windows.
+      const fwd = f.split(path.sep).join('/');
+      const ph = fwd.includes('/') ? fwd.split('/')[0] : null;
       if (!ph || _skipDir(ph)) continue;
       if (!filesByPhotographer.has(ph)) filesByPhotographer.set(ph, []);
-      filesByPhotographer.get(ph).push(f);
+      filesByPhotographer.get(ph).push(fwd);
     }
     photographerEntries = [...filesByPhotographer.keys()].map(name => ({ name }));
   } else if (targetPh) {
@@ -753,7 +791,31 @@ async function verifyJobChecksum(job, { nasRoot, stagingRoot, progressCallback }
 
   const collectionFolderName = path.basename(path.dirname(localEventPath));
   const eventFolderName      = path.basename(localEventPath);
-  const archiveEventPath     = path.join(nasRoot, collectionFolderName, eventFolderName);
+  const localCollectionPath  = path.dirname(localEventPath);
+
+  let archiveEventPath;
+  try {
+    const { ok: hasLink, link } = await offlineRegistry.readLink(localCollectionPath);
+    if (!hasLink || !link) {
+      archiveEventPath = path.join(nasRoot, collectionFolderName, eventFolderName);
+    } else if (link.status === 'provisional') {
+      result.errors.push('Collection is provisional — match it to a NAS collection before verifying.');
+      result.status = 'provisional-needs-match';
+      return result;
+    } else if (link.nasRoot && link.nasRoot !== nasRoot) {
+      result.errors.push('Stale collection link — stored NAS root does not match current. Re-link this collection before verifying.');
+      result.status = 'stale-link-needs-rematch';
+      return result;
+    } else if (!link.nasCollectionPath) {
+      result.errors.push('Collection link is incomplete (no NAS collection path) — match it to a NAS collection before verifying.');
+      result.status = 'provisional-needs-match';
+      return result;
+    } else {
+      archiveEventPath = path.join(link.nasCollectionPath, eventFolderName);
+    }
+  } catch {
+    archiveEventPath = path.join(nasRoot, collectionFolderName, eventFolderName);
+  }
 
   // Build file pairs: Strategy A (files[]) or Strategy B (photographer folder scan)
   let filePairs = [];
