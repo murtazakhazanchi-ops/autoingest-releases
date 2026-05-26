@@ -1443,12 +1443,15 @@ let _alCurrentEventPath = null;
 let _alActiveMode       = 'local'; // 'local' | 'team'
 
 // ── Team Live advisory state (never written to disk) ─────────────────────────
-const _teamDevices    = new Map(); // deviceId → latest activity
-const TL_MAX_ACTIVITY = 100;
-let   _teamActivity   = [];        // bounded, newest first
-const TL_STALE_MS      = 2 * 60 * 1000; // 2 min → Inactive
-const TL_VERY_STALE_MS = 5 * 60 * 1000; // 5 min → Recently Seen section
-let   _tlRefreshTimer  = null;
+const _teamDevices      = new Map(); // deviceId → latest activity
+const _teamDeviceHealth = new Map(); // deviceId → health snapshot
+const TL_MAX_ACTIVITY   = 100;
+let   _teamActivity     = [];        // bounded, newest first
+const TL_STALE_MS       = 2 * 60 * 1000; // 2 min → Inactive
+const TL_VERY_STALE_MS  = 5 * 60 * 1000; // 5 min → Recently Seen section
+let   _tlRefreshTimer   = null;
+let   _tlSlotStatus     = null;      // last known sync slot status from server
+const _slotWaiting      = new Map(); // jobId → { position } — renderer slot wait state
 
 function _alClose() {
   _stopTeamLiveTimer();
@@ -1539,11 +1542,28 @@ function _tlActivityLabel(item) {
 }
 
 function _tlDeviceCard(d, stale) {
-  const initials   = _tlInitials(d.deviceDisplayName || d.operatorName || '');
-  const now        = Date.now();
-  const age        = now - new Date(d.updatedAt || 0).getTime();
-  const isStale    = stale || age >= TL_STALE_MS;
-  const modeLabel  = isStale ? 'Inactive' : _tlModeLabel(d.mode);
+  const initials = _tlInitials(d.deviceDisplayName || d.operatorName || '');
+  const now      = Date.now();
+  const age      = now - new Date(d.updatedAt || 0).getTime();
+  const isStale  = stale || age >= TL_STALE_MS;
+  const health   = _teamDeviceHealth.get(d.deviceId);
+
+  // Mapped status label: Online / Viewing / Importing / Syncing / Issue / Offline
+  let modeLabel;
+  if (isStale) {
+    modeLabel = 'Offline';
+  } else if (health?.failedSyncCount > 0) {
+    modeLabel = 'Issue';
+  } else {
+    switch (d.mode) {
+      case 'importing': modeLabel = 'Importing'; break;
+      case 'syncing':   modeLabel = 'Syncing';   break;
+      case 'viewing':   modeLabel = 'Viewing';   break;
+      case 'preparing': modeLabel = 'Preparing'; break;
+      default:          modeLabel = 'Online';    break;
+    }
+  }
+
   const dotMode    = isStale ? 'idle' : escapeHtml(d.mode || 'idle');
   const collLabel  = d.collectionName  ? escapeHtml(d.collectionName)  : null;
   const eventLabel = d.eventFolderName ? escapeHtml(d.eventFolderName) : null;
@@ -1558,7 +1578,33 @@ function _tlDeviceCard(d, stale) {
     <div class="tl-progress">
       <div class="tl-progress-bar${d.mode === 'syncing' ? ' tl-progress-bar--syncing' : ''}"
            style="width:${pct}%"></div>
-    </div>` : '';
+    </div>
+    <p class="tl-progress-text">${d.progressCurrent || 0} / ${d.progressTotal} files</p>` : '';
+
+  // Health line — compact, single advisory row
+  const healthParts = [];
+  if (!isStale && health) {
+    const localVer = window._tlLocalAppVersion || null;
+    if (localVer && health.appVersion && health.appVersion !== localVer) healthParts.push('Update recommended');
+    if (!health.nasConnected)           healthParts.push('Main Archive disconnected');
+    if (health.failedSyncCount > 0)     healthParts.push(`Sync issue: ${health.failedSyncCount}`);
+    else if (health.pendingSyncCount > 0) healthParts.push(`Pending sync: ${health.pendingSyncCount}`);
+  }
+  const healthHTML = healthParts.length > 0
+    ? `<p class="tl-device-health">${escapeHtml(healthParts.join(' · '))}</p>` : '';
+
+  // Same-event advisory — compare remote device's event with local active event
+  let sameEventHTML = '';
+  if (!isStale && d.collectionName && d.eventFolderName) {
+    const _activeData = (typeof EventCreator !== 'undefined' && EventCreator.getActiveEventData)
+      ? EventCreator.getActiveEventData() : null;
+    const _lColl  = _activeData?.coll?.name  || null;
+    const _lEvent = _activeData?.event?.name || null;
+    if (_lColl && _lEvent && d.collectionName === _lColl && d.eventFolderName === _lEvent) {
+      const _who = d.operatorName ? `${escapeHtml(d.operatorName)} · ` : '';
+      sameEventHTML = `<p class="tl-same-event">${_who}${escapeHtml(d.deviceDisplayName || 'Another device')} is also active in this event.</p>`;
+    }
+  }
 
   return `
     <div class="tl-device-card${isStale ? ' tl-device-card--stale' : ''}">
@@ -1574,8 +1620,57 @@ function _tlDeviceCard(d, stale) {
         </div>
         ${!isStale && photoLabel ? `<p class="tl-device-photographer">${photoLabel}</p>` : ''}
         ${progressHTML}
+        ${healthHTML}
+        ${sameEventHTML}
       </div>
       <div class="tl-device-time">${_tlRelativeTime(d.updatedAt)}</div>
+    </div>`;
+}
+
+function _renderReadiness() {
+  const activeData = (typeof EventCreator !== 'undefined' && EventCreator.getActiveEventData)
+    ? EventCreator.getActiveEventData() : null;
+  if (!activeData?.event?.name) return '';
+
+  const localColl  = activeData.coll?.name  || null;
+  const localEvent = activeData.event?.name || null;
+  const now        = Date.now();
+
+  const inEvent = Array.from(_teamDevices.values()).filter(d =>
+    d.collectionName === localColl && d.eventFolderName === localEvent
+  );
+  if (inEvent.length === 0) return '';
+
+  const rows = inEvent.map(d => {
+    const age      = now - new Date(d.updatedAt || 0).getTime();
+    const isStale  = age >= TL_VERY_STALE_MS;
+    const health   = _teamDeviceHealth.get(d.deviceId);
+    const name     = [d.operatorName, d.deviceDisplayName].filter(Boolean).join(' · ') || 'Unknown';
+
+    let readiness;
+    if (isStale)                          readiness = 'Offline';
+    else if (health?.failedSyncCount > 0) readiness = 'Sync issue';
+    else if (health?.pendingSyncCount > 0) readiness = `Pending sync: ${health.pendingSyncCount}`;
+    else if (d.mode === 'syncing')         readiness = 'Syncing';
+    else if (d.mode === 'importing')       readiness = 'Importing';
+    else if (!health)                      readiness = 'Unknown';
+    else                                   readiness = 'Complete';
+
+    const cls = readiness === 'Complete' ? 'tl-ready--ok'
+              : readiness === 'Unknown'  ? 'tl-ready--unknown'
+              : readiness === 'Offline'  ? 'tl-ready--offline'
+              : 'tl-ready--pending';
+
+    return `<div class="tl-readiness-row">
+      <span class="tl-ready-device">${escapeHtml(name)}</span>
+      <span class="tl-ready-status ${cls}">${escapeHtml(readiness)}</span>
+    </div>`;
+  }).join('');
+
+  return `
+    <div class="tl-readiness">
+      <p class="tl-section-label">Current Event Readiness</p>
+      <div class="tl-readiness-rows">${rows}</div>
     </div>`;
 }
 
@@ -1598,10 +1693,27 @@ function _renderTeamLiveBody() {
   const stale     = devices.filter(d => { const age = now - new Date(d.updatedAt || 0).getTime(); return age >= TL_STALE_MS && age < TL_VERY_STALE_MS; });
   const veryStale = devices.filter(d => (now - new Date(d.updatedAt || 0).getTime()) >= TL_VERY_STALE_MS);
 
+  // Top summary bar
+  const syncingCount   = active.filter(d => d.mode === 'syncing').length;
+  const waitingCount   = _tlSlotStatus?.queue?.length || 0;
+  const versions       = new Set(devices.map(d => d.appVersion).filter(Boolean));
+  const localVer       = window._tlLocalAppVersion || null;
+  if (localVer) versions.add(localVer);
+  const versionMismatch = versions.size > 1;
+
+  const summaryParts = [`${devices.length} device${devices.length !== 1 ? 's' : ''} online`];
+  if (syncingCount > 0) summaryParts.push(`${syncingCount} syncing`);
+  if (waitingCount > 0) summaryParts.push(`${waitingCount} waiting`);
+  const summaryBar = `
+    <div class="tl-summary-bar">
+      <span class="tl-summary-info">${escapeHtml(summaryParts.join(' · '))}</span>
+      ${versionMismatch ? `<span class="tl-version-warn">Update recommended</span>` : ''}
+    </div>`;
+
   const activeHTML = active.length > 0
-    ? `<p class="tl-section-label">Devices (${active.length})</p>
+    ? `<p class="tl-section-label">Active Now</p>
        <div class="tl-device-list">${active.map(d => _tlDeviceCard(d, false)).join('')}</div>`
-    : `<p class="tl-section-label">Devices</p>
+    : `<p class="tl-section-label">Active Now</p>
        <p class="tl-empty-sub" style="padding:12px 0 4px">No active devices right now.</p>`;
 
   const staleHTML = stale.length > 0
@@ -1614,10 +1726,12 @@ function _renderTeamLiveBody() {
       <div class="tl-device-list">${veryStale.map(d => _tlDeviceCard(d, true)).join('')}</div>
     </div>` : '';
 
+  const readinessHTML = _renderReadiness();
+
   const recentItems = _teamActivity.slice(0, 20);
   const feedHTML = recentItems.length > 0 ? `
     <div class="tl-feed">
-      <p class="tl-feed-label">Recent activity</p>
+      <p class="tl-feed-label">Recent Team Activity</p>
       ${recentItems.map(item => `
         <div class="tl-feed-item">
           <span class="tl-feed-device">${escapeHtml(item.deviceDisplayName || item.deviceId || '?')}</span>
@@ -1628,9 +1742,11 @@ function _renderTeamLiveBody() {
 
   return `
     <div class="tl-wrap">
+      ${summaryBar}
       ${activeHTML}
       ${staleHTML}
       ${veryStaleHTML}
+      ${readinessHTML}
       ${feedHTML}
     </div>`;
 }
@@ -1666,9 +1782,44 @@ function _onTeamUpdate(data) {
       }
     }
   } else if (data.type === 'device:offline') {
-    if (data.deviceId) _teamDevices.delete(data.deviceId);
+    if (data.deviceId) {
+      _teamDevices.delete(data.deviceId);
+      _teamDeviceHealth.delete(data.deviceId);
+    }
+  } else if (data.type === 'device:health') {
+    if (data.deviceId) {
+      _teamDeviceHealth.set(data.deviceId, {
+        deviceId:         data.deviceId,
+        appVersion:       data.appVersion       || null,
+        nasConnected:     !!data.nasConnected,
+        stagingAvailable: !!data.stagingAvailable,
+        pendingSyncCount: typeof data.pendingSyncCount === 'number' ? data.pendingSyncCount : 0,
+        failedSyncCount:  typeof data.failedSyncCount  === 'number' ? data.failedSyncCount  : 0,
+        ts:               data.ts || new Date().toISOString(),
+      });
+    }
   }
 
+  if (_alActiveMode === 'team' && document.getElementById('activityLogModal')?.classList.contains('open')) {
+    _refreshTeamLivePanel();
+  }
+}
+
+function _onSyncSlotGranted(data) {
+  const jobId = data?.jobId;
+  if (!jobId || !_slotWaiting.has(jobId)) return;
+  _slotWaiting.delete(jobId);
+  // The renderer was waiting for this slot — proceed with the sync.
+  _sqDoSync(jobId).catch(() => {});
+}
+
+function _onSyncSlotUpdate(data) {
+  if (!data || typeof data !== 'object') return;
+  _tlSlotStatus = {
+    slots:         Array.isArray(data.slots) ? data.slots : [],
+    queue:         Array.isArray(data.queue) ? data.queue : [],
+    maxConcurrent: typeof data.maxConcurrent === 'number' ? data.maxConcurrent : 1,
+  };
   if (_alActiveMode === 'team' && document.getElementById('activityLogModal')?.classList.contains('open')) {
     _refreshTeamLivePanel();
   }
@@ -3413,7 +3564,10 @@ function _sqJobRow(job, reviewEntry, archiveOffline) {
   const syncedText    = job.syncedAt   ? _sqFmtTime(job.syncedAt)   : '';
 
   let actionHtml = '';
-  if (job.status === 'ready-for-sync') {
+  if (_slotWaiting.has(job.jobId)) {
+    const _pos = _slotWaiting.get(job.jobId)?.position || '?';
+    actionHtml = `<button type="button" class="sq-action-btn sq-cancel-slot-btn" data-jobid="${_sqEsc(job.jobId)}" aria-label="Cancel waiting for sync slot">Waiting (${_sqEsc(String(_pos))})… Cancel</button>`;
+  } else if (job.status === 'ready-for-sync') {
     if (archiveOffline) {
       actionHtml = `<button type="button" class="sq-action-btn" disabled title="Reconnect archive to sync">Reconnect to sync</button>`;
     } else {
@@ -3430,7 +3584,10 @@ function _sqJobRow(job, reviewEntry, archiveOffline) {
       actionHtml = `<button type="button" class="sq-action-btn sq-resume-btn" data-jobid="${_sqEsc(job.jobId)}" aria-label="Resume sync">Resume</button>`;
     }
   } else if (job.status === 'needs-attention') {
-    if (archiveOffline) {
+    if (_slotWaiting.has(job.jobId)) {
+      const _pos2 = _slotWaiting.get(job.jobId)?.position || '?';
+      actionHtml = `<button type="button" class="sq-action-btn sq-cancel-slot-btn" data-jobid="${_sqEsc(job.jobId)}" aria-label="Cancel waiting for sync slot">Waiting (${_sqEsc(String(_pos2))})… Cancel</button>`;
+    } else if (archiveOffline) {
       actionHtml = `<button type="button" class="sq-action-btn" disabled title="Reconnect archive to sync">Reconnect to sync</button>`;
     } else {
       // Sync Now is the primary action — metadata failure must not block archive file copy.
@@ -3630,19 +3787,12 @@ document.getElementById('syncActivityModal')?.addEventListener('click', (e) => {
   if (e.target === document.getElementById('syncActivityModal')) _sqClose();
 });
 
-// Delegated click handler for Sync Now / Retry buttons
-document.getElementById('sqJobList')?.addEventListener('click', async (e) => {
-  const btn = e.target.closest('.sq-sync-btn, .sq-retry-btn');
-  if (!btn || btn.disabled) return;
-  const jobId = btn.dataset.jobid;
-  if (!jobId) return;
-  btn.disabled = true;
-  btn.textContent = 'Starting…';
+// ── Sync helper: run syncJobNow and handle result, then release slot ──────────
+async function _sqDoSync(jobId) {
   try {
     const result = await window.api.syncJobNow(jobId);
-    await _sqLoadQueue();
-    const _pendingResolved = await EventCreator.resolvePendingLocalCopyToArchive().catch(() => false);
-    if (_pendingResolved) _renderLandingEventCard();
+    const _pr = await EventCreator.resolvePendingLocalCopyToArchive().catch(() => false);
+    if (_pr) _renderLandingEventCard();
     if (result?.ok === false) {
       showMessage('Sync failed. Review needed.', 7000);
     } else {
@@ -3652,14 +3802,51 @@ document.getElementById('sqJobList')?.addEventListener('click', async (e) => {
       if (sr?.skippedDuplicates > 0) parts.push(`${sr.skippedDuplicates} skipped`);
       if (sr?.renamedConflicts  > 0) parts.push(`${sr.renamedConflicts} renamed`);
       if (sr?.errors?.length    > 0) parts.push(`${sr.errors.length} error${sr.errors.length !== 1 ? 's' : ''}`);
-      const summary = parts.length > 0 ? parts.join(' · ') : 'Already up to date';
-      showMessage(`Sync complete — ${summary}`, 7000);
+      showMessage(`Sync complete — ${parts.length > 0 ? parts.join(' · ') : 'Already up to date'}`, 7000);
     }
   } catch {
-    btn.disabled = false;
-    btn.textContent = btn.classList.contains('sq-sync-btn') ? 'Sync Now' : 'Retry';
     showMessage('Sync failed. Review needed.', 7000);
+  } finally {
+    _slotWaiting.delete(jobId);
+    if (window.api.releaseSyncSlot) window.api.releaseSyncSlot(jobId).catch(() => {});
+    await _sqLoadQueue().catch(() => {});
   }
+}
+
+// Delegated click handler for Sync Now / Retry buttons
+document.getElementById('sqJobList')?.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.sq-sync-btn, .sq-retry-btn');
+  if (!btn || btn.disabled) return;
+  const jobId = btn.dataset.jobid;
+  if (!jobId) return;
+  btn.disabled = true;
+  btn.textContent = 'Starting…';
+
+  // Advisory sync slot request — falls back immediately if realtime is unavailable.
+  try {
+    if (window.api.requestSyncSlot) {
+      const slotResult = await window.api.requestSyncSlot(jobId);
+      if (slotResult.queued && !slotResult.granted && !slotResult.fallback) {
+        // Queued — show waiting state; _onSyncSlotGranted will call _sqDoSync when ready.
+        _slotWaiting.set(jobId, { position: slotResult.position || '?' });
+        await _sqLoadQueue().catch(() => {});
+        return;
+      }
+    }
+  } catch { /* non-fatal — proceed */ }
+
+  await _sqDoSync(jobId);
+});
+
+// Delegated click handler for Cancel slot wait button
+document.getElementById('sqJobList')?.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.sq-cancel-slot-btn');
+  if (!btn || btn.disabled) return;
+  const jobId = btn.dataset.jobid;
+  if (!jobId) return;
+  _slotWaiting.delete(jobId);
+  if (window.api.cancelSyncSlot) window.api.cancelSyncSlot(jobId).catch(() => {});
+  await _sqLoadQueue().catch(() => {});
 });
 
 // Delegated click handler for Mark Reviewed buttons
@@ -3756,26 +3943,20 @@ document.getElementById('sqJobList')?.addEventListener('click', async (e) => {
     if (!jobId) return;
     resumeBtn.disabled    = true;
     resumeBtn.textContent = 'Resuming…';
+
+    // Advisory slot request for resume, same as Sync Now.
     try {
-      const result = await window.api.syncJobNow(jobId);
-      await _sqLoadQueue();
-      const _pendingResolved = await EventCreator.resolvePendingLocalCopyToArchive().catch(() => false);
-      if (_pendingResolved) _renderLandingEventCard();
-      if (result?.ok === false) {
-        showMessage('Resume failed. Review needed.', 7000);
-      } else {
-        const sr    = result?.syncResult;
-        const parts = [];
-        if (sr?.copiedToArchive   > 0) parts.push(`${sr.copiedToArchive} copied`);
-        if (sr?.skippedDuplicates > 0) parts.push(`${sr.skippedDuplicates} skipped`);
-        if (sr?.errors?.length    > 0) parts.push(`${sr.errors.length} error${sr.errors.length !== 1 ? 's' : ''}`);
-        showMessage(`Sync complete — ${parts.length > 0 ? parts.join(' · ') : 'up to date'}`, 6000);
+      if (window.api.requestSyncSlot) {
+        const slotResult = await window.api.requestSyncSlot(jobId);
+        if (slotResult.queued && !slotResult.granted && !slotResult.fallback) {
+          _slotWaiting.set(jobId, { position: slotResult.position || '?' });
+          await _sqLoadQueue().catch(() => {});
+          return;
+        }
       }
-    } catch {
-      resumeBtn.disabled    = false;
-      resumeBtn.textContent = 'Resume';
-      showMessage('Resume failed.', 5000);
-    }
+    } catch { /* non-fatal — proceed */ }
+
+    await _sqDoSync(jobId);
   }
 });
 
@@ -8941,6 +9122,17 @@ async function initApp() {
   }
   if (window.api.onTeamUpdate) {
     window.api.onTeamUpdate(_onTeamUpdate);
+  }
+  if (window.api.onSyncSlotGranted) {
+    window.api.onSyncSlotGranted(_onSyncSlotGranted);
+  }
+  if (window.api.onSyncSlotUpdate) {
+    window.api.onSyncSlotUpdate(_onSyncSlotUpdate);
+  }
+  if (window.api.getAppVersion) {
+    window.api.getAppVersion()
+      .then(v => { window._tlLocalAppVersion = v || null; })
+      .catch(() => {});
   }
   if (window.api.getRealtimeStatus) {
     window.api.getRealtimeStatus()

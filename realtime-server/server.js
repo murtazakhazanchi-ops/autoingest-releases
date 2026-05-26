@@ -37,6 +37,16 @@ const _registry = new Map(); // registryId → sanitized entry
 // Advisory only — cleared on server restart or disconnect.
 const _deviceActivity = new Map(); // socketId → sanitized activity payload
 
+// ── Sync slot coordination — runtime only, never persisted ────────────────────
+// Advisory timing gate: server grants a sync slot to limit concurrent NAS writers.
+// The server does NOT validate sync correctness — slot grant is a timing hint only.
+const MAX_CONCURRENT_SYNCS = 1;
+const SLOT_TIMEOUT_MS      = 90_000;  // drop slot if no heartbeat for 90 s
+const QUEUE_TIMEOUT_MS     = 300_000; // drop queued request after 5 min
+
+const _syncSlots     = new Map(); // deviceId → slot info
+const _syncSlotQueue = [];        // queued slot requests, in order
+
 const httpServer = createServer((req, res) => {
   if (req.url === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -72,7 +82,59 @@ const RELAY_EVENTS = [
   'sync:completed',
   'conflict:warning',
   'dashboard:update',
+  'device:health',
 ];
+
+// ── Sync slot helpers ─────────────────────────────────────────────────────────
+
+function _broadcastSlotStatus() {
+  const slots = Array.from(_syncSlots.values()).map(s => ({
+    deviceId:        s.deviceId,
+    operatorName:    s.operatorName,
+    deviceName:      s.deviceName,
+    collectionName:  s.collectionName,
+    eventFolderName: s.eventFolderName,
+    startedAt:       s.startedAt,
+  }));
+  const queue = _syncSlotQueue.map((r, i) => ({
+    deviceId:     r.deviceId,
+    operatorName: r.operatorName,
+    deviceName:   r.deviceName,
+    position:     i + 1,
+  }));
+  io.emit('sync:slot:status', { slots, queue, maxConcurrent: MAX_CONCURRENT_SYNCS });
+}
+
+function _grantNextSlot() {
+  const now = Date.now();
+  while (_syncSlotQueue.length > 0 && now - _syncSlotQueue[0].requestedAt > QUEUE_TIMEOUT_MS) {
+    _syncSlotQueue.shift();
+  }
+  if (_syncSlots.size >= MAX_CONCURRENT_SYNCS) return;
+  if (_syncSlotQueue.length === 0) return;
+
+  const next   = _syncSlotQueue.shift();
+  const target = io.sockets.sockets.get(next.socketId);
+  if (!target || !target.connected) { _grantNextSlot(); return; } // socket gone — try next
+
+  _syncSlots.set(next.deviceId, { ...next, startedAt: now, lastHeartbeat: now });
+  target.emit('sync:slot:response', { granted: true, jobId: next.jobId });
+  console.log(`[sync-slot] granted to ${next.deviceName || next.deviceId}`);
+}
+
+// Expire stale slots that missed heartbeats (runs every 30 s).
+setInterval(() => {
+  const now = Date.now();
+  let changed = false;
+  for (const [deviceId, slot] of _syncSlots) {
+    if (now - slot.lastHeartbeat > SLOT_TIMEOUT_MS) {
+      _syncSlots.delete(deviceId);
+      console.log(`[sync-slot] expired stale slot for ${slot.deviceName || deviceId}`);
+      changed = true;
+    }
+  }
+  if (changed) { _grantNextSlot(); _broadcastSlotStatus(); }
+}, 30_000);
 
 // ── Registry persistence ──────────────────────────────────────────────────────
 
@@ -266,18 +328,92 @@ io.on('connection', (socket) => {
     socket.emit('device:activity:snapshot', { activities });
   });
 
+  // ── Sync slot coordination ────────────────────────────────────────────────────
+  // Advisory timing gate. Server grants a slot to limit concurrent NAS writers.
+  // Does NOT validate sync correctness — local sync safety rules still apply.
+
+  socket.on('sync:slot:request', (payload) => {
+    const safe       = _truncateStrings(payload || {});
+    const deviceInfo = _devices.get(socket.id) || {};
+    const deviceId   = deviceInfo.deviceId || socket.id;
+
+    // Clear any existing slot or queue entry for this device before re-requesting.
+    _syncSlots.delete(deviceId);
+    const qi = _syncSlotQueue.findIndex(r => r.deviceId === deviceId);
+    if (qi !== -1) _syncSlotQueue.splice(qi, 1);
+
+    const now = Date.now();
+    if (_syncSlots.size < MAX_CONCURRENT_SYNCS) {
+      _syncSlots.set(deviceId, {
+        deviceId,
+        socketId:        socket.id,
+        operatorName:    deviceInfo.operatorName    || null,
+        deviceName:      deviceInfo.deviceDisplayName || null,
+        collectionName:  _s(safe.collectionName),
+        eventFolderName: _s(safe.eventFolderName),
+        jobId:           _s(safe.jobId),
+        startedAt:       now,
+        lastHeartbeat:   now,
+      });
+      socket.emit('sync:slot:response', { granted: true, jobId: safe.jobId });
+      console.log(`[sync-slot] granted immediately to ${deviceInfo.deviceDisplayName || deviceId}`);
+    } else {
+      const position = _syncSlotQueue.length + 1;
+      _syncSlotQueue.push({
+        deviceId,
+        socketId:        socket.id,
+        operatorName:    deviceInfo.operatorName    || null,
+        deviceName:      deviceInfo.deviceDisplayName || null,
+        collectionName:  _s(safe.collectionName),
+        eventFolderName: _s(safe.eventFolderName),
+        jobId:           _s(safe.jobId),
+        requestedAt:     now,
+      });
+      socket.emit('sync:slot:response', { granted: false, queued: true, position, jobId: safe.jobId });
+      console.log(`[sync-slot] queued ${deviceInfo.deviceDisplayName || deviceId} at position ${position}`);
+    }
+    _broadcastSlotStatus();
+  });
+
+  socket.on('sync:slot:heartbeat', () => {
+    const deviceInfo = _devices.get(socket.id) || {};
+    const deviceId   = deviceInfo.deviceId || socket.id;
+    const slot = _syncSlots.get(deviceId);
+    if (slot) slot.lastHeartbeat = Date.now();
+  });
+
+  socket.on('sync:slot:release', () => {
+    const deviceInfo = _devices.get(socket.id) || {};
+    const deviceId   = deviceInfo.deviceId || socket.id;
+    const hadSlot    = _syncSlots.delete(deviceId);
+    const qi = _syncSlotQueue.findIndex(r => r.deviceId === deviceId);
+    if (qi !== -1) _syncSlotQueue.splice(qi, 1);
+    if (hadSlot) {
+      console.log(`[sync-slot] released by ${deviceInfo.deviceDisplayName || deviceId}`);
+      _grantNextSlot();
+    }
+    _broadcastSlotStatus();
+  });
+
   socket.on('disconnect', (reason) => {
     const dev = _devices.get(socket.id);
     const act = _deviceActivity.get(socket.id);
     _devices.delete(socket.id);
     _deviceActivity.delete(socket.id);
 
+    // Release sync slot if held by this socket's device.
+    if (act?.deviceId) {
+      const hadSlot = _syncSlots.delete(act.deviceId);
+      const qi = _syncSlotQueue.findIndex(r => r.deviceId === act.deviceId);
+      if (qi !== -1) _syncSlotQueue.splice(qi, 1);
+      if (hadSlot) { _grantNextSlot(); _broadcastSlotStatus(); }
+    }
+
     // Notify other clients so they can remove this device from Team Live.
     if (act?.deviceId) {
       socket.broadcast.emit('device:offline', { deviceId: act.deviceId });
     }
     console.log(`[disconnect] ${dev?.deviceDisplayName || socket.id} — reason: ${reason} — devices online: ${_devices.size}`);
-    // Broadcast updated device count
     io.emit('dashboard:update', { devicesOnline: _devices.size });
   });
 });

@@ -37,9 +37,18 @@ let _remoteEvents      = []; // { key, collectionName, eventFolderName, eventDis
 const _registry = new Map(); // registryId → entry
 
 // Advisory per-device activity state for Team Live. Never written to disk.
-const _teamDevices   = new Map(); // deviceId → latest activity payload
+const _teamDevices    = new Map(); // deviceId → latest activity payload
 const TL_MAX_ACTIVITY = 100;
-let   _teamActivity  = []; // bounded array, newest first
+let   _teamActivity   = []; // bounded array, newest first
+
+// Per-device health snapshots — advisory, cleared on restart.
+const _teamDeviceHealth = new Map(); // deviceId → health payload
+
+// Last known sync slot status broadcast by server.
+let _lastKnownSlotStatus = null;
+
+// Pending sync slot Promise resolver (for requestSyncSlot).
+let _pendingSlotResolve = null; // { resolve, reject, jobId, timer }
 
 // Last registry entries emitted by this device — re-sent on socket reconnect.
 let _lastRegistryCollEntry = null;
@@ -110,6 +119,7 @@ function _sanitiseDeviceActivity(raw) {
     status:            _sanitiseStr(raw.status)            || null,
     progressCurrent:   (typeof raw.progressCurrent === 'number' && raw.progressCurrent >= 0) ? raw.progressCurrent : null,
     progressTotal:     (typeof raw.progressTotal   === 'number' && raw.progressTotal   >= 0) ? raw.progressTotal   : null,
+    appVersion:        _sanitiseStr(raw.appVersion)        || null,
     ts:                _sanitiseStr(raw.ts)                || new Date().toISOString(),
   };
 }
@@ -272,7 +282,74 @@ function _handleIncoming(eventName, payload) {
       const id = _sanitiseStr(payload.deviceId);
       if (!id) return;
       _teamDevices.delete(id);
+      _teamDeviceHealth.delete(id);
       _broadcast('realtime:team:update', { type: 'device:offline', deviceId: id });
+      break;
+    }
+
+    case 'device:health': {
+      const id = _sanitiseStr(payload.deviceId);
+      if (!id) return;
+      const health = {
+        deviceId:         id,
+        appVersion:       _sanitiseStr(payload.appVersion)  || null,
+        nasConnected:     payload.nasConnected     === true,
+        stagingAvailable: payload.stagingAvailable === true,
+        pendingSyncCount: typeof payload.pendingSyncCount === 'number' ? payload.pendingSyncCount : 0,
+        failedSyncCount:  typeof payload.failedSyncCount  === 'number' ? payload.failedSyncCount  : 0,
+        ts:               _sanitiseStr(payload.ts) || new Date().toISOString(),
+      };
+      _teamDeviceHealth.set(id, health);
+      _broadcast('realtime:team:update', { type: 'device:health', ...health });
+      break;
+    }
+
+    case 'sync:slot:response': {
+      // Response arrives on this socket directly (not broadcast).
+      // Two cases: immediate response to requestSyncSlot(), or deferred grant (was queued).
+      if (payload.granted) {
+        const jobId = _sanitiseStr(payload.jobId);
+        if (_pendingSlotResolve) {
+          const { resolve, timer } = _pendingSlotResolve;
+          clearTimeout(timer);
+          _pendingSlotResolve = null;
+          resolve({ granted: true, jobId });
+        } else {
+          // Deferred grant — device was queued; push to renderer so it can proceed.
+          _broadcast('realtime:syncSlot:granted', { jobId });
+        }
+      } else if (payload.queued && _pendingSlotResolve) {
+        if (_pendingSlotResolve.batchMode) {
+          // Batch mode (waitForSyncSlot): keep the promise open; extend timer to queue lifetime.
+          clearTimeout(_pendingSlotResolve.timer);
+          const { resolve } = _pendingSlotResolve;
+          _pendingSlotResolve.timer = setTimeout(() => {
+            _pendingSlotResolve = null;
+            resolve({ granted: true, fallback: true, timedOut: true });
+          }, 300_000);
+        } else {
+          // Renderer individual-sync mode: resolve immediately so UI can show waiting state.
+          const { resolve, timer } = _pendingSlotResolve;
+          clearTimeout(timer);
+          _pendingSlotResolve = null;
+          resolve({
+            granted:  false,
+            queued:   true,
+            position: typeof payload.position === 'number' ? payload.position : null,
+            jobId:    _sanitiseStr(payload.jobId),
+          });
+        }
+      }
+      break;
+    }
+
+    case 'sync:slot:status': {
+      _lastKnownSlotStatus = {
+        slots:         Array.isArray(payload.slots) ? payload.slots.slice(0, 10)  : [],
+        queue:         Array.isArray(payload.queue) ? payload.queue.slice(0, 20)  : [],
+        maxConcurrent: typeof payload.maxConcurrent === 'number' ? payload.maxConcurrent : 1,
+      };
+      _broadcast('realtime:syncSlot:update', _lastKnownSlotStatus);
       break;
     }
 
@@ -349,7 +426,16 @@ function connect(serverUrl) {
     if (_lastRegistryEvtEntry)  _send('registry:register', _lastRegistryEvtEntry);
   });
 
-  _socket.on('disconnect',     () => { _setStatus('offline'); });
+  _socket.on('disconnect', () => {
+    _setStatus('offline');
+    // Unblock any batch slot wait that is sitting in the queue — fallback so jobs can proceed.
+    if (_pendingSlotResolve) {
+      const { resolve, timer } = _pendingSlotResolve;
+      clearTimeout(timer);
+      _pendingSlotResolve = null;
+      resolve({ granted: true, fallback: true });
+    }
+  });
   _socket.on('connect_error',  () => { _setStatus('offline'); });
   _socket.on('reconnect_attempt', () => { _setStatus('reconnecting'); });
 
@@ -359,6 +445,7 @@ function connect(serverUrl) {
     'conflict:warning',       'dashboard:update',
     'registry:register',      'registry:snapshot',
     'device:activity',        'device:activity:snapshot', 'device:offline',
+    'device:health',          'sync:slot:response',       'sync:slot:status',
   ];
   for (const ev of INCOMING_EVENTS) {
     _socket.on(ev, (payload) => _handleIncoming(ev, payload));
@@ -466,6 +553,7 @@ function getRegistry() {
 function emitDeviceActivity({ mode, collectionName, eventFolderName, photographer, status, progressCurrent, progressTotal } = {}) {
   const VALID_MODES = ['idle', 'importing', 'syncing', 'viewing', 'preparing'];
   const safeMode = VALID_MODES.includes(mode) ? mode : 'idle';
+  const { app } = require('electron');
   _send('device:activity', {
     deviceId:          _getDeviceId(),
     deviceDisplayName: settings.getDeviceDisplayName() || null,
@@ -477,14 +565,97 @@ function emitDeviceActivity({ mode, collectionName, eventFolderName, photographe
     status:            (typeof status === 'string' ? status : null) || null,
     progressCurrent:   (typeof progressCurrent === 'number' && progressCurrent >= 0) ? progressCurrent : null,
     progressTotal:     (typeof progressTotal   === 'number' && progressTotal   >= 0) ? progressTotal   : null,
+    appVersion:        app.getVersion(),
     ts:                new Date().toISOString(),
   });
+}
+
+function emitDeviceHealth({ nasConnected, stagingAvailable, pendingSyncCount, failedSyncCount } = {}) {
+  const { app } = require('electron');
+  _send('device:health', {
+    deviceId:         _getDeviceId(),
+    appVersion:       app.getVersion(),
+    nasConnected:     nasConnected     === true,
+    stagingAvailable: stagingAvailable === true,
+    pendingSyncCount: typeof pendingSyncCount === 'number' ? pendingSyncCount : 0,
+    failedSyncCount:  typeof failedSyncCount  === 'number' ? failedSyncCount  : 0,
+    ts:               new Date().toISOString(),
+  });
+}
+
+function requestSyncSlot(jobId) {
+  if (!_socket || !_socket.connected) {
+    return Promise.resolve({ granted: true, fallback: true });
+  }
+  // Cancel any in-flight pending slot request.
+  if (_pendingSlotResolve) {
+    const { reject, timer } = _pendingSlotResolve;
+    clearTimeout(timer);
+    _pendingSlotResolve = null;
+    reject(new Error('superseded'));
+  }
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      _pendingSlotResolve = null;
+      resolve({ granted: true, fallback: true, timedOut: true }); // safety fallback
+    }, 10_000);
+    _pendingSlotResolve = { resolve, reject, jobId: jobId || null, timer };
+    _send('sync:slot:request', { jobId: jobId || null });
+  });
+}
+
+// waitForSyncSlot: like requestSyncSlot but keeps the Promise open when queued.
+// Resolves only when the slot is actually granted, realtime disconnects, or the
+// queue lifetime expires. Used by batch operations (syncAllReadyJobs) that must
+// not start file copies until coordination is confirmed.
+function waitForSyncSlot(jobId) {
+  if (!_socket || !_socket.connected) {
+    return Promise.resolve({ granted: true, fallback: true });
+  }
+  if (_pendingSlotResolve) {
+    const { reject, timer } = _pendingSlotResolve;
+    clearTimeout(timer);
+    _pendingSlotResolve = null;
+    reject(new Error('superseded'));
+  }
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      _pendingSlotResolve = null;
+      resolve({ granted: true, fallback: true, timedOut: true });
+    }, 10_000);
+    _pendingSlotResolve = { resolve, reject, jobId: jobId || null, timer, batchMode: true };
+    _send('sync:slot:request', { jobId: jobId || null });
+  });
+}
+
+function releaseSyncSlot(jobId) {
+  _send('sync:slot:release', { jobId: jobId || null });
+}
+
+function cancelSyncSlot(jobId) {
+  if (_pendingSlotResolve) {
+    const { reject, timer } = _pendingSlotResolve;
+    clearTimeout(timer);
+    _pendingSlotResolve = null;
+    reject(new Error('cancelled'));
+  }
+  _send('sync:slot:release', { jobId: jobId || null });
+}
+
+function sendSlotHeartbeat(jobId) {
+  _send('sync:slot:heartbeat', { jobId: jobId || null });
+}
+
+function getSyncSlotStatus() {
+  return _lastKnownSlotStatus;
 }
 
 function getTeamLiveSnapshot() {
   return {
     devices:        Array.from(_teamDevices.values()),
+    deviceHealth:   Array.from(_teamDeviceHealth.values()),
     recentActivity: _teamActivity.slice(0, 100),
+    slotStatus:     _lastKnownSlotStatus,
     status:         _status,
   };
 }
@@ -548,6 +719,7 @@ module.exports = {
   getKnownNames,
   getRegistry,
   getTeamLiveSnapshot,
+  getSyncSlotStatus,
   setOperatorName,
   emitCollectionVisible,
   emitEventVisible,
@@ -556,4 +728,10 @@ module.exports = {
   emitImportCompleted,
   emitSyncStatus,
   emitDeviceActivity,
+  emitDeviceHealth,
+  requestSyncSlot,
+  waitForSyncSlot,
+  releaseSyncSlot,
+  cancelSyncSlot,
+  sendSlotHeartbeat,
 };

@@ -233,6 +233,11 @@ contextBridge.exposeInMainWorld('api', {
   verifyJobChecksum:      (jobId)   => ipcRenderer.invoke('archive:verifyJobChecksum',     jobId),
   checkDirectArchiveLocks: (payload) => ipcRenderer.invoke('archive:checkDirectArchiveLocks', payload),
 
+  // ── Sync slot coordination (advisory) ──
+  requestSyncSlot: (jobId) => ipcRenderer.invoke('archive:requestSyncSlot', jobId),
+  releaseSyncSlot: (jobId) => ipcRenderer.invoke('archive:releaseSyncSlot', jobId),
+  cancelSyncSlot:  (jobId) => ipcRenderer.invoke('archive:cancelSyncSlot',  jobId),
+
   // ── Transfer Export ──
   chooseTransferRoot:                    ()                        => ipcRenderer.invoke('archive:chooseTransferRoot'),
   getTransferRoot:                       ()                        => ipcRenderer.invoke('archive:getTransferRoot'),
@@ -353,7 +358,11 @@ contextBridge.exposeInMainWorld('api', {
 
   // ── Team Live (advisory only — never writes authoritative files) ──
   reportTeamActivity: (data) => ipcRenderer.invoke('team:reportActivity', data),
-  onTeamUpdate:       (cb)   => _register('realtime:team:update', (_e, data) => cb(data)),
+  onTeamUpdate:          (cb) => _register('realtime:team:update',    (_e, data) => cb(data)),
+  onSyncSlotGranted:     (cb) => _register('realtime:syncSlot:granted', (_e, data) => cb(data)),
+  onSyncSlotUpdate:      (cb) => _register('realtime:syncSlot:update',  (_e, data) => cb(data)),
+  getTeamLiveSnapshot:   ()   => ipcRenderer.invoke('realtime:getTeamLiveSnapshot'),
+  getAppVersion:         ()   => ipcRenderer.invoke('app:getVersion'),
 
   // ── Realtime Operations (advisory only — never writes authoritative files) ──
   getRealtimeStatus:        ()          => ipcRenderer.invoke('realtime:getStatus'),

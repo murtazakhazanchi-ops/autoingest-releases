@@ -58,6 +58,21 @@ const _jobPauseSignals = new Map();
 // Prevents duplicate concurrent verifyJobChecksum calls for the same job.
 const _verifyingJobIds = new Set();
 
+// ── Device health broadcast (advisory) ───────────────────────────────────────
+async function _emitDeviceHealth() {
+  try {
+    const nasRoot     = settings.getNasRoot();
+    const stagingRoot = settings.getLocalStagingRoot();
+    const summary     = await syncQueueService.getSummary().catch(() => ({ ready: 0, needsAttention: 0, failed: 0 }));
+    realtimeOps.emitDeviceHealth({
+      nasConnected:     !!nasRoot,
+      stagingAvailable: !!stagingRoot,
+      pendingSyncCount: (summary.ready || 0) + (summary.needsAttention || 0),
+      failedSyncCount:  summary.failed || 0,
+    });
+  } catch { /* non-fatal advisory emission */ }
+}
+
 // ── Last imported file pairs for optional checksum verification ───────────────
 // Populated after each import; holds { src, dest } for every copied file.
 let lastImportedFiles = [];
@@ -231,6 +246,9 @@ app.whenReady().then(() => {
   loadImportIndex();
   settings.init();
   realtimeOps.init();
+  // Emit initial health snapshot after a short startup delay, then every 60 s.
+  setTimeout(_emitDeviceHealth, 6000);
+  setInterval(_emitDeviceHealth, 60_000);
   listManager.init(app.getPath('userData'));
   aliasEngine.init(app.getPath('userData'));
   telemetry.init();
@@ -2501,6 +2519,8 @@ ipcMain.handle('archive:syncJobNow', async (_event, jobId) => {
   }
 
   _syncingJobIds.add(jobId);
+  // Send periodic heartbeats to keep the sync slot alive while copying.
+  const _slotHeartbeatTimer = setInterval(() => realtimeOps.sendSlotHeartbeat(jobId), 15_000);
   await syncQueueService.updateJob(jobId, { status: 'syncing', syncStartedAt: Date.now() });
   realtimeOps.emitSyncStatus({
     jobId,
@@ -2600,6 +2620,7 @@ ipcMain.handle('archive:syncJobNow', async (_event, jobId) => {
     });
     return { ok: false, error: err.message };
   } finally {
+    clearInterval(_slotHeartbeatTimer);
     _syncingJobIds.delete(jobId);
     _jobPauseSignals.delete(jobId);
   }
@@ -2671,58 +2692,69 @@ ipcMain.handle('archive:syncAllReadyJobs', async () => {
   if (!nasRoot)     return { ok: false, error: 'Active Archive Root not configured' };
   if (!stagingRoot) return { ok: false, error: 'Local Staging Root not configured' };
 
+  // Wait for sync slot — blocks until actually granted (not a timed bypass).
+  // Falls back immediately if realtime is unavailable or unresponsive.
+  let _batchSlotGranted = false;
+  try {
+    const slotResult = await realtimeOps.waitForSyncSlot('syncAllReady');
+    _batchSlotGranted = !slotResult.fallback;
+  } catch { /* non-fatal — proceed without slot coordination */ }
+
   const { jobs } = await syncQueueService.getQueue();
   const eligible  = (jobs || []).filter(j => j.status === 'ready-for-sync');
 
   const results = [];
   const totals  = { copiedToArchive: 0, skippedDuplicates: 0, renamedConflicts: 0, errors: 0 };
-  for (const job of eligible) {
-    if (_syncingJobIds.has(job.jobId)) { results.push({ jobId: job.jobId, skipped: true }); continue; }
+  try {
+    for (const job of eligible) {
+      if (_syncingJobIds.has(job.jobId)) { results.push({ jobId: job.jobId, skipped: true }); continue; }
 
-    _syncingJobIds.add(job.jobId);
-    await syncQueueService.updateJob(job.jobId, { status: 'syncing', syncStartedAt: Date.now() });
-    // Load per-job files[] from manifest for targeted sync.
-    let _jobFiles = null;
-    if (job.importId && job.localEventPath) {
+      _syncingJobIds.add(job.jobId);
+      await syncQueueService.updateJob(job.jobId, { status: 'syncing', syncStartedAt: Date.now() });
+      // Load per-job files[] from manifest for targeted sync.
+      let _jobFiles = null;
+      if (job.importId && job.localEventPath) {
+        try {
+          const _m = await localSyncManifest.readManifest(job.localEventPath);
+          const _mj = Array.isArray(_m?.jobs) ? _m.jobs.find(j => j.importId === job.importId) : null;
+          if (Array.isArray(_mj?.files) && _mj.files.length > 0) _jobFiles = _mj.files;
+        } catch { /* non-fatal */ }
+      }
+      const _batchPause = { paused: false };
+      _jobPauseSignals.set(job.jobId, _batchPause);
+      const _batchProgress = (progress) => {
+        const w = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
+        if (w) w.webContents.send('sync:jobProgress', { jobId: job.jobId, ...progress });
+      };
       try {
-        const _m = await localSyncManifest.readManifest(job.localEventPath);
-        const _mj = Array.isArray(_m?.jobs) ? _m.jobs.find(j => j.importId === job.importId) : null;
-        if (Array.isArray(_mj?.files) && _mj.files.length > 0) _jobFiles = _mj.files;
-      } catch { /* non-fatal */ }
+        const syncResult = await archiveSyncService.syncJob(
+          { ...job, files: _jobFiles },
+          { nasRoot, stagingRoot },
+          { progressCallback: _batchProgress, pauseSignal: _batchPause },
+        );
+        await syncQueueService.updateJob(job.jobId, {
+          status:        syncResult.status,
+          syncResult,
+          syncedAt:      syncResult.syncedAt || null,
+          syncStartedAt: syncResult.syncStartedAt,
+        });
+        totals.copiedToArchive   += syncResult.copiedToArchive   || 0;
+        totals.skippedDuplicates += syncResult.skippedDuplicates || 0;
+        totals.renamedConflicts  += syncResult.renamedConflicts  || 0;
+        totals.errors            += syncResult.errors?.length    || 0;
+        results.push({ jobId: job.jobId, status: syncResult.status });
+      } catch (err) {
+        await syncQueueService.updateJob(job.jobId, { status: 'sync-failed', syncError: err.message });
+        totals.errors++;
+        results.push({ jobId: job.jobId, status: 'sync-failed', error: err.message });
+      } finally {
+        _syncingJobIds.delete(job.jobId);
+        _jobPauseSignals.delete(job.jobId);
+      }
     }
-    const _batchPause = { paused: false };
-    _jobPauseSignals.set(job.jobId, _batchPause);
-    const _batchProgress = (progress) => {
-      const w = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
-      if (w) w.webContents.send('sync:jobProgress', { jobId: job.jobId, ...progress });
-    };
-    try {
-      const syncResult = await archiveSyncService.syncJob(
-        { ...job, files: _jobFiles },
-        { nasRoot, stagingRoot },
-        { progressCallback: _batchProgress, pauseSignal: _batchPause },
-      );
-      await syncQueueService.updateJob(job.jobId, {
-        status:        syncResult.status,
-        syncResult,
-        syncedAt:      syncResult.syncedAt || null,
-        syncStartedAt: syncResult.syncStartedAt,
-      });
-      totals.copiedToArchive   += syncResult.copiedToArchive   || 0;
-      totals.skippedDuplicates += syncResult.skippedDuplicates || 0;
-      totals.renamedConflicts  += syncResult.renamedConflicts  || 0;
-      totals.errors            += syncResult.errors?.length    || 0;
-      results.push({ jobId: job.jobId, status: syncResult.status });
-    } catch (err) {
-      await syncQueueService.updateJob(job.jobId, { status: 'sync-failed', syncError: err.message });
-      totals.errors++;
-      results.push({ jobId: job.jobId, status: 'sync-failed', error: err.message });
-    } finally {
-      _syncingJobIds.delete(job.jobId);
-      _jobPauseSignals.delete(job.jobId);
-    }
+  } finally {
+    if (_batchSlotGranted) realtimeOps.releaseSyncSlot('syncAllReady');
   }
-
   return { ok: true, processed: results.length, results, totals };
 });
 
@@ -3855,6 +3887,29 @@ ipcMain.handle('team:reportActivity', (_event, data) => {
   if (!data || typeof data !== 'object') return { ok: false };
   const { mode, collectionName, eventFolderName, status } = data;
   realtimeOps.emitDeviceActivity({ mode, collectionName, eventFolderName, status });
+  return { ok: true };
+});
+
+ipcMain.handle('realtime:getTeamLiveSnapshot', () => realtimeOps.getTeamLiveSnapshot());
+ipcMain.handle('realtime:getSyncSlotStatus',   () => realtimeOps.getSyncSlotStatus());
+
+// App version — renderer uses this for version mismatch display in Team Live.
+ipcMain.handle('app:getVersion', () => app.getVersion());
+
+// ── Sync slot coordination IPC (advisory; delegates to realtimeOperationsService) ──
+ipcMain.handle('archive:requestSyncSlot', async (_event, jobId) => {
+  if (!jobId || typeof jobId !== 'string') return { granted: true, fallback: true };
+  try { return await realtimeOps.requestSyncSlot(jobId); }
+  catch { return { granted: true, fallback: true }; }
+});
+
+ipcMain.handle('archive:releaseSyncSlot', (_event, jobId) => {
+  if (jobId && typeof jobId === 'string') realtimeOps.releaseSyncSlot(jobId);
+  return { ok: true };
+});
+
+ipcMain.handle('archive:cancelSyncSlot', (_event, jobId) => {
+  if (jobId && typeof jobId === 'string') realtimeOps.cancelSyncSlot(jobId);
   return { ok: true };
 });
 
