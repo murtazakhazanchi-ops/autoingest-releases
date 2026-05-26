@@ -4088,6 +4088,16 @@ ${unparseable.map(ev => `
       return;
     }
 
+    // Advisory: report viewing activity to Team Live (non-blocking, fire-and-forget).
+    if (window.api?.reportTeamActivity) {
+      window.api.reportTeamActivity({
+        mode:            'viewing',
+        collectionName:  coll.name || null,
+        eventFolderName: lastEvent.name || null,
+        status:          'viewing',
+      }).catch(() => {});
+    }
+
     const isMulti   = lastEvent.components.length > 1;
     const modeLabel = isMulti ? 'Multi-component' : 'Single component';
 

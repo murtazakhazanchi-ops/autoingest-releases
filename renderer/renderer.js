@@ -1340,17 +1340,238 @@ function _renderHomeContextBar() {
 let _alEventList        = null;
 let _alMasterPath       = null;
 let _alCurrentEventPath = null;
+let _alActiveMode       = 'local'; // 'local' | 'team'
+
+// ── Team Live advisory state (never written to disk) ─────────────────────────
+const _teamDevices    = new Map(); // deviceId → latest activity
+const TL_MAX_ACTIVITY = 100;
+let   _teamActivity   = [];        // bounded, newest first
+const TL_STALE_MS      = 2 * 60 * 1000; // 2 min → Inactive
+const TL_VERY_STALE_MS = 5 * 60 * 1000; // 5 min → Recently Seen section
+let   _tlRefreshTimer  = null;
 
 function _alClose() {
+  _stopTeamLiveTimer();
   const overlay = document.getElementById('activityLogModal');
   if (overlay) overlay.classList.remove('open');
   document.body.style.overflow = '';
   _alEventList        = null;
   _alMasterPath       = null;
   _alCurrentEventPath = null;
+  _alActiveMode       = 'local';
   const pickerRow = document.getElementById('alPickerRow');
-  if (pickerRow) pickerRow.innerHTML = '';
+  if (pickerRow) { pickerRow.innerHTML = ''; pickerRow.style.display = ''; }
   document.getElementById('ovActivityLog')?.focus();
+}
+
+function _wireAlModeTabs() {
+  const body = document.getElementById('alBody');
+  if (!body) return;
+  body.querySelectorAll('.al-mode-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const mode = btn.dataset.mode;
+      if (_alActiveMode === mode) return;
+      _alActiveMode = mode;
+      body.querySelectorAll('.al-mode-tab').forEach(b => {
+        const active = b.dataset.mode === mode;
+        b.classList.toggle('al-mode-tab--active', active);
+        b.setAttribute('aria-selected', String(active));
+      });
+      const localPanel = document.getElementById('alLocalPanel');
+      const teamPanel  = document.getElementById('alTeamPanel');
+      if (localPanel) localPanel.hidden = mode !== 'local';
+      if (teamPanel)  teamPanel.hidden  = mode !== 'team';
+      const pickerRow = document.getElementById('alPickerRow');
+      if (pickerRow) pickerRow.style.display = mode === 'local' ? '' : 'none';
+      if (mode === 'team') { _refreshTeamLivePanel(); _startTeamLiveTimer(); }
+      else                 { _stopTeamLiveTimer(); }
+    });
+  });
+}
+
+function _refreshTeamLivePanel() {
+  const panel = document.getElementById('alTeamPanel');
+  if (panel) panel.innerHTML = _renderTeamLiveBody();
+}
+
+function _startTeamLiveTimer() {
+  if (_tlRefreshTimer) return;
+  _tlRefreshTimer = setInterval(_refreshTeamLivePanel, 30_000);
+}
+
+function _stopTeamLiveTimer() {
+  if (_tlRefreshTimer) { clearInterval(_tlRefreshTimer); _tlRefreshTimer = null; }
+}
+
+function _tlModeLabel(mode) {
+  switch (mode) {
+    case 'importing':  return 'Importing';
+    case 'syncing':    return 'Syncing';
+    case 'viewing':    return 'Viewing event';
+    case 'preparing':  return 'Preparing';
+    default:           return 'Idle';
+  }
+}
+
+function _tlInitials(name) {
+  if (!name) return '??';
+  return name.split(/\s+/).map(w => w[0] || '').join('').slice(0, 2).toUpperCase() || '??';
+}
+
+function _tlRelativeTime(iso) {
+  if (!iso) return '';
+  const diff = Date.now() - new Date(iso).getTime();
+  if (diff < 60000)    return 'just now';
+  if (diff < 3600000)  return `${Math.floor(diff / 60000)}m ago`;
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+  return `${Math.floor(diff / 86400000)}d ago`;
+}
+
+function _tlActivityLabel(item) {
+  const name = item.eventFolderName ? escapeHtml(item.eventFolderName) : null;
+  switch (item.mode) {
+    case 'importing':  return name ? `importing into ${name}` : 'importing';
+    case 'syncing':    return name ? `syncing ${name}` : 'syncing';
+    case 'viewing':    return name ? `viewing ${name}` : 'viewing event';
+    case 'preparing':  return 'preparing event';
+    default:           return item.status ? escapeHtml(item.status) : 'idle';
+  }
+}
+
+function _tlDeviceCard(d, stale) {
+  const initials   = _tlInitials(d.deviceDisplayName || d.operatorName || '');
+  const now        = Date.now();
+  const age        = now - new Date(d.updatedAt || 0).getTime();
+  const isStale    = stale || age >= TL_STALE_MS;
+  const modeLabel  = isStale ? 'Inactive' : _tlModeLabel(d.mode);
+  const dotMode    = isStale ? 'idle' : escapeHtml(d.mode || 'idle');
+  const collLabel  = d.collectionName  ? escapeHtml(d.collectionName)  : null;
+  const eventLabel = d.eventFolderName ? escapeHtml(d.eventFolderName) : null;
+  const photoLabel = d.photographer    ? escapeHtml(d.photographer)    : null;
+
+  const hasProgress = !isStale && (d.mode === 'importing' || d.mode === 'syncing')
+    && typeof d.progressTotal === 'number' && d.progressTotal > 0;
+  const pct = hasProgress
+    ? Math.round(Math.min(100, ((d.progressCurrent || 0) / d.progressTotal) * 100))
+    : 0;
+  const progressHTML = hasProgress ? `
+    <div class="tl-progress">
+      <div class="tl-progress-bar${d.mode === 'syncing' ? ' tl-progress-bar--syncing' : ''}"
+           style="width:${pct}%"></div>
+    </div>` : '';
+
+  return `
+    <div class="tl-device-card${isStale ? ' tl-device-card--stale' : ''}">
+      <div class="tl-device-avatar">${escapeHtml(initials)}</div>
+      <div class="tl-device-info">
+        <p class="tl-device-name">${escapeHtml(d.deviceDisplayName || d.deviceId || 'Unknown')}</p>
+        ${d.operatorName ? `<p class="tl-device-operator">${escapeHtml(d.operatorName)}</p>` : ''}
+        <div class="tl-device-status">
+          <span class="tl-status-dot tl-status-dot--${dotMode}"></span>
+          <span class="tl-status-label">${modeLabel}</span>
+          ${!isStale && collLabel  ? `<span class="tl-status-sep">·</span><span class="tl-status-ctx" title="${collLabel}">${collLabel}</span>` : ''}
+          ${!isStale && eventLabel ? `<span class="tl-status-sep">/</span><span class="tl-status-ctx" title="${eventLabel}">${eventLabel}</span>` : ''}
+        </div>
+        ${!isStale && photoLabel ? `<p class="tl-device-photographer">${photoLabel}</p>` : ''}
+        ${progressHTML}
+      </div>
+      <div class="tl-device-time">${_tlRelativeTime(d.updatedAt)}</div>
+    </div>`;
+}
+
+function _renderTeamLiveBody() {
+  const now     = Date.now();
+  const devices = Array.from(_teamDevices.values());
+
+  if (devices.length === 0) {
+    return `
+      <div class="tl-empty">
+        <div class="tl-empty-icon">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.56 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+        </div>
+        <div class="tl-empty-title">No team devices online</div>
+        <p class="tl-empty-sub">Other devices connected to the same realtime server will appear here when active.</p>
+      </div>`;
+  }
+
+  const active    = devices.filter(d => (now - new Date(d.updatedAt || 0).getTime()) < TL_STALE_MS);
+  const stale     = devices.filter(d => { const age = now - new Date(d.updatedAt || 0).getTime(); return age >= TL_STALE_MS && age < TL_VERY_STALE_MS; });
+  const veryStale = devices.filter(d => (now - new Date(d.updatedAt || 0).getTime()) >= TL_VERY_STALE_MS);
+
+  const activeHTML = active.length > 0
+    ? `<p class="tl-section-label">Devices (${active.length})</p>
+       <div class="tl-device-list">${active.map(d => _tlDeviceCard(d, false)).join('')}</div>`
+    : `<p class="tl-section-label">Devices</p>
+       <p class="tl-empty-sub" style="padding:12px 0 4px">No active devices right now.</p>`;
+
+  const staleHTML = stale.length > 0
+    ? `<div class="tl-device-list">${stale.map(d => _tlDeviceCard(d, true)).join('')}</div>`
+    : '';
+
+  const veryStaleHTML = veryStale.length > 0 ? `
+    <div class="tl-recently-seen">
+      <p class="tl-recently-seen-label">Recently Seen</p>
+      <div class="tl-device-list">${veryStale.map(d => _tlDeviceCard(d, true)).join('')}</div>
+    </div>` : '';
+
+  const recentItems = _teamActivity.slice(0, 20);
+  const feedHTML = recentItems.length > 0 ? `
+    <div class="tl-feed">
+      <p class="tl-feed-label">Recent activity</p>
+      ${recentItems.map(item => `
+        <div class="tl-feed-item">
+          <span class="tl-feed-device">${escapeHtml(item.deviceDisplayName || item.deviceId || '?')}</span>
+          <span class="tl-feed-action">${_tlActivityLabel(item)}</span>
+          <span class="tl-feed-time">${_tlRelativeTime(item.ts)}</span>
+        </div>`).join('')}
+    </div>` : '';
+
+  return `
+    <div class="tl-wrap">
+      ${activeHTML}
+      ${staleHTML}
+      ${veryStaleHTML}
+      ${feedHTML}
+    </div>`;
+}
+
+function _onTeamUpdate(data) {
+  if (!data || typeof data !== 'object') return;
+
+  if (data.type === 'device:activity') {
+    const { deviceId, deviceDisplayName, operatorName, photographer, mode,
+            collectionName, eventFolderName, status, progressCurrent, progressTotal, ts } = data;
+    if (!deviceId) return;
+    _teamDevices.set(deviceId, {
+      deviceId, deviceDisplayName, operatorName, photographer, mode,
+      collectionName, eventFolderName, status,
+      progressCurrent: typeof progressCurrent === 'number' ? progressCurrent : null,
+      progressTotal:   typeof progressTotal   === 'number' ? progressTotal   : null,
+      updatedAt: ts || new Date().toISOString(),
+    });
+    // Only add to feed on meaningful state changes, not throttled progress ticks.
+    const prev = _teamActivity[0];
+    const isSameMode = prev?.deviceId === deviceId && prev?.mode === mode && prev?.eventFolderName === eventFolderName;
+    if (!isSameMode) {
+      _teamActivity = [
+        { deviceId, deviceDisplayName, operatorName, photographer, mode, collectionName, eventFolderName, status, ts: ts || new Date().toISOString() },
+        ..._teamActivity,
+      ].slice(0, TL_MAX_ACTIVITY);
+    }
+  } else if (data.type === 'device:activity:snapshot') {
+    const activities = Array.isArray(data.activities) ? data.activities : [];
+    for (const act of activities) {
+      if (act?.deviceId && !_teamDevices.has(act.deviceId)) {
+        _teamDevices.set(act.deviceId, { ...act, updatedAt: act.ts || act.updatedAt || new Date().toISOString() });
+      }
+    }
+  } else if (data.type === 'device:offline') {
+    if (data.deviceId) _teamDevices.delete(data.deviceId);
+  }
+
+  if (_alActiveMode === 'team' && document.getElementById('activityLogModal')?.classList.contains('open')) {
+    _refreshTeamLivePanel();
+  }
 }
 
 async function _loadDurableMetaRun(eventPath) {
@@ -1938,11 +2159,11 @@ function _renderAlPicker(events, activeFolder) {
 }
 
 async function _onAlPickerChange(e) {
-  const folderName = e.target.value;
-  const activeData = EventCreator.getActiveEventData();
-  const body       = document.getElementById('alBody');
-  if (!body || !folderName || !_alMasterPath) return;
-  body.innerHTML = '';
+  const folderName  = e.target.value;
+  const activeData  = EventCreator.getActiveEventData();
+  const localPanel  = document.getElementById('alLocalPanel');
+  if (!localPanel || !folderName || !_alMasterPath) return;
+  localPanel.innerHTML = '';
 
   let ev = null;
   try {
@@ -1952,8 +2173,8 @@ async function _onAlPickerChange(e) {
   const ctx = folderName === (activeData?.event?.name || '')
     ? activeData
     : { coll: activeData?.coll, event: { name: folderName } };
-  body.innerHTML = _renderActivityLogBody(ev, ctx, folderName);
-  _alCurrentEventPath = _alMasterPath ? (_alMasterPath + '/' + folderName) : null;
+  localPanel.innerHTML = _renderActivityLogBody(ev, ctx, folderName);
+  _alCurrentEventPath  = _alMasterPath ? (_alMasterPath + '/' + folderName) : null;
   _wireAlVerifyBtn();
   _wireAlTabs();
   _wireAlRetryBtn();
@@ -1972,12 +2193,27 @@ async function openActivityLogModal(opts = {}) {
 
   overlay.classList.add('open');
   document.body.style.overflow = 'hidden';
+  _alActiveMode = 'local';
   body.innerHTML = '';
-  if (pickerRow) pickerRow.innerHTML = '';
+  if (pickerRow) { pickerRow.innerHTML = ''; pickerRow.style.display = ''; }
   setTimeout(() => document.getElementById('alCloseFooterBtn')?.focus(), 200);
 
+  // Build shell with mode tabs and two panels — Team Live is always accessible.
+  body.innerHTML = `
+    <div class="al-mode-tabs" role="tablist" aria-label="Activity view">
+      <button class="al-mode-tab al-mode-tab--active" data-mode="local" role="tab" aria-selected="true">Local Activity</button>
+      <button class="al-mode-tab" data-mode="team" role="tab" aria-selected="false">Team Live</button>
+    </div>
+    <div id="alLocalPanel" class="al-mode-panel"></div>
+    <div id="alTeamPanel"  class="al-mode-panel" hidden></div>`;
+
+  _wireAlModeTabs();
+  document.getElementById('alTeamPanel').innerHTML = _renderTeamLiveBody();
+
+  const localPanel = document.getElementById('alLocalPanel');
+
   if (importMode !== 'event') {
-    body.innerHTML = `
+    localPanel.innerHTML = `
       <div class="al-empty">
         <div class="al-empty-icon">
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
@@ -1992,7 +2228,7 @@ async function openActivityLogModal(opts = {}) {
   const activeData = EventCreator.getActiveEventData();
 
   if (!activeData?.eventPath) {
-    body.innerHTML = `
+    localPanel.innerHTML = `
       <div class="al-empty">
         <div class="al-empty-icon">
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -2003,12 +2239,22 @@ async function openActivityLogModal(opts = {}) {
     return;
   }
 
-  // Load active event immediately while scan runs in parallel
+  // Emit advisory "viewing" signal to team (non-blocking, fire-and-forget).
+  if (window.api.reportTeamActivity) {
+    window.api.reportTeamActivity({
+      mode:            'viewing',
+      collectionName:  activeData.coll?.name || null,
+      eventFolderName: activeData.event?.name || null,
+      status:          'viewing',
+    }).catch(() => {});
+  }
+
+  // Load active event immediately while scan runs in parallel.
   let currentEvent = null;
   try {
     currentEvent = await window.api.readEventJson(activeData.eventPath);
   } catch {
-    body.innerHTML = `
+    localPanel.innerHTML = `
       <div class="al-empty">
         <div class="al-empty-icon">
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -2020,7 +2266,7 @@ async function openActivityLogModal(opts = {}) {
   }
 
   if (!currentEvent) {
-    body.innerHTML = `
+    localPanel.innerHTML = `
       <div class="al-empty">
         <div class="al-empty-icon">
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
@@ -2032,7 +2278,7 @@ async function openActivityLogModal(opts = {}) {
   }
 
   const activeFolder = activeData.event?.name || '';
-  body.innerHTML = _renderActivityLogBody(currentEvent, activeData, activeFolder);
+  localPanel.innerHTML = _renderActivityLogBody(currentEvent, activeData, activeFolder);
   _alCurrentEventPath = activeData.eventPath || null;
   _wireAlVerifyBtn();
   _wireAlTabs();
@@ -2044,7 +2290,7 @@ async function openActivityLogModal(opts = {}) {
     _loadDurableMetaRun(_alCurrentEventPath).then(() => _refreshAlMetadataPanel());
   }
 
-  // If caller requested a specific tab, activate it programmatically
+  // If caller requested a specific inner tab, activate it programmatically.
   if (opts.tab) {
     const tabsEl = body.querySelector('.al-tabs');
     const targetBtn = tabsEl?.querySelector(`.al-tab-btn[data-tab="${opts.tab}"]`);
@@ -2055,7 +2301,7 @@ async function openActivityLogModal(opts = {}) {
     }
   }
 
-  // Scan master for all events to populate picker
+  // Scan master for all events to populate picker.
   if (!master?.path) return;
   _alMasterPath = master.path;
   let rawList = [];
@@ -8638,6 +8884,9 @@ async function initApp() {
         EventCreator.onRegistryEntry(entry);
       }
     });
+  }
+  if (window.api.onTeamUpdate) {
+    window.api.onTeamUpdate(_onTeamUpdate);
   }
   if (window.api.getRealtimeStatus) {
     window.api.getRealtimeStatus()

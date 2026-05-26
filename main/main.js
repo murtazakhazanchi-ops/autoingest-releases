@@ -505,7 +505,7 @@ ipcMain.handle('files:import', async (event, { filePaths, destination, importedB
   return result;
 });
 
-async function importFileJobs(event, fileJobs) {
+async function importFileJobs(event, fileJobs, onTeamProgress = null) {
   if (!Array.isArray(fileJobs) || fileJobs.length === 0) {
     return { copied: 0, skipped: 0, errors: 0, skippedReasons: [], failedFiles: [], duration: 0, integrity: 'verified' };
   }
@@ -536,6 +536,7 @@ async function importFileJobs(event, fileJobs) {
         if (fileIndex % 10 === 0) {
           perf.importSpeedSample(bytesCopiedSoFar, Date.now() - importStartMs);
         }
+        if (onTeamProgress) onTeamProgress(progress.completedCount, progress.total);
       }
     });
   } catch (err) {
@@ -781,9 +782,37 @@ ipcMain.handle('import:commitTransaction', async (event, {
       }
     }
 
+    // Advisory: broadcast import start to Team Live (non-blocking, fire-and-forget).
+    realtimeOps.emitDeviceActivity({
+      mode:            'importing',
+      collectionName:  collName || null,
+      eventFolderName: eventJsonPath ? path.basename(eventJsonPath) : null,
+      photographer:    photographer || null,
+      progressCurrent: 0,
+      progressTotal:   fileJobs.length,
+      status:          'Importing',
+    });
+
+    // Throttled team progress callback — fires at most once per second during copy.
+    let _tlImportThrottleTs = 0;
+    const _teamImportProgress = (current, total) => {
+      const now = Date.now();
+      if (now - _tlImportThrottleTs < 1000) return;
+      _tlImportThrottleTs = now;
+      realtimeOps.emitDeviceActivity({
+        mode:            'importing',
+        collectionName:  collName || null,
+        eventFolderName: eventJsonPath ? path.basename(eventJsonPath) : null,
+        photographer:    photographer || null,
+        progressCurrent: current,
+        progressTotal:   total,
+        status:          `${current} of ${total}`,
+      });
+    };
+
     let result;
     try {
-      result = await importFileJobs(event, fileJobs);
+      result = await importFileJobs(event, fileJobs, _teamImportProgress);
     } catch (err) {
       // Copy failed — no archive writes completed; release locks immediately.
       _releaseDirectNasLocks(_directNasLocks);
@@ -982,6 +1011,12 @@ ipcMain.handle('import:commitTransaction', async (event, {
       photographer:    photographer || null,
       completedFiles:  result.copied || 0,
       totalFiles:      (result.copied || 0) + (result.skipped || 0) + (result.errors || 0),
+    });
+    realtimeOps.emitDeviceActivity({
+      mode:            'idle',
+      collectionName:  collName || null,
+      eventFolderName: eventJsonPath ? path.basename(eventJsonPath) : null,
+      status:          'import-complete',
     });
 
     return result;
@@ -2465,6 +2500,15 @@ ipcMain.handle('archive:syncJobNow', async (_event, jobId) => {
     photographer:    job.photographer || null,
     status:          'syncing',
   });
+  realtimeOps.emitDeviceActivity({
+    mode:            'syncing',
+    collectionName:  job.localEventPath ? path.basename(path.dirname(job.localEventPath)) : null,
+    eventFolderName: job.localEventPath ? path.basename(job.localEventPath) : null,
+    photographer:    job.photographer || null,
+    progressCurrent: 0,
+    progressTotal:   null,
+    status:          'Syncing',
+  });
 
   // Load per-job files[] from manifest so syncJob can target exactly those files.
   let jobFiles = null;
@@ -2483,9 +2527,25 @@ ipcMain.handle('archive:syncJobNow', async (_event, jobId) => {
   const pauseSignal = { paused: false };
   _jobPauseSignals.set(jobId, pauseSignal);
 
+  let _tlSyncThrottleTs = 0;
   const progressCallback = (progress) => {
     const w = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
     if (w) w.webContents.send('sync:jobProgress', { jobId, ...progress });
+
+    // Throttled advisory team activity update — at most once per second.
+    const now = Date.now();
+    if (now - _tlSyncThrottleTs >= 1000) {
+      _tlSyncThrottleTs = now;
+      realtimeOps.emitDeviceActivity({
+        mode:            'syncing',
+        collectionName:  job.localEventPath ? path.basename(path.dirname(job.localEventPath)) : null,
+        eventFolderName: job.localEventPath ? path.basename(job.localEventPath) : null,
+        photographer:    job.photographer || null,
+        progressCurrent: progress.completedFiles || 0,
+        progressTotal:   progress.totalFiles || 0,
+        status:          `${progress.completedFiles || 0} of ${progress.totalFiles || 0}`,
+      });
+    }
   };
 
   try {
@@ -2507,6 +2567,12 @@ ipcMain.handle('archive:syncJobNow', async (_event, jobId) => {
       photographer:    job.photographer || null,
       status:          syncResult.status || 'synced',
     });
+    realtimeOps.emitDeviceActivity({
+      mode:            'idle',
+      collectionName:  job.localEventPath ? path.basename(path.dirname(job.localEventPath)) : null,
+      eventFolderName: job.localEventPath ? path.basename(job.localEventPath) : null,
+      status:          syncResult.status || 'synced',
+    });
     return { ok: syncResult.ok, syncResult };
   } catch (err) {
     await syncQueueService.updateJob(jobId, { status: 'sync-failed', syncError: err.message });
@@ -2515,6 +2581,12 @@ ipcMain.handle('archive:syncJobNow', async (_event, jobId) => {
       collectionName:  job?.localEventPath ? path.basename(path.dirname(job.localEventPath)) : null,
       eventFolderName: job?.localEventPath ? path.basename(job.localEventPath) : null,
       photographer:    job?.photographer || null,
+      status:          'sync-failed',
+    });
+    realtimeOps.emitDeviceActivity({
+      mode:            'idle',
+      collectionName:  job?.localEventPath ? path.basename(path.dirname(job.localEventPath)) : null,
+      eventFolderName: job?.localEventPath ? path.basename(job.localEventPath) : null,
       status:          'sync-failed',
     });
     return { ok: false, error: err.message };
@@ -3727,6 +3799,15 @@ ipcMain.handle('event:prepareFromRegistry', async (_event, { entry } = {}) => {
 ipcMain.handle('realtime:getStatus', () => realtimeOps.getStatus());
 
 ipcMain.handle('realtime:getKnownNames', () => realtimeOps.getKnownNames());
+
+// Team Live activity reporting (advisory only — never writes authoritative files).
+// Renderer calls this when navigating to an event (viewing) or to report live state.
+ipcMain.handle('team:reportActivity', (_event, data) => {
+  if (!data || typeof data !== 'object') return { ok: false };
+  const { mode, collectionName, eventFolderName, status } = data;
+  realtimeOps.emitDeviceActivity({ mode, collectionName, eventFolderName, status });
+  return { ok: true };
+});
 
 ipcMain.handle('realtime:configure', async (_event, cfg) => {
   if (!cfg || typeof cfg !== 'object') return { ok: false, error: 'Invalid config' };

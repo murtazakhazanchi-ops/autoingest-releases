@@ -351,6 +351,10 @@ contextBridge.exposeInMainWorld('api', {
   prepareEventFromRegistry:      (params) => ipcRenderer.invoke('event:prepareFromRegistry',      params),
   onRealtimeRegistryEntry:       (cb)     => _register('realtime:registry:entry', (_e, ev) => cb(ev)),
 
+  // ── Team Live (advisory only — never writes authoritative files) ──
+  reportTeamActivity: (data) => ipcRenderer.invoke('team:reportActivity', data),
+  onTeamUpdate:       (cb)   => _register('realtime:team:update', (_e, data) => cb(data)),
+
   // ── Realtime Operations (advisory only — never writes authoritative files) ──
   getRealtimeStatus:        ()    => ipcRenderer.invoke('realtime:getStatus'),
   configureRealtime:        (cfg) => ipcRenderer.invoke('realtime:configure', cfg),

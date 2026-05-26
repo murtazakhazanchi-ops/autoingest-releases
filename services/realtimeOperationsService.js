@@ -36,6 +36,11 @@ let _remoteEvents      = []; // { key, collectionName, eventFolderName, eventDis
 // Keyed by registryId. Ephemeral — cleared on service restart.
 const _registry = new Map(); // registryId → entry
 
+// Advisory per-device activity state for Team Live. Never written to disk.
+const _teamDevices   = new Map(); // deviceId → latest activity payload
+const TL_MAX_ACTIVITY = 100;
+let   _teamActivity  = []; // bounded array, newest first
+
 // Throttle map for outbound import/sync events: key → lastEmitMs
 const _throttle   = new Map();
 const THROTTLE_MS = 2000;
@@ -85,6 +90,24 @@ function _sanitiseStr(v, max = 512) {
   if (typeof v !== 'string') return null;
   const s = v.trim().slice(0, max);
   return s.length > 0 ? s : null;
+}
+
+function _sanitiseDeviceActivity(raw) {
+  const VALID_MODES = ['idle', 'importing', 'syncing', 'viewing', 'preparing'];
+  const mode = _sanitiseStr(raw.mode);
+  return {
+    deviceId:          _sanitiseStr(raw.deviceId),
+    deviceDisplayName: _sanitiseStr(raw.deviceDisplayName) || null,
+    operatorName:      _sanitiseStr(raw.operatorName)      || null,
+    photographer:      _sanitiseStr(raw.photographer)      || null,
+    mode:              VALID_MODES.includes(mode) ? mode : 'idle',
+    collectionName:    _sanitiseStr(raw.collectionName)    || null,
+    eventFolderName:   _sanitiseStr(raw.eventFolderName)   || null,
+    status:            _sanitiseStr(raw.status)            || null,
+    progressCurrent:   (typeof raw.progressCurrent === 'number' && raw.progressCurrent >= 0) ? raw.progressCurrent : null,
+    progressTotal:     (typeof raw.progressTotal   === 'number' && raw.progressTotal   >= 0) ? raw.progressTotal   : null,
+    ts:                _sanitiseStr(raw.ts)                || new Date().toISOString(),
+  };
 }
 
 function _validateIncoming(payload) {
@@ -217,6 +240,37 @@ function _handleIncoming(eventName, payload) {
       break;
     }
 
+    case 'device:activity': {
+      const act = _sanitiseDeviceActivity(payload);
+      if (!act.deviceId) return;
+      _teamDevices.set(act.deviceId, act);
+      _teamActivity = [act, ..._teamActivity].slice(0, TL_MAX_ACTIVITY);
+      _broadcast('realtime:team:update', { type: 'device:activity', ...act });
+      break;
+    }
+
+    case 'device:activity:snapshot': {
+      if (!Array.isArray(payload.activities)) return;
+      for (const raw of payload.activities.slice(0, 100)) {
+        const act = _sanitiseDeviceActivity(raw || {});
+        if (!act.deviceId || _teamDevices.has(act.deviceId)) continue;
+        _teamDevices.set(act.deviceId, act);
+      }
+      _broadcast('realtime:team:update', {
+        type:       'device:activity:snapshot',
+        activities: Array.from(_teamDevices.values()),
+      });
+      break;
+    }
+
+    case 'device:offline': {
+      const id = _sanitiseStr(payload.deviceId);
+      if (!id) return;
+      _teamDevices.delete(id);
+      _broadcast('realtime:team:update', { type: 'device:offline', deviceId: id });
+      break;
+    }
+
     default: break;
   }
 }
@@ -281,9 +335,10 @@ function connect(serverUrl) {
   _socket.on('connect', () => {
     _devicesOnline = 0;
     _setStatus('connected');
-    _send('device:hello',    _buildPresencePayload());
-    _send('device:presence', _buildPresencePayload());
-    _send('registry:request', {}); // pull current registry snapshot from server
+    _send('device:hello',            _buildPresencePayload());
+    _send('device:presence',         _buildPresencePayload());
+    _send('registry:request',        {}); // pull current registry snapshot from server
+    _send('device:activity:request', {}); // pull current team activity snapshot from server
   });
 
   _socket.on('disconnect',     () => { _setStatus('offline'); });
@@ -291,10 +346,11 @@ function connect(serverUrl) {
   _socket.on('reconnect_attempt', () => { _setStatus('reconnecting'); });
 
   const INCOMING_EVENTS = [
-    'device:presence', 'collection:visible', 'event:visible',
-    'import:progress', 'import:completed',   'sync:status',
-    'conflict:warning', 'dashboard:update',
-    'registry:register', 'registry:snapshot',
+    'device:presence',        'collection:visible',       'event:visible',
+    'import:progress',        'import:completed',         'sync:status',
+    'conflict:warning',       'dashboard:update',
+    'registry:register',      'registry:snapshot',
+    'device:activity',        'device:activity:snapshot', 'device:offline',
   ];
   for (const ev of INCOMING_EVENTS) {
     _socket.on(ev, (payload) => _handleIncoming(ev, payload));
@@ -399,6 +455,32 @@ function getRegistry() {
   return Array.from(_registry.values());
 }
 
+function emitDeviceActivity({ mode, collectionName, eventFolderName, photographer, status, progressCurrent, progressTotal } = {}) {
+  const VALID_MODES = ['idle', 'importing', 'syncing', 'viewing', 'preparing'];
+  const safeMode = VALID_MODES.includes(mode) ? mode : 'idle';
+  _send('device:activity', {
+    deviceId:          _getDeviceId(),
+    deviceDisplayName: settings.getDeviceDisplayName() || null,
+    operatorName:      _operatorName || null,
+    photographer:      (typeof photographer === 'string' ? photographer : null) || null,
+    mode:              safeMode,
+    collectionName:    (typeof collectionName === 'string' ? collectionName : null) || null,
+    eventFolderName:   (typeof eventFolderName === 'string' ? eventFolderName : null) || null,
+    status:            (typeof status === 'string' ? status : null) || null,
+    progressCurrent:   (typeof progressCurrent === 'number' && progressCurrent >= 0) ? progressCurrent : null,
+    progressTotal:     (typeof progressTotal   === 'number' && progressTotal   >= 0) ? progressTotal   : null,
+    ts:                new Date().toISOString(),
+  });
+}
+
+function getTeamLiveSnapshot() {
+  return {
+    devices:        Array.from(_teamDevices.values()),
+    recentActivity: _teamActivity.slice(0, 100),
+    status:         _status,
+  };
+}
+
 function emitRegistryCollection({ registryId, collectionName, nasCollectionPath, origin, createdByDeviceName } = {}) {
   if (!_isStr(collectionName)) return;
   const id = registryId || `coll:${collectionName}`;
@@ -456,6 +538,7 @@ module.exports = {
   getStatus,
   getKnownNames,
   getRegistry,
+  getTeamLiveSnapshot,
   setOperatorName,
   emitCollectionVisible,
   emitEventVisible,
@@ -463,4 +546,5 @@ module.exports = {
   emitRegistryEvent,
   emitImportCompleted,
   emitSyncStatus,
+  emitDeviceActivity,
 };

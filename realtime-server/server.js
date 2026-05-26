@@ -26,6 +26,10 @@ const _devices = new Map(); // socketId → { deviceId, deviceDisplayName, opera
 // Advisory only — not source of truth for any AutoIngest data.
 const _registry = new Map(); // registryId → sanitized entry
 
+// In-memory per-device activity — latest known state per socket.
+// Advisory only — cleared on server restart or disconnect.
+const _deviceActivity = new Map(); // socketId → sanitized activity payload
+
 const httpServer = createServer((req, res) => {
   if (req.url === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -126,9 +130,35 @@ io.on('connection', (socket) => {
     socket.emit('registry:snapshot', { entries });
   });
 
+  // Device activity: store latest state and relay to other clients
+  socket.on('device:activity', (payload) => {
+    if (!payload?.deviceId || typeof payload.deviceId !== 'string') return;
+    const raw = JSON.stringify(payload || {});
+    if (raw.length > MAX_PAYLOAD_BYTES) {
+      console.warn(`[drop] device:activity from ${socket.id} — payload too large`);
+      return;
+    }
+    const safe = _truncateStrings(payload || {});
+    _deviceActivity.set(socket.id, { ...safe, _socketId: socket.id });
+    socket.broadcast.emit('device:activity', safe);
+  });
+
+  // Device activity snapshot: send all current device states to requesting client
+  socket.on('device:activity:request', () => {
+    const activities = Array.from(_deviceActivity.values()).map(({ _socketId: _, ...rest }) => rest);
+    socket.emit('device:activity:snapshot', { activities });
+  });
+
   socket.on('disconnect', (reason) => {
     const dev = _devices.get(socket.id);
+    const act = _deviceActivity.get(socket.id);
     _devices.delete(socket.id);
+    _deviceActivity.delete(socket.id);
+
+    // Notify other clients so they can remove this device from Team Live.
+    if (act?.deviceId) {
+      socket.broadcast.emit('device:offline', { deviceId: act.deviceId });
+    }
     console.log(`[disconnect] ${dev?.deviceDisplayName || socket.id} — reason: ${reason} — devices online: ${_devices.size}`);
     // Broadcast updated device count
     io.emit('dashboard:update', { devicesOnline: _devices.size });

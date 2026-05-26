@@ -1407,6 +1407,86 @@
     .al-breakdown-tag { color: var(--text-primary); font-weight: 600; }
     .al-breakdown-count { color: var(--text-muted); flex-shrink: 0; }
 
+    /* ── Activity Log mode tabs (Local Activity / Team Live) ──────────── */
+    .al-mode-tabs {
+      display: flex; gap: 2px; padding: 0 0 10px;
+      border-bottom: 1px solid var(--border-subtle); margin-bottom: 16px; flex-shrink: 0;
+    }
+    .al-mode-tab {
+      background: none; border: none; padding: 5px 14px; border-radius: 6px;
+      font-size: 12px; font-weight: 600; color: var(--text-muted);
+      cursor: pointer; transition: color .15s, background .15s;
+    }
+    .al-mode-tab:hover { color: var(--text-primary); background: var(--border-subtle); }
+    .al-mode-tab--active { color: var(--text-primary) !important; background: var(--border-subtle) !important; }
+    .al-mode-panel[hidden] { display: none !important; }
+
+    /* ── Team Live panel ──────────────────────────────────────────────── */
+    .tl-wrap { display: flex; flex-direction: column; gap: 0; }
+    .tl-section-label {
+      font-size: 10.5px; font-weight: 700; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: .06em; margin: 0 0 10px;
+    }
+    .tl-device-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 20px; }
+    .tl-device-card {
+      display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+      border-radius: 8px; background: var(--bg-secondary); border: 1px solid var(--border-subtle);
+    }
+    .tl-device-avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: var(--accent); color: #fff;
+      font-size: 11px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .tl-device-info { flex: 1; min-width: 0; }
+    .tl-device-name {
+      font-size: 12.5px; font-weight: 600; color: var(--text-primary);
+      margin: 0 0 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .tl-device-operator { font-size: 11px; color: var(--text-muted); margin: 0 0 4px; }
+    .tl-device-status { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+    .tl-status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .tl-status-dot--idle      { background: var(--text-muted); }
+    .tl-status-dot--importing { background: var(--accent); box-shadow: 0 0 4px color-mix(in srgb, var(--accent) 50%, transparent); }
+    .tl-status-dot--syncing   { background: var(--yellow, #f9e6af); }
+    .tl-status-dot--viewing   { background: var(--success, #a6e3a1); }
+    .tl-status-dot--preparing { background: #89b4fa; }
+    .tl-status-label { font-size: 11px; color: var(--text-secondary); }
+    .tl-status-sep   { font-size: 11px; color: var(--text-muted); }
+    .tl-status-ctx   {
+      font-size: 11px; color: var(--text-muted);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      max-width: 140px; display: inline-block; vertical-align: bottom;
+    }
+    .tl-device-time { font-size: 10.5px; color: var(--text-muted); flex-shrink: 0; white-space: nowrap; }
+    .tl-device-photographer { font-size: 10.5px; color: var(--text-muted); margin-top: 2px; }
+    .tl-progress { height: 3px; border-radius: 2px; background: var(--border-subtle); margin-top: 6px; overflow: hidden; }
+    .tl-progress-bar { height: 100%; border-radius: 2px; background: var(--accent); transition: width .4s ease; min-width: 3px; }
+    .tl-progress-bar--syncing { background: var(--yellow, #f9e6af); }
+    .tl-empty { padding: 40px 0; text-align: center; }
+    .tl-empty-icon { display: flex; justify-content: center; margin-bottom: 12px; opacity: 0.35; color: var(--text-muted); }
+    .tl-empty-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; }
+    .tl-empty-sub   { font-size: 11.5px; color: var(--text-muted); line-height: 1.55; margin: 0; }
+    .tl-feed { margin-top: 4px; }
+    .tl-feed-label {
+      font-size: 10.5px; font-weight: 700; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: .06em; margin: 0 0 8px;
+    }
+    .tl-feed-item {
+      display: flex; align-items: baseline; gap: 5px; padding: 5px 0;
+      border-bottom: 1px solid var(--border-subtle); font-size: 11.5px;
+    }
+    .tl-feed-item:last-child { border-bottom: none; }
+    .tl-feed-device { font-weight: 600; color: var(--text-primary); white-space: nowrap; }
+    .tl-feed-action { color: var(--text-secondary); flex: 1; }
+    .tl-feed-time   { color: var(--text-muted); white-space: nowrap; flex-shrink: 0; }
+    .tl-device-card--stale { opacity: 0.45; }
+    .tl-recently-seen { margin-top: 16px; }
+    .tl-recently-seen-label {
+      font-size: 10.5px; font-weight: 700; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: .06em; margin: 0 0 6px;
+    }
+
     /* ── NAS EVENTS TILE ────────────────────────────── */
     .ov-tile-icon--nas svg { stroke: var(--accent, #6366f1); }
     #ovNasEvents .ov-nas-sub { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--subtext); white-space: nowrap; overflow: hidden; }
