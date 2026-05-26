@@ -3172,66 +3172,19 @@ async function _checkArchiveStatusTransition() {
 let _nasEventStats = null; // { totalEvents, totalCollections, source, refreshedAt } | null
 
 function _applyNasEventsCard(result, archiveOffline = false, hasLocalCopy = false) {
-  const valEl    = document.getElementById('ovNasEventsVal');
-  const labelEl  = document.getElementById('ovNasEventsLabel');
-  const badgeEl  = document.getElementById('ovNasCachedBadge');
-  const tileEl   = document.getElementById('ovNasEvents');
-  if (!valEl || !labelEl) return;
+  const badgeEl = document.getElementById('ovNasCachedBadge');
+  const tileEl  = document.getElementById('ovNasEvents');
+  if (badgeEl) badgeEl.hidden = true;
+  tileEl?.classList.remove('ov-tile--warn');
 
-  if (!result || result.status === 'nas-not-set') {
-    valEl.textContent    = '—';
-    labelEl.textContent  = 'Archive not set';
-    if (badgeEl) badgeEl.hidden = true;
-    tileEl?.classList.remove('ov-tile--warn');
+  if (!result || result.status === 'nas-not-set' ||
+      result.status === 'nas-disconnected' || result.status === 'invalid-nas' ||
+      result.status === 'no-cache') {
     return;
   }
 
-  if (result.status === 'nas-disconnected' || result.status === 'invalid-nas') {
-    valEl.textContent   = '—';
-    labelEl.textContent = result.status === 'nas-disconnected' ? 'Archive offline' : 'Invalid archive';
-    if (badgeEl) badgeEl.hidden = true;
-    tileEl?.classList.add('ov-tile--warn');
-    return;
-  }
-
-  if (result.status === 'no-cache') {
-    valEl.textContent   = '—';
-    labelEl.textContent = 'No data yet';
-    if (badgeEl) badgeEl.hidden = true;
-    tileEl?.classList.remove('ov-tile--warn');
-    return;
-  }
-
-  // ready — live or cache fallback
   const totalEvents      = (result.collections || []).reduce((n, c) => n + (c.events?.length || 0), 0);
   const totalCollections = (result.collections || []).length;
-
-  // Archive is offline — show degraded state, badge reflects local staging availability.
-  if (result.source === 'cache' && archiveOffline) {
-    valEl.textContent   = '—';
-    labelEl.textContent = 'Archive offline';
-    if (badgeEl) {
-      if (hasLocalCopy) {
-        badgeEl.textContent = 'Local copy';
-        badgeEl.hidden = false;
-      } else {
-        badgeEl.hidden = true;
-      }
-    }
-    if (tileEl) tileEl.title = hasLocalCopy
-      ? 'Archive is offline. Local staging copy is available.'
-      : 'Archive is offline. Reconnect to refresh live archive events.';
-    tileEl?.classList.add('ov-tile--warn');
-    _nasEventStats = { totalEvents, totalCollections, source: 'cache', refreshedAt: result.refreshedAt || result.cachedAt || null };
-    return;
-  }
-
-  valEl.textContent   = String(totalEvents);
-  labelEl.textContent = 'Archive Events';
-  if (tileEl) tileEl.title = '';  // clear any stale offline tooltip
-  if (badgeEl) badgeEl.hidden = true;
-  tileEl?.classList.toggle('ov-tile--warn', result.source === 'cache');
-
   _nasEventStats = {
     totalEvents,
     totalCollections,
