@@ -71,17 +71,42 @@ document.getElementById('settingsModal')?.addEventListener('click', e => {
 // ── Realtime Server settings ──────────────────────────────────────────────────
 
 async function _rtLoadSettings() {
-  if (!window.api?.getRealtimeSettings) return;
-  const s = await window.api.getRealtimeSettings().catch(() => null);
-  if (!s) return;
-  const el = document.getElementById('rtEnabled');
-  if (el) el.checked = Boolean(s.enabled);
-  const urlEl = document.getElementById('rtServerUrl');
-  if (urlEl) urlEl.value = s.serverUrl || '';
-  const nameEl = document.getElementById('rtDeviceName');
-  if (nameEl) nameEl.value = s.deviceName || '';
-  const opEl = document.getElementById('rtOperatorName');
-  if (opEl) opEl.value = s.operatorName || '';
+  const [s, identity, activeUser] = await Promise.all([
+    window.api?.getRealtimeSettings?.()?.catch(() => null)  ?? null,
+    window.api?.getDeviceIdentity?.()?.catch(() => null)    ?? null,
+    window.api?.getActiveUser?.()?.catch(() => null)        ?? null,
+  ]);
+
+  if (s) {
+    const el = document.getElementById('rtEnabled');
+    if (el) el.checked = Boolean(s.enabled);
+    const urlEl = document.getElementById('rtServerUrl');
+    if (urlEl) urlEl.value = s.serverUrl || '';
+  }
+
+  const hostname = identity?.deviceName || null;
+  const userName = activeUser?.name     || null;
+  const infoEl   = document.getElementById('rtInfoLine');
+  if (infoEl) {
+    infoEl.innerHTML = '';
+    const rows = [];
+    if (hostname) rows.push(['Device', hostname]);
+    if (userName) rows.push(['User',   userName]);
+    for (const [label, value] of rows) {
+      const row  = document.createElement('div');
+      row.className = 'settings-rt-info-row';
+      const lEl = document.createElement('span');
+      lEl.className   = 'settings-rt-info-label';
+      lEl.textContent = label;
+      const vEl = document.createElement('span');
+      vEl.className   = 'settings-rt-info-value';
+      vEl.textContent = value;
+      row.appendChild(lEl);
+      row.appendChild(vEl);
+      infoEl.appendChild(row);
+    }
+  }
+
   if (window.api?.getRealtimeStatus) {
     window.api.getRealtimeStatus().then(st => _rtUpdateSettingsStatus(st)).catch(() => {});
   }
@@ -118,23 +143,16 @@ function _rtUpdateSettingsStatus({ status } = {}) {
 
 async function _rtSaveSettings() {
   if (!window.api?.configureRealtime) return;
-  const enabled      = document.getElementById('rtEnabled')?.checked ?? false;
-  const rawUrl       = (document.getElementById('rtServerUrl')?.value || '').trim();
-  const deviceName   = (document.getElementById('rtDeviceName')?.value || '').trim() || null;
-  const operatorName = (document.getElementById('rtOperatorName')?.value || '').trim() || null;
+  const enabled = document.getElementById('rtEnabled')?.checked ?? false;
+  const rawUrl  = (document.getElementById('rtServerUrl')?.value || '').trim();
   // Basic URL shape validation — must start with http:// or https://
   const serverUrl = (rawUrl && (rawUrl.startsWith('http://') || rawUrl.startsWith('https://'))) ? rawUrl : null;
-  const result = await window.api.configureRealtime({
-    enabled, serverUrl, deviceDisplayName: deviceName, operatorName,
-  }).catch(() => null);
+  const result = await window.api.configureRealtime({ enabled, serverUrl }).catch(() => null);
   if (result?.status) _rtUpdateSettingsStatus(result.status);
 }
 
 document.getElementById('rtEnabled')?.addEventListener('change', _rtSaveSettings);
-
-['rtServerUrl', 'rtDeviceName', 'rtOperatorName'].forEach(id => {
-  document.getElementById(id)?.addEventListener('change', _rtSaveSettings);
-});
+document.getElementById('rtServerUrl')?.addEventListener('change', _rtSaveSettings);
 
 document.getElementById('rtTestBtn')?.addEventListener('click', async () => {
   const btn = document.getElementById('rtTestBtn');

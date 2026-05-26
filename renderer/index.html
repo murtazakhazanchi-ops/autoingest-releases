@@ -5474,6 +5474,13 @@
   }
   .settings-rt-test-btn:hover { background: var(--accent-hover); color: var(--text); border-color: var(--accent-border); }
   .settings-rt-test-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .settings-rt-info { display: flex; flex-direction: column; gap: 7px; margin-top: 10px; }
+  .settings-rt-info-row { display: flex; flex-direction: column; gap: 2px; }
+  .settings-rt-info-label {
+    font-size: 0.63rem; font-weight: 600; letter-spacing: 0.05em;
+    text-transform: uppercase; color: var(--text-muted);
+  }
+  .settings-rt-info-value { font-size: 0.78rem; color: var(--subtext); word-break: break-word; }
 
   /* ══════════════════════════════════════════════════════════════════════════
      GLASS DEPTH SYSTEM — purely visual, no layout or logic changes
@@ -7187,16 +7194,7 @@
             <input class="settings-rt-input" type="text" id="rtServerUrl"
               placeholder="http://192.168.1.50:4040" autocomplete="off" spellcheck="false">
           </div>
-          <div class="settings-rt-field">
-            <label class="settings-rt-label" for="rtDeviceName">Device Name</label>
-            <input class="settings-rt-input" type="text" id="rtDeviceName"
-              placeholder="e.g. Event Laptop 1" autocomplete="off">
-          </div>
-          <div class="settings-rt-field">
-            <label class="settings-rt-label" for="rtOperatorName">Operator Name</label>
-            <input class="settings-rt-input" type="text" id="rtOperatorName"
-              placeholder="e.g. Murtaza" autocomplete="off">
-          </div>
+          <div class="settings-rt-info" id="rtInfoLine"></div>
           <div class="settings-rt-footer">
             <span class="settings-rt-status-row">
               <span class="settings-rt-dot" id="rtSettingsDot"></span>
