@@ -41,6 +41,10 @@ const _teamDevices   = new Map(); // deviceId → latest activity payload
 const TL_MAX_ACTIVITY = 100;
 let   _teamActivity  = []; // bounded array, newest first
 
+// Last registry entries emitted by this device — re-sent on socket reconnect.
+let _lastRegistryCollEntry = null;
+let _lastRegistryEvtEntry  = null;
+
 // Throttle map for outbound import/sync events: key → lastEmitMs
 const _throttle   = new Map();
 const THROTTLE_MS = 2000;
@@ -234,7 +238,8 @@ function _handleIncoming(eventName, payload) {
       if (!Array.isArray(payload.entries)) return;
       for (const e of payload.entries.slice(0, MAX_CACHED)) {
         const id = _sanitiseStr(e?.registryId);
-        if (!id || _registry.has(id)) continue;
+        if (!id) continue;
+        // Always update — snapshot reflects the server's persisted truth after restart
         _registry.set(id, _sanitiseRegistryEntry(e));
       }
       break;
@@ -339,6 +344,9 @@ function connect(serverUrl) {
     _send('device:presence',         _buildPresencePayload());
     _send('registry:request',        {}); // pull current registry snapshot from server
     _send('device:activity:request', {}); // pull current team activity snapshot from server
+    // Re-publish this device's last known registry entries so other devices see them after reconnect
+    if (_lastRegistryCollEntry) _send('registry:register', _lastRegistryCollEntry);
+    if (_lastRegistryEvtEntry)  _send('registry:register', _lastRegistryEvtEntry);
   });
 
   _socket.on('disconnect',     () => { _setStatus('offline'); });
@@ -481,35 +489,35 @@ function getTeamLiveSnapshot() {
   };
 }
 
-function emitRegistryCollection({ registryId, collectionName, nasCollectionPath, origin, createdByDeviceName } = {}) {
+function emitRegistryCollection({ registryId, collectionName, nasRoot, nasCollectionPath, origin, createdByDeviceName } = {}) {
   if (!_isStr(collectionName)) return;
-  const id = registryId || `coll:${collectionName}`;
-  const now = new Date().toISOString();
+  const id       = registryId || `coll:${collectionName}`;
+  const now      = new Date().toISOString();
+  const existing = _registry.get(id);
   const entry = {
     registryId:          id,
     entryType:           'collection',
     origin:              origin || 'remote-created',
     collectionName,
-    eventFolderName:     null,
-    eventDisplayName:    null,
-    nasCollectionPath:   nasCollectionPath || null,
-    nasEventPath:        null,
-    eventJsonShell:      null,
+    nasRoot:             nasRoot             || null,
+    nasCollectionPath:   nasCollectionPath   || null,
     createdByDeviceId:   _getDeviceId(),
     createdByDeviceName: createdByDeviceName || settings.getDeviceDisplayName() || null,
-    createdByOperator:   _operatorName || null,
-    createdAt:           now,
+    createdByOperator:   _operatorName       || null,
+    createdAt:           existing?.createdAt || now,
     updatedAt:           now,
   };
   _registry.set(id, entry);
+  _lastRegistryCollEntry = entry;
   _send('registry:register', entry);
 }
 
 function emitRegistryEvent({ registryId, collectionName, eventFolderName, eventDisplayName, eventJsonShell, nasCollectionPath, nasEventPath, origin, createdByDeviceName } = {}) {
   if (!_isStr(eventFolderName)) return;
-  const cName = collectionName || '';
-  const id = registryId || `evt:${cName}:${eventFolderName}`;
-  const now = new Date().toISOString();
+  const cName    = collectionName || '';
+  const id       = registryId || `evt:${cName}:${eventFolderName}`;
+  const now      = new Date().toISOString();
+  const existing = _registry.get(id);
   const entry = {
     registryId:          id,
     entryType:           'event',
@@ -518,15 +526,16 @@ function emitRegistryEvent({ registryId, collectionName, eventFolderName, eventD
     eventFolderName,
     eventDisplayName:    eventDisplayName || eventFolderName,
     nasCollectionPath:   nasCollectionPath || null,
-    nasEventPath:        nasEventPath || null,
-    eventJsonShell:      eventJsonShell || null,
+    nasEventPath:        nasEventPath      || null,
+    eventJsonShell:      eventJsonShell    || null,
     createdByDeviceId:   _getDeviceId(),
     createdByDeviceName: createdByDeviceName || settings.getDeviceDisplayName() || null,
-    createdByOperator:   _operatorName || null,
-    createdAt:           now,
+    createdByOperator:   _operatorName       || null,
+    createdAt:           existing?.createdAt || now,
     updatedAt:           now,
   };
   _registry.set(id, entry);
+  _lastRegistryEvtEntry = entry;
   _send('registry:register', entry);
 }
 

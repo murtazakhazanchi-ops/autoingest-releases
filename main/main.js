@@ -1203,6 +1203,7 @@ ipcMain.handle('master:create', async (_event, basePath, folderName) => {
   );
   realtimeOps.emitRegistryCollection({
     collectionName:      folderName,
+    nasRoot:             _isNasPath ? _nasRoot : null,
     nasCollectionPath:   _isNasPath ? fullPath : null,
     origin:              _isNasPath ? 'archive-available' : 'remote-created',
     createdByDeviceName: settings.getDeviceDisplayName() || null,
@@ -1453,7 +1454,10 @@ ipcMain.handle('event:write', async (_event, eventFolderPath, eventData) => {
     // Emit full registry entry so other devices can prepare the same event locally
     const _evCollName = path.basename(path.dirname(eventFolderPath));
     const _nasRoot3   = settings.getNasRoot();
-    const _isNasEv    = _nasRoot3 && eventFolderPath.startsWith(_nasRoot3);
+    const _isNasEv    = _nasRoot3 && (
+      path.resolve(eventFolderPath) === path.resolve(_nasRoot3) ||
+      path.resolve(eventFolderPath).startsWith(path.resolve(_nasRoot3) + path.sep)
+    );
     const _jsonShell  = {
       version:      eventData.version || 1,
       hijriDate:    eventData.hijriDate,
@@ -3596,6 +3600,21 @@ ipcMain.handle('collection:matchToNas', async (_event, { localCollectionPath, na
     operator:                   (hasLink && existing?.operator)   ? existing.operator   : null,
     status:                     'linked',
   });
+
+  if (result.ok) {
+    // Emit registry update so other devices see the NAS target. Use the registryId
+    // already stored in collection.link.json if this collection was prepared from registry.
+    const collName        = existing?.collectionName || collectionName;
+    const existingRegId   = hasLink && existing?.registryId ? existing.registryId : null;
+    realtimeOps.emitRegistryCollection({
+      registryId:          existingRegId || `coll:${collName}`,
+      collectionName:      collName,
+      nasRoot,
+      nasCollectionPath,
+      origin:              'archive-available',
+      createdByDeviceName: settings.getDeviceDisplayName() || null,
+    });
+  }
 
   return { ok: result.ok, reason: result.reason };
 });

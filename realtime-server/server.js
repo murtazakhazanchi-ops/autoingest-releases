@@ -14,15 +14,22 @@
 
 'use strict';
 
+const fs   = require('fs');
+const path = require('path');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
 
 const PORT = parseInt(process.env.PORT || '4040', 10);
 
+// Persistent registry storage — advisory coordination only.
+const DATA_DIR      = path.join(__dirname, 'data');
+const REGISTRY_PATH = path.join(DATA_DIR, 'registry.json');
+const REGISTRY_TMP  = path.join(DATA_DIR, '.registry.tmp');
+
 // In-memory device registry — ephemeral, cleared on restart. Never persisted.
 const _devices = new Map(); // socketId → { deviceId, deviceDisplayName, operatorName, connectedAt }
 
-// In-memory collection/event registry — ephemeral, reset on server restart.
+// In-memory collection/event registry — runtime cache, loaded from registry.json on startup.
 // Advisory only — not source of truth for any AutoIngest data.
 const _registry = new Map(); // registryId → sanitized entry
 
@@ -52,7 +59,7 @@ const io = new Server(httpServer, {
 // Relay events — all events are broadcast to all OTHER connected clients.
 // The server does no validation of business logic; it only sanitises
 // against oversized payloads to prevent memory abuse.
-const MAX_PAYLOAD_BYTES = 8192;
+const MAX_PAYLOAD_BYTES = 16384; // registry event entries with full eventJsonShell can reach ~9 KB
 
 const RELAY_EVENTS = [
   'device:presence',
@@ -66,6 +73,104 @@ const RELAY_EVENTS = [
   'conflict:warning',
   'dashboard:update',
 ];
+
+// ── Registry persistence ──────────────────────────────────────────────────────
+
+const STR_MAX   = 256;
+const SHELL_MAX = 8192; // eventJsonShell is an object; limit applied to its JSON serialisation
+const VALID_ENTRY_TYPES  = ['collection', 'event'];
+const VALID_ENTRY_ORIGINS = ['archive-available', 'remote-created'];
+
+function _s(v) { return typeof v === 'string' ? v.slice(0, STR_MAX).trim() || null : null; }
+
+function _sanitiseRegistryEntry(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+
+  const registryId = _s(raw.registryId);
+  if (!registryId) return null;
+
+  const entryType = typeof raw.entryType === 'string' ? raw.entryType : null;
+  if (!VALID_ENTRY_TYPES.includes(entryType)) return null;
+
+  const collectionName = _s(raw.collectionName);
+  if (!collectionName) return null;
+
+  if (entryType === 'event') {
+    const eventFolderName = _s(raw.eventFolderName);
+    if (!eventFolderName) return null;
+  }
+
+  const entry = {
+    registryId,
+    entryType,
+    origin:              VALID_ENTRY_ORIGINS.includes(raw.origin) ? raw.origin : null,
+    collectionName,
+    nasRoot:             _s(raw.nasRoot),
+    nasCollectionPath:   _s(raw.nasCollectionPath),
+    createdByDeviceId:   _s(raw.createdByDeviceId),
+    createdByDeviceName: _s(raw.createdByDeviceName),
+    createdByOperator:   _s(raw.createdByOperator),
+    createdAt:           _s(raw.createdAt),
+    updatedAt:           _s(raw.updatedAt),
+    status:              _s(raw.status),
+  };
+
+  if (entryType === 'event') {
+    entry.eventFolderName  = _s(raw.eventFolderName);
+    entry.eventDisplayName = _s(raw.eventDisplayName);
+    entry.nasEventPath     = _s(raw.nasEventPath);
+    // eventJsonShell arrives as an object from the Electron app; stored as-is if within size limit
+    if (raw.eventJsonShell && typeof raw.eventJsonShell === 'object' && !Array.isArray(raw.eventJsonShell)) {
+      const shellStr = JSON.stringify(raw.eventJsonShell);
+      entry.eventJsonShell = shellStr.length <= SHELL_MAX ? raw.eventJsonShell : null;
+    } else {
+      entry.eventJsonShell = null;
+    }
+  }
+
+  // Strip null fields for a clean snapshot.
+  for (const k of Object.keys(entry)) { if (entry[k] === null) delete entry[k]; }
+
+  return entry;
+}
+
+function _loadRegistry() {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (_) {}
+
+  if (!fs.existsSync(REGISTRY_PATH)) {
+    console.log('[registry] no persistent registry found — starting empty');
+    return;
+  }
+
+  try {
+    const raw    = fs.readFileSync(REGISTRY_PATH, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.entries)) throw new Error('invalid snapshot shape');
+    let count = 0;
+    for (const entry of parsed.entries) {
+      const clean = _sanitiseRegistryEntry(entry);
+      if (clean) { _registry.set(clean.registryId, clean); count++; }
+    }
+    console.log(`[registry] loaded ${count} entries from registry.json`);
+  } catch (err) {
+    console.warn(`[registry] warning — corrupt registry.json, starting empty: ${err.message}`);
+  }
+}
+
+function _saveRegistry() {
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    const entries  = Array.from(_registry.values()).map(({ _seenAt: _, ...rest }) => rest);
+    const snapshot = { schemaVersion: 1, updatedAt: Date.now(), entries };
+    fs.writeFileSync(REGISTRY_TMP, JSON.stringify(snapshot, null, 2), 'utf8');
+    fs.renameSync(REGISTRY_TMP, REGISTRY_PATH);
+    console.log(`[registry] persisted ${entries.length} entries`);
+  } catch (err) {
+    console.warn(`[registry] warning — persistence failed: ${err.message}`);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 function _truncateStrings(obj, maxLen = 512) {
   if (typeof obj === 'string') return obj.slice(0, maxLen);
@@ -111,7 +216,7 @@ io.on('connection', (socket) => {
     });
   }
 
-  // Registry: store incoming entries and relay to other clients
+  // Registry: store incoming entries, persist, and relay to other clients
   socket.on('registry:register', (payload) => {
     if (!payload?.registryId || typeof payload.registryId !== 'string') return;
     const raw = JSON.stringify(payload || {});
@@ -119,9 +224,21 @@ io.on('connection', (socket) => {
       console.warn(`[drop] registry:register from ${socket.id} — payload too large (${raw.length} bytes)`);
       return;
     }
-    const safe = _truncateStrings(payload || {});
-    _registry.set(safe.registryId, { ...safe, _seenAt: Date.now() });
-    socket.broadcast.emit('registry:register', safe);
+
+    const entry = _sanitiseRegistryEntry(payload);
+    if (!entry) {
+      console.warn(`[drop] registry:register from ${socket.id} — failed sanitisation`);
+      return;
+    }
+
+    // Preserve createdAt from an existing entry on update; always refresh updatedAt.
+    const existing = _registry.get(entry.registryId);
+    if (existing?.createdAt && !entry.createdAt) entry.createdAt = existing.createdAt;
+    entry.updatedAt = new Date().toISOString();
+
+    _registry.set(entry.registryId, { ...entry, _seenAt: Date.now() });
+    _saveRegistry();
+    socket.broadcast.emit('registry:register', entry);
   });
 
   // Registry: send current snapshot to requesting client
@@ -164,6 +281,8 @@ io.on('connection', (socket) => {
     io.emit('dashboard:update', { devicesOnline: _devices.size });
   });
 });
+
+_loadRegistry();
 
 httpServer.listen(PORT, () => {
   console.log(`AutoIngest Realtime Dev Server listening on :${PORT}`);
