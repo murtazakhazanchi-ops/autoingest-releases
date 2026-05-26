@@ -7331,8 +7331,9 @@ function _renderMetadataBadge() {
     return;
   }
 
-  const finished = _metaBatchDone + _metaBatchFailed >= _metaBatchTotal;
-  const pct      = Math.floor((_metaBatchDone / _metaBatchTotal) * 100);
+  const _processed = _metaBatchDone + _metaBatchFailed + _metaBatchSkipped;
+  const finished   = _processed >= _metaBatchTotal;
+  const pct        = Math.floor((_processed / _metaBatchTotal) * 100);
 
   if (finished) {
     if (_metaBatchFailed > 0) {

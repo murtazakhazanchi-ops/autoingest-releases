@@ -994,8 +994,13 @@ ipcMain.handle('import:commitTransaction', async (event, {
             if (_willWriteNasMetadata && p.event === 'batch_complete') {
               _releaseDirectNasLocks(_directNasLocks);
             }
-            if (p.event === 'batch_complete' && eventJsonPath)
-              await _writeLastMetadataRun(path.join(eventJsonPath, 'event.json'), p, metaContext.groups);
+            if (p.event === 'batch_complete' && eventJsonPath) {
+              try {
+                await _writeLastMetadataRun(path.join(eventJsonPath, 'event.json'), p, metaContext.groups);
+              } catch (writeErr) {
+                log(`[main] _writeLastMetadataRun failed for ${eventJsonPath}: ${writeErr.message}`);
+              }
+            }
             if (baseEmit) baseEmit(p);
           }
         : null;

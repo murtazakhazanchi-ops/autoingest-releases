@@ -485,48 +485,77 @@ function applyBatch(batchId, copiedFiles, context, emitFn) {
 
   if (emitFn) emitFn({ batchId, event: 'batch_start', total: batch.total });
 
-  copiedFiles.forEach((file, idx) => {
-    _enqueue(async () => {
-      const status = batch.files[idx];
-      await _processFile(file, status, batch, context);
-
+  // Preflight: verify ExifTool responds before occupying queue slots with file jobs.
+  // A broken binary causes each et.write() to hang for taskTimeoutMillis (30 s) per file,
+  // making metadata appear stuck at 0% for the full batch duration.
+  _enqueue(async () => {
+    try {
+      await _getExifTool().version();
+    } catch (preflightErr) {
+      log(`[exifService] ExifTool preflight failed for batch ${batchId}: ${preflightErr.message}`);
+      for (const status of batch.files) {
+        status.status = 'error';
+        status.error  = `ExifTool unavailable: ${preflightErr.message}`;
+      }
+      batch.failed = batch.total;
       if (emitFn) {
         emitFn({
-          batchId, event: 'file_done',
-          index: idx, dest: file.dest, status: status.status,
-          done: batch.done, skipped: batch.skipped, failed: batch.failed, total: batch.total,
+          batchId, event: 'batch_complete',
+          done: 0, skipped: 0, failed: batch.total, total: batch.total,
+        });
+        emitFn({
+          batchId, event: 'batch_error',
+          failed: batch.total,
+          errors: batch.files.map(f => ({ file: path.basename(f.dest), error: f.error })),
         });
       }
+      return;
+    }
 
-      if (batch.done + batch.skipped + batch.failed === batch.total) {
+    // ExifTool is responsive — enqueue individual file jobs.
+    copiedFiles.forEach((file, idx) => {
+      _enqueue(async () => {
+        const status = batch.files[idx];
+        await _processFile(file, status, batch, context);
+
         if (emitFn) {
           emitFn({
-            batchId, event: 'batch_complete',
+            batchId, event: 'file_done',
+            index: idx, dest: file.dest, status: status.status,
             done: batch.done, skipped: batch.skipped, failed: batch.failed, total: batch.total,
           });
         }
-        log(`[exifService] Batch ${batchId} complete — ${batch.done} ok, ${batch.skipped} skipped, ${batch.failed} failed`);
 
-        if (batch.failed > 0) {
-          const failedFiles = batch.files.filter(f => f.status === 'error');
-          const preview     = failedFiles.slice(0, 10);
-          const overflow    = failedFiles.length - preview.length;
-          console.error(`[exifService] ${batch.failed} metadata write(s) failed in batch ${batchId}:`);
-          for (const f of preview) {
-            console.error(`  ✗ ${path.basename(f.dest)}: ${f.error}`);
-          }
-          if (overflow > 0) {
-            console.error(`  ...and ${overflow} more`);
-          }
+        if (batch.done + batch.skipped + batch.failed === batch.total) {
           if (emitFn) {
             emitFn({
-              batchId, event: 'batch_error',
-              failed: batch.failed,
-              errors: failedFiles.map(f => ({ file: path.basename(f.dest), error: f.error })),
+              batchId, event: 'batch_complete',
+              done: batch.done, skipped: batch.skipped, failed: batch.failed, total: batch.total,
             });
           }
+          log(`[exifService] Batch ${batchId} complete — ${batch.done} ok, ${batch.skipped} skipped, ${batch.failed} failed`);
+
+          if (batch.failed > 0) {
+            const failedFiles = batch.files.filter(f => f.status === 'error');
+            const preview     = failedFiles.slice(0, 10);
+            const overflow    = failedFiles.length - preview.length;
+            console.error(`[exifService] ${batch.failed} metadata write(s) failed in batch ${batchId}:`);
+            for (const f of preview) {
+              console.error(`  ✗ ${path.basename(f.dest)}: ${f.error}`);
+            }
+            if (overflow > 0) {
+              console.error(`  ...and ${overflow} more`);
+            }
+            if (emitFn) {
+              emitFn({
+                batchId, event: 'batch_error',
+                failed: batch.failed,
+                errors: failedFiles.map(f => ({ file: path.basename(f.dest), error: f.error })),
+              });
+            }
+          }
         }
-      }
+      });
     });
   });
 }
