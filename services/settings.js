@@ -545,33 +545,6 @@ async function setDeviceDisplayName(value) {
   await _save();
 }
 
-/**
- * Returns the configured realtime operator name, or null if not set.
- * @returns {string | null}
- */
-function getOperatorName() {
-  if (!_loaded) init();
-  const v = _state.operatorName;
-  return (typeof v === 'string' && v.length > 0) ? v : null;
-}
-
-/**
- * Persists the realtime operator name. Pass null or '' to clear.
- * @param {string | null} value
- * @returns {Promise<void>}
- */
-async function setOperatorName(value) {
-  if (!_loaded) init();
-  if (value === null || value === '') {
-    delete _state.operatorName;
-  } else if (typeof value === 'string') {
-    _state.operatorName = value;
-  } else {
-    throw new Error('setOperatorName: expected string or null');
-  }
-  await _save();
-}
-
 module.exports = {
   init,
   getArchiveRoot, setArchiveRoot,
@@ -589,5 +562,4 @@ module.exports = {
   getRealtimeServerUrl, setRealtimeServerUrl,
   getDeviceId, saveDeviceIdSync,
   getDeviceDisplayName, setDeviceDisplayName,
-  getOperatorName, setOperatorName,
 };

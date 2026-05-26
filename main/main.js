@@ -231,7 +231,6 @@ app.whenReady().then(() => {
   loadImportIndex();
   settings.init();
   realtimeOps.init();
-  realtimeOps.setOperatorName(settings.getOperatorName());
   listManager.init(app.getPath('userData'));
   aliasEngine.init(app.getPath('userData'));
   telemetry.init();
@@ -3819,10 +3818,8 @@ ipcMain.handle('event:prepareFromRegistry', async (_event, { entry } = {}) => {
 ipcMain.handle('realtime:getStatus', () => realtimeOps.getStatus());
 
 ipcMain.handle('realtime:getSettings', () => ({
-  enabled:      settings.getRealtimeEnabled(),
-  serverUrl:    settings.getRealtimeServerUrl(),
-  deviceName:   settings.getDeviceDisplayName(),
-  operatorName: settings.getOperatorName(),
+  enabled:   settings.getRealtimeEnabled(),
+  serverUrl: settings.getRealtimeServerUrl(),
 }));
 
 ipcMain.handle('realtime:testConnection', async (_event, { serverUrl } = {}) => {
@@ -3862,10 +3859,7 @@ ipcMain.handle('realtime:configure', async (_event, cfg) => {
   if (typeof enabled === 'boolean')          await settings.setRealtimeEnabled(enabled);
   if (serverUrl !== undefined)               await settings.setRealtimeServerUrl(typeof serverUrl === 'string' ? serverUrl : null);
   if (typeof deviceDisplayName === 'string') await settings.setDeviceDisplayName(deviceDisplayName || null);
-  if (typeof operatorName === 'string') {
-    await settings.setOperatorName(operatorName || null);
-    realtimeOps.setOperatorName(operatorName || null);
-  }
+  if (typeof operatorName === 'string') realtimeOps.setOperatorName(operatorName || null);
   const newEnabled = settings.getRealtimeEnabled();
   const newUrl     = settings.getRealtimeServerUrl();
   if (newEnabled && newUrl) {
