@@ -444,6 +444,134 @@ async function setTransferRoot(value) {
   await _save();
 }
 
+// ─── Realtime Operations settings ─────────────────────────────────────────────
+
+/**
+ * Returns whether the realtime operations layer is enabled (default: false).
+ * Realtime is opt-in: it is disabled unless a server URL is configured.
+ * @returns {boolean}
+ */
+function getRealtimeEnabled() {
+  if (!_loaded) init();
+  return Boolean(_state.realtimeEnabled ?? false);
+}
+
+/**
+ * Persists the realtimeEnabled flag.
+ * @param {boolean} value
+ * @returns {Promise<void>}
+ */
+async function setRealtimeEnabled(value) {
+  if (!_loaded) init();
+  _state.realtimeEnabled = Boolean(value);
+  await _save();
+}
+
+/**
+ * Returns the configured Socket.IO server URL, or null if not set.
+ * @returns {string | null}
+ */
+function getRealtimeServerUrl() {
+  if (!_loaded) init();
+  const v = _state.realtimeServerUrl;
+  return (typeof v === 'string' && v.length > 0) ? v : null;
+}
+
+/**
+ * Persists the Socket.IO server URL. Pass null or '' to clear.
+ * @param {string | null} value
+ * @returns {Promise<void>}
+ */
+async function setRealtimeServerUrl(value) {
+  if (!_loaded) init();
+  if (value === null || value === '') {
+    delete _state.realtimeServerUrl;
+  } else if (typeof value === 'string') {
+    _state.realtimeServerUrl = value;
+  } else {
+    throw new Error('setRealtimeServerUrl: expected string or null');
+  }
+  await _save();
+}
+
+/**
+ * Returns the stable per-device UUID, or null if not yet generated.
+ * The ID is generated on first use by realtimeOperationsService and saved here.
+ * @returns {string | null}
+ */
+function getDeviceId() {
+  if (!_loaded) init();
+  const v = _state.deviceId;
+  return (typeof v === 'string' && v.length > 0) ? v : null;
+}
+
+/**
+ * Saves the device UUID synchronously (called once, at first-use ID generation).
+ * Uses the same atomic tmp→rename guarantee as _saveSync().
+ * @param {string} id
+ */
+function saveDeviceIdSync(id) {
+  if (!_loaded) init();
+  if (typeof id !== 'string' || !id) return;
+  _state.deviceId = id;
+  _saveSync();
+}
+
+/**
+ * Returns the operator-configured device display name, or null if not set.
+ * Falls back to os.hostname() in realtimeOperationsService when null.
+ * @returns {string | null}
+ */
+function getDeviceDisplayName() {
+  if (!_loaded) init();
+  const v = _state.deviceDisplayName;
+  return (typeof v === 'string' && v.length > 0) ? v : null;
+}
+
+/**
+ * Persists the device display name. Pass null or '' to clear.
+ * @param {string | null} value
+ * @returns {Promise<void>}
+ */
+async function setDeviceDisplayName(value) {
+  if (!_loaded) init();
+  if (value === null || value === '') {
+    delete _state.deviceDisplayName;
+  } else if (typeof value === 'string') {
+    _state.deviceDisplayName = value;
+  } else {
+    throw new Error('setDeviceDisplayName: expected string or null');
+  }
+  await _save();
+}
+
+/**
+ * Returns the configured realtime operator name, or null if not set.
+ * @returns {string | null}
+ */
+function getOperatorName() {
+  if (!_loaded) init();
+  const v = _state.operatorName;
+  return (typeof v === 'string' && v.length > 0) ? v : null;
+}
+
+/**
+ * Persists the realtime operator name. Pass null or '' to clear.
+ * @param {string | null} value
+ * @returns {Promise<void>}
+ */
+async function setOperatorName(value) {
+  if (!_loaded) init();
+  if (value === null || value === '') {
+    delete _state.operatorName;
+  } else if (typeof value === 'string') {
+    _state.operatorName = value;
+  } else {
+    throw new Error('setOperatorName: expected string or null');
+  }
+  await _save();
+}
+
 module.exports = {
   init,
   getArchiveRoot, setArchiveRoot,
@@ -457,4 +585,9 @@ module.exports = {
   getDefaultImportMode, setDefaultImportMode,
   getMainArchiveRoot, setMainArchiveRoot,
   getTransferRoot, setTransferRoot,
+  getRealtimeEnabled, setRealtimeEnabled,
+  getRealtimeServerUrl, setRealtimeServerUrl,
+  getDeviceId, saveDeviceIdSync,
+  getDeviceDisplayName, setDeviceDisplayName,
+  getOperatorName, setOperatorName,
 };

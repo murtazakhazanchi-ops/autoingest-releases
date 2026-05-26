@@ -50,6 +50,7 @@ document.getElementById('settingsBtn')?.addEventListener('click', () => {
   const pref = localStorage.getItem('theme') || 'auto';
   document.querySelectorAll('.settings-theme-radio').forEach(r => { r.checked = r.value === pref; });
   document.getElementById('settingsModal').classList.add('visible');
+  _rtLoadSettings();
 });
 
 // Settings modal close
@@ -57,14 +58,95 @@ document.getElementById('settingsClose')?.addEventListener('click', () => {
   document.getElementById('settingsModal').classList.remove('visible');
 });
 
-// Radio changes
+// Radio changes (theme only — checkbox for rtEnabled handled separately)
 document.querySelectorAll('.settings-theme-radio').forEach(r => {
-  r.addEventListener('change', () => setThemePref(r.value));
+  if (r.type === 'radio') r.addEventListener('change', () => setThemePref(r.value));
 });
 
 // Click-outside dismiss
 document.getElementById('settingsModal')?.addEventListener('click', e => {
   if (e.target === e.currentTarget) e.currentTarget.classList.remove('visible');
+});
+
+// ── Realtime Server settings ──────────────────────────────────────────────────
+
+async function _rtLoadSettings() {
+  if (!window.api?.getRealtimeSettings) return;
+  const s = await window.api.getRealtimeSettings().catch(() => null);
+  if (!s) return;
+  const el = document.getElementById('rtEnabled');
+  if (el) el.checked = Boolean(s.enabled);
+  const urlEl = document.getElementById('rtServerUrl');
+  if (urlEl) urlEl.value = s.serverUrl || '';
+  const nameEl = document.getElementById('rtDeviceName');
+  if (nameEl) nameEl.value = s.deviceName || '';
+  const opEl = document.getElementById('rtOperatorName');
+  if (opEl) opEl.value = s.operatorName || '';
+  if (window.api?.getRealtimeStatus) {
+    window.api.getRealtimeStatus().then(st => _rtUpdateSettingsStatus(st)).catch(() => {});
+  }
+}
+
+function _rtUpdateSettingsStatus({ status } = {}) {
+  const dot  = document.getElementById('rtSettingsDot');
+  const text = document.getElementById('rtSettingsStatus');
+  if (!dot || !text) return;
+  const enabled = document.getElementById('rtEnabled')?.checked;
+  const url     = (document.getElementById('rtServerUrl')?.value || '').trim();
+  if (!enabled) {
+    dot.className = 'settings-rt-dot';
+    text.textContent = 'Disabled';
+    return;
+  }
+  if (!url) {
+    dot.className = 'settings-rt-dot';
+    text.textContent = 'Not configured';
+    return;
+  }
+  const s = status || 'offline';
+  dot.className = 'settings-rt-dot'
+    + (s === 'connected'    ? ' settings-rt-dot--connected'
+    :  s === 'connecting'   ? ' settings-rt-dot--connecting'
+    :  s === 'reconnecting' ? ' settings-rt-dot--reconnecting'
+    :  s === 'offline'      ? ' settings-rt-dot--offline'
+    :  '');
+  text.textContent = s === 'connected'    ? 'Connected'
+                   : s === 'connecting'   ? 'Connecting…'
+                   : s === 'reconnecting' ? 'Reconnecting…'
+                   : 'Disconnected';
+}
+
+async function _rtSaveSettings() {
+  if (!window.api?.configureRealtime) return;
+  const enabled      = document.getElementById('rtEnabled')?.checked ?? false;
+  const rawUrl       = (document.getElementById('rtServerUrl')?.value || '').trim();
+  const deviceName   = (document.getElementById('rtDeviceName')?.value || '').trim() || null;
+  const operatorName = (document.getElementById('rtOperatorName')?.value || '').trim() || null;
+  // Basic URL shape validation — must start with http:// or https://
+  const serverUrl = (rawUrl && (rawUrl.startsWith('http://') || rawUrl.startsWith('https://'))) ? rawUrl : null;
+  const result = await window.api.configureRealtime({
+    enabled, serverUrl, deviceDisplayName: deviceName, operatorName,
+  }).catch(() => null);
+  if (result?.status) _rtUpdateSettingsStatus(result.status);
+}
+
+document.getElementById('rtEnabled')?.addEventListener('change', _rtSaveSettings);
+
+['rtServerUrl', 'rtDeviceName', 'rtOperatorName'].forEach(id => {
+  document.getElementById(id)?.addEventListener('change', _rtSaveSettings);
+});
+
+document.getElementById('rtTestBtn')?.addEventListener('click', async () => {
+  const btn = document.getElementById('rtTestBtn');
+  const url = (document.getElementById('rtServerUrl')?.value || '').trim();
+  if (!url || !window.api?.testRealtimeConnection) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Testing…'; }
+  const result = await window.api.testRealtimeConnection(url).catch(() => ({ ok: false }));
+  if (btn) {
+    btn.disabled = false;
+    btn.textContent = result.ok ? 'Connected' : 'Cannot connect';
+    setTimeout(() => { if (btn) btn.textContent = 'Test Connection'; }, 3000);
+  }
 });
 
 // ════════════════════════════════════════════════════════════════
@@ -8944,6 +9026,9 @@ function checkRealtimeNameConflict(type, name, collectionName) {
 
 /** Updates the realtime status badge in the header. */
 function _renderRealtimeStatus({ status, devicesOnline } = {}) {
+  if (document.getElementById('settingsModal')?.classList.contains('visible')) {
+    _rtUpdateSettingsStatus({ status });
+  }
   const section = document.getElementById('realtimeSection');
   const dot     = document.getElementById('rtDot');
   const label   = document.getElementById('rtLabel');

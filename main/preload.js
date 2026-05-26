@@ -356,10 +356,12 @@ contextBridge.exposeInMainWorld('api', {
   onTeamUpdate:       (cb)   => _register('realtime:team:update', (_e, data) => cb(data)),
 
   // ── Realtime Operations (advisory only — never writes authoritative files) ──
-  getRealtimeStatus:        ()    => ipcRenderer.invoke('realtime:getStatus'),
-  configureRealtime:        (cfg) => ipcRenderer.invoke('realtime:configure', cfg),
-  getRealtimeKnownNames:    ()    => ipcRenderer.invoke('realtime:getKnownNames'),
-  onRealtimeStatus:         (cb)  => _register('realtime:statusChanged', (_e, s) => cb(s)),
-  onRealtimeEvent:          (cb)  => _register('realtime:event',         (_e, ev) => cb(ev)),
+  getRealtimeStatus:        ()          => ipcRenderer.invoke('realtime:getStatus'),
+  getRealtimeSettings:      ()          => ipcRenderer.invoke('realtime:getSettings'),
+  configureRealtime:        (cfg)       => ipcRenderer.invoke('realtime:configure', cfg),
+  testRealtimeConnection:   (serverUrl) => ipcRenderer.invoke('realtime:testConnection', { serverUrl }),
+  getRealtimeKnownNames:    ()          => ipcRenderer.invoke('realtime:getKnownNames'),
+  onRealtimeStatus:         (cb)        => _register('realtime:statusChanged', (_e, s) => cb(s)),
+  onRealtimeEvent:          (cb)        => _register('realtime:event',         (_e, ev) => cb(ev)),
 
 });

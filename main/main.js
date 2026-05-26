@@ -231,6 +231,7 @@ app.whenReady().then(() => {
   loadImportIndex();
   settings.init();
   realtimeOps.init();
+  realtimeOps.setOperatorName(settings.getOperatorName());
   listManager.init(app.getPath('userData'));
   aliasEngine.init(app.getPath('userData'));
   telemetry.init();
@@ -3817,6 +3818,33 @@ ipcMain.handle('event:prepareFromRegistry', async (_event, { entry } = {}) => {
 
 ipcMain.handle('realtime:getStatus', () => realtimeOps.getStatus());
 
+ipcMain.handle('realtime:getSettings', () => ({
+  enabled:      settings.getRealtimeEnabled(),
+  serverUrl:    settings.getRealtimeServerUrl(),
+  deviceName:   settings.getDeviceDisplayName(),
+  operatorName: settings.getOperatorName(),
+}));
+
+ipcMain.handle('realtime:testConnection', async (_event, { serverUrl } = {}) => {
+  if (!serverUrl || typeof serverUrl !== 'string') return { ok: false };
+  const url = serverUrl.trim().replace(/\/$/, '') + '/health';
+  return new Promise((resolve) => {
+    const mod = url.startsWith('https://') ? require('https') : require('http');
+    let done = false;
+    const finish = (ok) => { if (!done) { done = true; resolve({ ok }); } };
+    const timer = setTimeout(() => finish(false), 5000);
+    try {
+      const req = mod.get(url, { timeout: 5000 }, (res) => {
+        clearTimeout(timer);
+        finish(res.statusCode >= 200 && res.statusCode < 500);
+        res.resume();
+      });
+      req.on('error', () => { clearTimeout(timer); finish(false); });
+      req.on('timeout', () => { req.destroy(); clearTimeout(timer); finish(false); });
+    } catch { clearTimeout(timer); finish(false); }
+  });
+});
+
 ipcMain.handle('realtime:getKnownNames', () => realtimeOps.getKnownNames());
 
 // Team Live activity reporting (advisory only — never writes authoritative files).
@@ -3834,7 +3862,10 @@ ipcMain.handle('realtime:configure', async (_event, cfg) => {
   if (typeof enabled === 'boolean')          await settings.setRealtimeEnabled(enabled);
   if (serverUrl !== undefined)               await settings.setRealtimeServerUrl(typeof serverUrl === 'string' ? serverUrl : null);
   if (typeof deviceDisplayName === 'string') await settings.setDeviceDisplayName(deviceDisplayName || null);
-  if (typeof operatorName === 'string')      realtimeOps.setOperatorName(operatorName || null);
+  if (typeof operatorName === 'string') {
+    await settings.setOperatorName(operatorName || null);
+    realtimeOps.setOperatorName(operatorName || null);
+  }
   const newEnabled = settings.getRealtimeEnabled();
   const newUrl     = settings.getRealtimeServerUrl();
   if (newEnabled && newUrl) {
