@@ -3992,8 +3992,9 @@ ${unparseable.map(ev => `
   }
 
   async function _openSeqModal() {
-    // Works from SELECT mode (_selectedListFolder set) and from event-form view mode
-    // (_viewingExisting set). Requires at least one of the two to be available.
+    // Only valid from the event list (SELECT mode). Guards against being invoked
+    // during create/edit/master screens where no stable local event folder exists.
+    if (_navScreen !== 'eventList') return;
     const targetFolderName = _viewingExisting?.folderName || _selectedListFolder;
     if (!targetFolderName) return;
 

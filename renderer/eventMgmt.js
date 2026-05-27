@@ -13,16 +13,17 @@ const EventMgmt = (() => {
   // ── DOM refs ───────────────────────────────────────────────────────────────
   const $overlay     = () => document.getElementById('eventMgmtModal');
   const $collName    = () => document.getElementById('emmCollName');
-  const $editBtn     = () => document.getElementById('emmEditBtn');
-  const $continueBtn = () => document.getElementById('emmContinueBtn');
-  const $createBtn   = () => document.getElementById('emmCreateBtn');
-  const $saveBtn     = () => document.getElementById('emmSaveBtn');
-  const $repairBtn   = () => document.getElementById('emmRepairBtn');
+  const $editBtn        = () => document.getElementById('emmEditBtn');
+  const $seqFoldersBtn  = () => document.getElementById('emmSeqFoldersBtn');
+  const $continueBtn    = () => document.getElementById('emmContinueBtn');
+  const $createBtn      = () => document.getElementById('emmCreateBtn');
+  const $saveBtn        = () => document.getElementById('emmSaveBtn');
+  const $repairBtn      = () => document.getElementById('emmRepairBtn');
 
   // ── Footer sync ────────────────────────────────────────────────────────────
 
   function _syncFooterButtons() {
-    [$editBtn(), $continueBtn(), $createBtn(), $saveBtn(), $repairBtn()].forEach(b => {
+    [$editBtn(), $seqFoldersBtn(), $continueBtn(), $createBtn(), $saveBtn(), $repairBtn()].forEach(b => {
       if (b) b.style.display = 'none';
     });
 
