@@ -292,6 +292,9 @@ async function copyFiles(filePaths, destination, onProgress) {
     try {
       srcStat = await fsp.stat(srcPath);
     } catch {
+      // Parent directory also gone → source disconnected mid-copy.
+      // Abort so commitImportTransaction rolls back instead of committing partial data.
+      try { await fsp.access(path.dirname(srcPath)); } catch { abortCopy(); return; }
       errors++;
       completedCount++;
       const { eta, speedBps } = getSpeedAndEta();
@@ -544,6 +547,9 @@ async function copyFileJobs(fileJobs, onProgress) {
     try {
       srcStat = await fsp.stat(job.src);
     } catch {
+      // Parent directory also gone → source disconnected mid-copy.
+      // Abort so commitImportTransaction rolls back instead of committing partial data.
+      try { await fsp.access(path.dirname(job.src)); } catch { abortCopy(); return; }
       errors++;
       completedCount++;
       const { eta, speedBps } = getSpeedAndEta();

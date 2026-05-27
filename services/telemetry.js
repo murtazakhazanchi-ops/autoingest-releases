@@ -20,6 +20,14 @@ const path = require('path');
 
 const TELEMETRY_ENABLED = true;   // set false to instantly disable all telemetry
 
+// ── DEPLOYMENT NOTE (internal testing) ───────────────────────────────────────
+// Google Sheet auto-reporting is intentionally enabled for internal bug tracking.
+// config/service-account-key.json is bundled in the packaged app via extraResources.
+// ACCEPTED RISK: this key grants write access to the internal tracker sheet only.
+// DO NOT distribute publicly with bundled credentials — rotate the key and set
+// TELEMETRY_ENABLED = false before any public or open-source release.
+// ─────────────────────────────────────────────────────────────────────────────
+
 // ── Config — fill these in ────────────────────────────────────────────────────
 const SHEET_ID    = '1FKOL4bqScljgI8YPIMuCRNa0V7PtElnDFYaTYGx4TgU';      // ← paste your sheet ID here
 const SHEET_RANGE = "'Bug Tracker'!A:S";

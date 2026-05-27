@@ -11,7 +11,9 @@
     "build": "electron-builder",
     "build:mac": "electron-builder --mac",
     "build:win": "electron-builder --win",
-    "validate:metadata": "node scripts/validate-event-metadata.js"
+    "validate:metadata": "node scripts/validate-event-metadata.js",
+    "realtime:install": "cd realtime-server && npm install",
+    "realtime:start": "cd realtime-server && node server.js"
   },
   "dependencies": {
     "drivelist": "^9.2.4",
@@ -20,7 +22,8 @@
     "exiftool-vendored": "^28.8.0",
     "googleapis": "^144.0.0",
     "lucide": "^1.11.0",
-    "sharp": "^0.34.5"
+    "sharp": "^0.34.5",
+    "socket.io-client": "^4.7.5"
   },
   "devDependencies": {
     "electron": "^30.0.0",
