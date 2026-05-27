@@ -41,7 +41,8 @@ const { validateEventJson } = require('./contracts/dataValidator');
 const exifService         = require('./exifService');
 const metadataSyncService = require('./metadataSyncService');
 const realtimeOps              = require('../services/realtimeOperationsService');
-const offlineCollectionRegistry = require('../services/offlineCollectionRegistryService');
+const offlineCollectionRegistry    = require('../services/offlineCollectionRegistryService');
+const photographerSeqService       = require('../services/photographerSequenceService');
 
 // ── Platform ─────────────────────────────────────────────────────────────────
 const isMac = process.platform === 'darwin';
@@ -2901,7 +2902,8 @@ ipcMain.handle('metadata:reapplyEvent', async (_event, eventFolderPath) => {
     const rel   = path.relative(baseDir, filePath);
     const parts = rel.split(path.sep);
     const seg   = parts.length > 1 ? parts[0] : '';
-    return seg || fallbackPhotographer;
+    // Strip PCxx- prefix so metadata reflects canonical name regardless of sequencing.
+    return photographerSeqService.canonicalName(seg || fallbackPhotographer);
   }
 
   const groups      = [];
@@ -3994,5 +3996,171 @@ ipcMain.handle('window:toggleMaximize', () => {
 });
 ipcMain.handle('window:close', () => {
   BrowserWindow.getFocusedWindow()?.close();
+});
+
+// ── Photographer Folder Sequencing ────────────────────────────────────────────
+
+ipcMain.handle('event:getPhotographerFolders', async (_event, { localEventPath } = {}) => {
+  if (!localEventPath || typeof localEventPath !== 'string') {
+    return { ok: false, reason: 'localEventPath required' };
+  }
+
+  const stagingRoot = settings.getLocalStagingRoot();
+  if (!stagingRoot) return { ok: false, reason: 'No staging root configured.' };
+
+  const realStaging = path.resolve(stagingRoot);
+  const realEvent   = path.resolve(localEventPath);
+  if (!realEvent.startsWith(realStaging + path.sep)) {
+    return { ok: false, reason: 'localEventPath is outside staging root.' };
+  }
+
+  // Read event.json to determine component structure (single vs multi-component).
+  // This drives which directories are scanned for photographer folders.
+  const jsonPath = path.join(realEvent, 'event.json');
+  let components = [];
+  try {
+    const raw  = await fsp.readFile(jsonPath, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed?.components)) components = parsed.components;
+  } catch { /* no event.json yet — treat as single-component */ }
+
+  try {
+    const scopes = await photographerSeqService.scanPhotographerFolders(realEvent, components);
+    return { ok: true, scopes };
+  } catch (err) {
+    return { ok: false, reason: err.message };
+  }
+});
+
+ipcMain.handle('event:applyPhotographerSequence', async (_event, { localEventPath, scopedOrdered } = {}) => {
+  if (!localEventPath || typeof localEventPath !== 'string') {
+    return { ok: false, reason: 'localEventPath required' };
+  }
+  // scopedOrdered: [{ scopeKey: string, ordered: [{ canonical, sequence }] }]
+  if (!Array.isArray(scopedOrdered) || scopedOrdered.length === 0) {
+    return { ok: false, reason: 'scopedOrdered array required' };
+  }
+
+  const stagingRoot = settings.getLocalStagingRoot();
+  if (!stagingRoot) return { ok: false, reason: 'No staging root configured.' };
+
+  const realStaging = path.resolve(stagingRoot);
+  const realEvent   = path.resolve(localEventPath);
+  if (!realEvent.startsWith(realStaging + path.sep)) {
+    return { ok: false, reason: 'localEventPath is outside staging root.' };
+  }
+
+  // Block if a sync job is actively running for this event
+  const eventFolderName = path.basename(realEvent);
+  for (const jobId of _syncingJobIds) {
+    if (typeof jobId === 'string' && jobId.includes(eventFolderName)) {
+      return { ok: false, reason: 'A sync job is active for this event. Please wait for it to complete.' };
+    }
+  }
+
+  // Validate and build folderName for every entry in every scope.
+  // scopeKey and canonical are renderer-provided; reject any value that could
+  // construct a path outside the intended component/event directory.
+  const fullScopedOrdered = [];
+  for (const scope of scopedOrdered) {
+    if (!scope.scopeKey || typeof scope.scopeKey !== 'string') {
+      return { ok: false, reason: 'Each scope must have a scopeKey.' };
+    }
+    if (!Array.isArray(scope.ordered)) {
+      return { ok: false, reason: `scope "${scope.scopeKey}": ordered array required.` };
+    }
+
+    // Resolve and validate the scope base directory.
+    // EVENT_ROOT_KEY (__eventRoot__) maps directly to realEvent.
+    // Any other scopeKey is a component folder name — must be a single path
+    // segment with no separators and must resolve inside realEvent.
+    let scopeBaseDir;
+    if (scope.scopeKey === photographerSeqService.EVENT_ROOT_KEY) {
+      scopeBaseDir = realEvent;
+    } else {
+      if (/[/\\]/.test(scope.scopeKey)) {
+        return { ok: false, reason: `scope key "${scope.scopeKey}" contains path separator characters.` };
+      }
+      scopeBaseDir = path.resolve(path.join(realEvent, scope.scopeKey));
+      if (!scopeBaseDir.startsWith(realEvent + path.sep)) {
+        return { ok: false, reason: `scope key "${scope.scopeKey}" resolves outside event directory.` };
+      }
+    }
+
+    const fullOrdered = [];
+    for (const entry of scope.ordered) {
+      if (!entry.canonical || typeof entry.canonical !== 'string') {
+        return { ok: false, reason: `scope "${scope.scopeKey}": each entry must have a canonical name.` };
+      }
+      // Reject blank, path-separator chars, or any segment containing '..'.
+      const trimmedCanonical = entry.canonical.trim();
+      if (!trimmedCanonical) {
+        return { ok: false, reason: `scope "${scope.scopeKey}": canonical name must not be blank.` };
+      }
+      if (/[/\\]/.test(trimmedCanonical) || trimmedCanonical.split(path.sep).includes('..') || trimmedCanonical.includes('..')) {
+        return { ok: false, reason: `scope "${scope.scopeKey}": canonical name "${entry.canonical}" contains invalid characters.` };
+      }
+      if (typeof entry.sequence !== 'number' || entry.sequence < 1) {
+        return { ok: false, reason: `scope "${scope.scopeKey}": each entry must have sequence >= 1.` };
+      }
+      const folderName     = `${photographerSeqService.seqPrefix(entry.sequence)}-${trimmedCanonical}`;
+      const resolvedFolder = path.resolve(path.join(scopeBaseDir, folderName));
+      if (!resolvedFolder.startsWith(scopeBaseDir + path.sep)) {
+        return { ok: false, reason: `scope "${scope.scopeKey}": folder name for "${entry.canonical}" resolves outside scope directory.` };
+      }
+      fullOrdered.push({ canonical: trimmedCanonical, sequence: entry.sequence, folderName });
+    }
+    fullScopedOrdered.push({ scopeKey: scope.scopeKey, ordered: fullOrdered });
+  }
+
+  const totalFolders = fullScopedOrdered.reduce((n, s) => n + s.ordered.length, 0);
+  log('info', `[seq] Applying photographer sequence to ${realEvent} — ${fullScopedOrdered.length} scope(s), ${totalFolders} folder(s)`);
+
+  // Apply filesystem renames (component-aware two-phase)
+  const renameResult = await photographerSeqService.applyRenames(realEvent, fullScopedOrdered);
+  if (!renameResult.ok) {
+    log('warn', `[seq] Rename failed: ${renameResult.error}`);
+    return { ok: false, reason: renameResult.error };
+  }
+
+  // Build component-scoped photographerSequences
+  // { scopeKey: { canonical: { sequence, folderName } } }
+  const scopedSequences = {};
+  for (const scope of fullScopedOrdered) {
+    scopedSequences[scope.scopeKey] = {};
+    for (const entry of scope.ordered) {
+      scopedSequences[scope.scopeKey][entry.canonical] = {
+        sequence:   entry.sequence,
+        folderName: entry.folderName,
+      };
+    }
+  }
+
+  // Write photographerSequences into event.json
+  const writeResult = await photographerSeqService.writeSequencesToEventJson(realEvent, scopedSequences);
+  if (!writeResult.ok) {
+    log('warn', `[seq] event.json update failed: ${writeResult.error}`);
+    return { ok: false, reason: writeResult.error };
+  }
+
+  // Build scoped rename map for manifest update
+  // Map<scopeKey, Map<canonical, newFolderName>>
+  const scopedRenameMap = new Map(
+    fullScopedOrdered.map(scope => [
+      scope.scopeKey,
+      new Map(scope.ordered.map(e => [e.canonical, e.folderName])),
+    ])
+  );
+  await photographerSeqService.updateManifestAfterRename(realEvent, scopedRenameMap).catch(err => {
+    log('warn', `[seq] Manifest update warning: ${err.message}`);
+  });
+
+  // Refresh the in-memory sync queue
+  await syncQueueService.refreshQueue().catch(err => {
+    log('warn', `[seq] Queue refresh warning: ${err.message}`);
+  });
+
+  log('info', `[seq] Sequence applied — ${renameResult.renames.length} folder(s) renamed`);
+  return { ok: true, renames: renameResult.renames, sequences: scopedSequences };
 });
 

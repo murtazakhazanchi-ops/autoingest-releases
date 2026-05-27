@@ -23,8 +23,9 @@ const {
   LOCK_HEARTBEAT_INTERVAL_MS,
 } = require('./archiveLockService');
 
-const { hidePathBestEffort } = require('./internalFileProtection');
-const offlineRegistry = require('./offlineCollectionRegistryService');
+const { hidePathBestEffort }    = require('./internalFileProtection');
+const offlineRegistry           = require('./offlineCollectionRegistryService');
+const { canonicalName: _phCanonical } = require('./photographerSequenceService');
 const config = require('../config/app.config');
 
 const SKIP_DIRS  = new Set(['.autoingest', '__MACOSX']);
@@ -327,15 +328,19 @@ async function _syncOneFile(localPath, archivePath, filename, result, abortSigna
  *
  * @param {string[]} relPaths  Paths relative to localEventPath, using '/' separator.
  */
-async function _syncFileList(relPaths, localEventPath, archiveEventPath, result, abortSignal = null, pauseSignal = null, onFileProgress = null) {
+async function _syncFileList(relPaths, localEventPath, archiveEventPath, result, abortSignal = null, pauseSignal = null, onFileProgress = null, archivePathOverrides = null) {
   for (const relPath of relPaths) {
     if (abortSignal?.aborted) return;
     if (pauseSignal?.paused)  return;
     if (typeof relPath !== 'string' || !relPath) continue;
 
     const segments    = relPath.split('/').filter(Boolean);
-    const localPath   = path.join(localEventPath,   ...segments);
-    const archivePath = path.join(archiveEventPath, ...segments);
+    const localPath   = path.join(localEventPath, ...segments);
+
+    // For multi-component paths the photographer segment may be remapped to its
+    // canonical archive folder name (e.g. "M Murtaza" → "PC01-M Murtaza").
+    const archiveRel  = archivePathOverrides?.get(relPath) ?? relPath;
+    const archivePath = path.join(archiveEventPath, ...archiveRel.split('/').filter(Boolean));
     const filename    = segments[segments.length - 1] || '';
 
     await _syncOneFile(localPath, archivePath, filename, result, abortSignal, onFileProgress);
@@ -355,6 +360,61 @@ async function _syncFileList(relPaths, localEventPath, archiveEventPath, result,
       }
     }
   }
+}
+
+/**
+ * Build a Map<localRelPath, archiveRelPath> for Strategy A multi-component sync.
+ *
+ * For paths with the structure compFolder/photographerFolder/file (>= 3 segments),
+ * scans the archive component dir and remaps the photographer segment to whichever
+ * existing archive folder shares the same canonical name (PC-prefix stripped).
+ * Example: "01-Majlis/M Murtaza/photo.jpg" → "01-Majlis/PC01-M Murtaza/photo.jpg"
+ *
+ * Single-component paths (< 3 segments) are left unchanged — those are handled
+ * by the existing top-level canonical lookup (lines ~694-704 in syncJob).
+ *
+ * Returns null when no overrides are needed.
+ *
+ * @param {string[]} relPaths
+ * @param {string}   archiveEventPath
+ * @returns {Promise<Map<string,string>|null>}
+ */
+async function _buildArchiveOverrides(relPaths, archiveEventPath) {
+  // Cache: compFolder → Map<canonicalName, archiveFolderName>
+  const compDirCache = new Map();
+  const overrides    = new Map();
+
+  for (const relPath of relPaths) {
+    const parts = relPath.split('/').filter(Boolean);
+    if (parts.length < 3) continue; // not a comp/ph/file path — no remapping needed
+
+    const compFolder = parts[0];
+    const localPh    = parts[1];
+
+    if (!compDirCache.has(compFolder)) {
+      const compArchivePath = path.join(archiveEventPath, compFolder);
+      const cache = new Map(); // canonical → archiveFolderName
+      try {
+        const dirs = await fsp.readdir(compArchivePath, { withFileTypes: true });
+        for (const d of dirs) {
+          if (d.isDirectory() && !_skipDir(d.name)) {
+            cache.set(_phCanonical(d.name), d.name);
+          }
+        }
+      } catch { /* component dir absent in archive — no remapping possible yet */ }
+      compDirCache.set(compFolder, cache);
+    }
+
+    const phCache   = compDirCache.get(compFolder);
+    const canonical = _phCanonical(localPh);
+    const archivePh = phCache.get(canonical);
+
+    if (archivePh && archivePh !== localPh) {
+      overrides.set(relPath, [compFolder, archivePh, ...parts.slice(2)].join('/'));
+    }
+  }
+
+  return overrides.size > 0 ? overrides : null;
 }
 
 /**
@@ -686,7 +746,22 @@ async function syncJob(job, { nasRoot, stagingRoot }, { progressCallback, pauseS
 
     const phFolderName  = phEntry.name;
     const localPhPath   = path.join(localEventPath, phFolderName);
-    const archivePhPath = path.join(archiveEventPath, phFolderName);
+
+    // Canonical-name lookup: if the archive already has a sequenced folder for this
+    // photographer (e.g. PC01-Name) and the local folder is unsequenced (e.g. Name),
+    // sync into the existing sequenced folder rather than creating a duplicate.
+    let archivePhFolderName = phFolderName;
+    try {
+      const phCanonical = _phCanonical(phFolderName);
+      const archiveDirs = await fsp.readdir(archiveEventPath, { withFileTypes: true });
+      const match = archiveDirs.find(
+        d => d.isDirectory() && _phCanonical(d.name) === phCanonical
+      );
+      if (match && match.name !== phFolderName) {
+        archivePhFolderName = match.name;
+      }
+    } catch { /* archive event dir may not exist yet — proceed with local name */ }
+    const archivePhPath = path.join(archiveEventPath, archivePhFolderName);
 
     let lockResult;
     try {
@@ -733,15 +808,20 @@ async function syncJob(job, { nasRoot, stagingRoot }, { progressCallback, pauseS
 
     try {
       if (filesByPhotographer) {
-        // Strategy A: sync only the exact files listed for this photographer
+        // Strategy A: sync only the exact files listed for this photographer/component.
+        // For multi-component paths (comp/photographer/file), build an archive-path
+        // override map so that local "M Murtaza" lands in archive "PC01-M Murtaza".
+        const _stratAFiles     = filesByPhotographer.get(phFolderName) || [];
+        const _archiveOverrides = await _buildArchiveOverrides(_stratAFiles, archiveEventPath);
         await _syncFileList(
-          filesByPhotographer.get(phFolderName) || [],
+          _stratAFiles,
           localEventPath,
           archiveEventPath,
           result,
           abortSignal,
           externalPauseSignal,
           onFileProgress,
+          _archiveOverrides,
         );
       } else {
         // Strategy B or C: sync entire photographer folder

@@ -2566,6 +2566,7 @@ ${unparseable.map(ev => `
   ${_viewingExisting
     ? `<div class="ec-view-actions" style="display:none" aria-hidden="true">
          <button id="ecEventEdit" class="ec-outline-btn">Edit Event</button>
+         <button id="ecSeqFolders" class="ec-outline-btn">Sequence Folders</button>
          <button id="ecEventContinue" class="ec-continue-btn">Select for Import →</button>
        </div>`
     : `<button id="ecEventContinue" class="ec-continue-btn" disabled style="display:none" aria-hidden="true">Create Event →</button>`}
@@ -3193,6 +3194,12 @@ ${unparseable.map(ev => `
       if (e.target.closest('#ecEventEdit')) {
         const entry = (_scannedEvents || []).find(e => e.folderName === _viewingExisting?.folderName) || _viewingExisting;
         await openEventForEdit(entry);
+        return;
+      }
+
+      // #ecSeqFolders — open photographer folder sequencing modal
+      if (e.target.closest('#ecSeqFolders')) {
+        await _openSeqModal();
         return;
       }
 
@@ -3980,6 +3987,216 @@ ${unparseable.map(ev => `
     el.classList.add('visible');
     clearTimeout(el._hideTimer);
     el._hideTimer = setTimeout(() => el.classList.remove('visible'), 4500);
+  }
+
+  // ── Photographer Folder Sequencing Modal ──────────────────────────────────
+
+  // Must stay in sync with photographerSequenceService.EVENT_ROOT_KEY
+  const _SEQ_EVENT_ROOT_KEY = '__eventRoot__';
+
+  function _seqPrefix(n) {
+    return n < 10 ? `PC0${n}` : `PC${n}`;
+  }
+
+  async function _openSeqModal() {
+    if (!_viewingExisting) return;
+
+    // Derive local staging event path for IPC
+    const entry = (_scannedEvents || []).find(e => e.folderName === _viewingExisting?.folderName);
+    let localEventPath = entry?._localEventPath || null;
+    if (!localEventPath && _offlineStagingMode) {
+      const collPath = _effectiveCollPath();
+      if (collPath) localEventPath = collPath.replace(/\\/g, '/').replace(/\/$/, '') + '/' + _viewingExisting.folderName;
+    }
+    if (!localEventPath && _viewingExisting._stagingCollPath) {
+      localEventPath = _viewingExisting._stagingCollPath.replace(/\\/g, '/').replace(/\/$/, '') + '/' + _viewingExisting.folderName;
+    }
+
+    if (!localEventPath) {
+      await showErrorModal('Cannot sequence folders: local staging path not available for this event.');
+      return;
+    }
+
+    // Fetch component-scoped photographer folders from main process
+    const fetchResult = await window.api.getPhotographerFolders({ localEventPath });
+    if (!fetchResult.ok) {
+      await showErrorModal(`Cannot load photographer folders: ${fetchResult.reason}`);
+      return;
+    }
+
+    const { scopes } = fetchResult;
+    const allHavePhotographers = scopes && scopes.some(s => s.photographers.length > 0);
+    if (!scopes || !allHavePhotographers) {
+      await showErrorModal('No photographer folders found in this event.');
+      return;
+    }
+
+    // Existing component-scoped sequences from event.json
+    // Shape: { scopeKey: { canonical: { sequence, folderName } } }
+    const existingSeqs = entry?._eventJson?.photographerSequences || {};
+
+    // Build per-scope ordered working lists.
+    // Each scope: { scopeKey, scopeLabel, items: [{ canonical }] }
+    const scopeStates = scopes.map(scope => {
+      const scopeExisting = existingSeqs[scope.scopeKey] || {};
+      const sequenced   = [];
+      const unsequenced = [];
+      for (const ph of scope.photographers) {
+        const seqData = scopeExisting[ph.canonical];
+        if (seqData?.sequence) {
+          sequenced.push({ canonical: ph.canonical, sequence: seqData.sequence });
+        } else {
+          unsequenced.push({ canonical: ph.canonical });
+        }
+      }
+      sequenced.sort((a, b) => a.sequence - b.sequence);
+      return {
+        scopeKey:   scope.scopeKey,
+        scopeLabel: scope.scopeLabel,
+        items:      [...sequenced, ...unsequenced].map(x => ({ canonical: x.canonical })),
+      };
+    });
+
+    const isMultiScope = scopeStates.length > 1;
+
+    return new Promise(resolve => {
+      const overlay = document.createElement('div');
+      overlay.className = 'ec-modal-overlay';
+      document.body.appendChild(overlay);
+
+      const errEl = () => overlay.querySelector('#ecSeqError');
+
+      function buildRowHTML(item, idx, scopeIdx) {
+        const prefix = _seqPrefix(idx + 1);
+        const dest   = `${prefix}-${esc(item.canonical)}`;
+        return `
+<li class="ec-seq-row" draggable="true" data-idx="${idx}" data-scope="${scopeIdx}">
+  <span class="ec-drag-handle" title="Drag to reorder" aria-hidden="true">⠿</span>
+  <span class="ec-seq-num">${esc(prefix)}</span>
+  <span class="ec-seq-name">${esc(item.canonical)}</span>
+  <span class="ec-seq-arrow">→</span>
+  <span class="ec-seq-dest">${dest}</span>
+</li>`;
+      }
+
+      function buildScopeHTML(scope, scopeIdx) {
+        const rowsHTML = scope.items.map((item, idx) => buildRowHTML(item, idx, scopeIdx)).join('');
+        const headerHTML = isMultiScope
+          ? `<li class="ec-seq-group-header" aria-hidden="true">${esc(scope.scopeLabel || scope.scopeKey)}</li>`
+          : '';
+        return headerHTML + rowsHTML;
+      }
+
+      function renderList() {
+        const list = overlay.querySelector('#ecSeqList');
+        if (!list) return;
+        list.innerHTML = scopeStates.map((scope, si) => buildScopeHTML(scope, si)).join('');
+        wireRowDrag();
+      }
+
+      function renderModal() {
+        const subtitleText = isMultiScope
+          ? 'Drag to reorder within each sub-event. Folders will be renamed with PC prefix on apply.'
+          : 'Drag to reorder. Folders will be renamed with PC prefix on apply.';
+
+        overlay.innerHTML = `
+<div class="ec-seq-modal-box">
+  <p class="ec-modal-title">Photographer Folder Sequence</p>
+  <p class="ec-seq-subtitle">${esc(subtitleText)}</p>
+  <ul class="ec-seq-list" id="ecSeqList" role="list">
+    ${scopeStates.map((scope, si) => buildScopeHTML(scope, si)).join('')}
+  </ul>
+  <div class="ec-seq-error" id="ecSeqError" role="alert" aria-live="polite"></div>
+  <div class="ec-modal-actions">
+    <button class="ec-outline-btn" id="ecSeqCancel">Cancel</button>
+    <button class="ec-continue-btn" id="ecSeqApply">Apply Sequence</button>
+  </div>
+</div>`;
+
+        overlay.querySelector('#ecSeqCancel').addEventListener('click', () => cleanup(false));
+        overlay.querySelector('#ecSeqApply').addEventListener('click', () => applySequence());
+        wireRowDrag();
+        requestAnimationFrame(() => overlay.querySelector('#ecSeqApply')?.focus());
+      }
+
+      // _dragState: tracks drag source by scope index + item index
+      let _dragState = null;
+
+      function wireRowDrag() {
+        const list = overlay.querySelector('#ecSeqList');
+        if (!list) return;
+        list.querySelectorAll('.ec-seq-row').forEach(row => {
+          row.addEventListener('dragstart', e => {
+            _dragState = { scopeIdx: Number(row.dataset.scope), idx: Number(row.dataset.idx) };
+            e.dataTransfer.effectAllowed = 'move';
+            row.classList.add('ec-seq-dragging');
+          });
+          row.addEventListener('dragend', () => {
+            _dragState = null;
+            row.classList.remove('ec-seq-dragging');
+            list.querySelectorAll('.ec-seq-row').forEach(r => r.classList.remove('ec-seq-over'));
+          });
+          row.addEventListener('dragover', e => {
+            // Only allow reorder within the same scope
+            if (!_dragState || Number(row.dataset.scope) !== _dragState.scopeIdx) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            list.querySelectorAll('.ec-seq-row').forEach(r => r.classList.remove('ec-seq-over'));
+            row.classList.add('ec-seq-over');
+          });
+          row.addEventListener('drop', e => {
+            e.preventDefault();
+            if (!_dragState) return;
+            const toScopeIdx = Number(row.dataset.scope);
+            const toIdx      = Number(row.dataset.idx);
+            if (toScopeIdx !== _dragState.scopeIdx || toIdx === _dragState.idx) return;
+            const scope = scopeStates[toScopeIdx];
+            const [moved] = scope.items.splice(_dragState.idx, 1);
+            scope.items.splice(toIdx, 0, moved);
+            _dragState = null;
+            renderList();
+          });
+        });
+      }
+
+      async function applySequence() {
+        const applyBtn = overlay.querySelector('#ecSeqApply');
+        if (applyBtn) applyBtn.disabled = true;
+
+        // Build component-scoped ordered array for IPC
+        const scopedOrdered = scopeStates.map(scope => ({
+          scopeKey: scope.scopeKey,
+          ordered:  scope.items.map((item, idx) => ({
+            canonical: item.canonical,
+            sequence:  idx + 1,
+          })),
+        }));
+
+        const result = await window.api.applyPhotographerSequence({ localEventPath, scopedOrdered });
+
+        if (!result.ok) {
+          const err = errEl();
+          if (err) err.textContent = `Failed: ${result.reason}`;
+          if (applyBtn) applyBtn.disabled = false;
+          return;
+        }
+
+        cleanup(true);
+      }
+
+      function cleanup(applied) {
+        document.removeEventListener('keydown', keyHandler);
+        overlay.remove();
+        resolve(applied);
+      }
+
+      function keyHandler(e) {
+        if (e.key === 'Escape') { e.preventDefault(); cleanup(false); }
+      }
+      document.addEventListener('keydown', keyHandler);
+
+      renderModal();
+    });
   }
 
   // ── Slide-transition helper ────────────────────────────────────────────────

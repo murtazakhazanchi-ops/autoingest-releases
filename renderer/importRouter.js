@@ -75,21 +75,30 @@ const ImportRouter = (() => {
   // Returns the base directory path (no filename, no VIDEO segment).
   // Returns null when subEventId is missing in multi-component mode (caller skips).
   //
-  // ctx: { masterPath: string, eventName: string, photographer: string, isMulti: boolean }
+  // ctx: { masterPath: string, eventName: string, photographer: string, isMulti: boolean,
+  //        photographerSequences?: object }
   function _buildDestBase(group, ctx) {
-    const { masterPath, eventName, photographer, isMulti } = ctx;
+    const { masterPath, eventName, photographer, isMulti, photographerSequences } = ctx;
     const subEventId = _normalizeSubEventId(group.subEventId);
 
     if (!isMulti && subEventId) {
       console.error('[IMPORT] Unexpected subEventId in single-component event', subEventId);
     }
 
+    // Resolve the scope key for photographerSequences lookup:
+    //   multi-component → subEventId (the component folder name)
+    //   single-component → '__eventRoot__'
+    // This matches the component-scoped data shape written by photographerSequenceService.
+    const seqScopeKey = isMulti ? (subEventId || null) : '__eventRoot__';
+    const scopeSeqs   = (seqScopeKey && photographerSequences) ? photographerSequences[seqScopeKey] : null;
+    const folderName  = (scopeSeqs && scopeSeqs[photographer]?.folderName) || photographer;
+
     if (isMulti) {
       // Multi-component: subEventId is required — null means the group is unmapped.
       if (!subEventId) return null;
-      return `${masterPath}/${eventName}/${subEventId}/${photographer}`;
+      return `${masterPath}/${eventName}/${subEventId}/${folderName}`;
     }
-    return `${masterPath}/${eventName}/${photographer}`;
+    return `${masterPath}/${eventName}/${folderName}`;
   }
 
   // ── Part 3: Structured validation ─────────────────────────────────────────
@@ -220,9 +229,10 @@ const ImportRouter = (() => {
     const masterPath = coll._masterPath;
     const eventName  = event.name;
     const isMulti    = event.components.length > 1;
+    const photographerSequences = event.photographerSequences || null;
 
     // ctx is built ONCE here and reused for every _buildDestBase call — not inside loops.
-    const ctx = { masterPath, eventName, photographer, isMulti };
+    const ctx = { masterPath, eventName, photographer, isMulti, photographerSequences };
 
     _devLog(`simulateImport start — ${groups.length} groups, isMulti=${isMulti}, photographer="${photographer}"`);
 

@@ -356,6 +356,10 @@ contextBridge.exposeInMainWorld('api', {
   prepareEventFromRegistry:      (params) => ipcRenderer.invoke('event:prepareFromRegistry',      params),
   onRealtimeRegistryEntry:       (cb)     => _register('realtime:registry:entry', (_e, ev) => cb(ev)),
 
+  // ── Photographer Folder Sequencing ──
+  getPhotographerFolders:      (params) => ipcRenderer.invoke('event:getPhotographerFolders',    params),
+  applyPhotographerSequence:   (params) => ipcRenderer.invoke('event:applyPhotographerSequence', params),
+
   // ── Team Live (advisory only — never writes authoritative files) ──
   reportTeamActivity: (data) => ipcRenderer.invoke('team:reportActivity', data),
   onTeamUpdate:          (cb) => _register('realtime:team:update',    (_e, data) => cb(data)),
