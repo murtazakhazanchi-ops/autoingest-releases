@@ -3780,7 +3780,15 @@ ipcMain.handle('collection:prepareFromRegistry', async (_event, { entry } = {}) 
 
   const hasNasTarget = !!validatedNasPath;
   const deviceId     = settings.getDeviceId ? settings.getDeviceId() : null;
-  const result       = await offlineCollectionRegistry.writeLink(localCollectionPath, {
+
+  // Preserve an existing confirmed link — registry data must not overwrite a
+  // previously matched or prepared target (prevents cross-site link corruption).
+  const { ok: _priorOk, link: _priorLink } = await offlineCollectionRegistry.readLink(localCollectionPath);
+  if (_priorOk && _priorLink && _priorLink.status === 'linked' && _priorLink.nasCollectionPath) {
+    return { ok: true, localCollectionPath };
+  }
+
+  const result = await offlineCollectionRegistry.writeLink(localCollectionPath, {
     collectionName,
     registryId:                 registryId || null,
     nasRoot:                    hasNasTarget ? nasRoot : null,
@@ -3838,18 +3846,23 @@ ipcMain.handle('event:prepareFromRegistry', async (_event, { entry } = {}) => {
   const hasNasTarget = !!validatedNasPath;
   const deviceId     = settings.getDeviceId ? settings.getDeviceId() : null;
 
-  // Write/update collection.link.json
-  await offlineCollectionRegistry.writeLink(localCollectionPath, {
-    collectionName,
-    registryId:                 registryId || null,
-    nasRoot:                    hasNasTarget ? nasRoot : null,
-    nasCollectionPath:          validatedNasPath,
-    localStagingCollectionPath: localCollectionPath,
-    preparedAt:                 Date.now(),
-    deviceId,
-    operator:                   null,
-    status:                     hasNasTarget ? 'linked' : 'provisional',
-  });
+  // Write collection.link.json only when no confirmed link exists — event-level
+  // registry data must not demote a linked collection to provisional, and must
+  // not silently rewrite the NAS target with a cross-site path.
+  const { ok: _priorOk2, link: _priorLink2 } = await offlineCollectionRegistry.readLink(localCollectionPath);
+  if (!(_priorOk2 && _priorLink2 && _priorLink2.status === 'linked' && _priorLink2.nasCollectionPath)) {
+    await offlineCollectionRegistry.writeLink(localCollectionPath, {
+      collectionName,
+      registryId:                 registryId || null,
+      nasRoot:                    hasNasTarget ? nasRoot : null,
+      nasCollectionPath:          validatedNasPath,
+      localStagingCollectionPath: localCollectionPath,
+      preparedAt:                 Date.now(),
+      deviceId,
+      operator:                   null,
+      status:                     hasNasTarget ? 'linked' : 'provisional',
+    });
+  }
 
   try {
     await fsp.mkdir(localEventPath, { recursive: true });
