@@ -2905,6 +2905,15 @@ document.getElementById('emmEditBtn')?.addEventListener('click', async () => {
   const ok = await EventCreator.editSelectedEvent();
   if (!ok) EventMgmt.setMode('select');
 });
+document.getElementById('emmSeqFoldersBtn')?.addEventListener('click', async () => {
+  const btn = document.getElementById('emmSeqFoldersBtn');
+  if (btn) btn.disabled = true;
+  try {
+    await EventCreator.openSeqModal();
+  } finally {
+    if (EventMgmt.isOpen() && btn) btn.disabled = false;
+  }
+});
 document.getElementById('emmSaveBtn')?.addEventListener('click', async () => {
   const btn = document.getElementById('emmSaveBtn');
   if (!btn || btn.disabled) return;
@@ -2932,13 +2941,17 @@ document.addEventListener('eventcreator:listSelect', () => {
   if (cont) cont.disabled = false;
   const edit = document.getElementById('emmEditBtn');
   if (edit) edit.style.display = '';
+  const seq = document.getElementById('emmSeqFoldersBtn');
+  if (seq) seq.style.display = '';
 });
-// Point 8: deselect — restore disabled/hidden state on Continue + Edit.
+// Point 8: deselect — restore disabled/hidden state on Continue + Edit + Sequence Folders.
 document.addEventListener('eventcreator:listDeselect', () => {
   const cont = document.getElementById('emmContinueBtn');
   if (cont) cont.disabled = true;
   const edit = document.getElementById('emmEditBtn');
   if (edit) edit.style.display = 'none';
+  const seq = document.getElementById('emmSeqFoldersBtn');
+  if (seq) seq.style.display = 'none';
 });
 document.addEventListener('eventmgmt:requestClose', showLanding);
 document.addEventListener('eventcreator:openArchiveLocations', () => _alocOpen());

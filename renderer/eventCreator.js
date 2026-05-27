@@ -2566,7 +2566,6 @@ ${unparseable.map(ev => `
   ${_viewingExisting
     ? `<div class="ec-view-actions" style="display:none" aria-hidden="true">
          <button id="ecEventEdit" class="ec-outline-btn">Edit Event</button>
-         <button id="ecSeqFolders" class="ec-outline-btn">Sequence Folders</button>
          <button id="ecEventContinue" class="ec-continue-btn">Select for Import →</button>
        </div>`
     : `<button id="ecEventContinue" class="ec-continue-btn" disabled style="display:none" aria-hidden="true">Create Event →</button>`}
@@ -3194,12 +3193,6 @@ ${unparseable.map(ev => `
       if (e.target.closest('#ecEventEdit')) {
         const entry = (_scannedEvents || []).find(e => e.folderName === _viewingExisting?.folderName) || _viewingExisting;
         await openEventForEdit(entry);
-        return;
-      }
-
-      // #ecSeqFolders — open photographer folder sequencing modal
-      if (e.target.closest('#ecSeqFolders')) {
-        await _openSeqModal();
         return;
       }
 
@@ -3999,17 +3992,20 @@ ${unparseable.map(ev => `
   }
 
   async function _openSeqModal() {
-    if (!_viewingExisting) return;
+    // Works from SELECT mode (_selectedListFolder set) and from event-form view mode
+    // (_viewingExisting set). Requires at least one of the two to be available.
+    const targetFolderName = _viewingExisting?.folderName || _selectedListFolder;
+    if (!targetFolderName) return;
 
     // Derive local staging event path for IPC
-    const entry = (_scannedEvents || []).find(e => e.folderName === _viewingExisting?.folderName);
+    const entry = (_scannedEvents || []).find(e => e.folderName === targetFolderName);
     let localEventPath = entry?._localEventPath || null;
     if (!localEventPath && _offlineStagingMode) {
       const collPath = _effectiveCollPath();
-      if (collPath) localEventPath = collPath.replace(/\\/g, '/').replace(/\/$/, '') + '/' + _viewingExisting.folderName;
+      if (collPath) localEventPath = collPath.replace(/\\/g, '/').replace(/\/$/, '') + '/' + targetFolderName;
     }
-    if (!localEventPath && _viewingExisting._stagingCollPath) {
-      localEventPath = _viewingExisting._stagingCollPath.replace(/\\/g, '/').replace(/\/$/, '') + '/' + _viewingExisting.folderName;
+    if (!localEventPath && _viewingExisting?._stagingCollPath) {
+      localEventPath = _viewingExisting._stagingCollPath.replace(/\\/g, '/').replace(/\/$/, '') + '/' + targetFolderName;
     }
 
     if (!localEventPath) {
@@ -5255,6 +5251,9 @@ ${unparseable.map(ev => `
         _refreshEventListRegistryPanel();
       }
     },
+
+    /** Open the Photographer Folder Sequence modal for the currently selected or viewed event. */
+    async openSeqModal() { return _openSeqModal(); },
   };
 
 })();
