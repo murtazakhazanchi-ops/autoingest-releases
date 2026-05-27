@@ -1685,6 +1685,18 @@ function _renderTlSummaryBar() {
 }
 
 function _renderTeamActivityTab() {
+  // State-specific messages — tabs are always visible; content reflects realtime state
+  if (!_realtimeStatus || _realtimeStatus === 'disabled') {
+    return `<div class="tl-tab-empty">Realtime is disabled.<br><span>Enable Team Live &amp; Online Registry in Settings.</span></div>`;
+  }
+  if (_realtimeStatus === 'not-configured') {
+    return `<div class="tl-tab-empty">Realtime is not configured.<br><span>Add a server URL in Settings.</span></div>`;
+  }
+  if ((_realtimeStatus === 'offline' || _realtimeStatus === 'connecting' || _realtimeStatus === 'reconnecting')
+      && _teamDevices.size === 0) {
+    return `<div class="tl-tab-empty">Team Live unavailable.<br><span>AutoIngest will continue working normally.</span></div>`;
+  }
+
   const now     = Date.now();
   const devices = Array.from(_teamDevices.values());
 
@@ -1922,31 +1934,6 @@ function _renderDevicesTab() {
 }
 
 function _renderTeamLiveBody() {
-  // Disabled state — realtime not configured
-  if (!_realtimeStatus || _realtimeStatus === 'disabled') {
-    return `
-      <div class="tl-empty">
-        <div class="tl-empty-icon">
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        </div>
-        <div class="tl-empty-title">Realtime is disabled</div>
-        <p class="tl-empty-sub">Enable Team Live &amp; Online Registry in Settings.</p>
-      </div>`;
-  }
-
-  // Disconnected with no cached data yet
-  if ((_realtimeStatus === 'offline' || _realtimeStatus === 'connecting' || _realtimeStatus === 'reconnecting')
-      && _teamDevices.size === 0) {
-    return `
-      <div class="tl-empty">
-        <div class="tl-empty-icon">
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.56 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
-        </div>
-        <div class="tl-empty-title">Team Live unavailable</div>
-        <p class="tl-empty-sub">AutoIngest will continue working normally.</p>
-      </div>`;
-  }
-
   const summaryBar = _renderTlSummaryBar();
   const innerTabs  = _renderTeamLiveInnerTabs();
 
@@ -9415,7 +9402,7 @@ function _renderRealtimeStatus({ status, devicesOnline } = {}) {
   const label   = document.getElementById('rtLabel');
   if (!section || !dot || !label) return;
 
-  if (!status || status === 'disabled') {
+  if (!status || status === 'disabled' || status === 'not-configured') {
     section.style.display = 'none';
     return;
   }

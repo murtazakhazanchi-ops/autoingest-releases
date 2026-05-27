@@ -24,7 +24,7 @@ const settings = require('./settings');
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let _socket        = null;
-let _status        = 'disabled'; // disabled | connecting | connected | offline | reconnecting
+let _status        = 'disabled'; // disabled | not-configured | connecting | connected | offline | reconnecting
 let _devicesOnline = 0;
 let _operatorName  = null;
 
@@ -452,13 +452,13 @@ function connect(serverUrl) {
   }
 }
 
-function disconnect() {
+function disconnect(status = 'disabled') {
   if (_socket) {
     _socket.removeAllListeners();
     _socket.disconnect();
     _socket = null;
   }
-  _setStatus('disabled');
+  _setStatus(status);
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -468,6 +468,8 @@ function init() {
   const url     = settings.getRealtimeServerUrl();
   if (enabled && url) {
     connect(url);
+  } else if (enabled) {
+    _setStatus('not-configured');
   } else {
     _setStatus('disabled');
   }

@@ -3924,8 +3924,10 @@ ipcMain.handle('realtime:configure', async (_event, cfg) => {
   const newUrl     = settings.getRealtimeServerUrl();
   if (newEnabled && newUrl) {
     realtimeOps.connect(newUrl);
+  } else if (newEnabled) {
+    realtimeOps.disconnect('not-configured');
   } else {
-    realtimeOps.disconnect();
+    realtimeOps.disconnect('disabled');
   }
   return { ok: true, status: realtimeOps.getStatus() };
 });
