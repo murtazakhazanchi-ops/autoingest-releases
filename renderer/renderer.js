@@ -7472,7 +7472,7 @@ function updateProgress({ total, index, completedCount, filename, status, skipRe
 
 function showProgressSummary({ copied, skipped, errors, skippedReasons, failedFiles, duration, integrity, copiedFiles }, importCleanupRoot = null) {
   _postImportSucceeded = (errors === 0); // gates the post-success chooser in the Done handler
-  document.getElementById('progressFilename').textContent = 'Import complete.';
+  document.getElementById('progressFilename').textContent = errors > 0 ? 'Import completed with issues.' : 'Import complete.';
   document.getElementById('sumCopied').textContent  = copied;
   document.getElementById('sumSkipped').textContent = skipped;
   document.getElementById('sumErrors').textContent  = errors;

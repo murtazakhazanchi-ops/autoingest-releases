@@ -1,0 +1,13 @@
+{
+  "name": "autoingest-realtime-dev-server",
+  "version": "1.0.0",
+  "description": "Advisory-only dev relay server for AutoIngest realtime operations. NOT source of truth.",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "socket.io": "^4.7.5"
+  }
+}
