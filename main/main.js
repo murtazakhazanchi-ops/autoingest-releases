@@ -848,6 +848,23 @@ ipcMain.handle('import:commitTransaction', async (event, {
       );
     }
 
+    // If the copy was aborted by an external signal (e.g. source drive disconnected),
+    // copyFileJobs drained silently — unstarted files were dropped without incrementing
+    // errors, so copied + skipped + errors < total. Do NOT commit event.json as
+    // 'complete': the audit log counts come from group metadata (all selected files),
+    // not from result.copiedFiles, so committing would record a false file total.
+    // Roll back to 'created' instead; the user can retry and duplicate detection
+    // will skip files that were already successfully copied.
+    if (result.wasAborted) {
+      _releaseDirectNasLocks(_directNasLocks);
+      const copied = result.copied || 0;
+      const total  = fileJobs.length;
+      throw new Error(
+        `Import was cancelled — ${copied} of ${total} file${total !== 1 ? 's' : ''} copied before cancellation. ` +
+        `Retry to import the remaining files (already-copied files will be skipped automatically).`
+      );
+    }
+
     const auditContext = {
       groups,
       photographer,

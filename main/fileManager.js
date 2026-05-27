@@ -409,7 +409,7 @@ async function copyFiles(filePaths, destination, onProgress) {
         if (copied + skipped + errors !== total) {
           log(`[copyFiles] accounting drift: copied=${copied} skipped=${skipped} errors=${errors} total=${total}`);
         }
-        resolve({ copied, skipped, errors, skippedReasons, failedFiles, copiedFiles, duration: Date.now() - startTime });
+        resolve({ copied, skipped, errors, skippedReasons, failedFiles, copiedFiles, duration: Date.now() - startTime, wasAborted: isAborted });
         return;
       }
 
@@ -639,7 +639,7 @@ async function copyFileJobs(fileJobs, onProgress) {
         if (copied + skipped + errors !== total) {
           log(`[copyFileJobs] accounting drift: copied=${copied} skipped=${skipped} errors=${errors} total=${total}`);
         }
-        resolve({ copied, skipped, errors, skippedReasons, failedFiles, copiedFiles, duration: Date.now() - startTime });
+        resolve({ copied, skipped, errors, skippedReasons, failedFiles, copiedFiles, duration: Date.now() - startTime, wasAborted: isAborted });
         return;
       }
       while (active < MAX_CONCURRENT_COPIES && queueIndex < total) {
