@@ -76,6 +76,7 @@ async function writeLink(localCollectionPath, linkData) {
   const payload = JSON.stringify({
     schemaVersion:              SCHEMA_VERSION,
     collectionName:             linkData.collectionName              || null,
+    registryId:                 linkData.registryId                  || null,
     nasRoot:                    linkData.nasRoot                     || null,
     nasCollectionPath:          linkData.nasCollectionPath           || null,
     localStagingCollectionPath: linkData.localStagingCollectionPath  || localCollectionPath,

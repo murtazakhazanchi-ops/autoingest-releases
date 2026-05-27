@@ -2726,6 +2726,29 @@ ipcMain.handle('archive:syncAllReadyJobs', async () => {
     for (const job of eligible) {
       if (_syncingJobIds.has(job.jobId)) { results.push({ jobId: job.jobId, skipped: true }); continue; }
 
+      // Pre-check link status before marking syncing — mirrors syncJobNow to prevent
+      // blocked jobs from briefly showing 'syncing' in the UI.
+      if (job.localEventPath) {
+        const _preCollPath = path.dirname(job.localEventPath);
+        try {
+          const { ok: _hasLink, link: _link, reason: _reason } = await offlineCollectionRegistry.readLink(_preCollPath);
+          if (_hasLink && _link) {
+            if (_link.status === 'provisional') {
+              results.push({ jobId: job.jobId, status: 'provisional-needs-match', blocked: true });
+              continue;
+            }
+            if (_link.nasRoot && nasRoot && _link.nasRoot !== nasRoot) {
+              results.push({ jobId: job.jobId, status: 'stale-link-needs-rematch', blocked: true });
+              continue;
+            }
+          } else if (_reason && _reason !== 'not-found') {
+            // Link file exists but is unreadable — block rather than route to wrong NAS.
+            results.push({ jobId: job.jobId, status: 'stale-link-needs-rematch', blocked: true });
+            continue;
+          }
+        } catch { /* non-fatal — let service-level validation handle unexpected errors */ }
+      }
+
       _syncingJobIds.add(job.jobId);
       await syncQueueService.updateJob(job.jobId, { status: 'syncing', syncStartedAt: Date.now() });
       // Load per-job files[] from manifest for targeted sync.
