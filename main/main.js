@@ -247,6 +247,11 @@ app.whenReady().then(() => {
   loadImportIndex();
   settings.init();
   realtimeOps.init();
+  // Seed operator name from the last active user so presence is correct from first connect.
+  try {
+    const _activeUser = userManager.getActiveUser();
+    if (_activeUser?.name) realtimeOps.setOperatorName(_activeUser.name);
+  } catch (_e) { /* non-fatal — identity updates later via users:setActive */ }
   // Emit initial health snapshot after a short startup delay, then every 60 s.
   setTimeout(_emitDeviceHealth, 6000);
   setInterval(_emitDeviceHealth, 60_000);
@@ -4005,13 +4010,18 @@ ipcMain.handle('event:getPhotographerFolders', async (_event, { localEventPath }
     return { ok: false, reason: 'localEventPath required' };
   }
 
-  const stagingRoot = settings.getLocalStagingRoot();
-  if (!stagingRoot) return { ok: false, reason: 'No staging root configured.' };
+  // Validate against all configured roots — staging, NAS, archive.
+  const _seqRoots = [
+    settings.getLocalStagingRoot(),
+    settings.getNasRoot(),
+    settings.getArchiveRoot(),
+    settings.getMainArchiveRoot(),
+  ].filter(Boolean).map(r => path.resolve(r));
+  if (!_seqRoots.length) return { ok: false, reason: 'No archive root configured.' };
 
-  const realStaging = path.resolve(stagingRoot);
-  const realEvent   = path.resolve(localEventPath);
-  if (!realEvent.startsWith(realStaging + path.sep)) {
-    return { ok: false, reason: 'localEventPath is outside staging root.' };
+  const realEvent = path.resolve(localEventPath);
+  if (!_seqRoots.some(r => realEvent.startsWith(r + path.sep))) {
+    return { ok: false, reason: 'Selected event folder is not accessible. Check archive location or reconnect the drive/NAS.' };
   }
 
   // Read event.json to determine component structure (single vs multi-component).
@@ -4041,13 +4051,18 @@ ipcMain.handle('event:applyPhotographerSequence', async (_event, { localEventPat
     return { ok: false, reason: 'scopedOrdered array required' };
   }
 
-  const stagingRoot = settings.getLocalStagingRoot();
-  if (!stagingRoot) return { ok: false, reason: 'No staging root configured.' };
+  // Validate against all configured roots — staging, NAS, archive.
+  const _applySeqRoots = [
+    settings.getLocalStagingRoot(),
+    settings.getNasRoot(),
+    settings.getArchiveRoot(),
+    settings.getMainArchiveRoot(),
+  ].filter(Boolean).map(r => path.resolve(r));
+  if (!_applySeqRoots.length) return { ok: false, reason: 'No archive root configured.' };
 
-  const realStaging = path.resolve(stagingRoot);
-  const realEvent   = path.resolve(localEventPath);
-  if (!realEvent.startsWith(realStaging + path.sep)) {
-    return { ok: false, reason: 'localEventPath is outside staging root.' };
+  const realEvent = path.resolve(localEventPath);
+  if (!_applySeqRoots.some(r => realEvent.startsWith(r + path.sep))) {
+    return { ok: false, reason: 'Selected event folder is not accessible. Check archive location or reconnect the drive/NAS.' };
   }
 
   // Block if a sync job is actively running for this event

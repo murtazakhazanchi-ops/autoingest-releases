@@ -3998,11 +3998,12 @@ ${unparseable.map(ev => `
     const targetFolderName = _viewingExisting?.folderName || _selectedListFolder;
     if (!targetFolderName) return;
 
-    // Derive local staging event path for IPC
+    // Resolve event folder path — works for staging, archive, NAS, and direct-scan events.
+    // Priority mirrors _openExistingEvent: explicit _localEventPath → effective coll path → stagingCollPath.
     const entry = (_scannedEvents || []).find(e => e.folderName === targetFolderName);
     let localEventPath = entry?._localEventPath || null;
-    if (!localEventPath && _offlineStagingMode) {
-      const collPath = _effectiveCollPath();
+    if (!localEventPath) {
+      const collPath = _effectiveCollPath() || activeMaster?.path;
       if (collPath) localEventPath = collPath.replace(/\\/g, '/').replace(/\/$/, '') + '/' + targetFolderName;
     }
     if (!localEventPath && _viewingExisting?._stagingCollPath) {
@@ -4010,7 +4011,7 @@ ${unparseable.map(ev => `
     }
 
     if (!localEventPath) {
-      await showErrorModal('Cannot sequence folders: local staging path not available for this event.');
+      await showErrorModal('Cannot sequence folders: the selected event folder could not be located.');
       return;
     }
 
