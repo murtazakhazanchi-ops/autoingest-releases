@@ -1526,6 +1526,39 @@ function _tlInitials(name) {
   return name.split(/\s+/).map(w => w[0] || '').join('').slice(0, 2).toUpperCase() || '??';
 }
 
+function _tlNormVer(v) { return typeof v === 'string' ? v.replace(/^v/, '').trim() : null; }
+function _tlVerIsOlder(remote, local) {
+  const r = (_tlNormVer(remote) || '').split('.').map(Number);
+  const l = (_tlNormVer(local)  || '').split('.').map(Number);
+  if (!_tlNormVer(remote) || !_tlNormVer(local)) return false;
+  for (let i = 0; i < 3; i++) {
+    if ((r[i] || 0) < (l[i] || 0)) return true;
+    if ((r[i] || 0) > (l[i] || 0)) return false;
+  }
+  return false;
+}
+
+function _tlNormalizeDevice(raw) {
+  const deviceName = raw.deviceName || raw.deviceDisplayName || raw.hostname || raw.name || null;
+  const userName   = raw.operatorName || raw.userName || raw.activeUserName || null;
+  const ts         = raw.ts || raw.timestamp || raw.updatedAt || new Date().toISOString();
+  return {
+    deviceId:        raw.deviceId        || null,
+    deviceName,
+    userName,
+    photographer:    raw.photographer    || null,
+    mode:            raw.mode            || 'idle',
+    collectionName:  raw.collectionName  || null,
+    eventFolderName: raw.eventFolderName || null,
+    status:          raw.status          || null,
+    progressCurrent: typeof raw.progressCurrent === 'number' ? raw.progressCurrent : null,
+    progressTotal:   typeof raw.progressTotal   === 'number' ? raw.progressTotal   : null,
+    appVersion:      raw.appVersion      || raw.version      || null,
+    ts,
+    updatedAt: ts,
+  };
+}
+
 function _tlRelativeTime(iso) {
   if (!iso) return '';
   const diff = Date.now() - new Date(iso).getTime();
@@ -1547,7 +1580,7 @@ function _tlActivityLabel(item) {
 }
 
 function _tlDeviceCard(d, stale) {
-  const initials = _tlInitials(d.deviceDisplayName || d.operatorName || '');
+  const initials = _tlInitials(d.userName || d.deviceName || '');
   const now      = Date.now();
   const age      = now - new Date(d.updatedAt || 0).getTime();
   const isStale  = stale || age >= TL_STALE_MS;
@@ -1590,7 +1623,7 @@ function _tlDeviceCard(d, stale) {
   const healthParts = [];
   if (!isStale && health) {
     const localVer = window._tlLocalAppVersion || null;
-    if (localVer && health.appVersion && health.appVersion !== localVer) healthParts.push('Update recommended');
+    if (_tlVerIsOlder(health.appVersion, localVer)) healthParts.push('Update recommended');
     if (!health.nasConnected)           healthParts.push('Main Archive disconnected');
     if (health.failedSyncCount > 0)     healthParts.push(`Sync issue: ${health.failedSyncCount}`);
     else if (health.pendingSyncCount > 0) healthParts.push(`Pending sync: ${health.pendingSyncCount}`);
@@ -1606,23 +1639,26 @@ function _tlDeviceCard(d, stale) {
     const _lColl  = _activeData?.coll?.name  || null;
     const _lEvent = _activeData?.event?.name || null;
     if (_lColl && _lEvent && d.collectionName === _lColl && d.eventFolderName === _lEvent) {
-      const _who = d.operatorName ? `${escapeHtml(d.operatorName)} · ` : '';
-      sameEventHTML = `<p class="tl-same-event">${_who}${escapeHtml(d.deviceDisplayName || 'Another device')} is also active in this event.</p>`;
+      const _who = d.userName ? `${escapeHtml(d.userName)} · ` : '';
+      sameEventHTML = `<p class="tl-same-event">${_who}${escapeHtml(d.deviceName || 'Another device')} is also active in this event.</p>`;
     }
   }
+
+  const primaryName   = d.userName || d.deviceName || 'Device';
+  const secondaryName = d.userName && d.deviceName && d.deviceName !== d.userName ? d.deviceName : null;
 
   return `
     <div class="tl-device-card${isStale ? ' tl-device-card--stale' : ''}">
       <div class="tl-device-avatar">${escapeHtml(initials)}</div>
       <div class="tl-device-info">
-        <p class="tl-device-name">${escapeHtml(d.deviceDisplayName || 'Unknown')}</p>
-        ${d.operatorName ? `<p class="tl-device-operator">${escapeHtml(d.operatorName)}</p>` : ''}
+        <p class="tl-device-name">${escapeHtml(primaryName)}</p>
+        ${secondaryName ? `<p class="tl-device-operator">${escapeHtml(secondaryName)}</p>` : ''}
         <div class="tl-device-status">
           <span class="tl-status-dot tl-status-dot--${dotMode}"></span>
           <span class="tl-status-label">${modeLabel}</span>
-          ${!isStale && collLabel  ? `<span class="tl-status-sep">·</span><span class="tl-status-ctx" title="${collLabel}">${collLabel}</span>` : ''}
-          ${!isStale && eventLabel ? `<span class="tl-status-sep">/</span><span class="tl-status-ctx" title="${eventLabel}">${eventLabel}</span>` : ''}
+          ${!isStale && collLabel ? `<span class="tl-status-sep">·</span><span class="tl-status-ctx" title="${collLabel}">${collLabel}</span>` : ''}
         </div>
+        ${!isStale && eventLabel ? `<p class="tl-device-event" title="${eventLabel}">${eventLabel}</p>` : ''}
         ${!isStale && photoLabel ? `<p class="tl-device-photographer">${photoLabel}</p>` : ''}
         ${progressHTML}
         ${healthHTML}
@@ -1666,10 +1702,7 @@ function _renderTlSummaryBar() {
   const syncing  = active.filter(d => d.mode === 'syncing').length;
   const waiting  = _tlSlotStatus?.queue?.length || 0;
   const localVer = window._tlLocalAppVersion || null;
-  const versions = new Set();
-  if (localVer) versions.add(localVer);
-  for (const h of _teamDeviceHealth.values()) { if (h.appVersion) versions.add(h.appVersion); }
-  const versionMismatch = versions.size > 1;
+  const versionMismatch = !!localVer && Array.from(_teamDeviceHealth.values()).some(h => _tlVerIsOlder(h.appVersion, localVer));
 
   if (devices.length === 0) return '';
 
@@ -1727,12 +1760,19 @@ function _renderTeamActivityTab() {
   const feedHTML = recentItems.length > 0 ? `
     <div class="tl-feed">
       <p class="tl-feed-label">Recent Team Activity</p>
-      ${recentItems.map(item => `
+      ${recentItems.map(item => {
+        const who  = item.userName || item.deviceName || 'Device';
+        const verb = _tlModeLabel(item.mode);
+        const ev   = item.eventFolderName ? escapeHtml(item.eventFolderName) : '';
+        return `
         <div class="tl-feed-item">
-          <span class="tl-feed-device">${escapeHtml(item.deviceDisplayName || '?')}</span>
-          <span class="tl-feed-action">${_tlActivityLabel(item)}</span>
+          <div class="tl-feed-left">
+            ${ev ? `<div class="tl-feed-event" title="${ev}">${ev}</div>` : ''}
+            <div class="tl-feed-meta">${escapeHtml(verb)} · ${escapeHtml(who)}</div>
+          </div>
           <span class="tl-feed-time">${_tlRelativeTime(item.ts)}</span>
-        </div>`).join('')}
+        </div>`;
+      }).join('')}
     </div>` : '';
 
   return activeHTML + staleHTML + veryStaleHTML + feedHTML;
@@ -1765,7 +1805,7 @@ function _renderSyncQueueTab() {
   if (syncing.length > 0) {
     html += `<p class="tl-section-label">Currently Syncing</p><div class="tl-sync-list">`;
     for (const d of syncing) {
-      const name        = d.deviceDisplayName || d.operatorName || 'Unknown';
+      const name        = d.deviceName || d.userName || 'Device';
       const hasProgress = typeof d.progressTotal === 'number' && d.progressTotal > 0;
       const detail      = hasProgress ? `${d.progressCurrent || 0} / ${d.progressTotal} files` : '';
       html += `<div class="tl-sync-row">
@@ -1798,7 +1838,7 @@ function _renderSyncQueueTab() {
     html += `<p class="tl-section-label">Sync Issues</p><div class="tl-sync-list">`;
     for (const h of failed) {
       const dev  = _teamDevices.get(h.deviceId);
-      const name = dev?.deviceDisplayName || dev?.operatorName || 'Unknown';
+      const name = dev?.deviceName || dev?.userName || 'Device';
       html += `<div class="tl-sync-row">
         <span class="tl-sync-name">${escapeHtml(name)}</span>
         <span class="tl-sync-detail">${h.failedSyncCount} failed</span>
@@ -1812,7 +1852,7 @@ function _renderSyncQueueTab() {
     html += `<p class="tl-section-label">Pending Sync</p><div class="tl-sync-list">`;
     for (const h of pending) {
       const dev  = _teamDevices.get(h.deviceId);
-      const name = dev?.deviceDisplayName || dev?.operatorName || 'Unknown';
+      const name = dev?.deviceName || dev?.userName || 'Device';
       html += `<div class="tl-sync-row">
         <span class="tl-sync-name">${escapeHtml(name)}</span>
         <span class="tl-sync-detail">${h.pendingSyncCount} pending</span>
@@ -1857,7 +1897,7 @@ function _renderEventReadinessTab() {
     const age     = now - new Date(d.updatedAt || 0).getTime();
     const isStale = age >= TL_VERY_STALE_MS;
     const health  = _teamDeviceHealth.get(d.deviceId);
-    const name    = [d.operatorName, d.deviceDisplayName].filter(Boolean).join(' · ') || 'Unknown';
+    const name    = [d.userName, d.deviceName].filter(Boolean).join(' · ') || 'Device';
 
     let readiness, cls;
     if (isStale)                            { readiness = 'Offline';             cls = 'tl-ready--offline';  unknownN++; }
@@ -1901,10 +1941,12 @@ function _renderDevicesTab() {
     const age       = now - new Date(d.updatedAt || 0).getTime();
     const isOffline = age >= TL_VERY_STALE_MS;
     const health    = _teamDeviceHealth.get(d.deviceId);
-    const name      = d.deviceDisplayName || 'Unknown device';
-    const op        = d.operatorName || null;
+    const _primary  = d.userName || d.deviceName || 'Device';
+    const _secondary = d.userName && d.deviceName && d.deviceName !== d.userName ? d.deviceName : null;
+    const name      = _primary;
+    const op        = _secondary;
     const ver       = health?.appVersion || null;
-    const verMismatch = localVer && ver && ver !== localVer;
+    const verMismatch = _tlVerIsOlder(ver, localVer);
 
     const healthParts = [];
     if (!isOffline && health) {
@@ -1957,30 +1999,20 @@ function _onTeamUpdate(data) {
   if (!data || typeof data !== 'object') return;
 
   if (data.type === 'device:activity') {
-    const { deviceId, deviceDisplayName, operatorName, photographer, mode,
-            collectionName, eventFolderName, status, progressCurrent, progressTotal, ts } = data;
-    if (!deviceId) return;
-    _teamDevices.set(deviceId, {
-      deviceId, deviceDisplayName, operatorName, photographer, mode,
-      collectionName, eventFolderName, status,
-      progressCurrent: typeof progressCurrent === 'number' ? progressCurrent : null,
-      progressTotal:   typeof progressTotal   === 'number' ? progressTotal   : null,
-      updatedAt: ts || new Date().toISOString(),
-    });
+    const norm = _tlNormalizeDevice(data);
+    if (!norm.deviceId) return;
+    _teamDevices.set(norm.deviceId, norm);
     // Only add to feed on meaningful state changes, not throttled progress ticks.
     const prev = _teamActivity[0];
-    const isSameMode = prev?.deviceId === deviceId && prev?.mode === mode && prev?.eventFolderName === eventFolderName;
+    const isSameMode = prev?.deviceId === norm.deviceId && prev?.mode === norm.mode && prev?.eventFolderName === norm.eventFolderName;
     if (!isSameMode) {
-      _teamActivity = [
-        { deviceId, deviceDisplayName, operatorName, photographer, mode, collectionName, eventFolderName, status, ts: ts || new Date().toISOString() },
-        ..._teamActivity,
-      ].slice(0, TL_MAX_ACTIVITY);
+      _teamActivity = [norm, ..._teamActivity].slice(0, TL_MAX_ACTIVITY);
     }
   } else if (data.type === 'device:activity:snapshot') {
     const activities = Array.isArray(data.activities) ? data.activities : [];
     for (const act of activities) {
       if (act?.deviceId && !_teamDevices.has(act.deviceId)) {
-        _teamDevices.set(act.deviceId, { ...act, updatedAt: act.ts || act.updatedAt || new Date().toISOString() });
+        _teamDevices.set(act.deviceId, _tlNormalizeDevice(act));
       }
     }
   } else if (data.type === 'device:offline') {

@@ -107,11 +107,16 @@ function _sanitiseStr(v, max = 512) {
 
 function _sanitiseDeviceActivity(raw) {
   const VALID_MODES = ['idle', 'importing', 'syncing', 'viewing', 'preparing'];
-  const mode = _sanitiseStr(raw.mode);
+  const mode       = _sanitiseStr(raw.mode);
+  // Normalize identity fields — accept any alias from old or new payload shapes.
+  const deviceName = _sanitiseStr(raw.deviceName || raw.deviceDisplayName || raw.hostname || raw.name) || null;
+  const userName   = _sanitiseStr(raw.operatorName || raw.userName || raw.activeUserName) || null;
   return {
     deviceId:          _sanitiseStr(raw.deviceId),
-    deviceDisplayName: _sanitiseStr(raw.deviceDisplayName) || null,
-    operatorName:      _sanitiseStr(raw.operatorName)      || null,
+    deviceName,
+    userName,
+    deviceDisplayName: deviceName,  // keep for backward-compat with old renderers
+    operatorName:      userName,    // keep for backward-compat
     photographer:      _sanitiseStr(raw.photographer)      || null,
     mode:              VALID_MODES.includes(mode) ? mode : 'idle',
     collectionName:    _sanitiseStr(raw.collectionName)    || null,
@@ -119,8 +124,8 @@ function _sanitiseDeviceActivity(raw) {
     status:            _sanitiseStr(raw.status)            || null,
     progressCurrent:   (typeof raw.progressCurrent === 'number' && raw.progressCurrent >= 0) ? raw.progressCurrent : null,
     progressTotal:     (typeof raw.progressTotal   === 'number' && raw.progressTotal   >= 0) ? raw.progressTotal   : null,
-    appVersion:        _sanitiseStr(raw.appVersion)        || null,
-    ts:                _sanitiseStr(raw.ts)                || new Date().toISOString(),
+    appVersion:        _sanitiseStr(raw.appVersion || raw.version) || null,
+    ts:                _sanitiseStr(raw.ts || raw.timestamp)       || new Date().toISOString(),
   };
 }
 
@@ -372,8 +377,9 @@ function _buildPresencePayload() {
   const { app } = require('electron');
   return {
     deviceId:     _getDeviceId(),
-    deviceName:   settings.getDeviceDisplayName() || os.hostname(),
-    operatorName: _operatorName || null,
+    deviceName:        settings.getDeviceDisplayName() || os.hostname(),
+    deviceDisplayName: settings.getDeviceDisplayName() || os.hostname(), // server reads deviceDisplayName for device:hello
+    operatorName:      _operatorName || null,
     appVersion:   app.getVersion(),
     status:       'online',
     timestamp:    new Date().toISOString(),
@@ -558,8 +564,10 @@ function emitDeviceActivity({ mode, collectionName, eventFolderName, photographe
   const { app } = require('electron');
   _send('device:activity', {
     deviceId:          _getDeviceId(),
-    deviceDisplayName: settings.getDeviceDisplayName() || null,
-    operatorName:      _operatorName || null,
+    deviceName:        settings.getDeviceDisplayName() || os.hostname(),
+    deviceDisplayName: settings.getDeviceDisplayName() || os.hostname(), // backward compat
+    userName:          _operatorName || null,
+    operatorName:      _operatorName || null, // backward compat
     photographer:      (typeof photographer === 'string' ? photographer : null) || null,
     mode:              safeMode,
     collectionName:    (typeof collectionName === 'string' ? collectionName : null) || null,

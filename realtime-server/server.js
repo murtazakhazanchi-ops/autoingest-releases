@@ -251,14 +251,18 @@ io.on('connection', (socket) => {
   console.log(`[connect] ${socket.id}`);
 
   socket.on('device:hello', (payload) => {
-    const safe = _truncateStrings(payload || {});
+    const safe         = _truncateStrings(payload || {});
+    const resolvedName = safe.deviceDisplayName || safe.deviceName || safe.hostname || null;
+    const resolvedOp   = safe.operatorName || safe.userName || null;
     _devices.set(socket.id, {
-      deviceId: safe.deviceId || socket.id,
-      deviceDisplayName: safe.deviceDisplayName || 'Unknown',
-      operatorName: safe.operatorName || null,
-      connectedAt: Date.now(),
+      deviceId:          safe.deviceId || socket.id,
+      deviceName:        resolvedName,
+      deviceDisplayName: resolvedName,
+      operatorName:      resolvedOp,
+      userName:          resolvedOp,
+      connectedAt:       Date.now(),
     });
-    console.log(`[hello] ${safe.deviceDisplayName || safe.deviceId || socket.id} — devices online: ${_devices.size}`);
+    console.log(`[hello] ${resolvedName || safe.deviceId || socket.id} op=${resolvedOp || 'none'} — devices online: ${_devices.size}`);
 
     // Broadcast updated device count to all clients
     io.emit('dashboard:update', { devicesOnline: _devices.size });
@@ -317,7 +321,13 @@ io.on('connection', (socket) => {
       console.warn(`[drop] device:activity from ${socket.id} — payload too large`);
       return;
     }
-    const safe = _truncateStrings(payload || {});
+    const safe    = _truncateStrings(payload || {});
+    // Enrich with registered identity when payload lacks it (handles old/transitional builds)
+    const devInfo = _devices.get(socket.id) || {};
+    if (!safe.deviceName        && devInfo.deviceName)        safe.deviceName        = devInfo.deviceName;
+    if (!safe.deviceDisplayName && devInfo.deviceDisplayName) safe.deviceDisplayName = devInfo.deviceDisplayName;
+    if (!safe.operatorName      && devInfo.operatorName)      safe.operatorName      = devInfo.operatorName;
+    if (!safe.userName          && devInfo.userName)          safe.userName          = devInfo.userName;
     _deviceActivity.set(socket.id, { ...safe, _socketId: socket.id });
     socket.broadcast.emit('device:activity', safe);
   });
