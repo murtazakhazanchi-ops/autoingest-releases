@@ -6,6 +6,7 @@ Thumbs.db
 # Runtime-generated data (never committed)
 data/importIndex.json
 data/syncQueue.json
+realtime-server/data/
 .env
 config/service-account-key.json
 
@@ -26,3 +27,4 @@ docs/*
 !docs/CLAUDE.md
 !docs/dev-tools/
 !docs/dev-tools/graphify.md
+!docs/release-notes-*.md
