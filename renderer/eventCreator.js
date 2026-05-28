@@ -901,11 +901,27 @@ ${currentDevicePanel}
     return `<span class="ec-reg-pill ${cls}">${esc(label)}</span>`;
   }
 
+  function _isMeaningfulDisplayName(v) {
+    if (!v || typeof v !== 'string') return false;
+    const t = v.trim();
+    if (!t) return false;
+    const BAD = new Set(['archive', 'archive-available', 'remote-created', 'unknown']);
+    if (BAD.has(t.toLowerCase())) return false;
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(t)) return false;
+    return true;
+  }
+
   function _getRegistryOriginText(entry) {
-    const name = entry.createdByOperator || entry.createdByDeviceName || entry.createdByDeviceId;
-    if (name) return `From ${esc(name)}`;
-    if (entry.origin === 'archive-available') return 'From archive';
-    return 'From another device';
+    const candidates = [
+      entry.createdByOperator,
+      entry.operatorName,
+      entry.userName,
+      entry.activeUserName,
+      entry.createdByDeviceName,
+      entry.deviceName,
+    ];
+    const name = candidates.find(_isMeaningfulDisplayName);
+    return name ? `From ${esc(name.trim())}` : 'From Unknown device';
   }
 
   function buildRegistryCardHTML(entry) {
