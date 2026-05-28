@@ -82,6 +82,8 @@ async function _rtLoadSettings() {
     if (el) el.checked = Boolean(s.enabled);
     const urlEl = document.getElementById('rtServerUrl');
     if (urlEl) urlEl.value = s.serverUrl || '';
+    const keyEl = document.getElementById('rtServerKey');
+    if (keyEl) keyEl.value = s.serverKey || '';
   }
 
   const hostname = identity?.deviceName || null;
@@ -133,37 +135,43 @@ function _rtUpdateSettingsStatus({ status } = {}) {
     + (s === 'connected'    ? ' settings-rt-dot--connected'
     :  s === 'connecting'   ? ' settings-rt-dot--connecting'
     :  s === 'reconnecting' ? ' settings-rt-dot--reconnecting'
+    :  s === 'auth-failed'  ? ' settings-rt-dot--offline'
     :  s === 'offline'      ? ' settings-rt-dot--offline'
     :  '');
   text.textContent = s === 'connected'    ? 'Connected'
                    : s === 'connecting'   ? 'Connecting…'
                    : s === 'reconnecting' ? 'Reconnecting…'
+                   : s === 'auth-failed'  ? 'Authentication failed — check server key.'
                    : 'Disconnected';
 }
 
 async function _rtSaveSettings() {
   if (!window.api?.configureRealtime) return;
-  const enabled = document.getElementById('rtEnabled')?.checked ?? false;
-  const rawUrl  = (document.getElementById('rtServerUrl')?.value || '').trim();
-  // Basic URL shape validation — must start with http:// or https://
+  const enabled   = document.getElementById('rtEnabled')?.checked ?? false;
+  const rawUrl    = (document.getElementById('rtServerUrl')?.value || '').trim();
   const serverUrl = (rawUrl && (rawUrl.startsWith('http://') || rawUrl.startsWith('https://'))) ? rawUrl : null;
-  const result = await window.api.configureRealtime({ enabled, serverUrl }).catch(() => null);
+  const serverKey = (document.getElementById('rtServerKey')?.value || '').trim() || null;
+  const result = await window.api.configureRealtime({ enabled, serverUrl, serverKey }).catch(() => null);
   if (result?.status) _rtUpdateSettingsStatus(result.status);
 }
 
 document.getElementById('rtEnabled')?.addEventListener('change', _rtSaveSettings);
 document.getElementById('rtServerUrl')?.addEventListener('change', _rtSaveSettings);
+document.getElementById('rtServerKey')?.addEventListener('change', _rtSaveSettings);
 
 document.getElementById('rtTestBtn')?.addEventListener('click', async () => {
   const btn = document.getElementById('rtTestBtn');
   const url = (document.getElementById('rtServerUrl')?.value || '').trim();
+  const key = (document.getElementById('rtServerKey')?.value || '').trim();
   if (!url || !window.api?.testRealtimeConnection) return;
   if (btn) { btn.disabled = true; btn.textContent = 'Testing…'; }
-  const result = await window.api.testRealtimeConnection(url).catch(() => ({ ok: false }));
+  const result = await window.api.testRealtimeConnection(url, key).catch(() => ({ ok: false }));
   if (btn) {
     btn.disabled = false;
-    btn.textContent = result.ok ? 'Connected' : 'Cannot connect';
-    setTimeout(() => { if (btn) btn.textContent = 'Test Connection'; }, 3000);
+    btn.textContent = result.ok             ? 'Connected'
+                    : result.reason === 'auth-failed' ? 'Auth failed — check key'
+                    : 'Cannot connect';
+    setTimeout(() => { if (btn) btn.textContent = 'Test Connection'; }, 3500);
   }
 });
 

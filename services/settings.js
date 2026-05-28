@@ -495,6 +495,33 @@ async function setRealtimeServerUrl(value) {
 }
 
 /**
+ * Returns the configured realtime server key, or null if not set.
+ * @returns {string | null}
+ */
+function getRealtimeServerKey() {
+  if (!_loaded) init();
+  const v = _state.realtimeServerKey;
+  return (typeof v === 'string' && v.length > 0) ? v : null;
+}
+
+/**
+ * Persists the realtime server key. Pass null or '' to clear.
+ * @param {string | null} value
+ * @returns {Promise<void>}
+ */
+async function setRealtimeServerKey(value) {
+  if (!_loaded) init();
+  if (value === null || value === '') {
+    delete _state.realtimeServerKey;
+  } else if (typeof value === 'string') {
+    _state.realtimeServerKey = value;
+  } else {
+    throw new Error('setRealtimeServerKey: expected string or null');
+  }
+  await _save();
+}
+
+/**
  * Returns the stable per-device UUID, or null if not yet generated.
  * The ID is generated on first use by realtimeOperationsService and saved here.
  * @returns {string | null}
@@ -560,6 +587,7 @@ module.exports = {
   getTransferRoot, setTransferRoot,
   getRealtimeEnabled, setRealtimeEnabled,
   getRealtimeServerUrl, setRealtimeServerUrl,
+  getRealtimeServerKey, setRealtimeServerKey,
   getDeviceId, saveDeviceIdSync,
   getDeviceDisplayName, setDeviceDisplayName,
 };

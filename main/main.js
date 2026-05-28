@@ -3917,25 +3917,34 @@ ipcMain.handle('realtime:getStatus', () => realtimeOps.getStatus());
 ipcMain.handle('realtime:getSettings', () => ({
   enabled:   settings.getRealtimeEnabled(),
   serverUrl: settings.getRealtimeServerUrl(),
+  serverKey: settings.getRealtimeServerKey(),
 }));
 
-ipcMain.handle('realtime:testConnection', async (_event, { serverUrl } = {}) => {
+ipcMain.handle('realtime:testConnection', async (_event, { serverUrl, serverKey } = {}) => {
   if (!serverUrl || typeof serverUrl !== 'string') return { ok: false };
-  const url = serverUrl.trim().replace(/\/$/, '') + '/health';
+  let sioClient;
+  try { sioClient = require('socket.io-client'); } catch { return { ok: false }; }
   return new Promise((resolve) => {
-    const mod = url.startsWith('https://') ? require('https') : require('http');
     let done = false;
-    const finish = (ok) => { if (!done) { done = true; resolve({ ok }); } };
-    const timer = setTimeout(() => finish(false), 5000);
-    try {
-      const req = mod.get(url, { timeout: 5000 }, (res) => {
-        clearTimeout(timer);
-        finish(res.statusCode >= 200 && res.statusCode < 500);
-        res.resume();
-      });
-      req.on('error', () => { clearTimeout(timer); finish(false); });
-      req.on('timeout', () => { req.destroy(); clearTimeout(timer); finish(false); });
-    } catch { clearTimeout(timer); finish(false); }
+    const finish = (ok, reason) => {
+      if (done) return;
+      done = true;
+      try { sock.disconnect(); } catch {}
+      resolve(reason ? { ok, reason } : { ok });
+    };
+    const timer = setTimeout(() => finish(false), 7000);
+    const sock = sioClient(serverUrl, {
+      auth:         { serverKey: serverKey || '' },
+      reconnection: false,
+      timeout:      6000,
+      transports:   ['websocket', 'polling'],
+    });
+    sock.on('connect',       ()    => { clearTimeout(timer); finish(true); });
+    sock.on('connect_error', (err) => {
+      clearTimeout(timer);
+      if (err?.message === 'auth-failed') finish(false, 'auth-failed');
+      else finish(false);
+    });
   });
 });
 
@@ -3975,9 +3984,10 @@ ipcMain.handle('archive:cancelSyncSlot', (_event, jobId) => {
 
 ipcMain.handle('realtime:configure', async (_event, cfg) => {
   if (!cfg || typeof cfg !== 'object') return { ok: false, error: 'Invalid config' };
-  const { enabled, serverUrl, deviceDisplayName, operatorName } = cfg;
+  const { enabled, serverUrl, serverKey, deviceDisplayName, operatorName } = cfg;
   if (typeof enabled === 'boolean')          await settings.setRealtimeEnabled(enabled);
   if (serverUrl !== undefined)               await settings.setRealtimeServerUrl(typeof serverUrl === 'string' ? serverUrl : null);
+  if (serverKey !== undefined)               await settings.setRealtimeServerKey(typeof serverKey === 'string' ? serverKey : null);
   if (typeof deviceDisplayName === 'string') await settings.setDeviceDisplayName(deviceDisplayName || null);
   if (typeof operatorName === 'string') realtimeOps.setOperatorName(operatorName || null);
   const newEnabled = settings.getRealtimeEnabled();

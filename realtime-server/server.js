@@ -66,6 +66,21 @@ const io = new Server(httpServer, {
   transports: ['websocket', 'polling'],
 });
 
+// ── Server key authentication ─────────────────────────────────────────────────
+// Set REALTIME_SERVER_KEY env var before public deployment.
+// If unset, the server is open (compatible with local/LAN usage).
+const _expectedKey = process.env.REALTIME_SERVER_KEY || null;
+if (!_expectedKey) {
+  console.warn('[security] REALTIME_SERVER_KEY not set — realtime server is open. Set this variable before public deployment.');
+}
+
+io.use((socket, next) => {
+  if (!_expectedKey) return next();
+  const provided = socket.handshake.auth?.serverKey;
+  if (typeof provided === 'string' && provided === _expectedKey) return next();
+  next(new Error('auth-failed'));
+});
+
 // Relay events — all events are broadcast to all OTHER connected clients.
 // The server does no validation of business logic; it only sanitises
 // against oversized payloads to prevent memory abuse.

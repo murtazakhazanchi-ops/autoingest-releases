@@ -24,7 +24,7 @@ const settings = require('./settings');
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let _socket        = null;
-let _status        = 'disabled'; // disabled | not-configured | connecting | connected | offline | reconnecting
+let _status        = 'disabled'; // disabled | not-configured | connecting | connected | offline | reconnecting | auth-failed
 let _devicesOnline = 0;
 let _operatorName  = null;
 
@@ -412,6 +412,7 @@ function connect(serverUrl) {
   _setStatus('connecting');
 
   _socket = io(serverUrl, {
+    auth:                 { serverKey: settings.getRealtimeServerKey() || '' },
     autoConnect:          true,
     reconnection:         true,
     reconnectionDelay:    2000,
@@ -442,7 +443,15 @@ function connect(serverUrl) {
       resolve({ granted: true, fallback: true });
     }
   });
-  _socket.on('connect_error',  () => { _setStatus('offline'); });
+  _socket.on('connect_error', (err) => {
+    if (err?.message === 'auth-failed') {
+      _setStatus('auth-failed');
+      // Stop the reconnect loop — a wrong key won't fix itself on retry.
+      const s = _socket; _socket = null; s?.disconnect();
+    } else {
+      _setStatus('offline');
+    }
+  });
   _socket.on('reconnect_attempt', () => { _setStatus('reconnecting'); });
 
   const INCOMING_EVENTS = [

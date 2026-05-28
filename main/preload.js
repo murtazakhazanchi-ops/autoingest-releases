@@ -372,7 +372,7 @@ contextBridge.exposeInMainWorld('api', {
   getRealtimeStatus:        ()          => ipcRenderer.invoke('realtime:getStatus'),
   getRealtimeSettings:      ()          => ipcRenderer.invoke('realtime:getSettings'),
   configureRealtime:        (cfg)       => ipcRenderer.invoke('realtime:configure', cfg),
-  testRealtimeConnection:   (serverUrl) => ipcRenderer.invoke('realtime:testConnection', { serverUrl }),
+  testRealtimeConnection:   (serverUrl, serverKey) => ipcRenderer.invoke('realtime:testConnection', { serverUrl, serverKey }),
   getRealtimeKnownNames:    ()          => ipcRenderer.invoke('realtime:getKnownNames'),
   onRealtimeStatus:         (cb)        => _register('realtime:statusChanged', (_e, s) => cb(s)),
   onRealtimeEvent:          (cb)        => _register('realtime:event',         (_e, ev) => cb(ev)),
