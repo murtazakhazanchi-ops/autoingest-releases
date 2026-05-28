@@ -366,9 +366,10 @@ const EventCreator = (() => {
   let _kwRegistryPromise       = null;         // In-flight promise so we load at most once
 
   // ── Online Registry state (advisory — separate from filesystem truth) ───────
-  let _activeTab       = 'current-device'; // 'current-device' | 'online-registry'
-  let _registryEntries = [];               // advisory registry entries from realtime service
-  let _registryLoading = false;
+  let _activeTab        = 'current-device'; // 'current-device' | 'online-registry'
+  let _registryEntries  = [];               // advisory registry entries from realtime service
+  let _registryLoading  = false;
+  let _provisionalColls = [];               // { name, localCollectionPath }[] — from collection:listProvisional
 
   function _makeComp() {
     return { id: ++_compSeq, eventTypes: [], location: null, city: _globalCityVal ? { ..._globalCityVal } : null, country: '', additionalKeywords: [] };
@@ -879,28 +880,32 @@ ${currentDevicePanel}
   function _getRegistryLocalStatus(entry) {
     if (entry.entryType === 'collection') {
       if (sessionCollections.some(c => c.name === entry.collectionName)) return 'ready';
+      if (_provisionalColls.some(c => c.name === entry.collectionName)) return 'provisional';
     } else {
       const coll = sessionCollections.find(c => c.name === entry.collectionName);
       if (coll?.events?.some(ev => ev.name === entry.eventFolderName)) return 'ready';
+      if (_provisionalColls.some(c => c.name === entry.collectionName)) return 'provisional';
     }
     return entry.nasCollectionPath ? 'available' : 'needs-setup';
   }
 
   function _getRegistryStatusPillHTML(status) {
     const map = {
-      'available':   ['ec-reg-pill--available',   'Available'],
-      'ready':       ['ec-reg-pill--ready',        'Ready'],
-      'needs-setup': ['ec-reg-pill--needs-setup',  'Needs setup'],
-      'issue':       ['ec-reg-pill--issue',        'Issue'],
+      'available':   ['ec-reg-pill--available',    'Available'],
+      'ready':       ['ec-reg-pill--ready',         'Ready'],
+      'provisional': ['ec-reg-pill--provisional',   'Needs Archive Match'],
+      'needs-setup': ['ec-reg-pill--needs-setup',   'Needs setup'],
+      'issue':       ['ec-reg-pill--issue',         'Issue'],
     };
     const [cls, label] = map[status] || map['available'];
     return `<span class="ec-reg-pill ${cls}">${esc(label)}</span>`;
   }
 
   function _getRegistryOriginText(entry) {
+    const name = entry.createdByOperator || entry.createdByDeviceName || entry.createdByDeviceId;
+    if (name) return `From ${esc(name)}`;
     if (entry.origin === 'archive-available') return 'From archive';
-    const name = entry.createdByDeviceName || entry.createdByDeviceId;
-    return name ? `From ${esc(name)}` : 'From another device';
+    return 'From another device';
   }
 
   function buildRegistryCardHTML(entry) {
@@ -916,9 +921,11 @@ ${currentDevicePanel}
     const regId     = esc(entry.registryId);
 
     let actionHTML = '';
-    if (status !== 'ready') {
-      const act   = isEvent ? 'prepare-event' : 'prepare-collection';
-      actionHTML  = `<div class="ec-coll-actions"><button class="ec-coll-action-btn ec-coll-action-btn--primary" data-reg-action="${act}" data-registry-id="${regId}">Prepare Locally</button></div>`;
+    if (status === 'provisional') {
+      actionHTML = `<div class="ec-coll-actions"><button class="ec-coll-action-btn ec-coll-action-btn--secondary" data-reg-action="match-nas" data-registry-id="${regId}">Match to NAS</button></div>`;
+    } else if (status !== 'ready') {
+      const act  = isEvent ? 'prepare-event' : 'prepare-collection';
+      actionHTML = `<div class="ec-coll-actions"><button class="ec-coll-action-btn ec-coll-action-btn--primary" data-reg-action="${act}" data-registry-id="${regId}">Prepare Locally</button></div>`;
     }
 
     return `
@@ -951,9 +958,18 @@ ${currentDevicePanel}
     _registryLoading = true;
     _refreshEventListRegistryPanel();
     try {
-      const result = await window.api.registryGetAll();
-      if (result?.ok && Array.isArray(result.entries)) {
-        _registryEntries = result.entries;
+      const provPromise = window.api.listProvisionalCollections
+        ? window.api.listProvisionalCollections()
+        : Promise.resolve(null);
+      const [regResult, provResult] = await Promise.all([
+        window.api.registryGetAll(),
+        provPromise,
+      ]);
+      if (regResult?.ok && Array.isArray(regResult.entries)) {
+        _registryEntries = regResult.entries;
+      }
+      if (provResult?.ok && Array.isArray(provResult.collections)) {
+        _provisionalColls = provResult.collections;
       }
     } catch (err) {
       console.warn('[EventCreator] registry load failed:', err);
@@ -975,6 +991,8 @@ ${currentDevicePanel}
           _doPrepareCollFromRegistry(entry).catch(err => showBanner(err.message || 'Preparation failed.', 'error'));
         } else if (action === 'prepare-event') {
           _doPrepareEventFromRegistry(entry).catch(err => showBanner(err.message || 'Preparation failed.', 'error'));
+        } else if (action === 'match-nas') {
+          _doRegistryMatchToNas(entry).catch(err => showBanner(err.message || 'Match failed.', 'error'));
         }
       });
     });
@@ -1035,6 +1053,29 @@ ${currentDevicePanel}
       _scannedEvents = [];
       _renderEventList();
     });
+  }
+
+  async function _doRegistryMatchToNas(entry) {
+    const collectionName = entry.collectionName;
+    const sessionColl = sessionCollections.find(c => c.name === collectionName);
+    const provColl    = _provisionalColls.find(c => c.name === collectionName);
+    const localCollectionPath = sessionColl?._masterPath || provColl?.localCollectionPath;
+    if (!localCollectionPath) {
+      showBanner('Cannot match — local staging path not found.', 'error');
+      return;
+    }
+    const picked = await window.api.chooseExistingMaster(undefined);
+    if (!picked?.path) return;
+    const result = await window.api.matchCollectionToNas({ localCollectionPath, nasCollectionPath: picked.path });
+    if (!result?.ok) {
+      showBanner(`Match to NAS failed: ${result?.reason || 'unknown error'}`, 'error');
+      return;
+    }
+    if (sessionColl) sessionColl._linkStatus = 'linked';
+    _provisionalColls = _provisionalColls.filter(c => c.name !== collectionName);
+    _refreshEventListRegistryPanel();
+    _refreshMasterStep();
+    showBanner(`"${collectionName}" is now linked to the selected NAS collection.`, 'success');
   }
 
   function _getLinkBadgeHTML(linkStatus) {
