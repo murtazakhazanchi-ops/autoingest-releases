@@ -1710,9 +1710,14 @@ ${unparseable.map(ev => `
           p.hidden = (p.dataset.panel !== tab);
         });
         if (tab === 'online-registry') {
+          // Hide local-only footer actions — they only apply to current-device selections.
+          document.dispatchEvent(new CustomEvent('eventcreator:listDeselect'));
           _registryLoading = true;
           _refreshEventListRegistryPanel();
           _loadRegistryEntries().catch(() => {});
+        } else if (tab === 'current-device' && _selectedListFolder) {
+          // Restore footer buttons if the user had a selection before switching away.
+          document.dispatchEvent(new CustomEvent('eventcreator:listSelect'));
         }
       });
     });
@@ -3995,6 +4000,8 @@ ${unparseable.map(ev => `
     // Only valid from the event list (SELECT mode). Guards against being invoked
     // during create/edit/master screens where no stable local event folder exists.
     if (_navScreen !== 'eventList') return;
+    // Online Registry entries are remote — no local path to sequence.
+    if (_activeTab === 'online-registry') return;
     const targetFolderName = _viewingExisting?.folderName || _selectedListFolder;
     if (!targetFolderName) return;
 
@@ -4748,6 +4755,15 @@ ${unparseable.map(ev => `
           isOfflineLocalCopy,
           comps: components.map(c => ({ id: c.id, eventTypes: c.eventTypes.map(t => t.label), city: c.city?.label })),
         });
+
+        // Publish restored event to Online Registry so other connected devices see it.
+        // Uses resolvedEventPath (staging or NAS — whichever was successfully verified above).
+        if (window.api.publishEventToRegistry && resolvedEventPath && selectedCollection) {
+          window.api.publishEventToRegistry({
+            eventFolderPath: resolvedEventPath,
+            collectionName:  selectedCollection,
+          }).catch(() => {});
+        }
       } catch (err) {
         console.error('[restoreLastEvent] Error restoring event:', err);
       }
@@ -5193,6 +5209,14 @@ ${unparseable.map(ev => `
           collectionName: selectedCollection,
           eventName:      evt.displayName || evt.name,
           safeEventName:  evt.name,
+        }).catch(() => {});
+      }
+
+      // Publish existing event to Online Registry so other connected devices see it.
+      if (window.api.publishEventToRegistry) {
+        window.api.publishEventToRegistry({
+          eventFolderPath: eventPath,
+          collectionName:  selectedCollection,
         }).catch(() => {});
       }
 

@@ -354,6 +354,7 @@ contextBridge.exposeInMainWorld('api', {
   registryGetAll:                ()       => ipcRenderer.invoke('registry:getAll'),
   prepareCollectionFromRegistry: (params) => ipcRenderer.invoke('collection:prepareFromRegistry', params),
   prepareEventFromRegistry:      (params) => ipcRenderer.invoke('event:prepareFromRegistry',      params),
+  publishEventToRegistry:        (params) => ipcRenderer.invoke('event:publishRegistry',          params),
   onRealtimeRegistryEntry:       (cb)     => _register('realtime:registry:entry', (_e, ev) => cb(ev)),
 
   // ── Photographer Folder Sequencing ──

@@ -1531,6 +1531,70 @@ ipcMain.handle('event:write', async (_event, eventFolderPath, eventData) => {
   }
 });
 
+// Publish an existing event to the Online Registry (called when selecting/viewing an event,
+// not just on creation). Validates path containment, reads event.json, emits registry entry.
+ipcMain.handle('event:publishRegistry', async (_event, { eventFolderPath, collectionName } = {}) => {
+  if (!eventFolderPath || typeof eventFolderPath !== 'string') {
+    console.warn('[publishRegistry] missing eventFolderPath');
+    return { ok: false, reason: 'missing-path' };
+  }
+  if (!collectionName || typeof collectionName !== 'string') {
+    console.warn('[publishRegistry] missing collectionName');
+    return { ok: false, reason: 'missing-collection' };
+  }
+
+  const _pubRoots = [
+    settings.getLocalStagingRoot(),
+    settings.getNasRoot(),
+    settings.getArchiveRoot(),
+    settings.getMainArchiveRoot(),
+  ].filter(Boolean).map(r => path.resolve(r));
+  const realEvPath = path.resolve(eventFolderPath);
+
+  if (!_pubRoots.some(r => realEvPath === r || realEvPath.startsWith(r + path.sep))) {
+    console.warn('[publishRegistry] outside safe roots — not publishing');
+    return { ok: false, reason: 'outside-roots' };
+  }
+
+  let eventData;
+  try {
+    const raw = await fsp.readFile(path.join(realEvPath, 'event.json'), 'utf8');
+    eventData  = JSON.parse(raw);
+  } catch (err) {
+    console.warn('[publishRegistry] event.json read failed:', err.message);
+    return { ok: false, reason: 'event-json-missing' };
+  }
+  if (!eventData || !Array.isArray(eventData.components) || eventData.components.length === 0) {
+    console.warn('[publishRegistry] invalid event.json (no components)');
+    return { ok: false, reason: 'event-json-invalid' };
+  }
+
+  const _nasRoot4  = settings.getNasRoot();
+  const _isNasPub  = _nasRoot4 && (realEvPath === path.resolve(_nasRoot4) || realEvPath.startsWith(path.resolve(_nasRoot4) + path.sep));
+  const _origin    = _isNasPub ? 'archive-available' : 'remote-created';
+  const _jsonShell = {
+    version:       eventData.version || 1,
+    hijriDate:     eventData.hijriDate,
+    sequence:      typeof eventData.sequence === 'number' ? eventData.sequence : parseInt(eventData.sequence, 10),
+    eventName:     eventData.eventName,
+    safeEventName: eventData.safeEventName || eventData.eventName,
+    status:        eventData.status || 'created',
+    components:    eventData.components,
+    updatedAt:     Date.now(),
+  };
+  realtimeOps.emitRegistryEvent({
+    collectionName,
+    eventFolderName:     path.basename(realEvPath),
+    eventDisplayName:    eventData.eventName || path.basename(realEvPath),
+    eventJsonShell:      _jsonShell,
+    nasCollectionPath:   _isNasPub ? path.dirname(realEvPath) : null,
+    nasEventPath:        _isNasPub ? realEvPath : null,
+    origin:              _origin,
+    createdByDeviceName: settings.getDeviceDisplayName() || null,
+  });
+  return { ok: true };
+});
+
 // Read event.json from a folder. Returns a valid parsed object or null.
 ipcMain.handle('event:read', async (_event, eventFolderPath) => {
   if (!eventFolderPath || typeof eventFolderPath !== 'string') return null;
