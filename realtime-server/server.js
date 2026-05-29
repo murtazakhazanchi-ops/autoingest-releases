@@ -62,8 +62,10 @@ const httpServer = createServer((req, res) => {
 });
 
 const io = new Server(httpServer, {
-  cors: { origin: '*', methods: ['GET', 'POST'] },
-  transports: ['websocket', 'polling'],
+  cors:         { origin: '*', methods: ['GET', 'POST'] },
+  transports:   ['websocket', 'polling'],
+  pingInterval: 25000,
+  pingTimeout:  30000,
 });
 
 // ── Server key authentication ─────────────────────────────────────────────────
@@ -426,6 +428,12 @@ io.on('connection', (socket) => {
     _devices.delete(socket.id);
     _deviceActivity.delete(socket.id);
 
+    if (!dev) {
+      // Socket disconnected before sending device:hello (e.g. test connection probes).
+      console.log(`[disconnect] unidentified socket ${socket.id} — reason: ${reason}`);
+      return;
+    }
+
     // Release sync slot if held by this socket's device.
     if (act?.deviceId) {
       const hadSlot = _syncSlots.delete(act.deviceId);
@@ -438,7 +446,7 @@ io.on('connection', (socket) => {
     if (act?.deviceId) {
       socket.broadcast.emit('device:offline', { deviceId: act.deviceId });
     }
-    console.log(`[disconnect] ${dev?.deviceDisplayName || socket.id} — reason: ${reason} — devices online: ${_devices.size}`);
+    console.log(`[disconnect] ${dev.deviceDisplayName || socket.id} — reason: ${reason} — devices online: ${_devices.size}`);
     io.emit('dashboard:update', { devicesOnline: _devices.size });
   });
 });

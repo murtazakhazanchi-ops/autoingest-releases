@@ -4032,25 +4032,36 @@ ipcMain.handle('realtime:testConnection', async (_event, { serverUrl, serverKey 
   let sioClient;
   try { sioClient = require('socket.io-client'); } catch { return { ok: false }; }
   return new Promise((resolve) => {
-    let done = false;
-    const finish = (ok, reason) => {
-      if (done) return;
-      done = true;
-      try { sock.disconnect(); } catch {}
+    let resolved = false;
+    const done = (ok, reason) => {
+      if (resolved) return;
+      resolved = true;
       resolve(reason ? { ok, reason } : { ok });
     };
-    const timer = setTimeout(() => finish(false), 7000);
+    const timer = setTimeout(() => {
+      sock.disconnect();
+      done(false);
+    }, 7000);
     const sock = sioClient(serverUrl, {
       auth:         { serverKey: serverKey || '' },
       reconnection: false,
       timeout:      6000,
       transports:   ['websocket', 'polling'],
     });
-    sock.on('connect',       ()    => { clearTimeout(timer); finish(true); });
+    sock.on('connect', () => {
+      clearTimeout(timer);
+      // Wait for the server-side disconnect to complete before resolving,
+      // so the server processes the close cleanly rather than seeing a ping timeout.
+      sock.once('disconnect', () => done(true));
+      sock.disconnect();
+      // Safety fallback: resolve after 500 ms if disconnect event is delayed.
+      setTimeout(() => done(true), 500);
+    });
     sock.on('connect_error', (err) => {
       clearTimeout(timer);
-      if (err?.message === 'auth-failed') finish(false, 'auth-failed');
-      else finish(false);
+      sock.disconnect();
+      if (err?.message === 'auth-failed') done(false, 'auth-failed');
+      else done(false);
     });
   });
 });
