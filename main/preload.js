@@ -202,6 +202,7 @@ contextBridge.exposeInMainWorld('api', {
   validateMainArchiveRoot:    (v)   => ipcRenderer.invoke('archive:validateMainArchiveRoot', v),
   initArchiveRoot:            (v)   => ipcRenderer.invoke('archive:initArchiveRoot', v),
   getDeviceIdentity:          ()    => ipcRenderer.invoke('archive:getDeviceIdentity'),
+  resolveEffectiveArchiveRoot: ()   => ipcRenderer.invoke('archive:resolveEffectiveRoot'),
 
   // ── Archive NAS Event List ──
   scanNasEvents:            ()            => ipcRenderer.invoke('archive:scanNasEvents'),
