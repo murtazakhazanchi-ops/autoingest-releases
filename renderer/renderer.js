@@ -1594,10 +1594,14 @@ function _tlDeviceCard(d, stale) {
   const isStale  = stale || age >= TL_STALE_MS;
   const health   = _teamDeviceHealth.get(d.deviceId);
 
-  // Mapped status label: Online / Viewing / Importing / Syncing / Issue / Offline
+  // Mapped status label: Online / Viewing / Importing / Syncing / Issue / Idle / Offline
+  // All entries in _teamDevices are connected — device:offline removes them from the map.
+  // "Offline" is therefore never appropriate for a card rendered from _teamDevices.
+  // Use "Idle" for any stale entry (age >= TL_STALE_MS); "Offline" only appears in
+  // historical/activity contexts where the device is absent from live presence.
   let modeLabel;
   if (isStale) {
-    modeLabel = 'Offline';
+    modeLabel = 'Idle';
   } else if (health?.failedSyncCount > 0) {
     modeLabel = 'Issue';
   } else {
@@ -1946,9 +1950,9 @@ function _renderDevicesTab() {
   }
 
   const rows = devices.map(d => {
-    const age       = now - new Date(d.updatedAt || 0).getTime();
-    const isOffline = age >= TL_VERY_STALE_MS;
-    const health    = _teamDeviceHealth.get(d.deviceId);
+    const age     = now - new Date(d.updatedAt || 0).getTime();
+    const isIdle  = age >= TL_STALE_MS;  // connected but no recent activity
+    const health  = _teamDeviceHealth.get(d.deviceId);
     const _primary  = d.userName || d.deviceName || 'Device';
     const _secondary = d.userName && d.deviceName && d.deviceName !== d.userName ? d.deviceName : null;
     const name      = _primary;
@@ -1957,20 +1961,20 @@ function _renderDevicesTab() {
     const verMismatch = _tlVerIsOlder(ver, localVer);
 
     const healthParts = [];
-    if (!isOffline && health) {
+    if (health) {
       if (health.failedSyncCount  > 0) healthParts.push(`${health.failedSyncCount} sync failed`);
       else if (health.pendingSyncCount > 0) healthParts.push(`${health.pendingSyncCount} pending`);
       if (!health.nasConnected)        healthParts.push('Archive disconnected');
     }
 
-    return `<div class="tl-device-card${isOffline ? ' tl-device-card--stale' : ''}">
+    return `<div class="tl-device-card${isIdle ? ' tl-device-card--stale' : ''}">
       <div class="tl-device-avatar">${escapeHtml(_tlInitials(name))}</div>
       <div class="tl-device-info">
         <p class="tl-device-name">${escapeHtml(name)}</p>
         ${op ? `<p class="tl-device-operator">${escapeHtml(op)}</p>` : ''}
         <div class="tl-device-status">
-          <span class="tl-status-dot tl-status-dot--${isOffline ? 'idle' : 'viewing'}"></span>
-          <span class="tl-status-label">${isOffline ? 'Offline' : 'Online'}</span>
+          <span class="tl-status-dot tl-status-dot--${isIdle ? 'idle' : 'viewing'}"></span>
+          <span class="tl-status-label">${isIdle ? 'Idle' : 'Online'}</span>
           ${ver ? `<span class="tl-status-sep">·</span><span class="tl-status-label">v${escapeHtml(ver)}</span>` : ''}
           ${verMismatch ? `<span class="tl-version-warn tl-version-warn--inline">Update recommended</span>` : ''}
         </div>
@@ -2018,9 +2022,14 @@ function _onTeamUpdate(data) {
     }
   } else if (data.type === 'device:activity:snapshot') {
     const activities = Array.isArray(data.activities) ? data.activities : [];
+    // Use current time as updatedAt for snapshot entries: the snapshot is the server
+    // confirming these devices are online now. Their stored activity ts may be stale.
+    const snapshotTs = new Date().toISOString();
     for (const act of activities) {
       if (act?.deviceId && !_teamDevices.has(act.deviceId)) {
-        _teamDevices.set(act.deviceId, _tlNormalizeDevice(act));
+        const norm = _tlNormalizeDevice(act);
+        norm.updatedAt = snapshotTs;
+        _teamDevices.set(act.deviceId, norm);
       }
     }
   } else if (data.type === 'device:offline') {
