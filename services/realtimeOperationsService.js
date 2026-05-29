@@ -47,6 +47,10 @@ const _teamDeviceHealth = new Map(); // deviceId → health payload
 // Last known sync slot status broadcast by server.
 let _lastKnownSlotStatus = null;
 
+// Presence heartbeat timer — keeps this device visible as Online on remote devices
+// while the app is open and connected. Cleared on disconnect.
+let _presenceTimer = null;
+
 // Pending sync slot Promise resolver (for requestSyncSlot).
 let _pendingSlotResolve = null; // { resolve, reject, jobId, timer }
 
@@ -431,10 +435,16 @@ function connect(serverUrl) {
     // Re-publish this device's last known registry entries so other devices see them after reconnect
     if (_lastRegistryCollEntry) _send('registry:register', _lastRegistryCollEntry);
     if (_lastRegistryEvtEntry)  _send('registry:register', _lastRegistryEvtEntry);
+    // Emit an immediate activity so this device appears in remote snapshots, then
+    // keep emitting on a 45 s heartbeat so it stays Online regardless of modal state.
+    emitDeviceActivity({ mode: 'idle' });
+    if (_presenceTimer) clearInterval(_presenceTimer);
+    _presenceTimer = setInterval(() => emitDeviceActivity({ mode: 'idle' }), 45_000);
   });
 
   _socket.on('disconnect', () => {
     _setStatus('offline');
+    if (_presenceTimer) { clearInterval(_presenceTimer); _presenceTimer = null; }
     // Unblock any batch slot wait that is sitting in the queue — fallback so jobs can proceed.
     if (_pendingSlotResolve) {
       const { resolve, timer } = _pendingSlotResolve;
@@ -444,6 +454,7 @@ function connect(serverUrl) {
     }
   });
   _socket.on('connect_error', (err) => {
+    if (_presenceTimer) { clearInterval(_presenceTimer); _presenceTimer = null; }
     if (err?.message === 'auth-failed') {
       _setStatus('auth-failed');
       // Stop the reconnect loop — a wrong key won't fix itself on retry.
