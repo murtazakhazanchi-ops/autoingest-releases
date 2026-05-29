@@ -3089,11 +3089,18 @@ async function _alocOpen() {
   _alocPendingImportMode  = undefined;
   _alocPendingMainNasRoot = undefined;
 
-  // Populate NAS path
+  // Populate NAS path.
+  // For 'main': show the auto-resolved main path (effectiveNasRoot).
+  // For all other sources: show the persisted nasRoot so the override (or lack
+  // thereof) is always what's visible, never masked by effectiveNasRoot.
+  const effSource = status?.effectiveSource;
   const nasEl = document.getElementById('alocNasPath');
   if (nasEl) {
-    if (status.nasRoot) {
-      nasEl.textContent = status.nasRoot;
+    const displayPath = effSource === 'main'
+      ? (status.effectiveNasRoot || status.mainArchiveRoot)
+      : status.nasRoot;
+    if (displayPath) {
+      nasEl.textContent = displayPath;
       nasEl.classList.remove('aloc-unset');
     } else {
       nasEl.textContent = 'Not set';
@@ -3148,6 +3155,21 @@ async function _alocOpen() {
   if (alocTransferVal) alocTransferVal.textContent = '';
   document.getElementById('alocNasInitBtn')?.setAttribute('hidden', '');
   document.getElementById('alocMainNasInitBtn')?.setAttribute('hidden', '');
+
+  // Show contextual status for the Active Archive Root row based on effective source.
+  // Choose is always enabled; user can always pick a temporary working location.
+  if (alocNasVal) {
+    if (effSource === 'main') {
+      alocNasVal.textContent = 'Auto: Using Main Archive Root';
+      alocNasVal.className = 'aloc-validation ok';
+    } else if (effSource === 'override') {
+      alocNasVal.textContent = 'Temporary override — using Active Archive Root';
+      alocNasVal.className = 'aloc-validation ok';
+    } else if (status?.mainArchiveRoot && !status?.mainAvailable) {
+      alocNasVal.textContent = 'Main Archive Root unavailable — using Active Archive Root';
+      alocNasVal.className = 'aloc-validation warn';
+    }
+  }
 
   // Validate main archive root on open if path is saved (fire-and-forget)
   if (status.mainArchiveRoot) {
@@ -3392,16 +3414,24 @@ document.getElementById('alocSaveBtn')?.addEventListener('click', async () => {
   if (nasRootChanged) {
     await window.api.clearNasEventCache();
     _refreshNasEventsCard(false);
-    // Align EventCreator's sessionArchiveRoot with the newly saved NAS root.
-    // This keeps the header, step 1 LOCATION, and activeMaster in sync
-    // without requiring an app restart.
     const syncRoot = (typeof committedNasRoot === 'string') ? committedNasRoot : null;
-    EventCreator.setSessionArchiveRoot(syncRoot);
+    if (syncRoot !== null) {
+      // User saved a new working root — use it directly.
+      EventCreator.setSessionArchiveRoot(syncRoot);
+      window.api.setArchiveRootSetting(syncRoot)
+        .catch(err => console.error('[aloc] archiveRoot sync failed:', err));
+    } else {
+      // nasRoot cleared — re-resolve in case mainArchiveRoot now auto-applies.
+      try {
+        const newStatus = await window.api.getArchiveOperationsStatus();
+        EventCreator.setSessionArchiveRoot(newStatus?.effectiveNasRoot || null);
+      } catch (_e) {
+        EventCreator.setSessionArchiveRoot(null);
+      }
+      window.api.setArchiveRootSetting('')
+        .catch(err => console.error('[aloc] archiveRoot sync failed:', err));
+    }
     _renderHomeContextBar();
-    // Keep settings.archiveRoot in sync so primeFromSettings() reads the
-    // correct value on the next app launch.
-    window.api.setArchiveRootSetting(syncRoot ?? '')
-      .catch(err => console.error('[aloc] archiveRoot sync failed:', err));
   }
 });
 
@@ -8942,7 +8972,7 @@ async function showEventImportConfirmModal(groups, eventData) {
 
     // ── Import Method UI ─────────────────────────────────────────────────────
     const nasStatus     = archiveStatus.status || '';
-    const nasRoot       = archiveStatus.nasRoot       || null;
+    const nasRoot       = archiveStatus.effectiveNasRoot || archiveStatus.nasRoot || null;
     const stagingRoot   = archiveStatus.localStagingRoot || null;
     const nasUsable     = !!nasRoot && ['ready', 'local-staging-missing'].includes(nasStatus);
     const stagingUsable = !!stagingRoot;
@@ -9316,20 +9346,24 @@ async function initApp() {
     console.error('Failed to prime archive root', e);
   }
 
-  // Sync EventCreator with the Archive Locations nasRoot.
-  // nasRoot (set via Archive Locations) is the authoritative source.
-  // This handles first-launch migration where nasRoot was set before
-  // archiveRoot was kept in sync, as well as any restart after a Save.
+  // Sync EventCreator with the effective archive root.
+  // If mainArchiveRoot is configured and reachable it is used automatically;
+  // otherwise nasRoot (Active Archive Root) is used.
+  // We do NOT persist effectiveNasRoot back to archiveRoot when it comes from
+  // mainArchiveRoot — that would pollute the stored nasRoot field.
   try {
     const _archStatus = await window.api.getArchiveOperationsStatus();
-    const _nasRoot = _archStatus?.nasRoot || null;
+    const _effSource  = _archStatus?.effectiveSource || 'active';
+    const _nasRoot    = _archStatus?.effectiveNasRoot || _archStatus?.nasRoot || null;
     if (_nasRoot && _nasRoot !== EventCreator.getSessionArchiveRoot()) {
       EventCreator.setSessionArchiveRoot(_nasRoot);
-      window.api.setArchiveRootSetting(_nasRoot)
-        .catch(err => console.error('[initApp] archiveRoot sync failed:', err));
+      if (_effSource !== 'main') {
+        window.api.setArchiveRootSetting(_nasRoot)
+          .catch(err => console.error('[initApp] archiveRoot sync failed:', err));
+      }
     }
   } catch (e) {
-    console.error('[initApp] nasRoot sync failed:', e);
+    console.error('[initApp] archive root sync failed:', e);
   }
 
   // Restore last active event — all logic delegated to EventCreator.
