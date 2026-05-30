@@ -51,6 +51,11 @@ let _lastKnownSlotStatus = null;
 // while the app is open and connected. Cleared on disconnect.
 let _presenceTimer = null;
 
+// Last URL and key used in connect() — used to skip a redundant reconnect when
+// the socket is already connected with the same credentials.
+let _lastConnectUrl = null;
+let _lastConnectKey = null;
+
 // Pending sync slot Promise resolver (for requestSyncSlot).
 let _pendingSlotResolve = null; // { resolve, reject, jobId, timer }
 
@@ -393,16 +398,24 @@ function _buildPresencePayload() {
 // ── Connection lifecycle ──────────────────────────────────────────────────────
 
 function connect(serverUrl) {
+  if (!serverUrl || typeof serverUrl !== 'string') {
+    _setStatus('disabled');
+    return;
+  }
+
+  const currentKey = settings.getRealtimeServerKey() || '';
+  if (_socket && _socket.connected && _lastConnectUrl === serverUrl && _lastConnectKey === currentKey) {
+    return; // Already connected with same URL and key — no reconnect needed.
+  }
+
   if (_socket) {
     _socket.removeAllListeners();
     _socket.disconnect();
     _socket = null;
   }
 
-  if (!serverUrl || typeof serverUrl !== 'string') {
-    _setStatus('disabled');
-    return;
-  }
+  _lastConnectUrl = serverUrl;
+  _lastConnectKey = currentKey;
 
   let io;
   try {
@@ -423,6 +436,7 @@ function connect(serverUrl) {
     reconnectionDelayMax: 10000,
     reconnectionAttempts: Infinity,
     timeout:              10000,
+    transports:           ['websocket', 'polling'],
   });
 
   _socket.on('connect', () => {
@@ -443,8 +457,10 @@ function connect(serverUrl) {
   });
 
   _socket.on('disconnect', () => {
-    _setStatus('offline');
     if (_presenceTimer) { clearInterval(_presenceTimer); _presenceTimer = null; }
+    // Do not overwrite auth-failed — that status was set intentionally and must
+    // be visible to the user.  All other disconnect reasons show as offline.
+    if (_status !== 'auth-failed') _setStatus('offline');
     // Unblock any batch slot wait that is sitting in the queue — fallback so jobs can proceed.
     if (_pendingSlotResolve) {
       const { resolve, timer } = _pendingSlotResolve;

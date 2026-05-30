@@ -55,6 +55,7 @@ document.getElementById('settingsBtn')?.addEventListener('click', () => {
 
 // Settings modal close
 document.getElementById('settingsClose')?.addEventListener('click', () => {
+  _rtSaveSettings();
   document.getElementById('settingsModal').classList.remove('visible');
 });
 
@@ -65,7 +66,10 @@ document.querySelectorAll('.settings-theme-radio').forEach(r => {
 
 // Click-outside dismiss
 document.getElementById('settingsModal')?.addEventListener('click', e => {
-  if (e.target === e.currentTarget) e.currentTarget.classList.remove('visible');
+  if (e.target === e.currentTarget) {
+    _rtSaveSettings();
+    e.currentTarget.classList.remove('visible');
+  }
 });
 
 // ── Realtime Server settings ──────────────────────────────────────────────────
@@ -160,6 +164,9 @@ document.getElementById('rtServerUrl')?.addEventListener('change', _rtSaveSettin
 document.getElementById('rtServerKey')?.addEventListener('change', _rtSaveSettings);
 
 document.getElementById('rtTestBtn')?.addEventListener('click', async () => {
+  // Save settings before testing — ensures persistent socket is started with
+  // the current URL/key, not just the temporary Test Connection socket.
+  _rtSaveSettings();
   const btn = document.getElementById('rtTestBtn');
   const url = (document.getElementById('rtServerUrl')?.value || '').trim();
   const key = (document.getElementById('rtServerKey')?.value || '').trim();
