@@ -879,11 +879,24 @@ ${currentDevicePanel}
 
   function _getRegistryLocalStatus(entry) {
     if (entry.entryType === 'collection') {
-      if (sessionCollections.some(c => c.name === entry.collectionName)) return 'ready';
+      const coll = sessionCollections.find(c => c.name === entry.collectionName);
+      if (coll) {
+        // A provisional/stale collection needs archive match before it's fully usable.
+        return (coll._linkStatus === 'provisional' || coll._linkStatus === 'stale-link')
+          ? 'provisional' : 'ready';
+      }
       if (_provisionalColls.some(c => c.name === entry.collectionName)) return 'provisional';
     } else {
       const coll = sessionCollections.find(c => c.name === entry.collectionName);
-      if (coll?.events?.some(ev => ev.name === entry.eventFolderName)) return 'ready';
+      if (coll) {
+        // Collection is local — check its link state before claiming the event is ready.
+        if (coll._linkStatus === 'provisional' || coll._linkStatus === 'stale-link') return 'provisional';
+        if (coll.events?.some(ev => ev.name === entry.eventFolderName)) return 'ready';
+        // Collection exists locally with a confirmed link; event may just not be in the
+        // scanned list yet (e.g. pending scan). Treat as ready rather than prompting a
+        // redundant "Prepare Locally".
+        return 'ready';
+      }
       if (_provisionalColls.some(c => c.name === entry.collectionName)) return 'provisional';
     }
     return entry.nasCollectionPath ? 'available' : 'needs-setup';
@@ -951,7 +964,7 @@ ${currentDevicePanel}
     <div class="ec-coll-name">${nameText}</div>
     ${subText}
     <div class="ec-coll-card-footer">
-      <span class="ec-coll-meta">${esc(metaText)}</span>
+      <span class="ec-coll-meta">${metaText}</span>
       ${_getRegistryStatusPillHTML(status)}
       ${actionHTML}
     </div>
