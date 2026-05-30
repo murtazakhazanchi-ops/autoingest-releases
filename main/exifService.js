@@ -69,6 +69,7 @@ const EXIFTOOL_CONFIG = __dirname.includes('app.asar')
 // ── ExifTool singleton ────────────────────────────────────────────────────────
 
 let _ExifTool = null;
+
 function _getExifTool() {
   if (!_ExifTool) {
     const { ExifTool } = require('exiftool-vendored');
@@ -86,6 +87,15 @@ function _getExifTool() {
     });
   }
   return _ExifTool;
+}
+
+// Tears down a dead cluster and clears the singleton so _getExifTool() spawns
+// a fresh instance on the next call. Used when BatchCluster reports it has ended
+// (e.g. after an ExifTool process crash or a previous error that terminated the pool).
+function _resetExifTool() {
+  const old = _ExifTool;
+  _ExifTool = null;
+  if (old) old.end().catch(() => {});
 }
 
 // ── Extension sets ────────────────────────────────────────────────────────────
@@ -444,6 +454,9 @@ async function _processFile(file, status, batch, context) {
       }
     }
   } catch (err) {
+    if (err.message && err.message.includes('BatchCluster has ended')) {
+      _resetExifTool();
+    }
     status.status = 'error';
     status.error  = err.message;
     batch.failed++;
@@ -488,10 +501,28 @@ function applyBatch(batchId, copiedFiles, context, emitFn) {
   // Preflight: verify ExifTool responds before occupying queue slots with file jobs.
   // A broken binary causes each et.write() to hang for taskTimeoutMillis (30 s) per file,
   // making metadata appear stuck at 0% for the full batch duration.
+  //
+  // If the cluster has already ended (e.g. from a previous batch error), reset it and
+  // retry once with a fresh instance before failing the entire batch.
   _enqueue(async () => {
+    let preflightErr = null;
     try {
       await _getExifTool().version();
-    } catch (preflightErr) {
+    } catch (err) {
+      if (err.message && err.message.includes('BatchCluster has ended')) {
+        log(`[exifService] BatchCluster ended — resetting ExifTool and retrying preflight for batch ${batchId}`);
+        _resetExifTool();
+        try {
+          await _getExifTool().version();
+        } catch (retryErr) {
+          preflightErr = retryErr;
+        }
+      } else {
+        preflightErr = err;
+      }
+    }
+
+    if (preflightErr) {
       log(`[exifService] ExifTool preflight failed for batch ${batchId}: ${preflightErr.message}`);
       for (const status of batch.files) {
         status.status = 'error';

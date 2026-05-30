@@ -67,7 +67,9 @@
       "!**/.git/**"
     ],
     "asarUnpack": [
-      "main/exiftool-config.pl"
+      "main/exiftool-config.pl",
+      "node_modules/exiftool-vendored.pl/**/*",
+      "node_modules/exiftool-vendored.exe/**/*"
     ],
     "mac": {
       "target": [
