@@ -4595,7 +4595,44 @@ ${unparseable.map(ev => `
         let _resolvedStagingRoot  = null;
 
         const valid = await window.api.verifyLastEvent(last.collectionPath, eventPath);
-        if (!valid) {
+
+        // The stored collectionPath may belong to a root that is now offline (e.g. it was
+        // saved against a Main Archive Root that is currently unreachable). Before falling
+        // back to a local-staging copy, re-resolve the same collection/event under the
+        // currently active archive root. A reachable archive (NAS) MUST win over a stale
+        // local-staging copy — staging is only a last resort when no archive root has the event.
+        let rebasedToArchive = false;
+        if (!valid && safeName && last.collectionName) {
+          try {
+            const eff     = await window.api.resolveEffectiveArchiveRoot();
+            const effRoot = eff?.path || null;
+            if (effRoot) {
+              const candCollPath  = effRoot + '/' + last.collectionName;
+              const candEventPath = candCollPath + '/' + safeName;
+              if (candCollPath !== last.collectionPath) {
+                const candValid = await window.api.verifyLastEvent(candCollPath, candEventPath);
+                if (candValid) {
+                  last                  = { ...last, collectionPath: candCollPath };
+                  resolvedCollPath      = candCollPath;
+                  resolvedEventPath     = candEventPath;
+                  rebasedToArchive      = true;
+                  console.log('[restoreLastEvent] stale path re-resolved onto active archive root:', candEventPath);
+                  // Persist the corrected archive path so future restarts use it directly.
+                  window.api.setLastEvent({
+                    collectionPath: candCollPath,
+                    collectionName: last.collectionName,
+                    eventName:      last.eventName || safeName,
+                    safeEventName:  safeName,
+                  }).catch(err => console.warn('[restoreLastEvent] setLastEvent during rebase failed:', err));
+                }
+              }
+            }
+          } catch (rebaseErr) {
+            console.warn('[restoreLastEvent] archive rebase failed:', rebaseErr);
+          }
+        }
+
+        if (!valid && !rebasedToArchive) {
           // Before clearing, attempt fallback to local staging copy (archive may be offline).
           let stagingResolved = false;
           let archiveOffline  = false;
@@ -4760,7 +4797,9 @@ ${unparseable.map(ev => `
           coll._masterPath = resolvedCollPath;
         }
 
-        // Always persist archive path in activeMaster so settings reconnect correctly on next launch.
+        // Always persist archive path in activeMaster so settings reconnect correctly on next
+        // launch. last.collectionPath is the rebased active-archive path when the stored path
+        // was stale/offline, otherwise the original stored archive path.
         activeMaster = { name: last.collectionName, path: last.collectionPath };
 
         // When restored from local staging, activate offline staging mode so that

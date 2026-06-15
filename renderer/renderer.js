@@ -3187,10 +3187,27 @@ async function _alocOpen() {
     }
   }
 
-  // Validate main archive root on open if path is saved (fire-and-forget)
+  // Validate main archive root on open if path is saved (fire-and-forget).
+  // If the saved Main Archive Root is offline but the active archive root is a
+  // valid, online AutoIngest archive, surface the mismatch and reveal an "Adopt"
+  // affordance so the user can promote the active root to Main Archive Root.
+  const alocMainAdoptBtn = document.getElementById('alocMainNasAdoptBtn');
+  alocMainAdoptBtn?.setAttribute('hidden', '');
   if (status.mainArchiveRoot) {
-    window.api.validateMainArchiveRoot(status.mainArchiveRoot).then(result => {
+    window.api.validateMainArchiveRoot(status.mainArchiveRoot).then(async result => {
       _alocShowMainNasValidation('alocMainNasValidation', result);
+      if (!result?.valid) {
+        const activeRoot = status?.effectiveNasRoot || status?.nasRoot || null;
+        if (alocMainAdoptBtn && activeRoot && activeRoot !== status.mainArchiveRoot) {
+          const activeRes = await window.api.validateMainArchiveRoot(activeRoot).catch(() => null);
+          if (activeRes?.valid && alocMainNasVal) {
+            alocMainNasVal.textContent = 'Saved Main Archive Root is offline, but the active archive root is online and valid.';
+            alocMainNasVal.className   = 'aloc-validation warn';
+            alocMainAdoptBtn.dataset.adoptPath = activeRoot;
+            alocMainAdoptBtn.removeAttribute('hidden');
+          }
+        }
+      }
     }).catch(() => {});
   }
 
@@ -3387,6 +3404,21 @@ document.getElementById('alocMainNasClearBtn')?.addEventListener('click', () => 
   document.getElementById('alocMainNasValidation').textContent = '';
   document.getElementById('alocMainNasValidation').className   = 'aloc-validation';
   document.getElementById('alocMainNasInitBtn')?.setAttribute('hidden', '');
+  document.getElementById('alocMainNasAdoptBtn')?.setAttribute('hidden', '');
+});
+
+// Main Archive Root adopt — promote the online active archive root to Main Archive Root.
+// Stages the change as a pending value; the user confirms with Save (reuses setMainArchiveRoot).
+document.getElementById('alocMainNasAdoptBtn')?.addEventListener('click', async () => {
+  const btn  = document.getElementById('alocMainNasAdoptBtn');
+  const path = btn?.dataset.adoptPath;
+  if (!path) return;
+  const mainNasEl = document.getElementById('alocMainNasPath');
+  if (mainNasEl) { mainNasEl.textContent = path; mainNasEl.classList.remove('aloc-unset'); }
+  _alocPendingMainNasRoot = path;
+  btn.setAttribute('hidden', '');
+  const result = await window.api.validateMainArchiveRoot(path);
+  _alocShowMainNasValidation('alocMainNasValidation', result);
 });
 
 // Import mode toggle
