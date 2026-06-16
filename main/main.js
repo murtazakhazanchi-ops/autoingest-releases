@@ -1106,7 +1106,10 @@ ipcMain.handle('users:create',    async (_e, p)    => userManager.createUser(p))
 ipcMain.handle('users:getActive', async ()         => userManager.getActiveUser());
 ipcMain.handle('users:setActive', async (_e, id) => {
   const result = await userManager.setActiveUser(id);
-  const user   = await userManager.getActiveUser().catch(() => null);
+  // getActiveUser() is synchronous — await is safe but .catch() is not a method on a
+  // plain return value, so guard with try/catch instead.
+  let user = null;
+  try { user = await userManager.getActiveUser(); } catch { user = null; }
   if (user?.name) realtimeOps.setOperatorName(user.name);
   return result;
 });
