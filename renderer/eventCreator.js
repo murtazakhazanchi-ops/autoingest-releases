@@ -666,6 +666,11 @@ const EventCreator = (() => {
     _loadStagingCollectionsIfOffline().catch(err => {
       console.warn('[EventCreator] staging collection scan failed:', err);
     });
+    // Async: when the archive is online, load existing NAS master collections into the
+    // Step 1 list so they show as selectable cards (mirrors the offline staging path).
+    _loadExistingNasCollections().catch(err => {
+      console.warn('[EventCreator] NAS collection load failed:', err);
+    });
   }
 
   // Re-renders Step 1 in place — used after async staging scan completes.
@@ -721,6 +726,56 @@ const EventCreator = (() => {
     }
 
     _refreshMasterStep();
+  }
+
+  // When the archive is online, load existing NAS master collections into the Step 1 list.
+  // Renders instantly from the NAS cache (if present), then refreshes from a fresh scan so
+  // newly-created collections appear. No-ops while offline (handled by the staging path).
+  async function _loadExistingNasCollections() {
+    let opsStatus;
+    try { opsStatus = await window.api.getArchiveOperationsStatus(); } catch { return; }
+    const isOffline = opsStatus?.status === 'nas-disconnected' || opsStatus?.status === 'invalid-nas';
+    if (isOffline) return;
+
+    // Fast path — merge from cache for an instant render.
+    if (window.api.getCachedNasEvents) {
+      try {
+        const cached = await window.api.getCachedNasEvents();
+        if (_mergeNasCollections(cached) && _navScreen === 'masterStep') _refreshMasterStep();
+      } catch { /* no cache yet — fresh scan below */ }
+    }
+
+    // Fresh scan — picks up collections created since the cache was written.
+    if (!window.api.scanNasEvents) return;
+    let result;
+    try { result = await window.api.scanNasEvents(); } catch (err) {
+      console.warn('[EventCreator] NAS collection scan failed:', err);
+      return;
+    }
+    if (_mergeNasCollections(result) && _navScreen === 'masterStep') _refreshMasterStep();
+  }
+
+  // Merges NAS scan/cache collections into sessionCollections. Returns true if anything
+  // changed (caller re-renders). Skips system folders (#recycle, etc.). Never overwrites
+  // an existing session collection's working _masterPath (e.g. an active staging copy).
+  function _mergeNasCollections(result) {
+    if (!result || result.status !== 'ready' || !Array.isArray(result.collections)) return false;
+    let changed = false;
+    for (const nc of result.collections) {
+      if (!nc?.name || nc.name.startsWith('#')) continue;
+      const existing = sessionCollections.find(c => c.name === nc.name);
+      if (existing) {
+        if (!existing._masterPath && nc.path) { existing._masterPath = nc.path; changed = true; }
+      } else {
+        sessionCollections.push({
+          name: nc.name, hijriDate: '', label: '',
+          events: (nc.events || []).map(e => ({ name: e.name })),
+          _masterPath: nc.path, _linkStatus: null, _linkData: null,
+        });
+        changed = true;
+      }
+    }
+    return changed;
   }
 
   // Returns the effective on-disk path for the current collection.
@@ -4481,6 +4536,9 @@ ${unparseable.map(ev => `
 
     /** Called on resetAppState — clears selection but keeps session collections and archive root. */
     resetSelection() {
+      if (selectedCollection) {
+        console.log('[EventCreator] resetSelection — clearing active event selection:', selectedCollection);
+      }
       selectedCollection  = null;
       activeMaster        = null;
       _scannedEvents      = null;
@@ -4522,10 +4580,22 @@ ${unparseable.map(ev => `
         _editMode           = false;
         _selectedListFolder = null;
       }
-      // Clear cached session collections from a different root — step 1 re-scans on next open
+      // Drop cached session collections that belong to a different root — step 1 re-scans
+      // on next open. NEVER drop the currently-active collection: a successfully restored
+      // event (esp. a local-staging copy whose _masterPath points at the staging root) must
+      // survive an archive-root sync at startup, otherwise getActiveEventData() returns null
+      // and the landing card falls back to "Create or Select Event".
       if (sessionCollections.length > 0) {
-        const allFromNewRoot = root && sessionCollections.every(c => c._masterPath?.startsWith(root + '/'));
-        if (!allFromNewRoot) sessionCollections.length = 0;
+        const kept = sessionCollections.filter(c =>
+          (selectedCollection && c.name === selectedCollection) ||
+          (root && c._masterPath?.startsWith(root + '/')));
+        if (kept.length !== sessionCollections.length) {
+          const dropped = sessionCollections.length - kept.length;
+          sessionCollections.length = 0;
+          sessionCollections.push(...kept);
+          console.log('[EventCreator] setSessionArchiveRoot — dropped', dropped,
+            'stale collection(s); kept', kept.length, '(active preserved:', selectedCollection || 'none', ')');
+        }
       }
     },
 
@@ -4606,29 +4676,46 @@ ${unparseable.map(ev => `
           try {
             const eff     = await window.api.resolveEffectiveArchiveRoot();
             const effRoot = eff?.path || null;
-            if (effRoot) {
-              const candCollPath  = effRoot + '/' + last.collectionName;
-              const candEventPath = candCollPath + '/' + safeName;
-              if (candCollPath !== last.collectionPath) {
-                const candValid = await window.api.verifyLastEvent(candCollPath, candEventPath);
-                if (candValid) {
-                  last                  = { ...last, collectionPath: candCollPath };
-                  resolvedCollPath      = candCollPath;
-                  resolvedEventPath     = candEventPath;
-                  rebasedToArchive      = true;
-                  console.log('[restoreLastEvent] stale path re-resolved onto active archive root:', candEventPath);
-                  // Persist the corrected archive path so future restarts use it directly.
-                  window.api.setLastEvent({
-                    collectionPath: candCollPath,
-                    collectionName: last.collectionName,
-                    eventName:      last.eventName || safeName,
-                    safeEventName:  safeName,
-                  }).catch(err => console.warn('[restoreLastEvent] setLastEvent during rebase failed:', err));
-                }
+            console.log('[restoreLastEvent] NAS candidate — root:', effRoot,
+              '| collection:', last.collectionName, '| event:', safeName);
+            if (effRoot && window.api.resolveArchiveEventPath) {
+              // Bounded, exact-name search under the active archive root. Handles both the
+              // flat <root>/<collection>/<event> layout and one intermediate (year/date)
+              // folder. A reachable NAS event MUST win over a stale local-staging copy —
+              // staging is only a last resort when no archive root has the event.
+              const res = await window.api.resolveArchiveEventPath(effRoot, last.collectionName, safeName);
+              console.log('[restoreLastEvent] NAS resolve result:', res);
+              if (res?.found && res.hasEventJson) {
+                last              = { ...last, collectionPath: res.collectionPath };
+                resolvedCollPath  = res.collectionPath;
+                resolvedEventPath = res.eventPath;
+                rebasedToArchive  = true;
+                console.log('[restoreLastEvent] resolved on active archive root (bounded search):', res.eventPath);
+                // Persist the corrected archive path so future restarts use it directly.
+                window.api.setLastEvent({
+                  collectionPath: res.collectionPath,
+                  collectionName: last.collectionName,
+                  eventName:      last.eventName || safeName,
+                  safeEventName:  safeName,
+                }).catch(err => console.warn('[restoreLastEvent] setLastEvent during rebase failed:', err));
+              } else if (res?.found && !res.hasEventJson) {
+                // Archive event FOLDER exists but event.json is absent (partial / pending sync).
+                // Adopt the archive folder: loadEventFromDisk below returns null for the
+                // json-less folder, which routes into the existing pending-sync staging
+                // fallback (badge = "pending sync", not "archive offline").
+                last              = { ...last, collectionPath: res.collectionPath };
+                resolvedCollPath  = res.collectionPath;
+                resolvedEventPath = res.eventPath;
+                rebasedToArchive  = true;
+                console.warn('[restoreLastEvent] NAS event folder found but event.json missing — pending sync:', res.eventPath);
+              } else {
+                console.warn('[restoreLastEvent] NAS event not found under archive root —',
+                  'reason:', res?.reason || 'unknown',
+                  '| collection:', last.collectionName, '| event:', safeName, '| root:', effRoot);
               }
             }
           } catch (rebaseErr) {
-            console.warn('[restoreLastEvent] archive rebase failed:', rebaseErr);
+            console.warn('[restoreLastEvent] archive resolve failed:', rebaseErr);
           }
         }
 
@@ -4651,7 +4738,8 @@ ${unparseable.map(ev => `
                 isOfflineLocalCopy    = true;
                 stagingResolved       = true;
                 _resolvedStagingRoot  = stagingRoot;
-                console.log('[restoreLastEvent] archive offline — restoring from local staging (exact):', sEventPath);
+                console.log('[restoreLastEvent]', archiveOffline ? 'archive offline' : 'NAS event not found',
+                  '— restoring from local staging (exact):', sEventPath);
               } else {
                 // Exact path check failed — scan the staging collection for a matching event folder.
                 try {
@@ -4676,7 +4764,8 @@ ${unparseable.map(ev => `
                         isOfflineLocalCopy    = true;
                         stagingResolved       = true;
                         _resolvedStagingRoot  = stagingRoot;
-                        console.log('[restoreLastEvent] archive offline — restoring from local staging (scan):', scannedEventPath);
+                        console.log('[restoreLastEvent]', archiveOffline ? 'archive offline' : 'NAS event not found',
+                          '— restoring from local staging (scan):', scannedEventPath);
                       } else {
                         console.warn('[restoreLastEvent] staging scan: event folder found but verifyLastEvent failed:', scannedEventPath);
                       }

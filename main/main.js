@@ -2008,6 +2008,60 @@ ipcMain.handle('settings:verifyLastEvent', async (_event, collectionPath, eventF
   return true;
 });
 
+// Bounded, exact-name search for an event folder under an archive root.
+// Looks for a directory named exactly `collectionName` at the root itself or one
+// intermediate level below it (e.g. a year/date folder), then for `eventFolderName`
+// inside that collection. Exact-name matching only — never fuzzy. Depth and breadth
+// are capped so this never recurses the whole NAS. Returns the resolved paths and
+// whether event.json is actually present in the event folder.
+const _RESOLVE_INTERMEDIATE_CAP = 64; // max intermediate (year/date) dirs probed
+ipcMain.handle('settings:resolveArchiveEventPath', async (_event, rootPath, collectionName, eventFolderName) => {
+  if (!rootPath || !collectionName) return { found: false, reason: 'missing-args' };
+  try {
+    const st = await fsp.stat(rootPath);
+    if (!st.isDirectory()) return { found: false, reason: 'root-not-directory' };
+  } catch {
+    return { found: false, reason: 'root-offline' };
+  }
+
+  // Candidate base dirs that may directly contain the collection folder:
+  // the root itself, plus one level of intermediate directories (year/date).
+  const candidateBases = [rootPath];
+  try {
+    const entries = await fsp.readdir(rootPath, { withFileTypes: true });
+    for (const ent of entries) {
+      if (!ent.isDirectory()) continue;
+      if (ent.name.startsWith('.') || _NAS_SKIP_DIRS.has(ent.name)) continue;
+      if (ent.name === collectionName) continue; // direct hit handled below
+      candidateBases.push(path.join(rootPath, ent.name));
+      if (candidateBases.length > _RESOLVE_INTERMEDIATE_CAP) break;
+    }
+  } catch { /* root unreadable — fall through with direct base only */ }
+
+  let collectionPath = null;
+  for (const base of candidateBases) {
+    const candidate = path.join(base, collectionName);
+    try {
+      const st = await fsp.stat(candidate);
+      if (st.isDirectory()) { collectionPath = candidate; break; }
+    } catch { /* not under this base */ }
+  }
+  if (!collectionPath) return { found: false, reason: 'collection-not-found' };
+  if (!eventFolderName) return { found: false, reason: 'no-event-name', collectionPath };
+
+  const eventPath = path.join(collectionPath, eventFolderName);
+  try {
+    const st = await fsp.stat(eventPath);
+    if (!st.isDirectory()) return { found: false, reason: 'event-not-directory', collectionPath };
+  } catch {
+    return { found: false, reason: 'event-not-found', collectionPath };
+  }
+
+  let hasEventJson = false;
+  try { hasEventJson = (await fsp.stat(path.join(eventPath, 'event.json'))).isFile(); } catch {}
+  return { found: true, collectionPath, eventPath, hasEventJson };
+});
+
 // ── Archive Operations ────────────────────────────────────────────────────────
 
 ipcMain.handle('archive:getDeviceIdentity', () => ({ deviceName: os.hostname() }));
