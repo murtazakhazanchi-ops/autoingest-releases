@@ -81,7 +81,10 @@ function _getExifTool() {
     // (-stay_open True -@ -) so the custom XMP-ajs namespace is registered
     // at startup.
     _ExifTool = new ExifTool({
-      maxProcs: 2,
+      // 4 persistent processes let metadata reads/writes overlap NAS I/O latency
+      // (each read is a network round-trip). The metadata-sync classify scan issues
+      // reads with matching bounded concurrency to keep these busy without flooding.
+      maxProcs: 4,
       taskTimeoutMillis: 30_000,
       exiftoolArgs: ['-config', EXIFTOOL_CONFIG, '-stay_open', 'True', '-@', '-'],
     });

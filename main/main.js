@@ -3365,10 +3365,10 @@ ipcMain.handle('preview:getRawPreview', async (_event, srcPath) => {
 
 // ── Metadata Sync ─────────────────────────────────────────────────────────────
 
-ipcMain.handle('metadataSync:scanPending', async (_event, masterPath) => {
+ipcMain.handle('metadataSync:scanPending', async (_event, masterPath, opts) => {
   if (!masterPath || typeof masterPath !== 'string') return [];
   const userDataPath = app.getPath('userData');
-  return metadataSyncService.scanPendingEvents(masterPath, userDataPath);
+  return metadataSyncService.scanPendingEvents(masterPath, userDataPath, opts || {});
 });
 
 ipcMain.handle('metadataSync:scanEventFolder', async (_event, eventFolderPath) => {

@@ -4430,7 +4430,9 @@ async function _msScanBackground({ force = false } = {}) {
   try {
     const masterPath = EventCreator.getActiveMaster()?.path;
     if (!masterPath) return;
-    const pending = await window.api.metadataSyncScanPending(masterPath);
+    // count-only: this background scan only needs pending.length for the card badge.
+    // Skipping changedSubfolders avoids hundreds of per-file ExifTool reads over the NAS.
+    const pending = await window.api.metadataSyncScanPending(masterPath, { countOnly: true });
     _msLastBgScanAt = Date.now();  // only update on success — failed scans don't block retry
     const valEl = document.getElementById('ovMetadataSyncVal');
     if (valEl) valEl.setAttribute('data-pending', String(pending.length));
@@ -4506,12 +4508,14 @@ async function _msScanAndRender(masterPath) {
 
   let pending = [];
   try {
-    // Race against a 30-second timeout — NAS filesystem calls have no built-in Node.js timeout
+    // Race against a 60-second timeout — NAS filesystem calls have no built-in Node.js timeout
     // and a stale/unresponsive mount will block fsp.readdir/stat indefinitely without this guard.
+    // Reads run with bounded concurrency in the main process, so large events finish well under
+    // this; the timeout only fires on a genuinely stalled mount.
     pending = await Promise.race([
       window.api.metadataSyncScanPending(masterPath),
       new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Scan timed out — check archive connection')), 30_000)
+        setTimeout(() => reject(new Error('Scan timed out — check archive connection')), 60_000)
       ),
     ]);
   } catch (err) {

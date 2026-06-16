@@ -75,6 +75,10 @@ const RAW_EXTENSIONS = ['.cr2', '.cr3', '.raw', '.nef', '.arw', '.dng', '.orf', 
 // Bridge writes keywords directly into these files (no separate sidecar).
 const EMBEDDED_EXTENSIONS = new Set(['.jpg', '.jpeg']);
 
+// Bounded concurrency for the classify-scan per-file ExifTool reads. Matches the
+// ExifTool pool size (exifService maxProcs) so reads overlap NAS I/O without queueing.
+const _CLASSIFY_CONCURRENCY = 4;
+
 function _isMetadataBearingFile(name) {
   const ext = path.extname(name).toLowerCase();
   return ext === '.xmp' || EMBEDDED_EXTENSIONS.has(ext);
@@ -652,6 +656,58 @@ async function _classifySubfolders(eventFolderPath, doc, userDataPath, lastSyncM
 
   const actionableSet = new Set();
 
+  // Per-file actionability check — pure read + in-memory compare, safe to run concurrently.
+  // Returns true when this file alone makes its subfolder actionable. Logic mirrors the
+  // previous sequential block exactly; only the iteration is parallelised below.
+  const _isFileActionable = async (filePath) => {
+    const ext        = path.extname(filePath).toLowerCase();
+    const isEmbedded = EMBEDDED_EXTENSIONS.has(ext);
+    const foundKeywords = isEmbedded
+      ? await _readKeywordsFromJpeg(filePath, diag)
+      : await _readKeywordsFromSidecar(filePath, diag);
+
+    // Fast-path: no keywords and no prior index means nothing actionable here.
+    if ((!foundKeywords || foundKeywords.length === 0) && !existingMetaDoc) return false;
+
+    let relPath;
+    if (isEmbedded) {
+      relPath = path.relative(eventFolderPath, filePath);
+    } else {
+      const rawPeer = await _findRawPeer(filePath);
+      relPath = path.relative(eventFolderPath, rawPeer);
+    }
+
+    const existingFile   = existingMetaDoc?.files?.[relPath] || {};
+    const existingExtIds = existingFile.externalKeywordIds || [];
+
+    // File is actionable when all bridge keywords were removed: stored in index but absent now.
+    if ((!foundKeywords || foundKeywords.length === 0) && existingExtIds.length > 0) return true;
+    if (!foundKeywords || foundKeywords.length === 0) return false;
+
+    const existingExtKws  = existingExtIds.map(id => existingMetaDoc?.keywords?.[id]).filter(Boolean);
+    const existingAutoIds = existingFile.autoKeywordIds || [];
+    const existingAutoKws = existingAutoIds.map(id => existingMetaDoc?.keywords?.[id]).filter(Boolean);
+
+    const existingExtLabels  = new Set(existingExtKws.map(k => (k.label || '').toLowerCase()));
+    const existingAutoLabels = new Set(existingAutoKws.map(k => (k.label || '').toLowerCase()));
+    const effectiveExistingLabels = new Set([...existingExtLabels, ...existingAutoLabels, ...eventIdentityLabelSet]);
+
+    const { externalKeywords, unknownKeywords } = _classifyKeywords(
+      foundKeywords,
+      new Set(existingAutoKws.map(k => (k.label || '').toLowerCase()))
+    );
+
+    const willAdd = externalKeywords.filter(k => !effectiveExistingLabels.has(k.label.toLowerCase()));
+
+    // Also detect partial bridge keyword removals — mirrors previewEventMetadata's removedBridgeCount check.
+    const currentFoundLabels = new Set(foundKeywords.map(k => k.toLowerCase()));
+    const removedBridgeCount = existingExtKws.filter(
+      k => !currentFoundLabels.has((k.label || '').toLowerCase())
+    ).length;
+
+    return willAdd.length > 0 || unknownKeywords.length > 0 || removedBridgeCount > 0;
+  };
+
   for (const entry of topEntries) {
     if (entry.name.startsWith('.') || !entry.isDirectory()) continue;
 
@@ -663,63 +719,18 @@ async function _classifySubfolders(eventFolderPath, doc, userDataPath, lastSyncM
       if (!hasNewer) continue;
     }
 
-    // Stage 2 — classify keyword contents; break after first actionable file
+    // Stage 2 — classify keyword contents with bounded concurrency. The subfolder is
+    // actionable if ANY file is actionable; we evaluate files in chunks and short-circuit
+    // as soon as a chunk yields a hit (reads at most _CLASSIFY_CONCURRENCY-1 extra files
+    // beyond the first actionable one — negligible vs the parallelism win over the NAS).
     const subFiles = await _scanXmpSidecars(subdir);
-    for (const filePath of subFiles) {
-      const ext        = path.extname(filePath).toLowerCase();
-      const isEmbedded = EMBEDDED_EXTENSIONS.has(ext);
-      const foundKeywords = isEmbedded
-        ? await _readKeywordsFromJpeg(filePath, diag)
-        : await _readKeywordsFromSidecar(filePath, diag);
-
-      // Fast-path: no keywords and no prior index means nothing actionable here.
-      if ((!foundKeywords || foundKeywords.length === 0) && !existingMetaDoc) continue;
-
-      let relPath;
-      if (isEmbedded) {
-        relPath = path.relative(eventFolderPath, filePath);
-      } else {
-        const rawPeer = await _findRawPeer(filePath);
-        relPath = path.relative(eventFolderPath, rawPeer);
-      }
-
-      const existingFile   = existingMetaDoc?.files?.[relPath] || {};
-      const existingExtIds = existingFile.externalKeywordIds || [];
-
-      // File is actionable when all bridge keywords were removed: stored in index but absent now.
-      if ((!foundKeywords || foundKeywords.length === 0) && existingExtIds.length > 0) {
-        actionableSet.add(entry.name);
-        break;
-      }
-
-      if (!foundKeywords || foundKeywords.length === 0) continue;
-
-      const existingExtKws  = existingExtIds.map(id => existingMetaDoc?.keywords?.[id]).filter(Boolean);
-      const existingAutoIds = existingFile.autoKeywordIds || [];
-      const existingAutoKws = existingAutoIds.map(id => existingMetaDoc?.keywords?.[id]).filter(Boolean);
-
-      const existingExtLabels  = new Set(existingExtKws.map(k => (k.label || '').toLowerCase()));
-      const existingAutoLabels = new Set(existingAutoKws.map(k => (k.label || '').toLowerCase()));
-      const effectiveExistingLabels = new Set([...existingExtLabels, ...existingAutoLabels, ...eventIdentityLabelSet]);
-
-      const { externalKeywords, unknownKeywords } = _classifyKeywords(
-        foundKeywords,
-        new Set(existingAutoKws.map(k => (k.label || '').toLowerCase()))
-      );
-
-      const willAdd = externalKeywords.filter(k => !effectiveExistingLabels.has(k.label.toLowerCase()));
-
-      // Also detect partial bridge keyword removals — mirrors previewEventMetadata's removedBridgeCount check.
-      const currentFoundLabels = new Set(foundKeywords.map(k => k.toLowerCase()));
-      const removedBridgeCount = existingExtKws.filter(
-        k => !currentFoundLabels.has((k.label || '').toLowerCase())
-      ).length;
-
-      if (willAdd.length > 0 || unknownKeywords.length > 0 || removedBridgeCount > 0) {
-        actionableSet.add(entry.name);
-        break;  // short-circuit: confirmed actionable — skip remaining files in this subfolder
-      }
+    let isActionable = false;
+    for (let i = 0; i < subFiles.length && !isActionable; i += _CLASSIFY_CONCURRENCY) {
+      const chunk   = subFiles.slice(i, i + _CLASSIFY_CONCURRENCY);
+      const results = await Promise.all(chunk.map(fp => _isFileActionable(fp)));
+      if (results.some(Boolean)) isActionable = true;
     }
+    if (isActionable) actionableSet.add(entry.name);
   }
 
   return [...actionableSet];  // top-level dir names only; '.' excluded since we skip non-directories
@@ -740,7 +751,11 @@ async function _classifySubfolders(eventFolderPath, doc, userDataPath, lastSyncM
  */
 // Per-event pending check — shared by scanPendingEvents and scanSingleEventFolder.
 // Returns a pending-event object or null (not pending / unreadable).
-async function _checkEventPending(folderName, eventFolderPath, userDataPath, diag = null) {
+// countOnly: when true, skip the expensive _classifySubfolders() file-parsing pass — pending
+// DETECTION (_hasXmpModifiedAfter) is stat-based and cheap, so the count stays accurate while
+// avoiding hundreds of per-file ExifTool reads over the NAS. Used by the background count scan,
+// which only consumes pending.length and never reads changedSubfolders.
+async function _checkEventPending(folderName, eventFolderPath, userDataPath, diag = null, countOnly = false) {
   const jsonPath = path.join(eventFolderPath, 'event.json');
   try {
     const raw = await fsp.readFile(jsonPath, 'utf8');
@@ -815,7 +830,7 @@ async function _checkEventPending(folderName, eventFolderPath, userDataPath, dia
           eventName:         doc.eventName || folderName,
           pendingReason:     'never-synced',
           lastSyncError:     null,
-          changedSubfolders: await _classifySubfolders(eventFolderPath, doc, userDataPath, 0, diag),
+          changedSubfolders: countOnly ? [] : await _classifySubfolders(eventFolderPath, doc, userDataPath, 0, diag),
         };
       }
       return null;
@@ -829,7 +844,7 @@ async function _checkEventPending(folderName, eventFolderPath, userDataPath, dia
         eventName:         doc.eventName || folderName,
         pendingReason:     'xmp-changed',
         lastSyncError:     null,
-        changedSubfolders: await _classifySubfolders(eventFolderPath, doc, userDataPath, lastSyncMs, diag),
+        changedSubfolders: countOnly ? [] : await _classifySubfolders(eventFolderPath, doc, userDataPath, lastSyncMs, diag),
       };
     }
 
@@ -839,8 +854,9 @@ async function _checkEventPending(folderName, eventFolderPath, userDataPath, dia
   }
 }
 
-async function scanPendingEvents(masterPath, userDataPath) {
+async function scanPendingEvents(masterPath, userDataPath, opts = {}) {
   if (!masterPath || typeof masterPath !== 'string') return [];
+  const countOnly = opts?.countOnly === true;
 
   let entries;
   try {
@@ -858,11 +874,11 @@ async function scanPendingEvents(masterPath, userDataPath) {
     diag.eventsChecked++;
     const folderName      = entry.name;
     const eventFolderPath = path.join(masterPath, folderName);
-    const result = await _checkEventPending(folderName, eventFolderPath, userDataPath, diag);
+    const result = await _checkEventPending(folderName, eventFolderPath, userDataPath, diag, countOnly);
     if (result) { diag.pendingEvents++; pending.push({ ...result, masterFolderName }); }
   }
 
-  log(`[metadataSyncService] collection scan: ${diag.eventsChecked} events checked, ${diag.candidateEvents} candidates, ${diag.pendingEvents} pending, ${diag.filesStatted} files statted, ${diag.filesParsed} files parsed, ${Date.now() - diag.startedAt}ms — ${masterFolderName}`);
+  log(`[metadataSyncService] collection scan${countOnly ? ' (count-only)' : ''}: ${diag.eventsChecked} events checked, ${diag.candidateEvents} candidates, ${diag.pendingEvents} pending, ${diag.filesStatted} files statted, ${diag.filesParsed} files parsed, ${Date.now() - diag.startedAt}ms — ${masterFolderName}`);
   return pending;
 }
 
