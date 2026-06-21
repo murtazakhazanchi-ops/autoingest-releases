@@ -9480,6 +9480,10 @@ async function initApp() {
   // Render the full home dashboard (context bar, primary card, insights)
   renderHome();
 
+  // Surface any transfer that is still running in the main process (e.g. after a renderer
+  // reload while a background export/import was in progress). Self-stops if nothing is active.
+  _transferMonitor.start();
+
   // Register batch listener before the initial getDrives call so no
   // in-flight batch event is missed between registration and first poll.
   window.api.onFilesBatch(applyFileBatch);
@@ -11053,6 +11057,78 @@ document.addEventListener('keydown', e => {
 })();
 
 // ────────────────────────────────────────────────────────────────────────────
+// PERSISTENT TRANSFER MONITOR
+// Keeps Transfer Export/Import status visible (status-bar pill) while their modals are
+// minimized/closed. The jobs run in the main process (transfer services own the state), so
+// minimizing never affects them — this only mirrors status and offers a reopen action.
+// Export and import modals live in separate IIFEs; each registers its reopen hook here.
+// ────────────────────────────────────────────────────────────────────────────
+const _transferMonitor = (() => {
+  let timer = null;
+  let reopenExport = null, reopenImport = null;
+  let ackExport = false, ackImport = false;  // true once the user has seen a finished result
+
+  const _pct = (s) => {
+    const done = (s.copied || 0) + (s.skipped || 0) + (s.renamed || 0);
+    return s.total > 0 ? Math.min(100, Math.round(done / s.total * 100)) : null;
+  };
+  const _errs = (s) => (s.errors?.length || s.result?.errorCount || 0);
+  function _phase(kind, s) {
+    if (s.paused)     { const p = _pct(s); return { cls: 'paused',  txt: `${kind} paused${p == null ? '' : ' — ' + p + '%'}` }; }
+    if (s.running)    { const p = _pct(s); return { cls: 'running', txt: `${kind} ${p == null ? '…' : p + '%'} · ${s.copied || 0} copied${_errs(s) ? ' · ' + _errs(s) + ' errors' : ''}` }; }
+    if (s.result?.ok) return { cls: s.result.status === 'partial' ? 'warn' : 'done', txt: `${kind} ${s.result.status === 'partial' ? 'completed with errors' : 'complete'} · ${s.copied || 0} copied` };
+    if (s.result)     return { cls: 'fail', txt: `${kind} failed` };
+    return null;
+  }
+  const _open = (id) => !!document.getElementById(id)?.classList.contains('open');
+
+  async function tick() {
+    let ex = null, im = null;
+    try { ex = await window.api.getTransferExportStatus(); } catch {}
+    try { im = await window.api.getTransferImportStatus(); } catch {}
+    const pill = document.getElementById('transferPill');
+    if (!pill) return;
+
+    // A new run clears the prior acknowledgement; viewing the result (modal open) acknowledges it.
+    if (ex?.running) ackExport = false;
+    if (im?.running) ackImport = false;
+    if (_open('transferExportModal') && ex?.result) ackExport = true;
+    if (_open('transferImportModal') && im?.result) ackImport = true;
+
+    const exActive = !!(ex && (ex.running || ex.paused));
+    const imActive = !!(im && (im.running || im.paused));
+    const exDone   = !!(ex && ex.result && !ackExport);
+    const imDone   = !!(im && im.result && !ackImport);
+
+    let show = null, reopen = null;
+    if      (exActive && !_open('transferExportModal')) { show = _phase('Export', ex); reopen = reopenExport; }
+    else if (imActive && !_open('transferImportModal')) { show = _phase('Import', im); reopen = reopenImport; }
+    else if (exDone   && !_open('transferExportModal')) { show = _phase('Export', ex); reopen = reopenExport; }
+    else if (imDone   && !_open('transferImportModal')) { show = _phase('Import', im); reopen = reopenImport; }
+
+    if (show) {
+      pill.hidden = false;
+      pill.textContent = '⤢ ' + show.txt;
+      pill.className = 'status-transfer-pill tx-pill-' + show.cls;
+      pill.onclick = () => { if (typeof reopen === 'function') reopen(); };
+    } else {
+      pill.hidden = true;
+      pill.onclick = null;
+    }
+
+    if (!(exActive || imActive || exDone || imDone)) stop();
+  }
+
+  function start() { if (!timer) { timer = setInterval(() => tick().catch(() => {}), 1500); } tick().catch(() => {}); }
+  function stop()  { if (timer) { clearInterval(timer); timer = null; } }
+  return {
+    start, stop, tick,
+    setReopenExport(fn) { reopenExport = fn; },
+    setReopenImport(fn) { reopenImport = fn; },
+  };
+})();
+
+// ────────────────────────────────────────────────────────────────────────────
 // TRANSFER EXPORT MODAL (Phase 11 — staggered batch export with pause/resume)
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -11084,6 +11160,8 @@ document.addEventListener('keydown', e => {
     pauseBtn.hidden     = phase !== 'running';
     resumeInline.hidden = phase !== 'paused';
     verifyBtn.hidden    = phase !== 'done';
+    const minBtn = _txEl('txMinimizeBtn');
+    if (minBtn) minBtn.hidden = !(phase === 'running' || phase === 'paused');
 
     // Lock tree during active operation to prevent scope drift
     const treeEl = _txEl('txScopeTree');
@@ -11110,6 +11188,16 @@ document.addEventListener('keydown', e => {
     _txStopPoll();
     _txRunning   = false;
     _txVerifying = false;
+  }
+
+  // Hide the modal without cancelling — the export job keeps running in the main process.
+  // The persistent status pill takes over progress display; reopening restores full detail.
+  function _txMinimize() {
+    _txEl('transferExportModal')?.classList.remove('open');
+    document.body.style.overflow = '';
+    _txStopPoll();         // stop the modal's own poll; the monitor updates the pill instead
+    _txRunning = false;    // modal no longer tracking — job is unaffected and continues
+    _transferMonitor.start();
   }
 
   async function _txOpen() {
@@ -11504,6 +11592,12 @@ document.addEventListener('keydown', e => {
       showMessage('Select at least one folder to export.', 4000);
       return;
     }
+    // Block a conflicting concurrent transfer (an import already moving the same drive).
+    const _imp = await window.api.getTransferImportStatus().catch(() => null);
+    if (_imp && (_imp.running || _imp.paused)) {
+      showMessage('A Transfer Import is currently running. Wait for it to finish before exporting.', 6000);
+      return;
+    }
     // backupUpdate: when this export follows a Backup Sync scan, copy missing files only —
     // changed/conflict files are left untouched (no overwrite, no _1/_2 duplicate).
     const scope = { folderPaths, eventRootPaths, purpose: _txPurpose, backupUpdate: _txScanMode };
@@ -11548,6 +11642,7 @@ document.addEventListener('keydown', e => {
     _txRunning = true;
     _txSetButtonPhase('running');
     _txStartPoll();
+    _transferMonitor.start();   // keep status visible if the user minimizes
   }
 
   // ── Resume from checkpoint ────────────────────────────────────────────────
@@ -11776,7 +11871,10 @@ document.addEventListener('keydown', e => {
     _txOpen();
   });
 
-  _txEl('txCloseBtn')?.addEventListener('click', () => { if (!_txRunning) _txClose(); });
+  // While a transfer is active, the close/Escape affordance minimizes (runs in background) —
+  // it never cancels the job. When idle, it closes normally.
+  _txEl('txCloseBtn')?.addEventListener('click', () => { if (_txRunning) _txMinimize(); else _txClose(); });
+  _txEl('txMinimizeBtn')?.addEventListener('click', _txMinimize);
   _txEl('txDoneBtn')?.addEventListener('click', _txClose);
 
   _txEl('transferExportModal')?.addEventListener('click', e => {
@@ -11785,9 +11883,12 @@ document.addEventListener('keydown', e => {
 
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && _txEl('transferExportModal')?.classList.contains('open')) {
-      if (!_txRunning) _txClose();
+      if (_txRunning) _txMinimize(); else _txClose();
     }
   });
+
+  // Register the reopen hook so the persistent pill can restore this modal.
+  _transferMonitor.setReopenExport(_txOpen);
 
   _txEl('txChooseDriveBtn')?.addEventListener('click', async () => {
     const chosen = normalizePickedPath(await window.api.chooseTransferRoot());
@@ -11864,6 +11965,8 @@ document.addEventListener('keydown', e => {
     pauseBtn.hidden     = phase !== 'running';
     resumeInline.hidden = phase !== 'paused';
     verifyBtn.hidden    = phase !== 'done';
+    const minBtn = _tiEl('tiMinimizeBtn');
+    if (minBtn) minBtn.hidden = !(phase === 'running' || phase === 'paused');
   }
 
   // ── Open / Close ─────────────────────────────────────────────────────────
@@ -11874,6 +11977,15 @@ document.addEventListener('keydown', e => {
     _tiStopPoll();
     _tiRunning   = false;
     _tiVerifying = false;
+  }
+
+  // Hide the modal without cancelling — the import job keeps running in the main process.
+  function _tiMinimize() {
+    _tiEl('transferImportModal')?.classList.remove('open');
+    document.body.style.overflow = '';
+    _tiStopPoll();
+    _tiRunning = false;
+    _transferMonitor.start();
   }
 
   async function _tiOpen() {
@@ -12039,6 +12151,12 @@ document.addEventListener('keydown', e => {
       showMessage('Select at least one collection to import.', 4000);
       return;
     }
+    // Block a conflicting concurrent transfer (an export already moving the same drive).
+    const _exp = await window.api.getTransferExportStatus().catch(() => null);
+    if (_exp && (_exp.running || _exp.paused)) {
+      showMessage('A Transfer Export is currently running. Wait for it to finish before importing.', 6000);
+      return;
+    }
 
     const importBtn  = _tiEl('tiImportBtn');
     const previewBtn = _tiEl('tiPreviewBtn');
@@ -12081,6 +12199,7 @@ document.addEventListener('keydown', e => {
     _tiRunning = true;
     _tiSetButtonPhase('running');
     _tiStartPoll();
+    _transferMonitor.start();   // keep status visible if the user minimizes
   }
 
   // ── Resume from checkpoint ────────────────────────────────────────────────
@@ -12266,7 +12385,9 @@ document.addEventListener('keydown', e => {
     _tiOpen();
   });
 
-  _tiEl('tiCloseBtn')?.addEventListener('click', () => { if (!_tiRunning) _tiClose(); });
+  // While a transfer is active, close/Escape minimizes (runs in background) — never cancels.
+  _tiEl('tiCloseBtn')?.addEventListener('click', () => { if (_tiRunning) _tiMinimize(); else _tiClose(); });
+  _tiEl('tiMinimizeBtn')?.addEventListener('click', _tiMinimize);
   _tiEl('tiDoneBtn')?.addEventListener('click', _tiClose);
 
   _tiEl('transferImportModal')?.addEventListener('click', e => {
@@ -12275,9 +12396,12 @@ document.addEventListener('keydown', e => {
 
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && _tiEl('transferImportModal')?.classList.contains('open')) {
-      if (!_tiRunning) _tiClose();
+      if (_tiRunning) _tiMinimize(); else _tiClose();
     }
   });
+
+  // Register the reopen hook so the persistent pill can restore this modal.
+  _transferMonitor.setReopenImport(_tiOpen);
 
   _tiEl('tiSelectAllBtn')?.addEventListener('click',  () => { document.querySelectorAll('.ti-coll-cb').forEach(cb => { cb.checked = true;  }); });
   _tiEl('tiSelectNoneBtn')?.addEventListener('click', () => { document.querySelectorAll('.ti-coll-cb').forEach(cb => { cb.checked = false; }); });

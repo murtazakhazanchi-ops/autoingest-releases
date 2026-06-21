@@ -2638,6 +2638,13 @@
     #statusMessage { color: var(--yellow); opacity: 1; font-weight: 500; transition: opacity 0.3s; }
     #statusMessage:empty { display: none; }
     #statusMessage.sm--clickable { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 2px; }
+    .status-transfer-pill { opacity: 1; cursor: pointer; font-weight: 500; font-size: inherit; border: 1px solid var(--border); border-radius: 999px; padding: 1px 10px; background: var(--card-bg, rgba(255,255,255,0.05)); color: var(--text); display: inline-flex; align-items: center; gap: 6px; }
+    .status-transfer-pill[hidden] { display: none; }
+    .status-transfer-pill.tx-pill-running { border-color: rgba(99,102,241,0.5); color: #6366f1; }
+    .status-transfer-pill.tx-pill-paused  { border-color: rgba(234,179,8,0.5);  color: #b8860b; }
+    .status-transfer-pill.tx-pill-done    { border-color: rgba(34,197,94,0.5);  color: #16a34a; }
+    .status-transfer-pill.tx-pill-warn    { border-color: rgba(234,179,8,0.6);  color: #b8860b; }
+    .status-transfer-pill.tx-pill-fail    { border-color: rgba(239,68,68,0.6);  color: #ef4444; }
     .status-icon-btn { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; background: none; border: none; cursor: pointer; color: var(--text-muted); opacity: 0.45; border-radius: 5px; transition: opacity 0.15s, background 0.15s; padding: 0; }
     .status-icon-btn:hover { opacity: 1; background: color-mix(in srgb, var(--border) 15%, transparent); }
     .status-icon-btn svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
@@ -7081,6 +7088,8 @@
       <span id="statusDrives">Scanning for drives…</span>
       <span id="statusFiles"></span>
       <span id="statusMessage"></span>
+      <button id="transferPill" class="status-transfer-pill" type="button" hidden
+              title="Reopen transfer details"></button>
     </div>
     <div class="status-right">
       <button id="helpBtn" class="status-icon-btn" title="Help &amp; Reference" aria-label="Help">
@@ -7734,6 +7743,7 @@
           <button type="button" class="emm-btn-primary"   id="txExportBtn"  disabled>Export</button>
           <button type="button" class="emm-btn-secondary" id="txPauseBtn"   hidden>Pause</button>
           <button type="button" class="emm-btn-secondary" id="txResumeInlineBtn" hidden>Resume</button>
+          <button type="button" class="emm-btn-secondary" id="txMinimizeBtn" hidden>Run in Background</button>
           <button type="button" class="emm-btn-secondary" id="txVerifyBtn"  hidden>Verify Checksum</button>
           <button type="button" class="emm-btn-secondary" id="txDoneBtn">Done</button>
         </div>
@@ -7827,6 +7837,7 @@
           <button type="button" class="emm-btn-primary"   id="tiImportBtn"  disabled>Import</button>
           <button type="button" class="emm-btn-secondary" id="tiPauseBtn"   hidden>Pause</button>
           <button type="button" class="emm-btn-secondary" id="tiResumeInlineBtn" hidden>Resume</button>
+          <button type="button" class="emm-btn-secondary" id="tiMinimizeBtn" hidden>Run in Background</button>
           <button type="button" class="emm-btn-secondary" id="tiVerifyBtn"  hidden>Verify Checksum</button>
           <button type="button" class="emm-btn-secondary" id="tiDoneBtn">Done</button>
         </div>
