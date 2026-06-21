@@ -11563,7 +11563,7 @@ const _transferMonitor = (() => {
     if (exportBtn) {
       const nothingNew     = (result.totals.toCopy === 0);
       exportBtn.disabled    = nothingNew;
-      exportBtn.textContent = nothingNew ? 'Nothing new to copy' : 'Update Backup';
+      exportBtn.textContent = nothingNew ? 'Up to date' : 'Update Backup';
     }
   }
 
