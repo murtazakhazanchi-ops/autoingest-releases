@@ -11607,10 +11607,35 @@ const _transferMonitor = (() => {
       + row('Conflicts / Needs Review', g.incomplete,    'tx-scan--review',  false)
       + row('Destination Only',       g.destinationOnly, 'tx-scan--dest',    false)
       + row('Errors',                 g.errors,          'tx-scan--err',     true);
-    reviewEl.innerHTML =
-      `<div class=”tx-scan-note”>Scan compares the archive with this drive — backup can continue from any AutoIngest device.</div>`
-      + `<div class=”tx-scan-note”>Changed files are review-only. Update Backup copies missing files only.</div>`
-      + (groups || '<div class=”tx-scan-empty” style=”padding:6px 2px”>All files are up to date.</div>');
+
+    // Compact summary line (Task 5)
+    const newCount     = g.newFiles?.count     || 0;
+    const sameCount    = g.existingSame?.count || 0;
+    const changedCount = g.changed?.count      || 0;
+    const summaryParts = [];
+    if (newCount > 0)     summaryParts.push(`<span class=”tx-scan-sum--new”>${newCount.toLocaleString()} file${newCount !== 1 ? 's' : ''} need backup</span>`);
+    if (sameCount > 0)    summaryParts.push(`<span class=”tx-scan-sum--same”>${sameCount.toLocaleString()} up to date</span>`);
+    if (changedCount > 0) summaryParts.push(`<span class=”tx-scan-sum--review”>${changedCount.toLocaleString()} changed — review only</span>`);
+    const summaryHtml = summaryParts.length
+      ? `<div class=”tx-scan-summary”>${summaryParts.join('<span class=”tx-scan-sum-sep”>·</span>')}</div>`
+      : '';
+
+    // Note (condensed to one line)
+    const noteHtml = `<div class=”tx-scan-note”>Update Backup copies missing files only. Changed files are not copied automatically.</div>`;
+
+    // Folder badge legend (Task 4) — explains tree badges visible after scan
+    const legendHtml = `<div class=”tx-scan-legend”>`
+      + `<span class=”tx-scan-legend-lbl”>Folder status:</span>`
+      + `<span class=”tx-scan-legend-item tx-scan-legend--ok”>✓ Up to date</span>`
+      + `<span class=”tx-scan-legend-item tx-scan-legend--partial”>Partial</span>`
+      + `<span class=”tx-scan-legend-item tx-scan-legend--review”>Needs review</span>`
+      + `<span class=”tx-scan-legend-item tx-scan-legend--new”>Not copied</span>`
+      + `</div>`;
+
+    reviewEl.innerHTML = summaryHtml
+      + noteHtml
+      + (groups || '<div class=”tx-scan-empty” style=”padding:6px 2px”>All files are up to date.</div>')
+      + legendHtml;
   }
 
   // ── Export ────────────────────────────────────────────────────────────────
