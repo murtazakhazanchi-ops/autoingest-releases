@@ -17,8 +17,9 @@
  *   - Concurrent sync to the same event is blocked (per-event lock).
  */
 
-const path = require('path');
-const fsp  = require('fs').promises;
+const path   = require('path');
+const fsp    = require('fs').promises;
+const config = require('../config/app.config');
 const { log } = require('../services/logger');
 const { readFileTags } = require('./exifService');
 const { hidePathBestEffort } = require('../services/internalFileProtection');
@@ -68,8 +69,8 @@ const _CANONICAL_ROOT = {
   misc:        'misc',
 };
 
-// ── RAW extensions for sidecar peer lookup ────────────────────────────────────
-const RAW_EXTENSIONS = ['.cr2', '.cr3', '.raw', '.nef', '.arw', '.dng', '.orf', '.rw2'];
+// ── RAW extensions for sidecar peer lookup (config is the source of truth) ───
+const RAW_EXTENSIONS = config.RAW_EXTENSIONS;
 
 // ── Embedded-metadata image extensions ───────────────────────────────────────
 // Bridge writes keywords directly into these files (no separate sidecar).

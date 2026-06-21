@@ -54,8 +54,9 @@
  * DateTimeOriginal: never written. Camera date fields are never modified.
  */
 
-const path  = require('path');
-const fsp   = require('fs').promises;
+const path   = require('path');
+const fsp    = require('fs').promises;
+const config = require('../config/app.config');
 const { log } = require('../services/logger');
 
 // Absolute path to the ExifTool config file that declares the XMP-ajs namespace.
@@ -103,10 +104,7 @@ function _resetExifTool() {
 
 // ── Extension sets ────────────────────────────────────────────────────────────
 
-const RAW_EXTENSIONS = new Set([
-  '.cr2', '.cr3', '.arw', '.nef', '.orf', '.rw2', '.raf', '.dng',
-  '.pef', '.srw', '.x3f', '.iiq', '.3fr',
-]);
+const RAW_EXTENSIONS = new Set(config.RAW_EXTENSIONS);
 
 const VIDEO_EXTENSIONS = new Set([
   '.mp4', '.mov', '.avi', '.mkv', '.mts', '.m2ts', '.wmv', '.flv',

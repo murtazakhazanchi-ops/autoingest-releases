@@ -19,7 +19,7 @@
 
 // ── Supported photo formats ───────────────────────────────────────────────────
 // Includes standard image formats + ALL major camera RAW formats.
-// COUNT: 18 extensions — DO NOT REMOVE ANY.
+// COUNT: 19 extensions — DO NOT REMOVE ANY.
 const PHOTO_EXTENSIONS = [
   '.jpg',   // JPEG
   '.jpeg',  // JPEG (alternate)
@@ -39,11 +39,12 @@ const PHOTO_EXTENSIONS = [
   '.rw2',   // Panasonic RAW
   '.pef',   // Pentax RAW
   '.x3f',   // Sigma RAW
+  '.3fr',   // Hasselblad RAW
 ];
 
 // ── RAW-only subset (used for badge styling in the UI) ────────────────────────
 // Must be a subset of PHOTO_EXTENSIONS above.
-// COUNT: 13 extensions — DO NOT REMOVE ANY.
+// COUNT: 14 extensions — DO NOT REMOVE ANY.
 const RAW_EXTENSIONS = [
   '.cr2',
   '.cr3',
@@ -58,6 +59,7 @@ const RAW_EXTENSIONS = [
   '.rw2',
   '.pef',
   '.x3f',
+  '.3fr',
 ];
 
 // ── Supported video formats ───────────────────────────────────────────────────
