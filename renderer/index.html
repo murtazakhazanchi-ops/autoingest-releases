@@ -857,7 +857,7 @@
       padding: 7px 16px; background: var(--card-hover);
       border: 1px solid var(--border-strong); border-radius: 9px;
       color: var(--text-secondary); font-size: 0.8rem; font-weight: 500;
-      font-family: inherit; cursor: pointer;
+      font-family: inherit; cursor: pointer; white-space: nowrap;
       transition: background 0.15s, color 0.15s, border-color 0.15s;
     }
     .emm-btn-secondary:hover { background: var(--accent-soft); color: var(--text-primary); border-color: var(--accent-border); }
@@ -865,7 +865,7 @@
       padding: 7px 18px; background: var(--accent);
       border: none; border-radius: 9px;
       color: #fff; font-size: 0.8rem; font-weight: 600;
-      font-family: inherit; cursor: pointer;
+      font-family: inherit; cursor: pointer; white-space: nowrap;
       transition: opacity 0.15s, transform 0.12s;
     }
     .emm-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -913,7 +913,7 @@
     /* ── Transfer Export / Import modals ── */
     #transferExportModal .emm-box,
     #transferImportModal .emm-box { width: min(580px, calc(100vw - 48px)); }
-    .tx-body { padding: 20px 24px 8px; display: flex; flex-direction: column; gap: 18px; }
+    .tx-body { padding: 20px 24px 8px; display: flex; flex-direction: column; gap: 18px; flex: 1; overflow-y: auto; min-height: 0; }
     .tx-section-label { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--subtext); margin-bottom: 2px; }
     .tx-drive-wrap { display: flex; align-items: center; gap: 8px; }
     .tx-drive-path {
@@ -7738,7 +7738,7 @@
       <div class="emm-footer">
         <div id="txFooterNote" class="sq-footer-note">Active Archive → Transfer Drive</div>
         <div class="emm-footer-right">
-          <button type="button" class="emm-btn-secondary" id="txScanBtn">Run Scan for New Data</button>
+          <button type="button" class="emm-btn-secondary" id="txScanBtn">Scan for New Data</button>
           <button type="button" class="emm-btn-secondary" id="txPreviewBtn">Preview</button>
           <button type="button" class="emm-btn-primary"   id="txExportBtn"  disabled>Export</button>
           <button type="button" class="emm-btn-secondary" id="txPauseBtn"   hidden>Pause</button>

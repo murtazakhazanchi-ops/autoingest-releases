@@ -11276,10 +11276,10 @@ const _transferMonitor = (() => {
         `<div class="tx-tree-node" data-coll="${ci}">` +
         `<div class="tx-tree-row tx-tree-row-coll">` +
         `<input type="checkbox" class="tx-cb-coll" data-ci="${ci}" checked>` +
-        `<span class="tx-tree-arrow" data-ci="${ci}">▼</span>` +
+        `<span class="tx-tree-arrow" data-ci="${ci}">▶</span>` +
         `<span class="tx-tree-name" title="${_esc(coll.path)}">${_esc(coll.name)}</span>` +
         `</div>` +
-        `<div class="tx-tree-children" data-coll-children="${ci}">`
+        `<div class="tx-tree-children tx-collapsed" data-coll-children="${ci}">`
       );
 
       coll.events.forEach((ev, ei) => {
@@ -11288,10 +11288,10 @@ const _transferMonitor = (() => {
           `<div class="tx-tree-node" data-coll="${ci}" data-ev="${ei}">` +
           `<div class="tx-tree-row tx-tree-row-ev">` +
           `<input type="checkbox" class="tx-cb-ev" data-ci="${ci}" data-ei="${ei}" checked>` +
-          `<span class="tx-tree-arrow" data-ci="${ci}" data-ei="${ei}">${hasFolders ? '▼' : ' '}</span>` +
+          `<span class="tx-tree-arrow" data-ci="${ci}" data-ei="${ei}">${hasFolders ? '▶' : ' '}</span>` +
           `<span class="tx-tree-name" title="${_esc(ev.path)}">${_esc(ev.name)}</span>` +
           `</div>` +
-          `<div class="tx-tree-children" data-ev-children="${ci}-${ei}">`
+          `<div class="tx-tree-children tx-collapsed" data-ev-children="${ci}-${ei}">`
         );
 
         ev.folders.forEach((fold, fi) => {
@@ -11559,29 +11559,33 @@ const _transferMonitor = (() => {
     const reviewEl = _txEl('txScanReview');
     if (!reviewEl) return;
     const g = result.groups;
-    const row = (label, grp, cls) => {
+    const row = (label, grp, cls, autoOpen) => {
+      if (!grp || grp.count === 0) return '';
       const items = grp.items || [];
-      const body = grp.count > 0 && items.length
-        ? `<details class="tx-scan-details"><summary>${grp.count.toLocaleString()} item${grp.count === 1 ? '' : 's'} · ${formatSize(grp.bytes)}</summary>`
-          + `<ul class="tx-scan-list">`
-          + items.map(it => `<li><span class="tx-scan-rel">${escapeHtml(it.relPath)}</span><span class="tx-scan-sz">${formatSize(it.size)}</span></li>`).join('')
-          + (grp.truncated ? `<li class="tx-scan-more">…and ${(grp.count - items.length).toLocaleString()} more</li>` : '')
+      const openAttr = autoOpen ? ' open' : '';
+      const body = items.length
+        ? `<details class=”tx-scan-details”${openAttr}><summary>${grp.count.toLocaleString()} item${grp.count === 1 ? '' : 's'} · ${formatSize(grp.bytes)}</summary>`
+          + `<ul class=”tx-scan-list”>`
+          + items.map(it => `<li><span class=”tx-scan-rel”>${escapeHtml(it.relPath)}</span><span class=”tx-scan-sz”>${formatSize(it.size)}</span></li>`).join('')
+          + (grp.truncated ? `<li class=”tx-scan-more”>…and ${(grp.count - items.length).toLocaleString()} more</li>` : '')
           + `</ul></details>`
-        : `<div class="tx-scan-empty">0 items</div>`;
-      return `<div class="tx-scan-group ${cls}">`
-        + `<div class="tx-scan-grp-hd"><span class="tx-scan-grp-lbl">${label}</span>`
-        + `<span class="tx-scan-grp-count">${grp.count.toLocaleString()}</span>`
-        + `<span class="tx-scan-grp-sz">${formatSize(grp.bytes)}</span></div>${body}</div>`;
+        : '';
+      return `<div class=”tx-scan-group ${cls}”>`
+        + `<div class=”tx-scan-grp-hd”><span class=”tx-scan-grp-lbl”>${label}</span>`
+        + `<span class=”tx-scan-grp-count”>${grp.count.toLocaleString()}</span>`
+        + `<span class=”tx-scan-grp-sz”>${formatSize(grp.bytes)}</span></div>${body}</div>`;
     };
+    const groups =
+        row('New Data',               g.newFiles,        'tx-scan--new',     g.newFiles?.count <= 5)
+      + row('Updated / Changed Data', g.changed,         'tx-scan--changed', false)
+      + row('Already Up to Date',     g.existingSame,    'tx-scan--same',    false)
+      + row('Conflicts / Needs Review', g.incomplete,    'tx-scan--review',  false)
+      + row('Destination Only',       g.destinationOnly, 'tx-scan--dest',    false)
+      + row('Errors',                 g.errors,          'tx-scan--err',     true);
     reviewEl.innerHTML =
-      `<div class="tx-scan-note">This scan compares the Archive Root with the connected external drive, so backup can continue from any AutoIngest device.</div>`
-      + `<div class="tx-scan-note">Changed files are listed for review and will not be copied automatically. “Update Backup” copies missing files only.</div>`
-      + row('New Data',               g.newFiles,        'tx-scan--new')
-      + row('Updated / Changed Data', g.changed,         'tx-scan--changed')
-      + row('Already Up to Date',     g.existingSame,    'tx-scan--same')
-      + row('Conflicts / Needs Review', g.incomplete,    'tx-scan--review')
-      + row('Destination Only',       g.destinationOnly, 'tx-scan--dest')
-      + row('Errors',                 g.errors,          'tx-scan--err');
+      `<div class=”tx-scan-note”>Scan compares the archive with this drive — backup can continue from any AutoIngest device.</div>`
+      + `<div class=”tx-scan-note”>Changed files are review-only. Update Backup copies missing files only.</div>`
+      + (groups || '<div class=”tx-scan-empty” style=”padding:6px 2px”>All files are up to date.</div>');
   }
 
   // ── Export ────────────────────────────────────────────────────────────────
