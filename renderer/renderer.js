@@ -11151,14 +11151,15 @@ const _transferMonitor = (() => {
   function _txEl(id) { return document.getElementById(id); }
 
   function _txSetButtonPhase(phase) {
-    // phase: 'idle' | 'running' | 'paused' | 'done' | 'failed'
+    // phase: 'idle' | 'scanning' | 'running' | 'paused' | 'done' | 'failed'
     const exportBtn     = _txEl('txExportBtn');
     const pauseBtn      = _txEl('txPauseBtn');
     const resumeInline  = _txEl('txResumeInlineBtn');
     const verifyBtn     = _txEl('txVerifyBtn');
     if (!exportBtn) return;
 
-    const activePhase = phase === 'running' || phase === 'paused';
+    const activePhase   = phase === 'running' || phase === 'paused';
+    const scanningPhase = phase === 'scanning';
     exportBtn.hidden    = phase !== 'idle';
     exportBtn.disabled  = phase !== 'idle';
     pauseBtn.hidden     = phase !== 'running';
@@ -11168,8 +11169,11 @@ const _transferMonitor = (() => {
     if (minBtn) minBtn.hidden = !activePhase;
     const scanBtn    = _txEl('txScanBtn');
     const previewBtn = _txEl('txPreviewBtn');
-    if (scanBtn)    scanBtn.hidden    = activePhase;
-    if (previewBtn) previewBtn.hidden = activePhase;
+    if (scanBtn) {
+      scanBtn.hidden   = activePhase || phase === 'done';
+      scanBtn.disabled = scanningPhase;
+    }
+    if (previewBtn) previewBtn.hidden = activePhase || scanningPhase || phase === 'done';
 
     // Lock tree during active operation to prevent scope drift
     const treeEl = _txEl('txScopeTree');
@@ -11521,27 +11525,33 @@ const _transferMonitor = (() => {
     }
     const scope = { folderPaths, eventRootPaths, purpose: _txPurpose };
 
-    const scanBtn   = _txEl('txScanBtn');
-    const exportBtn  = _txEl('txExportBtn');
+    const exportBtn = _txEl('txExportBtn');
     const reviewEl  = _txEl('txScanReview');
-    if (scanBtn)  scanBtn.disabled = true;
-    if (exportBtn) exportBtn.disabled = true;
+    const noteEl    = _txEl('txFooterNote');
+
+    _txSetButtonPhase('scanning');
+    if (noteEl) noteEl.textContent = 'Scanning…';
     _txEl('txPreviewBox')?.setAttribute('hidden', '');
     if (reviewEl) {
       reviewEl.removeAttribute('hidden');
-      reviewEl.innerHTML = '<div class="tx-scan-loading">Scanning archive against external drive…</div>';
+      reviewEl.innerHTML = '<div class="tx-scan-loading">'
+        + '<div class="tx-scan-loading-title">Checking backup status…</div>'
+        + '<div class="tx-scan-loading-sub">Comparing selected folders against the external drive. Nothing is being copied yet.</div>'
+        + '</div>';
     }
 
     let result;
     try { result = await window.api.scanBackupSync(scope); }
     catch (e) {
-      if (scanBtn) scanBtn.disabled = false;
+      _txSetButtonPhase('idle');
+      if (noteEl) noteEl.textContent = 'Scan failed';
       if (reviewEl) reviewEl.innerHTML = `<div class="tx-scan-err">Scan failed: ${escapeHtml(e.message)}</div>`;
       return;
     }
-    if (scanBtn) scanBtn.disabled = false;
 
     if (!result.ok) {
+      _txSetButtonPhase('idle');
+      if (noteEl) noteEl.textContent = 'Scan failed';
       const msgs = {
         'nas-not-set':               'Active Archive Root is not set.',
         'transfer-root-not-set':     'External backup drive is not set.',
@@ -11559,13 +11569,15 @@ const _transferMonitor = (() => {
     _txApplyTreeStatus();
     _txLastScope = scope;
     _txScanMode  = true;   // next export is a backup-update: copy missing only, never overwrite/duplicate
+    _txSetButtonPhase('idle');
     // "Update Backup" is enabled only after a scan, and only when there is genuinely new
     // (missing) data to copy. Changed/conflict files are review-only and are NOT copied.
+    const nothingNew = (result.totals.toCopy === 0);
     if (exportBtn) {
-      const nothingNew     = (result.totals.toCopy === 0);
       exportBtn.disabled    = nothingNew;
       exportBtn.textContent = nothingNew ? 'Up to date' : 'Update Backup';
     }
+    if (noteEl) noteEl.textContent = nothingNew ? 'Up to date' : 'Scan complete';
   }
 
   function _txRenderScanReview(result) {
@@ -11957,20 +11969,20 @@ const _transferMonitor = (() => {
     // Footer note + button phase
     const noteEl = _txEl('txFooterNote');
     if (status.paused) {
-      if (noteEl) noteEl.textContent = 'Export paused.';
+      if (noteEl) noteEl.textContent = 'Paused';
       _txSetButtonPhase('paused');
     } else if (status.running) {
-      if (noteEl) noteEl.textContent = 'Export in progress…';
+      if (noteEl) noteEl.textContent = 'Exporting…';
       _txSetButtonPhase('running');
     } else if (status.result?.ok) {
       const isPartial = status.result.status === 'partial';
-      if (noteEl) noteEl.textContent = isPartial ? 'Completed with errors.' : 'Export complete.';
+      if (noteEl) noteEl.textContent = isPartial ? 'Errors' : 'Done';
       _txSetButtonPhase(isPartial ? 'failed' : 'done');
     } else if (status.result) {
-      if (noteEl) noteEl.textContent = 'Export failed.';
+      if (noteEl) noteEl.textContent = 'Failed';
       _txSetButtonPhase('failed');
     } else {
-      if (noteEl) noteEl.textContent = 'Active Archive → Transfer Drive';
+      if (noteEl) noteEl.textContent = 'Ready';
       _txSetButtonPhase('idle');
     }
   }

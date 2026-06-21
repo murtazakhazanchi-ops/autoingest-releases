@@ -846,7 +846,7 @@
       padding: 12px 24px; border-top: 1px solid var(--border-subtle); flex-shrink: 0;
       gap: 12px;
     }
-    .emm-footer-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 6px; justify-content: flex-end; }
+    .emm-footer-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 6px; justify-content: flex-end; flex-shrink: 0; }
     .emm-btn-ghost {
       background: none; border: none; cursor: pointer; font-family: inherit;
       color: var(--text-muted); font-size: 0.8rem;
@@ -953,8 +953,10 @@
     .tx-preview-row { display: flex; gap: 16px; flex-wrap: wrap; }
     .tx-scan-review { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: var(--subtext); }
     .tx-scan-note { font-size: 11px; color: var(--subtext); background: rgba(99,102,241,0.07); border: 1px solid var(--accent-border, rgba(99,102,241,0.3)); border-radius: 6px; padding: 8px 10px; }
-    .tx-scan-loading, .tx-scan-err { padding: 10px 12px; }
-    .tx-scan-err { color: #ef4444; }
+    .tx-scan-loading { padding: 12px 14px; border-left: 3px solid var(--accent); background: rgba(99,102,241,0.06); border-radius: 0 6px 6px 0; }
+    .tx-scan-loading-title { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+    .tx-scan-loading-sub { font-size: 11px; color: var(--subtext); line-height: 1.45; }
+    .tx-scan-err { padding: 10px 12px; color: #ef4444; }
     .tx-scan-group { border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; background: var(--card-bg, rgba(255,255,255,0.03)); }
     .tx-scan-grp-hd { display: flex; align-items: baseline; gap: 10px; }
     .tx-scan-grp-lbl { font-weight: 600; color: var(--text); flex: 1; }
@@ -7753,7 +7755,7 @@
       </div>
 
       <div class="emm-footer">
-        <div id="txFooterNote" class="sq-footer-note">Active Archive → Transfer Drive</div>
+        <div id="txFooterNote" class="sq-footer-note">Ready</div>
         <div class="emm-footer-right">
           <button type="button" class="emm-btn-secondary" id="txScanBtn">Scan for New Data</button>
           <button type="button" class="emm-btn-secondary" id="txPreviewBtn">Preview</button>
