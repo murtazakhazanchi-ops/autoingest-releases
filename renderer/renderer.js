@@ -372,6 +372,14 @@ let currentFolder = null;
 let globalImportIndex = {};
 
 /**
+ * "Imports This Session" counter — number of files successfully imported during THIS app
+ * runtime. Starts at 0 every launch and is NEVER seeded from importIndex, settings, telemetry,
+ * archive totals, or any persisted source. Incremented only by showProgressSummary (the import
+ * completion handler); Transfer Export/Import never touch it.
+ */
+let _importsThisSession = 0;
+
+/**
  * PERF — tileMap: path → DOM element (div.file-tile or tr.file-tile).
  * Built once in renderFileArea(). Used for all single-tile updates.
  * Never iterate querySelectorAll for individual lookups.
@@ -2838,11 +2846,36 @@ async function openActivityLogModal(opts = {}) {
 }
 
 function _renderInsightsBar() {
-  const count = Object.keys(globalImportIndex || {}).length;
+  // "Imports This Session" = session-scoped counter (0 on fresh launch), NOT the lifetime
+  // importIndex. Always shows a real number, including 0.
   const impEl = document.getElementById('ovImportsVal');
-  if (impEl) impEl.textContent = count > 0 ? String(count) : '—';
+  if (impEl) impEl.textContent = String(_importsThisSession);
   _refreshMetadataSyncCard();
-  _msScanBackground();  // async, non-blocking — populates pending count without opening modal
+  _msScanBackground();        // async, non-blocking — pending metadata count
+  _refreshEventsThisWeek();   // async, throttled — populates "Events This Week"
+}
+
+// "Events This Week" — count of managed events created/modified in the last 7 days under the
+// effective archive root. Shows a real number (including 0) when the archive is available; "—"
+// only for true loading/unavailable/error. Throttled to avoid rescanning on every home render.
+let _ewLastAt = 0;
+let _ewBusy   = false;
+const _EW_MIN_MS = 30_000;
+async function _refreshEventsThisWeek({ force = false } = {}) {
+  if (_ewBusy) return;
+  if (!force && Date.now() - _ewLastAt < _EW_MIN_MS) return;
+  _ewBusy = true;
+  try {
+    const r  = await window.api.countEventsThisWeek();
+    const el = document.getElementById('ovEventsVal');
+    if (el) el.textContent = (r && r.ok) ? String(r.count) : '—';
+    if (r && r.ok) _ewLastAt = Date.now();  // only throttle after a successful read
+  } catch {
+    const el = document.getElementById('ovEventsVal');
+    if (el) el.textContent = '—';
+  } finally {
+    _ewBusy = false;
+  }
 }
 
 function _switchModeCard(toMode) {
@@ -3612,6 +3645,7 @@ async function _checkArchiveStatusTransition() {
   // Archive came back online — refresh sync queue and NAS events tile.
   await _refreshSyncQueueCard(false).catch(() => {});
   _refreshNasEventsCard(false).catch(() => {});
+  _refreshEventsThisWeek({ force: true }).catch(() => {});  // archive now available → refresh dashboard count
 
   // If the current event was restored from local staging while offline,
   // re-verify the archive event path now and clear the offline badge if valid.
@@ -7606,6 +7640,11 @@ function updateProgress({ total, index, completedCount, filename, status, skipRe
 }
 
 function showProgressSummary({ copied, skipped, errors, skippedReasons, failedFiles, duration, integrity, copiedFiles }, importCleanupRoot = null) {
+  // "Imports This Session": count files actually copied in this import run. This is the only
+  // place the session counter grows — Transfer Export/Import never reach here.
+  _importsThisSession += (Number(copied) || 0);
+  const _impEl = document.getElementById('ovImportsVal');
+  if (_impEl) _impEl.textContent = String(_importsThisSession);
   _postImportSucceeded = (errors === 0); // gates the post-success chooser in the Done handler
   document.getElementById('progressFilename').textContent = errors > 0 ? 'Import completed with issues.' : 'Import complete.';
   document.getElementById('sumCopied').textContent  = copied;

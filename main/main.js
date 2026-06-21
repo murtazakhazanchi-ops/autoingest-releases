@@ -2234,6 +2234,43 @@ ipcMain.handle('archive:resolveEffectiveRoot', async () => {
   return _resolveEffectiveArchiveRoot();
 });
 
+// Dashboard "Events This Week": count managed event folders (containing event.json) under the
+// effective archive root whose folder was created/modified within the last 7 days. Read-only,
+// bounded (collection → event, 2 levels). Returns { ok:false } when the archive is unavailable
+// so the dashboard can show "—" (loading/unavailable) rather than a stale number.
+ipcMain.handle('archive:countEventsThisWeek', async () => {
+  const eff  = await _resolveEffectiveArchiveRoot();
+  const root = eff?.path;
+  if (!root) return { ok: false, reason: 'no-root' };
+  let collEntries;
+  try {
+    const st = await fsp.stat(root);
+    if (!st.isDirectory()) return { ok: false, reason: 'unavailable' };
+    collEntries = await fsp.readdir(root, { withFileTypes: true });
+  } catch {
+    return { ok: false, reason: 'unavailable' };
+  }
+  const sinceMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  let count = 0;
+  for (const coll of collEntries) {
+    if (!coll.isDirectory() || coll.name.startsWith('.') || _NAS_SKIP_DIRS.has(coll.name)) continue;
+    const collPath = path.join(root, coll.name);
+    let evEntries;
+    try { evEntries = await fsp.readdir(collPath, { withFileTypes: true }); } catch { continue; }
+    for (const ev of evEntries) {
+      if (!ev.isDirectory() || ev.name.startsWith('.') || _NAS_SKIP_DIRS.has(ev.name)) continue;
+      const evPath = path.join(collPath, ev.name);
+      try { await fsp.access(path.join(evPath, 'event.json')); } catch { continue; } // managed events only
+      try {
+        const est = await fsp.stat(evPath);
+        const t   = est.birthtimeMs > 0 ? est.birthtimeMs : est.mtimeMs; // creation when available, else modified
+        if (t >= sinceMs) count++;
+      } catch { /* skip unreadable event folder */ }
+    }
+  }
+  return { ok: true, count };
+});
+
 ipcMain.handle('archive:getOperationsStatus', async () => {
   const localStagingRoot  = settings.getLocalStagingRoot();
   const defaultImportMode = settings.getDefaultImportMode();

@@ -189,6 +189,7 @@ contextBridge.exposeInMainWorld('api', {
   setLastEvent:             (v)                      => ipcRenderer.invoke('settings:setLastEvent', v),
   verifyLastEvent:          (collectionPath, eventFolderPath) => ipcRenderer.invoke('settings:verifyLastEvent', collectionPath, eventFolderPath),
   resolveArchiveEventPath:  (rootPath, collectionName, eventFolderName) => ipcRenderer.invoke('settings:resolveArchiveEventPath', rootPath, collectionName, eventFolderName),
+  countEventsThisWeek:      ()                       => ipcRenderer.invoke('archive:countEventsThisWeek'),
   getAutoMetadataEnabled:   ()                       => ipcRenderer.invoke('settings:getAutoMetadataEnabled'),
   setAutoMetadataEnabled:   (v)                      => ipcRenderer.invoke('settings:setAutoMetadataEnabled', v),
 
