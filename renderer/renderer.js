@@ -11026,6 +11026,7 @@ document.addEventListener('keydown', e => {
   let _txLastScope    = null;
   let _txVerifying    = false;
   let _txPurpose      = 'archive-transfer';
+  let _txScanMode     = false;   // true after a Backup Sync scan → "Update Backup" copies missing only (no _1 duplicates)
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -11075,6 +11076,7 @@ document.addEventListener('keydown', e => {
   async function _txOpen() {
     const overlay = _txEl('transferExportModal');
     if (!overlay || overlay.classList.contains('open')) return;
+    _txScanMode = false;  // clean flag on every open — never carry a stale backup-update mode
 
     const savedRoot = await window.api.getTransferRoot().catch(() => null);
     const driveEl   = _txEl('txDrivePath');
@@ -11271,6 +11273,7 @@ document.addEventListener('keydown', e => {
   function _txInvalidatePreview() {
     // Changing selection resets preview/export state
     _txLastScope = null;
+    _txScanMode  = false;
     const exportBtn = _txEl('txExportBtn');
     if (exportBtn && !_txRunning) {
       exportBtn.disabled = true;
@@ -11278,6 +11281,7 @@ document.addEventListener('keydown', e => {
     }
     _txEl('txPreviewBox')?.setAttribute('hidden', '');
     _txEl('txVerifyResult')?.setAttribute('hidden', '');
+    _txEl('txScanReview')?.setAttribute('hidden', '');
   }
 
   function _txBuildScope() {
@@ -11311,6 +11315,8 @@ document.addEventListener('keydown', e => {
       showMessage('Select at least one folder to preview.', 4000);
       return;
     }
+    _txScanMode = false;  // normal export preview — not a backup-update
+    _txEl('txScanReview')?.setAttribute('hidden', '');
     const scope = { folderPaths, eventRootPaths, purpose: _txPurpose };
 
     const previewBtn = _txEl('txPreviewBtn');
@@ -11367,6 +11373,90 @@ document.addEventListener('keydown', e => {
     if (exportBtn) exportBtn.disabled = (result.files === 0);
   }
 
+  // ── Backup Sync Scan (read-only pre-copy diff vs connected external drive) ──
+
+  async function _txScanBackup() {
+    const { folderPaths, eventRootPaths } = _txBuildScope();
+    if (folderPaths.length === 0 && eventRootPaths.length === 0) {
+      showMessage('Select at least one folder to scan.', 4000);
+      return;
+    }
+    const scope = { folderPaths, eventRootPaths, purpose: _txPurpose };
+
+    const scanBtn   = _txEl('txScanBtn');
+    const exportBtn  = _txEl('txExportBtn');
+    const reviewEl  = _txEl('txScanReview');
+    if (scanBtn)  scanBtn.disabled = true;
+    if (exportBtn) exportBtn.disabled = true;
+    _txEl('txPreviewBox')?.setAttribute('hidden', '');
+    if (reviewEl) {
+      reviewEl.removeAttribute('hidden');
+      reviewEl.innerHTML = '<div class="tx-scan-loading">Scanning archive against external drive…</div>';
+    }
+
+    let result;
+    try { result = await window.api.scanBackupSync(scope); }
+    catch (e) {
+      if (scanBtn) scanBtn.disabled = false;
+      if (reviewEl) reviewEl.innerHTML = `<div class="tx-scan-err">Scan failed: ${escapeHtml(e.message)}</div>`;
+      return;
+    }
+    if (scanBtn) scanBtn.disabled = false;
+
+    if (!result.ok) {
+      const msgs = {
+        'nas-not-set':               'Active Archive Root is not set.',
+        'transfer-root-not-set':     'External backup drive is not set.',
+        'transfer-root-unavailable': 'External backup drive is not connected.',
+        'transfer-root-not-directory':'External backup path is not a folder.',
+        'roots-overlap':             'Archive and backup roots overlap.',
+        'empty-scope':               'Select at least one folder to scan.',
+      };
+      if (reviewEl) reviewEl.innerHTML = `<div class="tx-scan-err">${escapeHtml(msgs[result.reason] || ('Scan error: ' + result.reason))}</div>`;
+      return;
+    }
+
+    _txRenderScanReview(result);
+    _txLastScope = scope;
+    _txScanMode  = true;   // next export is a backup-update: copy missing only, never overwrite/duplicate
+    // "Update Backup" is enabled only after a scan, and only when there is genuinely new
+    // (missing) data to copy. Changed/conflict files are review-only and are NOT copied.
+    if (exportBtn) {
+      const nothingNew     = (result.totals.toCopy === 0);
+      exportBtn.disabled    = nothingNew;
+      exportBtn.textContent = nothingNew ? 'Nothing new to copy' : 'Update Backup';
+    }
+  }
+
+  function _txRenderScanReview(result) {
+    const reviewEl = _txEl('txScanReview');
+    if (!reviewEl) return;
+    const g = result.groups;
+    const row = (label, grp, cls) => {
+      const items = grp.items || [];
+      const body = grp.count > 0 && items.length
+        ? `<details class="tx-scan-details"><summary>${grp.count.toLocaleString()} item${grp.count === 1 ? '' : 's'} · ${formatSize(grp.bytes)}</summary>`
+          + `<ul class="tx-scan-list">`
+          + items.map(it => `<li><span class="tx-scan-rel">${escapeHtml(it.relPath)}</span><span class="tx-scan-sz">${formatSize(it.size)}</span></li>`).join('')
+          + (grp.truncated ? `<li class="tx-scan-more">…and ${(grp.count - items.length).toLocaleString()} more</li>` : '')
+          + `</ul></details>`
+        : `<div class="tx-scan-empty">0 items</div>`;
+      return `<div class="tx-scan-group ${cls}">`
+        + `<div class="tx-scan-grp-hd"><span class="tx-scan-grp-lbl">${label}</span>`
+        + `<span class="tx-scan-grp-count">${grp.count.toLocaleString()}</span>`
+        + `<span class="tx-scan-grp-sz">${formatSize(grp.bytes)}</span></div>${body}</div>`;
+    };
+    reviewEl.innerHTML =
+      `<div class="tx-scan-note">This scan compares the Archive Root with the connected external drive, so backup can continue from any AutoIngest device.</div>`
+      + `<div class="tx-scan-note">Changed files are listed for review and will not be copied automatically. “Update Backup” copies missing files only.</div>`
+      + row('New Data',               g.newFiles,        'tx-scan--new')
+      + row('Updated / Changed Data', g.changed,         'tx-scan--changed')
+      + row('Already Up to Date',     g.existingSame,    'tx-scan--same')
+      + row('Conflicts / Needs Review', g.incomplete,    'tx-scan--review')
+      + row('Destination Only',       g.destinationOnly, 'tx-scan--dest')
+      + row('Errors',                 g.errors,          'tx-scan--err');
+  }
+
   // ── Export ────────────────────────────────────────────────────────────────
 
   async function _txStartExport() {
@@ -11375,7 +11465,9 @@ document.addEventListener('keydown', e => {
       showMessage('Select at least one folder to export.', 4000);
       return;
     }
-    const scope = { folderPaths, eventRootPaths, purpose: _txPurpose };
+    // backupUpdate: when this export follows a Backup Sync scan, copy missing files only —
+    // changed/conflict files are left untouched (no overwrite, no _1/_2 duplicate).
+    const scope = { folderPaths, eventRootPaths, purpose: _txPurpose, backupUpdate: _txScanMode };
 
     const exportBtn  = _txEl('txExportBtn');
     const previewBtn = _txEl('txPreviewBtn');
@@ -11604,6 +11696,13 @@ document.addEventListener('keydown', e => {
     _txEl('txStCopied').textContent  = status.copied  ?? 0;
     _txEl('txStSkipped').textContent = status.skipped ?? 0;
     _txEl('txStRenamed').textContent = status.renamed ?? 0;
+    // Backup-update: changed/conflict files left for review (not copied) — reported separately.
+    const changedSkipped = status.changedSkipped ?? 0;
+    const chWrap = _txEl('txStChangedWrap');
+    if (chWrap) {
+      _txEl('txStChanged').textContent = changedSkipped;
+      chWrap.style.display = changedSkipped > 0 ? '' : 'none';
+    }
     _txEl('txStErrors').textContent  = status.result?.errorCount ?? status.errors?.length ?? 0;
 
     // Current file
@@ -11661,6 +11760,8 @@ document.addEventListener('keydown', e => {
     _txEl('txResumeOffer')?.setAttribute('hidden', '');
     _txEl('txExportBtn').disabled = true;
     _txLastScope = null;
+    _txScanMode  = false;
+    _txEl('txScanReview')?.setAttribute('hidden', '');
   });
 
   _txEl('txSelectAllBtn')?.addEventListener('click', () => {
@@ -11683,6 +11784,7 @@ document.addEventListener('keydown', e => {
     }
   });
 
+  _txEl('txScanBtn')?.addEventListener('click',         _txScanBackup);
   _txEl('txPreviewBtn')?.addEventListener('click',      _txPreview);
   _txEl('txExportBtn')?.addEventListener('click',       _txStartExport);
   _txEl('txPauseBtn')?.addEventListener('click',        _txPause);

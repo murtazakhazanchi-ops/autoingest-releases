@@ -3554,6 +3554,17 @@ ipcMain.handle('archive:previewTransferExport', async (_event, { scope } = {}) =
   return transferExportService.previewExport(nasRoot, transferRoot, scope);
 });
 
+// Read-only pre-copy backup sync scan: classify source vs external-drive backup by
+// relative path (new / existing-same / changed / incomplete / destination-only / error).
+// Filesystem comparison is the source of truth — works across devices, no userData dependency.
+ipcMain.handle('archive:scanBackupSync', async (_event, { scope } = {}) => {
+  const nasRoot      = settings.getNasRoot();
+  const transferRoot = settings.getTransferRoot();
+  if (!nasRoot)      return { ok: false, reason: 'nas-not-set' };
+  if (!transferRoot) return { ok: false, reason: 'transfer-root-not-set' };
+  return transferExportService.scanBackupSync(nasRoot, transferRoot, scope);
+});
+
 ipcMain.handle('archive:runTransferExport', async (_event, { scope, operatorName } = {}) => {
   const nasRoot      = settings.getNasRoot();
   const transferRoot = settings.getTransferRoot();

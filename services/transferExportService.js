@@ -51,6 +51,7 @@ let _state = {
   copied:        0,
   skipped:       0,
   renamed:       0,
+  changedSkipped: 0,
   errors:        [],
   total:         0,
   result:        null,
@@ -103,7 +104,7 @@ async function _findSafeConflictPath(destPath) {
   return `${base}_${Date.now()}${ext}`;
 }
 
-async function _copyFileSafe(srcPath, destPath, stats) {
+async function _copyFileSafe(srcPath, destPath, stats, opts = {}) {
   let srcStat;
   try { srcStat = await fsp.stat(srcPath); } catch (e) {
     throw new Error(`stat source: ${e.message}`);
@@ -119,6 +120,14 @@ async function _copyFileSafe(srcPath, destPath, stats) {
     if (destStat.size === srcStat.size) {
       stats.skipped++;
       return 'skipped';
+    }
+    // Backup-update mode (Backup Sync Check): NEVER overwrite and NEVER create _1/_2
+    // duplicates. A same-path / different-size file is left untouched and surfaced by the
+    // scan as "Changed / Needs Review" — only genuinely missing files are copied.
+    if (opts.backupUpdate) {
+      stats.skipped++;
+      if (typeof stats.changedSkipped === 'number') stats.changedSkipped++;
+      return 'skipped-changed';
     }
     finalDest = await _findSafeConflictPath(destPath);
     outcome = 'renamed';
@@ -175,7 +184,7 @@ async function _walkAndCopy(srcDir, destDir, stats, opts = {}) {
       _state.current = entry.name;
 
       try {
-        await _copyFileSafe(srcPath, destPath, stats);
+        await _copyFileSafe(srcPath, destPath, stats, opts);
       } catch (e) {
         stats.errors.push({ file: srcPath, error: e.message });
       }
@@ -335,8 +344,8 @@ function _fileHash(filePath) {
 
 async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
   const startedAt = new Date().toISOString();
-  const { collectionPaths = [], folderPaths = null, eventRootPaths = null, purpose = 'archive-transfer' } = scope || {};
-  const copyOpts = { skipControlFiles: purpose === 'external-sharing' };
+  const { collectionPaths = [], folderPaths = null, eventRootPaths = null, purpose = 'archive-transfer', backupUpdate = false } = scope || {};
+  const copyOpts = { skipControlFiles: purpose === 'external-sharing', backupUpdate: !!backupUpdate };
 
   try {
     await _initTransferMeta(transferRoot, meta.deviceName);
@@ -439,6 +448,7 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
     folderPaths:     folderPaths     || null,
     eventRootPaths:  eventRootPaths  || null,
     exportPurpose:   purpose,
+    backupUpdate,
     createdAt:       startedAt,
     status:          'running',
     batches,
@@ -454,6 +464,7 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
     copied:  _state.copied,
     skipped: _state.skipped,
     renamed: _state.renamed,
+    changedSkipped: _state.changedSkipped || 0,
     errors:  [..._state.errors],
   };
 
@@ -492,6 +503,7 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
       folderPaths:     folderPaths    || null,
       eventRootPaths:  eventRootPaths || null,
       exportPurpose:   purpose,
+      backupUpdate,
       createdAt:       startedAt,
       status:          _state.paused ? 'paused' : 'running',
       batches,
@@ -515,6 +527,7 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
     folderPaths:    folderPaths    || null,
     eventRootPaths: eventRootPaths || null,
     exportPurpose:  purpose,
+    backupUpdate,
     createdAt:      startedAt,
     completedAt,
     status:         'complete',
@@ -548,6 +561,7 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
   _state.copied  = stats.copied;
   _state.skipped = stats.skipped;
   _state.renamed = stats.renamed;
+  _state.changedSkipped = stats.changedSkipped;
   _state.errors  = [...stats.errors];
   _state.result  = {
     ok:         true,
@@ -555,6 +569,7 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
     copied:     stats.copied,
     skipped:    stats.skipped,
     renamed:    stats.renamed,
+    changedSkipped: stats.changedSkipped,
     errorCount: stats.errors.length,
     startedAt,
     completedAt,
@@ -700,7 +715,7 @@ async function runExport(nasRoot, transferRoot, scope, meta = {}) {
   _state = {
     running: true, paused: false, batchId,
     batchIndex: 0, batchCount: 0, batchName: '',
-    current: '', copied: 0, skipped: 0, renamed: 0, errors: [],
+    current: '', copied: 0, skipped: 0, renamed: 0, changedSkipped: 0, errors: [],
     total: 0, result: null,
     verifyStatus: null, verifyTotal: 0, verifyDone: 0,
     verifyFailed: 0, verifyMissing: 0, verifyCurrent: '', verifyResult: null,
@@ -739,6 +754,7 @@ async function resumeExportFromCheckpoint(nasRoot, transferRoot, meta = {}) {
     copied:        checkpoint.totalCopied  || 0,
     skipped:       checkpoint.totalSkipped || 0,
     renamed:       checkpoint.totalRenamed || 0,
+    changedSkipped: 0,
     errors:        [],
     total:         checkpoint.totalFiles   || 0,
     result:        null,
@@ -753,6 +769,7 @@ async function resumeExportFromCheckpoint(nasRoot, transferRoot, meta = {}) {
       folderPaths:     checkpoint.folderPaths     || null,
       eventRootPaths:  checkpoint.eventRootPaths  || null,
       purpose:         checkpoint.exportPurpose   || 'archive-transfer',
+      backupUpdate:    checkpoint.backupUpdate    || false,
     },
     { ...meta, batchId, deviceName },
     checkpoint.batches
@@ -896,6 +913,162 @@ async function verifyExport(nasRoot, transferRoot, scope) {
   return verifyResult;
 }
 
+// ── Backup Sync Scan (read-only pre-copy diff) ──────────────────────────────────
+// Compares the selected source scope against the connected external backup root by
+// relative path, classifying each file WITHOUT copying anything. Filesystem comparison
+// is the source of truth (no local userData dependency) — so a backup started on one
+// device can be scanned/continued from another. Classification mirrors _copyFileSafe:
+//   dest missing            → 'new'
+//   dest present, same size → 'existing-same'
+//   dest present, diff size → 'changed'   (Update Backup will safe-rename, never overwrite)
+//   dest *.autoingest-tx-tmp → 'incomplete' (a copy that did not finish)
+//   dest file with no source → 'destination-only' (display only — never deleted)
+//   stat/readdir failure     → 'error'
+// Size is the primary check; mtime is advisory only.
+const SCAN_ITEM_CAP = 500; // per-group item cap for the IPC payload (counts/bytes stay exact)
+
+// Resolve a scope object into walk units, mirroring _doExport's batch resolution exactly
+// so the scan matches what runExport (Update Backup) will actually copy.
+async function _resolveScanUnits(nasRoot, transferRoot, scope) {
+  const { collectionPaths = [], folderPaths = null, eventRootPaths = null } = scope || {};
+  const units = [];
+  if ((folderPaths && folderPaths.length > 0) || (eventRootPaths && eventRootPaths.length > 0)) {
+    for (const ep of (eventRootPaths || [])) {
+      const rel = path.relative(nasRoot, ep);
+      units.push({ srcDir: ep, destDir: path.join(transferRoot, rel), rootFilesOnly: true });
+    }
+    for (const fp of (folderPaths || [])) {
+      const rel = path.relative(nasRoot, fp);
+      units.push({ srcDir: fp, destDir: path.join(transferRoot, rel), rootFilesOnly: false });
+    }
+  } else {
+    for (const collPath of collectionPaths) {
+      const collName = path.basename(collPath);
+      let collEntries;
+      try { collEntries = await fsp.readdir(collPath, { withFileTypes: true }); } catch { continue; }
+      for (const entry of collEntries) {
+        if (!entry.isDirectory() || _skipDir(entry.name)) continue;
+        units.push({
+          srcDir:  path.join(collPath, entry.name),
+          destDir: path.join(transferRoot, collName, entry.name),
+          rootFilesOnly: false,
+        });
+      }
+    }
+  }
+  return units;
+}
+
+async function scanBackupSync(nasRoot, transferRoot, scope) {
+  if (!nasRoot || !transferRoot) return { ok: false, reason: 'missing-roots' };
+  if (_isInsideDir(nasRoot, transferRoot) || _isInsideDir(transferRoot, nasRoot) || nasRoot === transferRoot) {
+    return { ok: false, reason: 'roots-overlap' };
+  }
+  try {
+    const st = await fsp.stat(transferRoot);
+    if (!st.isDirectory()) return { ok: false, reason: 'transfer-root-not-directory' };
+  } catch {
+    return { ok: false, reason: 'transfer-root-unavailable' };
+  }
+
+  const groups = {
+    newFiles:        { count: 0, bytes: 0, items: [], truncated: false },
+    changed:         { count: 0, bytes: 0, items: [], truncated: false },
+    existingSame:    { count: 0, bytes: 0, items: [], truncated: false },
+    incomplete:      { count: 0, bytes: 0, items: [], truncated: false },
+    destinationOnly: { count: 0, bytes: 0, items: [], truncated: false },
+    errors:          { count: 0, bytes: 0, items: [], truncated: false },
+  };
+  const add = (g, relPath, size, extra = {}) => {
+    g.count++; g.bytes += (size || 0);
+    if (g.items.length < SCAN_ITEM_CAP) g.items.push({ relPath, size: size || 0, ...extra });
+    else g.truncated = true;
+  };
+
+  // Match _doExport: external-sharing exports exclude control files (event.json, etc.),
+  // so the scan must exclude them too or it would over-count what the export will copy.
+  const skipControlFiles = !!(scope && scope.purpose === 'external-sharing');
+
+  // Source side: classify every source file as new / existing-same / changed / error.
+  async function scanSource(srcDir, destDir, rootFilesOnly) {
+    let entries;
+    try { entries = await fsp.readdir(srcDir, { withFileTypes: true }); }
+    catch (e) { add(groups.errors, path.relative(nasRoot, srcDir), 0, { error: `readdir source: ${e.message}` }); return; }
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        if (_skipDir(entry.name) || rootFilesOnly) continue;
+        await scanSource(path.join(srcDir, entry.name), path.join(destDir, entry.name), false);
+      } else if (entry.isFile()) {
+        if (_skipFile(entry.name)) continue;
+        if (skipControlFiles && _skipControlFile(entry.name)) continue;
+        const srcPath  = path.join(srcDir, entry.name);
+        const destPath = path.join(destDir, entry.name);
+        const rel      = path.relative(nasRoot, srcPath);
+        const ext      = path.extname(entry.name).toLowerCase();
+        let srcStat;
+        try { srcStat = await fsp.stat(srcPath); }
+        catch (e) { add(groups.errors, rel, 0, { error: `stat source: ${e.message}` }); continue; }
+        let destStat = null;
+        try { destStat = await fsp.stat(destPath); } catch {}
+        const meta = { ext, mtimeMs: Math.round(srcStat.mtimeMs) };
+        if (!destStat)                              add(groups.newFiles,     rel, srcStat.size, meta);
+        else if (destStat.size === srcStat.size)    add(groups.existingSame, rel, srcStat.size, meta);
+        else                                        add(groups.changed,      rel, srcStat.size, { ...meta, destSize: destStat.size });
+      }
+    }
+  }
+
+  // Destination side: find destination-only files and incomplete (.autoingest-tx-tmp) partials.
+  async function scanDest(srcDir, destDir, rootFilesOnly) {
+    let entries;
+    try { entries = await fsp.readdir(destDir, { withFileTypes: true }); } catch { return; } // dest may not exist yet
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        if (_skipDir(entry.name) || rootFilesOnly) continue;
+        await scanDest(path.join(srcDir, entry.name), path.join(destDir, entry.name), false);
+      } else if (entry.isFile()) {
+        if (entry.name.startsWith('._') || entry.name === '.DS_Store') continue;
+        if (skipControlFiles && _skipControlFile(entry.name)) continue;
+        const destPath = path.join(destDir, entry.name);
+        const rel      = path.relative(transferRoot, destPath);
+        let destStat = null;
+        try { destStat = await fsp.stat(destPath); } catch {}
+        const size = destStat ? destStat.size : 0;
+        if (entry.name.endsWith(TX_TMP_SUFFIX)) { add(groups.incomplete, rel, size, { ext: path.extname(entry.name).toLowerCase() }); continue; }
+        if (entry.name.endsWith('.autoingest-sync-tmp')) continue;
+        // Destination-only: a clean dest file whose source counterpart does not exist.
+        const srcPath = path.join(srcDir, entry.name);
+        let hasSrc = false;
+        try { await fsp.access(srcPath); hasSrc = true; } catch {}
+        if (!hasSrc) add(groups.destinationOnly, rel, size, { ext: path.extname(entry.name).toLowerCase() });
+      }
+    }
+  }
+
+  let units;
+  try { units = await _resolveScanUnits(nasRoot, transferRoot, scope); }
+  catch (e) { return { ok: false, reason: 'scope-resolution-failed', error: e.message }; }
+  if (!units.length) return { ok: false, reason: 'empty-scope' };
+
+  for (const u of units) {
+    await scanSource(u.srcDir, u.destDir, u.rootFilesOnly);
+    await scanDest(u.srcDir, u.destDir, u.rootFilesOnly);
+  }
+
+  const totals = {
+    files:   groups.newFiles.count + groups.changed.count + groups.existingSame.count,
+    toCopy:  groups.newFiles.count,            // Update Backup copies missing files only; changed are skipped (review-only, never copied/renamed)
+    bytesToCopy: groups.newFiles.bytes,
+    upToDate: groups.existingSame.count,
+    changed:  groups.changed.count,
+    incomplete: groups.incomplete.count,
+    destinationOnly: groups.destinationOnly.count,
+    errors: groups.errors.count,
+  };
+
+  return { ok: true, nasRoot, transferRoot, scope, groups, totals, scannedAt: new Date().toISOString() };
+}
+
 module.exports = {
   scanExportTree,
   previewExport,
@@ -907,4 +1080,5 @@ module.exports = {
   getExportCheckpoint,
   clearExportCheckpoint,
   verifyExport,
+  scanBackupSync,
 };

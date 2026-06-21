@@ -246,6 +246,7 @@ contextBridge.exposeInMainWorld('api', {
   getTransferExportTree:                 ()                        => ipcRenderer.invoke('archive:getTransferExportTree'),
   validateTransferRoot:                  (v)                       => ipcRenderer.invoke('archive:validateTransferRoot', v),
   previewTransferExport:                 (scope)                   => ipcRenderer.invoke('archive:previewTransferExport',              { scope }),
+  scanBackupSync:                        (scope)                   => ipcRenderer.invoke('archive:scanBackupSync',                     { scope }),
   runTransferExport:                     (scope, operatorName)     => ipcRenderer.invoke('archive:runTransferExport',                  { scope, operatorName }),
   getTransferExportStatus:               ()                        => ipcRenderer.invoke('archive:getTransferExportStatus'),
   pauseTransferExport:                   ()                        => ipcRenderer.invoke('archive:pauseTransferExport'),

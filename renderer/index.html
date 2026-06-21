@@ -945,6 +945,26 @@
     .tx-tree-children.tx-collapsed { display: none; }
     .tx-preview-box { background: var(--card-bg, rgba(255,255,255,0.03)); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; font-size: 12px; color: var(--subtext); }
     .tx-preview-row { display: flex; gap: 16px; flex-wrap: wrap; }
+    .tx-scan-review { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: var(--subtext); }
+    .tx-scan-note { font-size: 11px; color: var(--subtext); background: rgba(99,102,241,0.07); border: 1px solid var(--accent-border, rgba(99,102,241,0.3)); border-radius: 6px; padding: 8px 10px; }
+    .tx-scan-loading, .tx-scan-err { padding: 10px 12px; }
+    .tx-scan-err { color: #ef4444; }
+    .tx-scan-group { border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; background: var(--card-bg, rgba(255,255,255,0.03)); }
+    .tx-scan-grp-hd { display: flex; align-items: baseline; gap: 10px; }
+    .tx-scan-grp-lbl { font-weight: 600; color: var(--text); flex: 1; }
+    .tx-scan-grp-count { font-weight: 700; color: var(--text); }
+    .tx-scan-grp-sz { color: var(--subtext); min-width: 64px; text-align: right; }
+    .tx-scan-group.tx-scan--new   .tx-scan-grp-count { color: #22c55e; }
+    .tx-scan-group.tx-scan--review .tx-scan-grp-count,
+    .tx-scan-group.tx-scan--err   .tx-scan-grp-count { color: #ef4444; }
+    .tx-scan-details { margin-top: 6px; }
+    .tx-scan-details > summary { cursor: pointer; color: var(--subtext); }
+    .tx-scan-list { list-style: none; margin: 6px 0 0; padding: 0; max-height: 180px; overflow: auto; }
+    .tx-scan-list li { display: flex; gap: 10px; padding: 2px 0; border-top: 1px solid var(--border); }
+    .tx-scan-rel { flex: 1; word-break: break-all; color: var(--text); }
+    .tx-scan-sz { color: var(--subtext); white-space: nowrap; }
+    .tx-scan-more { color: var(--subtext); font-style: italic; }
+    .tx-scan-empty { color: var(--subtext); margin-top: 4px; }
     .tx-preview-stat { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
     .tx-preview-val { font-size: 18px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
     .tx-preview-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--subtext); }
@@ -7674,6 +7694,9 @@
           <div class="tx-pv-note" id="txPvNote" hidden></div>
         </div>
 
+        <!-- Backup Sync Scan review (grouped diff vs connected external drive) -->
+        <div id="txScanReview" class="tx-scan-review" hidden></div>
+
         <!-- Resume offer (shown when incomplete checkpoint detected) -->
         <div id="txResumeOffer" class="tx-resume-offer" hidden>
           <span class="tx-resume-msg" id="txResumeMsg">A previous export was interrupted.</span>
@@ -7694,6 +7717,7 @@
             <span><span class="tx-status-key">Copied</span> <span class="tx-status-val" id="txStCopied">0</span></span>
             <span><span class="tx-status-key">Skipped</span> <span class="tx-status-val" id="txStSkipped">0</span></span>
             <span><span class="tx-status-key">Renamed</span> <span class="tx-status-val" id="txStRenamed">0</span></span>
+            <span id="txStChangedWrap" style="display:none"><span class="tx-status-key">Changed (review)</span> <span class="tx-status-val" id="txStChanged">0</span></span>
             <span><span class="tx-status-key">Errors</span> <span class="tx-status-val" id="txStErrors">0</span></span>
           </div>
           <div class="tx-status-current" id="txStCurrent"></div>
@@ -7705,6 +7729,7 @@
       <div class="emm-footer">
         <div id="txFooterNote" class="sq-footer-note">Active Archive → Transfer Drive</div>
         <div class="emm-footer-right">
+          <button type="button" class="emm-btn-secondary" id="txScanBtn">Run Scan for New Data</button>
           <button type="button" class="emm-btn-secondary" id="txPreviewBtn">Preview</button>
           <button type="button" class="emm-btn-primary"   id="txExportBtn"  disabled>Export</button>
           <button type="button" class="emm-btn-secondary" id="txPauseBtn"   hidden>Pause</button>
