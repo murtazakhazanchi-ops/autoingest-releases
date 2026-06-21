@@ -11143,6 +11143,7 @@ const _transferMonitor = (() => {
   let _txPurpose      = 'archive-transfer';
   let _txScanMode     = false;   // true after a Backup Sync scan → "Update Backup" copies missing only (no _1 duplicates)
   let _txEtaSamples   = [];      // rolling window: [{ts, done}] for ETA calculation
+  let _txSpeedSamples = [];      // rolling window: [{ts, bytes}] for speed calculation
   let _txScanResult   = null;    // last successful scanBackupSync result; null when invalidated
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -11790,7 +11791,8 @@ const _transferMonitor = (() => {
 
   function _txStartPoll() {
     _txStopPoll();
-    _txEtaSamples = [];
+    _txEtaSamples   = [];
+    _txSpeedSamples = [];
     _txPollTimer = setInterval(async () => {
       const status = await window.api.getTransferExportStatus().catch(() => null);
       if (!status) return;
@@ -11923,6 +11925,35 @@ const _transferMonitor = (() => {
       }
     }
 
+    // Speed (rolling 30-second window, byte-based)
+    const speedEl = _txEl('txStatusSpeed');
+    if (speedEl) {
+      if (status.running && !status.paused) {
+        const bytes = status.copiedBytes || 0;
+        const now   = Date.now();
+        _txSpeedSamples.push({ ts: now, bytes });
+        const cutoff = now - 30000;
+        _txSpeedSamples = _txSpeedSamples.filter(s => s.ts >= cutoff);
+        let speedText = 'Speed: Estimating…';
+        if (_txSpeedSamples.length >= 2) {
+          const oldest     = _txSpeedSamples[0];
+          const elapsed    = (now - oldest.ts) / 1000;
+          const bytesDelta = bytes - oldest.bytes;
+          if (bytesDelta > 0 && elapsed > 0) {
+            speedText = 'Speed: ' + _txFormatSpeed(bytesDelta / elapsed / (1024 * 1024));
+          }
+        }
+        speedEl.textContent = speedText;
+        speedEl.removeAttribute('hidden');
+      } else if (status.paused) {
+        speedEl.textContent = 'Speed: Paused';
+        speedEl.removeAttribute('hidden');
+      } else {
+        speedEl.setAttribute('hidden', '');
+        speedEl.textContent = '';
+      }
+    }
+
     // Footer note + button phase
     const noteEl = _txEl('txFooterNote');
     if (status.paused) {
@@ -12052,6 +12083,12 @@ const _transferMonitor = (() => {
     return h + ' hr ' + m + ' min';
   }
 
+  function _txFormatSpeed(mbps) {
+    if (mbps < 10)   return mbps.toFixed(1) + ' MB/s';
+    if (mbps < 1000) return Math.round(mbps) + ' MB/s';
+    return (mbps / 1024).toFixed(1) + ' GB/s';
+  }
+
   // ── Event listeners ───────────────────────────────────────────────────────
 
   document.getElementById('alocTransferExportBtn')?.addEventListener('click', () => {
@@ -12136,7 +12173,9 @@ const _transferMonitor = (() => {
   let _tiPollTimer   = null;
   let _tiRunning     = false;
   let _tiLastScope   = null;
-  let _tiVerifying   = false;
+  let _tiVerifying    = false;
+  let _tiEtaSamples   = [];
+  let _tiSpeedSamples = [];
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -12485,6 +12524,8 @@ const _transferMonitor = (() => {
 
   function _tiStartPoll() {
     _tiStopPoll();
+    _tiEtaSamples   = [];
+    _tiSpeedSamples = [];
     _tiPollTimer = setInterval(async () => {
       const status = await window.api.getTransferImportStatus().catch(() => null);
       if (!status) return;
@@ -12547,6 +12588,69 @@ const _transferMonitor = (() => {
     const currEl = _tiEl('tiStCurrent');
     if (currEl) currEl.textContent = (status.running || status.paused) ? (status.current || '…') : '';
 
+    // ETA (rolling 30-second window, file-count based)
+    const tiEtaEl = _tiEl('tiStatusEta');
+    if (tiEtaEl) {
+      if (status.running && !status.paused && status.total > 0) {
+        const done = (status.copied || 0) + (status.skipped || 0) + (status.renamed || 0);
+        const now  = Date.now();
+        _tiEtaSamples.push({ ts: now, done });
+        const cutoff = now - 30000;
+        _tiEtaSamples = _tiEtaSamples.filter(s => s.ts >= cutoff);
+        let etaText = 'Estimated remaining: Estimating…';
+        if (_tiEtaSamples.length >= 2) {
+          const oldest = _tiEtaSamples[0];
+          const elapsed = (now - oldest.ts) / 1000;
+          const filesProcessed = done - oldest.done;
+          if (filesProcessed > 0 && elapsed > 0) {
+            const remaining = status.total - done;
+            const secLeft = Math.round((remaining / filesProcessed) * elapsed);
+            etaText = 'Estimated remaining: ' + _tiFormatEta(secLeft);
+          }
+        }
+        tiEtaEl.textContent = etaText;
+        tiEtaEl.removeAttribute('hidden');
+      } else if (status.paused) {
+        tiEtaEl.textContent = 'Estimated remaining: Paused';
+        tiEtaEl.removeAttribute('hidden');
+      } else if (status.result) {
+        tiEtaEl.textContent = status.result.ok && status.result.status !== 'partial' ? 'Estimated remaining: Complete' : '';
+        if (tiEtaEl.textContent) tiEtaEl.removeAttribute('hidden'); else tiEtaEl.setAttribute('hidden', '');
+      } else {
+        tiEtaEl.setAttribute('hidden', '');
+        tiEtaEl.textContent = '';
+      }
+    }
+
+    // Speed (rolling 30-second window, byte-based)
+    const tiSpeedEl = _tiEl('tiStatusSpeed');
+    if (tiSpeedEl) {
+      if (status.running && !status.paused) {
+        const bytes = status.copiedBytes || 0;
+        const now   = Date.now();
+        _tiSpeedSamples.push({ ts: now, bytes });
+        const cutoff = now - 30000;
+        _tiSpeedSamples = _tiSpeedSamples.filter(s => s.ts >= cutoff);
+        let speedText = 'Speed: Estimating…';
+        if (_tiSpeedSamples.length >= 2) {
+          const oldest     = _tiSpeedSamples[0];
+          const elapsed    = (now - oldest.ts) / 1000;
+          const bytesDelta = bytes - oldest.bytes;
+          if (bytesDelta > 0 && elapsed > 0) {
+            speedText = 'Speed: ' + _tiFormatSpeed(bytesDelta / elapsed / (1024 * 1024));
+          }
+        }
+        tiSpeedEl.textContent = speedText;
+        tiSpeedEl.removeAttribute('hidden');
+      } else if (status.paused) {
+        tiSpeedEl.textContent = 'Speed: Paused';
+        tiSpeedEl.removeAttribute('hidden');
+      } else {
+        tiSpeedEl.setAttribute('hidden', '');
+        tiSpeedEl.textContent = '';
+      }
+    }
+
     // Footer note + button phase
     const noteEl = _tiEl('tiFooterNote');
     if (status.paused) {
@@ -12566,6 +12670,20 @@ const _transferMonitor = (() => {
       if (noteEl) noteEl.textContent = 'Transfer Drive → Main Archive Root';
       _tiSetButtonPhase('idle');
     }
+  }
+
+  function _tiFormatEta(sec) {
+    if (sec < 60) return '< 1 min';
+    const h = Math.floor(sec / 3600);
+    const m = Math.round((sec % 3600) / 60);
+    if (h === 0) return m + ' min';
+    return h + ' hr ' + m + ' min';
+  }
+
+  function _tiFormatSpeed(mbps) {
+    if (mbps < 10)   return mbps.toFixed(1) + ' MB/s';
+    if (mbps < 1000) return Math.round(mbps) + ' MB/s';
+    return (mbps / 1024).toFixed(1) + ' GB/s';
   }
 
   // ── Event listeners ───────────────────────────────────────────────────────

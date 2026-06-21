@@ -48,6 +48,7 @@ let _state = {
   copied:       0,
   skipped:      0,
   renamed:      0,
+  copiedBytes:  0,
   errors:       [],
   total:        0,
   result:       null,
@@ -127,6 +128,7 @@ async function _copyFileSafe(srcPath, destPath, stats) {
     }
     await fsp.rename(tmpPath, finalDest);
     if (outcome === 'renamed') stats.renamed++; else stats.copied++;
+    stats.copiedBytes = (stats.copiedBytes || 0) + srcStat.size;
   } catch (e) {
     await fsp.unlink(tmpPath).catch(() => {});
     throw e;
@@ -167,10 +169,11 @@ async function _walkAndCopy(srcDir, destDir, stats) {
         stats.errors.push({ file: srcPath, error: e.message });
       }
 
-      _state.copied  = stats.copied;
-      _state.skipped = stats.skipped;
-      _state.renamed = stats.renamed;
-      _state.errors  = [...stats.errors];
+      _state.copied      = stats.copied;
+      _state.skipped     = stats.skipped;
+      _state.renamed     = stats.renamed;
+      _state.errors      = [...stats.errors];
+      _state.copiedBytes = stats.copiedBytes || 0;
     }
   }
 }
@@ -299,6 +302,7 @@ async function _doImport(transferRoot, mainArchiveRoot, collectionPaths, meta, r
     copied:  _state.copied,
     skipped: _state.skipped,
     renamed: _state.renamed,
+    copiedBytes: 0,
     errors:  [..._state.errors],
   };
 
