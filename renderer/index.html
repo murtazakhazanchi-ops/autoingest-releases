@@ -977,6 +977,7 @@
     .tx-status-key { font-weight: 600; color: var(--subtext); }
     .tx-status-val { color: var(--text); }
     .tx-status-current { color: var(--subtext); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+    .tx-status-file { margin-top: 1px; }
     .tx-empty-note { font-size: 12px; color: var(--subtext); font-style: italic; padding: 4px 0; }
     .tx-batch-info { font-size: 11px; color: var(--subtext); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .tx-progress-wrap { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
@@ -7736,7 +7737,8 @@
             <span id="txStChangedWrap" style="display:none"><span class="tx-status-key">Changed (review)</span> <span class="tx-status-val" id="txStChanged">0</span></span>
             <span><span class="tx-status-key">Errors</span> <span class="tx-status-val" id="txStErrors">0</span></span>
           </div>
-          <div class="tx-status-current" id="txStCurrent"></div>
+          <div class="tx-status-current" id="txStFolder"></div>
+          <div class="tx-status-current tx-status-file" id="txStFile"></div>
           <div class="tx-status-eta" id="txStatusEta" hidden></div>
           <div class="tx-verify-result" id="txVerifyResult" hidden></div>
         </div>

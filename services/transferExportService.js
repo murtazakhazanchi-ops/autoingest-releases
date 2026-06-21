@@ -48,6 +48,7 @@ let _state = {
   batchCount:    0,
   batchName:     '',
   current:       '',
+  currentDir:    '',
   copied:        0,
   skipped:       0,
   renamed:       0,
@@ -181,7 +182,8 @@ async function _walkAndCopy(srcDir, destDir, stats, opts = {}) {
 
       const srcPath  = path.join(srcDir, entry.name);
       const destPath = path.join(destDir, entry.name);
-      _state.current = entry.name;
+      _state.current    = entry.name;
+      _state.currentDir = srcDir;
 
       try {
         await _copyFileSafe(srcPath, destPath, stats, opts);
@@ -715,7 +717,7 @@ async function runExport(nasRoot, transferRoot, scope, meta = {}) {
   _state = {
     running: true, paused: false, batchId,
     batchIndex: 0, batchCount: 0, batchName: '',
-    current: '', copied: 0, skipped: 0, renamed: 0, changedSkipped: 0, errors: [],
+    current: '', currentDir: '', copied: 0, skipped: 0, renamed: 0, changedSkipped: 0, errors: [],
     total: 0, result: null,
     verifyStatus: null, verifyTotal: 0, verifyDone: 0,
     verifyFailed: 0, verifyMissing: 0, verifyCurrent: '', verifyResult: null,
@@ -751,6 +753,7 @@ async function resumeExportFromCheckpoint(nasRoot, transferRoot, meta = {}) {
     batchCount:    checkpoint.batches.length,
     batchName:     '',
     current:       '',
+    currentDir:    '',
     copied:        checkpoint.totalCopied  || 0,
     skipped:       checkpoint.totalSkipped || 0,
     renamed:       checkpoint.totalRenamed || 0,

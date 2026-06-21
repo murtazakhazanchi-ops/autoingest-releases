@@ -11850,9 +11850,20 @@ const _transferMonitor = (() => {
     }
     _txEl('txStErrors').textContent  = status.result?.errorCount ?? status.errors?.length ?? 0;
 
-    // Current file
-    const currEl = _txEl('txStCurrent');
-    if (currEl) currEl.textContent = (status.running || status.paused) ? (status.current || '…') : '';
+    // Current folder + file
+    const active = status.running || status.paused;
+    const folderEl = _txEl('txStFolder');
+    const fileEl   = _txEl('txStFile');
+    if (folderEl && fileEl) {
+      if (active) {
+        const { folderLabel, fileLabel } = _txSplitCurrentPath(status.currentDir, status.current);
+        folderEl.textContent = 'Folder: ' + folderLabel;
+        fileEl.textContent   = 'File: '   + fileLabel;
+      } else {
+        folderEl.textContent = '';
+        fileEl.textContent   = '';
+      }
+    }
 
     // Status headline
     const headlineEl = _txEl('txStatusHeadline');
@@ -11925,6 +11936,19 @@ const _transferMonitor = (() => {
       if (noteEl) noteEl.textContent = 'Active Archive → Transfer Drive';
       _txSetButtonPhase('idle');
     }
+  }
+
+  function _txSplitCurrentPath(currentDir, current) {
+    const fileName = current || '';
+    if (!currentDir) return { folderLabel: fileName ? 'Preparing…' : '…', fileLabel: fileName || 'Waiting…' };
+    // Normalise separators, then take last 3 meaningful segments
+    const parts = currentDir.replace(/\\/g, '/').split('/').filter(Boolean);
+    // Drop leading volume/root noise: /Volumes/DriveName or drive letters
+    let start = 0;
+    if (parts[0] === 'Volumes' && parts.length > 1) start = 2;
+    const useful = parts.slice(start);
+    const label  = useful.slice(-3).join(' / ') || useful.join(' / ') || currentDir;
+    return { folderLabel: label, fileLabel: fileName || 'Waiting…' };
   }
 
   function _txFormatEta(sec) {
