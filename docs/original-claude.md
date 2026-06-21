@@ -71,16 +71,16 @@ electron-app-v24/
 Full lists that must always be preserved:
 
 ```js
-PHOTO_EXTENSIONS (18 — DO NOT REMOVE ANY):
+PHOTO_EXTENSIONS (19 — DO NOT REMOVE ANY):
   '.jpg', '.jpeg', '.png', '.tiff', '.tif',
   '.cr2', '.cr3', '.nef', '.nrw', '.arw',
   '.sr2', '.srf', '.dng', '.raf', '.orf',
-  '.rw2', '.pef', '.x3f'
+  '.rw2', '.pef', '.x3f', '.3fr'
 
-RAW_EXTENSIONS (13 — DO NOT REMOVE ANY):
+RAW_EXTENSIONS (14 — DO NOT REMOVE ANY):
   '.cr2', '.cr3', '.nef', '.nrw', '.arw',
   '.sr2', '.srf', '.dng', '.raf', '.orf',
-  '.rw2', '.pef', '.x3f'
+  '.rw2', '.pef', '.x3f', '.3fr'
 
 VIDEO_EXTENSIONS (2):
   '.mp4', '.mov'
