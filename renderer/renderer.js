@@ -11142,6 +11142,7 @@ const _transferMonitor = (() => {
   let _txVerifying    = false;
   let _txPurpose      = 'archive-transfer';
   let _txScanMode     = false;   // true after a Backup Sync scan → "Update Backup" copies missing only (no _1 duplicates)
+  let _txEtaSamples   = [];      // rolling window: [{ts, done}] for ETA calculation
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -11155,13 +11156,18 @@ const _transferMonitor = (() => {
     const verifyBtn     = _txEl('txVerifyBtn');
     if (!exportBtn) return;
 
+    const activePhase = phase === 'running' || phase === 'paused';
     exportBtn.hidden    = phase !== 'idle';
     exportBtn.disabled  = phase !== 'idle';
     pauseBtn.hidden     = phase !== 'running';
     resumeInline.hidden = phase !== 'paused';
     verifyBtn.hidden    = phase !== 'done';
     const minBtn = _txEl('txMinimizeBtn');
-    if (minBtn) minBtn.hidden = !(phase === 'running' || phase === 'paused');
+    if (minBtn) minBtn.hidden = !activePhase;
+    const scanBtn    = _txEl('txScanBtn');
+    const previewBtn = _txEl('txPreviewBtn');
+    if (scanBtn)    scanBtn.hidden    = activePhase;
+    if (previewBtn) previewBtn.hidden = activePhase;
 
     // Lock tree during active operation to prevent scope drift
     const treeEl = _txEl('txScopeTree');
@@ -11778,6 +11784,7 @@ const _transferMonitor = (() => {
 
   function _txStartPoll() {
     _txStopPoll();
+    _txEtaSamples = [];
     _txPollTimer = setInterval(async () => {
       const status = await window.api.getTransferExportStatus().catch(() => null);
       if (!status) return;
@@ -11847,6 +11854,58 @@ const _transferMonitor = (() => {
     const currEl = _txEl('txStCurrent');
     if (currEl) currEl.textContent = (status.running || status.paused) ? (status.current || '…') : '';
 
+    // Status headline
+    const headlineEl = _txEl('txStatusHeadline');
+    if (headlineEl) {
+      if (status.paused) {
+        headlineEl.textContent = 'Export paused';
+      } else if (status.running) {
+        headlineEl.textContent = 'Export in progress — Copying files';
+      } else if (status.result?.ok) {
+        const isPartial = status.result.status === 'partial';
+        headlineEl.textContent = isPartial ? 'Export completed with errors' : 'Export complete';
+      } else if (status.result) {
+        headlineEl.textContent = 'Export failed';
+      } else {
+        headlineEl.textContent = '';
+      }
+    }
+
+    // ETA (rolling 30-second window, file-count based)
+    const etaEl = _txEl('txStatusEta');
+    if (etaEl) {
+      if (status.running && !status.paused && status.total > 0) {
+        const done = (status.copied || 0) + (status.skipped || 0) + (status.renamed || 0);
+        const now  = Date.now();
+        _txEtaSamples.push({ ts: now, done });
+        // keep only samples from the last 30 seconds
+        const cutoff = now - 30000;
+        _txEtaSamples = _txEtaSamples.filter(s => s.ts >= cutoff);
+        let etaText = 'Estimating…';
+        if (_txEtaSamples.length >= 2) {
+          const oldest = _txEtaSamples[0];
+          const elapsed = (now - oldest.ts) / 1000;
+          const filesProcessed = done - oldest.done;
+          if (filesProcessed > 0 && elapsed > 0) {
+            const remaining = status.total - done;
+            const secLeft = Math.round((remaining / filesProcessed) * elapsed);
+            etaText = 'Estimated remaining: ' + _txFormatEta(secLeft);
+          }
+        }
+        etaEl.textContent = etaText;
+        etaEl.removeAttribute('hidden');
+      } else if (status.paused) {
+        etaEl.textContent = 'Estimated remaining: Paused';
+        etaEl.removeAttribute('hidden');
+      } else if (status.result) {
+        etaEl.textContent = status.result.ok && status.result.status !== 'partial' ? 'Estimated remaining: Complete' : '';
+        if (etaEl.textContent) etaEl.removeAttribute('hidden'); else etaEl.setAttribute('hidden', '');
+      } else {
+        etaEl.setAttribute('hidden', '');
+        etaEl.textContent = '';
+      }
+    }
+
     // Footer note + button phase
     const noteEl = _txEl('txFooterNote');
     if (status.paused) {
@@ -11866,6 +11925,14 @@ const _transferMonitor = (() => {
       if (noteEl) noteEl.textContent = 'Active Archive → Transfer Drive';
       _txSetButtonPhase('idle');
     }
+  }
+
+  function _txFormatEta(sec) {
+    if (sec < 60) return '< 1 min';
+    const h = Math.floor(sec / 3600);
+    const m = Math.round((sec % 3600) / 60);
+    if (h === 0) return m + ' min';
+    return h + ' hr ' + m + ' min';
   }
 
   // ── Event listeners ───────────────────────────────────────────────────────

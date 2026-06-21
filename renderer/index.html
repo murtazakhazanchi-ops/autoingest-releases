@@ -989,6 +989,12 @@
     .tx-verify-result { font-size: 11px; margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(128,128,128,0.15); color: var(--subtext); white-space: pre-line; }
     .tx-verify-result.ok { color: #16a34a; }
     .tx-verify-result.fail { color: #dc2626; }
+    .tx-status-headline { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+    .tx-status-box.tx-running .tx-status-headline { color: var(--accent, #6366f1); }
+    .tx-status-box.tx-paused  .tx-status-headline { color: #b45309; }
+    .tx-status-box.tx-done    .tx-status-headline { color: #16a34a; }
+    .tx-status-box.tx-error   .tx-status-headline { color: #dc2626; }
+    .tx-status-eta { font-size: 11px; color: var(--subtext); margin-top: 3px; }
     .tx-resume-offer { background: rgba(234,179,8,0.08); border: 1px solid rgba(234,179,8,0.3); border-radius: 6px; padding: 10px 14px; margin-bottom: 8px; font-size: 12px; }
     .tx-resume-msg { color: var(--text); }
     .tx-resume-actions { display: flex; gap: 8px; margin-top: 8px; }
@@ -7717,6 +7723,7 @@
 
         <!-- Status -->
         <div id="txStatusBox" class="tx-status-box tx-idle" hidden>
+          <div class="tx-status-headline" id="txStatusHeadline"></div>
           <div class="tx-batch-info" id="txBatchInfo"></div>
           <div class="tx-progress-wrap" id="txProgressWrap" hidden>
             <div class="tx-progress-bar"><div class="tx-progress-fill" id="txProgressFill"></div></div>
@@ -7730,6 +7737,7 @@
             <span><span class="tx-status-key">Errors</span> <span class="tx-status-val" id="txStErrors">0</span></span>
           </div>
           <div class="tx-status-current" id="txStCurrent"></div>
+          <div class="tx-status-eta" id="txStatusEta" hidden></div>
           <div class="tx-verify-result" id="txVerifyResult" hidden></div>
         </div>
 
