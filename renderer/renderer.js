@@ -11143,6 +11143,7 @@ const _transferMonitor = (() => {
   let _txPurpose      = 'archive-transfer';
   let _txScanMode     = false;   // true after a Backup Sync scan → "Update Backup" copies missing only (no _1 duplicates)
   let _txEtaSamples   = [];      // rolling window: [{ts, done}] for ETA calculation
+  let _txScanResult   = null;    // last successful scanBackupSync result; null when invalidated
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -11209,7 +11210,8 @@ const _transferMonitor = (() => {
   async function _txOpen() {
     const overlay = _txEl('transferExportModal');
     if (!overlay || overlay.classList.contains('open')) return;
-    _txScanMode = false;  // clean flag on every open — never carry a stale backup-update mode
+    _txScanMode   = false;  // clean flag on every open — never carry a stale backup-update mode
+    _txScanResult = null;
 
     const savedRoot = await window.api.getTransferRoot().catch(() => null);
     const driveEl   = _txEl('txDrivePath');
@@ -11405,8 +11407,10 @@ const _transferMonitor = (() => {
 
   function _txInvalidatePreview() {
     // Changing selection resets preview/export state
-    _txLastScope = null;
-    _txScanMode  = false;
+    _txLastScope  = null;
+    _txScanMode   = false;
+    _txScanResult = null;
+    _txClearTreeStatus();
     const exportBtn = _txEl('txExportBtn');
     if (exportBtn && !_txRunning) {
       exportBtn.disabled = true;
@@ -11550,6 +11554,8 @@ const _transferMonitor = (() => {
     }
 
     _txRenderScanReview(result);
+    _txScanResult = result;
+    _txApplyTreeStatus();
     _txLastScope = scope;
     _txScanMode  = true;   // next export is a backup-update: copy missing only, never overwrite/duplicate
     // "Update Backup" is enabled only after a scan, and only when there is genuinely new
@@ -11938,6 +11944,93 @@ const _transferMonitor = (() => {
     }
   }
 
+  // ── Tree status badges (read-only; populated from scan result) ───────────────
+
+  function _txClearTreeStatus() {
+    _txEl('txScopeTree')?.querySelectorAll('.tx-tree-status').forEach(el => el.remove());
+  }
+
+  function _txNodeStatus(fst) {
+    if (!fst) return 'unknown';
+    if (fst.changed > 0)              return 'review';
+    if (fst.new > 0 && fst.same > 0)  return 'partial';
+    if (fst.new > 0)                   return 'not-copied';
+    if (fst.same > 0)                  return 'up-to-date';
+    return 'unknown';
+  }
+
+  function _txAggregateStatus(statuses) {
+    const known = statuses.filter(s => s !== 'unknown');
+    if (!known.length) return 'unknown';
+    if (known.includes('review'))      return 'review';
+    if (known.includes('partial'))     return 'partial';
+    const hasNew  = known.includes('not-copied');
+    const hasSame = known.includes('up-to-date');
+    if (hasNew && hasSame) return 'partial';
+    if (hasNew)  return 'not-copied';
+    if (hasSame) return 'up-to-date';
+    return 'unknown';
+  }
+
+  function _txSetTreeBadge(rowEl, status) {
+    let badge = rowEl.querySelector('.tx-tree-status');
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'tx-tree-status';
+      rowEl.appendChild(badge);
+    }
+    badge.dataset.status = status;
+    const labels = { 'up-to-date': '✓', 'partial': 'Partial', 'review': 'Needs review', 'not-copied': 'Not copied' };
+    const label = labels[status] || '';
+    badge.textContent = label;
+    badge.hidden = !label;
+  }
+
+  function _txApplyTreeStatus() {
+    if (!_txScanResult || !_txTree.length) return;
+    const { folderStats, nasRoot } = _txScanResult;
+    if (!folderStats || !nasRoot) return;
+
+    const treeEl = _txEl('txScopeTree');
+    if (!treeEl) return;
+
+    const sep   = nasRoot.endsWith('/') ? nasRoot : nasRoot + '/';
+    const relOf = fp => fp.startsWith(sep) ? fp.slice(sep.length) : fp;
+
+    _txTree.forEach((coll, ci) => {
+      const evStatuses = [];
+
+      coll.events.forEach((ev, ei) => {
+        const leafStatuses = [];
+
+        ev.folders.forEach((fold, fi) => {
+          const foldKey    = relOf(fold.path);
+          const foldStatus = _txNodeStatus(folderStats[foldKey]);
+          leafStatuses.push(foldStatus);
+          const cb    = treeEl.querySelector(`input.tx-cb-fold[data-ci="${ci}"][data-ei="${ei}"][data-fi="${fi}"]`);
+          const rowEl = cb?.closest('.tx-tree-row');
+          if (rowEl) _txSetTreeBadge(rowEl, foldStatus);
+        });
+
+        // Event root files are a separate scan unit keyed by the event folder itself
+        const evKey        = relOf(ev.path);
+        const evRootStatus = _txNodeStatus(folderStats[evKey]);
+        if (evRootStatus !== 'unknown') leafStatuses.push(evRootStatus);
+
+        const evStatus = _txAggregateStatus(leafStatuses.length ? leafStatuses : ['unknown']);
+        evStatuses.push(evStatus);
+        const evCb    = treeEl.querySelector(`input.tx-cb-ev[data-ci="${ci}"][data-ei="${ei}"]`);
+        const evRowEl = evCb?.closest('.tx-tree-row');
+        if (evRowEl) _txSetTreeBadge(evRowEl, evStatus);
+      });
+
+      const collStatus = _txAggregateStatus(evStatuses.length ? evStatuses : ['unknown']);
+      const collCb     = treeEl.querySelector(`input.tx-cb-coll[data-ci="${ci}"]`);
+      const collRowEl  = collCb?.closest('.tx-tree-row');
+      if (collRowEl) _txSetTreeBadge(collRowEl, collStatus);
+    });
+  }
+
   function _txSplitCurrentPath(currentDir, current) {
     const fileName = current || '';
     if (!currentDir) return { folderLabel: fileName ? 'Preparing…' : '…', fileLabel: fileName || 'Waiting…' };
@@ -11994,8 +12087,10 @@ const _transferMonitor = (() => {
     _txEl('txStatusBox')?.setAttribute('hidden', '');
     _txEl('txResumeOffer')?.setAttribute('hidden', '');
     _txEl('txExportBtn').disabled = true;
-    _txLastScope = null;
-    _txScanMode  = false;
+    _txLastScope    = null;
+    _txScanMode     = false;
+    _txScanResult   = null;
+    _txClearTreeStatus();
     _txEl('txScanReview')?.setAttribute('hidden', '');
   });
 

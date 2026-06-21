@@ -937,7 +937,12 @@
     .tx-tree-row:hover { background: var(--card-hover); }
     .tx-tree-row input[type=checkbox] { width: 14px; height: 14px; flex-shrink: 0; cursor: pointer; accent-color: var(--accent); }
     .tx-tree-arrow { width: 12px; flex-shrink: 0; font-size: 9px; color: var(--subtext); cursor: pointer; user-select: none; text-align: center; }
-    .tx-tree-name { font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; cursor: pointer; }
+    .tx-tree-name { font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; cursor: pointer; }
+    .tx-tree-status { font-size: 10px; flex-shrink: 0; margin-left: 6px; white-space: nowrap; }
+    .tx-tree-status[data-status="up-to-date"] { color: #16a34a; }
+    .tx-tree-status[data-status="partial"]    { color: #b45309; }
+    .tx-tree-status[data-status="review"]     { color: #b45309; font-weight: 600; }
+    .tx-tree-status[data-status="not-copied"] { color: var(--subtext); }
     .tx-tree-name.tx-tree-event-root { color: var(--subtext); font-style: italic; }
     .tx-tree-row-coll { padding-left: 2px; }
     .tx-tree-row-ev   { padding-left: 18px; }

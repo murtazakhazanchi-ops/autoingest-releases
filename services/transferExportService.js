@@ -988,6 +988,9 @@ async function scanBackupSync(nasRoot, transferRoot, scope) {
     else g.truncated = true;
   };
 
+  // Per-folder file counts (no item cap — used for tree status badges in renderer).
+  const folderStats = {};  // relFolderPath → {new, same, changed}
+
   // Match _doExport: external-sharing exports exclude control files (event.json, etc.),
   // so the scan must exclude them too or it would over-count what the export will copy.
   const skipControlFiles = !!(scope && scope.purpose === 'external-sharing');
@@ -997,6 +1000,9 @@ async function scanBackupSync(nasRoot, transferRoot, scope) {
     let entries;
     try { entries = await fsp.readdir(srcDir, { withFileTypes: true }); }
     catch (e) { add(groups.errors, path.relative(nasRoot, srcDir), 0, { error: `readdir source: ${e.message}` }); return; }
+    const relDir = path.relative(nasRoot, srcDir).replace(/\\/g, '/') || '.';
+    if (!folderStats[relDir]) folderStats[relDir] = { new: 0, same: 0, changed: 0 };
+    const fst = folderStats[relDir];
     for (const entry of entries) {
       if (entry.isDirectory()) {
         if (_skipDir(entry.name) || rootFilesOnly) continue;
@@ -1014,9 +1020,9 @@ async function scanBackupSync(nasRoot, transferRoot, scope) {
         let destStat = null;
         try { destStat = await fsp.stat(destPath); } catch {}
         const meta = { ext, mtimeMs: Math.round(srcStat.mtimeMs) };
-        if (!destStat)                              add(groups.newFiles,     rel, srcStat.size, meta);
-        else if (destStat.size === srcStat.size)    add(groups.existingSame, rel, srcStat.size, meta);
-        else                                        add(groups.changed,      rel, srcStat.size, { ...meta, destSize: destStat.size });
+        if (!destStat)                              { add(groups.newFiles,     rel, srcStat.size, meta);                              fst.new++; }
+        else if (destStat.size === srcStat.size)    { add(groups.existingSame, rel, srcStat.size, meta);                              fst.same++; }
+        else                                        { add(groups.changed,      rel, srcStat.size, { ...meta, destSize: destStat.size }); fst.changed++; }
       }
     }
   }
@@ -1069,7 +1075,7 @@ async function scanBackupSync(nasRoot, transferRoot, scope) {
     errors: groups.errors.count,
   };
 
-  return { ok: true, nasRoot, transferRoot, scope, groups, totals, scannedAt: new Date().toISOString() };
+  return { ok: true, nasRoot, transferRoot, scope, groups, totals, folderStats, scannedAt: new Date().toISOString() };
 }
 
 module.exports = {
