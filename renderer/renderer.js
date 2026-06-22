@@ -7752,9 +7752,13 @@ function showProgressSummary({ copied, skipped, errors, skippedReasons, failedFi
   if (window._DEBUG_SOURCE_CLEANUP) {
     console.log('[CSQ DEBUG] showProgressSummary:', { importCleanupRoot, activeSourcePath: activeSource?.path ?? null, resolved: _cleanupRoot, copiedCount: copiedFiles?.length ?? 0 });
   }
-  if (actLeft && !modal.querySelector('#scqOpenBtn') && copiedFiles && copiedFiles.length > 0 && _cleanupRoot) {
+  // Always refresh eligible files when a new batch of copied files is available —
+  // decouple from button-creation so a second import in the same session also updates the list.
+  if (copiedFiles && copiedFiles.length > 0 && _cleanupRoot) {
     _csqEligibleFiles = copiedFiles;
     _csqSourceRoot    = _cleanupRoot;
+  }
+  if (actLeft && !modal.querySelector('#scqOpenBtn') && _csqEligibleFiles && _csqEligibleFiles.length > 0) {
     const cleanBtn = document.createElement('button');
     cleanBtn.id        = 'scqOpenBtn';
     cleanBtn.className = 'im-btn-secondary';
@@ -8090,6 +8094,23 @@ function openSourceCleanup() {
   if (scActions)    scActions.style.display = '';
   if (selectAllRow) selectAllRow.style.display = '';
 
+  // Safety net: empty state when all files were deleted but state was not nulled
+  if (_csqEligibleFiles.length === 0) {
+    fileList.innerHTML = '<div class="sc-empty-state">No source files are eligible for cleanup.<br>Only files confirmed imported successfully can be deleted.</div>';
+    if (selectAllRow) selectAllRow.style.display = 'none';
+    if (confirmGate)  confirmGate.style.display  = 'none';
+    if (scActions) {
+      scActions.innerHTML = '';
+      const doneBtn = document.createElement('button');
+      doneBtn.className   = 'sc-btn-done';
+      doneBtn.textContent = 'Done';
+      doneBtn.onclick     = _closeSourceCleanup;
+      scActions.appendChild(doneBtn);
+    }
+    overlay.classList.remove('hidden');
+    return;
+  }
+
   // Populate file rows using current _csqEligibleFiles (already filtered of past deletions)
   _csqEligibleFiles.forEach((f, idx) => {
     const filename = f.src.split(/[\\/]/).pop();
@@ -8193,6 +8214,12 @@ async function _handleSourceDelete() {
       if (f && deletedSrcs.has(f.src)) cb.closest('.sc-file-row').remove();
     });
     _csqEligibleFiles = _csqEligibleFiles.filter(f => !deletedSrcs.has(f.src));
+    // When all eligible files are gone, retire the button so the modal can't reopen blank.
+    if (_csqEligibleFiles.length === 0) {
+      document.getElementById('scqOpenBtn')?.remove();
+      _csqEligibleFiles = null;
+      _csqSourceRoot    = null;
+    }
 
     // Surgically remove deleted files from the visible file grid
     if (deletedSrcs.size > 0) {
