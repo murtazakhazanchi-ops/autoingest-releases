@@ -348,6 +348,7 @@ contextBridge.exposeInMainWorld('api', {
   keywordsLoadRegistry:        ()                => ipcRenderer.invoke('keywords:loadRegistry'),
   keywordsRepairIds:           ()                => ipcRenderer.invoke('keywords:repairIds'),
   keywordsSaveCityCountry:     (cityLabel, countryLabel) => ipcRenderer.invoke('keywords:saveCityCountry', cityLabel, countryLabel),
+  keywordsAddKeyword:          (params)                 => ipcRenderer.invoke('keywords:addKeyword',        params),
 
   // ── Offline Collection Registry ──
   prepareOffline:              (params) => ipcRenderer.invoke('collection:prepareOffline',       params),

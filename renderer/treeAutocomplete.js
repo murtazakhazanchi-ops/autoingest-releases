@@ -15,11 +15,14 @@ class TreeAutocomplete {
    * @param {string}     [opts.placeholder]
    * @param {Function}   [opts.onSelect]  called with {id,label} or null on clear
    */
-  constructor({ container, type, placeholder = 'Search…', onSelect = () => {} }) {
+  constructor({ container, type, placeholder = 'Search…', onSelect = () => {}, onAddNew = null }) {
     this.type     = type;
     this.ph       = placeholder;
     this.onSelect = onSelect;
-    this.allowAdd = TreeAutocomplete.ALLOW_ADD.has(type);
+    // onAddNew(rawValue) → Promise<{id,label}|null>. When provided, "+ Add" routes through
+    // it (the registry Add New Keyword modal) instead of the legacy flat addToList path.
+    this.onAddNew = typeof onAddNew === 'function' ? onAddNew : null;
+    this.allowAdd = TreeAutocomplete.ALLOW_ADD.has(type) || !!this.onAddNew;
 
     // ── state ──
     this._inputVal  = '';
@@ -440,6 +443,15 @@ class TreeAutocomplete {
   }
 
   async _addNew(rawValue) {
+    // Registry-backed fields: delegate to the Add New Keyword modal via onAddNew.
+    if (this.onAddNew) {
+      const created = await this.onAddNew(rawValue);
+      if (!created || !created.label) return;  // cancelled or failed — create nothing
+      this._fullData = await window.api.getLists(this.type);
+      this._buildPathMap(this._fullData);
+      await this._select(created.id || this._slug(created.label), created.label);
+      return;
+    }
     const result = await window.api.addToList(this.type, rawValue);
     if (!result.success) return;
     // Refresh cached data so new item appears in future tree views

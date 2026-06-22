@@ -2197,6 +2197,10 @@ ${unparseable.map(ev => `
       _applyEditLockState();
     }
 
+    // Wire component drag-to-reorder on the initial render too (not just on add/remove via
+    // _refreshCompList). Gated to editable mode inside the helper, so view mode stays inert.
+    _wireCompDragReorder();
+
     // Point 3: focus first visible input so keyboard users can start typing immediately.
     requestAnimationFrame(() => {
       const first = body.querySelector('input:not([type="hidden"]):not(:disabled)');
@@ -2837,15 +2841,18 @@ ${unparseable.map(ev => `
     const matches = items
       .filter(kw => kw.label.toLowerCase().includes(q) && !existingLabels.has(kw.label.toLowerCase()))
       .slice(0, 8);
+    const typed  = (query || '').trim();
+    const addRow = `<div class="ec-kw-dd-add ec-kw-dd-item" data-add="${esc(typed)}" role="option" tabindex="-1"><span class="ec-kw-dd-add-plus">+</span> Add "${esc(typed)}" to registry…</div>`;
     if (matches.length === 0) {
-      ddEl.innerHTML = `<div class="ec-kw-dd-empty">No matches in registry</div>`;
+      ddEl.innerHTML = `<div class="ec-kw-dd-empty">No matches in registry</div>` + addRow;
       ddEl.hidden = false;
       inputEl.setAttribute('aria-expanded', 'true');
       return;
     }
+    const hasExact = matches.some(kw => kw.label.toLowerCase() === q);
     ddEl.innerHTML = matches.map(kw =>
       `<div class="ec-kw-dd-item" data-label="${esc(kw.label)}" data-kid="${esc(kw.id || '')}" role="option" tabindex="-1">${esc(kw.label)}</div>`
-    ).join('');
+    ).join('') + (hasExact ? '' : addRow);
     ddEl.hidden = false;
     inputEl.setAttribute('aria-expanded', 'true');
   }
@@ -2856,6 +2863,173 @@ ${unparseable.map(ev => `
     if (comp.additionalKeywords.some(k => (k.label || '').toLowerCase() === label.toLowerCase())) return false;
     comp.additionalKeywords.push({ label, keywordId: keywordId || null, useInFolderName: false });
     return true;
+  }
+
+  // ── Add New Keyword modal (registry-backed) ─────────────────────────────────
+  // Reusable parent/path picker for adding ONE keyword to the Keyword Registry
+  // override. rootCategory scopes the picker to one category (event/location/city/
+  // country) so the new term lands in the right field; pass null (Additional
+  // Keywords) to show all 10 categories. Resolves { label, registryId, category }
+  // on success, or null on cancel. Writes only via window.api.keywordsAddKeyword.
+  let _aknkStyleInjected = false;
+  function _ensureAknkStyle() {
+    if (_aknkStyleInjected) return;
+    _aknkStyleInjected = true;
+    const s = document.createElement('style');
+    s.textContent = `
+.aknk-ov{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:10000}
+.aknk-modal{background:var(--surface,#fff);color:var(--text,#111);width:min(560px,92vw);max-height:86vh;display:flex;flex-direction:column;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.32);overflow:hidden}
+.aknk-hd{padding:16px 20px;font-size:16px;font-weight:600;border-bottom:1px solid var(--border,#e3e3e3)}
+.aknk-bd{padding:16px 20px;overflow:auto;display:flex;flex-direction:column;gap:12px}
+.aknk-bd label{font-size:12px;font-weight:600;opacity:.8;display:block;margin-bottom:4px}
+.aknk-inp{width:100%;padding:8px 10px;border:1px solid var(--border,#ccc);border-radius:8px;background:var(--input-bg,#fff);color:inherit;font-size:14px;box-sizing:border-box}
+.aknk-tree{border:1px solid var(--border,#e3e3e3);border-radius:8px;max-height:260px;overflow:auto;padding:6px}
+.aknk-row{display:flex;align-items:center;gap:4px;padding:3px 4px;border-radius:6px;cursor:pointer;font-size:13px}
+.aknk-row:hover{background:var(--hover,#f0f0f0)}
+.aknk-row.sel{background:var(--accent-weak,#dce8ff);font-weight:600}
+.aknk-tc{width:14px;display:inline-block;text-align:center;opacity:.7}
+.aknk-children{margin-left:16px}
+.aknk-pathprev{font-size:12px;padding:8px 10px;background:var(--hover,#f5f5f5);border-radius:8px;min-height:18px;word-break:break-word}
+.aknk-err{color:var(--danger,#c0392b);font-size:12px;min-height:14px}
+.aknk-ft{padding:12px 20px;border-top:1px solid var(--border,#e3e3e3);display:flex;justify-content:flex-end;gap:8px}
+.aknk-btn{padding:8px 16px;border-radius:8px;border:1px solid var(--border,#ccc);background:var(--surface,#fff);color:inherit;cursor:pointer;font-size:13px}
+.aknk-btn.primary{background:var(--accent,#2d6cdf);color:#fff;border-color:transparent}
+.aknk-btn.primary:disabled{opacity:.5;cursor:not-allowed}`;
+    document.head.appendChild(s);
+  }
+
+  // Build the picker tree from the merged registry. Node: {label, path[], category, kwId, children[]}.
+  function _buildRegistryPickerTree(reg, rootCategory) {
+    const kws = [...(reg?.base?.keywords || []), ...(reg?.overrides || [])]
+      .filter(k => k && k.label && k.status !== 'deleted' && (!rootCategory || k.category === rootCategory));
+    const roots = new Map();
+    for (const k of kws) {
+      const segs = Array.isArray(k.path) ? k.path : [];
+      if (!segs.length) continue;
+      let level = roots, acc = [];
+      for (let i = 0; i < segs.length; i++) {
+        acc = [...acc, segs[i]];
+        if (!level.has(segs[i])) level.set(segs[i], { label: segs[i], path: acc.slice(), category: k.category, kwId: null, children: new Map() });
+        const node = level.get(segs[i]);
+        if (i === segs.length - 1) node.kwId = k.id || null;
+        level = node.children;
+      }
+    }
+    const toArr = (m) => [...m.values()].map(n => ({ label: n.label, path: n.path, category: n.category, kwId: n.kwId, children: toArr(n.children) }));
+    return toArr(roots);
+  }
+
+  function _openAddKeywordModal({ label = '', rootCategory = null } = {}) {
+    return new Promise(async (resolve) => {
+      _ensureAknkStyle();
+      const reg  = await _getRegistry();
+      const tree = _buildRegistryPickerTree(reg, rootCategory);
+
+      const ov = document.createElement('div');
+      ov.className = 'aknk-ov';
+      ov.innerHTML = `
+<div class="aknk-modal" role="dialog" aria-modal="true" aria-label="Add New Keyword">
+  <div class="aknk-hd">Add New Keyword</div>
+  <div class="aknk-bd">
+    <div><label for="aknkLabel">Keyword label</label><input class="aknk-inp" id="aknkLabel" type="text" value="${esc(label)}" placeholder="New keyword…" autocomplete="off"></div>
+    <div><label for="aknkSearch">Find parent in registry</label><input class="aknk-inp" id="aknkSearch" type="text" placeholder="Search categories / paths…" autocomplete="off"></div>
+    <div><label>Choose parent path</label><div class="aknk-tree" id="aknkTree" role="tree"></div></div>
+    <div><label>Will be added as</label><div class="aknk-pathprev" id="aknkPrev">— select a parent path above —</div></div>
+    <div class="aknk-err" id="aknkErr" role="alert"></div>
+  </div>
+  <div class="aknk-ft">
+    <button class="aknk-btn" id="aknkCancel" type="button">Cancel</button>
+    <button class="aknk-btn primary" id="aknkAdd" type="button" disabled>Add Keyword</button>
+  </div>
+</div>`;
+      document.body.appendChild(ov);
+
+      const labelEl  = ov.querySelector('#aknkLabel');
+      const searchEl = ov.querySelector('#aknkSearch');
+      const treeEl   = ov.querySelector('#aknkTree');
+      const prevEl   = ov.querySelector('#aknkPrev');
+      const errEl    = ov.querySelector('#aknkErr');
+      const addBtn   = ov.querySelector('#aknkAdd');
+
+      let selected   = null;
+      const expanded = new Set();
+      const keyOf    = n => n.path.join('›');
+
+      const matches = (node, q) => {
+        if (!q) return true;
+        if (node.path.join(' ').toLowerCase().includes(q)) return true;
+        return (node.children || []).some(c => matches(c, q));
+      };
+      const updatePrev = () => {
+        const lbl = labelEl.value.trim();
+        if (selected && lbl)      prevEl.textContent = [...selected.path, lbl].join('  ›  ');
+        else if (selected)        prevEl.textContent = selected.path.join('  ›  ') + '  ›  …';
+        else                      prevEl.textContent = '— select a parent path above —';
+        addBtn.disabled = !(selected && lbl);
+      };
+      const renderTree = () => {
+        const q = searchEl.value.trim().toLowerCase();
+        treeEl.innerHTML = '';
+        const renderNodes = (nodes, host) => {
+          for (const n of nodes) {
+            if (!matches(n, q)) continue;
+            const wrap  = document.createElement('div');
+            const row   = document.createElement('div');
+            row.className = 'aknk-row' + (selected === n ? ' sel' : '');
+            const hasCh = (n.children || []).length > 0;
+            const isExp = expanded.has(keyOf(n)) || !!q;
+            row.innerHTML = `<span class="aknk-tc">${hasCh ? (isExp ? '▾' : '▸') : ''}</span><span>${esc(n.label)}</span>`;
+            row.addEventListener('click', e => {
+              if (hasCh && e.target.classList.contains('aknk-tc')) {
+                if (expanded.has(keyOf(n))) expanded.delete(keyOf(n)); else expanded.add(keyOf(n));
+                renderTree(); return;
+              }
+              selected = n; errEl.textContent = ''; renderTree(); updatePrev();
+            });
+            wrap.appendChild(row);
+            if (hasCh && isExp) {
+              const ch = document.createElement('div'); ch.className = 'aknk-children';
+              renderNodes(n.children, ch); wrap.appendChild(ch);
+            }
+            host.appendChild(wrap);
+          }
+        };
+        renderNodes(tree, treeEl);
+        if (!treeEl.children.length) treeEl.innerHTML = '<div style="padding:8px;opacity:.6;font-size:13px">No matching paths.</div>';
+      };
+
+      const close = (val) => { document.removeEventListener('keydown', onKey, true); ov.remove(); resolve(val); };
+      const onKey = e => { if (e.key === 'Escape') { e.preventDefault(); close(null); } };
+      document.addEventListener('keydown', onKey, true);
+      ov.addEventListener('mousedown', e => { if (e.target === ov) close(null); });
+      ov.querySelector('#aknkCancel').addEventListener('click', () => close(null));
+      labelEl.addEventListener('input', updatePrev);
+      searchEl.addEventListener('input', renderTree);
+      addBtn.addEventListener('click', async () => {
+        const lbl = labelEl.value.trim();
+        if (!selected) { errEl.textContent = 'Select a parent path in the tree.'; return; }
+        if (!lbl)      { errEl.textContent = 'Enter a keyword label.'; return; }
+        addBtn.disabled = true;
+        const parentId = selected.kwId || selected.category;
+        const res = await window.api.keywordsAddKeyword({
+          label: lbl, parentPath: selected.path, parentId, category: selected.category,
+        });
+        if (!res || !res.ok) {
+          errEl.textContent = res?.reason === 'duplicate'
+            ? `Already exists in this branch: ${res.existingLabel}`
+            : `Could not add keyword: ${res?.reason || 'error'}`;
+          addBtn.disabled = false;
+          return;
+        }
+        // Invalidate the renderer registry cache so the new term appears immediately.
+        _kwRegistry = null; _kwRegistryPromise = null;
+        close({ label: res.label, registryId: res.id, category: res.category });
+      });
+
+      renderTree();
+      updatePrev();
+      requestAnimationFrame(() => labelEl.focus());
+    });
   }
 
   // ── Advanced folder-name panel ─────────────────────────────────────────────
@@ -2937,6 +3111,7 @@ ${unparseable.map(ev => `
         container: gcEl,
         type: 'cities',
         placeholder: 'Search city…',
+        onAddNew: (raw) => _openAddKeywordModal({ label: raw, rootCategory: 'city' }),
         onSelect: async ({ id, label }) => {
           _globalCityVal = { id, label };
           // Lookup country for this global city
@@ -2972,6 +3147,7 @@ ${unparseable.map(ev => `
       const etDD = new TreeAutocomplete({
         container: etEl, type: 'event-types',
         placeholder: 'Search event type…',
+        onAddNew: (raw) => _openAddKeywordModal({ label: raw, rootCategory: 'event' }),
         onSelect: (item) => {
           if (!item) return;
           const { id, label } = item;
@@ -2992,6 +3168,7 @@ ${unparseable.map(ev => `
     if (locEl) {
       row.loc = new TreeAutocomplete({
         container: locEl, type: 'locations', placeholder: 'Location… (optional)',
+        onAddNew: (raw) => _openAddKeywordModal({ label: raw, rootCategory: 'location' }),
         onSelect: ({ id, label }) => { comp.location = { id, label }; _refreshKwAdvanced(comp); _updateEventPreview(); }
       });
       if (comp.location) row.loc.setValue(comp.location.id, comp.location.label);
@@ -3001,6 +3178,7 @@ ${unparseable.map(ev => `
     if (cityEl) {
       row.city = new TreeAutocomplete({
         container: cityEl, type: 'cities', placeholder: 'City…',
+        onAddNew: (raw) => _openAddKeywordModal({ label: raw, rootCategory: 'city' }),
         onSelect: async ({ id, label }) => {
           comp.city = { id, label };
           _refreshKwAdvanced(comp);
@@ -3120,6 +3298,26 @@ ${unparseable.map(ev => `
           el.addEventListener('mousedown', e => { e.preventDefault(); _select(c.label); });
           dd.append(el);
         });
+      }
+
+      // Add New (registry-backed) — opens the Add New Keyword modal scoped to 'country'.
+      const hasExact = (_items || []).some(c => c.label.toLowerCase() === q);
+      if (q && !hasExact) {
+        const addEl = document.createElement('div');
+        addEl.className = 'tac-add';
+        addEl.innerHTML = `<span class="tac-add-plus">+</span> Add <em class="tac-add-val">${esc(inp.value.trim())}</em>`;
+        addEl.addEventListener('mousedown', async e => {
+          e.preventDefault();
+          const typed = inp.value.trim();
+          _close();
+          const created = await _openAddKeywordModal({ label: typed, rootCategory: 'country' });
+          if (created && created.label) {
+            _items = null;          // force re-fetch so the new country appears immediately
+            await _ensureItems();
+            _select(created.label);
+          }
+        });
+        dd.append(addEl);
       }
     }
 
@@ -3438,6 +3636,29 @@ ${unparseable.map(ev => `
         return;
       }
 
+      // .ec-kw-dd-add — open the Add New Keyword modal for Additional Keywords (any category)
+      const ddAdd = e.target.closest('.ec-kw-dd-add');
+      if (ddAdd) {
+        const wrap = ddAdd.closest('.ec-kw-search-wrap');
+        if (!wrap) return;
+        const compId = Number(wrap.dataset.compId);
+        const comp   = _eventComps.find(c => c.id === compId);
+        if (!comp) return;
+        const typed   = ddAdd.dataset.add || '';
+        const inputEl = document.getElementById(`ecKwInput-${comp.id}`);
+        const ddEl    = document.getElementById(`ecKwDD-${comp.id}`);
+        if (ddEl) ddEl.hidden = true;
+        _openAddKeywordModal({ label: typed, rootCategory: null }).then(created => {
+          if (created && created.label && _addKwToComp(comp, created.label, created.registryId)) {
+            _refreshKwChips(comp);
+            _refreshKwAdvanced(comp);
+            _updateEventPreview();
+          }
+          if (inputEl) { inputEl.value = ''; inputEl.setAttribute('aria-expanded', 'false'); }
+        });
+        return;
+      }
+
       // .ec-kw-dd-item — select a keyword from the search dropdown
       const ddItem = e.target.closest('.ec-kw-dd-item');
       if (ddItem) {
@@ -3447,7 +3668,7 @@ ${unparseable.map(ev => `
         const comp   = _eventComps.find(c => c.id === compId);
         if (!comp) return;
         const label     = ddItem.dataset.label;
-        if (!label) return; // "No matches" placeholder — no data-label
+        if (!label) return; // "No matches" placeholder or add-row — no data-label
         const keywordId = ddItem.dataset.kid || null;
         if (_addKwToComp(comp, label, keywordId)) {
           _refreshKwChips(comp);
@@ -3603,11 +3824,24 @@ ${unparseable.map(ev => `
     _eventComps.forEach(comp => _mountCompDDs(comp));
     // Remove-button clicks handled by delegated listener on #ecBody — no per-button wiring needed.
 
-    // Wire drag-to-reorder on the drag handles.
+    _wireCompDragReorder();
+  }
+
+  // Wire drag-to-reorder on the component drag handles. Active only while the form is
+  // editable (create or edit mode) — never in read-only view mode. Must run on EVERY
+  // list render: the initial form render (_renderEventForm) AND _refreshCompList rebuilds.
+  // Previously this lived inline in _refreshCompList only, so edit mode — which renders
+  // existing components without an add/remove — never wired the handles, making
+  // drag-to-reorder inert when editing an existing multi-component event.
+  function _wireCompDragReorder() {
+    const listEl = document.getElementById('ecCompList');
+    if (!listEl) return;
+    const editable = !_viewingExisting || _editMode;
     let _dragSrcId = null;
     listEl.querySelectorAll('.ec-comp-row[data-comp-id]').forEach(row => {
       const handle = row.querySelector('.ec-drag-handle');
       if (!handle) return;
+      if (!editable) { handle.removeAttribute('draggable'); return; }
       handle.setAttribute('draggable', 'true');
       handle.addEventListener('dragstart', e => {
         _dragSrcId = Number(row.dataset.compId);

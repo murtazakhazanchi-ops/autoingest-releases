@@ -3201,10 +3201,16 @@ ipcMain.handle('metadata:reapplyEvent', async (_event, eventFolderPath) => {
 
 // ── List manager ──────────────────────────────────────────────────────────────
 
-ipcMain.handle('lists:get',        (_event, name)                              => listManager.getList(name));
-ipcMain.handle('lists:add',        (_event, name, value)                       => listManager.addToList(name, value));
-ipcMain.handle('lists:match',      (_event, name, input)                       => aliasEngine.match(input, name, listManager.getList(name)));
-ipcMain.handle('lists:learnAlias', (_event, name, canonicalId, label, typed)   => aliasEngine.learnAlias(name, canonicalId, label, typed));
+// Event Type / Location / City resolve through the Keyword Registry adapter; all
+// other list names (photographers) keep the legacy listManager + aliasEngine path.
+ipcMain.handle('lists:get',        (_event, name)                              => (_REG_LIST_CATEGORY[name] ? _registryListData(name) : listManager.getList(name)));
+ipcMain.handle('lists:match',      (_event, name, input)                       => (_REG_LIST_CATEGORY[name] ? _registryMatch(name, input) : aliasEngine.match(input, name, listManager.getList(name))));
+// Add New for registry-backed fields goes through keywords:addKeyword (the Add New
+// Keyword modal) — block the legacy flat write so no parallel vocabulary source is created.
+ipcMain.handle('lists:add',        (_event, name, value)                       => (_REG_LIST_CATEGORY[name] ? { success: false, error: 'use-registry-modal' } : listManager.addToList(name, value)));
+// Alias learning is not persisted for registry-backed fields yet (safe no-op) — never
+// write aliases into the legacy listManager alias files for these fields.
+ipcMain.handle('lists:learnAlias', (_event, name, canonicalId, label, typed)   => (_REG_LIST_CATEGORY[name] ? { ok: true, skipped: 'registry-backed' } : aliasEngine.learnAlias(name, canonicalId, label, typed)));
 
 // ── Date engine ──────────────────────────────────────────────────────────────
 ipcMain.handle('date:getToday',       ()                   => dateEngine.getToday());
@@ -3576,6 +3582,192 @@ ipcMain.handle('keywords:saveCityCountry', async (_event, cityLabel, countryLabe
     return { ok: true };
   } catch (err) {
     console.error('[keywords:saveCityCountry] failed:', err);
+    return { ok: false, reason: err.message };
+  }
+});
+
+// ── Keyword Registry adapter — single vocabulary source for event fields ────────
+// Event Type / Location / City resolve through the Bridge-imported Keyword Registry
+// (data/keywords.registry.json + userData/keywords.override.json) instead of the
+// legacy listManager JSON files. listManager stays for 'photographers' and as a
+// READ-ONLY fallback for the few legacy terms not yet in the registry. New writes
+// go ONLY to the registry override via keywords:addKeyword.
+const _REG_LIST_CATEGORY = { 'event-types': 'event', 'locations': 'location', 'cities': 'city' };
+
+function _regOverridePath() {
+  return require('path').join(app.getPath('userData'), 'keywords.override.json');
+}
+
+// Merged keyword array (base + override). Synchronous — used by lists:get / lists:match.
+function _loadRegistryKeywords() {
+  const registryPath = require('path').join(__dirname, '..', 'data', 'keywords.registry.json');
+  let base = {}, ovr = {};
+  try { base = JSON.parse(fs.readFileSync(registryPath, 'utf8')); } catch {}
+  try { ovr  = JSON.parse(fs.readFileSync(_regOverridePath(), 'utf8')); } catch {}
+  const baseKws = Array.isArray(base.keywords) ? base.keywords : [];
+  const ovrKws  = Array.isArray(ovr.keywords)  ? ovr.keywords  : [];
+  return [...baseKws, ...ovrKws];
+}
+
+// Slug matching renderer/treeAutocomplete.js _slug() so tree-leaf ids, matchList ids
+// and the pathMap breadcrumb keys stay consistent (and event.json id format is preserved).
+function _regSlug(label) {
+  return String(label).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+function _regActiveInCategory(category) {
+  return _loadRegistryKeywords().filter(
+    k => k && k.category === category && k.label && k.status !== 'deleted'
+  );
+}
+
+// Legacy listManager labels not present in the registry for this category — kept
+// selectable (read-only fallback) so nothing the user relied on silently disappears.
+function _regLegacyFallbackLabels(name, registryLabels) {
+  const have = new Set(registryLabels.map(l => String(l).toLowerCase()));
+  let legacy = [];
+  try {
+    const lm = listManager.getList(name) || [];
+    legacy = lm.map(n => (typeof n === 'string' ? n : n.label))
+               .filter(l => l && !have.has(String(l).toLowerCase()));
+  } catch {}
+  const seen = new Set();
+  return legacy.filter(l => { const k = l.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+}
+
+// Build TreeAutocomplete-shaped data for a registry-backed list name.
+function _registryListData(name) {
+  const category = _REG_LIST_CATEGORY[name];
+  const kws      = _regActiveInCategory(category);
+
+  if (name === 'cities') {
+    const labels = kws.map(k => k.label);
+    const legacy = _regLegacyFallbackLabels(name, labels);
+    const seen = new Set();
+    return [...labels, ...legacy].filter(l => { const k = l.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+  }
+
+  // Tree types: build nested tree from keyword.path, dropping path[0] (category root group).
+  const root = new Map();
+  for (const k of kws) {
+    const segs = Array.isArray(k.path) ? k.path.slice(1) : [];
+    if (segs.length === 0) continue;
+    let level = root;
+    for (const seg of segs) {
+      if (!level.has(seg)) level.set(seg, { label: seg, _ch: new Map() });
+      level = level.get(seg)._ch;
+    }
+  }
+  const toArr = (m) => [...m.values()].map(n => {
+    const children = toArr(n._ch);
+    return children.length ? { label: n.label, children } : { label: n.label };
+  });
+  const tree = toArr(root);
+
+  // Read-only fallback for legacy listManager terms not in the registry, grouped clearly.
+  const registryLabels = [];
+  (function collect(nodes) { for (const n of nodes) { registryLabels.push(n.label); if (n.children) collect(n.children); } })(tree);
+  const legacy = _regLegacyFallbackLabels(name, registryLabels);
+  if (legacy.length) {
+    tree.push({ label: 'Other (legacy — read-only)', children: legacy.map(l => ({ label: l })) });
+  }
+  return tree;
+}
+
+// Registry-backed match for lists:match. Returns [{ id, label, matchType, score }].
+function _registryMatch(name, input) {
+  const q = String(input || '').trim().toLowerCase();
+  if (!q) return [];
+  const category = _REG_LIST_CATEGORY[name];
+  const kws      = _regActiveInCategory(category);
+
+  const seen = new Set();
+  const out  = [];
+  const push = (label, matchType, score) => {
+    const key = label.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ id: _regSlug(label), label, matchType, score });
+  };
+  for (const k of kws) {
+    const lo = k.label.toLowerCase();
+    if (lo === q)                    push(k.label, 'exact', 100);
+    else if (lo.startsWith(q))       push(k.label, 'startsWith', 70);
+    else if (lo.includes(q))         push(k.label, 'contains', 50);
+    else if (Array.isArray(k.aliases) && k.aliases.some(a => String(a).toLowerCase().includes(q)))
+                                     push(k.label, 'alias', 40);
+  }
+  // Legacy fallback terms participate in search too (read-only).
+  const registryLabels = kws.map(k => k.label);
+  for (const label of _regLegacyFallbackLabels(name, registryLabels)) {
+    const lo = label.toLowerCase();
+    if (lo === q)              push(label, 'exact', 100);
+    else if (lo.startsWith(q)) push(label, 'startsWith', 70);
+    else if (lo.includes(q))   push(label, 'contains', 50);
+  }
+  out.sort((a, b) => b.score - a.score || a.label.localeCompare(b.label));
+  return out.slice(0, 50);
+}
+
+// Add a new keyword to the registry override under an explicitly chosen parent path.
+// params: { label, parentId, parentPath:[...], category }
+ipcMain.handle('keywords:addKeyword', async (_event, params) => {
+  try {
+    const label      = (params?.label || '').trim();
+    const parentPath = Array.isArray(params?.parentPath) ? params.parentPath.filter(Boolean) : null;
+    const parentId   = (params?.parentId || '').trim();
+    const category   = (params?.category || '').trim();
+    if (!label)               return { ok: false, reason: 'empty-label' };
+    if (!category)            return { ok: false, reason: 'no-category' };
+    if (!parentPath || parentPath.length === 0) return { ok: false, reason: 'no-parent-path' };
+
+    const overridePath = _regOverridePath();
+    let data = { version: 1, keywords: [] };
+    try { data = JSON.parse(fs.readFileSync(overridePath, 'utf8')); } catch {}
+    if (!Array.isArray(data.keywords)) data.keywords = [];
+
+    const all = _loadRegistryKeywords();
+    const newPath = [...parentPath, label];
+    const newPathKey = newPath.join('›').toLowerCase();
+
+    // Duplicate check: same label (or alias) already under the same parent path / category branch.
+    const dup = all.find(k => {
+      if (k.category !== category) return false;
+      const sameLabel = (k.label || '').toLowerCase() === label.toLowerCase();
+      const aliasHit  = Array.isArray(k.aliases) && k.aliases.some(a => String(a).toLowerCase() === label.toLowerCase());
+      const samePath  = Array.isArray(k.path) && k.path.join('›').toLowerCase() === newPathKey;
+      return samePath || ((sameLabel || aliasHit) && Array.isArray(k.path) &&
+             k.path.slice(0, parentPath.length).join('›').toLowerCase() === parentPath.join('›').toLowerCase());
+    });
+    if (dup) return { ok: false, reason: 'duplicate', existingLabel: dup.label };
+
+    const root  = category;
+    const depth = parentPath.length;
+    const slug  = label.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    let   id    = `${root}.${slug}`;
+    if (all.some(k => k.id === id)) id = `${root}.${slug}_${Date.now().toString(36)}`;
+    const now = new Date().toISOString();
+
+    data.keywords.push({
+      id, label, category, root,
+      path:         newPath,
+      parentId:     parentId || root,
+      groupLabel:   parentPath[0],
+      depth,
+      aliases:      [],
+      labelHistory: [],
+      status:       'active',
+      source:       'manual-add',
+      importedAt:   now,
+      updatedAt:    now,
+    });
+
+    const tmp = overridePath + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf8');
+    fs.renameSync(tmp, overridePath);
+    return { ok: true, id, label, category, path: newPath };
+  } catch (err) {
+    console.error('[keywords:addKeyword] failed:', err);
     return { ok: false, reason: err.message };
   }
 });
