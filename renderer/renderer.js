@@ -11627,10 +11627,10 @@ const _transferMonitor = (() => {
           + (grp.truncated ? `<li class=”tx-scan-more”>…and ${(grp.count - items.length).toLocaleString()} more</li>` : '')
           + `</ul></details>`
         : '';
+      const meta = `${grp.count.toLocaleString()} item${grp.count === 1 ? '' : 's'} · ${formatSize(grp.bytes)}`;
       return `<div class=”tx-scan-group ${cls}”>`
         + `<div class=”tx-scan-grp-hd”><span class=”tx-scan-grp-lbl”>${label}</span>`
-        + `<span class=”tx-scan-grp-count”>${grp.count.toLocaleString()}</span>`
-        + `<span class=”tx-scan-grp-sz”>${formatSize(grp.bytes)}</span></div>${body}</div>`;
+        + `<span class=”tx-scan-grp-meta”>${meta}</span></div>${body}</div>`;
     };
     const groups =
         row('New Data',               g.newFiles,        'tx-scan--new',     g.newFiles?.count <= 5)
