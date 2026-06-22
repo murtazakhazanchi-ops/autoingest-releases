@@ -35,10 +35,17 @@ function seqPrefix(seq) {
 }
 
 // Folder names that should never be treated as photographer or component folders.
-const SKIP_DIRS = new Set(['.autoingest', '.DS_Store', 'Thumbs.db']);
+// _Selected/__MACOSX: mirror _NAS_SKIP_DIRS in main.js.
+// VIDEO: excluded at every archive-walk level; never a photographer folder.
+// .DS_Store/Thumbs.db: filesystem artefacts.
+const SKIP_DIRS = new Set([
+  '_Selected', '__MACOSX', 'VIDEO',
+  '.autoingest', '.DS_Store', 'Thumbs.db',
+]);
 
 function _skipDir(name) {
-  return SKIP_DIRS.has(name) || (typeof name === 'string' && name.startsWith('.'));
+  if (typeof name !== 'string') return true;
+  return SKIP_DIRS.has(name) || name.startsWith('.') || name.startsWith('#');
 }
 
 /**
@@ -141,6 +148,7 @@ async function _applyRenamesInDir(baseDir, ordered) {
 
   // Phase 1: current → temp
   for (const entry of ordered) {
+    if (_skipDir(entry.canonical)) continue;  // defensive: never rename system/selection folders
     const target = path.join(baseDir, entry.folderName);
 
     // Locate whichever folder currently holds this canonical name
