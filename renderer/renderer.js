@@ -11629,8 +11629,10 @@ const _transferMonitor = (() => {
         : '';
       const meta = `${grp.count.toLocaleString()} item${grp.count === 1 ? '' : 's'} · ${formatSize(grp.bytes)}`;
       return `<div class=”tx-scan-group ${cls}”>`
-        + `<div class=”tx-scan-grp-hd”><span class=”tx-scan-grp-lbl”>${label}</span>`
-        + `<span class=”tx-scan-grp-meta”>${meta}</span></div>${body}</div>`;
+        + `<div class=”tx-scan-grp-hd”>`
+        + `<div class=”tx-scan-grp-lbl”>${label}</div>`
+        + `<div class=”tx-scan-grp-meta”>${meta}</div>`
+        + `</div>${body}</div>`;
     };
     const groups =
         row('New Data',               g.newFiles,        'tx-scan--new',     g.newFiles?.count <= 5)
@@ -11640,32 +11642,35 @@ const _transferMonitor = (() => {
       + row('Destination Only',       g.destinationOnly, 'tx-scan--dest',    false)
       + row('Errors',                 g.errors,          'tx-scan--err',     true);
 
-    // Compact summary line (Task 5)
-    const newCount     = g.newFiles?.count     || 0;
-    const sameCount    = g.existingSame?.count || 0;
-    const changedCount = g.changed?.count      || 0;
-    const summaryParts = [];
-    if (newCount > 0)     summaryParts.push(`<span class=”tx-scan-sum--new”>${newCount.toLocaleString()} file${newCount !== 1 ? 's' : ''} need backup</span>`);
-    if (sameCount > 0)    summaryParts.push(`<span class=”tx-scan-sum--same”>${sameCount.toLocaleString()} up to date</span>`);
-    if (changedCount > 0) summaryParts.push(`<span class=”tx-scan-sum--review”>${changedCount.toLocaleString()} changed — review only</span>`);
-    const summaryHtml = summaryParts.length
-      ? `<div class=”tx-scan-summary”>${summaryParts.join('<span class=”tx-scan-sum-sep”>·</span>')}</div>`
-      : '';
+    // Summary card — title, subtitle, per-category stat chips
+    const newCount     = g.newFiles?.count      || 0;
+    const newBytes     = g.newFiles?.bytes       || 0;
+    const sameCount    = g.existingSame?.count   || 0;
+    const sameBytes    = g.existingSame?.bytes    || 0;
+    const changedCount = g.changed?.count        || 0;
+    const changedBytes = g.changed?.bytes         || 0;
+    const stats = [];
+    if (newCount > 0)     stats.push(`<div class=”tx-sum-stat tx-sum-stat--new”><div class=”tx-sum-stat-lbl”>Need backup</div><div class=”tx-sum-stat-val”>${newCount.toLocaleString()} file${newCount !== 1 ? 's' : ''}</div><div class=”tx-sum-stat-sz”>${formatSize(newBytes)}</div></div>`);
+    if (sameCount > 0)    stats.push(`<div class=”tx-sum-stat tx-sum-stat--same”><div class=”tx-sum-stat-lbl”>Up to date</div><div class=”tx-sum-stat-val”>${sameCount.toLocaleString()} file${sameCount !== 1 ? 's' : ''}</div><div class=”tx-sum-stat-sz”>${formatSize(sameBytes)}</div></div>`);
+    if (changedCount > 0) stats.push(`<div class=”tx-sum-stat tx-sum-stat--review”><div class=”tx-sum-stat-lbl”>Needs review</div><div class=”tx-sum-stat-val”>${changedCount.toLocaleString()} file${changedCount !== 1 ? 's' : ''}</div><div class=”tx-sum-stat-sz”>${formatSize(changedBytes)}</div></div>`);
+    const summaryHtml = `<div class=”tx-scan-summary”>`
+      + `<div class=”tx-scan-summary-hd”>`
+      + `<span class=”tx-scan-summary-title”>Backup scan complete</span>`
+      + `<span class=”tx-scan-summary-sub”>Update Backup copies missing files only. Changed files are not copied automatically.</span>`
+      + `</div>`
+      + (stats.length ? `<div class=”tx-sum-stats”>${stats.join('')}</div>` : '')
+      + `</div>`;
 
-    // Note (condensed to one line)
-    const noteHtml = `<div class=”tx-scan-note”>Update Backup copies missing files only. Changed files are not copied automatically.</div>`;
-
-    // Folder badge legend (Task 4) — explains tree badges visible after scan
+    // Legend — reuses .tx-tree-status pill badges (identical class/data-status as tree)
     const legendHtml = `<div class=”tx-scan-legend”>`
-      + `<span class=”tx-scan-legend-lbl”>Folder status:</span>`
-      + `<span class=”tx-scan-legend-item tx-scan-legend--ok”>✓ Up to date</span>`
-      + `<span class=”tx-scan-legend-item tx-scan-legend--partial”>Partial</span>`
-      + `<span class=”tx-scan-legend-item tx-scan-legend--review”>Needs review</span>`
-      + `<span class=”tx-scan-legend-item tx-scan-legend--new”>Not copied</span>`
+      + `<span class=”tx-scan-legend-title”>Folder status</span>`
+      + `<span class=”tx-tree-status” data-status=”up-to-date”>✓ Up to date</span>`
+      + `<span class=”tx-tree-status” data-status=”partial”>Partial</span>`
+      + `<span class=”tx-tree-status” data-status=”review”>Needs review</span>`
+      + `<span class=”tx-tree-status” data-status=”not-copied”>Not copied</span>`
       + `</div>`;
 
     reviewEl.innerHTML = summaryHtml
-      + noteHtml
       + (groups || '<div class=”tx-scan-empty” style=”padding:6px 2px”>All files are up to date.</div>')
       + legendHtml;
   }
@@ -12080,7 +12085,7 @@ const _transferMonitor = (() => {
       rowEl.appendChild(badge);
     }
     badge.dataset.status = status;
-    const labels = { 'up-to-date': '✓', 'partial': 'Partial', 'review': 'Needs review', 'not-copied': 'Not copied' };
+    const labels = { 'up-to-date': '✓ Up to date', 'partial': 'Partial', 'review': 'Needs review', 'not-copied': 'Not copied' };
     const label = labels[status] || '';
     badge.textContent = label;
     badge.hidden = !label;
