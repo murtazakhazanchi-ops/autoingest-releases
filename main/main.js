@@ -3408,6 +3408,49 @@ ipcMain.handle('metadataSync:scanPending', async (_event, masterPath, opts) => {
   return metadataSyncService.scanPendingEvents(masterPath, userDataPath, opts || {});
 });
 
+// ── Metadata scan background job ──────────────────────────────────────────────
+// In-memory only — not persisted. One job at a time across all masterPaths.
+let _msScanJob = {
+  id: null, masterPath: null, state: 'idle',
+  startedAt: null, updatedAt: null,
+  result: null, errorType: null, errorMessage: null,
+};
+
+ipcMain.handle('metadataSync:startScanPending', async (_event, masterPath) => {
+  if (!masterPath || typeof masterPath !== 'string') return { ok: false, errorType: 'invalid_path' };
+  if (_msScanJob.state === 'running') {
+    if (_msScanJob.masterPath === masterPath) return { ok: true, jobId: _msScanJob.id };
+    return { ok: false, errorType: 'service_busy' };
+  }
+  try { await fsp.access(masterPath); } catch { return { ok: false, errorType: 'archive_unavailable' }; }
+  const jobId        = `ms-scan-${Date.now().toString(36)}`;
+  const userDataPath = app.getPath('userData');
+  _msScanJob = { id: jobId, masterPath, state: 'running', startedAt: Date.now(), updatedAt: Date.now(), result: null, errorType: null, errorMessage: null };
+  metadataSyncService.scanPendingEvents(masterPath, userDataPath, {})
+    .then(pending => {
+      if (_msScanJob.id !== jobId) return;
+      _msScanJob = { ..._msScanJob, state: 'complete', result: pending, updatedAt: Date.now() };
+    })
+    .catch(err => {
+      if (_msScanJob.id !== jobId) return;
+      _msScanJob = { ..._msScanJob, state: 'error', errorType: 'scan_failed', errorMessage: err.message, updatedAt: Date.now() };
+    });
+  return { ok: true, jobId };
+});
+
+ipcMain.handle('metadataSync:getScanPendingStatus', (_event, jobId) => {
+  if (!jobId || _msScanJob.id !== jobId) return { state: 'not_found' };
+  return {
+    id:           _msScanJob.id,
+    state:        _msScanJob.state,
+    startedAt:    _msScanJob.startedAt,
+    updatedAt:    _msScanJob.updatedAt,
+    result:       _msScanJob.state === 'complete' ? _msScanJob.result : null,
+    errorType:    _msScanJob.errorType,
+    errorMessage: _msScanJob.errorMessage,
+  };
+});
+
 ipcMain.handle('metadataSync:scanEventFolder', async (_event, eventFolderPath) => {
   if (!eventFolderPath || typeof eventFolderPath !== 'string') return [];
   const userDataPath = app.getPath('userData');

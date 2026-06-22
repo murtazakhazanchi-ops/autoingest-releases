@@ -332,8 +332,10 @@ contextBridge.exposeInMainWorld('api', {
   getRawPreview: (srcPath) => ipcRenderer.invoke('preview:getRawPreview', srcPath),
 
   // ── Metadata Sync ──
-  metadataSyncScanPending:        (masterPath, opts) => ipcRenderer.invoke('metadataSync:scanPending',        masterPath, opts),
-  metadataSyncSyncEvent:          (eventFolderPath)  => ipcRenderer.invoke('metadataSync:syncEvent',          eventFolderPath),
+  metadataSyncScanPending:          (masterPath, opts) => ipcRenderer.invoke('metadataSync:scanPending',          masterPath, opts),
+  metadataSyncStartScanPending:    (masterPath)       => ipcRenderer.invoke('metadataSync:startScanPending',    masterPath),
+  metadataSyncGetScanPendingStatus: (jobId)           => ipcRenderer.invoke('metadataSync:getScanPendingStatus', jobId),
+  metadataSyncSyncEvent:            (eventFolderPath) => ipcRenderer.invoke('metadataSync:syncEvent',            eventFolderPath),
   metadataSyncSyncStatus:         (eventFolderPath)  => ipcRenderer.invoke('metadataSync:syncStatus',         eventFolderPath),
   metadataSyncPreviewEvent:       (eventFolderPath)  => ipcRenderer.invoke('metadataSync:previewEvent',       eventFolderPath),
   metadataSyncScanEventFolder:    (eventFolderPath)  => ipcRenderer.invoke('metadataSync:scanEventFolder',    eventFolderPath),

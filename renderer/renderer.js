@@ -4421,6 +4421,7 @@ const _MS_BG_SCAN_MIN_MS = 90_000;    // minimum interval between automatic back
 let _msScopeEvents      = [];          // cached event list for "Select Event…" picker
 let _msScopeSelected    = null;        // currently selected event folder in picker
 let _msScanCounter      = 0;           // incremented on each user-triggered scan; guards against stale async results
+let _msScanPollTimer    = null;        // setInterval handle for background collection-scan status polling
 
 function _refreshMetadataSyncCard() {
   const valEl   = document.getElementById('ovMetadataSyncVal');
@@ -4534,43 +4535,72 @@ function _msBuildResultHtml(result) {
     ${kwChips}`;
 }
 
+function _msScanStopPoll() {
+  if (_msScanPollTimer) { clearInterval(_msScanPollTimer); _msScanPollTimer = null; }
+}
+
 async function _msScanAndRender(masterPath) {
   const thisScan = ++_msScanCounter;
-  const listEl = document.getElementById('msEventList');
+  const listEl   = document.getElementById('msEventList');
   if (!listEl) return;
-  listEl.innerHTML = '<div class="ms-loading">Scanning for metadata changes…</div>';
+  _msScanStopPoll();
+  listEl.innerHTML = '<div class="ms-loading"><div class="ms-loading-title">Scanning metadata status…</div><div class="ms-loading-sub">Checking events in the selected archive. Large collections may take a few minutes.</div></div>';
 
-  let pending = [];
-  try {
-    // Race against a 60-second timeout — NAS filesystem calls have no built-in Node.js timeout
-    // and a stale/unresponsive mount will block fsp.readdir/stat indefinitely without this guard.
-    // Reads run with bounded concurrency in the main process, so large events finish well under
-    // this; the timeout only fires on a genuinely stalled mount.
-    pending = await Promise.race([
-      window.api.metadataSyncScanPending(masterPath),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Scan timed out — check archive connection')), 60_000)
-      ),
-    ]);
-  } catch (err) {
-    if (thisScan !== _msScanCounter) return;  // scope changed while awaiting — discard stale error
-    listEl.innerHTML = `<p class="ms-empty">Could not scan collection: ${escapeHtml(err.message)}</p>`;
+  // Ask the main process to start a background scan job — returns immediately with a jobId.
+  let startResult;
+  try { startResult = await window.api.metadataSyncStartScanPending(masterPath); } catch {
+    if (thisScan !== _msScanCounter) return;
+    listEl.innerHTML = '<p class="ms-empty">Metadata scan failed. Please try again.</p>';
     return;
   }
 
-  if (thisScan !== _msScanCounter) return;  // scope changed while awaiting — discard stale results
+  if (thisScan !== _msScanCounter) return;
 
-  // Update the card badge (only collection scans update the global count)
-  const valEl = document.getElementById('ovMetadataSyncVal');
-  if (valEl) valEl.setAttribute('data-pending', String(pending.length));
-  _refreshMetadataSyncCard();
-
-  if (pending.length === 0) {
-    listEl.innerHTML = '<p class="ms-empty">All events are up to date. No metadata sync needed.</p>';
+  if (!startResult?.ok) {
+    const msg = startResult?.errorType === 'archive_unavailable'
+      ? 'Archive root is not available. Reconnect the archive and try again.'
+      : startResult?.errorType === 'service_busy'
+      ? 'Another metadata scan is already running. Please wait for it to finish.'
+      : 'Metadata scan failed. Please try again.';
+    listEl.innerHTML = `<p class="ms-empty">${escapeHtml(msg)}</p>`;
     return;
   }
 
-  _msRenderPendingList(pending, listEl);
+  const jobId = startResult.jobId;
+
+  // Poll job status every 1.5 s. The scan runs entirely in the main process — no renderer timeout needed.
+  _msScanPollTimer = setInterval(async () => {
+    if (thisScan !== _msScanCounter) { _msScanStopPoll(); return; }
+
+    let status;
+    try { status = await window.api.metadataSyncGetScanPendingStatus(jobId); } catch { return; }
+
+    if (!status || status.state === 'running') return;
+
+    _msScanStopPoll();
+    if (thisScan !== _msScanCounter) return;
+    if (status.state === 'not_found') {
+      listEl.innerHTML = '<p class="ms-empty">Metadata scan was interrupted. Please start the scan again.</p>';
+      return;
+    }
+
+    if (status.state === 'complete') {
+      const pending = status.result || [];
+      const valEl = document.getElementById('ovMetadataSyncVal');
+      if (valEl) valEl.setAttribute('data-pending', String(pending.length));
+      _refreshMetadataSyncCard();
+      if (pending.length === 0) {
+        listEl.innerHTML = '<p class="ms-empty">All events are up to date. No metadata sync needed.</p>';
+      } else {
+        _msRenderPendingList(pending, listEl);
+      }
+    } else {
+      const msg = status.errorType === 'archive_unavailable'
+        ? 'Archive root is not available. Reconnect the archive and try again.'
+        : 'Metadata scan failed. Please try again.';
+      listEl.innerHTML = `<p class="ms-empty">${escapeHtml(msg)}</p>`;
+    }
+  }, 1_500);
 }
 
 async function _msRunSync(eventFolderPath, folderName) {
@@ -4980,6 +5010,8 @@ async function openMetadataSyncModal() {
 
 function _msClose() {
   document.getElementById('metadataSyncModal')?.classList.remove('open');
+  _msScanStopPoll();
+  _msScanCounter++;   // invalidate any in-flight startScan await so stale results are not rendered
 }
 
 // ── Scope selector logic ──────────────────────────────────────────────────────
