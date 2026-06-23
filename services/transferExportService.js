@@ -979,6 +979,67 @@ async function verifyExport(nasRoot, transferRoot, scope) {
 // Size is the primary check; mtime is advisory only.
 const SCAN_ITEM_CAP = 500; // per-group item cap for the IPC payload (counts/bytes stay exact)
 
+// Extract a photographer sequence prefix from a folder name (e.g. "PC001", "A123").
+// Returns { letters, digits, full } or null.
+function _extractSequencePrefix(name) {
+  const m = /^([A-Z]{1,3})(\d{3})/.exec(name);
+  return m ? { letters: m[1], digits: m[2], full: m[0] } : null;
+}
+
+// Score a candidate dest-subfolder / src-subfolder rename pair.
+// Returns -1 if disqualified, otherwise a score (0–130).
+// Threshold for suggestion: ≥54.
+// Scoring:
+//   Sequence prefix match (both sides share same prefix) → +60
+//   Sequence prefix mismatch (both have prefix but different) → disqualify (-1)
+//   File overlap (sample ≤30 dest files found in src) → round(ratio × 60), 0–60
+//   Structure match (same immediate subdir count) → +10
+async function _scoreSubfolderMatch(destSubDir, srcSubDir) {
+  const destName = path.basename(destSubDir);
+  const srcName  = path.basename(srcSubDir);
+  const destPfx  = _extractSequencePrefix(destName);
+  const srcPfx   = _extractSequencePrefix(srcName);
+  let score = 0;
+
+  if (destPfx && srcPfx) {
+    if (destPfx.letters === srcPfx.letters && destPfx.digits === srcPfx.digits) {
+      score += 60;
+    } else {
+      return -1; // both have prefix but they differ — disqualify
+    }
+  }
+
+  // File overlap: sample up to 30 dest files and check for them in src.
+  let destFiles = [];
+  try {
+    const entries = await fsp.readdir(destSubDir, { withFileTypes: true });
+    destFiles = entries.filter(e => e.isFile() && !e.name.startsWith('._') && e.name !== '.DS_Store').map(e => e.name);
+  } catch {}
+  if (destFiles.length > 0) {
+    const sample = destFiles.length <= 30 ? destFiles : destFiles.slice(0, 30);
+    let hits = 0;
+    for (const fname of sample) {
+      try { await fsp.access(path.join(srcSubDir, fname)); hits++; } catch {}
+    }
+    score += Math.round((hits / sample.length) * 60);
+  }
+
+  // Structure match: same count of non-skipped immediate subdirectories.
+  let destSubs = 0;
+  let srcSubs  = 0;
+  try {
+    const e = await fsp.readdir(destSubDir, { withFileTypes: true });
+    destSubs = e.filter(x => x.isDirectory() && !_skipDir(x.name)).length;
+  } catch {}
+  try {
+    const e = await fsp.readdir(srcSubDir, { withFileTypes: true });
+    srcSubs = e.filter(x => x.isDirectory() && !_skipDir(x.name)).length;
+  } catch {}
+  if (destSubs === srcSubs) score += 10;
+
+  return score;
+}
+
 // Resolve a scope object into walk units, mirroring _doExport's batch resolution exactly
 // so the scan matches what runExport (Update Backup) will actually copy.
 async function _resolveScanUnits(nasRoot, transferRoot, scope) {
@@ -1183,6 +1244,7 @@ async function scanBackupSync(nasRoot, transferRoot, scope) {
       const orphanDir = orphanByKey.get(id.key);
       if (!orphanDir) continue;
       renameMatches.push({
+        type:        'event',
         srcRelPath:  path.relative(nasRoot, u.srcDir).replace(/\\/g, '/'),
         destRelPath: path.relative(transferRoot, orphanDir).replace(/\\/g, '/'),
         srcAbsPath:  u.srcDir,
@@ -1190,7 +1252,70 @@ async function scanBackupSync(nasRoot, transferRoot, scope) {
         hijriDate:   id.hijriDate,
         sequence:    id.sequence,
         confidence:  'high',
+        matchReason: `Matching event identity (${id.hijriDate}, #${id.sequence})`,
       });
+    }
+
+    // Nested subfolder rename detection: for each event-level unit whose dest EXISTS,
+    // find orphan dest subfolders that have no same-named src counterpart and score them
+    // against unmatched src subfolders. Only one candidate above threshold is suggested.
+    for (const u of units) {
+      const rel = path.relative(transferRoot, u.destDir).split(path.sep);
+      if (rel.length !== 2) continue; // event-level units only (collection/event depth)
+
+      let destExists = false;
+      try { await fsp.access(u.destDir); destExists = true; } catch {}
+      if (!destExists) continue; // dest doesn't exist — event itself may be a rename, handled above
+
+      let destEntries;
+      try { destEntries = await fsp.readdir(u.destDir, { withFileTypes: true }); } catch { continue; }
+      let srcEntries;
+      try { srcEntries = await fsp.readdir(u.srcDir, { withFileTypes: true }); } catch { continue; }
+
+      const srcSubNames  = new Set(srcEntries.filter(e => e.isDirectory() && !_skipDir(e.name)).map(e => e.name));
+      const destSubNames = new Set(destEntries.filter(e => e.isDirectory() && !_skipDir(e.name)).map(e => e.name));
+
+      const orphanDestSubDirs   = destEntries.filter(e => e.isDirectory() && !_skipDir(e.name) && !srcSubNames.has(e.name)).map(e => path.join(u.destDir, e.name));
+      const unmatchedSrcSubDirs = srcEntries.filter(e => e.isDirectory() && !_skipDir(e.name) && !destSubNames.has(e.name)).map(e => path.join(u.srcDir, e.name));
+
+      if (!orphanDestSubDirs.length || !unmatchedSrcSubDirs.length) continue;
+
+      for (const orphanDest of orphanDestSubDirs) {
+        let bestScore = -1;
+        let bestSrc   = null;
+        let aboveThreshold = 0;
+
+        for (const candidateSrc of unmatchedSrcSubDirs) {
+          const score = await _scoreSubfolderMatch(orphanDest, candidateSrc);
+          if (score >= 54) {
+            aboveThreshold++;
+            if (score > bestScore) { bestScore = score; bestSrc = candidateSrc; }
+          }
+        }
+
+        // Only suggest when exactly one candidate clears the threshold — ambiguous matches are skipped.
+        if (aboveThreshold === 1 && bestSrc !== null) {
+          const destName = path.basename(orphanDest);
+          const srcName  = path.basename(bestSrc);
+          const destPfx  = _extractSequencePrefix(destName);
+          const srcPfx   = _extractSequencePrefix(srcName);
+          let matchReason;
+          if (destPfx && srcPfx && destPfx.letters === srcPfx.letters && destPfx.digits === srcPfx.digits) {
+            matchReason = `Matching sequence prefix (${destPfx.full}) within event`;
+          } else {
+            matchReason = `High file overlap within event`;
+          }
+          renameMatches.push({
+            type:        'subfolder',
+            srcRelPath:  path.relative(nasRoot, bestSrc).replace(/\\/g, '/'),
+            destRelPath: path.relative(transferRoot, orphanDest).replace(/\\/g, '/'),
+            srcAbsPath:  bestSrc,
+            destAbsPath: orphanDest,
+            confidence:  'high',
+            matchReason,
+          });
+        }
+      }
     }
   }
 

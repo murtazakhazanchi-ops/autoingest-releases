@@ -11762,7 +11762,7 @@ const _transferMonitor = (() => {
         + `<div class=”tx-rename-detail”>`
         + `<div class=”tx-rename-row”><span class=”tx-rename-lbl”>Transfer drive:</span><span class=”tx-rename-val”>${escapeHtml(m.destRelPath)}</span></div>`
         + `<div class=”tx-rename-row”><span class=”tx-rename-lbl”>Archive folder:</span><span class=”tx-rename-val”>${escapeHtml(m.srcRelPath)}</span></div>`
-        + `<div class=”tx-rename-row”><span class=”tx-rename-lbl”>Match reason:</span><span class=”tx-rename-val”>Matching event identity (${escapeHtml(m.hijriDate)}, #${escapeHtml(m.sequence)})</span></div>`
+        + `<div class=”tx-rename-row”><span class=”tx-rename-lbl”>Match reason:</span><span class=”tx-rename-val”>${escapeHtml(m.matchReason || (m.hijriDate != null ? `Matching event identity (${m.hijriDate}, #${m.sequence})` : 'High-confidence match'))}</span></div>`
         + `</div>`
         + `<div class=”tx-rename-actions”><button class=”emm-btn-secondary tx-rename-review-btn” data-idx=”${idx}”>Review Rename</button></div>`
         + `</div>`
@@ -11803,7 +11803,7 @@ const _transferMonitor = (() => {
       + `<span style=”font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--subtext)”>Active Archive folder</span>`
       + `<span style=”font-size:12px;font-weight:600;color:var(--text);word-break:break-all” title=”${escapeHtml(match.srcRelPath)}”>${escapeHtml(match.srcRelPath)}</span>`
       + `</div>`
-      + `<div style=”font-size:11px;color:var(--subtext)”>Match reason: Matching event identity (${escapeHtml(match.hijriDate)}, sequence #${escapeHtml(match.sequence)})</div>`
+      + `<div style=”font-size:11px;color:var(--subtext)”>Match reason: ${escapeHtml(match.matchReason || (match.hijriDate != null ? `Matching event identity (${match.hijriDate}, sequence #${match.sequence})` : 'High-confidence match'))}</div>`
       + `</div>`
       + `<div style=”font-size:11px;color:var(--subtext);line-height:1.45”>Renaming updates the transfer drive folder name to match the archive. The archive is not modified. Only the folder name on the transfer drive changes.</div>`
       + `</div>`
