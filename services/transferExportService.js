@@ -979,21 +979,34 @@ async function verifyExport(nasRoot, transferRoot, scope) {
 // Size is the primary check; mtime is advisory only.
 const SCAN_ITEM_CAP = 500; // per-group item cap for the IPC payload (counts/bytes stay exact)
 
-// Extract a photographer sequence prefix from a folder name (e.g. "PC001", "A123").
+// Extract a photographer sequence prefix from a folder name.
+// Recognises PC001-, PC001_, PC01-, PC01_, A01-, A001_, etc. (separator required).
 // Returns { letters, digits, full } or null.
 function _extractSequencePrefix(name) {
-  const m = /^([A-Z]{1,3})(\d{3})/.exec(name);
+  const m = /^([A-Z]{1,3})(\d{2,3})(?=[-_])/.exec(name);
   return m ? { letters: m[1], digits: m[2], full: m[0] } : null;
+}
+
+// Remove a leading sequence prefix (including its separator) from a folder name.
+function _stripSequencePrefix(name) {
+  return name.replace(/^[A-Z]{1,3}\d{2,3}[-_]/, '');
+}
+
+// Normalise a folder name for loose comparison: lowercase, collapse all
+// hyphens/underscores/spaces to a single space, trim.
+function _normalizeFolderName(name) {
+  return name.toLowerCase().replace(/[-_\s]+/g, ' ').trim();
 }
 
 // Score a candidate dest-subfolder / src-subfolder rename pair.
 // Returns -1 if disqualified, otherwise a score (0–130).
 // Threshold for suggestion: ≥54.
 // Scoring:
-//   Sequence prefix match (both sides share same prefix) → +60
-//   Sequence prefix mismatch (both have prefix but different) → disqualify (-1)
+//   Both have same sequence prefix                    → +60
+//   Both have prefix but they differ                  → disqualify (-1)
+//   Only src has prefix; stripped src name ≈ dest name → +40 (prefix-added match)
 //   File overlap (sample ≤30 dest files found in src) → round(ratio × 60), 0–60
-//   Structure match (same immediate subdir count) → +10
+//   Structure match (same immediate subdir count)     → +10
 async function _scoreSubfolderMatch(destSubDir, srcSubDir) {
   const destName = path.basename(destSubDir);
   const srcName  = path.basename(srcSubDir);
@@ -1005,8 +1018,15 @@ async function _scoreSubfolderMatch(destSubDir, srcSubDir) {
     if (destPfx.letters === srcPfx.letters && destPfx.digits === srcPfx.digits) {
       score += 60;
     } else {
-      return -1; // both have prefix but they differ — disqualify
+      return -1; // both have prefix but they differ — hard disqualify
     }
+  } else if (!destPfx && srcPfx) {
+    // "Prefix added" path: src gained a sequence prefix, dest still has the original name.
+    // Add a bonus only when the normalized base names match after stripping the prefix.
+    const srcBase  = _normalizeFolderName(_stripSequencePrefix(srcName));
+    const destBase = _normalizeFolderName(destName);
+    if (srcBase === destBase) score += 40;
+    // If names differ, no bonus — file overlap alone must clear the threshold.
   }
 
   // File overlap: sample up to 30 dest files and check for them in src.
@@ -1302,6 +1322,8 @@ async function scanBackupSync(nasRoot, transferRoot, scope) {
           let matchReason;
           if (destPfx && srcPfx && destPfx.letters === srcPfx.letters && destPfx.digits === srcPfx.digits) {
             matchReason = `Matching sequence prefix (${destPfx.full}) within event`;
+          } else if (!destPfx && srcPfx && _normalizeFolderName(_stripSequencePrefix(srcName)) === _normalizeFolderName(destName)) {
+            matchReason = `Sequence prefix added; folder contents match`;
           } else {
             matchReason = `High file overlap within event`;
           }
