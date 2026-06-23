@@ -3923,6 +3923,24 @@ ipcMain.handle('archive:resumeTransferExportFromCheckpoint', async (_event, { op
   });
 });
 
+ipcMain.handle('archive:getCustomTransferExportCheckpoint', async (_event, { customDestRoot } = {}) => {
+  if (!customDestRoot) return null;
+  return transferExportService.getExportCheckpoint(customDestRoot);
+});
+
+ipcMain.handle('archive:clearCustomTransferExportCheckpoint', async (_event, { customDestRoot } = {}) => {
+  if (!customDestRoot) return { ok: false, reason: 'custom-dest-not-set' };
+  return transferExportService.clearExportCheckpoint(customDestRoot);
+});
+
+ipcMain.handle('archive:resumeCustomTransferExportFromCheckpoint', async (_event, { customSrcRoot, customDestRoot, operatorName } = {}) => {
+  if (!customSrcRoot || !customDestRoot) return { ok: false, reason: 'custom-paths-not-set' };
+  return transferExportService.resumeExportFromCheckpoint(customSrcRoot, customDestRoot, {
+    operatorName: operatorName || null,
+    deviceName:   os.hostname(),
+  });
+});
+
 ipcMain.handle('archive:verifyTransferExport', async (_event, { scope } = {}) => {
   const nasRoot      = settings.getNasRoot();
   const transferRoot = settings.getTransferRoot();

@@ -259,6 +259,9 @@ contextBridge.exposeInMainWorld('api', {
   renameFolderOnTransferDrive:           (destAbsPath, newName)    => ipcRenderer.invoke('archive:renameFolderOnTransferDrive',        { destAbsPath, newName }),
   chooseCustomSrcFolder:                 ()                        => ipcRenderer.invoke('archive:chooseCustomSrcFolder'),
   chooseCustomDestFolder:                ()                        => ipcRenderer.invoke('archive:chooseCustomDestFolder'),
+  getCustomTransferExportCheckpoint:     ({ customDestRoot })                                        => ipcRenderer.invoke('archive:getCustomTransferExportCheckpoint',        { customDestRoot }),
+  clearCustomTransferExportCheckpoint:   ({ customDestRoot })                                        => ipcRenderer.invoke('archive:clearCustomTransferExportCheckpoint',      { customDestRoot }),
+  resumeCustomTransferExportFromCheckpoint: ({ customSrcRoot, customDestRoot, operatorName })        => ipcRenderer.invoke('archive:resumeCustomTransferExportFromCheckpoint', { customSrcRoot, customDestRoot, operatorName }),
 
   // ── Transfer Import ──
   getTransferDriveCollections:           ()                        => ipcRenderer.invoke('archive:getTransferDriveCollections'),
