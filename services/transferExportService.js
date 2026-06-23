@@ -919,12 +919,15 @@ async function resumeExportFromCheckpoint(nasRoot, transferRoot, meta = {}) {
   _doExport(
     nasRoot, transferRoot,
     {
-      collectionPaths: checkpoint.collectionPaths || [],
-      folderPaths:     checkpoint.folderPaths     || null,
-      eventRootPaths:  checkpoint.eventRootPaths  || null,
-      purpose:         checkpoint.exportPurpose   || 'archive-transfer',
-      backupUpdate:    checkpoint.backupUpdate    || false,
-      sourceMode:      checkpoint.sourceMode      || 'archive',
+      collectionPaths:  checkpoint.collectionPaths || [],
+      folderPaths:      checkpoint.folderPaths     || null,
+      eventRootPaths:   checkpoint.eventRootPaths  || null,
+      purpose:          checkpoint.exportPurpose   || 'archive-transfer',
+      backupUpdate:     checkpoint.backupUpdate    || false,
+      sourceMode:       checkpoint.sourceMode      || 'archive',
+      // In backupUpdate mode the checkpoint stores the queued-work total (not full source
+      // count). Pass it back so the resumeBatches branch does not inflate the denominator.
+      updateTotalFiles: checkpoint.backupUpdate ? checkpoint.totalFiles : undefined,
     },
     { ...meta, batchId, deviceName },
     checkpoint.batches
