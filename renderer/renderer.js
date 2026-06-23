@@ -11899,7 +11899,10 @@ const _transferMonitor = (() => {
     const updateTotalFiles = _txScanMode && _txScanResult
       ? (_txScanResult.totals.toCopy + (_txScanResult.totals.controlUpdates || 0))
       : undefined;
-    const scope = { ...builtScope, purpose: _txPurpose, backupUpdate: _txScanMode, updateTotalFiles };
+    const updateTotalBytes = _txScanMode && _txScanResult
+      ? (_txScanResult.totals.bytesToCopy + (_txScanResult.totals.controlUpdateBytes || 0))
+      : undefined;
+    const scope = { ...builtScope, purpose: _txPurpose, backupUpdate: _txScanMode, updateTotalFiles, updateTotalBytes };
 
     const exportBtn  = _txEl('txExportBtn');
     const previewBtn = _txEl('txPreviewBtn');
@@ -12096,6 +12099,10 @@ const _transferMonitor = (() => {
     if (!box) return;
     box.removeAttribute('hidden');
 
+    // Read backup-update mode from the service status so progress stays correct
+    // even if the modal is closed and reopened mid-export (which resets _txScanMode).
+    const isBackupUpdate = !!(status.backupUpdate);
+
     // Box class
     box.className = 'tx-status-box';
     if (status.paused)          box.classList.add('tx-paused');
@@ -12120,11 +12127,14 @@ const _transferMonitor = (() => {
     const progressLabel = _txEl('txProgressLabel');
     if (progressWrap && status.total > 0) {
       progressWrap.removeAttribute('hidden');
-      // In backup-update mode only copied files count toward progress; skipped same-files
-      // are invisible work and inflating done would make the bar jump immediately to ~99%.
-      const done = _txScanMode
+      // Backup-update mode: only actually-copied files count toward progress.
+      // Up-to-date skipped files are encountered during the walk but are not part of
+      // the queued total, so including them inflates done above total.
+      // isBackupUpdate comes from service state — reliable even after modal reopen.
+      const doneRaw = isBackupUpdate
         ? (status.copied || 0)
         : (status.copied || 0) + (status.skipped || 0) + (status.renamed || 0);
+      const done = Math.min(doneRaw, status.total);
       const pct  = Math.min(100, Math.round((done / status.total) * 100));
       if (progressFill)  progressFill.style.width = pct + '%';
       if (progressLabel) progressLabel.textContent = `${done.toLocaleString()} / ${status.total.toLocaleString()}`;
@@ -12181,9 +12191,10 @@ const _transferMonitor = (() => {
     const etaEl = _txEl('txStatusEta');
     if (etaEl) {
       if (status.running && !status.paused && status.total > 0) {
-        const done = _txScanMode
+        const doneRaw = isBackupUpdate
           ? (status.copied || 0)
           : (status.copied || 0) + (status.skipped || 0) + (status.renamed || 0);
+        const done = Math.min(doneRaw, status.total);
         const now  = Date.now();
         _txEtaSamples.push({ ts: now, done });
         // keep only samples from the last 30 seconds
@@ -12240,6 +12251,28 @@ const _transferMonitor = (() => {
       } else {
         speedEl.setAttribute('hidden', '');
         speedEl.textContent = '';
+      }
+    }
+
+    // Data size (queued bytes in backup-update mode; copied bytes only otherwise)
+    const dataSizeEl = _txEl('txDataSize');
+    if (dataSizeEl) {
+      const copiedBytes = status.copiedBytes || 0;
+      const totalBytes  = status.totalBytes  || 0;
+      if (status.running || status.paused || status.result) {
+        if (totalBytes > 0) {
+          dataSizeEl.textContent = `Data: ${formatSize(copiedBytes)} / ${formatSize(totalBytes)}`;
+          dataSizeEl.removeAttribute('hidden');
+        } else if (copiedBytes > 0) {
+          dataSizeEl.textContent = `Data: ${formatSize(copiedBytes)}`;
+          dataSizeEl.removeAttribute('hidden');
+        } else {
+          dataSizeEl.setAttribute('hidden', '');
+          dataSizeEl.textContent = '';
+        }
+      } else {
+        dataSizeEl.setAttribute('hidden', '');
+        dataSizeEl.textContent = '';
       }
     }
 

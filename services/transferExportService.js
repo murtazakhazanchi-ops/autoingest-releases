@@ -54,8 +54,10 @@ let _state = {
   renamed:       0,
   copiedBytes:   0,
   changedSkipped: 0,
+  backupUpdate:  false,
   errors:        [],
   total:         0,
+  totalBytes:    0,
   result:        null,
   verifyStatus:  null,
   verifyTotal:   0,
@@ -357,7 +359,7 @@ function _fileHash(filePath) {
 
 async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
   const startedAt = new Date().toISOString();
-  const { collectionPaths = [], folderPaths = null, eventRootPaths = null, purpose = 'archive-transfer', backupUpdate = false, updateTotalFiles, sourceMode } = scope || {};
+  const { collectionPaths = [], folderPaths = null, eventRootPaths = null, purpose = 'archive-transfer', backupUpdate = false, updateTotalFiles, updateTotalBytes, sourceMode } = scope || {};
   const isCustom = sourceMode === 'custom';
   const copyOpts = { skipControlFiles: !isCustom && purpose === 'external-sharing', backupUpdate: !!backupUpdate, sourceMode: sourceMode || 'archive' };
 
@@ -469,9 +471,12 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
   }
 
   // In backup-update mode the scan already measured the exact work queue.
-  // Use that count so progress reflects real remaining work, not total source files.
+  // Use those counts so progress reflects real queued work, not total source files.
   if (copyOpts.backupUpdate && updateTotalFiles != null) {
     _state.total = updateTotalFiles;
+  }
+  if (copyOpts.backupUpdate && updateTotalBytes != null) {
+    _state.totalBytes = updateTotalBytes;
   }
 
   // ── Write initial checkpoint (archive mode only) ──────────────────────────
@@ -767,6 +772,7 @@ async function runExport(nasRoot, transferRoot, scope, meta = {}) {
     running: true, paused: false, batchId,
     batchIndex: 0, batchCount: 0, batchName: '',
     current: '', currentDir: '', copied: 0, skipped: 0, renamed: 0, changedSkipped: 0, errors: [],
+    copiedBytes: 0, totalBytes: 0, backupUpdate: !!(scope?.backupUpdate),
     total: 0, result: null,
     verifyStatus: null, verifyTotal: 0, verifyDone: 0,
     verifyFailed: 0, verifyMissing: 0, verifyCurrent: '', verifyResult: null,
@@ -808,6 +814,9 @@ async function resumeExportFromCheckpoint(nasRoot, transferRoot, meta = {}) {
     renamed:       checkpoint.totalRenamed || 0,
     changedSkipped: 0,
     errors:        [],
+    copiedBytes:   0,
+    totalBytes:    0,
+    backupUpdate:  !!(checkpoint.backupUpdate),
     total:         checkpoint.totalFiles   || 0,
     result:        null,
     verifyStatus:  null, verifyTotal: 0, verifyDone: 0,
