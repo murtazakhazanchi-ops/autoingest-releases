@@ -381,15 +381,12 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
   const isCustom = sourceMode === 'custom';
   const copyOpts = { skipControlFiles: !isCustom && purpose === 'external-sharing', backupUpdate: !!backupUpdate, sourceMode: sourceMode || 'archive' };
 
-  // Custom-source exports write no archive metadata (no .autoingest-transfer/ marker).
-  if (!isCustom) {
-    try {
-      await _initTransferMeta(transferRoot, meta.deviceName);
-    } catch (e) {
-      _state.running = false;
-      _state.result  = { ok: false, reason: 'meta-init-failed', error: e.message, completedAt: new Date().toISOString() };
-      return;
-    }
+  try {
+    await _initTransferMeta(transferRoot, meta.deviceName);
+  } catch (e) {
+    _state.running = false;
+    _state.result  = { ok: false, reason: 'meta-init-failed', error: e.message, completedAt: new Date().toISOString() };
+    return;
   }
 
   // ── Build or restore batch list ───────────────────────────────────────────
@@ -505,8 +502,7 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
     _state.totalBytes = updateTotalBytes;
   }
 
-  // ── Write initial checkpoint (archive mode only) ──────────────────────────
-  if (!isCustom) await _writeCheckpoint(transferRoot, {
+  await _writeCheckpoint(transferRoot, {
     exportId:        meta.batchId,
     nasRoot,
     transferRoot,
@@ -515,6 +511,7 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
     eventRootPaths:  eventRootPaths  || null,
     exportPurpose:   purpose,
     backupUpdate,
+    sourceMode:      isCustom ? 'custom' : 'archive',
     createdAt:       startedAt,
     status:          'running',
     batches,
@@ -562,7 +559,7 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
     batch.errors  = stats.errors.length - beforeErrors;
     batch.status  = 'complete';
 
-    if (!isCustom) await _writeCheckpoint(transferRoot, {
+    await _writeCheckpoint(transferRoot, {
       exportId:        meta.batchId,
       nasRoot,
       transferRoot,
@@ -571,6 +568,7 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
       eventRootPaths:  eventRootPaths || null,
       exportPurpose:   purpose,
       backupUpdate,
+      sourceMode:      isCustom ? 'custom' : 'archive',
       createdAt:       startedAt,
       status:          _state.paused ? 'paused' : 'running',
       batches,
@@ -586,7 +584,7 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
   const completedAt = new Date().toISOString();
   const finalStatus = stats.errors.length === 0 ? 'ok' : 'partial';
 
-  if (!isCustom) await _writeCheckpoint(transferRoot, {
+  await _writeCheckpoint(transferRoot, {
     exportId:       meta.batchId,
     nasRoot,
     transferRoot,
@@ -595,6 +593,7 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
     eventRootPaths: eventRootPaths || null,
     exportPurpose:  purpose,
     backupUpdate,
+    sourceMode:     isCustom ? 'custom' : 'archive',
     createdAt:      startedAt,
     completedAt,
     status:         'complete',
@@ -857,6 +856,7 @@ async function resumeExportFromCheckpoint(nasRoot, transferRoot, meta = {}) {
       eventRootPaths:  checkpoint.eventRootPaths  || null,
       purpose:         checkpoint.exportPurpose   || 'archive-transfer',
       backupUpdate:    checkpoint.backupUpdate    || false,
+      sourceMode:      checkpoint.sourceMode      || 'archive',
     },
     { ...meta, batchId, deviceName },
     checkpoint.batches
