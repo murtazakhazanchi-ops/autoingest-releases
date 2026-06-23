@@ -230,6 +230,24 @@ async function _countFiles(dir, opts = {}) {
   return count;
 }
 
+async function _sumBytes(dir, opts = {}) {
+  let bytes = 0;
+  let entries;
+  try { entries = await fsp.readdir(dir, { withFileTypes: true }); } catch { return 0; }
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      if (_skipDir(entry.name)) continue;
+      if (opts.rootFilesOnly) continue;
+      bytes += await _sumBytes(path.join(dir, entry.name), opts);
+    } else if (entry.isFile()) {
+      if (_skipFile(entry.name)) continue;
+      if (opts.skipControlFiles && _skipControlFile(entry.name)) continue;
+      try { const st = await fsp.stat(path.join(dir, entry.name)); bytes += st.size; } catch {}
+    }
+  }
+  return bytes;
+}
+
 async function _initTransferMeta(transferRoot, deviceName) {
   const metaDir    = path.join(transferRoot, TRANSFER_META_DIR);
   const markerPath = path.join(metaDir, TRANSFER_ROOT_JSON);
@@ -392,6 +410,7 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
     }];
     batches[0].fileCount = await _countFiles(nasRoot, copyOpts);
     _state.total      = batches[0].fileCount;
+    _state.totalBytes = await _sumBytes(nasRoot, copyOpts);
     _state.batchCount = 1;
   } else if ((folderPaths && folderPaths.length > 0) || (eventRootPaths && eventRootPaths.length > 0)) {
     batches = [];
@@ -431,11 +450,15 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
     }
 
     let totalFiles = 0;
+    let totalBytes = 0;
     for (const batch of batches) {
-      batch.fileCount = await _countFiles(batch.srcDir, { ...copyOpts, rootFilesOnly: !!batch.rootFilesOnly });
+      const batchOpts = { ...copyOpts, rootFilesOnly: !!batch.rootFilesOnly };
+      batch.fileCount = await _countFiles(batch.srcDir, batchOpts);
       totalFiles += batch.fileCount;
+      totalBytes += await _sumBytes(batch.srcDir, batchOpts);
     }
     _state.total      = totalFiles;
+    _state.totalBytes = totalBytes;
     _state.batchCount = batches.length;
   } else {
     // Event-level batches from collection paths (original behaviour)
@@ -462,11 +485,14 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
     }
 
     let totalFiles = 0;
+    let totalBytes = 0;
     for (const batch of batches) {
       batch.fileCount = await _countFiles(batch.srcDir, copyOpts);
       totalFiles += batch.fileCount;
+      totalBytes += await _sumBytes(batch.srcDir, copyOpts);
     }
     _state.total      = totalFiles;
+    _state.totalBytes = totalBytes;
     _state.batchCount = batches.length;
   }
 
