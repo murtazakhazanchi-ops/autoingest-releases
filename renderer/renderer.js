@@ -11699,17 +11699,17 @@ const _transferMonitor = (() => {
       const items = grp.items || [];
       const openAttr = autoOpen ? ' open' : '';
       const body = items.length
-        ? `<details class=”tx-scan-details”${openAttr}><summary>${grp.count.toLocaleString()} item${grp.count === 1 ? '' : 's'} · ${formatSize(grp.bytes)}</summary>`
-          + `<ul class=”tx-scan-list”>`
-          + items.map(it => `<li><span class=”tx-scan-rel”>${escapeHtml(it.relPath)}</span><span class=”tx-scan-sz”>${formatSize(it.size)}</span></li>`).join('')
-          + (grp.truncated ? `<li class=”tx-scan-more”>…and ${(grp.count - items.length).toLocaleString()} more</li>` : '')
+        ? `<details class="tx-scan-details"${openAttr}><summary>${grp.count.toLocaleString()} item${grp.count === 1 ? '' : 's'} · ${formatSize(grp.bytes)}</summary>`
+          + `<ul class="tx-scan-list">`
+          + items.map(it => `<li><span class="tx-scan-rel">${escapeHtml(it.relPath)}</span><span class="tx-scan-sz">${formatSize(it.size)}</span></li>`).join('')
+          + (grp.truncated ? `<li class="tx-scan-more">…and ${(grp.count - items.length).toLocaleString()} more</li>` : '')
           + `</ul></details>`
         : '';
       const meta = `${grp.count.toLocaleString()} item${grp.count === 1 ? '' : 's'} · ${formatSize(grp.bytes)}`;
-      return `<div class=”tx-scan-group ${cls}”>`
-        + `<div class=”tx-scan-grp-hd”>`
-        + `<div class=”tx-scan-grp-lbl”>${label}</div>`
-        + `<div class=”tx-scan-grp-meta”>${meta}</div>`
+      return `<div class="tx-scan-group ${cls}">`
+        + `<div class="tx-scan-grp-hd">`
+        + `<div class="tx-scan-grp-lbl">${label}</div>`
+        + `<div class="tx-scan-grp-meta">${meta}</div>`
         + `</div>${body}</div>`;
     };
     const groups =
@@ -11733,26 +11733,26 @@ const _transferMonitor = (() => {
     const destCount    = g.destinationOnly?.count  || 0;
     const destBytes    = g.destinationOnly?.bytes  || 0;
     const stats = [];
-    if (newCount > 0)     stats.push(`<div class=”tx-sum-stat tx-sum-stat--new”><div class=”tx-sum-stat-lbl”>Need backup</div><div class=”tx-sum-stat-meta”>${newCount.toLocaleString()} file${newCount !== 1 ? 's' : ''} · ${formatSize(newBytes)}</div></div>`);
-    if (ctrlCount > 0)    stats.push(`<div class=”tx-sum-stat tx-sum-stat--ctrl”><div class=”tx-sum-stat-lbl”>Control updates</div><div class=”tx-sum-stat-meta”>${ctrlCount.toLocaleString()} file${ctrlCount !== 1 ? 's' : ''} · ${formatSize(ctrlBytes)}</div></div>`);
-    if (sameCount > 0)    stats.push(`<div class=”tx-sum-stat tx-sum-stat--same”><div class=”tx-sum-stat-lbl”>Up to date</div><div class=”tx-sum-stat-meta”>${sameCount.toLocaleString()} file${sameCount !== 1 ? 's' : ''} · ${formatSize(sameBytes)}</div></div>`);
-    if (changedCount > 0) stats.push(`<div class=”tx-sum-stat tx-sum-stat--review”><div class=”tx-sum-stat-lbl”>Needs review</div><div class=”tx-sum-stat-meta”>${changedCount.toLocaleString()} file${changedCount !== 1 ? 's' : ''} · ${formatSize(changedBytes)}</div></div>`);
-    if (destCount > 0)    stats.push(`<div class=”tx-sum-stat tx-sum-stat--dest”><div class=”tx-sum-stat-lbl”>Destination only</div><div class=”tx-sum-stat-meta”>${destCount.toLocaleString()} item${destCount !== 1 ? 's' : ''} · ${formatSize(destBytes)}</div></div>`);
-    const summaryHtml = `<div class=”tx-scan-summary”>`
-      + `<div class=”tx-scan-summary-hd”>`
-      + `<div class=”tx-scan-summary-title”>Backup scan complete</div>`
-      + `<div class=”tx-scan-summary-sub”>Update Backup copies missing files and updates control files (event.json). Changed media files are not copied automatically.</div>`
+    if (newCount > 0)     stats.push(`<div class="tx-sum-stat tx-sum-stat--new"><div class="tx-sum-stat-lbl">Need backup</div><div class="tx-sum-stat-meta">${newCount.toLocaleString()} file${newCount !== 1 ? 's' : ''} · ${formatSize(newBytes)}</div></div>`);
+    if (ctrlCount > 0)    stats.push(`<div class="tx-sum-stat tx-sum-stat--ctrl"><div class="tx-sum-stat-lbl">Control updates</div><div class="tx-sum-stat-meta">${ctrlCount.toLocaleString()} file${ctrlCount !== 1 ? 's' : ''} · ${formatSize(ctrlBytes)}</div></div>`);
+    if (sameCount > 0)    stats.push(`<div class="tx-sum-stat tx-sum-stat--same"><div class="tx-sum-stat-lbl">Up to date</div><div class="tx-sum-stat-meta">${sameCount.toLocaleString()} file${sameCount !== 1 ? 's' : ''} · ${formatSize(sameBytes)}</div></div>`);
+    if (changedCount > 0) stats.push(`<div class="tx-sum-stat tx-sum-stat--review"><div class="tx-sum-stat-lbl">Needs review</div><div class="tx-sum-stat-meta">${changedCount.toLocaleString()} file${changedCount !== 1 ? 's' : ''} · ${formatSize(changedBytes)}</div></div>`);
+    if (destCount > 0)    stats.push(`<div class="tx-sum-stat tx-sum-stat--dest"><div class="tx-sum-stat-lbl">Destination only</div><div class="tx-sum-stat-meta">${destCount.toLocaleString()} item${destCount !== 1 ? 's' : ''} · ${formatSize(destBytes)}</div></div>`);
+    const summaryHtml = `<div class="tx-scan-summary">`
+      + `<div class="tx-scan-summary-hd">`
+      + `<div class="tx-scan-summary-title">Backup scan complete</div>`
+      + `<div class="tx-scan-summary-sub">Update Backup copies missing files and updates control files (event.json). Changed media files are not copied automatically.</div>`
       + `</div>`
-      + (stats.length ? `<div class=”tx-sum-stats”>${stats.join('')}</div>` : '')
+      + (stats.length ? `<div class="tx-sum-stats">${stats.join('')}</div>` : '')
       + `</div>`;
 
     // Legend — reuses .tx-tree-status pill badges (identical class/data-status as tree)
-    const legendHtml = `<div class=”tx-scan-legend”>`
-      + `<div class=”tx-scan-legend-title”>Folder status</div>`
-      + `<span class=”tx-tree-status” data-status=”up-to-date”>✓ Up to date</span>`
-      + `<span class=”tx-tree-status” data-status=”partial”>◐ Partial</span>`
-      + `<span class=”tx-tree-status” data-status=”review”>⚠ Needs review</span>`
-      + `<span class=”tx-tree-status” data-status=”not-copied”>○ Not copied</span>`
+    const legendHtml = `<div class="tx-scan-legend">`
+      + `<div class="tx-scan-legend-title">Folder status</div>`
+      + `<span class="tx-tree-status" data-status="up-to-date">✓ Up to date</span>`
+      + `<span class="tx-tree-status" data-status="partial">◐ Partial</span>`
+      + `<span class="tx-tree-status" data-status="review">⚠ Needs review</span>`
+      + `<span class="tx-tree-status" data-status="not-copied">○ Not copied</span>`
       + `</div>`;
 
     // Rename match cards — shown when a backup-update scan detects a likely archive rename.
@@ -11760,20 +11760,20 @@ const _transferMonitor = (() => {
     const renameMatches = result.renameMatches || [];
     if (renameMatches.length > 0) {
       renameHtml = renameMatches.map((m, idx) =>
-        `<div class=”tx-scan-group tx-scan--rename”>`
-        + `<div class=”tx-scan-grp-hd”><div class=”tx-scan-grp-lbl”>Possible Folder Rename</div><div class=”tx-scan-grp-meta”>High-confidence match</div></div>`
-        + `<div class=”tx-rename-detail”>`
-        + `<div class=”tx-rename-row”><span class=”tx-rename-lbl”>Transfer drive:</span><span class=”tx-rename-val”>${escapeHtml(m.destRelPath)}</span></div>`
-        + `<div class=”tx-rename-row”><span class=”tx-rename-lbl”>Archive folder:</span><span class=”tx-rename-val”>${escapeHtml(m.srcRelPath)}</span></div>`
-        + `<div class=”tx-rename-row”><span class=”tx-rename-lbl”>Match reason:</span><span class=”tx-rename-val”>${escapeHtml(m.matchReason || (m.hijriDate != null ? `Matching event identity (${m.hijriDate}, #${m.sequence})` : 'High-confidence match'))}</span></div>`
+        `<div class="tx-scan-group tx-scan--rename">`
+        + `<div class="tx-scan-grp-hd"><div class="tx-scan-grp-lbl">Possible Folder Rename</div><div class="tx-scan-grp-meta">High-confidence match</div></div>`
+        + `<div class="tx-rename-detail">`
+        + `<div class="tx-rename-row"><span class="tx-rename-lbl">Transfer drive:</span><span class="tx-rename-val">${escapeHtml(m.destRelPath)}</span></div>`
+        + `<div class="tx-rename-row"><span class="tx-rename-lbl">Archive folder:</span><span class="tx-rename-val">${escapeHtml(m.srcRelPath)}</span></div>`
+        + `<div class="tx-rename-row"><span class="tx-rename-lbl">Match reason:</span><span class="tx-rename-val">${escapeHtml(m.matchReason || (m.hijriDate != null ? `Matching event identity (${m.hijriDate}, #${m.sequence})` : 'High-confidence match'))}</span></div>`
         + `</div>`
-        + `<div class=”tx-rename-actions”><button class=”emm-btn-secondary tx-rename-review-btn” data-idx=”${idx}”>Review Rename</button></div>`
+        + `<div class="tx-rename-actions"><button class="emm-btn-secondary tx-rename-review-btn" data-idx="${idx}">Review Rename</button></div>`
         + `</div>`
       ).join('');
     }
 
     reviewEl.innerHTML = summaryHtml
-      + (groups || '<div class=”tx-scan-empty” style=”padding:6px 2px”>All files are up to date.</div>')
+      + (groups || '<div class="tx-scan-empty" style="padding:6px 2px">All files are up to date.</div>')
       + renameHtml
       + legendHtml;
 
@@ -11794,26 +11794,26 @@ const _transferMonitor = (() => {
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-label', 'Review Folder Rename');
     overlay.innerHTML =
-      `<div class=”emm-box” style=”width:min(520px,calc(100vw - 48px));display:flex;flex-direction:column;max-height:calc(100vh - 80px)”>`
-      + `<div class=”emm-topbar”><span class=”emm-topbar-title”>Review Folder Rename</span></div>`
-      + `<div style=”flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:12px”>`
-      + `<div class=”tx-scan-group”>`
-      + `<div style=”display:flex;flex-direction:column;gap:4px;margin-bottom:8px”>`
-      + `<span style=”font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--subtext)”>Transfer drive folder</span>`
-      + `<span style=”font-size:12px;font-weight:600;color:var(--text);word-break:break-all” title=”${escapeHtml(match.destRelPath)}”>${escapeHtml(match.destRelPath)}</span>`
+      `<div class="emm-box" style="width:min(520px,calc(100vw - 48px));display:flex;flex-direction:column;max-height:calc(100vh - 80px)">`
+      + `<div class="emm-topbar"><span class="emm-topbar-title">Review Folder Rename</span></div>`
+      + `<div style="flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:12px">`
+      + `<div class="tx-scan-group">`
+      + `<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px">`
+      + `<span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--subtext)">Transfer drive folder</span>`
+      + `<span style="font-size:12px;font-weight:600;color:var(--text);word-break:break-all" title="${escapeHtml(match.destRelPath)}">${escapeHtml(match.destRelPath)}</span>`
       + `</div>`
-      + `<div style=”display:flex;flex-direction:column;gap:4px;margin-bottom:8px”>`
-      + `<span style=”font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--subtext)”>Active Archive folder</span>`
-      + `<span style=”font-size:12px;font-weight:600;color:var(--text);word-break:break-all” title=”${escapeHtml(match.srcRelPath)}”>${escapeHtml(match.srcRelPath)}</span>`
+      + `<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px">`
+      + `<span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--subtext)">Active Archive folder</span>`
+      + `<span style="font-size:12px;font-weight:600;color:var(--text);word-break:break-all" title="${escapeHtml(match.srcRelPath)}">${escapeHtml(match.srcRelPath)}</span>`
       + `</div>`
-      + `<div style=”font-size:11px;color:var(--subtext)”>Match reason: ${escapeHtml(match.matchReason || (match.hijriDate != null ? `Matching event identity (${match.hijriDate}, sequence #${match.sequence})` : 'High-confidence match'))}</div>`
+      + `<div style="font-size:11px;color:var(--subtext)">Match reason: ${escapeHtml(match.matchReason || (match.hijriDate != null ? `Matching event identity (${match.hijriDate}, sequence #${match.sequence})` : 'High-confidence match'))}</div>`
       + `</div>`
-      + `<div style=”font-size:11px;color:var(--subtext);line-height:1.45”>Renaming updates the transfer drive folder name to match the archive. The archive is not modified. Only the folder name on the transfer drive changes.</div>`
+      + `<div style="font-size:11px;color:var(--subtext);line-height:1.45">Renaming updates the transfer drive folder name to match the archive. The archive is not modified. Only the folder name on the transfer drive changes.</div>`
       + `</div>`
-      + `<div class=”emm-footer”><div class=”emm-footer-right”>`
-      + `<button class=”emm-btn-secondary” id=”txRenameCancel”>Cancel</button>`
-      + `<button class=”emm-btn-secondary” id=”txRenameKeep”>Keep Separate</button>`
-      + `<button class=”emm-btn-primary” id=”txRenameConfirm”>Rename on Transfer Drive</button>`
+      + `<div class="emm-footer"><div class="emm-footer-right">`
+      + `<button class="emm-btn-secondary" id="txRenameCancel">Cancel</button>`
+      + `<button class="emm-btn-secondary" id="txRenameKeep">Keep Separate</button>`
+      + `<button class="emm-btn-primary" id="txRenameConfirm">Rename on Transfer Drive</button>`
       + `</div></div>`
       + `</div>`;
     document.body.appendChild(overlay);
