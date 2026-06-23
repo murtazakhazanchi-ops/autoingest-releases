@@ -11730,26 +11730,29 @@ const _transferMonitor = (() => {
     const changedBytes = g.changed?.bytes          || 0;
     const ctrlCount    = g.controlUpdates?.count  || 0;
     const ctrlBytes    = g.controlUpdates?.bytes   || 0;
+    const destCount    = g.destinationOnly?.count  || 0;
+    const destBytes    = g.destinationOnly?.bytes  || 0;
     const stats = [];
-    if (newCount > 0)     stats.push(`<div class=”tx-sum-stat tx-sum-stat--new”><div class=”tx-sum-stat-lbl”>Need backup</div><div class=”tx-sum-stat-val”>${newCount.toLocaleString()} file${newCount !== 1 ? 's' : ''}</div><div class=”tx-sum-stat-sz”>${formatSize(newBytes)}</div></div>`);
-    if (ctrlCount > 0)    stats.push(`<div class=”tx-sum-stat tx-sum-stat--ctrl”><div class=”tx-sum-stat-lbl”>Control updates</div><div class=”tx-sum-stat-val”>${ctrlCount.toLocaleString()} file${ctrlCount !== 1 ? 's' : ''}</div><div class=”tx-sum-stat-sz”>${formatSize(ctrlBytes)}</div></div>`);
-    if (sameCount > 0)    stats.push(`<div class=”tx-sum-stat tx-sum-stat--same”><div class=”tx-sum-stat-lbl”>Up to date</div><div class=”tx-sum-stat-val”>${sameCount.toLocaleString()} file${sameCount !== 1 ? 's' : ''}</div><div class=”tx-sum-stat-sz”>${formatSize(sameBytes)}</div></div>`);
-    if (changedCount > 0) stats.push(`<div class=”tx-sum-stat tx-sum-stat--review”><div class=”tx-sum-stat-lbl”>Needs review</div><div class=”tx-sum-stat-val”>${changedCount.toLocaleString()} file${changedCount !== 1 ? 's' : ''}</div><div class=”tx-sum-stat-sz”>${formatSize(changedBytes)}</div></div>`);
+    if (newCount > 0)     stats.push(`<div class=”tx-sum-stat tx-sum-stat--new”><div class=”tx-sum-stat-lbl”>Need backup</div><div class=”tx-sum-stat-meta”>${newCount.toLocaleString()} file${newCount !== 1 ? 's' : ''} · ${formatSize(newBytes)}</div></div>`);
+    if (ctrlCount > 0)    stats.push(`<div class=”tx-sum-stat tx-sum-stat--ctrl”><div class=”tx-sum-stat-lbl”>Control updates</div><div class=”tx-sum-stat-meta”>${ctrlCount.toLocaleString()} file${ctrlCount !== 1 ? 's' : ''} · ${formatSize(ctrlBytes)}</div></div>`);
+    if (sameCount > 0)    stats.push(`<div class=”tx-sum-stat tx-sum-stat--same”><div class=”tx-sum-stat-lbl”>Up to date</div><div class=”tx-sum-stat-meta”>${sameCount.toLocaleString()} file${sameCount !== 1 ? 's' : ''} · ${formatSize(sameBytes)}</div></div>`);
+    if (changedCount > 0) stats.push(`<div class=”tx-sum-stat tx-sum-stat--review”><div class=”tx-sum-stat-lbl”>Needs review</div><div class=”tx-sum-stat-meta”>${changedCount.toLocaleString()} file${changedCount !== 1 ? 's' : ''} · ${formatSize(changedBytes)}</div></div>`);
+    if (destCount > 0)    stats.push(`<div class=”tx-sum-stat tx-sum-stat--dest”><div class=”tx-sum-stat-lbl”>Destination only</div><div class=”tx-sum-stat-meta”>${destCount.toLocaleString()} item${destCount !== 1 ? 's' : ''} · ${formatSize(destBytes)}</div></div>`);
     const summaryHtml = `<div class=”tx-scan-summary”>`
       + `<div class=”tx-scan-summary-hd”>`
-      + `<span class=”tx-scan-summary-title”>Backup scan complete</span>`
-      + `<span class=”tx-scan-summary-sub”>Update Backup copies missing files and updates control files (event.json). Changed media files are not copied automatically.</span>`
+      + `<div class=”tx-scan-summary-title”>Backup scan complete</div>`
+      + `<div class=”tx-scan-summary-sub”>Update Backup copies missing files and updates control files (event.json). Changed media files are not copied automatically.</div>`
       + `</div>`
       + (stats.length ? `<div class=”tx-sum-stats”>${stats.join('')}</div>` : '')
       + `</div>`;
 
     // Legend — reuses .tx-tree-status pill badges (identical class/data-status as tree)
     const legendHtml = `<div class=”tx-scan-legend”>`
-      + `<span class=”tx-scan-legend-title”>Folder status</span>`
+      + `<div class=”tx-scan-legend-title”>Folder status</div>`
       + `<span class=”tx-tree-status” data-status=”up-to-date”>✓ Up to date</span>`
-      + `<span class=”tx-tree-status” data-status=”partial”>Partial</span>`
-      + `<span class=”tx-tree-status” data-status=”review”>Needs review</span>`
-      + `<span class=”tx-tree-status” data-status=”not-copied”>Not copied</span>`
+      + `<span class=”tx-tree-status” data-status=”partial”>◐ Partial</span>`
+      + `<span class=”tx-tree-status” data-status=”review”>⚠ Needs review</span>`
+      + `<span class=”tx-tree-status” data-status=”not-copied”>○ Not copied</span>`
       + `</div>`;
 
     // Rename match cards — shown when a backup-update scan detects a likely archive rename.
