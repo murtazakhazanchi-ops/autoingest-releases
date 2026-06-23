@@ -3848,6 +3848,27 @@ ipcMain.handle('archive:runTransferExport', async (_event, { scope, operatorName
   });
 });
 
+ipcMain.handle('archive:renameFolderOnTransferDrive', async (_event, { destAbsPath, newName } = {}) => {
+  const transferRoot = settings.getTransferRoot();
+  if (!transferRoot)           return { ok: false, reason: 'transfer-root-not-set' };
+  if (!destAbsPath || !newName) return { ok: false, reason: 'invalid-args' };
+  // Safety: destAbsPath must be inside transferRoot.
+  let realTransfer, realDest;
+  try { realTransfer = await fsp.realpath(transferRoot); } catch { realTransfer = transferRoot; }
+  try { realDest     = await fsp.realpath(destAbsPath);  } catch { realDest     = destAbsPath;  }
+  const sep = realTransfer.endsWith(path.sep) ? realTransfer : realTransfer + path.sep;
+  if (!realDest.startsWith(sep)) return { ok: false, reason: 'outside-transfer-root' };
+  // Target path must not already exist.
+  const newPath = path.join(path.dirname(destAbsPath), newName);
+  try { await fsp.access(newPath); return { ok: false, reason: 'target-already-exists' }; } catch {}
+  try {
+    await fsp.rename(destAbsPath, newPath);
+    return { ok: true, newPath };
+  } catch (e) {
+    return { ok: false, reason: 'rename-failed', error: e.message };
+  }
+});
+
 ipcMain.handle('archive:getTransferExportStatus', () => transferExportService.getExportStatus());
 
 ipcMain.handle('archive:pauseTransferExport',  () => transferExportService.pauseExport());

@@ -256,6 +256,7 @@ contextBridge.exposeInMainWorld('api', {
   clearTransferExportCheckpoint:         ()                        => ipcRenderer.invoke('archive:clearTransferExportCheckpoint'),
   resumeTransferExportFromCheckpoint:    (operatorName)            => ipcRenderer.invoke('archive:resumeTransferExportFromCheckpoint', { operatorName }),
   verifyTransferExport:                  (scope)                   => ipcRenderer.invoke('archive:verifyTransferExport',               { scope }),
+  renameFolderOnTransferDrive:           (destAbsPath, newName)    => ipcRenderer.invoke('archive:renameFolderOnTransferDrive',        { destAbsPath, newName }),
 
   // ── Transfer Import ──
   getTransferDriveCollections:           ()                        => ipcRenderer.invoke('archive:getTransferDriveCollections'),

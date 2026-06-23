@@ -127,12 +127,20 @@ async function _copyFileSafe(srcPath, destPath, stats, opts = {}) {
     // duplicates. A same-path / different-size file is left untouched and surfaced by the
     // scan as "Changed / Needs Review" — only genuinely missing files are copied.
     if (opts.backupUpdate) {
-      stats.skipped++;
-      if (typeof stats.changedSkipped === 'number') stats.changedSkipped++;
-      return 'skipped-changed';
+      // Control files (event.json, etc.) are safe to overwrite — they are updated by the
+      // source archive and not user-editable on the transfer drive. Media files are never
+      // overwritten in backup-update mode.
+      if (!_CONTROL_FILE_NAMES.has(path.basename(destPath))) {
+        stats.skipped++;
+        if (typeof stats.changedSkipped === 'number') stats.changedSkipped++;
+        return 'skipped-changed';
+      }
+      // Control file: fall through to overwrite at destPath.
+      outcome = 'copied';
+    } else {
+      finalDest = await _findSafeConflictPath(destPath);
+      outcome = 'renamed';
     }
-    finalDest = await _findSafeConflictPath(destPath);
-    outcome = 'renamed';
   } else {
     outcome = 'copied';
   }
@@ -349,7 +357,7 @@ function _fileHash(filePath) {
 
 async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
   const startedAt = new Date().toISOString();
-  const { collectionPaths = [], folderPaths = null, eventRootPaths = null, purpose = 'archive-transfer', backupUpdate = false } = scope || {};
+  const { collectionPaths = [], folderPaths = null, eventRootPaths = null, purpose = 'archive-transfer', backupUpdate = false, updateTotalFiles } = scope || {};
   const copyOpts = { skipControlFiles: purpose === 'external-sharing', backupUpdate: !!backupUpdate };
 
   try {
@@ -442,6 +450,12 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
     }
     _state.total      = totalFiles;
     _state.batchCount = batches.length;
+  }
+
+  // In backup-update mode the scan already measured the exact work queue.
+  // Use that count so progress reflects real remaining work, not total source files.
+  if (copyOpts.backupUpdate && updateTotalFiles != null) {
+    _state.total = updateTotalFiles;
   }
 
   // ── Write initial checkpoint ──────────────────────────────────────────────
@@ -980,6 +994,7 @@ async function scanBackupSync(nasRoot, transferRoot, scope) {
 
   const groups = {
     newFiles:        { count: 0, bytes: 0, items: [], truncated: false },
+    controlUpdates:  { count: 0, bytes: 0, items: [], truncated: false },
     changed:         { count: 0, bytes: 0, items: [], truncated: false },
     existingSame:    { count: 0, bytes: 0, items: [], truncated: false },
     incomplete:      { count: 0, bytes: 0, items: [], truncated: false },
@@ -1005,7 +1020,7 @@ async function scanBackupSync(nasRoot, transferRoot, scope) {
     try { entries = await fsp.readdir(srcDir, { withFileTypes: true }); }
     catch (e) { add(groups.errors, path.relative(nasRoot, srcDir), 0, { error: `readdir source: ${e.message}` }); return; }
     const relDir = path.relative(nasRoot, srcDir).replace(/\\/g, '/') || '.';
-    if (!folderStats[relDir]) folderStats[relDir] = { new: 0, same: 0, changed: 0 };
+    if (!folderStats[relDir]) folderStats[relDir] = { new: 0, same: 0, changed: 0, controlUpdate: 0 };
     const fst = folderStats[relDir];
     for (const entry of entries) {
       if (entry.isDirectory()) {
@@ -1024,9 +1039,15 @@ async function scanBackupSync(nasRoot, transferRoot, scope) {
         let destStat = null;
         try { destStat = await fsp.stat(destPath); } catch {}
         const meta = { ext, mtimeMs: Math.round(srcStat.mtimeMs) };
-        if (!destStat)                              { add(groups.newFiles,     rel, srcStat.size, meta);                              fst.new++; }
-        else if (destStat.size === srcStat.size)    { add(groups.existingSame, rel, srcStat.size, meta);                              fst.same++; }
-        else                                        { add(groups.changed,      rel, srcStat.size, { ...meta, destSize: destStat.size }); fst.changed++; }
+        if (!destStat) {
+          add(groups.newFiles, rel, srcStat.size, meta); fst.new++;
+        } else if (destStat.size === srcStat.size) {
+          add(groups.existingSame, rel, srcStat.size, meta); fst.same++;
+        } else if (_CONTROL_FILE_NAMES.has(entry.name)) {
+          add(groups.controlUpdates, rel, srcStat.size, { ...meta, destSize: destStat.size }); fst.controlUpdate++;
+        } else {
+          add(groups.changed, rel, srcStat.size, { ...meta, destSize: destStat.size }); fst.changed++;
+        }
       }
     }
   }
@@ -1068,10 +1089,82 @@ async function scanBackupSync(nasRoot, transferRoot, scope) {
     await scanDest(u.srcDir, u.destDir, u.rootFilesOnly);
   }
 
+  // Detect likely folder renames in backup-update mode: a source event whose identity
+  // (hijriDate + sequence from event.json) matches an orphan dest event folder indicates
+  // the archive folder was renamed and the transfer drive has the old name.
+  const renameMatches = [];
+  if (scope && scope.backupUpdate) {
+    const unitDestDirs = new Set(units.map(u => u.destDir));
+
+    // Collect dest collection-level directories to search for orphan event folders.
+    const destCollectionDirs = new Set();
+    for (const u of units) {
+      const rel = path.relative(transferRoot, u.destDir).split(path.sep);
+      if (rel.length >= 2) destCollectionDirs.add(path.join(transferRoot, rel[0]));
+    }
+
+    // Find event-level dest folders not covered by any source unit.
+    const orphanDestDirs = [];
+    for (const collDir of destCollectionDirs) {
+      let entries;
+      try { entries = await fsp.readdir(collDir, { withFileTypes: true }); } catch { continue; }
+      for (const entry of entries) {
+        if (!entry.isDirectory() || _skipDir(entry.name)) continue;
+        const evDir = path.join(collDir, entry.name);
+        if (!unitDestDirs.has(evDir)) orphanDestDirs.push(evDir);
+      }
+    }
+
+    // Identify source units at event-level (rel depth 2) whose dest does not yet exist.
+    const unmatchedSrcUnits = [];
+    for (const u of units) {
+      const rel = path.relative(transferRoot, u.destDir).split(path.sep);
+      if (rel.length !== 2) continue;
+      let destExists = false;
+      try { await fsp.access(u.destDir); destExists = true; } catch {}
+      if (!destExists) unmatchedSrcUnits.push(u);
+    }
+
+    const readEventId = async (dir) => {
+      try {
+        const raw = await fsp.readFile(path.join(dir, 'event.json'), 'utf8');
+        const d = JSON.parse(raw);
+        const hd = d.hijriDate || null;
+        const sq = d.sequence != null ? String(d.sequence) : null;
+        if (!hd || sq === null) return null;
+        return { hijriDate: hd, sequence: sq, key: `${hd}__${sq}` };
+      } catch { return null; }
+    };
+
+    const orphanByKey = new Map();
+    for (const orphanDir of orphanDestDirs) {
+      const id = await readEventId(orphanDir);
+      if (id) orphanByKey.set(id.key, orphanDir);
+    }
+
+    for (const u of unmatchedSrcUnits) {
+      const id = await readEventId(u.srcDir);
+      if (!id) continue;
+      const orphanDir = orphanByKey.get(id.key);
+      if (!orphanDir) continue;
+      renameMatches.push({
+        srcRelPath:  path.relative(nasRoot, u.srcDir).replace(/\\/g, '/'),
+        destRelPath: path.relative(transferRoot, orphanDir).replace(/\\/g, '/'),
+        srcAbsPath:  u.srcDir,
+        destAbsPath: orphanDir,
+        hijriDate:   id.hijriDate,
+        sequence:    id.sequence,
+        confidence:  'high',
+      });
+    }
+  }
+
   const totals = {
     files:   groups.newFiles.count + groups.changed.count + groups.existingSame.count,
-    toCopy:  groups.newFiles.count,            // Update Backup copies missing files only; changed are skipped (review-only, never copied/renamed)
+    toCopy:  groups.newFiles.count,
     bytesToCopy: groups.newFiles.bytes,
+    controlUpdates: groups.controlUpdates.count,
+    controlUpdateBytes: groups.controlUpdates.bytes,
     upToDate: groups.existingSame.count,
     changed:  groups.changed.count,
     incomplete: groups.incomplete.count,
@@ -1079,7 +1172,7 @@ async function scanBackupSync(nasRoot, transferRoot, scope) {
     errors: groups.errors.count,
   };
 
-  return { ok: true, nasRoot, transferRoot, scope, groups, totals, folderStats, scannedAt: new Date().toISOString() };
+  return { ok: true, nasRoot, transferRoot, scope, groups, totals, folderStats, renameMatches, scannedAt: new Date().toISOString() };
 }
 
 module.exports = {

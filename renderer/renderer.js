@@ -11631,7 +11631,7 @@ const _transferMonitor = (() => {
     _txSetButtonPhase('idle');
     // "Update Backup" is enabled only after a scan, and only when there is genuinely new
     // (missing) data to copy. Changed/conflict files are review-only and are NOT copied.
-    const nothingNew = (result.totals.toCopy === 0);
+    const nothingNew = (result.totals.toCopy === 0 && (result.totals.controlUpdates || 0) === 0);
     if (exportBtn) {
       exportBtn.disabled    = nothingNew;
       exportBtn.textContent = nothingNew ? 'Up to date' : 'Update Backup';
@@ -11662,28 +11662,32 @@ const _transferMonitor = (() => {
         + `</div>${body}</div>`;
     };
     const groups =
-        row('New Data',               g.newFiles,        'tx-scan--new',     g.newFiles?.count <= 5)
-      + row('Updated / Changed Data', g.changed,         'tx-scan--changed', false)
-      + row('Already Up to Date',     g.existingSame,    'tx-scan--same',    false)
-      + row('Conflicts / Needs Review', g.incomplete,    'tx-scan--review',  false)
-      + row('Destination Only',       g.destinationOnly, 'tx-scan--dest',    false)
-      + row('Errors',                 g.errors,          'tx-scan--err',     true);
+        row('New Data',                 g.newFiles,        'tx-scan--new',     g.newFiles?.count <= 5)
+      + row('Control File Updates',     g.controlUpdates,  'tx-scan--control', false)
+      + row('Updated / Changed Data',   g.changed,         'tx-scan--changed', false)
+      + row('Already Up to Date',       g.existingSame,    'tx-scan--same',    false)
+      + row('Conflicts / Needs Review', g.incomplete,      'tx-scan--review',  false)
+      + row('Destination Only',         g.destinationOnly, 'tx-scan--dest',    false)
+      + row('Errors',                   g.errors,          'tx-scan--err',     true);
 
     // Summary card — title, subtitle, per-category stat chips
-    const newCount     = g.newFiles?.count      || 0;
-    const newBytes     = g.newFiles?.bytes       || 0;
-    const sameCount    = g.existingSame?.count   || 0;
-    const sameBytes    = g.existingSame?.bytes    || 0;
-    const changedCount = g.changed?.count        || 0;
-    const changedBytes = g.changed?.bytes         || 0;
+    const newCount     = g.newFiles?.count       || 0;
+    const newBytes     = g.newFiles?.bytes        || 0;
+    const sameCount    = g.existingSame?.count    || 0;
+    const sameBytes    = g.existingSame?.bytes     || 0;
+    const changedCount = g.changed?.count         || 0;
+    const changedBytes = g.changed?.bytes          || 0;
+    const ctrlCount    = g.controlUpdates?.count  || 0;
+    const ctrlBytes    = g.controlUpdates?.bytes   || 0;
     const stats = [];
     if (newCount > 0)     stats.push(`<div class=”tx-sum-stat tx-sum-stat--new”><div class=”tx-sum-stat-lbl”>Need backup</div><div class=”tx-sum-stat-val”>${newCount.toLocaleString()} file${newCount !== 1 ? 's' : ''}</div><div class=”tx-sum-stat-sz”>${formatSize(newBytes)}</div></div>`);
+    if (ctrlCount > 0)    stats.push(`<div class=”tx-sum-stat tx-sum-stat--ctrl”><div class=”tx-sum-stat-lbl”>Control updates</div><div class=”tx-sum-stat-val”>${ctrlCount.toLocaleString()} file${ctrlCount !== 1 ? 's' : ''}</div><div class=”tx-sum-stat-sz”>${formatSize(ctrlBytes)}</div></div>`);
     if (sameCount > 0)    stats.push(`<div class=”tx-sum-stat tx-sum-stat--same”><div class=”tx-sum-stat-lbl”>Up to date</div><div class=”tx-sum-stat-val”>${sameCount.toLocaleString()} file${sameCount !== 1 ? 's' : ''}</div><div class=”tx-sum-stat-sz”>${formatSize(sameBytes)}</div></div>`);
     if (changedCount > 0) stats.push(`<div class=”tx-sum-stat tx-sum-stat--review”><div class=”tx-sum-stat-lbl”>Needs review</div><div class=”tx-sum-stat-val”>${changedCount.toLocaleString()} file${changedCount !== 1 ? 's' : ''}</div><div class=”tx-sum-stat-sz”>${formatSize(changedBytes)}</div></div>`);
     const summaryHtml = `<div class=”tx-scan-summary”>`
       + `<div class=”tx-scan-summary-hd”>`
       + `<span class=”tx-scan-summary-title”>Backup scan complete</span>`
-      + `<span class=”tx-scan-summary-sub”>Update Backup copies missing files only. Changed files are not copied automatically.</span>`
+      + `<span class=”tx-scan-summary-sub”>Update Backup copies missing files and updates control files (event.json). Changed media files are not copied automatically.</span>`
       + `</div>`
       + (stats.length ? `<div class=”tx-sum-stats”>${stats.join('')}</div>` : '')
       + `</div>`;
@@ -11697,9 +11701,99 @@ const _transferMonitor = (() => {
       + `<span class=”tx-tree-status” data-status=”not-copied”>Not copied</span>`
       + `</div>`;
 
+    // Rename match cards — shown when a backup-update scan detects a likely archive rename.
+    let renameHtml = '';
+    const renameMatches = result.renameMatches || [];
+    if (renameMatches.length > 0) {
+      renameHtml = renameMatches.map((m, idx) =>
+        `<div class=”tx-scan-group tx-scan--rename”>`
+        + `<div class=”tx-scan-grp-hd”><div class=”tx-scan-grp-lbl”>Possible Folder Rename</div><div class=”tx-scan-grp-meta”>High-confidence match</div></div>`
+        + `<div class=”tx-rename-detail”>`
+        + `<div class=”tx-rename-row”><span class=”tx-rename-lbl”>Transfer drive:</span><span class=”tx-rename-val”>${escapeHtml(m.destRelPath)}</span></div>`
+        + `<div class=”tx-rename-row”><span class=”tx-rename-lbl”>Archive folder:</span><span class=”tx-rename-val”>${escapeHtml(m.srcRelPath)}</span></div>`
+        + `<div class=”tx-rename-row”><span class=”tx-rename-lbl”>Match reason:</span><span class=”tx-rename-val”>Matching event identity (${escapeHtml(m.hijriDate)}, #${escapeHtml(m.sequence)})</span></div>`
+        + `</div>`
+        + `<div class=”tx-rename-actions”><button class=”emm-btn-secondary tx-rename-review-btn” data-idx=”${idx}”>Review Rename</button></div>`
+        + `</div>`
+      ).join('');
+    }
+
     reviewEl.innerHTML = summaryHtml
       + (groups || '<div class=”tx-scan-empty” style=”padding:6px 2px”>All files are up to date.</div>')
+      + renameHtml
       + legendHtml;
+
+    // Wire rename review buttons (must happen after innerHTML is set).
+    reviewEl.querySelectorAll('.tx-rename-review-btn').forEach(btn => {
+      const idx = parseInt(btn.dataset.idx, 10);
+      const match = renameMatches[idx];
+      if (match) btn.addEventListener('click', () => _txShowRenameModal(match));
+    });
+  }
+
+  function _txShowRenameModal(match) {
+    document.getElementById('txRenameFolderModal')?.remove();
+    const overlay = document.createElement('div');
+    overlay.id        = 'txRenameFolderModal';
+    overlay.className = 'emm-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', 'Review Folder Rename');
+    overlay.innerHTML =
+      `<div class=”emm-box” style=”width:min(520px,calc(100vw - 48px));display:flex;flex-direction:column;max-height:calc(100vh - 80px)”>`
+      + `<div class=”emm-topbar”><span class=”emm-topbar-title”>Review Folder Rename</span></div>`
+      + `<div style=”flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:12px”>`
+      + `<div class=”tx-scan-group”>`
+      + `<div style=”display:flex;flex-direction:column;gap:4px;margin-bottom:8px”>`
+      + `<span style=”font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--subtext)”>Transfer drive folder</span>`
+      + `<span style=”font-size:12px;font-weight:600;color:var(--text);word-break:break-all” title=”${escapeHtml(match.destRelPath)}”>${escapeHtml(match.destRelPath)}</span>`
+      + `</div>`
+      + `<div style=”display:flex;flex-direction:column;gap:4px;margin-bottom:8px”>`
+      + `<span style=”font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--subtext)”>Active Archive folder</span>`
+      + `<span style=”font-size:12px;font-weight:600;color:var(--text);word-break:break-all” title=”${escapeHtml(match.srcRelPath)}”>${escapeHtml(match.srcRelPath)}</span>`
+      + `</div>`
+      + `<div style=”font-size:11px;color:var(--subtext)”>Match reason: Matching event identity (${escapeHtml(match.hijriDate)}, sequence #${escapeHtml(match.sequence)})</div>`
+      + `</div>`
+      + `<div style=”font-size:11px;color:var(--subtext);line-height:1.45”>Renaming updates the transfer drive folder name to match the archive. The archive is not modified. Only the folder name on the transfer drive changes.</div>`
+      + `</div>`
+      + `<div class=”emm-footer”><div class=”emm-footer-right”>`
+      + `<button class=”emm-btn-secondary” id=”txRenameCancel”>Cancel</button>`
+      + `<button class=”emm-btn-secondary” id=”txRenameKeep”>Keep Separate</button>`
+      + `<button class=”emm-btn-primary” id=”txRenameConfirm”>Rename on Transfer Drive</button>`
+      + `</div></div>`
+      + `</div>`;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('open'));
+
+    const close = () => { overlay.classList.remove('open'); setTimeout(() => overlay.remove(), 200); };
+
+    overlay.querySelector('#txRenameCancel').addEventListener('click', close);
+    overlay.querySelector('#txRenameKeep').addEventListener('click', close);
+
+    overlay.querySelector('#txRenameConfirm').addEventListener('click', async () => {
+      const confirmBtn = overlay.querySelector('#txRenameConfirm');
+      if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = 'Renaming…'; }
+      const newName = match.srcRelPath.split('/').pop();
+      try {
+        const res = await window.api.renameFolderOnTransferDrive(match.destAbsPath, newName);
+        if (res.ok) {
+          close();
+          showMessage('Transfer drive folder renamed successfully.', 4000);
+          await _txScanBackup();
+        } else {
+          const errs = {
+            'outside-transfer-root': 'Safety check failed: path is outside the transfer drive.',
+            'target-already-exists': 'A folder with that name already exists on the transfer drive.',
+            'rename-failed': 'Rename failed: ' + (res.error || 'unknown error'),
+          };
+          showMessage(errs[res.reason] || ('Rename failed: ' + res.reason), 6000);
+          if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'Rename on Transfer Drive'; }
+        }
+      } catch (e) {
+        showMessage('Rename error: ' + e.message, 6000);
+        if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'Rename on Transfer Drive'; }
+      }
+    });
   }
 
   // ── Export ────────────────────────────────────────────────────────────────
@@ -11718,7 +11812,10 @@ const _transferMonitor = (() => {
     }
     // backupUpdate: when this export follows a Backup Sync scan, copy missing files only —
     // changed/conflict files are left untouched (no overwrite, no _1/_2 duplicate).
-    const scope = { folderPaths, eventRootPaths, purpose: _txPurpose, backupUpdate: _txScanMode };
+    const updateTotalFiles = _txScanMode && _txScanResult
+      ? (_txScanResult.totals.toCopy + (_txScanResult.totals.controlUpdates || 0))
+      : undefined;
+    const scope = { folderPaths, eventRootPaths, purpose: _txPurpose, backupUpdate: _txScanMode, updateTotalFiles };
 
     const exportBtn  = _txEl('txExportBtn');
     const previewBtn = _txEl('txPreviewBtn');
@@ -11938,7 +12035,11 @@ const _transferMonitor = (() => {
     const progressLabel = _txEl('txProgressLabel');
     if (progressWrap && status.total > 0) {
       progressWrap.removeAttribute('hidden');
-      const done = (status.copied || 0) + (status.skipped || 0) + (status.renamed || 0);
+      // In backup-update mode only copied files count toward progress; skipped same-files
+      // are invisible work and inflating done would make the bar jump immediately to ~99%.
+      const done = _txScanMode
+        ? (status.copied || 0)
+        : (status.copied || 0) + (status.skipped || 0) + (status.renamed || 0);
       const pct  = Math.min(100, Math.round((done / status.total) * 100));
       if (progressFill)  progressFill.style.width = pct + '%';
       if (progressLabel) progressLabel.textContent = `${done.toLocaleString()} / ${status.total.toLocaleString()}`;
@@ -11995,7 +12096,9 @@ const _transferMonitor = (() => {
     const etaEl = _txEl('txStatusEta');
     if (etaEl) {
       if (status.running && !status.paused && status.total > 0) {
-        const done = (status.copied || 0) + (status.skipped || 0) + (status.renamed || 0);
+        const done = _txScanMode
+          ? (status.copied || 0)
+          : (status.copied || 0) + (status.skipped || 0) + (status.renamed || 0);
         const now  = Date.now();
         _txEtaSamples.push({ ts: now, done });
         // keep only samples from the last 30 seconds
@@ -12087,6 +12190,7 @@ const _transferMonitor = (() => {
     if (fst.changed > 0)              return 'review';
     if (fst.new > 0 && fst.same > 0)  return 'partial';
     if (fst.new > 0)                   return 'not-copied';
+    if (fst.controlUpdate > 0)         return 'partial';
     if (fst.same > 0)                  return 'up-to-date';
     return 'unknown';
   }

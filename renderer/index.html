@@ -989,6 +989,15 @@
     .tx-scan-sz { color: var(--subtext); white-space: nowrap; }
     .tx-scan-more { color: var(--subtext); font-style: italic; }
     .tx-scan-empty { color: var(--subtext); margin-top: 4px; }
+    .tx-scan-group.tx-scan--control .tx-scan-grp-meta { color: #d97706; }
+    .tx-scan-group.tx-scan--rename  .tx-scan-grp-meta { color: #7c3aed; }
+    .tx-sum-stat--ctrl { background: rgba(217,119,6,0.08); border-color: rgba(217,119,6,0.22); }
+    .tx-sum-stat--ctrl .tx-sum-stat-lbl { color: #d97706; }
+    .tx-rename-detail { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
+    .tx-rename-row { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+    .tx-rename-lbl { font-size: 11px; color: var(--subtext); flex-shrink: 0; }
+    .tx-rename-val { font-size: 11px; color: var(--text); word-break: break-all; }
+    .tx-rename-actions { margin-top: 10px; }
     .tx-preview-stat { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
     .tx-preview-val { font-size: 18px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
     .tx-preview-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--subtext); }
