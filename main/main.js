@@ -3923,6 +3923,11 @@ ipcMain.handle('archive:resumeTransferExportFromCheckpoint', async (_event, { op
   });
 });
 
+ipcMain.handle('archive:validateCustomExportSource', async (_event, { customSrcRoot, customDestRoot } = {}) => {
+  if (!customSrcRoot || !customDestRoot) return { ok: false, reason: 'missing-paths' };
+  return transferExportService.validateCustomExportSource(customSrcRoot, customDestRoot);
+});
+
 ipcMain.handle('archive:getCustomTransferExportCheckpoint', async (_event, { customDestRoot } = {}) => {
   if (!customDestRoot) return null;
   return transferExportService.getExportCheckpoint(customDestRoot);

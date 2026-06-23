@@ -248,6 +248,65 @@ async function _sumBytes(dir, opts = {}) {
   return bytes;
 }
 
+async function _sampleFiles(srcDir, maxCount, opts = {}, baseDir, out = []) {
+  if (baseDir === undefined) baseDir = srcDir;
+  if (out.length >= maxCount) return out;
+  let entries;
+  try { entries = await fsp.readdir(srcDir, { withFileTypes: true }); } catch { return out; }
+  for (const entry of entries) {
+    if (out.length >= maxCount) break;
+    if (entry.isDirectory()) {
+      if (_skipDir(entry.name) || opts.rootFilesOnly) continue;
+      await _sampleFiles(path.join(srcDir, entry.name), maxCount, opts, baseDir, out);
+    } else if (entry.isFile()) {
+      if (_skipFile(entry.name)) continue;
+      if (opts.skipControlFiles && _skipControlFile(entry.name)) continue;
+      const filePath = path.join(srcDir, entry.name);
+      const relPath  = path.relative(baseDir, filePath).replace(/\\/g, '/');
+      let size = 0;
+      try { const st = await fsp.stat(filePath); size = st.size; } catch {}
+      out.push({ relPath, size });
+    }
+  }
+  return out;
+}
+
+async function _validateCustomSource(proposedSrcRoot, checkpoint) {
+  // 1. Basename must match the original source folder name.
+  if (path.basename(proposedSrcRoot) !== path.basename(checkpoint.nasRoot)) {
+    return { ok: false, reason: 'basename-mismatch' };
+  }
+
+  // 2. If a source sample was stored at checkpoint write time, verify it.
+  const sample = checkpoint.batches?.[0]?.sourceSample ?? [];
+  if (sample.length > 0) {
+    let matched = 0;
+    for (const { relPath, size } of sample) {
+      try {
+        const st = await fsp.stat(path.join(proposedSrcRoot, relPath));
+        if (st.size === size) matched++;
+      } catch {}
+    }
+    // Require 100% match for tiny samples (< 5); 80% otherwise.
+    const threshold = sample.length < 5 ? 1.0 : 0.8;
+    if (matched / sample.length < threshold) {
+      return { ok: false, reason: 'source-mismatch', matched, total: sample.length };
+    }
+    return { ok: true };
+  }
+
+  // 3. No sample — fall back to total file count.
+  const expected = checkpoint.totalFiles ?? 0;
+  if (expected > 0) {
+    const actual = await _countFiles(proposedSrcRoot, {});
+    if (actual !== expected) return { ok: false, reason: 'source-mismatch' };
+    return { ok: true };
+  }
+
+  // 4. No sample and no count — cannot verify safely.
+  return { ok: false, reason: 'source-unverifiable' };
+}
+
 async function _initTransferMeta(transferRoot, deviceName) {
   const metaDir    = path.join(transferRoot, TRANSFER_META_DIR);
   const markerPath = path.join(metaDir, TRANSFER_ROOT_JSON);
@@ -405,10 +464,11 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
       rootFilesOnly: false, fileCount: 0, status: 'pending',
       copied: 0, skipped: 0, renamed: 0, errors: 0,
     }];
-    batches[0].fileCount = await _countFiles(nasRoot, copyOpts);
-    _state.total      = batches[0].fileCount;
-    _state.totalBytes = await _sumBytes(nasRoot, copyOpts);
-    _state.batchCount = 1;
+    batches[0].fileCount    = await _countFiles(nasRoot, copyOpts);
+    _state.total            = batches[0].fileCount;
+    _state.totalBytes       = await _sumBytes(nasRoot, copyOpts);
+    batches[0].sourceSample = await _sampleFiles(nasRoot, 30, copyOpts);
+    _state.batchCount       = 1;
   } else if ((folderPaths && folderPaths.length > 0) || (eventRootPaths && eventRootPaths.length > 0)) {
     batches = [];
     for (const ep of (eventRootPaths || [])) {
@@ -817,9 +877,17 @@ async function resumeExportFromCheckpoint(nasRoot, transferRoot, meta = {}) {
 
   const checkpoint = await _readCheckpoint(transferRoot);
   if (!checkpoint)                         return { ok: false, reason: 'no-checkpoint' };
-  if (checkpoint.nasRoot !== nasRoot)      return { ok: false, reason: 'checkpoint-mismatch' };
   if (checkpoint.status === 'complete')    return { ok: false, reason: 'already-complete' };
   if (!Array.isArray(checkpoint.batches)) return { ok: false, reason: 'checkpoint-invalid' };
+
+  if (checkpoint.sourceMode === 'custom') {
+    // Custom mode: validate source identity rather than strict path equality (supports cross-device resume).
+    const validation = await _validateCustomSource(nasRoot, checkpoint);
+    if (!validation.ok) return { ok: false, reason: validation.reason || 'source-mismatch' };
+  } else {
+    // Archive mode: strict path equality required.
+    if (checkpoint.nasRoot !== nasRoot) return { ok: false, reason: 'checkpoint-mismatch' };
+  }
 
   const batchId    = checkpoint.exportId;
   const deviceName = meta.deviceName || os.hostname();
@@ -1392,11 +1460,20 @@ async function scanBackupSync(nasRoot, transferRoot, scope) {
   return { ok: true, nasRoot, transferRoot, scope, groups, totals, folderStats, renameMatches, scannedAt: new Date().toISOString() };
 }
 
+async function validateCustomExportSource(customSrcRoot, customDestRoot) {
+  if (!customSrcRoot || !customDestRoot) return { ok: false, reason: 'missing-paths' };
+  const checkpoint = await _readCheckpoint(customDestRoot);
+  if (!checkpoint)                              return { ok: false, reason: 'no-checkpoint' };
+  if (checkpoint.sourceMode !== 'custom')       return { ok: false, reason: 'not-custom-checkpoint' };
+  return _validateCustomSource(customSrcRoot, checkpoint);
+}
+
 module.exports = {
   scanExportTree,
   previewExport,
   runExport,
   resumeExportFromCheckpoint,
+  validateCustomExportSource,
   getExportStatus,
   pauseExport,
   resumeExport,

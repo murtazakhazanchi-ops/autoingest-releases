@@ -11208,6 +11208,12 @@ const _transferMonitor = (() => {
   let _txCustomSrc    = null;       // custom source folder path
   let _txCustomDest   = null;       // custom destination folder path
 
+  // Cross-device resume state (reset on every _txOpen)
+  let _txResumeCheckpoint    = null;   // checkpoint found at current custom dest
+  let _txResumeNeedsSrcPick  = false;  // true when original source path is unreachable
+  let _txResumeAltSrc        = null;   // user-picked source for cross-device resume
+  let _txResumeAltSrcValid   = false;  // whether alt source passed validation
+
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   function _txEl(id) { return document.getElementById(id); }
@@ -11291,12 +11297,20 @@ const _transferMonitor = (() => {
   async function _txOpen() {
     const overlay = _txEl('transferExportModal');
     if (!overlay || overlay.classList.contains('open')) return;
-    _txScanMode   = false;  // clean flag on every open — never carry a stale backup-update mode
-    _txScanResult = null;
-    _txSourceMode = 'archive';
-    _txCustomSrc  = null;
-    _txCustomDest = null;
+    _txScanMode            = false;
+    _txScanResult          = null;
+    _txSourceMode          = 'archive';
+    _txCustomSrc           = null;
+    _txCustomDest          = null;
+    _txResumeCheckpoint    = null;
+    _txResumeNeedsSrcPick  = false;
+    _txResumeAltSrc        = null;
+    _txResumeAltSrcValid   = false;
     _txApplySourceMode('archive');
+    const resumeBtn = _txEl('txResumeBtn');
+    if (resumeBtn) resumeBtn.disabled = false;
+    _txEl('txResumeChooseSrcBtn')?.setAttribute('hidden', '');
+    _txEl('txResumeValidationMsg')?.setAttribute('hidden', '');
 
     const savedRoot = await window.api.getTransferRoot().catch(() => null);
     const driveEl   = _txEl('txDrivePath');
@@ -11966,8 +11980,22 @@ const _transferMonitor = (() => {
 
     let result;
     try {
-      if (_txSourceMode === 'custom' && _txCustomSrc && _txCustomDest) {
-        result = await window.api.resumeCustomTransferExportFromCheckpoint({ customSrcRoot: _txCustomSrc, customDestRoot: _txCustomDest, operatorName });
+      if (_txSourceMode === 'custom' && _txCustomDest) {
+        let customSrcRoot;
+        if (_txResumeNeedsSrcPick) {
+          if (!_txResumeAltSrc || !_txResumeAltSrcValid) {
+            showMessage('Choose and validate a source folder before resuming.', 5000);
+            return;
+          }
+          customSrcRoot = _txResumeAltSrc;
+        } else {
+          customSrcRoot = _txResumeCheckpoint?.nasRoot || _txCustomSrc;
+        }
+        if (!customSrcRoot) {
+          showMessage('Source folder is required to resume.', 5000);
+          return;
+        }
+        result = await window.api.resumeCustomTransferExportFromCheckpoint({ customSrcRoot, customDestRoot: _txCustomDest, operatorName });
       } else {
         result = await window.api.resumeTransferExportFromCheckpoint(operatorName);
       }
@@ -12513,19 +12541,73 @@ const _transferMonitor = (() => {
   _txEl('txChooseCustomDestBtn')?.addEventListener('click', async () => {
     const p = normalizePickedPath(await window.api.chooseCustomDestFolder().catch(() => null));
     if (!p) return;
-    _txCustomDest = p;
+    _txCustomDest          = p;
+    _txResumeCheckpoint    = null;
+    _txResumeNeedsSrcPick  = false;
+    _txResumeAltSrc        = null;
+    _txResumeAltSrcValid   = false;
     _txUpdateCustomUI();
     _txInvalidatePreview();
 
-    // Check for an interrupted custom export at this destination.
+    // Reset resume offer UI before re-evaluating.
     _txEl('txResumeOffer')?.setAttribute('hidden', '');
+    _txEl('txResumeChooseSrcBtn')?.setAttribute('hidden', '');
+    _txEl('txResumeValidationMsg')?.setAttribute('hidden', '');
+    const resumeBtn = _txEl('txResumeBtn');
+    if (resumeBtn) resumeBtn.disabled = false;
+
     const ckpt = await window.api.getCustomTransferExportCheckpoint({ customDestRoot: p }).catch(() => null);
-    if (ckpt && ckpt.status !== 'complete') {
-      const done   = ckpt.batches?.filter(b => b.status === 'complete').length ?? 0;
-      const total  = ckpt.batches?.length ?? 0;
-      const msgEl  = _txEl('txResumeMsg');
+    if (!ckpt || ckpt.status === 'complete') return;
+
+    _txResumeCheckpoint = ckpt;
+    const done  = ckpt.batches?.filter(b => b.status === 'complete').length ?? 0;
+    const total = ckpt.batches?.length ?? 0;
+    const msgEl = _txEl('txResumeMsg');
+
+    // Check whether the original source folder is still accessible and valid.
+    const srcCheck = ckpt.nasRoot
+      ? await window.api.validateCustomExportSource({ customSrcRoot: ckpt.nasRoot, customDestRoot: p }).catch(() => null)
+      : null;
+
+    if (srcCheck?.ok) {
+      // Same device or already-verified path — offer direct resume.
+      _txResumeNeedsSrcPick = false;
       if (msgEl) msgEl.textContent = `A previous custom export was interrupted (${done} / ${total} batches done).`;
-      _txEl('txResumeOffer')?.removeAttribute('hidden');
+    } else {
+      // Original source unreachable — require user to reselect source.
+      _txResumeNeedsSrcPick = true;
+      if (resumeBtn) resumeBtn.disabled = true;
+      _txEl('txResumeChooseSrcBtn')?.removeAttribute('hidden');
+      if (msgEl) msgEl.textContent = 'Source folder not found on this device. Choose the source folder to resume.';
+    }
+    _txEl('txResumeOffer')?.removeAttribute('hidden');
+  });
+
+  // Cross-device resume: user picks source folder to validate against checkpoint.
+  _txEl('txResumeChooseSrcBtn')?.addEventListener('click', async () => {
+    if (!_txCustomDest) return;
+    const p = normalizePickedPath(await window.api.chooseCustomSrcFolder().catch(() => null));
+    if (!p) return;
+
+    const validationEl = _txEl('txResumeValidationMsg');
+    if (validationEl) { validationEl.textContent = 'Validating source folder…'; validationEl.removeAttribute('hidden'); }
+
+    const result = await window.api.validateCustomExportSource({ customSrcRoot: p, customDestRoot: _txCustomDest }).catch(() => null);
+
+    if (result?.ok) {
+      _txResumeAltSrc      = p;
+      _txResumeAltSrcValid = true;
+      const resumeBtn = _txEl('txResumeBtn');
+      if (resumeBtn) resumeBtn.disabled = false;
+      const msgEl = _txEl('txResumeMsg');
+      if (msgEl) msgEl.textContent = 'Source folder verified. Ready to resume.';
+      if (validationEl) validationEl.setAttribute('hidden', '');
+    } else {
+      _txResumeAltSrc      = null;
+      _txResumeAltSrcValid = false;
+      const resumeBtn = _txEl('txResumeBtn');
+      if (resumeBtn) resumeBtn.disabled = true;
+      if (validationEl) { validationEl.textContent = 'Selected source folder does not match this backup job.'; }
     }
   });
 

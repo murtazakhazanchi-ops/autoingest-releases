@@ -1034,7 +1034,8 @@
     .tx-status-eta { font-size: 11px; color: var(--subtext); margin-top: 3px; }
     .tx-resume-offer { background: rgba(234,179,8,0.08); border: 1px solid rgba(234,179,8,0.3); border-radius: 6px; padding: 10px 14px; margin-bottom: 8px; font-size: 12px; }
     .tx-resume-msg { color: var(--text); }
-    .tx-resume-actions { display: flex; gap: 8px; margin-top: 8px; }
+    .tx-resume-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+    .tx-resume-validation { display: block; margin-top: 6px; font-size: 11px; color: var(--text-secondary, #888); }
     .tx-purpose-group { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
     .tx-purpose-opt { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--border); transition: border-color 0.15s; }
     .tx-purpose-opt:hover { border-color: var(--accent, #6366f1); }
@@ -7801,8 +7802,10 @@
           <span class="tx-resume-msg" id="txResumeMsg">A previous export was interrupted.</span>
           <div class="tx-resume-actions">
             <button type="button" class="emm-btn-primary"   id="txResumeBtn">Resume Export</button>
+            <button type="button" class="emm-btn-secondary" id="txResumeChooseSrcBtn" hidden>Choose Source…</button>
             <button type="button" class="emm-btn-secondary" id="txStartFreshBtn">Start Fresh</button>
           </div>
+          <span class="tx-resume-validation" id="txResumeValidationMsg" hidden></span>
         </div>
 
         <!-- Status -->
