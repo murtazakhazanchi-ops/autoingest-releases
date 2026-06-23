@@ -11204,6 +11204,9 @@ const _transferMonitor = (() => {
   let _txEtaSamples   = [];      // rolling window: [{ts, done}] for ETA calculation
   let _txSpeedSamples = [];      // rolling window: [{ts, bytes}] for speed calculation
   let _txScanResult   = null;    // last successful scanBackupSync result; null when invalidated
+  let _txSourceMode   = 'archive';  // 'archive' | 'custom'
+  let _txCustomSrc    = null;       // custom source folder path
+  let _txCustomDest   = null;       // custom destination folder path
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -11249,6 +11252,20 @@ const _transferMonitor = (() => {
       const locked = phase === 'running' || phase === 'paused';
       purposeGroup.querySelectorAll('input[type=radio]').forEach(r => { r.disabled = locked; });
     }
+
+    // Lock source mode selector during active operation
+    const srcModeGroup = _txEl('txSourceModeGroup');
+    if (srcModeGroup) {
+      const locked = phase === 'running' || phase === 'paused';
+      srcModeGroup.querySelectorAll('input[type=radio]').forEach(r => { r.disabled = locked; });
+    }
+
+    // Lock custom folder pickers during active operation
+    const locked = phase === 'running' || phase === 'paused';
+    const srcBtn  = _txEl('txChooseCustomSrcBtn');
+    const destBtn = _txEl('txChooseCustomDestBtn');
+    if (srcBtn)  srcBtn.disabled  = locked;
+    if (destBtn) destBtn.disabled = locked;
   }
 
   // ── Open / Close ─────────────────────────────────────────────────────────
@@ -11276,6 +11293,10 @@ const _transferMonitor = (() => {
     if (!overlay || overlay.classList.contains('open')) return;
     _txScanMode   = false;  // clean flag on every open — never carry a stale backup-update mode
     _txScanResult = null;
+    _txSourceMode = 'archive';
+    _txCustomSrc  = null;
+    _txCustomDest = null;
+    _txApplySourceMode('archive');
 
     const savedRoot = await window.api.getTransferRoot().catch(() => null);
     const driveEl   = _txEl('txDrivePath');
@@ -11486,6 +11507,16 @@ const _transferMonitor = (() => {
   }
 
   function _txBuildScope() {
+    if (_txSourceMode === 'custom') {
+      return {
+        sourceMode:    'custom',
+        customSrcRoot: _txCustomSrc,
+        customDestRoot: _txCustomDest,
+        folderPaths:    [],
+        eventRootPaths: [],
+      };
+    }
+
     const treeEl = _txEl('txScopeTree');
     if (!treeEl) return { folderPaths: [], eventRootPaths: [] };
 
@@ -11511,14 +11542,21 @@ const _transferMonitor = (() => {
   // ── Preview ───────────────────────────────────────────────────────────────
 
   async function _txPreview() {
-    const { folderPaths, eventRootPaths } = _txBuildScope();
-    if (folderPaths.length === 0 && eventRootPaths.length === 0) {
-      showMessage('Select at least one folder to preview.', 4000);
-      return;
+    const builtScope = _txBuildScope();
+    if (_txSourceMode === 'custom') {
+      if (!builtScope.customSrcRoot || !builtScope.customDestRoot) {
+        showMessage('Choose source and destination folders first.', 4000);
+        return;
+      }
+    } else {
+      if (builtScope.folderPaths.length === 0 && builtScope.eventRootPaths.length === 0) {
+        showMessage('Select at least one folder to preview.', 4000);
+        return;
+      }
     }
     _txScanMode = false;  // normal export preview — not a backup-update
     _txEl('txScanReview')?.setAttribute('hidden', '');
-    const scope = { folderPaths, eventRootPaths, purpose: _txPurpose };
+    const scope = { ...builtScope, purpose: _txPurpose };
 
     const previewBtn = _txEl('txPreviewBtn');
     const exportBtn  = _txEl('txExportBtn');
@@ -11555,10 +11593,16 @@ const _transferMonitor = (() => {
       return;
     }
 
-    _txEl('txPvCollections').textContent = result.collections;
-    _txEl('txPvEvents').textContent      = result.events;
-    _txEl('txPvFolders').textContent     = result.folders ?? result.externalFolders ?? '—';
-    _txEl('txPvFiles').textContent       = result.files.toLocaleString();
+    if (result.custom) {
+      _txEl('txPvCollections').textContent = '—';
+      _txEl('txPvEvents').textContent      = '—';
+      _txEl('txPvFolders').textContent     = '—';
+    } else {
+      _txEl('txPvCollections').textContent = result.collections;
+      _txEl('txPvEvents').textContent      = result.events;
+      _txEl('txPvFolders').textContent     = result.folders ?? result.externalFolders ?? '—';
+    }
+    _txEl('txPvFiles').textContent = result.files.toLocaleString();
 
     const pvNote = _txEl('txPvNote');
     if (pvNote) {
@@ -11577,12 +11621,19 @@ const _transferMonitor = (() => {
   // ── Backup Sync Scan (read-only pre-copy diff vs connected external drive) ──
 
   async function _txScanBackup() {
-    const { folderPaths, eventRootPaths } = _txBuildScope();
-    if (folderPaths.length === 0 && eventRootPaths.length === 0) {
-      showMessage('Select at least one folder to scan.', 4000);
-      return;
+    const builtScope = _txBuildScope();
+    if (_txSourceMode === 'custom') {
+      if (!builtScope.customSrcRoot || !builtScope.customDestRoot) {
+        showMessage('Choose source and destination folders first.', 4000);
+        return;
+      }
+    } else {
+      if (builtScope.folderPaths.length === 0 && builtScope.eventRootPaths.length === 0) {
+        showMessage('Select at least one folder to scan.', 4000);
+        return;
+      }
     }
-    const scope = { folderPaths, eventRootPaths, purpose: _txPurpose };
+    const scope = { ...builtScope, purpose: _txPurpose };
 
     const exportBtn = _txEl('txExportBtn');
     const reviewEl  = _txEl('txScanReview');
@@ -11796,13 +11847,46 @@ const _transferMonitor = (() => {
     });
   }
 
+  // ── Source mode switcher ──────────────────────────────────────────────────
+
+  function _txUpdateCustomUI() {
+    const srcEl  = _txEl('txCustomSrcPath');
+    const destEl = _txEl('txCustomDestPath');
+    if (srcEl)  { srcEl.textContent  = _txCustomSrc  || 'Not set'; srcEl.classList.toggle('tx-unset', !_txCustomSrc); }
+    if (destEl) { destEl.textContent = _txCustomDest || 'Not set'; destEl.classList.toggle('tx-unset', !_txCustomDest); }
+  }
+
+  function _txApplySourceMode(mode) {
+    _txSourceMode = mode;
+    _txCustomSrc  = null;
+    _txCustomDest = null;
+    _txUpdateCustomUI();
+    _txInvalidatePreview();
+
+    const archiveSections = _txEl('txArchiveSections');
+    const customSection   = _txEl('txCustomSection');
+    if (archiveSections) archiveSections.hidden = (mode === 'custom');
+    if (customSection)   customSection.hidden   = (mode !== 'custom');
+
+    // Reset source mode radio to match
+    const radio = _txEl(mode === 'custom' ? 'txSrcModeCustom' : 'txSrcModeArchive');
+    if (radio) radio.checked = true;
+  }
+
   // ── Export ────────────────────────────────────────────────────────────────
 
   async function _txStartExport() {
-    const { folderPaths, eventRootPaths } = _txBuildScope();
-    if (folderPaths.length === 0 && eventRootPaths.length === 0) {
-      showMessage('Select at least one folder to export.', 4000);
-      return;
+    const builtScope = _txBuildScope();
+    if (_txSourceMode === 'custom') {
+      if (!builtScope.customSrcRoot || !builtScope.customDestRoot) {
+        showMessage('Choose source and destination folders first.', 4000);
+        return;
+      }
+    } else {
+      if (builtScope.folderPaths.length === 0 && builtScope.eventRootPaths.length === 0) {
+        showMessage('Select at least one folder to export.', 4000);
+        return;
+      }
     }
     // Block a conflicting concurrent transfer (an import already moving the same drive).
     const _imp = await window.api.getTransferImportStatus().catch(() => null);
@@ -11815,7 +11899,7 @@ const _transferMonitor = (() => {
     const updateTotalFiles = _txScanMode && _txScanResult
       ? (_txScanResult.totals.toCopy + (_txScanResult.totals.controlUpdates || 0))
       : undefined;
-    const scope = { folderPaths, eventRootPaths, purpose: _txPurpose, backupUpdate: _txScanMode, updateTotalFiles };
+    const scope = { ...builtScope, purpose: _txPurpose, backupUpdate: _txScanMode, updateTotalFiles };
 
     const exportBtn  = _txEl('txExportBtn');
     const previewBtn = _txEl('txPreviewBtn');
@@ -11843,8 +11927,9 @@ const _transferMonitor = (() => {
         'busy':                  'An export is already running.',
         'nas-not-set':           'Active Archive Root is not set.',
         'transfer-root-not-set': 'Transfer Drive is not set.',
+        'custom-paths-not-set':  'Choose source and destination folders first.',
         'empty-scope':           'Select at least one folder.',
-        'roots-overlap':         'Transfer Drive must not overlap with the Active Archive.',
+        'roots-overlap':         'Source and destination folders must not overlap.',
       };
       showMessage(msgs[result.reason] || ('Export error: ' + result.reason), 6000);
       if (exportBtn)  exportBtn.disabled  = false;
@@ -12364,6 +12449,28 @@ const _transferMonitor = (() => {
   _txEl('txVerifyBtn')?.addEventListener('click',       _txVerify);
   _txEl('txResumeBtn')?.addEventListener('click',       _txResumeFromCheckpoint);
   _txEl('txStartFreshBtn')?.addEventListener('click',   _txStartFresh);
+
+  // Source mode selector
+  _txEl('txSourceModeGroup')?.querySelectorAll('input[type=radio]').forEach(r => {
+    r.addEventListener('change', () => { if (r.checked) _txApplySourceMode(r.value); });
+  });
+
+  // Custom folder pickers
+  _txEl('txChooseCustomSrcBtn')?.addEventListener('click', async () => {
+    const p = normalizePickedPath(await window.api.chooseCustomSrcFolder().catch(() => null));
+    if (!p) return;
+    _txCustomSrc = p;
+    _txUpdateCustomUI();
+    _txInvalidatePreview();
+  });
+
+  _txEl('txChooseCustomDestBtn')?.addEventListener('click', async () => {
+    const p = normalizePickedPath(await window.api.chooseCustomDestFolder().catch(() => null));
+    if (!p) return;
+    _txCustomDest = p;
+    _txUpdateCustomUI();
+    _txInvalidatePreview();
+  });
 
 })();
 

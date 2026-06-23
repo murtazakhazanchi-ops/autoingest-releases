@@ -7701,36 +7701,80 @@
           </div>
         </div>
 
-        <!-- Export Purpose -->
-        <div>
-          <div class="tx-section-label">Export Purpose</div>
-          <div class="tx-purpose-group" id="txPurposeGroup">
+        <!-- Source Mode -->
+        <div id="txSourceModeGroup">
+          <div class="tx-section-label">Source</div>
+          <div class="tx-purpose-group">
             <label class="tx-purpose-opt">
-              <input type="radio" name="txPurpose" value="archive-transfer" id="txPurposeArchive" checked>
+              <input type="radio" name="txSourceMode" value="archive" id="txSrcModeArchive" checked>
               <span class="tx-purpose-text">
-                <span class="tx-purpose-name">Archive transfer / backup</span>
-                <span class="tx-purpose-desc">Includes event.json and all AutoIngest control files</span>
+                <span class="tx-purpose-name">Active Archive</span>
+                <span class="tx-purpose-desc">Export from the current AutoIngest archive</span>
               </span>
             </label>
             <label class="tx-purpose-opt">
-              <input type="radio" name="txPurpose" value="external-sharing" id="txPurposeExternal">
+              <input type="radio" name="txSourceMode" value="custom" id="txSrcModeCustom">
               <span class="tx-purpose-text">
-                <span class="tx-purpose-name">External sharing</span>
-                <span class="tx-purpose-desc">Media files only — event.json and control files excluded</span>
+                <span class="tx-purpose-name">Custom Folder</span>
+                <span class="tx-purpose-desc">Export any folder to any destination — no AutoIngest structure required</span>
               </span>
             </label>
           </div>
         </div>
 
-        <!-- Export Scope -->
-        <div>
-          <div class="tx-section-label">Export Scope</div>
-          <div id="txScopeTree" class="tx-scope-tree">
-            <div class="tx-empty-note">Load the Archive event list first.</div>
+        <!-- Archive sections (hidden in Custom Folder mode) -->
+        <div id="txArchiveSections">
+
+          <!-- Export Purpose -->
+          <div>
+            <div class="tx-section-label">Export Purpose</div>
+            <div class="tx-purpose-group" id="txPurposeGroup">
+              <label class="tx-purpose-opt">
+                <input type="radio" name="txPurpose" value="archive-transfer" id="txPurposeArchive" checked>
+                <span class="tx-purpose-text">
+                  <span class="tx-purpose-name">Archive transfer / backup</span>
+                  <span class="tx-purpose-desc">Includes event.json and all AutoIngest control files</span>
+                </span>
+              </label>
+              <label class="tx-purpose-opt">
+                <input type="radio" name="txPurpose" value="external-sharing" id="txPurposeExternal">
+                <span class="tx-purpose-text">
+                  <span class="tx-purpose-name">External sharing</span>
+                  <span class="tx-purpose-desc">Media files only — event.json and control files excluded</span>
+                </span>
+              </label>
+            </div>
           </div>
-          <div class="tx-scope-controls" style="margin-top:6px">
-            <button type="button" id="txSelectAllBtn">Select all</button>
-            <button type="button" id="txSelectNoneBtn">Select none</button>
+
+          <!-- Export Scope -->
+          <div>
+            <div class="tx-section-label">Export Scope</div>
+            <div id="txScopeTree" class="tx-scope-tree">
+              <div class="tx-empty-note">Load the Archive event list first.</div>
+            </div>
+            <div class="tx-scope-controls" style="margin-top:6px">
+              <button type="button" id="txSelectAllBtn">Select all</button>
+              <button type="button" id="txSelectNoneBtn">Select none</button>
+            </div>
+          </div>
+
+        </div><!-- /txArchiveSections -->
+
+        <!-- Custom Folder section (hidden in Active Archive mode) -->
+        <div id="txCustomSection" hidden>
+          <div>
+            <div class="tx-section-label">Source Folder</div>
+            <div class="tx-drive-wrap">
+              <div class="tx-drive-path tx-unset" id="txCustomSrcPath">Not set</div>
+              <button type="button" class="aloc-btn" id="txChooseCustomSrcBtn">Choose…</button>
+            </div>
+          </div>
+          <div style="margin-top:12px">
+            <div class="tx-section-label">Destination Folder</div>
+            <div class="tx-drive-wrap">
+              <div class="tx-drive-path tx-unset" id="txCustomDestPath">Not set</div>
+              <button type="button" class="aloc-btn" id="txChooseCustomDestBtn">Choose…</button>
+            </div>
           </div>
         </div>
 

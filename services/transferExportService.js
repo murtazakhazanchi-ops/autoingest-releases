@@ -127,15 +127,15 @@ async function _copyFileSafe(srcPath, destPath, stats, opts = {}) {
     // duplicates. A same-path / different-size file is left untouched and surfaced by the
     // scan as "Changed / Needs Review" — only genuinely missing files are copied.
     if (opts.backupUpdate) {
-      // Control files (event.json, etc.) are safe to overwrite — they are updated by the
-      // source archive and not user-editable on the transfer drive. Media files are never
-      // overwritten in backup-update mode.
-      if (!_CONTROL_FILE_NAMES.has(path.basename(destPath))) {
+      // Custom-source mode treats all files equally — no special archive control files.
+      // Archive mode overwrites control files (event.json, etc.) since they are maintained
+      // by the source archive and not user-editable on the transfer drive.
+      if (opts.sourceMode === 'custom' || !_CONTROL_FILE_NAMES.has(path.basename(destPath))) {
         stats.skipped++;
         if (typeof stats.changedSkipped === 'number') stats.changedSkipped++;
         return 'skipped-changed';
       }
-      // Control file: fall through to overwrite at destPath.
+      // Archive mode control file: fall through to overwrite at destPath.
       outcome = 'copied';
     } else {
       finalDest = await _findSafeConflictPath(destPath);
@@ -357,15 +357,19 @@ function _fileHash(filePath) {
 
 async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
   const startedAt = new Date().toISOString();
-  const { collectionPaths = [], folderPaths = null, eventRootPaths = null, purpose = 'archive-transfer', backupUpdate = false, updateTotalFiles } = scope || {};
-  const copyOpts = { skipControlFiles: purpose === 'external-sharing', backupUpdate: !!backupUpdate };
+  const { collectionPaths = [], folderPaths = null, eventRootPaths = null, purpose = 'archive-transfer', backupUpdate = false, updateTotalFiles, sourceMode } = scope || {};
+  const isCustom = sourceMode === 'custom';
+  const copyOpts = { skipControlFiles: !isCustom && purpose === 'external-sharing', backupUpdate: !!backupUpdate, sourceMode: sourceMode || 'archive' };
 
-  try {
-    await _initTransferMeta(transferRoot, meta.deviceName);
-  } catch (e) {
-    _state.running = false;
-    _state.result  = { ok: false, reason: 'meta-init-failed', error: e.message, completedAt: new Date().toISOString() };
-    return;
+  // Custom-source exports write no archive metadata (no .autoingest-transfer/ marker).
+  if (!isCustom) {
+    try {
+      await _initTransferMeta(transferRoot, meta.deviceName);
+    } catch (e) {
+      _state.running = false;
+      _state.result  = { ok: false, reason: 'meta-init-failed', error: e.message, completedAt: new Date().toISOString() };
+      return;
+    }
   }
 
   // ── Build or restore batch list ───────────────────────────────────────────
@@ -375,6 +379,18 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
     batches           = resumeBatches;
     _state.total      = batches.reduce((s, b) => s + (b.fileCount || 0), 0);
     _state.batchCount = batches.length;
+  } else if (isCustom) {
+    // Custom-source: single flat batch from nasRoot (= customSrcRoot) → transferRoot (= customDestRoot).
+    const batchLabel = path.basename(nasRoot) + ' → ' + path.basename(transferRoot);
+    batches = [{
+      batchIdx: 0, collectionName: '', eventName: '', folderName: '',
+      batchLabel, srcDir: nasRoot, destDir: transferRoot,
+      rootFilesOnly: false, fileCount: 0, status: 'pending',
+      copied: 0, skipped: 0, renamed: 0, errors: 0,
+    }];
+    batches[0].fileCount = await _countFiles(nasRoot, copyOpts);
+    _state.total      = batches[0].fileCount;
+    _state.batchCount = 1;
   } else if ((folderPaths && folderPaths.length > 0) || (eventRootPaths && eventRootPaths.length > 0)) {
     batches = [];
     for (const ep of (eventRootPaths || [])) {
@@ -458,8 +474,8 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
     _state.total = updateTotalFiles;
   }
 
-  // ── Write initial checkpoint ──────────────────────────────────────────────
-  await _writeCheckpoint(transferRoot, {
+  // ── Write initial checkpoint (archive mode only) ──────────────────────────
+  if (!isCustom) await _writeCheckpoint(transferRoot, {
     exportId:        meta.batchId,
     nasRoot,
     transferRoot,
@@ -515,7 +531,7 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
     batch.errors  = stats.errors.length - beforeErrors;
     batch.status  = 'complete';
 
-    await _writeCheckpoint(transferRoot, {
+    if (!isCustom) await _writeCheckpoint(transferRoot, {
       exportId:        meta.batchId,
       nasRoot,
       transferRoot,
@@ -539,7 +555,7 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
   const completedAt = new Date().toISOString();
   const finalStatus = stats.errors.length === 0 ? 'ok' : 'partial';
 
-  await _writeCheckpoint(transferRoot, {
+  if (!isCustom) await _writeCheckpoint(transferRoot, {
     exportId:       meta.batchId,
     nasRoot,
     transferRoot,
@@ -574,7 +590,7 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
     errorCount:   stats.errors.length,
     status:       finalStatus,
   };
-  await _appendAudit(transferRoot, auditEntry);
+  if (!isCustom) await _appendAudit(transferRoot, auditEntry);
 
   _state.running = false;
   _state.paused  = false;
@@ -596,7 +612,7 @@ async function _doExport(nasRoot, transferRoot, scope, meta, resumeBatches) {
     status:     finalStatus,
   };
 
-  if (purpose === 'external-sharing') {
+  if (!isCustom && purpose === 'external-sharing') {
     await _cleanExternalSharingMeta(transferRoot);
   }
 }
@@ -639,6 +655,16 @@ async function clearExportCheckpoint(transferRoot) {
 
 async function previewExport(nasRoot, transferRoot, scope) {
   if (!nasRoot || !transferRoot) return { ok: false, reason: 'missing-roots' };
+
+  // Custom-source mode: count files in the source folder directly, skip archive validations.
+  if (scope && scope.sourceMode === 'custom') {
+    if (nasRoot === transferRoot || _isInsideDir(nasRoot, transferRoot) || _isInsideDir(transferRoot, nasRoot)) {
+      return { ok: false, reason: 'roots-overlap' };
+    }
+    const files = await _countFiles(nasRoot, {});
+    return { ok: true, custom: true, files, collections: 0, events: 0, folders: 0, externalFolders: 0 };
+  }
+
   if (nasRoot === transferRoot || _isInsideDir(nasRoot, transferRoot) || _isInsideDir(transferRoot, nasRoot)) {
     return { ok: false, reason: 'roots-overlap' };
   }
@@ -713,17 +739,22 @@ async function runExport(nasRoot, transferRoot, scope, meta = {}) {
   if (_state.running) return { ok: false, reason: 'busy' };
 
   if (!nasRoot || !transferRoot) return { ok: false, reason: 'missing-roots' };
-  const hasFoldPaths  = Array.isArray(scope?.folderPaths)     && scope.folderPaths.length > 0;
-  const hasEvRtPaths  = Array.isArray(scope?.eventRootPaths)  && scope.eventRootPaths.length > 0;
-  const hasCollPaths  = Array.isArray(scope?.collectionPaths) && scope.collectionPaths.length > 0;
-  if (!scope || (!hasCollPaths && !hasFoldPaths && !hasEvRtPaths)) {
-    return { ok: false, reason: 'empty-scope' };
-  }
-  for (const cp of (scope.collectionPaths || [])) {
-    if (!_isInsideDir(nasRoot, cp)) return { ok: false, reason: 'scope-outside-nas-root', path: cp };
-  }
+
   if (nasRoot === transferRoot || _isInsideDir(nasRoot, transferRoot) || _isInsideDir(transferRoot, nasRoot)) {
     return { ok: false, reason: 'roots-overlap' };
+  }
+
+  // Custom-source mode: roots are the custom src/dest — no archive scope validation needed.
+  if (!(scope && scope.sourceMode === 'custom')) {
+    const hasFoldPaths  = Array.isArray(scope?.folderPaths)     && scope.folderPaths.length > 0;
+    const hasEvRtPaths  = Array.isArray(scope?.eventRootPaths)  && scope.eventRootPaths.length > 0;
+    const hasCollPaths  = Array.isArray(scope?.collectionPaths) && scope.collectionPaths.length > 0;
+    if (!scope || (!hasCollPaths && !hasFoldPaths && !hasEvRtPaths)) {
+      return { ok: false, reason: 'empty-scope' };
+    }
+    for (const cp of (scope.collectionPaths || [])) {
+      if (!_isInsideDir(nasRoot, cp)) return { ok: false, reason: 'scope-outside-nas-root', path: cp };
+    }
   }
 
   const batchId    = crypto.randomBytes(8).toString('hex');
@@ -982,7 +1013,7 @@ async function _resolveScanUnits(nasRoot, transferRoot, scope) {
 
 async function scanBackupSync(nasRoot, transferRoot, scope) {
   if (!nasRoot || !transferRoot) return { ok: false, reason: 'missing-roots' };
-  if (_isInsideDir(nasRoot, transferRoot) || _isInsideDir(transferRoot, nasRoot) || nasRoot === transferRoot) {
+  if (nasRoot === transferRoot || _isInsideDir(nasRoot, transferRoot) || _isInsideDir(transferRoot, nasRoot)) {
     return { ok: false, reason: 'roots-overlap' };
   }
   try {
@@ -991,6 +1022,7 @@ async function scanBackupSync(nasRoot, transferRoot, scope) {
   } catch {
     return { ok: false, reason: 'transfer-root-unavailable' };
   }
+  const isCustom = !!(scope && scope.sourceMode === 'custom');
 
   const groups = {
     newFiles:        { count: 0, bytes: 0, items: [], truncated: false },
@@ -1080,20 +1112,23 @@ async function scanBackupSync(nasRoot, transferRoot, scope) {
   }
 
   let units;
-  try { units = await _resolveScanUnits(nasRoot, transferRoot, scope); }
-  catch (e) { return { ok: false, reason: 'scope-resolution-failed', error: e.message }; }
-  if (!units.length) return { ok: false, reason: 'empty-scope' };
+  if (isCustom) {
+    // Custom-source: single flat unit — the entire source folder mirrors to dest.
+    units = [{ srcDir: nasRoot, destDir: transferRoot, rootFilesOnly: false }];
+  } else {
+    try { units = await _resolveScanUnits(nasRoot, transferRoot, scope); }
+    catch (e) { return { ok: false, reason: 'scope-resolution-failed', error: e.message }; }
+    if (!units.length) return { ok: false, reason: 'empty-scope' };
+  }
 
   for (const u of units) {
     await scanSource(u.srcDir, u.destDir, u.rootFilesOnly);
     await scanDest(u.srcDir, u.destDir, u.rootFilesOnly);
   }
 
-  // Detect likely folder renames in backup-update mode: a source event whose identity
-  // (hijriDate + sequence from event.json) matches an orphan dest event folder indicates
-  // the archive folder was renamed and the transfer drive has the old name.
+  // Rename detection: archive backup-update mode only (not applicable to custom-source).
   const renameMatches = [];
-  if (scope && scope.backupUpdate) {
+  if (!isCustom && scope && scope.backupUpdate) {
     const unitDestDirs = new Set(units.map(u => u.destDir));
 
     // Collect dest collection-level directories to search for orphan event folders.

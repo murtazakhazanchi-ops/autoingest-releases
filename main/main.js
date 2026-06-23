@@ -3819,10 +3819,12 @@ ipcMain.handle('archive:getTransferExportTree', async () => {
 });
 
 ipcMain.handle('archive:previewTransferExport', async (_event, { scope } = {}) => {
-  const nasRoot      = settings.getNasRoot();
-  const transferRoot = settings.getTransferRoot();
-  if (!nasRoot)      return { ok: false, reason: 'nas-not-set' };
-  if (!transferRoot) return { ok: false, reason: 'transfer-root-not-set' };
+  const isCustom     = scope?.sourceMode === 'custom';
+  const nasRoot      = isCustom ? scope.customSrcRoot  : settings.getNasRoot();
+  const transferRoot = isCustom ? scope.customDestRoot : settings.getTransferRoot();
+  if (isCustom && (!nasRoot || !transferRoot)) return { ok: false, reason: 'custom-paths-not-set' };
+  if (!isCustom && !nasRoot)      return { ok: false, reason: 'nas-not-set' };
+  if (!isCustom && !transferRoot) return { ok: false, reason: 'transfer-root-not-set' };
   return transferExportService.previewExport(nasRoot, transferRoot, scope);
 });
 
@@ -3830,22 +3832,46 @@ ipcMain.handle('archive:previewTransferExport', async (_event, { scope } = {}) =
 // relative path (new / existing-same / changed / incomplete / destination-only / error).
 // Filesystem comparison is the source of truth — works across devices, no userData dependency.
 ipcMain.handle('archive:scanBackupSync', async (_event, { scope } = {}) => {
-  const nasRoot      = settings.getNasRoot();
-  const transferRoot = settings.getTransferRoot();
-  if (!nasRoot)      return { ok: false, reason: 'nas-not-set' };
-  if (!transferRoot) return { ok: false, reason: 'transfer-root-not-set' };
+  const isCustom     = scope?.sourceMode === 'custom';
+  const nasRoot      = isCustom ? scope.customSrcRoot  : settings.getNasRoot();
+  const transferRoot = isCustom ? scope.customDestRoot : settings.getTransferRoot();
+  if (isCustom && (!nasRoot || !transferRoot)) return { ok: false, reason: 'custom-paths-not-set' };
+  if (!isCustom && !nasRoot)      return { ok: false, reason: 'nas-not-set' };
+  if (!isCustom && !transferRoot) return { ok: false, reason: 'transfer-root-not-set' };
   return transferExportService.scanBackupSync(nasRoot, transferRoot, scope);
 });
 
 ipcMain.handle('archive:runTransferExport', async (_event, { scope, operatorName } = {}) => {
-  const nasRoot      = settings.getNasRoot();
-  const transferRoot = settings.getTransferRoot();
-  if (!nasRoot)      return { ok: false, reason: 'nas-not-set' };
-  if (!transferRoot) return { ok: false, reason: 'transfer-root-not-set' };
+  const isCustom     = scope?.sourceMode === 'custom';
+  const nasRoot      = isCustom ? scope.customSrcRoot  : settings.getNasRoot();
+  const transferRoot = isCustom ? scope.customDestRoot : settings.getTransferRoot();
+  if (isCustom && (!nasRoot || !transferRoot)) return { ok: false, reason: 'custom-paths-not-set' };
+  if (!isCustom && !nasRoot)      return { ok: false, reason: 'nas-not-set' };
+  if (!isCustom && !transferRoot) return { ok: false, reason: 'transfer-root-not-set' };
   return transferExportService.runExport(nasRoot, transferRoot, scope, {
     operatorName: operatorName || null,
     deviceName:   os.hostname(),
   });
+});
+
+ipcMain.handle('archive:chooseCustomSrcFolder', async () => {
+  const win    = BrowserWindow.getFocusedWindow();
+  const result = await dialog.showOpenDialog(win, {
+    title:      'Choose Source Folder',
+    properties: ['openDirectory'],
+  });
+  if (result.canceled) return null;
+  return result.filePaths[0];
+});
+
+ipcMain.handle('archive:chooseCustomDestFolder', async () => {
+  const win    = BrowserWindow.getFocusedWindow();
+  const result = await dialog.showOpenDialog(win, {
+    title:      'Choose Destination Folder',
+    properties: ['openDirectory', 'createDirectory'],
+  });
+  if (result.canceled) return null;
+  return result.filePaths[0];
 });
 
 ipcMain.handle('archive:renameFolderOnTransferDrive', async (_event, { destAbsPath, newName } = {}) => {
