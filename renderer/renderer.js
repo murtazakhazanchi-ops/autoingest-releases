@@ -11965,7 +11965,13 @@ const _transferMonitor = (() => {
     } catch {}
 
     let result;
-    try { result = await window.api.resumeTransferExportFromCheckpoint(operatorName); } catch (e) {
+    try {
+      if (_txSourceMode === 'custom' && _txCustomSrc && _txCustomDest) {
+        result = await window.api.resumeCustomTransferExportFromCheckpoint({ customSrcRoot: _txCustomSrc, customDestRoot: _txCustomDest, operatorName });
+      } else {
+        result = await window.api.resumeTransferExportFromCheckpoint(operatorName);
+      }
+    } catch (e) {
       showMessage('Resume failed: ' + e.message, 6000);
       return;
     }
@@ -11982,7 +11988,11 @@ const _transferMonitor = (() => {
 
   async function _txStartFresh() {
     _txEl('txResumeOffer')?.setAttribute('hidden', '');
-    await window.api.clearTransferExportCheckpoint().catch(() => {});
+    if (_txSourceMode === 'custom' && _txCustomDest) {
+      await window.api.clearCustomTransferExportCheckpoint({ customDestRoot: _txCustomDest }).catch(() => {});
+    } else {
+      await window.api.clearTransferExportCheckpoint().catch(() => {});
+    }
     _txSetButtonPhase('idle');
   }
 
@@ -12506,6 +12516,17 @@ const _transferMonitor = (() => {
     _txCustomDest = p;
     _txUpdateCustomUI();
     _txInvalidatePreview();
+
+    // Check for an interrupted custom export at this destination.
+    _txEl('txResumeOffer')?.setAttribute('hidden', '');
+    const ckpt = await window.api.getCustomTransferExportCheckpoint({ customDestRoot: p }).catch(() => null);
+    if (ckpt && ckpt.status !== 'complete') {
+      const done   = ckpt.batches?.filter(b => b.status === 'complete').length ?? 0;
+      const total  = ckpt.batches?.length ?? 0;
+      const msgEl  = _txEl('txResumeMsg');
+      if (msgEl) msgEl.textContent = `A previous custom export was interrupted (${done} / ${total} batches done).`;
+      _txEl('txResumeOffer')?.removeAttribute('hidden');
+    }
   });
 
 })();
