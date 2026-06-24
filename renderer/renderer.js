@@ -11128,8 +11128,15 @@ const _transferMonitor = (() => {
   let ackExport = false, ackImport = false;  // true once the user has seen a finished result
 
   const _pct = (s) => {
-    const done = (s.copied || 0) + (s.skipped || 0) + (s.renamed || 0);
-    return s.total > 0 ? Math.min(100, Math.round(done / s.total * 100)) : null;
+    // Mirror the modal's done formula: backupUpdate uses copied-only because total is the
+    // queued-work count and skipped (up-to-date) files are not part of that denominator.
+    const done = s.backupUpdate
+      ? (s.copied || 0)
+      : (s.copied || 0) + (s.skipped || 0) + (s.renamed || 0);
+    if (s.total <= 0) return null;
+    const pct = Math.round(done / s.total * 100);
+    // Defensive cap: never show 100 while still running — fixes rounding edge cases too.
+    return (s.running || s.paused) ? Math.min(99, pct) : Math.min(100, pct);
   };
   const _errs = (s) => (s.errors?.length || s.result?.errorCount || 0);
   function _phase(kind, s) {
