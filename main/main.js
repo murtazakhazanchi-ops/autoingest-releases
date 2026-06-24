@@ -529,6 +529,87 @@ ipcMain.handle('files:import', async (event, { filePaths, destination, importedB
   return result;
 });
 
+// ── Sequenced-photographer-folder resolution ─────────────────────────────────
+// Handles the case where photographer sequencing (PCxx- prefixes) has already
+// been applied to an event folder but the import still references the plain name.
+// importRouter builds dest paths from photographerSequences in event.json; if that
+// field is absent (pre-feature events, manual renames, sync lag) the plain name is
+// used and would create a duplicate unsequenced folder.
+//
+// This pre-flight step checks each unique photographer dest dir before the copy.
+// If the dir doesn't exist but exactly one PCxx-/PCxx_ prefixed sibling matches
+// (after prefix strip + normalisation), dest paths are rewritten to use it.
+// 0 matches → create new folder as normal. 2+ matches → warn, keep plain name.
+
+// PC prefix pattern: PC01-…PC999- or PC01_…PC999_ (mirrors photographerSequenceService)
+const _IMPORT_PC_SEQ_RE = /^PC(\d{2,3})[-_]/;
+
+function _normPhotogName(name) {
+  return (name || '').replace(_IMPORT_PC_SEQ_RE, '').toLowerCase().trim()
+    .replace(/[\s\-_]+/g, ' ');
+}
+
+async function _resolveSeqPhotographerFolders(jobs) {
+  const VIDEO_EXTS = new Set(['.mp4', '.mov']); // mirrors VIDEO_EXTENSIONS in importRouter.js
+  const SKIP_NAMES = new Set(['_Selected', '__MACOSX', '.autoingest', '.DS_Store']);
+
+  // Collect unique photographer dirs (strip VIDEO sub-dir for video files).
+  const dirMap = new Map(); // photogDir → resolved photogDir
+  for (const job of jobs) {
+    const ext = path.extname(job.dest).toLowerCase();
+    let photogDir = path.dirname(job.dest);
+    if (VIDEO_EXTS.has(ext) && path.basename(photogDir) === 'VIDEO') {
+      photogDir = path.dirname(photogDir);
+    }
+    if (!dirMap.has(photogDir)) dirMap.set(photogDir, photogDir);
+  }
+
+  for (const [photogDir] of dirMap) {
+    // Already exists (correct folder name, sequenced or plain) → no change needed.
+    try { await fsp.access(photogDir); continue; } catch {}
+
+    const parentDir  = path.dirname(photogDir);
+    const targetNorm = _normPhotogName(path.basename(photogDir));
+    if (!targetNorm) continue;
+
+    let candidates = [];
+    try {
+      const entries = await fsp.readdir(parentDir, { withFileTypes: true });
+      for (const e of entries) {
+        if (!e.isDirectory()) continue;
+        if (SKIP_NAMES.has(e.name) || e.name.startsWith('.')) continue;
+        if (!_IMPORT_PC_SEQ_RE.test(e.name)) continue; // only check sequenced folders
+        if (_normPhotogName(e.name) === targetNorm) candidates.push(e.name);
+      }
+    } catch { continue; }
+
+    if (candidates.length === 1) {
+      dirMap.set(photogDir, path.join(parentDir, candidates[0]));
+      log(`[import] Sequenced folder resolved: "${path.basename(photogDir)}" → "${candidates[0]}"`);
+    } else if (candidates.length > 1) {
+      log(`[import] Ambiguous sequenced folder for "${path.basename(photogDir)}" (${candidates.join(', ')}) — keeping plain name`);
+    }
+  }
+
+  // Rewrite dest paths only where the photographer dir changed.
+  return jobs.map(job => {
+    const ext = path.extname(job.dest).toLowerCase();
+    let photogDir = path.dirname(job.dest);
+    let relSuffix = path.basename(job.dest);
+    if (VIDEO_EXTS.has(ext) && path.basename(photogDir) === 'VIDEO') {
+      relSuffix = path.join('VIDEO', relSuffix);
+      photogDir = path.dirname(photogDir);
+    }
+    const resolved = dirMap.get(photogDir);
+    if (resolved && resolved !== photogDir) {
+      return { src: job.src, dest: path.join(resolved, relSuffix) };
+    }
+    return job;
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 async function importFileJobs(event, fileJobs, onTeamProgress = null) {
   if (!Array.isArray(fileJobs) || fileJobs.length === 0) {
     return { copied: 0, skipped: 0, errors: 0, skippedReasons: [], failedFiles: [], duration: 0, integrity: 'verified' };
@@ -544,13 +625,18 @@ async function importFileJobs(event, fileJobs, onTeamProgress = null) {
     dest: path.normalize(j.dest),
   }));
 
+  // Resolve existing sequenced photographer folders before copying.
+  // Rewrites dest paths to match an existing PCxx-Name folder when the plain
+  // name doesn't exist on disk yet. No-op when sequences are already correct.
+  const resolvedJobs = await _resolveSeqPhotographerFolders(normalisedJobs);
+
   const importStartMs    = Date.now();
   let   bytesCopiedSoFar = 0;
   let   fileIndex        = 0;
 
   let result;
   try {
-    result = await copyFileJobs(normalisedJobs, (progress) => {
+    result = await copyFileJobs(resolvedJobs, (progress) => {
       if (!event.sender.isDestroyed()) {
         event.sender.send('import:progress', progress);
       }
