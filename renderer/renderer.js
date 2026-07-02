@@ -9185,14 +9185,22 @@ document.getElementById('importBtn').addEventListener('click', async () => {
         while (_lockCheckPending) {
           const lockCheck = await window.api.checkDirectArchiveLocks({ fileJobs });
           if (!lockCheck.blocked?.length) { _lockCheckPending = false; break; }
-          const choice = await _showDirectArchiveBusyDialog(lockCheck.blocked);
+          const choice = await _showDirectArchiveBusyDialog(lockCheck.blocked, lockCheck.currentDeviceName ?? null);
           if (choice === 'cancel') return;
           if (choice === 'switch') {
             _applyImportModeUI('local-first', null);
             showMessage('Switched to Local First mode. Please try importing again.');
             return;
           }
-          // choice === 'refresh' — re-check in next loop iteration
+          if (choice === 'clear') {
+            // Clear each stale self-lock, then re-check in the next loop iteration.
+            for (const b of lockCheck.blocked) {
+              if (b.lockPath) {
+                await window.api.clearSelfStaleLock({ lockPath: b.lockPath }).catch(() => {});
+              }
+            }
+          }
+          // choice === 'refresh' or 'clear' — re-check in next loop iteration
         }
       }
     }
@@ -9490,39 +9498,80 @@ function _renderDestinationTree(groups, eventData, photographerName) {
 
 /**
  * Show a modal when a direct-nas import conflicts with an active background sync lock.
- * Returns 'switch' (use local-first instead), 'refresh' (re-check locks), or 'cancel'.
+ * Returns 'switch', 'refresh', 'cancel', or 'clear' (same-device stale lock only).
  *
- * @param {Array<{collection:string, eventFolderName:string, photographerFolderName:string, lockedBy:string}>} blocked
- * @returns {Promise<'switch'|'refresh'|'cancel'>}
+ * When currentDeviceName is supplied and ALL blocked entries belong to this device,
+ * shows the "Previous Import Lock Found" variant with a Clear & Continue action.
+ * Otherwise shows the standard "Archive Busy" dialog unchanged.
+ *
+ * @param {Array<{collection:string, eventFolderName:string, photographerFolderName:string, lockedBy:string, lockPath?:string}>} blocked
+ * @param {string|null} currentDeviceName  os.hostname() from main process, or null.
+ * @returns {Promise<'switch'|'refresh'|'cancel'|'clear'>}
  */
-function _showDirectArchiveBusyDialog(blocked) {
+function _showDirectArchiveBusyDialog(blocked, currentDeviceName) {
   return new Promise(resolve => {
     const overlay = document.createElement('div');
     overlay.className = 'ec-modal-overlay';
 
-    const names    = blocked.map(b => escapeHtml(b.photographerFolderName)).join(', ');
-    const lockedBy = escapeHtml(blocked[0]?.lockedBy || 'another device');
+    const names = blocked.map(b => escapeHtml(b.photographerFolderName)).join(', ');
+    const plur  = blocked.length === 1 ? 'is' : 'are';
 
-    overlay.innerHTML = `
-      <div class="ec-modal-box" style="max-width:440px">
-        <div class="ec-modal-title">Archive Busy</div>
-        <div class="ec-modal-body">
-          <strong>${names}</strong> ${blocked.length === 1 ? 'is' : 'are'} currently being
-          synced to the archive by <strong>${lockedBy}</strong>.<br><br>
-          Importing now may cause file conflicts. You can wait and re-check, switch to
-          Local&nbsp;First mode, or cancel.
-        </div>
-        <div class="ec-modal-actions">
-          <button class="ec-outline-btn dab-cancel-btn">Cancel</button>
-          <button class="ec-outline-btn dab-refresh-btn">Re-check</button>
-          <button class="ec-continue-btn dab-switch-btn">Use Local First</button>
-        </div>
-      </div>`;
+    // Same-device stale lock: every blocked entry was locked by this machine.
+    const isSameDev = !!currentDeviceName &&
+      blocked.length > 0 &&
+      blocked.every(b => b.lockedBy === currentDeviceName);
 
-    const done = (choice) => { document.body.removeChild(overlay); resolve(choice); };
-    overlay.querySelector('.dab-cancel-btn').addEventListener('click',  () => done('cancel'));
-    overlay.querySelector('.dab-refresh-btn').addEventListener('click', () => done('refresh'));
-    overlay.querySelector('.dab-switch-btn').addEventListener('click',  () => done('switch'));
+    if (isSameDev) {
+      const machine = escapeHtml(currentDeviceName);
+      overlay.innerHTML = `
+        <div class="ec-modal-box" style="max-width:460px">
+          <div class="ec-modal-title">Previous Import Lock Found</div>
+          <div class="ec-modal-body">
+            <strong>${names}</strong> ${plur} locked by this same machine
+            (<strong>${machine}</strong>), but no active import appears to be running.
+            The previous import may have failed or closed unexpectedly.<br><br>
+            You can clear the stale lock and continue importing, switch to
+            Local&nbsp;First mode, re-check, or cancel.
+          </div>
+          <div class="dab-stale-actions">
+            <button class="dab-clear-btn">Clear &amp; Continue</button>
+            <div class="dab-secondary-row">
+              <button class="ec-outline-btn dab-cancel-btn">Cancel</button>
+              <button class="ec-outline-btn dab-refresh-btn">Re-check</button>
+              <button class="ec-continue-btn dab-switch-btn">Use Local First</button>
+            </div>
+          </div>
+        </div>`;
+
+      const done = (choice) => { document.body.removeChild(overlay); resolve(choice); };
+      overlay.querySelector('.dab-clear-btn').addEventListener('click',  () => done('clear'));
+      overlay.querySelector('.dab-cancel-btn').addEventListener('click', () => done('cancel'));
+      overlay.querySelector('.dab-refresh-btn').addEventListener('click',() => done('refresh'));
+      overlay.querySelector('.dab-switch-btn').addEventListener('click', () => done('switch'));
+    } else {
+      // Standard other-machine busy dialog — unchanged.
+      const lockedBy = escapeHtml(blocked[0]?.lockedBy || 'another device');
+      overlay.innerHTML = `
+        <div class="ec-modal-box" style="max-width:440px">
+          <div class="ec-modal-title">Archive Busy</div>
+          <div class="ec-modal-body">
+            <strong>${names}</strong> ${plur} currently being
+            synced to the archive by <strong>${lockedBy}</strong>.<br><br>
+            Importing now may cause file conflicts. You can wait and re-check, switch to
+            Local&nbsp;First mode, or cancel.
+          </div>
+          <div class="ec-modal-actions">
+            <button class="ec-outline-btn dab-cancel-btn">Cancel</button>
+            <button class="ec-outline-btn dab-refresh-btn">Re-check</button>
+            <button class="ec-continue-btn dab-switch-btn">Use Local First</button>
+          </div>
+        </div>`;
+
+      const done = (choice) => { document.body.removeChild(overlay); resolve(choice); };
+      overlay.querySelector('.dab-cancel-btn').addEventListener('click',  () => done('cancel'));
+      overlay.querySelector('.dab-refresh-btn').addEventListener('click', () => done('refresh'));
+      overlay.querySelector('.dab-switch-btn').addEventListener('click',  () => done('switch'));
+    }
 
     document.body.appendChild(overlay);
   });
@@ -9775,7 +9824,7 @@ function showQuickImportConfirmModal(fileCount, destPath) {
 document.getElementById('progressPauseBtn').addEventListener('click', () => {
   window.api.pauseCopy();
   document.getElementById('progressPauseBtn').style.display  = 'none';
-  document.getElementById('progressResumeBtn').style.display = '';
+  document.getElementById('progressResumeBtn').style.display = 'flex';
   document.getElementById('progressEta').textContent = 'Paused';
 });
 

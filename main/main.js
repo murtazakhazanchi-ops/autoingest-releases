@@ -3096,19 +3096,34 @@ ipcMain.handle('archive:syncAllReadyJobs', async () => {
 
 ipcMain.handle('archive:checkDirectArchiveLocks', async (_event, { fileJobs } = {}) => {
   const nasRoot = settings.getNasRoot();
-  if (!nasRoot) return { ok: true, blocked: [] };
+  const currentDeviceName = os.hostname();
+  if (!nasRoot) return { ok: true, blocked: [], currentDeviceName };
 
   const scopes  = _extractPhotographerLockScopes(fileJobs || [], nasRoot);
   const blocked = [];
   for (const scope of scopes) {
     try {
       const r = await archiveLockService.checkLock(nasRoot, scope);
-      if (r.blocked) blocked.push({ ...scope, lockedBy: r.lockedBy, expiresAt: r.expiresAt });
+      if (r.blocked) {
+        const lockPath = archiveLockService.getLockPath(nasRoot, scope);
+        blocked.push({ ...scope, lockedBy: r.lockedBy, expiresAt: r.expiresAt, lockPath });
+      }
     } catch (err) {
       console.warn('[archive:checkDirectArchiveLocks] checkLock I/O error (treating as not blocked):', scope.photographerFolderName, err.message);
     }
   }
-  return { ok: true, blocked };
+  return { ok: true, blocked, currentDeviceName };
+});
+
+ipcMain.handle('archive:clearSelfStaleLock', async (_event, { lockPath } = {}) => {
+  if (!lockPath || typeof lockPath !== 'string') return { ok: false, reason: 'invalid-path' };
+  const nas  = settings.getNasRoot();
+  const main = settings.getMainArchiveRoot();
+  const configuredRoots = [nas, main].filter(Boolean);
+  if (configuredRoots.length === 0) return { ok: false, reason: 'no-configured-roots' };
+  const result = await archiveLockService.clearSelfLock(lockPath, configuredRoots);
+  if (result.ok) log(`[import] Cleared self-stale lock: ${path.basename(lockPath)}`);
+  return result;
 });
 
 // ── EXIF metadata service ─────────────────────────────────────────────────────

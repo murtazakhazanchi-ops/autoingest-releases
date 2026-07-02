@@ -235,6 +235,7 @@ contextBridge.exposeInMainWorld('api', {
   pauseJob:               (jobId)   => ipcRenderer.invoke('archive:pauseJob',              jobId),
   verifyJobChecksum:      (jobId)   => ipcRenderer.invoke('archive:verifyJobChecksum',     jobId),
   checkDirectArchiveLocks: (payload) => ipcRenderer.invoke('archive:checkDirectArchiveLocks', payload),
+  clearSelfStaleLock:      (params)  => ipcRenderer.invoke('archive:clearSelfStaleLock',      params),
 
   // ── Sync slot coordination (advisory) ──
   requestSyncSlot: (jobId) => ipcRenderer.invoke('archive:requestSyncSlot', jobId),

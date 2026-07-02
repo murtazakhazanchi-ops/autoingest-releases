@@ -149,6 +149,65 @@ async function releaseLock(lockPath) {
 }
 
 /**
+ * Return the absolute path of a lock file without reading or modifying it.
+ * Pure, deterministic — same inputs always yield the same path.
+ *
+ * @param {string} activeArchiveRoot
+ * @param {{ collection: string, eventFolderName: string, photographerFolderName: string }} params
+ * @returns {string}
+ */
+function getLockPath(activeArchiveRoot, { collection, eventFolderName, photographerFolderName }) {
+  return _lockPath(activeArchiveRoot, collection, eventFolderName, photographerFolderName);
+}
+
+/**
+ * Force-clear a lock that belongs to this device.
+ *
+ * Safety rules:
+ *  1. lockPath must be inside a configured archive root's .autoingest/locks/ directory.
+ *  2. lock.deviceName must match os.hostname() — only own-device locks may be cleared here.
+ *  3. Heartbeat recency guard: if lastHeartbeatAt is within (LOCK_HEARTBEAT_INTERVAL_MS + 30 s)
+ *     of now, a process may still be actively renewing the lock — refuse to clear.
+ *  4. ENOENT is treated as already-released (idempotent OK).
+ *
+ * @param {string}   lockPath         Absolute path to the candidate lock file.
+ * @param {string[]} configuredRoots  Archive roots from settings (nas + main).
+ * @returns {Promise<{ ok: boolean, reason: string }>}
+ */
+async function clearSelfLock(lockPath, configuredRoots) {
+  if (!_isValidLockPath(lockPath, configuredRoots)) {
+    return { ok: false, reason: 'invalid-path' };
+  }
+
+  let lock;
+  try {
+    const raw = await fsp.readFile(lockPath, 'utf8');
+    lock = JSON.parse(raw);
+  } catch (e) {
+    if (e.code === 'ENOENT') return { ok: true, reason: 'already-missing' };
+    throw e;
+  }
+
+  if (lock.deviceName !== os.hostname()) {
+    return { ok: false, reason: 'not-self-device' };
+  }
+
+  // If the heartbeat was renewed very recently a process may still be alive.
+  const STALE_THRESHOLD_MS = LOCK_HEARTBEAT_INTERVAL_MS + 30_000;
+  if (typeof lock.lastHeartbeatAt === 'number' &&
+      Date.now() - lock.lastHeartbeatAt < STALE_THRESHOLD_MS) {
+    return { ok: false, reason: 'may-still-active' };
+  }
+
+  try {
+    await fsp.unlink(lockPath);
+  } catch (e) {
+    if (e.code !== 'ENOENT') throw e;
+  }
+  return { ok: true, reason: 'released' };
+}
+
+/**
  * Safely release a stale lock via the diagnostics repair UI.
  *
  * Safety rules:
@@ -259,6 +318,8 @@ module.exports = {
   checkLock,
   releaseLock,
   releaseStaleLock,
+  clearSelfLock,
+  getLockPath,
   renewLock,
   LOCK_TTL_MS,
   LOCK_HEARTBEAT_INTERVAL_MS,
