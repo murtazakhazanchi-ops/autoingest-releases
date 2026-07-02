@@ -321,6 +321,13 @@ let fileLoadRequestId = 0;
 let _draggedPaths    = [];          // paths being dragged from the file grid
 let _csqEligibleFiles = null;       // [{src,dest,size}] — set after successful import
 let _csqSourceRoot    = null;       // source root path for path-containment validation
+let _qmzOpen          = false;      // true while QMZ sequence manager overlay is visible
+let _qmzRoot          = null;       // qmzRoot path for the active manager session
+let _qmzData          = null;       // last scanRoot result { sequences, unsequenced, other }
+let _qmzEventContext  = null;       // { component, isMulti } for metadata tagging
+let _qmzActivePg      = null;       // photographer selected in left panel
+let _qmzActiveLocation = null;      // 'unsequenced' or sequence code (e.g. '01Q')
+let _qmzSelectedFiles  = new Set(); // file paths selected in center panel
 let _previewOpen      = false;      // true while preview overlay is visible
 let _previewPath      = null;       // path of currently previewed file
 let _previewOrder     = [];         // snapshot of getRenderedPathOrder() at open time
@@ -7767,6 +7774,40 @@ function showProgressSummary({ copied, skipped, errors, skippedReasons, failedFi
     cleanBtn.addEventListener('click', () => openSourceCleanup());
     actLeft.appendChild(cleanBtn);
   }
+
+  // ── Sort QMZ Photos button — only when the active event has a QMZ component ─
+  if (actLeft && !modal.querySelector('#qmzSortBtn') && copiedFiles && copiedFiles.length > 0) {
+    const eData      = (typeof EventCreator !== 'undefined') ? EventCreator.getActiveEventData() : null;
+    const components = eData?.event?.components || [];
+    const qmzComp    = components.find(c => c.eventTypes?.some(t => t.label === 'QMZ'));
+    if (qmzComp) {
+      const sep = (eData?.eventPath || copiedFiles[0]?.dest || '').includes('/') ? '/' : '\\';
+      let derivedRoot;
+      if (eData?.eventPath) {
+        const eventFolder = eData.eventPath.split(sep).slice(0, -1).join(sep);
+        derivedRoot = (components.length > 1 && qmzComp.folderName)
+          ? eventFolder + sep + qmzComp.folderName
+          : eventFolder;
+      } else {
+        // Fallback: find a copiedFile belonging to the QMZ component by folder name
+        const qmzFile = (components.length > 1 && qmzComp.folderName)
+          ? copiedFiles.find(f => f.dest.includes(sep + qmzComp.folderName + sep))
+          : null;
+        const dest0 = (qmzFile || copiedFiles[0])?.dest || '';
+        derivedRoot = dest0.split(sep).slice(0, -2).join(sep);
+      }
+      const evtCtx  = {
+        component: { location: qmzComp.location || '', city: qmzComp.city || '', country: qmzComp.country || '' },
+        isMulti: components.length > 1,
+      };
+      const qmzBtn = document.createElement('button');
+      qmzBtn.id          = 'qmzSortBtn';
+      qmzBtn.className   = 'im-btn-secondary';
+      qmzBtn.textContent = 'Sort QMZ Photos';
+      qmzBtn.addEventListener('click', () => openQMZManager(derivedRoot, evtCtx));
+      actLeft.appendChild(qmzBtn);
+    }
+  }
 }
 
 window.api.onImportProgress(updateProgress);
@@ -8281,9 +8322,427 @@ async function _handleSourceDelete() {
 function _closeSourceCleanup() {
   const overlay = document.getElementById('sourceCleanupOverlay');
   if (overlay) overlay.classList.add('hidden');
-  // State (_csqEligibleFiles, _csqSourceRoot) intentionally kept — cleared by
-  // progressDoneBtn or resetAppState, not here, so partial results survive Cancel.
+  // State (_csqEligibleFiles, _csqSourceRoot) intentionally kept — cleared only at
+  // import start or by resetAppState (disconnect/eject), not here, so partial
+  // results survive Cancel and the list remains intact until the next import.
 }
+
+// ── QMZ Sequence Manager ──────────────────────────────────────────────────────
+
+async function openQMZManager(qmzRoot, eventContext) {
+  _qmzRoot          = qmzRoot;
+  _qmzEventContext  = eventContext;
+  _qmzActivePg      = null;
+  _qmzActiveLocation = 'unsequenced';
+  _qmzSelectedFiles  = new Set();
+  _qmzOpen           = true;
+
+  const folder = qmzRoot.replace(/[/\\][^/\\]+[/\\]?$/, s => s) || qmzRoot;
+  const label  = qmzRoot.split(/[/\\]/).filter(Boolean).pop() || qmzRoot;
+  document.getElementById('qmzSubtitle').textContent = label;
+  document.getElementById('qmzOverlay').classList.remove('hidden');
+  _qmzSetStatus('Loading…');
+
+  await window.api.qmzInitRoot({ qmzRoot });
+  await _qmzRefresh();
+  _qmzSetStatus('');
+}
+// Expose so eventCreator.js (loaded before this script) can open the overlay.
+window.openQMZManager = openQMZManager;
+
+function _closeQMZManager() {
+  _qmzOpen           = false;
+  _qmzRoot           = null;
+  _qmzData           = null;
+  _qmzEventContext   = null;
+  _qmzActivePg       = null;
+  _qmzActiveLocation = null;
+  _qmzSelectedFiles  = new Set();
+  document.getElementById('qmzOverlay').classList.add('hidden');
+  _qmzSetStatus('');
+}
+
+async function _qmzRefresh() {
+  if (!_qmzRoot) return;
+  _qmzData = await window.api.qmzScanRoot({ qmzRoot: _qmzRoot });
+  _renderQMZPhotographerList();
+  _renderQMZCenter();
+  _renderQMZRight();
+  _qmzUpdateActions();
+}
+
+function _renderQMZPhotographerList() {
+  const el = document.getElementById('qmzPhotographerList');
+  if (!el || !_qmzData) return;
+
+  const { unsequenced, sequences } = _qmzData;
+  const rows = [];
+
+  // Unsequenced photographers
+  const uPgs = Object.keys(unsequenced).sort();
+  if (uPgs.length) {
+    rows.push('<div class="qmz-pg-group-label">Unsequenced</div>');
+    for (const pg of uPgs) {
+      const isActive = _qmzActivePg === pg && _qmzActiveLocation === 'unsequenced';
+      rows.push(`<div class="qmz-pg-row${isActive ? ' active' : ''}" data-pg="${escapeHtml(pg)}" data-loc="unsequenced">
+        <span class="qmz-pg-name">${escapeHtml(pg)}</span>
+        <span class="qmz-pg-count">${unsequenced[pg].count}</span>
+      </div>`);
+    }
+  }
+
+  // Sequenced photographers (aggregate across all sequences)
+  const seqPgMap = {};
+  for (const seq of sequences) {
+    for (const [pg, data] of Object.entries(seq.photographers)) {
+      seqPgMap[pg] = (seqPgMap[pg] || 0) + data.count;
+    }
+  }
+  const sPgs = Object.keys(seqPgMap).sort();
+  if (sPgs.length) {
+    rows.push('<div class="qmz-pg-group-label">Sequenced</div>');
+    for (const pg of sPgs) {
+      const isActive = _qmzActivePg === pg && _qmzActiveLocation !== 'unsequenced';
+      rows.push(`<div class="qmz-pg-row${isActive ? ' active' : ''}" data-pg="${escapeHtml(pg)}" data-loc="${isActive ? escapeHtml(_qmzActiveLocation) : ''}">
+        <span class="qmz-pg-name">${escapeHtml(pg)}</span>
+        <span class="qmz-pg-count">${seqPgMap[pg]}</span>
+      </div>`);
+    }
+  }
+
+  if (!rows.length) {
+    el.innerHTML = '<div class="qmz-empty">No photographer folders found.</div>';
+    return;
+  }
+  el.innerHTML = rows.join('');
+
+  el.querySelectorAll('.qmz-pg-row').forEach(row => {
+    row.addEventListener('click', () => {
+      _qmzActivePg       = row.dataset.pg;
+      _qmzActiveLocation = row.dataset.loc || 'unsequenced';
+      _qmzSelectedFiles  = new Set();
+      _renderQMZPhotographerList();
+      _renderQMZCenter();
+      _qmzUpdateActions();
+    });
+  });
+}
+
+function _renderQMZCenter() {
+  const el      = document.getElementById('qmzFileGrid');
+  const titleEl = document.getElementById('qmzCenterTitle');
+  if (!el || !_qmzData) return;
+
+  if (!_qmzActivePg) {
+    if (titleEl) titleEl.textContent = 'Select a photographer';
+    el.innerHTML = '<div class="qmz-empty">Select a photographer from the left panel.</div>';
+    return;
+  }
+
+  let files = [];
+  if (_qmzActiveLocation === 'unsequenced') {
+    files = _qmzData.unsequenced[_qmzActivePg]?.files || [];
+    if (titleEl) titleEl.textContent = `${_qmzActivePg} — Unsequenced`;
+  } else {
+    const seq = _qmzData.sequences.find(s => s.code === _qmzActiveLocation);
+    files = seq?.photographers[_qmzActivePg]?.files || [];
+    if (titleEl) titleEl.textContent = `${_qmzActivePg} — ${_qmzActiveLocation}`;
+  }
+
+  if (!files.length) {
+    el.innerHTML = '<div class="qmz-empty">No media files here.</div>';
+    return;
+  }
+
+  el.innerHTML = files.map(f => {
+    const sel = _qmzSelectedFiles.has(f.path);
+    return `<label class="qmz-file-row${sel ? ' selected' : ''}" data-path="${escapeHtml(f.path)}">
+      <input type="checkbox"${sel ? ' checked' : ''} />
+      <span class="qmz-file-name">${escapeHtml(f.name)}</span>
+      <span class="qmz-file-size">${_formatBytes(f.size)}</span>
+    </label>`;
+  }).join('');
+
+  el.querySelectorAll('.qmz-file-row').forEach(row => {
+    row.addEventListener('change', () => {
+      const p   = row.dataset.path;
+      const chk = row.querySelector('input[type="checkbox"]');
+      if (chk.checked) { _qmzSelectedFiles.add(p); row.classList.add('selected'); }
+      else             { _qmzSelectedFiles.delete(p); row.classList.remove('selected'); }
+      _qmzUpdateActions();
+    });
+  });
+}
+
+function _renderQMZRight() {
+  const el = document.getElementById('qmzSequenceList');
+  if (!el || !_qmzData) return;
+
+  const { sequences } = _qmzData;
+  if (!sequences.length) {
+    el.innerHTML = '<div class="qmz-empty">No sequences yet.<br>Add one below.</div>';
+    return;
+  }
+
+  el.innerHTML = sequences.map(seq => {
+    const total = Object.values(seq.photographers).reduce((s, p) => s + p.count, 0);
+    return `<div class="qmz-seq-chip ${seq.letter.toLowerCase()}" data-code="${escapeHtml(seq.code)}">
+      <span class="qmz-seq-chip-code">${escapeHtml(seq.code)}</span>
+      <span class="qmz-seq-chip-type">${escapeHtml(seq.type)}</span>
+      <span class="qmz-seq-chip-count">${total}</span>
+    </div>`;
+  }).join('');
+
+  el.querySelectorAll('.qmz-seq-chip').forEach(chip => {
+    chip.addEventListener('click', () => _qmzAssignToSequence(chip.dataset.code));
+  });
+}
+
+function _qmzUpdateActions() {
+  const hasSel  = _qmzSelectedFiles.size > 0;
+  const notUseq = _qmzActiveLocation !== 'unsequenced';
+  document.getElementById('qmzMoveUnsequencedBtn').disabled = !(hasSel && notUseq);
+  document.getElementById('qmzQueueMetaBtn').disabled       = !hasSel;
+  document.getElementById('qmzSelectAllBtn').disabled       = !_qmzActivePg;
+}
+
+function _qmzSetStatus(msg, cls) {
+  const el = document.getElementById('qmzStatus');
+  if (!el) return;
+  el.textContent = msg;
+  el.className   = cls ? `qmz-status ${cls}` : 'qmz-status';
+}
+
+// Queue metadata for the given files at their current (post-move) paths.
+// Called automatically after every successful assign; never writes the sequence code.
+async function _qmzAutoQueueMetadata(sequenceCode, filePaths, photographerName) {
+  const typeMap  = { Q: 'Qadam', M: 'Majlis', Z: 'Ziyafat' };
+  const letter   = sequenceCode[sequenceCode.length - 1];
+  const typeTags = typeMap[letter] ? [typeMap[letter]] : [];
+  if (!typeTags.length) return;
+  const batchId = `qmz-${Date.now()}`;
+  const files   = filePaths.map(dest => ({ dest, photographer: photographerName }));
+  const ctx     = {
+    component:    _qmzEventContext?.component || null,
+    isMulti:      _qmzEventContext?.isMulti   ?? false,
+    explicitTags: typeTags,
+  };
+  await window.api.qmzQueueMetadata({ batchId, files, context: ctx });
+}
+
+async function _qmzAssignToSequence(sequenceCode) {
+  if (!_qmzRoot || !_qmzSelectedFiles.size || !_qmzActivePg) return;
+  const filesToMove = [..._qmzSelectedFiles];
+  _qmzSetStatus(`Moving ${filesToMove.length} file(s) to ${sequenceCode}…`);
+  const result = await window.api.qmzMoveToSequence({
+    qmzRoot: _qmzRoot,
+    filePaths: filesToMove,
+    sequenceCode,
+    photographerName: _qmzActivePg,
+  });
+  if (result.ok) {
+    // Auto-queue metadata with the type keyword for the moved files' new paths
+    const movedDests = result.moved.map(m => m.dest);
+    await _qmzAutoQueueMetadata(sequenceCode, movedDests, _qmzActivePg);
+    _qmzSetStatus(`Moved ${result.moved.length} to ${sequenceCode} — metadata queued`, 'ok');
+  } else {
+    _qmzSetStatus(`${result.errors.length} error(s) moving to ${sequenceCode}`, 'err');
+  }
+  _qmzSelectedFiles = new Set();
+  await _qmzRefresh();
+}
+
+async function _qmzHandleMoveToUnsequenced() {
+  if (!_qmzRoot || !_qmzSelectedFiles.size || !_qmzActivePg) return;
+  _qmzSetStatus(`Moving ${_qmzSelectedFiles.size} file(s) to Unsequenced…`);
+  const result = await window.api.qmzMoveToUnsequenced({
+    qmzRoot: _qmzRoot,
+    filePaths: [..._qmzSelectedFiles],
+    photographerName: _qmzActivePg,
+  });
+  _qmzSetStatus(
+    result.ok ? `Moved ${result.moved.length} file(s) to Unsequenced` : `${result.errors.length} error(s)`,
+    result.ok ? 'ok' : 'err'
+  );
+  _qmzSelectedFiles  = new Set();
+  _qmzActiveLocation = 'unsequenced';
+  await _qmzRefresh();
+}
+
+// Quick Add Next: next number = global max across ALL sequences + 1 (not per-letter).
+async function _qmzHandleAddNext() {
+  if (!_qmzRoot) return;
+  const letter    = document.getElementById('qmzLetterSelect')?.value || 'Q';
+  const letterMax = { Q: 50, M: 51, Z: 52 };
+  const allNums   = (_qmzData?.sequences || []).map(s => s.number);
+  const next      = allNums.length ? Math.max(...allNums) + 1 : 1;
+  if (next > (letterMax[letter] ?? 50)) { _qmzSetStatus(`Max number reached`, 'err'); return; }
+  const result = await window.api.qmzCreateSequence({ qmzRoot: _qmzRoot, number: next, letter });
+  _qmzSetStatus(result.ok ? `Created ${result.code}` : (result.error || 'Create failed'), result.ok ? 'ok' : 'err');
+  if (result.ok) await _qmzRefresh();
+}
+
+// Add Specific: reads separate number + letter fields — creation only, no assign.
+async function _qmzHandleAddSpecific() {
+  if (!_qmzRoot) return;
+  const number = parseInt(document.getElementById('qmzSeqNumInput')?.value || '', 10);
+  const letter = (document.getElementById('qmzSeqLetterSelect')?.value || 'Q').toUpperCase();
+  if (!number || number < 1 || number > 52) { _qmzSetStatus('Enter a valid number (1–52)', 'err'); return; }
+  const result = await window.api.qmzCreateSequence({ qmzRoot: _qmzRoot, number, letter });
+  _qmzSetStatus(result.ok ? `Created ${result.code}` : (result.error || 'Create failed'), result.ok ? 'ok' : 'err');
+  if (result.ok) {
+    const numEl = document.getElementById('qmzSeqNumInput');
+    if (numEl) numEl.value = '';
+    await _qmzRefresh();
+  }
+}
+
+// Show the inline type chooser. onPick(letter) is called when user selects Q/M/Z.
+// If availableLetters is set, only those letters are enabled.
+function _qmzShowTypeChooser(label, onPick, availableLetters) {
+  const chooser = document.getElementById('qmzTypeChooser');
+  if (!chooser) return;
+  document.getElementById('qmzChooserLabel').textContent = label;
+  chooser.hidden = false;
+  chooser.querySelectorAll('.qmz-chooser-btn[data-letter]').forEach(btn => {
+    btn.disabled = availableLetters ? !availableLetters.includes(btn.dataset.letter) : false;
+    btn.onclick  = async () => { chooser.hidden = true; await onPick(btn.dataset.letter); };
+  });
+}
+
+// Create-while-assigning: type a sequence number + Enter.
+// Existing → assign directly. Missing → show chooser to create then assign.
+async function _qmzHandleAssignByNumber() {
+  const raw = (document.getElementById('qmzAssignInput')?.value || '').trim();
+  const num = parseInt(raw, 10);
+  if (!raw || isNaN(num) || num < 1 || num > 52) {
+    _qmzSetStatus('Enter a sequence number (1–52)', 'err');
+    return;
+  }
+  if (!_qmzSelectedFiles.size) {
+    _qmzSetStatus('Select files first', 'err');
+    return;
+  }
+  const matches = (_qmzData?.sequences || []).filter(s => s.number === num);
+  if (matches.length === 1) {
+    document.getElementById('qmzAssignInput').value = '';
+    await _qmzAssignToSequence(matches[0].code);
+  } else if (matches.length > 1) {
+    // Multiple sequences share this number — let user pick which to assign to
+    _qmzShowTypeChooser(
+      `Seq ${num} exists as multiple types. Pick one:`,
+      async (letter) => {
+        const m = matches.find(s => s.letter === letter);
+        if (m) { document.getElementById('qmzAssignInput').value = ''; await _qmzAssignToSequence(m.code); }
+      },
+      matches.map(s => s.letter)
+    );
+  } else {
+    // Sequence doesn't exist — offer to create then assign
+    _qmzShowTypeChooser(
+      `Sequence ${num} not found. Create as:`,
+      async (letter) => {
+        const r = await window.api.qmzCreateSequence({ qmzRoot: _qmzRoot, number: num, letter });
+        if (!r.ok) { _qmzSetStatus(r.error || 'Create failed', 'err'); return; }
+        await _qmzRefresh();
+        document.getElementById('qmzAssignInput').value = '';
+        await _qmzAssignToSequence(r.code);
+      }
+    );
+  }
+}
+
+// Bulk Create — parse space-separated letters, preview, then create all.
+function _qmzUpdateBulkPreview() {
+  const raw     = (document.getElementById('qmzBulkInput')?.value || '').toUpperCase().trim();
+  const letters = raw.split(/\s+/).filter(l => ['Q', 'M', 'Z'].includes(l));
+  const preview = document.getElementById('qmzBulkPreview');
+  if (!preview) return;
+  if (!letters.length) { preview.textContent = ''; return; }
+  const allNums = (_qmzData?.sequences || []).map(s => s.number);
+  const start   = allNums.length ? Math.max(...allNums) + 1 : 1;
+  const codes   = letters.map((l, i) => `${String(start + i).padStart(2, '0')}${l}`);
+  preview.textContent = codes.join(', ');
+}
+
+async function _qmzHandleBulkCreate() {
+  if (!_qmzRoot) return;
+  const raw     = (document.getElementById('qmzBulkInput')?.value || '').toUpperCase().trim();
+  const letters = raw.split(/\s+/).filter(l => ['Q', 'M', 'Z'].includes(l));
+  if (!letters.length) { _qmzSetStatus('Enter letters: e.g. Q M Z Q Q', 'err'); return; }
+  const allNums = (_qmzData?.sequences || []).map(s => s.number);
+  const start   = allNums.length ? Math.max(...allNums) + 1 : 1;
+  const items   = letters.map((letter, i) => ({ number: start + i, letter }));
+  const result  = await window.api.qmzBulkCreate({ qmzRoot: _qmzRoot, items });
+  _qmzSetStatus(
+    `Created ${result.created.length}${result.errors.length ? `, ${result.errors.length} error(s)` : ''} sequence(s)`,
+    result.ok ? 'ok' : 'err'
+  );
+  const bulkEl = document.getElementById('qmzBulkInput');
+  if (bulkEl) bulkEl.value = '';
+  const prevEl = document.getElementById('qmzBulkPreview');
+  if (prevEl) prevEl.textContent = '';
+  await _qmzRefresh();
+}
+
+// Manual retry: re-tag currently selected files (e.g. after a metadata failure).
+async function _qmzHandleRetryTagging() {
+  if (!_qmzRoot || !_qmzSelectedFiles.size || !_qmzActivePg) return;
+  if (_qmzActiveLocation === 'unsequenced') { _qmzSetStatus('Select sequenced files to tag', 'err'); return; }
+  const dests = [..._qmzSelectedFiles];
+  _qmzSetStatus(`Queuing metadata for ${dests.length} file(s)…`);
+  await _qmzAutoQueueMetadata(_qmzActiveLocation, dests, _qmzActivePg);
+  _qmzSetStatus(`Metadata queued for ${dests.length} file(s)`, 'ok');
+}
+
+// Wire QMZ overlay event listeners — runs once at page load.
+(function _initQMZListeners() {
+  document.getElementById('qmzCloseBtn')?.addEventListener('click', _closeQMZManager);
+  document.getElementById('qmzDoneBtn')?.addEventListener('click',  _closeQMZManager);
+
+  document.getElementById('qmzSelectAllBtn')?.addEventListener('click', () => {
+    const grid  = document.getElementById('qmzFileGrid');
+    const boxes = [...(grid?.querySelectorAll('input[type="checkbox"]') ?? [])];
+    const allOn = boxes.every(c => c.checked);
+    boxes.forEach(c => {
+      const p = c.closest('.qmz-file-row')?.dataset.path;
+      if (!p) return;
+      c.checked = !allOn;
+      c.closest('.qmz-file-row').classList.toggle('selected', !allOn);
+      if (!allOn) _qmzSelectedFiles.add(p); else _qmzSelectedFiles.delete(p);
+    });
+    _qmzUpdateActions();
+  });
+
+  // Assign input: Enter → create-while-assigning flow
+  document.getElementById('qmzAssignInput')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); _qmzHandleAssignByNumber(); }
+  });
+  document.getElementById('qmzChooserCancel')?.addEventListener('click', () => {
+    document.getElementById('qmzTypeChooser').hidden = true;
+    _qmzSetStatus('');
+  });
+
+  // Add Sequence controls
+  document.getElementById('qmzAddNextBtn')?.addEventListener('click', _qmzHandleAddNext);
+  document.getElementById('qmzAddSpecificBtn')?.addEventListener('click', _qmzHandleAddSpecific);
+  document.getElementById('qmzSeqNumInput')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') _qmzHandleAddSpecific();
+  });
+
+  // Bulk Create
+  document.getElementById('qmzBulkInput')?.addEventListener('input', _qmzUpdateBulkPreview);
+  document.getElementById('qmzBulkCreateBtn')?.addEventListener('click', _qmzHandleBulkCreate);
+
+  // Bottom actions
+  document.getElementById('qmzMoveUnsequencedBtn')?.addEventListener('click', _qmzHandleMoveToUnsequenced);
+  document.getElementById('qmzQueueMetaBtn')?.addEventListener('click', _qmzHandleRetryTagging);
+
+  // Escape closes the overlay
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && _qmzOpen) { e.preventDefault(); _closeQMZManager(); }
+  });
+})();
 
 // ── Space-bar Media Preview ────────────────────────────────────────────────
 // Phase 1: JPEG/PNG (full-res via files:getPreviewUrl), RAW (thumbnail via
@@ -8740,6 +9199,11 @@ document.getElementById('importBtn').addEventListener('click', async () => {
 
     importRunning = true;
     updateSelectionBar();
+    // Reset cleanup eligibility for the new import session — per-import state,
+    // owned here (import start) not in _closeProgressModal.
+    _csqEligibleFiles = null;
+    _csqSourceRoot    = null;
+    document.getElementById('scqOpenBtn')?.remove();
     showProgress();
 
     // Mark event as in-progress so an interrupted import is detectable on restart.
@@ -8868,6 +9332,10 @@ document.getElementById('importBtn').addEventListener('click', async () => {
   setStatusBarMessage('selection', null);
   setStatusBarMessage('import', 'Importing…', 3);
   updateSelectionBar();
+  // Reset cleanup eligibility for the new import session — owned at import start.
+  _csqEligibleFiles = null;
+  _csqSourceRoot    = null;
+  document.getElementById('scqOpenBtn')?.remove();
   showProgress();
 
   if (window._DEBUG_SOURCE_CLEANUP) {
@@ -9325,13 +9793,13 @@ function _closeProgressModal() {
   importRunning        = false;
   _postImportSucceeded = false;
 
-  // Remove per-import dynamic elements so the next import gets a clean modal
+  // Remove per-import dynamic elements so the next import gets a clean modal.
+  // Cleanup eligibility (_csqEligibleFiles / _csqSourceRoot) is NOT cleared here —
+  // it is reset at the start of the next import so the state survives modal close.
   document.getElementById('progressReportBtn')?.remove();
   document.getElementById('runChecksumBtn')?.remove();
   document.getElementById('sumIntegrity')?.remove();
   document.getElementById('scqOpenBtn')?.remove();
-  _csqEligibleFiles = null;
-  _csqSourceRoot    = null;
 
   // Restore main actions row; remove post-import chooser if present
   const modal = document.getElementById('progressModal');
@@ -11034,6 +11502,16 @@ document.addEventListener('keydown', e => {
   // Never intercept shortcuts when the user is typing in a form field.
   const tag = document.activeElement?.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+  // QMZ mode: S focuses the assign input; Cmd+G is blocked.
+  if (_qmzOpen) {
+    if (e.key === 's' && !(e.metaKey || e.ctrlKey || e.altKey)) {
+      e.preventDefault();
+      document.getElementById('qmzAssignInput')?.focus();
+    }
+    if ((e.metaKey || e.ctrlKey) && e.key === 'g') e.preventDefault();
+    return;
+  }
 
   if ((e.metaKey || e.ctrlKey) && e.key === 'g') {
     e.preventDefault();

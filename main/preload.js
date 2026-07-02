@@ -364,6 +364,16 @@ contextBridge.exposeInMainWorld('api', {
   listProvisionalCollections:  ()       => ipcRenderer.invoke('collection:listProvisional'),
   writeProvisionalLink:        (params) => ipcRenderer.invoke('collection:writeProvisionalLink', params),
 
+  // ── QMZ Sequence Manager ──
+  qmzScanRoot:          (params) => ipcRenderer.invoke('qmz:scanRoot',          params),
+  qmzInitRoot:          (params) => ipcRenderer.invoke('qmz:initRoot',          params),
+  qmzCreateSequence:    (params) => ipcRenderer.invoke('qmz:createSequence',    params),
+  qmzBulkCreate:        (params) => ipcRenderer.invoke('qmz:bulkCreate',        params),
+  qmzMoveToSequence:    (params) => ipcRenderer.invoke('qmz:moveToSequence',    params),
+  qmzMoveToUnsequenced: (params) => ipcRenderer.invoke('qmz:moveToUnsequenced', params),
+  qmzQueueMetadata:     (params) => ipcRenderer.invoke('qmz:queueMetadata',     params),
+  onQmzMetadataProgress: (cb)    => _register('qmz:metadata:progress', (_e, data) => cb(data)),
+
   // ── Online Registry (advisory — prepare local shells from remote registry entries) ──
   registryGetAll:                ()       => ipcRenderer.invoke('registry:getAll'),
   prepareCollectionFromRegistry: (params) => ipcRenderer.invoke('collection:prepareFromRegistry', params),

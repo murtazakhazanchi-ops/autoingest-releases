@@ -43,6 +43,7 @@ const metadataSyncService = require('./metadataSyncService');
 const realtimeOps              = require('../services/realtimeOperationsService');
 const offlineCollectionRegistry    = require('../services/offlineCollectionRegistryService');
 const photographerSeqService       = require('../services/photographerSequenceService');
+const qmzService                   = require('./qmzService');
 
 // ── Platform ─────────────────────────────────────────────────────────────────
 const isMac = process.platform === 'darwin';
@@ -4801,5 +4802,42 @@ ipcMain.handle('event:applyPhotographerSequence', async (_event, { localEventPat
 
   log('info', `[seq] Sequence applied — ${renameResult.renames.length} folder(s) renamed`);
   return { ok: true, renames: renameResult.renames, sequences: scopedSequences };
+});
+
+// ── QMZ Sequence Manager ──────────────────────────────────────────────────────
+
+ipcMain.handle('qmz:scanRoot', async (_e, { qmzRoot }) => {
+  return qmzService.scanRoot(qmzRoot);
+});
+
+ipcMain.handle('qmz:initRoot', async (_e, { qmzRoot }) => {
+  return qmzService.initRoot(qmzRoot);
+});
+
+ipcMain.handle('qmz:createSequence', async (_e, { qmzRoot, number, letter }) => {
+  return qmzService.createSequence(qmzRoot, number, letter);
+});
+
+ipcMain.handle('qmz:bulkCreate', async (_e, { qmzRoot, items }) => {
+  return qmzService.bulkCreateSequences(qmzRoot, items);
+});
+
+ipcMain.handle('qmz:moveToSequence', async (_e, { qmzRoot, filePaths, sequenceCode, photographerName }) => {
+  return qmzService.moveFilesToSequence(qmzRoot, filePaths, sequenceCode, photographerName);
+});
+
+ipcMain.handle('qmz:moveToUnsequenced', async (_e, { qmzRoot, filePaths, photographerName }) => {
+  return qmzService.moveFilesToUnsequenced(qmzRoot, filePaths, photographerName);
+});
+
+ipcMain.handle('qmz:queueMetadata', async (event, { batchId, files, context }) => {
+  const sender = event.sender;
+  const emitFn = (data) => {
+    if (!sender.isDestroyed()) sender.send('qmz:metadata:progress', data);
+  };
+  // files: [{ dest, photographer }] — src == dest for in-place re-tagging
+  const copiedFiles = files.map(f => ({ src: f.dest, dest: f.dest, photographer: f.photographer ?? null }));
+  exifService.applyBatch(batchId, copiedFiles, context, emitFn);
+  return { ok: true };
 });
 

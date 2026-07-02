@@ -1754,6 +1754,9 @@ ${_offlineStagingMode ? '<p class="ec-subtext">Archive offline — showing colle
     const resolved    = _scannedEvents.filter(e => e.isParseable);
     const unparseable = _scannedEvents.filter(e => !e.isParseable);
 
+    const _evlBasePath = _effectiveCollPath() || activeMaster?.path || '';
+    const _evlSep = _evlBasePath.includes('/') ? '/' : '\\';
+
     const resolvedHTML = resolved.map(ev => {
       const isLegacy = ev.isLegacy === true;
       const warnBadge = ev.isUnresolved
@@ -1766,13 +1769,31 @@ ${_offlineStagingMode ? '<p class="ec-subtext">Archive offline — showing colle
         ? `<span class="ec-evl-badge--pending" title="Created while archive was offline — waiting to sync to archive">Pending sync</span>`
         : '';
       const displayName = ev._eventJson?.eventName || ev.folderName;
+
+      // QMZ button(s) — one per QMZ component, only when a base path is known.
+      const _evlIsMulti = (ev.components || []).length > 1;
+      const _evlEventFolder = _evlBasePath ? _evlBasePath + _evlSep + ev.folderName : '';
+      const _evlQmzComps = (ev.components || []).filter(c => Array.isArray(c.types) && c.types.includes('QMZ'));
+      const qmzBtnsHTML = (_evlEventFolder && _evlQmzComps.length > 0)
+        ? _evlQmzComps.map(comp => {
+            const compIdx = ev.components.indexOf(comp);
+            const qmzRoot = (_evlIsMulti && comp.folderName)
+              ? _evlEventFolder + _evlSep + comp.folderName
+              : _evlEventFolder;
+            const btnLabel = (_evlIsMulti && _evlQmzComps.length > 1 && comp.folderName)
+              ? `Sort QMZ (${comp.folderName})`
+              : 'Sort QMZ Photos';
+            return `<button class="ec-evl-qmz-btn" data-qmz-root="${esc(qmzRoot)}" data-qmz-folder="${esc(ev.folderName)}" data-qmz-comp-idx="${compIdx}" title="Open QMZ Sequence Manager">${esc(btnLabel)}</button>`;
+          }).join('')
+        : '';
+
       return `
 <div class="ec-evl-item" data-folder="${esc(ev.folderName)}" tabindex="0" role="option" aria-selected="false">
   <div class="ec-evl-meta">
     <div class="ec-evl-name" title="${esc(displayName)}">${esc(displayName)}</div>
     <div class="ec-evl-date">${esc(ev.hijriDate)}</div>
   </div>
-  ${legacyBadge}${warnBadge}${pendingBadge}
+  ${legacyBadge}${warnBadge}${pendingBadge}${qmzBtnsHTML}
 </div>`;
     }).join('');
 
@@ -1864,6 +1885,22 @@ ${unparseable.map(ev => `
       btn.addEventListener('click', e => {
         e.stopPropagation(); // prevent bubble to disabled parent
         _openRepairEvent(btn.dataset.folder);
+      });
+    });
+
+    // Phase 6: wire "Sort QMZ Photos" buttons — delegates to renderer.js openQMZManager.
+    body.querySelectorAll('.ec-evl-qmz-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation(); // prevent item selection on click
+        const qmzRoot = btn.dataset.qmzRoot;
+        const folder  = btn.dataset.qmzFolder;
+        const compIdx = parseInt(btn.dataset.qmzCompIdx, 10);
+        const evEntry = (_scannedEvents || []).find(ev => ev.folderName === folder);
+        const comp    = evEntry?.components?.[compIdx] ?? null;
+        const isMulti = (evEntry?.components?.length ?? 0) > 1;
+        if (typeof window.openQMZManager === 'function') {
+          window.openQMZManager(qmzRoot, { component: comp, isMulti });
+        }
       });
     });
 

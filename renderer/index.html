@@ -4382,6 +4382,22 @@
     .ec-evl-repair-btn:hover {
       background: color-mix(in srgb, var(--yellow) 22%, transparent);
     }
+    .ec-evl-qmz-btn {
+      flex-shrink: 0;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--green);
+      background: color-mix(in srgb, var(--green) 12%, transparent);
+      border: 1px solid color-mix(in srgb, var(--green) 30%, transparent);
+      border-radius: 6px;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+      white-space: nowrap;
+    }
+    .ec-evl-qmz-btn:hover {
+      background: color-mix(in srgb, var(--green) 22%, transparent);
+    }
     .ec-evl-seq {
       font-variant-numeric: tabular-nums;
       font-weight: 600;
@@ -6110,6 +6126,186 @@
   }
   .sc-btn-done:hover { opacity: 0.85; }
 
+  /* ── QMZ Sequence Manager ────────────────────────────────────────────── */
+  #qmzOverlay {
+    position: fixed; inset: 0; z-index: 200;
+    background: var(--scrim);
+    display: flex; align-items: center; justify-content: center;
+  }
+  #qmzOverlay.hidden { display: none; }
+  .qmz-shell {
+    background: var(--card-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 18px;
+    width: min(960px, calc(100vw - 32px));
+    height: min(720px, calc(100vh - 48px));
+    display: flex; flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    overflow: hidden;
+  }
+  .qmz-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 18px 22px 14px;
+    border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+  }
+  .qmz-title  { font-size: 1rem; font-weight: 700; color: var(--text); }
+  .qmz-subtitle { font-size: 0.78rem; color: var(--subtext); flex: 1; }
+  .qmz-close-btn {
+    width: 30px; height: 30px; border-radius: 8px; border: none;
+    background: transparent; color: var(--subtext); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.12s, color 0.12s;
+  }
+  .qmz-close-btn:hover { background: var(--card-hover); color: var(--text); }
+  .qmz-panels {
+    display: flex; flex: 1; overflow: hidden;
+  }
+  .qmz-panel { display: flex; flex-direction: column; overflow: hidden; }
+  .qmz-panel-left  { width: 200px; border-right: 1px solid var(--border-subtle); flex-shrink: 0; }
+  .qmz-panel-center { flex: 1; }
+  .qmz-panel-right { width: 224px; border-left: 1px solid var(--border-subtle); flex-shrink: 0; }
+  .qmz-panel-header {
+    padding: 10px 14px 8px;
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--subtext);
+    border-bottom: 1px solid var(--border-subtle); flex-shrink: 0;
+  }
+  /* Left panel */
+  .qmz-photographer-list { flex: 1; overflow-y: auto; padding: 6px 0; }
+  .qmz-pg-group { padding: 4px 0; }
+  .qmz-pg-group-label {
+    padding: 2px 14px; font-size: 0.68rem; font-weight: 700;
+    text-transform: uppercase; color: var(--subtext); letter-spacing: 0.05em;
+  }
+  .qmz-pg-row {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 14px; font-size: 0.8rem; color: var(--text);
+    cursor: pointer; transition: background 0.1s;
+  }
+  .qmz-pg-row:hover { background: var(--card-hover); }
+  .qmz-pg-row.active { background: var(--blue); color: #fff; border-radius: 0; }
+  .qmz-pg-row.active .qmz-pg-count { color: rgba(255,255,255,0.7); }
+  .qmz-pg-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .qmz-pg-count { font-size: 0.72rem; color: var(--subtext); flex-shrink: 0; }
+  /* Center panel */
+  .qmz-center-header {
+    display: flex; align-items: center; gap: 8px; padding: 10px 14px 8px;
+    border-bottom: 1px solid var(--border-subtle); flex-shrink: 0;
+  }
+  .qmz-center-title { flex: 1; font-size: 0.82rem; font-weight: 600; color: var(--text); }
+  .qmz-action-btn {
+    height: 28px; padding: 0 12px; border-radius: 7px; font-size: 0.75rem; font-weight: 600;
+    border: 1px solid var(--border); background: transparent; color: var(--subtext);
+    cursor: pointer; transition: border-color 0.12s, color 0.12s;
+  }
+  .qmz-action-btn:hover:not(:disabled) { border-color: var(--text); color: var(--text); }
+  .qmz-action-btn:disabled { opacity: 0.35; cursor: default; }
+  .qmz-file-grid { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 2px; }
+  .qmz-file-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 8px; border-radius: 7px; font-size: 0.78rem; color: var(--text); cursor: pointer;
+  }
+  .qmz-file-row:hover { background: var(--card-hover); }
+  .qmz-file-row.selected { background: rgba(137,180,250,0.15); }
+  .qmz-file-row input[type="checkbox"] { flex-shrink: 0; accent-color: var(--blue); cursor: pointer; }
+  .qmz-file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .qmz-file-size { color: var(--subtext); flex-shrink: 0; font-size: 0.72rem; }
+  .qmz-empty { padding: 24px 16px; font-size: 0.8rem; color: var(--subtext); text-align: center; line-height: 1.7; }
+  /* Right panel */
+  .qmz-sequence-list { flex: 1; overflow-y: auto; padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; }
+  .qmz-seq-chip {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 10px; border-radius: 8px; cursor: pointer;
+    font-size: 0.8rem; font-weight: 600; color: var(--text);
+    border: 1px solid var(--border-subtle);
+    transition: background 0.1s, border-color 0.1s;
+  }
+  .qmz-seq-chip:hover { background: var(--card-hover); border-color: var(--blue); }
+  .qmz-seq-chip-code { font-family: monospace; font-size: 0.9rem; min-width: 32px; }
+  .qmz-seq-chip-type { flex: 1; font-size: 0.72rem; color: var(--subtext); font-weight: 400; }
+  .qmz-seq-chip-count { font-size: 0.72rem; color: var(--subtext); }
+  .qmz-seq-chip.q { border-left: 3px solid var(--blue); }
+  .qmz-seq-chip.m { border-left: 3px solid var(--green); }
+  .qmz-seq-chip.z { border-left: 3px solid var(--yellow); }
+  .qmz-seq-create {
+    padding: 8px; border-top: 1px solid var(--border-subtle);
+    display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;
+  }
+  .qmz-seq-create-row { display: flex; gap: 6px; }
+  .qmz-add-btn {
+    flex: 1; height: 30px; border-radius: 8px; font-size: 0.75rem; font-weight: 600;
+    border: 1px solid var(--border); background: transparent; color: var(--text);
+    cursor: pointer; transition: background 0.12s, border-color 0.12s;
+  }
+  .qmz-add-btn:hover { background: var(--card-hover); border-color: var(--blue); }
+  .qmz-select {
+    height: 30px; border-radius: 8px; font-size: 0.75rem; padding: 0 6px;
+    border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text);
+    cursor: pointer;
+  }
+  .qmz-seq-input {
+    flex: 1; height: 30px; padding: 0 10px; border-radius: 8px; font-size: 0.82rem;
+    font-family: monospace; border: 1px solid var(--border-subtle);
+    background: var(--bg-secondary); color: var(--text); outline: none;
+    transition: border-color 0.15s; text-transform: uppercase;
+  }
+  .qmz-seq-input:focus { border-color: var(--blue); }
+  .qmz-right-actions {
+    padding: 8px; border-top: 1px solid var(--border-subtle);
+    display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;
+  }
+  .qmz-btn-primary {
+    height: 32px; padding: 0 16px; border-radius: 9px; font-size: 0.8rem; font-weight: 700;
+    background: var(--blue); color: #fff; border: none; cursor: pointer; transition: opacity 0.12s;
+  }
+  .qmz-btn-primary:hover:not(:disabled) { opacity: 0.85; }
+  .qmz-btn-primary:disabled { opacity: 0.35; cursor: default; }
+  /* Footer */
+  .qmz-footer {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 22px; border-top: 1px solid var(--border-subtle); flex-shrink: 0;
+  }
+  .qmz-status  { flex: 1; font-size: 0.78rem; color: var(--subtext); }
+  .qmz-status.ok  { color: var(--green); }
+  .qmz-status.err { color: var(--red); }
+  .qmz-btn-done {
+    height: 34px; padding: 0 22px; border-radius: 10px; font-size: 0.82rem; font-weight: 700;
+    background: var(--blue); color: #fff; border: none; cursor: pointer; transition: opacity 0.12s;
+  }
+  .qmz-btn-done:hover { opacity: 0.85; }
+  /* QMZ right-panel subdivisions */
+  .qmz-section-header {
+    padding: 5px 10px 2px;
+    font-size: 0.66rem; font-weight: 700; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--subtext);
+    border-top: 1px solid var(--border-subtle); flex-shrink: 0;
+  }
+  .qmz-right-block {
+    padding: 3px 8px 6px; display: flex; flex-direction: column; gap: 4px; flex-shrink: 0;
+  }
+  /* Inline type chooser for create-while-assigning */
+  .qmz-type-chooser { display: flex; flex-direction: column; gap: 4px; padding-top: 2px; }
+  .qmz-chooser-label { font-size: 0.7rem; color: var(--subtext); }
+  .qmz-chooser-btns { display: flex; gap: 3px; flex-wrap: wrap; }
+  .qmz-chooser-btn {
+    flex: 1; min-width: 40px; height: 26px; border-radius: 6px; font-size: 0.68rem; font-weight: 600;
+    border: 1px solid var(--border); background: transparent; color: var(--text);
+    cursor: pointer; transition: background 0.12s, border-color 0.12s;
+  }
+  .qmz-chooser-btn:hover:not(:disabled) { background: var(--card-hover); border-color: var(--blue); color: var(--blue); }
+  .qmz-chooser-btn:disabled { opacity: 0.28; cursor: default; }
+  .qmz-chooser-cancel {
+    height: 26px; padding: 0 8px; border-radius: 6px; font-size: 0.68rem;
+    border: 1px solid var(--border-subtle); background: transparent; color: var(--subtext); cursor: pointer;
+  }
+  .qmz-chooser-cancel:hover { color: var(--text); }
+  /* Bulk create */
+  .qmz-bulk-preview {
+    font-size: 0.68rem; color: var(--blue); min-height: 14px; line-height: 1.5; word-break: break-all;
+  }
+  .qmz-bulk-create-btn { width: 100%; }
+
   /* ── Startup Splash Overlay ──────────────────────────────────────────── */
   #loginSplash {
     position: fixed; inset: 0; z-index: 9999;
@@ -7509,6 +7705,99 @@
         <span class="sc-sel-count" id="scSelCount"></span>
         <button id="scCancelBtn" class="sc-btn-cancel">Cancel</button>
         <button id="scDeleteBtn" class="sc-btn-delete" disabled>Delete Selected</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── QMZ SEQUENCE MANAGER ─────────────────────────────────────────────── -->
+  <div id="qmzOverlay" class="hidden" role="dialog" aria-modal="true" aria-labelledby="qmzTitle">
+    <div class="qmz-shell">
+      <div class="qmz-header">
+        <span class="qmz-title" id="qmzTitle">Sort QMZ Photos</span>
+        <span class="qmz-subtitle" id="qmzSubtitle"></span>
+        <button class="qmz-close-btn" id="qmzCloseBtn" aria-label="Close QMZ manager">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="1" y1="1" x2="13" y2="13"/><line x1="13" y1="1" x2="1" y2="13"/></svg>
+        </button>
+      </div>
+      <div class="qmz-panels">
+        <!-- Left: Photographer list -->
+        <div class="qmz-panel qmz-panel-left">
+          <div class="qmz-panel-header">Photographers</div>
+          <div id="qmzPhotographerList" class="qmz-photographer-list"></div>
+        </div>
+        <!-- Center: File list -->
+        <div class="qmz-panel qmz-panel-center">
+          <div class="qmz-center-header">
+            <span class="qmz-center-title" id="qmzCenterTitle">Select a photographer</span>
+            <button id="qmzSelectAllBtn" class="qmz-action-btn">Select All</button>
+          </div>
+          <div id="qmzFileGrid" class="qmz-file-grid"></div>
+        </div>
+        <!-- Right: Sequence chips + creation -->
+        <div class="qmz-panel qmz-panel-right">
+          <div class="qmz-panel-header">Sequences</div>
+          <div id="qmzSequenceList" class="qmz-sequence-list"></div>
+
+          <!-- Assign Selected — S to focus, number then Enter -->
+          <div class="qmz-section-header">Assign Selected</div>
+          <div class="qmz-right-block">
+            <input id="qmzAssignInput" class="qmz-seq-input" type="text" inputmode="numeric"
+              placeholder="# then Enter" maxlength="2" autocomplete="off"
+              aria-label="Sequence number for assignment (S key)" />
+            <div id="qmzTypeChooser" class="qmz-type-chooser" hidden>
+              <span class="qmz-chooser-label" id="qmzChooserLabel"></span>
+              <div class="qmz-chooser-btns">
+                <button class="qmz-chooser-btn" data-letter="Q">Q Qadam</button>
+                <button class="qmz-chooser-btn" data-letter="M">M Majlis</button>
+                <button class="qmz-chooser-btn" data-letter="Z">Z Ziyafat</button>
+                <button class="qmz-chooser-cancel" id="qmzChooserCancel">Cancel</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Add Sequence — Quick Add or specific number+type -->
+          <div class="qmz-section-header">Add Sequence</div>
+          <div class="qmz-right-block">
+            <div class="qmz-seq-create-row">
+              <button id="qmzAddNextBtn" class="qmz-add-btn">+ Next</button>
+              <select id="qmzLetterSelect" class="qmz-select" aria-label="Type for quick add">
+                <option value="Q">Q Qadam</option>
+                <option value="M">M Majlis</option>
+                <option value="Z">Z Ziyafat</option>
+              </select>
+            </div>
+            <div class="qmz-seq-create-row">
+              <input id="qmzSeqNumInput" class="qmz-seq-input" type="number" min="1" max="52"
+                placeholder="#" autocomplete="off" aria-label="Sequence number to create"
+                style="width:46px;flex-shrink:0" />
+              <select id="qmzSeqLetterSelect" class="qmz-select" aria-label="Sequence type">
+                <option value="Q">Q</option>
+                <option value="M">M</option>
+                <option value="Z">Z</option>
+              </select>
+              <button id="qmzAddSpecificBtn" class="qmz-add-btn">Create</button>
+            </div>
+          </div>
+
+          <!-- Bulk Create — paste pattern, preview, create all -->
+          <div class="qmz-section-header">Bulk Create</div>
+          <div class="qmz-right-block">
+            <input id="qmzBulkInput" class="qmz-seq-input" type="text"
+              placeholder="Q M Z Q Q M Z" autocomplete="off" aria-label="Bulk sequence pattern" />
+            <div id="qmzBulkPreview" class="qmz-bulk-preview"></div>
+            <button id="qmzBulkCreateBtn" class="qmz-add-btn qmz-bulk-create-btn">Create All</button>
+          </div>
+
+          <!-- Actions -->
+          <div class="qmz-right-actions">
+            <button id="qmzMoveUnsequencedBtn" class="qmz-action-btn" disabled>↩ Unsequenced</button>
+            <button id="qmzQueueMetaBtn" class="qmz-action-btn" disabled>Retry Tagging</button>
+          </div>
+        </div>
+      </div>
+      <div class="qmz-footer">
+        <span id="qmzStatus" class="qmz-status"></span>
+        <button id="qmzDoneBtn" class="qmz-btn-done">Done</button>
       </div>
     </div>
   </div>
