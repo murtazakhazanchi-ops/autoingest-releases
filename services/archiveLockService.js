@@ -174,7 +174,7 @@ function getLockPath(activeArchiveRoot, { collection, eventFolderName, photograp
  * @param {string[]} configuredRoots  Archive roots from settings (nas + main).
  * @returns {Promise<{ ok: boolean, reason: string }>}
  */
-async function clearSelfLock(lockPath, configuredRoots) {
+async function clearSelfLock(lockPath, configuredRoots, { force = false } = {}) {
   if (!_isValidLockPath(lockPath, configuredRoots)) {
     return { ok: false, reason: 'invalid-path' };
   }
@@ -193,10 +193,13 @@ async function clearSelfLock(lockPath, configuredRoots) {
   }
 
   // If the heartbeat was renewed very recently a process may still be alive.
-  const STALE_THRESHOLD_MS = LOCK_HEARTBEAT_INTERVAL_MS + 30_000;
-  if (typeof lock.lastHeartbeatAt === 'number' &&
-      Date.now() - lock.lastHeartbeatAt < STALE_THRESHOLD_MS) {
-    return { ok: false, reason: 'may-still-active' };
+  // Skip this guard only when the caller has confirmed no active job is running.
+  if (!force) {
+    const STALE_THRESHOLD_MS = LOCK_HEARTBEAT_INTERVAL_MS + 30_000;
+    if (typeof lock.lastHeartbeatAt === 'number' &&
+        Date.now() - lock.lastHeartbeatAt < STALE_THRESHOLD_MS) {
+      return { ok: false, reason: 'may-still-active' };
+    }
   }
 
   try {

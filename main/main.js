@@ -3115,13 +3115,16 @@ ipcMain.handle('archive:checkDirectArchiveLocks', async (_event, { fileJobs } = 
   return { ok: true, blocked, currentDeviceName };
 });
 
-ipcMain.handle('archive:clearSelfStaleLock', async (_event, { lockPath } = {}) => {
+ipcMain.handle('archive:clearSelfStaleLock', async (_event, { lockPath, force = false } = {}) => {
   if (!lockPath || typeof lockPath !== 'string') return { ok: false, reason: 'invalid-path' };
   const nas  = settings.getNasRoot();
   const main = settings.getMainArchiveRoot();
   const configuredRoots = [nas, main].filter(Boolean);
   if (configuredRoots.length === 0) return { ok: false, reason: 'no-configured-roots' };
-  const result = await archiveLockService.clearSelfLock(lockPath, configuredRoots);
+  // Allow bypassing the heartbeat recency guard only when the renderer has confirmed
+  // no active import is running AND this process has no background sync jobs running.
+  const allowForce = force && _syncingJobIds.size === 0;
+  const result = await archiveLockService.clearSelfLock(lockPath, configuredRoots, { force: allowForce });
   if (result.ok) log(`[import] Cleared self-stale lock: ${path.basename(lockPath)}`);
   return result;
 });

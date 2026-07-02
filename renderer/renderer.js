@@ -9192,15 +9192,8 @@ document.getElementById('importBtn').addEventListener('click', async () => {
             showMessage('Switched to Local First mode. Please try importing again.');
             return;
           }
-          if (choice === 'clear') {
-            // Clear each stale self-lock, then re-check in the next loop iteration.
-            for (const b of lockCheck.blocked) {
-              if (b.lockPath) {
-                await window.api.clearSelfStaleLock({ lockPath: b.lockPath }).catch(() => {});
-              }
-            }
-          }
-          // choice === 'refresh' or 'clear' — re-check in next loop iteration
+          // choice === 'refresh': re-check.
+          // choice === 'clear': lock was already cleared inside the dialog before resolving.
         }
       }
     }
@@ -9544,10 +9537,45 @@ function _showDirectArchiveBusyDialog(blocked, currentDeviceName) {
         </div>`;
 
       const done = (choice) => { document.body.removeChild(overlay); resolve(choice); };
-      overlay.querySelector('.dab-clear-btn').addEventListener('click',  () => done('clear'));
-      overlay.querySelector('.dab-cancel-btn').addEventListener('click', () => done('cancel'));
-      overlay.querySelector('.dab-refresh-btn').addEventListener('click',() => done('refresh'));
-      overlay.querySelector('.dab-switch-btn').addEventListener('click', () => done('switch'));
+      const clearBtn   = overlay.querySelector('.dab-clear-btn');
+      const cancelBtn  = overlay.querySelector('.dab-cancel-btn');
+      const refreshBtn = overlay.querySelector('.dab-refresh-btn');
+      const switchBtn  = overlay.querySelector('.dab-switch-btn');
+      const bodyEl     = overlay.querySelector('.ec-modal-body');
+
+      clearBtn.addEventListener('click', async () => {
+        [clearBtn, cancelBtn, refreshBtn, switchBtn].forEach(b => { b.disabled = true; });
+        clearBtn.textContent = 'Clearing…';
+        const failures = [];
+        for (const b of blocked) {
+          if (!b.lockPath) continue;
+          try {
+            // force:true is safe here — renderer is pre-import (importRunning===false);
+            // main.js additionally guards on _syncingJobIds.size===0.
+            const res = await window.api.clearSelfStaleLock({ lockPath: b.lockPath, force: true });
+            if (!res.ok) failures.push(res);
+          } catch (_e) {
+            failures.push({ reason: 'unexpected-error' });
+          }
+        }
+        if (failures.length === 0) { done('clear'); return; }
+        const r   = failures[0].reason;
+        const msg = r === 'may-still-active'
+          ? 'Could not clear the lock: the heartbeat is too recent — a sync job may still be running on this machine. Re-check or Use Local First.'
+          : `Could not clear the lock: ${escapeHtml(r)}. Re-check or Use Local First.`;
+        const existing = bodyEl.querySelector('.dab-clear-error');
+        if (existing) existing.remove();
+        const errEl = document.createElement('p');
+        errEl.className = 'dab-clear-error';
+        errEl.innerHTML = msg;
+        bodyEl.appendChild(errEl);
+        [cancelBtn, refreshBtn, switchBtn].forEach(b => { b.disabled = false; });
+        clearBtn.textContent = 'Clear & Continue';
+        clearBtn.disabled = true;
+      });
+      cancelBtn.addEventListener('click',  () => done('cancel'));
+      refreshBtn.addEventListener('click', () => done('refresh'));
+      switchBtn.addEventListener('click',  () => done('switch'));
     } else {
       // Standard other-machine busy dialog — unchanged.
       const lockedBy = escapeHtml(blocked[0]?.lockedBy || 'another device');
