@@ -11,6 +11,26 @@ const SEQ_RE      = /^\d{2}[QMZ]$/;
 const LETTER_TYPE = { Q: 'Qadam', M: 'Majlis', Z: 'Ziyafat' };
 const LETTER_MAX  = { Q: 50, M: 51, Z: 52 };
 const MEDIA_EXT   = new Set([...config.PHOTO_EXTENSIONS, ...config.VIDEO_EXTENSIONS]);
+const RAW_EXTS    = new Set(config.RAW_EXTENSIONS);
+const PHOTO_EXTS  = new Set(config.PHOTO_EXTENSIONS);
+const VIDEO_EXTS  = new Set(config.VIDEO_EXTENSIONS);
+
+// Mirrors main/fileBrowser.js's mediaType() — RAW checked before photo (RAW_EXTS ⊂ PHOTO_EXTS).
+// Duplicated locally rather than imported to keep qmzService decoupled from fileBrowser.
+function mediaType(filename) {
+  const e = path.extname(filename).toLowerCase();
+  if (RAW_EXTS.has(e))   return 'raw';
+  if (PHOTO_EXTS.has(e)) return 'photo';
+  if (VIDEO_EXTS.has(e)) return 'video';
+  return null;
+}
+
+// Mirrors main/fileBrowser.js's isJunkFile() — macOS AppleDouble sidecars
+// (._Foo.ARW) and .DS_Store must never surface as media, even though their
+// extension alone would otherwise match MEDIA_EXT (e.g. "._Foo.ARW" → .ARW).
+function isJunkFile(filename) {
+  return filename.startsWith('._') || filename === '.DS_Store';
+}
 
 // ── Pure helpers ──────────────────────────────────────────────────────────────
 
@@ -85,11 +105,16 @@ async function listMediaFiles(dir) {
     const entries = await fsp.readdir(dir, { withFileTypes: true });
     const files   = [];
     for (const e of entries) {
-      if (!e.isFile() || !MEDIA_EXT.has(path.extname(e.name).toLowerCase())) continue;
+      if (!e.isFile() || isJunkFile(e.name) || !MEDIA_EXT.has(path.extname(e.name).toLowerCase())) continue;
       const p = path.join(dir, e.name);
       let size = 0;
-      try { size = (await fsp.stat(p)).size; } catch {}
-      files.push({ name: e.name, path: p, size });
+      let modifiedAt = null;
+      try {
+        const stat = await fsp.stat(p);
+        size       = stat.size;
+        modifiedAt = stat.mtime.toISOString();
+      } catch {}
+      files.push({ name: e.name, path: p, size, type: mediaType(e.name), modifiedAt });
     }
     return files;
   } catch { return []; }

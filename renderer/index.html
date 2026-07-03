@@ -2575,49 +2575,62 @@
     }
     .metadata-badge--done  { color: var(--green); }
     .metadata-badge--error { color: var(--red); }
-    .im-actions {
-      display: flex; align-items: center; justify-content: space-between; gap: 18px;
+    /* Scoped strictly to #progressModal — must not affect Archive Busy, stale-lock,
+       source-cleanup, or QMZ workspace UI, none of which use these classes/IDs. */
+    #progressModal .im-actions {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; row-gap: 8px;
       margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border-subtle);
+      flex-wrap: wrap;
     }
-    .im-actions-left  { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; flex-wrap: wrap; }
-    .im-actions-right { display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0; }
-    .im-btn-primary, .im-btn-secondary, .im-btn-tertiary {
+    #progressModal .im-actions-left  { display: flex; align-items: center; gap: 8px; row-gap: 8px; min-width: 0; flex: 1 1 auto; flex-wrap: wrap; }
+    #progressModal .im-actions-right { display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0; }
+    #progressModal .im-btn-primary,
+    #progressModal .im-btn-secondary,
+    #progressModal .im-btn-tertiary {
       height: 38px; min-height: 38px;
       display: inline-flex; align-items: center; justify-content: center; gap: 6px;
       white-space: nowrap; line-height: 1; border-radius: 12px; box-sizing: border-box;
     }
-    .im-btn-primary {
+    #progressModal .im-btn-primary {
       display: none; padding: 0 24px; min-width: 112px; flex-shrink: 0;
       font-size: 0.85rem; font-weight: 700;
       background: var(--blue); color: var(--bg); border: none;
       cursor: pointer; transition: opacity 0.12s;
     }
-    .im-btn-primary.visible { display: inline-flex; }
-    .im-btn-primary:hover { opacity: 0.85; }
-    .im-btn-secondary {
-      padding: 0 14px; font-size: 0.8rem; font-weight: 600;
+    #progressModal .im-btn-primary.visible { display: inline-flex; }
+    #progressModal .im-btn-primary:hover { opacity: 0.85; }
+    #progressModal .im-btn-secondary {
+      padding: 0 12px; font-size: 0.8rem; font-weight: 600;
       background: transparent; color: var(--subtext);
       border: 1px solid var(--border);
       cursor: pointer; transition: border-color 0.15s, color 0.15s;
+      flex: 0 1 auto; min-width: 0;
     }
-    .im-btn-secondary:hover:not(:disabled) { border-color: var(--blue); color: var(--blue); }
-    .im-btn-secondary:disabled { opacity: 0.5; cursor: default; pointer-events: none; }
-    .im-btn-secondary.csq-success { color: var(--green) !important; border-color: var(--green) !important; }
-    .im-btn-secondary.csq-error   { color: var(--red)   !important; border-color: var(--red)   !important; }
-    .im-btn-tertiary {
+    #progressModal .im-btn-secondary:hover:not(:disabled) { border-color: var(--blue); color: var(--blue); }
+    #progressModal .im-btn-secondary:disabled { opacity: 0.5; cursor: default; pointer-events: none; }
+    #progressModal .im-btn-secondary.csq-success { color: var(--green) !important; border-color: var(--green) !important; }
+    #progressModal .im-btn-secondary.csq-error   { color: var(--red)   !important; border-color: var(--red)   !important; }
+    /* Lock the visual order (Sort QMZ Photos → Review Cleanup → Deep Verify)
+       regardless of which conditional block appends each button in renderer.js —
+       avoids touching that creation logic just to reorder the DOM. */
+    #progressModal #qmzSortBtn      { order: 1; }
+    #progressModal #scqOpenBtn      { order: 2; }
+    #progressModal #runChecksumBtn  { order: 3; }
+    #progressModal .im-btn-tertiary {
       padding: 0 12px; font-size: 0.8rem; font-weight: 500;
       background: transparent; color: var(--subtext);
       border: 1px solid transparent;
       cursor: pointer; transition: border-color 0.15s, color 0.15s;
     }
-    .im-btn-tertiary:hover { border-color: color-mix(in srgb, var(--red) 55%, transparent); color: var(--red); }
-    .im-btn-tertiary .icon { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; flex-shrink: 0; }
-    .im-btn-tertiary .icon svg { width: 100%; height: 100%; }
-    .im-actions button { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #progressModal .im-btn-tertiary:hover { border-color: color-mix(in srgb, var(--red) 55%, transparent); color: var(--red); }
+    #progressModal .im-btn-tertiary .icon { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; flex-shrink: 0; }
+    #progressModal .im-btn-tertiary .icon svg { width: 100%; height: 100%; }
+    #progressModal .im-actions button { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     @media (max-width: 680px) {
-      .im-actions { flex-direction: column; align-items: stretch; }
-      .im-actions-left { width: 100%; flex-wrap: wrap; }
-      .im-actions-right { width: 100%; justify-content: flex-end; }
+      #progressModal .im-actions { flex-direction: column; align-items: stretch; }
+      #progressModal .im-actions-left { width: 100%; flex-wrap: wrap; }
+      #progressModal .im-actions-right { width: 100%; justify-content: flex-end; }
     }
     /* ── Post-import action chooser (replaces .im-actions after success) ── */
     .im-post-actions {
@@ -6171,185 +6184,227 @@
   }
   .sc-btn-done:hover { opacity: 0.85; }
 
-  /* ── QMZ Sequence Manager ────────────────────────────────────────────── */
+  /* ── QMZ Sequence Manager — full workspace (scoped entirely under #qmzOverlay) ── */
   #qmzOverlay {
     position: fixed; inset: 0; z-index: 200;
-    background: var(--scrim);
-    display: flex; align-items: center; justify-content: center;
+    background: var(--bg-primary);
+    display: flex; align-items: stretch; justify-content: stretch;
   }
   #qmzOverlay.hidden { display: none; }
-  .qmz-shell {
-    background: var(--card-bg);
-    border: 1px solid var(--glass-border);
-    border-radius: 18px;
-    width: min(960px, calc(100vw - 32px));
-    height: min(720px, calc(100vh - 48px));
+  #qmzOverlay .qmz-shell {
+    background: var(--bg-primary);
+    border: none;
+    border-radius: 0;
+    width: 100%;
+    height: 100%;
     display: flex; flex-direction: column;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    box-shadow: none;
     overflow: hidden;
   }
-  .qmz-header {
+  #qmzOverlay .qmz-header {
     display: flex; align-items: center; gap: 12px;
-    padding: 18px 22px 14px;
-    border-bottom: 1px solid var(--border-subtle);
+    padding: 12px 20px;
+    background: var(--surface2);
+    border-bottom: 2px solid var(--border);
     flex-shrink: 0;
   }
-  .qmz-title  { font-size: 1rem; font-weight: 700; color: var(--text); }
-  .qmz-subtitle { font-size: 0.78rem; color: var(--subtext); flex: 1; }
-  .qmz-close-btn {
+  /* QMZ is a full-window overlay starting at the very top of a frameless
+     macOS window (titleBarStyle:'hiddenInset', trafficLightPosition x:16/y:8) —
+     mirrors the same clearance pattern already used for .header-section.brand. */
+  .is-mac #qmzOverlay .qmz-header { padding-top: 20px; padding-left: 78px; }
+  #qmzOverlay .qmz-header-titles {
+    display: flex; flex-direction: column; gap: 2px;
+    flex: 1; min-width: 0;
+  }
+  #qmzOverlay .qmz-title  { font-size: 1rem; font-weight: 700; color: var(--text); }
+  #qmzOverlay .qmz-subtitle {
+    font-size: 0.78rem; color: var(--subtext);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  #qmzOverlay .qmz-close-btn {
     width: 30px; height: 30px; border-radius: 8px; border: none;
     background: transparent; color: var(--subtext); cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     transition: background 0.12s, color 0.12s;
   }
-  .qmz-close-btn:hover { background: var(--card-hover); color: var(--text); }
-  .qmz-panels {
+  #qmzOverlay .qmz-close-btn:hover { background: var(--card-hover); color: var(--text); }
+  #qmzOverlay .qmz-panels {
     display: flex; flex: 1; overflow: hidden;
   }
-  .qmz-panel { display: flex; flex-direction: column; overflow: hidden; }
-  .qmz-panel-left  { width: 200px; border-right: 1px solid var(--border-subtle); flex-shrink: 0; }
-  .qmz-panel-center { flex: 1; }
-  .qmz-panel-right { width: 224px; border-left: 1px solid var(--border-subtle); flex-shrink: 0; }
-  .qmz-panel-header {
+  #qmzOverlay .qmz-panel { display: flex; flex-direction: column; overflow: hidden; }
+  #qmzOverlay .qmz-panel-left  { width: 220px; min-width: 220px; border-right: 1px solid var(--border-subtle); flex-shrink: 0; background: var(--bg-secondary); }
+  #qmzOverlay .qmz-panel-center { flex: 1; }
+  #qmzOverlay .qmz-panel-right { width: 240px; border-left: 1px solid var(--border-subtle); flex-shrink: 0; }
+  #qmzOverlay .qmz-panel-header {
     padding: 10px 14px 8px;
     font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em;
     text-transform: uppercase; color: var(--subtext);
     border-bottom: 1px solid var(--border-subtle); flex-shrink: 0;
   }
   /* Left panel */
-  .qmz-photographer-list { flex: 1; overflow-y: auto; padding: 6px 0; }
-  .qmz-pg-group { padding: 4px 0; }
-  .qmz-pg-group-label {
+  #qmzOverlay .qmz-photographer-list { flex: 1; overflow-y: auto; padding: 6px 0; }
+  #qmzOverlay .qmz-pg-group { padding: 4px 0; }
+  #qmzOverlay .qmz-pg-group-label {
     padding: 2px 14px; font-size: 0.68rem; font-weight: 700;
     text-transform: uppercase; color: var(--subtext); letter-spacing: 0.05em;
   }
-  .qmz-pg-row {
+  #qmzOverlay .qmz-pg-row {
     display: flex; align-items: center; gap: 6px;
     padding: 6px 14px; font-size: 0.8rem; color: var(--text);
     cursor: pointer; transition: background 0.1s;
   }
-  .qmz-pg-row:hover { background: var(--card-hover); }
-  .qmz-pg-row.active { background: var(--blue); color: #fff; border-radius: 0; }
-  .qmz-pg-row.active .qmz-pg-count { color: rgba(255,255,255,0.7); }
-  .qmz-pg-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .qmz-pg-count { font-size: 0.72rem; color: var(--subtext); flex-shrink: 0; }
+  #qmzOverlay .qmz-pg-row:hover { background: var(--card-hover); }
+  #qmzOverlay .qmz-pg-row.active { background: var(--blue); color: #fff; border-radius: 0; }
+  #qmzOverlay .qmz-pg-row.active .qmz-pg-count { color: rgba(255,255,255,0.7); }
+  #qmzOverlay .qmz-pg-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #qmzOverlay .qmz-pg-count { font-size: 0.72rem; color: var(--subtext); flex-shrink: 0; }
   /* Center panel */
-  .qmz-center-header {
+  #qmzOverlay .qmz-center-header {
     display: flex; align-items: center; gap: 8px; padding: 10px 14px 8px;
     border-bottom: 1px solid var(--border-subtle); flex-shrink: 0;
   }
-  .qmz-center-title { flex: 1; font-size: 0.82rem; font-weight: 600; color: var(--text); }
-  .qmz-action-btn {
+  #qmzOverlay .qmz-center-title { flex: 1; font-size: 0.82rem; font-weight: 600; color: var(--text); }
+  #qmzOverlay .qmz-action-btn {
     height: 28px; padding: 0 12px; border-radius: 7px; font-size: 0.75rem; font-weight: 600;
     border: 1px solid var(--border); background: transparent; color: var(--subtext);
     cursor: pointer; transition: border-color 0.12s, color 0.12s;
   }
-  .qmz-action-btn:hover:not(:disabled) { border-color: var(--text); color: var(--text); }
-  .qmz-action-btn:disabled { opacity: 0.35; cursor: default; }
-  .qmz-file-grid { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 2px; }
-  .qmz-file-row {
-    display: flex; align-items: center; gap: 8px;
-    padding: 5px 8px; border-radius: 7px; font-size: 0.78rem; color: var(--text); cursor: pointer;
+  #qmzOverlay .qmz-action-btn:hover:not(:disabled) { border-color: var(--text); color: var(--text); }
+  #qmzOverlay .qmz-action-btn:disabled { opacity: 0.35; cursor: default; }
+  /* Toolbar — sort/view controls, visually mirrors #toolbar's .sort-btn/.view-btn
+     but uses distinct classnames (.qmz-sort-btn/.qmz-view-btn) so QMZ buttons are
+     never picked up by import's page-load-time document.querySelectorAll('.sort-btn'). */
+  #qmzOverlay .qmz-toolbar {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 14px; border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0; background: var(--surface2);
   }
-  .qmz-file-row:hover { background: var(--card-hover); }
-  .qmz-file-row.selected { background: rgba(137,180,250,0.15); }
-  .qmz-file-row input[type="checkbox"] { flex-shrink: 0; accent-color: var(--blue); cursor: pointer; }
-  .qmz-file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .qmz-file-size { color: var(--subtext); flex-shrink: 0; font-size: 0.72rem; }
-  .qmz-empty { padding: 24px 16px; font-size: 0.8rem; color: var(--subtext); text-align: center; line-height: 1.7; }
+  #qmzOverlay .qmz-toolbar-left  { display: flex; align-items: center; gap: 6px; flex: 1; }
+  #qmzOverlay .qmz-toolbar-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  #qmzOverlay .qmz-sort-label { font-size: 0.68rem; opacity: 0.35; text-transform: uppercase; letter-spacing: 0.08em; margin-right: 2px; }
+  #qmzOverlay .qmz-sort-btn,
+  #qmzOverlay .qmz-view-btn {
+    box-sizing: border-box;
+    padding: 2px 9px; min-height: 24px; font-size: 0.72rem; font-weight: 600;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 5px;
+    color: var(--subtext); cursor: pointer;
+    transition: border-color 0.12s, color 0.12s;
+    display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  }
+  /* Defense-in-depth: the label/arrow are purely decorative — guarantee clicks
+     anywhere in the button box reach the <button> itself, not a child node. */
+  #qmzOverlay .qmz-sort-btn *,
+  #qmzOverlay .qmz-view-btn * { pointer-events: none; }
+  #qmzOverlay .qmz-sort-btn:hover,
+  #qmzOverlay .qmz-view-btn:hover { border-color: var(--blue); color: var(--text); }
+  #qmzOverlay .qmz-sort-btn.qmz-active,
+  #qmzOverlay .qmz-view-btn.qmz-active { border-color: var(--blue); color: var(--blue); background: var(--blue-dim); }
+  #qmzOverlay .qmz-sort-arrow { font-size: 0.68rem; margin-left: 2px; }
+  #qmzOverlay .qmz-toolbar-sep { width: 1px; height: 16px; background: var(--border); margin: 0 4px; }
+  #qmzOverlay .qmz-sel-count { font-size: 0.75rem; font-weight: 600; color: var(--text); }
+  /* File grid — reuses shared .icon-grid/.file-tile/.list-table/.section-header
+     visuals verbatim (defined once, unscoped, elsewhere) for pixel parity with
+     the import screen. No new tile CSS is added here. */
+  #qmzOverlay .qmz-file-grid { flex: 1; overflow-y: auto; padding: 8px; }
+  #qmzOverlay .qmz-file-grid.qmz-view-list { padding: 0; }
+  #qmzOverlay .qmz-empty { padding: 24px 16px; font-size: 0.8rem; color: var(--subtext); text-align: center; line-height: 1.7; }
   /* Right panel */
-  .qmz-sequence-list { flex: 1; overflow-y: auto; padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; }
-  .qmz-seq-chip {
+  #qmzOverlay .qmz-sequence-list { flex: 1; overflow-y: auto; padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; }
+  #qmzOverlay .qmz-seq-chip {
     display: flex; align-items: center; gap: 8px;
     padding: 7px 10px; border-radius: 8px; cursor: pointer;
     font-size: 0.8rem; font-weight: 600; color: var(--text);
     border: 1px solid var(--border-subtle);
     transition: background 0.1s, border-color 0.1s;
   }
-  .qmz-seq-chip:hover { background: var(--card-hover); border-color: var(--blue); }
-  .qmz-seq-chip-code { font-family: monospace; font-size: 0.9rem; min-width: 32px; }
-  .qmz-seq-chip-type { flex: 1; font-size: 0.72rem; color: var(--subtext); font-weight: 400; }
-  .qmz-seq-chip-count { font-size: 0.72rem; color: var(--subtext); }
-  .qmz-seq-chip.q { border-left: 3px solid var(--blue); }
-  .qmz-seq-chip.m { border-left: 3px solid var(--green); }
-  .qmz-seq-chip.z { border-left: 3px solid var(--yellow); }
-  .qmz-seq-create {
+  #qmzOverlay .qmz-seq-chip:hover { background: var(--card-hover); border-color: var(--blue); }
+  #qmzOverlay .qmz-seq-chip-code { font-family: monospace; font-size: 0.9rem; min-width: 32px; }
+  #qmzOverlay .qmz-seq-chip-type { flex: 1; font-size: 0.72rem; color: var(--subtext); font-weight: 400; }
+  #qmzOverlay .qmz-seq-chip-count { font-size: 0.72rem; color: var(--subtext); }
+  #qmzOverlay .qmz-seq-chip.q { border-left: 3px solid var(--blue); }
+  #qmzOverlay .qmz-seq-chip.m { border-left: 3px solid var(--green); }
+  #qmzOverlay .qmz-seq-chip.z { border-left: 3px solid var(--yellow); }
+  #qmzOverlay .qmz-seq-chip.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+  #qmzOverlay .qmz-seq-chip.active .qmz-seq-chip-type,
+  #qmzOverlay .qmz-seq-chip.active .qmz-seq-chip-count { color: rgba(255,255,255,0.75); }
+  #qmzOverlay .qmz-seq-create {
     padding: 8px; border-top: 1px solid var(--border-subtle);
     display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;
   }
-  .qmz-seq-create-row { display: flex; gap: 6px; }
-  .qmz-add-btn {
+  #qmzOverlay .qmz-seq-create-row { display: flex; gap: 6px; }
+  #qmzOverlay .qmz-add-btn {
     flex: 1; height: 30px; border-radius: 8px; font-size: 0.75rem; font-weight: 600;
     border: 1px solid var(--border); background: transparent; color: var(--text);
     cursor: pointer; transition: background 0.12s, border-color 0.12s;
   }
-  .qmz-add-btn:hover { background: var(--card-hover); border-color: var(--blue); }
-  .qmz-select {
+  #qmzOverlay .qmz-add-btn:hover { background: var(--card-hover); border-color: var(--blue); }
+  #qmzOverlay .qmz-select {
     height: 30px; border-radius: 8px; font-size: 0.75rem; padding: 0 6px;
     border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text);
     cursor: pointer;
   }
-  .qmz-seq-input {
+  #qmzOverlay .qmz-seq-input {
     flex: 1; height: 30px; padding: 0 10px; border-radius: 8px; font-size: 0.82rem;
     font-family: monospace; border: 1px solid var(--border-subtle);
     background: var(--bg-secondary); color: var(--text); outline: none;
     transition: border-color 0.15s; text-transform: uppercase;
   }
-  .qmz-seq-input:focus { border-color: var(--blue); }
-  .qmz-right-actions {
+  #qmzOverlay .qmz-seq-input:focus { border-color: var(--blue); }
+  #qmzOverlay .qmz-right-actions {
     padding: 8px; border-top: 1px solid var(--border-subtle);
     display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;
   }
-  .qmz-btn-primary {
+  #qmzOverlay .qmz-btn-primary {
     height: 32px; padding: 0 16px; border-radius: 9px; font-size: 0.8rem; font-weight: 700;
     background: var(--blue); color: #fff; border: none; cursor: pointer; transition: opacity 0.12s;
   }
-  .qmz-btn-primary:hover:not(:disabled) { opacity: 0.85; }
-  .qmz-btn-primary:disabled { opacity: 0.35; cursor: default; }
-  /* Footer */
-  .qmz-footer {
+  #qmzOverlay .qmz-btn-primary:hover:not(:disabled) { opacity: 0.85; }
+  #qmzOverlay .qmz-btn-primary:disabled { opacity: 0.35; cursor: default; }
+  /* Footer / status bar */
+  #qmzOverlay .qmz-footer {
     display: flex; align-items: center; gap: 12px;
-    padding: 12px 22px; border-top: 1px solid var(--border-subtle); flex-shrink: 0;
+    padding: 10px 20px; background: var(--surface2);
+    border-top: 2px solid var(--border); flex-shrink: 0;
   }
-  .qmz-status  { flex: 1; font-size: 0.78rem; color: var(--subtext); }
-  .qmz-status.ok  { color: var(--green); }
-  .qmz-status.err { color: var(--red); }
-  .qmz-btn-done {
+  #qmzOverlay .qmz-status  { flex: 1; font-size: 0.78rem; color: var(--subtext); }
+  #qmzOverlay .qmz-status.ok  { color: var(--green); }
+  #qmzOverlay .qmz-status.err { color: var(--red); }
+  #qmzOverlay .qmz-btn-done {
     height: 34px; padding: 0 22px; border-radius: 10px; font-size: 0.82rem; font-weight: 700;
     background: var(--blue); color: #fff; border: none; cursor: pointer; transition: opacity 0.12s;
   }
-  .qmz-btn-done:hover { opacity: 0.85; }
+  #qmzOverlay .qmz-btn-done:hover { opacity: 0.85; }
   /* QMZ right-panel subdivisions */
-  .qmz-section-header {
+  #qmzOverlay .qmz-section-header {
     padding: 5px 10px 2px;
     font-size: 0.66rem; font-weight: 700; letter-spacing: 0.06em;
     text-transform: uppercase; color: var(--subtext);
     border-top: 1px solid var(--border-subtle); flex-shrink: 0;
   }
-  .qmz-right-block {
+  #qmzOverlay .qmz-right-block {
     padding: 3px 8px 6px; display: flex; flex-direction: column; gap: 4px; flex-shrink: 0;
   }
   /* Inline type chooser for create-while-assigning */
-  .qmz-type-chooser { display: flex; flex-direction: column; gap: 4px; padding-top: 2px; }
-  .qmz-chooser-label { font-size: 0.7rem; color: var(--subtext); }
-  .qmz-chooser-btns { display: flex; gap: 3px; flex-wrap: wrap; }
-  .qmz-chooser-btn {
+  #qmzOverlay .qmz-type-chooser { display: flex; flex-direction: column; gap: 4px; padding-top: 2px; }
+  #qmzOverlay .qmz-chooser-label { font-size: 0.7rem; color: var(--subtext); }
+  #qmzOverlay .qmz-chooser-btns { display: flex; gap: 3px; flex-wrap: wrap; }
+  #qmzOverlay .qmz-chooser-btn {
     flex: 1; min-width: 40px; height: 26px; border-radius: 6px; font-size: 0.68rem; font-weight: 600;
     border: 1px solid var(--border); background: transparent; color: var(--text);
     cursor: pointer; transition: background 0.12s, border-color 0.12s;
   }
-  .qmz-chooser-btn:hover:not(:disabled) { background: var(--card-hover); border-color: var(--blue); color: var(--blue); }
-  .qmz-chooser-btn:disabled { opacity: 0.28; cursor: default; }
-  .qmz-chooser-cancel {
+  #qmzOverlay .qmz-chooser-btn:hover:not(:disabled) { background: var(--card-hover); border-color: var(--blue); color: var(--blue); }
+  #qmzOverlay .qmz-chooser-btn:disabled { opacity: 0.28; cursor: default; }
+  #qmzOverlay .qmz-chooser-cancel {
     height: 26px; padding: 0 8px; border-radius: 6px; font-size: 0.68rem;
     border: 1px solid var(--border-subtle); background: transparent; color: var(--subtext); cursor: pointer;
   }
-  .qmz-chooser-cancel:hover { color: var(--text); }
+  #qmzOverlay .qmz-chooser-cancel:hover { color: var(--text); }
   /* Bulk create */
-  .qmz-bulk-preview {
+  #qmzOverlay .qmz-bulk-preview {
     font-size: 0.68rem; color: var(--blue); min-height: 14px; line-height: 1.5; word-break: break-all;
   }
-  .qmz-bulk-create-btn { width: 100%; }
+  #qmzOverlay .qmz-bulk-create-btn { width: 100%; }
 
   /* ── Startup Splash Overlay ──────────────────────────────────────────── */
   #loginSplash {
@@ -7758,8 +7813,10 @@
   <div id="qmzOverlay" class="hidden" role="dialog" aria-modal="true" aria-labelledby="qmzTitle">
     <div class="qmz-shell">
       <div class="qmz-header">
-        <span class="qmz-title" id="qmzTitle">Sort QMZ Photos</span>
-        <span class="qmz-subtitle" id="qmzSubtitle"></span>
+        <div class="qmz-header-titles">
+          <span class="qmz-title" id="qmzTitle">Sort QMZ Photos</span>
+          <span class="qmz-subtitle" id="qmzSubtitle"></span>
+        </div>
         <button class="qmz-close-btn" id="qmzCloseBtn" aria-label="Close QMZ manager">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="1" y1="1" x2="13" y2="13"/><line x1="13" y1="1" x2="1" y2="13"/></svg>
         </button>
@@ -7770,11 +7827,27 @@
           <div class="qmz-panel-header">Photographers</div>
           <div id="qmzPhotographerList" class="qmz-photographer-list"></div>
         </div>
-        <!-- Center: File list -->
+        <!-- Center: File grid -->
         <div class="qmz-panel qmz-panel-center">
           <div class="qmz-center-header">
             <span class="qmz-center-title" id="qmzCenterTitle">Select a photographer</span>
-            <button id="qmzSelectAllBtn" class="qmz-action-btn">Select All</button>
+            <span class="qmz-sel-count" id="qmzSelCount"></span>
+          </div>
+          <div class="qmz-toolbar">
+            <div class="qmz-toolbar-left">
+              <span class="qmz-sort-label">Sort</span>
+              <button class="qmz-sort-btn" data-qmz-sort="date">Date<span class="qmz-sort-arrow"></span></button>
+              <button class="qmz-sort-btn" data-qmz-sort="name">Name<span class="qmz-sort-arrow"></span></button>
+              <button class="qmz-sort-btn" data-qmz-sort="size">Size<span class="qmz-sort-arrow"></span></button>
+              <span class="qmz-toolbar-sep"></span>
+              <button class="qmz-view-btn" data-qmz-view="icon">Grid</button>
+              <button class="qmz-view-btn" data-qmz-view="list">List</button>
+              <button class="qmz-view-btn" data-qmz-view="timeline">Timeline</button>
+            </div>
+            <div class="qmz-toolbar-right">
+              <button id="qmzSelectAllBtn" class="qmz-action-btn">Select All</button>
+              <button id="qmzClearSelBtn" class="qmz-action-btn" disabled>Clear</button>
+            </div>
           </div>
           <div id="qmzFileGrid" class="qmz-file-grid"></div>
         </div>

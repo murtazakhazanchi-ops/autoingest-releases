@@ -328,6 +328,19 @@ let _qmzEventContext  = null;       // { component, isMulti } for metadata taggi
 let _qmzActivePg      = null;       // photographer selected in left panel
 let _qmzActiveLocation = null;      // 'unsequenced' or sequence code (e.g. '01Q')
 let _qmzSelectedFiles  = new Set(); // file paths selected in center panel
+// QMZ workspace — deliberately separate from the import screen's currentFiles/selectedFiles/
+// tileMap/viewMode/sortKey/renderSessionId/thumbObserver. Kept isolated so nothing here can
+// ever mutate import state, even while QMZ sits on top of it as a full-screen overlay.
+let _qmzViewMode        = 'icon';   // 'icon' | 'list' — persists across QMZ opens, like import's viewMode
+let _qmzSortKey         = 'date';   // 'date' | 'name' | 'size'
+let _qmzSortDir         = 'desc';
+let _qmzTileMap         = new Map(); // path → tile element, scoped to #qmzFileGrid only
+let _qmzThumbObserver   = null;      // QMZ's own IntersectionObserver instance
+let _qmzLastClickedPath = null;
+let _qmzSelectionAnchor = null;
+let _qmzPrevFocusPath   = null; // previously focused path — for O(1) pv-focused class swap
+let _qmzViewScope       = 'unsequenced'; // 'unsequenced' | 'sequence' — see _qmzGetActiveFiles()
+let _qmzHiddenEventMgmt = false; // true if openQMZManager() visually hid an open Event Creator modal
 let _previewOpen      = false;      // true while preview overlay is visible
 let _previewPath      = null;       // path of currently previewed file
 let _previewOrder     = [];         // snapshot of getRenderedPathOrder() at open time
@@ -3099,7 +3112,11 @@ document.getElementById('qiImportBtn')?.addEventListener('click', async () => {
 });
 
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && EventMgmt.isOpen()) EventMgmt.requestClose();
+  // Guard: while QMZ sits on top of a hidden Event Creator (see openQMZManager's
+  // _qmzHiddenEventMgmt handling), Escape must close QMZ, not tear down the
+  // Event Creator modal underneath it — EventMgmt.isOpen() stays true the whole
+  // time since only its CSS visibility was toggled, not its internal state.
+  if (e.key === 'Escape' && EventMgmt.isOpen() && !_qmzOpen) EventMgmt.requestClose();
   if (e.key === 'Escape' && document.getElementById('activityLogModal')?.classList.contains('open')) _alClose();
 });
 
@@ -7054,6 +7071,21 @@ document.getElementById('clearSelBtn').addEventListener('click', () => {
 // ════════════════════════════════════════════════════════════════
 document.addEventListener('keydown', e => {
   if (!(e.metaKey || e.ctrlKey) || e.key !== 'a') return;
+  if (_qmzOpen) {
+    // QMZ's own Select-All — operates only on _qmzSelectedFiles, never on
+    // the hidden import screen's selectedFiles.
+    const tag = document.activeElement.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    const order = _qmzGetRenderedPathOrder();
+    if (!order.length) return;
+    e.preventDefault();
+    const allSelected = order.every(p => _qmzSelectedFiles.has(p));
+    if (allSelected) order.forEach(p => _qmzSelectedFiles.delete(p));
+    else             order.forEach(p => _qmzSelectedFiles.add(p));
+    _qmzSyncAllTiles();
+    _qmzUpdateActions();
+    return;
+  }
   const tag = document.activeElement.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA') return;
   const visible = getVisibleFiles();
@@ -7078,6 +7110,17 @@ document.addEventListener('keydown', e => {
 // ════════════════════════════════════════════════════════════════
 document.addEventListener('keydown', e => {
   if (!(e.metaKey || e.ctrlKey) || e.key !== 'd') return;
+  if (_qmzOpen) {
+    // QMZ's own Clear — operates only on _qmzSelectedFiles.
+    const tag = document.activeElement.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if (!_qmzSelectedFiles.size) return;
+    e.preventDefault();
+    _qmzSelectedFiles.clear();
+    _qmzSyncAllTiles();
+    _qmzUpdateActions();
+    return;
+  }
   const tag = document.activeElement.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA') return;
   if (!getVisibleFiles().length) return;
@@ -7796,9 +7839,12 @@ function showProgressSummary({ copied, skipped, errors, skippedReasons, failedFi
         const dest0 = (qmzFile || copiedFiles[0])?.dest || '';
         derivedRoot = dest0.split(sep).slice(0, -2).join(sep);
       }
+      const eventTitle = eData?.event?.eventName || eData?.event?._eventJson?.eventName || eData?.event?.name || null;
       const evtCtx  = {
         component: { location: qmzComp.location || '', city: qmzComp.city || '', country: qmzComp.country || '' },
         isMulti: components.length > 1,
+        eventTitle,
+        componentTitle: (components.length > 1 && qmzComp.folderName) ? qmzComp.folderName : null,
       };
       const qmzBtn = document.createElement('button');
       qmzBtn.id          = 'qmzSortBtn';
@@ -8334,12 +8380,35 @@ async function openQMZManager(qmzRoot, eventContext) {
   _qmzEventContext  = eventContext;
   _qmzActivePg      = null;
   _qmzActiveLocation = 'unsequenced';
+  _qmzViewScope      = 'unsequenced';
   _qmzSelectedFiles  = new Set();
+  _qmzSelectionAnchor = null;
+  _qmzLastClickedPath = null;
+  _qmzPrevFocusPath   = null;
   _qmzOpen           = true;
 
-  const folder = qmzRoot.replace(/[/\\][^/\\]+[/\\]?$/, s => s) || qmzRoot;
-  const label  = qmzRoot.split(/[/\\]/).filter(Boolean).pop() || qmzRoot;
-  document.getElementById('qmzSubtitle').textContent = label;
+  // If opened from the Event Creator event list, that modal (.emm-overlay,
+  // z-index 1000) would otherwise render on top of QMZ (z-index 200) and QMZ
+  // would silently open "behind" it. Hide it visually — CSS class only, no
+  // EventMgmt.close()/requestClose() call — so its internal _isOpen flag and
+  // all EventCreator list/selection state stay completely untouched, and
+  // restore it exactly as-is when QMZ closes.
+  const ecModal = document.getElementById('eventMgmtModal');
+  _qmzHiddenEventMgmt = !!ecModal?.classList.contains('open');
+  if (_qmzHiddenEventMgmt) ecModal.classList.remove('open');
+
+  // Full event context (e.g. "1448-01-16 _01-Urs Majlis...-London › 01-QMZ") when the
+  // caller supplied it; falls back to the previous qmzRoot-derived short label
+  // ("01-QMZ" / folder name) when no event title is available.
+  const fallbackLabel  = qmzRoot.split(/[/\\]/).filter(Boolean).pop() || qmzRoot;
+  const eventTitle     = eventContext?.eventTitle || null;
+  const componentTitle = eventContext?.componentTitle || null;
+  const subtitleText   = eventTitle
+    ? (componentTitle ? `${eventTitle} › ${componentTitle}` : eventTitle)
+    : fallbackLabel;
+  const subtitleEl = document.getElementById('qmzSubtitle');
+  subtitleEl.textContent = subtitleText;
+  subtitleEl.title       = subtitleText; // full text on hover even when CSS-ellipsized
   document.getElementById('qmzOverlay').classList.remove('hidden');
   _qmzSetStatus('Loading…');
 
@@ -8357,9 +8426,20 @@ function _closeQMZManager() {
   _qmzEventContext   = null;
   _qmzActivePg       = null;
   _qmzActiveLocation = null;
+  _qmzViewScope      = 'unsequenced';
   _qmzSelectedFiles  = new Set();
+  _qmzSelectionAnchor = null;
+  _qmzLastClickedPath = null;
+  _qmzPrevFocusPath   = null;
+  if (_qmzThumbObserver) { _qmzThumbObserver.disconnect(); _qmzThumbObserver = null; }
+  _qmzTileMap = new Map();
   document.getElementById('qmzOverlay').classList.add('hidden');
   _qmzSetStatus('');
+
+  if (_qmzHiddenEventMgmt) {
+    document.getElementById('eventMgmtModal')?.classList.add('open');
+    _qmzHiddenEventMgmt = false;
+  }
 }
 
 async function _qmzRefresh() {
@@ -8402,8 +8482,17 @@ function _renderQMZPhotographerList() {
   if (sPgs.length) {
     rows.push('<div class="qmz-pg-group-label">Sequenced</div>');
     for (const pg of sPgs) {
-      const isActive = _qmzActivePg === pg && _qmzActiveLocation !== 'unsequenced';
-      rows.push(`<div class="qmz-pg-row${isActive ? ' active' : ''}" data-pg="${escapeHtml(pg)}" data-loc="${isActive ? escapeHtml(_qmzActiveLocation) : ''}">
+      // Jump target: the first sequence (lowest code) that has this photographer's
+      // files. Previously data-loc was left blank unless the row was already
+      // active, which silently routed the click to "Unsequenced" instead of
+      // into the sequence — a real navigation bug even for a photographer with
+      // exactly one sequence. A photographer with files in more than one
+      // sequence still lands on just this first one (known limitation — no
+      // full chooser here); use the right-panel sequence chips to reach others.
+      const pgSeqCodes = sequences.filter(s => s.photographers[pg]?.count > 0).map(s => s.code).sort();
+      const targetLoc  = pgSeqCodes[0] || 'unsequenced';
+      const isActive   = _qmzActivePg === pg && _qmzViewScope === 'sequence' && _qmzActiveLocation === targetLoc;
+      rows.push(`<div class="qmz-pg-row${isActive ? ' active' : ''}" data-pg="${escapeHtml(pg)}" data-loc="${escapeHtml(targetLoc)}">
         <span class="qmz-pg-name">${escapeHtml(pg)}</span>
         <span class="qmz-pg-count">${seqPgMap[pg]}</span>
       </div>`);
@@ -8420,12 +8509,232 @@ function _renderQMZPhotographerList() {
     row.addEventListener('click', () => {
       _qmzActivePg       = row.dataset.pg;
       _qmzActiveLocation = row.dataset.loc || 'unsequenced';
+      _qmzViewScope       = _qmzActiveLocation === 'unsequenced' ? 'unsequenced' : 'sequence';
       _qmzSelectedFiles  = new Set();
+      _qmzSelectionAnchor = null;
+      _qmzLastClickedPath = null;
+      _qmzPrevFocusPath   = null;
       _renderQMZPhotographerList();
       _renderQMZCenter();
+      _renderQMZRight();
       _qmzUpdateActions();
     });
   });
+}
+
+// ── QMZ file grid — grouping/sort/tile-HTML helpers ─────────────────────────
+// Deliberately independent of currentFiles/selectedFiles/tileMap/viewMode/sortKey/
+// renderSessionId/thumbObserver. Reuses the same *visual* classes as the import
+// screen (.file-tile/.icon-grid/.list-table/.section-header) for pixel parity,
+// and the same pure formatters (thumbHtml/formatSize/formatDate/fileExt), but
+// never reads or writes any import-screen state.
+
+function _qmzGetActiveFiles() {
+  if (!_qmzData) return [];
+  if (_qmzViewScope === 'sequence') {
+    const seq = _qmzData.sequences.find(s => s.code === _qmzActiveLocation);
+    if (!seq) return [];
+    // A specific photographer within the sequence (existing capability), or
+    // — when no photographer is selected — every photographer's files in this
+    // sequence combined (the new "review this sequence" MVP view).
+    if (_qmzActivePg) return seq.photographers[_qmzActivePg]?.files || [];
+    return Object.values(seq.photographers).flatMap(p => p.files);
+  }
+  if (!_qmzActivePg) return [];
+  return _qmzData.unsequenced[_qmzActivePg]?.files || [];
+}
+
+// Renderer has no Node/path access — parse the immediate parent folder name
+// (the photographer folder) from a file's own path string. Used so batch
+// actions on an "all photographers" sequence view route each file back to
+// its own photographer, never a single UI-context photographer for everyone.
+function _qmzPhotographerFromPath(filePath) {
+  const parts = String(filePath).split(/[/\\]/).filter(Boolean);
+  return parts.length >= 2 ? parts[parts.length - 2] : null;
+}
+
+function _qmzSortGroup(files) {
+  const copy = [...files];
+  copy.sort((a, b) => {
+    let cmp = 0;
+    if      (_qmzSortKey === 'date') cmp = new Date(a.modifiedAt || 0) - new Date(b.modifiedAt || 0);
+    else if (_qmzSortKey === 'size') cmp = (a.size ?? 0) - (b.size ?? 0);
+    else                              cmp = a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    return _qmzSortDir === 'asc' ? cmp : -cmp;
+  });
+  return copy;
+}
+
+// Rendered path order for the active photographer/location — used for shift-click ranges.
+function _qmzGetRenderedPathOrder() {
+  const files = _qmzGetActiveFiles();
+  return ['raw', 'photo', 'video'].flatMap(type =>
+    _qmzSortGroup(files.filter(f => f.type === type)).map(f => f.path)
+  );
+}
+
+function _qmzBuildIconTilesHtml(files) {
+  return files.map(file => {
+    const checked  = _qmzSelectedFiles.has(file.path);
+    const ext      = fileExt(file.name);
+    const extUp    = ext.slice(1).toUpperCase();
+    const badgeCls = file.type === 'video' ? 'ext-video' : file.type === 'raw' ? 'ext-raw' : 'ext-photo';
+    const tileCls  = 'file-tile' + (checked ? ' selected' : '');
+    return `<div class="${tileCls}" data-path="${escapeHtml(file.path)}" data-size="${file.size}">
+      <input type="checkbox" ${checked ? 'checked' : ''} data-path="${escapeHtml(file.path)}" />
+      <div class="file-thumb">${thumbHtml(file)}</div>
+      <div class="file-meta">
+        <div class="file-meta-row">
+          <div class="file-meta-left">
+            <div class="file-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</div>
+            <div class="file-details">
+              <span class="file-ext-badge ${badgeCls}">${extUp}</span>
+              <span class="file-size">${formatSize(file.size)}</span>
+            </div>
+            <div class="file-date">${formatDate(file.modifiedAt)}</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function _qmzBuildListRowsHtml(files) {
+  return files.map(file => {
+    const checked  = _qmzSelectedFiles.has(file.path);
+    const ext      = fileExt(file.name);
+    const extUp    = ext.slice(1).toUpperCase();
+    const badgeCls = file.type === 'video' ? 'ext-video' : file.type === 'raw' ? 'ext-raw' : 'ext-photo';
+    const rowCls   = 'file-tile' + (checked ? ' selected' : '');
+    return `<tr class="${rowCls}" data-path="${escapeHtml(file.path)}" data-size="${file.size}">
+      <td class="lt-check"><input type="checkbox" ${checked ? 'checked' : ''} data-path="${escapeHtml(file.path)}" /></td>
+      <td class="lt-thumb"><div class="list-thumb">${thumbHtml(file)}</div></td>
+      <td class="lt-name"><span class="file-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</span></td>
+      <td class="lt-type"><span class="file-ext-badge ${badgeCls}">${extUp}</span></td>
+      <td class="lt-size">${formatSize(file.size)}</td>
+      <td class="lt-date">${formatDate(file.modifiedAt)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// Timeline view — mirrors import's buildTimelineHtml() structurally, reusing
+// the same generic .timeline-group/.timeline-header CSS and the shared pure
+// groupByTime() helper, but built from QMZ's own tile builders/state so it
+// never touches viewMode/pairingEnabled/currentFiles.
+function _qmzBuildTimelineHtml(groups) {
+  if (!groups.length) return '';
+  return groups.map(([key, files]) => {
+    const lastDash = key.lastIndexOf('-');
+    const datePart = key.slice(0, lastDash);
+    const hour     = parseInt(key.slice(lastDash + 1), 10);
+    const label    = `${datePart}  ·  ${String(hour).padStart(2, '0')}:00`;
+    const tilesHtml = _qmzBuildIconTilesHtml(files);
+    return `<div class="timeline-group">
+      <div class="timeline-header">
+        <span class="timeline-icon">${_SVG_CLOCK_SM}</span>
+        <span class="timeline-label">${escapeHtml(label)}</span>
+        <span class="section-count">${files.length} file${files.length !== 1 ? 's' : ''}</span>
+      </div>
+      <div class="icon-grid">${tilesHtml}</div>
+    </div>`;
+  }).join('');
+}
+
+function _qmzBuildSectionHtml(key, label, icon, files) {
+  const sorted    = _qmzSortGroup(files);
+  const count     = sorted.length;
+  const tilesHtml = _qmzViewMode === 'list' ? _qmzBuildListRowsHtml(sorted) : _qmzBuildIconTilesHtml(sorted);
+  return `<div class="file-section" data-qmz-group="${key}">
+    <div class="section-header">
+      <span class="section-icon">${icon}</span>
+      <span class="section-label">${label}</span>
+      <span class="section-count">${count} file${count !== 1 ? 's' : ''}</span>
+    </div>
+    <div class="section-body">
+      ${_qmzViewMode === 'list'
+        ? `<table class="list-table"><thead><tr>
+             <th class="lt-check"></th><th class="lt-thumb"></th>
+             <th class="lt-name">Name</th><th class="lt-type">Type</th>
+             <th class="lt-size">Size</th><th class="lt-date">Date</th>
+           </tr></thead><tbody>${tilesHtml}</tbody></table>`
+        : `<div class="icon-grid">${tilesHtml}</div>`}
+    </div>
+  </div>`;
+}
+
+// ── QMZ thumbnails — fully independent lazy loader ──────────────────────────
+// Reads the shared thumbCache/LRUThumbCache (cache hits are instant) and calls
+// the shared window.api.getThumb/getVideoThumb IPC for misses, exactly like the
+// import screen does — but owns its own IntersectionObserver + queue + capped
+// concurrency counter. Deliberately does NOT call the shared requestThumbForImage()
+// or touch pendingThumbQueue/activeLoads/thumbObserver/renderSessionId, since those
+// are singletons keyed to the import screen's render lifecycle.
+let _qmzActiveLoads = 0;
+let _qmzThumbQueue  = [];
+const _QMZ_MAX_CONCURRENT_LOADS = 4;
+
+function _qmzDrainThumbQueue() {
+  while (_qmzActiveLoads < _QMZ_MAX_CONCURRENT_LOADS && _qmzThumbQueue.length) {
+    _qmzActiveLoads++;
+    const job = _qmzThumbQueue.shift();
+    job();
+  }
+}
+
+function _qmzStartThumbLoad(img, srcPath, cacheKey) {
+  delete img.dataset.queued;
+  if (!img.isConnected || img.dataset.file !== srcPath) {
+    _qmzActiveLoads--;
+    _qmzDrainThumbQueue();
+    return;
+  }
+  img.dataset.loaded = 'loading';
+  if (_qmzThumbObserver) _qmzThumbObserver.unobserve(img);
+
+  const thumbFn = (img.dataset.thumbType === 'video' && window.api.getVideoThumb)
+    ? window.api.getVideoThumb
+    : window.api.getThumb;
+
+  thumbFn(srcPath)
+    .then(url => {
+      if (img.dataset.file !== srcPath) return;   // stale — tile reused for a different file
+      if (!url) { img.dataset.loaded = 'error'; return; }
+      thumbCache.set(cacheKey, url);
+      safeSetImageSrc(img, url);
+      const done = img.decode ? img.decode().catch(() => {}) : Promise.resolve();
+      return done.then(() => {
+        img.dataset.loaded = 'true';
+        img.classList.add('thumb-loaded');
+      });
+    })
+    .catch(() => { img.dataset.loaded = 'error'; })
+    .finally(() => {
+      _qmzActiveLoads--;
+      _qmzDrainThumbQueue();
+    });
+}
+
+function _qmzRequestThumb(img) {
+  if (!img || !showThumbnails) return;
+  if (isShuttingDown) return;
+  const loadedState = img.dataset.loaded;
+  if (loadedState === 'loading' || loadedState === 'true') return;
+  if (img.dataset.queued) return;
+  const srcPath = img.dataset.file;
+  if (!srcPath) return;
+
+  const cacheKey  = LRUThumbCache.key(srcPath, img.dataset.size || '', img.dataset.modified || '');
+  const cachedUrl = thumbCache.get(cacheKey);
+  if (cachedUrl) {
+    safeSetImageSrc(img, cachedUrl);
+    img.dataset.loaded = 'true';
+    img.classList.add('thumb-loaded');
+    return;
+  }
+
+  img.dataset.queued = 'true';
+  _qmzThumbQueue.push(() => _qmzStartThumbLoad(img, srcPath, cacheKey));
+  _qmzDrainThumbQueue();
 }
 
 function _renderQMZCenter() {
@@ -8433,45 +8742,225 @@ function _renderQMZCenter() {
   const titleEl = document.getElementById('qmzCenterTitle');
   if (!el || !_qmzData) return;
 
-  if (!_qmzActivePg) {
+  el.classList.toggle('qmz-view-list', _qmzViewMode === 'list');
+
+  if (_qmzViewScope === 'unsequenced' && !_qmzActivePg) {
     if (titleEl) titleEl.textContent = 'Select a photographer';
     el.innerHTML = '<div class="qmz-empty">Select a photographer from the left panel.</div>';
+    _qmzTileMap = new Map();
+    if (_qmzThumbObserver) { _qmzThumbObserver.disconnect(); _qmzThumbObserver = null; }
     return;
   }
 
-  let files = [];
-  if (_qmzActiveLocation === 'unsequenced') {
-    files = _qmzData.unsequenced[_qmzActivePg]?.files || [];
-    if (titleEl) titleEl.textContent = `${_qmzActivePg} — Unsequenced`;
-  } else {
-    const seq = _qmzData.sequences.find(s => s.code === _qmzActiveLocation);
-    files = seq?.photographers[_qmzActivePg]?.files || [];
-    if (titleEl) titleEl.textContent = `${_qmzActivePg} — ${_qmzActiveLocation}`;
+  if (titleEl) {
+    if (_qmzViewScope === 'sequence') {
+      const seq   = _qmzData.sequences.find(s => s.code === _qmzActiveLocation);
+      const label = seq ? `${seq.code} — ${seq.type}` : _qmzActiveLocation;
+      titleEl.textContent = _qmzActivePg ? `${label} — ${_qmzActivePg}` : `${label} — All Photographers`;
+    } else {
+      titleEl.textContent = `${_qmzActivePg} — Unsequenced`;
+    }
   }
 
+  const files = _qmzGetActiveFiles();
   if (!files.length) {
     el.innerHTML = '<div class="qmz-empty">No media files here.</div>';
+    _qmzTileMap = new Map();
+    if (_qmzThumbObserver) { _qmzThumbObserver.disconnect(); _qmzThumbObserver = null; }
     return;
   }
 
-  el.innerHTML = files.map(f => {
-    const sel = _qmzSelectedFiles.has(f.path);
-    return `<label class="qmz-file-row${sel ? ' selected' : ''}" data-path="${escapeHtml(f.path)}">
-      <input type="checkbox"${sel ? ' checked' : ''} />
-      <span class="qmz-file-name">${escapeHtml(f.name)}</span>
-      <span class="qmz-file-size">${_formatBytes(f.size)}</span>
-    </label>`;
-  }).join('');
+  if (_qmzViewMode === 'timeline') {
+    // groupByTime() is a pure function (renderer.js) — takes/returns plain
+    // arrays, no import-screen state — safe to reuse directly.
+    el.innerHTML = _qmzBuildTimelineHtml(groupByTime(_qmzSortGroup(files)));
+  } else {
+    const sections = [
+      { key: 'raw',   label: 'RAW Files',   icon: _SVG_SECT_RAW,   files: files.filter(f => f.type === 'raw')   },
+      { key: 'photo', label: 'Image Files', icon: _SVG_SECT_PHOTO, files: files.filter(f => f.type === 'photo') },
+      { key: 'video', label: 'Video Files', icon: _SVG_SECT_VIDEO, files: files.filter(f => f.type === 'video') },
+    ].filter(s => s.files.length > 0);
+    el.innerHTML = sections.map(s => _qmzBuildSectionHtml(s.key, s.label, s.icon, s.files)).join('');
+  }
 
-  el.querySelectorAll('.qmz-file-row').forEach(row => {
-    row.addEventListener('change', () => {
-      const p   = row.dataset.path;
-      const chk = row.querySelector('input[type="checkbox"]');
-      if (chk.checked) { _qmzSelectedFiles.add(p); row.classList.add('selected'); }
-      else             { _qmzSelectedFiles.delete(p); row.classList.remove('selected'); }
-      _qmzUpdateActions();
+  // Tile map scoped to this grid only — never touches the import screen's tileMap.
+  // Selection interaction is handled by the delegated #qmzFileGrid listeners
+  // (registered once in _initQMZListeners), not per-render listeners.
+  _qmzTileMap = new Map();
+
+  // Own IntersectionObserver, scoped to this grid element — independent of the
+  // import screen's singleton thumbObserver.
+  if (_qmzThumbObserver) { _qmzThumbObserver.disconnect(); _qmzThumbObserver = null; }
+  _qmzThumbObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) _qmzRequestThumb(entry.target);
     });
+  }, { root: el, rootMargin: '200px', threshold: 0 });
+
+  el.querySelectorAll('.file-tile').forEach(tile => {
+    if (tile.dataset.path) _qmzTileMap.set(tile.dataset.path, tile);
+    const img = tile.querySelector('img.thumb-img[data-file]');
+    if (img) {
+      _qmzThumbObserver.observe(img);
+      if (_qmzSelectedFiles.has(img.dataset.file)) _qmzRequestThumb(img);
+    }
   });
+}
+
+// ── QMZ toolbar — sort/view controls ────────────────────────────────────────
+// Own state (_qmzSortKey/_qmzSortDir/_qmzViewMode) and own classnames
+// (.qmz-sort-btn/.qmz-view-btn) — never touches import's sortKey/viewMode or the
+// page-load-time document.querySelectorAll('.sort-btn') binding.
+function _qmzUpdateSortButtons() {
+  document.querySelectorAll('#qmzOverlay .qmz-sort-btn').forEach(btn => {
+    const active = btn.dataset.qmzSort === _qmzSortKey;
+    btn.classList.toggle('qmz-active', active);
+    const arrow = btn.querySelector('.qmz-sort-arrow');
+    if (arrow) arrow.textContent = active ? (_qmzSortDir === 'asc' ? ' ↑' : ' ↓') : '';
+  });
+}
+
+function _qmzUpdateViewButtons() {
+  document.querySelectorAll('#qmzOverlay .qmz-view-btn').forEach(btn => {
+    btn.classList.toggle('qmz-active', btn.dataset.qmzView === _qmzViewMode);
+  });
+}
+
+function _qmzSetSort(key) {
+  if (_qmzSortKey === key) {
+    _qmzSortDir = _qmzSortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    _qmzSortKey = key;
+    _qmzSortDir = key === 'name' ? 'asc' : 'desc';
+  }
+  _qmzUpdateSortButtons();
+  _renderQMZCenter();  // re-render only — no disk re-scan
+}
+
+function _qmzSetViewMode(mode) {
+  if (_qmzViewMode === mode) return;
+  _qmzViewMode = mode;
+  _qmzUpdateViewButtons();
+  _renderQMZCenter();  // re-render only — no disk re-scan
+}
+
+// ── QMZ selection — O(1) tile updates via _qmzTileMap ───────────────────────
+// Mirrors syncOneTile/syncAllTiles/handleTileClick's shift-click range logic,
+// but reads/writes only _qmzTileMap/_qmzSelectedFiles/_qmzSelectionAnchor —
+// never the import screen's tileMap/selectedFiles/_selectionAnchor.
+
+function _qmzSyncOneTile(filePath) {
+  const tile = _qmzTileMap.get(filePath);
+  if (!tile) return;
+  const checked = _qmzSelectedFiles.has(filePath);
+  tile.classList.toggle('selected', checked);
+  const cb = tile.querySelector('input[type="checkbox"]');
+  if (cb) cb.checked = checked;
+}
+
+function _qmzSyncAllTiles() {
+  for (const [path, tile] of _qmzTileMap) {
+    const checked = _qmzSelectedFiles.has(path);
+    tile.classList.toggle('selected', checked);
+    tile.classList.toggle('pv-focused', path === _qmzLastClickedPath);
+    const cb = tile.querySelector('input[type="checkbox"]');
+    if (cb) cb.checked = checked;
+  }
+  _qmzPrevFocusPath = _qmzLastClickedPath;
+}
+
+// ── QMZ preview-focus + arrow-key grid navigation ───────────────────────────
+// Mirrors _setPreviewFocus/_arrowFocusTarget, reusing the generic .pv-focused
+// CSS class, but reads/writes only _qmzTileMap/_qmzLastClickedPath/_qmzViewMode —
+// never the import screen's tileMap/lastClickedPath/viewMode.
+
+function _qmzSetPreviewFocus(path) {
+  if (_qmzPrevFocusPath) _qmzTileMap.get(_qmzPrevFocusPath)?.classList.remove('pv-focused');
+  if (path) _qmzTileMap.get(path)?.classList.add('pv-focused');
+  _qmzPrevFocusPath   = path;
+  _qmzLastClickedPath = path;
+}
+
+function _qmzArrowFocusTarget(key, order) {
+  const curIdx = _qmzLastClickedPath ? order.indexOf(_qmzLastClickedPath) : -1;
+
+  if (key === 'ArrowLeft') {
+    if (curIdx === -1) return order[0];
+    return curIdx > 0 ? order[curIdx - 1] : null;
+  }
+  if (key === 'ArrowRight') {
+    if (curIdx === -1) return order[0];
+    return curIdx < order.length - 1 ? order[curIdx + 1] : null;
+  }
+
+  if (_qmzViewMode === 'list') {
+    if (curIdx === -1) return order[0];
+    const next = curIdx + (key === 'ArrowDown' ? 1 : -1);
+    return (next >= 0 && next < order.length) ? order[next] : null;
+  }
+
+  // Up/Down in grid/icon mode: find tile in same visual column of next/prev row
+  if (curIdx === -1) return order[0];
+  const curTile = _qmzTileMap.get(_qmzLastClickedPath);
+  if (!curTile) return null;
+
+  const curRect = curTile.getBoundingClientRect();
+  const TOL     = 4;
+  const goDown  = key === 'ArrowDown';
+
+  let targetY = null;
+  for (const t of _qmzTileMap.values()) {
+    const ty = t.getBoundingClientRect().top;
+    if (goDown) {
+      if (ty > curRect.top + TOL && (targetY === null || ty < targetY)) targetY = ty;
+    } else {
+      if (ty < curRect.top - TOL && (targetY === null || ty > targetY)) targetY = ty;
+    }
+  }
+  if (targetY === null) return null;
+
+  const curCX = curRect.left + curRect.width / 2;
+  let best = null, bestD = Infinity;
+  for (const [path, t] of _qmzTileMap) {
+    const r = t.getBoundingClientRect();
+    if (Math.abs(r.top - targetY) <= TOL) {
+      const d = Math.abs((r.left + r.width / 2) - curCX);
+      if (d < bestD) { bestD = d; best = path; }
+    }
+  }
+  return best;
+}
+
+/**
+ * Plain click / checkbox toggle: toggles this file's selection, sets anchor.
+ * Shift-click (with an existing, still-valid anchor): range-selects from the
+ * anchor to filePath (adds only — matches import's shift-click semantics).
+ */
+function _qmzHandleTileClick(filePath, shiftKey) {
+  const order = _qmzGetRenderedPathOrder();
+  if (_qmzSelectionAnchor && !order.includes(_qmzSelectionAnchor)) {
+    _qmzSelectionAnchor = null;
+  }
+
+  if (shiftKey && _qmzSelectionAnchor && _qmzSelectionAnchor !== filePath) {
+    const a = order.indexOf(_qmzSelectionAnchor);
+    const b = order.indexOf(filePath);
+    if (a !== -1 && b !== -1) {
+      const [lo, hi] = a < b ? [a, b] : [b, a];
+      order.slice(lo, hi + 1).forEach(p => _qmzSelectedFiles.add(p));
+      _qmzLastClickedPath = filePath;
+      _qmzSyncAllTiles();
+      _qmzUpdateActions();
+      return;
+    }
+  }
+
+  if (_qmzSelectedFiles.has(filePath)) _qmzSelectedFiles.delete(filePath);
+  else _qmzSelectedFiles.add(filePath);
+  _qmzSelectionAnchor  = filePath;
+  _qmzSetPreviewFocus(filePath);
+  _qmzSyncOneTile(filePath);
+  _qmzUpdateActions();
 }
 
 function _renderQMZRight() {
@@ -8485,25 +8974,53 @@ function _renderQMZRight() {
   }
 
   el.innerHTML = sequences.map(seq => {
-    const total = Object.values(seq.photographers).reduce((s, p) => s + p.count, 0);
-    return `<div class="qmz-seq-chip ${seq.letter.toLowerCase()}" data-code="${escapeHtml(seq.code)}">
+    const total    = Object.values(seq.photographers).reduce((s, p) => s + p.count, 0);
+    const isActive = _qmzViewScope === 'sequence' && _qmzActiveLocation === seq.code;
+    return `<div class="qmz-seq-chip ${seq.letter.toLowerCase()}${isActive ? ' active' : ''}" data-code="${escapeHtml(seq.code)}" role="button" tabindex="0" title="Review files in ${escapeHtml(seq.code)}">
       <span class="qmz-seq-chip-code">${escapeHtml(seq.code)}</span>
       <span class="qmz-seq-chip-type">${escapeHtml(seq.type)}</span>
       <span class="qmz-seq-chip-count">${total}</span>
     </div>`;
   }).join('');
 
+  // Clicking a chip reviews that sequence's files (Fix 3) — assignment happens
+  // via the dedicated "Assign Selected" number input + Enter (_qmzHandleAssignByNumber),
+  // which already fully covers the assign workflow without this ambiguity.
   el.querySelectorAll('.qmz-seq-chip').forEach(chip => {
-    chip.addEventListener('click', () => _qmzAssignToSequence(chip.dataset.code));
+    chip.addEventListener('click', () => _qmzViewSequence(chip.dataset.code));
+    chip.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); _qmzViewSequence(chip.dataset.code); }
+    });
   });
 }
 
+// Switch the center panel to review every photographer's files inside a
+// sequence (MVP scope from Fix 3 — "all photographers" combined view).
+function _qmzViewSequence(code) {
+  _qmzViewScope        = 'sequence';
+  _qmzActiveLocation   = code;
+  _qmzActivePg         = null;
+  _qmzSelectedFiles    = new Set();
+  _qmzSelectionAnchor  = null;
+  _qmzLastClickedPath  = null;
+  _qmzPrevFocusPath    = null;
+  _renderQMZPhotographerList();
+  _renderQMZCenter();
+  _renderQMZRight();
+  _qmzUpdateActions();
+}
+
 function _qmzUpdateActions() {
-  const hasSel  = _qmzSelectedFiles.size > 0;
-  const notUseq = _qmzActiveLocation !== 'unsequenced';
+  const hasSel     = _qmzSelectedFiles.size > 0;
+  const notUseq    = _qmzViewScope !== 'unsequenced';
+  const hasContext = _qmzActivePg || _qmzViewScope === 'sequence'; // sequence view can be "all photographers" (no active pg)
   document.getElementById('qmzMoveUnsequencedBtn').disabled = !(hasSel && notUseq);
   document.getElementById('qmzQueueMetaBtn').disabled       = !hasSel;
-  document.getElementById('qmzSelectAllBtn').disabled       = !_qmzActivePg;
+  document.getElementById('qmzSelectAllBtn').disabled       = !hasContext;
+  const clearBtn = document.getElementById('qmzClearSelBtn');
+  if (clearBtn) clearBtn.disabled = !hasSel;
+  const selCountEl = document.getElementById('qmzSelCount');
+  if (selCountEl) selCountEl.textContent = hasSel ? `${_qmzSelectedFiles.size} selected` : '';
 }
 
 function _qmzSetStatus(msg, cls) {
@@ -8530,42 +9047,78 @@ async function _qmzAutoQueueMetadata(sequenceCode, filePaths, photographerName) 
   await window.api.qmzQueueMetadata({ batchId, files, context: ctx });
 }
 
-async function _qmzAssignToSequence(sequenceCode) {
-  if (!_qmzRoot || !_qmzSelectedFiles.size || !_qmzActivePg) return;
-  const filesToMove = [..._qmzSelectedFiles];
-  _qmzSetStatus(`Moving ${filesToMove.length} file(s) to ${sequenceCode}…`);
-  const result = await window.api.qmzMoveToSequence({
-    qmzRoot: _qmzRoot,
-    filePaths: filesToMove,
-    sequenceCode,
-    photographerName: _qmzActivePg,
-  });
-  if (result.ok) {
-    // Auto-queue metadata with the type keyword for the moved files' new paths
-    const movedDests = result.moved.map(m => m.dest);
-    await _qmzAutoQueueMetadata(sequenceCode, movedDests, _qmzActivePg);
-    _qmzSetStatus(`Moved ${result.moved.length} to ${sequenceCode} — metadata queued`, 'ok');
-  } else {
-    _qmzSetStatus(`${result.errors.length} error(s) moving to ${sequenceCode}`, 'err');
+// Groups paths by their own photographer folder (derived from the path itself,
+// not the current UI context) so batch actions stay correct even when viewing
+// an "all photographers" sequence — where the selection can span photographers
+// and each file must be routed back to its own photographer folder.
+function _qmzGroupPathsByPhotographer(paths) {
+  const byPg = new Map();
+  for (const p of paths) {
+    const pg = _qmzActivePg || _qmzPhotographerFromPath(p);
+    if (!pg) continue;
+    if (!byPg.has(pg)) byPg.set(pg, []);
+    byPg.get(pg).push(p);
   }
+  return byPg;
+}
+
+async function _qmzAssignToSequence(sequenceCode) {
+  if (!_qmzRoot || !_qmzSelectedFiles.size) return;
+  const filesToMove = [..._qmzSelectedFiles];
+  const byPg = _qmzGroupPathsByPhotographer(filesToMove);
+  _qmzSetStatus(`Moving ${filesToMove.length} file(s) to ${sequenceCode}…`);
+  let movedTotal = 0, errorTotal = 0;
+  for (const [pg, paths] of byPg) {
+    const result = await window.api.qmzMoveToSequence({
+      qmzRoot: _qmzRoot,
+      filePaths: paths,
+      sequenceCode,
+      photographerName: pg,
+    });
+    if (result.ok) {
+      // Auto-queue metadata with the type keyword for the moved files' new paths
+      const movedDests = result.moved.map(m => m.dest);
+      await _qmzAutoQueueMetadata(sequenceCode, movedDests, pg);
+      movedTotal += result.moved.length;
+    } else {
+      errorTotal += result.errors.length;
+    }
+  }
+  _qmzSetStatus(
+    errorTotal ? `Moved ${movedTotal}, ${errorTotal} error(s) moving to ${sequenceCode}` : `Moved ${movedTotal} to ${sequenceCode} — metadata queued`,
+    errorTotal ? 'err' : 'ok'
+  );
   _qmzSelectedFiles = new Set();
   await _qmzRefresh();
 }
 
 async function _qmzHandleMoveToUnsequenced() {
-  if (!_qmzRoot || !_qmzSelectedFiles.size || !_qmzActivePg) return;
+  if (!_qmzRoot || !_qmzSelectedFiles.size) return;
+  const wasSinglePgSequenceView = _qmzViewScope === 'sequence' && !!_qmzActivePg;
+  const byPg = _qmzGroupPathsByPhotographer([..._qmzSelectedFiles]);
   _qmzSetStatus(`Moving ${_qmzSelectedFiles.size} file(s) to Unsequenced…`);
-  const result = await window.api.qmzMoveToUnsequenced({
-    qmzRoot: _qmzRoot,
-    filePaths: [..._qmzSelectedFiles],
-    photographerName: _qmzActivePg,
-  });
+  let movedTotal = 0, errorTotal = 0;
+  for (const [pg, paths] of byPg) {
+    const result = await window.api.qmzMoveToUnsequenced({
+      qmzRoot: _qmzRoot,
+      filePaths: paths,
+      photographerName: pg,
+    });
+    if (result.ok) movedTotal += result.moved.length;
+    else errorTotal += result.errors.length;
+  }
   _qmzSetStatus(
-    result.ok ? `Moved ${result.moved.length} file(s) to Unsequenced` : `${result.errors.length} error(s)`,
-    result.ok ? 'ok' : 'err'
+    errorTotal ? `Moved ${movedTotal}, ${errorTotal} error(s)` : `Moved ${movedTotal} file(s) to Unsequenced`,
+    errorTotal ? 'err' : 'ok'
   );
-  _qmzSelectedFiles  = new Set();
-  _qmzActiveLocation = 'unsequenced';
+  _qmzSelectedFiles = new Set();
+  // Matches prior behavior for "sequence, one photographer" view (jump back to
+  // that photographer's now-updated unsequenced folder). An "all photographers"
+  // sequence view stays put so the user can keep reviewing/moving the rest.
+  if (wasSinglePgSequenceView) {
+    _qmzViewScope      = 'unsequenced';
+    _qmzActiveLocation = 'unsequenced';
+  }
   await _qmzRefresh();
 }
 
@@ -8687,11 +9240,14 @@ async function _qmzHandleBulkCreate() {
 
 // Manual retry: re-tag currently selected files (e.g. after a metadata failure).
 async function _qmzHandleRetryTagging() {
-  if (!_qmzRoot || !_qmzSelectedFiles.size || !_qmzActivePg) return;
-  if (_qmzActiveLocation === 'unsequenced') { _qmzSetStatus('Select sequenced files to tag', 'err'); return; }
+  if (!_qmzRoot || !_qmzSelectedFiles.size) return;
+  if (_qmzViewScope === 'unsequenced') { _qmzSetStatus('Select sequenced files to tag', 'err'); return; }
   const dests = [..._qmzSelectedFiles];
+  const byPg  = _qmzGroupPathsByPhotographer(dests);
   _qmzSetStatus(`Queuing metadata for ${dests.length} file(s)…`);
-  await _qmzAutoQueueMetadata(_qmzActiveLocation, dests, _qmzActivePg);
+  for (const [pg, paths] of byPg) {
+    await _qmzAutoQueueMetadata(_qmzActiveLocation, paths, pg);
+  }
   _qmzSetStatus(`Metadata queued for ${dests.length} file(s)`, 'ok');
 }
 
@@ -8705,14 +9261,61 @@ async function _qmzHandleRetryTagging() {
     const boxes = [...(grid?.querySelectorAll('input[type="checkbox"]') ?? [])];
     const allOn = boxes.every(c => c.checked);
     boxes.forEach(c => {
-      const p = c.closest('.qmz-file-row')?.dataset.path;
+      const p = c.closest('.file-tile')?.dataset.path;
       if (!p) return;
       c.checked = !allOn;
-      c.closest('.qmz-file-row').classList.toggle('selected', !allOn);
+      c.closest('.file-tile').classList.toggle('selected', !allOn);
       if (!allOn) _qmzSelectedFiles.add(p); else _qmzSelectedFiles.delete(p);
     });
     _qmzUpdateActions();
   });
+
+  document.getElementById('qmzClearSelBtn')?.addEventListener('click', () => {
+    _qmzSelectedFiles.clear();
+    const grid = document.getElementById('qmzFileGrid');
+    grid?.querySelectorAll('.file-tile.selected').forEach(t => t.classList.remove('selected'));
+    grid?.querySelectorAll('input[type="checkbox"]:checked').forEach(c => { c.checked = false; });
+    _qmzUpdateActions();
+  });
+
+  document.querySelectorAll('#qmzOverlay .qmz-sort-btn').forEach(btn => {
+    btn.addEventListener('click', () => _qmzSetSort(btn.dataset.qmzSort));
+  });
+  document.querySelectorAll('#qmzOverlay .qmz-view-btn').forEach(btn => {
+    btn.addEventListener('click', () => _qmzSetViewMode(btn.dataset.qmzView));
+  });
+  _qmzUpdateSortButtons();
+  _qmzUpdateViewButtons();
+
+  // Single delegated listener for all QMZ tile interaction — never rebuilt per
+  // render, matching the O(1)/no-rebuild pattern used by import's #fileGrid.
+  document.getElementById('qmzFileGrid')?.addEventListener('click', e => {
+    if (e.target.type === 'checkbox') return;  // handled by the change listener below
+    const tile = e.target.closest('.file-tile');
+    if (!tile || !tile.dataset.path) return;
+    _qmzHandleTileClick(tile.dataset.path, e.shiftKey);
+  });
+  document.getElementById('qmzFileGrid')?.addEventListener('change', e => {
+    if (e.target.type !== 'checkbox') return;
+    const path = e.target.dataset.path;
+    if (!path) return;
+    if (e.target.checked) _qmzSelectedFiles.add(path); else _qmzSelectedFiles.delete(path);
+    _qmzSelectionAnchor = path;
+    _qmzLastClickedPath = path;
+    _qmzSyncOneTile(path);
+    _qmzUpdateActions();
+  });
+  // Delegated error listener — thumbnail load failures fall back to the same
+  // generic SVG placeholder import uses, instead of a native broken-image icon.
+  document.getElementById('qmzFileGrid')?.addEventListener('error', e => {
+    const img = e.target;
+    if (!(img instanceof HTMLImageElement) || !img.classList.contains('thumb-img')) return;
+    if (img.dataset.loaded === 'error') return;
+    const accentHex = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#89b4fa';
+    img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(SVG_FALLBACK_PHOTO.replace(/currentColor/g, accentHex))}`;
+    img.dataset.loaded = 'error';
+    img.classList.add('thumb-error');
+  }, true);
 
   // Assign input: Enter → create-while-assigning flow
   document.getElementById('qmzAssignInput')?.addEventListener('keydown', e => {
@@ -8738,9 +9341,11 @@ async function _qmzHandleRetryTagging() {
   document.getElementById('qmzMoveUnsequencedBtn')?.addEventListener('click', _qmzHandleMoveToUnsequenced);
   document.getElementById('qmzQueueMetaBtn')?.addEventListener('click', _qmzHandleRetryTagging);
 
-  // Escape closes the overlay
+  // Escape closes the overlay — but not while QMZ's own preview is open on top
+  // of it; the preview keyboard handler owns Escape in that case (closes the
+  // preview first, matching import's Escape-closes-preview-first behavior).
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && _qmzOpen) { e.preventDefault(); _closeQMZManager(); }
+    if (e.key === 'Escape' && _qmzOpen && !_previewOpen) { e.preventDefault(); _closeQMZManager(); }
   });
 })();
 
@@ -8776,13 +9381,18 @@ function _isAnyBlockingOverlayOpen() {
 async function openPreview(filePath) {
   if (_previewOpen) return;
   if (!filePath) return;
-  if (_isAnyBlockingOverlayOpen()) return;    // Ref.6
+  // QMZ opens preview from on top of the (still-visible) progress/summary overlay
+  // by design — _isAnyBlockingOverlayOpen()'s progressOverlay check would otherwise
+  // block every QMZ preview opened from the post-import entry point.
+  if (!_qmzOpen && _isAnyBlockingOverlayOpen()) return;    // Ref.6
 
-  const file = currentFiles.find(f => f.path === filePath);
+  const file = _qmzOpen
+    ? _qmzGetActiveFiles().find(f => f.path === filePath)
+    : currentFiles.find(f => f.path === filePath);
   if (!file) return;
 
   _previewPath  = filePath;
-  _previewOrder = getRenderedPathOrder();
+  _previewOrder = _qmzOpen ? _qmzGetRenderedPathOrder() : getRenderedPathOrder();
   _previewOpen  = true;
 
   const overlay    = document.getElementById('previewOverlay');
@@ -8920,7 +9530,9 @@ async function navigatePreview(dir) {
   // Ref.7 — skip redundant load on rapid key presses
   if (nextPath === _previewPath) return;
 
-  const nextFile = currentFiles.find(f => f.path === nextPath);
+  const nextFile = _qmzOpen
+    ? _qmzGetActiveFiles().find(f => f.path === nextPath)
+    : currentFiles.find(f => f.path === nextPath);
   if (!nextFile) return;
 
   // Stop current video before switching (Ref.5)
@@ -8944,6 +9556,38 @@ async function navigatePreview(dir) {
 // ── Preview keyboard handler ───────────────────────────────────────────────
 document.addEventListener('keydown', e => {
   if (_isEditableTarget(document.activeElement)) return;
+
+  // QMZ is a full-screen overlay sitting on top of the import screen. These keys
+  // must operate on QMZ's own file set/tileMap, never fall through to the hidden
+  // import grid/selection underneath — hence a fully separate branch here rather
+  // than reusing the import branches below with a few tweaked lookups.
+  if (_qmzOpen) {
+    if (e.key === ' ') {
+      if (_previewOpen) { e.preventDefault(); e.stopPropagation(); closePreview(); return; }
+      const fp = _qmzLastClickedPath || [..._qmzSelectedFiles][0] || _qmzGetRenderedPathOrder()[0];
+      if (fp) { e.preventDefault(); e.stopPropagation(); openPreview(fp); }
+      return;
+    }
+    if (!_previewOpen &&
+        (e.key === 'ArrowRight' || e.key === 'ArrowLeft' ||
+         e.key === 'ArrowDown'  || e.key === 'ArrowUp')) {
+      const order = _qmzGetRenderedPathOrder();
+      if (!order.length) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const nextPath = _qmzArrowFocusTarget(e.key, order);
+      if (nextPath) {
+        _qmzSetPreviewFocus(nextPath);
+        _qmzTileMap.get(nextPath)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      }
+      return;
+    }
+    if (!_previewOpen) return;
+    if (e.key === 'Escape')     { closePreview(); return; }
+    if (e.key === 'ArrowLeft')  { e.preventDefault(); e.stopPropagation(); navigatePreview(-1); return; }
+    if (e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); navigatePreview(1);  return; }
+    return;
+  }
 
   if (e.key === ' ') {
     if (_previewOpen) { e.preventDefault(); e.stopPropagation(); closePreview(); return; }

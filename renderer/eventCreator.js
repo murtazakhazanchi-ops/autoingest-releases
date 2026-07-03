@@ -1898,8 +1898,10 @@ ${unparseable.map(ev => `
         const evEntry = (_scannedEvents || []).find(ev => ev.folderName === folder);
         const comp    = evEntry?.components?.[compIdx] ?? null;
         const isMulti = (evEntry?.components?.length ?? 0) > 1;
+        const eventTitle     = evEntry?._eventJson?.eventName || evEntry?.folderName || null;
+        const componentTitle = (isMulti && comp?.folderName) ? comp.folderName : null;
         if (typeof window.openQMZManager === 'function') {
-          window.openQMZManager(qmzRoot, { component: comp, isMulti });
+          window.openQMZManager(qmzRoot, { component: comp, isMulti, eventTitle, componentTitle });
         }
       });
     });
