@@ -266,8 +266,9 @@ contextBridge.exposeInMainWorld('api', {
   resumeCustomTransferExportFromCheckpoint: ({ customSrcRoot, customDestRoot, operatorName })        => ipcRenderer.invoke('archive:resumeCustomTransferExportFromCheckpoint', { customSrcRoot, customDestRoot, operatorName }),
 
   // ── Transfer Import ──
-  getTransferDriveCollections:           ()                        => ipcRenderer.invoke('archive:getTransferDriveCollections'),
+  getTransferImportTree:                 ()                        => ipcRenderer.invoke('archive:getTransferImportTree'),
   previewTransferImport:                 (scope)                   => ipcRenderer.invoke('archive:previewTransferImport',              { scope }),
+  scanImportSync:                        (scope)                   => ipcRenderer.invoke('archive:scanImportSync',                     { scope }),
   runTransferImport:                     (scope, operatorName)     => ipcRenderer.invoke('archive:runTransferImport',                  { scope, operatorName }),
   getTransferImportStatus:               ()                        => ipcRenderer.invoke('archive:getTransferImportStatus'),
   pauseTransferImport:                   ()                        => ipcRenderer.invoke('archive:pauseTransferImport'),
@@ -370,6 +371,8 @@ contextBridge.exposeInMainWorld('api', {
   qmzInitRoot:          (params) => ipcRenderer.invoke('qmz:initRoot',          params),
   qmzCreateSequence:    (params) => ipcRenderer.invoke('qmz:createSequence',    params),
   qmzBulkCreate:        (params) => ipcRenderer.invoke('qmz:bulkCreate',        params),
+  qmzEditSequence:      (params) => ipcRenderer.invoke('qmz:editSequence',      params),
+  qmzRemoveSequence:    (params) => ipcRenderer.invoke('qmz:removeSequence',    params),
   qmzMoveToSequence:    (params) => ipcRenderer.invoke('qmz:moveToSequence',    params),
   qmzMoveToUnsequenced: (params) => ipcRenderer.invoke('qmz:moveToUnsequenced', params),
   qmzQueueMetadata:     (params) => ipcRenderer.invoke('qmz:queueMetadata',     params),

@@ -2,6 +2,7 @@
 
 const path   = require('path');
 const fsp    = require('fs').promises;
+const exifr  = require('exifr');
 const { log } = require('../services/logger');
 const config = require('../config/app.config');
 
@@ -14,6 +15,86 @@ const MEDIA_EXT   = new Set([...config.PHOTO_EXTENSIONS, ...config.VIDEO_EXTENSI
 const RAW_EXTS    = new Set(config.RAW_EXTENSIONS);
 const PHOTO_EXTS  = new Set(config.PHOTO_EXTENSIONS);
 const VIDEO_EXTS  = new Set(config.VIDEO_EXTENSIONS);
+
+// ── Original capture date (EXIF) ────────────────────────────────────────────
+// Import's own file listing (main/fileBrowser.js) only ever records
+// stat.mtime, and fs.copyFile() during import does not preserve source mtime
+// across a cross-volume copy (SD card → archive) — so filesystem mtime is not
+// a reliable proxy for capture time. The original capture date is baked into
+// the file's own bytes (EXIF) and survives any copy/move, so QMZ reads it
+// directly instead. Filesystem mtime is used ONLY as a last-resort fallback
+// when no embedded capture date can be read at all.
+//
+// Two readers, chosen by file type:
+//   - photo (JPEG/PNG/TIFF/…): exifr, in-process, fast tag-only parse.
+//   - raw   (CR2/CR3/ARW/…):   ExifTool, via main/exifService.js's existing
+//     readFileTags() — reuses that module's already-running, singleton
+//     ExifTool process pool (no second pool spawned). QMZ deliberately does
+//     NOT use exifr for RAW: services/thumbnailer.js already established that
+//     exifr can leak file descriptors on malformed/exotic RAW formats, and
+//     that restriction is mirrored here rather than relaxed. ExifTool runs as
+//     a persistent external process, so it carries none of that fd-leak risk.
+//   - video: not attempted here (no existing video capture-date extraction in
+//     this project) — falls back to mtime, same as before.
+//
+// Both readers share one timeout-guarded, cached entry point (readCaptureDate)
+// below. Never writes anything — read-only, exactly like readFileTags itself.
+const EXIF_DATE_TIMEOUT_MS     = 500; // exifr — fast in-process parse
+const RAW_EXIF_TIMEOUT_MS      = 800; // ExifTool — persistent process + possible NAS round-trip
+// Cache avoids re-reading EXIF on every _qmzRefresh() rescan for files that
+// haven't changed. Keyed like the thumbnail cache (path+size+mtime) so a
+// moved/renamed file (new path after sequence assignment) or a genuinely
+// changed file gets a fresh read. Values are tiny ISO strings — an unbounded
+// Map is negligible memory even for large archives.
+const _exifDateCache = new Map();
+
+async function _readPhotoCaptureDate(filePath) {
+  try {
+    const exifPromise    = exifr.parse(filePath, { pick: ['DateTimeOriginal', 'CreateDate'] });
+    const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), EXIF_DATE_TIMEOUT_MS));
+    const tags = await Promise.race([exifPromise, timeoutPromise]);
+    const date = tags?.DateTimeOriginal || tags?.CreateDate;
+    return (date instanceof Date && !isNaN(date)) ? date.toISOString() : null;
+  } catch {
+    return null; // malformed/unreadable EXIF — caller falls back to mtime
+  }
+}
+
+async function _readRawCaptureDate(filePath) {
+  try {
+    // Lazy require — keeps exifService's ExifTool pool from spawning until a
+    // RAW file actually needs a date read, and avoids a load-order dependency
+    // between the two main-process modules.
+    const { readFileTags } = require('./exifService');
+    const readPromise     = readFileTags(filePath);
+    const timeoutPromise  = new Promise(resolve => setTimeout(() => resolve(null), RAW_EXIF_TIMEOUT_MS));
+    const tags = await Promise.race([readPromise, timeoutPromise]);
+    if (!tags) return null;
+    // Prefer SubSecDateTimeOriginal (sub-second precision) when the camera
+    // wrote it; otherwise DateTimeOriginal; CreateDate as a last EXIF resort.
+    const raw = tags.SubSecDateTimeOriginal || tags.DateTimeOriginal || tags.CreateDate;
+    if (!raw) return null;
+    // exiftool-vendored returns ExifDateTime objects (with their own
+    // .toISOString()) for recognized date tags, but falls back to a plain
+    // string for tags it couldn't fully parse — handle both.
+    if (typeof raw.toISOString === 'function') return raw.toISOString() || null;
+    const parsed = new Date(raw);
+    return isNaN(parsed) ? null : parsed.toISOString();
+  } catch {
+    return null; // malformed/unreadable EXIF, or ExifTool pool error — caller falls back to mtime
+  }
+}
+
+async function readCaptureDate(filePath, size, mtimeMs, type) {
+  const cacheKey = `${filePath}|${size}|${mtimeMs}`;
+  if (_exifDateCache.has(cacheKey)) return _exifDateCache.get(cacheKey);
+  let result = null;
+  if (type === 'raw') result = await _readRawCaptureDate(filePath);
+  else if (type === 'photo') result = await _readPhotoCaptureDate(filePath);
+  // video: no reader yet — result stays null, caller falls back to mtime.
+  _exifDateCache.set(cacheKey, result);
+  return result;
+}
 
 // Mirrors main/fileBrowser.js's mediaType() — RAW checked before photo (RAW_EXTS ⊂ PHOTO_EXTS).
 // Duplicated locally rather than imported to keep qmzService decoupled from fileBrowser.
@@ -93,6 +174,25 @@ async function moveWithSidecar(src, destDir) {
   return result;
 }
 
+// Removes `dir` only if it contains nothing but macOS junk (._*, .DS_Store) or
+// is fully empty — a real file or a subdirectory of any kind blocks removal.
+// Junk files are deleted first (never media), then the now-truly-empty
+// directory. Best-effort: any error (missing, not empty, permission) is
+// swallowed — this is cosmetic cleanup and must never fail the caller's move.
+async function removeIfEmptyIgnoringJunk(dir) {
+  try {
+    const entries = await fsp.readdir(dir, { withFileTypes: true });
+    const hasRealContent = entries.some(e => !(e.isFile() && isJunkFile(e.name)));
+    if (hasRealContent) return; // real file or any subdirectory — leave it alone
+    for (const e of entries) {
+      if (e.isFile() && isJunkFile(e.name)) {
+        try { await fsp.unlink(path.join(dir, e.name)); } catch {}
+      }
+    }
+    await fsp.rmdir(dir);
+  } catch { /* best-effort — never throw */ }
+}
+
 async function listChildDirs(dir) {
   try {
     const entries = await fsp.readdir(dir, { withFileTypes: true });
@@ -106,18 +206,38 @@ async function listMediaFiles(dir) {
     const files   = [];
     for (const e of entries) {
       if (!e.isFile() || isJunkFile(e.name) || !MEDIA_EXT.has(path.extname(e.name).toLowerCase())) continue;
-      const p = path.join(dir, e.name);
+      const p    = path.join(dir, e.name);
+      const type = mediaType(e.name);
       let size = 0;
       let modifiedAt = null;
+      let capturedAt = null;
       try {
         const stat = await fsp.stat(p);
         size       = stat.size;
         modifiedAt = stat.mtime.toISOString();
+        // Preferred: original capture date, read per-type (see note above).
+        // Fallback only: filesystem modified time — used below when this is
+        // null, i.e. no embedded capture date could be read at all.
+        if (type === 'photo' || type === 'raw') {
+          capturedAt = await readCaptureDate(p, stat.size, stat.mtimeMs, type);
+        }
       } catch {}
-      files.push({ name: e.name, path: p, size, type: mediaType(e.name), modifiedAt });
+      files.push({ name: e.name, path: p, size, type, modifiedAt, capturedAt: capturedAt || modifiedAt });
     }
     return files;
   } catch { return []; }
+}
+
+// True if `code`'s sequence folder has any photographer subfolder containing
+// at least one real (non-junk) media file. Only inspects one level of
+// nesting — sequence folders only ever contain photographer folders directly.
+async function _sequenceHasFiles(qmzRoot, code) {
+  const pgDirs = await listChildDirs(path.join(qmzRoot, code));
+  for (const pg of pgDirs) {
+    const files = await listMediaFiles(path.join(qmzRoot, code, pg));
+    if (files.length > 0) return true;
+  }
+  return false;
 }
 
 // ── State I/O ────────────────────────────────────────────────────────────────
@@ -262,6 +382,83 @@ async function bulkCreateSequences(qmzRoot, items) {
   return { ok: errors.length === 0, created, errors };
 }
 
+// ── Edit / remove sequences ──────────────────────────────────────────────────
+// MVP scope: only an EMPTY sequence (no real files in any photographer
+// subfolder) may be edited or removed. A non-empty sequence is blocked with a
+// clear message rather than silently reassigning/deleting anything — no
+// batch re-tagging or renumbering is attempted here.
+
+async function editSequenceType(qmzRoot, code, newLetter) {
+  const parsed = parseCode(code);
+  if (!parsed) return { ok: false, error: `Invalid sequence code: ${code}` };
+  newLetter = String(newLetter ?? '').toUpperCase();
+  if (!LETTER_TYPE[newLetter]) return { ok: false, error: `Invalid letter: ${newLetter}` };
+  if (newLetter === parsed.letter) return { ok: true, code }; // no-op, already this type
+
+  if (await _sequenceHasFiles(qmzRoot, code)) {
+    return { ok: false, error: 'Move files out of this sequence before changing its type.' };
+  }
+
+  const newCode = formatCode(parsed.number, newLetter);
+  const state   = await readState(qmzRoot);
+  if (state.sequences.some(s => s.code === newCode)) {
+    return { ok: false, error: `Sequence ${newCode} already exists.` };
+  }
+
+  const srcDir  = path.join(qmzRoot, code);
+  const destDir = path.join(qmzRoot, newCode);
+  try { await fsp.access(destDir); return { ok: false, error: `Folder ${newCode} already exists on disk.` }; }
+  catch { /* dest absent — proceed */ }
+  try { await fsp.rename(srcDir, destDir); }
+  catch (err) { return { ok: false, error: err.message }; }
+
+  state.sequences = state.sequences.map(s => s.code === code
+    ? { code: newCode, number: parsed.number, letter: newLetter, type: LETTER_TYPE[newLetter] }
+    : s);
+  state.sequences.sort((a, b) => (a.code < b.code ? -1 : 1));
+  const r = await saveState(qmzRoot, state);
+  if (!r.ok) return { ok: false, error: r.error };
+
+  log(`[qmz] editSequenceType: ${code} → ${newCode}`);
+  return { ok: true, code: newCode };
+}
+
+async function removeSequence(qmzRoot, code) {
+  const parsed = parseCode(code);
+  if (!parsed) return { ok: false, error: `Invalid sequence code: ${code}` };
+
+  if (await _sequenceHasFiles(qmzRoot, code)) {
+    return { ok: false, error: 'This sequence contains files. Move them back to Unsequenced before removing the sequence.' };
+  }
+
+  const seqDir = path.join(qmzRoot, code);
+  try {
+    const pgDirs = await listChildDirs(seqDir);
+    for (const pg of pgDirs) {
+      await removeIfEmptyIgnoringJunk(path.join(seqDir, pg));
+    }
+    await removeIfEmptyIgnoringJunk(seqDir);
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+
+  // Only drop the sequence from state once the folder is verifiably gone —
+  // if any unexpected content survived cleanup, leave state and folder in
+  // sync (still listed) rather than orphaning real content on disk.
+  try {
+    await fsp.access(seqDir);
+    return { ok: false, error: 'Sequence folder is not empty.' };
+  } catch { /* good — folder is gone */ }
+
+  const state = await readState(qmzRoot);
+  state.sequences = state.sequences.filter(s => s.code !== code);
+  const r = await saveState(qmzRoot, state);
+  if (!r.ok) return { ok: false, error: r.error };
+
+  log(`[qmz] removeSequence: ${code} removed`);
+  return { ok: true, code };
+}
+
 // ── Move files ────────────────────────────────────────────────────────────────
 
 async function moveFilesToSequence(qmzRoot, filePaths, sequenceCode, photographerName) {
@@ -293,6 +490,15 @@ async function moveFilesToUnsequenced(qmzRoot, filePaths, photographerName) {
     else errors.push({ src, error: r.reason });
   }
 
+  // Clean up any sequence photographer folder left empty by this move (real
+  // files or unmoved leftovers block removal — see removeIfEmptyIgnoringJunk).
+  // Only the leaf photographer folder is ever touched here, never the
+  // sequence folder itself — that stays until the user explicitly removes it.
+  const sourceDirs = new Set(moved.map(m => path.dirname(m.src)));
+  for (const dir of sourceDirs) {
+    await removeIfEmptyIgnoringJunk(dir);
+  }
+
   log(`[qmz] moveToUnsequenced ${photographerName}: ${moved.length} moved, ${errors.length} errors`);
   return { ok: errors.length === 0, moved, errors };
 }
@@ -309,6 +515,8 @@ module.exports = {
   initRoot,
   createSequence,
   bulkCreateSequences,
+  editSequenceType,
+  removeSequence,
   moveFilesToSequence,
   moveFilesToUnsequenced,
 };

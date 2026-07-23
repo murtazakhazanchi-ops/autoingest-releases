@@ -258,6 +258,23 @@ Validation:
 - Confirm that running the service against edge-case input (unparseable name, missing prerequisite data) still returns the full set of named check categories.
 - Grep for `addCheck` calls in the service and confirm every check name appears in at least one `else` / default branch.
 
+### Resolver Branch Evidence-Equivalence Review
+
+Context:
+- Applies when reviewing any resolver/recovery function with multiple branches that can each independently reach the same "accept" outcome (e.g. destination resolution, identity matching, hint-based recovery).
+
+Rule:
+- Confirm every accepting branch requires the same standard of real, independently-verifiable evidence — not just that at least one branch was hardened. A branch that accepts a cached hint, reachability check, or structural inference alone (without confirming against real, current evidence) reopens the same class of bug that a sibling branch's hardening was meant to close.
+
+Avoid:
+- Approving a resolver fix because the flagged branch is now hardened, without checking sibling branches for the same evidence standard.
+- Accepting "reachable" or "structurally plausible" as sufficient evidence in one branch when another branch in the same resolver requires a real identity/archive match.
+
+Validation:
+- List every branch in the resolver that can reach "accept."
+- Confirm each requires equivalent real evidence, not merely a hint or heuristic.
+- Confirm the resolver leaves the item unresolved (and excluded) rather than guessing when no branch confirms.
+
 ## Validation Checklist
 
 Before giving a verdict, review:
@@ -282,6 +299,7 @@ Check for:
 - Duplicated logic.
 - Broad unrelated changes.
 - Missing validation.
+- Hardcoded RAW/photo extension lists in metadata or EXIF services — `exifService.js` and `metadataSyncService.js` must derive from `config.RAW_EXTENSIONS`, not local arrays or Sets.
 - Missing error handling.
 - Documentation drift, if docs were changed.
 - Security regressions, if Electron/main/preload/CSP files changed.

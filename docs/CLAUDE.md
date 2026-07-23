@@ -400,6 +400,34 @@ Before architecture, refactor, or debugging tasks, Claude may consult `graphify-
 
 See `docs/dev-tools/graphify.md` for install instructions, recommended queries, and full rules of use.
 
+### Graphify Context Budget Protocol
+
+Use Graphify as a **read-only context router** before broad file reads to reduce token usage.
+
+**When to use Graphify first** — run 1–3 targeted queries before reading files for any task that is:
+- High-risk, broad, or unclear in scope
+- Architecture, debugging, IPC, renderer/main boundary, ingestion, metadata, persistence, sync, or multi-file
+
+**After Graphify orientation, read only:**
+- Docs routed by `CLAUDE.md` for the task type
+- Exact files, functions, IPC channels, and services Graphify identified
+- Direct callers/callees needed for verification
+
+**Authority order** — Graphify is advisory only. `CLAUDE.md`, routed docs, `event.json` contracts, Electron security rules, file-copy rules, metadata rules, and source-of-truth rules remain authoritative. If Graphify contradicts any of these, stop and report.
+
+**When to skip Graphify:**
+- Task is small or obviously scoped to one file
+- `graphify-out/` is missing or stale
+- Graphify contradicts source or docs and direct verification is required
+- Task is security-critical and requires reading source directly
+
+**Implementation agent declaration** — for any task where Graphify was used, the agent must state:
+1. Graphify queries run
+2. Files Graphify identified
+3. Docs/source sections actually read
+4. Files intentionally not read and why
+5. Why the resulting context is sufficient
+
 ---
 
 ## Enforcement

@@ -783,6 +783,24 @@ Validation:
 - Confirm the import flow in question uses `import:commitTransaction` for all event-import operations that must be audited.
 - Confirm `files:import` is only used for non-event copy operations where no audit trail is needed.
 
+### Equivalent-Evidence-Across-Branches — Resolver Branches Must Match Standard
+
+Context:
+- Applies when debugging a resolver/recovery function that has multiple branches which can each independently reach an "accept" outcome (e.g. a cached hint, a live reachability check, a structural inference) — for example, destination resolution, hierarchical-identity recovery, or hint-based matching.
+
+Rule:
+- Every branch that can reach an "accept" outcome must require the same standard of real, independently-verifiable evidence — not just a cached hint, a reachability check, or a structural inference alone. A resolver that hardens one branch (e.g. "unreachable hint requires an archive-identity match") but leaves a sibling branch trusting the hint outright (e.g. "reachable hint accepted unconditionally") reintroduces the exact class of bug the hardening was meant to close. This is easy to miss because each branch looks locally reasonable in isolation. Reference: `_resolveEventDestination` in `services/transferImportService.js`.
+- When no branch confirms with real evidence, the correct outcome is unresolved — never synthesize or guess a destination/identity to keep the operation moving.
+
+Avoid:
+- Treating a resolver as fixed because one flagged branch was hardened, without auditing sibling branches for the same evidence standard.
+- Accepting a match because a hint is "reachable" or "structurally plausible" when a sibling branch in the same resolver requires a real identity/archive match.
+
+Validation:
+- Enumerate every branch of the resolver that can reach "accept."
+- Confirm each branch requires equivalent real, current, independently-checkable evidence — not merely a hint or heuristic.
+- Confirm an unresolved outcome excludes the item from the operation rather than guessing.
+
 ## Validation Checklist
 
 Before debugging, read:

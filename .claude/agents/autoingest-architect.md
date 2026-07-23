@@ -748,6 +748,24 @@ Validation:
 - Confirm each subsequent fix has its own commit.
 - Confirm no adjacent systems are touched by the first patch.
 
+### Equivalent-Evidence-Across-Branches — Resolver Branches Must Match Standard
+
+Context:
+- Applies to any hierarchical-identity recovery/resolution logic where multiple branches can each independently reach an "accept" outcome by different means (e.g. a cached checkpoint hint, a live reachability check, a structural inference).
+
+Rule:
+- Every accepting branch of a resolver must require the same standard of real, independently-verifiable evidence before binding an item to a parent (e.g. an Event folder to a Collection) — a path being reachable, structurally plausible, or merely mentioned by a checkpoint/manifest is not sufficient on its own. A resolver is only as safe as its weakest accepting branch: hardening one branch while a sibling branch still trusts a hint alone reintroduces the same bug class. Reference: `_resolveEventDestination` in `services/transferImportService.js`.
+- When no branch confirms with real evidence, mark the item unresolved and exclude it from the operation — never synthesize or guess.
+
+Avoid:
+- Approving a resolver design because one branch is hardened without auditing sibling branches for the same evidence standard.
+- Allowing a "reachable" or "structurally plausible" hint to satisfy acceptance in one branch when a sibling branch requires a real archive-identity match.
+
+Validation:
+- Enumerate every branch of the resolver that can reach "accept."
+- Confirm each branch requires equivalent real, current, independently-checkable evidence.
+- Confirm an unresolved outcome excludes the item from the operation rather than guessing a destination.
+
 ## Validation Checklist
 
 When invoked, return:

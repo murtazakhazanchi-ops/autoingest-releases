@@ -947,6 +947,29 @@ Validation:
 - Confirm no separate side file for city-country associations exists.
 - Confirm the IPC handler finds the city entry by label (case-insensitive or exact per project convention) and writes `entry.country = countryLabel`.
 
+### RAW Extension Source of Truth
+
+Context:
+- Applies to any service that classifies files as RAW, writes XMP sidecars, or performs RAW peer lookup (e.g., `exifService.js`, `metadataSyncService.js`).
+
+Rule:
+- `config/app.config.js` is the sole source of truth for all media extension lists including `RAW_EXTENSIONS`.
+- Every service that needs a RAW extension set must `require('../config/app.config')` and derive from `config.RAW_EXTENSIONS` or `new Set(config.RAW_EXTENSIONS)`.
+- Do not maintain a service-local hardcoded extension array or Set. Any format not in `PHOTO_EXTENSIONS` cannot be ingested — service-local support for it is phantom dead code.
+- Media extension support must be end-to-end across all three layers: scanner/import (`fileBrowser`) + EXIF write (`exifService`) + RAW peer lookup (`metadataSyncService`). A gap in any layer silently breaks that format's metadata.
+- When adding a new RAW format to config, verify all three layers derive from config and do not have a hardcoded list that would miss it.
+
+Avoid:
+- Hardcoding a RAW extension `Set` or `Array` inside `exifService.js`, `metadataSyncService.js`, or any other metadata service.
+- Adding a format to a service-local list without first adding it to `config/app.config.js` PHOTO_EXTENSIONS and RAW_EXTENSIONS.
+- Preserving legacy service-local formats (e.g., `.srw`, `.iiq`) that are absent from `PHOTO_EXTENSIONS` — they are unreachable through ingestion and should not be supported downstream.
+
+Validation:
+- Confirm `exifService.js` RAW set is `new Set(config.RAW_EXTENSIONS)`, not a hardcoded literal.
+- Confirm `metadataSyncService.js` RAW peer list is `config.RAW_EXTENSIONS`, not a hardcoded array.
+- Confirm no other metadata service has a local `const RAW_EXTENSIONS = [...]` or `new Set([...])`.
+- When a new RAW format is added to config, confirm `_findRawPeer` and `exifService` pick it up automatically (no other file needs changing).
+
 ### Documentation Follow-Up
 
 Context:

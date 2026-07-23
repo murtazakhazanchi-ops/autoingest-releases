@@ -944,6 +944,8 @@
     .tx-tree-status[data-status="partial"]    { color: #b45309; background: rgba(180,83,9,0.10); border-color: rgba(180,83,9,0.25); }
     .tx-tree-status[data-status="review"]     { color: #dc2626; background: rgba(220,38,38,0.09); border-color: rgba(220,38,38,0.22); }
     .tx-tree-status[data-status="not-copied"] { color: var(--subtext); background: var(--card-bg,rgba(0,0,0,0.04)); border-color: var(--border); }
+    .tx-tree-row[data-unresolved="true"] { opacity: .6; }
+    .tx-tree-row[data-unresolved="true"] .tx-tree-name { text-decoration: line-through; text-decoration-color: rgba(220,38,38,0.4); }
     .tx-tree-name.tx-tree-event-root { color: var(--subtext); font-style: italic; }
     .tx-tree-row-coll { padding-left: 2px; }
     .tx-tree-row-ev   { padding-left: 18px; }
@@ -6285,11 +6287,14 @@
   #qmzOverlay .qmz-sort-btn,
   #qmzOverlay .qmz-view-btn {
     box-sizing: border-box;
-    padding: 2px 9px; min-height: 24px; font-size: 0.72rem; font-weight: 600;
+    padding: 2px 9px; height: 24px; min-height: 24px; line-height: 1;
+    font-size: 0.72rem; font-weight: 600;
     background: var(--surface); border: 1px solid var(--border); border-radius: 5px;
     color: var(--subtext); cursor: pointer;
     transition: border-color 0.12s, color 0.12s;
     display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+    position: relative; z-index: 1; /* stay above any sibling in this row */
+    -webkit-app-region: no-drag;
   }
   /* Defense-in-depth: the label/arrow are purely decorative — guarantee clicks
      anywhere in the button box reach the <button> itself, not a child node. */
@@ -6327,6 +6332,22 @@
   #qmzOverlay .qmz-seq-chip.active { background: var(--blue); border-color: var(--blue); color: #fff; }
   #qmzOverlay .qmz-seq-chip.active .qmz-seq-chip-type,
   #qmzOverlay .qmz-seq-chip.active .qmz-seq-chip-count { color: rgba(255,255,255,0.75); }
+  /* Edit/Remove — hover-reveal only, so the chip stays compact/uncluttered by default. */
+  #qmzOverlay .qmz-seq-chip-actions {
+    display: flex; gap: 2px; flex-shrink: 0;
+    opacity: 0; transition: opacity 0.12s;
+  }
+  #qmzOverlay .qmz-seq-chip:hover .qmz-seq-chip-actions,
+  #qmzOverlay .qmz-seq-chip-actions:focus-within { opacity: 1; }
+  #qmzOverlay .qmz-seq-chip-action {
+    width: 20px; height: 20px; padding: 0; border: none; border-radius: 4px;
+    background: transparent; color: inherit; opacity: 0.7; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: background 0.12s, opacity 0.12s, color 0.12s;
+  }
+  #qmzOverlay .qmz-seq-chip-action:hover { background: rgba(0,0,0,0.12); opacity: 1; }
+  #qmzOverlay .qmz-seq-chip.active .qmz-seq-chip-action:hover { background: rgba(255,255,255,0.2); }
+  #qmzOverlay .qmz-seq-chip-action--danger:hover { color: var(--red); }
   #qmzOverlay .qmz-seq-create {
     padding: 8px; border-top: 1px solid var(--border-subtle);
     display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;
@@ -7842,7 +7863,16 @@
               <span class="qmz-toolbar-sep"></span>
               <button class="qmz-view-btn" data-qmz-view="icon">Grid</button>
               <button class="qmz-view-btn" data-qmz-view="list">List</button>
-              <button class="qmz-view-btn" data-qmz-view="timeline">Timeline</button>
+              <span class="qmz-toolbar-sep"></span>
+              <!-- Timeline toggle — mirrors import's #timelineSwitch pattern
+                   (.toggle-control/.switch/.slider), not a third view button. -->
+              <label class="toggle-control" title="Group files by capture time">
+                <span class="switch">
+                  <input type="checkbox" id="qmzTimelineToggle" aria-label="Timeline grouping">
+                  <span class="slider"><span class="circle"></span></span>
+                </span>
+                <span class="toggle-label">Timeline</span>
+              </label>
             </div>
             <div class="qmz-toolbar-right">
               <button id="qmzSelectAllBtn" class="qmz-action-btn">Select All</button>
@@ -8284,8 +8314,8 @@
         <!-- Import Scope -->
         <div>
           <div class="tx-section-label">Import Scope</div>
-          <div id="tiScopeList" class="tx-scope-list">
-            <div class="tx-empty-note">Set a Transfer Drive to load collections.</div>
+          <div id="tiScopeTree" class="tx-scope-tree">
+            <div class="tx-empty-note">Set a Transfer Drive to load scope.</div>
           </div>
           <div class="tx-scope-controls" style="margin-top:6px">
             <button type="button" id="tiSelectAllBtn">Select all</button>
@@ -8305,7 +8335,11 @@
             <div class="tx-preview-stat"><span class="tx-preview-val" id="tiPvExternal">—</span><span class="tx-preview-lbl">External</span></div>
             <div class="tx-preview-stat"><span class="tx-preview-val" id="tiPvFiles">—</span><span class="tx-preview-lbl">Files</span></div>
           </div>
+          <div id="tiPvUnresolvedNote" class="tx-scan-group tx-scan--err" hidden></div>
         </div>
+
+        <!-- Scan for New Data review (grouped diff vs Main Archive Root) -->
+        <div id="tiScanReview" class="tx-scan-review" hidden></div>
 
         <!-- Resume offer (shown when incomplete checkpoint detected) -->
         <div id="tiResumeOffer" class="tx-resume-offer" hidden>
@@ -8318,6 +8352,7 @@
 
         <!-- Status -->
         <div id="tiStatusBox" class="tx-status-box tx-idle" hidden>
+          <div class="tx-status-headline" id="tiStatusHeadline"></div>
           <div class="tx-batch-info" id="tiBatchInfo"></div>
           <div class="tx-progress-wrap" id="tiProgressWrap" hidden>
             <div class="tx-progress-bar"><div class="tx-progress-fill" id="tiProgressFill"></div></div>
@@ -8327,11 +8362,14 @@
             <span><span class="tx-status-key">Copied</span> <span class="tx-status-val" id="tiStCopied">0</span></span>
             <span><span class="tx-status-key">Skipped</span> <span class="tx-status-val" id="tiStSkipped">0</span></span>
             <span><span class="tx-status-key">Renamed</span> <span class="tx-status-val" id="tiStRenamed">0</span></span>
+            <span id="tiStChangedWrap" style="display:none"><span class="tx-status-key">Changed (review)</span> <span class="tx-status-val" id="tiStChanged">0</span></span>
             <span><span class="tx-status-key">Errors</span> <span class="tx-status-val" id="tiStErrors">0</span></span>
           </div>
-          <div class="tx-status-current" id="tiStCurrent"></div>
+          <div class="tx-status-current" id="tiStFolder"></div>
+          <div class="tx-status-current tx-status-file" id="tiStFile"></div>
           <div class="tx-status-eta" id="tiStatusEta" hidden></div>
           <div class="tx-status-eta" id="tiStatusSpeed" hidden></div>
+          <div class="tx-status-eta" id="tiDataSize" hidden></div>
           <div class="tx-verify-result" id="tiVerifyResult" hidden></div>
         </div>
 
@@ -8340,6 +8378,7 @@
       <div class="emm-footer">
         <div id="tiFooterNote" class="sq-footer-note">Transfer Drive → Main Archive Root</div>
         <div class="emm-footer-right">
+          <button type="button" class="emm-btn-secondary" id="tiScanBtn">Scan for New Data</button>
           <button type="button" class="emm-btn-secondary" id="tiPreviewBtn">Preview</button>
           <button type="button" class="emm-btn-primary"   id="tiImportBtn"  disabled>Import</button>
           <button type="button" class="emm-btn-secondary" id="tiPauseBtn"   hidden>Pause</button>

@@ -341,6 +341,7 @@ let _qmzSelectionAnchor = null;
 let _qmzPrevFocusPath   = null; // previously focused path — for O(1) pv-focused class swap
 let _qmzViewScope       = 'unsequenced'; // 'unsequenced' | 'sequence' — see _qmzGetActiveFiles()
 let _qmzHiddenEventMgmt = false; // true if openQMZManager() visually hid an open Event Creator modal
+let _qmzLastNonTimelineViewMode = 'icon'; // 'icon' | 'list' — restored when the Timeline toggle turns off
 let _previewOpen      = false;      // true while preview overlay is visible
 let _previewPath      = null;       // path of currently previewed file
 let _previewOrder     = [];         // snapshot of getRenderedPathOrder() at open time
@@ -8557,7 +8558,7 @@ function _qmzSortGroup(files) {
   const copy = [...files];
   copy.sort((a, b) => {
     let cmp = 0;
-    if      (_qmzSortKey === 'date') cmp = new Date(a.modifiedAt || 0) - new Date(b.modifiedAt || 0);
+    if      (_qmzSortKey === 'date') cmp = new Date(a.capturedAt || 0) - new Date(b.capturedAt || 0);
     else if (_qmzSortKey === 'size') cmp = (a.size ?? 0) - (b.size ?? 0);
     else                              cmp = a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
     return _qmzSortDir === 'asc' ? cmp : -cmp;
@@ -8591,7 +8592,7 @@ function _qmzBuildIconTilesHtml(files) {
               <span class="file-ext-badge ${badgeCls}">${extUp}</span>
               <span class="file-size">${formatSize(file.size)}</span>
             </div>
-            <div class="file-date">${formatDate(file.modifiedAt)}</div>
+            <div class="file-date">${formatDate(file.capturedAt)}</div>
           </div>
         </div>
       </div>
@@ -8612,15 +8613,31 @@ function _qmzBuildListRowsHtml(files) {
       <td class="lt-name"><span class="file-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</span></td>
       <td class="lt-type"><span class="file-ext-badge ${badgeCls}">${extUp}</span></td>
       <td class="lt-size">${formatSize(file.size)}</td>
-      <td class="lt-date">${formatDate(file.modifiedAt)}</td>
+      <td class="lt-date">${formatDate(file.capturedAt)}</td>
     </tr>`;
   }).join('');
 }
 
+// Mirrors import's pure groupByTime() (renderer.js) exactly, except it groups
+// by file.capturedAt instead of file.modifiedAt. Import's own files never set
+// capturedAt, so import's groupByTime() must stay untouched — this QMZ-local
+// copy is the safe way to use QMZ's original-capture-date field without ever
+// risking import's own timeline (which intentionally still groups by mtime).
+function _qmzGroupByTime(files) {
+  const groups = new Map();
+  for (const file of files) {
+    const date = file.capturedAt ? new Date(file.capturedAt) : new Date(0);
+    const key  = date.toDateString() + '-' + date.getHours();
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(file);
+  }
+  return Array.from(groups.entries());
+}
+
 // Timeline view — mirrors import's buildTimelineHtml() structurally, reusing
-// the same generic .timeline-group/.timeline-header CSS and the shared pure
-// groupByTime() helper, but built from QMZ's own tile builders/state so it
-// never touches viewMode/pairingEnabled/currentFiles.
+// the same generic .timeline-group/.timeline-header CSS, but built from QMZ's
+// own tile builders/state/grouping so it never touches
+// viewMode/pairingEnabled/currentFiles or import's groupByTime().
 function _qmzBuildTimelineHtml(groups) {
   if (!groups.length) return '';
   return groups.map(([key, files]) => {
@@ -8771,9 +8788,9 @@ function _renderQMZCenter() {
   }
 
   if (_qmzViewMode === 'timeline') {
-    // groupByTime() is a pure function (renderer.js) — takes/returns plain
-    // arrays, no import-screen state — safe to reuse directly.
-    el.innerHTML = _qmzBuildTimelineHtml(groupByTime(_qmzSortGroup(files)));
+    // _qmzGroupByTime groups by capturedAt (EXIF-preferred) — import's own
+    // groupByTime() groups by modifiedAt and must stay untouched.
+    el.innerHTML = _qmzBuildTimelineHtml(_qmzGroupByTime(_qmzSortGroup(files)));
   } else {
     const sections = [
       { key: 'raw',   label: 'RAW Files',   icon: _SVG_SECT_RAW,   files: files.filter(f => f.type === 'raw')   },
@@ -8824,6 +8841,8 @@ function _qmzUpdateViewButtons() {
   document.querySelectorAll('#qmzOverlay .qmz-view-btn').forEach(btn => {
     btn.classList.toggle('qmz-active', btn.dataset.qmzView === _qmzViewMode);
   });
+  const toggle = document.getElementById('qmzTimelineToggle');
+  if (toggle) toggle.checked = (_qmzViewMode === 'timeline');
 }
 
 function _qmzSetSort(key) {
@@ -8838,10 +8857,25 @@ function _qmzSetSort(key) {
 }
 
 function _qmzSetViewMode(mode) {
+  // Remember the last Grid/List choice so the Timeline toggle can restore it
+  // on OFF. Clicking Grid/List directly also naturally turns Timeline off,
+  // since _qmzViewMode moves away from 'timeline' and _qmzUpdateViewButtons()
+  // syncs the toggle checkbox below.
+  if (mode !== 'timeline') _qmzLastNonTimelineViewMode = mode;
   if (_qmzViewMode === mode) return;
   _qmzViewMode = mode;
   _qmzUpdateViewButtons();
   _renderQMZCenter();  // re-render only — no disk re-scan
+}
+
+// Timeline toggle ON/OFF (Fix 6 — a toggle next to the label, mirroring
+// import's #timelineSwitch, rather than a third exclusive view button).
+function _qmzToggleTimeline(checked) {
+  if (checked) {
+    _qmzSetViewMode('timeline');
+  } else {
+    _qmzSetViewMode(_qmzLastNonTimelineViewMode || 'icon');
+  }
 }
 
 // ── QMZ selection — O(1) tile updates via _qmzTileMap ───────────────────────
@@ -8980,6 +9014,14 @@ function _renderQMZRight() {
       <span class="qmz-seq-chip-code">${escapeHtml(seq.code)}</span>
       <span class="qmz-seq-chip-type">${escapeHtml(seq.type)}</span>
       <span class="qmz-seq-chip-count">${total}</span>
+      <span class="qmz-seq-chip-actions">
+        <button class="qmz-seq-chip-action" data-action="edit" data-code="${escapeHtml(seq.code)}" data-letter="${escapeHtml(seq.letter)}" title="Edit sequence type" aria-label="Edit sequence type">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+        </button>
+        <button class="qmz-seq-chip-action qmz-seq-chip-action--danger" data-action="remove" data-code="${escapeHtml(seq.code)}" title="Remove sequence" aria-label="Remove sequence">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        </button>
+      </span>
     </div>`;
   }).join('');
 
@@ -8992,6 +9034,53 @@ function _renderQMZRight() {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); _qmzViewSequence(chip.dataset.code); }
     });
   });
+  el.querySelectorAll('.qmz-seq-chip-action[data-action="edit"]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation(); // don't also trigger the chip's own "view sequence" click
+      _qmzHandleEditSequence(btn.dataset.code, btn.dataset.letter);
+    });
+  });
+  el.querySelectorAll('.qmz-seq-chip-action[data-action="remove"]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      _qmzHandleRemoveSequence(btn.dataset.code);
+    });
+  });
+}
+
+// Edit — reuses the existing create-while-assigning type chooser UI as a
+// compact "pick the new type" picker; MVP-blocked (backend-enforced) when the
+// sequence has any files.
+async function _qmzHandleEditSequence(code, currentLetter) {
+  const otherLetters = ['Q', 'M', 'Z'].filter(l => l !== currentLetter);
+  _qmzShowTypeChooser(
+    `Change ${code}'s type to:`,
+    async (letter) => {
+      const r = await window.api.qmzEditSequence({ qmzRoot: _qmzRoot, code, newLetter: letter });
+      _qmzSetStatus(r.ok ? `${code} changed to ${r.code}` : (r.error || 'Edit failed'), r.ok ? 'ok' : 'err');
+      if (r.ok) await _qmzRefresh();
+    },
+    otherLetters
+  );
+}
+
+// Remove — confirmation wording explicitly says only the empty sequence
+// folder is removed, never media files (backend also enforces this).
+async function _qmzHandleRemoveSequence(code) {
+  const confirmed = window.confirm(
+    `Remove sequence ${code}?\n\nThis removes the empty sequence folder only. No media files will be deleted.`
+  );
+  if (!confirmed) return;
+  const r = await window.api.qmzRemoveSequence({ qmzRoot: _qmzRoot, code });
+  _qmzSetStatus(r.ok ? `Removed ${code}` : (r.error || 'Remove failed'), r.ok ? 'ok' : 'err');
+  if (r.ok) {
+    if (_qmzViewScope === 'sequence' && _qmzActiveLocation === code) {
+      _qmzViewScope      = 'unsequenced';
+      _qmzActiveLocation = 'unsequenced';
+      _qmzActivePg       = null;
+    }
+    await _qmzRefresh();
+  }
 }
 
 // Switch the center panel to review every photographer's files inside a
@@ -9278,11 +9367,18 @@ async function _qmzHandleRetryTagging() {
     _qmzUpdateActions();
   });
 
-  document.querySelectorAll('#qmzOverlay .qmz-sort-btn').forEach(btn => {
-    btn.addEventListener('click', () => _qmzSetSort(btn.dataset.qmzSort));
+  // Delegated on the toolbar row rather than each button individually —
+  // e.target.closest() finds the button regardless of exactly which
+  // descendant node the click landed on, which is strictly more robust than
+  // a listener bound to the button element itself.
+  document.querySelector('#qmzOverlay .qmz-toolbar')?.addEventListener('click', e => {
+    const sortBtn = e.target.closest('.qmz-sort-btn');
+    if (sortBtn) { _qmzSetSort(sortBtn.dataset.qmzSort); return; }
+    const viewBtn = e.target.closest('.qmz-view-btn');
+    if (viewBtn) { _qmzSetViewMode(viewBtn.dataset.qmzView); return; }
   });
-  document.querySelectorAll('#qmzOverlay .qmz-view-btn').forEach(btn => {
-    btn.addEventListener('click', () => _qmzSetViewMode(btn.dataset.qmzView));
+  document.getElementById('qmzTimelineToggle')?.addEventListener('change', e => {
+    _qmzToggleTimeline(e.target.checked);
   });
   _qmzUpdateSortButtons();
   _qmzUpdateViewButtons();
@@ -13820,17 +13916,20 @@ const _transferMonitor = (() => {
 })();
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Transfer Import modal (Phase 11 — staggered batch import with pause/resume)
+// Transfer Import modal — structure-aware scope tree, Scan for New Data
+// (incremental/update import), staggered batch import with pause/resume
 // ─────────────────────────────────────────────────────────────────────────────
 
 (function () {
   // ── State ────────────────────────────────────────────────────────────────
 
-  let _tiCollections = [];
-  let _tiPollTimer   = null;
-  let _tiRunning     = false;
-  let _tiLastScope   = null;
+  let _tiTree         = [];   // mixed list from getTransferImportTree(): [{type:'collection'|'event'|'external', ...}]
+  let _tiPollTimer    = null;
+  let _tiRunning      = false;
+  let _tiLastScope    = null;
   let _tiVerifying    = false;
+  let _tiScanMode     = false;   // true after a successful Scan → next Import is an Update Import
+  let _tiScanResult   = null;    // last successful scanImportSync result (incl. scanFingerprint); null when invalidated
   let _tiEtaSamples   = [];
   let _tiSpeedSamples = [];
 
@@ -13838,21 +13937,55 @@ const _transferMonitor = (() => {
 
   function _tiEl(id) { return document.getElementById(id); }
 
+  function _esc(s) {
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function _tiUnresolvedReasonText(reason) {
+    const msgs = {
+      'collection-not-found-in-archive':       'The matching Collection does not exist in the Main Archive Root.',
+      'no-existing-collection-found':          'No matching Event was found anywhere in the Main Archive Root.',
+      'ambiguous-archive-match':                'This Event matches more than one existing Collection — cannot resolve automatically.',
+      'external-root-no-approved-destination': 'This folder is not part of a recognized Collection or Event.',
+    };
+    return msgs[reason] || 'Destination could not be resolved — this item will not be imported.';
+  }
+
   function _tiSetButtonPhase(phase) {
-    // phase: 'idle' | 'running' | 'paused' | 'done' | 'failed'
-    const importBtn     = _tiEl('tiImportBtn');
+    // phase: 'idle' | 'scanning' | 'running' | 'paused' | 'done' | 'failed'
+    const importBtn    = _tiEl('tiImportBtn');
     const pauseBtn      = _tiEl('tiPauseBtn');
     const resumeInline  = _tiEl('tiResumeInlineBtn');
     const verifyBtn     = _tiEl('tiVerifyBtn');
     if (!importBtn) return;
 
+    const activePhase   = phase === 'running' || phase === 'paused';
+    const scanningPhase = phase === 'scanning';
     importBtn.hidden    = phase !== 'idle';
     importBtn.disabled  = phase !== 'idle';
     pauseBtn.hidden     = phase !== 'running';
     resumeInline.hidden = phase !== 'paused';
     verifyBtn.hidden    = phase !== 'done';
     const minBtn = _tiEl('tiMinimizeBtn');
-    if (minBtn) minBtn.hidden = !(phase === 'running' || phase === 'paused');
+    if (minBtn) minBtn.hidden = !activePhase;
+
+    const scanBtn    = _tiEl('tiScanBtn');
+    const previewBtn = _tiEl('tiPreviewBtn');
+    if (scanBtn)    { scanBtn.hidden = activePhase || phase === 'done'; scanBtn.disabled = scanningPhase; }
+    if (previewBtn) previewBtn.hidden = activePhase || scanningPhase || phase === 'done';
+
+    // Lock tree during active operation; permanently-unresolved checkboxes stay disabled.
+    const treeEl = _tiEl('tiScopeTree');
+    if (treeEl) {
+      const locked = phase === 'running' || phase === 'paused';
+      treeEl.querySelectorAll('input[type=checkbox]').forEach(cb => {
+        cb.disabled = locked || cb.dataset.unresolved === 'true';
+      });
+      const selAll  = _tiEl('tiSelectAllBtn');
+      const selNone = _tiEl('tiSelectNoneBtn');
+      if (selAll)  selAll.disabled  = locked;
+      if (selNone) selNone.disabled = locked;
+    }
   }
 
   // ── Open / Close ─────────────────────────────────────────────────────────
@@ -13878,6 +14011,10 @@ const _transferMonitor = (() => {
     const overlay = _tiEl('transferImportModal');
     if (!overlay || overlay.classList.contains('open')) return;
 
+    // Any prior scan is invalidated on every (re)open — see plan §5f.
+    _tiScanMode   = false;
+    _tiScanResult = null;
+
     // Populate Transfer Drive path (read-only display)
     const savedTransferRoot = await window.api.getTransferRoot().catch(() => null);
     const driveEl = _tiEl('tiDrivePath');
@@ -13895,7 +14032,7 @@ const _transferMonitor = (() => {
       mainEl.classList.toggle('tx-unset', !mar);
     }
 
-    await _tiLoadCollections();
+    await _tiLoadTree();
 
     // Check for incomplete checkpoint
     _tiEl('tiResumeOffer')?.setAttribute('hidden', '');
@@ -13924,65 +14061,308 @@ const _transferMonitor = (() => {
     document.body.style.overflow = 'hidden';
   }
 
-  // ── Scope list ────────────────────────────────────────────────────────────
+  // ── Scope tree ────────────────────────────────────────────────────────────
+  // Mixed list: Collection nodes (Events nested, may have unresolved siblings and non-Event
+  // externalFolders), direct Event nodes rendered at root with NO synthetic Collection
+  // wrapper, and root-level external nodes (always unresolved — never land at archive root).
 
-  async function _tiLoadCollections() {
-    const listEl = _tiEl('tiScopeList');
-    if (!listEl) return;
+  async function _tiLoadTree() {
+    const treeEl = _tiEl('tiScopeTree');
+    if (!treeEl) return;
+
+    treeEl.innerHTML = '<div class="tx-empty-note">Loading…</div>';
 
     let result;
-    try { result = await window.api.getTransferDriveCollections(); } catch { result = null; }
+    try { result = await window.api.getTransferImportTree(); } catch { result = null; }
 
-    if (!result || !result.ok) {
-      const msgs = {
-        'transfer-root-not-set':    'Set a Transfer Drive first.',
-        'transfer-root-unreadable': 'Transfer Drive is offline or unreadable.',
-      };
-      const reason = result?.reason || '';
-      listEl.innerHTML = `<div class="tx-empty-note">${msgs[reason] || 'No collections found.'}</div>`;
-      _tiCollections = [];
+    if (!result || !result.ok || !result.tree || result.tree.length === 0) {
+      const reason = result?.reason;
+      const msg = reason === 'transfer-root-not-set'
+        ? 'Transfer Drive is not set.'
+        : reason === 'main-archive-not-set'
+        ? 'Main Archive Root is not set.'
+        : reason === 'transfer-root-unreadable'
+        ? 'Transfer Drive is offline or unreadable.'
+        : 'No importable content found on Transfer Drive.';
+      treeEl.innerHTML = `<div class="tx-empty-note">${msg}</div>`;
+      _tiTree = [];
       return;
     }
 
-    _tiCollections = result.collections || [];
+    _tiTree = result.tree;
+    const html = [];
 
-    const importNote = _tiEl('tiImportNote');
-    if (importNote) {
-      if (result.exportPurpose === 'external-sharing') {
-        importNote.textContent = 'This drive was exported in external sharing mode — event.json and control files are not present.';
-        importNote.removeAttribute('hidden');
+    const rowAttrs   = (status, reason) => status === 'unresolved' ? ` data-unresolved="true" title="${_esc(_tiUnresolvedReasonText(reason))}"` : '';
+    const cbAttrs    = status => status === 'unresolved' ? ' disabled data-unresolved="true"' : ' checked data-unresolved="false"';
+    const unresolvedBadge = status => status === 'unresolved' ? '<span class="tx-tree-status" data-status="review">⚠ Unresolved</span>' : '';
+
+    _tiTree.forEach((node, ti) => {
+      if (node.type === 'collection') {
+        html.push(
+          `<div class="tx-tree-node" data-ti="${ti}">` +
+          `<div class="tx-tree-row tx-tree-row-coll">` +
+          `<input type="checkbox" class="ti-cb-coll" data-ti="${ti}" checked>` +
+          `<span class="tx-tree-arrow" data-ti="${ti}">▶</span>` +
+          `<span class="tx-tree-name" title="${_esc(node.path)}">${_esc(node.name)}</span>` +
+          `</div>` +
+          `<div class="tx-tree-children tx-collapsed" data-coll-children="${ti}">`
+        );
+
+        node.events.forEach((ev, ei) => {
+          const hasFolders = ev.folders.length > 0;
+          html.push(
+            `<div class="tx-tree-node" data-ti="${ti}" data-ei="${ei}">` +
+            `<div class="tx-tree-row tx-tree-row-ev"${rowAttrs(ev.destinationStatus, ev.destinationReason)}>` +
+            `<input type="checkbox" class="ti-cb-ev" data-ti="${ti}" data-ei="${ei}"${cbAttrs(ev.destinationStatus)}>` +
+            `<span class="tx-tree-arrow" data-ti="${ti}" data-ei="${ei}">${hasFolders ? '▶' : ' '}</span>` +
+            `<span class="tx-tree-name" title="${_esc(ev.path)}">${_esc(ev.name)}</span>` +
+            unresolvedBadge(ev.destinationStatus) +
+            `</div>` +
+            `<div class="tx-tree-children tx-collapsed" data-ev-children="${ti}-${ei}">`
+          );
+          ev.folders.forEach((fold, fi) => {
+            html.push(
+              `<div class="tx-tree-row tx-tree-row-fold">` +
+              `<input type="checkbox" class="ti-cb-fold" data-ti="${ti}" data-ei="${ei}" data-fi="${fi}"${cbAttrs(ev.destinationStatus)}>` +
+              `<span class="tx-tree-arrow"> </span>` +
+              `<span class="tx-tree-name" title="${_esc(fold.path)}">${_esc(fold.name)}</span>` +
+              `</div>`
+            );
+          });
+          html.push('</div></div>');
+        });
+
+        node.externalFolders.forEach((ext, xi) => {
+          html.push(
+            `<div class="tx-tree-row tx-tree-row-ev"${rowAttrs(ext.destinationStatus, ext.destinationReason)}>` +
+            `<input type="checkbox" class="ti-cb-cext" data-ti="${ti}" data-xi="${xi}"${cbAttrs(ext.destinationStatus)}>` +
+            `<span class="tx-tree-arrow"> </span>` +
+            `<span class="tx-tree-name" title="${_esc(ext.path)}">${_esc(ext.name)}</span>` +
+            unresolvedBadge(ext.destinationStatus) +
+            `</div>`
+          );
+        });
+
+        html.push('</div></div>');
+      } else if (node.type === 'event') {
+        const hasFolders = node.folders.length > 0;
+        html.push(
+          `<div class="tx-tree-node" data-ti="${ti}">` +
+          `<div class="tx-tree-row tx-tree-row-coll"${rowAttrs(node.destinationStatus, node.destinationReason)}>` +
+          `<input type="checkbox" class="ti-cb-devent" data-ti="${ti}"${cbAttrs(node.destinationStatus)}>` +
+          `<span class="tx-tree-arrow" data-ti="${ti}" data-devent="1">${hasFolders ? '▶' : ' '}</span>` +
+          `<span class="tx-tree-name" title="${_esc(node.path)}">${_esc(node.name)}</span>` +
+          unresolvedBadge(node.destinationStatus) +
+          `</div>` +
+          `<div class="tx-tree-children tx-collapsed" data-devent-children="${ti}">`
+        );
+        node.folders.forEach((fold, fi) => {
+          html.push(
+            `<div class="tx-tree-row tx-tree-row-fold">` +
+            `<input type="checkbox" class="ti-cb-dfold" data-ti="${ti}" data-fi="${fi}"${cbAttrs(node.destinationStatus)}>` +
+            `<span class="tx-tree-arrow"> </span>` +
+            `<span class="tx-tree-name" title="${_esc(fold.path)}">${_esc(fold.name)}</span>` +
+            `</div>`
+          );
+        });
+        html.push('</div></div>');
       } else {
-        importNote.setAttribute('hidden', '');
+        // type === 'external' — root-level, always unresolved (never lands at archive root)
+        html.push(
+          `<div class="tx-tree-row tx-tree-row-coll" data-unresolved="true" title="${_esc(_tiUnresolvedReasonText(node.destinationReason))}">` +
+          `<input type="checkbox" class="ti-cb-rext" data-ti="${ti}" disabled data-unresolved="true">` +
+          `<span class="tx-tree-arrow"> </span>` +
+          `<span class="tx-tree-name" title="${_esc(node.path)}">${_esc(node.name)}</span>` +
+          `<span class="tx-tree-status" data-status="review">⚠ Unresolved</span>` +
+          `</div>`
+        );
       }
-    }
+    });
 
-    if (_tiCollections.length === 0) {
-      listEl.innerHTML = '<div class="tx-empty-note">No collections found on Transfer Drive.</div>';
-      return;
-    }
-
-    listEl.innerHTML = _tiCollections.map((c, i) => `
-      <label class="tx-scope-item">
-        <input type="checkbox" class="ti-coll-cb" data-idx="${i}" checked>
-        <span title="${c.path}">${c.name}</span>
-      </label>
-    `).join('');
+    treeEl.innerHTML = html.join('');
+    _tiBindTreeEvents(treeEl);
   }
 
-  function _tiGetSelectedCollectionPaths() {
-    return Array.from(document.querySelectorAll('.ti-coll-cb:checked'))
-      .map(cb => _tiCollections[parseInt(cb.dataset.idx, 10)]?.path)
-      .filter(Boolean);
+  function _tiBindTreeEvents(treeEl) {
+    // Arrow collapse/expand
+    treeEl.querySelectorAll('.tx-tree-arrow').forEach(arrow => {
+      arrow.addEventListener('click', () => {
+        const ti = arrow.dataset.ti;
+        if (ti === undefined) return;
+        const ei = arrow.dataset.ei;
+        const isDevent = arrow.dataset.devent === '1';
+        const childrenEl = isDevent
+          ? treeEl.querySelector(`[data-devent-children="${ti}"]`)
+          : (ei !== undefined ? treeEl.querySelector(`[data-ev-children="${ti}-${ei}"]`) : treeEl.querySelector(`[data-coll-children="${ti}"]`));
+        if (!childrenEl) return;
+        const collapsed = childrenEl.classList.toggle('tx-collapsed');
+        arrow.textContent = collapsed ? '▶' : '▼';
+      });
+    });
+
+    // Collection-nested: folder → event → collection propagation
+    treeEl.querySelectorAll('.ti-cb-fold').forEach(cb => {
+      cb.addEventListener('change', () => {
+        _tiUpdateEvState(treeEl, cb.dataset.ti, cb.dataset.ei);
+        _tiUpdateCollState(treeEl, cb.dataset.ti);
+        _tiInvalidatePreview();
+      });
+    });
+    treeEl.querySelectorAll('.ti-cb-ev').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const checked = cb.checked;
+        treeEl.querySelectorAll(`.ti-cb-fold[data-ti="${cb.dataset.ti}"][data-ei="${cb.dataset.ei}"]`).forEach(f => {
+          if (f.disabled) return;
+          f.checked = checked; f.indeterminate = false;
+        });
+        cb.indeterminate = false;
+        _tiUpdateCollState(treeEl, cb.dataset.ti);
+        _tiInvalidatePreview();
+      });
+    });
+    treeEl.querySelectorAll('.ti-cb-coll').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const checked = cb.checked;
+        const ti = cb.dataset.ti;
+        treeEl.querySelectorAll(`.ti-cb-ev[data-ti="${ti}"]`).forEach(e => { if (!e.disabled) { e.checked = checked; e.indeterminate = false; } });
+        treeEl.querySelectorAll(`.ti-cb-fold[data-ti="${ti}"]`).forEach(f => { if (!f.disabled) { f.checked = checked; f.indeterminate = false; } });
+        treeEl.querySelectorAll(`.ti-cb-cext[data-ti="${ti}"]`).forEach(x => { if (!x.disabled) x.checked = checked; });
+        cb.indeterminate = false;
+        _tiInvalidatePreview();
+      });
+    });
+    treeEl.querySelectorAll('.ti-cb-cext').forEach(cb => {
+      cb.addEventListener('change', _tiInvalidatePreview);
+    });
+
+    // Direct Event (root-level): folder → event propagation
+    treeEl.querySelectorAll('.ti-cb-dfold').forEach(cb => {
+      cb.addEventListener('change', () => {
+        _tiUpdateDeventState(treeEl, cb.dataset.ti);
+        _tiInvalidatePreview();
+      });
+    });
+    treeEl.querySelectorAll('.ti-cb-devent').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const checked = cb.checked;
+        treeEl.querySelectorAll(`.ti-cb-dfold[data-ti="${cb.dataset.ti}"]`).forEach(f => {
+          if (f.disabled) return;
+          f.checked = checked; f.indeterminate = false;
+        });
+        cb.indeterminate = false;
+        _tiInvalidatePreview();
+      });
+    });
+  }
+
+  function _tiUpdateEvState(treeEl, ti, ei) {
+    const folds = Array.from(treeEl.querySelectorAll(`.ti-cb-fold[data-ti="${ti}"][data-ei="${ei}"]`));
+    if (folds.length === 0) return;
+    const evCb = treeEl.querySelector(`.ti-cb-ev[data-ti="${ti}"][data-ei="${ei}"]`);
+    if (!evCb || evCb.disabled) return;
+    const checkedCount = folds.filter(f => f.checked).length;
+    if (checkedCount === 0)                 { evCb.checked = false; evCb.indeterminate = false; }
+    else if (checkedCount === folds.length) { evCb.checked = true;  evCb.indeterminate = false; }
+    else                                    { evCb.checked = false; evCb.indeterminate = true;  }
+  }
+
+  function _tiUpdateCollState(treeEl, ti) {
+    const evCbs  = Array.from(treeEl.querySelectorAll(`.ti-cb-ev[data-ti="${ti}"]`)).filter(e => !e.disabled);
+    const extCbs = Array.from(treeEl.querySelectorAll(`.ti-cb-cext[data-ti="${ti}"]`)).filter(e => !e.disabled);
+    const collCb = treeEl.querySelector(`.ti-cb-coll[data-ti="${ti}"]`);
+    const all = [...evCbs, ...extCbs];
+    if (!collCb || all.length === 0) return;
+    const checkedCount     = all.filter(e => e.checked && !e.indeterminate).length;
+    const indeterminateAny = all.some(e => e.indeterminate || (e.checked && checkedCount < all.length));
+    if (checkedCount === all.length && !indeterminateAny)      { collCb.checked = true;  collCb.indeterminate = false; }
+    else if (checkedCount === 0 && !indeterminateAny)          { collCb.checked = false; collCb.indeterminate = false; }
+    else                                                       { collCb.checked = false; collCb.indeterminate = true;  }
+  }
+
+  function _tiUpdateDeventState(treeEl, ti) {
+    const folds = Array.from(treeEl.querySelectorAll(`.ti-cb-dfold[data-ti="${ti}"]`));
+    if (folds.length === 0) return;
+    const evCb = treeEl.querySelector(`.ti-cb-devent[data-ti="${ti}"]`);
+    if (!evCb || evCb.disabled) return;
+    const checkedCount = folds.filter(f => f.checked).length;
+    if (checkedCount === 0)                 { evCb.checked = false; evCb.indeterminate = false; }
+    else if (checkedCount === folds.length) { evCb.checked = true;  evCb.indeterminate = false; }
+    else                                    { evCb.checked = false; evCb.indeterminate = true;  }
+  }
+
+  function _tiInvalidatePreview() {
+    // Any selection change invalidates a prior scan — this is the hard UI gate that makes
+    // "scope changed → must re-scan" non-optional (see plan §5f): the Import button is
+    // disabled here and only re-enabled by a fresh Preview or Scan.
+    _tiLastScope  = null;
+    _tiScanMode   = false;
+    _tiScanResult = null;
+    const importBtn = _tiEl('tiImportBtn');
+    if (importBtn && !_tiRunning) {
+      importBtn.disabled    = true;
+      importBtn.hidden      = false;
+      importBtn.textContent = 'Import';
+    }
+    _tiEl('tiPreviewBox')?.setAttribute('hidden', '');
+    _tiEl('tiVerifyResult')?.setAttribute('hidden', '');
+    _tiEl('tiScanReview')?.setAttribute('hidden', '');
+  }
+
+  function _tiBuildScope() {
+    const treeEl = _tiEl('tiScopeTree');
+    if (!treeEl) return { folderPaths: [], eventRootPaths: [], externalPaths: [] };
+
+    const folderPaths    = new Set();
+    const eventRootPaths = new Set();
+    const externalPaths  = new Set();
+
+    treeEl.querySelectorAll('.ti-cb-fold:checked').forEach(cb => {
+      const p = _tiTree[parseInt(cb.dataset.ti, 10)]?.events?.[parseInt(cb.dataset.ei, 10)]?.folders?.[parseInt(cb.dataset.fi, 10)]?.path;
+      if (p) folderPaths.add(p);
+    });
+    treeEl.querySelectorAll('.ti-cb-dfold:checked').forEach(cb => {
+      const p = _tiTree[parseInt(cb.dataset.ti, 10)]?.folders?.[parseInt(cb.dataset.fi, 10)]?.path;
+      if (p) folderPaths.add(p);
+    });
+    treeEl.querySelectorAll('.ti-cb-ev').forEach(evCb => {
+      if (!evCb.checked || evCb.indeterminate || evCb.disabled) return;
+      const ev = _tiTree[parseInt(evCb.dataset.ti, 10)]?.events?.[parseInt(evCb.dataset.ei, 10)];
+      if (ev?.hasEventRootFiles) eventRootPaths.add(ev.path);
+    });
+    treeEl.querySelectorAll('.ti-cb-devent').forEach(evCb => {
+      if (!evCb.checked || evCb.indeterminate || evCb.disabled) return;
+      const node = _tiTree[parseInt(evCb.dataset.ti, 10)];
+      if (node?.hasEventRootFiles) eventRootPaths.add(node.path);
+    });
+    treeEl.querySelectorAll('.ti-cb-cext:checked').forEach(cb => {
+      const p = _tiTree[parseInt(cb.dataset.ti, 10)]?.externalFolders?.[parseInt(cb.dataset.xi, 10)]?.path;
+      if (p) externalPaths.add(p);
+    });
+    // Root-level externals are always disabled/unresolved and can never be :checked; the
+    // selector below is a harmless no-op kept only for symmetry.
+    treeEl.querySelectorAll('.ti-cb-rext:checked').forEach(cb => {
+      const p = _tiTree[parseInt(cb.dataset.ti, 10)]?.path;
+      if (p) externalPaths.add(p);
+    });
+
+    return { folderPaths: [...folderPaths], eventRootPaths: [...eventRootPaths], externalPaths: [...externalPaths] };
+  }
+
+  function _tiScopeIsEmpty(scope) {
+    return scope.folderPaths.length === 0 && scope.eventRootPaths.length === 0 && scope.externalPaths.length === 0;
   }
 
   // ── Preview ───────────────────────────────────────────────────────────────
 
   async function _tiPreview() {
-    const scope = { collectionPaths: _tiGetSelectedCollectionPaths() };
-    if (scope.collectionPaths.length === 0) {
-      showMessage('Select at least one collection to preview.', 4000);
+    const builtScope = _tiBuildScope();
+    if (_tiScopeIsEmpty(builtScope)) {
+      showMessage('Select at least one folder to preview.', 4000);
       return;
     }
+    _tiScanMode = false;
+    _tiEl('tiScanReview')?.setAttribute('hidden', '');
+    const scope = { ...builtScope };
 
     const previewBtn = _tiEl('tiPreviewBtn');
     const importBtn  = _tiEl('tiImportBtn');
@@ -13996,6 +14376,7 @@ const _transferMonitor = (() => {
       _tiEl('tiPvEvents').textContent      = '…';
       _tiEl('tiPvExternal').textContent    = '…';
       _tiEl('tiPvFiles').textContent       = '…';
+      _tiEl('tiPvUnresolvedNote')?.setAttribute('hidden', '');
     }
 
     let result;
@@ -14011,7 +14392,7 @@ const _transferMonitor = (() => {
       const msgs = {
         'transfer-root-not-set':       'Transfer Drive is not set.',
         'main-archive-not-set':        'Main Archive Root is not set.',
-        'empty-scope':                 'Select at least one collection.',
+        'empty-scope':                 'Select at least one folder.',
         'scope-outside-transfer-root': 'Selected path is outside the Transfer Drive.',
         'roots-overlap':               'Transfer Drive must not overlap with Main Archive Root.',
       };
@@ -14025,16 +14406,125 @@ const _transferMonitor = (() => {
     _tiEl('tiPvExternal').textContent    = result.externalFolders;
     _tiEl('tiPvFiles').textContent       = result.files.toLocaleString();
 
+    const noteEl = _tiEl('tiPvUnresolvedNote');
+    if (noteEl) {
+      if (result.unresolvedCount > 0) {
+        noteEl.removeAttribute('hidden');
+        noteEl.innerHTML =
+          `<div class="tx-scan-grp-hd"><div class="tx-scan-grp-lbl">${result.unresolvedCount} item${result.unresolvedCount === 1 ? '' : 's'} could not be matched to an existing Collection and will not be imported</div></div>` +
+          `<ul class="tx-scan-list">${result.unresolvedItems.map(u => `<li><span class="tx-scan-rel">${escapeHtml(u.name)}</span></li>`).join('')}</ul>`;
+      } else {
+        noteEl.setAttribute('hidden', '');
+      }
+    }
+
     _tiLastScope = scope;
     if (importBtn) importBtn.disabled = (result.files === 0);
+  }
+
+  // ── Scan for New Data ─────────────────────────────────────────────────────
+
+  async function _tiScanImport() {
+    const builtScope = _tiBuildScope();
+    if (_tiScopeIsEmpty(builtScope)) {
+      showMessage('Select at least one folder to scan.', 4000);
+      return;
+    }
+    const scope = { ...builtScope };
+
+    const importBtn = _tiEl('tiImportBtn');
+    const reviewEl  = _tiEl('tiScanReview');
+    const noteEl    = _tiEl('tiFooterNote');
+
+    _tiSetButtonPhase('scanning');
+    if (noteEl) noteEl.textContent = 'Scanning…';
+    _tiEl('tiPreviewBox')?.setAttribute('hidden', '');
+    if (reviewEl) {
+      reviewEl.removeAttribute('hidden');
+      reviewEl.innerHTML = '<div class="tx-scan-loading">'
+        + '<div class="tx-scan-loading-title">Checking Main Archive Root…</div>'
+        + '<div class="tx-scan-loading-sub">Comparing selected folders against the archive. Nothing is being copied yet.</div>'
+        + '</div>';
+    }
+
+    let result;
+    try { result = await window.api.scanImportSync(scope); }
+    catch (e) {
+      _tiSetButtonPhase('idle');
+      if (noteEl) noteEl.textContent = 'Scan failed';
+      if (reviewEl) reviewEl.innerHTML = `<div class="tx-scan-err">Scan failed: ${escapeHtml(e.message)}</div>`;
+      return;
+    }
+
+    if (!result.ok) {
+      _tiSetButtonPhase('idle');
+      if (noteEl) noteEl.textContent = 'Scan failed';
+      const msgs = {
+        'transfer-root-not-set':       'Transfer Drive is not set.',
+        'main-archive-not-set':        'Main Archive Root is not set.',
+        'roots-overlap':               'Transfer Drive must not overlap with Main Archive Root.',
+        'empty-scope':                 'Select at least one folder to scan.',
+        'scope-outside-transfer-root': 'Selected path is outside the Transfer Drive.',
+      };
+      if (reviewEl) reviewEl.innerHTML = `<div class="tx-scan-err">${escapeHtml(msgs[result.reason] || ('Scan error: ' + result.reason))}</div>`;
+      return;
+    }
+
+    _tiRenderScanReview(result);
+    _tiScanResult = result;
+    _tiLastScope  = scope;
+    _tiScanMode   = true;
+    _tiSetButtonPhase('idle');
+
+    const nothingNew = result.totals.newFiles === 0;
+    if (importBtn) {
+      importBtn.disabled    = nothingNew;
+      importBtn.textContent = nothingNew ? 'Up to date' : 'Update Import';
+    }
+    if (noteEl) noteEl.textContent = nothingNew ? 'Up to date' : 'Scan complete';
+  }
+
+  function _tiRenderScanReview(result) {
+    const reviewEl = _tiEl('tiScanReview');
+    if (!reviewEl) return;
+    const t = result.totals;
+
+    const stats = [];
+    if (t.newFiles > 0)        stats.push(`<div class="tx-sum-stat tx-sum-stat--new"><div class="tx-sum-stat-lbl">New</div><div class="tx-sum-stat-meta">${t.newFiles.toLocaleString()} file${t.newFiles !== 1 ? 's' : ''} · ${formatSize(t.newBytes)}</div></div>`);
+    if (t.alreadyImported > 0) stats.push(`<div class="tx-sum-stat tx-sum-stat--same"><div class="tx-sum-stat-lbl">Already imported</div><div class="tx-sum-stat-meta">${t.alreadyImported.toLocaleString()} file${t.alreadyImported !== 1 ? 's' : ''}</div></div>`);
+    if (t.changed > 0)         stats.push(`<div class="tx-sum-stat tx-sum-stat--review"><div class="tx-sum-stat-lbl">Changed (needs review)</div><div class="tx-sum-stat-meta">${t.changed.toLocaleString()} file${t.changed !== 1 ? 's' : ''}</div></div>`);
+
+    const bodyHtml = stats.length
+      ? `<div class="tx-sum-stats">${stats.join('')}</div>`
+      : `<div class="tx-scan-empty" style="padding:6px 2px">All files are up to date.</div>`;
+
+    const summaryHtml = `<div class="tx-scan-summary">`
+      + `<div class="tx-scan-summary-hd">`
+      + `<div class="tx-scan-summary-title">Scan complete</div>`
+      + `<div class="tx-scan-summary-sub">Update Import copies missing files only. Changed files are not copied automatically.</div>`
+      + `</div>`
+      + bodyHtml
+      + `</div>`;
+
+    let unresolvedHtml = '';
+    const unresolvedUnits = result.unresolvedUnits || [];
+    if (unresolvedUnits.length > 0) {
+      const n = unresolvedUnits.length;
+      unresolvedHtml = `<div class="tx-scan-group tx-scan--err">`
+        + `<div class="tx-scan-grp-hd"><div class="tx-scan-grp-lbl">${n} item${n === 1 ? '' : 's'} could not be matched to an existing Collection and will not be imported</div></div>`
+        + `<ul class="tx-scan-list">${unresolvedUnits.map(u => `<li><span class="tx-scan-rel">${escapeHtml(u.name)}</span></li>`).join('')}</ul>`
+        + `</div>`;
+    }
+
+    reviewEl.innerHTML = summaryHtml + unresolvedHtml;
   }
 
   // ── Import ────────────────────────────────────────────────────────────────
 
   async function _tiStartImport() {
-    const scope = { collectionPaths: _tiGetSelectedCollectionPaths() };
-    if (scope.collectionPaths.length === 0) {
-      showMessage('Select at least one collection to import.', 4000);
+    const builtScope = _tiBuildScope();
+    if (_tiScopeIsEmpty(builtScope)) {
+      showMessage('Select at least one folder to import.', 4000);
       return;
     }
     // Block a conflicting concurrent transfer (an export already moving the same drive).
@@ -14046,8 +14536,18 @@ const _transferMonitor = (() => {
 
     const importBtn  = _tiEl('tiImportBtn');
     const previewBtn = _tiEl('tiPreviewBtn');
+    const scanBtn    = _tiEl('tiScanBtn');
     if (importBtn)  importBtn.disabled  = true;
     if (previewBtn) previewBtn.disabled = true;
+
+    // A prior successful Scan makes this an Update Import — the backend independently
+    // re-resolves and re-scans before copying anything, and refuses (reason:'scan-stale')
+    // if the reviewed file inventory or destination resolution has changed since. This never
+    // silently falls back to a plain import.
+    const scope = (_tiScanMode && _tiScanResult)
+      ? { ...builtScope, backupUpdate: true, expectedFingerprint: _tiScanResult.scanFingerprint,
+          updateTotalFiles: _tiScanResult.totals.newFiles, updateTotalBytes: _tiScanResult.totals.newBytes }
+      : { ...builtScope };
 
     let operatorName = null;
     try {
@@ -14066,13 +14566,24 @@ const _transferMonitor = (() => {
     }
 
     if (!result.ok) {
+      if (result.reason === 'scan-stale') {
+        showMessage('The source, destination, selection, or resolved archive mapping changed after the scan. Run Scan for New Data again before importing.', 8000);
+        _tiScanMode   = false;
+        _tiScanResult = null;
+        _tiEl('tiScanReview')?.setAttribute('hidden', '');
+        if (scanBtn)    scanBtn.disabled    = false;
+        if (previewBtn) previewBtn.disabled = false;
+        if (importBtn)  { importBtn.disabled = true; importBtn.textContent = 'Import'; }
+        return;
+      }
       const msgs = {
         'busy':                        'An import is already running.',
         'transfer-root-not-set':       'Transfer Drive is not set.',
         'main-archive-not-set':        'Main Archive Root is not set.',
-        'empty-scope':                 'Select at least one collection.',
+        'empty-scope':                 'Select at least one folder.',
         'roots-overlap':               'Transfer Drive must not overlap with Main Archive Root.',
-        'scope-outside-transfer-root': 'A selected collection is outside the Transfer Drive.',
+        'scope-outside-transfer-root': 'A selected item is outside the Transfer Drive.',
+        'missing-fingerprint':         'Run Scan for New Data again before importing.',
       };
       showMessage(msgs[result.reason] || ('Import error: ' + result.reason), 6000);
       if (importBtn)  importBtn.disabled  = false;
@@ -14112,6 +14623,8 @@ const _transferMonitor = (() => {
       return;
     }
 
+    _tiScanMode   = false;
+    _tiScanResult = null;
     _tiRunning = true;
     _tiSetButtonPhase('running');
     _tiStartPoll();
@@ -14211,14 +14724,23 @@ const _transferMonitor = (() => {
     else if (status.result)     box.classList.add('tx-error');
     else                        box.classList.add('tx-idle');
 
+    // Headline
+    const headlineEl = _tiEl('tiStatusHeadline');
+    if (headlineEl) {
+      let headline = '';
+      if (status.paused) headline = 'Import paused';
+      else if (status.running) headline = 'Import in progress…';
+      else if (status.result?.ok) headline = status.result.status === 'partial' ? 'Import complete — with errors' : 'Import complete';
+      else if (status.result) headline = 'Import failed';
+      headlineEl.textContent = headline;
+    }
+
     // Batch info
     const batchInfoEl = _tiEl('tiBatchInfo');
     if (batchInfoEl) {
-      if (status.running && status.batchCount > 0) {
-        batchInfoEl.textContent = `Batch ${status.batchIndex + 1} / ${status.batchCount}: ${status.batchName || ''}`;
-      } else {
-        batchInfoEl.textContent = '';
-      }
+      batchInfoEl.textContent = (status.running && status.batchCount > 0)
+        ? `Batch ${status.batchIndex + 1} / ${status.batchCount}: ${status.batchName || ''}`
+        : '';
     }
 
     // Progress bar
@@ -14227,7 +14749,7 @@ const _transferMonitor = (() => {
     const progressLabel = _tiEl('tiProgressLabel');
     if (progressWrap && status.total > 0) {
       progressWrap.removeAttribute('hidden');
-      const done = (status.copied || 0) + (status.skipped || 0) + (status.renamed || 0);
+      const done = (status.copied || 0) + (status.skipped || 0) + (status.renamed || 0) + (status.changedSkipped || 0);
       const pct  = Math.min(100, Math.round((done / status.total) * 100));
       if (progressFill)  progressFill.style.width = pct + '%';
       if (progressLabel) progressLabel.textContent = `${done.toLocaleString()} / ${status.total.toLocaleString()}`;
@@ -14235,21 +14757,45 @@ const _transferMonitor = (() => {
       progressWrap.setAttribute('hidden', '');
     }
 
-    // Counters
+    // Counters — Changed is always its own distinct figure, never folded into Skipped.
     _tiEl('tiStCopied').textContent  = status.copied  ?? 0;
     _tiEl('tiStSkipped').textContent = status.skipped ?? 0;
     _tiEl('tiStRenamed').textContent = status.renamed ?? 0;
     _tiEl('tiStErrors').textContent  = status.result?.errorCount ?? status.errors?.length ?? 0;
 
-    // Current file
-    const currEl = _tiEl('tiStCurrent');
-    if (currEl) currEl.textContent = (status.running || status.paused) ? (status.current || '…') : '';
+    const changedWrap = _tiEl('tiStChangedWrap');
+    const changedEl   = _tiEl('tiStChanged');
+    if (changedWrap && changedEl) {
+      const changed = status.changedSkipped || 0;
+      changedWrap.style.display = changed > 0 ? '' : 'none';
+      changedEl.textContent = changed;
+    }
+
+    // Current folder / file
+    const folderEl = _tiEl('tiStFolder');
+    const fileEl   = _tiEl('tiStFile');
+    if (folderEl) folderEl.textContent = (status.running || status.paused) ? (status.batchName || '') : '';
+    if (fileEl)   fileEl.textContent   = (status.running || status.paused) ? (status.current   || '…') : '';
+
+    // Data size
+    const dataSizeEl = _tiEl('tiDataSize');
+    if (dataSizeEl) {
+      if ((status.running || status.paused) && status.copiedBytes) {
+        dataSizeEl.textContent = 'Copied: ' + formatSize(status.copiedBytes);
+        dataSizeEl.removeAttribute('hidden');
+      } else if (status.result?.ok && status.copiedBytes) {
+        dataSizeEl.textContent = 'Copied: ' + formatSize(status.copiedBytes);
+        dataSizeEl.removeAttribute('hidden');
+      } else {
+        dataSizeEl.setAttribute('hidden', '');
+      }
+    }
 
     // ETA (rolling 30-second window, file-count based)
     const tiEtaEl = _tiEl('tiStatusEta');
     if (tiEtaEl) {
       if (status.running && !status.paused && status.total > 0) {
-        const done = (status.copied || 0) + (status.skipped || 0) + (status.renamed || 0);
+        const done = (status.copied || 0) + (status.skipped || 0) + (status.renamed || 0) + (status.changedSkipped || 0);
         const now  = Date.now();
         _tiEtaSamples.push({ ts: now, done });
         const cutoff = now - 30000;
@@ -14368,9 +14914,20 @@ const _transferMonitor = (() => {
   // Register the reopen hook so the persistent pill can restore this modal.
   _transferMonitor.setReopenImport(_tiOpen);
 
-  _tiEl('tiSelectAllBtn')?.addEventListener('click',  () => { document.querySelectorAll('.ti-coll-cb').forEach(cb => { cb.checked = true;  }); });
-  _tiEl('tiSelectNoneBtn')?.addEventListener('click', () => { document.querySelectorAll('.ti-coll-cb').forEach(cb => { cb.checked = false; }); });
+  _tiEl('tiSelectAllBtn')?.addEventListener('click', () => {
+    document.querySelectorAll('#tiScopeTree .ti-cb-coll:not(:disabled), #tiScopeTree .ti-cb-devent:not(:disabled)').forEach(cb => {
+      cb.checked = true;
+      cb.dispatchEvent(new Event('change'));
+    });
+  });
+  _tiEl('tiSelectNoneBtn')?.addEventListener('click', () => {
+    document.querySelectorAll('#tiScopeTree .ti-cb-coll:not(:disabled), #tiScopeTree .ti-cb-devent:not(:disabled)').forEach(cb => {
+      cb.checked = false;
+      cb.dispatchEvent(new Event('change'));
+    });
+  });
 
+  _tiEl('tiScanBtn')?.addEventListener('click',           _tiScanImport);
   _tiEl('tiPreviewBtn')?.addEventListener('click',        _tiPreview);
   _tiEl('tiImportBtn')?.addEventListener('click',         _tiStartImport);
   _tiEl('tiPauseBtn')?.addEventListener('click',          _tiPause);

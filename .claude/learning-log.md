@@ -17,6 +17,31 @@ Rules:
 
 ---
 
+### 2026-07-22 — Transfer Import: Structure-Aware Destination Resolution + Incremental Scan Fingerprint
+
+Task type:
+- New Feature / Archive Safety / Incremental Diff Correctness / Multi-Round Plan Hardening
+
+What happened:
+- Built Transfer Import (`services/transferImportService.js`) to reach feature parity with Transfer Export, adding support for Transfer Drives where Event folders sit directly at drive-root with no Collection parent (not just the guaranteed Collection→Event layout the Main Archive Root enforces).
+- The plan went through 3 rounds of `ExitPlanMode` rejection before approval. Each round exposed a real correctness gap, not a preference difference: round 1 caught that a naive `path.relative(transferRoot, srcPath)` destination mapping would place a direct-Event folder straight under the Main Archive Root, breaking the Collection→Event archive contract. Round 2 caught that a first-draft "trust an Export checkpoint's `nasRoot` field whenever reachable, or whenever the drive has 2+ sibling direct-Events" resolver was still guessable — a stale checkpoint from an earlier, different export could name the wrong Collection while today's drive coincidentally satisfies the heuristic. Round 3 caught that a resolved-destination-only fingerprint for the Scan→Update-Import flow would miss a file added/resized/renamed on either side between Scan and Import — the fingerprint had to cover the full file-level inventory, not just where units resolve to.
+- A post-implementation code-review pass (code-reviewer agent) then caught a real asymmetry the plan itself still had: the destination resolver's "checkpoint reachable" branch accepted a Collection match unconditionally, while the "checkpoint unreachable" branch (correctly, per round 2's fix) required an actual archive-identity match first. Fixed by requiring the identical evidence standard in both branches (`_resolveEventDestination` in `services/transferImportService.js`).
+- Verified end-to-end against synthetic fixtures (no real archive touched): confirmed a stale scan fingerprint blocks Update Import entirely (nothing copied) while a fresh one copies exactly the reviewed file set to the correct existing Collection, and that an Event-root selection plus one of its own child-folder selections do not double-count or double-copy.
+
+Reusable lessons:
+1. **Destination recovery must require equivalent evidence across every resolver branch.** A path being reachable, structurally plausible, or merely mentioned by a checkpoint/manifest is not enough to bind a specific item (e.g. an Event folder) to a specific parent (e.g. a Collection). Every recovery branch — however the hint was obtained — must be held to the same "confirm with real, current, independently-checkable evidence, or leave it unresolved" standard. A resolver that hardens one branch (e.g. "unreachable hint requires an archive match") but leaves a sibling branch trusting the hint alone (e.g. "reachable hint is accepted outright") reintroduces the exact class of bug the hardening was meant to close — this is easy to miss because each branch looks locally reasonable in isolation. Never synthesize/guess a destination; when no branch confirms, mark the item unresolved and exclude it from the operation rather than silently proceeding.
+2. **Incremental/diff-scan integrity must be file-level, not only path- or destination-level.** When a feature shows the user a preview/scan of what an operation will do and then executes that operation later (Scan → Update Import, or any "review then commit" flow), the integrity check gating execution must cover the complete reviewed source inventory (every file's path and size) and destination state (missing / same-size / changed-size) — not just the resolved paths/units. A fingerprint over destination-resolution alone cannot detect a file added, removed, resized, or renamed on the source, or a file appearing/changing at the destination, between review and execution. The execution step must re-derive this same file-level fingerprint immediately before acting, compare it to the one the user reviewed, and abort the entire operation (touching nothing) on any mismatch — it must never silently fall back to a weaker/different execution mode as a workaround. The approved worklist should then drive execution directly (copy exactly the reviewed new-file list), not a fresh unrestricted re-walk that could pick up files never reviewed.
+
+Promote to agents (proposed, not yet applied):
+- `contract-debugger.md` / `autoingest-architect.md` — lesson 1 (equivalent-evidence-across-branches pattern for any hierarchical-identity recovery/resolution logic)
+- `ingestion-routing-specialist.md` — lesson 2 (file-level scan-fingerprint requirement for any review-then-commit incremental operation)
+- `code-reviewer.md` — lesson 1 as a review checklist item: when a resolver/recovery function has multiple branches reaching the same "accept" outcome, verify each branch requires equivalent evidence, not just that at least one branch was hardened
+
+Status:
+- Promoted
+
+---
+
 ### 2026-05-20 — dir:rename IPC Safety Fix: Containment + Collision Guard Implementation
 
 Task type:
@@ -2219,6 +2244,34 @@ Reusable lessons:
 Promote to agents:
 - `ui-system-specialist.md` — lessons 1, 2, 3 (custom dropdown keyboard contract; auto-fill `isManuallySet()` guard; disk-loaded values must be marked manually set)
 - `metadata-specialist.md` — lessons 4, 5 (city-country storage pattern; registry cache invalidation after write)
+
+Status:
+- Promoted
+
+---
+
+### 2026-06-22 — Phantom RAW Extension Support in Metadata/EXIF Services
+
+Task type:
+- Metadata / File Extension Source-of-Truth Fix
+
+What happened:
+- `config/app.config.js` is the declared source of truth for all media extensions. Two services violated this:
+- `main/exifService.js` had a hardcoded `new Set([...])` for RAW_EXTENSIONS containing `.srw` (Samsung) and `.iiq` (Phase One) — formats absent from PHOTO_EXTENSIONS and therefore unreachable through normal ingestion. Phantom support: the metadata writer accepted them; the import path never produced them.
+- `main/metadataSyncService.js` had a hardcoded 8-item array for `_findRawPeer` missing `.pef`, `.x3f`, `.raf`, `.3fr`, `.nrw`, `.sr2`, `.srf`. RAW peer lookup silently fell back to XMP path for all these formats, keying metadata records under the wrong canonical key.
+- `main/fileBrowser.js` was already correct — used `config.RAW_EXTENSIONS`.
+- Fix: both services now `require('../config/app.config')` and derive from `config.RAW_EXTENSIONS` / `new Set(config.RAW_EXTENSIONS)`.
+- Also added `.3fr` (Hasselblad) to both PHOTO_EXTENSIONS (→19) and RAW_EXTENSIONS (→14) in config.
+
+Reusable lessons:
+1. **Phantom extension support**: if a format is not in PHOTO_EXTENSIONS, it cannot be ingested — downstream service support for it is dead code and creates a false sense of coverage. Never add a format to a service-local list without first adding it to config.
+2. **End-to-end extension support requires three layers**: scanner/import (`fileBrowser`) + EXIF write (`exifService`) + RAW peer lookup (`metadataSyncService`) must all derive from `config.RAW_EXTENSIONS`. A gap in any layer silently breaks that format's metadata.
+3. **`_findRawPeer` failure is silent**: when the RAW extension is missing from the peer-lookup list, the function falls back to the XMP path. Symptom: metadata keyed under the XMP path instead of the RAW path — no error, just wrong canonical key.
+4. **Adding a new RAW format to config is not complete until all three layers are verified**: check that no service has a hardcoded list that would miss the new extension.
+
+Promote to agents:
+- `metadata-specialist.md` — all four lessons as a new "RAW Extension Source of Truth" rule
+- `code-reviewer.md` — add check: RAW extension sets in metadata/EXIF services must derive from config, not hardcoded lists
 
 Status:
 - Promoted

@@ -443,6 +443,27 @@ Validation:
 - Confirm remaining files continue.
 - Confirm transaction state remains safe.
 
+### File-Level Scan Fingerprint Required for Review-Then-Commit Flows
+
+Context:
+- Applies to any "review then commit" incremental flow — the user reviews a scan/preview, then a later action executes based on it (e.g. Scan → Update Import, or any similar diff-then-act flow).
+
+Rule:
+- The integrity check gating execution must fingerprint the full file-level inventory shown to the user — every file's path and size, and destination state (missing / same-size / changed-size) — not just resolved destination paths or units. A fingerprint over destination-resolution alone cannot detect a file added, removed, resized, or renamed on the source, or a file appearing/changing at the destination, between review and execution.
+- The execution step must re-derive this same file-level fingerprint immediately before acting, compare it to the one the user reviewed, and abort the entire operation (touching nothing) on any mismatch. It must never silently fall back to a weaker/different execution mode as a workaround.
+- The approved worklist should drive execution directly (copy exactly the reviewed new-file list), not a fresh unrestricted re-walk that could pick up files never reviewed. Reference: Scan → Update Import fingerprint in `services/transferImportService.js`.
+
+Avoid:
+- Fingerprinting only resolved destination paths/units for a review-then-commit flow.
+- Falling back to a different or weaker execution mode when the fingerprint mismatches, instead of aborting entirely.
+- Re-walking the source unrestricted at execution time instead of driving off the reviewed worklist.
+
+Validation:
+- Confirm the fingerprint covers every file's path and size from the reviewed scan, plus destination state per file.
+- Confirm a file added/removed/resized/renamed on either side between review and execution is detected and blocks execution.
+- Confirm execution copies exactly the reviewed worklist, not a fresh unrestricted re-walk.
+- Confirm a mismatch aborts the entire operation with nothing touched — no silent fallback mode.
+
 ## Validation Checklist
 
 Before making changes, read:

@@ -4061,10 +4061,12 @@ ipcMain.handle('archive:verifyTransferExport', async (_event, { scope } = {}) =>
 
 // ── Transfer Import ───────────────────────────────────────────────────────────
 
-ipcMain.handle('archive:getTransferDriveCollections', async () => {
-  const transferRoot = settings.getTransferRoot();
-  if (!transferRoot) return { ok: false, reason: 'transfer-root-not-set' };
-  return transferImportService.scanCollections(transferRoot);
+ipcMain.handle('archive:getTransferImportTree', async () => {
+  const transferRoot    = settings.getTransferRoot();
+  const mainArchiveRoot = settings.getMainArchiveRoot();
+  if (!transferRoot)    return { ok: false, reason: 'transfer-root-not-set' };
+  if (!mainArchiveRoot) return { ok: false, reason: 'main-archive-not-set' };
+  return transferImportService.scanImportTree(transferRoot, mainArchiveRoot, isValidEventJson);
 });
 
 ipcMain.handle('archive:previewTransferImport', async (_event, { scope } = {}) => {
@@ -4072,7 +4074,17 @@ ipcMain.handle('archive:previewTransferImport', async (_event, { scope } = {}) =
   const mainArchiveRoot = settings.getMainArchiveRoot();
   if (!transferRoot)    return { ok: false, reason: 'transfer-root-not-set' };
   if (!mainArchiveRoot) return { ok: false, reason: 'main-archive-not-set' };
-  return transferImportService.previewImport(transferRoot, mainArchiveRoot, scope);
+  return transferImportService.previewImport(transferRoot, mainArchiveRoot, scope, isValidEventJson);
+});
+
+// Read-only pre-copy scan: classify the selected Transfer Drive scope against the Main
+// Archive Root by relative path + size (new / already-imported / changed / unresolved).
+ipcMain.handle('archive:scanImportSync', async (_event, { scope } = {}) => {
+  const transferRoot    = settings.getTransferRoot();
+  const mainArchiveRoot = settings.getMainArchiveRoot();
+  if (!transferRoot)    return { ok: false, reason: 'transfer-root-not-set' };
+  if (!mainArchiveRoot) return { ok: false, reason: 'main-archive-not-set' };
+  return transferImportService.scanImportSync(transferRoot, mainArchiveRoot, scope, isValidEventJson);
 });
 
 ipcMain.handle('archive:runTransferImport', async (_event, { scope, operatorName } = {}) => {
@@ -4080,7 +4092,7 @@ ipcMain.handle('archive:runTransferImport', async (_event, { scope, operatorName
   const mainArchiveRoot = settings.getMainArchiveRoot();
   if (!transferRoot)    return { ok: false, reason: 'transfer-root-not-set' };
   if (!mainArchiveRoot) return { ok: false, reason: 'main-archive-not-set' };
-  return transferImportService.runImport(transferRoot, mainArchiveRoot, scope, {
+  return transferImportService.runImport(transferRoot, mainArchiveRoot, scope, isValidEventJson, {
     operatorName: operatorName || null,
     deviceName:   os.hostname(),
   });
@@ -4119,7 +4131,7 @@ ipcMain.handle('archive:verifyTransferImport', async (_event, { scope } = {}) =>
   const mainArchiveRoot = settings.getMainArchiveRoot();
   if (!transferRoot)    return { ok: false, reason: 'transfer-root-not-set' };
   if (!mainArchiveRoot) return { ok: false, reason: 'main-archive-not-set' };
-  return transferImportService.verifyImport(transferRoot, mainArchiveRoot, scope);
+  return transferImportService.verifyImport(transferRoot, mainArchiveRoot, scope, isValidEventJson);
 });
 
 // ── Archive Diagnostics (Phase 13A — read-only) ───────────────────────────────
@@ -4838,6 +4850,14 @@ ipcMain.handle('qmz:createSequence', async (_e, { qmzRoot, number, letter }) => 
 
 ipcMain.handle('qmz:bulkCreate', async (_e, { qmzRoot, items }) => {
   return qmzService.bulkCreateSequences(qmzRoot, items);
+});
+
+ipcMain.handle('qmz:editSequence', async (_e, { qmzRoot, code, newLetter }) => {
+  return qmzService.editSequenceType(qmzRoot, code, newLetter);
+});
+
+ipcMain.handle('qmz:removeSequence', async (_e, { qmzRoot, code }) => {
+  return qmzService.removeSequence(qmzRoot, code);
 });
 
 ipcMain.handle('qmz:moveToSequence', async (_e, { qmzRoot, filePaths, sequenceCode, photographerName }) => {
