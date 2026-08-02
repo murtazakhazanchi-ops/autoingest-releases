@@ -2071,6 +2071,11 @@ ${unparseable.map(ev => `
       displayName:        entry._eventJson?.eventName || entry.folderName,
       hijriDate:          entry.hijriDate    || entry._eventJson?.hijriDate    || null,
       sequence:           entry.sequence     ?? entry._eventJson?.sequence     ?? null,
+      // Threaded through to the edit-save payload so saving descriptive-field edits
+      // preserves the event's real workflow status (created/in-progress/complete)
+      // instead of the payload hardcoding 'created' and silently reverting an
+      // already-complete event on every edit.
+      status:              entry._eventJson?.status || null,
       isUnresolved:       !!entry.isUnresolved,
       isOfflineLocalCopy: _offlineStagingMode,
     };
@@ -2412,7 +2417,11 @@ ${unparseable.map(ev => `
           hijriDate:     _viewingExisting.hijriDate,
           sequence:      _viewingExisting.sequence,
           components:    noRenameCompsForDisk,
-          status:        'created',
+          // Preserve the event's real workflow status — editing descriptive fields
+          // must never revert an already-complete event back to 'created'. Only
+          // falls back to 'created' when the event genuinely has no status yet
+          // (e.g. a just-repaired legacy event).
+          status:        _viewingExisting.status || 'created',
           ...(_viewingExisting.adoption != null ? { adoption: _viewingExisting.adoption } : {}),
         };
         try {
@@ -2574,7 +2583,11 @@ ${unparseable.map(ev => `
         hijriDate:     _viewingExisting.hijriDate,
         sequence:      _viewingExisting.sequence,
         components:    compsForDisk,
-        status:        'created',
+        // Preserve the event's real workflow status — editing descriptive fields
+        // must never revert an already-complete event back to 'created'. Only
+        // falls back to 'created' when the event genuinely has no status yet
+        // (e.g. a just-repaired legacy event being created at this new path).
+        status:        _viewingExisting.status || 'created',
         ...(_viewingExisting.adoption != null ? { adoption: _viewingExisting.adoption } : {}),
       };
       try {
