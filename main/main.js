@@ -44,6 +44,8 @@ const metadataQueueStore    = require('./metadataQueueStore');
 const metadataStateService  = require('./metadataStateService');
 const metadataQueueRecovery = require('./metadataQueueRecovery');
 const metadataVerificationService = require('./metadataVerificationService');
+const metadataAuditService  = require('../services/metadataAuditService');
+const metadataAuditExport   = require('../services/metadataAuditExport');
 const metadataSyncService = require('./metadataSyncService');
 const { resolvePhotographerFromPath } = require('../services/eventEvidenceReconstruction');
 const realtimeOps              = require('../services/realtimeOperationsService');
@@ -4366,6 +4368,44 @@ ipcMain.handle('archive:verifyTransferImport', async (_event, { scope } = {}) =>
 ipcMain.handle('archive:runDiagnostics',       async (_event, { scope } = {}) => archiveDiagnosticsService.runDiagnostics(scope));
 ipcMain.handle('archive:getDiagnosticsStatus', ()                              => archiveDiagnosticsService.getDiagnosticsStatus());
 ipcMain.handle('archive:getDiagnosticsReport', ()                              => archiveDiagnosticsService.getDiagnosticsReport());
+
+// ── Metadata Audit (Phase E — read-only, scope always explicit, never auto-scans) ──
+
+ipcMain.handle('archive:runMetadataAudit', async (_event, { scope } = {}) => {
+  if (!scope || !scope.type) return { ok: false, reason: 'invalid-scope' };
+  // 'archiveRoot' with no explicit rootPath resolves to the configured Main Archive
+  // Root server-side — the renderer's "Main Archive Root" option never guesses a path.
+  let rootPath = scope.rootPath;
+  if (!rootPath && scope.type === 'archiveRoot') rootPath = settings.getMainArchiveRoot();
+  if (!rootPath) return { ok: false, reason: 'invalid-scope' };
+  return metadataAuditService.runMetadataAudit({ ...scope, rootPath });
+});
+ipcMain.handle('archive:resumeMetadataAudit',  async (_event, { jobId } = {}) => metadataAuditService.resumeMetadataAudit(jobId));
+ipcMain.handle('archive:cancelMetadataAudit',  (_event, { jobId } = {})       => metadataAuditService.cancelMetadataAudit(jobId));
+ipcMain.handle('archive:getMetadataAuditStatus', async (_event, { jobId } = {}) => metadataAuditService.getMetadataAuditStatus(jobId));
+ipcMain.handle('archive:getMetadataAuditReport', async (_event, { jobId, offset, limit, statusFilter } = {}) =>
+  metadataAuditService.getMetadataAuditReport(jobId, { offset, limit, statusFilter }));
+
+ipcMain.handle('archive:exportMetadataAuditReport', async (_event, { jobId, format, exceptionsOnly } = {}) => {
+  const win = BrowserWindow.getFocusedWindow();
+  const ext = format === 'csv' ? 'csv' : (format === 'jsonl' ? 'jsonl' : 'json');
+  const { canceled, filePath } = await dialog.showSaveDialog(win, {
+    title: 'Export Metadata Audit Report',
+    defaultPath: `metadata-audit-${jobId}.${ext}`,
+    filters: [{ name: ext.toUpperCase(), extensions: [ext] }],
+  });
+  if (canceled || !filePath) return { ok: false, reason: 'cancelled' };
+  return metadataAuditExport.exportMetadataAuditReport(jobId, { format: format || 'json', destPath: filePath, exceptionsOnly: !!exceptionsOnly });
+});
+
+ipcMain.handle('archive:chooseMetadataAuditFolder', async () => {
+  const win = BrowserWindow.getFocusedWindow();
+  const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+    title: 'Choose Audit Scope Folder',
+    properties: ['openDirectory'],
+  });
+  return canceled ? null : filePaths[0];
+});
 
 // ── Archive Diagnostics — Stale Lock Release (Phase 13B-1) ───────────────────
 

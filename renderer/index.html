@@ -8045,6 +8045,7 @@
             <button type="button" class="aloc-btn" id="alocTransferExportBtn">Transfer Export…</button>
             <button type="button" class="aloc-btn" id="alocTransferImportBtn">Transfer Import…</button>
             <button type="button" class="aloc-btn" id="alocDiagnosticsBtn">Diagnostics…</button>
+            <button type="button" class="aloc-btn" id="alocMetadataAuditBtn">Metadata Audit…</button>
           </div>
         </div>
 
@@ -8456,6 +8457,57 @@
       </div>
 
       <div id="adoptDetailPanel" hidden></div>
+    </div>
+  </div>
+
+  <!-- Metadata Audit modal (Phase E — read-only audit; repair preview/confirm UI added in Phase F) -->
+  <div id="metadataAuditModal" class="emm-overlay" role="dialog" aria-modal="true" aria-labelledby="maTitle">
+    <div class="emm-box">
+      <div class="emm-topbar">
+        <span class="emm-topbar-title" id="maTitle">Metadata Audit</span>
+      </div>
+
+      <div class="diag-body">
+        <div class="diag-actions">
+          <p class="diag-helper">Scans a chosen archive scope for missing, incorrect, or duplicate metadata. Read-only — no files are modified until you explicitly run Repair below.</p>
+          <div class="diag-actions-tools">
+            <label style="display:flex;align-items:center;gap:6px;">
+              <input type="radio" name="maScopeType" id="maScopeArchiveRoot" value="archiveRoot" checked>
+              Main Archive Root
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;">
+              <input type="radio" name="maScopeType" id="maScopeFolder" value="folder">
+              Choose folder…
+            </label>
+            <span id="maScopeFolderPath" class="sq-footer-note"></span>
+          </div>
+          <button type="button" class="emm-btn-primary" id="maRunBtn">Run Audit</button>
+          <button type="button" class="emm-btn-secondary" id="maCancelBtn" hidden>Cancel</button>
+        </div>
+
+        <div class="diag-status-row">
+          <span id="maStatusText">Idle — select a scope and click Run Audit.</span>
+        </div>
+
+        <div id="maSummaryBar" class="diag-summary-bar" hidden>
+          <span class="diag-badge diag-badge-error" id="maBadgeExceptions">0 exceptions</span>
+          <span class="diag-badge diag-badge-info"  id="maBadgeScanned">0 scanned</span>
+        </div>
+
+        <div id="maList" class="diag-list">
+          <div class="sq-empty">Run an audit to see results.</div>
+        </div>
+      </div>
+
+      <div class="emm-footer">
+        <span class="sq-footer-note">Audit is read-only. Repair requires explicit confirmation per run.</span>
+        <div class="emm-footer-right">
+          <button type="button" class="emm-btn-secondary" id="maExportJsonBtn" hidden>Export JSON</button>
+          <button type="button" class="emm-btn-secondary" id="maExportCsvBtn" hidden>Export CSV</button>
+          <button type="button" class="emm-btn-secondary" id="maRepairBtn" hidden>Repair…</button>
+          <button type="button" class="emm-btn-secondary" id="maDoneBtn">Close</button>
+        </div>
+      </div>
     </div>
   </div>
 

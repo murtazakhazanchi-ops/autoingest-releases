@@ -15266,6 +15266,162 @@ const _transferMonitor = (() => {
     }
   });
 
+  // ── Metadata Audit (Phase E — read-only audit) ──
+
+  let _maJobId = null;
+  let _maPoll = null;
+  let _maScopeFolderPath = null;
+  let _maRunning = false;
+
+  const MA_STATUS_LABEL = {
+    complete: 'Complete', partial: 'Partial', ambiguous: 'Ambiguous',
+    'read-error': 'Read error', excluded: 'Excluded',
+  };
+
+  function _maStopPoll() {
+    if (_maPoll) { clearInterval(_maPoll); _maPoll = null; }
+  }
+
+  function _maClose() {
+    document.getElementById('metadataAuditModal')?.classList.remove('open');
+    _maStopPoll();
+  }
+
+  function _maRenderList(report) {
+    const list = document.getElementById('maList');
+    if (!list) return;
+    const exceptions = report.items.filter(i => i.status !== 'complete' && i.status !== 'excluded');
+    if (exceptions.length === 0) {
+      list.innerHTML = '<div class="sq-empty">No exceptions in this page of results.</div>';
+      return;
+    }
+    let html = '';
+    for (const item of exceptions.slice(0, 100)) {
+      const sevClass = item.status === 'ambiguous' || item.status === 'read-error' ? 'diag-item-error' : 'diag-item-warn';
+      const detail = item.status === 'ambiguous'
+        ? `Ambiguous: ${_esc(item.ambiguityReason || '')}`
+        : item.status === 'read-error'
+          ? `Read error: ${_esc(item.error || '')}`
+          : [
+              item.fields ? Object.entries(item.fields).filter(([, d]) => d.status !== 'match').map(([f, d]) => `${f}: ${d.status}`).join(', ') : '',
+              item.keywords && !item.keywords.compliant ? 'keywords: non-compliant' : '',
+            ].filter(Boolean).join(' · ');
+      html += `<div class="diag-item ${sevClass}">
+  <div class="diag-item-header">
+    <span class="diag-item-sev">${_esc(MA_STATUS_LABEL[item.status] || item.status)}</span>
+    <span class="diag-item-title">${_esc(item.filePath)}</span>
+  </div>
+  <div class="diag-item-msg">${detail}</div>
+</div>`;
+    }
+    list.innerHTML = html;
+  }
+
+  async function _maPollOnce() {
+    const status = await window.api.getMetadataAuditStatus(_maJobId).catch(() => null);
+    if (!status) return;
+    const statusEl = document.getElementById('maStatusText');
+    const bar = document.getElementById('maSummaryBar');
+    if (status.running) {
+      if (statusEl) statusEl.textContent = `Scanning… ${status.eventsScanned}/${status.eventsTotal} events, ${status.scannedCount} files, ${status.exceptionCount} exceptions so far.`;
+      return;
+    }
+    _maRunning = false;
+    _maStopPoll();
+    document.getElementById('maRunBtn').disabled = false;
+    document.getElementById('maRunBtn').textContent = 'Run Audit';
+    document.getElementById('maCancelBtn').hidden = true;
+
+    if (statusEl) {
+      const cancelledNote = status.cancelled ? ' (cancelled — partial results)' : '';
+      const scopeNote = status.resumedOverChangedScope ? ' — scope changed since this job started, resumed report may be incomplete for new content' : '';
+      statusEl.textContent = `Done: ${status.eventsScanned}/${status.eventsTotal} events, ${status.scannedCount} files scanned, ${status.exceptionCount} exceptions.${cancelledNote}${scopeNote}`;
+    }
+    if (bar) {
+      bar.hidden = false;
+      document.getElementById('maBadgeExceptions').textContent = `${status.exceptionCount} exceptions`;
+      document.getElementById('maBadgeScanned').textContent = `${status.scannedCount} scanned`;
+    }
+
+    const report = await window.api.getMetadataAuditReport(_maJobId, 0, 500, null).catch(() => null);
+    if (report) _maRenderList(report);
+
+    document.getElementById('maExportJsonBtn').hidden = false;
+    document.getElementById('maExportCsvBtn').hidden = false;
+    document.getElementById('maRepairBtn').hidden = status.exceptionCount === 0;
+  }
+
+  document.getElementById('alocMetadataAuditBtn')?.addEventListener('click', () => {
+    _alocClose();
+    document.getElementById('metadataAuditModal')?.classList.add('open');
+  });
+
+  document.getElementById('maScopeFolder')?.addEventListener('change', async (e) => {
+    if (!e.target.checked) return;
+    const chosen = await window.api.chooseMetadataAuditFolder().catch(() => null);
+    const pathEl = document.getElementById('maScopeFolderPath');
+    if (chosen) {
+      _maScopeFolderPath = chosen;
+      if (pathEl) pathEl.textContent = chosen;
+    } else {
+      document.getElementById('maScopeArchiveRoot').checked = true;
+    }
+  });
+
+  document.getElementById('maRunBtn')?.addEventListener('click', async () => {
+    if (_maRunning) return;
+    const useFolder = document.getElementById('maScopeFolder')?.checked;
+    if (useFolder && !_maScopeFolderPath) return;
+    const scope = useFolder
+      ? { type: 'event', rootPath: _maScopeFolderPath } // operator-chosen folder — most callers point this at a single event; broader folders can be re-run as 'collection'/'archiveRoot' scope via future UI polish.
+      : { type: 'archiveRoot' };
+
+    _maRunning = true;
+    const btn = document.getElementById('maRunBtn');
+    btn.disabled = true; btn.textContent = 'Running…';
+    document.getElementById('maCancelBtn').hidden = false;
+    document.getElementById('maSummaryBar').hidden = true;
+    document.getElementById('maExportJsonBtn').hidden = true;
+    document.getElementById('maExportCsvBtn').hidden = true;
+    document.getElementById('maRepairBtn').hidden = true;
+    document.getElementById('maList').innerHTML = '<div class="sq-empty">Scanning…</div>';
+    document.getElementById('maStatusText').textContent = 'Starting scan…';
+
+    const res = await window.api.runMetadataAudit(scope).catch(() => null);
+    if (!res || !res.ok) {
+      _maRunning = false;
+      btn.disabled = false; btn.textContent = 'Run Audit';
+      document.getElementById('maCancelBtn').hidden = true;
+      document.getElementById('maStatusText').textContent = res?.reason === 'busy' ? 'An audit is already running.' : 'Failed to start audit.';
+      return;
+    }
+    _maJobId = res.jobId;
+    _maStopPoll();
+    _maPoll = setInterval(_maPollOnce, 1200);
+  });
+
+  document.getElementById('maCancelBtn')?.addEventListener('click', async () => {
+    if (!_maJobId) return;
+    await window.api.cancelMetadataAudit(_maJobId).catch(() => {});
+  });
+
+  document.getElementById('maExportJsonBtn')?.addEventListener('click', async () => {
+    if (!_maJobId) return;
+    await window.api.exportMetadataAuditReport(_maJobId, 'json', false).catch(() => {});
+  });
+  document.getElementById('maExportCsvBtn')?.addEventListener('click', async () => {
+    if (!_maJobId) return;
+    await window.api.exportMetadataAuditReport(_maJobId, 'csv', false).catch(() => {});
+  });
+
+  document.getElementById('maDoneBtn')?.addEventListener('click', _maClose);
+  document.getElementById('metadataAuditModal')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('metadataAuditModal')) _maClose();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.getElementById('metadataAuditModal')?.classList.contains('open')) _maClose();
+  });
+
   // ── Archive Consistency Report (Phase 13D-1 — read-only) ─────────────────────
 
   function _crRootRow(label, info) {

@@ -298,6 +298,15 @@ contextBridge.exposeInMainWorld('api', {
   generateAuditTimeline:         ()   => ipcRenderer.invoke('archive:generateAuditTimeline'),
   getAuditTimeline:              ()   => ipcRenderer.invoke('archive:getAuditTimeline'),
 
+  // ── Metadata Audit ──
+  runMetadataAudit:        (scope)                        => ipcRenderer.invoke('archive:runMetadataAudit',        { scope }),
+  resumeMetadataAudit:     (jobId)                         => ipcRenderer.invoke('archive:resumeMetadataAudit',     { jobId }),
+  cancelMetadataAudit:     (jobId)                         => ipcRenderer.invoke('archive:cancelMetadataAudit',     { jobId }),
+  getMetadataAuditStatus:  (jobId)                         => ipcRenderer.invoke('archive:getMetadataAuditStatus',  { jobId }),
+  getMetadataAuditReport:  (jobId, offset, limit, statusFilter) => ipcRenderer.invoke('archive:getMetadataAuditReport', { jobId, offset, limit, statusFilter }),
+  exportMetadataAuditReport: (jobId, format, exceptionsOnly) => ipcRenderer.invoke('archive:exportMetadataAuditReport', { jobId, format, exceptionsOnly }),
+  chooseMetadataAuditFolder: ()                            => ipcRenderer.invoke('archive:chooseMetadataAuditFolder'),
+
   // ── EXIF metadata service ──
   getMetadataStatus:      (batchId)            => ipcRenderer.invoke('metadata:getStatus',     batchId),
   retryMetadata:          (batchId)            => ipcRenderer.invoke('metadata:retry',          batchId),
