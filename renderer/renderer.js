@@ -7841,10 +7841,13 @@ function showProgressSummary({ copied, skipped, errors, skippedReasons, failedFi
         derivedRoot = dest0.split(sep).slice(0, -2).join(sep);
       }
       const eventTitle = eData?.event?.eventName || eData?.event?._eventJson?.eventName || eData?.event?.name || null;
+      const hijriDate  = eData?.event?.hijriDate || eData?.event?._eventJson?.hijriDate || null;
       const evtCtx  = {
         component: { location: qmzComp.location || '', city: qmzComp.city || '', country: qmzComp.country || '' },
         isMulti: components.length > 1,
         eventTitle,
+        hijriDate,
+        eventJsonPath: eData?.eventPath || null,
         componentTitle: (components.length > 1 && qmzComp.folderName) ? qmzComp.folderName : null,
       };
       const qmzBtn = document.createElement('button');
@@ -9119,6 +9122,26 @@ function _qmzSetStatus(msg, cls) {
   el.className   = cls ? `qmz-status ${cls}` : 'qmz-status';
 }
 
+// _qmzAutoQueueMetadata's applyBatch call is fire-and-forget from the renderer's
+// perspective (qmz:queueMetadata resolves immediately, before tagging finishes), so
+// the "metadata queued" status set right after it is not the final outcome. This
+// listener is the only place QMZ metadata failures/ambiguity actually surface —
+// without it they were previously silent.
+if (window.api.onQmzMetadataProgress) {
+  window.api.onQmzMetadataProgress((progress) => {
+    if (!progress || progress.event !== 'batch_complete' || !_qmzOpen) return;
+    const failed    = progress.failed    || 0;
+    const ambiguous = progress.ambiguous || 0;
+    const partial   = progress.partial   || 0;
+    if (failed || ambiguous || partial) {
+      _qmzSetStatus(
+        `Metadata: ${failed} failed, ${ambiguous} ambiguous, ${partial} partial (of ${progress.total || 0})`,
+        'err'
+      );
+    }
+  });
+}
+
 // Queue metadata for the given files at their current (post-move) paths.
 // Called automatically after every successful assign; never writes the sequence code.
 async function _qmzAutoQueueMetadata(sequenceCode, filePaths, photographerName) {
@@ -9129,9 +9152,13 @@ async function _qmzAutoQueueMetadata(sequenceCode, filePaths, photographerName) 
   const batchId = `qmz-${Date.now()}`;
   const files   = filePaths.map(dest => ({ dest, photographer: photographerName }));
   const ctx     = {
-    component:    _qmzEventContext?.component || null,
-    isMulti:      _qmzEventContext?.isMulti   ?? false,
-    explicitTags: typeTags,
+    component:        _qmzEventContext?.component || null,
+    explicitTags:      typeTags,
+    hijriDate:         _qmzEventContext?.hijriDate || null,
+    eventDescription:  _qmzEventContext?.eventTitle || null,
+    eventJsonPath:     _qmzEventContext?.eventJsonPath
+      ? (_qmzEventContext.eventJsonPath.replace(/[\\/]+$/, '') + '/event.json')
+      : null,
   };
   await window.api.qmzQueueMetadata({ batchId, files, context: ctx });
 }

@@ -58,6 +58,8 @@ const path   = require('path');
 const fsp    = require('fs').promises;
 const config = require('../config/app.config');
 const { log } = require('../services/logger');
+const { resolveExpectedMetadata } = require('../services/metadataExpectationService');
+const queueStore = require('./metadataQueueStore');
 
 // Absolute path to the ExifTool config file that declares the XMP-ajs namespace.
 // When packaged, __dirname resolves inside app.asar which OS-level child processes
@@ -113,8 +115,14 @@ const VIDEO_EXTENSIONS = new Set([
 // ── Batch state ───────────────────────────────────────────────────────────────
 
 /**
+ * `status` is the original three-way write outcome (unchanged, for backward
+ * compatibility with existing UI consumers). `classification` is the new,
+ * finer-grained result the read-back verification produces — this is what
+ * distinguishes a write that actually landed the expected fields from one that
+ * merely didn't throw (the exact QMZ blind spot this fix closes).
  * @typedef {{
- *   status:  'pending'|'writing'|'done'|'skipped'|'error',
+ *   status:         'pending'|'writing'|'done'|'skipped'|'error',
+ *   classification: 'complete'|'partial'|'failed'|'excluded'|'ambiguous'|null,
  *   src:     string,
  *   dest:    string,
  *   sidecar: string|null,
@@ -122,11 +130,14 @@ const VIDEO_EXTENSIONS = new Set([
  * }} FileStatus
  *
  * @typedef {{
- *   total:   number,
- *   done:    number,
- *   skipped: number,
- *   failed:  number,
- *   files:   FileStatus[],
+ *   total:     number,
+ *   done:      number,
+ *   skipped:   number,
+ *   failed:    number,
+ *   partial:   number,
+ *   ambiguous: number,
+ *   excluded:  number,
+ *   files:     FileStatus[],
  * }} BatchStatus
  */
 
@@ -152,154 +163,28 @@ function _drain() {
   }
 }
 
-// ── Keyword builder ───────────────────────────────────────────────────────────
-
-/**
- * Builds the deduplicated IPTC keyword array for a single file.
- *
- * Keyword contents (ONLY these — never collName, eventName, photographer):
- *  - location, city, country from the resolved component (always, when present)
- *  - Component type tags (from component.types[]), with comma-split rules:
- *
- *    Single-component event (isMulti = false):
- *      Join types[], split by comma, trim, filter. If exactly 1 tag → include.
- *      If 0 or 2+ tags → ambiguous, suppress all type keywords.
- *
- *    Multi-component event (isMulti = true):
- *      Files are already routed to a specific sub-event component. All of that
- *      component's comma-split tags are included (routing disambiguates).
- *
- *    Metadata grouping mode (explicitTags array provided):
- *      Uses exactly the provided tags. Empty array = no component keywords.
- *      Location/city/country are still included regardless.
- *
- * @param {{ component: object|null, isMulti: boolean, explicitTags?: string[] }} ctx
- * @returns {string[]}
- */
-function _buildKeywords({ component, isMulti, explicitTags }) {
-  const kw = [];
-
-  if (component) {
-    const location = (typeof component.location === 'string' ? component.location : '') || '';
-    const city     = (typeof component.city     === 'string' ? component.city     : '') || '';
-    const country  = (typeof component.country  === 'string' ? component.country  : '') || '';
-
-    // 1. Component type tag(s)
-    if (Array.isArray(explicitTags)) {
-      // Metadata grouping mode: use the group's assigned tags exactly.
-      // Empty array means no component keywords (user chose "No component tag").
-      kw.push(...explicitTags);
-    } else {
-      const typeArr = Array.isArray(component.types) ? component.types : [];
-      const allTags = typeArr
-        .join(',')
-        .split(',')
-        .map(t => t.trim())
-        .filter(Boolean);
-
-      if (isMulti) {
-        // Multi-component: sub-event routing disambiguates — include all type tags.
-        kw.push(...allTags);
-      } else {
-        // Single-component: include type tag only when comma-split gives exactly 1.
-        if (allTags.length === 1) kw.push(allTags[0]);
-        // 0 or 2+ → ambiguous, suppress.
-      }
-    }
-
-    // 2. location  3. city  4. country — always included when present.
-    if (location) kw.push(location);
-    if (city)     kw.push(city);
-    if (country)  kw.push(country);
-  }
-
-  const seen = new Set();
-  return kw.filter(k => {
-    const key = (k || '').trim().toLowerCase();
-    if (!key || seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
-// ── Component resolver ────────────────────────────────────────────────────────
-
-/**
- * Returns the disk-format component for a given source file path.
- *
- * Context carries diskComponents from event.json (authoritative source of
- * truth). Matching for multi-component events uses comp.folderName, which is
- * the same value stored in group.subEventId.
- *
- * @param {string}   src
- * @param {object[]} groups         Array of { id, subEventId, files: string[] }
- * @param {object[]} diskComponents Disk-format components from event.json
- * @returns {object|null}
- */
-function _resolveComponent(src, groups, diskComponents) {
-  if (!Array.isArray(groups) || !Array.isArray(diskComponents)) return null;
-
-  const srcNorm = path.normalize(src);
-  for (const group of groups) {
-    const files = Array.isArray(group.files) ? group.files : [];
-    if (!files.some(f => path.normalize(f) === srcNorm)) continue;
-
-    if (!group.subEventId) {
-      return diskComponents[0] || null;
-    }
-
-    return diskComponents.find(c => c.folderName === group.subEventId) || null;
-  }
-
-  return null;
-}
-
-/**
- * Returns the raw group object for a given source file path, or null.
- * Used to detect metadata grouping assignments (group.metadataTags).
- *
- * @param {string}   src
- * @param {object[]} groups
- * @returns {object|null}
- */
-function _resolveGroupForFile(src, groups) {
-  if (!Array.isArray(groups)) return null;
-  const srcNorm = path.normalize(src);
-  for (const group of groups) {
-    const files = Array.isArray(group.files) ? group.files : [];
-    if (files.some(f => path.normalize(f) === srcNorm)) return group;
-  }
-  return null;
-}
-
 // ── Tag builder ───────────────────────────────────────────────────────────────
+// Decision logic (which component/keywords/photographer apply) lives entirely in
+// metadataExpectationService — this only turns an already-resolved expectation
+// into an ExifTool tag map. See that module for the evidence hierarchy.
 
 /**
- * Builds the complete tag object for a non-video file.
- *
- * XMP tags are always included — they are valid in both standalone .xmp sidecar
- * files and in the embedded XMP block of JPEG/TIFF/PNG files.
- *
- * IPTC/EXIF tags are added only for direct image writes (isRaw = false).
- * Standalone XMP sidecar files have no IPTC binary segment; ExifTool silently
- * drops IPTC:* writes to .xmp files, so sending them would leave keywords and
- * location fields missing from sidecars.
- *
- * @param {{ photographer:string, hijriDate:string|null, component:object|null, isMulti:boolean, isRaw:boolean, explicitTags?:string[] }} ctx
+ * @param {ReturnType<import('../services/metadataExpectationService').resolveExpectedMetadata>} expectation
+ * @param {boolean} isRaw
  * @returns {object}
  */
-function _buildTags({ photographer, hijriDate, component, isMulti, isRaw, explicitTags }) {
+function _buildTags(expectation, isRaw) {
+  const { photographer, component, keywords, hijriDate, eventDescription, copyright } = expectation;
   const location = component?.location || '';
   const city     = component?.city     || '';
   const country  = component?.country  || '';
 
-  const keywords = _buildKeywords({ component, isMulti, explicitTags });
-
   // XMP tags — valid for both .xmp sidecars and embedded XMP in images.
   const tags = {
     'XMP-dc:Creator':           photographer ? [photographer] : [],
-    'XMP-dc:Rights':            '© Aljamea-tus-Saifiyah',
+    'XMP-dc:Rights':            copyright,
     'XMP-dc:Subject':           keywords,
+    'XMP-dc:Description':       eventDescription || '',
     'XMP-xmp:CreatorTool':      'AutoIngest',
     'XMP-xmpRights:Marked':     'True',
     'XMP-iptcCore:Location':    location,
@@ -314,8 +199,9 @@ function _buildTags({ photographer, hijriDate, component, isMulti, isRaw, explic
     Object.assign(tags, {
       'EXIF:Artist':                       photographer || '',
       'IPTC:By-line':                      photographer || '',
-      'IPTC:CopyrightNotice':              '© Aljamea-tus-Saifiyah',
+      'IPTC:CopyrightNotice':              copyright,
       'IPTC:Credit':                       'Aljamea-tus-Saifiyah',
+      'IPTC:Caption-Abstract':             eventDescription || '',
       'IPTC:Sub-location':                 location,
       'IPTC:City':                         city,
       'IPTC:Country-PrimaryLocationName':  country,
@@ -374,94 +260,232 @@ async function _writeMetadata(filePath, tags, isRaw) {
   return null;
 }
 
+// ── Evidence adapter ──────────────────────────────────────────────────────────
+// Translates exifService's existing per-batch context (already the evidence the
+// resolver needs) into the resolver's evidence shape. This is a pure translation,
+// not decision logic — which shape to use is signaled by the presence of
+// `diskComponents` (standard/reapply) vs `component` (QMZ) on the context object.
+
+function _buildEvidence(file, context) {
+  const photographer      = file.photographer != null ? file.photographer : (context.photographer || '');
+  const hijriDate          = context.hijriDate || null;
+  const eventDescription   = context.eventDescription || null;
+
+  if (Array.isArray(context.diskComponents)) {
+    return { filePath: file.src, photographer, hijriDate, eventDescription, groups: context.groups, diskComponents: context.diskComponents };
+  }
+  return {
+    filePath: file.src, photographer, hijriDate, eventDescription,
+    qmzComponent: context.component ?? null, qmzExplicitTags: context.explicitTags,
+  };
+}
+
+// ── Read-back comparator ──────────────────────────────────────────────────────
+// Normalizes both sides before comparing — exiftool-vendored collapses single-item
+// List tags to a plain string on read, so a written array and a read-back string
+// must not be treated as a mismatch.
+
+function _norm(v) {
+  if (v === undefined || v === null) return [];
+  return (Array.isArray(v) ? v : [v]).map(x => String(x).trim()).filter(Boolean);
+}
+
+function _arraysEqualUnordered(a, b) {
+  if (a.length !== b.length) return false;
+  const sa = [...a].sort(), sb = [...b].sort();
+  return sa.every((v, i) => v === sb[i]);
+}
+
+/**
+ * Compares the actually-written tags against the resolved expectation.
+ * @returns {{ complete: boolean, mismatches: string[] }}
+ */
+function _compareReadback(actual, expectation, isRaw) {
+  const mismatches = [];
+  const check = (field, expected, actualVal, ordered) => {
+    const e = _norm(expected), a = _norm(actualVal);
+    const match = ordered ? (e.length === a.length && e.every((v, i) => v === a[i])) : _arraysEqualUnordered(e, a);
+    if (!match) mismatches.push(field);
+  };
+
+  check('photographer', expectation.photographer, actual.Creator ?? actual['XMP-dc:Creator'], false);
+  check('copyright',    expectation.copyright,     actual.Rights  ?? actual['XMP-dc:Rights'],  false);
+  check('keywords',     expectation.keywords,      actual.Subject ?? actual['XMP-dc:Subject'], false);
+  check('description',  expectation.eventDescription || '', actual.Description ?? actual['XMP-dc:Description'], false);
+  check('location',     expectation.component?.location || '', actual.Location ?? actual['XMP-iptcCore:Location'], false);
+  check('city',         expectation.component?.city     || '', actual.City     ?? actual['XMP-photoshop:City'],   false);
+  check('country',      expectation.component?.country  || '', actual.Country  ?? actual['XMP-photoshop:Country'], false);
+  if (expectation.hijriDate) {
+    check('hijriDate', expectation.hijriDate, actual.HijriDate ?? actual['XMP-ajs:HijriDate'], false);
+  }
+  if (!isRaw) {
+    check('copyright(iptc)', expectation.copyright, actual.CopyrightNotice ?? actual['IPTC:CopyrightNotice'], false);
+    check('keywords(iptc)',  expectation.keywords,  actual.Keywords ?? actual['IPTC:Keywords'], false);
+  }
+
+  return { complete: mismatches.length === 0, mismatches };
+}
+
+// ── Durable manifest + journal wiring ─────────────────────────────────────────
+// Frozen-snapshot principle (plan §6): every file's expectation is resolved once,
+// up front, and recorded in the batch manifest before any write happens. _processFile
+// below always writes the frozen expectation it's handed — it never re-resolves.
+// Recovery (metadataQueueRecovery.js) may re-resolve as a safety comparison only.
+
+function _classify(file) {
+  const ext = path.extname(file.dest).toLowerCase();
+  return { isRaw: RAW_EXTENSIONS.has(ext), isVideo: VIDEO_EXTENSIONS.has(ext) };
+}
+
+function _resolveForFile(file, context) {
+  const { isRaw, isVideo } = _classify(file);
+  if (isVideo) return { isRaw, isVideo, evidence: null, expectation: null };
+  const evidence = _buildEvidence(file, context);
+  const expectation = resolveExpectedMetadata(evidence);
+  return { isRaw, isVideo, evidence, expectation };
+}
+
+async function _journal(batchId, dest, status, extra = {}) {
+  try {
+    await queueStore.appendJournalEntry(batchId, { dest, status, ...extra });
+  } catch (err) {
+    log(`[exifService] journal append failed for batch ${batchId} (${dest}): ${err.message}`);
+  }
+}
+
+/**
+ * Writes the batch manifest once, before any file is processed. Best-effort: a
+ * manifest write failure is logged but never blocks metadata writing itself —
+ * durability is a safety net, not a precondition for the primary write path.
+ */
+async function _writeBatchManifest(batchId, resolved, context) {
+  try {
+    const settings = require('../services/settings');
+    const mainArchiveRoot = settings.getMainArchiveRoot ? settings.getMainArchiveRoot() : null;
+    const archiveRootIdentity = mainArchiveRoot
+      ? await queueStore.readRootIdentity(path.join(mainArchiveRoot, '.autoingest', 'root', 'archive-root.json'))
+      : null;
+
+    const eventDir = context.eventJsonPath ? path.dirname(context.eventJsonPath) : null;
+    const files = await Promise.all(resolved.map(async ({ file, isRaw, isVideo, evidence, expectation }) => {
+      let size = null;
+      try { size = (await fsp.stat(file.dest)).size; } catch { /* not yet on disk / unreadable — non-fatal */ }
+      return {
+        src: file.src, dest: file.dest,
+        relDestPath: eventDir ? path.relative(eventDir, file.dest) : null,
+        size, isRaw, isVideo, evidence, expectation,
+      };
+    }));
+
+    await queueStore.writeManifestOnce(batchId, {
+      schemaVersion: 1,
+      batchId,
+      metadataContractVersion: require('../services/metadataExpectationService').METADATA_CONTRACT_VERSION,
+      resolverVersion: require('../services/metadataExpectationService').RESOLVER_VERSION,
+      archiveRootIdentity,
+      eventJsonPath: context.eventJsonPath || null,
+      queuedAt: new Date().toISOString(),
+      files,
+    });
+  } catch (err) {
+    log(`[exifService] manifest write failed for batch ${batchId}: ${err.message}`);
+  }
+}
+
 // ── Shared per-file processor ─────────────────────────────────────────────────
 
 /**
- * Processes a single file entry: skip videos, write metadata for images/RAW.
- * Updates the FileStatus object in place and bumps batch counters.
+ * Writes + read-back-verifies a single already-resolved expectation. Never resolves
+ * on its own — callers (normal processing, retry, resume) all hand it a frozen
+ * expectation so a resumed/retried write is guaranteed to target the same value
+ * the original queue decision recorded.
+ */
+async function _writeAndVerify(file, status, expectation, isRaw) {
+  const tags    = _buildTags(expectation, isRaw);
+  const sidecar = await _writeMetadata(file.dest, tags, isRaw);
+  status.sidecar = sidecar;
+
+  // Always-on, bounded read-back — only the fields just written, not a full dump.
+  // For RAW files this MUST read the sidecar path _writeMetadata returned, never
+  // the RAW file's own embedded tags (exiftool-vendored reads embedded RAW tags
+  // when pointed at the RAW path directly — proven in test/rawXmpReadback.test.js).
+  const verifyPath = sidecar || file.dest;
+  const et  = _getExifTool();
+  const rb  = await et.read(verifyPath);
+  return _compareReadback(rb, expectation, isRaw);
+}
+
+/**
+ * Processes a single file entry: skip videos, write the frozen expectation
+ * (resolved up front — see _resolveForFile/_writeBatchManifest), and verify.
+ * Updates the FileStatus object in place, bumps batch counters, and journals
+ * every status transition for durability.
  *
- * @param {{ src:string, dest:string }} file
+ * @param {string} batchId
+ * @param {{ src:string, dest:string, photographer?:string|null }} file
  * @param {FileStatus} status
  * @param {BatchStatus} batch
- * @param {{ photographer:string, hijriDate:string|null,
- *           groups:object[], diskComponents:object[] }} context
+ * @param {{isRaw:boolean, isVideo:boolean, expectation:object|null}} resolved Frozen
+ *   per-file resolution from _resolveForFile, computed once at applyBatch time.
  */
-async function _processFile(file, status, batch, context) {
-  const ext     = path.extname(file.dest).toLowerCase();
-  const isRaw   = RAW_EXTENSIONS.has(ext);
-  const isVideo = VIDEO_EXTENSIONS.has(ext);
+async function _processFile(batchId, file, status, batch, resolved) {
+  const { isRaw, isVideo, expectation } = resolved;
 
   if (isVideo) {
     status.status = 'skipped';
+    status.classification = 'excluded';
     batch.skipped++;
+    batch.excluded = (batch.excluded || 0) + 1;
     log(`[exifService] Skipped (video metadata disabled): ${path.basename(file.dest)}`);
+    await _journal(batchId, file.dest, 'excluded', { classification: 'excluded' });
+    return;
+  }
+
+  if (expectation.status === 'ambiguous') {
+    status.status = 'skipped';
+    status.classification = 'ambiguous';
+    status.error = expectation.ambiguityReason;
+    batch.skipped++;
+    batch.ambiguous = (batch.ambiguous || 0) + 1;
+    log(`[exifService] Ambiguous — not written: ${path.basename(file.dest)} (${expectation.ambiguityReason})`);
+    await _journal(batchId, file.dest, 'ambiguous', { classification: 'ambiguous', error: expectation.ambiguityReason });
     return;
   }
 
   status.status = 'writing';
+  await _journal(batchId, file.dest, 'writing');
 
   try {
-    const isMulti      = Array.isArray(context.diskComponents) && context.diskComponents.length > 1;
-    let   component    = _resolveComponent(file.src, context.groups, context.diskComponents);
+    // Validate before writing: a resolved expectation with no photographer at all
+    // is still written (photographer may legitimately be unknown for some sources),
+    // but is flagged for the read-back classification below rather than blocked —
+    // the write must still happen so Copyright/Description/Keywords land.
+    const cmp = await _writeAndVerify(file, status, expectation, isRaw);
 
-    // Defensive: every file must resolve to a group (and therefore a component) so that
-    // location/city/country are always written. If a future change to group reconstruction,
-    // metadataGroups format, or reapply logic breaks this invariant for a single-component
-    // event, fall back to diskComponents[0] rather than silently writing no metadata.
-    // Multi-component null is genuinely unresolvable and left as-is.
-    if (!component && !isMulti && Array.isArray(context.diskComponents) && context.diskComponents.length > 0) {
-      console.warn(`[exifService] No component resolved for ${path.basename(file.src)} — falling back to base component for location/city/country`);
-      component = context.diskComponents[0];
-    }
-
-    // Per-file photographer takes precedence (set by reapplyEvent for multi-photographer events).
-    const photographer = file.photographer != null ? file.photographer : (context.photographer || '');
-
-    // Metadata grouping mode: if the resolved group carries an explicit metadataTags
-    // array, pass it to _buildTags so it overrides the standard comma-split logic.
-    // null/undefined metadataTags → fall through to existing keyword rules.
-    const resolvedGroup = _resolveGroupForFile(file.src, context.groups);
-    const explicitTags  = Array.isArray(resolvedGroup?.metadataTags)
-      ? resolvedGroup.metadataTags
-      : undefined;
-
-    const tags         = _buildTags({
-      photographer,
-      hijriDate:    context.hijriDate    || null,
-      component,
-      isMulti,
-      isRaw,
-      explicitTags,
-    });
-
-    const sidecar = await _writeMetadata(file.dest, tags, isRaw);
-    status.status  = 'done';
-    status.sidecar = sidecar;
-    batch.done++;
-
-    // Post-write readback — only when DEBUG_METADATA=1. Verifies XMP-dc:Subject
-    // appears in sidecars and all core fields round-trip correctly.
-    if (process.env.DEBUG_METADATA === '1') {
-      const verifyPath = sidecar || file.dest;
-      const et = _getExifTool();
-      const rb = await et.read(verifyPath);
-      const label = `[exifService] Readback ${path.basename(verifyPath)}`;
-      log(`${label} — Subject:${JSON.stringify(rb.Subject ?? rb['XMP-dc:Subject'] ?? 'MISSING')}`);
-      log(`${label} — Creator:${JSON.stringify(rb.Creator ?? rb['XMP-dc:Creator'] ?? 'MISSING')}`);
-      log(`${label} — Rights:${JSON.stringify(rb.Rights ?? rb['XMP-dc:Rights'] ?? 'MISSING')}`);
-      log(`${label} — Marked:${JSON.stringify(rb.Marked ?? rb['XMP-xmpRights:Marked'] ?? 'MISSING')}`);
-      if (tags['XMP-ajs:HijriDate']) {
-        log(`${label} — HijriDate:${JSON.stringify(rb.HijriDate ?? rb['XMP-ajs:HijriDate'] ?? 'MISSING')}`);
-      }
+    if (cmp.complete) {
+      status.status = 'done';
+      status.classification = 'complete';
+      batch.done++;
+      await _journal(batchId, file.dest, 'complete', { classification: 'complete' });
+    } else {
+      status.status = 'done';
+      status.classification = 'partial';
+      status.error  = `Read-back mismatch: ${cmp.mismatches.join(', ')}`;
+      batch.done++;
+      batch.partial = (batch.partial || 0) + 1;
+      log(`[exifService] Partial (read-back mismatch): ${path.basename(file.dest)} — ${cmp.mismatches.join(', ')}`);
+      await _journal(batchId, file.dest, 'partial', { classification: 'partial', error: status.error });
     }
   } catch (err) {
     if (err.message && err.message.includes('BatchCluster has ended')) {
       _resetExifTool();
     }
     status.status = 'error';
+    status.classification = 'failed';
     status.error  = err.message;
     batch.failed++;
     log(`[exifService] Write failed: ${file.dest} | ${err.message}`);
+    await _journal(batchId, file.dest, 'failed', { classification: 'failed', error: err.message });
   }
 }
 
@@ -489,12 +513,21 @@ function applyBatch(batchId, copiedFiles, context, emitFn) {
   const fileStatuses = copiedFiles.map(f => ({
     // photographer is optional per-file — set by reapply to support multi-photographer events.
     // When null, _processFile falls back to context.photographer.
-    status: 'pending', src: f.src, dest: f.dest, photographer: f.photographer ?? null, sidecar: null, error: null,
+    status: 'pending', classification: null, src: f.src, dest: f.dest, photographer: f.photographer ?? null, sidecar: null, error: null,
   }));
+
+  // Frozen-snapshot resolution (plan §6): every file's expectation is resolved once,
+  // right here, before any write or manifest persistence — _processFile/_writeAndVerify
+  // always consume this frozen value, never re-resolve.
+  const resolved = copiedFiles.map(f => _resolveForFile(f, context));
 
   // Store context alongside batch so retries re-use the event.json-derived context,
   // never a stale renderer-side snapshot.
-  const batch = { total: copiedFiles.length, done: 0, skipped: 0, failed: 0, files: fileStatuses, _context: context };
+  const batch = {
+    total: copiedFiles.length, done: 0, skipped: 0, failed: 0,
+    partial: 0, ambiguous: 0, excluded: 0,
+    files: fileStatuses, _context: context, _resolved: resolved,
+  };
   _batches.set(batchId, batch);
 
   if (emitFn) emitFn({ batchId, event: 'batch_start', total: batch.total });
@@ -505,7 +538,18 @@ function applyBatch(batchId, copiedFiles, context, emitFn) {
   //
   // If the cluster has already ended (e.g. from a previous batch error), reset it and
   // retry once with a fresh instance before failing the entire batch.
+  //
+  // The manifest write is awaited as the FIRST step of this same queued job — never
+  // fired unawaited alongside it — because _enqueue runs up to MAX_CONCURRENCY jobs
+  // concurrently, not strictly FIFO. Only after the manifest is durably on disk do we
+  // even check ExifTool, and file jobs are only ever scheduled from this function's own
+  // continuation below — so no file's journal entry can exist before its batch's
+  // manifest does, closing the race where a crash mid-batch could leave completed work
+  // invisible to both resume and the durable-counts system (no manifest → not found by
+  // listActiveBatchIds → never revisited).
   _enqueue(async () => {
+    await _writeBatchManifest(batchId, resolved.map((r, i) => ({ file: copiedFiles[i], ...r })), context);
+
     let preflightErr = null;
     try {
       await _getExifTool().version();
@@ -527,13 +571,16 @@ function applyBatch(batchId, copiedFiles, context, emitFn) {
       log(`[exifService] ExifTool preflight failed for batch ${batchId}: ${preflightErr.message}`);
       for (const status of batch.files) {
         status.status = 'error';
+        status.classification = 'failed';
         status.error  = `ExifTool unavailable: ${preflightErr.message}`;
+        await _journal(batchId, status.dest, 'failed', { classification: 'failed', error: status.error });
       }
       batch.failed = batch.total;
       if (emitFn) {
         emitFn({
           batchId, event: 'batch_complete',
           done: 0, skipped: 0, failed: batch.total, total: batch.total,
+          partial: 0, ambiguous: 0, excluded: 0,
         });
         emitFn({
           batchId, event: 'batch_error',
@@ -548,7 +595,7 @@ function applyBatch(batchId, copiedFiles, context, emitFn) {
     copiedFiles.forEach((file, idx) => {
       _enqueue(async () => {
         const status = batch.files[idx];
-        await _processFile(file, status, batch, context);
+        await _processFile(batchId, file, status, batch, resolved[idx]);
 
         if (emitFn) {
           emitFn({
@@ -563,6 +610,7 @@ function applyBatch(batchId, copiedFiles, context, emitFn) {
             emitFn({
               batchId, event: 'batch_complete',
               done: batch.done, skipped: batch.skipped, failed: batch.failed, total: batch.total,
+              partial: batch.partial, ambiguous: batch.ambiguous, excluded: batch.excluded,
             });
           }
           log(`[exifService] Batch ${batchId} complete — ${batch.done} ok, ${batch.skipped} skipped, ${batch.failed} failed`);
@@ -613,20 +661,23 @@ function retryFailed(batchId, emitFn) {
 
   if (toRetry.length === 0) return;
 
-  const context = batch._context;
-
   for (const { f } of toRetry) {
     batch.failed--;
     f.status = 'pending';
+    f.classification = null;
     f.error  = null;
   }
+
+  let remaining = toRetry.length;
 
   for (const { idx } of toRetry) {
     const file   = batch.files[idx];
     const status = file;
 
     _enqueue(async () => {
-      await _processFile({ src: file.src, dest: file.dest, photographer: file.photographer ?? null }, status, batch, context);
+      const fileArg = { src: file.src, dest: file.dest, photographer: file.photographer ?? null };
+      await _processFile(batchId, fileArg, status, batch, batch._resolved[idx]);
+      remaining--;
 
       if (emitFn) {
         emitFn({
@@ -634,6 +685,28 @@ function retryFailed(batchId, emitFn) {
           index: idx, dest: file.dest, status: status.status,
           done: batch.done, skipped: batch.skipped, failed: batch.failed, total: batch.total,
         });
+      }
+
+      // Retry has its own completion signal — without this, the renderer's
+      // retry-pending flag never clears (it only ever watched batch_complete/
+      // batch_error, which applyBatch's original run already fired once).
+      if (remaining === 0) {
+        const retriedIdx = toRetry.map(t => t.idx);
+        const stillFailed = retriedIdx.filter(i => batch.files[i].status === 'error');
+        if (emitFn) {
+          emitFn({
+            batchId, event: 'batch_complete',
+            done: batch.done, skipped: batch.skipped, failed: batch.failed, total: batch.total,
+            partial: batch.partial, ambiguous: batch.ambiguous, excluded: batch.excluded,
+          });
+          if (stillFailed.length > 0) {
+            emitFn({
+              batchId, event: 'batch_error',
+              failed: stillFailed.length,
+              errors: stillFailed.map(i => ({ file: path.basename(batch.files[i].dest), error: batch.files[i].error })),
+            });
+          }
+        }
       }
     });
   }
@@ -669,4 +742,57 @@ function readFileTags(filePath) {
   return _getExifTool().read(filePath);
 }
 
-module.exports = { applyBatch, retryFailed, getBatchStatus, shutdown, readFileTags };
+/**
+ * Resume-only entry point: writes a single previously-frozen expectation (from a
+ * manifest recovered by metadataQueueRecovery.js) without re-resolving it. The
+ * caller is responsible for the safety comparison against a fresh resolve (plan
+ * §6) — by the time this is called, that decision has already been made.
+ * @param {string} batchId The original batch's id (journal entries append to it).
+ * @param {{dest:string, isRaw:boolean, expectation:object}} fileEntry
+ * @returns {Promise<{classification:'complete'|'partial'|'failed', error?:string}>}
+ */
+async function resumeFrozenFile(batchId, fileEntry) {
+  const { dest, isRaw, expectation } = fileEntry;
+  await _journal(batchId, dest, 'writing');
+  try {
+    const cmp = await _writeAndVerify({ dest }, { sidecar: null }, expectation, isRaw);
+    if (cmp.complete) {
+      await _journal(batchId, dest, 'complete', { classification: 'complete' });
+      return { classification: 'complete' };
+    }
+    const error = `Read-back mismatch: ${cmp.mismatches.join(', ')}`;
+    await _journal(batchId, dest, 'partial', { classification: 'partial', error });
+    return { classification: 'partial', error };
+  } catch (err) {
+    if (err.message && err.message.includes('BatchCluster has ended')) _resetExifTool();
+    await _journal(batchId, dest, 'failed', { classification: 'failed', error: err.message });
+    return { classification: 'failed', error: err.message };
+  }
+}
+
+/**
+ * Read-only classification + sidecar-path resolution, shared with verification
+ * workflows (Transfer Import / same-size-skip) so they never re-derive the RAW/video
+ * split or the sidecar-path convention independently of the apply engine.
+ * @param {string} destPath
+ * @returns {{isRaw:boolean, isVideo:boolean, verifyPath:string}} verifyPath is the
+ *   sidecar path for RAW files (whether or not it exists yet) or destPath itself.
+ */
+function classifyForVerification(destPath) {
+  const { isRaw, isVideo } = _classify({ dest: destPath });
+  if (!isRaw) return { isRaw, isVideo, verifyPath: destPath };
+  const ext = path.extname(destPath);
+  return { isRaw, isVideo, verifyPath: destPath.slice(0, destPath.length - ext.length) + '.xmp' };
+}
+
+module.exports = {
+  applyBatch, retryFailed, getBatchStatus, shutdown, readFileTags, resumeFrozenFile,
+  classifyForVerification, compareReadback: _compareReadback, buildEvidence: _buildEvidence,
+  RAW_EXTENSIONS, VIDEO_EXTENSIONS,
+  // Test-only: exposes the tag builder so test/fieldSpecsConsistency.test.js can
+  // behaviorally verify it stays in sync with the resolver's field set (closure item
+  // #10's interim guardrail) without hand-copying a duplicate field list into the
+  // test itself. Not part of the module's real public API — no other caller should
+  // use this directly; go through applyBatch/resumeFrozenFile instead.
+  _buildTags,
+};

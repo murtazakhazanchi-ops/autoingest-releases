@@ -1783,7 +1783,7 @@ ${_offlineStagingMode ? '<p class="ec-subtext">Archive offline — showing colle
             const btnLabel = (_evlIsMulti && _evlQmzComps.length > 1 && comp.folderName)
               ? `Sort QMZ (${comp.folderName})`
               : 'Sort QMZ Photos';
-            return `<button class="ec-evl-qmz-btn" data-qmz-root="${esc(qmzRoot)}" data-qmz-folder="${esc(ev.folderName)}" data-qmz-comp-idx="${compIdx}" title="Open QMZ Sequence Manager">${esc(btnLabel)}</button>`;
+            return `<button class="ec-evl-qmz-btn" data-qmz-root="${esc(qmzRoot)}" data-qmz-folder="${esc(ev.folderName)}" data-qmz-comp-idx="${compIdx}" data-qmz-event-folder="${esc(_evlEventFolder)}" title="Open QMZ Sequence Manager">${esc(btnLabel)}</button>`;
           }).join('')
         : '';
 
@@ -1892,16 +1892,21 @@ ${unparseable.map(ev => `
     body.querySelectorAll('.ec-evl-qmz-btn').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation(); // prevent item selection on click
-        const qmzRoot = btn.dataset.qmzRoot;
-        const folder  = btn.dataset.qmzFolder;
-        const compIdx = parseInt(btn.dataset.qmzCompIdx, 10);
+        const qmzRoot     = btn.dataset.qmzRoot;
+        const folder      = btn.dataset.qmzFolder;
+        const compIdx     = parseInt(btn.dataset.qmzCompIdx, 10);
+        const eventFolder = btn.dataset.qmzEventFolder || null;
         const evEntry = (_scannedEvents || []).find(ev => ev.folderName === folder);
         const comp    = evEntry?.components?.[compIdx] ?? null;
         const isMulti = (evEntry?.components?.length ?? 0) > 1;
         const eventTitle     = evEntry?._eventJson?.eventName || evEntry?.folderName || null;
         const componentTitle = (isMulti && comp?.folderName) ? comp.folderName : null;
+        // hijriDate + eventJsonPath (the event folder — QMZ appends /event.json itself)
+        // are required so queued metadata carries HijriDate and durably persists its
+        // run to event.json — without them the resolver treats every field as absent.
+        const hijriDate = evEntry?.hijriDate || evEntry?._eventJson?.hijriDate || null;
         if (typeof window.openQMZManager === 'function') {
-          window.openQMZManager(qmzRoot, { component: comp, isMulti, eventTitle, componentTitle });
+          window.openQMZManager(qmzRoot, { component: comp, isMulti, eventTitle, componentTitle, hijriDate, eventJsonPath: eventFolder });
         }
       });
     });

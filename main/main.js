@@ -39,6 +39,7 @@ const { hidePathBestEffort }     = require('../services/internalFileProtection')
 const userManager   = require('./userManager');
 const { validateEventJson } = require('./contracts/dataValidator');
 const exifService         = require('./exifService');
+const { updateEventJsonAtomic } = require('./eventJsonStore');
 const metadataSyncService = require('./metadataSyncService');
 const realtimeOps              = require('../services/realtimeOperationsService');
 const offlineCollectionRegistry    = require('../services/offlineCollectionRegistryService');
@@ -767,14 +768,22 @@ function buildAuditImportEntries(auditContext = {}) {
 }
 
 async function _writeLastMetadataRun(eventJsonFilePath, batchStats, contextGroups) {
-  const { done = 0, failed = 0, skipped = 0 } = batchStats;
-  const status = failed === 0 ? 'applied' : (done > 0 || skipped > 0) ? 'partial' : 'failed';
+  const { done = 0, failed = 0, skipped = 0, partial = 0, ambiguous = 0 } = batchStats;
+  // partial/ambiguous files were written (or skipped) without full read-back-verified
+  // completion — they must not be reported as a clean 'applied' run. A fuller
+  // per-event-state derivation (durable counts, precedence-free decision tree) is
+  // Phase C/D scope; this is the minimal fix so lastMetadataRun.status stops lying.
+  const status = (failed > 0 && done === 0 && skipped === 0) ? 'failed'
+    : (failed > 0 || partial > 0 || ambiguous > 0) ? 'partial'
+    : 'applied';
   const lastMetadataRun = {
     timestamp: new Date().toISOString(),
     status,
     processed: done,
     failed,
     skipped,
+    partial,
+    ambiguous,
     metadataVersion: 1,
   };
   const taggedGroups = Array.isArray(contextGroups)
@@ -787,19 +796,12 @@ async function _writeLastMetadataRun(eventJsonFilePath, batchStats, contextGroup
       }))
     : null;
   try {
-    const raw = await fsp.readFile(eventJsonFilePath, 'utf8');
-    const doc = JSON.parse(raw);
-    doc.lastMetadataRun = lastMetadataRun;
-    if (metadataSummary) doc.metadataSummary = metadataSummary;
-    const tmp = eventJsonFilePath + '.tmp';
-    try {
-      await fsp.writeFile(tmp, JSON.stringify(doc, null, 2), 'utf8');
-      await fsp.rename(tmp, eventJsonFilePath);
-      hidePathBestEffort(eventJsonFilePath).catch(() => {});
-    } catch (writeErr) {
-      try { await fsp.unlink(tmp); } catch {}
-      throw writeErr;
-    }
+    await updateEventJsonAtomic(eventJsonFilePath, () => {
+      const changes = { lastMetadataRun };
+      if (metadataSummary) changes.metadataSummary = metadataSummary;
+      return changes;
+    });
+    hidePathBestEffort(eventJsonFilePath).catch(() => {});
   } catch (err) {
     log(`[main] Failed to persist lastMetadataRun to ${path.basename(eventJsonFilePath)}: ${err.message}`);
   }
@@ -821,24 +823,21 @@ ipcMain.handle('import:commitTransaction', async (event, {
 
   const restoreCreatedStatus = async () => {
     if (!eventJsonPath) return;
+    const jsonPath = path.join(eventJsonPath, 'event.json');
 
     if (originalEventJson && typeof originalEventJson === 'object') {
-      const jsonPath = path.join(eventJsonPath, 'event.json');
-      const tmp = jsonPath + '.tmp';
-      await fsp.writeFile(
-        tmp,
-        JSON.stringify({ ...originalEventJson, status: 'created', updatedAt: Date.now() }, null, 2),
-        'utf-8'
-      );
-      await fsp.rename(tmp, jsonPath);
+      // Restore every field to its pre-import snapshot, routed through the shared
+      // updater so this rollback can't race (or be raced by) a concurrent writer —
+      // a plain overwrite here would have silently discarded any unrelated field a
+      // concurrent operation (e.g. a metadata completion for a different batch)
+      // wrote in the meantime.
+      await updateEventJsonAtomic(jsonPath, () => ({ ...originalEventJson, status: 'created', updatedAt: Date.now() }));
       hidePathBestEffort(jsonPath).catch(() => {});
       return;
     }
 
-    const rollbackResult = await updateEventJson(eventJsonPath, { status: 'created' });
-    if (!rollbackResult?.ok) {
-      throw new Error(rollbackResult?.reason || 'Event rollback failed.');
-    }
+    await updateEventJsonAtomic(jsonPath, () => ({ status: 'created', updatedAt: Date.now() }));
+    hidePathBestEffort(jsonPath).catch(() => {});
   };
 
   // Declared before the outer try so both are reachable by the inner catch and outer catch.
@@ -1022,63 +1021,44 @@ ipcMain.handle('import:commitTransaction', async (event, {
     }
 
     if (eventJsonPath) {
-      // Single atomic write: merge audit logs + set lastImport + set status:'complete'.
-      // All three fields are updated in one read/merge/write cycle to eliminate the
-      // partial-state window where a crash between writes would erase already-committed
-      // audit entries while leaving copied files on disk.
+      // Single serialized read/merge/write: merge audit logs + set lastImport + set
+      // status:'complete'. Routed through updateEventJsonAtomic (not a hand-rolled
+      // read-then-write) so this write can never race a concurrent metadata-completion
+      // write (or any other event.json writer) to the same document — the prior
+      // "read twice" heuristic reduced but did not eliminate that window.
       const jsonPath = path.join(eventJsonPath, 'event.json');
-      let doc = {};
-      // First read
       try {
-        const raw = await fsp.readFile(jsonPath, 'utf8');
-        doc = JSON.parse(raw);
-      } catch { /* no file yet — start from empty */ }
-      // Second read (handles concurrent writers on NAS)
-      try {
-        const latestRaw = await fsp.readFile(jsonPath, 'utf8');
-        doc = JSON.parse(latestRaw);
-      } catch { /* fall back to first read */ }
+        await updateEventJsonAtomic(jsonPath, (doc) => {
+          const changes = { status: 'complete', updatedAt: Date.now() };
 
-      if (logs.length > 0) {
-        const mergedMap = new Map();
-        (Array.isArray(doc.imports) ? doc.imports : [])
-          .concat(logs)
-          .forEach(entry => {
-            if (isValidImportEntry(entry)) mergedMap.set(entry.id, entry);
-            else console.warn('[AUDIT] Skipped invalid entry:', entry);
-          });
-        doc.imports = Array.from(mergedMap.values());
-        const MAX_IMPORTS = 5000;
-        if (doc.imports.length > MAX_IMPORTS) {
-          doc.imports = doc.imports.sort(sortImports).slice(0, MAX_IMPORTS);
-          console.warn('[AUDIT] Trimmed to latest', MAX_IMPORTS);
-        }
-        const latestLog = logs[logs.length - 1];
-        doc.lastImport = {
-          photographer: latestLog.photographer,
-          timestamp:    latestLog.timestamp,
-          fileCount:    latestLog.counts.photos + latestLog.counts.videos,
-        };
-      }
+          if (logs.length > 0) {
+            const mergedMap = new Map();
+            (Array.isArray(doc.imports) ? doc.imports : [])
+              .concat(logs)
+              .forEach(entry => {
+                if (isValidImportEntry(entry)) mergedMap.set(entry.id, entry);
+                else console.warn('[AUDIT] Skipped invalid entry:', entry);
+              });
+            let imports = Array.from(mergedMap.values());
+            const MAX_IMPORTS = 5000;
+            if (imports.length > MAX_IMPORTS) {
+              imports = imports.sort(sortImports).slice(0, MAX_IMPORTS);
+              console.warn('[AUDIT] Trimmed to latest', MAX_IMPORTS);
+            }
+            changes.imports = imports;
+            const latestLog = logs[logs.length - 1];
+            changes.lastImport = {
+              photographer: latestLog.photographer,
+              timestamp:    latestLog.timestamp,
+              fileCount:    latestLog.counts.photos + latestLog.counts.videos,
+            };
+          }
 
-      doc.status    = 'complete';
-      doc.updatedAt = Date.now();
-      if (metadataGroupsForDisk) doc.metadataGroups = metadataGroupsForDisk;
-
-      const tmp = jsonPath + '.tmp';
-      try {
-        await fsp.writeFile(tmp, JSON.stringify(doc, null, 2), 'utf8');
-        try {
-          await fsp.rename(tmp, jsonPath);
-        } catch (renameErr) {
-          if (renameErr.code !== 'EXDEV') throw renameErr;
-          // Cross-device rename (e.g. NAS or iCloud drive on different volume) — fall back to copy+unlink.
-          await fsp.copyFile(tmp, jsonPath);
-          await fsp.unlink(tmp).catch(() => {});
-        }
+          if (metadataGroupsForDisk) changes.metadataGroups = metadataGroupsForDisk;
+          return changes;
+        });
         hidePathBestEffort(jsonPath).catch(() => {});
       } catch (err) {
-        await fsp.unlink(tmp).catch(() => {});
         console.error(`[import:commitTransaction] event.json write failed at ${jsonPath}:`, err.stack || err.message);
         throw new Error(`Event finalization failed (${err.code || 'ERR'}): ${err.message}`);
       }
@@ -1104,12 +1084,14 @@ ipcMain.handle('import:commitTransaction', async (event, {
       const batchId = result.auditLogs?.[0]?.id || Date.now().toString(36);
       const win = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
       const metaContext = {
-        photographer:   photographer || '',
-        eventName:      eventJsonPath ? path.basename(eventJsonPath) : '',
-        collName:       collName || '',
-        hijriDate:      originalEventJson?.hijriDate || null,
-        groups:         groups || [],
-        diskComponents: originalEventJson?.components || [],
+        photographer:     photographer || '',
+        eventName:        eventJsonPath ? path.basename(eventJsonPath) : '',
+        collName:         collName || '',
+        hijriDate:        originalEventJson?.hijriDate || null,
+        eventDescription: originalEventJson?.eventName || null,
+        groups:           groups || [],
+        diskComponents:   originalEventJson?.components || [],
+        eventJsonPath:    eventJsonPath ? path.join(eventJsonPath, 'event.json') : null,
       };
       const baseEmit = win
         ? (p) => { if (!win.isDestroyed()) win.webContents.send('metadata:progress', p); }
@@ -1402,9 +1384,7 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
         if (eventJson.status === 'in-progress') {
           eventJson.status   = 'created';
           eventJson.updatedAt = Date.now();
-          const tmp = jsonPath + '.tmp';
-          await fsp.writeFile(tmp, JSON.stringify(eventJson, null, 2), 'utf8');
-          await fsp.rename(tmp, jsonPath);
+          await updateEventJsonAtomic(jsonPath, () => ({ status: 'created', updatedAt: eventJson.updatedAt }));
           hidePathBestEffort(jsonPath).catch(() => {});
         }
       } else {
@@ -1737,49 +1717,46 @@ async function updateEventJson(eventFolderPath, payload) {
                         payload.sequence !== undefined &&
                         Array.isArray(payload.components);
 
-  let dataToWrite;
-  if (isFullPayload) {
-    // Repair / save path — caller supplies the complete payload; write it directly.
-    dataToWrite = {
-      version:       payload.version ?? 1,
-      hijriDate:     payload.hijriDate,
-      sequence:      typeof payload.sequence === 'number'
-                       ? payload.sequence
-                       : parseInt(payload.sequence, 10),
-      eventName:     payload.eventName,
-      safeEventName: payload.safeEventName,
-      status:        payload.status ?? 'created',
-      components:    payload.components,
-      ...(payload.adoption != null ? { adoption: payload.adoption } : {}),
-      updatedAt:     payload.updatedAt ?? Date.now(),
-    };
-    if (!isValidEventJson(dataToWrite)) {
-      return { ok: false, reason: 'event.json full payload failed schema validation.' };
-    }
-  } else {
-    // Status-only / partial-patch path — read existing, merge, write back.
-    let existing = {};
-    try {
-      const raw = await fsp.readFile(jsonPath, 'utf8');
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === 'object') existing = parsed;
-    } catch { /* no file yet — partial write will be best-effort */ }
-    const PATCH_ALLOWLIST = new Set(['status']);
-    const safePatch = {};
-    for (const [k, v] of Object.entries(payload)) {
-      if (PATCH_ALLOWLIST.has(k)) safePatch[k] = v;
-    }
-    dataToWrite = { ...existing, ...safePatch, updatedAt: Date.now() };
-  }
-
-  const tmp = jsonPath + '.tmp';
   try {
-    await fsp.writeFile(tmp, JSON.stringify(dataToWrite, null, 2), 'utf-8');
-    await fsp.rename(tmp, jsonPath);
+    let validationError = null;
+    await updateEventJsonAtomic(jsonPath, (existing) => {
+      if (isFullPayload) {
+        // Repair / save path — caller supplies the complete identity/component shape.
+        // Only these canonical fields are replaced; every other on-disk field (e.g.
+        // lastMetadataRun, metadataSummary, metadataGroups, imports) survives untouched
+        // — a prior version of this function reconstructed the whole document from
+        // just these fields, silently discarding all of those on every repair/save.
+        const changes = {
+          version:       payload.version ?? 1,
+          hijriDate:     payload.hijriDate,
+          sequence:      typeof payload.sequence === 'number'
+                           ? payload.sequence
+                           : parseInt(payload.sequence, 10),
+          eventName:     payload.eventName,
+          safeEventName: payload.safeEventName,
+          status:        payload.status ?? 'created',
+          components:    payload.components,
+          ...(payload.adoption != null ? { adoption: payload.adoption } : {}),
+          updatedAt:     payload.updatedAt ?? Date.now(),
+        };
+        if (!isValidEventJson({ ...existing, ...changes })) {
+          validationError = 'event.json full payload failed schema validation.';
+          return {}; // no-op merge; validationError short-circuits below
+        }
+        return changes;
+      }
+      // Status-only / partial-patch path — allowlisted fields only.
+      const PATCH_ALLOWLIST = new Set(['status']);
+      const safePatch = {};
+      for (const [k, v] of Object.entries(payload)) {
+        if (PATCH_ALLOWLIST.has(k)) safePatch[k] = v;
+      }
+      return { ...safePatch, updatedAt: Date.now() };
+    });
+    if (validationError) return { ok: false, reason: validationError };
     hidePathBestEffort(jsonPath).catch(() => {});
     return { ok: true };
   } catch (err) {
-    try { await fsp.unlink(tmp); } catch {}
     return { ok: false, reason: `Write failed: ${err.message}` };
   }
 }
@@ -1814,42 +1791,29 @@ function isValidImportEntry(e) {
 ipcMain.handle('event:appendImports', async (_event, eventFolderPath, entries) => {
   if (!eventFolderPath || !Array.isArray(entries)) return { ok: false, reason: 'Invalid args.' };
   const jsonPath = path.join(eventFolderPath, 'event.json');
-  let doc = {};
-  try {
-    const raw = await fsp.readFile(jsonPath, 'utf8');
-    doc = JSON.parse(raw);
-  } catch { /* no file yet — start from empty doc */ }
-  // Re-read latest before final write (handles concurrent writers on NAS).
-  let latestImports = [];
-  try {
-    const latestRaw = await fsp.readFile(jsonPath, 'utf8');
-    const latest = JSON.parse(latestRaw);
-    if (Array.isArray(latest.imports)) latestImports = latest.imports;
-    doc = latest; // use freshest doc as base for write
-  } catch { /* file unchanged or gone — fall back to first read */ }
   const incomingSafe = Array.isArray(entries) ? entries : [];
-  const mergedMap = new Map();
-  [...latestImports, ...incomingSafe].forEach(entry => {
-    if (isValidImportEntry(entry)) {
-      mergedMap.set(entry.id, entry);
-    } else {
-      console.warn('[AUDIT] Skipped invalid entry:', entry);
-    }
-  });
-  doc.imports = Array.from(mergedMap.values());
-  const MAX_IMPORTS = 5000;
-  if (doc.imports.length > MAX_IMPORTS) {
-    doc.imports = doc.imports.sort(sortImports).slice(0, MAX_IMPORTS);
-    console.warn('[AUDIT] Trimmed to latest', MAX_IMPORTS);
-  }
-  const tmp = jsonPath + '.tmp';
   try {
-    await fsp.writeFile(tmp, JSON.stringify(doc, null, 2), 'utf8');
-    await fsp.rename(tmp, jsonPath);
+    const updated = await updateEventJsonAtomic(jsonPath, (doc) => {
+      const existingImports = Array.isArray(doc.imports) ? doc.imports : [];
+      const mergedMap = new Map();
+      [...existingImports, ...incomingSafe].forEach(entry => {
+        if (isValidImportEntry(entry)) {
+          mergedMap.set(entry.id, entry);
+        } else {
+          console.warn('[AUDIT] Skipped invalid entry:', entry);
+        }
+      });
+      let imports = Array.from(mergedMap.values());
+      const MAX_IMPORTS = 5000;
+      if (imports.length > MAX_IMPORTS) {
+        imports = imports.sort(sortImports).slice(0, MAX_IMPORTS);
+        console.warn('[AUDIT] Trimmed to latest', MAX_IMPORTS);
+      }
+      return { imports };
+    });
     hidePathBestEffort(jsonPath).catch(() => {});
-    return { ok: true, count: incomingSafe.length };
+    return { ok: true, count: incomingSafe.length, total: updated.imports.length };
   } catch (err) {
-    try { await fsp.unlink(tmp); } catch {}
     return { ok: false, reason: err.message };
   }
 });
@@ -4870,7 +4834,15 @@ ipcMain.handle('qmz:moveToUnsequenced', async (_e, { qmzRoot, filePaths, photogr
 
 ipcMain.handle('qmz:queueMetadata', async (event, { batchId, files, context }) => {
   const sender = event.sender;
-  const emitFn = (data) => {
+  const eventJsonFilePath = context?.eventJsonPath || null;
+  const emitFn = async (data) => {
+    if (data.event === 'batch_complete' && eventJsonFilePath) {
+      try {
+        await _writeLastMetadataRun(eventJsonFilePath, data, null);
+      } catch (writeErr) {
+        log(`[main] qmz:queueMetadata _writeLastMetadataRun failed for ${eventJsonFilePath}: ${writeErr.message}`);
+      }
+    }
     if (!sender.isDestroyed()) sender.send('qmz:metadata:progress', data);
   };
   // files: [{ dest, photographer }] — src == dest for in-place re-tagging
