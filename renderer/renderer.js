@@ -15414,6 +15414,65 @@ const _transferMonitor = (() => {
     await window.api.exportMetadataAuditReport(_maJobId, 'csv', false).catch(() => {});
   });
 
+  // ── Repair (exhaustive preview, explicit confirmation before any write) ────────
+
+  function _maRenderRepairPreview(items) {
+    const list = document.getElementById('maRepairList');
+    if (!list) return;
+    const writable = items.filter(i => i.proposedAction === 'write');
+    const stale = items.filter(i => i.stale);
+    let html = `<div class="sq-footer-note">${writable.length} file(s) will be written; ${stale.length} skipped as stale (re-audit required).</div>`;
+    for (const item of writable.slice(0, 100)) {
+      const changes = item.fieldsToChange.map(c => `${_esc(c.field)}: "${_esc(c.from)}" → "${_esc(Array.isArray(c.to) ? c.to.join(', ') : c.to)}"`).join('; ');
+      html += `<div class="diag-item diag-item-warn">
+  <div class="diag-item-header"><span class="diag-item-title">${_esc(item.filePath)}</span></div>
+  <div class="diag-item-msg">${changes}</div>
+</div>`;
+    }
+    for (const item of stale.slice(0, 20)) {
+      html += `<div class="diag-item diag-item-error">
+  <div class="diag-item-header"><span class="diag-item-title">${_esc(item.filePath)}</span></div>
+  <div class="diag-item-msg">${_esc(item.staleReason || 're-audit required')}</div>
+</div>`;
+    }
+    list.innerHTML = html;
+    document.getElementById('maRepairConfirmBtn').hidden = writable.length === 0;
+  }
+
+  document.getElementById('maRepairBtn')?.addEventListener('click', async () => {
+    if (!_maJobId) return;
+    const section = document.getElementById('maRepairSection');
+    const statusEl = document.getElementById('maRepairStatusText');
+    section.hidden = false;
+    statusEl.textContent = 'Loading repair preview…';
+    const preview = await window.api.previewMetadataRepair(_maJobId).catch(() => null);
+    if (!preview || !preview.ok) {
+      statusEl.textContent = 'Failed to build repair preview.';
+      return;
+    }
+    statusEl.textContent = `Repair Preview — ${preview.items.length} candidate file(s)`;
+    _maRenderRepairPreview(preview.items);
+  });
+
+  document.getElementById('maRepairConfirmBtn')?.addEventListener('click', async () => {
+    if (!_maJobId) return;
+    const btn = document.getElementById('maRepairConfirmBtn');
+    btn.disabled = true; btn.textContent = 'Writing…';
+    const result = await window.api.runMetadataRepair(_maJobId).catch(() => null);
+    const statusEl = document.getElementById('maRepairStatusText');
+    if (!result || !result.ok) {
+      statusEl.textContent = 'Repair failed to run.';
+    } else if (result.reason === 'nothing-to-repair') {
+      statusEl.textContent = 'Nothing left to repair (all candidates were stale since the audit ran).';
+    } else {
+      const r = result.result;
+      statusEl.textContent = `Repair complete — ${r.complete} fixed, ${r.partial} partial, ${r.failed} failed.`;
+      document.getElementById('maRepairList').innerHTML = '';
+    }
+    btn.hidden = true;
+    btn.disabled = false; btn.textContent = 'Confirm & Write Repairs';
+  });
+
   document.getElementById('maDoneBtn')?.addEventListener('click', _maClose);
   document.getElementById('metadataAuditModal')?.addEventListener('click', e => {
     if (e.target === document.getElementById('metadataAuditModal')) _maClose();

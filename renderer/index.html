@@ -531,6 +531,7 @@
     .qi-content { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
     .qi-title { font-size: 0.95rem; font-weight: 700; color: var(--text-primary); }
     .qi-subtitle { font-size: 0.72rem; color: var(--text-muted); }
+    .qi-boundary-note { font-size: 0.68rem; color: var(--text-muted); margin-top: 4px; line-height: 1.4; }
     .qi-dest-row { display: flex; align-items: center; gap: var(--space-3); margin-top: 8px; }
     .qi-dest-label { font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); white-space: nowrap; }
     .qi-dest-pill {
@@ -6908,6 +6909,7 @@
           <div class="qi-content">
             <div class="qi-title">Quick Import</div>
             <div class="qi-subtitle">Import files directly to a folder — no event required</div>
+            <div class="qi-boundary-note">Staging only — files copied this way aren't tracked as an event, so they're outside Metadata Audit and Repair coverage. Use Event Import for the final archive.</div>
             <div class="qi-dest-row">
               <span class="qi-dest-label">Destination</span>
               <div class="qi-dest-pill">
@@ -7668,7 +7670,8 @@
         <div id="qiModalPhotographerContainer"></div>
       </div>
 
-      <div id="qiModalFileSummary" style="font-size:0.78rem;color:var(--subtext);text-align:center;margin:6px 0 18px;"></div>
+      <div id="qiModalFileSummary" style="font-size:0.78rem;color:var(--subtext);text-align:center;margin:6px 0;"></div>
+      <div class="qi-boundary-note" style="text-align:center;margin:0 0 18px;">Staging only — not tracked as an event, so it won't appear in Metadata Audit or be eligible for Metadata Repair.</div>
 
       <div class="ei-actions">
         <button id="qiModalCancelBtn" class="dup-btn dup-btn-cancel">Cancel</button>
@@ -8496,6 +8499,18 @@
 
         <div id="maList" class="diag-list">
           <div class="sq-empty">Run an audit to see results.</div>
+        </div>
+
+        <div id="maRepairSection" class="adopt-section" hidden>
+          <div class="adopt-header">
+            <span id="maRepairStatusText">Repair Preview</span>
+          </div>
+          <div class="sq-footer-note" id="maRepairSnapshotNote">
+            This preview and repair use the audit snapshot above — the files and values shown were captured when that audit ran, not read again live.
+            After repairing, run a fresh audit before repairing this scope again: files this run repairs will correctly show as "stale" in the same snapshot if you try to repair them a second time — that's the staleness check protecting against a duplicate write, not a failure.
+          </div>
+          <div id="maRepairList" class="adopt-list"></div>
+          <button type="button" class="emm-btn-primary" id="maRepairConfirmBtn" hidden>Confirm &amp; Write Repairs</button>
         </div>
       </div>
 

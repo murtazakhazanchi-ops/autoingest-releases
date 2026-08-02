@@ -46,6 +46,7 @@ const metadataQueueRecovery = require('./metadataQueueRecovery');
 const metadataVerificationService = require('./metadataVerificationService');
 const metadataAuditService  = require('../services/metadataAuditService');
 const metadataAuditExport   = require('../services/metadataAuditExport');
+const metadataRepairService = require('./metadataRepairService');
 const metadataSyncService = require('./metadataSyncService');
 const { resolvePhotographerFromPath } = require('../services/eventEvidenceReconstruction');
 const realtimeOps              = require('../services/realtimeOperationsService');
@@ -4406,6 +4407,12 @@ ipcMain.handle('archive:chooseMetadataAuditFolder', async () => {
   });
   return canceled ? null : filePaths[0];
 });
+
+// ── Metadata Repair (Phase F — consumes an audit's frozen snapshot only) ───────
+
+ipcMain.handle('archive:previewMetadataRepair', async (_event, { auditJobId } = {}) => metadataRepairService.previewMetadataRepair(auditJobId));
+ipcMain.handle('archive:runMetadataRepair',     async (_event, { auditJobId } = {}) => metadataRepairService.runMetadataRepair(auditJobId));
+ipcMain.handle('archive:getMetadataRepairResult', async (_event, { batchId } = {}) => metadataRepairService.getMetadataRepairResult(batchId));
 
 // ── Archive Diagnostics — Stale Lock Release (Phase 13B-1) ───────────────────
 
