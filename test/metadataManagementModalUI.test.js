@@ -176,7 +176,12 @@ async function mkTmp(prefix) { return fsp.mkdtemp(path.join(os.tmpdir(), prefix)
   const closedState = await window.evaluate(() => document.getElementById('metadataSyncModal')?.classList.contains('open'));
   check(closedState === false, 'Close button closes the modal');
 
-  // ── Opening directly onto Audit & Repair (mirrors #alocMetadataAuditBtn's handler) ──
+  // ── openMetadataSyncModal({tab: 'msTabAudit'}) still targets Audit & Repair directly.
+  // No current UI trigger calls it with this option (the former #alocMetadataAuditBtn
+  // deep-link from Archive Location Setup was removed — Metadata Management is now
+  // the sole audit entry point, reached via the dashboard tile's default-tab open,
+  // then manually switching to Audit & Repair) — kept as defensive coverage of the
+  // open function's own tab-targeting behavior. ──
   await window.evaluate(() => window.openMetadataSyncModal({ tab: 'msTabAudit' }));
   await window.waitForTimeout(500);
   let directAuditOpen = await window.evaluate(() => ({
@@ -188,21 +193,24 @@ async function mkTmp(prefix) { return fsp.mkdtemp(path.join(os.tmpdir(), prefix)
   await domClick('#msCloseFooterBtn');
   await window.waitForTimeout(200);
 
-  // ── #alocMetadataAuditBtn's real click handler opens directly on Audit & Repair ──
-  const alocBtnExists = await window.evaluate(() => !!document.getElementById('alocMetadataAuditBtn'));
-  check(alocBtnExists, '#alocMetadataAuditBtn exists in the DOM');
-  if (alocBtnExists) {
-    await domClick('#alocMetadataAuditBtn');
-    await window.waitForTimeout(500);
-    const alocOpenState = await window.evaluate(() => ({
-      open: document.getElementById('metadataSyncModal')?.classList.contains('open'),
-      tabActiveId: document.querySelector('.ms-tab.ms-tab-active')?.id,
-    }));
-    log('#alocMetadataAuditBtn click result:', JSON.stringify(alocOpenState));
-    check(alocOpenState.open === true && alocOpenState.tabActiveId === 'msTab-audit', '#alocMetadataAuditBtn opens the Metadata Management modal directly on Audit & Repair');
-  }
+  // ── Metadata Audit is no longer a separate entry point inside Archive Location
+  // Setup — it was consolidated into Metadata Management → Audit & Repair (the
+  // {tab: 'msTabAudit'} open path checked above). #alocMetadataAuditBtn must not
+  // exist anywhere in the DOM, and the Advanced Archive Operations section must
+  // not have gained a replacement audit entry of any kind. ──
+  const alocAuditRemoved = await window.evaluate(() => ({
+    btnGone: document.getElementById('alocMetadataAuditBtn') === null,
+    advancedRowText: document.querySelector('.aloc-advanced-row')?.textContent || '',
+  }));
+  log('Archive Location Setup Advanced Archive Operations state:', JSON.stringify(alocAuditRemoved));
+  check(alocAuditRemoved.btnGone, '#alocMetadataAuditBtn no longer exists in the DOM');
+  check(!/audit/i.test(alocAuditRemoved.advancedRowText), 'Advanced Archive Operations no longer mentions Metadata Audit in any form');
 
   // ── Backdrop-click / Escape guard: no-op while a repair preview or reapply is pending ──
+  // Self-contained: explicitly (re)open the modal rather than relying on a prior
+  // test block happening to leave it open as a side effect.
+  await window.evaluate(() => window.openMetadataSyncModal());
+  await window.waitForTimeout(300);
   await window.evaluate(() => { _metaReapplyPending = true; });
   await window.evaluate(() => {
     document.getElementById('metadataSyncModal')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));

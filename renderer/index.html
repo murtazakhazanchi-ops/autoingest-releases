@@ -1085,6 +1085,15 @@
     .diag-actions { flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
     .diag-actions-tools { display: flex; gap: 6px; flex-wrap: wrap; }
     .diag-actions-tools button { font-size: 11px; padding: 4px 10px; }
+    /* .diag-actions is flex-direction:column with no align-items override, so its
+       direct children stretch to the container's full width by default flexbox
+       cross-axis stretch — correct for .diag-helper/.diag-actions-tools (no visible
+       box), wrong for a primary action button (looks like a giant full-width button).
+       .ma-run-row is a row wrapper (mirrors the .diag-actions-tools mechanism one
+       element up) so Run/Cancel keep their normal .emm-btn-primary/-secondary
+       compact sizing — unchanged typography/height/radius/states — and appear
+       side by side with no layout jump when Cancel un-hides during a run. */
+    .ma-run-row { display: flex; align-items: center; gap: 8px; }
     .diag-helper { font-size: 11.5px; color: var(--subtext); margin-bottom: 2px; line-height: 1.45; }
 
     /* Adoption Preview (Phase 13C-1) */
@@ -7287,8 +7296,10 @@
                 </label>
                 <span id="maScopeFolderPath" class="sq-footer-note"></span>
               </div>
-              <button type="button" class="emm-btn-primary" id="maRunBtn">Run Audit</button>
-              <button type="button" class="emm-btn-secondary" id="maCancelBtn" hidden>Cancel</button>
+              <div class="ma-run-row">
+                <button type="button" class="emm-btn-primary" id="maRunBtn">Run Audit</button>
+                <button type="button" class="emm-btn-secondary" id="maCancelBtn" hidden>Cancel</button>
+              </div>
             </div>
 
             <div class="diag-status-row">
@@ -8170,7 +8181,6 @@
             <button type="button" class="aloc-btn" id="alocTransferExportBtn">Transfer Export…</button>
             <button type="button" class="aloc-btn" id="alocTransferImportBtn">Transfer Import…</button>
             <button type="button" class="aloc-btn" id="alocDiagnosticsBtn">Diagnostics…</button>
-            <button type="button" class="aloc-btn" id="alocMetadataAuditBtn">Metadata Audit…</button>
           </div>
         </div>
 

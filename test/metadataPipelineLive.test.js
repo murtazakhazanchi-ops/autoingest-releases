@@ -314,10 +314,16 @@ async function rawFile(p) {
   await fsp.writeFile(path.join(evCDir, 'event.json'), JSON.stringify(evCJsonData, null, 2), 'utf8');
   await rawFile(path.join(evCDir, 'Jane Doe', 'c1.cr2'));
 
-  await window.evaluate(() => document.getElementById('alocMetadataAuditBtn').click());
+  // Metadata Audit is now reached via Metadata Management → Audit & Repair (the
+  // standalone #metadataAuditModal and its #alocMetadataAuditBtn deep-link from
+  // Archive Location Setup were both consolidated away).
+  await window.evaluate(() => window.openMetadataSyncModal({ tab: 'msTabAudit' }));
   await window.waitForTimeout(300);
-  const modalOpen = await window.evaluate(() => document.getElementById('metadataAuditModal')?.classList.contains('open'));
-  check(modalOpen === true, 'Test C: Metadata Audit modal opens');
+  const modalOpen = await window.evaluate(() => ({
+    open: document.getElementById('metadataSyncModal')?.classList.contains('open'),
+    tabActiveId: document.querySelector('.ms-tab.ms-tab-active')?.id,
+  }));
+  check(modalOpen.open === true && modalOpen.tabActiveId === 'msTab-audit', 'Test C: Metadata Management opens directly on Audit & Repair');
 
   const scopeRadioExists = await window.evaluate(() => !!document.getElementById('maScopeArchiveRoot'));
   log('maScopeArchiveRoot exists:', scopeRadioExists);

@@ -15621,11 +15621,6 @@ const _transferMonitor = (() => {
     document.getElementById('maRepairBtn').hidden = status.exceptionCount === 0;
   }
 
-  document.getElementById('alocMetadataAuditBtn')?.addEventListener('click', () => {
-    _alocClose();
-    openMetadataSyncModal({ tab: 'msTabAudit' });
-  });
-
   document.getElementById('maScopeFolder')?.addEventListener('change', async (e) => {
     if (!e.target.checked) return;
     const chosen = await window.api.chooseMetadataAuditFolder().catch(() => null);
