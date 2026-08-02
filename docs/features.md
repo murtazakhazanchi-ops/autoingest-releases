@@ -214,25 +214,31 @@ Use this as a reference before implementing or modifying any feature.
 
 ---
 
-## Planned Features
-
-### 1. Metadata Tagging
+### 15. Metadata Tagging, Durable Queue, Audit & Repair
 
 **Description**
-- Attach metadata (event, subject, tags) to files
+- Post-import EXIF/IPTC/XMP tagging (Creator, Copyright, event-type/location/city/country keywords, Hijri date, Description/Caption) applied via a single shared resolver (`services/metadataExpectationService.js`) and a single shared write engine (`main/exifService.js`) — every writer (Standard Import, QMZ, Reapply, resume, repair) is a consumer of that one engine, never an independent write path
+- Durable, crash-recoverable metadata queue: immutable per-batch manifest + append-only journal under `userData/metadata-queue/`, replayed on startup to resume any batch an unclean exit interrupted (proven via a real `SIGKILL` mid-batch + relaunch test, not only a hand-constructed simulation)
+- Event-level metadata status is a 9-state derivation always re-computed from durable per-file counts, never an independently-settable flag — surfaced on the import completion screen and via `metadata:getEventState`
+- Read-only, streaming, resumable archive-wide metadata audit scanner (`services/metadataAuditService.js`) with JSON/JSONL/CSV export
+- Frozen-snapshot metadata repair (`main/metadataRepairService.js`): consumes an audit's captured snapshot only, never re-resolves against live state, guards against drift with a real staleness check, requires explicit operator confirmation before any write
+- See `docs/metadata-system.md` for the full field list, state-machine meanings, durability/recovery behavior, and system boundaries (including what is intentionally out of scope, e.g. Quick Import)
 
-**Expected Impact**
+**System Impact**
 - DATA
 - INGEST
 - UI
+- FILESYSTEM
 
 **Notes**
-- Must not break event.json structure
-- Must remain deterministic
+- Does not alter event.json's core ingestion contract — metadata state lives in its own `metadataState` block, written exclusively through `updateEventJsonAtomic`
+- Quick Import remains intentionally metadata-blind and outside audit/repair coverage — see docs/metadata-system.md's Non-Goals section
 
 ---
 
-### 2. NAS Sync
+## Planned Features
+
+### 1. NAS Sync
 
 **Description**
 - Sync archive to network storage
@@ -248,7 +254,7 @@ Use this as a reference before implementing or modifying any feature.
 
 ---
 
-### 3. Persistence Enhancements
+### 2. Persistence Enhancements
 
 **Description**
 - Improve state persistence across sessions
@@ -262,7 +268,7 @@ Use this as a reference before implementing or modifying any feature.
 
 ---
 
-### 4. Multi-User Handling
+### 3. Multi-User Handling
 
 **Description**
 - Support concurrent users or roles
