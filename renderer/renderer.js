@@ -7722,7 +7722,80 @@ function updateProgress({ total, index, completedCount, filename, status, skipRe
   document.getElementById('progressFilename').innerHTML = labelHtml;
 }
 
-function showProgressSummary({ copied, skipped, errors, skippedReasons, failedFiles, duration, integrity, copiedFiles }, importCleanupRoot = null) {
+const METADATA_STATE_LABELS = {
+  'metadata-not-required':          { label: 'Not required',      cls: 'meta-state-neutral' },
+  'metadata-interrupted':           { label: 'Interrupted — will resume', cls: 'meta-state-warn' },
+  'metadata-in-progress':           { label: 'Applying…',          cls: 'meta-state-neutral' },
+  'metadata-complete':              { label: 'Complete',           cls: 'meta-state-ok' },
+  'metadata-partial':               { label: 'Partial — see details', cls: 'meta-state-warn' },
+  'metadata-failed':                { label: 'Failed',             cls: 'meta-state-error' },
+  'metadata-verification-required': { label: 'Verification required', cls: 'meta-state-warn' },
+  'metadata-queued':                { label: 'Queued',             cls: 'meta-state-neutral' },
+  'metadata-not-attempted':         { label: 'Not yet applied',    cls: 'meta-state-neutral' },
+};
+
+let _psMetadataPollTimer = null;
+
+// Polls event.json's durable metadataState directly rather than trying to stitch
+// together multiple concurrent batchIds (the main copy batch plus any background
+// Transfer/same-size-skip verification batch) through the existing badge's
+// single-batchId progress stream — the durable state is the source of truth and is
+// always safe to re-read, per the same "recompute, never trust a stale flag"
+// principle the rest of this system uses.
+function _pollProgressSummaryMetadataState(eventFolderPath, attemptsLeft = 10) {
+  if (_psMetadataPollTimer) { clearTimeout(_psMetadataPollTimer); _psMetadataPollTimer = null; }
+  if (!eventFolderPath || !window.api?.getMetadataEventState) return;
+
+  window.api.getMetadataEventState(eventFolderPath).then(metadataState => {
+    const row    = document.getElementById('sumMetadataStatusRow');
+    const statusEl = document.getElementById('sumMetadataStatus');
+    if (!row || !statusEl) return;
+
+    if (!metadataState || !metadataState.state) {
+      // Nothing durable yet — metadata work may still be starting. Retry a few times
+      // since verification/queueing happens asynchronously after this modal opens.
+      if (attemptsLeft > 0) _psMetadataPollTimer = setTimeout(() => _pollProgressSummaryMetadataState(eventFolderPath, attemptsLeft - 1), 2000);
+      return;
+    }
+
+    const info = METADATA_STATE_LABELS[metadataState.state] || { label: metadataState.state, cls: 'meta-state-neutral' };
+    row.style.display = 'flex';
+    statusEl.className = info.cls;
+    statusEl.textContent = info.label;
+
+    const actLeft = document.getElementById('progressModal')?.querySelector('.im-actions-left');
+    document.getElementById('verifyMetadataBtn')?.remove();
+    if (actLeft && metadataState.state === 'metadata-verification-required') {
+      const verifyBtn = document.createElement('button');
+      verifyBtn.id        = 'verifyMetadataBtn';
+      verifyBtn.className = 'im-btn-secondary';
+      verifyBtn.textContent = 'Verify Metadata';
+      verifyBtn.title       = 'Re-check and re-queue any files still missing metadata';
+      verifyBtn.addEventListener('click', async () => {
+        verifyBtn.disabled = true;
+        verifyBtn.textContent = 'Checking…';
+        await window.api.reapplyEventMetadata(eventFolderPath).catch(() => {});
+        _pollProgressSummaryMetadataState(eventFolderPath, 5);
+      });
+      actLeft.appendChild(verifyBtn);
+    }
+
+    // Still settling — keep polling so the row reflects the eventual outcome without
+    // the user needing to reopen anything. metadata-verification-required is included
+    // because "Verify Metadata" re-arms this poll immediately after firing a fire-
+    // and-forget reapply IPC call (main.js never awaits exifService.applyBatch) — the
+    // very first poll can easily still see the pre-click state before the backend
+    // batch has finished and persisted, and without this the poll would stop after
+    // that single stale check, leaving the button's own outcome permanently invisible
+    // even though the write completes correctly moments later.
+    const settling = ['metadata-in-progress', 'metadata-queued', 'metadata-interrupted', 'metadata-verification-required'].includes(metadataState.state);
+    if (settling && attemptsLeft > 0) {
+      _psMetadataPollTimer = setTimeout(() => _pollProgressSummaryMetadataState(eventFolderPath, attemptsLeft - 1), 2000);
+    }
+  }).catch(() => {});
+}
+
+function showProgressSummary({ copied, skipped, errors, skippedReasons, failedFiles, duration, integrity, copiedFiles }, importCleanupRoot = null, eventFolderPath = null) {
   // "Imports This Session": count files actually copied in this import run. This is the only
   // place the session counter grows — Transfer Export/Import never reach here.
   _importsThisSession += (Number(copied) || 0);
@@ -7733,6 +7806,15 @@ function showProgressSummary({ copied, skipped, errors, skippedReasons, failedFi
   document.getElementById('sumCopied').textContent  = copied;
   document.getElementById('sumSkipped').textContent = skipped;
   document.getElementById('sumErrors').textContent  = errors;
+
+  // Metadata status row — durable state, polled from event.json (see
+  // _pollProgressSummaryMetadataState). Reset per call so a Quick Import (which
+  // never tags metadata and passes no eventFolderPath) shows nothing stale.
+  if (_psMetadataPollTimer) { clearTimeout(_psMetadataPollTimer); _psMetadataPollTimer = null; }
+  document.getElementById('verifyMetadataBtn')?.remove();
+  const _metaStatusRow = document.getElementById('sumMetadataStatusRow');
+  if (_metaStatusRow) _metaStatusRow.style.display = 'none';
+  if (eventFolderPath) _pollProgressSummaryMetadataState(eventFolderPath);
 
   // Duration row
   const durEl = document.getElementById('sumDuration');
@@ -10002,7 +10084,7 @@ document.getElementById('importBtn').addEventListener('click', async () => {
       const summary = await window.api.commitImportTransaction(_txFileJobs, _txEventPath, auditContext);
       if (!activeSource && !_importCleanupRoot) return;
 
-      showProgressSummary(summary, _importCleanupRoot);
+      showProgressSummary(summary, _importCleanupRoot, _txEventPath);
       if (_eiSelectedImportMode === 'local-first') {
         const _lfCollName   = (eventData.collectionPath || '').replace(/\\/g, '/').replace(/\/$/, '').split('/').filter(Boolean).pop() || '';
         const _lfImportedAt = Date.now();
@@ -14760,6 +14842,20 @@ const _transferMonitor = (() => {
       else if (status.result?.ok) headline = status.result.status === 'partial' ? 'Import complete — with errors' : 'Import complete';
       else if (status.result) headline = 'Import failed';
       headlineEl.textContent = headline;
+    }
+
+    // Checkpoint-health warning — inline, non-modal, persists silently while unhealthy
+    // rather than re-alerting on every poll tick. checkpointHealthy reflects the MOST
+    // RECENT checkpoint write attempt (see transferImportService.js's _state comment),
+    // so this clears itself automatically once a later write succeeds.
+    const checkpointWarnEl = _tiEl('tiCheckpointWarning');
+    if (checkpointWarnEl) {
+      if (status.running && status.checkpointHealthy === false) {
+        checkpointWarnEl.textContent = 'This transfer cannot be safely resumed if interrupted right now — the resume checkpoint could not be saved. Files already copied are unaffected; only resume-after-restart capability is at risk.';
+        checkpointWarnEl.removeAttribute('hidden');
+      } else {
+        checkpointWarnEl.setAttribute('hidden', '');
+      }
     }
 
     // Batch info

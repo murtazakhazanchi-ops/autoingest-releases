@@ -40,7 +40,12 @@ const userManager   = require('./userManager');
 const { validateEventJson } = require('./contracts/dataValidator');
 const exifService         = require('./exifService');
 const { updateEventJsonAtomic } = require('./eventJsonStore');
+const metadataQueueStore    = require('./metadataQueueStore');
+const metadataStateService  = require('./metadataStateService');
+const metadataQueueRecovery = require('./metadataQueueRecovery');
+const metadataVerificationService = require('./metadataVerificationService');
 const metadataSyncService = require('./metadataSyncService');
+const { resolvePhotographerFromPath } = require('../services/eventEvidenceReconstruction');
 const realtimeOps              = require('../services/realtimeOperationsService');
 const offlineCollectionRegistry    = require('../services/offlineCollectionRegistryService');
 const photographerSeqService       = require('../services/photographerSequenceService');
@@ -257,6 +262,28 @@ app.whenReady().then(() => {
   // Emit initial health snapshot after a short startup delay, then every 60 s.
   setTimeout(_emitDeviceHealth, 6000);
   setInterval(_emitDeviceHealth, 60_000);
+  // Resume metadata batches an unclean exit left mid-write. Runs once, after a
+  // short delay so it never competes with startup I/O for the splash screen.
+  setTimeout(() => {
+    metadataQueueRecovery.resumeInterruptedBatches()
+      .then(summary => {
+        if (summary.batchesScanned > 0) {
+          log(`[main] Metadata queue resume: ${summary.batchesScanned} batch(es) scanned, ${summary.filesResumed} file(s) resumed, ${summary.filesStale} stale, ${summary.eventsUpdated} event(s) updated`);
+        }
+        // Prune old compacted batches only after resume has had first crack at the
+        // active queue — retention is a disk-growth concern with no correctness
+        // impact (compacted/ is never rescanned by resume/audit/repair), so it can
+        // safely run after, never gating, the recovery pass. Best-effort by design;
+        // never throws.
+        return metadataQueueStore.pruneCompactedBatches();
+      })
+      .then(pruneSummary => {
+        if (pruneSummary && pruneSummary.deleted > 0) {
+          log(`[main] Metadata queue retention: ${pruneSummary.deleted}/${pruneSummary.scanned} compacted file(s) older than retention pruned, ${pruneSummary.failed} failed`);
+        }
+      })
+      .catch(err => log(`[main] Metadata queue resume/prune failed: ${err.message}`));
+  }, 3000);
   listManager.init(app.getPath('userData'));
   aliasEngine.init(app.getPath('userData'));
   telemetry.init();
@@ -807,6 +834,184 @@ async function _writeLastMetadataRun(eventJsonFilePath, batchStats, contextGroup
   }
 }
 
+/**
+ * Recomputes the event's durable metadata-status block from the metadata-queue
+ * manifest+journal records and persists it into event.json, then compacts the
+ * batch's manifest+journal out of the active queue dir — only after event.json
+ * durably reflects the outcome, so a crash between these two steps never makes a
+ * batch's result invisible to a later resume.
+ */
+async function _persistMetadataStateAndCompact(batchId, eventJsonFilePath) {
+  if (!eventJsonFilePath) return;
+  try {
+    await metadataStateService.persistEventMetadataState(eventJsonFilePath);
+  } catch (err) {
+    log(`[main] Failed to persist metadataState for ${eventJsonFilePath}: ${err.message}`);
+    return; // do not compact — event.json doesn't durably reflect this batch yet.
+  }
+  if (batchId) {
+    metadataQueueStore.compactBatch(batchId).catch(err =>
+      log(`[main] Failed to compact metadata batch ${batchId}: ${err.message}`));
+  }
+}
+
+/**
+ * Read-only verification + reconcile for files that reached the archive outside the
+ * normal applyBatch write path (Transfer Import, same-size-skip). Incomplete files
+ * are queued through applyBatch — governed by settings.getAutoMetadataEnabled() —
+ * only when the setting is on; otherwise they're recorded as verification-required.
+ *
+ * Known limitation: extraCounts merged here reflect this verification pass's
+ * findings at the moment it runs. If a later, unrelated metadata batch for the same
+ * event recomputes metadataState (manifest-derived only), that later recompute can
+ * transiently drop this pass's contribution from the displayed rollup until the next
+ * verification run — the underlying files' real tag state on disk is unaffected.
+ * A durable per-event verification ledger (merged the same way manifests are) would
+ * close this gap; not built here (Phase E/F-adjacent scope).
+ *
+ * @param {string} eventJsonFilePath
+ * @param {Array<{src:string, dest:string, photographer?:string|null}>} files
+ * @param {object} context Same evidence shape exifService.applyBatch consumes.
+ */
+async function _verifyAndReconcile(eventJsonFilePath, files, context) {
+  if (!files || files.length === 0) return;
+
+  let results;
+  try {
+    results = await metadataVerificationService.verifyFiles(files, context);
+  } catch (err) {
+    log(`[main] Metadata verification failed for ${eventJsonFilePath}: ${err.message}`);
+    return;
+  }
+
+  const toQueue = [];
+  const extraCounts = { eligible: 0, complete: 0, ambiguous: 0, verificationRequired: 0, failed: 0 };
+
+  for (const r of results) {
+    if (r.status === 'excluded') continue; // video — never eligible, never counted.
+    if (r.status === 'complete') { extraCounts.eligible++; extraCounts.complete++; continue; }
+    if (r.status === 'ambiguous') { extraCounts.eligible++; extraCounts.ambiguous++; continue; }
+    if (r.status === 'read-error') { extraCounts.eligible++; extraCounts.failed++; continue; }
+    // incomplete
+    if (settings.getAutoMetadataEnabled()) {
+      const src = files.find(f => f.dest === r.dest);
+      if (src) toQueue.push(src);
+    } else {
+      extraCounts.eligible++; extraCounts.verificationRequired++;
+    }
+  }
+
+  if (toQueue.length > 0) {
+    const batchId = `verify-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+    exifService.applyBatch(batchId, toQueue, context, async (p) => {
+      if (p.event === 'batch_complete') {
+        try {
+          await _writeLastMetadataRun(eventJsonFilePath, p, context.groups);
+        } catch (writeErr) {
+          log(`[main] verify-and-repair _writeLastMetadataRun failed for ${eventJsonFilePath}: ${writeErr.message}`);
+        }
+        await _persistMetadataStateAndCompact(p.batchId, eventJsonFilePath);
+      }
+    });
+  }
+
+  if (extraCounts.eligible > 0) {
+    try {
+      await metadataStateService.persistEventMetadataState(eventJsonFilePath, { extraCounts });
+    } catch (err) {
+      log(`[main] Failed to persist verification-derived metadataState for ${eventJsonFilePath}: ${err.message}`);
+    }
+  }
+}
+
+/**
+ * Reconstructs groups/diskComponents-shaped evidence + per-file photographer for
+ * files that reached the archive without ever passing through a renderer-built
+ * metadataGroups selection (Transfer Import) — mirrors metadata:reapplyEvent's
+ * folder-structure-based photographer resolution, the only other workflow that
+ * already has to solve this same problem.
+ */
+function _buildTransferVerificationContext(eventFolderPath, eventJson, filesForEvent) {
+  const components = Array.isArray(eventJson?.components) ? eventJson.components : [];
+  const isMulti = components.length > 1;
+  const imports = Array.isArray(eventJson?.imports) ? eventJson.imports : [];
+  const fallbackPhotographer = imports.length > 0 ? (imports[imports.length - 1].photographer || '') : '';
+
+  const resolvePhotographer = (filePath, baseDir) => resolvePhotographerFromPath(filePath, baseDir, fallbackPhotographer);
+
+  const groups = [];
+  const filesWithPhotographer = [];
+
+  if (!isMulti) {
+    groups.push({ id: 'root', subEventId: null, files: filesForEvent.map(f => f.dest) });
+    for (const f of filesForEvent) {
+      filesWithPhotographer.push({ ...f, photographer: resolvePhotographer(f.dest, eventFolderPath) });
+    }
+  } else {
+    const matched = new Set();
+    for (const comp of components) {
+      if (!comp.folderName) continue;
+      const compDir  = path.join(eventFolderPath, comp.folderName) + path.sep;
+      const compFiles = filesForEvent.filter(f => f.dest.startsWith(compDir));
+      if (compFiles.length === 0) continue;
+      groups.push({ id: comp.folderName, subEventId: comp.folderName, files: compFiles.map(f => f.dest) });
+      for (const f of compFiles) {
+        filesWithPhotographer.push({ ...f, photographer: resolvePhotographer(f.dest, path.join(eventFolderPath, comp.folderName)) });
+        matched.add(f.dest);
+      }
+    }
+    for (const f of filesForEvent) {
+      if (!matched.has(f.dest)) filesWithPhotographer.push({ ...f, photographer: fallbackPhotographer || null });
+    }
+  }
+
+  return {
+    context: {
+      photographer: fallbackPhotographer, hijriDate: eventJson?.hijriDate || null,
+      eventDescription: eventJson?.eventName || null, groups, diskComponents: components,
+      eventJsonPath: path.join(eventFolderPath, 'event.json'),
+    },
+    files: filesWithPhotographer,
+  };
+}
+
+/**
+ * Post-transfer metadata verification (plan §7). Reads the batch's per-file outcome
+ * manifest, scopes verification to files this transfer actually materialized
+ * (copied/same-size-skipped/renamed/resumed — never a destination-folder walk, and
+ * never failed/changed-skipped files), groups by owning event, and reconciles each.
+ */
+async function _verifyTransferBatch(mainArchiveRoot, batchId) {
+  if (!batchId) return;
+  let outcomes;
+  try {
+    outcomes = await transferImportService.readTransferOutcomes(mainArchiveRoot, batchId);
+  } catch (err) {
+    log(`[main] Transfer metadata verification: could not read outcomes for batch ${batchId}: ${err.message}`);
+    return;
+  }
+  if (outcomes.length === 0) return;
+
+  const eligibleOutcomes = new Set(['copied', 'same-size-skipped', 'renamed', 'resumed']);
+  const byEvent = new Map();
+  for (const o of outcomes) {
+    if (!eligibleOutcomes.has(o.outcome) || !o.eventPath) continue;
+    if (!byEvent.has(o.eventPath)) byEvent.set(o.eventPath, []);
+    byEvent.get(o.eventPath).push({ src: o.destPath, dest: o.destPath });
+  }
+
+  for (const [eventFolderPath, filesForEvent] of byEvent) {
+    try {
+      const raw = await fsp.readFile(path.join(eventFolderPath, 'event.json'), 'utf8');
+      const eventJson = JSON.parse(raw);
+      const { context, files } = _buildTransferVerificationContext(eventFolderPath, eventJson, filesForEvent);
+      await _verifyAndReconcile(context.eventJsonPath, files, context);
+    } catch (err) {
+      log(`[main] Transfer metadata verification failed for ${eventFolderPath}: ${err.message}`);
+    }
+  }
+}
+
 ipcMain.handle('import:commitTransaction', async (event, {
   fileJobs,
   eventJsonPath,
@@ -1110,6 +1315,7 @@ ipcMain.handle('import:commitTransaction', async (event, {
               } catch (writeErr) {
                 log(`[main] _writeLastMetadataRun failed for ${eventJsonPath}: ${writeErr.message}`);
               }
+              await _persistMetadataStateAndCompact(p.batchId, path.join(eventJsonPath, 'event.json'));
             }
             if (baseEmit) baseEmit(p);
           }
@@ -1117,6 +1323,27 @@ ipcMain.handle('import:commitTransaction', async (event, {
 
       exifService.applyBatch(batchId, result.copiedFiles, metaContext, emitFn);
       result.metadataBatchId = batchId;
+    }
+
+    // Same-size-skip metadata verification (plan §6): a skipped file's pre-existing
+    // destination content was never checked for metadata by the copy step itself —
+    // it may be a leftover from before this fix, or from an import where metadata
+    // writing was disabled. Read-only verification runs regardless of whether this
+    // import's own copy batch had metadata enabled; only auto-repair is gated by it.
+    if (eventJsonPath && result.skippedFiles?.length > 0) {
+      const verifyContext = {
+        photographer:     photographer || '',
+        hijriDate:        originalEventJson?.hijriDate || null,
+        eventDescription: originalEventJson?.eventName || null,
+        groups:           groups || [],
+        diskComponents:   originalEventJson?.components || [],
+      };
+      const verifyEventJsonPath = path.join(eventJsonPath, 'event.json');
+      _verifyAndReconcile(
+        verifyEventJsonPath,
+        result.skippedFiles.map(f => ({ src: f.src, dest: f.dest })),
+        verifyContext
+      ).catch(err => log(`[main] same-size-skip metadata verification failed for ${eventJsonPath}: ${err.message}`));
     }
 
     // Realtime: broadcast import completed summary (advisory only, non-blocking).
@@ -3101,9 +3328,22 @@ ipcMain.handle('metadata:getStatus', (_event, batchId) => {
 
 ipcMain.handle('metadata:retry', async (_event, batchId) => {
   const win = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
-  const emitFn = win
-    ? (progress) => { if (!win.isDestroyed()) win.webContents.send('metadata:progress', progress); }
-    : null;
+  // eventJsonPath was stored on the batch's context at applyBatch time (Standard
+  // Import / Reapply) so a retry can persist lastMetadataRun the same way the
+  // original run did — retry previously never wrote this at all.
+  const storedContext = exifService.getBatchStatus(batchId)?._context || null;
+  const eventJsonFilePath = storedContext?.eventJsonPath || null;
+  const emitFn = async (progress) => {
+    if (progress.event === 'batch_complete' && eventJsonFilePath) {
+      try {
+        await _writeLastMetadataRun(eventJsonFilePath, progress, storedContext?.groups);
+      } catch (writeErr) {
+        log(`[main] metadata:retry _writeLastMetadataRun failed for ${eventJsonFilePath}: ${writeErr.message}`);
+      }
+      await _persistMetadataStateAndCompact(progress.batchId, eventJsonFilePath);
+    }
+    if (win && !win.isDestroyed()) win.webContents.send('metadata:progress', progress);
+  };
   // Context is taken from the stored batch state (event.json-derived), not from the renderer.
   exifService.retryFailed(batchId, emitFn);
   return { ok: true };
@@ -3119,6 +3359,17 @@ ipcMain.handle('metadata:getLastRun', async (_event, eventFolderPath) => {
       ...doc.lastMetadataRun,
       metadataSummary: Array.isArray(doc.metadataSummary) ? doc.metadataSummary : null,
     };
+  } catch {
+    return null;
+  }
+});
+
+ipcMain.handle('metadata:getEventState', async (_event, eventFolderPath) => {
+  if (!eventFolderPath || typeof eventFolderPath !== 'string') return null;
+  try {
+    const raw = await fsp.readFile(path.join(eventFolderPath, 'event.json'), 'utf8');
+    const doc = JSON.parse(raw);
+    return doc.metadataState || null;
   } catch {
     return null;
   }
@@ -3174,11 +3425,7 @@ ipcMain.handle('metadata:reapplyEvent', async (_event, eventFolderPath) => {
   // Multi-component:   eventFolder/<comp>/<photographer>/[VIDEO/]filename
   // In both cases the photographer segment is always parts[0] relative to baseDir.
   function resolvePhotographer(filePath, baseDir) {
-    const rel   = path.relative(baseDir, filePath);
-    const parts = rel.split(path.sep);
-    const seg   = parts.length > 1 ? parts[0] : '';
-    // Strip PCxx- prefix so metadata reflects canonical name regardless of sequencing.
-    return photographerSeqService.canonicalName(seg || fallbackPhotographer);
+    return resolvePhotographerFromPath(filePath, baseDir, fallbackPhotographer);
   }
 
   const groups      = [];
@@ -3243,22 +3490,26 @@ ipcMain.handle('metadata:reapplyEvent', async (_event, eventFolderPath) => {
 
   const batchId = `reapply-${Date.now().toString(36)}`;
   const win     = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
+  const reapplyEventJsonPath = path.join(eventFolderPath, 'event.json');
   const reapplyContext = {
-    photographer:   fallbackPhotographer,
+    photographer:     fallbackPhotographer,
     eventName,
     collName,
     hijriDate,
+    eventDescription: eventJson?.eventName || null,
     groups,
-    diskComponents: components,
+    diskComponents:   components,
+    eventJsonPath:    reapplyEventJsonPath,
   };
-  const reapplyEventJsonPath = path.join(eventFolderPath, 'event.json');
   const baseEmit = win
     ? (p) => { if (!win.isDestroyed()) win.webContents.send('metadata:progress', p); }
     : null;
   const emitFn = baseEmit
     ? async (p) => {
-        if (p.event === 'batch_complete')
+        if (p.event === 'batch_complete') {
           await _writeLastMetadataRun(reapplyEventJsonPath, p, reapplyContext.groups);
+          await _persistMetadataStateAndCompact(p.batchId, reapplyEventJsonPath);
+        }
         baseEmit(p);
       }
     : null;
@@ -4059,6 +4310,12 @@ ipcMain.handle('archive:runTransferImport', async (_event, { scope, operatorName
   return transferImportService.runImport(transferRoot, mainArchiveRoot, scope, isValidEventJson, {
     operatorName: operatorName || null,
     deviceName:   os.hostname(),
+    onComplete: (result) => {
+      if (result?.ok && result.batchId) {
+        _verifyTransferBatch(mainArchiveRoot, result.batchId).catch(err =>
+          log(`[main] Transfer metadata verification orchestration failed: ${err.message}`));
+      }
+    },
   });
 });
 
@@ -4087,6 +4344,12 @@ ipcMain.handle('archive:resumeTransferImportFromCheckpoint', async (_event, { op
   return transferImportService.resumeImportFromCheckpoint(transferRoot, mainArchiveRoot, {
     operatorName: operatorName || null,
     deviceName:   os.hostname(),
+    onComplete: (result) => {
+      if (result?.ok && result.batchId) {
+        _verifyTransferBatch(mainArchiveRoot, result.batchId).catch(err =>
+          log(`[main] Transfer metadata verification orchestration failed: ${err.message}`));
+      }
+    },
   });
 });
 
@@ -4842,6 +5105,7 @@ ipcMain.handle('qmz:queueMetadata', async (event, { batchId, files, context }) =
       } catch (writeErr) {
         log(`[main] qmz:queueMetadata _writeLastMetadataRun failed for ${eventJsonFilePath}: ${writeErr.message}`);
       }
+      await _persistMetadataStateAndCompact(data.batchId, eventJsonFilePath);
     }
     if (!sender.isDestroyed()) sender.send('qmz:metadata:progress', data);
   };

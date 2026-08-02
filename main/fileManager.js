@@ -458,7 +458,7 @@ async function copyFiles(filePaths, destination, onProgress) {
  */
 async function copyFileJobs(fileJobs, onProgress) {
   if (!Array.isArray(fileJobs) || fileJobs.length === 0) {
-    return { copied: 0, skipped: 0, errors: 0, skippedReasons: [], failedFiles: [], copiedFiles: [], duration: 0 };
+    return { copied: 0, skipped: 0, errors: 0, skippedReasons: [], failedFiles: [], copiedFiles: [], skippedFiles: [], duration: 0 };
   }
 
   isPaused  = false; // always start fresh
@@ -530,6 +530,7 @@ async function copyFileJobs(fileJobs, onProgress) {
   const skippedReasons = [];
   const failedFiles    = [];
   const copiedFiles    = [];
+  const skippedFiles   = []; // { src, dest } for every same-size-skipped file — metadata verification scope.
 
   // ── Per-job processor ───────────────────────────────────────────────────────
   async function processJob(job, origIndex) {
@@ -579,6 +580,7 @@ async function copyFileJobs(fileJobs, onProgress) {
       completedCount++;
       completedBytes += fileSize;
       skippedReasons.push(`Skipped: ${filename} — ${resolved.reason}`);
+      skippedFiles.push({ src: job.src, dest: path.join(destDir, filename) });
       const { eta, speedBps } = getSpeedAndEta();
       onProgress({ total, index: origIndex + 1, completedCount, filename,
                    status: 'skipped', skipReason: resolved.reason, eta, speedBps, fileSize });
@@ -645,7 +647,7 @@ async function copyFileJobs(fileJobs, onProgress) {
         if (copied + skipped + errors !== total) {
           log(`[copyFileJobs] accounting drift: copied=${copied} skipped=${skipped} errors=${errors} total=${total}`);
         }
-        resolve({ copied, skipped, errors, skippedReasons, failedFiles, copiedFiles, duration: Date.now() - startTime, wasAborted: isAborted });
+        resolve({ copied, skipped, errors, skippedReasons, failedFiles, copiedFiles, skippedFiles, duration: Date.now() - startTime, wasAborted: isAborted });
         return;
       }
       while (active < MAX_CONCURRENT_COPIES && queueIndex < total) {

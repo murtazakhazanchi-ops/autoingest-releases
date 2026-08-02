@@ -210,6 +210,62 @@ async function compactBatch(batchId) {
   }
 }
 
+// Retention window for compacted/ (already-durably-reflected batches — see
+// compactBatch's own doc comment for the invariant that gates when a batch may be
+// compacted at all). 90 days is a conservative default: no prior architecture in
+// this codebase specifies a value, and this directory is never rescanned by any
+// recovery/audit/repair path (confirmed — only listActiveBatchIds, which globs the
+// top-level queue dir, not compacted/), so retention is purely a disk-growth
+// concern, not a correctness one. Named here so it has exactly one definition.
+const COMPACTED_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
+
+/**
+ * Best-effort deletion of compacted batch files older than `retentionMs`. Scoped
+ * exclusively to compactedDir() — never touches the active queue directory (where
+ * listActiveBatchIds/readManifest/readJournal look for in-progress work) or anything
+ * else under userData. Non-recursive (one flat readdir, files only) so it can never
+ * wander into an unrelated userData subdirectory. Age is determined by each file's
+ * own mtime rather than by parsing its content, so a malformed/corrupt compacted
+ * file is still safely pruned by age instead of being skipped indefinitely because
+ * it fails to parse. Never throws — every failure (missing directory, a single
+ * file's stat/unlink failing) is caught, logged, and does not stop the rest of the
+ * sweep or whatever called this.
+ * @param {number} [retentionMs]
+ * @returns {Promise<{scanned:number, deleted:number, failed:number}>}
+ */
+async function pruneCompactedBatches(retentionMs = COMPACTED_RETENTION_MS) {
+  const dir = compactedDir();
+  let entries;
+  try {
+    entries = await fsp.readdir(dir, { withFileTypes: true });
+  } catch (err) {
+    if (err.code !== 'ENOENT') console.error(`[metadataQueueStore] Failed to list compacted dir for pruning: ${err.message}`);
+    return { scanned: 0, deleted: 0, failed: 0 };
+  }
+
+  const cutoff = Date.now() - retentionMs;
+  let scanned = 0;
+  let deleted = 0;
+  let failed = 0;
+
+  for (const entry of entries) {
+    if (!entry.isFile()) continue; // bounded — never descends into a subdirectory.
+    scanned++;
+    const filePath = path.join(dir, entry.name);
+    try {
+      const st = await fsp.stat(filePath);
+      if (st.mtimeMs < cutoff) {
+        await fsp.unlink(filePath);
+        deleted++;
+      }
+    } catch (err) {
+      failed++;
+      console.error(`[metadataQueueStore] Failed to prune compacted file ${filePath}: ${err.message}`);
+    }
+  }
+  return { scanned, deleted, failed };
+}
+
 module.exports = {
   queueDir,
   readRootIdentity,
@@ -220,4 +276,7 @@ module.exports = {
   computeFileStates,
   listActiveBatchIds,
   compactBatch,
+  compactedDir,
+  COMPACTED_RETENTION_MS,
+  pruneCompactedBatches,
 };

@@ -303,6 +303,7 @@ contextBridge.exposeInMainWorld('api', {
   retryMetadata:          (batchId)            => ipcRenderer.invoke('metadata:retry',          batchId),
   reapplyEventMetadata:   (eventFolderPath)    => ipcRenderer.invoke('metadata:reapplyEvent',   eventFolderPath),
   getMetadataLastRun:     (eventFolderPath)    => ipcRenderer.invoke('metadata:getLastRun',     eventFolderPath),
+  getMetadataEventState:  (eventFolderPath)    => ipcRenderer.invoke('metadata:getEventState',  eventFolderPath),
   onMetadataProgress:     (cb) => _register('metadata:progress', (_e, progress) => cb(progress)),
 
   // ── Event JSON (disk-backed event persistence) ──

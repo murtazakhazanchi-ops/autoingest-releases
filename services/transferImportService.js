@@ -69,7 +69,22 @@ let _state = {
   verifyTotal:    0,
   verifyDone:     0,
   verifyFailed:   0,
+  // checkpointHealthy reflects the outcome of the MOST RECENT checkpoint write
+  // attempt (not sticky-forever-broken) — a later successful write genuinely does
+  // restore resumability, since a fresh valid checkpoint is then on disk. false
+  // means: if the app is interrupted right now, this transfer cannot be safely
+  // resumed from where it left off (already-completed copies are never affected —
+  // this only concerns resume capability after a restart).
+  checkpointHealthy: true,
+  checkpointError:   null,
 };
+
+// Set once per run (reset in runImport/resumeImportFromCheckpoint) so a checkpoint
+// write failing repeatedly during one import only records ONE audit-log entry and
+// surfaces ONE operator-facing warning transition, not a flood of identical ones —
+// per-attempt detail still goes to console.error for debugging, just not repeated
+// into the durable audit trail or re-triggering renderer-side alert state.
+let _checkpointFailureLoggedThisRun = false;
 
 let _isPaused       = false;
 let _pauseResolvers = [];
@@ -107,9 +122,47 @@ async function _findSafeConflictPath(destPath) {
   return `${base}_${Date.now()}${ext}`;
 }
 
+// ── Per-file outcome manifest ─────────────────────────────────────────────────
+// Purely additive recording of the outcome _copyFileSafe already decides — never
+// itself a decision point. Consumed read-only by main.js's post-transfer metadata
+// verification step (plan §7) to scope which destination files belong to this
+// completed transfer, since a destination-folder walk can't tell.
+
+function _transferOutcomesPath(mainArchiveRoot, batchId) {
+  return path.join(mainArchiveRoot, '.autoingest', 'transfer-imports', `transfer-outcomes-${batchId}.jsonl`);
+}
+
+async function _recordTransferOutcome(outcomeCtx, outcome, srcPath, destPath) {
+  if (!outcomeCtx) return;
+  const entry = {
+    batchId:              outcomeCtx.batchId,
+    transferRootIdentity: outcomeCtx.transferRootIdentity || null,
+    eventPath:            outcomeCtx.eventPath || null,
+    srcRelPath:           path.relative(outcomeCtx.transferRoot, srcPath),
+    destPath,
+    outcome,
+  };
+  try {
+    await fsp.appendFile(_transferOutcomesPath(outcomeCtx.mainArchiveRoot, outcomeCtx.batchId), JSON.stringify(entry) + '\n', 'utf8');
+  } catch (e) {
+    console.error('[transferImport] outcome manifest append failed:', e.message);
+  }
+}
+
+async function _readTransferRootIdentity(transferRoot) {
+  try {
+    const raw = await fsp.readFile(path.join(transferRoot, '.autoingest-transfer', 'transfer-root.json'), 'utf8');
+    const marker = JSON.parse(raw);
+    return marker.createdAt || null;
+  } catch {
+    return null;
+  }
+}
+
 async function _copyFileSafe(srcPath, destPath, stats, opts = {}) {
   let srcStat;
   try { srcStat = await fsp.stat(srcPath); } catch (e) {
+    await _recordTransferOutcome(opts.outcomeCtx, 'failed', srcPath, destPath);
     throw new Error(`stat source: ${e.message}`);
   }
 
@@ -122,6 +175,7 @@ async function _copyFileSafe(srcPath, destPath, stats, opts = {}) {
   if (destStat) {
     if (destStat.size === srcStat.size) {
       stats.skipped++;
+      await _recordTransferOutcome(opts.outcomeCtx, 'same-size-skipped', srcPath, destPath);
       return 'skipped';
     }
     if (opts.backupUpdate) {
@@ -129,6 +183,7 @@ async function _copyFileSafe(srcPath, destPath, stats, opts = {}) {
       // was already made once by the Scan's inventory snapshot — this branch only guards
       // the narrow race between that snapshot and this copy (see _scanUnitsInventory).
       stats.changedSkipped = (stats.changedSkipped || 0) + 1;
+      await _recordTransferOutcome(opts.outcomeCtx, 'changed-skipped', srcPath, destPath);
       return 'skipped-changed';
     }
     finalDest = await _findSafeConflictPath(destPath);
@@ -151,6 +206,7 @@ async function _copyFileSafe(srcPath, destPath, stats, opts = {}) {
     stats.copiedBytes = (stats.copiedBytes || 0) + srcStat.size;
   } catch (e) {
     await fsp.unlink(tmpPath).catch(() => {});
+    await _recordTransferOutcome(opts.outcomeCtx, 'failed', srcPath, destPath);
     throw e;
   }
 
@@ -158,6 +214,7 @@ async function _copyFileSafe(srcPath, destPath, stats, opts = {}) {
     hidePathBestEffort(finalDest).catch(() => {});
   }
 
+  await _recordTransferOutcome(opts.outcomeCtx, outcome, srcPath, finalDest);
   return outcome;
 }
 
@@ -231,8 +288,28 @@ async function _writeCheckpoint(mainArchiveRoot, data) {
     await fsp.mkdir(path.dirname(dest), { recursive: true });
     await fsp.writeFile(tmp, JSON.stringify(data, null, 2), 'utf8');
     await fsp.rename(tmp, dest);
+    // A later successful write genuinely restores resumability (a fresh valid
+    // checkpoint is now on disk) — never leave the operator-facing flag stuck on a
+    // transient failure that has since self-corrected.
+    _state.checkpointHealthy = true;
+    _state.checkpointError   = null;
   } catch (e) {
     console.error('[transferImport] checkpoint write failed:', e.message);
+    _state.checkpointHealthy = false;
+    _state.checkpointError   = e.message;
+    if (!_checkpointFailureLoggedThisRun) {
+      _checkpointFailureLoggedThisRun = true;
+      const auditDir = path.join(mainArchiveRoot, '.autoingest', 'transfer-imports');
+      try {
+        await fsp.mkdir(auditDir, { recursive: true });
+        await fsp.appendFile(path.join(auditDir, 'imports.audit.jsonl'), JSON.stringify({
+          type: 'checkpoint-failure', batchId: _state.batchId, mainArchiveRoot,
+          ts: new Date().toISOString(), error: e.message, errorCode: e.code || null,
+        }) + '\n', 'utf8');
+      } catch (auditErr) {
+        console.error('[transferImport] failed to record checkpoint-failure audit entry:', auditErr.message);
+      }
+    }
   }
 }
 
@@ -781,6 +858,36 @@ async function _finishImport(transferRoot, mainArchiveRoot, meta, startedAt, bat
     changedSkipped: stats.changedSkipped || 0,
     errorCount: stats.errors.length, startedAt, completedAt, status: finalStatus,
   };
+
+  // Fire-and-forget completion signal for main.js's IPC layer to orchestrate
+  // post-transfer metadata verification (plan §7). This module never verifies or
+  // queues metadata itself — it only announces "this batch finished" and hands back
+  // its own id, mirroring the additive, decision-free nature of the outcome manifest.
+  if (typeof meta.onComplete === 'function') {
+    try { meta.onComplete(_state.result); } catch (e) { console.error('[transferImport] onComplete callback failed:', e.message); }
+  }
+}
+
+/**
+ * Reads a batch's per-file outcome manifest (plan §7). Returns [] if the batch never
+ * wrote one (e.g. nothing was copied) or the file is missing/corrupt.
+ * @param {string} mainArchiveRoot
+ * @param {string} batchId
+ * @returns {Promise<Array<{batchId:string, transferRootIdentity:string|null, eventPath:string|null, srcRelPath:string, destPath:string, outcome:string}>>}
+ */
+async function readTransferOutcomes(mainArchiveRoot, batchId) {
+  let raw;
+  try {
+    raw = await fsp.readFile(_transferOutcomesPath(mainArchiveRoot, batchId), 'utf8');
+  } catch {
+    return [];
+  }
+  const entries = [];
+  for (const line of raw.split('\n')) {
+    if (!line.trim()) continue;
+    try { entries.push(JSON.parse(line)); } catch { /* corrupt line — skip, not fatal for a read-only consumer */ }
+  }
+  return entries;
 }
 
 // Plain Import — unchanged from prior behaviour: live recursive walk, same-size skip,
@@ -818,6 +925,7 @@ async function _doImportPlain(transferRoot, mainArchiveRoot, resolvedUnits, meta
   });
 
   const stats = { copied: 0, skipped: 0, renamed: 0, changedSkipped: 0, copiedBytes: 0, errors: [] };
+  const transferRootIdentity = await _readTransferRootIdentity(transferRoot);
 
   for (let i = 0; i < batches.length; i++) {
     const batch = batches[i];
@@ -832,8 +940,9 @@ async function _doImportPlain(transferRoot, mainArchiveRoot, resolvedUnits, meta
 
     try { await fsp.mkdir(batch.destDir, { recursive: true }); } catch {}
 
+    const outcomeCtx = { batchId: meta.batchId, transferRoot, mainArchiveRoot, transferRootIdentity, eventPath: batch.destDir };
     const before = { copied: stats.copied, skipped: stats.skipped, renamed: stats.renamed, errors: stats.errors.length };
-    await _walkAndCopy(batch.srcDir, batch.destDir, stats, { rootFilesOnly: batch.rootFilesOnly });
+    await _walkAndCopy(batch.srcDir, batch.destDir, stats, { rootFilesOnly: batch.rootFilesOnly, outcomeCtx });
     batch.copied  = stats.copied  - before.copied;
     batch.skipped = stats.skipped - before.skipped;
     batch.renamed = stats.renamed - before.renamed;
@@ -904,6 +1013,8 @@ async function _doImportUpdate(transferRoot, mainArchiveRoot, resolvedUnits, inv
   _state.skipped        = stats.skipped;
   _state.changedSkipped = stats.changedSkipped;
 
+  const transferRootIdentity = await _readTransferRootIdentity(transferRoot);
+
   if (!resumeBatches) {
     await _writeCheckpoint(mainArchiveRoot, {
       importId: meta.batchId, transferRoot, mainArchiveRoot, mode: 'update',
@@ -912,6 +1023,19 @@ async function _doImportUpdate(transferRoot, mainArchiveRoot, resolvedUnits, inv
       totalFiles: _state.total, totalCopied: 0, totalSkipped: stats.skipped,
       totalRenamed: 0, totalChangedSkipped: stats.changedSkipped, totalErrors: 0,
     });
+
+    // Pre-classified same-size / changed-size files (from the Scan's inventory
+    // snapshot) never go through _copyFileSafe in Update Import — record their
+    // outcome here so the verification step can still see them.
+    for (const e of inventoryEntries) {
+      if (e.destinationState !== 'same-size' && e.destinationState !== 'changed-size') continue;
+      const unit = resolvedUnits.find(u => u.srcDir === e.unitSrcDir);
+      await _recordTransferOutcome(
+        { batchId: meta.batchId, transferRoot, mainArchiveRoot, transferRootIdentity, eventPath: unit?.destDir || null },
+        e.destinationState === 'same-size' ? 'same-size-skipped' : 'changed-skipped',
+        path.join(e.unitSrcDir, e.relativeFilePath), path.join(e.unitDestDir, e.relativeFilePath)
+      );
+    }
   }
 
   for (let i = 0; i < batches.length; i++) {
@@ -927,13 +1051,14 @@ async function _doImportUpdate(transferRoot, mainArchiveRoot, resolvedUnits, inv
 
     try { await fsp.mkdir(batch.destDir, { recursive: true }); } catch {}
 
+    const outcomeCtx = { batchId: meta.batchId, transferRoot, mainArchiveRoot, transferRootIdentity, eventPath: batch.destDir };
     const before = { copied: stats.copied, errors: stats.errors.length };
     for (const f of batch.fileList) {
       if (stats.errors.length >= MAX_ERRORS) break;
       await _waitIfPaused();
       _state.current = path.basename(f.srcPath);
       try {
-        await _copyFileSafe(f.srcPath, f.destPath, stats, { backupUpdate: true });
+        await _copyFileSafe(f.srcPath, f.destPath, stats, { backupUpdate: true, outcomeCtx });
       } catch (e) {
         stats.errors.push({ file: f.srcPath, error: e.message });
       }
@@ -1080,6 +1205,7 @@ async function runImport(transferRoot, mainArchiveRoot, scope, isValidEventJsonF
 
   _isPaused       = false;
   _pauseResolvers = [];
+  _checkpointFailureLoggedThisRun = false;
 
   _state = {
     running: true, paused: false, batchId,
@@ -1087,6 +1213,7 @@ async function runImport(transferRoot, mainArchiveRoot, scope, isValidEventJsonF
     current: '', copied: 0, skipped: 0, renamed: 0, changedSkipped: 0, errors: [],
     copiedBytes: 0, total: 0, result: null,
     verifyStatus: null, verifyTotal: 0, verifyDone: 0, verifyFailed: 0,
+    checkpointHealthy: true, checkpointError: null,
   };
 
   const runMeta = { ...meta, batchId, deviceName, scope };
@@ -1118,6 +1245,7 @@ async function resumeImportFromCheckpoint(transferRoot, mainArchiveRoot, meta = 
 
   _isPaused       = false;
   _pauseResolvers = [];
+  _checkpointFailureLoggedThisRun = false;
 
   _state = {
     running: true, paused: false, batchId,
@@ -1134,6 +1262,7 @@ async function resumeImportFromCheckpoint(transferRoot, mainArchiveRoot, meta = 
     total:          checkpoint.totalFiles || 0,
     result:         null,
     verifyStatus: null, verifyTotal: 0, verifyDone: 0, verifyFailed: 0,
+    checkpointHealthy: true, checkpointError: null,
   };
 
   const runMeta = { ...meta, batchId, deviceName, scope: checkpoint.scope };
@@ -1315,4 +1444,5 @@ module.exports = {
   clearImportCheckpoint,
   verifyImport,
   scanImportSync,
+  readTransferOutcomes,
 };
