@@ -1718,6 +1718,12 @@
       flex: 1; overflow-y: auto; padding: 20px 20px 22px;
       scroll-behavior: smooth; min-height: 180px;
     }
+    /* Audit & Repair tab: the standalone audit modal it was moved from used its own
+       internal flex/scroll region (.diag-body{flex:1;overflow:hidden}); here #msBody
+       already scrolls as a whole, matching the other two tabs, so neutralize that and
+       let the content flow like the rest of the modal instead of fighting it. */
+    #msTabAudit .diag-body { flex: unset; overflow: visible; display: block; }
+    #msTabAudit .diag-list { flex: unset; overflow-y: visible; }
     .ms-empty   { font-size: 13px; color: var(--text-muted); text-align: center; padding: 40px 0; }
     .ms-loading {
       font-size: 13px; color: var(--text-muted); text-align: center; padding: 40px 0;
@@ -1980,6 +1986,23 @@
     }
     .ms-tab:hover { color: var(--text-secondary); background: var(--accent-hover); }
     .ms-tab.ms-tab-active { color: var(--accent); border-bottom-color: var(--accent); }
+    .ms-status-strip {
+      display: flex; gap: 20px; flex-wrap: wrap;
+      padding: 0 24px 10px; margin-top: -4px;
+    }
+    .ms-status-item { display: flex; align-items: baseline; gap: 6px; font-size: 12px; }
+    .ms-status-item-label { color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; font-size: 10.5px; font-weight: 600; }
+    .ms-status-item-val { color: var(--text); font-weight: 500; }
+    .ms-subsection { padding-bottom: 18px; margin-bottom: 18px; border-bottom: 1px solid var(--border-subtle); }
+    .ms-subsection:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    .ms-subsection-title { font-size: 13.5px; font-weight: 600; color: var(--text); margin: 0 0 4px; }
+    .ms-subsection-desc { font-size: 12px; color: var(--text-muted); margin: 0 0 10px; line-height: 1.5; }
+    .ms-current-event-row { font-size: 12.5px; color: var(--text-secondary); margin-bottom: 10px; padding: 6px 10px; background: var(--card-bg, rgba(255,255,255,0.03)); border: 1px solid var(--border-subtle); border-radius: 6px; }
+    .ms-audit-local-footer {
+      display: flex; align-items: center; justify-content: space-between;
+      padding-top: 12px; margin-top: 12px; border-top: 1px solid var(--border-subtle);
+      gap: 12px; flex-wrap: wrap;
+    }
     .ms-warn-link {
       display: inline; background: none; border: none; cursor: pointer;
       color: inherit; font-size: inherit; font-family: inherit;
@@ -7058,7 +7081,7 @@
             </div>
             <span class="ov-arrow">›</span>
           </div>
-          <div class="ov-tile ov-tile--action" id="ovMetadataSync" role="button" tabindex="0" aria-label="Open Metadata Sync">
+          <div class="ov-tile ov-tile--action" id="ovMetadataSync" role="button" tabindex="0" aria-label="Open Metadata Management">
             <div class="ov-tile-icon ov-tile-icon--sync">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0115-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 01-15 6.7L3 16"/></svg>
             </div>
@@ -7168,41 +7191,115 @@
     </div>
   </div>
 
-  <!-- METADATA SYNC MODAL -->
+  <!-- METADATA MANAGEMENT MODAL -->
   <div id="metadataSyncModal" class="emm-overlay" role="dialog" aria-modal="true" aria-labelledby="msTitle">
     <div class="emm-box">
       <div class="emm-topbar">
         <span class="emm-topbar-title">System Overview</span>
       </div>
       <div class="emm-header">
-        <span id="msTitle">Metadata Sync</span>
+        <span id="msTitle">Metadata Management</span>
+      </div>
+      <div id="msStatusStrip" class="ms-status-strip">
+        <span class="ms-status-item"><span class="ms-status-item-label">AutoIngest Metadata</span><span class="ms-status-item-val" id="msStripAutoIngestVal">—</span></span>
+        <span class="ms-status-item"><span class="ms-status-item-label">External Updates</span><span class="ms-status-item-val" id="msStripExternalVal">—</span></span>
       </div>
       <div id="msBody">
         <!-- Tab bar -->
         <div class="ms-tabs" role="tablist">
-          <button class="ms-tab ms-tab-active" id="msTab-metadata" role="tab" aria-selected="true" aria-controls="msTabMetadata" data-ms-tab="msTabMetadata">Metadata Updates</button>
+          <button class="ms-tab ms-tab-active" id="msTab-metadata" role="tab" aria-selected="true" aria-controls="msTabMetadata" data-ms-tab="msTabMetadata">Metadata</button>
+          <button class="ms-tab" id="msTab-audit" role="tab" aria-selected="false" aria-controls="msTabAudit" data-ms-tab="msTabAudit">Audit &amp; Repair</button>
           <button class="ms-tab" id="msTab-registry" role="tab" aria-selected="false" aria-controls="msTabRegistry" data-ms-tab="msTabRegistry">Keyword Registry</button>
         </div>
 
-        <!-- Panel: Metadata Updates -->
+        <!-- Panel: Metadata -->
         <div id="msTabMetadata" role="tabpanel" aria-labelledby="msTab-metadata">
-          <p id="msHelperText">Review events with new or changed external metadata from Bridge/XMP and update event.json safely.</p>
-          <div id="msRegistryWarning">Keyword registry is empty. Import your Bridge keyword list before syncing for best results.<button class="ms-warn-link" id="msOpenRegistryTabBtn">Open Keyword Registry →</button></div>
-          <div class="ms-scope-bar">
-            <label for="msScopeSelect" class="ms-scope-label">Scope</label>
-            <select id="msScopeSelect" class="ms-scope-select">
-              <option value="collection">All Events in Current Collection</option>
-              <option value="current">Current Event Only</option>
-              <option value="select">Select Event…</option>
-              <option value="folder">Choose Event Folder…</option>
-            </select>
+
+          <!-- Sub-section: AutoIngest Metadata (apply/status/queue/retry — exiftool pipeline) -->
+          <div class="ms-subsection">
+            <p class="ms-subsection-title">AutoIngest Metadata</p>
+            <p class="ms-subsection-desc">Status, queue, and retry for metadata AutoIngest writes directly to files during and after import.</p>
+            <div id="msCurrentEventRow" class="ms-current-event-row">Current Event: No event selected</div>
+            <div id="msApplyStatusPanel"></div>
           </div>
-          <div id="msScopePicker" style="display:none" class="ms-scope-picker">
-            <input type="text" id="msScopeSearch" class="ms-scope-search" placeholder="Search events…" aria-label="Search events" />
-            <div id="msScopeEventList" class="ms-scope-event-list" role="listbox" aria-label="Event list"></div>
+
+          <!-- Sub-section: External Metadata Updates (Bridge/XMP → event.json sync) -->
+          <div class="ms-subsection">
+            <p class="ms-subsection-title">External Metadata Updates</p>
+            <p class="ms-subsection-desc">Review metadata changes made in Bridge/XMP and synchronize supported changes back to event.json.</p>
+            <div id="msRegistryWarning">Keyword registry is empty. Import your Bridge keyword list before syncing for best results.<button class="ms-warn-link" id="msOpenRegistryTabBtn">Open Keyword Registry →</button></div>
+            <div class="ms-scope-bar">
+              <label for="msScopeSelect" class="ms-scope-label">Scope</label>
+              <select id="msScopeSelect" class="ms-scope-select">
+                <option value="collection">All Events in Current Collection</option>
+                <option value="current">Current Event Only</option>
+                <option value="select">Select Event…</option>
+                <option value="folder">Choose Event Folder…</option>
+              </select>
+            </div>
+            <div id="msScopePicker" style="display:none" class="ms-scope-picker">
+              <input type="text" id="msScopeSearch" class="ms-scope-search" placeholder="Search events…" aria-label="Search events" />
+              <div id="msScopeEventList" class="ms-scope-event-list" role="listbox" aria-label="Event list"></div>
+            </div>
+            <div id="msScopeResultLabel" class="ms-scope-result-label" style="display:none"></div>
+            <div id="msEventList"></div>
           </div>
-          <div id="msScopeResultLabel" class="ms-scope-result-label" style="display:none"></div>
-          <div id="msEventList"></div>
+        </div>
+
+        <!-- Panel: Audit & Repair (moved from the former standalone #metadataAuditModal) -->
+        <div id="msTabAudit" role="tabpanel" aria-labelledby="msTab-audit" style="display:none">
+          <div class="diag-body">
+            <div class="diag-actions">
+              <p class="diag-helper">Scans a chosen archive scope for missing, incorrect, or duplicate metadata. Read-only — no files are modified until you explicitly run Repair below.</p>
+              <div class="diag-actions-tools">
+                <label style="display:flex;align-items:center;gap:6px;">
+                  <input type="radio" name="maScopeType" id="maScopeArchiveRoot" value="archiveRoot" checked>
+                  Main Archive Root
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;">
+                  <input type="radio" name="maScopeType" id="maScopeFolder" value="folder">
+                  Choose folder…
+                </label>
+                <span id="maScopeFolderPath" class="sq-footer-note"></span>
+              </div>
+              <button type="button" class="emm-btn-primary" id="maRunBtn">Run Audit</button>
+              <button type="button" class="emm-btn-secondary" id="maCancelBtn" hidden>Cancel</button>
+            </div>
+
+            <div class="diag-status-row">
+              <span id="maStatusText">Idle — select a scope and click Run Audit.</span>
+            </div>
+
+            <div id="maSummaryBar" class="diag-summary-bar" hidden>
+              <span class="diag-badge diag-badge-error" id="maBadgeExceptions">0 exceptions</span>
+              <span class="diag-badge diag-badge-info"  id="maBadgeScanned">0 scanned</span>
+            </div>
+
+            <div id="maList" class="diag-list">
+              <div class="sq-empty">Run an audit to see results.</div>
+            </div>
+
+            <div id="maRepairSection" class="adopt-section" hidden>
+              <div class="adopt-header">
+                <span id="maRepairStatusText">Repair Preview</span>
+              </div>
+              <div class="sq-footer-note" id="maRepairSnapshotNote">
+                This preview and repair use the audit snapshot above — the files and values shown were captured when that audit ran, not read again live.
+                After repairing, run a fresh audit before repairing this scope again: files this run repairs will correctly show as "stale" in the same snapshot if you try to repair them a second time — that's the staleness check protecting against a duplicate write, not a failure.
+              </div>
+              <div id="maRepairList" class="adopt-list"></div>
+              <button type="button" class="emm-btn-primary" id="maRepairConfirmBtn" hidden>Confirm &amp; Write Repairs</button>
+            </div>
+
+            <div class="ms-audit-local-footer">
+              <span class="sq-footer-note">Audit is read-only. Repair requires explicit confirmation per run.</span>
+              <div class="emm-footer-right">
+                <button type="button" class="emm-btn-secondary" id="maExportJsonBtn" hidden>Export JSON</button>
+                <button type="button" class="emm-btn-secondary" id="maExportCsvBtn" hidden>Export CSV</button>
+                <button type="button" class="emm-btn-secondary" id="maRepairBtn" hidden>Repair…</button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Panel: Keyword Registry -->
@@ -8460,69 +8557,6 @@
       </div>
 
       <div id="adoptDetailPanel" hidden></div>
-    </div>
-  </div>
-
-  <!-- Metadata Audit modal (Phase E — read-only audit; repair preview/confirm UI added in Phase F) -->
-  <div id="metadataAuditModal" class="emm-overlay" role="dialog" aria-modal="true" aria-labelledby="maTitle">
-    <div class="emm-box">
-      <div class="emm-topbar">
-        <span class="emm-topbar-title" id="maTitle">Metadata Audit</span>
-      </div>
-
-      <div class="diag-body">
-        <div class="diag-actions">
-          <p class="diag-helper">Scans a chosen archive scope for missing, incorrect, or duplicate metadata. Read-only — no files are modified until you explicitly run Repair below.</p>
-          <div class="diag-actions-tools">
-            <label style="display:flex;align-items:center;gap:6px;">
-              <input type="radio" name="maScopeType" id="maScopeArchiveRoot" value="archiveRoot" checked>
-              Main Archive Root
-            </label>
-            <label style="display:flex;align-items:center;gap:6px;">
-              <input type="radio" name="maScopeType" id="maScopeFolder" value="folder">
-              Choose folder…
-            </label>
-            <span id="maScopeFolderPath" class="sq-footer-note"></span>
-          </div>
-          <button type="button" class="emm-btn-primary" id="maRunBtn">Run Audit</button>
-          <button type="button" class="emm-btn-secondary" id="maCancelBtn" hidden>Cancel</button>
-        </div>
-
-        <div class="diag-status-row">
-          <span id="maStatusText">Idle — select a scope and click Run Audit.</span>
-        </div>
-
-        <div id="maSummaryBar" class="diag-summary-bar" hidden>
-          <span class="diag-badge diag-badge-error" id="maBadgeExceptions">0 exceptions</span>
-          <span class="diag-badge diag-badge-info"  id="maBadgeScanned">0 scanned</span>
-        </div>
-
-        <div id="maList" class="diag-list">
-          <div class="sq-empty">Run an audit to see results.</div>
-        </div>
-
-        <div id="maRepairSection" class="adopt-section" hidden>
-          <div class="adopt-header">
-            <span id="maRepairStatusText">Repair Preview</span>
-          </div>
-          <div class="sq-footer-note" id="maRepairSnapshotNote">
-            This preview and repair use the audit snapshot above — the files and values shown were captured when that audit ran, not read again live.
-            After repairing, run a fresh audit before repairing this scope again: files this run repairs will correctly show as "stale" in the same snapshot if you try to repair them a second time — that's the staleness check protecting against a duplicate write, not a failure.
-          </div>
-          <div id="maRepairList" class="adopt-list"></div>
-          <button type="button" class="emm-btn-primary" id="maRepairConfirmBtn" hidden>Confirm &amp; Write Repairs</button>
-        </div>
-      </div>
-
-      <div class="emm-footer">
-        <span class="sq-footer-note">Audit is read-only. Repair requires explicit confirmation per run.</span>
-        <div class="emm-footer-right">
-          <button type="button" class="emm-btn-secondary" id="maExportJsonBtn" hidden>Export JSON</button>
-          <button type="button" class="emm-btn-secondary" id="maExportCsvBtn" hidden>Export CSV</button>
-          <button type="button" class="emm-btn-secondary" id="maRepairBtn" hidden>Repair…</button>
-          <button type="button" class="emm-btn-secondary" id="maDoneBtn">Close</button>
-        </div>
-      </div>
     </div>
   </div>
 

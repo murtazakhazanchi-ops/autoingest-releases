@@ -2229,10 +2229,10 @@ function _buildImportSection(summary, issueCount) {
     </div>`;
 }
 
-function _buildMetadataSection() {
-  const hasImports  = _alLastImportEntries.length > 0;
+function _buildMetadataSection(idPrefix = 'al', eventPath = _alCurrentEventPath, importEntries = _alLastImportEntries) {
+  const hasImports  = importEntries.length > 0;
   const reapplyArea = hasImports
-    ? `<div class="al-reapply-area" id="alReapplyArea"><button class="al-reapply-btn" id="alReapplyMetaBtn" type="button">Reapply Metadata</button></div>`
+    ? `<div class="al-reapply-area" id="${idPrefix}ReapplyArea"><button class="al-reapply-btn" id="${idPrefix}ReapplyMetaBtn" type="button"${eventPath ? '' : ' disabled'}>Reapply Metadata</button></div>`
     : '';
 
   const status = _computeMetaStatus();
@@ -2242,7 +2242,7 @@ function _buildMetadataSection() {
   }
 
   // Whether we're showing data from the durable disk record vs. the live session batch.
-  const scope = _alCurrentEventPath;
+  const scope = eventPath;
   const isLiveBatch = !!_metaBatchId && (!_metaBatchEventPath || _metaBatchEventPath === scope);
   const useDurable = !isLiveBatch && _metaDurableRun && _metaDurableRunPath === scope;
 
@@ -2333,7 +2333,7 @@ function _buildMetadataSection() {
   }
 
   const retryBtnHtml = (!useDurable && status !== 'outdated' && _metaBatchId && _metaBatchFailed > 0)
-    ? `<button class="al-retry-btn" id="alRetryMetaBtn" type="button">Retry Failed</button>`
+    ? `<button class="al-retry-btn" id="${idPrefix}RetryMetaBtn" type="button">Retry Failed</button>`
     : '';
 
   return `
@@ -2433,8 +2433,16 @@ function _wireAlTabs() {
   });
 }
 
-function _wireAlRetryBtn() {
-  const btn = document.getElementById('alRetryMetaBtn');
+// Dispatches to the correct live-refresh function for a given control-set namespace.
+// 'al' = Activity Log's own copy (renderer.js _refreshAlMetadataPanel).
+// 'ms' = Metadata Management modal's copy (_refreshMsApplyStatusPanel).
+function _refreshMetaApplyPanel(idPrefix) {
+  if (idPrefix === 'ms') { _refreshMsApplyStatusPanel(); }
+  else { _refreshAlMetadataPanel(); }
+}
+
+function _wireAlRetryBtn(idPrefix = 'al') {
+  const btn = document.getElementById(`${idPrefix}RetryMetaBtn`);
   if (!btn) return;
   btn.addEventListener('click', async () => {
     if (!_metaBatchId || btn.disabled) return;
@@ -2451,64 +2459,108 @@ function _wireAlRetryBtn() {
   });
 }
 
-function _wireAlReapplyBtn() {
-  const btn = document.getElementById('alReapplyMetaBtn');
+function _wireAlReapplyBtn(idPrefix = 'al', eventPath = _alCurrentEventPath, importEntries = _alLastImportEntries) {
+  const btn = document.getElementById(`${idPrefix}ReapplyMetaBtn`);
   if (!btn) return;
   btn.addEventListener('click', () => {
-    if (!_alCurrentEventPath || btn.disabled) return;
-    const estimatedFiles = _alLastImportEntries.reduce(
+    if (!eventPath || btn.disabled) return;
+    const estimatedFiles = importEntries.reduce(
       (sum, e) => sum + (e.photos || 0) + (e.videos || 0), 0
     );
     if (estimatedFiles > REAPPLY_CONFIRM_THRESHOLD) {
-      _showReapplyConfirm(estimatedFiles);
+      _showReapplyConfirm(estimatedFiles, idPrefix, eventPath);
     } else {
-      _doReapply();
+      _doReapply(idPrefix, eventPath);
     }
   });
 }
 
-function _showReapplyConfirm(estimatedFiles) {
-  const area = document.getElementById('alReapplyArea');
+function _showReapplyConfirm(estimatedFiles, idPrefix = 'al', eventPath = _alCurrentEventPath) {
+  const area = document.getElementById(`${idPrefix}ReapplyArea`);
   if (!area) return;
   area.innerHTML = `
     <p class="al-reapply-confirm-msg">Reapply metadata to ${estimatedFiles} file${estimatedFiles === 1 ? '' : 's'}? This will overwrite existing metadata fields managed by AutoIngest.</p>
     <div class="al-reapply-confirm-btns">
-      <button class="al-reapply-confirm-cancel" id="alReapplyCancel" type="button">Cancel</button>
-      <button class="al-reapply-confirm-go" id="alReapplyConfirmGo" type="button">Reapply</button>
+      <button class="al-reapply-confirm-cancel" id="${idPrefix}ReapplyCancel" type="button">Cancel</button>
+      <button class="al-reapply-confirm-go" id="${idPrefix}ReapplyConfirmGo" type="button">Reapply</button>
     </div>`;
-  document.getElementById('alReapplyCancel')?.addEventListener('click', () => _refreshAlMetadataPanel());
-  document.getElementById('alReapplyConfirmGo')?.addEventListener('click', () => _doReapply());
+  document.getElementById(`${idPrefix}ReapplyCancel`)?.addEventListener('click', () => _refreshMetaApplyPanel(idPrefix));
+  document.getElementById(`${idPrefix}ReapplyConfirmGo`)?.addEventListener('click', () => _doReapply(idPrefix, eventPath));
 }
 
-async function _doReapply() {
-  if (!_alCurrentEventPath) return;
+async function _doReapply(idPrefix = 'al', eventPath = _alCurrentEventPath) {
+  if (!eventPath) return;
   _metaReapplyPending = true;
-  const btn = document.getElementById('alReapplyMetaBtn');
+  const btn = document.getElementById(`${idPrefix}ReapplyMetaBtn`);
   if (btn) { btn.disabled = true; btn.textContent = 'Applying…'; }
   let res;
   try {
-    res = await window.api.reapplyEventMetadata(_alCurrentEventPath);
+    res = await window.api.reapplyEventMetadata(eventPath);
   } catch {
     _metaReapplyPending = false;
-    _refreshAlMetadataPanel();
+    _refreshMetaApplyPanel(idPrefix);
     showMessage('Reapply failed — could not reach main process', 6000);
     return;
   }
   if (!res?.ok) {
     _metaReapplyPending = false;
-    _refreshAlMetadataPanel();
+    _refreshMetaApplyPanel(idPrefix);
     showMessage(`Reapply failed — ${res?.error || 'unknown error'}`, 6000);
   }
-  // On success: leave pending; batch_complete/_refreshAlMetadataPanel resets the panel
+  // On success: leave pending; batch_complete/_refreshAlMetadataPanel or
+  // _refreshMsApplyStatusPanel (per idPrefix) resets the panel.
 }
 
 function _refreshAlMetadataPanel() {
   if (!document.getElementById('activityLogModal')?.classList.contains('open')) return;
   const panel = document.getElementById('alBody')?.querySelector('.al-panel--section[data-tabs~="metadata"]');
   if (!panel) return;
-  panel.innerHTML = `<p class="al-section-label">Metadata</p>${_buildMetadataSection()}`;
-  _wireAlRetryBtn();
-  _wireAlReapplyBtn();
+  panel.innerHTML = `<p class="al-section-label">Metadata</p>${_buildMetadataSection('al', _alCurrentEventPath, _alLastImportEntries)}`;
+  _wireAlRetryBtn('al');
+  _wireAlReapplyBtn('al', _alCurrentEventPath, _alLastImportEntries);
+}
+
+// Metadata Management modal's own copy of the Apply/Status/Retry/Reapply surface —
+// independently sourced from _msCurrentEventPath/_msLastImportEntries (see their
+// declaration above). Never reads _alCurrentEventPath/_alLastImportEntries, so it
+// cannot show or act on whatever event Activity Log happens to have open.
+function _refreshMsApplyStatusPanel() {
+  if (!document.getElementById('metadataSyncModal')?.classList.contains('open')) return;
+  const metadataPanel = document.getElementById('msTabMetadata');
+  if (!metadataPanel || metadataPanel.style.display === 'none') return;
+
+  const contextRow = document.getElementById('msCurrentEventRow');
+  if (contextRow) {
+    contextRow.textContent = _msCurrentEventPath
+      ? `Current Event: ${_msCurrentEventName || _msCurrentEventPath}`
+      : 'Current Event: No event selected';
+  }
+
+  const panel = document.getElementById('msApplyStatusPanel');
+  if (!panel) return;
+  panel.innerHTML = _buildMetadataSection('ms', _msCurrentEventPath, _msLastImportEntries);
+  _wireAlRetryBtn('ms');
+  _wireAlReapplyBtn('ms', _msCurrentEventPath, _msLastImportEntries);
+}
+
+// Header status strip's "AutoIngest Metadata" value — the durable per-event state
+// (same source as the completion-screen #sumMetadataStatusRow), never the Bridge/XMP
+// pending-sync count. Kept honestly separate from "External Updates" (see
+// _refreshMetadataSyncCard) so the strip never implies one direction of sync is the
+// other. Runs regardless of which tab is active — a header strip, not tab content.
+async function _msRefreshStripAutoIngestValue() {
+  const el = document.getElementById('msStripAutoIngestVal');
+  if (!el) return;
+  if (!document.getElementById('metadataSyncModal')?.classList.contains('open')) return;
+  if (!_msCurrentEventPath) { el.textContent = 'No event selected'; return; }
+  if (!window.api?.getMetadataEventState) { el.textContent = 'Unavailable'; return; }
+  try {
+    const metadataState = await window.api.getMetadataEventState(_msCurrentEventPath);
+    const info = metadataState?.state ? METADATA_STATE_LABELS[metadataState.state] : null;
+    el.textContent = info ? info.label : (metadataState?.state || 'Unknown');
+  } catch {
+    el.textContent = 'Unavailable';
+  }
 }
 
 function _refreshAlErrorBadge() {
@@ -2673,7 +2725,7 @@ function _renderActivityLogBody(ev, activeData, folderName) {
     </div>
     <div class="al-panel al-panel--section" data-tabs="all metadata">
       <p class="al-section-label">Metadata</p>
-      ${_buildMetadataSection()}
+      ${_buildMetadataSection('al', _alCurrentEventPath, _alLastImportEntries)}
     </div>
     <div class="al-panel al-panel--section" data-tabs="all cleanup">
       <p class="al-section-label">Source Cleanup</p>
@@ -2715,8 +2767,8 @@ async function _onAlPickerChange(e) {
   _alCurrentEventPath  = _alMasterPath ? (_alMasterPath + '/' + folderName) : null;
   _wireAlVerifyBtn();
   _wireAlTabs();
-  _wireAlRetryBtn();
-  _wireAlReapplyBtn();
+  _wireAlRetryBtn('al');
+  _wireAlReapplyBtn('al', _alCurrentEventPath, _alLastImportEntries);
 
   if (_alCurrentEventPath) {
     _loadDurableMetaRun(_alCurrentEventPath).then(() => _refreshAlMetadataPanel());
@@ -2821,8 +2873,8 @@ async function openActivityLogModal(opts = {}) {
   _alCurrentEventPath = activeData.eventPath || null;
   _wireAlVerifyBtn();
   _wireAlTabs();
-  _wireAlRetryBtn();
-  _wireAlReapplyBtn();
+  _wireAlRetryBtn('al');
+  _wireAlReapplyBtn('al', _alCurrentEventPath, _alLastImportEntries);
 
   // Load durable metadata state from event.json and refresh the panel once loaded.
   if (_alCurrentEventPath) {
@@ -4448,16 +4500,27 @@ let _msScopeSelected    = null;        // currently selected event folder in pic
 let _msScanCounter      = 0;           // incremented on each user-triggered scan; guards against stale async results
 let _msScanPollTimer    = null;        // setInterval handle for background collection-scan status polling
 
+// AutoIngest Metadata sub-section (Metadata tab) — independent of Activity Log's
+// own _alCurrentEventPath/_alLastImportEntries so the two surfaces never bleed
+// into each other's event context. Set on modal open, cleared on close.
+let _msCurrentEventPath = null;        // event this modal's Apply & Status section targets
+let _msCurrentEventName = null;        // that event's display name, for the context row
+let _msLastImportEntries = [];         // that event's imports[], fetched once per open
+
 function _refreshMetadataSyncCard() {
   const valEl   = document.getElementById('ovMetadataSyncVal');
   const labelEl = document.getElementById('ovMetadataSyncLabel');
   const tileEl  = document.getElementById('ovMetadataSync');
+  // Metadata Management modal's header status strip mirrors this same data —
+  // updated alongside the dashboard tile so the two never show different values.
+  const stripEl = document.getElementById('msStripExternalVal');
   if (!valEl || !labelEl) return;
 
   if (_msSyncRunning.size > 0) {
     valEl.textContent   = 'Syncing…';
     labelEl.textContent = 'METADATA UPDATE';
     tileEl?.classList.remove('ov-tile--pending');
+    if (stripEl) stripEl.textContent = 'Syncing…';
     return;
   }
   // Pending count set by _msScanAndRender; default state shows "—"
@@ -4466,10 +4529,12 @@ function _refreshMetadataSyncCard() {
     valEl.textContent   = String(pending);
     labelEl.textContent = 'EVENTS NEED SYNC';
     tileEl?.classList.add('ov-tile--pending');
+    if (stripEl) stripEl.textContent = `${pending} event${pending !== 1 ? 's' : ''} need sync`;
   } else {
     valEl.textContent   = '—';
     labelEl.textContent = 'METADATA UP TO DATE';
     tileEl?.classList.remove('ov-tile--pending');
+    if (stripEl) stripEl.textContent = 'Up to date';
   }
 }
 
@@ -4973,7 +5038,7 @@ async function _msRunSyncFromPreview(eventFolderPath, folderName, updateBtn) {
 }
 
 function _msSetTab(tabId) {
-  ['msTabMetadata', 'msTabRegistry'].forEach(id => {
+  ['msTabMetadata', 'msTabAudit', 'msTabRegistry'].forEach(id => {
     const panel = document.getElementById(id);
     const btn   = document.querySelector(`[data-ms-tab="${id}"]`);
     const active = id === tabId;
@@ -4983,6 +5048,11 @@ function _msSetTab(tabId) {
       btn.setAttribute('aria-selected', String(active));
     }
   });
+  // Audit tab's own poll (window._maStopPoll's owner) keeps running/writing to its
+  // DOM regardless of visibility — nothing to (re)start here. The Metadata tab's
+  // Apply & Status sub-section, however, needs an explicit refresh on every switch
+  // into it, since _msCurrentEventPath is only set once per modal open.
+  if (tabId === 'msTabMetadata') _refreshMsApplyStatusPanel();
 }
 
 async function _msRefreshRegistryStatus() {
@@ -5003,14 +5073,35 @@ async function _msRefreshRegistryStatus() {
   }
 }
 
-async function openMetadataSyncModal() {
+async function openMetadataSyncModal(opts = {}) {
   const overlay = document.getElementById('metadataSyncModal');
   if (!overlay) return;
   overlay.classList.add('open');
 
-  // Default to Metadata Updates tab on each open
-  _msSetTab('msTabMetadata');
-  setTimeout(() => document.getElementById('msTab-metadata')?.focus(), 150);
+  const targetTab = opts.tab || 'msTabMetadata';
+
+  // AutoIngest Metadata sub-section (Metadata tab) — independent event context,
+  // sourced the same way Activity Log sources its own (EventCreator.getActiveEventData()).
+  // Never read from or written to _alCurrentEventPath/_alLastImportEntries, and
+  // vice versa, so the two surfaces cannot leak each other's event selection.
+  const activeData = EventCreator.getActiveEventData();
+  _msCurrentEventPath  = activeData?.eventPath || null;
+  _msCurrentEventName  = activeData?.event?.name || null;
+  _msLastImportEntries = [];
+  if (_msCurrentEventPath) {
+    try {
+      const ev = await window.api.readEventJson(_msCurrentEventPath);
+      _msLastImportEntries = ev?.imports || [];
+    } catch { _msLastImportEntries = []; }
+  }
+
+  _msSetTab(targetTab);
+  setTimeout(() => document.querySelector(`[data-ms-tab="${targetTab}"]`)?.focus(), 150);
+
+  // Header status strip — External Updates mirrors the dashboard tile's already-
+  // computed value; AutoIngest Metadata reads this modal's own event context above.
+  _refreshMetadataSyncCard();
+  _msRefreshStripAutoIngestValue();
 
   // Load registry status (populates warning + registry tab count)
   _msRefreshRegistryStatus();
@@ -5037,6 +5128,22 @@ function _msClose() {
   document.getElementById('metadataSyncModal')?.classList.remove('open');
   _msScanStopPoll();
   _msScanCounter++;   // invalidate any in-flight startScan await so stale results are not rendered
+  window._maStopPoll?.();   // stop an in-flight audit poll regardless of which tab was active
+  _msCurrentEventPath  = null;
+  _msCurrentEventName  = null;
+  _msLastImportEntries = [];
+}
+
+// Backdrop-click/Escape close for the Metadata Management modal — routed through
+// one guard so an accidental click/Escape can't discard an in-progress repair
+// preview, a pending reapply, or an in-flight Bridge/XMP sync. Active audit
+// *scanning* is deliberately not guarded here: closing while an audit runs
+// already only stops polling (see _msClose above) without cancelling the
+// backend job, matching the former standalone audit modal's existing behavior.
+function _msRequestClose() {
+  const repairPreviewVisible = !document.getElementById('maRepairSection')?.hidden;
+  if (repairPreviewVisible || _metaReapplyPending || _msSyncRunning.size > 0) return;
+  _msClose();
 }
 
 // ── Scope selector logic ──────────────────────────────────────────────────────
@@ -5370,8 +5477,11 @@ document.getElementById('msRepairIdsBtn')?.addEventListener('click', async () =>
 });
 
 document.getElementById('msCloseFooterBtn')?.addEventListener('click', _msClose);
+document.getElementById('metadataSyncModal')?.addEventListener('click', e => {
+  if (e.target === document.getElementById('metadataSyncModal')) _msRequestClose();
+});
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && document.getElementById('metadataSyncModal')?.classList.contains('open')) _msClose();
+  if (e.key === 'Escape' && document.getElementById('metadataSyncModal')?.classList.contains('open')) _msRequestClose();
 });
 document.querySelectorAll('[data-ms-tab]').forEach(btn => {
   btn.addEventListener('click', () => _msSetTab(btn.dataset.msTab));
@@ -8047,9 +8157,15 @@ window.api.onMetadataProgress((progress) => {
     _metaOutdatedPath   = null; // batch result replaces outdated state
     _renderMetadataBadge();
     _refreshAlMetadataPanel();
+    _refreshMsApplyStatusPanel();
+    _msRefreshStripAutoIngestValue();
     // Refresh durable state from disk (main.js wrote lastMetadataRun before emitting this event).
     if (_metaBatchEventPath) {
-      _loadDurableMetaRun(_metaBatchEventPath).then(() => _refreshAlMetadataPanel());
+      _loadDurableMetaRun(_metaBatchEventPath).then(() => {
+        _refreshAlMetadataPanel();
+        _refreshMsApplyStatusPanel();
+        _msRefreshStripAutoIngestValue();
+      });
     }
     // Flash "Completed" in the title bar for 4s when all files succeeded
     if (_metaBatchFailed === 0) {
@@ -8084,6 +8200,8 @@ window.api.onMetadataProgress((progress) => {
     }
     _renderMetaTitleIndicator();
     _refreshAlMetadataPanel();
+    _refreshMsApplyStatusPanel();
+    _msRefreshStripAutoIngestValue();
     _refreshAlErrorsPanel();
     _pendingLfSyncManifest && _writeLocalFirstManifest('failed');
   }
@@ -15281,11 +15399,11 @@ const _transferMonitor = (() => {
   function _maStopPoll() {
     if (_maPoll) { clearInterval(_maPoll); _maPoll = null; }
   }
-
-  function _maClose() {
-    document.getElementById('metadataAuditModal')?.classList.remove('open');
-    _maStopPoll();
-  }
+  // Exposed so the outer-scope _msClose() (Metadata Management modal, defined
+  // elsewhere in this file) can stop an in-flight audit poll on close/backdrop/
+  // Escape, regardless of which tab was active — this IIFE is the only owner of
+  // _maPoll's lifecycle, so the poll itself is still only ever stopped from here.
+  window._maStopPoll = _maStopPoll;
 
   function _maRenderList(report) {
     const list = document.getElementById('maList');
@@ -15353,7 +15471,7 @@ const _transferMonitor = (() => {
 
   document.getElementById('alocMetadataAuditBtn')?.addEventListener('click', () => {
     _alocClose();
-    document.getElementById('metadataAuditModal')?.classList.add('open');
+    openMetadataSyncModal({ tab: 'msTabAudit' });
   });
 
   document.getElementById('maScopeFolder')?.addEventListener('change', async (e) => {
@@ -15473,13 +15591,12 @@ const _transferMonitor = (() => {
     btn.disabled = false; btn.textContent = 'Confirm & Write Repairs';
   });
 
-  document.getElementById('maDoneBtn')?.addEventListener('click', _maClose);
-  document.getElementById('metadataAuditModal')?.addEventListener('click', e => {
-    if (e.target === document.getElementById('metadataAuditModal')) _maClose();
-  });
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && document.getElementById('metadataAuditModal')?.classList.contains('open')) _maClose();
-  });
+  // The Audit & Repair tab has no local Close button — the Metadata Management
+  // modal's own shared footer Close (#msCloseFooterBtn) already covers every tab,
+  // and closing (via that button, Escape, or backdrop) routes through _msClose(),
+  // which also stops this IIFE's audit poll via window._maStopPoll (see above).
+  // The standalone #metadataAuditModal overlay no longer exists, so its own
+  // backdrop-click/Escape listeners are gone too — #metadataSyncModal owns those now.
 
   // ── Archive Consistency Report (Phase 13D-1 — read-only) ─────────────────────
 
