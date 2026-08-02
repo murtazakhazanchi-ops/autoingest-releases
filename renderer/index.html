@@ -1711,6 +1711,27 @@
     .ov-tile--pending .ov-tile-icon { background: color-mix(in srgb, var(--warning) 10%, transparent); }
     .ov-tile--pending .ov-tile-icon svg { stroke: var(--warning); }
     .ov-tile--pending .ov-value { color: var(--warning); }
+    /* Dashboard Metadata Health card — true-failure-only red, mirrors .ov-tile--pending's
+       structure exactly (same properties, red token instead of amber). Reserved for the
+       metadata-failed case only; partial/interrupted/verification/queued reuse .ov-tile--pending above. */
+    .ov-tile--error { border-color: color-mix(in srgb, var(--red) 30%, transparent); background: color-mix(in srgb, var(--red) 4%, transparent); }
+    .ov-tile--error .ov-tile-icon { background: color-mix(in srgb, var(--red) 10%, transparent); }
+    .ov-tile--error .ov-tile-icon svg { stroke: var(--red); }
+    .ov-tile--error .ov-value { color: var(--red); }
+    /* "Current Event Complete" — deliberately almost-neutral, text tint only, no border/background/icon change. */
+    .ov-value--ok { color: var(--success); }
+    /* Primary label strings are short phrases ("Attention Required", "Not Yet Applied"),
+       chosen and measured (canvas.measureText against the tile's real rendered width)
+       to fit on one line at the SAME font-size every other Overview tile uses at the
+       app's typical and maximized window widths (minWidth 1100 in main.js is the one
+       width where a couple of the longer labels still wrap to 2 lines — verified this
+       produces even row heights, not truncation, and is deliberately accepted rather
+       than shrinking the font or diverging from the shared .ov-value typography). Only
+       line-height is loosened slightly so a wrapped 2nd line doesn't look cramped. */
+    #ovMetadataSyncVal { line-height: 1.15; }
+    /* Sentence-case secondary line for the Metadata Health card only — the shared .ov-label
+       rule (short all-caps labels used by every other tile) is left untouched. */
+    .ov-label--sentence { text-transform: none; letter-spacing: normal; opacity: 0.75; }
     #metadataSyncModal .emm-box { height: calc(100vh - 80px); }
     #msTitle { font-size: 18px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.01em; }
     #msHelperText { font-size: 12.5px; color: var(--text-muted); margin: 0 0 16px; line-height: 1.5; }
@@ -5717,6 +5738,10 @@
   [data-theme="light"] .ov-tile--pending {
     background: color-mix(in srgb, var(--warning) 5%, transparent);
     border-color: color-mix(in srgb, var(--warning) 35%, transparent);
+  }
+  [data-theme="light"] .ov-tile--error {
+    background: color-mix(in srgb, var(--red) 5%, transparent);
+    border-color: color-mix(in srgb, var(--red) 35%, transparent);
   }
 
   [data-theme="light"] #updateBanner {

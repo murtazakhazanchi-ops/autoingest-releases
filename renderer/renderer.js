@@ -4507,34 +4507,120 @@ let _msCurrentEventPath = null;        // event this modal's Apply & Status sect
 let _msCurrentEventName = null;        // that event's display name, for the context row
 let _msLastImportEntries = [];         // that event's imports[], fetched once per open
 
-function _refreshMetadataSyncCard() {
+// Stale-result guard for _refreshMetadataSyncCard(). During an active metadata batch
+// this function is now called from up to 4 rapid-succession trigger points
+// (batch_start, batch_complete x2, batch_error), each awaiting a getMetadataEventState
+// IPC round-trip (fsp.readFile + JSON.parse in the main process). ipcRenderer.invoke
+// preserves message order, not response latency — an earlier call's disk read can
+// resolve after a later call's, so without this guard a stale "Processing" write
+// could land after and overwrite a correct "Complete" write. Same pattern as the
+// existing _msScanCounter (see _msScanAndRender).
+let _metaHealthRefreshCounter = 0;
+
+// Data-prep helper — reads the existing Bridge/XMP external-sync source of truth
+// (_msSyncRunning / the data-pending attribute _msScanBackground already maintains)
+// and returns both the priority-helper input shape and the pre-existing strip text.
+// Read-only DOM access (one attribute read); no writes.
+function _resolveExternalSyncStatus(valEl) {
+  if (_msSyncRunning.size > 0) {
+    return { status: 'syncing', stripText: METADATA_HEALTH_CARD_TEXT.externalSyncing };
+  }
+  const pending = parseInt(valEl.getAttribute('data-pending') || '0', 10);
+  return {
+    status: pending > 0 ? { pending } : 'upToDate',
+    stripText: pending > 0 ? `${pending} event${pending !== 1 ? 's' : ''} need sync` : METADATA_HEALTH_CARD_TEXT.externalUpToDate,
+  };
+}
+
+// Data-prep helper — resolves the active event and its durable metadata state via
+// the existing getMetadataEventState IPC (no new channel). Owns the stale-result
+// check for this specific await (see _metaHealthRefreshCounter above): returns
+// `null` if a newer _refreshMetadataSyncCard() call started while this one was
+// in flight, so the caller can discard the result instead of writing stale DOM.
+async function _getActiveEventMetadataContext(thisRefresh) {
+  const activeData = EventCreator.getActiveEventData();
+  const eventPath  = activeData?.eventPath || null;
+  const eventName  = activeData?.event?.name || null;
+  if (!eventPath) return { eventPath: null, eventName: null, durableState: null, durableUpdatedAt: null, durableCounts: null };
+
+  try {
+    const metadataState = await window.api.getMetadataEventState(eventPath);
+    if (thisRefresh !== _metaHealthRefreshCounter) return null; // stale — a newer refresh already ran
+    return {
+      eventPath, eventName,
+      durableState: metadataState?.state || null,
+      durableUpdatedAt: metadataState?.updatedAt || null,
+      durableCounts: metadataState?.counts || null,
+    };
+  } catch {
+    if (thisRefresh !== _metaHealthRefreshCounter) return null;
+    return { eventPath, eventName, durableState: null, durableUpdatedAt: null, durableCounts: null };
+  }
+}
+
+// Pure helper — builds the tile's tooltip text. Surfaces only information already
+// present in the durable metadataState.counts (no new IPC): complete/failed/
+// verification-required/queued counts, when available and non-zero — formatted as
+// labelled "Label: N" values (one per line) for faster scanning than a run-on phrase.
+function _buildMetadataHealthTooltip({ eventName, primaryLabel, durableUpdatedAt, durableCounts }) {
+  const lines = [
+    eventName || METADATA_HEALTH_CARD_TEXT.noEventSelected,
+    primaryLabel,
+    `Last update: ${durableUpdatedAt ? new Date(durableUpdatedAt).toLocaleString() : 'never'}`,
+  ];
+  if (durableCounts) {
+    if (durableCounts.complete)             lines.push(`Completed: ${durableCounts.complete}`);
+    if (durableCounts.failed)               lines.push(`Failed: ${durableCounts.failed}`);
+    if (durableCounts.verificationRequired) lines.push(`Verification Required: ${durableCounts.verificationRequired}`);
+    if (durableCounts.queued)               lines.push(`Queued: ${durableCounts.queued}`);
+  }
+  return lines.join('\n');
+}
+
+// Sole owner of the dashboard Metadata Health tile (#ovMetadataSync) — the only
+// function that writes #ovMetadataSyncVal/#ovMetadataSyncLabel/its tile-variant
+// class/its tooltip. Data preparation is delegated to the 3 focused helpers above;
+// this function only orchestrates them and performs the actual IPC/DOM/CSS work —
+// deriveMetadataHealthCardState() (further above) only returns presentation data.
+async function _refreshMetadataSyncCard() {
+  const thisRefresh = ++_metaHealthRefreshCounter;
+
   const valEl   = document.getElementById('ovMetadataSyncVal');
   const labelEl = document.getElementById('ovMetadataSyncLabel');
   const tileEl  = document.getElementById('ovMetadataSync');
-  // Metadata Management modal's header status strip mirrors this same data —
-  // updated alongside the dashboard tile so the two never show different values.
+  // Metadata Management modal's header status strip mirrors this same external-sync
+  // data — updated alongside the dashboard tile so the two never show different values.
   const stripEl = document.getElementById('msStripExternalVal');
   if (!valEl || !labelEl) return;
 
-  if (_msSyncRunning.size > 0) {
-    valEl.textContent   = 'Syncing…';
-    labelEl.textContent = 'METADATA UPDATE';
-    tileEl?.classList.remove('ov-tile--pending');
-    if (stripEl) stripEl.textContent = 'Syncing…';
-    return;
-  }
-  // Pending count set by _msScanAndRender; default state shows "—"
-  const pending = parseInt(valEl.getAttribute('data-pending') || '0', 10);
-  if (pending > 0) {
-    valEl.textContent   = String(pending);
-    labelEl.textContent = 'EVENTS NEED SYNC';
-    tileEl?.classList.add('ov-tile--pending');
-    if (stripEl) stripEl.textContent = `${pending} event${pending !== 1 ? 's' : ''} need sync`;
-  } else {
-    valEl.textContent   = '—';
-    labelEl.textContent = 'METADATA UP TO DATE';
-    tileEl?.classList.remove('ov-tile--pending');
-    if (stripEl) stripEl.textContent = 'Up to date';
+  const { status: externalStatus, stripText: externalStripText } = _resolveExternalSyncStatus(valEl);
+  if (stripEl) stripEl.textContent = externalStripText;
+
+  const ctx = await _getActiveEventMetadataContext(thisRefresh);
+  if (!ctx) return; // stale — a newer refresh already ran and already wrote the DOM
+
+  const { eventPath, eventName, durableState, durableUpdatedAt, durableCounts } = ctx;
+  const isLiveBatchRunning = eventPath ? (_computeMetaStatus(eventPath) === 'running') : false;
+  const liveRelevant = isLiveBatchRunning && _metaBatchEventPath === eventPath;
+
+  const result = deriveMetadataHealthCardState({
+    hasActiveEvent: !!eventPath,
+    durableState,
+    isLiveBatchRunning,
+    liveBatchDone: liveRelevant ? _metaBatchDone : null,
+    liveBatchTotal: liveRelevant ? _metaBatchTotal : null,
+    externalStatus,
+  });
+
+  valEl.textContent   = result.primaryLabel;
+  labelEl.textContent = result.secondaryLabel;
+  labelEl.classList.add('ov-label--sentence');
+  valEl.classList.toggle('ov-value--ok', result.cardVariant === 'ok');
+  tileEl?.classList.toggle('ov-tile--pending', result.cardVariant === 'warn');
+  tileEl?.classList.toggle('ov-tile--error',   result.cardVariant === 'error');
+
+  if (tileEl) {
+    tileEl.title = _buildMetadataHealthTooltip({ eventName, primaryLabel: result.primaryLabel, durableUpdatedAt, durableCounts });
   }
 }
 
@@ -7832,17 +7918,79 @@ function updateProgress({ total, index, completedCount, filename, status, skipRe
   document.getElementById('progressFilename').innerHTML = labelHtml;
 }
 
+// Single canonical per-state UI definition. `label`/`cls` are consumed by the Metadata
+// Management modal header strip and the completion-screen status row — unchanged.
+// `cardLabel`/`cardVariant`/`severity`/`cardSecondary` are consumed by the dashboard
+// Metadata Health card (deriveMetadataHealthCardState, below) — additive, does not
+// affect the first two. `cardLabel` strings favor being self-explanatory in isolation
+// ("Metadata Complete", not bare "Complete") over being maximally short — measured
+// against the tile's real rendered width, these wrap to 2 lines at the app's minWidth
+// (1100px) and at a typical 1400px window, and fit on one line once maximized
+// (~1920px). Verified via live screenshots at all three widths that wrapping stays
+// contained (no overflow, no truncation) and every Overview tile in the row stays
+// exactly the same height as its siblings — deliberately accepted in favor of keeping
+// labels self-explanatory rather than shrinking the font (see design-system.md: this
+// tile intentionally does not use a smaller font-size than the rest of the row).
 const METADATA_STATE_LABELS = {
-  'metadata-not-required':          { label: 'Not required',      cls: 'meta-state-neutral' },
-  'metadata-interrupted':           { label: 'Interrupted — will resume', cls: 'meta-state-warn' },
-  'metadata-in-progress':           { label: 'Applying…',          cls: 'meta-state-neutral' },
-  'metadata-complete':              { label: 'Complete',           cls: 'meta-state-ok' },
-  'metadata-partial':               { label: 'Partial — see details', cls: 'meta-state-warn' },
-  'metadata-failed':                { label: 'Failed',             cls: 'meta-state-error' },
-  'metadata-verification-required': { label: 'Verification required', cls: 'meta-state-warn' },
-  'metadata-queued':                { label: 'Queued',             cls: 'meta-state-neutral' },
-  'metadata-not-attempted':         { label: 'Not yet applied',    cls: 'meta-state-neutral' },
+  'metadata-not-required':          { label: 'Not required',      cls: 'meta-state-neutral', cardLabel: 'No Metadata Required', cardVariant: 'neutral', severity: 6, cardSecondary: 'No metadata-eligible files' },
+  'metadata-interrupted':           { label: 'Interrupted — will resume', cls: 'meta-state-warn', cardLabel: 'Attention Required', cardVariant: 'warn', severity: 2 },
+  'metadata-in-progress':           { label: 'Applying…',          cls: 'meta-state-neutral', cardLabel: 'Metadata Processing', cardVariant: 'active', severity: 1 },
+  'metadata-complete':              { label: 'Complete',           cls: 'meta-state-ok',      cardLabel: 'Metadata Complete',   cardVariant: 'ok',      severity: 4 },
+  'metadata-partial':               { label: 'Partial — see details', cls: 'meta-state-warn', cardLabel: 'Attention Required', cardVariant: 'warn', severity: 2 },
+  'metadata-failed':                { label: 'Failed',             cls: 'meta-state-error',   cardLabel: 'Attention Required', cardVariant: 'error', severity: 2 },
+  'metadata-verification-required': { label: 'Verification required', cls: 'meta-state-warn', cardLabel: 'Verification Required', cardVariant: 'warn', severity: 3 },
+  'metadata-queued':                { label: 'Queued',             cls: 'meta-state-neutral', cardLabel: 'Metadata Queued',     cardVariant: 'warn',    severity: 3 },
+  'metadata-not-attempted':         { label: 'Not yet applied',    cls: 'meta-state-neutral', cardLabel: 'Metadata Pending',    cardVariant: 'neutral', severity: 5, cardSecondary: 'Ready to apply' },
 };
+
+// Centralized dashboard-card presentation strings that aren't keyed by a single
+// durable state (METADATA_STATE_LABELS above owns everything that is). Kept
+// separate so METADATA_STATE_LABELS stays scoped to "per-durable-state UI text"
+// rather than becoming a catch-all for unrelated card copy — one canonical home
+// per concern, both centralized, neither a new file.
+const METADATA_HEALTH_CARD_TEXT = {
+  processing:       'Metadata Processing',
+  applyingMetadata: 'Applying metadata…',
+  noEventSelected:  'No Event Selected',
+  externalPrefix:   'External Updates',
+  externalSyncing:  'Syncing…',
+  externalUpToDate: 'Up to date',
+};
+
+// Pure UI-presentation helper for the dashboard Metadata Health card. Never infers
+// metadata state — only combines already-known, already-resolved inputs (durable
+// state, live in-session batch state, external Bridge/XMP sync state) into display
+// text, sourced entirely from METADATA_STATE_LABELS/METADATA_HEALTH_CARD_TEXT above —
+// no string literals live in this function's logic. External sync status never
+// becomes the primary label — only ever secondary context — except for the
+// Processing tier (needs live progress numbers instead) and the two not-applicable
+// tiers (need their own explanatory text instead, via each entry's `cardSecondary`).
+// No DOM access, no IPC — _refreshMetadataSyncCard() is the sole caller and sole
+// owner of IPC/DOM/CSS-class/tooltip/accessibility responsibilities.
+function deriveMetadataHealthCardState({ hasActiveEvent, durableState, isLiveBatchRunning, liveBatchDone, liveBatchTotal, externalStatus }) {
+  const T = METADATA_HEALTH_CARD_TEXT;
+  const externalLabel = externalStatus === 'syncing' ? T.externalSyncing
+    : externalStatus === 'upToDate' ? T.externalUpToDate
+    : `${externalStatus?.pending ?? 0} pending`;
+  const externalSecondary = `${T.externalPrefix}: ${externalLabel}`;
+
+  if (isLiveBatchRunning || durableState === 'metadata-in-progress') {
+    return {
+      primaryLabel: T.processing,
+      secondaryLabel: (liveBatchTotal != null) ? `${liveBatchDone} / ${liveBatchTotal} files` : T.applyingMetadata,
+      cardVariant: 'active',
+    };
+  }
+  if (!hasActiveEvent) {
+    return { primaryLabel: T.noEventSelected, secondaryLabel: externalSecondary, cardVariant: 'neutral' };
+  }
+  const info = METADATA_STATE_LABELS[durableState];
+  if (!info) {
+    const fallback = METADATA_STATE_LABELS['metadata-not-attempted'];
+    return { primaryLabel: fallback.cardLabel, secondaryLabel: fallback.cardSecondary, cardVariant: fallback.cardVariant };
+  }
+  return { primaryLabel: info.cardLabel, secondaryLabel: info.cardSecondary || externalSecondary, cardVariant: info.cardVariant };
+}
 
 let _psMetadataPollTimer = null;
 
@@ -8135,6 +8283,7 @@ window.api.onMetadataProgress((progress) => {
       : null;
     _renderMetadataBadge();
     _renderMetaTitleIndicator();
+    _refreshMetadataSyncCard();
     return;
   }
 
@@ -8159,12 +8308,14 @@ window.api.onMetadataProgress((progress) => {
     _refreshAlMetadataPanel();
     _refreshMsApplyStatusPanel();
     _msRefreshStripAutoIngestValue();
+    _refreshMetadataSyncCard();
     // Refresh durable state from disk (main.js wrote lastMetadataRun before emitting this event).
     if (_metaBatchEventPath) {
       _loadDurableMetaRun(_metaBatchEventPath).then(() => {
         _refreshAlMetadataPanel();
         _refreshMsApplyStatusPanel();
         _msRefreshStripAutoIngestValue();
+        _refreshMetadataSyncCard();
       });
     }
     // Flash "Completed" in the title bar for 4s when all files succeeded
@@ -8202,6 +8353,7 @@ window.api.onMetadataProgress((progress) => {
     _refreshAlMetadataPanel();
     _refreshMsApplyStatusPanel();
     _msRefreshStripAutoIngestValue();
+    _refreshMetadataSyncCard();
     _refreshAlErrorsPanel();
     _pendingLfSyncManifest && _writeLocalFirstManifest('failed');
   }
