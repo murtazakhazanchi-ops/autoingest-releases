@@ -15563,8 +15563,10 @@ const _transferMonitor = (() => {
     const exceptions = report.items.filter(i => i.status !== 'complete' && i.status !== 'excluded');
     if (exceptions.length === 0) {
       list.innerHTML = '<div class="sq-empty">No exceptions in this page of results.</div>';
+      document.querySelector('#msTabAudit .ma-results-scroll')?.classList.add('ma-results-scroll--empty');
       return;
     }
+    document.querySelector('#msTabAudit .ma-results-scroll')?.classList.remove('ma-results-scroll--empty');
     let html = '';
     for (const item of exceptions.slice(0, 100)) {
       const sevClass = item.status === 'ambiguous' || item.status === 'read-error' ? 'diag-item-error' : 'diag-item-warn';
@@ -15650,6 +15652,7 @@ const _transferMonitor = (() => {
     document.getElementById('maExportCsvBtn').hidden = true;
     document.getElementById('maRepairBtn').hidden = true;
     document.getElementById('maList').innerHTML = '<div class="sq-empty">Scanning…</div>';
+    document.querySelector('#msTabAudit .ma-results-scroll')?.classList.add('ma-results-scroll--empty');
     document.getElementById('maStatusText').textContent = 'Starting scan…';
 
     const res = await window.api.runMetadataAudit(scope).catch(() => null);

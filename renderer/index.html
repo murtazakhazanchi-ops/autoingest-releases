@@ -1747,13 +1747,52 @@
     #msBody {
       flex: 1; overflow-y: auto; padding: 20px 20px 22px;
       scroll-behavior: smooth; min-height: 180px;
+      /* Flex column so the Audit & Repair tab's flex:1 (below) can correctly fill the
+         space remaining after .ms-tabs, instead of a height:100% miscalculating
+         against #msBody's full content box (which includes the tab bar above it).
+         The other two tab panels get flex-shrink:0 so their sizing stays exactly
+         content-based, matching their prior block-layout behavior byte-for-byte —
+         only #msTabAudit actually grows/shrinks within this flex context. */
+      display: flex; flex-direction: column;
     }
-    /* Audit & Repair tab: the standalone audit modal it was moved from used its own
-       internal flex/scroll region (.diag-body{flex:1;overflow:hidden}); here #msBody
-       already scrolls as a whole, matching the other two tabs, so neutralize that and
-       let the content flow like the rest of the modal instead of fighting it. */
-    #msTabAudit .diag-body { flex: unset; overflow: visible; display: block; }
-    #msTabAudit .diag-list { flex: unset; overflow-y: visible; }
+    #msBody > .ms-tabs { flex-shrink: 0; }
+    #msTabMetadata, #msTabRegistry { flex-shrink: 0; }
+    /* Audit & Repair tab: fills the height remaining within #msBody's flex column
+       after .ms-tabs (rather than sizing to its own short content and stranding
+       blank space below the footer note, as the whole-panel-scroll approach used by
+       the other two tabs would otherwise produce) — the Results zone below is the
+       one growing region. flex:1 (not height:100%) is required here specifically
+       because #msBody's content box also includes .ms-tabs above this panel —
+       height:100% would resolve against #msBody's full content height and overflow
+       past it by exactly .ms-tabs's height; flex:1 correctly distributes only the
+       space left over after .ms-tabs's own (flex-shrink:0) natural height. */
+    #msTabAudit { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+    #msTabAudit .diag-body { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+    #msTabAudit .diag-actions { flex-shrink: 0; }
+    #msTabAudit .ms-audit-local-footer { flex-shrink: 0; }
+    /* Groups the Results heading + summary (fixed) around the one scrolling region
+       below — does not scroll itself, just sized by flex:1 to fill the zone. */
+    .ma-results-panel { flex: 1; display: flex; flex-direction: column; min-height: 0; gap: 8px; }
+    /* The ONLY element that scrolls, and the sole owner of flex-grow/height in the
+       Results zone — #maList and #maRepairSection are plain flowing children within
+       it, so Repair Preview naturally follows the audit results in one shared scroll
+       region instead of each carrying its own independent scrollbar. */
+    .ma-results-scroll { flex: 1; overflow-y: auto; display: flex; flex-direction: column; min-height: 0; gap: 12px; }
+    /* Explicit state class, toggled by the renderer at the points that already decide
+       empty-vs-populated — centers the results zone's content only while genuinely
+       empty (before first run, while scanning, or "no exceptions"), reverting to
+       normal top-aligned flow the moment real rows exist. */
+    .ma-results-scroll--empty { justify-content: center; }
+    /* Plain document flow, no flex-grow — the scroll container above owns the height. */
+    /* #maList still carries the shared .diag-list class (flex:1; overflow-y:auto) —
+       both must be explicitly cancelled here, or #maList silently keeps growing and
+       self-scrolling instead of .ma-results-scroll owning that. */
+    #msTabAudit #maList { flex: none; overflow: visible; display: flex; flex-direction: column; gap: 4px; }
+    /* Modifier, not an override of .adopt-section's base rule — #adoptionSection
+       (Orphan File Adoption, elsewhere in this modal) relies on that rule's own
+       max-height/overflow-y as its genuine bounded-scroll contract; this modifier only
+       relaxes those two properties for Repair Preview's inline usage in this tab. */
+    .adopt-section--inline { max-height: none; overflow: visible; flex-shrink: 0; }
     .ms-empty   { font-size: 13px; color: var(--text-muted); text-align: center; padding: 40px 0; }
     .ms-loading {
       font-size: 13px; color: var(--text-muted); text-align: center; padding: 40px 0;
@@ -7300,31 +7339,37 @@
                 <button type="button" class="emm-btn-primary" id="maRunBtn">Run Audit</button>
                 <button type="button" class="emm-btn-secondary" id="maCancelBtn" hidden>Cancel</button>
               </div>
-            </div>
-
-            <div class="diag-status-row">
-              <span id="maStatusText">Idle — select a scope and click Run Audit.</span>
-            </div>
-
-            <div id="maSummaryBar" class="diag-summary-bar" hidden>
-              <span class="diag-badge diag-badge-error" id="maBadgeExceptions">0 exceptions</span>
-              <span class="diag-badge diag-badge-info"  id="maBadgeScanned">0 scanned</span>
-            </div>
-
-            <div id="maList" class="diag-list">
-              <div class="sq-empty">Run an audit to see results.</div>
-            </div>
-
-            <div id="maRepairSection" class="adopt-section" hidden>
-              <div class="adopt-header">
-                <span id="maRepairStatusText">Repair Preview</span>
+              <div class="diag-status-row">
+                <span id="maStatusText">Idle — select a scope and click Run Audit.</span>
               </div>
-              <div class="sq-footer-note" id="maRepairSnapshotNote">
-                This preview and repair use the audit snapshot above — the files and values shown were captured when that audit ran, not read again live.
-                After repairing, run a fresh audit before repairing this scope again: files this run repairs will correctly show as "stale" in the same snapshot if you try to repair them a second time — that's the staleness check protecting against a duplicate write, not a failure.
+            </div>
+
+            <div class="ma-results-panel">
+              <p class="ms-subsection-title">Results</p>
+              <div id="maSummaryBar" class="diag-summary-bar" hidden>
+                <span class="diag-badge diag-badge-error" id="maBadgeExceptions">0 exceptions</span>
+                <span class="diag-badge diag-badge-info"  id="maBadgeScanned">0 scanned</span>
               </div>
-              <div id="maRepairList" class="adopt-list"></div>
-              <button type="button" class="emm-btn-primary" id="maRepairConfirmBtn" hidden>Confirm &amp; Write Repairs</button>
+              <div class="ma-results-scroll ma-results-scroll--empty">
+                <div id="maList" class="diag-list">
+                  <div class="al-empty">
+                    <div class="al-empty-title">No audit has been run yet.</div>
+                    <p>Select a scope and click Run Audit.</p>
+                  </div>
+                </div>
+
+                <div id="maRepairSection" class="adopt-section adopt-section--inline" hidden>
+                  <div class="adopt-header">
+                    <span id="maRepairStatusText">Repair Preview</span>
+                  </div>
+                  <div class="sq-footer-note" id="maRepairSnapshotNote">
+                    This preview and repair use the audit snapshot above — the files and values shown were captured when that audit ran, not read again live.
+                    After repairing, run a fresh audit before repairing this scope again: files this run repairs will correctly show as "stale" in the same snapshot if you try to repair them a second time — that's the staleness check protecting against a duplicate write, not a failure.
+                  </div>
+                  <div id="maRepairList" class="adopt-list"></div>
+                  <button type="button" class="emm-btn-primary" id="maRepairConfirmBtn" hidden>Confirm &amp; Write Repairs</button>
+                </div>
+              </div>
             </div>
 
             <div class="ms-audit-local-footer">

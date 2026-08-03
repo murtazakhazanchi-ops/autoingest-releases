@@ -1198,7 +1198,197 @@ Avoid:
 Validation:
 - Confirm the button node is cloned immediately before the new listener is added on each open.
 - Confirm clicking the button after three opens fires the handler exactly once, not three times.
+
+### Playwright Cannot Stub contextBridge-Exposed APIs From page.evaluate()
+
+Context:
+- Applies to any Playwright test that needs to mock or intercept a `window.api.*` call in `renderer/renderer.js` or `renderer/index.html`.
+
+Rule:
+- `contextBridge.exposeInMainWorld` typically exposes a non-configurable/read-only surface. Assigning `window.api.someMethod = stubFn` inside a `page.evaluate()` callback silently fails — the real IPC call still fires (or nothing happens), with no error raised.
+- Instead, assert on the synchronous pre-IPC side effects of the real click/action handler (a pending flag flipping true, a button becoming disabled and relabeled, an inline confirm panel rendering) — this proves the same code path without fighting contextBridge's isolation.
+- If a test genuinely needs to mock a main-process API (native dialogs, `app.getPath`, etc.), the correct technique is `electronApp.evaluate(({dialog}) => { dialog.showOpenDialog = async () => ({...}) })` via Playwright's `_electron` module, patching in the main process — not `page.evaluate()` in the renderer.
+
+Avoid:
+- `page.evaluate(() => { window.api.getX = async () => ({...}) })` and expecting the stub to take effect.
+- Concluding a feature is untestable because the contextBridge stub "did nothing" — the fix is to assert on side effects or mock at the main-process layer, not to skip the test.
+
+Validation:
+- Confirm no test attempts `window.api.<method> = ...` inside `page.evaluate()`.
+- Confirm renderer-side assertions target synchronous pre-IPC side effects of the real handler.
+- Confirm any main-process API mock uses `electronApp.evaluate()` (see `test/metadataPipelineLive.test.js` for the established pattern), not `page.evaluate()`.
+
+### Plain In-Page Singletons (Not contextBridge Objects) Are Freely Stubbable via page.evaluate()
+
+Context:
+- Companion to the rule above. Applies when a Playwright test needs to simulate a specific app/session state (active event, selected drive, etc.) without navigating the full real UI flow to get there.
+
+Rule:
+- Not everything on `window` is contextBridge-protected. Objects that are plain in-page JS globals — an IIFE-returned singleton assigned directly to `window` (e.g. `EventCreator`), not passed through `contextBridge.exposeInMainWorld` — are ordinary configurable properties and CAN be reassigned from `page.evaluate()`.
+- Before assuming something is stubbable or not, check `main/preload.js` for whether it is exposed via `contextBridge.exposeInMainWorld`. If it isn't, it is a normal page global and monkey-patching is fair game.
+- Pattern: `page.evaluate(() => { EventCreator.getActiveEventData = () => ({ eventPath: '/tmp/fixture-event', ... }); })`. Combine this with writing a real, minimal synthetic fixture (e.g. a real `event.json`) to a temp directory and pointing the patched getter at that real path — this lets the real downstream `window.api.*` IPC call read genuine fixture data end-to-end, rather than requiring the IPC layer itself to also be stubbed.
+
+Avoid:
+- Assuming every `window.*` object is contextBridge-protected and unstubbable just because `window.api.*` is.
+- Stubbing the IPC call directly when the plain-object entry point that feeds it can be patched instead — patching the entry point exercises more of the real code path (the real IPC handler runs against real fixture data).
+
+Validation:
+- Confirm the patched object is a plain in-page global (verify it is absent from `contextBridge.exposeInMainWorld` calls in `main/preload.js`) before relying on `page.evaluate()` reassignment.
+- Confirm a real fixture file backs the patched getter's return value so the real IPC handler is exercised end-to-end, not bypassed.
+
+### Each Playwright Test Block Must Establish Its Own Preconditions — No Hidden Test-Order Coupling
+
+Context:
+- Applies to AutoIngest's Playwright test files, which run as sequential top-to-bottom check blocks in one script (no per-test `beforeEach` isolation resetting DOM/modal state between blocks). A later block can end up silently depending on DOM or module state left behind by an earlier block, purely because of execution order.
+
+Rule:
+- Every test block that asserts on a modal's open/closed state, tab state, or any other DOM/module condition must first explicitly establish that precondition itself (e.g., call `openMetadataSyncModal()` and wait for it), never assume it is already true because an earlier, unrelated block happened to leave it that way.
+- This failure signature is specific and worth recognizing on sight: removing or reordering an earlier test block breaks a later, seemingly-unrelated assertion with a confusing failure, because the later block was never actually testing what its own comment/name says it should be self-sufficient for.
+- When editing or removing any test block, check whether later blocks in the same file rely on DOM/module state it happens to leave behind (modal left open, a flag left set, a panel left rendered) before assuming the removal is isolated to that block alone.
+
+Avoid:
+- Writing a test block that asserts on modal/DOM state without an explicit setup step, relying on a prior block's side effect to have put the app in the right state.
+- Discovering hidden test-order coupling only when an unrelated later change makes a distant assertion fail — this indicates a real gap, not a flaky test to skip.
+
+Validation:
+- Confirm every test block that checks a modal/panel/flag state opens or sets that state explicitly within the same block.
+- Before removing or reordering a test block, scan the rest of the file for assertions on the state it currently leaves behind (open modal, active tab, module-level flag).
+- Confirm a test file's blocks still pass when run as edited, not only when run in their original order/composition.
+
+### Cross-IIFE-Scope Calls in renderer.js Require Explicit window Bridging
+
+Context:
+- Applies to any code change in `renderer/renderer.js` that needs to call a function or read a `let`/`const` defined inside one of the file's large top-level IIFEs from code outside that IIFE (or from a different IIFE).
+
+Rule:
+- `renderer.js` contains multiple large top-level IIFEs (`(function () { ... })();`). Lexical scoping is one-directional: code inside an IIFE can freely call outer/global-scope functions, but a function or variable declared inside an IIFE is invisible to global-scope code or other IIFEs.
+- Before wiring a new cross-location call, grep for `(function () {` / `})();` boundaries around both the caller's and the callee's line numbers to check whether either lives inside one of these IIFEs.
+- If a cross-boundary call is genuinely needed, bridge the inner function onto `window` immediately after its definition (`window._fnName = fnName;`) and call it from outside as `window._fnName?.()`.
+
+```js
+// Inside a large IIFE, right after the function definition
+function _maStopPoll() { /* ... */ }
+window._maStopPoll = _maStopPoll;   // bridge for cross-scope callers
+
+// Outside the IIFE, at global scope
+window._maStopPoll?.();
+```
+
+Avoid:
+- Assuming any function defined anywhere in `renderer.js` is callable from anywhere else in the file.
+- Discovering the scope boundary only via a `ReferenceError` or a silently-no-op call at runtime.
+- Bridging every IIFE-internal function onto `window` preemptively — only bridge functions that a specific cross-boundary caller actually needs.
+
+Validation:
+- Confirm a `window._fnName = fnName;` bridge line exists immediately after the definition of any function called from outside its enclosing IIFE.
+- Confirm the external call site uses `window._fnName?.()` (optional chaining) rather than a bare reference that would throw if the bridge is ever removed.
+- Grep for the IIFE boundaries (`(function () {` / `})();`) around any new cross-location call before assuming it will resolve.
+
+### Merging UI Surfaces With Independent Per-Scope State
+
+Context:
+- Applies when consolidating two or more existing UI surfaces (modals, panels, tabs) that each carry their own instance of the same controls/data over a different scope — e.g., one copy scoped to a single event, another scoped to a session-wide batch.
+
+Rule:
+- A plan that only "moves DOM around" is likely to accidentally conflate previously-independent scopes. Before implementing, explicitly design: (a) separate module-level state variables per copy, (b) a distinct ID prefix per copy for every reused ID-based lookup, and (c) the underlying data source (event path, entry list, batch ID) threaded as a parameter alongside the ID prefix.
+- Renaming only the ID prefix is not sufficient — the function must also receive the correct scope-specific data (`eventPath`, `importEntries`, etc.) as a parameter, or the prefix-renamed copy will still read/act on the wrong underlying data.
+- When a shared ID-building function (e.g., `_buildMetadataSection()`) is rendered into two simultaneously-present DOM locations, hardcoded IDs collide; `getElementById`-based wiring silently attaches to the first-in-document-order copy.
+
+```js
+// Parameterize both the ID prefix and the data source together
+function _buildMetadataSection({ idPrefix = 'al', eventPath, importEntries } = {}) {
+  const btnId = `${idPrefix}RetryMetaBtn`;
+  // ... reads importEntries / eventPath, never a module-level default ...
+}
+```
+
+Avoid:
+- Duplicating a UI-building function's output into a second container without parameterizing its element IDs — produces duplicate DOM ids and misdirected event wiring.
+- Renaming ID prefixes without also threading the correct scope-specific data through the same function chain.
+- Treating a UI-consolidation plan as complete once the DOM layout is described, without an explicit statement of how each copy's state stays isolated.
+
+Validation:
+- Confirm every reused ID-based lookup takes an `idPrefix` (or equivalent) parameter with no hardcoded default shared across copies.
+- Confirm the scope-specific data (event path, entry list, batch ID) is passed as an explicit parameter to every function in the reused chain — not read from a shared module-level variable.
+- Confirm interacting with one copy's controls never mutates or reads the other copy's scope (e.g., editing via the new modal does not affect Activity Log's independent copy, and vice versa).
+
+### Extend an Existing Owning Table/Function Before Adding a New Shared File
+
+Context:
+- Applies when a UI enhancement needs shared, reusable logic (a status/priority mapping, a presentation-computing function) and creating a new small shared module file seems like a clean way to get it — especially "for unit-testability outside Electron."
+
+Rule:
+- Check first whether an existing single-owner location (an object/table/function already responsible for this domain, e.g. `METADATA_STATE_LABELS`) can be extended in place — add new fields to existing entries, and place the new pure function beside the existing owning function — before introducing a new file.
+- In this codebase, several renderer files already exist as "separate modules" (`eventCreator.js`, `eventMgmt.js`, `groupManager.js`, `importRouter.js`, `treeAutocomplete.js`), but none of them use `module.exports` — they are plain IIFE globals loaded via `<script src>`, not `require()`-able from a plain Node test. Their existence is not precedent for "a new `module.exports` file is the established pattern here"; verify this by grep before treating it as precedent.
+- **Unit-testing convenience alone is not sufficient justification for a new file.** If extending the existing location in place still allows the pure function to be tested (e.g. loaded and exercised the same way the rest of the file already is, or simply via `page.evaluate()`/live app testing), prefer that over a new module.
+
+Avoid:
+- Proposing a new UMD-lite (`module.exports` + `window` fallback) file purely to make one function `require()`-able from Node, when nothing else in the renderer architecture uses that export pattern.
+- Assuming that because several "separate files" already exist in this codebase, adding one more is automatically consistent with the architecture — check whether those files actually share the property (e.g. `module.exports`) that matters for the new file's justification.
+
+Validation:
+- Before proposing a new shared renderer file, grep existing renderer files for `module.exports` to check whether any already use it.
+- Confirm whether the need can be met by adding fields to an existing owning object/table and placing the new function beside its existing owning function, with zero new files.
+- If extending in place, confirm existing consumers of the extended object/table are unaffected (only new fields were added; existing fields/behavior untouched).
+
+### Live Screenshot Pass Required After UI Restructuring
+
+Context:
+- Applies to any task that relocates, duplicates, or consolidates existing UI controls into a new layout (modal consolidation, panel restructuring, tab reorganization).
+
+Rule:
+- After implementing exactly per the approved plan, take a live screenshot pass of the resulting UI before considering the task complete.
+- Structural and behavioral tests, and code review, both check conformance to the plan — neither catches visual redundancy or awkward juxtaposition that only appears when the UI is actually rendered (e.g., two Close buttons stacked because relocated content carried its own local close control in addition to the destination's shared footer close control).
+- Fixing an issue found this way is a legitimate deliberate improvement beyond the literal plan, not scope creep — note it as such.
+
+Avoid:
+- Treating "implemented exactly per plan, tests pass, code review clean" as sufficient sign-off for UI restructuring work.
+- Skipping a live render/screenshot pass because the change was "just moving existing, already-correct controls."
+
+Validation:
+- Confirm a live screenshot (or equivalent rendered inspection) of the restructured UI was taken after implementation.
+- Confirm no duplicated or redundant controls (e.g., two close/done/cancel buttons for the same action) are visible in the final rendered result.
 - Confirm the clone replaces the old node in the DOM (`replaceChild`) rather than being appended alongside it.
+
+### Verify Rendered Text Fits When Replacing Short Content With Longer Labels — Fix Content Strategy, Not Font-Size, When the Class Is Shared
+
+Context:
+- Companion to "Live Screenshot Pass Required After UI Restructuring." Applies specifically when a UI change swaps SHORT existing display content (a number, a badge, a 1-2 word status like "—" or "3 pending") for LONGER new display content (a full status phrase, a longer label) inside an element that was never sized/styled to hold that much text — especially when that element shares a typography class (e.g. `.ov-value`) with several visually-equivalent sibling elements (e.g. other tiles in the same dashboard row).
+
+Rule:
+- Do not assume the existing font-size/sizing "just works" for materially longer text just because tests pass (Playwright's `.textContent` checks do not detect wrapping/truncation) and code review is clean (diff review does not see rendered pixels). Explicitly check for wrap, mid-word truncation, or tile height growth via a live screenshot, at every width the app actually supports — including the real minimum window width (check `main.js` `minWidth`), not just a "typical" width.
+- When it does not fit, measure actual rendered text width empirically: call `canvas.measureText()` inside a live `page.evaluate()` against the element's real available pixel width, testing every candidate label string the presentation logic can produce (not just the one being eyeballed).
+- If the element's font-size is a shared/global rule used by other sibling elements, do NOT default to a font-size cut scoped to just that one element by ID. It looks like a narrow, well-scoped, low-risk fix (correct CSS specificity, no leak to siblings) but it still creates an inconsistent typography scale within an otherwise-uniform row — a real design-system violation, not just a technical detail. Treat "shrink the font" as treating the symptom.
+- Prefer, in order: (1) shorter but still self-explanatory wording for the content itself, measured the same way; (2) accepting the layout's natural responsive wrapping at the shared font-size, verified safe (see next rule) rather than assumed safe. Only fall back to a scoped font-size change if a reviewer/stakeholder has explicitly signed off on breaking the shared typography scale for that element.
+
+Avoid:
+- Trusting that a design/plan approved at the text-content level will also fit visually once real strings are rendered at the existing font-size.
+- Eyeballing only the longest-looking string instead of measuring every candidate string the mapping/status logic can actually produce.
+- Defaulting to shrinking one element's font-size away from a shared class (e.g. `#ovMetadataSyncVal { font-size: 0.68rem; }` cut from the shared `.ov-value` size) as the first fix — this was tried and explicitly rejected as "treating the symptom rather than the UI problem" in a prior task; the shipped fix was shorter label wording plus verified-safe wrapping at the unmodified shared size.
+- Measuring only text width and skipping the sibling-height-parity check before deciding wrapping is acceptable.
+
+Validation:
+- Confirm a live screenshot pass explicitly checked every new candidate label string for wrapping, mid-word truncation, or unwanted height growth, at the app's real minimum and typical widths.
+- Confirm any font-size fix was derived from measuring actual rendered width against all candidate strings, not a single eyeballed one — and confirm a shared-class font-size cut was not the first fix reached for.
+- If wrapping is accepted as the resolution, confirm sibling tile heights were verified numerically (see "Verify Sibling Height Parity" below), not just eyeballed in a screenshot.
+
+### Verify Sibling Height Parity Numerically When Accepting Text Wrap in a Flex Row
+
+Context:
+- Applies whenever accepting that a label/value may wrap to multiple lines inside one tile/card of a flex row of visually-equivalent sibling tiles (e.g. dashboard Overview tiles), instead of shrinking font-size or truncating.
+
+Rule:
+- Wrapping inside one flex-row sibling is only safe when it does not produce uneven tile heights relative to its siblings — that is the actual failure mode to avoid, not wrapping itself.
+- Verify this numerically, not just visually: call `getBoundingClientRect()` (or compare computed `height`) on every sibling tile in the same parent row, at each tested width, and confirm they are all equal. A screenshot alone is a weaker form of evidence — small height deltas are easy to miss by eye.
+- This check relies on the row's default `align-items: stretch` (or equivalent) making siblings grow together; confirm that behavior is actually in effect for the row in question before trusting it.
+
+Avoid:
+- Judging "no uneven tile heights" from a screenshot alone when `getBoundingClientRect()` is available and cheap to call in the same `page.evaluate()` pass already used for text measurement.
+- Assuming a flex row stretches siblings evenly without confirming `align-items` on the actual container.
+
+Validation:
+- Confirm sibling heights were compared via `getBoundingClientRect()`/computed height, not eyeballed, at every tested width.
+- Confirm all siblings in the row report equal heights at each width before accepting wrapped content as the shipped resolution.
 
 ### Preview UI Must Use Operator Language for Section Headings
 
@@ -1649,6 +1839,26 @@ Validation:
 - Confirm the CSS rule(s) for the removed class are also deleted.
 - Confirm no visual regressions appear in areas that used the removed class.
 
+### Entry-Point Removal Audit Must Include test/ — Not Only Markup and Renderer JS
+
+Context:
+- Applies whenever a UI entry point (button, deep-link, modal trigger) is removed because its functionality was consolidated elsewhere or is no longer needed.
+- Companion to "Modal open() Focus Fallback Must Target a Persistent Element" (grep renderer JS for the removed ID) and "Remove Dead CSS Rules When Removing All Usages of a Class" — this rule extends the same grep-before-closing-task discipline to `test/`.
+
+Rule:
+- Grep `test/` for the removed element's ID/selector in the same pass used to grep renderer JS files. A Playwright test file is a real reference to the removed entry point, not just documentation of it.
+- Do not assume an untouched test file still reflects current reality just because your change didn't intentionally touch it. Test files that are not part of every routine run can silently reference removed/renamed elements for an arbitrarily long time — the breakage is invisible until someone happens to run that specific file.
+- If the grep surfaces a test file broken by an *earlier*, unrelated removal (not the one in the current task), fix it as part of the current removal pass if it concerns the same entry point family — do not leave a second known-broken reference in place because "it wasn't this task's regression."
+
+Avoid:
+- Treating "renderer JS is clean" as sufficient evidence a removal is complete without also grepping `test/`.
+- Skipping a test file's staleness check because the current task's diff doesn't touch it.
+
+Validation:
+- After removing any DOM element, ID, or handler: grep `test/` for the same identifier, not only `renderer/`.
+- Confirm every surfaced test reference is either updated to the current entry point or replaced with a removal-confirmation assertion (element absent, no replacement added).
+- Run the affected test file(s) directly — do not infer correctness from the diff alone.
+
 ### Primary Action Button Must Not Be Full-Width in a Modal
 
 Context:
@@ -1659,15 +1869,21 @@ Rule:
 - Full-width styling makes a single button appear as a banner that dominates the modal visually, inconsistent with AutoIngest modal design.
 - Content-width (intrinsic size driven by padding and label) is the correct default. The design system handles button sizing through padding, not explicit width.
 - If emphasis is needed, use a background color, icon, or helper text above the button — not full-width expansion.
+- **A full-width button can appear with zero `width` rule anywhere on the button or its class.** If the button's parent is `flex-direction: column` with no `align-items` override, the default `align-items: stretch` alone stretches every child — including the button — to the container's full width. Before concluding the button's own class is at fault (or already fixed because no explicit `width: 100%` remains), check the immediate parent's `display`/`flex-direction`/`align-items`. This is why removing an explicit `width: 100%` from a button does not always fix a full-width appearance — the stretch behavior is independent of whether the button has its own width rule.
+- Fix by wrapping the button (and any sibling action button) in a small scoped flex row (`display: flex; align-items: center; gap: Npx`) rather than adding `align-items` to the shared parent — the shared parent may have other children (helper text, tool button rows) that rely on the current stretch/column behavior.
 
 Avoid:
 - `.diag-actions #diagRunBtn { width: 100%; }` or equivalent — makes the button fill the container width.
 - Treating full-width as a way to make a primary action "stand out" — it over-dominates and breaks visual hierarchy.
+- Assuming a full-width button bug is fixed once no `width: 100%` rule targets it — if the parent is a stretch-by-default flex column, the bug persists with or without that rule. Diagnose the parent's flex layout, not just the button's own class.
+- Fixing the shared parent's `align-items` directly when only one child (the button) is the reported problem — this silently changes every sibling's cross-axis sizing, some of which may depend on the current stretch behavior.
 
 Validation:
 - Confirm no standalone primary action button in a modal body has `width: 100%` or equivalent.
 - Confirm the button renders at content-width, visually consistent with other primary action buttons in AutoIngest.
 - Confirm helper text or section context (if needed) is placed above the button, not expressed through button width.
+- When a button reports as full-width, check the parent's computed `align-items` (via `getBoundingClientRect()` width comparison: button width vs. panel/container width) before editing the button's own CSS.
+- If the same parent class is shared by another modal/component instance with the identical latent full-width issue, note it explicitly and confirm whether fixing it is in scope — do not silently leave a known-identical bug undocumented.
 
 ## Validation Checklist
 
@@ -1948,3 +2164,57 @@ Validation:
 - Confirm sections with null defaults rely on `—` rendering and the top-level banner.
 - Confirm section-error lookup uses exact match (`e.section === key`).
 - Confirm the banner is suppressed when `sectionErrors` is empty or absent (backward-compat with old cached reports).
+
+### Percentage Height on a Child Cannot Account for Sibling-Consumed Space
+
+Context:
+- Applies to any panel, tab-content, or section element intended to fill the space remaining after one or more fixed-size sibling elements within a shared container (e.g., a tab bar above a tab panel, a toolbar above a list, a footer below a results zone).
+
+Rule:
+- `height: 100%` (or `width: 100%`) on a child resolves against the parent's total content box, not "the space left after other visible siblings." On a plain block parent, this silently overflows the parent by exactly the height of any sibling that consumes its own space.
+- Fill-remaining-space layouts require the parent to be `display: flex; flex-direction: column` (or grid with defined rows/tracks). Give fixed-size siblings `flex-shrink: 0` to preserve their exact existing dimensions, and give the space-filling child `flex: 1` instead of `height: 100%`.
+
+Avoid:
+- Assigning `height: 100%` to a panel meant to fill space next to a sibling tab bar/toolbar without first converting the parent to flex/grid.
+- Assuming `height: 100%` behaves like `flex: 1` — it does not; it always measures against the parent's box, unaware of sibling consumption.
+
+Validation:
+- Confirm the parent of any "fill remaining space" child is `display: flex` (or grid) before shipping `height: 100%`/`flex: 1` sizing on the child.
+- Confirm fixed-size siblings carry `flex-shrink: 0` so their size is unaffected by the new flex context.
+- Prefer an automated check that measures the actual gap/overflow between the space-filling element and the container's edge/next sibling, not a screenshot eyeball alone.
+
+### Scoped CSS Overrides Must Explicitly Cancel Every Conflicting Base-Class Property
+
+Context:
+- Applies whenever a scoped selector (`#parentId #childId { ... }` or any higher-specificity rule) is written to change the layout behavior of an element that already carries a shared/base CSS class.
+
+Rule:
+- CSS cascade only overrides properties the more-specific rule actually declares. Any property the override omits still resolves from the highest-specificity rule that does declare it — including the base class.
+- To cancel a base class's `flex`, `overflow`, `display`, or similar layout property, the override must explicitly re-declare that property with the desired value (e.g., `flex: none; overflow: visible;`), not merely add new properties alongside it.
+- Verify by inspecting the element's computed style (DevTools "Computed" tab or `getComputedStyle()`), not by re-reading the written CSS rule — the written rule cannot reveal which base-class properties are still silently active.
+
+Avoid:
+- Writing a scoped override that only adds new declarations, assuming it "replaces" the base class's conflicting properties.
+- Trusting the written CSS as evidence of the resulting behavior — always confirm against computed style.
+
+Validation:
+- For any scoped override intended to change base-class layout behavior, list every base-class property being cancelled and confirm each one is explicitly re-declared in the override.
+- Confirm computed style (not source CSS) reflects the intended cancellation.
+- Confirm no double-scrollbar, layout collision, or broken adjacent technique (e.g., a centering trick that depends on the element not being flex-grow) results from the change.
+
+### Grep Shared-Class Usage Before Repurposing It For a New Feature
+
+Context:
+- Applies whenever an existing shared CSS class is being reused to fit a new UI surface's needs (relaxed `max-height`, different `overflow`, new sizing), not only when a class is being removed. Companion to "Entry-Point Removal Audit Must Include test/" and "Remove Dead CSS Rules When Removing All Usages of a Class" above, which cover the removal direction of this same grep-before-touching-shared-state discipline.
+
+Rule:
+- Before relaxing or changing any property on a shared class to fit a new use case, grep the codebase for every element/selector using that class.
+- If another feature depends on the exact same property being changed, do not edit the base rule — add a modifier class (e.g., `.base-class--inline`) scoped to the new use case instead.
+
+Avoid:
+- Editing a shared base class's properties to fit one new caller's needs without checking whether other features rely on the current behavior.
+- Assuming a class "looks generic enough" to be safely changed without a grep check.
+
+Validation:
+- Confirm a grep for the class name across renderer HTML/JS was performed before any base-rule edit.
+- Confirm a modifier class was used instead of a base-rule edit whenever another feature was found to share the same properties.
