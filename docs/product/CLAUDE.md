@@ -29,6 +29,19 @@ Agents must read:
 - Never contradict an authoritative technical doc under `docs/` — if this system and a technical doc disagree, the technical doc wins; fix this system and record the reconciliation.
 - Never mark a feature `Implemented` (or a milestone `Complete`) without evidence and verification — evidence-pending is an acceptable, honest state; a fabricated-sounding "done" is not.
 
+## When to consult the architectural-evolution document
+
+Before work that changes any of the following, agents must also read [11_ARCHITECTURAL_EVOLUTION.md](11_ARCHITECTURAL_EVOLUTION.md):
+
+- core architecture (the event-based model, the archive-root model, the security model);
+- archive ownership or source-of-truth boundaries (what is authoritative over what — `event.json`, the archive filesystem, or the UI);
+- metadata pipeline design (the shared write engine, the resolver, the durable queue);
+- import/transfer transaction behavior (atomic commit semantics, checkpoint/resume mechanics);
+- recovery architecture (crash recovery, stale-lock recovery, verification-after-copy);
+- or the relationship between established manual practice (Adobe Bridge, professional review) and AutoIngest's automation of it.
+
+**When a major architectural transition is implemented**, [11_ARCHITECTURAL_EVOLUTION.md](11_ARCHITECTURAL_EVOLUTION.md) must be updated as part of that work — see [05_DOCUMENTATION_WORKFLOW.md](05_DOCUMENTATION_WORKFLOW.md) for the specific criteria distinguishing a major transition from routine work that does not require this.
+
 ## Task-to-Doc Routing
 
 | Task type | Read |
@@ -40,6 +53,7 @@ Agents must read:
 | Bug/troubleshooting knowledge base | [bugs/](bugs/) |
 | Product/architecture decisions | [decisions/](decisions/) |
 | Incident history | [postmortems/](postmortems/) |
+| Architectural history / why things are shaped this way | [11_ARCHITECTURAL_EVOLUTION.md](11_ARCHITECTURAL_EVOLUTION.md) |
 | How to maintain this system | [05_DOCUMENTATION_WORKFLOW.md](05_DOCUMENTATION_WORKFLOW.md) |
 
 This file is intentionally short. It routes; it does not duplicate the full rules — those live in [05_DOCUMENTATION_WORKFLOW.md](05_DOCUMENTATION_WORKFLOW.md).

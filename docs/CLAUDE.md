@@ -141,6 +141,9 @@ Product feature registry / roadmap / milestone progress / implementation timelin
 → relevant docs/product/decisions/*.md
 → relevant docs/product/postmortems/*.md
 
+Architectural history / architectural evolution / why the architecture is shaped this way / relationship between established manual practice and automation
+→ docs/product/11_ARCHITECTURAL_EVOLUTION.md
+
 Full agent rules for docs/product/ live in docs/product/CLAUDE.md — this entry only routes, it does not duplicate those rules.
 
 ---

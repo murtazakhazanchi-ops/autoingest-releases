@@ -14,6 +14,7 @@ It records not only what is planned and completed, but how each feature evolved 
 - [01_FEATURE_REGISTRY.md](01_FEATURE_REGISTRY.md) is the canonical inventory of product capabilities.
 - [02_MASTER_ROADMAP.md](02_MASTER_ROADMAP.md) is the canonical milestone order, unless the project owner explicitly reprioritizes it.
 - [04_PROJECT_DASHBOARD.md](04_PROJECT_DASHBOARD.md) records the current milestone, completed milestones, next milestone, and overall progress.
+- [11_ARCHITECTURAL_EVOLUTION.md](11_ARCHITECTURAL_EVOLUTION.md) is the chronological architectural narrative — how the registry, roadmap, and decisions connect over time, and why major transitions happened. It does not carry its own authority over current behavior; it links to the records that do.
 - `features/` contains one permanent document per registered product feature.
 - `bugs/` contains reusable bug records and cross-feature troubleshooting knowledge.
 - `decisions/` contains accepted and rejected architectural/product decisions.
@@ -50,6 +51,7 @@ Every factual claim here must trace to current source code, tests, existing tech
 - [02_MASTER_ROADMAP.md](02_MASTER_ROADMAP.md) — ordered implementation roadmap (`AI-RM-001`–`AI-RM-009`)
 - [03_IMPLEMENTATION_TIMELINE.md](03_IMPLEMENTATION_TIMELINE.md) — planned and actual milestone timing
 - [04_PROJECT_DASHBOARD.md](04_PROJECT_DASHBOARD.md) — live project status
+- [11_ARCHITECTURAL_EVOLUTION.md](11_ARCHITECTURAL_EVOLUTION.md) — the chronological narrative connecting the registry, roadmap, and decisions: how AutoIngest's architecture and archival workflow evolved, and why. Complements but does not duplicate the registry/roadmap/changelog/decisions.
 - [05_DOCUMENTATION_WORKFLOW.md](05_DOCUMENTATION_WORKFLOW.md) — mandatory maintenance workflow
 - [06_FEATURE_TEMPLATE.md](06_FEATURE_TEMPLATE.md) — template for every feature file
 - [07_BUG_TEMPLATE.md](07_BUG_TEMPLATE.md) — troubleshooting/bug-record template

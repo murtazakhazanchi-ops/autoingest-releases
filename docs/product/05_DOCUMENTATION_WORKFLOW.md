@@ -52,6 +52,22 @@ A roadmap milestone may introduce one feature, expand several existing features,
 | A significant incident occurred and was resolved | New file in `postmortems/` |
 | Small clarification to an existing feature | Edit the existing feature file's journal — no new record |
 
+## When to Update the Architectural-Evolution Document
+
+[11_ARCHITECTURAL_EVOLUTION.md](11_ARCHITECTURAL_EVOLUTION.md) records major architectural transitions, not day-to-day feature work. Update it when a change is a **major architectural transition** — one or more of:
+
+- a new core architectural layer or model is introduced (e.g. a new source-of-truth boundary, a new top-level workflow shape like QMZ's, a new storage-root concept);
+- archive ownership or source-of-truth boundaries change (what is authoritative over what);
+- the metadata pipeline's fundamental design changes (not a new field — a change to the resolver/engine/queue architecture itself);
+- import/transfer transaction semantics change (not a bug fix to existing semantics — a change to what "atomic" or "durable" means here);
+- recovery architecture changes (a new class of crash/failure recovery is added, not a bug fix to an existing one);
+- the relationship between established manual practice (Adobe Bridge, professional review) and AutoIngest's automation shifts;
+- a roadmap milestone (`AI-RM-###`) is completed and represents an architectural transition, not just a feature ship.
+
+**Do not update it for**: routine bug fixes, UI/styling changes, adding a field to an existing data structure, performance tuning, or any change that doesn't alter *how the pieces relate to each other* — those belong in the relevant `features/AI-FEAT-###` file's own journal instead. When in doubt, ask: "does this change what future architects need to understand about *why* the system is shaped this way, or just *what* it currently does?" Only the former belongs here.
+
+When updating: append a new dated subsection to the relevant timeline stage (§3) rather than rewriting prior stages, add or update the relevant row in the relationship map (§5), and record any new durable lesson in §4 if one emerged. Verify every `AI-FEAT-###`/`AI-RM-###` citation against [01_FEATURE_REGISTRY.md](01_FEATURE_REGISTRY.md)/[02_MASTER_ROADMAP.md](02_MASTER_ROADMAP.md) before adding it — the same evidence discipline as everywhere else in this system applies here.
+
 ## Exports Are Not Source
 
 Anything under `exports/` (DOCX, PDF) is generated output for sharing outside the repository. It is never edited directly and never treated as authoritative — regenerate it from the Markdown source instead. `exports/` content is excluded from version control (see `.gitignore`); only the Markdown under `docs/product/` is tracked.

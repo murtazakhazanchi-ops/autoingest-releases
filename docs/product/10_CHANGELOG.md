@@ -6,6 +6,17 @@ Append newest first. Never edit or delete a prior entry — if something was wro
 
 ---
 
+## 2026-08-04 — Architectural-evolution document added
+
+- Created `docs/product/11_ARCHITECTURAL_EVOLUTION.md`, per explicit user instruction: the chronological narrative connecting the feature registry, roadmap, and decision records — how AutoIngest's architecture and archival workflow evolved, and why.
+- Recorded the pre-AutoIngest Adobe Bridge/manual workflow (§3A) as stated directly by the project owner during this document's creation; marked as not independently verifiable from repository artifacts, since it predates the codebase. All other timeline sections (§3B–§3I) are grounded in existing repository evidence already cited elsewhere in this system.
+- Confirmed no repository evidence exists for any archival access, metadata, preservation, or discovery platform beyond AutoIngest and Adobe Bridge — the document makes no claims about any such system.
+- Updated `README.md` (documentation map + authority-boundary bullet), `CLAUDE.md` (new "When to consult the architectural-evolution document" rule + routing table row), and `05_DOCUMENTATION_WORKFLOW.md` (new "When to Update the Architectural-Evolution Document" criteria) to integrate the new document.
+- Updated `docs/CLAUDE.md`'s Task Documentation Routing so architectural-history questions route to `docs/product/11_ARCHITECTURAL_EVOLUTION.md`.
+- No application/runtime code changed.
+
+---
+
 ## 2026-08-04 — System established
 
 - Created `docs/product/` as the canonical local product-roadmap and engineering-history system, per explicit user instruction.
