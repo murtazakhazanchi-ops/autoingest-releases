@@ -28,3 +28,9 @@ docs/*
 !docs/dev-tools/
 !docs/dev-tools/graphify.md
 !docs/release-notes-*.md
+!docs/product/
+
+# docs/product/ is the canonical product-roadmap/history system (tracked).
+# Generated DOCX/PDF exports are not the source of truth and are not tracked.
+docs/product/exports/*
+!docs/product/exports/.gitkeep

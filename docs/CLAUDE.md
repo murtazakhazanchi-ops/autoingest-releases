@@ -132,6 +132,20 @@ New feature planning
 → docs/workflows.md  
 → docs/decision-matrix.md
 
+Product feature registry / roadmap / milestone progress / implementation timeline / feature evolution / engineering journals / bug knowledge base / product decisions / postmortems
+→ docs/product/README.md
+→ docs/product/01_FEATURE_REGISTRY.md
+→ docs/product/04_PROJECT_DASHBOARD.md
+→ relevant docs/product/features/*.md
+→ relevant docs/product/bugs/*.md
+→ relevant docs/product/decisions/*.md
+→ relevant docs/product/postmortems/*.md
+
+Architectural history / architectural evolution / why the architecture is shaped this way / relationship between established manual practice and automation
+→ docs/product/11_ARCHITECTURAL_EVOLUTION.md
+
+Full agent rules for docs/product/ live in docs/product/CLAUDE.md — this entry only routes, it does not duplicate those rules.
+
 ---
 
 ## Agent Selection Routing
