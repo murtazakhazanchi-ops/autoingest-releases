@@ -15,6 +15,21 @@
 | First-known implementation | Phase 13D era (2026-05-14, per `docs/archive-operations-layer.md`'s phase numbering) |
 | Latest major update | Evidence pending beyond Phase 13D |
 
+## Lifecycle Metadata
+
+Additive fields not already covered by the header table or the Known Bugs/Decisions sections above — see [05_DOCUMENTATION_WORKFLOW.md](../05_DOCUMENTATION_WORKFLOW.md) for the evidence-discipline rules governing every field below.
+
+| Field | Value |
+|---|---|
+| Related features | [AI-FEAT-041](AI-FEAT-041_TRANSFER_BACKGROUND_MINIMIZE_OPERATION.md), [AI-FEAT-045](AI-FEAT-045_ARCHIVE_LOCK_HANDLING_STALE_LOCK_RECOVERY.md), [AI-FEAT-046](AI-FEAT-046_ARCHIVE_FOLDER_ADOPTION.md) (found via cross-reference in this file's own prose, not yet in Dependencies/Parent/Subfeatures above) |
+| Related decisions | None recorded |
+| Related bugs | [BUG-005](../bugs/BUG-005_TRANSFER_EXPORT_RESUME_STATE_DIVERGENCE.md) |
+| Related postmortems | None |
+| Related architectural evolution sections | [§3E — E. Transfer and Distributed Working](../11_ARCHITECTURAL_EVOLUTION.md#e-transfer-and-distributed-working) |
+| Related release notes | Evidence pending — no release-notes file matched this feature's cited version(s) by filename; docs/product/10_CHANGELOG.md tracks the documentation system itself, not per-feature user-facing changes |
+| Testing coverage | No dedicated test file identified via automated search of `test/` (17 test files exist repository-wide, concentrated in the metadata subsystem — see AI-FEAT-029 through AI-FEAT-033) |
+| Documentation completeness | Mostly complete — 2 unresolved evidence gap(s) in this file (see fields/sections marked "Evidence pending" above) |
+
 ## Summary
 
 Writes a clean mirror of selected events from the Active Archive Root to a Transfer Drive, for physical transport to the Main Archive Root.
@@ -34,6 +49,18 @@ Evidence pending beyond the Phase 13D documentation already read.
 - **Phase 13D (2026-05-14)** — introduced as part of the Archive Operations Layer milestone (`docs/release-notes-archive-operations.md`, `docs/archive-operations-layer.md`).
 - **Backup Update Scanning** (AI-FEAT-040) was added as a sibling capability within the same service file, with its own conflict semantics.
 - **Transfer Background/Minimize Operation** (AI-FEAT-041) added the ability to run this in the background without blocking the UI.
+
+## Engineering Evolution
+
+This section classifies this feature's already-evidenced history by milestone type. It adds no new facts beyond what the header table, Evolution / Implementation Journal, Known Bugs, and Decisions sections above already establish — it is a categorized index over that same evidence, not a second changelog.
+
+**Initial implementation**: Phase 13D era (2026-05-14, per `docs/archive-operations-layer.md`'s phase numbering) (see header table's "First-known implementation" field for citation).
+
+**Architectural / workflow decisions**: None recorded — see Decisions section above.
+
+**Reliability / correctness fixes**: [BUG-005](../bugs/BUG-005_TRANSFER_EXPORT_RESUME_STATE_DIVERGENCE.md) — see the Known Bugs section above and each record's own "Root Cause"/"Fix" fields for what changed and why.
+
+**Other dated milestones**: 3 entries exist in the Evolution / Implementation Journal above; not individually re-classified by milestone type here to avoid restating evidence — read that section directly for the full dated sequence.
 
 ## Known Bugs / Troubleshooting
 

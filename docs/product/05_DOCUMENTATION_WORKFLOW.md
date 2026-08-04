@@ -68,6 +68,52 @@ A roadmap milestone may introduce one feature, expand several existing features,
 
 When updating: append a new dated subsection to the relevant timeline stage (§3) rather than rewriting prior stages, add or update the relevant row in the relationship map (§5), and record any new durable lesson in §4 if one emerged. Verify every `AI-FEAT-###`/`AI-RM-###` citation against [01_FEATURE_REGISTRY.md](01_FEATURE_REGISTRY.md)/[02_MASTER_ROADMAP.md](02_MASTER_ROADMAP.md) before adding it — the same evidence discipline as everywhere else in this system applies here.
 
+## Documentation Lifecycle Enforcement
+
+This formalizes the update rule above into an explicit, checkable sequence. It applies to every feature implementation, extension, or milestone going forward — not only large features. A feature is **not complete** until every applicable step below is done; skipping steps 3–10 is incomplete work, not optional polish.
+
+### The 10-step lifecycle
+
+| # | Step | Where |
+|---|---|---|
+| 1 | Create/update the roadmap milestone | [02_MASTER_ROADMAP.md](02_MASTER_ROADMAP.md) — new `AI-RM-###` or updated status/objective on an existing one |
+| 2 | Implement the feature | Application code (out of scope for `docs/product/` itself) |
+| 3 | Record architectural evolution | [11_ARCHITECTURAL_EVOLUTION.md](11_ARCHITECTURAL_EVOLUTION.md) — **only** if the change meets the "major architectural transition" bar above; otherwise this step is a no-op, not a skip |
+| 4 | Document key engineering decisions | New file in [decisions/](decisions/) when a real alternative was weighed |
+| 5 | Record important bugs encountered | New file in [bugs/](bugs/) when the bug is reusable/architectural, per [07_BUG_TEMPLATE.md](07_BUG_TEMPLATE.md)'s selection criteria — not every fix qualifies |
+| 6 | Record rejected approaches | Inside the decision record's "Options Considered" section, or the feature file's journal marked **rejected**/**superseded** — never deleted, per Append, Never Erase above |
+| 7 | Record the accepted solution | The feature file's Evolution / Implementation Journal, and the decision record's "Decision" section |
+| 8 | Update feature status | [01_FEATURE_REGISTRY.md](01_FEATURE_REGISTRY.md) row + the feature's own `AI-FEAT-###` file (header table, Lifecycle Metadata, Engineering Evolution sections) |
+| 9 | Update roadmap progress | [02_MASTER_ROADMAP.md](02_MASTER_ROADMAP.md) milestone status, [04_PROJECT_DASHBOARD.md](04_PROJECT_DASHBOARD.md) |
+| 10 | Update changelog | [10_CHANGELOG.md](10_CHANGELOG.md), newest-first, append-only |
+
+Steps 4–7 are conditional — not every feature change produces a decision, a bug, a rejected approach, or a distinct "accepted solution" worth recording beyond the journal entry itself. Steps 1, 8, 9, and 10 are close to universal: almost any feature work touches roadmap/registry/dashboard/changelog in some way, even if only to confirm nothing moved.
+
+### Per-feature fields this obligates you to keep current
+
+Since Part 3 (`docs/product/features/*.md`'s **Lifecycle Metadata** and **Engineering Evolution** sections), completing step 8 above means more than editing prose — it means these mechanically-checkable fields stay accurate:
+
+- **Current maturity / implementation status** (header table) — must reflect the real current state, not the state at feature inception.
+- **Related decisions / bugs / postmortems** (Lifecycle Metadata) — when you create a new `DEC-###`/`BUG-###`/`PM-###` naming this feature, add the forward link in *both* places: the new record's own `Related feature(s)` field, and this feature's `Known Bugs`/`Decisions` section (or, at minimum, its existence becomes visible via the reverse lookup in [12_DEPENDENCY_MODEL.md](12_DEPENDENCY_MODEL.md) — but forward-linking at the source is preferred and should not be skipped just because the reverse lookup will eventually surface it).
+- **Testing coverage** — if you add a test file for this feature, that becomes discoverable evidence the next time this field is regenerated; there is no separate manual field to hand-edit.
+- **Documentation completeness** — a mechanical count of `"Evidence pending"` markers in the file. Resolving a real evidence gap (finding the actual date, the actual commit, the actual root cause) is what improves this field — never resolve it by deleting the marker without replacing it with verified fact.
+
+### Definition of "documentation complete" for a feature
+
+A feature's documentation lifecycle is complete when **all** of the following hold:
+
+1. Its `01_FEATURE_REGISTRY.md` row and its own file's header table agree on Status and Maturity.
+2. Every bug/decision/postmortem that names this feature in its own `Related feature(s)` field is discoverable from the feature's own file (forward-linked, or at minimum surfaced via [12_DEPENDENCY_MODEL.md](12_DEPENDENCY_MODEL.md)'s reverse-lookup tables).
+3. If the feature was part of a completed `AI-RM-###` milestone, that milestone's status in [02_MASTER_ROADMAP.md](02_MASTER_ROADMAP.md) and [04_PROJECT_DASHBOARD.md](04_PROJECT_DASHBOARD.md) says so.
+4. [10_CHANGELOG.md](10_CHANGELOG.md) has an entry for the documentation work itself (not the application release — see that file's own scope note).
+5. No newly-introduced fact contradicts an existing record without an explicit **Reconciliation Note** (for decisions) or an appended, marked-superseded journal entry (for features) — see Append, Never Erase above.
+
+A feature is allowed to be documentation-complete while still carrying real "Evidence pending" markers for genuinely unknown history (e.g., a pre-2026-05 implementation date nothing in the repo can recover) — completeness means *nothing knowable was left undocumented*, not that every field is filled in.
+
+### Do not treat this checklist as a gate that blocks shipping
+
+This is a documentation discipline, not a release gate. Application code ships on its own schedule; this checklist governs when the *documentation* for that work is considered finished, which may lag a merge by the time it takes to write it up — but per the Update Rule above, that lag should be measured in the same work session, not a future cleanup pass.
+
 ## Exports Are Not Source
 
 Anything under `exports/` (DOCX, PDF) is generated output for sharing outside the repository. It is never edited directly and never treated as authoritative — regenerate it from the Markdown source instead. `exports/` content is excluded from version control (see `.gitignore`); only the Markdown under `docs/product/` is tracked.

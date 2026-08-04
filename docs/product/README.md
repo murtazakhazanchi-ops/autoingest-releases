@@ -15,7 +15,9 @@ It records not only what is planned and completed, but how each feature evolved 
 - [02_MASTER_ROADMAP.md](02_MASTER_ROADMAP.md) is the canonical milestone order, unless the project owner explicitly reprioritizes it.
 - [04_PROJECT_DASHBOARD.md](04_PROJECT_DASHBOARD.md) records the current milestone, completed milestones, next milestone, and overall progress.
 - [11_ARCHITECTURAL_EVOLUTION.md](11_ARCHITECTURAL_EVOLUTION.md) is the chronological architectural narrative — how the registry, roadmap, and decisions connect over time, and why major transitions happened. It does not carry its own authority over current behavior; it links to the records that do.
-- `features/` contains one permanent document per registered product feature.
+- [12_DEPENDENCY_MODEL.md](12_DEPENDENCY_MODEL.md) is a navigational index over relationships already documented elsewhere — it carries no authority of its own; if it and an individual record disagree, the record wins.
+- [13_ENGINEERING_HANDBOOK.md](13_ENGINEERING_HANDBOOK.md) originates no new facts — every claim in it is downstream of a cited decision, technical doc, or other record.
+- `features/` contains one permanent document per registered product feature, each with header metadata, a **Lifecycle Metadata** section (cross-cutting relationships), and an **Engineering Evolution** section (categorized history).
 - `bugs/` contains reusable bug records and cross-feature troubleshooting knowledge — populated (`BUG-001`–`BUG-010`, see [bugs/README.md](bugs/README.md)).
 - `decisions/` contains accepted and rejected architectural/product decisions — populated (`DEC-001`–`DEC-015`, see [decisions/README.md](decisions/README.md)).
 - `postmortems/` contains records of significant incidents — populated (`PM-001`, see [postmortems/README.md](postmortems/README.md)).
@@ -52,7 +54,10 @@ Every factual claim here must trace to current source code, tests, existing tech
 - [03_IMPLEMENTATION_TIMELINE.md](03_IMPLEMENTATION_TIMELINE.md) — planned and actual milestone timing
 - [04_PROJECT_DASHBOARD.md](04_PROJECT_DASHBOARD.md) — live project status
 - [11_ARCHITECTURAL_EVOLUTION.md](11_ARCHITECTURAL_EVOLUTION.md) — the chronological narrative connecting the registry, roadmap, and decisions: how AutoIngest's architecture and archival workflow evolved, and why. Complements but does not duplicate the registry/roadmap/changelog/decisions.
-- [05_DOCUMENTATION_WORKFLOW.md](05_DOCUMENTATION_WORKFLOW.md) — mandatory maintenance workflow
+- [12_DEPENDENCY_MODEL.md](12_DEPENDENCY_MODEL.md) — canonical relationship index: Milestone→Features, Decision→Decision, Bug→Decision, Bug→Bug, Architecture→Features/Decisions/Postmortems, Feature→Postmortem
+- [13_ENGINEERING_HANDBOOK.md](13_ENGINEERING_HANDBOOK.md) — onboarding guide covering application, archival, metadata, folder, naming, UI, UX, performance, reliability, testing, release, documentation, decision, bug-documentation, and feature-lifecycle philosophy
+- [14_VALIDATION_SPECIFICATION.md](14_VALIDATION_SPECIFICATION.md) — the integrity rules this system must satisfy (duplicate IDs, broken links, orphan records, roadmap inconsistencies, etc.) and how to check each one
+- [05_DOCUMENTATION_WORKFLOW.md](05_DOCUMENTATION_WORKFLOW.md) — mandatory maintenance workflow, including the 10-step Documentation Lifecycle Enforcement sequence
 - [06_FEATURE_TEMPLATE.md](06_FEATURE_TEMPLATE.md) — template for every feature file
 - [07_BUG_TEMPLATE.md](07_BUG_TEMPLATE.md) — troubleshooting/bug-record template
 - [08_DECISION_TEMPLATE.md](08_DECISION_TEMPLATE.md) — architecture/product decision template

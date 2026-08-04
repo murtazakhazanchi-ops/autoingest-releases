@@ -15,6 +15,21 @@
 | First-known implementation | Evidence pending |
 | Latest major update | v0.8.7 (source card double-selection fix) |
 
+## Lifecycle Metadata
+
+Additive fields not already covered by the header table or the Known Bugs/Decisions sections above — see [05_DOCUMENTATION_WORKFLOW.md](../05_DOCUMENTATION_WORKFLOW.md) for the evidence-discipline rules governing every field below.
+
+| Field | Value |
+|---|---|
+| Related features | [AI-FEAT-024](AI-FEAT-024_SOURCE_CLEANUP.md) (found via cross-reference in this file's own prose, not yet in Dependencies/Parent/Subfeatures above) |
+| Related decisions | None recorded |
+| Related bugs | [BUG-001](../bugs/BUG-001_SOURCE_CLEANUP_POST_IMPORT_STATE_OWNERSHIP.md) *(found via reverse lookup — not yet cross-linked in the Known Bugs section above)* |
+| Related postmortems | None |
+| Related architectural evolution sections | Not yet covered in 11_ARCHITECTURAL_EVOLUTION.md's relationship map |
+| Related release notes | Evidence pending — no release-notes file matched this feature's cited version(s) by filename; docs/product/10_CHANGELOG.md tracks the documentation system itself, not per-feature user-facing changes |
+| Testing coverage | Evidence pending — this feature's related files are shared, multi-feature modules (e.g. `main/main.js`, `renderer/renderer.js`); automated basename matching against test/ is unreliable for these and was not attempted |
+| Documentation completeness | Mostly complete — 2 unresolved evidence gap(s) in this file (see fields/sections marked "Evidence pending" above) |
+
 ## Summary
 
 Activating a source for import, whether a local folder, external drive, or memory card. Originally proposed as two separate registry entries ("Local Folder Source Selection" and "External Drive Source Selection"); merged into one after `autoingest-architect` review found `selectLocalFolder()` is a thin wrapper calling the same `_setActiveSource()` used by `selectSource()`, writing into the same `activeSource` state with only the `type` discriminator changing — no independent backend or state shape exists for local folders specifically.
@@ -31,6 +46,18 @@ Evidence pending — not yet documented as fact.
 
 - **v0.8.7** — source card double-selection fix: clicking between source types previously left the old type's checkmark visible until the next polling cycle; each click handler now immediately clears the other list's checkmarks; `_pendingSourcePath` added so polling renders stay consistent during the async scan window in `selectSource()` (`docs/history.md`).
 - **v0.8.8** — Source Cleanup root-capture race fixed (see `docs/failure-patterns.md` #16 and AI-FEAT-024) — root cause was `activeSource` being nulled by drive-polling disconnect detection during an in-flight import await.
+
+## Engineering Evolution
+
+This section classifies this feature's already-evidenced history by milestone type. It adds no new facts beyond what the header table, Evolution / Implementation Journal, Known Bugs, and Decisions sections above already establish — it is a categorized index over that same evidence, not a second changelog.
+
+**Initial implementation**: Evidence pending — no independently-verified first-implementation date exists in this file's header table.
+
+**Architectural / workflow decisions**: None recorded — see Decisions section above.
+
+**Reliability / correctness fixes**: [BUG-001](../bugs/BUG-001_SOURCE_CLEANUP_POST_IMPORT_STATE_OWNERSHIP.md) — see the Known Bugs section above and each record's own "Root Cause"/"Fix" fields for what changed and why.
+
+**Other dated milestones**: 2 entries exist in the Evolution / Implementation Journal above; not individually re-classified by milestone type here to avoid restating evidence — read that section directly for the full dated sequence.
 
 ## Known Bugs / Troubleshooting
 

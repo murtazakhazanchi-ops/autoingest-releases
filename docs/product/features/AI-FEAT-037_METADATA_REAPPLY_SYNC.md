@@ -15,6 +15,21 @@
 | First-known implementation | 2026-05-09 |
 | Latest major update | 2026-05-11 |
 
+## Lifecycle Metadata
+
+Additive fields not already covered by the header table or the Known Bugs/Decisions sections above — see [05_DOCUMENTATION_WORKFLOW.md](../05_DOCUMENTATION_WORKFLOW.md) for the evidence-discipline rules governing every field below.
+
+| Field | Value |
+|---|---|
+| Related features | None beyond Dependencies/Parent/Subfeatures already listed in the header table above |
+| Related decisions | None recorded |
+| Related bugs | None recorded |
+| Related postmortems | None |
+| Related architectural evolution sections | [§3C — C. Metadata Automation](../11_ARCHITECTURAL_EVOLUTION.md#c-metadata-automation) |
+| Related release notes | Evidence pending — no release-notes file matched this feature's cited version(s) by filename; docs/product/10_CHANGELOG.md tracks the documentation system itself, not per-feature user-facing changes |
+| Testing coverage | No dedicated test file identified via automated search of `test/` (17 test files exist repository-wide, concentrated in the metadata subsystem — see AI-FEAT-029 through AI-FEAT-033) |
+| Documentation completeness | Mostly complete — 1 unresolved evidence gap(s) in this file (see fields/sections marked "Evidence pending" above) |
+
 ## Summary
 
 Detects when metadata needs to be reapplied to already-imported files (e.g. after an operator corrects event component location/city/country post-import) and syncs the corrected metadata across previously-imported files, with a preview modal showing affected folders and changed/removed fields. `docs/metadata-system.md`'s Import Path Coverage table lists "Reapply" as a synchronous write via the shared engine (AI-FEAT-029) — this feature is that Reapply capability plus its scan/sync/preview surface.
@@ -35,6 +50,18 @@ Evidence pending — not yet documented as fact.
 - **2026-05-10** — "previewEventMetadata Classification Fix (commit 1464c85)" (learning-log).
 - **2026-05-10** — "Metadata Sync Stabilization and Scan Performance Optimization" (learning-log).
 - **2026-05-11** — "Metadata Sync Hardening: Sync Resilience and Scan Reliability (commit b14d5fd)" (learning-log) — most recent dated entry found.
+
+## Engineering Evolution
+
+This section classifies this feature's already-evidenced history by milestone type. It adds no new facts beyond what the header table, Evolution / Implementation Journal, Known Bugs, and Decisions sections above already establish — it is a categorized index over that same evidence, not a second changelog.
+
+**Initial implementation**: 2026-05-09 (see header table's "First-known implementation" field for citation).
+
+**Architectural / workflow decisions**: None recorded — see Decisions section above.
+
+**Reliability / correctness fixes**: None recorded — see Known Bugs section above.
+
+**Other dated milestones**: 6 entries exist in the Evolution / Implementation Journal above; not individually re-classified by milestone type here to avoid restating evidence — read that section directly for the full dated sequence.
 
 ## Known Bugs / Troubleshooting
 

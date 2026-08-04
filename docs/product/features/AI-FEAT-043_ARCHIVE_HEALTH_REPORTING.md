@@ -15,6 +15,21 @@
 | First-known implementation | Phase 13D-1 (2026-05-14) |
 | Latest major update | Phase 13D-5 (2026-05-14) |
 
+## Lifecycle Metadata
+
+Additive fields not already covered by the header table or the Known Bugs/Decisions sections above — see [05_DOCUMENTATION_WORKFLOW.md](../05_DOCUMENTATION_WORKFLOW.md) for the evidence-discipline rules governing every field below.
+
+| Field | Value |
+|---|---|
+| Related features | [AI-FEAT-045](AI-FEAT-045_ARCHIVE_LOCK_HANDLING_STALE_LOCK_RECOVERY.md), [AI-FEAT-046](AI-FEAT-046_ARCHIVE_FOLDER_ADOPTION.md), [AI-FEAT-052](AI-FEAT-052_ARCHIVE_REPAIR.md) (found via cross-reference in this file's own prose, not yet in Dependencies/Parent/Subfeatures above) |
+| Related decisions | None recorded |
+| Related bugs | None recorded |
+| Related postmortems | None |
+| Related architectural evolution sections | [§3G — G. Archive Operations Layer](../11_ARCHITECTURAL_EVOLUTION.md#g-archive-operations-layer) |
+| Related release notes | Evidence pending — no release-notes file matched this feature's cited version(s) by filename; docs/product/10_CHANGELOG.md tracks the documentation system itself, not per-feature user-facing changes |
+| Testing coverage | No dedicated test file identified via automated search of `test/` (17 test files exist repository-wide, concentrated in the metadata subsystem — see AI-FEAT-029 through AI-FEAT-033) |
+| Documentation completeness | Complete — no unresolved "Evidence pending" markers in this file |
+
 ## Summary
 
 Four read-only reporting and audit surfaces giving operators visibility into archive health, none of which mutate any file or service state: Consistency Report, Completeness Checklist, Archive Diagnostics, and Audit Timeline.
@@ -36,6 +51,18 @@ Phases 13D-1/2/4/5, all dated 2026-05-14 per the learning-log's phase-numbered e
 
 - **2026-05-14** — Phase 13D-1 (Consistency Report), 13D-2 (Completeness Checklist — "Consistency Report Section-Failure Visibility" in learning-log), 13D-4 (Archive Diagnostics — "rich readiness summary"), 13D-5 (Audit Timeline), and 13D-6 ("Archive Operations Layer Documentation").
 - **2026-05-14** — "Phase 14A: Full Archive Operations Beta Validation" and "Phase 14B-1/14B-2" (fixing beta validation findings, transfer root validation UI integration) — hardening pass immediately following the initial build.
+
+## Engineering Evolution
+
+This section classifies this feature's already-evidenced history by milestone type. It adds no new facts beyond what the header table, Evolution / Implementation Journal, Known Bugs, and Decisions sections above already establish — it is a categorized index over that same evidence, not a second changelog.
+
+**Initial implementation**: Phase 13D-1 (2026-05-14) (see header table's "First-known implementation" field for citation).
+
+**Architectural / workflow decisions**: None recorded — see Decisions section above.
+
+**Reliability / correctness fixes**: None recorded — see Known Bugs section above.
+
+**Other dated milestones**: 2 entries exist in the Evolution / Implementation Journal above; not individually re-classified by milestone type here to avoid restating evidence — read that section directly for the full dated sequence.
 
 ## Known Bugs / Troubleshooting
 

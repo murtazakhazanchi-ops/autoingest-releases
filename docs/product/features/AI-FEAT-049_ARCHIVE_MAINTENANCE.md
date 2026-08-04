@@ -15,6 +15,21 @@
 | First-known implementation | Not started |
 | Latest major update | Not applicable |
 
+## Lifecycle Metadata
+
+Additive fields not already covered by the header table or the Known Bugs/Decisions sections above — see [05_DOCUMENTATION_WORKFLOW.md](../05_DOCUMENTATION_WORKFLOW.md) for the evidence-discipline rules governing every field below.
+
+| Field | Value |
+|---|---|
+| Related features | None beyond Dependencies/Parent/Subfeatures already listed in the header table above |
+| Related decisions | [DEC-015](../decisions/DEC-015_PLANNED_ARCHITECTURE_SEPARATE_FROM_IMPLEMENTED.md) *(found via reverse lookup — not yet cross-linked in the Decisions section above)* |
+| Related bugs | None recorded |
+| Related postmortems | None |
+| Related architectural evolution sections | [§3I — I. Planned Architectural Direction](../11_ARCHITECTURAL_EVOLUTION.md#i-planned-architectural-direction) |
+| Related release notes | Evidence pending — no release-notes file matched this feature's cited version(s) by filename; docs/product/10_CHANGELOG.md tracks the documentation system itself, not per-feature user-facing changes |
+| Testing coverage | Not applicable — feature not yet implemented (see header table's Status/Evidence status fields) |
+| Documentation completeness | Complete — no unresolved "Evidence pending" markers in this file |
+
 ## Summary
 
 Planned archive-maintenance capability — the next roadmap milestone after the completed AI-RM-001 (Metadata Audit & Repair). No architecture, scope, or design has been finalized. This document intentionally does not invent implementation detail for unbuilt work.
@@ -30,6 +45,18 @@ Named as "Archive Maintenance" in the canonical roadmap order (see [../02_MASTER
 ## Evolution / Implementation Journal
 
 Not started.
+
+## Engineering Evolution
+
+This section classifies this feature's already-evidenced history by milestone type. It adds no new facts beyond what the header table, Evolution / Implementation Journal, Known Bugs, and Decisions sections above already establish — it is a categorized index over that same evidence, not a second changelog.
+
+**Initial implementation**: Not applicable — feature not yet implemented.
+
+**Architectural / workflow decisions**: [DEC-015](../decisions/DEC-015_PLANNED_ARCHITECTURE_SEPARATE_FROM_IMPLEMENTED.md) — see the Decisions section above and each record's own "Decision"/"Consequences" fields for what changed and why.
+
+**Reliability / correctness fixes**: None recorded — see Known Bugs section above.
+
+**Other dated milestones**: Evidence pending — Evolution / Implementation Journal above has no dated entries.
 
 ## Known Bugs / Troubleshooting
 

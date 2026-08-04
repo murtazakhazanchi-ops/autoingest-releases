@@ -19,6 +19,21 @@
 
 **Not on the original 63-item feature checklist** — independently discovered by both research passes conducted for this audit. `autoingest-architect` review confirmed this as a legitimate new category ("Collaboration and Realtime Coordination"), structurally isolated (own server process, own settings-gated toggle, no writes to `event.json`).
 
+## Lifecycle Metadata
+
+Additive fields not already covered by the header table or the Known Bugs/Decisions sections above — see [05_DOCUMENTATION_WORKFLOW.md](../05_DOCUMENTATION_WORKFLOW.md) for the evidence-discipline rules governing every field below.
+
+| Field | Value |
+|---|---|
+| Related features | None beyond Dependencies/Parent/Subfeatures already listed in the header table above |
+| Related decisions | None recorded |
+| Related bugs | None recorded |
+| Related postmortems | None |
+| Related architectural evolution sections | Not yet covered in 11_ARCHITECTURAL_EVOLUTION.md's relationship map |
+| Related release notes | `docs/release-notes-v0.9.1.md`; `docs/release-notes-v0.9.7.md` |
+| Testing coverage | No dedicated test file identified via automated search of `test/` (17 test files exist repository-wide, concentrated in the metadata subsystem — see AI-FEAT-029 through AI-FEAT-033) |
+| Documentation completeness | Mostly complete — 1 unresolved evidence gap(s) in this file (see fields/sections marked "Evidence pending" above) |
+
 ## Summary
 
 A full realtime multi-device coordination system: a Socket.IO relay server for sync-slot negotiation, live activity, and device presence, explicitly documented as **advisory-only** — `services/realtimeOperationsService.js` "never writes event.json, sync manifests, archive folders, metadata files, or any authoritative state." The app degrades gracefully to direct archive operations when the relay is unreachable.
@@ -39,6 +54,18 @@ Evidence pending — not yet documented as fact.
 - **v0.9.5 (2026-05-29)** — correct idle/offline presence state model (`docs/release-notes-v0.9.5.md`).
 - **v0.9.6 (2026-05-29)** — application-level presence heartbeat: a 45-second heartbeat now runs from socket-connect to disconnect, fixing devices incorrectly appearing Idle when open-but-not-importing (`docs/release-notes-v0.9.6.md`).
 - **v0.9.7 (2026-05-30)** — metadata/registry stability fixes in the same release cycle, not specific to this feature (`docs/release-notes-v0.9.7.md`).
+
+## Engineering Evolution
+
+This section classifies this feature's already-evidenced history by milestone type. It adds no new facts beyond what the header table, Evolution / Implementation Journal, Known Bugs, and Decisions sections above already establish — it is a categorized index over that same evidence, not a second changelog.
+
+**Initial implementation**: v0.9.1 (see header table's "First-known implementation" field for citation).
+
+**Architectural / workflow decisions**: None recorded — see Decisions section above.
+
+**Reliability / correctness fixes**: None recorded — see Known Bugs section above.
+
+**Other dated milestones**: 6 entries exist in the Evolution / Implementation Journal above; not individually re-classified by milestone type here to avoid restating evidence — read that section directly for the full dated sequence.
 
 ## Known Bugs / Troubleshooting
 

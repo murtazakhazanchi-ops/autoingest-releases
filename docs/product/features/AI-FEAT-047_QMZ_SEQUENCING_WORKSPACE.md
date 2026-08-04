@@ -15,6 +15,21 @@
 | First-known implementation | Evidence pending |
 | Latest major update | Evidence pending |
 
+## Lifecycle Metadata
+
+Additive fields not already covered by the header table or the Known Bugs/Decisions sections above — see [05_DOCUMENTATION_WORKFLOW.md](../05_DOCUMENTATION_WORKFLOW.md) for the evidence-discipline rules governing every field below.
+
+| Field | Value |
+|---|---|
+| Related features | [AI-FEAT-016](AI-FEAT-016_PREVIEW_FOCUS_SELECTION_SEPARATION.md), [AI-FEAT-046](AI-FEAT-046_ARCHIVE_FOLDER_ADOPTION.md) (found via cross-reference in this file's own prose, not yet in Dependencies/Parent/Subfeatures above) |
+| Related decisions | [DEC-011](../decisions/DEC-011_QMZ_DEDICATED_DOMAIN_WORKFLOW.md) |
+| Related bugs | [BUG-007](../bugs/BUG-007_QMZ_METADATA_CONTEXT_SHAPE_MISMATCH.md) |
+| Related postmortems | [PM-001](../postmortems/PM-001_METADATA_CORRECTNESS_GAP_PRODUCTION_READINESS_REVIEW.md) |
+| Related architectural evolution sections | [§3F — F. Specialized Archival Workflows](../11_ARCHITECTURAL_EVOLUTION.md#f-specialized-archival-workflows) |
+| Related release notes | Evidence pending — no release-notes file matched this feature's cited version(s) by filename; docs/product/10_CHANGELOG.md tracks the documentation system itself, not per-feature user-facing changes |
+| Testing coverage | Referenced in 1 test file(s) (mechanical name/import match, not a coverage percentage — the test suite was not executed for this documentation pass): `test/qmzLiveE2E.test.js` |
+| Documentation completeness | Partial — 3 unresolved evidence gaps in this file (see fields/sections marked "Evidence pending" above) |
+
 ## Summary
 
 **QMZ = Qadam / Majlis / Ziyafat** — a standalone sequencing workspace distinct from standard Event Import, with its own root (`qmzRoot`), durable state file (`qmz-sequences.json`), namespaced renderer state/UI (`_qmz*` prefix throughout — explicitly documented in code comments as never touching Import's `sortKey`/`viewMode`), and its own IPC surface.
@@ -37,6 +52,18 @@ Evidence pending — not yet documented as fact. Git history confirms at least t
 
 - Commit `b56f6ba` — "feat(qmz): add QMZ Sequence Manager and event-list entry point."
 - Commit `a2e3b7a` — "feat(qmz): convert QMZ Sequence Manager to a full workspace with sequence review, timeline, and event context."
+
+## Engineering Evolution
+
+This section classifies this feature's already-evidenced history by milestone type. It adds no new facts beyond what the header table, Evolution / Implementation Journal, Known Bugs, and Decisions sections above already establish — it is a categorized index over that same evidence, not a second changelog.
+
+**Initial implementation**: Evidence pending — no independently-verified first-implementation date exists in this file's header table.
+
+**Architectural / workflow decisions**: [DEC-011](../decisions/DEC-011_QMZ_DEDICATED_DOMAIN_WORKFLOW.md) — see the Decisions section above and each record's own "Decision"/"Consequences" fields for what changed and why.
+
+**Reliability / correctness fixes**: [BUG-007](../bugs/BUG-007_QMZ_METADATA_CONTEXT_SHAPE_MISMATCH.md) — see the Known Bugs section above and each record's own "Root Cause"/"Fix" fields for what changed and why.
+
+**Other dated milestones**: 2 entries exist in the Evolution / Implementation Journal above; not individually re-classified by milestone type here to avoid restating evidence — read that section directly for the full dated sequence.
 
 ## Known Bugs / Troubleshooting
 

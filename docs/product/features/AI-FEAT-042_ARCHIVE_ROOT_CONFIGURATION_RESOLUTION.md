@@ -15,6 +15,21 @@
 | First-known implementation | Phase 12A (per learning-log Phase numbering) |
 | Latest major update | v0.9.8 (2026-06-16) |
 
+## Lifecycle Metadata
+
+Additive fields not already covered by the header table or the Known Bugs/Decisions sections above — see [05_DOCUMENTATION_WORKFLOW.md](../05_DOCUMENTATION_WORKFLOW.md) for the evidence-discipline rules governing every field below.
+
+| Field | Value |
+|---|---|
+| Related features | None beyond Dependencies/Parent/Subfeatures already listed in the header table above |
+| Related decisions | [DEC-003](../decisions/DEC-003_LOCAL_FIRST_ON_PREMISES_ARCHITECTURE.md) *(found via reverse lookup — not yet cross-linked in the Decisions section above)*; [DEC-012](../decisions/DEC-012_ARCHIVE_ROOT_RESOLUTION_REQUIRES_EVIDENCE.md) |
+| Related bugs | [BUG-003](../bugs/BUG-003_STALE_LOCAL_STAGING_RESTORE_OVER_ARCHIVE_ROOT.md) |
+| Related postmortems | None |
+| Related architectural evolution sections | [§3G — G. Archive Operations Layer](../11_ARCHITECTURAL_EVOLUTION.md#g-archive-operations-layer) |
+| Related release notes | `docs/release-notes-v0.9.8.md` |
+| Testing coverage | No dedicated test file identified via automated search of `test/` (17 test files exist repository-wide, concentrated in the metadata subsystem — see AI-FEAT-029 through AI-FEAT-033) |
+| Documentation completeness | Mostly complete — 1 unresolved evidence gap(s) in this file (see fields/sections marked "Evidence pending" above) |
+
 ## Summary
 
 Configuration and automatic resolution of AutoIngest's four storage roots — Active Archive Root (portable NAS), Local Staging Root (operator SSD), Main Archive Root (permanent office server), Transfer Drive Root (migration carrier) — including auto-resolution, temporary override, and re-resolution when a saved root goes offline.
@@ -32,6 +47,18 @@ Evidence pending beyond the release-notes trail below.
 - **2026-05-12** — "Phase 12A: Main Archive Root Setting and Validation Foundation" (learning-log).
 - **v0.9.4 (2026-05-29)** — "Archive Root & Realtime Stability Tester Build": auto-resolution and temporary override introduced (`docs/release-notes-v0.9.4.md`).
 - **v0.9.8 (2026-06-16)** — "Archive Root Detection & Event Restore Fix": NAS root detection on startup event restore fixed (a reachable NAS now always wins over stale local-staging); "Adopt active root as Main Archive Root" action added to the Archive Locations panel when the saved Main Archive Root is offline but the active root is a valid online archive (`docs/release-notes-v0.9.8.md`).
+
+## Engineering Evolution
+
+This section classifies this feature's already-evidenced history by milestone type. It adds no new facts beyond what the header table, Evolution / Implementation Journal, Known Bugs, and Decisions sections above already establish — it is a categorized index over that same evidence, not a second changelog.
+
+**Initial implementation**: Phase 12A (per learning-log Phase numbering) (see header table's "First-known implementation" field for citation).
+
+**Architectural / workflow decisions**: [DEC-003](../decisions/DEC-003_LOCAL_FIRST_ON_PREMISES_ARCHITECTURE.md); [DEC-012](../decisions/DEC-012_ARCHIVE_ROOT_RESOLUTION_REQUIRES_EVIDENCE.md) — see the Decisions section above and each record's own "Decision"/"Consequences" fields for what changed and why.
+
+**Reliability / correctness fixes**: [BUG-003](../bugs/BUG-003_STALE_LOCAL_STAGING_RESTORE_OVER_ARCHIVE_ROOT.md) — see the Known Bugs section above and each record's own "Root Cause"/"Fix" fields for what changed and why.
+
+**Other dated milestones**: 3 entries exist in the Evolution / Implementation Journal above; not individually re-classified by milestone type here to avoid restating evidence — read that section directly for the full dated sequence.
 
 ## Known Bugs / Troubleshooting
 
