@@ -572,32 +572,60 @@ async function mkTmp(prefix) { return fsp.mkdtemp(path.join(os.tmpdir(), prefix)
   check(scrollOverflowStable, '.ma-results-scroll keeps overflow-y:auto throughout appends (scrollbar presence changes only because content height changes, not a style toggle)');
 
   // ── Empty-state centering stability at minimum and taller window heights ───────
+  // Full reset to the realistic pre-first-run state — Export/Repair buttons are only
+  // ever shown by _maPollOnce() after a completed run with results, never alongside
+  // this empty state in production, so they must be hidden here too (a leftover from
+  // the earlier large-result-set block otherwise shrinks the results zone further
+  // than any real "no audit has been run yet" state ever would).
   await window.evaluate(() => {
     document.getElementById('maRepairSection').hidden = true;
     document.getElementById('maSummaryBar').hidden = true;
+    document.getElementById('maExportJsonBtn').hidden = true;
+    document.getElementById('maExportCsvBtn').hidden = true;
+    document.getElementById('maRepairBtn').hidden = true;
     document.getElementById('maList').innerHTML = '<div class="al-empty"><div class="al-empty-title">No audit has been run yet.</div><p>Select a scope and click Run Audit.</p></div>';
     document.querySelector('#msTabAudit .ma-results-scroll').classList.add('ma-results-scroll--empty');
   });
   await window.waitForTimeout(150);
 
-  async function emptyCenterOffset() {
+  async function emptyCenterState() {
     return window.evaluate(() => {
       const scroll = document.querySelector('#msTabAudit .ma-results-scroll');
       const empty = document.querySelector('#maList .al-empty');
       if (!scroll || !empty) return null;
       const s = scroll.getBoundingClientRect();
       const e = empty.getBoundingClientRect();
-      return ((e.top + e.height / 2) - (s.top + s.height / 2)) / s.height; // proportional offset
+      return {
+        offset: ((e.top + e.height / 2) - (s.top + s.height / 2)) / s.height, // proportional offset
+        fits: scroll.scrollHeight <= scroll.clientHeight + 1,
+        // safe-center's fallback (only engages when content doesn't fit): starts flush
+        // at the scroll container's own top, reachable by scrolling — never clipped.
+        reachableFromTop: Math.abs(e.top - s.top) <= 1,
+      };
     });
   }
   await setWindowSize(1400, 700);
-  const offsetMin = await emptyCenterOffset();
+  const stateMin = await emptyCenterState();
   await setWindowSize(1400, 1400);
   await window.waitForTimeout(200);
-  const offsetMax = await emptyCenterOffset();
-  log(`empty-state centering proportional offset — minHeight=${offsetMin} tallHeight=${offsetMax}`);
-  check(offsetMin !== null && Math.abs(offsetMin) <= 0.08, 'empty state is centered (not drifting) within the results zone at minimum window height');
-  check(offsetMax !== null && Math.abs(offsetMax) <= 0.08, 'empty state is centered (not drifting) within the results zone at a taller window height');
+  const stateMax = await emptyCenterState();
+  log(`empty-state centering — minHeight=${JSON.stringify(stateMin)} tallHeight=${JSON.stringify(stateMax)}`);
+  // At a taller height the message comfortably fits, so it must be genuinely centered.
+  check(stateMax !== null && stateMax.fits && Math.abs(stateMax.offset) <= 0.08, 'empty state is centered (not drifting) within the results zone at a taller window height');
+  // At the app's literal minimum supported height, the two-line "before first run"
+  // message can be taller than the available results zone (a real, if narrow, edge
+  // case — not a test artifact). Plain `center` would clip it with no way to scroll to
+  // it; `safe center` (see index.html) falls back to start-aligned instead. So the
+  // requirement here isn't strict centering, it's "never clipped": either it fits and
+  // is centered, or it doesn't fit and safe-center's reachable-from-top fallback has
+  // correctly engaged.
+  check(
+    stateMin !== null && (
+      (stateMin.fits && Math.abs(stateMin.offset) <= 0.08) ||
+      (!stateMin.fits && stateMin.reachableFromTop)
+    ),
+    'empty state is never clipped at minimum window height — centered when it fits, reachable-from-top (safe-center fallback) when it does not'
+  );
 
   // ── Cancel still works ──────────────────────────────────────────────────────────
   await window.evaluate(() => { document.getElementById('maList').innerHTML = '<div class="al-empty"><div class="al-empty-title">No audit has been run yet.</div><p>Select a scope and click Run Audit.</p></div>'; });

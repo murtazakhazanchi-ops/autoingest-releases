@@ -1768,11 +1768,40 @@
        space left over after .ms-tabs's own (flex-shrink:0) natural height. */
     #msTabAudit { display: flex; flex-direction: column; flex: 1; min-height: 0; }
     #msTabAudit .diag-body { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
-    #msTabAudit .diag-actions { flex-shrink: 0; }
+    /* Visual-polish pass, final rhythm (chosen after an explicit side-by-side compare
+       of 12/14/16px for the radio-option gap, and of alternating vs. uniform-12 vs.
+       uniform-14 for the whole Controls rhythm — see conversation for the comparison
+       screenshots). 14px reused as the one spacing unit for every gap within Controls
+       — helper→Scope, Scope→radios, radios→Run row, Run row→status — reads as one
+       consistent rhythm instead of the earlier alternating 10/12/14/10px scheme. 16px
+       (a small, deliberate step up, not a jump) marks the divider as a boundary rather
+       than just more of the same internal rhythm. Calmer divider color also matches
+       the border-subtle separator convention used by .ms-subsection and the footer
+       note elsewhere in this same modal, instead of the stronger .diag-actions border
+       this tab shares with Archive Diagnostics. */
+    #msTabAudit .diag-actions { flex-shrink: 0; gap: 14px; padding-bottom: 16px; border-bottom-color: var(--border-subtle); }
+    /* .diag-helper carries its own small margin-bottom in the shared base rule (used
+       also by Archive Diagnostics) — cancelled here so the gap after it matches the
+       uniform 14px rhythm exactly, not 14px + a few extra px of residual margin. */
+    #msTabAudit .diag-helper { margin-bottom: 0; }
+    /* Chosen as the clear winner in the 12/14/16px comparison: 6px (the shared
+       .diag-actions-tools default) reads as one fused control at this font size;
+       16px started to make the two options feel like they were drifting apart into
+       separate elements rather than one cohesive radio group. 14px gives clear
+       separation while the pairing still reads as a single control. */
+    #msTabAudit .diag-actions-tools { gap: 14px; }
     #msTabAudit .ms-audit-local-footer { flex-shrink: 0; }
+    /* .ms-subsection-title's own small margin-bottom (shared with the Metadata tab's
+       "AutoIngest Metadata"/"External Metadata Updates" headings) is cancelled only
+       for its "Scope" usage here — scoped narrowly enough that "Results" (the same
+       class, inside .ma-results-panel below) keeps its own separate margin. */
+    #msTabAudit .diag-actions .ms-subsection-title { margin-bottom: 0; }
     /* Groups the Results heading + summary (fixed) around the one scrolling region
-       below — does not scroll itself, just sized by flex:1 to fill the zone. */
-    .ma-results-panel { flex: 1; display: flex; flex-direction: column; min-height: 0; gap: 8px; }
+       below — does not scroll itself, just sized by flex:1 to fill the zone. The 4px
+       top margin lands the divider-to-heading gap at 16px (matching .diag-actions's
+       own 16px padding-bottom above), so the divider has equal, deliberate breathing
+       room on both sides as the one boundary in an otherwise uniform 14px rhythm. */
+    .ma-results-panel { flex: 1; display: flex; flex-direction: column; min-height: 0; gap: 10px; margin-top: 4px; }
     /* The ONLY element that scrolls, and the sole owner of flex-grow/height in the
        Results zone — #maList and #maRepairSection are plain flowing children within
        it, so Repair Preview naturally follows the audit results in one shared scroll
@@ -1782,17 +1811,71 @@
        empty-vs-populated — centers the results zone's content only while genuinely
        empty (before first run, while scanning, or "no exceptions"), reverting to
        normal top-aligned flow the moment real rows exist. */
-    .ma-results-scroll--empty { justify-content: center; }
+    /* safe center (not plain center): the added Controls-block spacing above reduces
+       the Results zone's available height, so at the app's minimum supported window
+       height the centered empty-state message can be taller than that space. Plain
+       `center` on a scrollable flex container clips/hides the overflow symmetrically
+       with no way to scroll to it; `safe` falls back to start-aligned (reachable via
+       scroll) instead, only while it doesn't actually fit — visually still centered
+       at every window size this tab actually renders at. */
+    .ma-results-scroll--empty { justify-content: safe center; }
+    /* .al-empty/.sq-empty are shared with Activity Log and many other panels
+       throughout this file — scoped here rather than edited on the base rules. Their
+       default padding (40px+) was sized for less space-constrained contexts; trimmed
+       to a comfortable (not cramped) amount that suits this tab's typical size. Fit
+       at the app's literal minimum window height is handled separately below (the
+       @media block), not by compressing this further — see that block's comment. */
+    #msTabAudit .al-empty { padding: 20px 20px 16px; }
+    #msTabAudit .ma-results-scroll .sq-empty { padding: 20px 20px; }
+    /* At the app's documented minimum window height (main.js minHeight:700), the
+       comfortable rhythm/padding above doesn't leave enough room for the two-line
+       "before first run" empty-state message — 30px short, measured empirically.
+       Rather than compress the 14px rhythm (or the empty-state padding) at every
+       window size to cover a case that only exists in a narrow band near the literal
+       floor, this gives that band its own correctly-tuned spacing — treating the
+       minimum supported size as a first-class target with appropriate spacing of its
+       own, not a compromise applied everywhere. 730px is the exact threshold where
+       the comfortable rhythm starts fitting on its own (700px + the 30px deficit);
+       above it this block does nothing. Within it: the top padding above the helper
+       text (outside the Description→Scope→Radio→Run→Status rhythm entirely, so the
+       least visually significant lever) is dropped first, then the internal rhythm is
+       trimmed only slightly (14→12px, not collapsed), then the divider gets a smaller
+       but still slightly larger allowance than the internal rhythm (12/13px vs 12px)
+       so it still reads as a boundary. Together this fully closes the gap with no
+       clipping, while every window size above 730px keeps the full 14px rhythm and
+       comfortable empty-state padding untouched. */
+    @media (max-height: 730px) {
+      #msTabAudit .diag-body { padding-top: 0; }
+      #msTabAudit .diag-actions { gap: 12px; padding-bottom: 12px; }
+      #msTabAudit .ma-results-panel { margin-top: 1px; }
+    }
     /* Plain document flow, no flex-grow — the scroll container above owns the height. */
     /* #maList still carries the shared .diag-list class (flex:1; overflow-y:auto) —
        both must be explicitly cancelled here, or #maList silently keeps growing and
-       self-scrolling instead of .ma-results-scroll owning that. */
-    #msTabAudit #maList { flex: none; overflow: visible; display: flex; flex-direction: column; gap: 4px; }
+       self-scrolling instead of .ma-results-scroll owning that. Gap bumped from 4px
+       to 6px for an easier scan rhythm through long result lists. */
+    #msTabAudit #maList { flex: none; overflow: visible; display: flex; flex-direction: column; gap: 6px; }
+    /* .diag-item is shared with Archive Diagnostics (#diagList) — scoped here rather
+       than edited on the base rule, matching the modifier-not-override discipline used
+       for .adopt-section below. Slightly roomier than the shared default (8px 10px)
+       for a calmer, less dev-tool-dense card read at this tab's typical result volume. */
+    #msTabAudit .diag-item { padding: 9px 12px; }
     /* Modifier, not an override of .adopt-section's base rule — #adoptionSection
        (Orphan File Adoption, elsewhere in this modal) relies on that rule's own
        max-height/overflow-y as its genuine bounded-scroll contract; this modifier only
        relaxes those two properties for Repair Preview's inline usage in this tab. */
     .adopt-section--inline { max-height: none; overflow: visible; flex-shrink: 0; }
+    /* Repair Preview internals: #maRepairSnapshotNote/#maRepairList/#maRepairConfirmBtn
+       are IDs unique to this tab, so styled directly rather than through .adopt-header
+       (a shared class also used by #adoptionSection — left untouched). A bit more room
+       above "Repair Preview" separates it as a sub-section within Results; the note and
+       result cards were previously flush against each other with zero gap (#maRepairList
+       is a plain block container, unlike #maList's flex gap) — now matches the same
+       6px card rhythm as the main results list, reinforcing "continuation of Results"
+       rather than a bolted-on separate panel. */
+    #msTabAudit #maRepairSection .adopt-header { padding-top: 12px; }
+    #msTabAudit #maRepairSnapshotNote { margin: 6px 0 10px; }
+    #msTabAudit #maRepairList { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
     .ms-empty   { font-size: 13px; color: var(--text-muted); text-align: center; padding: 40px 0; }
     .ms-loading {
       font-size: 13px; color: var(--text-muted); text-align: center; padding: 40px 0;
@@ -7324,6 +7407,7 @@
           <div class="diag-body">
             <div class="diag-actions">
               <p class="diag-helper">Scans a chosen archive scope for missing, incorrect, or duplicate metadata. Read-only — no files are modified until you explicitly run Repair below.</p>
+              <p class="ms-subsection-title">Scope</p>
               <div class="diag-actions-tools">
                 <label style="display:flex;align-items:center;gap:6px;">
                   <input type="radio" name="maScopeType" id="maScopeArchiveRoot" value="archiveRoot" checked>
