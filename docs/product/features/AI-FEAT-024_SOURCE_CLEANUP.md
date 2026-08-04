@@ -36,11 +36,11 @@ Evidence pending — not yet documented as fact.
 
 ## Known Bugs / Troubleshooting
 
-See `docs/failure-patterns.md` #16 ("Path Outside Source Root" on Cleanup After External Drive Import) — the root cause traces back to AI-FEAT-012's `activeSource` state, not this feature's own logic.
+See `docs/failure-patterns.md` #16 ("Path Outside Source Root" on Cleanup After External Drive Import) — the root cause traces back to AI-FEAT-012's `activeSource` state, not this feature's own logic. Documented as [BUG-001 — Source Cleanup / Post-Import State Ownership Race](../bugs/BUG-001_SOURCE_CLEANUP_POST_IMPORT_STATE_OWNERSHIP.md).
 
 ## Decisions
 
-None recorded.
+See [DEC-005 — Original Preservation and Non-Destructive Ingest](../decisions/DEC-005_ORIGINAL_PRESERVATION_NON_DESTRUCTIVE_INGEST.md) for the source-of-truth decision behind this feature's strict copy-verification-gated deletion order.
 
 ## Future Enhancements
 

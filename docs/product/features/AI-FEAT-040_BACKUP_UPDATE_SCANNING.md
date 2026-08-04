@@ -33,11 +33,11 @@ Commits confirmed on `main` (via the fully-merged `feat/backup-sync-scan` branch
 
 ## Known Bugs / Troubleshooting
 
-None recorded in `docs/product/bugs/` yet — several of the commits above are themselves bug fixes (folder-rename detection, resume-state display, progress-total preservation) but were not backfilled into individual bug records.
+Several of the commits above are bug fixes now backfilled as [BUG-005 — Transfer Export/Backup-Update Resume State Diverges From Backend Progress](../bugs/BUG-005_TRANSFER_EXPORT_RESUME_STATE_DIVERGENCE.md) (`803c756`, `9f825df`, and sibling commit `cb01b34`).
 
 ## Decisions
 
-None recorded.
+See [DEC-010 — Transfer Update Is Missing-Files-Only](../decisions/DEC-010_TRANSFER_UPDATE_MISSING_FILES_ONLY.md).
 
 ## Future Enhancements
 

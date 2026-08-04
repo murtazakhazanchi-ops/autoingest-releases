@@ -37,11 +37,11 @@ No dated entries found in this pass.
 
 ## Known Bugs / Troubleshooting
 
-None recorded.
+See [BUG-004 — Same-Device Stale Archive Lock Blocks All Future Imports](../bugs/BUG-004_SAME_DEVICE_STALE_ARCHIVE_LOCK.md) (fixed 2026-07-02).
 
 ## Decisions
 
-None recorded.
+See [DEC-013 — Lock Clearing Must Be Constrained](../decisions/DEC-013_LOCK_CLEARING_MUST_BE_CONSTRAINED.md).
 
 ## Future Enhancements
 

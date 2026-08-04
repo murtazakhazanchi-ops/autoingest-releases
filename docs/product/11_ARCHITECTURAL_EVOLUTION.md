@@ -55,6 +55,8 @@ The automation covers direct IPTC/XMP writing for JPEG/TIFF, XMP-sidecar handlin
 
 **Adobe Bridge remains relevant** for registry management, inspection, verification, correction, and professional review — AutoIngest is an automation and control layer over an established practice, not a claim that Bridge or human review is obsolete. The Bridge-import path inside the Keyword Registry (AI-FEAT-036) is the concrete, current point of continuity between the two.
 
+The shared metadata engine/resolver (DEC-007) and the durable crash-recoverable queue (DEC-008) were both direct corrections to real defects found during this stage's own hardening — see [BUG-007](bugs/BUG-007_QMZ_METADATA_CONTEXT_SHAPE_MISMATCH.md) and [BUG-010](bugs/BUG-010_METADATA_QUEUE_IN_MEMORY_LOSS_ON_CRASH.md), and the combined remediation narrative in [PM-001](postmortems/PM-001_METADATA_CORRECTNESS_GAP_PRODUCTION_READINESS_REVIEW.md).
+
 ### D. Archive Integrity and Transaction Safety
 
 Evidence: `docs/system-contracts.md`, `docs/history.md` v0.7.4-dev, AI-FEAT-019 through AI-FEAT-028.
@@ -124,13 +126,13 @@ Durable lessons this history has produced, worth preserving independent of any s
 
 Only verified links — each ID below was confirmed directly against [01_FEATURE_REGISTRY.md](01_FEATURE_REGISTRY.md) before inclusion.
 
-| Architectural stage | Related AI-FEAT IDs | Related technical docs |
-|---|---|---|
-| §3A Adobe Bridge workflow (continuity point) | AI-FEAT-029, AI-FEAT-036 | `docs/metadata-system.md` |
-| §3B Initial foundation | AI-FEAT-001, AI-FEAT-004, AI-FEAT-009, AI-FEAT-011, AI-FEAT-018, AI-FEAT-019, AI-FEAT-020, AI-FEAT-022 | `docs/architecture.md`, `docs/event-system.md`, `docs/ingestion-flow.md` |
-| §3C Metadata automation | AI-FEAT-029, AI-FEAT-030, AI-FEAT-031, AI-FEAT-032, AI-FEAT-033, AI-FEAT-036, AI-FEAT-037 | `docs/metadata-system.md` |
-| §3D Archive integrity & transaction safety | AI-FEAT-019, AI-FEAT-020, AI-FEAT-021, AI-FEAT-024, AI-FEAT-025, AI-FEAT-027, AI-FEAT-028 | `docs/system-contracts.md` |
-| §3E Transfer & distributed working | AI-FEAT-038, AI-FEAT-039, AI-FEAT-040, AI-FEAT-041, AI-FEAT-044, AI-FEAT-045 | `docs/archive-operations-layer.md` |
-| §3F Specialized workflows (QMZ) | AI-FEAT-022, AI-FEAT-047 | `docs/metadata-system.md` § Import Path Coverage |
-| §3G Archive Operations layer | AI-FEAT-042, AI-FEAT-043, AI-FEAT-044, AI-FEAT-045, AI-FEAT-046 | `docs/archive-operations-layer.md` |
-| §3I Planned direction | AI-FEAT-049 – AI-FEAT-056 | [02_MASTER_ROADMAP.md](02_MASTER_ROADMAP.md) |
+| Architectural stage | Related AI-FEAT IDs | Related technical docs | Related bug/decision/postmortem records |
+|---|---|---|---|
+| §3A Adobe Bridge workflow (continuity point) | AI-FEAT-029, AI-FEAT-036 | `docs/metadata-system.md` | [DEC-004](decisions/DEC-004_PRESERVE_BRIDGE_BASED_ARCHIVAL_PRACTICE.md), [DEC-014](decisions/DEC-014_CONTROLLED_KEYWORD_REGISTRY.md) |
+| §3B Initial foundation | AI-FEAT-001, AI-FEAT-004, AI-FEAT-009, AI-FEAT-011, AI-FEAT-018, AI-FEAT-019, AI-FEAT-020, AI-FEAT-022 | `docs/architecture.md`, `docs/event-system.md`, `docs/ingestion-flow.md` | [DEC-001](decisions/DEC-001_EVENT_DATA_AS_DURABLE_ARCHIVE_TRUTH.md), [DEC-002](decisions/DEC-002_FOLDER_STRUCTURE_PLUS_EMBEDDED_METADATA.md), [DEC-005](decisions/DEC-005_ORIGINAL_PRESERVATION_NON_DESTRUCTIVE_INGEST.md), [BUG-002](bugs/BUG-002_PHOTOGRAPHER_SEQUENCE_FOLDER_RESOLUTION.md) |
+| §3C Metadata automation | AI-FEAT-029, AI-FEAT-030, AI-FEAT-031, AI-FEAT-032, AI-FEAT-033, AI-FEAT-036, AI-FEAT-037 | `docs/metadata-system.md` | [BUG-007](bugs/BUG-007_QMZ_METADATA_CONTEXT_SHAPE_MISMATCH.md), [BUG-008](bugs/BUG-008_LASTMETADATARUN_EISDIR_SILENT_FAILURE.md), [BUG-009](bugs/BUG-009_SAME_SIZE_SKIP_METADATA_UNVERIFIED.md), [BUG-010](bugs/BUG-010_METADATA_QUEUE_IN_MEMORY_LOSS_ON_CRASH.md), [DEC-006](decisions/DEC-006_RAW_FILES_USE_XMP_SIDECARS.md), [DEC-007](decisions/DEC-007_SHARED_METADATA_ENGINE_RESOLVER.md), [DEC-008](decisions/DEC-008_DURABLE_METADATA_SURVIVES_RESTART.md), [DEC-009](decisions/DEC-009_COPY_IDEMPOTENCY_MUST_NOT_SUPPRESS_METADATA_REPAIR.md), [PM-001](postmortems/PM-001_METADATA_CORRECTNESS_GAP_PRODUCTION_READINESS_REVIEW.md) |
+| §3D Archive integrity & transaction safety | AI-FEAT-019, AI-FEAT-020, AI-FEAT-021, AI-FEAT-024, AI-FEAT-025, AI-FEAT-027, AI-FEAT-028 | `docs/system-contracts.md` | [BUG-001](bugs/BUG-001_SOURCE_CLEANUP_POST_IMPORT_STATE_OWNERSHIP.md), [DEC-005](decisions/DEC-005_ORIGINAL_PRESERVATION_NON_DESTRUCTIVE_INGEST.md) |
+| §3E Transfer & distributed working | AI-FEAT-038, AI-FEAT-039, AI-FEAT-040, AI-FEAT-041, AI-FEAT-044, AI-FEAT-045 | `docs/archive-operations-layer.md` | [BUG-004](bugs/BUG-004_SAME_DEVICE_STALE_ARCHIVE_LOCK.md), [BUG-005](bugs/BUG-005_TRANSFER_EXPORT_RESUME_STATE_DIVERGENCE.md), [DEC-010](decisions/DEC-010_TRANSFER_UPDATE_MISSING_FILES_ONLY.md), [DEC-013](decisions/DEC-013_LOCK_CLEARING_MUST_BE_CONSTRAINED.md) |
+| §3F Specialized workflows (QMZ) | AI-FEAT-022, AI-FEAT-047 | `docs/metadata-system.md` § Import Path Coverage | [BUG-007](bugs/BUG-007_QMZ_METADATA_CONTEXT_SHAPE_MISMATCH.md), [DEC-011](decisions/DEC-011_QMZ_DEDICATED_DOMAIN_WORKFLOW.md) |
+| §3G Archive Operations layer | AI-FEAT-042, AI-FEAT-043, AI-FEAT-044, AI-FEAT-045, AI-FEAT-046 | `docs/archive-operations-layer.md` | [BUG-003](bugs/BUG-003_STALE_LOCAL_STAGING_RESTORE_OVER_ARCHIVE_ROOT.md), [BUG-004](bugs/BUG-004_SAME_DEVICE_STALE_ARCHIVE_LOCK.md), [DEC-012](decisions/DEC-012_ARCHIVE_ROOT_RESOLUTION_REQUIRES_EVIDENCE.md), [DEC-013](decisions/DEC-013_LOCK_CLEARING_MUST_BE_CONSTRAINED.md) |
+| §3I Planned direction | AI-FEAT-049 – AI-FEAT-056 | [02_MASTER_ROADMAP.md](02_MASTER_ROADMAP.md) | [DEC-015](decisions/DEC-015_PLANNED_ARCHITECTURE_SEPARATE_FROM_IMPLEMENTED.md) |

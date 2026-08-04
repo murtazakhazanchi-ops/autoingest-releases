@@ -40,11 +40,11 @@ Evidence pending — not yet documented as fact. Git history confirms at least t
 
 ## Known Bugs / Troubleshooting
 
-The metadata-system.md's live-verified regression test explicitly calls out that QMZ was originally affected by "the original root-cause bug this entire [metadata] system was built to fix" (silently dropping keywords/Hijri date due to a context-shape mismatch) — now proven fixed end-to-end through the real UI. Not yet backfilled as a dedicated `docs/product/bugs/` entry.
+The metadata-system.md's live-verified regression test explicitly calls out that QMZ was originally affected by "the original root-cause bug this entire [metadata] system was built to fix" (silently dropping keywords/Hijri date due to a context-shape mismatch) — now proven fixed end-to-end through the real UI. Documented as [BUG-007 — QMZ Metadata Context-Shape Mismatch Silently Drops Keywords/Hijri Date](../bugs/BUG-007_QMZ_METADATA_CONTEXT_SHAPE_MISMATCH.md); see also [PM-001](../postmortems/PM-001_METADATA_CORRECTNESS_GAP_PRODUCTION_READINESS_REVIEW.md) for the broader remediation this bug drove.
 
 ## Decisions
 
-None recorded.
+See [DEC-011 — QMZ Requires a Dedicated Domain Workflow](../decisions/DEC-011_QMZ_DEDICATED_DOMAIN_WORKFLOW.md).
 
 ## Future Enhancements
 

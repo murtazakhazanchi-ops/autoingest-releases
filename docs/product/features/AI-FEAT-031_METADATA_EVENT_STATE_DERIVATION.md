@@ -33,7 +33,7 @@ No dated entries found specific to this subfeature beyond AI-FEAT-029's general 
 
 ## Known Bugs / Troubleshooting
 
-None recorded.
+See [BUG-008 — lastMetadataRun Never Written Due to EISDIR Silent Failure](../bugs/BUG-008_LASTMETADATARUN_EISDIR_SILENT_FAILURE.md) — a durable-record-of-completion bug in an adjacent persistence path, not this feature's derivation logic itself, but directly relevant to trusting this feature's state output.
 
 ## Decisions
 

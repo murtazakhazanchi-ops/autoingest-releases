@@ -35,11 +35,11 @@ Evidence pending — not yet documented as fact.
 
 ## Known Bugs / Troubleshooting
 
-None recorded in `docs/product/bugs/` yet — see the learning-log entries above for narrative detail on the Phase 13C-10 guard bug.
+See [BUG-006 — Event-Edit Full-Payload Save Silently Drops Untracked Fields](../bugs/BUG-006_EVENT_EDIT_FULL_PAYLOAD_FIELD_DROP.md) — a recurring architectural weakness in this feature's save path, found for two different fields (`adoption`, `status`) roughly three months apart. See also the Phase 13C-10 guard-bug learning-log entry above for narrative detail on a separate, unrelated selection/redirect bug.
 
 ## Decisions
 
-None recorded.
+See [DEC-001 — Event Data as Durable Archive Truth](../decisions/DEC-001_EVENT_DATA_AS_DURABLE_ARCHIVE_TRUTH.md).
 
 ## Future Enhancements
 

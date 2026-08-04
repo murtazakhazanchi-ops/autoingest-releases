@@ -33,11 +33,11 @@ No dated entries beyond AI-FEAT-029's general metadata-architecture timeline wer
 
 ## Known Bugs / Troubleshooting
 
-None recorded.
+See [BUG-010 — Metadata Batches Held Only In-Memory, Lost on Crash/Restart](../bugs/BUG-010_METADATA_QUEUE_IN_MEMORY_LOSS_ON_CRASH.md) — this feature's durable manifest+journal architecture is the fix.
 
 ## Decisions
 
-None recorded.
+See [DEC-008 — Durable Metadata Work Survives Restart](../decisions/DEC-008_DURABLE_METADATA_SURVIVES_RESTART.md).
 
 ## Future Enhancements
 

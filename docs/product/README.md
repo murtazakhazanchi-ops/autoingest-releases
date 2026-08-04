@@ -16,9 +16,9 @@ It records not only what is planned and completed, but how each feature evolved 
 - [04_PROJECT_DASHBOARD.md](04_PROJECT_DASHBOARD.md) records the current milestone, completed milestones, next milestone, and overall progress.
 - [11_ARCHITECTURAL_EVOLUTION.md](11_ARCHITECTURAL_EVOLUTION.md) is the chronological architectural narrative — how the registry, roadmap, and decisions connect over time, and why major transitions happened. It does not carry its own authority over current behavior; it links to the records that do.
 - `features/` contains one permanent document per registered product feature.
-- `bugs/` contains reusable bug records and cross-feature troubleshooting knowledge.
-- `decisions/` contains accepted and rejected architectural/product decisions.
-- `postmortems/` contains records of significant incidents.
+- `bugs/` contains reusable bug records and cross-feature troubleshooting knowledge — populated (`BUG-001`–`BUG-010`, see [bugs/README.md](bugs/README.md)).
+- `decisions/` contains accepted and rejected architectural/product decisions — populated (`DEC-001`–`DEC-015`, see [decisions/README.md](decisions/README.md)).
+- `postmortems/` contains records of significant incidents — populated (`PM-001`, see [postmortems/README.md](postmortems/README.md)).
 
 ## Two separate ID systems — do not conflate them
 
@@ -71,3 +71,7 @@ Anything under `exports/` is generated output for sharing outside the repository
 ## How Claude Code and local agents must use this
 
 See [CLAUDE.md](CLAUDE.md) for the mandatory agent-routing rules. In short: read the registry, roadmap, and dashboard before significant AutoIngest work; preserve stable IDs; update documentation alongside the work, not after; never let an export become authoritative; never contradict a technical contract under `docs/`.
+
+## Using the bug, decision, and postmortem records
+
+`bugs/`, `decisions/`, and `postmortems/` are now populated (`10_CHANGELOG.md`'s 2026-08-04 "Part 2 populated" entry has the full inventory). Before debugging a state-management, resolver, metadata, or lock issue, check [bugs/README.md](bugs/README.md)'s index for a prior occurrence of the same symptom class — several of the ten backfilled records document a *recurring* pattern (e.g. [BUG-006](bugs/BUG-006_EVENT_EDIT_FULL_PAYLOAD_FIELD_DROP.md)'s full-payload field-drop weakness, [BUG-002](bugs/BUG-002_PHOTOGRAPHER_SEQUENCE_FOLDER_RESOLUTION.md)/[BUG-003](bugs/BUG-003_STALE_LOCAL_STAGING_RESTORE_OVER_ARCHIVE_ROOT.md)'s "never guess, require confirming evidence" resolver principle, formalized as [DEC-012](decisions/DEC-012_ARCHIVE_ROOT_RESOLUTION_REQUIRES_EVIDENCE.md)) that is easy to reintroduce in a new subsystem without realizing it already happened once. Before an architectural decision that touches metadata, archive-root resolution, locking, or transfer semantics, check [decisions/README.md](decisions/README.md) first — several existing decisions (`DEC-007` through `DEC-013`) constrain exactly these areas. [PM-001](postmortems/PM-001_METADATA_CORRECTNESS_GAP_PRODUCTION_READINESS_REVIEW.md) is the one populated postmortem; read its framing note before citing it, since it explicitly does not confirm the specific named incident this documentation task was originally briefed to investigate.

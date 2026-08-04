@@ -39,7 +39,7 @@ None recorded.
 
 ## Decisions
 
-None recorded.
+See [DEC-014 — Controlled Keyword Registry](../decisions/DEC-014_CONTROLLED_KEYWORD_REGISTRY.md) and [DEC-004 — Preserve Established Bridge-Based Archival Practice](../decisions/DEC-004_PRESERVE_BRIDGE_BASED_ARCHIVAL_PRACTICE.md).
 
 ## Future Enhancements
 

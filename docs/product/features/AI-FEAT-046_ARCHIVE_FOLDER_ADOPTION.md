@@ -42,7 +42,7 @@ Evidence pending beyond the Phase 13C-7 contract statement.
 
 ## Known Bugs / Troubleshooting
 
-Phase 13C-9's "Adoption Block Silent Drop on Full-Payload Save" (2026-05-14) is a real bug worth a dedicated `docs/product/bugs/` entry in a future pass — not yet backfilled here.
+Phase 13C-9's "Adoption Block Silent Drop on Full-Payload Save" (2026-05-14) is now documented as [BUG-006 — Event-Edit Full-Payload Save Silently Drops Untracked Fields](../bugs/BUG-006_EVENT_EDIT_FULL_PAYLOAD_FIELD_DROP.md).
 
 ## Decisions
 

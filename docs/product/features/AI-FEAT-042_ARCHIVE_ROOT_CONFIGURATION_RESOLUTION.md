@@ -35,11 +35,11 @@ Evidence pending beyond the release-notes trail below.
 
 ## Known Bugs / Troubleshooting
 
-The v0.9.8 fix directly addresses a real prior bug: the last active event could be restored from a stale local-staging copy even when a valid online archive root held the same event. See `docs/release-notes-v0.9.8.md` for the full symptom/fix description.
+The v0.9.8 fix directly addresses a real prior bug: the last active event could be restored from a stale local-staging copy even when a valid online archive root held the same event. See `docs/release-notes-v0.9.8.md` for the full symptom/fix description, documented as [BUG-003 — Stale Local-Staging Restore Wins Over Reachable Archive Root](../bugs/BUG-003_STALE_LOCAL_STAGING_RESTORE_OVER_ARCHIVE_ROOT.md).
 
 ## Decisions
 
-None recorded.
+See [DEC-012 — Archive Root Resolution Requires Evidence](../decisions/DEC-012_ARCHIVE_ROOT_RESOLUTION_REQUIRES_EVIDENCE.md).
 
 ## Future Enhancements
 

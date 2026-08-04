@@ -37,11 +37,11 @@ Evidence pending — not yet documented as fact. The engine's versioning scheme 
 
 ## Known Bugs / Troubleshooting
 
-None recorded in `docs/product/bugs/` yet — see the 2026-05-05 learning-log entry for narrative detail on the boolean-encoding and XMP/IPTC sidecar bugs found and fixed at that time.
+See the 2026-05-05 learning-log entry for narrative detail on the boolean-encoding and XMP/IPTC sidecar bugs found and fixed at that time. The engine's current shared-engine/resolver architecture (as opposed to earlier per-workflow write logic) is the direct fix for [BUG-007 — QMZ Metadata Context-Shape Mismatch](../bugs/BUG-007_QMZ_METADATA_CONTEXT_SHAPE_MISMATCH.md); the durable queue it depends on fixes [BUG-010 — Metadata Batches Held Only In-Memory](../bugs/BUG-010_METADATA_QUEUE_IN_MEMORY_LOSS_ON_CRASH.md); its `lastMetadataRun` persistence path was the site of [BUG-008 — lastMetadataRun EISDIR Silent Failure](../bugs/BUG-008_LASTMETADATARUN_EISDIR_SILENT_FAILURE.md); and its verification path fixes [BUG-009 — Same-Size Skip Left Metadata Unverified](../bugs/BUG-009_SAME_SIZE_SKIP_METADATA_UNVERIFIED.md). See [PM-001](../postmortems/PM-001_METADATA_CORRECTNESS_GAP_PRODUCTION_READINESS_REVIEW.md) for the combined remediation narrative.
 
 ## Decisions
 
-None recorded.
+See [DEC-006 — RAW Files Use XMP Sidecars](../decisions/DEC-006_RAW_FILES_USE_XMP_SIDECARS.md) and [DEC-007 — Metadata Uses One Shared Engine/Resolver](../decisions/DEC-007_SHARED_METADATA_ENGINE_RESOLVER.md).
 
 ## Future Enhancements
 

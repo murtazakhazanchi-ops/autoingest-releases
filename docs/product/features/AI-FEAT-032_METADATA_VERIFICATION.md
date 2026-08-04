@@ -33,11 +33,11 @@ No dated entries found specific to this subfeature beyond AI-FEAT-029's general 
 
 ## Known Bugs / Troubleshooting
 
-None recorded.
+This feature's existence is the direct fix for [BUG-009 — Same-Size Skip Left Metadata Unverified](../bugs/BUG-009_SAME_SIZE_SKIP_METADATA_UNVERIFIED.md).
 
 ## Decisions
 
-None recorded.
+See [DEC-009 — Copy Idempotency Must Not Suppress Metadata Repair](../decisions/DEC-009_COPY_IDEMPOTENCY_MUST_NOT_SUPPRESS_METADATA_REPAIR.md).
 
 ## Future Enhancements
 

@@ -37,7 +37,7 @@ Evidence pending beyond the Phase 13D documentation already read.
 
 ## Known Bugs / Troubleshooting
 
-None recorded in `docs/product/bugs/` yet.
+See [BUG-005 — Transfer Export/Backup-Update Resume State Diverges From Backend Progress](../bugs/BUG-005_TRANSFER_EXPORT_RESUME_STATE_DIVERGENCE.md) (fixed 2026-06-23).
 
 ## Decisions
 

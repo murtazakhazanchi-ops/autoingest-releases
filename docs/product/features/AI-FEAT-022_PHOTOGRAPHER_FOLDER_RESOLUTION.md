@@ -33,7 +33,7 @@ Evidence pending — not yet documented as fact.
 
 ## Known Bugs / Troubleshooting
 
-None recorded.
+See [BUG-002 — Photographer Sequence Folder Resolution Discards Existing Sequenced Folders](../bugs/BUG-002_PHOTOGRAPHER_SEQUENCE_FOLDER_RESOLUTION.md) (fixed 2026-06-24, commit `0d7e0b3`).
 
 ## Decisions
 
