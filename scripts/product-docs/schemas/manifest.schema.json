@@ -1,0 +1,29 @@
+{
+  "$id": "manifest.schema.json",
+  "type": "object",
+  "required": [
+    "docsys_version", "schema_version", "generator_version", "source_commit",
+    "generation_command", "generated_files", "source_file_count", "entity_counts", "relationship_counts"
+  ],
+  "properties": {
+    "docsys_version": { "type": "string" },
+    "schema_version": { "type": "string" },
+    "generator_version": { "type": "string" },
+    "source_commit": { "type": "string" },
+    "generation_command": { "type": "string" },
+    "generated_files": { "type": "array" },
+    "source_file_count": { "type": "number" },
+    "entity_counts": {
+      "type": "object",
+      "required": ["features", "roadmap_milestones", "bugs", "decisions", "postmortems"],
+      "properties": {
+        "features": { "type": "number" },
+        "roadmap_milestones": { "type": "number" },
+        "bugs": { "type": "number" },
+        "decisions": { "type": "number" },
+        "postmortems": { "type": "number" }
+      }
+    },
+    "relationship_counts": { "type": "object" }
+  }
+}

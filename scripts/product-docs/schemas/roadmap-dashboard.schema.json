@@ -1,0 +1,30 @@
+{
+  "$id": "roadmap-dashboard.schema.json",
+  "type": "object",
+  "required": [
+    "schema_version", "docsys_version", "total_milestones", "completed_count",
+    "current_milestone_id", "milestones", "feature_status_counts_overall", "total_features"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "docsys_version": { "type": "string" },
+    "total_milestones": { "type": "number" },
+    "completed_count": { "type": "number" },
+    "current_milestone_id": { "type": ["string", "null"] },
+    "milestones": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "status", "included_features"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "status": { "type": "string" },
+          "included_features": { "type": "array" }
+        }
+      }
+    },
+    "feature_status_counts_overall": { "type": "object" },
+    "total_features": { "type": "number" }
+  }
+}

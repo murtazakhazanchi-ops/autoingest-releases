@@ -68,10 +68,19 @@ Every factual claim here must trace to current source code, tests, existing tech
 - [decisions/](decisions/) — accepted/rejected decision records
 - [postmortems/](postmortems/) — significant-incident records
 - [exports/](exports/) — generated DOCX/PDF exports (not tracked in git, not the source of truth — see below)
+- [generated/](generated/) — machine-queryable indexes, dependency graphs, timelines, and validation reports produced by `scripts/product-docs/` (Part 4). Tracked in git, unlike `exports/`, but never a source of new facts — see "Generated indexes are not source" below.
 
 ## Exports are not source
 
 Anything under `exports/` is generated output for sharing outside the repository. It is never edited directly and never authoritative — regenerate it from the Markdown source instead. `exports/` content is excluded from version control (see `.gitignore`); only the Markdown under `docs/product/` is tracked.
+
+## Generated indexes are not source
+
+`docs/product/generated/` is a locator/index layer built from the canonical Markdown above by `scripts/product-docs/` — see [scripts/product-docs/README.md](../../scripts/product-docs/README.md) for the full tool and its authority model. It is tracked in git (a rebuild-free browse is worth the discipline cost), but `node scripts/product-docs/cli.js validate` enforces freshness on every run by rebuilding in memory and diffing byte-for-byte against what's committed — treat any `stale-generated-output` finding as blocking. Like `12_DEPENDENCY_MODEL.md`, it originates no new facts: if it and a canonical record ever disagree, regenerate it, don't edit around the discrepancy. Query it for navigation (`node scripts/product-docs/cli.js query "..."`, `impact <path>`), never for implementation-time truth — always open the canonical Markdown a query points to before acting on it.
+
+## Documentation-system version
+
+`DOCSYS_VERSION` (currently `1.0.0`) tracks the shape of `docs/product/generated/`'s output — see [scripts/product-docs/README.md](../../scripts/product-docs/README.md) § Documentation-system version. This is distinct from the application's `package.json` version and from the `AI-FEAT-###`/`AI-RM-###` ID systems above; do not conflate the three.
 
 ## How Claude Code and local agents must use this
 

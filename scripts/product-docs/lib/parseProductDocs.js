@@ -1,0 +1,292 @@
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+const { PRODUCT_DOCS_ROOT } = require('./repoRoot');
+const md = require('./markdown');
+const ids = require('./ids');
+
+function listMarkdownFiles(dir) {
+  const out = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name === 'generated' || entry.name === 'exports' || entry.name.startsWith('.')) continue;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      out.push(...listMarkdownFiles(full));
+    } else if (entry.name.endsWith('.md')) {
+      out.push(full);
+    }
+  }
+  return out;
+}
+
+function relPath(absPath, root) {
+  return path.relative(root || PRODUCT_DOCS_ROOT, absPath).split(path.sep).join('/');
+}
+
+function readFile(absPath) {
+  return fs.readFileSync(absPath, 'utf8');
+}
+
+// ── Registry (01_FEATURE_REGISTRY.md): category -> ordered [{id, name, status, maturity, parent, roadmap, doc}] ──
+function parseRegistry(content) {
+  const headings = md.extractHeadings(content).filter((h) => h.level === 2);
+  const categories = [];
+  const lines = content.replace(/\r\n/g, '\n').split('\n');
+  for (let i = 0; i < headings.length; i++) {
+    const h = headings[i];
+    if (h.text === 'Totals' || h.text.startsWith('Cross-Cutting') || h.text.startsWith('Reconciliation')) continue;
+    const next = headings[i + 1];
+    const sectionLines = lines.slice(h.line, next ? next.line - 1 : lines.length);
+    const rows = md.parseFirstTable(sectionLines.join('\n'));
+    const features = [];
+    for (const row of rows) {
+      if (row.length < 7 || row[0] === 'ID') continue;
+      const idMatch = /AI-FEAT-\d{3}/.exec(row[0]);
+      if (!idMatch) continue;
+      features.push({
+        id: idMatch[0],
+        name: row[1],
+        status: row[2],
+        maturity: row[3],
+        parent: row[4],
+        roadmap: row[5],
+        doc: row[6],
+      });
+    }
+    if (features.length) categories.push({ category: h.text, features });
+  }
+  return categories;
+}
+
+// ── Roadmap (02_MASTER_ROADMAP.md): [{id, name, header:{...}}] ──
+function parseRoadmap(content) {
+  const headings = md.extractHeadings(content).filter((h) => h.level === 2);
+  const lines = content.replace(/\r\n/g, '\n').split('\n');
+  const milestones = [];
+  for (let i = 0; i < headings.length; i++) {
+    const h = headings[i];
+    const m = /^(AI-RM-\d{3})\s*—\s*(.+)$/.exec(h.text);
+    if (!m) continue;
+    const next = headings[i + 1];
+    const sectionLines = lines.slice(h.line, next ? next.line - 1 : lines.length).join('\n');
+    milestones.push({ id: m[1], name: m[2], header: md.extractHeaderTable(sectionLines) });
+  }
+  return milestones;
+}
+
+// ── Architectural evolution (11_ARCHITECTURAL_EVOLUTION.md): relationship map rows ──
+// The §5 Relationship Map table's "Architectural stage" cells use short prose
+// ("§3A Adobe Bridge workflow...") that does not textually match the actual
+// "### A. Established Adobe Bridge Workflow..." H3 headings — both cite the
+// same §3<letter> subsection by construction (11_ARCHITECTURAL_EVOLUTION.md's
+// own §3/§5 numbering scheme), so the letter prefix is the reliable join key.
+function parseArchEvolutionRelationshipMap(content) {
+  const section = md.extractSection(content, '5. Relationship Map');
+  if (!section) return [];
+  const rows = md.parseFirstTable(section);
+  const headings = md.extractHeadings(content).filter((h) => h.level === 3);
+  const headingsByLetter = new Map();
+  for (const h of headings) {
+    const m = /^([A-Z])\./.exec(h.text);
+    if (m) headingsByLetter.set(m[1], h);
+  }
+  const out = [];
+  for (const row of rows) {
+    if (row.length < 3 || row[0] === 'Stage' || row[0] === 'Architectural stage') continue;
+    const letterMatch = /§3([A-Z])/.exec(row[0]);
+    const heading = letterMatch ? headingsByLetter.get(letterMatch[1]) : null;
+    out.push({
+      stage: row[0],
+      anchorSlug: heading ? heading.slug : null,
+      features: ids.extractIds(row[1], 'feature'),
+      records: {
+        bugs: ids.extractIds(row[3] || '', 'bug'),
+        decisions: ids.extractIds(row[3] || '', 'decision'),
+        postmortems: ids.extractIds(row[3] || '', 'postmortem'),
+      },
+    });
+  }
+  return out;
+}
+
+function parseRecordFile(absPath, family, root) {
+  const content = readFile(absPath);
+  const header = md.extractHeaderTable(content);
+  const idMatch = new RegExp(ids.ID_PATTERNS[family].source).exec(path.basename(absPath));
+  const id = idMatch ? idMatch[0] : null;
+  const nameMatch = /^#\s+\S+\s*—\s*(.+)$/m.exec(content);
+  return {
+    id,
+    name: nameMatch ? nameMatch[1].trim() : path.basename(absPath, '.md'),
+    filePath: relPath(absPath, root),
+    header,
+    body: content,
+    headings: md.extractHeadings(content),
+    allIds: ids.extractAllIds(content),
+    related: md.extractSection(content, 'Related'),
+  };
+}
+
+function parseFeatureFile(absPath, root) {
+  const content = readFile(absPath);
+  const header = md.extractHeaderTable(content);
+  const lifecycle = md.extractSectionTable(content, 'Lifecycle Metadata') || {};
+  const idMatch = /AI-FEAT-\d{3}/.exec(path.basename(absPath));
+  const nameMatch = /^#\s+AI-FEAT-\d{3}\s*—\s*(.+)$/m.exec(content);
+  const relatedFilesSection = md.extractSection(content, 'Related Files');
+  const relatedFiles = md.extractBulletList(relatedFilesSection).map((item) => {
+    const m = /`([^`]+)`/.exec(item);
+    return m ? m[1] : null;
+  }).filter(Boolean);
+  return {
+    id: idMatch ? idMatch[0] : null,
+    name: nameMatch ? nameMatch[1].trim() : path.basename(absPath, '.md'),
+    filePath: relPath(absPath, root),
+    header,
+    lifecycle,
+    summary: md.extractSection(content, 'Summary'),
+    currentBehavior: md.extractSection(content, 'Current Behavior'),
+    evolutionJournal: md.extractSection(content, 'Evolution / Implementation Journal'),
+    engineeringEvolution: md.extractSection(content, 'Engineering Evolution'),
+    knownBugsSection: md.extractSection(content, 'Known Bugs / Troubleshooting'),
+    decisionsSection: md.extractSection(content, 'Decisions'),
+    futureEnhancements: md.extractSection(content, 'Future Enhancements'),
+    relatedFiles,
+    headings: md.extractHeadings(content),
+    allIds: ids.extractAllIds(content),
+    body: content,
+  };
+}
+
+function loadAll(root) {
+  root = root || PRODUCT_DOCS_ROOT;
+  const registryPath = path.join(root, '01_FEATURE_REGISTRY.md');
+  const roadmapPath = path.join(root, '02_MASTER_ROADMAP.md');
+  const dashboardPath = path.join(root, '04_PROJECT_DASHBOARD.md');
+  const archPath = path.join(root, '11_ARCHITECTURAL_EVOLUTION.md');
+  const changelogPath = path.join(root, '10_CHANGELOG.md');
+
+  const registryContent = readFile(registryPath);
+  const roadmapContent = readFile(roadmapPath);
+  const dashboardContent = readFile(dashboardPath);
+  const archContent = readFile(archPath);
+
+  const featureDir = path.join(root, 'features');
+  const bugDir = path.join(root, 'bugs');
+  const decisionDir = path.join(root, 'decisions');
+  const postmortemDir = path.join(root, 'postmortems');
+
+  const featureFiles = fs.readdirSync(featureDir).filter((f) => f.endsWith('.md')).sort();
+  const bugFiles = fs.readdirSync(bugDir).filter((f) => f.endsWith('.md') && f !== 'README.md').sort();
+  const decisionFiles = fs.readdirSync(decisionDir).filter((f) => f.endsWith('.md') && f !== 'README.md').sort();
+  const postmortemFiles = fs.readdirSync(postmortemDir).filter((f) => f.endsWith('.md') && f !== 'README.md').sort();
+
+  // idFilesSeen tracks every (id -> [filePath, ...]) pairing BEFORE collapsing
+  // into the by-id Maps below, so duplicate-ID detection (validators.js
+  // checkDuplicateIds) can see a real same-ID collision across two files of
+  // the SAME kind — the Maps themselves necessarily collapse duplicates to
+  // last-write-wins. idRowsSeen tracks the separate case of two rows sharing
+  // an ID within 01_FEATURE_REGISTRY.md / 02_MASTER_ROADMAP.md. One file plus
+  // one row for the same ID is the expected, correct structure — not a
+  // duplicate — so files and rows are deliberately never merged into one group.
+  const idFilesSeen = { feature: new Map(), bug: new Map(), decision: new Map(), postmortem: new Map() };
+  const idRowsSeen = { feature: new Map(), roadmap: new Map() };
+  const recordSeen = (bucket, family, id, location) => {
+    if (!id) return;
+    if (!bucket[family].has(id)) bucket[family].set(id, []);
+    bucket[family].get(id).push(location);
+  };
+
+  const features = new Map();
+  for (const f of featureFiles) {
+    const parsed = parseFeatureFile(path.join(featureDir, f), root);
+    recordSeen(idFilesSeen, 'feature', parsed.id, parsed.filePath);
+    if (parsed.id) features.set(parsed.id, parsed);
+  }
+
+  const bugs = new Map();
+  for (const f of bugFiles) {
+    const parsed = parseRecordFile(path.join(bugDir, f), 'bug', root);
+    recordSeen(idFilesSeen, 'bug', parsed.id, parsed.filePath);
+    if (parsed.id) bugs.set(parsed.id, parsed);
+  }
+
+  const decisions = new Map();
+  for (const f of decisionFiles) {
+    const parsed = parseRecordFile(path.join(decisionDir, f), 'decision', root);
+    recordSeen(idFilesSeen, 'decision', parsed.id, parsed.filePath);
+    if (parsed.id) decisions.set(parsed.id, parsed);
+  }
+
+  const postmortems = new Map();
+  for (const f of postmortemFiles) {
+    const parsed = parseRecordFile(path.join(postmortemDir, f), 'postmortem', root);
+    recordSeen(idFilesSeen, 'postmortem', parsed.id, parsed.filePath);
+    if (parsed.id) postmortems.set(parsed.id, parsed);
+  }
+
+  const registryCategories = parseRegistry(registryContent);
+  const categoryByFeatureId = new Map();
+  for (const cat of registryCategories) {
+    for (const feat of cat.features) {
+      categoryByFeatureId.set(feat.id, cat.category);
+      recordSeen(idRowsSeen, 'feature', feat.id, `${relPath(registryPath, root)} (${cat.category} row)`);
+    }
+  }
+
+  const roadmapMilestones = parseRoadmap(roadmapContent);
+  const roadmap = new Map();
+  for (const m of roadmapMilestones) {
+    recordSeen(idRowsSeen, 'roadmap', m.id, relPath(roadmapPath, root));
+    roadmap.set(m.id, m);
+  }
+
+  const archRelationshipMap = parseArchEvolutionRelationshipMap(archContent);
+  const archHeadings = md.extractHeadings(archContent).filter((h) => h.level === 3);
+
+  const allFiles = listMarkdownFiles(root).map((absPath) => {
+    const content = readFile(absPath);
+    return {
+      absPath,
+      relPath: relPath(absPath, root),
+      content,
+      headings: md.extractHeadings(content),
+      links: md.extractLinks(content),
+    };
+  });
+
+  return {
+    root,
+    idFilesSeen,
+    idRowsSeen,
+    registryPath: relPath(registryPath, root),
+    roadmapPath: relPath(roadmapPath, root),
+    dashboardPath: relPath(dashboardPath, root),
+    archPath: relPath(archPath, root),
+    changelogPath: relPath(changelogPath, root),
+    registryCategories,
+    categoryByFeatureId,
+    dashboardHeader: md.extractHeaderTable(dashboardContent),
+    roadmap,
+    roadmapOrder: roadmapMilestones.map((m) => m.id),
+    archRelationshipMap,
+    archHeadings,
+    features,
+    bugs,
+    decisions,
+    postmortems,
+    allFiles,
+  };
+}
+
+module.exports = {
+  loadAll,
+  parseRegistry,
+  parseRoadmap,
+  parseFeatureFile,
+  parseRecordFile,
+  parseArchEvolutionRelationshipMap,
+  listMarkdownFiles,
+  relPath,
+};

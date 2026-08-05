@@ -2,6 +2,8 @@
 
 Canonical, evidence-based relationship model connecting every record type in `docs/product/`. This document does not restate any record's own content — it is a navigational index over relationships already documented (in header tables, `Known Bugs`/`Decisions` sections, `Related` sections, and the architectural-evolution relationship map) elsewhere in this system. If this document and an individual record ever disagree, the individual record wins — regenerate this index rather than editing around the discrepancy.
 
+**Relationship to `docs/product/generated/dependency-graph.*` (Part 4)**: this document is the curated, hand-authored ID-relationship narrative — it groups relationships the way a person would read them (Milestone→Features, Decision→Decision, etc.). `generated/dependency-graph.json`/`.md` is a separate, mechanically-derived, code-level view built by `scripts/product-docs/` from the same underlying evidence (feature files' header tables and Lifecycle Metadata sections) plus the subsystem locator's source-file mapping, with bounded per-subsystem Mermaid diagrams. Neither supersedes the other: this document is better for understanding *why* records relate; the generated graph is better for machine queries, impact analysis, and subsystem-scoped diagrams. Both trace back to the same canonical records, so a disagreement between them means one needs to be regenerated/corrected against those records — not that either is independently authoritative over the other.
+
 ## Methodology
 
 Every edge below is one of:

@@ -1,0 +1,1239 @@
+{
+  "docsys_version": "1.0.0",
+  "schema_version": "1.0.0",
+  "topics": [
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-001_ELECTRON_APPLICATION_SHELL_SECURITY_MODEL.md",
+      "canonicalTechnicalDocs": [
+        "CLAUDE.md § Security Model",
+        "docs/README.md § Security Model"
+      ],
+      "codeAreas": [
+        "main/main.js",
+        "main/preload.js",
+        "renderer/theme-init.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-001_ELECTRON_APPLICATION_SHELL_SECURITY_MODEL.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-001",
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Electron Application Shell & Security Model"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-002_LOGIN_OPERATOR_IDENTITY.md",
+      "canonicalTechnicalDocs": [
+        "docs/history.md v0.8.1"
+      ],
+      "codeAreas": [
+        "renderer/splash.html",
+        "main/userManager.js",
+        "services/settings.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-002_LOGIN_OPERATOR_IDENTITY.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-002",
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Login & Operator Identity"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-003_DASHBOARD_SYSTEM_STATUS.md",
+      "canonicalTechnicalDocs": [
+        "docs/ui-system.md § Dashboard",
+        "docs/features.md #7 \"UI Dashboard\""
+      ],
+      "codeAreas": [
+        "renderer/renderer.js",
+        "renderer/theme-init.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-003_DASHBOARD_SYSTEM_STATUS.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-003",
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Dashboard & System Status"
+    },
+    {
+      "aliases": [
+        "event.json",
+        "event json",
+        "persistence contract",
+        "data model"
+      ],
+      "canonicalProductDoc": "features/AI-FEAT-004_EVENT_JSON_DATA_MODEL_PERSISTENCE_CONTRACT.md",
+      "canonicalTechnicalDocs": [
+        "docs/data-model.md",
+        "docs/system-contracts.md §1-2",
+        "docs/event-system.md"
+      ],
+      "codeAreas": [
+        "main/eventJsonStore.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-004_EVENT_JSON_DATA_MODEL_PERSISTENCE_CONTRACT.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-004",
+      "relatedBugs": [
+        "BUG-003",
+        "BUG-006"
+      ],
+      "relatedDecisions": [
+        "DEC-001",
+        "DEC-002"
+      ],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "event.json Data Model & Persistence Contract"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-005_APPLICATION_SETTINGS_CONFIGURATION_STORE.md",
+      "canonicalTechnicalDocs": [],
+      "codeAreas": [
+        "services/settings.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-005_APPLICATION_SETTINGS_CONFIGURATION_STORE.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-005",
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Application Settings & Configuration Store"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-006_APPLICATION_AUTO_UPDATE.md",
+      "canonicalTechnicalDocs": [],
+      "codeAreas": [
+        "services/autoUpdater.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-006_APPLICATION_AUTO_UPDATE.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-006",
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Application Auto-Update"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-007_TELEMETRY_PIPELINE.md",
+      "canonicalTechnicalDocs": [],
+      "codeAreas": [
+        "services/telemetry.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-007_TELEMETRY_PIPELINE.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-007",
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Telemetry Pipeline"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-008_DESIGN_SYSTEM_UI_CONSISTENCY_FRAMEWORK.md",
+      "canonicalTechnicalDocs": [
+        "docs/design-system.md",
+        "docs/ui-system.md"
+      ],
+      "codeAreas": [
+        "renderer/index.html"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-008_DESIGN_SYSTEM_UI_CONSISTENCY_FRAMEWORK.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-008",
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Design System & UI Consistency Framework"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-009_EVENT_CREATION.md",
+      "canonicalTechnicalDocs": [
+        "docs/event-system.md § EventCreator",
+        "docs/features.md #4"
+      ],
+      "codeAreas": [
+        "renderer/eventCreator.js",
+        "renderer/folderNameHelper.js",
+        "renderer/treeAutocomplete.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-009_EVENT_CREATION.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-009",
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Event Creation"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-010_EVENT_MANAGEMENT_EDITING.md",
+      "canonicalTechnicalDocs": [
+        "docs/event-system.md § Editing",
+        "docs/failure-patterns.md #1",
+        "#12"
+      ],
+      "codeAreas": [
+        "renderer/eventMgmt.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-010_EVENT_MANAGEMENT_EDITING.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-010",
+      "relatedBugs": [
+        "BUG-001",
+        "BUG-006"
+      ],
+      "relatedDecisions": [
+        "DEC-001"
+      ],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Event Management & Editing"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-011_SOURCE_DETECTION.md",
+      "canonicalTechnicalDocs": [
+        "docs/architecture.md § Drive Detection"
+      ],
+      "codeAreas": [
+        "main/driveDetector.js",
+        "main/fileBrowser.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-011_SOURCE_DETECTION.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-011",
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Source Detection (Drives, DCIM, Sony PRIVATE)"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-012_SOURCE_SELECTION.md",
+      "canonicalTechnicalDocs": [
+        "docs/failure-patterns.md #16",
+        "docs/system-contracts.md §4"
+      ],
+      "codeAreas": [
+        "renderer/renderer.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-012_SOURCE_SELECTION.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-012",
+      "relatedBugs": [
+        "BUG-001"
+      ],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Source Selection (Local Folder / External Drive)"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-013_FILE_BROWSER_MEDIA_GRID_LIST_VIEWING.md",
+      "canonicalTechnicalDocs": [
+        "docs/ui-system.md § File Panel",
+        "docs/features.md #2"
+      ],
+      "codeAreas": [
+        "main/fileBrowser.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-013_FILE_BROWSER_MEDIA_GRID_LIST_VIEWING.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-013",
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "File Browser & Media Grid/List Viewing"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-014_THUMBNAIL_GENERATION_CACHING.md",
+      "canonicalTechnicalDocs": [],
+      "codeAreas": [
+        "services/thumbnailCache.js",
+        "main/videoThumbService.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-014_THUMBNAIL_GENERATION_CACHING.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-014",
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Thumbnail Generation & Caching"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-015_MEDIA_PREVIEW.md",
+      "canonicalTechnicalDocs": [
+        "docs/features.md #12"
+      ],
+      "codeAreas": [
+        "main/rawPreviewService.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-015_MEDIA_PREVIEW.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-015",
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Media Preview"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-016_PREVIEW_FOCUS_SELECTION_SEPARATION.md",
+      "canonicalTechnicalDocs": [
+        "docs/ui-system.md § Selection System",
+        "docs/features.md #13"
+      ],
+      "codeAreas": [
+        "renderer/renderer.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-016_PREVIEW_FOCUS_SELECTION_SEPARATION.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-016",
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Preview Focus / Selection Separation"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-017_GROUPING_SYSTEM.md",
+      "canonicalTechnicalDocs": [
+        "docs/group-manager.md",
+        "docs/features.md #3"
+      ],
+      "codeAreas": [
+        "renderer/groupManager.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-017_GROUPING_SYSTEM.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-017",
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Grouping System"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-018_EVENT_COMPONENT_IMPORT_ROUTING.md",
+      "canonicalTechnicalDocs": [
+        "docs/event-system.md § Routing Relationship",
+        "docs/ingestion-flow.md § Routing"
+      ],
+      "codeAreas": [
+        "renderer/importRouter.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-018_EVENT_COMPONENT_IMPORT_ROUTING.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-018",
+      "relatedBugs": [
+        "BUG-002"
+      ],
+      "relatedDecisions": [
+        "DEC-002"
+      ],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Event-Component Import Routing"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-019_IMPORT_PIPELINE_COPY_ENGINE.md",
+      "canonicalTechnicalDocs": [
+        "docs/ingestion-flow.md",
+        "docs/system-contracts.md §4-5",
+        "docs/features.md #5"
+      ],
+      "codeAreas": [
+        "main/fileManager.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-019_IMPORT_PIPELINE_COPY_ENGINE.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-019",
+      "relatedBugs": [
+        "BUG-009"
+      ],
+      "relatedDecisions": [
+        "DEC-005",
+        "DEC-009"
+      ],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Import Pipeline & Copy Engine"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-020_DUPLICATE_DETECTION.md",
+      "canonicalTechnicalDocs": [
+        "docs/ingestion-flow.md § Duplicate Handling",
+        "docs/features.md #6"
+      ],
+      "codeAreas": [
+        "main/fileManager.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-020_DUPLICATE_DETECTION.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-020",
+      "relatedBugs": [],
+      "relatedDecisions": [
+        "DEC-005"
+      ],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Duplicate Detection"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-021_ATOMIC_IMPORT_TRANSACTION.md",
+      "canonicalTechnicalDocs": [
+        "docs/system-contracts.md §13",
+        "CLAUDE.md § Transactional Ingest Layer",
+        "docs/features.md #8"
+      ],
+      "codeAreas": [
+        "main/eventJsonStore.js",
+        "main/main.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-021_ATOMIC_IMPORT_TRANSACTION.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-021",
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Atomic Import Transaction"
+    },
+    {
+      "aliases": [
+        "photographer sequencing",
+        "photographer folder sequencing",
+        "pcxx"
+      ],
+      "canonicalProductDoc": "features/AI-FEAT-022_PHOTOGRAPHER_FOLDER_RESOLUTION.md",
+      "canonicalTechnicalDocs": [],
+      "codeAreas": [
+        "services/photographerSequenceService.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-022_PHOTOGRAPHER_FOLDER_RESOLUTION.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-022",
+      "relatedBugs": [
+        "BUG-002"
+      ],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Photographer-Folder Resolution"
+    },
+    {
+      "aliases": [
+        "quick import"
+      ],
+      "canonicalProductDoc": "features/AI-FEAT-023_QUICK_IMPORT.md",
+      "canonicalTechnicalDocs": [
+        "docs/metadata-system.md § Non-Goals"
+      ],
+      "codeAreas": [
+        "renderer/renderer.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-023_QUICK_IMPORT.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-023",
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Quick Import"
+    },
+    {
+      "aliases": [
+        "source cleanup"
+      ],
+      "canonicalProductDoc": "features/AI-FEAT-024_SOURCE_CLEANUP.md",
+      "canonicalTechnicalDocs": [
+        "docs/system-contracts.md §4",
+        "docs/failure-patterns.md #16"
+      ],
+      "codeAreas": [
+        "main/main.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-024_SOURCE_CLEANUP.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-024",
+      "relatedBugs": [
+        "BUG-001"
+      ],
+      "relatedDecisions": [
+        "DEC-005"
+      ],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Source Cleanup"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-025_CHECKSUM_BASED_FILE_VERIFICATION.md",
+      "canonicalTechnicalDocs": [],
+      "codeAreas": [
+        "main/main.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-025_CHECKSUM_BASED_FILE_VERIFICATION.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-025",
+      "relatedBugs": [],
+      "relatedDecisions": [
+        "DEC-005"
+      ],
+      "relatedPostmortems": [],
+      "roadmapIds": [
+        "AI-RM-006"
+      ],
+      "topic": "Checksum-Based File Verification"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-026_AUDIT_INTEGRITY_VERIFICATION.md",
+      "canonicalTechnicalDocs": [
+        "docs/features.md #10"
+      ],
+      "codeAreas": [
+        "renderer/renderer.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-026_AUDIT_INTEGRITY_VERIFICATION.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-026",
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Audit Integrity Verification (Count-Based)"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-027_ACTIVITY_LOG.md",
+      "canonicalTechnicalDocs": [
+        "docs/features.md #9",
+        "docs/failure-patterns.md #12"
+      ],
+      "codeAreas": [
+        "renderer/renderer.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-027_ACTIVITY_LOG.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-027",
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Activity Log"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-028_IMPORT_SOURCE_ATTRIBUTION.md",
+      "canonicalTechnicalDocs": [
+        "docs/features.md #11",
+        "docs/data-model.md § Import Entry Schema"
+      ],
+      "codeAreas": [
+        "renderer/renderer.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-028_IMPORT_SOURCE_ATTRIBUTION.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-028",
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Import Source Attribution"
+    },
+    {
+      "aliases": [
+        "metadata writing",
+        "exif",
+        "iptc",
+        "xmp",
+        "xmp sidecars",
+        "raw metadata",
+        "raw sidecars",
+        "tagging"
+      ],
+      "canonicalProductDoc": "features/AI-FEAT-029_METADATA_WRITING_ENGINE.md",
+      "canonicalTechnicalDocs": [
+        "docs/metadata-system.md"
+      ],
+      "codeAreas": [
+        "main/exifService.js",
+        "services/metadataExpectationService.js",
+        "main/eventJsonStore.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-029_METADATA_WRITING_ENGINE.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-029",
+      "relatedBugs": [
+        "BUG-007",
+        "BUG-008",
+        "BUG-009",
+        "BUG-010"
+      ],
+      "relatedDecisions": [
+        "DEC-002",
+        "DEC-004",
+        "DEC-006",
+        "DEC-007"
+      ],
+      "relatedPostmortems": [
+        "PM-001"
+      ],
+      "roadmapIds": [
+        "AI-RM-001"
+      ],
+      "topic": "Metadata Writing Engine"
+    },
+    {
+      "aliases": [
+        "metadata queue",
+        "durable queue",
+        "crash recovery"
+      ],
+      "canonicalProductDoc": "features/AI-FEAT-030_METADATA_DURABLE_QUEUE_CRASH_RECOVERY.md",
+      "canonicalTechnicalDocs": [
+        "docs/metadata-system.md § Durable Queue Storage and Recovery Behavior"
+      ],
+      "codeAreas": [
+        "main/metadataQueueRecovery.js",
+        "main/metadataQueueStore.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-030_METADATA_DURABLE_QUEUE_CRASH_RECOVERY.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-030",
+      "relatedBugs": [
+        "BUG-010"
+      ],
+      "relatedDecisions": [
+        "DEC-008"
+      ],
+      "relatedPostmortems": [
+        "PM-001"
+      ],
+      "roadmapIds": [
+        "AI-RM-001"
+      ],
+      "topic": "Metadata Durable Queue & Crash Recovery"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-031_METADATA_EVENT_STATE_DERIVATION.md",
+      "canonicalTechnicalDocs": [
+        "docs/metadata-system.md § Event-Level Metadata State"
+      ],
+      "codeAreas": [
+        "main/metadataStateService.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-031_METADATA_EVENT_STATE_DERIVATION.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-031",
+      "relatedBugs": [
+        "BUG-008"
+      ],
+      "relatedDecisions": [],
+      "relatedPostmortems": [
+        "PM-001"
+      ],
+      "roadmapIds": [
+        "AI-RM-001"
+      ],
+      "topic": "Metadata Event-State Derivation"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-032_METADATA_VERIFICATION.md",
+      "canonicalTechnicalDocs": [
+        "docs/metadata-system.md § Import Path Coverage"
+      ],
+      "codeAreas": [
+        "main/metadataVerificationService.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-032_METADATA_VERIFICATION.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-032",
+      "relatedBugs": [
+        "BUG-009"
+      ],
+      "relatedDecisions": [
+        "DEC-009"
+      ],
+      "relatedPostmortems": [
+        "PM-001"
+      ],
+      "roadmapIds": [
+        "AI-RM-001"
+      ],
+      "topic": "Metadata Verification"
+    },
+    {
+      "aliases": [
+        "metadata audit",
+        "metadata repair",
+        "audit and repair"
+      ],
+      "canonicalProductDoc": "features/AI-FEAT-033_METADATA_AUDIT_REPAIR.md",
+      "canonicalTechnicalDocs": [
+        "docs/metadata-system.md § Metadata Audit",
+        "§ Repair",
+        "docs/features.md #15"
+      ],
+      "codeAreas": [
+        "services/metadataAuditService.js",
+        "main/metadataRepairService.js",
+        "services/metadataAuditExport.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-033_METADATA_AUDIT_REPAIR.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-033",
+      "relatedBugs": [
+        "BUG-007"
+      ],
+      "relatedDecisions": [],
+      "relatedPostmortems": [
+        "PM-001"
+      ],
+      "roadmapIds": [
+        "AI-RM-001"
+      ],
+      "topic": "Metadata Audit & Repair"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-034_METADATA_MANAGEMENT_MODAL.md",
+      "canonicalTechnicalDocs": [],
+      "codeAreas": [
+        "renderer/index.html",
+        "test/metadataManagementModalUI.test.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-034_METADATA_MANAGEMENT_MODAL.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-034",
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [
+        "AI-RM-001"
+      ],
+      "topic": "Metadata Management Modal"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-035_DASHBOARD_METADATA_HEALTH.md",
+      "canonicalTechnicalDocs": [],
+      "codeAreas": [
+        "renderer/renderer.js",
+        "test/dashboardMetadataHealthCard.test.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-035_DASHBOARD_METADATA_HEALTH.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-035",
+      "relatedBugs": [
+        "BUG-008"
+      ],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [
+        "AI-RM-001"
+      ],
+      "topic": "Dashboard Metadata Health"
+    },
+    {
+      "aliases": [
+        "keyword registry",
+        "controlled keywords"
+      ],
+      "canonicalProductDoc": "features/AI-FEAT-036_KEYWORD_REGISTRY.md",
+      "canonicalTechnicalDocs": [],
+      "codeAreas": [
+        "data/keywords.registry.json",
+        "main/main.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-036_KEYWORD_REGISTRY.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-036",
+      "relatedBugs": [],
+      "relatedDecisions": [
+        "DEC-004",
+        "DEC-014"
+      ],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Keyword Registry"
+    },
+    {
+      "aliases": [
+        "metadata reapply",
+        "metadata sync"
+      ],
+      "canonicalProductDoc": "features/AI-FEAT-037_METADATA_REAPPLY_SYNC.md",
+      "canonicalTechnicalDocs": [
+        "docs/metadata-system.md § Import Path Coverage"
+      ],
+      "codeAreas": [
+        "main/metadataSyncService.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-037_METADATA_REAPPLY_SYNC.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-037",
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Metadata Reapply / Sync"
+    },
+    {
+      "aliases": [
+        "transfer export"
+      ],
+      "canonicalProductDoc": "features/AI-FEAT-038_TRANSFER_EXPORT.md",
+      "canonicalTechnicalDocs": [
+        "docs/archive-operations-layer.md § Transfer Workflow"
+      ],
+      "codeAreas": [
+        "services/transferExportService.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-038_TRANSFER_EXPORT.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-038",
+      "relatedBugs": [
+        "BUG-005"
+      ],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Transfer Export"
+    },
+    {
+      "aliases": [
+        "transfer import"
+      ],
+      "canonicalProductDoc": "features/AI-FEAT-039_TRANSFER_IMPORT.md",
+      "canonicalTechnicalDocs": [
+        "docs/archive-operations-layer.md § Transfer Workflow"
+      ],
+      "codeAreas": [
+        "services/transferImportService.js",
+        "test/transferImportOutcomeManifest.test.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-039_TRANSFER_IMPORT.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-039",
+      "relatedBugs": [],
+      "relatedDecisions": [
+        "DEC-012"
+      ],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Transfer Import"
+    },
+    {
+      "aliases": [
+        "backup update",
+        "backup scanning"
+      ],
+      "canonicalProductDoc": "features/AI-FEAT-040_BACKUP_UPDATE_SCANNING.md",
+      "canonicalTechnicalDocs": [],
+      "codeAreas": [
+        "services/transferExportService.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-040_BACKUP_UPDATE_SCANNING.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-040",
+      "relatedBugs": [
+        "BUG-005"
+      ],
+      "relatedDecisions": [
+        "DEC-010"
+      ],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Backup Update Scanning"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-041_TRANSFER_BACKGROUND_MINIMIZE_OPERATION.md",
+      "canonicalTechnicalDocs": [],
+      "codeAreas": [
+        "services/transferExportService.js",
+        "renderer/index.html"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-041_TRANSFER_BACKGROUND_MINIMIZE_OPERATION.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-041",
+      "relatedBugs": [
+        "BUG-005"
+      ],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Transfer Background/Minimize Operation"
+    },
+    {
+      "aliases": [
+        "archive root resolution",
+        "archive root configuration",
+        "main archive root",
+        "active archive root"
+      ],
+      "canonicalProductDoc": "features/AI-FEAT-042_ARCHIVE_ROOT_CONFIGURATION_RESOLUTION.md",
+      "canonicalTechnicalDocs": [
+        "docs/archive-operations-layer.md § Three-Root Model"
+      ],
+      "codeAreas": [
+        "services/settings.js",
+        "services/nasEventCache.js",
+        "services/offlineCollectionRegistryService.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-042_ARCHIVE_ROOT_CONFIGURATION_RESOLUTION.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-042",
+      "relatedBugs": [
+        "BUG-003"
+      ],
+      "relatedDecisions": [
+        "DEC-003",
+        "DEC-012"
+      ],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Archive Root Configuration & Resolution"
+    },
+    {
+      "aliases": [
+        "archive health",
+        "archive health reporting",
+        "diagnostics"
+      ],
+      "canonicalProductDoc": "features/AI-FEAT-043_ARCHIVE_HEALTH_REPORTING.md",
+      "canonicalTechnicalDocs": [
+        "docs/archive-operations-layer.md § Reporting Layer (Phases 13D-1",
+        "13D-2",
+        "13D-4",
+        "13D-5)"
+      ],
+      "codeAreas": [
+        "services/archiveConsistencyService.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-043_ARCHIVE_HEALTH_REPORTING.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-043",
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Archive Health Reporting"
+    },
+    {
+      "aliases": [
+        "local-first sync",
+        "background archive sync",
+        "nas sync"
+      ],
+      "canonicalProductDoc": "features/AI-FEAT-044_LOCAL_FIRST_BACKGROUND_ARCHIVE_SYNC.md",
+      "canonicalTechnicalDocs": [
+        "docs/archive-operations-layer.md § Local First"
+      ],
+      "codeAreas": [
+        "services/archiveSyncService.js",
+        "services/syncQueueService.js",
+        "services/syncReviewService.js",
+        "services/localSyncManifest.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-044_LOCAL_FIRST_BACKGROUND_ARCHIVE_SYNC.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-044",
+      "relatedBugs": [],
+      "relatedDecisions": [
+        "DEC-003"
+      ],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Local-First Background Archive Sync"
+    },
+    {
+      "aliases": [
+        "stale locks",
+        "lock handling",
+        "archive lock"
+      ],
+      "canonicalProductDoc": "features/AI-FEAT-045_ARCHIVE_LOCK_HANDLING_STALE_LOCK_RECOVERY.md",
+      "canonicalTechnicalDocs": [
+        "docs/archive-operations-layer.md § Direct Archive",
+        "§ Safety Guarantees"
+      ],
+      "codeAreas": [
+        "services/archiveLockService.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-045_ARCHIVE_LOCK_HANDLING_STALE_LOCK_RECOVERY.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-045",
+      "relatedBugs": [
+        "BUG-004"
+      ],
+      "relatedDecisions": [
+        "DEC-013"
+      ],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Archive Lock Handling & Stale-Lock Recovery"
+    },
+    {
+      "aliases": [
+        "archive folder adoption"
+      ],
+      "canonicalProductDoc": "features/AI-FEAT-046_ARCHIVE_FOLDER_ADOPTION.md",
+      "canonicalTechnicalDocs": [
+        "docs/archive-adoption-contract.md",
+        "docs/archive-adoption-workflow.md"
+      ],
+      "codeAreas": [
+        "services/adoptionDryRunService.js",
+        "services/adoptionPreviewService.js",
+        "services/adoptionWriteContract.js",
+        "services/adoptionWriteService.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-046_ARCHIVE_FOLDER_ADOPTION.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-046",
+      "relatedBugs": [
+        "BUG-006"
+      ],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Archive Folder Adoption"
+    },
+    {
+      "aliases": [
+        "qmz",
+        "qmz sequencing",
+        "quick mobile zip"
+      ],
+      "canonicalProductDoc": "features/AI-FEAT-047_QMZ_SEQUENCING_WORKSPACE.md",
+      "canonicalTechnicalDocs": [
+        "docs/metadata-system.md § Import Path Coverage"
+      ],
+      "codeAreas": [
+        "main/qmzService.js",
+        "renderer/renderer.js",
+        "test/qmzLiveE2E.test.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-047_QMZ_SEQUENCING_WORKSPACE.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-047",
+      "relatedBugs": [
+        "BUG-007"
+      ],
+      "relatedDecisions": [
+        "DEC-011"
+      ],
+      "relatedPostmortems": [
+        "PM-001"
+      ],
+      "roadmapIds": [],
+      "topic": "QMZ Sequencing Workspace"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-048_REALTIME_TEAM_PRESENCE_ONLINE_REGISTRY.md",
+      "canonicalTechnicalDocs": [
+        "realtime-server/README.md"
+      ],
+      "codeAreas": [
+        "realtime-server/",
+        "services/realtimeOperationsService.js",
+        "services/offlineCollectionRegistryService.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-048_REALTIME_TEAM_PRESENCE_ONLINE_REGISTRY.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-048",
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [],
+      "topic": "Realtime Team Presence & Online Registry"
+    },
+    {
+      "aliases": [
+        "archive maintenance"
+      ],
+      "canonicalProductDoc": "features/AI-FEAT-049_ARCHIVE_MAINTENANCE.md",
+      "canonicalTechnicalDocs": [],
+      "codeAreas": [],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-049_ARCHIVE_MAINTENANCE.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-049",
+      "relatedBugs": [],
+      "relatedDecisions": [
+        "DEC-015"
+      ],
+      "relatedPostmortems": [],
+      "roadmapIds": [
+        "AI-RM-001",
+        "AI-RM-002"
+      ],
+      "topic": "Archive Maintenance"
+    },
+    {
+      "aliases": [
+        "event maintenance"
+      ],
+      "canonicalProductDoc": "features/AI-FEAT-050_EVENT_MAINTENANCE.md",
+      "canonicalTechnicalDocs": [],
+      "codeAreas": [],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-050_EVENT_MAINTENANCE.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-050",
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [
+        "AI-RM-003"
+      ],
+      "topic": "Event Maintenance"
+    },
+    {
+      "aliases": [
+        "archive browser"
+      ],
+      "canonicalProductDoc": "features/AI-FEAT-051_ARCHIVE_BROWSER.md",
+      "canonicalTechnicalDocs": [],
+      "codeAreas": [],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-051_ARCHIVE_BROWSER.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-051",
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [
+        "AI-RM-004"
+      ],
+      "topic": "Archive Browser"
+    },
+    {
+      "aliases": [
+        "archive repair"
+      ],
+      "canonicalProductDoc": "features/AI-FEAT-052_ARCHIVE_REPAIR.md",
+      "canonicalTechnicalDocs": [],
+      "codeAreas": [],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-052_ARCHIVE_REPAIR.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-052",
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [
+        "AI-RM-007"
+      ],
+      "topic": "Archive Repair"
+    },
+    {
+      "aliases": [
+        "global search",
+        "search"
+      ],
+      "canonicalProductDoc": "features/AI-FEAT-053_GLOBAL_SEARCH.md",
+      "canonicalTechnicalDocs": [],
+      "codeAreas": [],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-053_GLOBAL_SEARCH.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-053",
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [
+        "AI-RM-005"
+      ],
+      "topic": "Global Search"
+    },
+    {
+      "aliases": [
+        "integrity verification",
+        "archive-wide verification"
+      ],
+      "canonicalProductDoc": "features/AI-FEAT-054_INTEGRITY_VERIFICATION_ARCHIVE_WIDE.md",
+      "canonicalTechnicalDocs": [],
+      "codeAreas": [],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-054_INTEGRITY_VERIFICATION_ARCHIVE_WIDE.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-054",
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [
+        "AI-RM-006"
+      ],
+      "topic": "Integrity Verification — Archive-Wide"
+    },
+    {
+      "aliases": [
+        "archive analytics"
+      ],
+      "canonicalProductDoc": "features/AI-FEAT-055_ARCHIVE_ANALYTICS.md",
+      "canonicalTechnicalDocs": [],
+      "codeAreas": [],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-055_ARCHIVE_ANALYTICS.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-055",
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [
+        "AI-RM-008"
+      ],
+      "topic": "Archive Analytics"
+    },
+    {
+      "aliases": [
+        "ai archive intelligence"
+      ],
+      "canonicalProductDoc": "features/AI-FEAT-056_AI_ARCHIVE_INTELLIGENCE.md",
+      "canonicalTechnicalDocs": [],
+      "codeAreas": [],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-056_AI_ARCHIVE_INTELLIGENCE.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-056",
+      "relatedBugs": [],
+      "relatedDecisions": [
+        "DEC-015"
+      ],
+      "relatedPostmortems": [],
+      "roadmapIds": [
+        "AI-RM-009"
+      ],
+      "topic": "AI Archive Intelligence"
+    }
+  ]
+}

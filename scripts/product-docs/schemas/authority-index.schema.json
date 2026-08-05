@@ -1,0 +1,25 @@
+{
+  "$id": "authority-index.schema.json",
+  "type": "object",
+  "required": ["schema_version", "docsys_version", "topics"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "docsys_version": { "type": "string" },
+    "topics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["topic", "featureId", "aliases", "canonicalProductDoc", "confidenceLevel"],
+        "properties": {
+          "topic": { "type": "string" },
+          "featureId": { "type": "string" },
+          "aliases": { "type": "array" },
+          "canonicalProductDoc": { "type": "string" },
+          "canonicalTechnicalDocs": { "type": "array" },
+          "roadmapIds": { "type": "array" },
+          "confidenceLevel": { "type": "string", "enum": ["explicit", "inferred", "unknown"] }
+        }
+      }
+    }
+  }
+}

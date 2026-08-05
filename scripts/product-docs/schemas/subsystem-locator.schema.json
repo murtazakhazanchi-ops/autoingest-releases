@@ -1,0 +1,25 @@
+{
+  "$id": "subsystem-locator.schema.json",
+  "type": "object",
+  "required": ["schema_version", "docsys_version", "subsystems"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "docsys_version": { "type": "string" },
+    "subsystems": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "aliases", "primaryFeatures", "sourceDirectories", "sourceFiles", "changeImpactChecklist"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "aliases": { "type": "array" },
+          "primaryFeatures": { "type": "array" },
+          "sourceDirectories": { "type": "array" },
+          "sourceFiles": { "type": "array" },
+          "changeImpactChecklist": { "type": "array" }
+        }
+      }
+    }
+  }
+}

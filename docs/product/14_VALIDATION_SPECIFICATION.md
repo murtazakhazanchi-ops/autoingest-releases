@@ -2,6 +2,8 @@
 
 This defines the rules `docs/product/` must satisfy, and how to check each one. It is a **specification**, not a script — no executable tooling is checked in here; each rule below states its check precisely enough that a human or an AI agent can run it by hand (grep/read), or a future maintainer can implement it as a script without inventing what "pass" means. Every rule listed here has already been run at least once by hand during this system's own construction (Part 2 and Part 3) — the "Verified in practice" line on each rule cites when.
 
+**Part 4 note (added when `scripts/product-docs/` was built)**: all 13 rules below now have a first real, runnable implementation in `scripts/product-docs/lib/validators.js`, invoked via `node scripts/product-docs/cli.js validate`. This document remains the specification — the executable checker is downstream of it, not a replacement; if the checker's behavior and this document's stated rule ever diverge, this document is correct and the checker has a bug. The checker also implements Part 4's own tooling-integrity checks (schema validity, dependency-graph edge integrity, generated-output freshness, registry/file mismatches, alias ambiguity) beyond these original 13 — see [scripts/product-docs/README.md](../../scripts/product-docs/README.md) and that file's `documentation-health.md` output for the full, current rule set and each rule's severity.
+
 Run these checks after any change to `docs/product/`, and always before a documentation commit — see [05_DOCUMENTATION_WORKFLOW.md](05_DOCUMENTATION_WORKFLOW.md) § Documentation Lifecycle Enforcement.
 
 ---

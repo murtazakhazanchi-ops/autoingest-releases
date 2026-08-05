@@ -33,6 +33,8 @@ Numbered top-level files (`00`–`14`) are the system's own spine and are never 
 
 Within `docs/product/` itself, there is a second authority order: an individual record (`features/AI-FEAT-###`, `bugs/BUG-###`, `decisions/DEC-###`, `postmortems/PM-###`) is authoritative over any aggregation of it. [12_DEPENDENCY_MODEL.md](12_DEPENDENCY_MODEL.md) is a navigational index, not a source — if it and an individual record disagree, regenerate the index, don't edit around the discrepancy (see that file's own opening note). [13_ENGINEERING_HANDBOOK.md](13_ENGINEERING_HANDBOOK.md) is downstream of every decision it cites — it originates no new facts (see that file's closing section).
 
+A third, generated layer sits below both: [generated/](generated/) (built by `scripts/product-docs/`, see [scripts/product-docs/README.md](../../scripts/product-docs/README.md)) is a machine-queryable locator over everything above — feature index, authority index, subsystem locator, dependency graph, per-feature timelines, roadmap dashboard, documentation health report. It is a **locator, not a contract**: consult it to find the relevant canonical document quickly (`node scripts/product-docs/cli.js query "..."`, `impact <path>`), then read that canonical document directly before implementing anything. Never cite `generated/` content as evidence in a feature/bug/decision/postmortem record — cite the canonical source it points to instead.
+
 ## 3. Routing
 
 ### Before significant AutoIngest work, read:
@@ -58,7 +60,8 @@ Within `docs/product/` itself, there is a second authority order: an individual 
 | Architectural history / why things are shaped this way | [11_ARCHITECTURAL_EVOLUTION.md](11_ARCHITECTURAL_EVOLUTION.md) |
 | Cross-cutting relationships (what depends on what) | [12_DEPENDENCY_MODEL.md](12_DEPENDENCY_MODEL.md) |
 | Engineering philosophy / onboarding / "why do we do it this way" | [13_ENGINEERING_HANDBOOK.md](13_ENGINEERING_HANDBOOK.md) |
-| Integrity/consistency checks on this documentation system | [14_VALIDATION_SPECIFICATION.md](14_VALIDATION_SPECIFICATION.md) |
+| Integrity/consistency checks on this documentation system | [14_VALIDATION_SPECIFICATION.md](14_VALIDATION_SPECIFICATION.md) — run via `node scripts/product-docs/cli.js validate` |
+| Fast lookup by topic/feature/bug/decision/subsystem/code path; impact analysis; "what changed" reports | [scripts/product-docs/README.md](../../scripts/product-docs/README.md) (`query`/`impact`/`changes` commands) — locator only, see § 2 and § 14a |
 | How to maintain this system / the update rules | [05_DOCUMENTATION_WORKFLOW.md](05_DOCUMENTATION_WORKFLOW.md) |
 
 ## 4. Feature Lifecycle
@@ -108,13 +111,44 @@ Reserve `postmortems/PM-###` for significant incidents with a reconstructable ti
 
 Run the checks in [14_VALIDATION_SPECIFICATION.md](14_VALIDATION_SPECIFICATION.md) after any change to `docs/product/`, and always before a documentation commit: duplicate IDs, broken links, missing roadmap/feature references, orphan bugs/decisions/postmortems, missing architecture/changelog references, implemented-without-documentation features, planned-without-roadmap features, roadmap inconsistencies, and documentation-completeness gaps. These are static-analysis checks over Markdown and `git log` — no application code execution required.
 
+These 13 rules now have a first real, runnable implementation: `node scripts/product-docs/cli.js validate` (see [scripts/product-docs/README.md](../../scripts/product-docs/README.md)). Run it after any change to `docs/product/` and before a documentation commit — it writes `generated/documentation-health.md`/`.json` and exits non-zero only on `error`-level findings; warnings and evidence gaps are reported, not blocking, per that document's own severity policy.
+
+## 14a. Required AI Workflow (Part 4 tooling)
+
+Before significant work on AutoIngest (implementing/modifying a registered feature, starting a roadmap milestone, or investigating a bug/decision that should have a record here):
+
+1. Query the authority index: `node scripts/product-docs/cli.js query "<topic>"` or open [generated/AUTHORITY_INDEX.md](generated/AUTHORITY_INDEX.md).
+2. Identify the relevant `AI-FEAT-###` ID(s) from the result.
+3. Open the canonical `features/AI-FEAT-###_*.md` file(s) — read directly, don't stop at the generated summary.
+4. Open the authoritative technical docs under `docs/` that the feature cites (`docs/CLAUDE.md`'s Task Documentation Routing).
+5. Inspect linked bugs, decisions, postmortems, and dependencies (the feature's own Lifecycle Metadata section, or `node scripts/product-docs/cli.js impact <AI-FEAT-### | path>`).
+6. Run impact analysis for anything you're about to change: `node scripts/product-docs/cli.js impact <path-or-ID>` — advisory only, it does not authorize the change.
+7. Plan the change.
+8. Update canonical `docs/product/` records **during** implementation, per the Update Rule (§5 below) — never reconstruct them from memory afterward.
+9. Rebuild generated indexes: `node scripts/product-docs/cli.js build`.
+10. Run `node scripts/product-docs/cli.js validate` before calling the documentation lifecycle complete.
+
+Generated indexes are a locator for step 1–2; they never replace reading the canonical documents in steps 3–5 for actual implementation work.
+
+**Examples**:
+- *Metadata task*: `query "metadata audit"` → `AI-FEAT-033` → read `features/AI-FEAT-033_METADATA_AUDIT_REPAIR.md` and `docs/metadata-system.md` → `impact main/exifService.js` before touching the shared write engine.
+- *QMZ task*: `query qmz` → `AI-FEAT-047` → read that feature file and `DEC-011` (dedicated domain workflow) → `impact AI-FEAT-047`.
+- *Transfer task*: `query "transfer export"` → `AI-FEAT-038` → check `BUG-005` (resume-state divergence) before changing checkpoint logic.
+- *event.json task*: `query "event.json"` → `AI-FEAT-004` → this is the foundational contract; read `docs/data-model.md` and `docs/event-system.md` directly, not only the feature summary.
+- *Archive Maintenance planning*: `impact AI-RM-002` → surfaces `AI-FEAT-049`, its dependencies (`AI-FEAT-042`, `AI-FEAT-043`), and `DEC-015` — read all three before scoping.
+
 ## 15. Update Workflow
 
 1. Make the documentation change.
-2. Run the [14_VALIDATION_SPECIFICATION.md](14_VALIDATION_SPECIFICATION.md) checks.
-3. Add or amend the [10_CHANGELOG.md](10_CHANGELOG.md) entry (newest-first, append-only, never edit a prior entry — add a correcting entry if something was wrong).
-4. Confirm `git diff --check` is clean and only documentation files changed (see `05_DOCUMENTATION_WORKFLOW.md`'s git-validation expectations, applied identically across Part 2 and Part 3 of this system's construction).
-5. Stage and commit as one cohesive documentation commit — do not mix documentation commits with application code changes.
+2. Run the [14_VALIDATION_SPECIFICATION.md](14_VALIDATION_SPECIFICATION.md) checks: `node scripts/product-docs/cli.js validate`.
+3. Rebuild generated indexes so they aren't stale at commit time: `node scripts/product-docs/cli.js build` (re-run `validate` afterward — it fails on any `stale-generated-output` finding).
+4. Add or amend the [10_CHANGELOG.md](10_CHANGELOG.md) entry (newest-first, append-only, never edit a prior entry — add a correcting entry if something was wrong).
+5. Confirm `git diff --check` is clean and only documentation files (plus `docs/product/generated/`) changed (see `05_DOCUMENTATION_WORKFLOW.md`'s git-validation expectations, applied identically across Part 2 and Part 3 of this system's construction).
+6. Stage and commit as one cohesive documentation commit — do not mix documentation commits with application code changes. `docs/product/generated/` may be committed in the same commit as the canonical change, or regenerated in a immediate follow-up commit — never left stale across a commit boundary (see § 15a).
+
+## 15a. When to commit generated output
+
+Commit `docs/product/generated/` in the **same commit** as the canonical `docs/product/` change whenever practical — a documentation commit that leaves the index stale defeats the freshness guarantee `validate` exists to enforce. Regenerating in an immediate follow-up commit is acceptable only when the canonical change and the regeneration genuinely can't land atomically (e.g. a generated-tooling bugfix applied after the fact) — and even then, `validate` will fail until that follow-up lands, which is the intended signal, not a bug to work around.
 
 ## 16. Release Workflow
 
@@ -146,3 +180,4 @@ Before work that changes any of the following, also read [11_ARCHITECTURAL_EVOLU
 - Never contradict an authoritative technical doc under `docs/` — the technical doc always wins; fix this system and record the reconciliation.
 - Never mark a feature `Implemented` (or a milestone `Complete`) without evidence — evidence-pending is honest; a fabricated-sounding "done" is not.
 - Never invent a relationship, date, bug, decision, or incident that repository evidence doesn't support.
+- Never treat `docs/product/generated/` as a source — it's a locator built from the canonical Markdown above; rebuild it (`node scripts/product-docs/cli.js build`) rather than hand-editing it, and run `validate` before trusting it.

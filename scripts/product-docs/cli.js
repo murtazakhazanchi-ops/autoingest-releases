@@ -1,0 +1,242 @@
+#!/usr/bin/env node
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+const { GENERATED_ROOT, PRODUCT_DOCS_ROOT } = require('./lib/repoRoot');
+const build = require('./lib/build');
+const validators = require('./lib/validators');
+const { renderDocumentationHealthMd, summarize } = require('./lib/renderHealth');
+const { stableStringify } = require('./lib/stableJson');
+const { runQuery, lookupById } = require('./lib/query');
+const { checkGeneratedSchemas } = require('./lib/validateSchemas');
+const { buildImpactAnalysis } = require('./lib/impact');
+const { buildChangeReport } = require('./lib/changeReport');
+const { renderChangeReportMd } = require('./lib/renderChanges');
+const gitInfo = require('./lib/gitInfo');
+const version = require('./lib/version');
+
+const HELP = `product-docs — Part 4 documentation intelligence tooling for docs/product/
+
+Usage: node scripts/product-docs/cli.js <command> [args]
+
+Commands:
+  build                     Regenerate all docs/product/generated/ artifacts
+  validate                  Run the documentation health checks (exit 1 on error-level findings)
+  query <text>              Search the offline index (or use --feature/--bug/--decision/--roadmap/--subsystem/--file)
+  impact <input>            Advisory impact analysis for a feature/roadmap/subsystem/source-path
+  changes <fromRef> [toRef] Generate a "what changed" report between two git refs (default toRef: HEAD)
+  all                       build, then validate
+
+Run any command with --help for command-specific usage.
+`;
+
+function writeGeneratedFiles(files) {
+  const written = [];
+  for (const [relPath, content] of files) {
+    const abs = path.join(GENERATED_ROOT, relPath);
+    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    fs.writeFileSync(abs, content);
+    written.push(relPath);
+  }
+  return written;
+}
+
+function readmeContent() {
+  return `# docs/product/generated/\n\n` +
+    `Derived artifacts produced by \`scripts/product-docs/cli.js build\`. **Never hand-edit anything in this directory** — regenerate it instead.\n\n` +
+    `Canonical Markdown under \`docs/product/\` (and, one level further up the authority chain, the technical docs under \`docs/\`) is always the source of truth. Everything here is a locator/index layer over that Markdown — see \`docs/product/CLAUDE.md\` and \`scripts/product-docs/README.md\` for the full authority model.\n\n` +
+    `Regenerate with: \`node scripts/product-docs/cli.js build\`\nValidate with: \`node scripts/product-docs/cli.js validate\`\n\n` +
+    `docsys version: ${version.DOCSYS_VERSION}\n`;
+}
+
+function cmdBuild() {
+  const start = Date.now();
+  const { files, manifest } = build.assemble();
+  files.set('README.md', readmeContent());
+  const written = writeGeneratedFiles(files);
+  const elapsed = Date.now() - start;
+  console.log(`Built ${written.length} file(s) under docs/product/generated/ in ${elapsed}ms.`);
+  console.log(`Entities: ${JSON.stringify(manifest.entity_counts)}`);
+  console.log(`Source commit: ${manifest.source_commit}`);
+  return { files, manifest, elapsed };
+}
+
+function cmdValidate() {
+  const start = Date.now();
+  const { parsed, built, files } = build.assemble();
+  const gitIsDirty = gitInfo.isWorkingTreeDirty();
+  const findings = validators.runAllChecks(parsed, built, { gitIsDirty });
+  findings.push(...validators.checkGeneratedFreshness(files, GENERATED_ROOT));
+  findings.push(...validators.checkManifestCommit(path.join(GENERATED_ROOT, 'manifest.json'), gitInfo.currentCommit()));
+  findings.push(...checkGeneratedSchemas(files));
+
+  const summary = summarize(findings);
+  const meta = { sourceCommit: gitInfo.currentCommit() };
+  const md = renderDocumentationHealthMd(findings, summary, meta);
+  const json = stableStringify({
+    schema_version: version.SCHEMA_VERSION,
+    docsys_version: version.DOCSYS_VERSION,
+    source_commit: meta.sourceCommit,
+    summary,
+    findings,
+  });
+  fs.mkdirSync(GENERATED_ROOT, { recursive: true });
+  fs.writeFileSync(path.join(GENERATED_ROOT, 'documentation-health.md'), md);
+  fs.writeFileSync(path.join(GENERATED_ROOT, 'documentation-health.json'), json);
+
+  const elapsed = Date.now() - start;
+  console.log(`Validated in ${elapsed}ms. errors=${summary.error} warnings=${summary.warning} information=${summary.information} evidence_gap=${summary.evidence_gap}`);
+  console.log('Wrote docs/product/generated/documentation-health.md and .json');
+  if (summary.error > 0) {
+    console.error(`FAIL — ${summary.error} error-level finding(s). See documentation-health.md.`);
+    process.exitCode = 1;
+  } else {
+    console.log('PASS');
+  }
+  return { findings, summary, elapsed };
+}
+
+function formatQueryResult(r) {
+  return `[${r.score}] ${r.record.entity_type} ${r.record.stable_id} — ${r.record.title}\n    ${r.record.canonical_path}${r.record.authority_level !== 'canonical' ? ` (authority: ${r.record.authority_level})` : ''}${r.record.evidence_status ? `\n    evidence: ${r.record.evidence_status}` : ''}${r.record.related_ids.length ? `\n    related: ${r.record.related_ids.join(', ')}` : ''}`;
+}
+
+function cmdQuery(args) {
+  if (args.includes('--help') || args.length === 0) {
+    console.log(`Usage: query <text> | --feature ID | --bug ID | --decision ID | --roadmap ID | --subsystem NAME | --file PATH | --impact PATH`);
+    return;
+  }
+  const { built } = build.assemble();
+  const flagIdx = args.findIndex((a) => a.startsWith('--'));
+  if (flagIdx === -1) {
+    const text = args.join(' ');
+    const results = runQuery(text, built.searchIndex, { limit: 20 });
+    if (!results.length) {
+      console.log(`No results for "${text}".`);
+      return;
+    }
+    for (const r of results) console.log(formatQueryResult(r));
+    return;
+  }
+  const flag = args[flagIdx];
+  const value = args[flagIdx + 1];
+  if (!value) {
+    console.error(`${flag} requires a value`);
+    process.exitCode = 1;
+    return;
+  }
+  if (flag === '--impact') {
+    const { parsed } = build.assemble();
+    printImpact(buildImpactAnalysis(value, built, parsed));
+    return;
+  }
+  if (flag === '--subsystem') {
+    const s = built.subsystems.find((x) => x.id.toLowerCase() === value.toLowerCase() || x.name.toLowerCase() === value.toLowerCase() || x.aliases.some((a) => a.toLowerCase() === value.toLowerCase()));
+    console.log(s ? JSON.stringify(s, null, 2) : `No subsystem matching "${value}".`);
+    return;
+  }
+  if (flag === '--file') {
+    const { resolveFileOwnership } = require('./lib/changeReport');
+    console.log(JSON.stringify(resolveFileOwnership(value, built.sourceIndex), null, 2));
+    return;
+  }
+  const record = lookupById(value, built.searchIndex);
+  console.log(record ? JSON.stringify(record, null, 2) : `No record matching "${value}".`);
+}
+
+function printImpact(impact) {
+  console.log(`Impact analysis for: ${impact.input}`);
+  console.log(`Resolution: ${impact.resolution_method} (confidence: ${impact.confidence})`);
+  console.log(`Primary ownership: ${impact.primary_ownership.join(', ') || 'None — evidence pending'}`);
+  console.log(`Related features: ${impact.related_features.join(', ') || 'None'}`);
+  console.log(`Dependencies: ${impact.dependencies.join(', ') || 'None'}`);
+  console.log(`Dependents: ${impact.dependents.join(', ') || 'None'}`);
+  console.log(`Decisions: ${impact.decisions.join(', ') || 'None'}`);
+  console.log(`Bugs: ${impact.bugs.join(', ') || 'None'}`);
+  console.log(`Required technical docs: ${impact.required_technical_docs.join(', ') || 'None'}`);
+  console.log(`Tests: ${impact.tests.join(', ') || 'None'}`);
+  console.log(`Documentation update checklist:\n${impact.documentation_update_checklist.map((f) => `  - ${f}`).join('\n') || '  (none)'}`);
+  console.log(`Generated artifacts to rebuild:\n${impact.generated_artifacts_to_rebuild.map((f) => `  - ${f}`).join('\n')}`);
+  console.log(impact.advisory_note);
+}
+
+function cmdImpact(args) {
+  if (args.includes('--help') || args.length === 0) {
+    console.log('Usage: impact <AI-FEAT-### | AI-RM-### | subsystem-name | source/path>');
+    return;
+  }
+  const { parsed, built } = build.assemble();
+  printImpact(buildImpactAnalysis(args[0], built, parsed));
+}
+
+function cmdChanges(args) {
+  if (args.includes('--help') || args.length === 0) {
+    console.log('Usage: changes <fromRef> [toRef=HEAD]');
+    return;
+  }
+  const fromRef = args[0];
+  const toRef = args[1] || 'HEAD';
+  if (!gitInfo.refExists(fromRef)) {
+    console.error(`Unknown git ref: ${fromRef}`);
+    process.exitCode = 1;
+    return;
+  }
+  if (!gitInfo.refExists(toRef)) {
+    console.error(`Unknown git ref: ${toRef}`);
+    process.exitCode = 1;
+    return;
+  }
+  const { parsed, built } = build.assemble();
+  const report = buildChangeReport(fromRef, toRef, parsed, built.subsystems, built.sourceIndex);
+  const safe = (s) => s.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const baseName = `${safe(fromRef)}_TO_${safe(toRef)}`;
+  const dir = path.join(GENERATED_ROOT, 'change-reports');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, `${baseName}.md`), renderChangeReportMd(report));
+  fs.writeFileSync(path.join(dir, `${baseName}.json`), stableStringify(report));
+  console.log(`Wrote docs/product/generated/change-reports/${baseName}.md and .json`);
+  console.log(`${report.commits.length} commit(s), ${report.files_changed.length} file(s) changed, ${report.affected_features.length} feature(s) affected.`);
+}
+
+function main() {
+  const [, , command, ...rest] = process.argv;
+  if (!command || command === '--help' || command === '-h') {
+    console.log(HELP);
+    process.exitCode = command ? 0 : 1;
+    return;
+  }
+  try {
+    switch (command) {
+      case 'build':
+        cmdBuild();
+        break;
+      case 'validate':
+        cmdValidate();
+        break;
+      case 'query':
+        cmdQuery(rest);
+        break;
+      case 'impact':
+        cmdImpact(rest);
+        break;
+      case 'changes':
+        cmdChanges(rest);
+        break;
+      case 'all': {
+        cmdBuild();
+        cmdValidate();
+        break;
+      }
+      default:
+        console.error(`Unknown command: ${command}\n`);
+        console.log(HELP);
+        process.exitCode = 1;
+    }
+  } catch (err) {
+    console.error(`product-docs ${command} failed: ${err.message}`);
+    if (process.env.DEBUG) console.error(err.stack);
+    process.exitCode = 1;
+  }
+}
+
+main();

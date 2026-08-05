@@ -1,0 +1,38 @@
+{
+  "$id": "change-report.schema.json",
+  "type": "object",
+  "required": [
+    "from_ref", "to_ref", "commits", "files_changed", "file_impacts",
+    "affected_features", "documentation_update_checklist", "confidence_notes"
+  ],
+  "properties": {
+    "from_ref": { "type": "string" },
+    "to_ref": { "type": "string" },
+    "commits": { "type": "array" },
+    "files_changed": { "type": "array" },
+    "file_impacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["file", "confidence", "subsystems", "features"],
+        "properties": {
+          "file": { "type": "string" },
+          "confidence": { "type": "string", "enum": ["explicit", "inferred", "unknown"] },
+          "subsystems": { "type": "array" },
+          "features": { "type": "array" }
+        }
+      }
+    },
+    "affected_features": { "type": "array" },
+    "documentation_update_checklist": { "type": "array" },
+    "confidence_notes": {
+      "type": "object",
+      "required": ["explicit", "inferred", "unknown"],
+      "properties": {
+        "explicit": { "type": "number" },
+        "inferred": { "type": "number" },
+        "unknown": { "type": "number" }
+      }
+    }
+  }
+}

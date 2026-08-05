@@ -1,0 +1,216 @@
+{
+  "blockers": "None identified for AI-RM-002 beyond the absence of a defined scope",
+  "completed_count": 1,
+  "completed_milestones": [
+    "AI-RM-001"
+  ],
+  "current_milestone_id": "AI-RM-002",
+  "current_risks": "(1) AI-RM-007's planned service name collides with an existing, unrelated `archiveRepairService.js` (temp-file cleanup only) — needs resolution before implementation starts. (2) AI-RM-006's scope needs explicit disambiguation from the already-implemented AI-FEAT-025 (narrower checksum verification) to avoid duplicating existing work without a clear reason.",
+  "docsys_version": "1.0.0",
+  "evidence_gaps_note": "See each feature file's \"Evidence status\" field. Notable gaps: AI-FEAT-037 (Metadata Reapply/Sync — file-existence + learning-log evidence only, not independently code-audited), AI-FEAT-007 (Telemetry Pipeline — scope of data collected not yet audited), AI-FEAT-022 (Photographer-Folder Resolution — relationship to the v0.9.0 \"Photographer Folder Sequencing\" release-note item not yet confirmed as same-or-different code path)",
+  "feature_status_counts_overall": {
+    "Implemented": 44,
+    "Implemented — evolving": 4,
+    "Planned": 8
+  },
+  "following_milestone_id": "AI-RM-003",
+  "milestones": [
+    {
+      "current_risks": "None blocking — see AI-FEAT-033's Known Bugs section for the one documented, non-blocking limitation (preview-session identifier does not survive the Preview→Confirm round trip)",
+      "dependencies": [],
+      "existing_features_extended": [
+        "AI-FEAT-003",
+        "AI-FEAT-004"
+      ],
+      "feature_status_counts": {
+        "Implemented": 7,
+        "Implemented — evolving": 2
+      },
+      "id": "AI-RM-001",
+      "included_features": [
+        "AI-FEAT-029",
+        "AI-FEAT-030",
+        "AI-FEAT-031",
+        "AI-FEAT-032",
+        "AI-FEAT-033",
+        "AI-FEAT-034",
+        "AI-FEAT-035",
+        "AI-FEAT-036",
+        "AI-FEAT-037"
+      ],
+      "name": "Metadata Audit & Repair",
+      "next_action": "None — complete. Recent work (2026-08-02 through 2026-08-04) has been UI polish on the already-delivered Metadata Management Modal, not new scope.",
+      "objective": "Give operators a way to audit archive-wide metadata correctness and repair drift, without ever blocking or rolling back the original import copy.",
+      "planned_estimate": "Evidence pending (predates this documentation system)",
+      "status": "**Completed**"
+    },
+    {
+      "current_risks": "Scope not yet defined",
+      "dependencies": [
+        "AI-RM-001"
+      ],
+      "existing_features_extended": [],
+      "feature_status_counts": {
+        "Planned": 1
+      },
+      "id": "AI-RM-002",
+      "included_features": [
+        "AI-FEAT-049"
+      ],
+      "name": "Archive Maintenance",
+      "next_action": "Discovery and specification",
+      "objective": "Evidence pending — not yet documented as fact",
+      "planned_estimate": "3–5 weeks (see [03_IMPLEMENTATION_TIMELINE.md](03_IMPLEMENTATION_TIMELINE.md))",
+      "status": "Planned — not started"
+    },
+    {
+      "current_risks": "Scope not yet defined",
+      "dependencies": [
+        "AI-RM-002"
+      ],
+      "existing_features_extended": [],
+      "feature_status_counts": {
+        "Planned": 1
+      },
+      "id": "AI-RM-003",
+      "included_features": [
+        "AI-FEAT-050"
+      ],
+      "name": "Event Maintenance",
+      "next_action": "Not started — follows AI-RM-002",
+      "objective": "Evidence pending — not yet documented as fact",
+      "planned_estimate": "4–6 weeks",
+      "status": "Planned — not started"
+    },
+    {
+      "current_risks": "Scope not yet defined",
+      "dependencies": [
+        "AI-RM-003"
+      ],
+      "existing_features_extended": [],
+      "feature_status_counts": {
+        "Planned": 1
+      },
+      "id": "AI-RM-004",
+      "included_features": [
+        "AI-FEAT-051"
+      ],
+      "name": "Archive Browser",
+      "next_action": "Not started — follows AI-RM-003",
+      "objective": "Evidence pending — not yet documented as fact",
+      "planned_estimate": "5–7 weeks",
+      "status": "Planned — not started"
+    },
+    {
+      "current_risks": "Scope not yet defined",
+      "dependencies": [
+        "AI-RM-004"
+      ],
+      "existing_features_extended": [],
+      "feature_status_counts": {
+        "Planned": 1
+      },
+      "id": "AI-RM-005",
+      "included_features": [
+        "AI-FEAT-053"
+      ],
+      "name": "Global Search",
+      "next_action": "Not started — follows AI-RM-004",
+      "objective": "Evidence pending — not yet documented as fact",
+      "planned_estimate": "3–5 weeks",
+      "status": "Planned — not started"
+    },
+    {
+      "current_risks": "Scope overlap with AI-FEAT-025 needs explicit disambiguation before implementation starts, to avoid duplicating the existing `getFileHash()`-based mechanism without a clear reason",
+      "dependencies": [
+        "AI-RM-005"
+      ],
+      "existing_features_extended": [
+        "AI-FEAT-025"
+      ],
+      "feature_status_counts": {
+        "Planned": 1
+      },
+      "id": "AI-RM-006",
+      "included_features": [
+        "AI-FEAT-054"
+      ],
+      "name": "Integrity Verification",
+      "next_action": "Not started — follows AI-RM-005",
+      "objective": "Evidence pending — not yet documented as fact. Narrower prior art exists: AI-FEAT-025 (import-batch and sync-job checksum verification) — this milestone's scope is expected to be broader (archive-wide), not merely a rename of that existing capability.",
+      "planned_estimate": "3–4 weeks",
+      "status": "Planned — not started"
+    },
+    {
+      "current_risks": "**Naming collision**: `services/archiveRepairService.js` already exists but implements an unrelated narrow temp-file-cleanup utility (Phase 13B-2, `.autoingest-sync-tmp`/`.autoingest-tx-tmp` only) — see AI-FEAT-052's Decisions section. Whoever scopes this milestone should resolve the naming collision before adding code to that file.",
+      "dependencies": [
+        "AI-RM-006"
+      ],
+      "existing_features_extended": [
+        "AI-FEAT-043"
+      ],
+      "feature_status_counts": {
+        "Planned": 1
+      },
+      "id": "AI-RM-007",
+      "included_features": [
+        "AI-FEAT-052"
+      ],
+      "name": "Archive Repair",
+      "next_action": "Not started — follows AI-RM-006",
+      "objective": "Close the documented gap in AI-FEAT-043: \"the diagnostics layer reports issues but does not auto-fix them\" (`docs/archive-operations-layer.md`).",
+      "planned_estimate": "4–6 weeks",
+      "status": "Planned — not started"
+    },
+    {
+      "current_risks": "Scope not yet defined",
+      "dependencies": [
+        "AI-RM-007"
+      ],
+      "existing_features_extended": [
+        "AI-FEAT-043"
+      ],
+      "feature_status_counts": {
+        "Planned": 1
+      },
+      "id": "AI-RM-008",
+      "included_features": [
+        "AI-FEAT-055"
+      ],
+      "name": "Archive Analytics",
+      "next_action": "Not started — follows AI-RM-007",
+      "objective": "Evidence pending — not yet documented as fact",
+      "planned_estimate": "2–4 weeks",
+      "status": "Planned — not started"
+    },
+    {
+      "current_risks": "Least-scoped item in the entire roadmap — nothing about its eventual shape should be assumed from its name alone",
+      "dependencies": [
+        "AI-RM-008"
+      ],
+      "existing_features_extended": [
+        "AI-FEAT-055"
+      ],
+      "feature_status_counts": {
+        "Planned": 1
+      },
+      "id": "AI-RM-009",
+      "included_features": [
+        "AI-FEAT-056"
+      ],
+      "name": "AI Archive Intelligence",
+      "next_action": "Not started — follows AI-RM-008; final milestone in the canonical order",
+      "objective": "Evidence pending — not yet documented as fact",
+      "planned_estimate": "6–10 weeks",
+      "status": "Planned — not started"
+    }
+  ],
+  "next_milestone_id": "AI-RM-002",
+  "next_planned_action": "Discovery and specification for AI-RM-002 (Archive Maintenance) — no scope exists yet",
+  "pending_decisions": "Naming collision for AI-RM-007's service (see Current risks); scope disambiguation for AI-RM-006 vs. AI-FEAT-025",
+  "progress_percent": 11.1,
+  "recently_completed_documentation_work": "UI polish to the Metadata Management Modal / Audit & Repair tab (commits `4446a30` → `c5d200f`, 2026-08-02 through 2026-08-04) — cosmetic/layout only, no behavior change, all part of the already-complete AI-RM-001",
+  "schema_version": "1.0.0",
+  "total_features": 56,
+  "total_milestones": 9
+}

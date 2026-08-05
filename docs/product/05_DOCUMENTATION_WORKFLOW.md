@@ -12,6 +12,7 @@ Documentation must be updated **alongside** meaningful feature work, not after t
 2. **During implementation** — append design revisions, discovered constraints, bugs, troubleshooting evidence, and rejected alternatives as they happen, not reconstructed afterward.
 3. **After verification** — record final architecture, files changed, tests added, commits, unresolved risks, and follow-up work in the feature file's Evolution / Implementation Journal.
 4. **After completion** — update [01_FEATURE_REGISTRY.md](01_FEATURE_REGISTRY.md) status/maturity, [02_MASTER_ROADMAP.md](02_MASTER_ROADMAP.md) if a milestone moved, [03_IMPLEMENTATION_TIMELINE.md](03_IMPLEMENTATION_TIMELINE.md) actual dates, [04_PROJECT_DASHBOARD.md](04_PROJECT_DASHBOARD.md), and [10_CHANGELOG.md](10_CHANGELOG.md).
+5. **Before committing** — rebuild and validate the Part 4 generated indexes: `node scripts/product-docs/cli.js build && node scripts/product-docs/cli.js validate` (see [scripts/product-docs/README.md](../../scripts/product-docs/README.md)). A stale `docs/product/generated/` is treated the same as a stale registry row — fix it before the commit, not after.
 
 ## Append, Never Erase
 
@@ -88,6 +89,8 @@ This formalizes the update rule above into an explicit, checkable sequence. It a
 | 10 | Update changelog | [10_CHANGELOG.md](10_CHANGELOG.md), newest-first, append-only |
 
 Steps 4–7 are conditional — not every feature change produces a decision, a bug, a rejected approach, or a distinct "accepted solution" worth recording beyond the journal entry itself. Steps 1, 8, 9, and 10 are close to universal: almost any feature work touches roadmap/registry/dashboard/changelog in some way, even if only to confirm nothing moved.
+
+**Part 4 addendum**: after step 10, rebuild and validate the generated indexes — `node scripts/product-docs/cli.js build && node scripts/product-docs/cli.js validate` — before the documentation commit. This isn't a numbered 11th step because it doesn't add new documentation content; it's the mechanical regeneration of the locator layer over what steps 1–10 just produced. See [scripts/product-docs/README.md](../../scripts/product-docs/README.md).
 
 ### Per-feature fields this obligates you to keep current
 

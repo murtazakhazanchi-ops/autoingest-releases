@@ -1,0 +1,32 @@
+{
+  "$id": "documentation-health.schema.json",
+  "type": "object",
+  "required": ["schema_version", "docsys_version", "source_commit", "summary", "findings"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "docsys_version": { "type": "string" },
+    "source_commit": { "type": "string" },
+    "summary": {
+      "type": "object",
+      "required": ["error", "warning", "information", "evidence_gap"],
+      "properties": {
+        "error": { "type": "number" },
+        "warning": { "type": "number" },
+        "information": { "type": "number" },
+        "evidence_gap": { "type": "number" }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["level", "rule", "message"],
+        "properties": {
+          "level": { "type": "string", "enum": ["error", "warning", "information", "evidence_gap"] },
+          "rule": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      }
+    }
+  }
+}

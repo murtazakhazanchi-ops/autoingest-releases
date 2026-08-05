@@ -1,0 +1,44 @@
+{
+  "$id": "feature-index.schema.json",
+  "type": "object",
+  "required": ["schema_version", "docsys_version", "features"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "docsys_version": { "type": "string" },
+    "features": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "feature_id", "name", "aliases", "category", "status", "maturity", "summary",
+          "canonical_document", "roadmap_ids", "dependencies", "dependents", "related_features",
+          "related_bugs", "related_decisions", "related_postmortems", "related_technical_docs",
+          "related_tests", "related_code_paths", "evidence_status", "timeline_path", "search_keywords"
+        ],
+        "properties": {
+          "feature_id": { "type": "string" },
+          "name": { "type": "string" },
+          "aliases": { "type": "array" },
+          "category": { "type": "string" },
+          "status": { "type": "string" },
+          "maturity": { "type": "string" },
+          "summary": { "type": "string" },
+          "canonical_document": { "type": "string" },
+          "roadmap_ids": { "type": "array" },
+          "dependencies": { "type": "array" },
+          "dependents": { "type": "array" },
+          "related_features": { "type": "array" },
+          "related_bugs": { "type": "array" },
+          "related_decisions": { "type": "array" },
+          "related_postmortems": { "type": "array" },
+          "related_technical_docs": { "type": "array" },
+          "related_tests": { "type": "array" },
+          "related_code_paths": { "type": "array" },
+          "evidence_status": { "type": "string" },
+          "timeline_path": { "type": "string" },
+          "search_keywords": { "type": "array" }
+        }
+      }
+    }
+  }
+}

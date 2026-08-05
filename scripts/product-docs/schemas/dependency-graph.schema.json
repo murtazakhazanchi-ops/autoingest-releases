@@ -1,0 +1,31 @@
+{
+  "$id": "dependency-graph.schema.json",
+  "type": "object",
+  "required": ["schema_version", "docsys_version", "nodes", "edges"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "docsys_version": { "type": "string" },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "label"],
+        "properties": { "id": { "type": "string" }, "type": { "type": "string" }, "label": { "type": "string" } }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["source", "target", "relationship", "provenance_path", "evidence_status"],
+        "properties": {
+          "source": { "type": "string" },
+          "target": { "type": "string" },
+          "relationship": { "type": "string" },
+          "provenance_path": { "type": "string" },
+          "evidence_status": { "type": "string" }
+        }
+      }
+    }
+  }
+}

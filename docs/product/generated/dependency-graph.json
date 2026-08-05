@@ -1,0 +1,4240 @@
+{
+  "docsys_version": "1.0.0",
+  "edges": [
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-001_ELECTRON_APPLICATION_SHELL_SECURITY_MODEL.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-001",
+      "target": "AI-FEAT-003"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-001_ELECTRON_APPLICATION_SHELL_SECURITY_MODEL.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-001",
+      "target": "ARCH-b-initial-autoingest-foundation"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-001",
+      "target": "ARCH-b-initial-autoingest-foundation"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-002_LOGIN_OPERATOR_IDENTITY.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-002",
+      "target": "AI-FEAT-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-002_LOGIN_OPERATOR_IDENTITY.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-002",
+      "target": "AI-FEAT-022"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-002_LOGIN_OPERATOR_IDENTITY.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-002",
+      "target": "AI-FEAT-027"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-002_LOGIN_OPERATOR_IDENTITY.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-002",
+      "target": "AI-FEAT-028"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-003_DASHBOARD_SYSTEM_STATUS.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-003",
+      "target": "AI-FEAT-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-003_DASHBOARD_SYSTEM_STATUS.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-003",
+      "target": "AI-FEAT-004"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-003_DASHBOARD_SYSTEM_STATUS.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-003",
+      "target": "AI-FEAT-031"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-003_DASHBOARD_SYSTEM_STATUS.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-003",
+      "target": "AI-FEAT-034"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-003_DASHBOARD_SYSTEM_STATUS.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-003",
+      "target": "AI-FEAT-035"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-001:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-003",
+      "target": "AI-RM-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-004_EVENT_JSON_DATA_MODEL_PERSISTENCE_CONTRACT.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-004",
+      "target": "AI-FEAT-021"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-001:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-004",
+      "target": "AI-RM-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-004_EVENT_JSON_DATA_MODEL_PERSISTENCE_CONTRACT.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-004",
+      "target": "ARCH-b-initial-autoingest-foundation"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-004",
+      "target": "ARCH-b-initial-autoingest-foundation"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-004_EVENT_JSON_DATA_MODEL_PERSISTENCE_CONTRACT.md#lifecycle-metadata:Related-bugs",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-004",
+      "target": "BUG-003"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-003_STALE_LOCAL_STAGING_RESTORE_OVER_ARCHIVE_ROOT.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-004",
+      "target": "BUG-003"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-004_EVENT_JSON_DATA_MODEL_PERSISTENCE_CONTRACT.md#lifecycle-metadata:Related-bugs",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-004",
+      "target": "BUG-006"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-006_EVENT_EDIT_FULL_PAYLOAD_FIELD_DROP.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-004",
+      "target": "BUG-006"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-004_EVENT_JSON_DATA_MODEL_PERSISTENCE_CONTRACT.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-004",
+      "target": "DEC-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-001_EVENT_DATA_AS_DURABLE_ARCHIVE_TRUTH.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-004",
+      "target": "DEC-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-004_EVENT_JSON_DATA_MODEL_PERSISTENCE_CONTRACT.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-004",
+      "target": "DEC-002"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-002_FOLDER_STRUCTURE_PLUS_EMBEDDED_METADATA.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-004",
+      "target": "DEC-002"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-005_APPLICATION_SETTINGS_CONFIGURATION_STORE.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-005",
+      "target": "AI-FEAT-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-005_APPLICATION_SETTINGS_CONFIGURATION_STORE.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-005",
+      "target": "AI-FEAT-002"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-005_APPLICATION_SETTINGS_CONFIGURATION_STORE.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-005",
+      "target": "AI-FEAT-004"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-005_APPLICATION_SETTINGS_CONFIGURATION_STORE.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-005",
+      "target": "AI-FEAT-029"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "parent extended by this subfeature",
+      "provenance_path": "features/AI-FEAT-042_ARCHIVE_ROOT_CONFIGURATION_RESOLUTION.md#header-table:Parent-feature",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-005",
+      "target": "AI-FEAT-042"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-005_APPLICATION_SETTINGS_CONFIGURATION_STORE.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-005",
+      "target": "AI-FEAT-042"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-005_APPLICATION_SETTINGS_CONFIGURATION_STORE.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-005",
+      "target": "AI-FEAT-048"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-006_APPLICATION_AUTO_UPDATE.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-006",
+      "target": "AI-FEAT-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-006_APPLICATION_AUTO_UPDATE.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-006",
+      "target": "AI-FEAT-007"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-007_TELEMETRY_PIPELINE.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-007",
+      "target": "AI-FEAT-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-007_TELEMETRY_PIPELINE.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-007",
+      "target": "AI-FEAT-006"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-008_DESIGN_SYSTEM_UI_CONSISTENCY_FRAMEWORK.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-008",
+      "target": "AI-FEAT-016"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-008_DESIGN_SYSTEM_UI_CONSISTENCY_FRAMEWORK.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-008",
+      "target": "AI-FEAT-034"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-009_EVENT_CREATION.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-009",
+      "target": "AI-FEAT-004"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-009_EVENT_CREATION.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-009",
+      "target": "AI-FEAT-008"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-009_EVENT_CREATION.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-009",
+      "target": "AI-FEAT-018"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-009_EVENT_CREATION.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-009",
+      "target": "ARCH-b-initial-autoingest-foundation"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-009",
+      "target": "ARCH-b-initial-autoingest-foundation"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-010_EVENT_MANAGEMENT_EDITING.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-010",
+      "target": "AI-FEAT-004"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-010_EVENT_MANAGEMENT_EDITING.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-010",
+      "target": "AI-FEAT-009"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-010_EVENT_MANAGEMENT_EDITING.md#lifecycle-metadata:Related-bugs",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-010",
+      "target": "BUG-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-001_SOURCE_CLEANUP_POST_IMPORT_STATE_OWNERSHIP.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-010",
+      "target": "BUG-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-010_EVENT_MANAGEMENT_EDITING.md#lifecycle-metadata:Related-bugs",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-010",
+      "target": "BUG-006"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-006_EVENT_EDIT_FULL_PAYLOAD_FIELD_DROP.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-010",
+      "target": "BUG-006"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-010_EVENT_MANAGEMENT_EDITING.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-010",
+      "target": "DEC-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-011_SOURCE_DETECTION.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-011",
+      "target": "AI-FEAT-012"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-011_SOURCE_DETECTION.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-011",
+      "target": "ARCH-b-initial-autoingest-foundation"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-011",
+      "target": "ARCH-b-initial-autoingest-foundation"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-012_SOURCE_SELECTION.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-012",
+      "target": "AI-FEAT-011"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-012_SOURCE_SELECTION.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-012",
+      "target": "AI-FEAT-024"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-012_SOURCE_SELECTION.md#lifecycle-metadata:Related-bugs",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-012",
+      "target": "BUG-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-001_SOURCE_CLEANUP_POST_IMPORT_STATE_OWNERSHIP.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-012",
+      "target": "BUG-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-013_FILE_BROWSER_MEDIA_GRID_LIST_VIEWING.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-013",
+      "target": "AI-FEAT-017"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-015_MEDIA_PREVIEW.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-015",
+      "target": "AI-FEAT-016"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-016_PREVIEW_FOCUS_SELECTION_SEPARATION.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-016",
+      "target": "AI-FEAT-008"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-017_GROUPING_SYSTEM.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-017",
+      "target": "AI-FEAT-004"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-018_EVENT_COMPONENT_IMPORT_ROUTING.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-018",
+      "target": "AI-FEAT-004"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-018_EVENT_COMPONENT_IMPORT_ROUTING.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-018",
+      "target": "AI-FEAT-009"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-018_EVENT_COMPONENT_IMPORT_ROUTING.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-018",
+      "target": "AI-FEAT-017"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-018_EVENT_COMPONENT_IMPORT_ROUTING.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-018",
+      "target": "ARCH-b-initial-autoingest-foundation"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-018",
+      "target": "ARCH-b-initial-autoingest-foundation"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-018_EVENT_COMPONENT_IMPORT_ROUTING.md#lifecycle-metadata:Related-bugs",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-018",
+      "target": "BUG-002"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-002_PHOTOGRAPHER_SEQUENCE_FOLDER_RESOLUTION.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-018",
+      "target": "BUG-002"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-018_EVENT_COMPONENT_IMPORT_ROUTING.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-018",
+      "target": "DEC-002"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-002_FOLDER_STRUCTURE_PLUS_EMBEDDED_METADATA.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-018",
+      "target": "DEC-002"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-019_IMPORT_PIPELINE_COPY_ENGINE.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-019",
+      "target": "AI-FEAT-004"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-019_IMPORT_PIPELINE_COPY_ENGINE.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-019",
+      "target": "AI-FEAT-018"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "this feature extended by subfeature",
+      "provenance_path": "features/AI-FEAT-019_IMPORT_PIPELINE_COPY_ENGINE.md#header-table:Subfeatures",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-019",
+      "target": "AI-FEAT-020"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "parent extended by this subfeature",
+      "provenance_path": "features/AI-FEAT-020_DUPLICATE_DETECTION.md#header-table:Parent-feature",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-019",
+      "target": "AI-FEAT-020"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-019_IMPORT_PIPELINE_COPY_ENGINE.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-019",
+      "target": "AI-FEAT-038"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-019_IMPORT_PIPELINE_COPY_ENGINE.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-019",
+      "target": "AI-FEAT-039"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-019_IMPORT_PIPELINE_COPY_ENGINE.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-019",
+      "target": "AI-FEAT-044"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-019_IMPORT_PIPELINE_COPY_ENGINE.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-019",
+      "target": "ARCH-b-initial-autoingest-foundation"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-019",
+      "target": "ARCH-b-initial-autoingest-foundation"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-019_IMPORT_PIPELINE_COPY_ENGINE.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-019",
+      "target": "ARCH-d-archive-integrity-and-transaction-safety"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-019",
+      "target": "ARCH-d-archive-integrity-and-transaction-safety"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-019_IMPORT_PIPELINE_COPY_ENGINE.md#lifecycle-metadata:Related-bugs",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-019",
+      "target": "BUG-009"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-009_SAME_SIZE_SKIP_METADATA_UNVERIFIED.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-019",
+      "target": "BUG-009"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-019_IMPORT_PIPELINE_COPY_ENGINE.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-019",
+      "target": "DEC-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-005_ORIGINAL_PRESERVATION_NON_DESTRUCTIVE_INGEST.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-019",
+      "target": "DEC-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-019_IMPORT_PIPELINE_COPY_ENGINE.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-019",
+      "target": "DEC-009"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-009_COPY_IDEMPOTENCY_MUST_NOT_SUPPRESS_METADATA_REPAIR.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-019",
+      "target": "DEC-009"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-020_DUPLICATE_DETECTION.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-020",
+      "target": "AI-FEAT-019"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-020_DUPLICATE_DETECTION.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-020",
+      "target": "ARCH-b-initial-autoingest-foundation"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-020",
+      "target": "ARCH-b-initial-autoingest-foundation"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-020_DUPLICATE_DETECTION.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-020",
+      "target": "ARCH-d-archive-integrity-and-transaction-safety"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-020",
+      "target": "ARCH-d-archive-integrity-and-transaction-safety"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-020_DUPLICATE_DETECTION.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-020",
+      "target": "DEC-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-005_ORIGINAL_PRESERVATION_NON_DESTRUCTIVE_INGEST.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-020",
+      "target": "DEC-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-021_ATOMIC_IMPORT_TRANSACTION.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-021",
+      "target": "AI-FEAT-004"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-021_ATOMIC_IMPORT_TRANSACTION.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-021",
+      "target": "AI-FEAT-019"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-021_ATOMIC_IMPORT_TRANSACTION.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-021",
+      "target": "ARCH-d-archive-integrity-and-transaction-safety"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-021",
+      "target": "ARCH-d-archive-integrity-and-transaction-safety"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-022_PHOTOGRAPHER_FOLDER_RESOLUTION.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-022",
+      "target": "AI-FEAT-002"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-022_PHOTOGRAPHER_FOLDER_RESOLUTION.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-022",
+      "target": "AI-FEAT-018"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-022_PHOTOGRAPHER_FOLDER_RESOLUTION.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-022",
+      "target": "AI-FEAT-028"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-022_PHOTOGRAPHER_FOLDER_RESOLUTION.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-022",
+      "target": "ARCH-b-initial-autoingest-foundation"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-022",
+      "target": "ARCH-b-initial-autoingest-foundation"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-022_PHOTOGRAPHER_FOLDER_RESOLUTION.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-022",
+      "target": "ARCH-f-specialized-archival-workflows"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-022",
+      "target": "ARCH-f-specialized-archival-workflows"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-022_PHOTOGRAPHER_FOLDER_RESOLUTION.md#lifecycle-metadata:Related-bugs",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-022",
+      "target": "BUG-002"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-002_PHOTOGRAPHER_SEQUENCE_FOLDER_RESOLUTION.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-022",
+      "target": "BUG-002"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-023_QUICK_IMPORT.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-023",
+      "target": "AI-FEAT-004"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-023_QUICK_IMPORT.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-023",
+      "target": "AI-FEAT-009"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-023_QUICK_IMPORT.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-023",
+      "target": "AI-FEAT-029"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-023_QUICK_IMPORT.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-023",
+      "target": "AI-FEAT-033"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-024_SOURCE_CLEANUP.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-024",
+      "target": "AI-FEAT-012"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-024_SOURCE_CLEANUP.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-024",
+      "target": "AI-FEAT-019"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-024_SOURCE_CLEANUP.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-024",
+      "target": "ARCH-d-archive-integrity-and-transaction-safety"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-024",
+      "target": "ARCH-d-archive-integrity-and-transaction-safety"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-024_SOURCE_CLEANUP.md#lifecycle-metadata:Related-bugs",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-024",
+      "target": "BUG-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-001_SOURCE_CLEANUP_POST_IMPORT_STATE_OWNERSHIP.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-024",
+      "target": "BUG-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-024_SOURCE_CLEANUP.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-024",
+      "target": "DEC-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-005_ORIGINAL_PRESERVATION_NON_DESTRUCTIVE_INGEST.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-024",
+      "target": "DEC-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-025_CHECKSUM_BASED_FILE_VERIFICATION.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-025",
+      "target": "AI-FEAT-019"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-025_CHECKSUM_BASED_FILE_VERIFICATION.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-025",
+      "target": "AI-FEAT-026"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-025_CHECKSUM_BASED_FILE_VERIFICATION.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-025",
+      "target": "AI-FEAT-044"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-025_CHECKSUM_BASED_FILE_VERIFICATION.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-025",
+      "target": "AI-FEAT-054"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-006:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-025",
+      "target": "AI-RM-006"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-025_CHECKSUM_BASED_FILE_VERIFICATION.md#header-table:Related-roadmap-milestone",
+      "relationship": "planned_in",
+      "source": "AI-FEAT-025",
+      "target": "AI-RM-006"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-025_CHECKSUM_BASED_FILE_VERIFICATION.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-025",
+      "target": "ARCH-d-archive-integrity-and-transaction-safety"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-025",
+      "target": "ARCH-d-archive-integrity-and-transaction-safety"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-025_CHECKSUM_BASED_FILE_VERIFICATION.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-025",
+      "target": "DEC-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-005_ORIGINAL_PRESERVATION_NON_DESTRUCTIVE_INGEST.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-025",
+      "target": "DEC-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-026_AUDIT_INTEGRITY_VERIFICATION.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-026",
+      "target": "AI-FEAT-025"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-026_AUDIT_INTEGRITY_VERIFICATION.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-026",
+      "target": "AI-FEAT-027"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-027_ACTIVITY_LOG.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-027",
+      "target": "AI-FEAT-004"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-027_ACTIVITY_LOG.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-027",
+      "target": "AI-FEAT-010"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "this feature extended by subfeature",
+      "provenance_path": "features/AI-FEAT-027_ACTIVITY_LOG.md#header-table:Subfeatures",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-027",
+      "target": "AI-FEAT-026"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-027_ACTIVITY_LOG.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-027",
+      "target": "ARCH-d-archive-integrity-and-transaction-safety"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-027",
+      "target": "ARCH-d-archive-integrity-and-transaction-safety"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-028_IMPORT_SOURCE_ATTRIBUTION.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-028",
+      "target": "AI-FEAT-002"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-028_IMPORT_SOURCE_ATTRIBUTION.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-028",
+      "target": "AI-FEAT-012"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-028_IMPORT_SOURCE_ATTRIBUTION.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-028",
+      "target": "AI-FEAT-021"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-028_IMPORT_SOURCE_ATTRIBUTION.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-028",
+      "target": "AI-FEAT-022"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-028_IMPORT_SOURCE_ATTRIBUTION.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-028",
+      "target": "AI-FEAT-027"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-028_IMPORT_SOURCE_ATTRIBUTION.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-028",
+      "target": "ARCH-d-archive-integrity-and-transaction-safety"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-028",
+      "target": "ARCH-d-archive-integrity-and-transaction-safety"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-029_METADATA_WRITING_ENGINE.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-029",
+      "target": "AI-FEAT-004"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "this feature extended by subfeature",
+      "provenance_path": "features/AI-FEAT-029_METADATA_WRITING_ENGINE.md#header-table:Subfeatures",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-029",
+      "target": "AI-FEAT-030"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "parent extended by this subfeature",
+      "provenance_path": "features/AI-FEAT-030_METADATA_DURABLE_QUEUE_CRASH_RECOVERY.md#header-table:Parent-feature",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-029",
+      "target": "AI-FEAT-030"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "this feature extended by subfeature",
+      "provenance_path": "features/AI-FEAT-029_METADATA_WRITING_ENGINE.md#header-table:Subfeatures",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-029",
+      "target": "AI-FEAT-031"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "parent extended by this subfeature",
+      "provenance_path": "features/AI-FEAT-031_METADATA_EVENT_STATE_DERIVATION.md#header-table:Parent-feature",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-029",
+      "target": "AI-FEAT-031"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "this feature extended by subfeature",
+      "provenance_path": "features/AI-FEAT-029_METADATA_WRITING_ENGINE.md#header-table:Subfeatures",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-029",
+      "target": "AI-FEAT-032"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "parent extended by this subfeature",
+      "provenance_path": "features/AI-FEAT-032_METADATA_VERIFICATION.md#header-table:Parent-feature",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-029",
+      "target": "AI-FEAT-032"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "this feature extended by subfeature",
+      "provenance_path": "features/AI-FEAT-029_METADATA_WRITING_ENGINE.md#header-table:Subfeatures",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-029",
+      "target": "AI-FEAT-033"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "parent extended by this subfeature",
+      "provenance_path": "features/AI-FEAT-033_METADATA_AUDIT_REPAIR.md#header-table:Parent-feature",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-029",
+      "target": "AI-FEAT-033"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "this feature extended by subfeature",
+      "provenance_path": "features/AI-FEAT-029_METADATA_WRITING_ENGINE.md#header-table:Subfeatures",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-029",
+      "target": "AI-FEAT-037"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "parent extended by this subfeature",
+      "provenance_path": "features/AI-FEAT-037_METADATA_REAPPLY_SYNC.md#header-table:Parent-feature",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-029",
+      "target": "AI-FEAT-037"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-029_METADATA_WRITING_ENGINE.md#header-table:Related-roadmap-milestone",
+      "relationship": "planned_in",
+      "source": "AI-FEAT-029",
+      "target": "AI-RM-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-029_METADATA_WRITING_ENGINE.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-029",
+      "target": "ARCH-a-established-adobe-bridge-workflow-pre-autoingest"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-029",
+      "target": "ARCH-a-established-adobe-bridge-workflow-pre-autoingest"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-029_METADATA_WRITING_ENGINE.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-029",
+      "target": "ARCH-c-metadata-automation"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-029",
+      "target": "ARCH-c-metadata-automation"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-029_METADATA_WRITING_ENGINE.md#lifecycle-metadata:Related-bugs",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-029",
+      "target": "BUG-007"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-007_QMZ_METADATA_CONTEXT_SHAPE_MISMATCH.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-029",
+      "target": "BUG-007"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-029_METADATA_WRITING_ENGINE.md#lifecycle-metadata:Related-bugs",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-029",
+      "target": "BUG-008"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-008_LASTMETADATARUN_EISDIR_SILENT_FAILURE.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-029",
+      "target": "BUG-008"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-029_METADATA_WRITING_ENGINE.md#lifecycle-metadata:Related-bugs",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-029",
+      "target": "BUG-009"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-029_METADATA_WRITING_ENGINE.md#lifecycle-metadata:Related-bugs",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-029",
+      "target": "BUG-010"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-010_METADATA_QUEUE_IN_MEMORY_LOSS_ON_CRASH.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-029",
+      "target": "BUG-010"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-029_METADATA_WRITING_ENGINE.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-029",
+      "target": "DEC-002"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-002_FOLDER_STRUCTURE_PLUS_EMBEDDED_METADATA.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-029",
+      "target": "DEC-002"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-029_METADATA_WRITING_ENGINE.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-029",
+      "target": "DEC-004"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-004_PRESERVE_BRIDGE_BASED_ARCHIVAL_PRACTICE.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-029",
+      "target": "DEC-004"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-029_METADATA_WRITING_ENGINE.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-029",
+      "target": "DEC-006"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-006_RAW_FILES_USE_XMP_SIDECARS.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-029",
+      "target": "DEC-006"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-029_METADATA_WRITING_ENGINE.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-029",
+      "target": "DEC-007"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-007_SHARED_METADATA_ENGINE_RESOLVER.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-029",
+      "target": "DEC-007"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "postmortem",
+      "provenance_path": "features/AI-FEAT-029_METADATA_WRITING_ENGINE.md#lifecycle-metadata:Related-postmortems",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-029",
+      "target": "PM-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "postmortem",
+      "provenance_path": "postmortems/PM-001_METADATA_CORRECTNESS_GAP_PRODUCTION_READINESS_REVIEW.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-029",
+      "target": "PM-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-030_METADATA_DURABLE_QUEUE_CRASH_RECOVERY.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-030",
+      "target": "AI-FEAT-029"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-030_METADATA_DURABLE_QUEUE_CRASH_RECOVERY.md#header-table:Related-roadmap-milestone",
+      "relationship": "planned_in",
+      "source": "AI-FEAT-030",
+      "target": "AI-RM-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-030_METADATA_DURABLE_QUEUE_CRASH_RECOVERY.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-030",
+      "target": "ARCH-c-metadata-automation"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-030",
+      "target": "ARCH-c-metadata-automation"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-030_METADATA_DURABLE_QUEUE_CRASH_RECOVERY.md#lifecycle-metadata:Related-bugs",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-030",
+      "target": "BUG-010"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-010_METADATA_QUEUE_IN_MEMORY_LOSS_ON_CRASH.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-030",
+      "target": "BUG-010"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-030_METADATA_DURABLE_QUEUE_CRASH_RECOVERY.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-030",
+      "target": "DEC-008"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-008_DURABLE_METADATA_SURVIVES_RESTART.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-030",
+      "target": "DEC-008"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "postmortem",
+      "provenance_path": "features/AI-FEAT-030_METADATA_DURABLE_QUEUE_CRASH_RECOVERY.md#lifecycle-metadata:Related-postmortems",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-030",
+      "target": "PM-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "postmortem",
+      "provenance_path": "postmortems/PM-001_METADATA_CORRECTNESS_GAP_PRODUCTION_READINESS_REVIEW.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-030",
+      "target": "PM-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-031_METADATA_EVENT_STATE_DERIVATION.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-031",
+      "target": "AI-FEAT-029"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-031_METADATA_EVENT_STATE_DERIVATION.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-031",
+      "target": "AI-FEAT-030"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "parent extended by this subfeature",
+      "provenance_path": "features/AI-FEAT-034_METADATA_MANAGEMENT_MODAL.md#header-table:Parent-feature",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-031",
+      "target": "AI-FEAT-034"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "parent extended by this subfeature",
+      "provenance_path": "features/AI-FEAT-035_DASHBOARD_METADATA_HEALTH.md#header-table:Parent-feature",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-031",
+      "target": "AI-FEAT-035"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-031_METADATA_EVENT_STATE_DERIVATION.md#header-table:Related-roadmap-milestone",
+      "relationship": "planned_in",
+      "source": "AI-FEAT-031",
+      "target": "AI-RM-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-031_METADATA_EVENT_STATE_DERIVATION.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-031",
+      "target": "ARCH-c-metadata-automation"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-031",
+      "target": "ARCH-c-metadata-automation"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-031_METADATA_EVENT_STATE_DERIVATION.md#lifecycle-metadata:Related-bugs",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-031",
+      "target": "BUG-008"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-008_LASTMETADATARUN_EISDIR_SILENT_FAILURE.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-031",
+      "target": "BUG-008"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "postmortem",
+      "provenance_path": "features/AI-FEAT-031_METADATA_EVENT_STATE_DERIVATION.md#lifecycle-metadata:Related-postmortems",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-031",
+      "target": "PM-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "postmortem",
+      "provenance_path": "postmortems/PM-001_METADATA_CORRECTNESS_GAP_PRODUCTION_READINESS_REVIEW.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-031",
+      "target": "PM-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-032_METADATA_VERIFICATION.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-032",
+      "target": "AI-FEAT-029"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-032_METADATA_VERIFICATION.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-032",
+      "target": "AI-FEAT-039"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-032_METADATA_VERIFICATION.md#header-table:Related-roadmap-milestone",
+      "relationship": "planned_in",
+      "source": "AI-FEAT-032",
+      "target": "AI-RM-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-032_METADATA_VERIFICATION.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-032",
+      "target": "ARCH-c-metadata-automation"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-032",
+      "target": "ARCH-c-metadata-automation"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-032_METADATA_VERIFICATION.md#lifecycle-metadata:Related-bugs",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-032",
+      "target": "BUG-009"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-009_SAME_SIZE_SKIP_METADATA_UNVERIFIED.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-032",
+      "target": "BUG-009"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-032_METADATA_VERIFICATION.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-032",
+      "target": "DEC-009"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-009_COPY_IDEMPOTENCY_MUST_NOT_SUPPRESS_METADATA_REPAIR.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-032",
+      "target": "DEC-009"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "postmortem",
+      "provenance_path": "features/AI-FEAT-032_METADATA_VERIFICATION.md#lifecycle-metadata:Related-postmortems",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-032",
+      "target": "PM-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "postmortem",
+      "provenance_path": "postmortems/PM-001_METADATA_CORRECTNESS_GAP_PRODUCTION_READINESS_REVIEW.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-032",
+      "target": "PM-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-033_METADATA_AUDIT_REPAIR.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-033",
+      "target": "AI-FEAT-029"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-033_METADATA_AUDIT_REPAIR.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-033",
+      "target": "AI-FEAT-030"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-033_METADATA_AUDIT_REPAIR.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-033",
+      "target": "AI-FEAT-031"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "parent extended by this subfeature",
+      "provenance_path": "features/AI-FEAT-034_METADATA_MANAGEMENT_MODAL.md#header-table:Parent-feature",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-033",
+      "target": "AI-FEAT-034"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-033_METADATA_AUDIT_REPAIR.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-033",
+      "target": "AI-FEAT-034"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-033_METADATA_AUDIT_REPAIR.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-033",
+      "target": "AI-FEAT-035"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-033_METADATA_AUDIT_REPAIR.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-033",
+      "target": "AI-FEAT-052"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-033_METADATA_AUDIT_REPAIR.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-033",
+      "target": "AI-FEAT-054"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-033_METADATA_AUDIT_REPAIR.md#header-table:Related-roadmap-milestone",
+      "relationship": "planned_in",
+      "source": "AI-FEAT-033",
+      "target": "AI-RM-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-033_METADATA_AUDIT_REPAIR.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-033",
+      "target": "ARCH-c-metadata-automation"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-033",
+      "target": "ARCH-c-metadata-automation"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-033_METADATA_AUDIT_REPAIR.md#lifecycle-metadata:Related-bugs",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-033",
+      "target": "BUG-007"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-007_QMZ_METADATA_CONTEXT_SHAPE_MISMATCH.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-033",
+      "target": "BUG-007"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "postmortem",
+      "provenance_path": "features/AI-FEAT-033_METADATA_AUDIT_REPAIR.md#lifecycle-metadata:Related-postmortems",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-033",
+      "target": "PM-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "postmortem",
+      "provenance_path": "postmortems/PM-001_METADATA_CORRECTNESS_GAP_PRODUCTION_READINESS_REVIEW.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-033",
+      "target": "PM-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-034_METADATA_MANAGEMENT_MODAL.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-034",
+      "target": "AI-FEAT-008"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-034_METADATA_MANAGEMENT_MODAL.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-034",
+      "target": "AI-FEAT-031"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-034_METADATA_MANAGEMENT_MODAL.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-034",
+      "target": "AI-FEAT-033"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-034_METADATA_MANAGEMENT_MODAL.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-034",
+      "target": "AI-FEAT-036"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-034_METADATA_MANAGEMENT_MODAL.md#header-table:Related-roadmap-milestone",
+      "relationship": "planned_in",
+      "source": "AI-FEAT-034",
+      "target": "AI-RM-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-035_DASHBOARD_METADATA_HEALTH.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-035",
+      "target": "AI-FEAT-003"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-035_DASHBOARD_METADATA_HEALTH.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-035",
+      "target": "AI-FEAT-031"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-035_DASHBOARD_METADATA_HEALTH.md#header-table:Related-roadmap-milestone",
+      "relationship": "planned_in",
+      "source": "AI-FEAT-035",
+      "target": "AI-RM-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-035_DASHBOARD_METADATA_HEALTH.md#lifecycle-metadata:Related-bugs",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-035",
+      "target": "BUG-008"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-008_LASTMETADATARUN_EISDIR_SILENT_FAILURE.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-035",
+      "target": "BUG-008"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "parent extended by this subfeature",
+      "provenance_path": "features/AI-FEAT-034_METADATA_MANAGEMENT_MODAL.md#header-table:Parent-feature",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-036",
+      "target": "AI-FEAT-034"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-036_KEYWORD_REGISTRY.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-036",
+      "target": "ARCH-a-established-adobe-bridge-workflow-pre-autoingest"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-036",
+      "target": "ARCH-a-established-adobe-bridge-workflow-pre-autoingest"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-036_KEYWORD_REGISTRY.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-036",
+      "target": "ARCH-c-metadata-automation"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-036",
+      "target": "ARCH-c-metadata-automation"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-036_KEYWORD_REGISTRY.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-036",
+      "target": "DEC-004"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-004_PRESERVE_BRIDGE_BASED_ARCHIVAL_PRACTICE.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-036",
+      "target": "DEC-004"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-036_KEYWORD_REGISTRY.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-036",
+      "target": "DEC-014"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-014_CONTROLLED_KEYWORD_REGISTRY.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-036",
+      "target": "DEC-014"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-037_METADATA_REAPPLY_SYNC.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-037",
+      "target": "AI-FEAT-029"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-037_METADATA_REAPPLY_SYNC.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-037",
+      "target": "AI-FEAT-036"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-037_METADATA_REAPPLY_SYNC.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-037",
+      "target": "ARCH-c-metadata-automation"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-037",
+      "target": "ARCH-c-metadata-automation"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "this feature extended by subfeature",
+      "provenance_path": "features/AI-FEAT-038_TRANSFER_EXPORT.md#header-table:Subfeatures",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-038",
+      "target": "AI-FEAT-040"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "parent extended by this subfeature",
+      "provenance_path": "features/AI-FEAT-040_BACKUP_UPDATE_SCANNING.md#header-table:Parent-feature",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-038",
+      "target": "AI-FEAT-040"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-038_TRANSFER_EXPORT.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-038",
+      "target": "AI-FEAT-041"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-038_TRANSFER_EXPORT.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-038",
+      "target": "AI-FEAT-042"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-038_TRANSFER_EXPORT.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-038",
+      "target": "AI-FEAT-045"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-038_TRANSFER_EXPORT.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-038",
+      "target": "AI-FEAT-046"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-038_TRANSFER_EXPORT.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-038",
+      "target": "ARCH-e-transfer-and-distributed-working"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-038",
+      "target": "ARCH-e-transfer-and-distributed-working"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-038_TRANSFER_EXPORT.md#lifecycle-metadata:Related-bugs",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-038",
+      "target": "BUG-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-005_TRANSFER_EXPORT_RESUME_STATE_DIVERGENCE.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-038",
+      "target": "BUG-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-039_TRANSFER_IMPORT.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-039",
+      "target": "AI-FEAT-032"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-039_TRANSFER_IMPORT.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-039",
+      "target": "AI-FEAT-038"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-039_TRANSFER_IMPORT.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-039",
+      "target": "AI-FEAT-042"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-039_TRANSFER_IMPORT.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-039",
+      "target": "ARCH-e-transfer-and-distributed-working"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-039",
+      "target": "ARCH-e-transfer-and-distributed-working"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-039_TRANSFER_IMPORT.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-039",
+      "target": "DEC-012"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-012_ARCHIVE_ROOT_RESOLUTION_REQUIRES_EVIDENCE.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-039",
+      "target": "DEC-012"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-040_BACKUP_UPDATE_SCANNING.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-040",
+      "target": "AI-FEAT-038"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-040_BACKUP_UPDATE_SCANNING.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-040",
+      "target": "ARCH-e-transfer-and-distributed-working"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-040",
+      "target": "ARCH-e-transfer-and-distributed-working"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-040_BACKUP_UPDATE_SCANNING.md#lifecycle-metadata:Related-bugs",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-040",
+      "target": "BUG-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-005_TRANSFER_EXPORT_RESUME_STATE_DIVERGENCE.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-040",
+      "target": "BUG-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-040_BACKUP_UPDATE_SCANNING.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-040",
+      "target": "DEC-010"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-010_TRANSFER_UPDATE_MISSING_FILES_ONLY.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-040",
+      "target": "DEC-010"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-041_TRANSFER_BACKGROUND_MINIMIZE_OPERATION.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-041",
+      "target": "AI-FEAT-038"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-041_TRANSFER_BACKGROUND_MINIMIZE_OPERATION.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-041",
+      "target": "AI-FEAT-039"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-041_TRANSFER_BACKGROUND_MINIMIZE_OPERATION.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-041",
+      "target": "AI-FEAT-040"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-041_TRANSFER_BACKGROUND_MINIMIZE_OPERATION.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-041",
+      "target": "ARCH-e-transfer-and-distributed-working"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-041",
+      "target": "ARCH-e-transfer-and-distributed-working"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-041_TRANSFER_BACKGROUND_MINIMIZE_OPERATION.md#lifecycle-metadata:Related-bugs",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-041",
+      "target": "BUG-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-005_TRANSFER_EXPORT_RESUME_STATE_DIVERGENCE.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-041",
+      "target": "BUG-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-042_ARCHIVE_ROOT_CONFIGURATION_RESOLUTION.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-042",
+      "target": "AI-FEAT-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-042_ARCHIVE_ROOT_CONFIGURATION_RESOLUTION.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-042",
+      "target": "ARCH-g-archive-operations-layer"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-042",
+      "target": "ARCH-g-archive-operations-layer"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-042_ARCHIVE_ROOT_CONFIGURATION_RESOLUTION.md#lifecycle-metadata:Related-bugs",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-042",
+      "target": "BUG-003"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-003_STALE_LOCAL_STAGING_RESTORE_OVER_ARCHIVE_ROOT.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-042",
+      "target": "BUG-003"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-042_ARCHIVE_ROOT_CONFIGURATION_RESOLUTION.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-042",
+      "target": "DEC-003"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-003_LOCAL_FIRST_ON_PREMISES_ARCHITECTURE.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-042",
+      "target": "DEC-003"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-042_ARCHIVE_ROOT_CONFIGURATION_RESOLUTION.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-042",
+      "target": "DEC-012"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-012_ARCHIVE_ROOT_RESOLUTION_REQUIRES_EVIDENCE.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-042",
+      "target": "DEC-012"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-043_ARCHIVE_HEALTH_REPORTING.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-043",
+      "target": "AI-FEAT-004"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-043_ARCHIVE_HEALTH_REPORTING.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-043",
+      "target": "AI-FEAT-042"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-043_ARCHIVE_HEALTH_REPORTING.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-043",
+      "target": "AI-FEAT-045"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-043_ARCHIVE_HEALTH_REPORTING.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-043",
+      "target": "AI-FEAT-046"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-043_ARCHIVE_HEALTH_REPORTING.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-043",
+      "target": "AI-FEAT-052"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-007:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-043",
+      "target": "AI-RM-007"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-008:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-043",
+      "target": "AI-RM-008"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-043_ARCHIVE_HEALTH_REPORTING.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-043",
+      "target": "ARCH-g-archive-operations-layer"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-043",
+      "target": "ARCH-g-archive-operations-layer"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-044_LOCAL_FIRST_BACKGROUND_ARCHIVE_SYNC.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-044",
+      "target": "AI-FEAT-019"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-044_LOCAL_FIRST_BACKGROUND_ARCHIVE_SYNC.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-044",
+      "target": "AI-FEAT-029"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-044_LOCAL_FIRST_BACKGROUND_ARCHIVE_SYNC.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-044",
+      "target": "AI-FEAT-042"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-044_LOCAL_FIRST_BACKGROUND_ARCHIVE_SYNC.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-044",
+      "target": "AI-FEAT-043"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-044_LOCAL_FIRST_BACKGROUND_ARCHIVE_SYNC.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-044",
+      "target": "ARCH-e-transfer-and-distributed-working"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-044",
+      "target": "ARCH-e-transfer-and-distributed-working"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-044_LOCAL_FIRST_BACKGROUND_ARCHIVE_SYNC.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-044",
+      "target": "ARCH-g-archive-operations-layer"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-044",
+      "target": "ARCH-g-archive-operations-layer"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-044_LOCAL_FIRST_BACKGROUND_ARCHIVE_SYNC.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-044",
+      "target": "DEC-003"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-003_LOCAL_FIRST_ON_PREMISES_ARCHITECTURE.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-044",
+      "target": "DEC-003"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-045_ARCHIVE_LOCK_HANDLING_STALE_LOCK_RECOVERY.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-045",
+      "target": "AI-FEAT-038"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-045_ARCHIVE_LOCK_HANDLING_STALE_LOCK_RECOVERY.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-045",
+      "target": "AI-FEAT-043"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-045_ARCHIVE_LOCK_HANDLING_STALE_LOCK_RECOVERY.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-045",
+      "target": "ARCH-e-transfer-and-distributed-working"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-045",
+      "target": "ARCH-e-transfer-and-distributed-working"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-045_ARCHIVE_LOCK_HANDLING_STALE_LOCK_RECOVERY.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-045",
+      "target": "ARCH-g-archive-operations-layer"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-045",
+      "target": "ARCH-g-archive-operations-layer"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-045_ARCHIVE_LOCK_HANDLING_STALE_LOCK_RECOVERY.md#lifecycle-metadata:Related-bugs",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-045",
+      "target": "BUG-004"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-004_SAME_DEVICE_STALE_ARCHIVE_LOCK.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-045",
+      "target": "BUG-004"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-045_ARCHIVE_LOCK_HANDLING_STALE_LOCK_RECOVERY.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-045",
+      "target": "DEC-013"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-013_LOCK_CLEARING_MUST_BE_CONSTRAINED.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-045",
+      "target": "DEC-013"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-046_ARCHIVE_FOLDER_ADOPTION.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-046",
+      "target": "AI-FEAT-004"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-046_ARCHIVE_FOLDER_ADOPTION.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-046",
+      "target": "AI-FEAT-042"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-046_ARCHIVE_FOLDER_ADOPTION.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-046",
+      "target": "AI-FEAT-047"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-046_ARCHIVE_FOLDER_ADOPTION.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-046",
+      "target": "ARCH-g-archive-operations-layer"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-046",
+      "target": "ARCH-g-archive-operations-layer"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-046_ARCHIVE_FOLDER_ADOPTION.md#lifecycle-metadata:Related-bugs",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-046",
+      "target": "BUG-006"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-006_EVENT_EDIT_FULL_PAYLOAD_FIELD_DROP.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-046",
+      "target": "BUG-006"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-047_QMZ_SEQUENCING_WORKSPACE.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-047",
+      "target": "AI-FEAT-016"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-047_QMZ_SEQUENCING_WORKSPACE.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-047",
+      "target": "AI-FEAT-029"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-047_QMZ_SEQUENCING_WORKSPACE.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-047",
+      "target": "AI-FEAT-046"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-047_QMZ_SEQUENCING_WORKSPACE.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-047",
+      "target": "ARCH-f-specialized-archival-workflows"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-047",
+      "target": "ARCH-f-specialized-archival-workflows"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-047_QMZ_SEQUENCING_WORKSPACE.md#lifecycle-metadata:Related-bugs",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-047",
+      "target": "BUG-007"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-007_QMZ_METADATA_CONTEXT_SHAPE_MISMATCH.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-047",
+      "target": "BUG-007"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-047_QMZ_SEQUENCING_WORKSPACE.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-047",
+      "target": "DEC-011"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-011_QMZ_DEDICATED_DOMAIN_WORKFLOW.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-047",
+      "target": "DEC-011"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "postmortem",
+      "provenance_path": "features/AI-FEAT-047_QMZ_SEQUENCING_WORKSPACE.md#lifecycle-metadata:Related-postmortems",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-047",
+      "target": "PM-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "postmortem",
+      "provenance_path": "postmortems/PM-001_METADATA_CORRECTNESS_GAP_PRODUCTION_READINESS_REVIEW.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-047",
+      "target": "PM-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-048_REALTIME_TEAM_PRESENCE_ONLINE_REGISTRY.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-048",
+      "target": "AI-FEAT-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-049_ARCHIVE_MAINTENANCE.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-049",
+      "target": "AI-FEAT-042"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-049_ARCHIVE_MAINTENANCE.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-049",
+      "target": "AI-FEAT-043"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-049_ARCHIVE_MAINTENANCE.md#header-table:Related-roadmap-milestone",
+      "relationship": "planned_in",
+      "source": "AI-FEAT-049",
+      "target": "AI-RM-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-049_ARCHIVE_MAINTENANCE.md#header-table:Related-roadmap-milestone",
+      "relationship": "planned_in",
+      "source": "AI-FEAT-049",
+      "target": "AI-RM-002"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-049_ARCHIVE_MAINTENANCE.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-049",
+      "target": "ARCH-i-planned-architectural-direction"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-049",
+      "target": "ARCH-i-planned-architectural-direction"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-049_ARCHIVE_MAINTENANCE.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-049",
+      "target": "DEC-015"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-015_PLANNED_ARCHITECTURE_SEPARATE_FROM_IMPLEMENTED.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-049",
+      "target": "DEC-015"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-050_EVENT_MAINTENANCE.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-050",
+      "target": "AI-FEAT-004"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-050_EVENT_MAINTENANCE.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-050",
+      "target": "AI-FEAT-010"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-050_EVENT_MAINTENANCE.md#header-table:Related-roadmap-milestone",
+      "relationship": "planned_in",
+      "source": "AI-FEAT-050",
+      "target": "AI-RM-003"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-050",
+      "target": "ARCH-i-planned-architectural-direction"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-015_PLANNED_ARCHITECTURE_SEPARATE_FROM_IMPLEMENTED.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-050",
+      "target": "DEC-015"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-051_ARCHIVE_BROWSER.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-051",
+      "target": "AI-FEAT-013"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-051_ARCHIVE_BROWSER.md#header-table:Related-roadmap-milestone",
+      "relationship": "planned_in",
+      "source": "AI-FEAT-051",
+      "target": "AI-RM-004"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-051",
+      "target": "ARCH-i-planned-architectural-direction"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-015_PLANNED_ARCHITECTURE_SEPARATE_FROM_IMPLEMENTED.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-051",
+      "target": "DEC-015"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-052_ARCHIVE_REPAIR.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-052",
+      "target": "AI-FEAT-043"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-052_ARCHIVE_REPAIR.md#header-table:Related-roadmap-milestone",
+      "relationship": "planned_in",
+      "source": "AI-FEAT-052",
+      "target": "AI-RM-007"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-052",
+      "target": "ARCH-i-planned-architectural-direction"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-015_PLANNED_ARCHITECTURE_SEPARATE_FROM_IMPLEMENTED.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-052",
+      "target": "DEC-015"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-053_GLOBAL_SEARCH.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-053",
+      "target": "AI-FEAT-051"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-053_GLOBAL_SEARCH.md#header-table:Related-roadmap-milestone",
+      "relationship": "planned_in",
+      "source": "AI-FEAT-053",
+      "target": "AI-RM-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-053",
+      "target": "ARCH-i-planned-architectural-direction"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-015_PLANNED_ARCHITECTURE_SEPARATE_FROM_IMPLEMENTED.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-053",
+      "target": "DEC-015"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-054_INTEGRITY_VERIFICATION_ARCHIVE_WIDE.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-054",
+      "target": "AI-FEAT-025"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-054_INTEGRITY_VERIFICATION_ARCHIVE_WIDE.md#header-table:Related-roadmap-milestone",
+      "relationship": "planned_in",
+      "source": "AI-FEAT-054",
+      "target": "AI-RM-006"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-054",
+      "target": "ARCH-i-planned-architectural-direction"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-015_PLANNED_ARCHITECTURE_SEPARATE_FROM_IMPLEMENTED.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-054",
+      "target": "DEC-015"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-055_ARCHIVE_ANALYTICS.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-055",
+      "target": "AI-FEAT-043"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-055_ARCHIVE_ANALYTICS.md#header-table:Related-roadmap-milestone",
+      "relationship": "planned_in",
+      "source": "AI-FEAT-055",
+      "target": "AI-RM-008"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-009:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-055",
+      "target": "AI-RM-009"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-055",
+      "target": "ARCH-i-planned-architectural-direction"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-015_PLANNED_ARCHITECTURE_SEPARATE_FROM_IMPLEMENTED.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-055",
+      "target": "DEC-015"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-056_AI_ARCHIVE_INTELLIGENCE.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-056",
+      "target": "AI-FEAT-055"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-056_AI_ARCHIVE_INTELLIGENCE.md#header-table:Related-roadmap-milestone",
+      "relationship": "planned_in",
+      "source": "AI-FEAT-056",
+      "target": "AI-RM-009"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-056_AI_ARCHIVE_INTELLIGENCE.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-056",
+      "target": "ARCH-i-planned-architectural-direction"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-056",
+      "target": "ARCH-i-planned-architectural-direction"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-056_AI_ARCHIVE_INTELLIGENCE.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-056",
+      "target": "DEC-015"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-015_PLANNED_ARCHITECTURE_SEPARATE_FROM_IMPLEMENTED.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-056",
+      "target": "DEC-015"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-001:Included-AI-FEAT-IDs",
+      "relationship": "implements",
+      "source": "AI-RM-001",
+      "target": "AI-FEAT-029"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-001:Included-AI-FEAT-IDs",
+      "relationship": "implements",
+      "source": "AI-RM-001",
+      "target": "AI-FEAT-030"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-001:Included-AI-FEAT-IDs",
+      "relationship": "implements",
+      "source": "AI-RM-001",
+      "target": "AI-FEAT-031"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-001:Included-AI-FEAT-IDs",
+      "relationship": "implements",
+      "source": "AI-RM-001",
+      "target": "AI-FEAT-032"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-001:Included-AI-FEAT-IDs",
+      "relationship": "implements",
+      "source": "AI-RM-001",
+      "target": "AI-FEAT-033"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-001:Included-AI-FEAT-IDs",
+      "relationship": "implements",
+      "source": "AI-RM-001",
+      "target": "AI-FEAT-034"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-001:Included-AI-FEAT-IDs",
+      "relationship": "implements",
+      "source": "AI-RM-001",
+      "target": "AI-FEAT-035"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-001:Included-AI-FEAT-IDs",
+      "relationship": "implements",
+      "source": "AI-RM-001",
+      "target": "AI-FEAT-036"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-001:Included-AI-FEAT-IDs",
+      "relationship": "implements",
+      "source": "AI-RM-001",
+      "target": "AI-FEAT-037"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-007_SHARED_METADATA_ENGINE_RESOLVER.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-RM-001",
+      "target": "DEC-007"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-008_DURABLE_METADATA_SURVIVES_RESTART.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-RM-001",
+      "target": "DEC-008"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-002:Included-AI-FEAT-IDs",
+      "relationship": "implements",
+      "source": "AI-RM-002",
+      "target": "AI-FEAT-049"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-002:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-RM-002",
+      "target": "AI-RM-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-015_PLANNED_ARCHITECTURE_SEPARATE_FROM_IMPLEMENTED.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-RM-002",
+      "target": "DEC-015"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-003:Included-AI-FEAT-IDs",
+      "relationship": "implements",
+      "source": "AI-RM-003",
+      "target": "AI-FEAT-050"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-003:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-RM-003",
+      "target": "AI-RM-002"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-015_PLANNED_ARCHITECTURE_SEPARATE_FROM_IMPLEMENTED.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-RM-003",
+      "target": "DEC-015"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-004:Included-AI-FEAT-IDs",
+      "relationship": "implements",
+      "source": "AI-RM-004",
+      "target": "AI-FEAT-051"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-004:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-RM-004",
+      "target": "AI-RM-003"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-015_PLANNED_ARCHITECTURE_SEPARATE_FROM_IMPLEMENTED.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-RM-004",
+      "target": "DEC-015"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-005:Included-AI-FEAT-IDs",
+      "relationship": "implements",
+      "source": "AI-RM-005",
+      "target": "AI-FEAT-053"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-005:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-RM-005",
+      "target": "AI-RM-004"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-015_PLANNED_ARCHITECTURE_SEPARATE_FROM_IMPLEMENTED.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-RM-005",
+      "target": "DEC-015"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-006:Included-AI-FEAT-IDs",
+      "relationship": "implements",
+      "source": "AI-RM-006",
+      "target": "AI-FEAT-054"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-006:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-RM-006",
+      "target": "AI-RM-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-015_PLANNED_ARCHITECTURE_SEPARATE_FROM_IMPLEMENTED.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-RM-006",
+      "target": "DEC-015"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-007:Included-AI-FEAT-IDs",
+      "relationship": "implements",
+      "source": "AI-RM-007",
+      "target": "AI-FEAT-052"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-007:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-RM-007",
+      "target": "AI-RM-006"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-015_PLANNED_ARCHITECTURE_SEPARATE_FROM_IMPLEMENTED.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-RM-007",
+      "target": "DEC-015"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-008:Included-AI-FEAT-IDs",
+      "relationship": "implements",
+      "source": "AI-RM-008",
+      "target": "AI-FEAT-055"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-008:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-RM-008",
+      "target": "AI-RM-007"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-015_PLANNED_ARCHITECTURE_SEPARATE_FROM_IMPLEMENTED.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-RM-008",
+      "target": "DEC-015"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-009:Included-AI-FEAT-IDs",
+      "relationship": "implements",
+      "source": "AI-RM-009",
+      "target": "AI-FEAT-056"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-009:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-RM-009",
+      "target": "AI-RM-008"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-015_PLANNED_ARCHITECTURE_SEPARATE_FROM_IMPLEMENTED.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-RM-009",
+      "target": "DEC-015"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "related_to",
+      "source": "ARCH-a-established-adobe-bridge-workflow-pre-autoingest",
+      "target": "DEC-004"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "related_to",
+      "source": "ARCH-a-established-adobe-bridge-workflow-pre-autoingest",
+      "target": "DEC-014"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "related_to",
+      "source": "ARCH-b-initial-autoingest-foundation",
+      "target": "BUG-002"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "related_to",
+      "source": "ARCH-b-initial-autoingest-foundation",
+      "target": "DEC-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "related_to",
+      "source": "ARCH-b-initial-autoingest-foundation",
+      "target": "DEC-002"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "related_to",
+      "source": "ARCH-b-initial-autoingest-foundation",
+      "target": "DEC-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "related_to",
+      "source": "ARCH-c-metadata-automation",
+      "target": "BUG-007"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "related_to",
+      "source": "ARCH-c-metadata-automation",
+      "target": "BUG-008"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "related_to",
+      "source": "ARCH-c-metadata-automation",
+      "target": "BUG-009"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "related_to",
+      "source": "ARCH-c-metadata-automation",
+      "target": "BUG-010"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "related_to",
+      "source": "ARCH-c-metadata-automation",
+      "target": "DEC-006"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "related_to",
+      "source": "ARCH-c-metadata-automation",
+      "target": "DEC-007"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "related_to",
+      "source": "ARCH-c-metadata-automation",
+      "target": "DEC-008"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "related_to",
+      "source": "ARCH-c-metadata-automation",
+      "target": "DEC-009"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "related_to",
+      "source": "ARCH-c-metadata-automation",
+      "target": "PM-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "related_to",
+      "source": "ARCH-d-archive-integrity-and-transaction-safety",
+      "target": "BUG-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "related_to",
+      "source": "ARCH-d-archive-integrity-and-transaction-safety",
+      "target": "DEC-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "related_to",
+      "source": "ARCH-e-transfer-and-distributed-working",
+      "target": "BUG-004"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "related_to",
+      "source": "ARCH-e-transfer-and-distributed-working",
+      "target": "BUG-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "related_to",
+      "source": "ARCH-e-transfer-and-distributed-working",
+      "target": "DEC-010"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "related_to",
+      "source": "ARCH-e-transfer-and-distributed-working",
+      "target": "DEC-013"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "related_to",
+      "source": "ARCH-f-specialized-archival-workflows",
+      "target": "BUG-007"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "related_to",
+      "source": "ARCH-f-specialized-archival-workflows",
+      "target": "DEC-011"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "related_to",
+      "source": "ARCH-g-archive-operations-layer",
+      "target": "BUG-003"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "related_to",
+      "source": "ARCH-g-archive-operations-layer",
+      "target": "BUG-004"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "related_to",
+      "source": "ARCH-g-archive-operations-layer",
+      "target": "DEC-012"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "related_to",
+      "source": "ARCH-g-archive-operations-layer",
+      "target": "DEC-013"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
+      "relationship": "related_to",
+      "source": "ARCH-i-planned-architectural-direction",
+      "target": "DEC-015"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-002_PHOTOGRAPHER_SEQUENCE_FOLDER_RESOLUTION.md#related",
+      "relationship": "shaped_by_decision",
+      "source": "BUG-002",
+      "target": "DEC-012"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-003_STALE_LOCAL_STAGING_RESTORE_OVER_ARCHIVE_ROOT.md#related",
+      "relationship": "related_to",
+      "source": "BUG-003",
+      "target": "BUG-002"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-003_STALE_LOCAL_STAGING_RESTORE_OVER_ARCHIVE_ROOT.md#related",
+      "relationship": "shaped_by_decision",
+      "source": "BUG-003",
+      "target": "DEC-012"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-004_SAME_DEVICE_STALE_ARCHIVE_LOCK.md#related",
+      "relationship": "shaped_by_decision",
+      "source": "BUG-004",
+      "target": "DEC-013"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-005_TRANSFER_EXPORT_RESUME_STATE_DIVERGENCE.md#related",
+      "relationship": "related_to",
+      "source": "BUG-005",
+      "target": "BUG-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-006_EVENT_EDIT_FULL_PAYLOAD_FIELD_DROP.md#related",
+      "relationship": "shaped_by_decision",
+      "source": "BUG-006",
+      "target": "DEC-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-007_QMZ_METADATA_CONTEXT_SHAPE_MISMATCH.md#related",
+      "relationship": "related_to",
+      "source": "BUG-007",
+      "target": "BUG-008"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-007_QMZ_METADATA_CONTEXT_SHAPE_MISMATCH.md#related",
+      "relationship": "shaped_by_decision",
+      "source": "BUG-007",
+      "target": "DEC-007"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-008_LASTMETADATARUN_EISDIR_SILENT_FAILURE.md#related",
+      "relationship": "related_to",
+      "source": "BUG-008",
+      "target": "BUG-007"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-009_SAME_SIZE_SKIP_METADATA_UNVERIFIED.md#related",
+      "relationship": "related_to",
+      "source": "BUG-009",
+      "target": "BUG-010"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-009_SAME_SIZE_SKIP_METADATA_UNVERIFIED.md#related",
+      "relationship": "shaped_by_decision",
+      "source": "BUG-009",
+      "target": "DEC-009"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-010_METADATA_QUEUE_IN_MEMORY_LOSS_ON_CRASH.md#related",
+      "relationship": "related_to",
+      "source": "BUG-010",
+      "target": "BUG-009"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-010_METADATA_QUEUE_IN_MEMORY_LOSS_ON_CRASH.md#related",
+      "relationship": "shaped_by_decision",
+      "source": "BUG-010",
+      "target": "DEC-008"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "decision-to-decision body reference",
+      "provenance_path": "decisions/DEC-003_LOCAL_FIRST_ON_PREMISES_ARCHITECTURE.md#body",
+      "relationship": "related_to",
+      "source": "DEC-003",
+      "target": "DEC-012"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "decision-to-decision body reference",
+      "provenance_path": "decisions/DEC-004_PRESERVE_BRIDGE_BASED_ARCHIVAL_PRACTICE.md#body",
+      "relationship": "related_to",
+      "source": "DEC-004",
+      "target": "DEC-014"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "decision-to-decision body reference",
+      "provenance_path": "decisions/DEC-009_COPY_IDEMPOTENCY_MUST_NOT_SUPPRESS_METADATA_REPAIR.md#body",
+      "relationship": "related_to",
+      "source": "DEC-009",
+      "target": "DEC-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "decision-to-decision body reference",
+      "provenance_path": "decisions/DEC-014_CONTROLLED_KEYWORD_REGISTRY.md#body",
+      "relationship": "related_to",
+      "source": "DEC-014",
+      "target": "DEC-004"
+    }
+  ],
+  "nodes": [
+    {
+      "doc_path": "features/AI-FEAT-001_ELECTRON_APPLICATION_SHELL_SECURITY_MODEL.md",
+      "id": "AI-FEAT-001",
+      "label": "Electron Application Shell & Security Model",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-002_LOGIN_OPERATOR_IDENTITY.md",
+      "id": "AI-FEAT-002",
+      "label": "Login & Operator Identity",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-003_DASHBOARD_SYSTEM_STATUS.md",
+      "id": "AI-FEAT-003",
+      "label": "Dashboard & System Status",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-004_EVENT_JSON_DATA_MODEL_PERSISTENCE_CONTRACT.md",
+      "id": "AI-FEAT-004",
+      "label": "event.json Data Model & Persistence Contract",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-005_APPLICATION_SETTINGS_CONFIGURATION_STORE.md",
+      "id": "AI-FEAT-005",
+      "label": "Application Settings & Configuration Store",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-006_APPLICATION_AUTO_UPDATE.md",
+      "id": "AI-FEAT-006",
+      "label": "Application Auto-Update",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-007_TELEMETRY_PIPELINE.md",
+      "id": "AI-FEAT-007",
+      "label": "Telemetry Pipeline",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-008_DESIGN_SYSTEM_UI_CONSISTENCY_FRAMEWORK.md",
+      "id": "AI-FEAT-008",
+      "label": "Design System & UI Consistency Framework",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-009_EVENT_CREATION.md",
+      "id": "AI-FEAT-009",
+      "label": "Event Creation",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-010_EVENT_MANAGEMENT_EDITING.md",
+      "id": "AI-FEAT-010",
+      "label": "Event Management & Editing",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-011_SOURCE_DETECTION.md",
+      "id": "AI-FEAT-011",
+      "label": "Source Detection (Drives, DCIM, Sony PRIVATE)",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-012_SOURCE_SELECTION.md",
+      "id": "AI-FEAT-012",
+      "label": "Source Selection (Local Folder / External Drive)",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-013_FILE_BROWSER_MEDIA_GRID_LIST_VIEWING.md",
+      "id": "AI-FEAT-013",
+      "label": "File Browser & Media Grid/List Viewing",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-014_THUMBNAIL_GENERATION_CACHING.md",
+      "id": "AI-FEAT-014",
+      "label": "Thumbnail Generation & Caching",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-015_MEDIA_PREVIEW.md",
+      "id": "AI-FEAT-015",
+      "label": "Media Preview",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-016_PREVIEW_FOCUS_SELECTION_SEPARATION.md",
+      "id": "AI-FEAT-016",
+      "label": "Preview Focus / Selection Separation",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-017_GROUPING_SYSTEM.md",
+      "id": "AI-FEAT-017",
+      "label": "Grouping System",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-018_EVENT_COMPONENT_IMPORT_ROUTING.md",
+      "id": "AI-FEAT-018",
+      "label": "Event-Component Import Routing",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-019_IMPORT_PIPELINE_COPY_ENGINE.md",
+      "id": "AI-FEAT-019",
+      "label": "Import Pipeline & Copy Engine",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-020_DUPLICATE_DETECTION.md",
+      "id": "AI-FEAT-020",
+      "label": "Duplicate Detection",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-021_ATOMIC_IMPORT_TRANSACTION.md",
+      "id": "AI-FEAT-021",
+      "label": "Atomic Import Transaction",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-022_PHOTOGRAPHER_FOLDER_RESOLUTION.md",
+      "id": "AI-FEAT-022",
+      "label": "Photographer-Folder Resolution",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-023_QUICK_IMPORT.md",
+      "id": "AI-FEAT-023",
+      "label": "Quick Import",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-024_SOURCE_CLEANUP.md",
+      "id": "AI-FEAT-024",
+      "label": "Source Cleanup",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-025_CHECKSUM_BASED_FILE_VERIFICATION.md",
+      "id": "AI-FEAT-025",
+      "label": "Checksum-Based File Verification",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-026_AUDIT_INTEGRITY_VERIFICATION.md",
+      "id": "AI-FEAT-026",
+      "label": "Audit Integrity Verification (Count-Based)",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-027_ACTIVITY_LOG.md",
+      "id": "AI-FEAT-027",
+      "label": "Activity Log",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-028_IMPORT_SOURCE_ATTRIBUTION.md",
+      "id": "AI-FEAT-028",
+      "label": "Import Source Attribution",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-029_METADATA_WRITING_ENGINE.md",
+      "id": "AI-FEAT-029",
+      "label": "Metadata Writing Engine",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-030_METADATA_DURABLE_QUEUE_CRASH_RECOVERY.md",
+      "id": "AI-FEAT-030",
+      "label": "Metadata Durable Queue & Crash Recovery",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-031_METADATA_EVENT_STATE_DERIVATION.md",
+      "id": "AI-FEAT-031",
+      "label": "Metadata Event-State Derivation",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-032_METADATA_VERIFICATION.md",
+      "id": "AI-FEAT-032",
+      "label": "Metadata Verification",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-033_METADATA_AUDIT_REPAIR.md",
+      "id": "AI-FEAT-033",
+      "label": "Metadata Audit & Repair",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-034_METADATA_MANAGEMENT_MODAL.md",
+      "id": "AI-FEAT-034",
+      "label": "Metadata Management Modal",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-035_DASHBOARD_METADATA_HEALTH.md",
+      "id": "AI-FEAT-035",
+      "label": "Dashboard Metadata Health",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-036_KEYWORD_REGISTRY.md",
+      "id": "AI-FEAT-036",
+      "label": "Keyword Registry",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-037_METADATA_REAPPLY_SYNC.md",
+      "id": "AI-FEAT-037",
+      "label": "Metadata Reapply / Sync",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-038_TRANSFER_EXPORT.md",
+      "id": "AI-FEAT-038",
+      "label": "Transfer Export",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-039_TRANSFER_IMPORT.md",
+      "id": "AI-FEAT-039",
+      "label": "Transfer Import",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-040_BACKUP_UPDATE_SCANNING.md",
+      "id": "AI-FEAT-040",
+      "label": "Backup Update Scanning",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-041_TRANSFER_BACKGROUND_MINIMIZE_OPERATION.md",
+      "id": "AI-FEAT-041",
+      "label": "Transfer Background/Minimize Operation",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-042_ARCHIVE_ROOT_CONFIGURATION_RESOLUTION.md",
+      "id": "AI-FEAT-042",
+      "label": "Archive Root Configuration & Resolution",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-043_ARCHIVE_HEALTH_REPORTING.md",
+      "id": "AI-FEAT-043",
+      "label": "Archive Health Reporting",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-044_LOCAL_FIRST_BACKGROUND_ARCHIVE_SYNC.md",
+      "id": "AI-FEAT-044",
+      "label": "Local-First Background Archive Sync",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-045_ARCHIVE_LOCK_HANDLING_STALE_LOCK_RECOVERY.md",
+      "id": "AI-FEAT-045",
+      "label": "Archive Lock Handling & Stale-Lock Recovery",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-046_ARCHIVE_FOLDER_ADOPTION.md",
+      "id": "AI-FEAT-046",
+      "label": "Archive Folder Adoption",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-047_QMZ_SEQUENCING_WORKSPACE.md",
+      "id": "AI-FEAT-047",
+      "label": "QMZ Sequencing Workspace",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-048_REALTIME_TEAM_PRESENCE_ONLINE_REGISTRY.md",
+      "id": "AI-FEAT-048",
+      "label": "Realtime Team Presence & Online Registry",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-049_ARCHIVE_MAINTENANCE.md",
+      "id": "AI-FEAT-049",
+      "label": "Archive Maintenance",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-050_EVENT_MAINTENANCE.md",
+      "id": "AI-FEAT-050",
+      "label": "Event Maintenance",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-051_ARCHIVE_BROWSER.md",
+      "id": "AI-FEAT-051",
+      "label": "Archive Browser",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-052_ARCHIVE_REPAIR.md",
+      "id": "AI-FEAT-052",
+      "label": "Archive Repair",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-053_GLOBAL_SEARCH.md",
+      "id": "AI-FEAT-053",
+      "label": "Global Search",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-054_INTEGRITY_VERIFICATION_ARCHIVE_WIDE.md",
+      "id": "AI-FEAT-054",
+      "label": "Integrity Verification — Archive-Wide",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-055_ARCHIVE_ANALYTICS.md",
+      "id": "AI-FEAT-055",
+      "label": "Archive Analytics",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-056_AI_ARCHIVE_INTELLIGENCE.md",
+      "id": "AI-FEAT-056",
+      "label": "AI Archive Intelligence",
+      "type": "feature"
+    },
+    {
+      "doc_path": "02_MASTER_ROADMAP.md",
+      "id": "AI-RM-001",
+      "label": "Metadata Audit & Repair",
+      "type": "milestone"
+    },
+    {
+      "doc_path": "02_MASTER_ROADMAP.md",
+      "id": "AI-RM-002",
+      "label": "Archive Maintenance",
+      "type": "milestone"
+    },
+    {
+      "doc_path": "02_MASTER_ROADMAP.md",
+      "id": "AI-RM-003",
+      "label": "Event Maintenance",
+      "type": "milestone"
+    },
+    {
+      "doc_path": "02_MASTER_ROADMAP.md",
+      "id": "AI-RM-004",
+      "label": "Archive Browser",
+      "type": "milestone"
+    },
+    {
+      "doc_path": "02_MASTER_ROADMAP.md",
+      "id": "AI-RM-005",
+      "label": "Global Search",
+      "type": "milestone"
+    },
+    {
+      "doc_path": "02_MASTER_ROADMAP.md",
+      "id": "AI-RM-006",
+      "label": "Integrity Verification",
+      "type": "milestone"
+    },
+    {
+      "doc_path": "02_MASTER_ROADMAP.md",
+      "id": "AI-RM-007",
+      "label": "Archive Repair",
+      "type": "milestone"
+    },
+    {
+      "doc_path": "02_MASTER_ROADMAP.md",
+      "id": "AI-RM-008",
+      "label": "Archive Analytics",
+      "type": "milestone"
+    },
+    {
+      "doc_path": "02_MASTER_ROADMAP.md",
+      "id": "AI-RM-009",
+      "label": "AI Archive Intelligence",
+      "type": "milestone"
+    },
+    {
+      "doc_path": "11_ARCHITECTURAL_EVOLUTION.md#a-established-adobe-bridge-workflow-pre-autoingest",
+      "id": "ARCH-a-established-adobe-bridge-workflow-pre-autoingest",
+      "label": "A. Established Adobe Bridge Workflow (pre-AutoIngest)",
+      "type": "architecture_section"
+    },
+    {
+      "doc_path": "11_ARCHITECTURAL_EVOLUTION.md#b-initial-autoingest-foundation",
+      "id": "ARCH-b-initial-autoingest-foundation",
+      "label": "B. Initial AutoIngest Foundation",
+      "type": "architecture_section"
+    },
+    {
+      "doc_path": "11_ARCHITECTURAL_EVOLUTION.md#c-metadata-automation",
+      "id": "ARCH-c-metadata-automation",
+      "label": "C. Metadata Automation",
+      "type": "architecture_section"
+    },
+    {
+      "doc_path": "11_ARCHITECTURAL_EVOLUTION.md#d-archive-integrity-and-transaction-safety",
+      "id": "ARCH-d-archive-integrity-and-transaction-safety",
+      "label": "D. Archive Integrity and Transaction Safety",
+      "type": "architecture_section"
+    },
+    {
+      "doc_path": "11_ARCHITECTURAL_EVOLUTION.md#e-transfer-and-distributed-working",
+      "id": "ARCH-e-transfer-and-distributed-working",
+      "label": "E. Transfer and Distributed Working",
+      "type": "architecture_section"
+    },
+    {
+      "doc_path": "11_ARCHITECTURAL_EVOLUTION.md#f-specialized-archival-workflows",
+      "id": "ARCH-f-specialized-archival-workflows",
+      "label": "F. Specialized Archival Workflows",
+      "type": "architecture_section"
+    },
+    {
+      "doc_path": "11_ARCHITECTURAL_EVOLUTION.md#g-archive-operations-layer",
+      "id": "ARCH-g-archive-operations-layer",
+      "label": "G. Archive Operations Layer",
+      "type": "architecture_section"
+    },
+    {
+      "doc_path": "11_ARCHITECTURAL_EVOLUTION.md#h-current-architectural-position",
+      "id": "ARCH-h-current-architectural-position",
+      "label": "H. Current Architectural Position",
+      "type": "architecture_section"
+    },
+    {
+      "doc_path": "11_ARCHITECTURAL_EVOLUTION.md#i-planned-architectural-direction",
+      "id": "ARCH-i-planned-architectural-direction",
+      "label": "I. Planned Architectural Direction",
+      "type": "architecture_section"
+    },
+    {
+      "doc_path": "bugs/BUG-001_SOURCE_CLEANUP_POST_IMPORT_STATE_OWNERSHIP.md",
+      "id": "BUG-001",
+      "label": "Source Cleanup / Post-Import State Ownership Race",
+      "type": "bug"
+    },
+    {
+      "doc_path": "bugs/BUG-002_PHOTOGRAPHER_SEQUENCE_FOLDER_RESOLUTION.md",
+      "id": "BUG-002",
+      "label": "Photographer Sequence Folder Resolution Discards Existing Sequenced Folders",
+      "type": "bug"
+    },
+    {
+      "doc_path": "bugs/BUG-003_STALE_LOCAL_STAGING_RESTORE_OVER_ARCHIVE_ROOT.md",
+      "id": "BUG-003",
+      "label": "Stale Local-Staging Restore Wins Over Reachable Archive Root",
+      "type": "bug"
+    },
+    {
+      "doc_path": "bugs/BUG-004_SAME_DEVICE_STALE_ARCHIVE_LOCK.md",
+      "id": "BUG-004",
+      "label": "Same-Device Stale Archive Lock Blocks All Future Imports",
+      "type": "bug"
+    },
+    {
+      "doc_path": "bugs/BUG-005_TRANSFER_EXPORT_RESUME_STATE_DIVERGENCE.md",
+      "id": "BUG-005",
+      "label": "Transfer Export/Backup-Update Resume State Diverges From Backend Progress",
+      "type": "bug"
+    },
+    {
+      "doc_path": "bugs/BUG-006_EVENT_EDIT_FULL_PAYLOAD_FIELD_DROP.md",
+      "id": "BUG-006",
+      "label": "Event-Edit Full-Payload Save Silently Drops Untracked Fields",
+      "type": "bug"
+    },
+    {
+      "doc_path": "bugs/BUG-007_QMZ_METADATA_CONTEXT_SHAPE_MISMATCH.md",
+      "id": "BUG-007",
+      "label": "QMZ Metadata Context-Shape Mismatch Silently Drops Keywords/Hijri Date",
+      "type": "bug"
+    },
+    {
+      "doc_path": "bugs/BUG-008_LASTMETADATARUN_EISDIR_SILENT_FAILURE.md",
+      "id": "BUG-008",
+      "label": "lastMetadataRun Never Written Due to EISDIR Silent Failure",
+      "type": "bug"
+    },
+    {
+      "doc_path": "bugs/BUG-009_SAME_SIZE_SKIP_METADATA_UNVERIFIED.md",
+      "id": "BUG-009",
+      "label": "Same-Size Skip Left Metadata Unverified",
+      "type": "bug"
+    },
+    {
+      "doc_path": "bugs/BUG-010_METADATA_QUEUE_IN_MEMORY_LOSS_ON_CRASH.md",
+      "id": "BUG-010",
+      "label": "Metadata Batches Held Only In-Memory, Lost on Crash/Restart",
+      "type": "bug"
+    },
+    {
+      "doc_path": "decisions/DEC-001_EVENT_DATA_AS_DURABLE_ARCHIVE_TRUTH.md",
+      "id": "DEC-001",
+      "label": "Event Data as Durable Archive Truth",
+      "type": "decision"
+    },
+    {
+      "doc_path": "decisions/DEC-002_FOLDER_STRUCTURE_PLUS_EMBEDDED_METADATA.md",
+      "id": "DEC-002",
+      "label": "Folder Structure Plus Embedded Metadata",
+      "type": "decision"
+    },
+    {
+      "doc_path": "decisions/DEC-003_LOCAL_FIRST_ON_PREMISES_ARCHITECTURE.md",
+      "id": "DEC-003",
+      "label": "Local-First and On-Premises Architecture",
+      "type": "decision"
+    },
+    {
+      "doc_path": "decisions/DEC-004_PRESERVE_BRIDGE_BASED_ARCHIVAL_PRACTICE.md",
+      "id": "DEC-004",
+      "label": "Preserve Established Bridge-Based Archival Practice",
+      "type": "decision"
+    },
+    {
+      "doc_path": "decisions/DEC-005_ORIGINAL_PRESERVATION_NON_DESTRUCTIVE_INGEST.md",
+      "id": "DEC-005",
+      "label": "Original Preservation and Non-Destructive Ingest",
+      "type": "decision"
+    },
+    {
+      "doc_path": "decisions/DEC-006_RAW_FILES_USE_XMP_SIDECARS.md",
+      "id": "DEC-006",
+      "label": "RAW Files Use XMP Sidecars",
+      "type": "decision"
+    },
+    {
+      "doc_path": "decisions/DEC-007_SHARED_METADATA_ENGINE_RESOLVER.md",
+      "id": "DEC-007",
+      "label": "Metadata Uses One Shared Engine/Resolver",
+      "type": "decision"
+    },
+    {
+      "doc_path": "decisions/DEC-008_DURABLE_METADATA_SURVIVES_RESTART.md",
+      "id": "DEC-008",
+      "label": "Durable Metadata Work Survives Restart",
+      "type": "decision"
+    },
+    {
+      "doc_path": "decisions/DEC-009_COPY_IDEMPOTENCY_MUST_NOT_SUPPRESS_METADATA_REPAIR.md",
+      "id": "DEC-009",
+      "label": "Copy Idempotency Must Not Suppress Metadata Repair",
+      "type": "decision"
+    },
+    {
+      "doc_path": "decisions/DEC-010_TRANSFER_UPDATE_MISSING_FILES_ONLY.md",
+      "id": "DEC-010",
+      "label": "Transfer Update Is Missing-Files-Only",
+      "type": "decision"
+    },
+    {
+      "doc_path": "decisions/DEC-011_QMZ_DEDICATED_DOMAIN_WORKFLOW.md",
+      "id": "DEC-011",
+      "label": "QMZ Requires a Dedicated Domain Workflow",
+      "type": "decision"
+    },
+    {
+      "doc_path": "decisions/DEC-012_ARCHIVE_ROOT_RESOLUTION_REQUIRES_EVIDENCE.md",
+      "id": "DEC-012",
+      "label": "Archive Root Resolution Requires Evidence",
+      "type": "decision"
+    },
+    {
+      "doc_path": "decisions/DEC-013_LOCK_CLEARING_MUST_BE_CONSTRAINED.md",
+      "id": "DEC-013",
+      "label": "Lock Clearing Must Be Constrained",
+      "type": "decision"
+    },
+    {
+      "doc_path": "decisions/DEC-014_CONTROLLED_KEYWORD_REGISTRY.md",
+      "id": "DEC-014",
+      "label": "Controlled Keyword Registry",
+      "type": "decision"
+    },
+    {
+      "doc_path": "decisions/DEC-015_PLANNED_ARCHITECTURE_SEPARATE_FROM_IMPLEMENTED.md",
+      "id": "DEC-015",
+      "label": "Planned Architecture Remains Separate From Implemented Behaviour",
+      "type": "decision"
+    },
+    {
+      "doc_path": "postmortems/PM-001_METADATA_CORRECTNESS_GAP_PRODUCTION_READINESS_REVIEW.md",
+      "id": "PM-001",
+      "label": "Metadata Correctness Gap Found in Production-Readiness Review",
+      "type": "postmortem"
+    }
+  ],
+  "schema_version": "1.0.0"
+}

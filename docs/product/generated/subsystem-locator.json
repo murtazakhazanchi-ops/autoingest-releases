@@ -1,0 +1,631 @@
+{
+  "docsys_version": "1.0.0",
+  "schema_version": "1.0.0",
+  "subsystems": [
+    {
+      "aliases": [
+        "electron shell",
+        "security model",
+        "settings store",
+        "auto-update",
+        "telemetry"
+      ],
+      "canonicalProductDoc": "docs/product/01_FEATURE_REGISTRY.md",
+      "canonicalTechnicalDocs": [
+        "CLAUDE.md § Security Model",
+        "docs/README.md § Security Model",
+        "docs/data-model.md",
+        "docs/event-system.md",
+        "docs/features.md #7 \"UI Dashboard\"",
+        "docs/history.md v0.8.1",
+        "docs/system-contracts.md §1-2",
+        "docs/ui-system.md § Dashboard"
+      ],
+      "changeImpactChecklist": [
+        "Re-read the Related Files section of every primary feature listed above before changing shared source files.",
+        "Check relatedBugs/relatedDecisions for constraints before altering resolver or write-path behavior.",
+        "Run: node scripts/product-docs/cli.js impact <changed-file-path> to confirm ownership before editing."
+      ],
+      "id": "SUBSYS-application-platform",
+      "name": "Application Platform",
+      "primaryFeatures": [
+        "AI-FEAT-001",
+        "AI-FEAT-002",
+        "AI-FEAT-003",
+        "AI-FEAT-004",
+        "AI-FEAT-005",
+        "AI-FEAT-006",
+        "AI-FEAT-007"
+      ],
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "sourceDirectories": [
+        "main",
+        "renderer",
+        "services"
+      ],
+      "sourceFiles": [
+        "main/eventJsonStore.js",
+        "main/main.js",
+        "main/preload.js",
+        "main/userManager.js",
+        "renderer/renderer.js",
+        "renderer/splash.html",
+        "renderer/theme-init.js",
+        "services/autoUpdater.js",
+        "services/settings.js",
+        "services/telemetry.js"
+      ]
+    },
+    {
+      "aliases": [
+        "design system",
+        "ui consistency"
+      ],
+      "canonicalProductDoc": "docs/product/01_FEATURE_REGISTRY.md",
+      "canonicalTechnicalDocs": [
+        "docs/design-system.md",
+        "docs/ui-system.md"
+      ],
+      "changeImpactChecklist": [
+        "Re-read the Related Files section of every primary feature listed above before changing shared source files.",
+        "Check relatedBugs/relatedDecisions for constraints before altering resolver or write-path behavior.",
+        "Run: node scripts/product-docs/cli.js impact <changed-file-path> to confirm ownership before editing."
+      ],
+      "id": "SUBSYS-product-ui",
+      "name": "Product UI",
+      "primaryFeatures": [
+        "AI-FEAT-008"
+      ],
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "sourceDirectories": [
+        "renderer"
+      ],
+      "sourceFiles": [
+        "renderer/index.html"
+      ]
+    },
+    {
+      "aliases": [
+        "event creation",
+        "event editing",
+        "event.json"
+      ],
+      "canonicalProductDoc": "docs/product/01_FEATURE_REGISTRY.md",
+      "canonicalTechnicalDocs": [
+        "#12",
+        "docs/event-system.md § Editing",
+        "docs/event-system.md § EventCreator",
+        "docs/failure-patterns.md #1",
+        "docs/features.md #4"
+      ],
+      "changeImpactChecklist": [
+        "Re-read the Related Files section of every primary feature listed above before changing shared source files.",
+        "Check relatedBugs/relatedDecisions for constraints before altering resolver or write-path behavior.",
+        "Run: node scripts/product-docs/cli.js impact <changed-file-path> to confirm ownership before editing."
+      ],
+      "id": "SUBSYS-event-management",
+      "name": "Event Management",
+      "primaryFeatures": [
+        "AI-FEAT-009",
+        "AI-FEAT-010"
+      ],
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "sourceDirectories": [
+        "renderer"
+      ],
+      "sourceFiles": [
+        "renderer/eventCreator.js",
+        "renderer/eventMgmt.js",
+        "renderer/folderNameHelper.js",
+        "renderer/treeAutocomplete.js"
+      ]
+    },
+    {
+      "aliases": [
+        "source detection",
+        "source selection",
+        "memory card",
+        "external drive",
+        "dcim"
+      ],
+      "canonicalProductDoc": "docs/product/01_FEATURE_REGISTRY.md",
+      "canonicalTechnicalDocs": [
+        "docs/architecture.md § Drive Detection",
+        "docs/failure-patterns.md #16",
+        "docs/system-contracts.md §4"
+      ],
+      "changeImpactChecklist": [
+        "Re-read the Related Files section of every primary feature listed above before changing shared source files.",
+        "Check relatedBugs/relatedDecisions for constraints before altering resolver or write-path behavior.",
+        "Run: node scripts/product-docs/cli.js impact <changed-file-path> to confirm ownership before editing."
+      ],
+      "id": "SUBSYS-source-acquisition",
+      "name": "Source Acquisition",
+      "primaryFeatures": [
+        "AI-FEAT-011",
+        "AI-FEAT-012"
+      ],
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "sourceDirectories": [
+        "main",
+        "renderer"
+      ],
+      "sourceFiles": [
+        "main/driveDetector.js",
+        "main/fileBrowser.js",
+        "renderer/renderer.js"
+      ]
+    },
+    {
+      "aliases": [
+        "file browser",
+        "thumbnail",
+        "media preview",
+        "media grid"
+      ],
+      "canonicalProductDoc": "docs/product/01_FEATURE_REGISTRY.md",
+      "canonicalTechnicalDocs": [
+        "docs/features.md #12",
+        "docs/features.md #13",
+        "docs/features.md #2",
+        "docs/ui-system.md § File Panel",
+        "docs/ui-system.md § Selection System"
+      ],
+      "changeImpactChecklist": [
+        "Re-read the Related Files section of every primary feature listed above before changing shared source files.",
+        "Check relatedBugs/relatedDecisions for constraints before altering resolver or write-path behavior.",
+        "Run: node scripts/product-docs/cli.js impact <changed-file-path> to confirm ownership before editing."
+      ],
+      "id": "SUBSYS-media-browsing",
+      "name": "Media Browsing",
+      "primaryFeatures": [
+        "AI-FEAT-013",
+        "AI-FEAT-014",
+        "AI-FEAT-015",
+        "AI-FEAT-016"
+      ],
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "sourceDirectories": [
+        "main",
+        "renderer",
+        "services"
+      ],
+      "sourceFiles": [
+        "main/fileBrowser.js",
+        "main/rawPreviewService.js",
+        "main/videoThumbService.js",
+        "renderer/renderer.js",
+        "services/thumbnailCache.js"
+      ]
+    },
+    {
+      "aliases": [
+        "grouping",
+        "group manager",
+        "import routing"
+      ],
+      "canonicalProductDoc": "docs/product/01_FEATURE_REGISTRY.md",
+      "canonicalTechnicalDocs": [
+        "docs/event-system.md § Routing Relationship",
+        "docs/features.md #3",
+        "docs/group-manager.md",
+        "docs/ingestion-flow.md § Routing"
+      ],
+      "changeImpactChecklist": [
+        "Re-read the Related Files section of every primary feature listed above before changing shared source files.",
+        "Check relatedBugs/relatedDecisions for constraints before altering resolver or write-path behavior.",
+        "Run: node scripts/product-docs/cli.js impact <changed-file-path> to confirm ownership before editing."
+      ],
+      "id": "SUBSYS-grouping-and-routing",
+      "name": "Grouping and Routing",
+      "primaryFeatures": [
+        "AI-FEAT-017",
+        "AI-FEAT-018"
+      ],
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "sourceDirectories": [
+        "renderer"
+      ],
+      "sourceFiles": [
+        "renderer/groupManager.js",
+        "renderer/importRouter.js"
+      ]
+    },
+    {
+      "aliases": [
+        "import pipeline",
+        "copy engine",
+        "duplicate detection",
+        "atomic import",
+        "photographer folder",
+        "quick import",
+        "source cleanup",
+        "checksum verification",
+        "audit integrity",
+        "activity log"
+      ],
+      "canonicalProductDoc": "docs/product/01_FEATURE_REGISTRY.md",
+      "canonicalTechnicalDocs": [
+        "CLAUDE.md § Transactional Ingest Layer",
+        "docs/data-model.md § Import Entry Schema",
+        "docs/failure-patterns.md #12",
+        "docs/failure-patterns.md #16",
+        "docs/features.md #10",
+        "docs/features.md #11",
+        "docs/features.md #5",
+        "docs/features.md #6",
+        "docs/features.md #8",
+        "docs/features.md #9",
+        "docs/ingestion-flow.md",
+        "docs/ingestion-flow.md § Duplicate Handling",
+        "docs/metadata-system.md § Non-Goals",
+        "docs/system-contracts.md §13",
+        "docs/system-contracts.md §4",
+        "docs/system-contracts.md §4-5"
+      ],
+      "changeImpactChecklist": [
+        "Re-read the Related Files section of every primary feature listed above before changing shared source files.",
+        "Check relatedBugs/relatedDecisions for constraints before altering resolver or write-path behavior.",
+        "Run: node scripts/product-docs/cli.js impact <changed-file-path> to confirm ownership before editing."
+      ],
+      "id": "SUBSYS-import-and-archive-writing",
+      "name": "Import and Archive Writing",
+      "primaryFeatures": [
+        "AI-FEAT-019",
+        "AI-FEAT-020",
+        "AI-FEAT-021",
+        "AI-FEAT-022",
+        "AI-FEAT-023",
+        "AI-FEAT-024",
+        "AI-FEAT-025",
+        "AI-FEAT-026",
+        "AI-FEAT-027",
+        "AI-FEAT-028"
+      ],
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "sourceDirectories": [
+        "main",
+        "renderer",
+        "services"
+      ],
+      "sourceFiles": [
+        "main/eventJsonStore.js",
+        "main/fileManager.js",
+        "main/main.js",
+        "renderer/renderer.js",
+        "services/photographerSequenceService.js"
+      ]
+    },
+    {
+      "aliases": [
+        "metadata writing",
+        "exif",
+        "iptc",
+        "xmp",
+        "xmp sidecars",
+        "raw metadata",
+        "metadata queue",
+        "metadata audit",
+        "metadata repair",
+        "metadata audit repair",
+        "keyword registry",
+        "metadata reapply",
+        "metadata sync",
+        "metadata verification"
+      ],
+      "canonicalProductDoc": "docs/product/01_FEATURE_REGISTRY.md",
+      "canonicalTechnicalDocs": [
+        "docs/features.md #15",
+        "docs/metadata-system.md",
+        "docs/metadata-system.md § Durable Queue Storage and Recovery Behavior",
+        "docs/metadata-system.md § Event-Level Metadata State",
+        "docs/metadata-system.md § Import Path Coverage",
+        "docs/metadata-system.md § Metadata Audit",
+        "§ Repair"
+      ],
+      "changeImpactChecklist": [
+        "Re-read the Related Files section of every primary feature listed above before changing shared source files.",
+        "Check relatedBugs/relatedDecisions for constraints before altering resolver or write-path behavior.",
+        "Run: node scripts/product-docs/cli.js impact <changed-file-path> to confirm ownership before editing."
+      ],
+      "id": "SUBSYS-metadata",
+      "name": "Metadata",
+      "primaryFeatures": [
+        "AI-FEAT-029",
+        "AI-FEAT-030",
+        "AI-FEAT-031",
+        "AI-FEAT-032",
+        "AI-FEAT-033",
+        "AI-FEAT-034",
+        "AI-FEAT-035",
+        "AI-FEAT-036",
+        "AI-FEAT-037"
+      ],
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "sourceDirectories": [
+        "data",
+        "main",
+        "renderer",
+        "services",
+        "test"
+      ],
+      "sourceFiles": [
+        "data/keywords.registry.json",
+        "main/eventJsonStore.js",
+        "main/exifService.js",
+        "main/main.js",
+        "main/metadataQueueRecovery.js",
+        "main/metadataQueueStore.js",
+        "main/metadataRepairService.js",
+        "main/metadataStateService.js",
+        "main/metadataSyncService.js",
+        "main/metadataVerificationService.js",
+        "renderer/index.html",
+        "renderer/renderer.js",
+        "services/metadataAuditExport.js",
+        "services/metadataAuditService.js",
+        "services/metadataExpectationService.js",
+        "test/dashboardMetadataHealthCard.test.js",
+        "test/metadataManagementModalUI.test.js"
+      ]
+    },
+    {
+      "aliases": [
+        "transfer export",
+        "transfer import",
+        "backup update",
+        "transfer background"
+      ],
+      "canonicalProductDoc": "docs/product/01_FEATURE_REGISTRY.md",
+      "canonicalTechnicalDocs": [
+        "docs/archive-operations-layer.md § Transfer Workflow"
+      ],
+      "changeImpactChecklist": [
+        "Re-read the Related Files section of every primary feature listed above before changing shared source files.",
+        "Check relatedBugs/relatedDecisions for constraints before altering resolver or write-path behavior.",
+        "Run: node scripts/product-docs/cli.js impact <changed-file-path> to confirm ownership before editing."
+      ],
+      "id": "SUBSYS-transfer-and-backup",
+      "name": "Transfer and Backup",
+      "primaryFeatures": [
+        "AI-FEAT-038",
+        "AI-FEAT-039",
+        "AI-FEAT-040",
+        "AI-FEAT-041"
+      ],
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "sourceDirectories": [
+        "renderer",
+        "services",
+        "test"
+      ],
+      "sourceFiles": [
+        "renderer/index.html",
+        "services/transferExportService.js",
+        "services/transferImportService.js",
+        "test/transferImportOutcomeManifest.test.js"
+      ]
+    },
+    {
+      "aliases": [
+        "archive root",
+        "archive root resolution",
+        "archive health",
+        "local-first sync",
+        "stale locks",
+        "lock handling",
+        "archive folder adoption"
+      ],
+      "canonicalProductDoc": "docs/product/01_FEATURE_REGISTRY.md",
+      "canonicalTechnicalDocs": [
+        "13D-2",
+        "13D-4",
+        "13D-5)",
+        "docs/archive-adoption-contract.md",
+        "docs/archive-adoption-workflow.md",
+        "docs/archive-operations-layer.md § Direct Archive",
+        "docs/archive-operations-layer.md § Local First",
+        "docs/archive-operations-layer.md § Reporting Layer (Phases 13D-1",
+        "docs/archive-operations-layer.md § Three-Root Model",
+        "§ Safety Guarantees"
+      ],
+      "changeImpactChecklist": [
+        "Re-read the Related Files section of every primary feature listed above before changing shared source files.",
+        "Check relatedBugs/relatedDecisions for constraints before altering resolver or write-path behavior.",
+        "Run: node scripts/product-docs/cli.js impact <changed-file-path> to confirm ownership before editing."
+      ],
+      "id": "SUBSYS-archive-operations",
+      "name": "Archive Operations",
+      "primaryFeatures": [
+        "AI-FEAT-042",
+        "AI-FEAT-043",
+        "AI-FEAT-044",
+        "AI-FEAT-045",
+        "AI-FEAT-046"
+      ],
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "sourceDirectories": [
+        "services"
+      ],
+      "sourceFiles": [
+        "services/adoptionDryRunService.js",
+        "services/adoptionPreviewService.js",
+        "services/adoptionWriteContract.js",
+        "services/adoptionWriteService.js",
+        "services/archiveConsistencyService.js",
+        "services/archiveLockService.js",
+        "services/archiveSyncService.js",
+        "services/localSyncManifest.js",
+        "services/nasEventCache.js",
+        "services/offlineCollectionRegistryService.js",
+        "services/settings.js",
+        "services/syncQueueService.js",
+        "services/syncReviewService.js"
+      ]
+    },
+    {
+      "aliases": [
+        "qmz",
+        "qmz sequencing"
+      ],
+      "canonicalProductDoc": "docs/product/01_FEATURE_REGISTRY.md",
+      "canonicalTechnicalDocs": [
+        "docs/metadata-system.md § Import Path Coverage"
+      ],
+      "changeImpactChecklist": [
+        "Re-read the Related Files section of every primary feature listed above before changing shared source files.",
+        "Check relatedBugs/relatedDecisions for constraints before altering resolver or write-path behavior.",
+        "Run: node scripts/product-docs/cli.js impact <changed-file-path> to confirm ownership before editing."
+      ],
+      "id": "SUBSYS-special-workflows",
+      "name": "Special Workflows",
+      "primaryFeatures": [
+        "AI-FEAT-047"
+      ],
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "sourceDirectories": [
+        "main",
+        "renderer",
+        "test"
+      ],
+      "sourceFiles": [
+        "main/qmzService.js",
+        "renderer/renderer.js",
+        "test/qmzLiveE2E.test.js"
+      ]
+    },
+    {
+      "aliases": [
+        "realtime presence",
+        "team presence",
+        "online registry"
+      ],
+      "canonicalProductDoc": "docs/product/01_FEATURE_REGISTRY.md",
+      "canonicalTechnicalDocs": [
+        "realtime-server/README.md"
+      ],
+      "changeImpactChecklist": [
+        "Re-read the Related Files section of every primary feature listed above before changing shared source files.",
+        "Check relatedBugs/relatedDecisions for constraints before altering resolver or write-path behavior.",
+        "Run: node scripts/product-docs/cli.js impact <changed-file-path> to confirm ownership before editing."
+      ],
+      "id": "SUBSYS-collaboration-and-realtime-coordination",
+      "name": "Collaboration and Realtime Coordination",
+      "primaryFeatures": [
+        "AI-FEAT-048"
+      ],
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "sourceDirectories": [
+        "realtime-server/",
+        "services"
+      ],
+      "sourceFiles": [
+        "realtime-server/",
+        "services/offlineCollectionRegistryService.js",
+        "services/realtimeOperationsService.js"
+      ]
+    },
+    {
+      "aliases": [
+        "archive maintenance",
+        "event maintenance"
+      ],
+      "canonicalProductDoc": "docs/product/01_FEATURE_REGISTRY.md",
+      "canonicalTechnicalDocs": [],
+      "changeImpactChecklist": [
+        "Re-read the Related Files section of every primary feature listed above before changing shared source files.",
+        "Check relatedBugs/relatedDecisions for constraints before altering resolver or write-path behavior.",
+        "Run: node scripts/product-docs/cli.js impact <changed-file-path> to confirm ownership before editing."
+      ],
+      "id": "SUBSYS-planned-archive-management",
+      "name": "Planned Archive Management",
+      "primaryFeatures": [
+        "AI-FEAT-049",
+        "AI-FEAT-050",
+        "AI-FEAT-051",
+        "AI-FEAT-052"
+      ],
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "sourceDirectories": [],
+      "sourceFiles": []
+    },
+    {
+      "aliases": [
+        "global search"
+      ],
+      "canonicalProductDoc": "docs/product/01_FEATURE_REGISTRY.md",
+      "canonicalTechnicalDocs": [],
+      "changeImpactChecklist": [
+        "Re-read the Related Files section of every primary feature listed above before changing shared source files.",
+        "Check relatedBugs/relatedDecisions for constraints before altering resolver or write-path behavior.",
+        "Run: node scripts/product-docs/cli.js impact <changed-file-path> to confirm ownership before editing."
+      ],
+      "id": "SUBSYS-search-and-discovery",
+      "name": "Search and Discovery",
+      "primaryFeatures": [
+        "AI-FEAT-053"
+      ],
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "sourceDirectories": [],
+      "sourceFiles": []
+    },
+    {
+      "aliases": [
+        "integrity verification"
+      ],
+      "canonicalProductDoc": "docs/product/01_FEATURE_REGISTRY.md",
+      "canonicalTechnicalDocs": [],
+      "changeImpactChecklist": [
+        "Re-read the Related Files section of every primary feature listed above before changing shared source files.",
+        "Check relatedBugs/relatedDecisions for constraints before altering resolver or write-path behavior.",
+        "Run: node scripts/product-docs/cli.js impact <changed-file-path> to confirm ownership before editing."
+      ],
+      "id": "SUBSYS-reliability-and-recovery",
+      "name": "Reliability and Recovery",
+      "primaryFeatures": [
+        "AI-FEAT-054"
+      ],
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "sourceDirectories": [],
+      "sourceFiles": []
+    },
+    {
+      "aliases": [
+        "archive analytics",
+        "ai archive intelligence"
+      ],
+      "canonicalProductDoc": "docs/product/01_FEATURE_REGISTRY.md",
+      "canonicalTechnicalDocs": [],
+      "changeImpactChecklist": [
+        "Re-read the Related Files section of every primary feature listed above before changing shared source files.",
+        "Check relatedBugs/relatedDecisions for constraints before altering resolver or write-path behavior.",
+        "Run: node scripts/product-docs/cli.js impact <changed-file-path> to confirm ownership before editing."
+      ],
+      "id": "SUBSYS-analytics-and-intelligence",
+      "name": "Analytics and Intelligence",
+      "primaryFeatures": [
+        "AI-FEAT-055",
+        "AI-FEAT-056"
+      ],
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "sourceDirectories": [],
+      "sourceFiles": []
+    }
+  ]
+}
