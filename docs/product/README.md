@@ -82,6 +82,10 @@ Anything under `exports/` is generated output for sharing outside the repository
 
 `DOCSYS_VERSION` (currently `1.0.0`) tracks the shape of `docs/product/generated/`'s output — see [scripts/product-docs/README.md](../../scripts/product-docs/README.md) § Documentation-system version. This is distinct from the application's `package.json` version and from the `AI-FEAT-###`/`AI-RM-###` ID systems above; do not conflate the three.
 
+## Automation (Part 5)
+
+`scripts/product-docs/automation/` extends the Part 4 tooling into an orchestration layer that keeps this system alive alongside normal engineering work — the project owner requests/discusses a change, an AI agent implements it, tests run, changes are committed; automation identifies affected features/milestones, updates the feature evolution journal, creates bug/decision records only when the evidence actually supports one, updates the changelog, and rebuilds `generated/`. It is governed by the same authority model and evidence discipline as everything else in this document: an **Engineering Evidence Packet** distinguishes deterministic git facts from AI-observed context from genuinely unknown information, and never promotes the third kind into a canonical record. See [scripts/product-docs/README.md](../../scripts/product-docs/README.md) § Part 5 — Automation for the full model, [CLAUDE.md](CLAUDE.md) § AI Session Completion Contract for what this obligates an agent to do before declaring work complete, and [05_DOCUMENTATION_WORKFLOW.md](05_DOCUMENTATION_WORKFLOW.md) § Automation and the Update Rule for how it relates to the manual workflow above. Part 5's own `.autoingest-docs/` run state is repository-local and gitignored — never canonical, never committed.
+
 ## How Claude Code and local agents must use this
 
 See [CLAUDE.md](CLAUDE.md) for the mandatory agent-routing rules. In short: read the registry, roadmap, and dashboard before significant AutoIngest work; preserve stable IDs; update documentation alongside the work, not after; never let an export become authoritative; never contradict a technical contract under `docs/`.

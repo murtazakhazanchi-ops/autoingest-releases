@@ -15,8 +15,9 @@ const { buildChangeReport } = require('./lib/changeReport');
 const { renderChangeReportMd } = require('./lib/renderChanges');
 const gitInfo = require('./lib/gitInfo');
 const version = require('./lib/version');
+const automationCli = require('./automation/cli');
 
-const HELP = `product-docs — Part 4 documentation intelligence tooling for docs/product/
+const HELP = `product-docs — Part 4/5 documentation intelligence & automation tooling for docs/product/
 
 Usage: node scripts/product-docs/cli.js <command> [args]
 
@@ -27,6 +28,7 @@ Commands:
   impact <input>            Advisory impact analysis for a feature/roadmap/subsystem/source-path
   changes <fromRef> [toRef] Generate a "what changed" report between two git refs (default toRef: HEAD)
   all                       build, then validate
+  automation <sub>          Part 5 engineering-documentation orchestration — see "automation --help"
 
 Run any command with --help for command-specific usage.
 `;
@@ -227,6 +229,9 @@ function main() {
         cmdValidate();
         break;
       }
+      case 'automation':
+        automationCli.run(rest);
+        break;
       default:
         console.error(`Unknown command: ${command}\n`);
         console.log(HELP);

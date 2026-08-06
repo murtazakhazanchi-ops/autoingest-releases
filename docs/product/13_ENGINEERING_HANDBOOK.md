@@ -66,6 +66,10 @@ Not every fixed bug earns a record — only bugs whose root cause, symptom, or f
 
 A feature is documentation-complete when nothing knowable about it was left undocumented — not when every field is filled in, since some history is genuinely unrecoverable and should say so (`05_DOCUMENTATION_WORKFLOW.md` § Documentation Lifecycle Enforcement). The lifecycle is explicit and sequential: roadmap milestone → implementation → architectural evolution (when it qualifies) → decisions → bugs → rejected approaches → accepted solution → feature status → roadmap progress → changelog (`05_DOCUMENTATION_WORKFLOW.md` § The 10-step lifecycle). This produces a continuously evolving engineering history rather than a codebase with a changelog bolted on — the explicit goal stated when this lifecycle was adopted (2026-08-04, PR #1).
 
+## 16. Documentation Automation Philosophy
+
+Automating the *labor* of §§12–15 above (finding the right file, formatting the table, remembering to touch the changelog) is a legitimate way to keep this system alive without asking the project owner to write Markdown by hand. Automating the *judgment* in §§12–15 — deciding a bug is worth a record, deciding two options were genuinely weighed, deciding a milestone is actually done — is not, and Part 5 (`scripts/product-docs/automation/`) is built around that distinction: every "when to create a record" rule from `05_DOCUMENTATION_WORKFLOW.md` is reimplemented as an explicit, testable predicate over evidence the caller supplied, not inferred from the size or shape of a diff. A record that doesn't clear the bar is recorded as an evidence-pending candidate, never fabricated to fill a gap. This is the same evidence discipline as §12 (Documentation Philosophy), applied to a system that can now act on a session's behalf instead of only a human's.
+
 ---
 
 ## What this handbook is not

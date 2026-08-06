@@ -101,3 +101,21 @@ Tests never mutate the real `docs/product/` tree. `test/fixtures/broken-product-
 ## Non-goals
 
 No network calls, no external AI API calls, no cloud dependency, no database, no web server, no UI inside the Electron app, no embeddings/semantic search, no scanning of real user archives, no auto-editing of canonical `docs/product/` Markdown from generated output or inference. Every one of `docs/product/generated/`'s files is disposable and reproducible — delete the whole directory and `build` recreates it byte-for-byte from the same source commit.
+
+## Part 5 — Automation
+
+`automation/` (see [automation/README.md](automation/README.md) for the module map) extends this tool with an orchestration layer that keeps `docs/product/` current alongside normal engineering work, without requiring manual Markdown edits, ID assignment, or index updates. It never treats `docs/product/generated/` as a source (same rule as everywhere else in this tool) and never invents a bug, decision, or postmortem record from a diff alone — see `automation/documentationPlanner.js`'s evidence-gated "when to create a record" rules.
+
+```bash
+node scripts/product-docs/cli.js automation start --type feature --title "Archive Maintenance"
+node scripts/product-docs/cli.js automation update  # append discoveries as work happens
+node scripts/product-docs/cli.js automation finalize
+node scripts/product-docs/cli.js automation status
+node scripts/product-docs/cli.js automation recover
+node scripts/product-docs/cli.js automation dry-run HEAD~1 HEAD
+node scripts/product-docs/cli.js automation reconcile
+node scripts/product-docs/cli.js automation release-draft v0.9.9 HEAD
+node scripts/product-docs/cli.js automation install-hooks   # not run automatically — see below
+```
+
+Three autonomy modes (STRICT/STANDARD/OBSERVE — default STANDARD) govern how much `finalize` blocks on; see `automation/README.md` for the exact gating rules. Version-controlled hooks live at `hooks/{pre-commit,post-commit,pre-push}` with an idempotent, hook-chaining installer (`hooks/install-hooks.js`) — **not installed into this repository's `.git/hooks/` by default**; installing them is a separate, explicit step (`automation install-hooks`), never invoked automatically by any other command. Automation run state lives under the repository-local, gitignored `.autoingest-docs/` — never canonical, never committed.

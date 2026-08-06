@@ -171,6 +171,18 @@ Before work that changes any of the following, also read [11_ARCHITECTURAL_EVOLU
 
 **When a major architectural transition is implemented**, that document must be updated as part of the same work — see [05_DOCUMENTATION_WORKFLOW.md](05_DOCUMENTATION_WORKFLOW.md) for the specific criteria distinguishing a major transition from routine work that doesn't require this.
 
+## 18. AI Session Completion Contract (Part 5)
+
+`scripts/product-docs/automation/` (see [scripts/product-docs/README.md](../../scripts/product-docs/README.md) § Part 5) automates most of §§4–5 above — it does not replace the evidence discipline in §6, only the manual labor of applying it. An AI agent doing significant AutoIngest work (§3's definition of "significant" applies here too) should not declare that work complete until it has, in the same session:
+
+1. started an Engineering Evidence Packet (`automation start --type <type> --title "<title>"`) before implementation begins;
+2. appended discoveries, bugs, alternatives, decisions, tests, and verification as they happen (`automation update`), not reconstructed afterward;
+3. run `automation finalize`, which resolves affected features/milestones (reusing the same query/impact tooling §14a already requires), updates canonical records **only for evidence-gated-justified actions**, rebuilds `generated/`, and runs `validate`;
+4. reported any `evidence_pending`/unjustified items the finalize gate surfaced, rather than silently treating them as done;
+5. confirmed Git state (`git status --short`, `git diff --check`) before commit.
+
+This is automation of the existing 10-step lifecycle (§4) and Update Rule (§5) — it does not create a new documentation standard, and it never fabricates a bug, decision, or postmortem record merely because a session touched a file. See [scripts/product-docs/automation/README.md](../../scripts/product-docs/automation/README.md) for the full Evidence Packet schema and the three autonomy modes (STRICT/STANDARD/OBSERVE). A trivial or purely technical task (§3's exemption) does not require starting a packet at all.
+
 ## Non-negotiables (quick checklist)
 
 - Preserve stable IDs — never reuse, never renumber.

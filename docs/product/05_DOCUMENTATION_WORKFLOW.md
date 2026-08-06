@@ -117,6 +117,12 @@ A feature is allowed to be documentation-complete while still carrying real "Evi
 
 This is a documentation discipline, not a release gate. Application code ships on its own schedule; this checklist governs when the *documentation* for that work is considered finished, which may lag a merge by the time it takes to write it up — but per the Update Rule above, that lag should be measured in the same work session, not a future cleanup pass.
 
+## Automation and the Update Rule (Part 5)
+
+`scripts/product-docs/automation/` (`node scripts/product-docs/cli.js automation <sub>` — see [scripts/product-docs/README.md](../../scripts/product-docs/README.md) § Part 5) automates the mechanical labor of the Update Rule above — it does not change what the rule requires. An Engineering Evidence Packet still needs the same evidence this document has always required (a symptom **and** a root cause/status for a bug record; two or more real alternatives **and** an accepted solution for a decision record) — `documentationPlanner.js` encodes exactly the "When to Create a New Record" table above as executable, testable predicates, and refuses to create a record when the packet's own evidence doesn't clear that bar, recording it as an evidence-pending candidate instead (Evidence Discipline above, unchanged).
+
+Three autonomy modes govern how much of this happens without a manual stop: STRICT blocks completion on any unmet requirement (recommended for `main`/release branches), STANDARD (default) updates justified records and blocks only on a hard validation error, OBSERVE reports without writing canonical docs at all. None of the three modes ever apply a roadmap/dashboard status transition automatically — see the Documentation Lifecycle Enforcement section above's Definition of "documentation complete"; a commit alone is never sufficient evidence of milestone completion, automated or not.
+
 ## Exports Are Not Source
 
 Anything under `exports/` (DOCX, PDF) is generated output for sharing outside the repository. It is never edited directly and never treated as authoritative — regenerate it from the Markdown source instead. `exports/` content is excluded from version control (see `.gitignore`); only the Markdown under `docs/product/` is tracked.

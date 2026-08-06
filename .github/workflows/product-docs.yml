@@ -1,0 +1,107 @@
+name: Product Documentation Validation
+
+# Validates docs/product/ and its Part 4/5 tooling on every push/PR that
+# touches them. Read-only: runs the existing repository-local Node tooling
+# (no npm dependencies, no external AI API, no network calls beyond
+# checkout), never commits, never pushes, never mutates main. Failure means
+# "documentation is stale or inconsistent," not "the AutoIngest app is
+# broken" — this workflow never touches application code.
+
+on:
+  push:
+    paths:
+      - 'docs/product/**'
+      - 'scripts/product-docs/**'
+  pull_request:
+    paths:
+      - 'docs/product/**'
+      - 'scripts/product-docs/**'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: product-docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history — validators/impact/changes tooling shells to git log/diff
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run Part 4/5 tooling test suite
+        run: |
+          node --test scripts/product-docs/test/*.test.js scripts/product-docs/test/automation/*.test.js
+
+      - name: Validate documentation health
+        # `validate` rebuilds every generated artifact in memory and diffs it
+        # byte-for-byte against what's committed (checkGeneratedFreshness) —
+        # a stale docs/product/generated/ is already a blocking error-level
+        # finding here; no separate "is it stale" step is needed.
+        run: node scripts/product-docs/cli.js validate
+
+      - name: Check for whitespace/line-ending issues in changed docs
+        run: git diff --check
+
+      - name: Generate documentation-impact summary for this PR
+        if: github.event_name == 'pull_request'
+        run: |
+          node scripts/product-docs/cli.js automation dry-run "${{ github.event.pull_request.base.sha }}" "${{ github.sha }}" > docs-impact-summary.json || true
+
+      - name: Upload documentation health report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation-health-report
+          path: |
+            docs/product/generated/documentation-health.md
+            docs/product/generated/documentation-health.json
+            docs-impact-summary.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Comment documentation-impact summary on PR
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let body = '## 📋 Documentation Impact Summary\n\n';
+            try {
+              const health = fs.readFileSync('docs/product/generated/documentation-health.md', 'utf8');
+              const summaryLine = health.split('\n').find((l) => l.startsWith('Validated in')) || '';
+              body += `**Validation**: ${summaryLine || 'see attached artifact'}\n\n`;
+            } catch (e) {
+              body += '_Could not read documentation-health.md — see workflow logs._\n\n';
+            }
+            try {
+              const impact = JSON.parse(fs.readFileSync('docs-impact-summary.json', 'utf8'));
+              const features = (impact.classification && impact.classification.primary_feature_ids) || [];
+              body += `**Affected features**: ${features.length ? features.join(', ') : 'none detected'}\n`;
+              body += `**Confidence**: ${(impact.classification && impact.classification.confidence) || 'unknown'}\n`;
+            } catch (e) {
+              body += '_No documentation-impact summary available for this diff._\n';
+            }
+            body += '\nFull report: see the `documentation-health-report` workflow artifact.';
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number,
+            });
+            const marker = '## 📋 Documentation Impact Summary';
+            const existing = comments.find((c) => c.body && c.body.startsWith(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body });
+            }

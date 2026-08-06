@@ -6,7 +6,7 @@
     "features": 56,
     "postmortems": 1,
     "roadmap_milestones": 9,
-    "search_index_records": 269,
+    "search_index_records": 270,
     "subsystems": 16
   },
   "generated_files": [
@@ -86,6 +86,6 @@
     "dependency_graph_nodes": 100
   },
   "schema_version": "1.0.0",
-  "source_commit": "bd767d4f6f1a27e47ee5ea6cdd6a6bdca0f1588d",
+  "source_commit": "a78b97cfb1d8c3ee776f3732a83137e01e4c6edd",
   "source_file_count": 102
 }

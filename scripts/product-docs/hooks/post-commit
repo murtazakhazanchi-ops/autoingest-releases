@@ -1,0 +1,25 @@
+#!/bin/sh
+# Part 5 documentation-automation post-commit reconciliation.
+# Version-controlled — installed by `node scripts/product-docs/cli.js automation install-hooks`.
+# Never edit .git/hooks/post-commit directly; edit this file instead.
+#
+# Records the new commit hash into the audit log and reconciles generated
+# artifacts. Never blocks (the commit already happened) — failures are
+# printed as a warning only. Fast (build+validate are both well under 1s on
+# this repository's current scale — see scripts/product-docs/README.md).
+
+GIT_DIR=$(git rev-parse --git-dir 2>/dev/null)
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
+[ -d "$GIT_DIR/rebase-merge" ] && exit 0
+[ -d "$GIT_DIR/rebase-apply" ] && exit 0
+[ -f "$GIT_DIR/MERGE_HEAD" ] && exit 0
+[ -f "$GIT_DIR/CHERRY_PICK_HEAD" ] && exit 0
+[ -z "$REPO_ROOT" ] && exit 0
+
+cd "$REPO_ROOT"
+CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || true)
+echo "$CHANGED" | grep -q '^docs/product/\|^scripts/product-docs/' || exit 0
+
+node "$REPO_ROOT/scripts/product-docs/cli.js" automation reconcile || \
+  echo "[autoingest-docs] post-commit reconciliation reported an issue (non-blocking) — run 'node scripts/product-docs/cli.js automation reconcile' manually to inspect."
+exit 0

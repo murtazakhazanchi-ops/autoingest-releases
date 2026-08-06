@@ -1,0 +1,62 @@
+{
+  "$id": "evidence-packet.schema.json",
+  "type": "object",
+  "description": "Engineering Evidence Packet — repository-local run state under .autoingest-docs/, never canonical. Documentation reference only, matching Part 4's schemas/ convention (not enforced by a schema library — see scripts/product-docs/automation/evidencePacket.js's hand-rolled validatePacket()).",
+  "required": [
+    "packet_version", "session_id", "task_id", "created_at", "updated_at",
+    "branch", "base_commit", "head_commit", "task_type", "task_title",
+    "affected_files", "affected_feature_ids", "affected_roadmap_ids",
+    "bugs_discovered", "decisions_made", "alternatives_considered", "rejected_solutions",
+    "tests_run", "test_results", "manual_verification", "risks", "unresolved_gaps",
+    "commits", "evidence_sources", "evidence_pending_fields", "automation_status"
+  ],
+  "properties": {
+    "packet_version": { "type": "string" },
+    "session_id": { "type": "string" },
+    "task_id": { "type": "string" },
+    "created_at": { "type": "string" },
+    "updated_at": { "type": "string" },
+    "branch": { "type": "string" },
+    "base_commit": { "type": "string" },
+    "head_commit": { "type": "string" },
+    "task_type": {
+      "type": "string",
+      "enum": ["feature", "enhancement", "bugfix", "refactor", "performance", "reliability", "ui-ux", "architecture", "documentation", "test", "release", "investigation", "maintenance"]
+    },
+    "task_title": { "type": "string" },
+    "task_summary": { "type": "string" },
+    "user_request_summary": { "type": "string" },
+    "affected_files": { "type": "array" },
+    "changed_symbols": { "type": "array" },
+    "affected_feature_ids": { "type": "array" },
+    "affected_roadmap_ids": { "type": "array" },
+    "affected_subsystems": { "type": "array" },
+    "bugs_discovered": { "type": "array", "description": "Each item: {title, symptom, root_cause?, status?, severity?, fix?, prevention?, investigation_notes?}" },
+    "decisions_made": { "type": "array" },
+    "alternatives_considered": { "type": "array", "description": "Each item: {name, description}" },
+    "accepted_solution": { "type": ["string", "null"] },
+    "rejected_solutions": { "type": "array" },
+    "root_cause": { "type": ["string", "null"] },
+    "implementation_summary": { "type": ["string", "null"] },
+    "tests_run": { "type": "array" },
+    "test_results": { "type": "array" },
+    "manual_verification": { "type": "array" },
+    "performance_results": { "type": "array" },
+    "risks": { "type": "array" },
+    "unresolved_gaps": { "type": "array" },
+    "commits": { "type": "array", "description": "Each item: {hash, short, date, subject}" },
+    "release_impact": { "type": ["object", "null"], "description": "{significant_incident?, severity?, incident_date?, impact_description?}" },
+    "confidence": { "type": "string", "enum": ["explicit", "strong", "inferred", "unknown"] },
+    "evidence_sources": {
+      "type": "array",
+      "items": { "enum": ["git", "code-diff", "test-output", "canonical-docs", "ai-session-summary", "explicit-user-statement", "commit-message", "release-metadata", "evidence-pending"] }
+    },
+    "evidence_pending_fields": { "type": "array" },
+    "automation_status": { "type": "string", "enum": ["pending", "in-progress", "finalizing", "completed", "failed", "stale"] },
+    "automation_mode": { "type": "string", "enum": ["strict", "standard", "observe"] },
+    "decision_record_created_id": { "type": "string", "description": "Set by canonicalUpdater.applyDecisionRecord once a DEC-### is created for this packet — prevents a retried finalize from allocating a second ID for the same evidence. Individual bugs_discovered[] items carry the equivalent created_record_id field." },
+    "postmortem_record_created_id": { "type": "string", "description": "Same retry-safety purpose as decision_record_created_id, for the packet's PM-### record." },
+    "classification": { "type": ["object", "null"], "description": "Filled by changeClassifier.js at finalize time — see that module." },
+    "finalize_report": { "type": ["object", "null"], "description": "Filled by validationGate.js at finalize time." }
+  }
+}

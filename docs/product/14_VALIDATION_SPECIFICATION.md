@@ -127,6 +127,40 @@ Run these checks after any change to `docs/product/`, and always before a docume
 
 ---
 
+## 14. Evidence Packet integrity (Part 5)
+
+**Checks**: every Engineering Evidence Packet (`.autoingest-docs/sessions/*.json`) carries every required field with the correct type/enum value before it may be persisted or finalized.
+
+**Fail condition**: a packet failing `automation/evidencePacket.js`'s `validatePacket()` blocks `automation finalize` in every autonomy mode (not just STRICT) — a structurally invalid packet is never allowed to drive a canonical update, regardless of how permissive the mode is otherwise.
+
+**Verified in practice**: `scripts/product-docs/test/automation/evidencePacket.test.js`.
+
+## 15. Record-allocation atomicity (Part 5)
+
+**Checks**: no two `BUG-###`/`DEC-###`/`PM-###` IDs are ever allocated to different content, even under concurrent sessions — `recordAllocator.js`'s lock-then-rescan-then-write critical section.
+
+**Fail condition**: a duplicate ID allocated by two concurrent processes would itself be caught by Rule 1 (Duplicate IDs) on the next `validate` — Rule 15 is the mechanism that prevents it from occurring in the first place, not a separate detection rule.
+
+**Verified in practice**: `scripts/product-docs/test/automation/orchestrator.integration.test.js`'s concurrent-allocation scenario (5 simultaneous child processes, zero collisions).
+
+## 16. Canonical-update idempotency (Part 5)
+
+**Checks**: repeating `automation finalize` against an already-completed session (or re-running the same justified plan twice) never duplicates a changelog entry or an evolution-journal line — `markdownSections.js`'s append/insert primitives are no-ops when the exact content already exists.
+
+**Fail condition**: a duplicate entry from a repeated run is itself visible as ordinary Markdown content, not a distinct validator finding — Rule 16 is a determinism guarantee the automation layer must uphold, verified by test rather than by a runtime check.
+
+**Verified in practice**: `scripts/product-docs/test/automation/markdownSections.test.js` and the "deterministic repeated finalize" integration scenario.
+
+## 17. Roadmap/dashboard transitions are never automatic (Part 5)
+
+**Checks**: no code path in `scripts/product-docs/automation/` writes `02_MASTER_ROADMAP.md` or `04_PROJECT_DASHBOARD.md` narrative prose without an explicit, separately-supplied human/agent confirmation — `documentationPlanner.planRoadmapTransition` always returns `justified: false`; `lifecycleUpdater.applyRoadmapTransition` refuses to write even when confirmed (see `docs/product/05_DOCUMENTATION_WORKFLOW.md`'s Automation and the Update Rule section).
+
+**Fail condition**: this is a structural guarantee (there is no bypass argument, env var, or mode that changes this), verified by code review rather than a runtime check — see the Part 5 final report's Security/Non-Goals sections for the review record.
+
+**Verified in practice**: `scripts/product-docs/test/automation/documentationPlanner.test.js`'s roadmap-transition test.
+
+---
+
 ## Running these checks together
 
 None of these rules depend on executing application code, running the test suite, or any tool beyond text search/parsing over `docs/product/` and `git log`. A future maintainer implementing this as an actual script should implement rules 1–8 and 13 as pure static analysis over the Markdown files (as this specification's authors did by hand, using the same logic described above), and rules 9, 11, and 12 as a combination of static analysis plus `git log` cross-reference. No rule here requires network access, a database, or any state external to this Git repository.

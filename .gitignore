@@ -34,3 +34,11 @@ docs/*
 # Generated DOCX/PDF exports are not the source of truth and are not tracked.
 docs/product/exports/*
 !docs/product/exports/.gitkeep
+
+# Part 5 documentation-automation local run state (evidence packets in
+# progress, allocation locks, audit log) — repository-local, never canonical,
+# never shared across machines. See scripts/product-docs/automation/README.md.
+.autoingest-docs/
+
+# Claude Code per-agent scratch memory — not part of the documentation system.
+.claude/agent-memory/

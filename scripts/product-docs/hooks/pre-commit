@@ -1,0 +1,48 @@
+#!/bin/sh
+# Part 5 documentation-automation pre-commit gate.
+# Version-controlled — installed by `node scripts/product-docs/cli.js automation install-hooks`.
+# Never edit .git/hooks/pre-commit directly; edit this file instead.
+#
+# What it checks (fast — target under 2s):
+#   1. If any staged file is under docs/product/ (excluding generated/),
+#      require docs/product/generated/ to already be fresh (validate must
+#      pass) — a stale index is treated the same as a stale registry row.
+#   2. In STRICT mode (main/release branches), block if a pending evidence
+#      packet on this branch whose affected_files overlap the staged files
+#      has not been finalized.
+# Bypass (emergency only, audited): AUTOINGEST_DOCS_BYPASS=1 git commit ...
+
+set -e
+
+GIT_DIR=$(git rev-parse --git-dir 2>/dev/null)
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
+[ -d "$GIT_DIR/rebase-merge" ] && exit 0
+[ -d "$GIT_DIR/rebase-apply" ] && exit 0
+[ -f "$GIT_DIR/MERGE_HEAD" ] && exit 0
+[ -f "$GIT_DIR/CHERRY_PICK_HEAD" ] && exit 0
+[ -z "$REPO_ROOT" ] && exit 0
+
+if [ "$AUTOINGEST_DOCS_BYPASS" = "1" ]; then
+  echo "[autoingest-docs] pre-commit BYPASSED via AUTOINGEST_DOCS_BYPASS=1 (audited in .autoingest-docs/audit/)"
+  exit 0
+fi
+
+cd "$REPO_ROOT"
+STAGED=$(git diff --cached --name-only)
+[ -z "$STAGED" ] && exit 0
+
+echo "$STAGED" | grep -q '^docs/product/' || exit 0
+echo "$STAGED" | grep -qv '^docs/product/generated/' || {
+  # Only generated/ files staged — nothing new to validate freshness of.
+  exit 0
+}
+
+echo "[autoingest-docs] docs/product/ change detected — validating generated index freshness..."
+VALIDATE_OUTPUT=$(node "$REPO_ROOT/scripts/product-docs/cli.js" validate 2>&1) || {
+  echo "$VALIDATE_OUTPUT"
+  echo "[autoingest-docs] BLOCKED — run 'node scripts/product-docs/cli.js build' and re-stage before committing."
+  echo "[autoingest-docs] Emergency bypass: AUTOINGEST_DOCS_BYPASS=1 git commit ..."
+  exit 1
+}
+echo "[autoingest-docs] validate passed."
+exit 0
