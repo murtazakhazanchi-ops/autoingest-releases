@@ -228,10 +228,45 @@ function finalize(sessionId) {
     return { ok: false, packet, ...result };
   }
 
+  // Part 6 — Engineering Memory: best-effort, never blocks Part 5's own
+  // finalize. Reuses THIS packet's own evidence (bugs_discovered,
+  // decisions_made, alternatives_considered, etc.) plus any raw memory
+  // events explicitly recorded on the same session_id via `memory <sub>` —
+  // see automation/memory/lifecycle.js's maybeCompileFromPacket and
+  // docs/product/16_ENGINEERING_MEMORY_POLICY.md § 8/§ 16. A thrown error
+  // here is swallowed inside maybeCompileFromPacket itself, never here.
+  const memoryResult = require('./memory/lifecycle').maybeCompileFromPacket(packet);
+  if (memoryResult && memoryResult.created) {
+    packet.memory_capsule_id = memoryResult.capsuleId;
+    // A new docs/product/memory/AI-MEM-####_*.md file changes parsed.allFiles
+    // (lib/parseProductDocs.js's listMarkdownFiles walks docs/product/memory/
+    // generically) even before any memory-specific generated artifact exists
+    // for it — so the on-disk generated/ snapshot rebuildGeneratedArtifacts()
+    // just wrote above is now stale the instant this file lands. Rebuild
+    // again so `validate` never sees a stale-generated-output finding caused
+    // by memory compilation itself.
+    const memoryRebuildResult = rebuildGeneratedArtifacts();
+    if (!memoryRebuildResult.ok) {
+      // Unlike the first (Part 5) rebuild, this one's result previously went
+      // unrecorded — a failure here left generated/ silently stale with no
+      // audit trail until a human happened to re-run `validate` (found in
+      // code review). Append a dedicated audit entry so the failure is at
+      // least discoverable; still never blocks — this is Part 6's own
+      // best-effort guarantee, not Part 5's.
+      auditLog.recordRun({
+        run_id: newRunId(), mode: packet.automation_mode, trigger: 'finalize',
+        branch: packet.branch, base_commit: packet.base_commit, head_commit: packet.head_commit,
+        command: 'automation finalize (post-memory-capsule rebuild)', outcome: 'rebuild-failed',
+        duration_ms: 0, warnings: [`rebuildGeneratedArtifacts failed after creating ${memoryResult.capsuleId}: ${memoryRebuildResult.output || 'no output captured'}`],
+        evidence_gaps: [],
+      });
+    }
+  }
+
   packet.automation_status = 'completed';
   packet.finalize_report = result.gateResult;
   evidencePacket.moveToTerminal(packet, 'completed');
-  return { ok: true, packet, ...result };
+  return { ok: true, packet, memoryResult, ...result };
 }
 
 // Same sequence, zero writes — for `--dry-run` review before a real

@@ -2,12 +2,23 @@
 
 // Stable ID patterns used across docs/product/. See docs/product/README.md
 // "Two separate ID systems" and docs/product/05_DOCUMENTATION_WORKFLOW.md "Stable IDs".
+//
+// AI-MEM-#### (Part 6, Engineering Memory) is deliberately 4 digits, not 3
+// like every other family here — see docs/product/16_ENGINEERING_MEMORY_POLICY.md
+// § ID Model. ID_DIGIT_WIDTH exists so extractIds' range-expansion regex
+// (below) stays correct for a family whose digit width differs from the rest,
+// rather than hardcoding \d{3} the way earlier callers of this pattern did.
+const ID_DIGIT_WIDTH = {
+  feature: 3, roadmap: 3, bug: 3, decision: 3, postmortem: 3, memory: 4,
+};
+
 const ID_PATTERNS = {
   feature: /AI-FEAT-(\d{3})/g,
   roadmap: /AI-RM-(\d{3})/g,
   bug: /BUG-(\d{3})/g,
   decision: /DEC-(\d{3})/g,
   postmortem: /PM-(\d{3})/g,
+  memory: /AI-MEM-(\d{4})/g,
 };
 
 const ID_PREFIXES = {
@@ -16,6 +27,7 @@ const ID_PREFIXES = {
   bug: 'BUG-',
   decision: 'DEC-',
   postmortem: 'PM-',
+  memory: 'AI-MEM-',
 };
 
 function idType(id) {
@@ -24,6 +36,7 @@ function idType(id) {
   if (/^BUG-\d{3}$/.test(id)) return 'bug';
   if (/^DEC-\d{3}$/.test(id)) return 'decision';
   if (/^PM-\d{3}$/.test(id)) return 'postmortem';
+  if (/^AI-MEM-\d{4}$/.test(id)) return 'memory';
   return null;
 }
 
@@ -45,10 +58,11 @@ function extractIds(text, family) {
   const pattern = ID_PATTERNS[family];
   const prefix = ID_PREFIXES[family];
   if (!pattern) throw new Error('Unknown ID family: ' + family);
+  const digits = ID_DIGIT_WIDTH[family] || 3;
   const found = new Set();
 
   const rangeRe = new RegExp(
-    `${escapeRegex(prefix)}(\\d{3})\\s*(?:–|—|-{1,2}|through|to)\\s*${escapeRegex(prefix)}(\\d{3})`,
+    `${escapeRegex(prefix)}(\\d{${digits}})\\s*(?:–|—|-{1,2}|through|to)\\s*${escapeRegex(prefix)}(\\d{${digits}})`,
     'gi',
   );
   let rm;
@@ -56,7 +70,7 @@ function extractIds(text, family) {
     const start = parseInt(rm[1], 10);
     const end = parseInt(rm[2], 10);
     if (start <= end && end - start <= MAX_RANGE_SPAN) {
-      for (let n = start; n <= end; n++) found.add(prefix + String(n).padStart(3, '0'));
+      for (let n = start; n <= end; n++) found.add(prefix + String(n).padStart(digits, '0'));
     }
   }
 
@@ -82,4 +96,4 @@ function compareIds(a, b) {
   return a.localeCompare(b, 'en', { numeric: true });
 }
 
-module.exports = { ID_PATTERNS, ID_PREFIXES, idType, extractIds, extractAllIds, compareIds };
+module.exports = { ID_PATTERNS, ID_PREFIXES, ID_DIGIT_WIDTH, idType, extractIds, extractAllIds, compareIds };

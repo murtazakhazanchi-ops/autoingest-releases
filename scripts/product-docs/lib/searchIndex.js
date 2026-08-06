@@ -29,8 +29,21 @@ function keywordsFrom(...texts) {
   return Array.from(words).sort();
 }
 
-function buildSearchIndex(parsed, featureIndexRecords, subsystems) {
+function buildSearchIndex(parsed, featureIndexRecords, subsystems, memoryIndexRecords) {
   const records = [];
+
+  // Part 6 — memory capsules join the same flat search index as every other
+  // entity type, so `query`/`impact`/`lookupById` pick them up for free —
+  // see docs/product/16_ENGINEERING_MEMORY_POLICY.md § 15.
+  for (const m of memoryIndexRecords || []) {
+    records.push(rec('memory', m.memory_id, m.title, m.canonical_path, {
+      keywords: m.keywords,
+      summary: m.summary,
+      relatedIds: [...m.feature_ids, ...m.bug_ids, ...m.decision_ids, ...m.postmortem_ids, ...m.roadmap_ids],
+      authorityLevel: 'evidence', // memory is historical evidence, not canonical — see policy § 3
+      evidenceStatus: m.evidence_classification,
+    }));
+  }
 
   for (const f of featureIndexRecords) {
     records.push(rec('feature', f.feature_id, f.name, f.canonical_document, {

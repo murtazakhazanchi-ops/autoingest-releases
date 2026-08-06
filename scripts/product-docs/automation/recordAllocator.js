@@ -16,6 +16,11 @@ const FAMILY_CONFIG = {
   bug: { prefix: 'BUG-', dir: path.join(REPO_ROOT, 'docs', 'product', 'bugs') },
   decision: { prefix: 'DEC-', dir: path.join(REPO_ROOT, 'docs', 'product', 'decisions') },
   postmortem: { prefix: 'PM-', dir: path.join(REPO_ROOT, 'docs', 'product', 'postmortems') },
+  // Part 6 — Engineering Memory. 4 digits (not 3, like every other family
+  // here) per docs/product/16_ENGINEERING_MEMORY_POLICY.md § ID Model —
+  // `digits` below is what lets currentMaxNumber/allocateAndWriteRecord stay
+  // generic across both widths instead of hardcoding \d{3}.
+  memory: { prefix: 'AI-MEM-', dir: path.join(REPO_ROOT, 'docs', 'product', 'memory'), digits: 4 },
 };
 
 const STALE_LOCK_MS = 60_000; // a lock older than this is assumed abandoned by a crashed process
@@ -109,9 +114,9 @@ function releaseLock(family, token) {
 // (never a cached in-memory index, which could be stale relative to a
 // concurrent session's just-written file) for the highest existing ID.
 function currentMaxNumber(family) {
-  const { prefix, dir } = FAMILY_CONFIG[family];
+  const { prefix, dir, digits = 3 } = FAMILY_CONFIG[family];
   if (!fs.existsSync(dir)) return 0;
-  const re = new RegExp(`^${prefix}(\\d{3})`);
+  const re = new RegExp(`^${prefix}(\\d{${digits}})`);
   let max = 0;
   for (const entry of fs.readdirSync(dir)) {
     const m = re.exec(entry);
@@ -126,11 +131,11 @@ function currentMaxNumber(family) {
 // is no window where the ID is "reserved" but no file exists for it.
 function allocateAndWriteRecord(family, slug, content) {
   if (!FAMILY_CONFIG[family]) throw new Error(`Unknown record family: ${family}`);
-  const { prefix, dir } = FAMILY_CONFIG[family];
+  const { prefix, dir, digits = 3 } = FAMILY_CONFIG[family];
   const token = acquireLock(family);
   try {
     const next = currentMaxNumber(family) + 1;
-    const id = `${prefix}${String(next).padStart(3, '0')}`;
+    const id = `${prefix}${String(next).padStart(digits, '0')}`;
     const safeSlug = String(slug || 'UNTITLED').toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80) || 'UNTITLED';
     const fileName = `${id}_${safeSlug}.md`;
     const filePath = path.join(dir, fileName);

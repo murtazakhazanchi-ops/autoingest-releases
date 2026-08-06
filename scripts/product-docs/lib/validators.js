@@ -448,6 +448,9 @@ function runAllChecks(parsed, built, opts = {}) {
     ...checkGraphIntegrity(built.graph),
     ...checkSharedCodePaths(built.featureIndex),
     ...checkDashboardNarrativeFreshness(parsed, opts.gitIsDirty),
+    // Part 6 — required lazily (not at module top) to avoid a circular
+    // require: memoryValidators.js itself imports `finding` from this file.
+    ...(parsed.memory ? require('./memoryValidators').runMemoryChecks(parsed) : []),
   ];
   return findings;
 }

@@ -176,11 +176,19 @@ function loadAll(root) {
   const bugDir = path.join(root, 'bugs');
   const decisionDir = path.join(root, 'decisions');
   const postmortemDir = path.join(root, 'postmortems');
+  // Part 6 — docs/product/memory/ is optional: a repository checked out
+  // before Part 6 (or a Part 4/5 test fixture that predates it) has no such
+  // directory, and that must not be a parse error — see
+  // docs/product/16_ENGINEERING_MEMORY_POLICY.md § 5.
+  const memoryDir = path.join(root, 'memory');
 
   const featureFiles = fs.readdirSync(featureDir).filter((f) => f.endsWith('.md')).sort();
   const bugFiles = fs.readdirSync(bugDir).filter((f) => f.endsWith('.md') && f !== 'README.md').sort();
   const decisionFiles = fs.readdirSync(decisionDir).filter((f) => f.endsWith('.md') && f !== 'README.md').sort();
   const postmortemFiles = fs.readdirSync(postmortemDir).filter((f) => f.endsWith('.md') && f !== 'README.md').sort();
+  const memoryFiles = fs.existsSync(memoryDir)
+    ? fs.readdirSync(memoryDir).filter((f) => f.endsWith('.md') && f !== 'README.md' && f !== 'INDEX.md').sort()
+    : [];
 
   // idFilesSeen tracks every (id -> [filePath, ...]) pairing BEFORE collapsing
   // into the by-id Maps below, so duplicate-ID detection (validators.js
@@ -190,7 +198,7 @@ function loadAll(root) {
   // an ID within 01_FEATURE_REGISTRY.md / 02_MASTER_ROADMAP.md. One file plus
   // one row for the same ID is the expected, correct structure — not a
   // duplicate — so files and rows are deliberately never merged into one group.
-  const idFilesSeen = { feature: new Map(), bug: new Map(), decision: new Map(), postmortem: new Map() };
+  const idFilesSeen = { feature: new Map(), bug: new Map(), decision: new Map(), postmortem: new Map(), memory: new Map() };
   const idRowsSeen = { feature: new Map(), roadmap: new Map() };
   const recordSeen = (bucket, family, id, location) => {
     if (!id) return;
@@ -224,6 +232,19 @@ function loadAll(root) {
     const parsed = parseRecordFile(path.join(postmortemDir, f), 'postmortem', root);
     recordSeen(idFilesSeen, 'postmortem', parsed.id, parsed.filePath);
     if (parsed.id) postmortems.set(parsed.id, parsed);
+  }
+
+  // Part 6 — memory capsules reuse the same generic record-file parser
+  // (header table + named sections) as bugs/decisions/postmortems; a
+  // capsule's own header table uses "## Identity" as its first table, not a
+  // bare top-of-file table, so parseRecordFile's extractHeaderTable (which
+  // reads the FIRST table in the whole document) still finds it correctly
+  // since Identity is the first section after the H1.
+  const memory = new Map();
+  for (const f of memoryFiles) {
+    const parsed = parseRecordFile(path.join(memoryDir, f), 'memory', root);
+    recordSeen(idFilesSeen, 'memory', parsed.id, parsed.filePath);
+    if (parsed.id) memory.set(parsed.id, parsed);
   }
 
   const registryCategories = parseRegistry(registryContent);
@@ -276,6 +297,8 @@ function loadAll(root) {
     bugs,
     decisions,
     postmortems,
+    memory,
+    memoryDirExists: fs.existsSync(memoryDir),
     allFiles,
   };
 }

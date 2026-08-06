@@ -16,6 +16,7 @@ const { renderChangeReportMd } = require('./lib/renderChanges');
 const gitInfo = require('./lib/gitInfo');
 const version = require('./lib/version');
 const automationCli = require('./automation/cli');
+const memoryCli = require('./automation/memoryCli');
 
 const HELP = `product-docs — Part 4/5 documentation intelligence & automation tooling for docs/product/
 
@@ -29,6 +30,7 @@ Commands:
   changes <fromRef> [toRef] Generate a "what changed" report between two git refs (default toRef: HEAD)
   all                       build, then validate
   automation <sub>          Part 5 engineering-documentation orchestration — see "automation --help"
+  memory <sub>              Part 6 engineering memory layer — see "memory --help"
 
 Run any command with --help for command-specific usage.
 `;
@@ -231,6 +233,9 @@ function main() {
       }
       case 'automation':
         automationCli.run(rest);
+        break;
+      case 'memory':
+        memoryCli.run(rest);
         break;
       default:
         console.error(`Unknown command: ${command}\n`);

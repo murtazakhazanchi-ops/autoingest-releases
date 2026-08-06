@@ -16,6 +16,8 @@ const { renderDependencyGraphMd } = require('./renderGraph');
 const { renderFeatureTimelineMd } = require('./renderTimeline');
 const { renderRoadmapDashboardMd } = require('./renderDashboard');
 const { compareIds } = require('./ids');
+const { buildMemoryIndex } = require('./memoryIndex');
+const { renderMemoryIndexMd, renderEngineeringMemoryTimelineMd } = require('./renderMemory');
 
 // Assembles every Part 4 generated artifact in memory. Returns:
 //   - `parsed`: the raw parsed docs/product/ structures (lib/parseProductDocs)
@@ -28,7 +30,8 @@ function assemble() {
   const featureIndex = buildFeatureIndex(parsed, sourceIndex);
   const authorityIndex = buildAuthorityIndex(parsed);
   const graph = buildGraph(parsed);
-  const searchIndex = buildSearchIndex(parsed, featureIndex, subsystems);
+  const memoryIndex = buildMemoryIndex(parsed);
+  const searchIndex = buildSearchIndex(parsed, featureIndex, subsystems, memoryIndex);
   const dashboard = buildRoadmapDashboard(parsed); // throws DashboardDisagreementError on real disagreement
 
   const timelines = [];
@@ -37,7 +40,7 @@ function assemble() {
   }
   timelines.sort((a, b) => compareIds(a.feature_id, b.feature_id));
 
-  const built = { subsystems, sourceIndex, featureIndex, authorityIndex, graph, searchIndex, dashboard, timelines };
+  const built = { subsystems, sourceIndex, featureIndex, authorityIndex, graph, searchIndex, dashboard, timelines, memoryIndex };
 
   const files = new Map();
 
@@ -82,6 +85,15 @@ function assemble() {
   }));
   files.set('roadmap-dashboard.md', renderRoadmapDashboardMd(dashboard));
 
+  files.set('memory-index.json', stableStringify({
+    schema_version: version.SCHEMA_VERSION,
+    docsys_version: version.DOCSYS_VERSION,
+    memory: memoryIndex,
+  }));
+  files.set('memory-index.jsonl', memoryIndex.map((r) => JSON.stringify(r)).join('\n') + (memoryIndex.length ? '\n' : ''));
+  files.set('MEMORY_INDEX.md', renderMemoryIndexMd(memoryIndex, version.DOCSYS_VERSION));
+  files.set('ENGINEERING_MEMORY_TIMELINE.md', renderEngineeringMemoryTimelineMd(memoryIndex, version.DOCSYS_VERSION));
+
   const manifest = {
     docsys_version: version.DOCSYS_VERSION,
     schema_version: version.SCHEMA_VERSION,
@@ -98,6 +110,7 @@ function assemble() {
       postmortems: parsed.postmortems.size,
       subsystems: subsystems.length,
       search_index_records: searchIndex.length,
+      memory_capsules: memoryIndex.length,
     },
     relationship_counts: {
       dependency_graph_edges: graph.edges.length,
