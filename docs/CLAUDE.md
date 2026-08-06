@@ -141,6 +141,11 @@ Product feature registry / roadmap / milestone progress / implementation timelin
 → relevant docs/product/decisions/*.md
 → relevant docs/product/postmortems/*.md
 
+Why a feature/bug/decision evolved the way it did / original request and plan revisions / rejected approaches / user feedback that changed a design / engineering memory
+→ docs/product/16_ENGINEERING_MEMORY_POLICY.md
+→ relevant docs/product/memory/AI-MEM-####_*.md
+→ `node scripts/product-docs/cli.js memory query "..."`
+
 Architectural history / architectural evolution / why the architecture is shaped this way / relationship between established manual practice and automation
 → docs/product/11_ARCHITECTURAL_EVOLUTION.md
 

@@ -119,3 +119,17 @@ node scripts/product-docs/cli.js automation install-hooks   # not run automatica
 ```
 
 Three autonomy modes (STRICT/STANDARD/OBSERVE — default STANDARD) govern how much `finalize` blocks on; see `automation/README.md` for the exact gating rules. Version-controlled hooks live at `hooks/{pre-commit,post-commit,pre-push}` with an idempotent, hook-chaining installer (`hooks/install-hooks.js`) — **not installed into this repository's `.git/hooks/` by default**; installing them is a separate, explicit step (`automation install-hooks`), never invoked automatically by any other command. Automation run state lives under the repository-local, gitignored `.autoingest-docs/` — never canonical, never committed.
+
+## Part 6 — Engineering Memory
+
+`automation/memory/` (see [automation/memory/README.md](automation/memory/README.md) and [docs/product/16_ENGINEERING_MEMORY_POLICY.md](../../docs/product/16_ENGINEERING_MEMORY_POLICY.md)) extends Part 5 with a durable record of the engineering conversation and reasoning behind meaningful work — the original request, plan revisions, rejected alternatives, investigations, user feedback, and final outcome. Capsules (`docs/product/memory/AI-MEM-####_*.md`) are historical evidence, not a technical contract — they sit below every canonical record in the authority order. Reuses this tool's existing infrastructure rather than duplicating it: ID allocation via `automation/recordAllocator.js`, redaction via `automation/redact.js`, atomic writes via `automation/atomicWrite.js`, and the same `finding()`-shaped validator rules (`lib/memoryValidators.js`) wired into the existing `validate` command.
+
+```bash
+node scripts/product-docs/cli.js memory start --title "..."
+node scripts/product-docs/cli.js memory event --type plan_revised --summary "..."
+node scripts/product-docs/cli.js memory finalize
+node scripts/product-docs/cli.js memory query --feature AI-FEAT-033
+node scripts/product-docs/cli.js memory show AI-MEM-0001
+```
+
+A capsule is only created when the work meets an evidence-gated significance bar (`automation/memory/significance.js`) — most sessions produce none, matching the "not for every session" rule. `automation/orchestrator.js`'s own `finalize()` calls this automatically for every finalized Evidence Packet; a memory session can also stand alone with no linked packet.

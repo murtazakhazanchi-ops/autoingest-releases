@@ -123,6 +123,10 @@ This is a documentation discipline, not a release gate. Application code ships o
 
 Three autonomy modes govern how much of this happens without a manual stop: STRICT blocks completion on any unmet requirement (recommended for `main`/release branches), STANDARD (default) updates justified records and blocks only on a hard validation error, OBSERVE reports without writing canonical docs at all. None of the three modes ever apply a roadmap/dashboard status transition automatically — see the Documentation Lifecycle Enforcement section above's Definition of "documentation complete"; a commit alone is never sufficient evidence of milestone completion, automated or not.
 
+## Engineering Memory (Part 6)
+
+The Update Rule above governs *canonical* records — what's true now. `docs/product/memory/` (`node scripts/product-docs/cli.js memory <sub>`, see [16_ENGINEERING_MEMORY_POLICY.md](16_ENGINEERING_MEMORY_POLICY.md)) governs a separate, lower-authority layer: *why* those canonical records evolved the way they did. A Memory Capsule is created only when the same significance judgment this document already exercises for bug/decision/postmortem records (§ When to Create a New Record) is met at a broader scope — see that policy's § 8. It reuses this workflow's evidence discipline unchanged, with one addition: where a canonical record can leave a fact "Evidence pending" indefinitely, a capsule describing a *past conversation* often has no path to recovering an unrecorded fact at all, and must say so explicitly ("Evidence pending — source conversation unavailable") rather than reconstruct a plausible-sounding version of it.
+
 ## Exports Are Not Source
 
 Anything under `exports/` (DOCX, PDF) is generated output for sharing outside the repository. It is never edited directly and never treated as authoritative — regenerate it from the Markdown source instead. `exports/` content is excluded from version control (see `.gitignore`); only the Markdown under `docs/product/` is tracked.

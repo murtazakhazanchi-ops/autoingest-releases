@@ -57,6 +57,8 @@ Every factual claim here must trace to current source code, tests, existing tech
 - [12_DEPENDENCY_MODEL.md](12_DEPENDENCY_MODEL.md) — canonical relationship index: Milestone→Features, Decision→Decision, Bug→Decision, Bug→Bug, Architecture→Features/Decisions/Postmortems, Feature→Postmortem
 - [13_ENGINEERING_HANDBOOK.md](13_ENGINEERING_HANDBOOK.md) — onboarding guide covering application, archival, metadata, folder, naming, UI, UX, performance, reliability, testing, release, documentation, decision, bug-documentation, and feature-lifecycle philosophy
 - [14_VALIDATION_SPECIFICATION.md](14_VALIDATION_SPECIFICATION.md) — the integrity rules this system must satisfy (duplicate IDs, broken links, orphan records, roadmap inconsistencies, etc.) and how to check each one
+- [15_MEMORY_TEMPLATE.md](15_MEMORY_TEMPLATE.md) — template for every Engineering Memory Capsule file (Part 6)
+- [16_ENGINEERING_MEMORY_POLICY.md](16_ENGINEERING_MEMORY_POLICY.md) — the governing policy for `memory/`: authority model, ID model, significance rules, privacy/redaction, retention (Part 6)
 - [05_DOCUMENTATION_WORKFLOW.md](05_DOCUMENTATION_WORKFLOW.md) — mandatory maintenance workflow, including the 10-step Documentation Lifecycle Enforcement sequence
 - [06_FEATURE_TEMPLATE.md](06_FEATURE_TEMPLATE.md) — template for every feature file
 - [07_BUG_TEMPLATE.md](07_BUG_TEMPLATE.md) — troubleshooting/bug-record template
@@ -67,6 +69,7 @@ Every factual claim here must trace to current source code, tests, existing tech
 - [bugs/](bugs/) — cross-project bug knowledge base
 - [decisions/](decisions/) — accepted/rejected decision records
 - [postmortems/](postmortems/) — significant-incident records
+- [memory/](memory/) — durable Engineering Memory Capsules (`AI-MEM-####`) preserving the engineering conversation and reasoning behind meaningful work — historical evidence, not a technical contract (Part 6; see [16_ENGINEERING_MEMORY_POLICY.md](16_ENGINEERING_MEMORY_POLICY.md) § 3 for its place in the authority order)
 - [exports/](exports/) — generated DOCX/PDF exports (not tracked in git, not the source of truth — see below)
 - [generated/](generated/) — machine-queryable indexes, dependency graphs, timelines, and validation reports produced by `scripts/product-docs/` (Part 4). Tracked in git, unlike `exports/`, but never a source of new facts — see "Generated indexes are not source" below.
 
@@ -85,6 +88,10 @@ Anything under `exports/` is generated output for sharing outside the repository
 ## Automation (Part 5)
 
 `scripts/product-docs/automation/` extends the Part 4 tooling into an orchestration layer that keeps this system alive alongside normal engineering work — the project owner requests/discusses a change, an AI agent implements it, tests run, changes are committed; automation identifies affected features/milestones, updates the feature evolution journal, creates bug/decision records only when the evidence actually supports one, updates the changelog, and rebuilds `generated/`. It is governed by the same authority model and evidence discipline as everything else in this document: an **Engineering Evidence Packet** distinguishes deterministic git facts from AI-observed context from genuinely unknown information, and never promotes the third kind into a canonical record. See [scripts/product-docs/README.md](../../scripts/product-docs/README.md) § Part 5 — Automation for the full model, [CLAUDE.md](CLAUDE.md) § AI Session Completion Contract for what this obligates an agent to do before declaring work complete, and [05_DOCUMENTATION_WORKFLOW.md](05_DOCUMENTATION_WORKFLOW.md) § Automation and the Update Rule for how it relates to the manual workflow above. Part 5's own `.autoingest-docs/` run state is repository-local and gitignored — never canonical, never committed.
+
+## Engineering Memory (Part 6)
+
+`docs/product/memory/` (governed by [16_ENGINEERING_MEMORY_POLICY.md](16_ENGINEERING_MEMORY_POLICY.md)) preserves the engineering conversation and reasoning around meaningful work — the original request, plan revisions, rejected alternatives, investigations, user feedback, and final outcome — that Parts 1–5 don't capture on their own. It is historical evidence, sitting below every canonical record in the authority order (§ 3 of that policy); it explains *why* a decision or feature evolved the way it did, and never overrides *what* the canonical record currently says. `node scripts/product-docs/cli.js memory <sub>` (see [scripts/product-docs/automation/memory/README.md](../../scripts/product-docs/automation/memory/README.md)) drives capture and compilation, largely automatically alongside Part 5's own Evidence Packet lifecycle — see [CLAUDE.md](CLAUDE.md) § 19 for what this obligates an agent to do.
 
 ## How Claude Code and local agents must use this
 

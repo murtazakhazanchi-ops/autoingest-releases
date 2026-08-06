@@ -183,6 +183,19 @@ Before work that changes any of the following, also read [11_ARCHITECTURAL_EVOLU
 
 This is automation of the existing 10-step lifecycle (§4) and Update Rule (§5) — it does not create a new documentation standard, and it never fabricates a bug, decision, or postmortem record merely because a session touched a file. See [scripts/product-docs/automation/README.md](../../scripts/product-docs/automation/README.md) for the full Evidence Packet schema and the three autonomy modes (STRICT/STANDARD/OBSERVE). A trivial or purely technical task (§3's exemption) does not require starting a packet at all.
 
+## 19. Engineering Memory Layer (Part 6)
+
+`scripts/product-docs/automation/memory/` (see [scripts/product-docs/automation/memory/README.md](../../scripts/product-docs/automation/memory/README.md) and [16_ENGINEERING_MEMORY_POLICY.md](16_ENGINEERING_MEMORY_POLICY.md)) extends §18's completion contract with a durable record of *why* the work happened the way it did, not only *that* it happened. For work that meets [16_ENGINEERING_MEMORY_POLICY.md](16_ENGINEERING_MEMORY_POLICY.md) § 8's significance bar, an AI agent should not declare that work complete until, in the same session:
+
+1. a memory session exists — either automatically (Part 5's `automation finalize` calls `maybeCompileFromPacket` for every finalized Evidence Packet) or explicitly started (`memory start --title "..."`) for work with no linked packet;
+2. meaningful plan revisions, user feedback, investigations, rejected alternatives, and accepted decisions were recorded as they happened (`memory event`/`memory feedback`/`memory revise-plan`/`memory option`/`memory decide`/...), not reconstructed afterward;
+3. `memory finalize` ran (automatically via the Part 5 hook, or explicitly), producing either a compiled `AI-MEM-####` capsule or an honest "not significant" result — never silently skipped for genuinely significant work;
+4. any resulting capsule was cross-linked into its primary feature file(s)' Engineering Evolution section (automatic, idempotent — `lifecycle.js`'s `crossLinkFeatures`);
+5. `node scripts/product-docs/cli.js build && node scripts/product-docs/cli.js validate` passed, including the memory-specific rules in `lib/memoryValidators.js`;
+6. any evidence-pending item the compiler surfaced was reported, not silently treated as resolved.
+
+The user must not need to say "document this," "record the feedback," or "save this decision" — for significant work, this is automatic, the same way §18's Evidence Packet capture already is. A trivial task (§3's exemption; also [16_ENGINEERING_MEMORY_POLICY.md](16_ENGINEERING_MEMORY_POLICY.md) § 8's "do not create one for" list) never requires a capsule. Memory is historical evidence, not a technical contract — see that policy document § 3 before citing a capsule as authority for a current-behavior claim; cite the canonical record it explains instead.
+
 ## Non-negotiables (quick checklist)
 
 - Preserve stable IDs — never reuse, never renumber.
@@ -193,3 +206,4 @@ This is automation of the existing 10-step lifecycle (§4) and Update Rule (§5)
 - Never mark a feature `Implemented` (or a milestone `Complete`) without evidence — evidence-pending is honest; a fabricated-sounding "done" is not.
 - Never invent a relationship, date, bug, decision, or incident that repository evidence doesn't support.
 - Never treat `docs/product/generated/` as a source — it's a locator built from the canonical Markdown above; rebuild it (`node scripts/product-docs/cli.js build`) rather than hand-editing it, and run `validate` before trusting it.
+- Never treat a `docs/product/memory/AI-MEM-####` capsule as authoritative over a canonical record — it explains *why*, never overrides *what* — and never fabricate its Original Request/plan-revision content when the source conversation is genuinely unavailable; write "Evidence pending — source conversation unavailable" instead (see [16_ENGINEERING_MEMORY_POLICY.md](16_ENGINEERING_MEMORY_POLICY.md)).
