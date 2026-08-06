@@ -63,6 +63,7 @@ This section classifies this feature's already-evidenced history by milestone ty
 **Reliability / correctness fixes**: None recorded — see Known Bugs section above.
 
 **Other dated milestones**: 3 entries exist in the Evolution / Implementation Journal above; not individually re-classified by milestone type here to avoid restating evidence — read that section directly for the full dated sequence.
+- **Engineering memory**: [AI-MEM-0001](../memory/AI-MEM-0001_METADATA_MANAGEMENT_MODAL_AUDIT_REPAIR_EVOLUTION.md) — Metadata Management Modal Consolidation and Audit & Repair Tab Evolution.
 
 ## Known Bugs / Troubleshooting
 

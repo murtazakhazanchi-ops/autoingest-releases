@@ -100,6 +100,14 @@ Source: `11_ARCHITECTURAL_EVOLUTION.md` § 5 Relationship Map (reproduced here f
 |---|---|
 | [PM-001](postmortems/PM-001_METADATA_CORRECTNESS_GAP_PRODUCTION_READINESS_REVIEW.md) | [AI-FEAT-029](features/AI-FEAT-029_METADATA_WRITING_ENGINE.md), [AI-FEAT-030](features/AI-FEAT-030_METADATA_DURABLE_QUEUE_CRASH_RECOVERY.md), [AI-FEAT-031](features/AI-FEAT-031_METADATA_EVENT_STATE_DERIVATION.md), [AI-FEAT-032](features/AI-FEAT-032_METADATA_VERIFICATION.md), [AI-FEAT-033](features/AI-FEAT-033_METADATA_AUDIT_REPAIR.md), [AI-FEAT-047](features/AI-FEAT-047_QMZ_SEQUENCING_WORKSPACE.md) |
 
+## Feature → Engineering Memory (Part 6)
+
+| Memory Capsule | Related features | Related bugs/decisions |
+|---|---|---|
+| [AI-MEM-0001](memory/AI-MEM-0001_METADATA_MANAGEMENT_MODAL_AUDIT_REPAIR_EVOLUTION.md) | [AI-FEAT-008](features/AI-FEAT-008_DESIGN_SYSTEM_UI_CONSISTENCY_FRAMEWORK.md), [AI-FEAT-033](features/AI-FEAT-033_METADATA_AUDIT_REPAIR.md), [AI-FEAT-034](features/AI-FEAT-034_METADATA_MANAGEMENT_MODAL.md) | None recorded — see the capsule's own Scope table |
+
+A Memory Capsule is historical evidence explaining *why* the cited feature(s) evolved the way they did — it carries no authority of its own and never supersedes the feature file it's linked from; see [16_ENGINEERING_MEMORY_POLICY.md](16_ENGINEERING_MEMORY_POLICY.md) § 3. This table, like every other one on this page, is a curated index over relationships already recorded at the source (each feature file's own Engineering Evolution section cross-links its capsule(s) directly); the machine-generated equivalent is [generated/MEMORY_INDEX.md](generated/MEMORY_INDEX.md).
+
 ## Coverage Summary
 
 - 20/56 features have at least one related bug record.
@@ -108,5 +116,6 @@ Source: `11_ARCHITECTURAL_EVOLUTION.md` § 5 Relationship Map (reproduced here f
 - 32/56 features are placed in the architectural-evolution relationship map.
 - 15/15 decisions checked for decision-to-decision references; 4 have at least one.
 - 10/10 bugs checked for bug-to-decision references; 7 have at least one.
+- 1 Memory Capsule recorded (`AI-MEM-0001`), citing 3 features.
 
 This is a coverage census, not a completeness requirement — a feature with zero related bugs/decisions is not a defect; it means no reusable bug or accepted-alternative decision has been recorded for it yet. See [14_VALIDATION_SPECIFICATION.md](14_VALIDATION_SPECIFICATION.md) for what *would* count as a genuine gap (an orphan bug/decision/postmortem with no valid feature reference at all).

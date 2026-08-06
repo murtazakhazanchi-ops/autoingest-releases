@@ -414,7 +414,12 @@
         "Not yet covered in 11_ARCHITECTURAL_EVOLUTION.md's relationship map"
       ],
       "related_bugs": [],
-      "related_changelog_entries": [],
+      "related_changelog_entries": [
+        {
+          "date": "2026-08-06",
+          "excerpt": "**One pilot Memory Capsule migrated**: `AI-MEM-0001` — \"Metadata Management Modal Consolidation and Audit & Repair Tab Evolution,\" reconstructed entirely from existing repository evidence (`.claude/le"
+        }
+      ],
       "related_code_paths": [
         "renderer/index.html"
       ],
@@ -1843,7 +1848,12 @@
       "related_bugs": [
         "BUG-007"
       ],
-      "related_changelog_entries": [],
+      "related_changelog_entries": [
+        {
+          "date": "2026-08-06",
+          "excerpt": "**One pilot Memory Capsule migrated**: `AI-MEM-0001` — \"Metadata Management Modal Consolidation and Audit & Repair Tab Evolution,\" reconstructed entirely from existing repository evidence (`.claude/le"
+        }
+      ],
       "related_code_paths": [
         "services/metadataAuditService.js",
         "main/metadataRepairService.js",
@@ -1916,7 +1926,12 @@
         "Not yet covered in 11_ARCHITECTURAL_EVOLUTION.md's relationship map"
       ],
       "related_bugs": [],
-      "related_changelog_entries": [],
+      "related_changelog_entries": [
+        {
+          "date": "2026-08-06",
+          "excerpt": "**One pilot Memory Capsule migrated**: `AI-MEM-0001` — \"Metadata Management Modal Consolidation and Audit & Repair Tab Evolution,\" reconstructed entirely from existing repository evidence (`.claude/le"
+        }
+      ],
       "related_code_paths": [
         "renderer/index.html",
         "test/metadataManagementModalUI.test.js"

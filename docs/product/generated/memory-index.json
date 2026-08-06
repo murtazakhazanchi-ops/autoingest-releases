@@ -1,0 +1,56 @@
+{
+  "docsys_version": "1.0.0",
+  "memory": [
+    {
+      "accepted_approach": "Evidence pending",
+      "aliases": [],
+      "bug_ids": [],
+      "canonical_path": "memory/AI-MEM-0001_METADATA_MANAGEMENT_MODAL_AUDIT_REPAIR_EVOLUTION.md",
+      "commit_ids": [
+        "4446a30",
+        "6349c62",
+        "2c2090a",
+        "c5d200f"
+      ],
+      "date_completed": "2026-08-04",
+      "date_started": "2026-08-02",
+      "decision_ids": [],
+      "evidence_classification": "Reconstructed from repository evidence only — `.claude/learning-log.md`'s four dated entries (themselves agent-authored post-hoc summaries, not verbatim conversation transcripts) plus the commit history and `docs/product/features/AI-FEAT-033_METADATA_AUDIT_REPAIR.md`/`AI-FEAT-034_METADATA_MANAGEMENT_MODAL.md`/`AI-FEAT-008_DESIGN_SYSTEM_UI_CONSISTENCY_FRAMEWORK.md`'s own citations of the same commits. This is Part 6's first pilot migration (`16_ENGINEERING_MEMORY_POLICY.md` § 17) — no original chat transcript was available to migrate from.",
+      "evidence_pending_summary": "original request wording (both tasks); initial plan's first-draft text (2026-08-02) and each of its 6 rejected drafts (2026-08-03); base commit hash; session ID(s); exact commands run beyond those specifically named; numeric test pass/fail counts; committed test-report artifact; the specific trigger for Revision 6's 700px spacing polish beyond its commit message.",
+      "feature_ids": [
+        "AI-FEAT-008",
+        "AI-FEAT-033",
+        "AI-FEAT-034"
+      ],
+      "keywords": [
+        "metadata",
+        "management",
+        "modal",
+        "consolidation",
+        "and",
+        "audit",
+        "repair",
+        "tab",
+        "evolution"
+      ],
+      "memory_id": "AI-MEM-0001",
+      "postmortem_ids": [],
+      "rejected_approaches": [
+        "Accepted or rejected**: Rejected, in favor of extending the existing shared class in place with a scoped modifier (`.adopt-section--inline`, Revision 5) rather than a new file or a base-rule edit.",
+        "Accepted or rejected**: Rejected as the fix for `#maRunBtn` specifically — confirmed insufficient because `#diagRunBtn` still exhibits the bug today despite having received exactly this fix previously."
+      ],
+      "revision_count": 7,
+      "roadmap_ids": [
+        "AI-RM-001"
+      ],
+      "source_types": "Claude Code (session identity not recorded by `.claude/learning-log.md` at the time)",
+      "status": "Compiled",
+      "summary": "Metadata Management Modal Consolidation and Audit & Repair Tab Evolution",
+      "title": "Metadata Management Modal Consolidation and Audit & Repair Tab Evolution",
+      "unresolved_items": [
+        "fixing Archive Diagnostics' `#diagRunBtn` with the same `.ma-run-row`-style wrapper pattern (or, alternatively, reconsidering whether `.diag-actions` itself should gain an `align-items` override once every current child's reliance on the stretch default is audited) is recorded here as unresolved, not scheduled against any roadmap milestone."
+      ]
+    }
+  ],
+  "schema_version": "1.0.0"
+}

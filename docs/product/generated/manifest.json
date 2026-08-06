@@ -4,13 +4,16 @@
     "bugs": 10,
     "decisions": 15,
     "features": 56,
+    "memory_capsules": 1,
     "postmortems": 1,
     "roadmap_milestones": 9,
-    "search_index_records": 270,
+    "search_index_records": 274,
     "subsystems": 16
   },
   "generated_files": [
     "AUTHORITY_INDEX.md",
+    "ENGINEERING_MEMORY_TIMELINE.md",
+    "MEMORY_INDEX.md",
     "SUBSYSTEM_LOCATOR.md",
     "authority-index.json",
     "dependency-graph.json",
@@ -73,6 +76,8 @@
     "feature-timelines/AI-FEAT-054_TIMELINE.md",
     "feature-timelines/AI-FEAT-055_TIMELINE.md",
     "feature-timelines/AI-FEAT-056_TIMELINE.md",
+    "memory-index.json",
+    "memory-index.jsonl",
     "roadmap-dashboard.json",
     "roadmap-dashboard.md",
     "search-index.jsonl",
@@ -86,6 +91,6 @@
     "dependency_graph_nodes": 100
   },
   "schema_version": "1.0.0",
-  "source_commit": "a78b97cfb1d8c3ee776f3732a83137e01e4c6edd",
-  "source_file_count": 102
+  "source_commit": "b973436c9c7bdbc70f2ce8fa49920ccf8d92925b",
+  "source_file_count": 108
 }

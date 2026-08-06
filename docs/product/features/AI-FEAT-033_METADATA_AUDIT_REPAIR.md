@@ -62,6 +62,7 @@ This section classifies this feature's already-evidenced history by milestone ty
 **Reliability / correctness fixes**: [BUG-007](../bugs/BUG-007_QMZ_METADATA_CONTEXT_SHAPE_MISMATCH.md) — see the Known Bugs section above and each record's own "Root Cause"/"Fix" fields for what changed and why.
 
 **Other dated milestones**: 4 entries exist in the Evolution / Implementation Journal above; not individually re-classified by milestone type here to avoid restating evidence — read that section directly for the full dated sequence.
+- **Engineering memory**: [AI-MEM-0001](../memory/AI-MEM-0001_METADATA_MANAGEMENT_MODAL_AUDIT_REPAIR_EVOLUTION.md) — Metadata Management Modal Consolidation and Audit & Repair Tab Evolution.
 
 ## Known Bugs / Troubleshooting
 
