@@ -18,6 +18,10 @@ const version = require('./lib/version');
 const automationCli = require('./automation/cli');
 const memoryCli = require('./automation/memoryCli');
 const releaseIntelligence = require('./automation/releaseIntelligence');
+// contextCli required lazily at its one call site (below) — Part 7E's
+// dispatcher wiring lands in its own commit, after Part 7D's `release`
+// command wiring, without this file referencing a module that doesn't
+// exist yet at that point in history.
 
 const HELP = `product-docs — Part 4/5/7 documentation intelligence & automation tooling for docs/product/
 
@@ -33,6 +37,7 @@ Commands:
   automation <sub>          Part 5/7 engineering-documentation orchestration — see "automation --help"
   memory <sub>              Part 6 engineering memory layer — see "memory --help"
   release <sub>             Part 7D release intelligence (drafts only, never publishes) — see "release --help"
+  context <sub>             Part 7E universal repository context assistant — see "context --help"
 
 Run any command with --help for command-specific usage.
 `;
@@ -326,6 +331,9 @@ function main() {
         break;
       case 'release':
         cmdRelease(rest);
+        break;
+      case 'context':
+        require('./automation/contextCli').run(rest);
         break;
       default:
         console.error(`Unknown command: ${command}\n`);
