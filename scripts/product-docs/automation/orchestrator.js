@@ -263,10 +263,42 @@ function finalize(sessionId) {
     }
   }
 
+  // Part 7B — Architectural Decision Intelligence: same best-effort,
+  // never-blocks-Part-5 contract as the memory compilation step above.
+  // Structural-signal detection only (never invents a rationale); creates
+  // a canonical Status: Draft record only when the packet's own recorded
+  // evidence already clears the same bar Part 5's explicit decision-record
+  // path uses, otherwise leaves a local, non-canonical review-required
+  // candidate under .autoingest-docs/decision-candidates/.
+  let decisionIntelResult = null;
+  try {
+    decisionIntelResult = require('./decisionIntelligence').scanPacket(packet);
+    if (decisionIntelResult && decisionIntelResult.state === 'draft') {
+      packet.architectural_decision_draft_id = decisionIntelResult.decision_id;
+      const decisionRebuildResult = rebuildGeneratedArtifacts();
+      if (!decisionRebuildResult.ok) {
+        auditLog.recordRun({
+          run_id: newRunId(), mode: packet.automation_mode, trigger: 'finalize',
+          branch: packet.branch, base_commit: packet.base_commit, head_commit: packet.head_commit,
+          command: 'automation finalize (post-decision-draft rebuild)', outcome: 'rebuild-failed',
+          duration_ms: 0, warnings: [`rebuildGeneratedArtifacts failed after creating ${decisionIntelResult.decision_id}: ${decisionRebuildResult.output || 'no output captured'}`],
+          evidence_gaps: [],
+        });
+      }
+    }
+  } catch (err) {
+    auditLog.recordRun({
+      run_id: newRunId(), mode: packet.automation_mode, trigger: 'finalize',
+      branch: packet.branch, base_commit: packet.base_commit, head_commit: packet.head_commit,
+      command: 'automation finalize (decision-intelligence scan)', outcome: 'decision-scan-failed',
+      duration_ms: 0, warnings: [err.message], evidence_gaps: [],
+    });
+  }
+
   packet.automation_status = 'completed';
   packet.finalize_report = result.gateResult;
   evidencePacket.moveToTerminal(packet, 'completed');
-  return { ok: true, packet, memoryResult, ...result };
+  return { ok: true, packet, memoryResult, decisionIntelResult, ...result };
 }
 
 // Same sequence, zero writes — for `--dry-run` review before a real

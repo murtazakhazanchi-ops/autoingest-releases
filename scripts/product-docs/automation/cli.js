@@ -37,6 +37,10 @@ Subcommands:
   pre-push-gate                   Auto-finalize eligible sessions, validate, report push impact
   post-commit-link                Link the just-made commit into any matching pending session
 
+  Part 7 — Decision Intelligence:
+  decision-scan [sessionId]       Detect architectural signals and plan a decision candidate/draft
+  decision-candidates             List locally-held (non-canonical) decision candidates
+
 Modes: STRICT blocks on any unmet requirement; STANDARD (default) updates docs
 and blocks only on hard validation errors; OBSERVE never writes canonical docs.
 `;
@@ -246,6 +250,31 @@ function cmdPostCommitLink() {
   console.log(JSON.stringify(require('./hookAutomation').postCommitLink(), null, 2));
 }
 
+function cmdDecisionScan(args) {
+  const decisionIntelligence = require('./decisionIntelligence');
+  const { positional } = parseFlags(args);
+  const sessionId = positional[0] || (() => {
+    try { return resolveSingleSession(); } catch { return null; }
+  })();
+  if (!sessionId) {
+    console.log('Usage: automation decision-scan <sessionId>  (or run with exactly one pending session)');
+    process.exitCode = 1;
+    return;
+  }
+  const found = evidencePacket.loadPacket(sessionId);
+  if (!found) throw new Error(`No packet found for session ${sessionId}`);
+  const result = decisionIntelligence.scanPacket(found.packet);
+  if (result.state === 'draft' && found.dir === require('./paths').PENDING_DIR) {
+    found.packet.architectural_decision_draft_id = result.decision_id;
+    evidencePacket.persist(found.packet, { event: 'decision-scan' });
+  }
+  console.log(JSON.stringify(result, null, 2));
+}
+
+function cmdDecisionCandidates() {
+  console.log(JSON.stringify(require('./decisionIntelligence').listCandidates(), null, 2));
+}
+
 function run(args) {
   const [sub, ...rest] = args;
   if (!sub || sub === '--help' || sub === '-h') {
@@ -267,6 +296,8 @@ function run(args) {
     case 'pre-commit-gate': return cmdPreCommitGate();
     case 'pre-push-gate': return cmdPrePushGate();
     case 'post-commit-link': return cmdPostCommitLink();
+    case 'decision-scan': return cmdDecisionScan(rest);
+    case 'decision-candidates': return cmdDecisionCandidates();
     default:
       console.error(`Unknown automation subcommand: ${sub}\n`);
       console.log(HELP);

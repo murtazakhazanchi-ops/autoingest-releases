@@ -15,6 +15,12 @@ const COMPLETED_DIR = path.join(SESSIONS_ROOT, 'completed');
 const FAILED_DIR = path.join(SESSIONS_ROOT, 'failed');
 const LOCKS_DIR = path.join(STATE_ROOT, 'locks');
 const AUDIT_DIR = path.join(STATE_ROOT, 'audit');
+// Part 7B — evidence-incomplete architectural decision candidates. Local
+// automation state, same tier as SESSIONS_ROOT: never canonical, never
+// committed (see .gitignore's ".autoingest-docs/" entry), holds the
+// review-required candidates the brief distinguishes from a published
+// decisions/DEC-### draft.
+const DECISION_CANDIDATES_DIR = path.join(STATE_ROOT, 'decision-candidates');
 
 const CLI_PATH = path.join(REPO_ROOT, 'scripts', 'product-docs', 'cli.js');
 
@@ -27,5 +33,6 @@ module.exports = {
   FAILED_DIR,
   LOCKS_DIR,
   AUDIT_DIR,
+  DECISION_CANDIDATES_DIR,
   CLI_PATH,
 };

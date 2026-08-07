@@ -476,6 +476,9 @@ function runAllChecks(parsed, built, opts = {}) {
     // Part 6 — required lazily (not at module top) to avoid a circular
     // require: memoryValidators.js itself imports `finding` from this file.
     ...(parsed.memory ? require('./memoryValidators').runMemoryChecks(parsed) : []),
+    // Part 7B — same lazy-require pattern; decisionValidators.js also
+    // imports `finding` from this file.
+    ...require('./decisionValidators').runDecisionIntelligenceChecks(parsed),
   ];
   return findings;
 }
