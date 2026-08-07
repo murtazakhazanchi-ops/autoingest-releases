@@ -18,8 +18,25 @@ REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 [ -z "$REPO_ROOT" ] && exit 0
 
 cd "$REPO_ROOT"
+
+# Fast no-op path — mirrors pre-commit's own guard. Run whenever this commit
+# touches docs/product/scripts/product-docs directly, OR whenever a pending
+# Evidence Packet exists at all: postCommitLink()'s job is to link ANY
+# commit whose changed files overlap a pending session's affected_files,
+# which is normally an application-code commit (main/renderer/services),
+# not a docs/product/ commit — gating on docs/product/-only content meant
+# commit-hash linking silently never ran for the common case (found during
+# Part 7 operational activation's disposable lifecycle test).
 CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || true)
-echo "$CHANGED" | grep -q '^docs/product/\|^scripts/product-docs/' || exit 0
+NEEDS_RECONCILE=0
+if echo "$CHANGED" | grep -q '^docs/product/\|^scripts/product-docs/'; then
+  NEEDS_RECONCILE=1
+fi
+PENDING_DIR="$REPO_ROOT/.autoingest-docs/sessions/pending"
+if [ -d "$PENDING_DIR" ] && [ -n "$(ls -A "$PENDING_DIR" 2>/dev/null)" ]; then
+  NEEDS_RECONCILE=1
+fi
+[ "$NEEDS_RECONCILE" = "1" ] || exit 0
 
 node "$REPO_ROOT/scripts/product-docs/cli.js" automation post-commit-link || \
   echo "[autoingest-docs] post-commit reconciliation reported an issue (non-blocking) — run 'node scripts/product-docs/cli.js automation reconcile' manually to inspect."

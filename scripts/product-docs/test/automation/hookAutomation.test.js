@@ -235,6 +235,42 @@ async function main() {
     });
   });
 
+  await t('REAL installed post-commit hook links a commit that touches application code, not just docs/product/ — found in Part 7 operational activation', async () => {
+    await withFixture(async (repo) => {
+      buildAndCommitBaseline(repo);
+      // Actually install into this fixture repo's own .git/hooks/ — a
+      // shell-level regression the CLI-only tests above never exercised
+      // (they always call `automation post-commit-link` directly, bypassing
+      // the shell wrapper's own fast-path gate entirely). Reproduces the
+      // exact bug: the wrapper used to only invoke post-commit-link when
+      // the commit touched docs/product/ or scripts/product-docs/ — but a
+      // pending session normally tracks an ordinary application-code
+      // change (fixture/sourceOne.js here), so the link never fired.
+      let r = repo.run(['automation', 'install-hooks']);
+      assert.equal(r.ok, true, r.output);
+      assert.ok(fs.existsSync(path.join(repo.dir, '.git/hooks/post-commit')));
+
+      r = repo.run(['automation', 'start', '--type', 'bugfix', '--title', 'Real Hook Link Test', '--summary', 'x']);
+      const sessionId = sessionIdFromStartOutput(r.output);
+      repo.writeFile('fixture/sourceOne.js', 'module.exports = 50;\n');
+      repo.commitAll('fix: commit A (application code, not docs/product)');
+      r = repo.run(['automation', 'update', sessionId, '--summary', 'wip']);
+      assert.equal(r.ok, true, r.output);
+
+      // A second application-code commit — real `git commit`, invoking the
+      // REAL installed .git/hooks/post-commit shell script, not the CLI
+      // subcommand directly.
+      repo.writeFile('fixture/sourceOne.js', 'module.exports = 51;\n');
+      repo.git(['add', 'fixture/sourceOne.js']);
+      repo.git(['commit', '-q', '-m', 'fix: commit B (application code, not docs/product)']);
+      const commitB = repo.git(['rev-parse', 'HEAD']);
+
+      const pendingFile = path.join(repo.dir, '.autoingest-docs', 'sessions', 'pending', `${sessionId}.json`);
+      const packet = JSON.parse(fs.readFileSync(pendingFile, 'utf8'));
+      assert.ok(packet.commits.some((c) => c.hash === commitB), 'the REAL installed post-commit hook must link an application-code commit, not only a docs/product/ one');
+    });
+  });
+
   await t('hook-installation readiness is a non-mutating dry-run', async () => {
     await withFixture(async (repo) => {
       const r = repo.run(['automation', 'install-hooks', '--dry-run']);
