@@ -1,15 +1,16 @@
 #!/bin/sh
-# Part 5 documentation-automation pre-commit gate.
+# Part 5/7 documentation-automation pre-commit gate.
 # Version-controlled — installed by `node scripts/product-docs/cli.js automation install-hooks`.
 # Never edit .git/hooks/pre-commit directly; edit this file instead.
 #
-# What it checks (fast — target under 2s):
-#   1. If any staged file is under docs/product/ (excluding generated/),
-#      require docs/product/generated/ to already be fresh (validate must
-#      pass) — a stale index is treated the same as a stale registry row.
-#   2. In STRICT mode (main/release branches), block if a pending evidence
-#      packet on this branch whose affected_files overlap the staged files
-#      has not been finalized.
+# What it checks (fast — target under 2s; see automation/hookAutomation.js's
+# preCommitGate for the actual logic, kept in JS so it's unit-testable):
+#   1. If staged files include docs/product/ content, require
+#      docs/product/generated/ to already be fresh (validate must pass) — a
+#      stale index is treated the same as a stale registry row.
+#   2. Discovers any pending Evidence Packet whose affected_files overlap
+#      the staged files; in STRICT mode, blocks until it's finalized.
+# Never auto-finalizes here (a commit is often mid-task) — see pre-push.
 # Bypass (emergency only, audited): AUTOINGEST_DOCS_BYPASS=1 git commit ...
 
 set -e
@@ -31,18 +32,23 @@ cd "$REPO_ROOT"
 STAGED=$(git diff --cached --name-only)
 [ -z "$STAGED" ] && exit 0
 
-echo "$STAGED" | grep -q '^docs/product/' || exit 0
-echo "$STAGED" | grep -qv '^docs/product/generated/' || {
-  # Only generated/ files staged — nothing new to validate freshness of.
-  exit 0
-}
+# Fast no-op path: skip spawning node entirely unless this commit could
+# plausibly need the gate — docs/product/ is staged, or a pending Evidence
+# Packet exists at all (STRICT-mode overlap can only matter if one does).
+# Keeps the true no-op case comfortably under the 500ms target.
+NEEDS_GATE=0
+if echo "$STAGED" | grep -q '^docs/product/'; then
+  NEEDS_GATE=1
+fi
+PENDING_DIR="$REPO_ROOT/.autoingest-docs/sessions/pending"
+if [ -d "$PENDING_DIR" ] && [ -n "$(ls -A "$PENDING_DIR" 2>/dev/null)" ]; then
+  NEEDS_GATE=1
+fi
+[ "$NEEDS_GATE" = "1" ] || exit 0
 
-echo "[autoingest-docs] docs/product/ change detected — validating generated index freshness..."
-VALIDATE_OUTPUT=$(node "$REPO_ROOT/scripts/product-docs/cli.js" validate 2>&1) || {
-  echo "$VALIDATE_OUTPUT"
-  echo "[autoingest-docs] BLOCKED — run 'node scripts/product-docs/cli.js build' and re-stage before committing."
+node "$REPO_ROOT/scripts/product-docs/cli.js" automation pre-commit-gate || {
+  echo "[autoingest-docs] pre-commit BLOCKED — see findings above."
   echo "[autoingest-docs] Emergency bypass: AUTOINGEST_DOCS_BYPASS=1 git commit ..."
   exit 1
 }
-echo "[autoingest-docs] validate passed."
 exit 0

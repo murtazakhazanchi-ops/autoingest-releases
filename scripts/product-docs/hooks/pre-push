@@ -1,13 +1,14 @@
 #!/bin/sh
-# Part 5 documentation-automation pre-push gate.
+# Part 5/7 documentation-automation pre-push gate.
 # Version-controlled — installed by `node scripts/product-docs/cli.js automation install-hooks`.
 # Never edit .git/hooks/pre-push directly; edit this file instead.
 #
-# Runs full documentation health validation and checks for pending evidence
-# packets before allowing a push. Target: under 10s (build+validate on this
-# repository's current scale is well under 1s — see
-# scripts/product-docs/README.md; the budget covers slower CI-adjacent
-# machines and future growth).
+# Auto-finalizes any pending session whose evidence gate would already pass
+# cleanly, runs full documentation health validation, and reports a push
+# impact summary (automation/hookAutomation.js's prePushGate). Target:
+# under 10s (build+validate on this repository's current scale is well
+# under 1s — see scripts/product-docs/README.md; the budget covers slower
+# CI-adjacent machines and future growth).
 # Bypass (emergency only, audited): AUTOINGEST_DOCS_BYPASS=1 git push ...
 # Never auto-pushes anything itself — this hook only ever blocks or allows
 # the push the user already initiated.
@@ -23,21 +24,12 @@ fi
 
 cd "$REPO_ROOT"
 
-VALIDATE_OUTPUT=$(node "$REPO_ROOT/scripts/product-docs/cli.js" validate 2>&1) || {
-  echo "$VALIDATE_OUTPUT"
-  echo "[autoingest-docs] PUSH BLOCKED — docs/product/ validation failed. Run 'node scripts/product-docs/cli.js build && node scripts/product-docs/cli.js validate' and commit the fix."
+node "$REPO_ROOT/scripts/product-docs/cli.js" automation pre-push-gate || {
+  echo "[autoingest-docs] PUSH BLOCKED — see findings above."
+  echo "[autoingest-docs] Run 'node scripts/product-docs/cli.js build && node scripts/product-docs/cli.js validate' or 'automation finalize' as directed, then retry."
   echo "[autoingest-docs] Emergency bypass: AUTOINGEST_DOCS_BYPASS=1 git push ..."
   exit 1
 }
-
-BLOCKING_OUTPUT=$(node "$REPO_ROOT/scripts/product-docs/cli.js" automation status --check-strict-blocking 2>&1)
-BLOCKING_STATUS=$?
-if [ $BLOCKING_STATUS -ne 0 ]; then
-  echo "$BLOCKING_OUTPUT"
-  echo "[autoingest-docs] PUSH BLOCKED — a STRICT-mode evidence packet is still in-progress. Run 'node scripts/product-docs/cli.js automation finalize' first."
-  echo "[autoingest-docs] Emergency bypass: AUTOINGEST_DOCS_BYPASS=1 git push ..."
-  exit 1
-fi
 
 echo "[autoingest-docs] pre-push validation passed."
 exit 0

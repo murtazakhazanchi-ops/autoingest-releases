@@ -393,6 +393,28 @@ function checkSharedCodePaths(featureIndexRecords) {
   return findings;
 }
 
+// manifest.json's own `source_commit` field can structurally never be
+// self-consistent for the commit that FIRST introduces a given rebuild: a
+// commit's hash is computed from its tree (which includes manifest.json),
+// so a `build` run before that commit necessarily embeds the commit's
+// PARENT hash, one commit behind the hash the commit will actually get
+// (found in Part 7 review — this made checkGeneratedFreshness permanently
+// flag a freshly-committed, correctly-built manifest.json as stale, which
+// would have made the Part 7A zero-touch hooks perpetually misfire on
+// ordinary commits). checkManifestCommit already carries the dedicated,
+// warning-level check for this exact field/drift; stale-generated-output
+// compares everything else in manifest.json (and every other generated
+// file) at full byte-for-byte strictness.
+function manifestContentIgnoringSourceCommit(jsonText) {
+  try {
+    const parsed = JSON.parse(jsonText);
+    delete parsed.source_commit;
+    return JSON.stringify(parsed);
+  } catch {
+    return jsonText; // not valid JSON — fall through to a normal strict compare, which will correctly flag it
+  }
+}
+
 // Stale-generated-output check: compares a freshly-built in-memory file map
 // against what's currently committed under docs/product/generated/. Any
 // difference means `build` must be re-run before this commit is trusted.
@@ -409,7 +431,10 @@ function checkGeneratedFreshness(freshFiles, generatedRoot) {
       continue;
     }
     const existing = fs.readFileSync(onDisk, 'utf8');
-    if (existing !== content) {
+    const mismatch = relPath === 'manifest.json'
+      ? manifestContentIgnoringSourceCommit(existing) !== manifestContentIgnoringSourceCommit(content)
+      : existing !== content;
+    if (mismatch) {
       findings.push(finding('error', 'stale-generated-output', `${relPath} on disk differs from a fresh rebuild — run \`build\` before committing`, relPath));
     }
   }
