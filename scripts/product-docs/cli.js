@@ -17,6 +17,7 @@ const gitInfo = require('./lib/gitInfo');
 const version = require('./lib/version');
 const automationCli = require('./automation/cli');
 const memoryCli = require('./automation/memoryCli');
+const conversationCli = require('./automation/conversationCli');
 const releaseIntelligence = require('./automation/releaseIntelligence');
 // contextCli required lazily at its one call site (below) — Part 7E's
 // dispatcher wiring lands in its own commit, after Part 7D's `release`
@@ -38,6 +39,7 @@ Commands:
   memory <sub>              Part 6 engineering memory layer — see "memory --help"
   release <sub>             Part 7D release intelligence (drafts only, never publishes) — see "release --help"
   context <sub>             Part 7E universal repository context assistant — see "context --help"
+  conversation <sub>        Part 8 multi-AI engineering conversation integration — see "conversation --help"
 
 Run any command with --help for command-specific usage.
 `;
@@ -328,6 +330,9 @@ function main() {
         break;
       case 'memory':
         memoryCli.run(rest);
+        break;
+      case 'conversation':
+        conversationCli.run(rest);
         break;
       case 'release':
         cmdRelease(rest);

@@ -1,0 +1,49 @@
+{
+  "$id": "engineering-conversation-packet.schema.json",
+  "type": "object",
+  "description": "Engineering Conversation Packet (ECP) 1.0 — the vendor-neutral handoff format for Part 8 conversation import (docs/product/18_ENGINEERING_CONVERSATION_POLICY.md). Documentation reference only, matching Part 4's schemas/ convention (not enforced by a schema library — see scripts/product-docs/automation/conversation/ecp.js's hand-rolled validateEcp()). Unknown fields beyond this shape are preserved but never trusted as fact.",
+  "required": ["ecp_version", "project", "source_tool", "conversation_title"],
+  "properties": {
+    "ecp_version": { "type": "string", "description": "Must be \"1.0\" for this schema revision." },
+    "project": { "type": "string" },
+    "source_tool": {
+      "type": "string",
+      "enum": ["chatgpt", "claude-code", "claude", "codex", "gemini", "human-meeting", "engineering-review", "email", "markdown-notes", "json", "manual-import", "unknown"],
+      "description": "Metadata only, as claimed by the packet — never a trust signal. See policy § 13."
+    },
+    "source_type": { "type": "string", "description": "e.g. \"engineering_conversation\"." },
+    "conversation_title": { "type": "string" },
+    "conversation_started_at": { "type": ["string", "null"] },
+    "conversation_completed_at": { "type": ["string", "null"] },
+    "source_conversation_id": { "type": ["string", "null"], "description": "Opaque external ID, if the source tool provides one — used for exact-duplicate detection on re-import." },
+    "repository_context": {
+      "type": "object",
+      "properties": {
+        "branch": { "type": ["string", "null"] },
+        "base_commit": { "type": ["string", "null"] },
+        "head_commit": { "type": ["string", "null"] }
+      }
+    },
+    "user_goal": { "type": "string" },
+    "explicit_requirements": { "type": "array" },
+    "constraints": { "type": "array" },
+    "initial_proposal": { "type": "object", "description": "{direction?, expected_behavior?, expected_architecture?, acceptance_criteria?}" },
+    "revisions": { "type": "array", "description": "Each item: {trigger?, user_feedback?, prior_approach?, revised_approach?, reason?, status?}" },
+    "feedback": { "type": "array", "description": "Each item: {summary?, affected_area?, impact?, disposition?}" },
+    "accepted_decisions": { "type": "array" },
+    "rejected_approaches": { "type": "array", "description": "Each item: {proposal?, reason_rejected?}" },
+    "deferred_items": { "type": "array" },
+    "bugs_discussed": { "type": "array", "description": "Each item: {symptoms?, hypotheses?, evidence?, root_cause?, proposed_fixes?, accepted_fix?, rejected_fixes?}" },
+    "implementation_requests": { "type": "array", "description": "Each item: {request?, expected_feature_ids?, expected_roadmap_ids?, constraints?, expected_tests?, non_goals?}" },
+    "open_questions": { "type": "array" },
+    "related_feature_ids": { "type": "array" },
+    "related_roadmap_ids": { "type": "array" },
+    "related_bug_ids": { "type": "array" },
+    "related_decision_ids": { "type": "array" },
+    "related_memory_ids": { "type": "array" },
+    "source_evidence": { "type": "array" },
+    "evidence_pending": { "type": "array" },
+    "redaction_status": { "type": "string" },
+    "integrity": { "type": "object", "description": "Filled by the importer at import time (fingerprint/checksum), not by the source tool." }
+  }
+}

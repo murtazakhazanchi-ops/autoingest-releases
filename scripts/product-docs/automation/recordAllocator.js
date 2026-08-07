@@ -21,6 +21,10 @@ const FAMILY_CONFIG = {
   // `digits` below is what lets currentMaxNumber/allocateAndWriteRecord stay
   // generic across both widths instead of hardcoding \d{3}.
   memory: { prefix: 'AI-MEM-', dir: path.join(REPO_ROOT, 'docs', 'product', 'memory'), digits: 4 },
+  // Part 8 — Engineering Conversations. Same 4-digit rationale as memory
+  // above (a much higher-volume corpus than the 3-digit families) — see
+  // docs/product/18_ENGINEERING_CONVERSATION_POLICY.md § ID Model.
+  conversation: { prefix: 'ENG-CONV-', dir: path.join(REPO_ROOT, 'docs', 'product', 'conversations'), digits: 4 },
 };
 
 const STALE_LOCK_MS = 60_000; // a lock older than this is assumed abandoned by a crashed process
