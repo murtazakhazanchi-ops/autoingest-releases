@@ -680,7 +680,7 @@
       ]
     }
   },
-  "docsys_version": "1.1.0",
+  "docsys_version": "1.2.0",
   "feature_to_code_paths": {
     "AI-FEAT-001": [
       "main/main.js",
@@ -1036,7 +1036,7 @@
     }
   },
   "note": "code_path_to_features only lists paths already explicitly authored in some feature's Related Files section — a path not appearing here is unresolved, not unowned. Use \"node scripts/product-docs/cli.js automation ownership <path>\" for a multi-signal, confidence-scored resolution of an arbitrary path.",
-  "schema_version": "1.1.0",
+  "schema_version": "1.2.0",
   "service_to_features": {
     "SUBSYS-application-platform": {
       "basis": "derived — subsystem source directories include services/",

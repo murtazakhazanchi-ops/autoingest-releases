@@ -146,6 +146,12 @@ Why a feature/bug/decision evolved the way it did / original request and plan re
 → relevant docs/product/memory/AI-MEM-####_*.md
 → `node scripts/product-docs/cli.js memory query "..."`
 
+External engineering discussion (ChatGPT, external Claude, Codex, Gemini, human meeting) / importing a conversation packet / what an external tool discussed or requested
+→ docs/product/18_ENGINEERING_CONVERSATION_POLICY.md
+→ docs/product/conversations/README.md
+→ relevant docs/product/conversations/ENG-CONV-####_*.md
+→ `node scripts/product-docs/cli.js conversation query "..."`
+
 Architectural history / architectural evolution / why the architecture is shaped this way / relationship between established manual practice and automation
 → docs/product/11_ARCHITECTURAL_EVOLUTION.md
 

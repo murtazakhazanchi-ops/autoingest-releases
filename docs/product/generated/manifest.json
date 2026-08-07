@@ -1,22 +1,28 @@
 {
-  "docsys_version": "1.1.0",
+  "docsys_version": "1.2.0",
   "entity_counts": {
     "bugs": 10,
     "decisions": 15,
+    "engineering_conversations": 1,
     "features": 56,
-    "memory_capsules": 1,
+    "memory_capsules": 2,
     "postmortems": 1,
     "roadmap_milestones": 9,
-    "search_index_records": 275,
+    "search_index_records": 280,
     "subsystems": 16
   },
   "generated_files": [
     "AUTHORITY_INDEX.md",
+    "CONVERSATION_INDEX.md",
+    "CONVERSATION_TIMELINE.md",
     "ENGINEERING_MEMORY_TIMELINE.md",
     "MEMORY_INDEX.md",
     "OWNERSHIP_MANIFEST.md",
     "SUBSYSTEM_LOCATOR.md",
+    "UNIMPLEMENTED_CONVERSATION_REQUIREMENTS.md",
     "authority-index.json",
+    "conversation-index.json",
+    "conversation-index.jsonl",
     "dependency-graph.json",
     "dependency-graph.md",
     "feature-index.json",
@@ -84,15 +90,16 @@
     "roadmap-dashboard.md",
     "search-index.jsonl",
     "subsystem-locator.json",
+    "unimplemented-conversation-requirements.json",
     "manifest.json"
   ],
   "generation_command": "node scripts/product-docs/cli.js build",
-  "generator_version": "1.1.0",
+  "generator_version": "1.2.0",
   "relationship_counts": {
     "dependency_graph_edges": 454,
-    "dependency_graph_nodes": 100
+    "dependency_graph_nodes": 101
   },
-  "schema_version": "1.1.0",
-  "source_commit": "bb23a28fd29446f95496bfaccc033ee7c1b125a4",
-  "source_file_count": 108
+  "schema_version": "1.2.0",
+  "source_commit": "25424a48ac840fc8956240d1533a5d963aaf796a",
+  "source_file_count": 115
 }

@@ -1,5 +1,5 @@
 {
-  "docsys_version": "1.1.0",
+  "docsys_version": "1.2.0",
   "memory": [
     {
       "accepted_approach": "Evidence pending",
@@ -50,7 +50,48 @@
       "unresolved_items": [
         "fixing Archive Diagnostics' `#diagRunBtn` with the same `.ma-run-row`-style wrapper pattern (or, alternatively, reconsidering whether `.diag-actions` itself should gain an `align-items` override once every current child's reliance on the stretch default is audited) is recorded here as unresolved, not scheduled against any roadmap milestone."
       ]
+    },
+    {
+      "accepted_approach": "At least one alternative explicitly accepted — see capsule §Alternatives Considered",
+      "aliases": [],
+      "bug_ids": [],
+      "canonical_path": "memory/AI-MEM-0002_PART_8_MULTI_AI_ENGINEERING_CONVERSATION_INTEGRATION_DESIGN_AND_IMPLEMENTATION_F.md",
+      "commit_ids": [
+        "Evidence pending — source conversation unavailable"
+      ],
+      "date_completed": "2026-08-07T08:36:21.929Z",
+      "date_started": "2026-08-07T08:36:21.929Z",
+      "decision_ids": [],
+      "evidence_classification": "Partial capture — memory events only, no linked Evidence Packet",
+      "evidence_pending_summary": "Identity, Scope, Original Request, Initial Understanding, Initial Plan, Evolution Timeline, Investigation Journal, Alternatives Considered, Implementation Chronicle, User Feedback, Testing and Verification, Final Outcome",
+      "feature_ids": [],
+      "keywords": [
+        "part",
+        "multi",
+        "engineering",
+        "conversation",
+        "integration",
+        "design",
+        "and",
+        "implementation",
+        "from",
+        "eng",
+        "conv",
+        "0001"
+      ],
+      "memory_id": "AI-MEM-0002",
+      "postmortem_ids": [],
+      "rejected_approaches": [],
+      "revision_count": 4,
+      "roadmap_ids": [],
+      "source_types": "claude-code",
+      "status": "Compiled",
+      "summary": "Part 8 — Multi-AI Engineering Conversation Integration: design and implementation (from ENG-CONV-0001)",
+      "title": "Part 8 — Multi-AI Engineering Conversation Integration: design and implementation (from ENG-CONV-0001)",
+      "unresolved_items": [
+        "- Implement the full Part 8 pipeline: ECP schema, ENG-CONV identity/allocator, import pipeline (redaction, sanitization, dedup, significance gate, ownership resolution, decision/bug/memory linkage), CLI, generated indexes, dependency graph edges, context assistant integration, hook reconciliation, tests, and documentation."
+      ]
     }
   ],
-  "schema_version": "1.1.0"
+  "schema_version": "1.2.0"
 }

@@ -108,6 +108,14 @@ Source: `11_ARCHITECTURAL_EVOLUTION.md` § 5 Relationship Map (reproduced here f
 
 A Memory Capsule is historical evidence explaining *why* the cited feature(s) evolved the way they did — it carries no authority of its own and never supersedes the feature file it's linked from; see [16_ENGINEERING_MEMORY_POLICY.md](16_ENGINEERING_MEMORY_POLICY.md) § 3. This table, like every other one on this page, is a curated index over relationships already recorded at the source (each feature file's own Engineering Evolution section cross-links its capsule(s) directly); the machine-generated equivalent is [generated/MEMORY_INDEX.md](generated/MEMORY_INDEX.md).
 
+## Feature → Engineering Conversation (Part 8)
+
+| Conversation | Related features |
+|---|---|
+| [ENG-CONV-0001](conversations/ENG-CONV-0001_PART_8_MULTI_AI_ENGINEERING_CONVERSATION_INTEGRATION_DESIGN_AND_IMPLEMENTATION.md) | None — the pilot conversation documents this documentation-system infrastructure work itself, not an AutoIngest application feature |
+
+An Engineering Conversation is historical evidence, same authority tier as a Memory Capsule — see [18_ENGINEERING_CONVERSATION_POLICY.md](18_ENGINEERING_CONVERSATION_POLICY.md) § 3. Unlike Memory Capsules, Part 8 deliberately does **not** auto-cross-link a conversation into its cited feature file's Engineering Evolution section in this pass (a documented, deferred decision — see the pilot conversation's own Discussion Evolution and Engineering Decisions sections) to avoid flooding those sections given a conversation corpus may grow faster than a memory-capsule corpus; this table is the current substitute. The machine-generated equivalent is [generated/CONVERSATION_INDEX.md](generated/CONVERSATION_INDEX.md).
+
 ## Coverage Summary
 
 - 20/56 features have at least one related bug record.
@@ -116,6 +124,7 @@ A Memory Capsule is historical evidence explaining *why* the cited feature(s) ev
 - 32/56 features are placed in the architectural-evolution relationship map.
 - 15/15 decisions checked for decision-to-decision references; 4 have at least one.
 - 10/10 bugs checked for bug-to-decision references; 7 have at least one.
-- 1 Memory Capsule recorded (`AI-MEM-0001`), citing 3 features.
+- 2 Memory Capsules recorded (`AI-MEM-0001`, `AI-MEM-0002`); `AI-MEM-0001` cites 3 features, `AI-MEM-0002` cites none (documentation-system infrastructure work).
+- 1 Engineering Conversation recorded (`ENG-CONV-0001`), citing no AutoIngest features.
 
 This is a coverage census, not a completeness requirement — a feature with zero related bugs/decisions is not a defect; it means no reusable bug or accepted-alternative decision has been recorded for it yet. See [14_VALIDATION_SPECIFICATION.md](14_VALIDATION_SPECIFICATION.md) for what *would* count as a genuine gap (an orphan bug/decision/postmortem with no valid feature reference at all).
