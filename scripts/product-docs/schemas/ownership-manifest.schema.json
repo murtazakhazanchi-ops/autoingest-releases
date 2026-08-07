@@ -1,0 +1,21 @@
+{
+  "$id": "ownership-manifest.schema.json",
+  "type": "object",
+  "required": [
+    "schema_version", "docsys_version", "feature_to_code_paths", "code_path_to_features",
+    "feature_to_tests", "test_to_features", "subsystem_to_features", "ipc_to_features",
+    "service_to_features", "note"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "docsys_version": { "type": "string" },
+    "feature_to_code_paths": { "type": "object" },
+    "code_path_to_features": { "type": "object" },
+    "feature_to_tests": { "type": "object" },
+    "test_to_features": { "type": "object" },
+    "subsystem_to_features": { "type": "object" },
+    "ipc_to_features": { "type": "object" },
+    "service_to_features": { "type": "object" },
+    "note": { "type": "string" }
+  }
+}

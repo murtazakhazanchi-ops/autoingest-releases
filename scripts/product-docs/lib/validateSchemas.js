@@ -14,6 +14,7 @@ const SCHEMA_MAP = {
   'dependency-graph.json': 'dependency-graph.schema.json',
   'roadmap-dashboard.json': 'roadmap-dashboard.schema.json',
   'manifest.json': 'manifest.schema.json',
+  'ownership-manifest.json': 'ownership-manifest.schema.json',
 };
 
 function checkGeneratedSchemas(freshFiles) {

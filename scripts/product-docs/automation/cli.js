@@ -41,6 +41,9 @@ Subcommands:
   decision-scan [sessionId]       Detect architectural signals and plan a decision candidate/draft
   decision-candidates             List locally-held (non-canonical) decision candidates
 
+  Part 7 — Ownership:
+  ownership <path>                Multi-signal ownership resolution for a source path
+
 Modes: STRICT blocks on any unmet requirement; STANDARD (default) updates docs
 and blocks only on hard validation errors; OBSERVE never writes canonical docs.
 `;
@@ -275,6 +278,15 @@ function cmdDecisionCandidates() {
   console.log(JSON.stringify(require('./decisionIntelligence').listCandidates(), null, 2));
 }
 
+function cmdOwnership(args) {
+  if (args.length === 0) {
+    console.log('Usage: automation ownership <path>');
+    process.exitCode = 1;
+    return;
+  }
+  console.log(JSON.stringify(require('./ownershipEngine').resolveOwnership(args[0]), null, 2));
+}
+
 function run(args) {
   const [sub, ...rest] = args;
   if (!sub || sub === '--help' || sub === '-h') {
@@ -298,6 +310,7 @@ function run(args) {
     case 'post-commit-link': return cmdPostCommitLink();
     case 'decision-scan': return cmdDecisionScan(rest);
     case 'decision-candidates': return cmdDecisionCandidates();
+    case 'ownership': return cmdOwnership(rest);
     default:
       console.error(`Unknown automation subcommand: ${sub}\n`);
       console.log(HELP);
