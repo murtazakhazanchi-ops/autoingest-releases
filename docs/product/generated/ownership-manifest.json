@@ -1,0 +1,1271 @@
+{
+  "code_path_to_features": {
+    "data/keywords.registry.json": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-029",
+        "AI-FEAT-030",
+        "AI-FEAT-031",
+        "AI-FEAT-032",
+        "AI-FEAT-033",
+        "AI-FEAT-034",
+        "AI-FEAT-035",
+        "AI-FEAT-036",
+        "AI-FEAT-037"
+      ]
+    },
+    "main/driveDetector.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-011",
+        "AI-FEAT-012"
+      ]
+    },
+    "main/eventJsonStore.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-001",
+        "AI-FEAT-002",
+        "AI-FEAT-003",
+        "AI-FEAT-004",
+        "AI-FEAT-005",
+        "AI-FEAT-006",
+        "AI-FEAT-007",
+        "AI-FEAT-019",
+        "AI-FEAT-020",
+        "AI-FEAT-021",
+        "AI-FEAT-022",
+        "AI-FEAT-023",
+        "AI-FEAT-024",
+        "AI-FEAT-025",
+        "AI-FEAT-026",
+        "AI-FEAT-027",
+        "AI-FEAT-028",
+        "AI-FEAT-029",
+        "AI-FEAT-030",
+        "AI-FEAT-031",
+        "AI-FEAT-032",
+        "AI-FEAT-033",
+        "AI-FEAT-034",
+        "AI-FEAT-035",
+        "AI-FEAT-036",
+        "AI-FEAT-037"
+      ]
+    },
+    "main/exifService.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-029",
+        "AI-FEAT-030",
+        "AI-FEAT-031",
+        "AI-FEAT-032",
+        "AI-FEAT-033",
+        "AI-FEAT-034",
+        "AI-FEAT-035",
+        "AI-FEAT-036",
+        "AI-FEAT-037"
+      ]
+    },
+    "main/fileBrowser.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-011",
+        "AI-FEAT-012",
+        "AI-FEAT-013",
+        "AI-FEAT-014",
+        "AI-FEAT-015",
+        "AI-FEAT-016"
+      ]
+    },
+    "main/fileManager.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-019",
+        "AI-FEAT-020",
+        "AI-FEAT-021",
+        "AI-FEAT-022",
+        "AI-FEAT-023",
+        "AI-FEAT-024",
+        "AI-FEAT-025",
+        "AI-FEAT-026",
+        "AI-FEAT-027",
+        "AI-FEAT-028"
+      ]
+    },
+    "main/main.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-001",
+        "AI-FEAT-002",
+        "AI-FEAT-003",
+        "AI-FEAT-004",
+        "AI-FEAT-005",
+        "AI-FEAT-006",
+        "AI-FEAT-007",
+        "AI-FEAT-019",
+        "AI-FEAT-020",
+        "AI-FEAT-021",
+        "AI-FEAT-022",
+        "AI-FEAT-023",
+        "AI-FEAT-024",
+        "AI-FEAT-025",
+        "AI-FEAT-026",
+        "AI-FEAT-027",
+        "AI-FEAT-028",
+        "AI-FEAT-029",
+        "AI-FEAT-030",
+        "AI-FEAT-031",
+        "AI-FEAT-032",
+        "AI-FEAT-033",
+        "AI-FEAT-034",
+        "AI-FEAT-035",
+        "AI-FEAT-036",
+        "AI-FEAT-037"
+      ]
+    },
+    "main/metadataQueueRecovery.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-029",
+        "AI-FEAT-030",
+        "AI-FEAT-031",
+        "AI-FEAT-032",
+        "AI-FEAT-033",
+        "AI-FEAT-034",
+        "AI-FEAT-035",
+        "AI-FEAT-036",
+        "AI-FEAT-037"
+      ]
+    },
+    "main/metadataQueueStore.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-029",
+        "AI-FEAT-030",
+        "AI-FEAT-031",
+        "AI-FEAT-032",
+        "AI-FEAT-033",
+        "AI-FEAT-034",
+        "AI-FEAT-035",
+        "AI-FEAT-036",
+        "AI-FEAT-037"
+      ]
+    },
+    "main/metadataRepairService.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-029",
+        "AI-FEAT-030",
+        "AI-FEAT-031",
+        "AI-FEAT-032",
+        "AI-FEAT-033",
+        "AI-FEAT-034",
+        "AI-FEAT-035",
+        "AI-FEAT-036",
+        "AI-FEAT-037"
+      ]
+    },
+    "main/metadataStateService.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-029",
+        "AI-FEAT-030",
+        "AI-FEAT-031",
+        "AI-FEAT-032",
+        "AI-FEAT-033",
+        "AI-FEAT-034",
+        "AI-FEAT-035",
+        "AI-FEAT-036",
+        "AI-FEAT-037"
+      ]
+    },
+    "main/metadataSyncService.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-029",
+        "AI-FEAT-030",
+        "AI-FEAT-031",
+        "AI-FEAT-032",
+        "AI-FEAT-033",
+        "AI-FEAT-034",
+        "AI-FEAT-035",
+        "AI-FEAT-036",
+        "AI-FEAT-037"
+      ]
+    },
+    "main/metadataVerificationService.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-029",
+        "AI-FEAT-030",
+        "AI-FEAT-031",
+        "AI-FEAT-032",
+        "AI-FEAT-033",
+        "AI-FEAT-034",
+        "AI-FEAT-035",
+        "AI-FEAT-036",
+        "AI-FEAT-037"
+      ]
+    },
+    "main/preload.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-001",
+        "AI-FEAT-002",
+        "AI-FEAT-003",
+        "AI-FEAT-004",
+        "AI-FEAT-005",
+        "AI-FEAT-006",
+        "AI-FEAT-007"
+      ]
+    },
+    "main/qmzService.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-047"
+      ]
+    },
+    "main/rawPreviewService.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-013",
+        "AI-FEAT-014",
+        "AI-FEAT-015",
+        "AI-FEAT-016"
+      ]
+    },
+    "main/userManager.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-001",
+        "AI-FEAT-002",
+        "AI-FEAT-003",
+        "AI-FEAT-004",
+        "AI-FEAT-005",
+        "AI-FEAT-006",
+        "AI-FEAT-007"
+      ]
+    },
+    "main/videoThumbService.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-013",
+        "AI-FEAT-014",
+        "AI-FEAT-015",
+        "AI-FEAT-016"
+      ]
+    },
+    "realtime-server/": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-048"
+      ]
+    },
+    "renderer/eventCreator.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-009",
+        "AI-FEAT-010"
+      ]
+    },
+    "renderer/eventMgmt.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-009",
+        "AI-FEAT-010"
+      ]
+    },
+    "renderer/folderNameHelper.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-009",
+        "AI-FEAT-010"
+      ]
+    },
+    "renderer/groupManager.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-017",
+        "AI-FEAT-018"
+      ]
+    },
+    "renderer/importRouter.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-017",
+        "AI-FEAT-018"
+      ]
+    },
+    "renderer/index.html": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-008",
+        "AI-FEAT-029",
+        "AI-FEAT-030",
+        "AI-FEAT-031",
+        "AI-FEAT-032",
+        "AI-FEAT-033",
+        "AI-FEAT-034",
+        "AI-FEAT-035",
+        "AI-FEAT-036",
+        "AI-FEAT-037",
+        "AI-FEAT-038",
+        "AI-FEAT-039",
+        "AI-FEAT-040",
+        "AI-FEAT-041"
+      ]
+    },
+    "renderer/renderer.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-001",
+        "AI-FEAT-002",
+        "AI-FEAT-003",
+        "AI-FEAT-004",
+        "AI-FEAT-005",
+        "AI-FEAT-006",
+        "AI-FEAT-007",
+        "AI-FEAT-011",
+        "AI-FEAT-012",
+        "AI-FEAT-013",
+        "AI-FEAT-014",
+        "AI-FEAT-015",
+        "AI-FEAT-016",
+        "AI-FEAT-019",
+        "AI-FEAT-020",
+        "AI-FEAT-021",
+        "AI-FEAT-022",
+        "AI-FEAT-023",
+        "AI-FEAT-024",
+        "AI-FEAT-025",
+        "AI-FEAT-026",
+        "AI-FEAT-027",
+        "AI-FEAT-028",
+        "AI-FEAT-029",
+        "AI-FEAT-030",
+        "AI-FEAT-031",
+        "AI-FEAT-032",
+        "AI-FEAT-033",
+        "AI-FEAT-034",
+        "AI-FEAT-035",
+        "AI-FEAT-036",
+        "AI-FEAT-037",
+        "AI-FEAT-047"
+      ]
+    },
+    "renderer/splash.html": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-001",
+        "AI-FEAT-002",
+        "AI-FEAT-003",
+        "AI-FEAT-004",
+        "AI-FEAT-005",
+        "AI-FEAT-006",
+        "AI-FEAT-007"
+      ]
+    },
+    "renderer/theme-init.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-001",
+        "AI-FEAT-002",
+        "AI-FEAT-003",
+        "AI-FEAT-004",
+        "AI-FEAT-005",
+        "AI-FEAT-006",
+        "AI-FEAT-007"
+      ]
+    },
+    "renderer/treeAutocomplete.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-009",
+        "AI-FEAT-010"
+      ]
+    },
+    "services/adoptionDryRunService.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-042",
+        "AI-FEAT-043",
+        "AI-FEAT-044",
+        "AI-FEAT-045",
+        "AI-FEAT-046"
+      ]
+    },
+    "services/adoptionPreviewService.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-042",
+        "AI-FEAT-043",
+        "AI-FEAT-044",
+        "AI-FEAT-045",
+        "AI-FEAT-046"
+      ]
+    },
+    "services/adoptionWriteContract.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-042",
+        "AI-FEAT-043",
+        "AI-FEAT-044",
+        "AI-FEAT-045",
+        "AI-FEAT-046"
+      ]
+    },
+    "services/adoptionWriteService.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-042",
+        "AI-FEAT-043",
+        "AI-FEAT-044",
+        "AI-FEAT-045",
+        "AI-FEAT-046"
+      ]
+    },
+    "services/archiveConsistencyService.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-042",
+        "AI-FEAT-043",
+        "AI-FEAT-044",
+        "AI-FEAT-045",
+        "AI-FEAT-046"
+      ]
+    },
+    "services/archiveLockService.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-042",
+        "AI-FEAT-043",
+        "AI-FEAT-044",
+        "AI-FEAT-045",
+        "AI-FEAT-046"
+      ]
+    },
+    "services/archiveSyncService.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-042",
+        "AI-FEAT-043",
+        "AI-FEAT-044",
+        "AI-FEAT-045",
+        "AI-FEAT-046"
+      ]
+    },
+    "services/autoUpdater.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-001",
+        "AI-FEAT-002",
+        "AI-FEAT-003",
+        "AI-FEAT-004",
+        "AI-FEAT-005",
+        "AI-FEAT-006",
+        "AI-FEAT-007"
+      ]
+    },
+    "services/localSyncManifest.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-042",
+        "AI-FEAT-043",
+        "AI-FEAT-044",
+        "AI-FEAT-045",
+        "AI-FEAT-046"
+      ]
+    },
+    "services/metadataAuditExport.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-029",
+        "AI-FEAT-030",
+        "AI-FEAT-031",
+        "AI-FEAT-032",
+        "AI-FEAT-033",
+        "AI-FEAT-034",
+        "AI-FEAT-035",
+        "AI-FEAT-036",
+        "AI-FEAT-037"
+      ]
+    },
+    "services/metadataAuditService.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-029",
+        "AI-FEAT-030",
+        "AI-FEAT-031",
+        "AI-FEAT-032",
+        "AI-FEAT-033",
+        "AI-FEAT-034",
+        "AI-FEAT-035",
+        "AI-FEAT-036",
+        "AI-FEAT-037"
+      ]
+    },
+    "services/metadataExpectationService.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-029",
+        "AI-FEAT-030",
+        "AI-FEAT-031",
+        "AI-FEAT-032",
+        "AI-FEAT-033",
+        "AI-FEAT-034",
+        "AI-FEAT-035",
+        "AI-FEAT-036",
+        "AI-FEAT-037"
+      ]
+    },
+    "services/nasEventCache.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-042",
+        "AI-FEAT-043",
+        "AI-FEAT-044",
+        "AI-FEAT-045",
+        "AI-FEAT-046"
+      ]
+    },
+    "services/offlineCollectionRegistryService.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-042",
+        "AI-FEAT-043",
+        "AI-FEAT-044",
+        "AI-FEAT-045",
+        "AI-FEAT-046",
+        "AI-FEAT-048"
+      ]
+    },
+    "services/photographerSequenceService.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-019",
+        "AI-FEAT-020",
+        "AI-FEAT-021",
+        "AI-FEAT-022",
+        "AI-FEAT-023",
+        "AI-FEAT-024",
+        "AI-FEAT-025",
+        "AI-FEAT-026",
+        "AI-FEAT-027",
+        "AI-FEAT-028"
+      ]
+    },
+    "services/realtimeOperationsService.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-048"
+      ]
+    },
+    "services/settings.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-001",
+        "AI-FEAT-002",
+        "AI-FEAT-003",
+        "AI-FEAT-004",
+        "AI-FEAT-005",
+        "AI-FEAT-006",
+        "AI-FEAT-007",
+        "AI-FEAT-042",
+        "AI-FEAT-043",
+        "AI-FEAT-044",
+        "AI-FEAT-045",
+        "AI-FEAT-046"
+      ]
+    },
+    "services/syncQueueService.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-042",
+        "AI-FEAT-043",
+        "AI-FEAT-044",
+        "AI-FEAT-045",
+        "AI-FEAT-046"
+      ]
+    },
+    "services/syncReviewService.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-042",
+        "AI-FEAT-043",
+        "AI-FEAT-044",
+        "AI-FEAT-045",
+        "AI-FEAT-046"
+      ]
+    },
+    "services/telemetry.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-001",
+        "AI-FEAT-002",
+        "AI-FEAT-003",
+        "AI-FEAT-004",
+        "AI-FEAT-005",
+        "AI-FEAT-006",
+        "AI-FEAT-007"
+      ]
+    },
+    "services/thumbnailCache.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-013",
+        "AI-FEAT-014",
+        "AI-FEAT-015",
+        "AI-FEAT-016"
+      ]
+    },
+    "services/transferExportService.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-038",
+        "AI-FEAT-039",
+        "AI-FEAT-040",
+        "AI-FEAT-041"
+      ]
+    },
+    "services/transferImportService.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-038",
+        "AI-FEAT-039",
+        "AI-FEAT-040",
+        "AI-FEAT-041"
+      ]
+    },
+    "test/dashboardMetadataHealthCard.test.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-029",
+        "AI-FEAT-030",
+        "AI-FEAT-031",
+        "AI-FEAT-032",
+        "AI-FEAT-033",
+        "AI-FEAT-034",
+        "AI-FEAT-035",
+        "AI-FEAT-036",
+        "AI-FEAT-037"
+      ]
+    },
+    "test/metadataManagementModalUI.test.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-029",
+        "AI-FEAT-030",
+        "AI-FEAT-031",
+        "AI-FEAT-032",
+        "AI-FEAT-033",
+        "AI-FEAT-034",
+        "AI-FEAT-035",
+        "AI-FEAT-036",
+        "AI-FEAT-037"
+      ]
+    },
+    "test/qmzLiveE2E.test.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-047"
+      ]
+    },
+    "test/transferImportOutcomeManifest.test.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-038",
+        "AI-FEAT-039",
+        "AI-FEAT-040",
+        "AI-FEAT-041"
+      ]
+    }
+  },
+  "docsys_version": "1.1.0",
+  "feature_to_code_paths": {
+    "AI-FEAT-001": [
+      "main/main.js",
+      "main/preload.js",
+      "renderer/theme-init.js"
+    ],
+    "AI-FEAT-002": [
+      "main/userManager.js",
+      "renderer/splash.html",
+      "services/settings.js"
+    ],
+    "AI-FEAT-003": [
+      "renderer/renderer.js",
+      "renderer/theme-init.js"
+    ],
+    "AI-FEAT-004": [
+      "main/eventJsonStore.js"
+    ],
+    "AI-FEAT-005": [
+      "services/settings.js"
+    ],
+    "AI-FEAT-006": [
+      "services/autoUpdater.js"
+    ],
+    "AI-FEAT-007": [
+      "services/telemetry.js"
+    ],
+    "AI-FEAT-008": [
+      "renderer/index.html"
+    ],
+    "AI-FEAT-009": [
+      "renderer/eventCreator.js",
+      "renderer/folderNameHelper.js",
+      "renderer/treeAutocomplete.js"
+    ],
+    "AI-FEAT-010": [
+      "renderer/eventMgmt.js"
+    ],
+    "AI-FEAT-011": [
+      "main/driveDetector.js",
+      "main/fileBrowser.js"
+    ],
+    "AI-FEAT-012": [
+      "renderer/renderer.js"
+    ],
+    "AI-FEAT-013": [
+      "main/fileBrowser.js"
+    ],
+    "AI-FEAT-014": [
+      "main/videoThumbService.js",
+      "services/thumbnailCache.js"
+    ],
+    "AI-FEAT-015": [
+      "main/rawPreviewService.js"
+    ],
+    "AI-FEAT-016": [
+      "renderer/renderer.js"
+    ],
+    "AI-FEAT-017": [
+      "renderer/groupManager.js"
+    ],
+    "AI-FEAT-018": [
+      "renderer/importRouter.js"
+    ],
+    "AI-FEAT-019": [
+      "main/fileManager.js"
+    ],
+    "AI-FEAT-020": [
+      "main/fileManager.js"
+    ],
+    "AI-FEAT-021": [
+      "main/eventJsonStore.js",
+      "main/main.js"
+    ],
+    "AI-FEAT-022": [
+      "services/photographerSequenceService.js"
+    ],
+    "AI-FEAT-023": [
+      "renderer/renderer.js"
+    ],
+    "AI-FEAT-024": [
+      "main/main.js"
+    ],
+    "AI-FEAT-025": [
+      "main/main.js"
+    ],
+    "AI-FEAT-026": [
+      "renderer/renderer.js"
+    ],
+    "AI-FEAT-027": [
+      "renderer/renderer.js"
+    ],
+    "AI-FEAT-028": [
+      "renderer/renderer.js"
+    ],
+    "AI-FEAT-029": [
+      "main/eventJsonStore.js",
+      "main/exifService.js",
+      "services/metadataExpectationService.js"
+    ],
+    "AI-FEAT-030": [
+      "main/metadataQueueRecovery.js",
+      "main/metadataQueueStore.js"
+    ],
+    "AI-FEAT-031": [
+      "main/metadataStateService.js"
+    ],
+    "AI-FEAT-032": [
+      "main/metadataVerificationService.js"
+    ],
+    "AI-FEAT-033": [
+      "main/metadataRepairService.js",
+      "services/metadataAuditExport.js",
+      "services/metadataAuditService.js"
+    ],
+    "AI-FEAT-034": [
+      "renderer/index.html",
+      "test/metadataManagementModalUI.test.js"
+    ],
+    "AI-FEAT-035": [
+      "renderer/renderer.js",
+      "test/dashboardMetadataHealthCard.test.js"
+    ],
+    "AI-FEAT-036": [
+      "data/keywords.registry.json",
+      "main/main.js"
+    ],
+    "AI-FEAT-037": [
+      "main/metadataSyncService.js"
+    ],
+    "AI-FEAT-038": [
+      "services/transferExportService.js"
+    ],
+    "AI-FEAT-039": [
+      "services/transferImportService.js",
+      "test/transferImportOutcomeManifest.test.js"
+    ],
+    "AI-FEAT-040": [
+      "services/transferExportService.js"
+    ],
+    "AI-FEAT-041": [
+      "renderer/index.html",
+      "services/transferExportService.js"
+    ],
+    "AI-FEAT-042": [
+      "services/nasEventCache.js",
+      "services/offlineCollectionRegistryService.js",
+      "services/settings.js"
+    ],
+    "AI-FEAT-043": [
+      "services/archiveConsistencyService.js"
+    ],
+    "AI-FEAT-044": [
+      "services/archiveSyncService.js",
+      "services/localSyncManifest.js",
+      "services/syncQueueService.js",
+      "services/syncReviewService.js"
+    ],
+    "AI-FEAT-045": [
+      "services/archiveLockService.js"
+    ],
+    "AI-FEAT-046": [
+      "services/adoptionDryRunService.js",
+      "services/adoptionPreviewService.js",
+      "services/adoptionWriteContract.js",
+      "services/adoptionWriteService.js"
+    ],
+    "AI-FEAT-047": [
+      "main/qmzService.js",
+      "renderer/renderer.js",
+      "test/qmzLiveE2E.test.js"
+    ],
+    "AI-FEAT-048": [
+      "realtime-server/",
+      "services/offlineCollectionRegistryService.js",
+      "services/realtimeOperationsService.js"
+    ],
+    "AI-FEAT-049": [],
+    "AI-FEAT-050": [],
+    "AI-FEAT-051": [],
+    "AI-FEAT-052": [],
+    "AI-FEAT-053": [],
+    "AI-FEAT-054": [],
+    "AI-FEAT-055": [],
+    "AI-FEAT-056": []
+  },
+  "feature_to_tests": {
+    "AI-FEAT-001": [],
+    "AI-FEAT-002": [],
+    "AI-FEAT-003": [],
+    "AI-FEAT-004": [
+      "test/eventJsonStore.test.js",
+      "test/metadataStateService.test.js"
+    ],
+    "AI-FEAT-005": [],
+    "AI-FEAT-006": [],
+    "AI-FEAT-007": [],
+    "AI-FEAT-008": [],
+    "AI-FEAT-009": [
+      "test/eventJsonStore.test.js"
+    ],
+    "AI-FEAT-010": [],
+    "AI-FEAT-011": [],
+    "AI-FEAT-012": [],
+    "AI-FEAT-013": [],
+    "AI-FEAT-014": [],
+    "AI-FEAT-015": [],
+    "AI-FEAT-016": [],
+    "AI-FEAT-017": [],
+    "AI-FEAT-018": [],
+    "AI-FEAT-019": [],
+    "AI-FEAT-020": [],
+    "AI-FEAT-021": [
+      "test/eventJsonStore.test.js",
+      "test/metadataStateService.test.js"
+    ],
+    "AI-FEAT-022": [],
+    "AI-FEAT-023": [],
+    "AI-FEAT-024": [],
+    "AI-FEAT-025": [],
+    "AI-FEAT-026": [],
+    "AI-FEAT-027": [],
+    "AI-FEAT-028": [],
+    "AI-FEAT-029": [
+      "test/eventJsonStore.test.js",
+      "test/fieldSpecsConsistency.test.js",
+      "test/metadataAuditExport.test.js",
+      "test/metadataAuditService.test.js",
+      "test/metadataExpectationService.test.js",
+      "test/metadataQueueResume.test.js",
+      "test/metadataRepairService.test.js",
+      "test/metadataStateService.test.js",
+      "test/metadataVerificationService.test.js",
+      "test/rawXmpReadback.test.js"
+    ],
+    "AI-FEAT-030": [
+      "test/fieldSpecsConsistency.test.js",
+      "test/metadataQueueResume.test.js",
+      "test/metadataQueueStore.test.js",
+      "test/metadataRepairService.test.js",
+      "test/metadataStateService.test.js"
+    ],
+    "AI-FEAT-031": [
+      "test/metadataStateService.test.js"
+    ],
+    "AI-FEAT-032": [
+      "test/metadataVerificationService.test.js"
+    ],
+    "AI-FEAT-033": [
+      "test/fieldSpecsConsistency.test.js",
+      "test/metadataAuditExport.test.js",
+      "test/metadataAuditService.test.js",
+      "test/metadataRepairService.test.js"
+    ],
+    "AI-FEAT-034": [
+      "test/dashboardMetadataHealthCard.test.js",
+      "test/metadataManagementModalUI.test.js"
+    ],
+    "AI-FEAT-035": [
+      "test/dashboardMetadataHealthCard.test.js"
+    ],
+    "AI-FEAT-036": [],
+    "AI-FEAT-037": [],
+    "AI-FEAT-038": [],
+    "AI-FEAT-039": [
+      "test/transferImportOutcomeManifest.test.js"
+    ],
+    "AI-FEAT-040": [],
+    "AI-FEAT-041": [
+      "test/transferImportOutcomeManifest.test.js"
+    ],
+    "AI-FEAT-042": [],
+    "AI-FEAT-043": [],
+    "AI-FEAT-044": [],
+    "AI-FEAT-045": [],
+    "AI-FEAT-046": [],
+    "AI-FEAT-047": [
+      "test/qmzLiveE2E.test.js"
+    ],
+    "AI-FEAT-048": [],
+    "AI-FEAT-049": [],
+    "AI-FEAT-050": [],
+    "AI-FEAT-051": [],
+    "AI-FEAT-052": [],
+    "AI-FEAT-053": [],
+    "AI-FEAT-054": [],
+    "AI-FEAT-055": [],
+    "AI-FEAT-056": []
+  },
+  "ipc_to_features": {
+    "SUBSYS-application-platform": {
+      "basis": "derived — subsystem source directories include main/",
+      "features": [
+        "AI-FEAT-001",
+        "AI-FEAT-002",
+        "AI-FEAT-003",
+        "AI-FEAT-004",
+        "AI-FEAT-005",
+        "AI-FEAT-006",
+        "AI-FEAT-007"
+      ]
+    },
+    "SUBSYS-import-and-archive-writing": {
+      "basis": "derived — subsystem source directories include main/",
+      "features": [
+        "AI-FEAT-019",
+        "AI-FEAT-020",
+        "AI-FEAT-021",
+        "AI-FEAT-022",
+        "AI-FEAT-023",
+        "AI-FEAT-024",
+        "AI-FEAT-025",
+        "AI-FEAT-026",
+        "AI-FEAT-027",
+        "AI-FEAT-028"
+      ]
+    },
+    "SUBSYS-media-browsing": {
+      "basis": "derived — subsystem source directories include main/",
+      "features": [
+        "AI-FEAT-013",
+        "AI-FEAT-014",
+        "AI-FEAT-015",
+        "AI-FEAT-016"
+      ]
+    },
+    "SUBSYS-metadata": {
+      "basis": "derived — subsystem source directories include main/",
+      "features": [
+        "AI-FEAT-029",
+        "AI-FEAT-030",
+        "AI-FEAT-031",
+        "AI-FEAT-032",
+        "AI-FEAT-033",
+        "AI-FEAT-034",
+        "AI-FEAT-035",
+        "AI-FEAT-036",
+        "AI-FEAT-037"
+      ]
+    },
+    "SUBSYS-source-acquisition": {
+      "basis": "derived — subsystem source directories include main/",
+      "features": [
+        "AI-FEAT-011",
+        "AI-FEAT-012"
+      ]
+    },
+    "SUBSYS-special-workflows": {
+      "basis": "derived — subsystem source directories include main/",
+      "features": [
+        "AI-FEAT-047"
+      ]
+    }
+  },
+  "note": "code_path_to_features only lists paths already explicitly authored in some feature's Related Files section — a path not appearing here is unresolved, not unowned. Use \"node scripts/product-docs/cli.js automation ownership <path>\" for a multi-signal, confidence-scored resolution of an arbitrary path.",
+  "schema_version": "1.1.0",
+  "service_to_features": {
+    "SUBSYS-application-platform": {
+      "basis": "derived — subsystem source directories include services/",
+      "features": [
+        "AI-FEAT-001",
+        "AI-FEAT-002",
+        "AI-FEAT-003",
+        "AI-FEAT-004",
+        "AI-FEAT-005",
+        "AI-FEAT-006",
+        "AI-FEAT-007"
+      ]
+    },
+    "SUBSYS-archive-operations": {
+      "basis": "derived — subsystem source directories include services/",
+      "features": [
+        "AI-FEAT-042",
+        "AI-FEAT-043",
+        "AI-FEAT-044",
+        "AI-FEAT-045",
+        "AI-FEAT-046"
+      ]
+    },
+    "SUBSYS-collaboration-and-realtime-coordination": {
+      "basis": "derived — subsystem source directories include services/",
+      "features": [
+        "AI-FEAT-048"
+      ]
+    },
+    "SUBSYS-import-and-archive-writing": {
+      "basis": "derived — subsystem source directories include services/",
+      "features": [
+        "AI-FEAT-019",
+        "AI-FEAT-020",
+        "AI-FEAT-021",
+        "AI-FEAT-022",
+        "AI-FEAT-023",
+        "AI-FEAT-024",
+        "AI-FEAT-025",
+        "AI-FEAT-026",
+        "AI-FEAT-027",
+        "AI-FEAT-028"
+      ]
+    },
+    "SUBSYS-media-browsing": {
+      "basis": "derived — subsystem source directories include services/",
+      "features": [
+        "AI-FEAT-013",
+        "AI-FEAT-014",
+        "AI-FEAT-015",
+        "AI-FEAT-016"
+      ]
+    },
+    "SUBSYS-metadata": {
+      "basis": "derived — subsystem source directories include services/",
+      "features": [
+        "AI-FEAT-029",
+        "AI-FEAT-030",
+        "AI-FEAT-031",
+        "AI-FEAT-032",
+        "AI-FEAT-033",
+        "AI-FEAT-034",
+        "AI-FEAT-035",
+        "AI-FEAT-036",
+        "AI-FEAT-037"
+      ]
+    },
+    "SUBSYS-transfer-and-backup": {
+      "basis": "derived — subsystem source directories include services/",
+      "features": [
+        "AI-FEAT-038",
+        "AI-FEAT-039",
+        "AI-FEAT-040",
+        "AI-FEAT-041"
+      ]
+    }
+  },
+  "subsystem_to_features": {
+    "SUBSYS-analytics-and-intelligence": [
+      "AI-FEAT-055",
+      "AI-FEAT-056"
+    ],
+    "SUBSYS-application-platform": [
+      "AI-FEAT-001",
+      "AI-FEAT-002",
+      "AI-FEAT-003",
+      "AI-FEAT-004",
+      "AI-FEAT-005",
+      "AI-FEAT-006",
+      "AI-FEAT-007"
+    ],
+    "SUBSYS-archive-operations": [
+      "AI-FEAT-042",
+      "AI-FEAT-043",
+      "AI-FEAT-044",
+      "AI-FEAT-045",
+      "AI-FEAT-046"
+    ],
+    "SUBSYS-collaboration-and-realtime-coordination": [
+      "AI-FEAT-048"
+    ],
+    "SUBSYS-event-management": [
+      "AI-FEAT-009",
+      "AI-FEAT-010"
+    ],
+    "SUBSYS-grouping-and-routing": [
+      "AI-FEAT-017",
+      "AI-FEAT-018"
+    ],
+    "SUBSYS-import-and-archive-writing": [
+      "AI-FEAT-019",
+      "AI-FEAT-020",
+      "AI-FEAT-021",
+      "AI-FEAT-022",
+      "AI-FEAT-023",
+      "AI-FEAT-024",
+      "AI-FEAT-025",
+      "AI-FEAT-026",
+      "AI-FEAT-027",
+      "AI-FEAT-028"
+    ],
+    "SUBSYS-media-browsing": [
+      "AI-FEAT-013",
+      "AI-FEAT-014",
+      "AI-FEAT-015",
+      "AI-FEAT-016"
+    ],
+    "SUBSYS-metadata": [
+      "AI-FEAT-029",
+      "AI-FEAT-030",
+      "AI-FEAT-031",
+      "AI-FEAT-032",
+      "AI-FEAT-033",
+      "AI-FEAT-034",
+      "AI-FEAT-035",
+      "AI-FEAT-036",
+      "AI-FEAT-037"
+    ],
+    "SUBSYS-planned-archive-management": [
+      "AI-FEAT-049",
+      "AI-FEAT-050",
+      "AI-FEAT-051",
+      "AI-FEAT-052"
+    ],
+    "SUBSYS-product-ui": [
+      "AI-FEAT-008"
+    ],
+    "SUBSYS-reliability-and-recovery": [
+      "AI-FEAT-054"
+    ],
+    "SUBSYS-search-and-discovery": [
+      "AI-FEAT-053"
+    ],
+    "SUBSYS-source-acquisition": [
+      "AI-FEAT-011",
+      "AI-FEAT-012"
+    ],
+    "SUBSYS-special-workflows": [
+      "AI-FEAT-047"
+    ],
+    "SUBSYS-transfer-and-backup": [
+      "AI-FEAT-038",
+      "AI-FEAT-039",
+      "AI-FEAT-040",
+      "AI-FEAT-041"
+    ]
+  },
+  "test_to_features": {
+    "test/dashboardMetadataHealthCard.test.js": [
+      "AI-FEAT-034",
+      "AI-FEAT-035"
+    ],
+    "test/eventJsonStore.test.js": [
+      "AI-FEAT-004",
+      "AI-FEAT-009",
+      "AI-FEAT-021",
+      "AI-FEAT-029"
+    ],
+    "test/fieldSpecsConsistency.test.js": [
+      "AI-FEAT-029",
+      "AI-FEAT-030",
+      "AI-FEAT-033"
+    ],
+    "test/metadataAuditExport.test.js": [
+      "AI-FEAT-029",
+      "AI-FEAT-033"
+    ],
+    "test/metadataAuditService.test.js": [
+      "AI-FEAT-029",
+      "AI-FEAT-033"
+    ],
+    "test/metadataExpectationService.test.js": [
+      "AI-FEAT-029"
+    ],
+    "test/metadataManagementModalUI.test.js": [
+      "AI-FEAT-034"
+    ],
+    "test/metadataQueueResume.test.js": [
+      "AI-FEAT-029",
+      "AI-FEAT-030"
+    ],
+    "test/metadataQueueStore.test.js": [
+      "AI-FEAT-030"
+    ],
+    "test/metadataRepairService.test.js": [
+      "AI-FEAT-029",
+      "AI-FEAT-030",
+      "AI-FEAT-033"
+    ],
+    "test/metadataStateService.test.js": [
+      "AI-FEAT-004",
+      "AI-FEAT-021",
+      "AI-FEAT-029",
+      "AI-FEAT-030",
+      "AI-FEAT-031"
+    ],
+    "test/metadataVerificationService.test.js": [
+      "AI-FEAT-029",
+      "AI-FEAT-032"
+    ],
+    "test/qmzLiveE2E.test.js": [
+      "AI-FEAT-047"
+    ],
+    "test/rawXmpReadback.test.js": [
+      "AI-FEAT-029"
+    ],
+    "test/transferImportOutcomeManifest.test.js": [
+      "AI-FEAT-039",
+      "AI-FEAT-041"
+    ]
+  }
+}

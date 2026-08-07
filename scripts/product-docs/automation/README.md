@@ -31,9 +31,14 @@ A packet is append-only-journaled (`*.journal.jsonl`, written before every atomi
 | `validationGate.js` | Mode-aware pass/fail decision for `automation finalize` |
 | `recovery.js` | Stale-base-commit and stale-lock detection |
 | `auditLog.js` | Append-only, secret-redacted run log |
-| `orchestrator.js` | Wires the above into `start`/`update`/`finalize`/`status`/`recover`/`dry-run`/`reconcile` |
+| `orchestrator.js` | Wires the above into `start`/`update`/`finalize`/`status`/`recover`/`dry-run`/`reconcile` — also invokes Part 7B's `decisionIntelligence.scanPacket` as a best-effort step during `finalize()`, same non-blocking contract as Part 6's memory compilation |
 | `markdownSections.js` | Two primitives: append-within-a-section, insert-after-changelog's-first-rule — both idempotent |
 | `cli.js` | Thin dispatcher for `automation <sub>`, mirroring the parent `cli.js` convention |
+| `hookAutomation.js` (Part 7A) | JS logic behind the version-controlled git hooks — `preCommitGate`/`prePushGate`/`postCommitLink`, kept out of the shell scripts so it's unit-testable |
+| `decisionIntelligence.js` (Part 7B) | Structural-signal detection + evidence-gated `Status: Draft` decision drafting or local candidate creation |
+| `ownershipEngine.js` (Part 7C) | Deterministic, weighted, multi-signal ownership scoring for paths Part 4's explicit/inferred resolution can't answer |
+| `releaseIntelligence.js` (Part 5, extended Part 7D) | Release-note **drafts** only — now with auto prior-tag discovery and evidence-gated breaking-change/migration/known-issues/roadmap-impact/risk sections |
+| `contextEngine.js` / `contextCli.js` (Part 7E) | Bounded, authority-ordered context bundles for `context <sub>` — reuses `lib/query.js`, `lib/impact.js`, `ownershipEngine.js` |
 
 ## Autonomy modes
 

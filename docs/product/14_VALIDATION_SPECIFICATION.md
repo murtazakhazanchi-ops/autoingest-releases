@@ -161,6 +161,40 @@ Run these checks after any change to `docs/product/`, and always before a docume
 
 ---
 
+## 18. Decision-draft evidence (Part 7B)
+
+**Checks**: every `decisions/DEC-###_*.md` with `Status: Draft — auto-detected architectural signal...` carries an `Evidence status` field citing the originating session or detected signals.
+
+**Fail condition**: a Draft decision with no such citation — indistinguishable from a hand-typed placeholder.
+
+**Verified in practice**: `scripts/product-docs/lib/decisionValidators.js`'s `checkDecisionDraftsHaveEvidence`, `scripts/product-docs/test/decisionValidators.test.js`.
+
+## 19. Accepted-decision evidence (Part 7B)
+
+**Checks**: an `Accepted` decision's Options Considered section is not still the literal evidence-pending placeholder `decisionIntelligence.js`/`canonicalUpdater.js` write when no alternatives were recorded.
+
+**Fail condition**: none by itself — this is an `evidence_gap`-level finding (visibility only, same policy as Rule 13), not a blocking error.
+
+**Verified in practice**: `checkAcceptedDecisionsHaveEvidence`, `scripts/product-docs/test/decisionValidators.test.js`.
+
+## 20. Superseded-decision reciprocal links (Part 7B)
+
+**Checks**: a `Superseded by DEC-###` status resolves to a real decision, and that target decision's own body mentions the superseded ID back.
+
+**Fail condition (hard)**: the superseding decision doesn't exist. **Warning (soft)**: it exists but doesn't reference back.
+
+**Verified in practice**: `checkSupersededReciprocalLinks`, `scripts/product-docs/test/decisionValidators.test.js`.
+
+## 21. Overlapping active decisions (Part 7B, informational)
+
+**Checks**: two or more `Accepted` decisions governing the exact same feature/roadmap set — not necessarily a contradiction, but worth a human glance.
+
+**Fail condition**: none — information-level only, never asserts the two actually disagree.
+
+**Verified in practice**: `checkContradictoryActiveDecisions`, `scripts/product-docs/test/decisionValidators.test.js`.
+
+---
+
 ## Running these checks together
 
 None of these rules depend on executing application code, running the test suite, or any tool beyond text search/parsing over `docs/product/` and `git log`. A future maintainer implementing this as an actual script should implement rules 1–8 and 13 as pure static analysis over the Markdown files (as this specification's authors did by hand, using the same logic described above), and rules 9, 11, and 12 as a combination of static analysis plus `git log` cross-reference. No rule here requires network access, a database, or any state external to this Git repository.

@@ -1,5 +1,5 @@
 {
-  "docsys_version": "1.0.0",
+  "docsys_version": "1.1.0",
   "findings": [
     {
       "file": "11_ARCHITECTURAL_EVOLUTION.md",
@@ -567,14 +567,21 @@
       "message": "services/offlineCollectionRegistryService.js is explicitly owned by 2 features (shared, not exclusive)",
       "note": "AI-FEAT-042, AI-FEAT-048",
       "rule": "shared-code-path"
+    },
+    {
+      "file": "DEC-006",
+      "level": "information",
+      "message": "2 Accepted decisions (DEC-006, DEC-007) all govern the exact same feature/milestone set (AI-FEAT-029) — worth a human check that they don't contradict each other",
+      "note": null,
+      "rule": "overlapping-active-decisions"
     }
   ],
-  "schema_version": "1.0.0",
-  "source_commit": "b973436c9c7bdbc70f2ce8fa49920ccf8d92925b",
+  "schema_version": "1.1.0",
+  "source_commit": "bb23a28fd29446f95496bfaccc033ee7c1b125a4",
   "summary": {
     "error": 0,
     "evidence_gap": 56,
-    "information": 11,
+    "information": 12,
     "warning": 14
   }
 }
