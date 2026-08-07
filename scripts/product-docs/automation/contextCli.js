@@ -19,6 +19,7 @@ Subcommands:
   decision DEC-###
   postmortem PM-###
   memory AI-MEM-####
+  conversation ENG-CONV-####
   release <tag | A..B>
   task "<natural-language task>"
   explain "<question>"
@@ -104,7 +105,7 @@ function run(args) {
   const { positional, flags } = parseArgs(rest);
   const asJson = !!flags.json;
 
-  const simpleKinds = ['feature', 'subsystem', 'file', 'roadmap', 'bug', 'decision', 'postmortem', 'memory', 'release', 'task', 'explain'];
+  const simpleKinds = ['feature', 'subsystem', 'file', 'roadmap', 'bug', 'decision', 'postmortem', 'memory', 'conversation', 'release', 'task', 'explain'];
   if (simpleKinds.includes(sub)) {
     if (positional.length === 0) {
       console.log(`Usage: context ${sub} <input> [--json]`);

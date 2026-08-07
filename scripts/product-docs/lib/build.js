@@ -19,6 +19,9 @@ const { compareIds } = require('./ids');
 const { buildMemoryIndex } = require('./memoryIndex');
 const { renderMemoryIndexMd, renderEngineeringMemoryTimelineMd } = require('./renderMemory');
 const { buildOwnershipManifest, renderOwnershipManifestMd } = require('./ownershipManifest');
+const { buildConversationIndex } = require('./conversationIndex');
+const { renderConversationIndexMd, renderConversationTimelineMd } = require('./renderConversation');
+const { buildUnimplementedRequirements, renderUnimplementedRequirementsMd } = require('./unimplementedRequirements');
 
 // Assembles every Part 4 generated artifact in memory. Returns:
 //   - `parsed`: the raw parsed docs/product/ structures (lib/parseProductDocs)
@@ -32,7 +35,8 @@ function assemble() {
   const authorityIndex = buildAuthorityIndex(parsed);
   const graph = buildGraph(parsed);
   const memoryIndex = buildMemoryIndex(parsed);
-  const searchIndex = buildSearchIndex(parsed, featureIndex, subsystems, memoryIndex);
+  const conversationIndex = buildConversationIndex(parsed);
+  const searchIndex = buildSearchIndex(parsed, featureIndex, subsystems, memoryIndex, conversationIndex);
   const dashboard = buildRoadmapDashboard(parsed); // throws DashboardDisagreementError on real disagreement
 
   const timelines = [];
@@ -42,8 +46,9 @@ function assemble() {
   timelines.sort((a, b) => compareIds(a.feature_id, b.feature_id));
 
   const ownershipManifest = buildOwnershipManifest(parsed, { featureIndex, subsystems, sourceIndex });
+  const unimplementedRequirements = buildUnimplementedRequirements(parsed, conversationIndex);
 
-  const built = { subsystems, sourceIndex, featureIndex, authorityIndex, graph, searchIndex, dashboard, timelines, memoryIndex, ownershipManifest };
+  const built = { subsystems, sourceIndex, featureIndex, authorityIndex, graph, searchIndex, dashboard, timelines, memoryIndex, ownershipManifest, conversationIndex, unimplementedRequirements };
 
   const files = new Map();
 
@@ -104,6 +109,22 @@ function assemble() {
   }));
   files.set('OWNERSHIP_MANIFEST.md', renderOwnershipManifestMd(ownershipManifest));
 
+  files.set('conversation-index.json', stableStringify({
+    schema_version: version.SCHEMA_VERSION,
+    docsys_version: version.DOCSYS_VERSION,
+    conversations: conversationIndex,
+  }));
+  files.set('conversation-index.jsonl', conversationIndex.map((r) => JSON.stringify(r)).join('\n') + (conversationIndex.length ? '\n' : ''));
+  files.set('CONVERSATION_INDEX.md', renderConversationIndexMd(conversationIndex, version.DOCSYS_VERSION));
+  files.set('CONVERSATION_TIMELINE.md', renderConversationTimelineMd(conversationIndex, version.DOCSYS_VERSION));
+
+  files.set('unimplemented-conversation-requirements.json', stableStringify({
+    schema_version: version.SCHEMA_VERSION,
+    docsys_version: version.DOCSYS_VERSION,
+    requirements: unimplementedRequirements,
+  }));
+  files.set('UNIMPLEMENTED_CONVERSATION_REQUIREMENTS.md', renderUnimplementedRequirementsMd(unimplementedRequirements, version.DOCSYS_VERSION));
+
   const manifest = {
     docsys_version: version.DOCSYS_VERSION,
     schema_version: version.SCHEMA_VERSION,
@@ -121,6 +142,7 @@ function assemble() {
       subsystems: subsystems.length,
       search_index_records: searchIndex.length,
       memory_capsules: memoryIndex.length,
+      engineering_conversations: conversationIndex.length,
     },
     relationship_counts: {
       dependency_graph_edges: graph.edges.length,

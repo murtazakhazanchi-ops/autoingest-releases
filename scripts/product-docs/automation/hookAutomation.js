@@ -241,6 +241,11 @@ function prePushGate() {
   const errorLevelPackets = remaining.filter((p) => p.automation_status === 'failed');
   const impactSummary = buildPushImpactSummary(assembled);
   const uncommittedDocs = uncommittedDocsChanges();
+  // Part 8 — informational only, never a STANDARD-mode blocker (see
+  // docs/product/18_ENGINEERING_CONVERSATION_POLICY.md § 19): report how
+  // many conversation-sourced implementation requests have no recorded
+  // Implemented outcome yet, so they don't silently fall out of view.
+  const unimplementedConversationRequirements = (assembled.built.unimplementedRequirements || []).length;
   const ok = v.ok && strictBlocking.length === 0;
   return {
     ok,
@@ -252,6 +257,10 @@ function prePushGate() {
     uncommitted_canonical_changes: uncommittedDocs,
     uncommitted_canonical_changes_note: uncommittedDocs.length
       ? `${uncommittedDocs.length} file(s) under docs/product/ were written by auto-finalize during this pre-push check and are NOT committed. This push proceeds without them — commit and push again, or they remain only in your local working tree.`
+      : null,
+    unimplemented_conversation_requirements_count: unimplementedConversationRequirements,
+    unimplemented_conversation_requirements_note: unimplementedConversationRequirements
+      ? `${unimplementedConversationRequirements} conversation-sourced implementation request(s) have no recorded "Implemented" outcome yet — see docs/product/generated/UNIMPLEMENTED_CONVERSATION_REQUIREMENTS.md. Informational only, never blocks this push.`
       : null,
   };
 }
@@ -266,6 +275,79 @@ function prePushGate() {
 // Then reconciles generated/ the same way `automation reconcile` already
 // does. Failures here are reported, never silently swallowed, and never
 // block (the commit already exists).
+
+// Part 8 — best-effort reconciliation of a conversation's Outcome log
+// against real commit evidence, extending postCommitLink the same way it
+// already extends Evidence Packet sessions. Never imports anything new
+// (see docs/product/18_ENGINEERING_CONVERSATION_POLICY.md § 19 / § 10 —
+// this reads existing canonical docs/product/conversations/ records only).
+// A conversation is only ever marked Implemented here when its own primary
+// feature ownership genuinely overlaps what this commit's changed files
+// resolve to — never a keyword guess.
+// Cheap pre-check, deliberately callable BEFORE the caller pays for a full
+// build.assemble() — an empty commit (no changed files) or a repository
+// with no docs/product/conversations/ directory yet has nothing this
+// function could possibly do, and the caller (postCommitLink) should never
+// spend a full docs/product/ parse to discover that (found in Part 8
+// performance review: an earlier version called build.assemble() first,
+// unconditionally, even for a commit this function would immediately
+// no-op on).
+function conversationLinkingCouldApply(changed) {
+  if (!changed || changed.length === 0) return false;
+  let CONVERSATION_DOCS_ROOT;
+  try {
+    ({ CONVERSATION_DOCS_ROOT } = require('./conversation/paths'));
+  } catch {
+    return false; // module not present in an older checkout
+  }
+  return require('fs').existsSync(CONVERSATION_DOCS_ROOT);
+}
+
+function linkCommitToConversations(headCommit, changed, built) {
+  const fs = require('fs');
+  const path = require('path');
+  const { CONVERSATION_DOCS_ROOT } = require('./conversation/paths');
+  const { resolveFileOwnership } = require('../lib/changeReport');
+  const changedFeatureIds = new Set();
+  const subsystemById = new Map((built.subsystems || []).map((s) => [s.id, s]));
+  for (const f of changed) {
+    const { confidence, subsystems } = resolveFileOwnership(f, built.sourceIndex);
+    if (confidence === 'unknown') continue;
+    for (const subId of subsystems) {
+      const s = subsystemById.get(subId);
+      if (s) for (const feat of s.primaryFeatures) changedFeatureIds.add(feat);
+    }
+  }
+  if (changedFeatureIds.size === 0) return [];
+
+  const md = require('../lib/markdown');
+  const { atomicWriteFileSync } = require('./atomicWrite');
+  const { appendLineToSection } = require('./markdownSections');
+  const linked = [];
+  for (const file of fs.readdirSync(CONVERSATION_DOCS_ROOT)) {
+    if (!/^ENG-CONV-\d{4}_.+\.md$/.test(file)) continue;
+    const filePath = path.join(CONVERSATION_DOCS_ROOT, file);
+    const content = fs.readFileSync(filePath, 'utf8');
+    if (/^-\s+\*\*\d{4}-\d{2}-\d{2}\*\*\s+—\s+Implemented/im.test(md.extractSection(content, 'Outcome') || '')) continue; // already Implemented
+    const handoff = md.extractSection(content, 'Implementation Handoff') || '';
+    if (/^-\s+\*\*Work requested\*\*:\s*None recorded\.?$/im.test(handoff.trim())) continue; // nothing was ever requested
+    const relSection = md.extractSection(content, 'Relationships') || '';
+    const relTable = relSection ? md.extractHeaderTable(relSection) : {};
+    const primaryFeatureIds = require('../lib/ids').extractIds(String(relTable['Primary feature IDs'] || ''), 'feature');
+    if (!primaryFeatureIds.some((id) => changedFeatureIds.has(id))) continue;
+    const idMatch = /^(ENG-CONV-\d{4})_/.exec(file);
+    const convId = idMatch ? idMatch[1] : null;
+    if (!convId) continue;
+    const line = `- **${new Date().toISOString().slice(0, 10)}** — Implemented — commit \`${headCommit.slice(0, 8)}\` (post-commit reconciliation; changed file(s) resolved to ${primaryFeatureIds.filter((id) => changedFeatureIds.has(id)).join(', ')}).`;
+    const updated = appendLineToSection(content, 'Outcome', line).replace(/(\| Status \|)([^|\n]*)(\|)/, `$1 Implemented $3`);
+    if (updated !== content) {
+      atomicWriteFileSync(filePath, updated);
+      linked.push(convId);
+    }
+  }
+  return linked;
+}
+
 function postCommitLink() {
   const headCommit = git(['rev-parse', 'HEAD']);
   const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']);
@@ -282,6 +364,16 @@ function postCommitLink() {
     linked.push(packet.session_id);
   }
 
+  let linkedConversations = [];
+  if (conversationLinkingCouldApply(changed)) {
+    try {
+      const { built } = build.assemble();
+      linkedConversations = linkCommitToConversations(headCommit, changed, built);
+    } catch {
+      linkedConversations = []; // best-effort only — never blocks post-commit
+    }
+  }
+
   const rebuild = rebuildGeneratedArtifacts();
 
   auditLog.recordRun({
@@ -296,11 +388,17 @@ function postCommitLink() {
     generated_rebuilt: !!rebuild.ok,
     outcome: rebuild.ok ? 'ok' : 'rebuild-failed',
     duration_ms: 0,
-    warnings: linked.map((id) => `linked commit ${headCommit.slice(0, 8)} to session ${id}`),
+    warnings: [
+      ...linked.map((id) => `linked commit ${headCommit.slice(0, 8)} to session ${id}`),
+      ...linkedConversations.map((id) => `linked commit ${headCommit.slice(0, 8)} to conversation ${id} (Outcome -> Implemented)`),
+    ],
     evidence_gaps: [],
   });
 
-  return { commit: headCommit, branch, linked_sessions: linked, changed_files: changed, generated_rebuilt: !!rebuild.ok, rebuild_output: rebuild.ok ? null : rebuild.output };
+  return {
+    commit: headCommit, branch, linked_sessions: linked, linked_conversations: linkedConversations,
+    changed_files: changed, generated_rebuilt: !!rebuild.ok, rebuild_output: rebuild.ok ? null : rebuild.output,
+  };
 }
 
 module.exports = {

@@ -29,7 +29,7 @@ function keywordsFrom(...texts) {
   return Array.from(words).sort();
 }
 
-function buildSearchIndex(parsed, featureIndexRecords, subsystems, memoryIndexRecords) {
+function buildSearchIndex(parsed, featureIndexRecords, subsystems, memoryIndexRecords, conversationIndexRecords) {
   const records = [];
 
   // Part 6 — memory capsules join the same flat search index as every other
@@ -42,6 +42,18 @@ function buildSearchIndex(parsed, featureIndexRecords, subsystems, memoryIndexRe
       relatedIds: [...m.feature_ids, ...m.bug_ids, ...m.decision_ids, ...m.postmortem_ids, ...m.roadmap_ids],
       authorityLevel: 'evidence', // memory is historical evidence, not canonical — see policy § 3
       evidenceStatus: m.evidence_classification,
+    }));
+  }
+
+  // Part 8 — Engineering Conversation records join the same flat search
+  // index, same tier as memory — see docs/product/18_ENGINEERING_CONVERSATION_POLICY.md § 3.
+  for (const c of conversationIndexRecords || []) {
+    records.push(rec('engineering_conversation', c.conversation_id, c.title, c.canonical_path, {
+      keywords: c.keywords,
+      summary: c.summary,
+      relatedIds: [...c.feature_ids, ...c.bug_ids, ...c.decision_ids, ...c.memory_ids, ...c.roadmap_ids, ...c.related_conversation_ids],
+      authorityLevel: 'evidence',
+      evidenceStatus: c.provenance_classification,
     }));
   }
 
