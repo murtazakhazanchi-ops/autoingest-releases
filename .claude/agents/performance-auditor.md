@@ -525,6 +525,24 @@ Validation:
 - Confirm main window loads after confirmation.
 - Confirm user switch avoids unnecessary workflow reset.
 
+### Cheap Pre-Check Before Expensive Operation in Hot/Frequently-Triggered Paths
+
+Context:
+- Applies to any git hook, per-request handler, or other frequently-triggered path that guards an expensive operation (a full parse, a full rebuild, a full scan) behind a cheap existence/relevance condition.
+
+Rule:
+- The cheap existence/relevance check must run in the caller, *before* the expensive operation — not be embedded inside the expensive operation's own callee, where the expensive work has already run by the time the cheap check executes.
+- This is an extension of "Bottleneck Classification First": once the bottleneck (an unconditional full parse/rebuild) is identified, the fix is ordering, not caching or restructuring the expensive operation itself.
+- Reference: `scripts/product-docs/automation/hookAutomation.js`'s `postCommitLink` called `build.assemble()` (a full `docs/product/` parse) unconditionally on every commit; the existence/emptiness check lived inside `linkCommitToConversations`, called only after `build.assemble()` had already run. Fixed by extracting `conversationLinkingCouldApply(changed)` and calling it before `build.assemble()`. This exact bug class had already been fixed once for a different caller in the same file (per the file's own comment referencing a prior performance review) — its recurrence for a new caller is a strong signal this ordering rule should be checked explicitly on every new caller of an expensive shared operation, not assumed to be handled once for the whole file.
+
+Avoid:
+- Approving a new caller of an expensive shared operation (parse, rebuild, scan) without checking whether that specific caller pays the cost unconditionally, even if other callers of the same operation already have a pre-check.
+- Placing the "is this even relevant" check inside the function that does the expensive work, when the goal is to avoid paying that cost at all for irrelevant invocations.
+
+Validation:
+- For any new caller of an expensive shared operation in a hot/frequently-triggered path: confirm a cheap relevance/existence check runs in the caller before the expensive call, not after it or inside the callee.
+- Confirm the check covers the actual conditions under which the expensive work is unnecessary (e.g. zero relevant changed files, target directory doesn't exist yet).
+
 ## Validation Checklist
 
 Before analysis, read:
