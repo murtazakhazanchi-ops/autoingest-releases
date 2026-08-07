@@ -275,6 +275,41 @@ Validation:
 - Confirm each requires equivalent real evidence, not merely a hint or heuristic.
 - Confirm the resolver leaves the item unresolved (and excluded) rather than guessing when no branch confirms.
 
+### Exact-Match Identity Comparison, Not Substring Containment
+
+Context:
+- Applies to any dedup, identity-matching, or lookup logic that compares an extracted identifier/provenance value against another field or document.
+
+Rule:
+- Identity/dedup matching must use exact-value comparison against a precisely, narrowly extracted field (a strict per-line/per-field regex or equivalent) — never a substring/`.includes()` search across a whole rendered prose section, log line, or document that may also contain unrelated boilerplate text.
+- A substring check against a larger text blob can match purely because the blob's boilerplate happens to contain the search string, silently misclassifying an unrelated record as a match (or a match as unrelated).
+- Reference: `scripts/product-docs/automation/conversation/dedupe.js`'s `findExactDuplicate()` originally did `provenance.includes(String(packet.source_conversation_id))` against a whole Provenance section containing boilerplate like "adapter" — a packet with `source_conversation_id: "adapter"` matched an unrelated record. Fixed with `extractSourceConversationId()` (strict per-line regex) plus exact string equality.
+
+Avoid:
+- Approving `.includes()`, `indexOf()`, or regex-without-anchors used to compare an identifier against a larger text blob for identity/dedup purposes.
+- Assuming a substring check is "good enough" because it worked in manual testing with unremarkable input values.
+
+Validation:
+- For any dedup/identity-matching diff: confirm the comparison extracts an exact field value (bounded regex or structured field access) before comparing, not a substring search on a larger blob.
+- Try a synthetic identifier value equal to a substring of the target document's boilerplate text and confirm it does not falsely match.
+
+### Replacer Function Required for Untrusted Values in String.replace()
+
+Context:
+- Applies to any code calling `String.prototype.replace(pattern, replacementString)` where the replacement string is built by interpolating an untrusted or dynamic value (CLI input, user input, external data).
+
+Rule:
+- Never interpolate untrusted/dynamic data into the replacement-*string* argument of `.replace()`. A replacement string specially interprets `$&`, `` $` ``, `$'`, `$$`, and `$<n>` sequences — untrusted input containing one of these can splice in unintended surrounding text or corrupt the result.
+- Use a replacer *function* instead: `content.replace(re, (matched, g1, g2, ...) => \`${g1} ${value} ${g2}\`)`. A replacer function's return value is never re-interpreted for `$`-sequences.
+- Reference: `scripts/product-docs/automation/conversationCli.js`'s `cmdLink` did `content.replace(re, \`$1 ${merged} $3\`)` — a CLI-supplied value containing `$'` spliced in trailing document text, corrupting a Markdown table row.
+
+Avoid:
+- Approving `content.replace(re, \`...${untrustedValue}...\`)` for any untrusted or dynamic `untrustedValue`, even if a separate validation step also exists elsewhere — the replacer-function fix is structural and independent of input validation.
+
+Validation:
+- Grep the diff for `.replace(` calls where the second argument is a template literal or string concatenation containing a variable.
+- For each match, confirm the variable's value cannot originate from untrusted/dynamic input, or confirm the call uses a replacer function instead.
+
 ## Validation Checklist
 
 Before giving a verdict, review:

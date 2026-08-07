@@ -195,6 +195,58 @@ Run these checks after any change to `docs/product/`, and always before a docume
 
 ---
 
+## 22. Conversation broken references (Part 8)
+
+**Checks**: every `AI-FEAT-###`/`AI-RM-###`/`BUG-###`/`DEC-###`/`AI-MEM-####`/`ENG-CONV-####` an `ENG-CONV-####_*.md` record's Relationships table cites actually exists.
+
+**Fail condition**: a cited ID that doesn't resolve to a real record.
+
+**Verified in practice**: `scripts/product-docs/lib/conversationValidators.js`'s `checkConversationReferences`.
+
+## 23. Conversation status vocabulary (Part 8)
+
+**Checks**: a conversation's Identity `Status` field is one of the documented enum values (`Imported`/`Linked`/`Active`/`Implementation Pending`/`Implementation In Progress`/`Implemented`/`Partially Implemented`/`Deferred`/`Rejected`/`Superseded`/`Archived`).
+
+**Fail condition**: any other value.
+
+**Verified in practice**: `checkConversationStatusVocabulary`.
+
+## 24. Conversation structural completeness (Part 8)
+
+**Checks**: every conversation record has a `## Provenance` section and a `## Outcome` section — the two sections the Append, Never Erase lifecycle and honesty-boundary accounting depend on structurally existing, distinct from their *content* being complete (not mechanically checkable, same disclaimer as § What this specification deliberately does not cover).
+
+**Fail condition**: either section missing.
+
+**Verified in practice**: `checkConversationProvenanceSection`.
+
+## 25. Conversation filename/Identity consistency (Part 8)
+
+**Checks**: a conversation file's `ENG-CONV-####` filename prefix matches its own Identity table's declared `Conversation ID`.
+
+**Fail condition**: a mismatch — catches a manually-renamed or manually-copied file drifting from its own declared identity.
+
+**Verified in practice**: `checkConversationFileIdentityConsistency`.
+
+## 26. Conversation unredacted secrets (Part 8)
+
+**Checks**: no committed conversation record contains an obvious credential/token pattern (reusing `automation/redact.js`'s existing detector).
+
+**Fail condition**: a pattern match — the fix is always `conversation redact <ID> --text "<span>"`, never a silent edit by this check itself.
+
+**Verified in practice**: `checkConversationUnredactedSecrets`.
+
+## 27. Conversation "Implemented" without linked evidence (Part 8, informational/warning)
+
+**Checks**: a conversation whose Outcome claims `Implemented` names at least one feature/roadmap/memory relationship to point at.
+
+**Fail condition**: none blocking — a warning, since the absence of a link doesn't prove the implementation claim is false, only that it has nothing to cite.
+
+**Verified in practice**: `checkConversationImplementedWithoutEvidence`.
+
+**Verified in practice (all Part 8 rules)**: `scripts/product-docs/test/automation/conversationImport.test.js`'s end-to-end scenarios exercise every rule above against a disposable fixture repository; `runConversationChecks` is wired into `lib/validators.js`'s `runAllChecks` the same lazy-require way `runMemoryChecks`/`runDecisionIntelligenceChecks` already are.
+
+---
+
 ## Running these checks together
 
 None of these rules depend on executing application code, running the test suite, or any tool beyond text search/parsing over `docs/product/` and `git log`. A future maintainer implementing this as an actual script should implement rules 1–8 and 13 as pure static analysis over the Markdown files (as this specification's authors did by hand, using the same logic described above), and rules 9, 11, and 12 as a combination of static analysis plus `git log` cross-reference. No rule here requires network access, a database, or any state external to this Git repository.

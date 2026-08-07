@@ -39,6 +39,7 @@ A packet is append-only-journaled (`*.journal.jsonl`, written before every atomi
 | `ownershipEngine.js` (Part 7C) | Deterministic, weighted, multi-signal ownership scoring for paths Part 4's explicit/inferred resolution can't answer |
 | `releaseIntelligence.js` (Part 5, extended Part 7D) | Release-note **drafts** only — now with auto prior-tag discovery and evidence-gated breaking-change/migration/known-issues/roadmap-impact/risk sections |
 | `contextEngine.js` / `contextCli.js` (Part 7E) | Bounded, authority-ordered context bundles for `context <sub>` — reuses `lib/query.js`, `lib/impact.js`, `ownershipEngine.js` |
+| `conversation/` (Part 8) | External Engineering Conversation import — see [conversation/README.md](conversation/README.md). Deliberately never called from this directory's own `orchestrator.js`/`decisionIntelligence.js`/`hookAutomation.js` finalize path (except `hookAutomation.js`'s `postCommitLink`, read-only reconciliation only) — see `docs/product/18_ENGINEERING_CONVERSATION_POLICY.md` § 10. |
 
 ## Autonomy modes
 

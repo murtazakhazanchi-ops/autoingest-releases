@@ -38,6 +38,11 @@ JSON-shape validation for generated artifacts is a small hand-rolled check (see 
 | `impact <input>` | Advisory impact analysis for a feature ID, roadmap ID, subsystem name/alias, or source path |
 | `changes <fromRef> [toRef=HEAD]` | "What changed?" report between two git refs, written to `generated/change-reports/` |
 | `all` | `build` then `validate` |
+| `automation <sub>` | Part 5/7 engineering-documentation orchestration — see § Part 5 |
+| `memory <sub>` | Part 6 engineering memory layer — see § Part 6 |
+| `release <sub>` | Part 7D release intelligence (drafts only) — see § Part 7 |
+| `context <sub>` | Part 7E universal repository context assistant — see § Part 7 |
+| `conversation <sub>` | Part 8 multi-AI engineering conversation integration — see § Part 8 |
 
 Every command supports `--help`, exits non-zero on invalid use or on validation failure, and never performs a destructive filesystem operation outside `docs/product/generated/`.
 
@@ -96,7 +101,7 @@ Tests never mutate the real `docs/product/` tree. `test/fixtures/broken-product-
 
 ## Documentation-system version
 
-`DOCSYS_VERSION` (currently `1.0.0`, see `lib/version.js`) tracks the shape of this tooling's generated output — distinct from `package.json`'s application version and from the `AI-FEAT-###`/`AI-RM-###` ID systems. Bump it when a generated file's field shape changes in a way a consumer needs to know about; bump `GENERATOR_VERSION` for internal logic changes that don't change output shape. See `docs/product/README.md` for where this is cross-referenced.
+`DOCSYS_VERSION` (see `lib/version.js` for the current value and its per-bump history) tracks the shape of this tooling's generated output — distinct from `package.json`'s application version and from the `AI-FEAT-###`/`AI-RM-###` ID systems. Bump it when a generated file's field shape changes in a way a consumer needs to know about; bump `GENERATOR_VERSION` for internal logic changes that don't change output shape. See `docs/product/README.md` for where this is cross-referenced.
 
 ## Non-goals
 
@@ -166,3 +171,35 @@ node scripts/product-docs/cli.js context explain "<question>"
 **Security**: identical non-goals to Parts 4-6 — no network calls, no external AI API, no `eval`, every git invocation uses `execFileSync` with argument arrays (never shell interpolation), every write is constrained inside the repository root (`automation/atomicWrite.js`'s existing `assertInsideRepo`), no automatic push/merge/release-publish, hooks are never installed into the real `.git/hooks/` except via the explicit, human-approved `automation install-hooks`.
 
 **A pre-existing bug found and fixed during Part 7's own verification**: `lib/validators.js`'s `checkGeneratedFreshness` used to compare `manifest.json` byte-for-byte including its own `source_commit` field, which can never correctly self-reference the commit that first introduces a given rebuild (a commit's hash is a function of its own tree). This made a freshly-committed `manifest.json` perpetually fail `validate` on the very next clean checkout — verified directly against this repository's real history. Fixed by excluding only that one field from the strict comparison (see `10_CHANGELOG.md`'s Part 7 entry for the full account); every other field, and every other generated file, remains a full byte-for-byte comparison.
+
+## Part 8 — Multi-AI Engineering Conversation Integration
+
+Brings engineering discussions that happen **outside** an active local Claude Code session — ChatGPT, an external Claude conversation, Codex, Gemini, human meeting notes, imported Markdown/JSON, or any future tool — into the same evidence/memory/feature/decision/bug pipelines Parts 5-7 already maintain (see [docs/product/18_ENGINEERING_CONVERSATION_POLICY.md](../../docs/product/18_ENGINEERING_CONVERSATION_POLICY.md) for the governing policy and [automation/conversation/README.md](automation/conversation/README.md) for the module map). A vendor-neutral **Engineering Conversation Packet** (ECP 1.0, `schemas/engineering-conversation-packet.schema.json`) is the single handoff format; `source_tool` is metadata only, never a trust or ownership signal.
+
+```bash
+# Import / preview / validate a packet
+node scripts/product-docs/cli.js conversation import --format ecp|markdown|json --file <path> [--mode strict|standard|observe]
+node scripts/product-docs/cli.js conversation preview --format ecp --file <path>     # dry run, no writes
+node scripts/product-docs/cli.js conversation validate --format ecp --file <path>    # schema + secret scan only
+
+# Local inbox (gitignored .autoingest-docs/conversations/inbox/)
+node scripts/product-docs/cli.js conversation inbox
+node scripts/product-docs/cli.js conversation process-inbox
+
+# Query / read / maintain
+node scripts/product-docs/cli.js conversation query "<text>" | --feature AI-FEAT-###
+node scripts/product-docs/cli.js conversation show ENG-CONV-####
+node scripts/product-docs/cli.js conversation redact ENG-CONV-#### --text "<span>"
+node scripts/product-docs/cli.js conversation supersede ENG-CONV-#### --summary "..."
+
+# Context assistant integration
+node scripts/product-docs/cli.js context conversation ENG-CONV-####
+```
+
+New generated artifacts: `generated/conversation-index.{json,jsonl}`, `generated/CONVERSATION_INDEX.md`, `generated/CONVERSATION_TIMELINE.md`, and `generated/UNIMPLEMENTED_CONVERSATION_REQUIREMENTS.md` (`unimplemented-conversation-requirements.json`) — every conversation whose Implementation Handoff named concrete work and whose Outcome log hasn't recorded "Implemented" from real repository evidence. A missing keyword in source code is never used as evidence there; only feature/commit/memory relationships are.
+
+**Trust boundary (the one place Part 8 deliberately diverges from Part 7's live-session automation)**: conversation-import evidence is structurally isolated from the `evidencePacket`/`decisionIntelligence.scanPacket` auto-finalize pipeline `hookAutomation.js` drives at commit/push time. `automation/conversation/decisionLink.js`/`bugLink.js`/`memoryLink.js` are only ever reached from an explicit `conversation import`/`conversation finalize` CLI invocation — never from a git hook — so an untrusted external transcript can never indirectly shape a canonical `DEC-###` purely by entering the same automatic stream live-session evidence already uses. See [docs/product/18_ENGINEERING_CONVERSATION_POLICY.md](../../docs/product/18_ENGINEERING_CONVERSATION_POLICY.md) § 10 for the full rationale (a finding from this Part's own architecture review).
+
+**Security**: identical non-goals to Parts 4-7, extended for a stronger trust boundary (imported text originates entirely outside this repository) — no network calls, no external AI API, no `eval`, no code/Markdown/HTML execution over imported content, path-traversal- and symlink-escape-safe file loading, size- and JSON-depth-capped imports, automatic secret-pattern redaction before any write (canonical or raw), and data minimization (an unrecognized vendor-specific field never reaches the canonical record).
+
+**A bug found and fixed during this Part's own E2E testing**: an early version of `automation/conversation/decisionLink.js` could draft a canonical `Status: Draft` decision record from conversation evidence that named no feature or roadmap ownership, producing an `orphan-decision` validation error the moment `validate` ran (every canonical decision must cite at least one feature/milestone). Fixed by requiring resolved feature/roadmap ownership as part of the evidence bar for canonical drafting — with no ownership, the same evidence now becomes a local, non-canonical, review-required candidate instead.

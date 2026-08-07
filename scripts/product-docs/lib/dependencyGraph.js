@@ -20,6 +20,9 @@ function buildGraph(parsed) {
   for (const [id, b] of parsed.bugs) addNode(id, 'bug', b.name, b.filePath);
   for (const [id, d] of parsed.decisions) addNode(id, 'decision', d.name, d.filePath);
   for (const [id, p] of parsed.postmortems) addNode(id, 'postmortem', p.name, p.filePath);
+  if (parsed.conversations) {
+    for (const [id, c] of parsed.conversations) addNode(id, 'engineering_conversation', c.name, c.filePath);
+  }
   for (const h of parsed.archHeadings) {
     addNode('ARCH-' + h.slug, 'architecture_section', h.text, parsed.archPath + '#' + h.slug);
   }
@@ -105,6 +108,33 @@ function buildGraph(parsed) {
   for (const [id, pm] of parsed.postmortems) {
     for (const featId of extractIds(String(pm.header['Related feature(s)'] || ''), 'feature')) {
       edges.push(edge(featId, id, 'affected_by_bug', `${pm.filePath}#header-table:Related-feature(s)`, 'explicit', 'postmortem'));
+    }
+  }
+
+  // Part 8 — Engineering Conversation -> Feature / Roadmap / Bug / Decision /
+  // Memory / Conversation, read from the record's own Relationships table.
+  if (parsed.conversations) {
+    for (const [id, c] of parsed.conversations) {
+      const relSection = require('./markdown').extractSection(c.body, 'Relationships') || '';
+      const relTable = require('./markdown').extractHeaderTable(relSection);
+      for (const featId of [...extractIds(String(relTable['Primary feature IDs'] || ''), 'feature'), ...extractIds(String(relTable['Secondary feature IDs'] || ''), 'feature')]) {
+        edges.push(edge(id, featId, 'conversation_about_feature', `${c.filePath}#relationships`, 'explicit'));
+      }
+      for (const rmId of extractIds(String(relTable['Roadmap milestone IDs'] || ''), 'roadmap')) {
+        edges.push(edge(id, rmId, 'conversation_about_roadmap', `${c.filePath}#relationships`, 'explicit'));
+      }
+      for (const bugId of extractIds(String(relTable['Related bugs'] || ''), 'bug')) {
+        edges.push(edge(id, bugId, 'conversation_reports_bug', `${c.filePath}#relationships`, 'explicit'));
+      }
+      for (const decId of extractIds(String(relTable['Related decisions'] || ''), 'decision')) {
+        edges.push(edge(id, decId, 'conversation_shapes_decision', `${c.filePath}#relationships`, 'explicit'));
+      }
+      for (const memId of extractIds(String(relTable['Related memory capsules'] || ''), 'memory')) {
+        edges.push(edge(id, memId, 'conversation_relates_to_memory', `${c.filePath}#relationships`, 'explicit'));
+      }
+      for (const otherConvId of extractIds(String(relTable['Related conversations'] || ''), 'conversation')) {
+        if (otherConvId !== id) edges.push(edge(id, otherConvId, 'conversation_follows_conversation', `${c.filePath}#relationships`, 'explicit'));
+      }
     }
   }
 

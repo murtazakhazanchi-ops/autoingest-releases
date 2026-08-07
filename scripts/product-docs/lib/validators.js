@@ -479,6 +479,9 @@ function runAllChecks(parsed, built, opts = {}) {
     // Part 7B — same lazy-require pattern; decisionValidators.js also
     // imports `finding` from this file.
     ...require('./decisionValidators').runDecisionIntelligenceChecks(parsed),
+    // Part 8 — same lazy-require pattern; conversationValidators.js also
+    // imports `finding` from this file.
+    ...(parsed.conversations ? require('./conversationValidators').runConversationChecks(parsed) : []),
   ];
   return findings;
 }

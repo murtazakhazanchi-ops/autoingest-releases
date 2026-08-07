@@ -8,8 +8,13 @@
 // § ID Model. ID_DIGIT_WIDTH exists so extractIds' range-expansion regex
 // (below) stays correct for a family whose digit width differs from the rest,
 // rather than hardcoding \d{3} the way earlier callers of this pattern did.
+// AI-MEM-#### and ENG-CONV-#### are deliberately 4 digits, not 3 like the
+// other families — both are expected to accumulate faster than product
+// features or roadmap milestones (potentially one record per significant
+// session, over years). See docs/product/16_ENGINEERING_MEMORY_POLICY.md §
+// ID Model and docs/product/18_ENGINEERING_CONVERSATION_POLICY.md § ID Model.
 const ID_DIGIT_WIDTH = {
-  feature: 3, roadmap: 3, bug: 3, decision: 3, postmortem: 3, memory: 4,
+  feature: 3, roadmap: 3, bug: 3, decision: 3, postmortem: 3, memory: 4, conversation: 4,
 };
 
 const ID_PATTERNS = {
@@ -19,6 +24,7 @@ const ID_PATTERNS = {
   decision: /DEC-(\d{3})/g,
   postmortem: /PM-(\d{3})/g,
   memory: /AI-MEM-(\d{4})/g,
+  conversation: /ENG-CONV-(\d{4})/g,
 };
 
 const ID_PREFIXES = {
@@ -28,6 +34,7 @@ const ID_PREFIXES = {
   decision: 'DEC-',
   postmortem: 'PM-',
   memory: 'AI-MEM-',
+  conversation: 'ENG-CONV-',
 };
 
 function idType(id) {
@@ -37,6 +44,7 @@ function idType(id) {
   if (/^DEC-\d{3}$/.test(id)) return 'decision';
   if (/^PM-\d{3}$/.test(id)) return 'postmortem';
   if (/^AI-MEM-\d{4}$/.test(id)) return 'memory';
+  if (/^ENG-CONV-\d{4}$/.test(id)) return 'conversation';
   return null;
 }
 

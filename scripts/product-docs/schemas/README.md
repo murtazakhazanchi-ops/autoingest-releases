@@ -14,5 +14,7 @@ Reference JSON Schema documents for `docs/product/generated/`'s key JSON outputs
 | `documentation-health.schema.json` | `docs/product/generated/documentation-health.json` |
 | `change-report.schema.json` | `docs/product/generated/change-reports/*.json` |
 | `manifest.schema.json` | `docs/product/generated/manifest.json` |
+| `ownership-manifest.schema.json` | `docs/product/generated/ownership-manifest.json` |
+| `engineering-conversation-packet.schema.json` | Part 8 import input — `.autoingest-docs/conversations/{inbox,imported}/*.json` (an ECP packet, never `docs/product/generated/` output; validated by `automation/conversation/ecp.js`, not `checkGeneratedSchemas`) |
 
 Run `node scripts/product-docs/cli.js validate` to validate the current generated output against all of these.

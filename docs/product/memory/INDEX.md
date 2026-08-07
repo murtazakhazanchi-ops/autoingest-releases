@@ -5,3 +5,4 @@ Hand-authored pointer index for `docs/product/memory/`. See [../generated/MEMORY
 | ID | Title | Status | Primary feature(s) |
 |---|---|---|---|
 | AI-MEM-0001 | Metadata Management Modal Consolidation and Audit & Repair Tab Evolution | Compiled | AI-FEAT-034, AI-FEAT-033 |
+| [AI-MEM-0002](AI-MEM-0002_PART_8_MULTI_AI_ENGINEERING_CONVERSATION_INTEGRATION_DESIGN_AND_IMPLEMENTATION_F.md) | Part 8 — Multi-AI Engineering Conversation Integration: design and implementation (from ENG-CONV-0001) | Compiled | None — documentation-system infrastructure work, not tied to an AutoIngest application feature |

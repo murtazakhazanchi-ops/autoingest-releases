@@ -766,6 +766,75 @@ Validation:
 - Confirm each branch requires equivalent real, current, independently-checkable evidence.
 - Confirm an unresolved outcome excludes the item from the operation rather than guessing a destination.
 
+### Sanitize Untrusted External Text Once, Centrally, Before Any Structural Parser
+
+Context:
+- Applies to any pipeline that ingests free-text from an external or untrusted source (external tool output, imported conversation/comment text, third-party metadata) and later feeds it into a renderer or parser that treats a sub-syntax (Markdown headings, delimiters, table structure) as meaningful.
+
+Rule:
+- Sanitize the untrusted text exactly once, centrally, at the point it enters the pipeline — immediately after redaction/normalization, before it reaches any downstream renderer or parser.
+- Forged structural syntax in unescaped untrusted text (e.g. a fake Markdown heading matching the same pattern the parser uses for real section boundaries) is a deterministic parser-integrity bug, not merely a prompt-injection concern — any code that later greps/extracts "the X section" can be fooled into reading forged content as real.
+- Reference: `scripts/product-docs/automation/conversation/markdownSanitizer.js`'s `sanitizeDeep()`, applied once in `lifecycle.js#analyzePacket` before `compiler.js`/`decisionLink.js`/`memoryLink.js` ever see the packet.
+
+Avoid:
+- Escaping untrusted text separately inside each renderer/consumer — a single missed consumer reopens the hole.
+- Assuming a parser that only checks the built-in application's own generated headings is safe once external free-text is interpolated into the same document.
+
+Validation:
+- Confirm there is exactly one sanitization point for any given untrusted-text field, applied before the first consumer that parses structure from the document.
+- Confirm every downstream renderer/parser of that document type receives only already-sanitized text.
+
+### Consume Validated Pipeline Results, Not Raw Untrusted Claims
+
+Context:
+- Applies to any pipeline where an earlier step computes a validated/resolved result (e.g. an ownership, identity, or evidence resolution) from a raw untrusted input field, and a later step must decide whether to gate a canonical write.
+
+Rule:
+- The gating decision must read the already-computed validated result, never the raw input field that seeded it — even when the raw field is syntactically well-formed. A downstream consumer that re-reads the raw claim silently reopens whatever validation the earlier step performed.
+- This is a sibling to the existing "Equivalent-Evidence-Across-Branches" rule below, but a distinct failure mode: not mismatched evidence standards across branches of one resolver, but a later pipeline stage bypassing validation that already happened earlier in the same pipeline.
+
+Avoid:
+- A gating function that accepts both a validated-result parameter and falls back to the raw field when the validated one isn't passed — require the caller to pass the validated result explicitly.
+- Assuming "it was already validated somewhere upstream" without tracing whether the specific value being read is the validated one or the raw one.
+
+Validation:
+- Trace every canonical-write-gating check back to its data source: confirm it reads the output of the validation/resolution step, not the raw field that was the input to that step.
+
+### Permanent ID Allocation Lifecycle Discipline
+
+Context:
+- Applies to any feature that allocates a permanent, non-reusable identifier or record number (a canonical ID family, a serial/sequence number, a slot).
+
+Rule:
+- **Before allocating**: gate allocation behind an explicit significance/content predicate, not implicitly via a dedup-only check. A naive design that allocates for every schema-valid, non-duplicate input regardless of content risks burning a bulk of permanent IDs on records with no real content. Reference: `scripts/product-docs/automation/conversation/significance.js`'s `planConversationCanonicalization()`, modeled on the pre-existing `automation/memory/significance.js`'s `planMemoryCapsule()`.
+- **After allocating**: once the permanent ID is spent and a first-pass canonical artifact is written, every subsequent side-effect operation in the same import/creation flow must be isolated in its own try/catch, degrading to an `{ state: 'error', ... }`-shaped partial result rather than propagating and aborting the whole flow. The ID is already spent and cannot be un-allocated — an all-or-nothing failure signal at this point is dishonest: it hides a partially-rendered canonical artifact behind a claim of total failure. This differs from the "Read-Only Aggregation Service Pattern" per-source isolation below, which protects a read-only report from partial-source failure; this protects the audit trail's accuracy after an irreversible write has already occurred.
+
+Avoid:
+- Gating permanent-ID allocation only on "is this a duplicate of something else," with no check for whether the content is significant enough to deserve a permanent record at all.
+- Wrapping all post-allocation side-effect steps in one shared try/catch — a single downstream failure then falsely reports the entire import as failed while an incomplete canonical file silently remains on disk, unreferenced by the failure record.
+
+Validation:
+- For any new permanent-ID-allocating feature: confirm an explicit significance/content predicate gates allocation, separate from duplicate detection.
+- For any post-allocation side-effect sequence: confirm each step has its own try/catch and that a failure produces an accurate error-state result rather than aborting silently-incomplete work.
+
+### Untrusted-Content Pipelines Must Be Structurally Isolated From Auto-Finalize Automation
+
+Context:
+- Applies to any feature that ingests untrusted/external content (imported conversations, third-party comments, external tool output) in a codebase that also has an automatic finalize/merge/git-hook pipeline (e.g. pre-push auto-finalize, post-commit reconciliation).
+
+Rule:
+- Code paths that process untrusted/external content must be reachable only through an explicit, foreground, human-invoked action (a deliberate CLI command or UI action) — never through an automatic hook trigger reachable by nothing more than `git commit`/`git push`.
+- Reusing an existing scanner/matcher (built for trusted, human-authored content) directly against untrusted content, inside a call graph that an automatic pipeline already consumes, silently extends that automation's trust boundary to include the untrusted source — even if the scanner itself is unchanged.
+- Reference: `scripts/product-docs/automation/conversation/decisionLink.js`/`bugLink.js`/`memoryLink.js` are only called from `lifecycle.js#importPacket` (explicit CLI action); `hookAutomation.js`'s `postCommitLink`/`prePushGate` never call into them — the hook-reachable `linkCommitToConversations` only reads existing canonical records and writes from real commit evidence, never imports untrusted content.
+
+Avoid:
+- Calling an untrusted-content importer, linker, or scanner from any function reachable by an automatic hook (post-commit, pre-push, or equivalent).
+- Assuming a scanner is safe to reuse against a new untrusted source because it was already safe against a trusted source.
+
+Validation:
+- For any new untrusted-content-processing function, trace every call site back to confirm none is reachable from an automatic hook — only from an explicit human-invoked entry point.
+- Confirm automatic hook-reachable code that touches the same records only reads/updates from already-canonical, already-trusted state.
+
 ## Validation Checklist
 
 When invoked, return:

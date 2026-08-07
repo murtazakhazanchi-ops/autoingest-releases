@@ -1,0 +1,41 @@
+{
+  "conversations": [
+    {
+      "aliases": [],
+      "bug_ids": [],
+      "canonical_path": "conversations/ENG-CONV-0001_PART_8_MULTI_AI_ENGINEERING_CONVERSATION_INTEGRATION_DESIGN_AND_IMPLEMENTATION.md",
+      "conversation_id": "ENG-CONV-0001",
+      "conversation_type": "mixed",
+      "date_completed": "2026-08-07T00:00:00Z",
+      "date_started": "2026-08-07T00:00:00Z",
+      "decision_ids": [],
+      "evidence_pending_summary": "Identity, Repository Context, Initial Understanding, Initial Proposal, Discussion Evolution, Alternatives, Bug / Investigation Evidence, Implementation Handoff",
+      "feature_ids": [],
+      "import_date": "2026-08-07T08:36:21.844Z",
+      "keywords": [
+        "part",
+        "multi",
+        "engineering",
+        "conversation",
+        "integration",
+        "design",
+        "and",
+        "implementation"
+      ],
+      "latest_outcome": "2026-08-07 — Imported. Canonicalized from a \"ecp\"-format packet claiming source_tool \"claude-code\".",
+      "memory_ids": [],
+      "open_questions_summary": "- Should ENG-CONV records eventually cross-link into feature Engineering Evolution sections once real corpus volume is better understood?",
+      "provenance_classification": "Imported packet — no secret pattern detected",
+      "rejected_approach_count": 5,
+      "related_conversation_ids": [],
+      "revision_count": 4,
+      "roadmap_ids": [],
+      "source_tool": "claude-code",
+      "status": "Imported",
+      "summary": "Part 8 — Multi-AI Engineering Conversation Integration: design and implementation",
+      "title": "Part 8 — Multi-AI Engineering Conversation Integration: design and implementation"
+    }
+  ],
+  "docsys_version": "1.2.0",
+  "schema_version": "1.2.0"
+}

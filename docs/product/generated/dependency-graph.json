@@ -1,5 +1,5 @@
 {
-  "docsys_version": "1.1.0",
+  "docsys_version": "1.2.0",
   "edges": [
     {
       "evidence_status": "explicit",
@@ -4230,11 +4230,17 @@
       "type": "decision"
     },
     {
+      "doc_path": "conversations/ENG-CONV-0001_PART_8_MULTI_AI_ENGINEERING_CONVERSATION_INTEGRATION_DESIGN_AND_IMPLEMENTATION.md",
+      "id": "ENG-CONV-0001",
+      "label": "Part 8 — Multi-AI Engineering Conversation Integration: design and implementation",
+      "type": "engineering_conversation"
+    },
+    {
       "doc_path": "postmortems/PM-001_METADATA_CORRECTNESS_GAP_PRODUCTION_READINESS_REVIEW.md",
       "id": "PM-001",
       "label": "Metadata Correctness Gap Found in Production-Readiness Review",
       "type": "postmortem"
     }
   ],
-  "schema_version": "1.1.0"
+  "schema_version": "1.2.0"
 }

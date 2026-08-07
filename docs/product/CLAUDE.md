@@ -211,6 +211,19 @@ The user must not need to say "document this," "record the feedback," or "save t
 
 The project owner must not need to say "start tracking this," "check who owns this file," "is this a breaking change," or "write the release notes" — for significant work, this is automatic, the same way §§18-19's Evidence Packet and Memory Capsule capture already are.
 
+## 21. Multi-AI Engineering Conversation Integration (Part 8)
+
+`scripts/product-docs/automation/conversation/` (see [scripts/product-docs/automation/conversation/README.md](../../scripts/product-docs/automation/conversation/README.md) and [18_ENGINEERING_CONVERSATION_POLICY.md](18_ENGINEERING_CONVERSATION_POLICY.md)) extends §19's memory layer to engineering discussions that happen **outside** this repository's own sessions — ChatGPT, an external Claude conversation, Codex, Gemini, a human meeting, or any future tool. The project owner never manually retypes a decision, requirement, or rejected approach from one of those discussions into Markdown:
+
+1. When an external AutoIngest engineering discussion reaches a meaningful conclusion, the source tool (or the user, following [conversations/CHATGPT_HANDOFF.md](conversations/CHATGPT_HANDOFF.md)'s instruction) produces an Engineering Conversation Packet (ECP 1.0).
+2. `node scripts/product-docs/cli.js conversation import --format ecp --file <path>` (or `conversation process-inbox` for the local, gitignored `.autoingest-docs/conversations/inbox/`) redacts, schema-validates, deduplicates, resolves likely feature/roadmap/bug/decision/memory ownership, and — only if the packet clears its own significance bar ([18_ENGINEERING_CONVERSATION_POLICY.md](18_ENGINEERING_CONVERSATION_POLICY.md) § 8) — allocates a permanent `ENG-CONV-####` and writes the canonical record.
+3. `context conversation ENG-CONV-####` / `context task "<topic>"` surface that conversation the same way §20's `context <sub>` already surfaces canonical docs — below canonical authority, above generic inference (§ 3 of the policy).
+4. When a later commit actually implements what the conversation requested, post-commit reconciliation transitions the conversation's `Outcome` to Implemented automatically — never inferred from the conversation text alone, always from real repository evidence (a linked commit).
+
+**Never fabricate a canonical decision or bug from conversation text alone.** Decision/bug linkage from an imported conversation is deliberately isolated from §20's live Evidence Packet auto-finalize pipeline — a `Status: Draft` decision is only ever created via an explicit `conversation import`/`conversation finalize` invocation, never automatically inside a git hook, so an untrusted external transcript can never indirectly shape a canonical record through `git commit`/`git push` alone (see [18_ENGINEERING_CONVERSATION_POLICY.md](18_ENGINEERING_CONVERSATION_POLICY.md) § 10). A bug discussed in an imported conversation is linked to an existing `BUG-###` if one matches; it is never sufficient on its own to create a new canonical bug record or declare a defect fixed.
+
+The project owner should never need to say "summarize that ChatGPT conversation into the docs" — for a conversation with real engineering content, importing the packet is the only manual step; everything downstream (linking, indexing, unimplemented-requirement tracking) is automatic, the same way §§18-20's automation already is.
+
 ## Non-negotiables (quick checklist)
 
 - Preserve stable IDs — never reuse, never renumber.
@@ -222,3 +235,4 @@ The project owner must not need to say "start tracking this," "check who owns th
 - Never invent a relationship, date, bug, decision, or incident that repository evidence doesn't support.
 - Never treat `docs/product/generated/` as a source — it's a locator built from the canonical Markdown above; rebuild it (`node scripts/product-docs/cli.js build`) rather than hand-editing it, and run `validate` before trusting it.
 - Never treat a `docs/product/memory/AI-MEM-####` capsule as authoritative over a canonical record — it explains *why*, never overrides *what* — and never fabricate its Original Request/plan-revision content when the source conversation is genuinely unavailable; write "Evidence pending — source conversation unavailable" instead (see [16_ENGINEERING_MEMORY_POLICY.md](16_ENGINEERING_MEMORY_POLICY.md)).
+- Never treat a `docs/product/conversations/ENG-CONV-####` record as authoritative over a canonical record, and never claim automatic access to an external tool's history — only what was explicitly imported via `conversation import` (see [18_ENGINEERING_CONVERSATION_POLICY.md](18_ENGINEERING_CONVERSATION_POLICY.md)).

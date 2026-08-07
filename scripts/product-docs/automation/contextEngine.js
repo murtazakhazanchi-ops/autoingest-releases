@@ -29,7 +29,7 @@ const AUTHORITY_ORDER = [
   '1. Authoritative technical docs under docs/ (see docs/CLAUDE.md Task Documentation Routing) — always wins on runtime-behavior, contract, or architecture questions.',
   '2. Canonical docs/product/ records (features/, bugs/, decisions/, postmortems/) — authoritative for product planning, feature history, and roadmap progress.',
   '3. docs/product/generated/ (this tool\'s own output, including this context bundle) — a locator/index layer only; regenerate rather than trust stale, never cite as evidence in a canonical record.',
-  '4. docs/product/memory/AI-MEM-#### capsules — historical evidence explaining WHY a canonical record evolved the way it did; never overrides WHAT the canonical record currently says.',
+  '4. docs/product/memory/AI-MEM-#### capsules and docs/product/conversations/ENG-CONV-#### records — historical evidence explaining WHY a canonical record evolved the way it did, or what an external discussion concluded; never overrides WHAT the canonical record currently says (see docs/product/18_ENGINEERING_CONVERSATION_POLICY.md § 3).',
   '5. Agent inference — lowest tier; verify against tiers 1-4 above before acting on it.',
 ];
 
@@ -94,6 +94,14 @@ function featureBundle(featureId, { parsed, built }) {
   bundle.tests = boundList(impact.tests).items;
   bundle.code_paths = boundList(feat.relatedFiles).items;
   bundle.evidence_gap_present = hasEvidenceGap(feat.body);
+  // Part 8 — reverse lookup: which imported conversations named this
+  // feature as a primary/secondary owner. Below canonical docs in the
+  // returned Authority Order (a locator, never authority) — see
+  // docs/product/18_ENGINEERING_CONVERSATION_POLICY.md § 3.
+  const relatedConversations = (built.conversationIndex || [])
+    .filter((c) => c.feature_ids.includes(id))
+    .map((c) => ({ conversation_id: c.conversation_id, title: c.title, status: c.status, canonical_path: c.canonical_path }));
+  bundle.related_conversations = boundList(relatedConversations).items;
   bundle.provenance = [feat.filePath, ...impact.required_technical_docs];
   bundle.implementation_constraints = [
     'Never contradict an authoritative technical doc under docs/ — if this feature file and a technical doc disagree, the technical doc wins (see docs/product/05_DOCUMENTATION_WORKFLOW.md § Authority Boundary).',
@@ -175,6 +183,35 @@ function recordBundle(kind, familyMap, id, headerFeatureField) {
   return bundle;
 }
 
+// Part 8 — Engineering Conversation bundle. Same recordBundle shape as
+// bug/decision/postmortem/memory, but header-field-named "Primary feature
+// IDs" (from the Relationships section, not the top-of-file header table —
+// see lib/conversationIndex.js for why the same extractSectionTable
+// indirection is needed here that recordBundle's single extractIds(header[...])
+// call doesn't handle on its own for this family).
+function conversationBundle(id, { parsed }) {
+  const upperId = id.toUpperCase();
+  const rec = parsed.conversations ? parsed.conversations.get(upperId) : null;
+  if (!rec) return notFound('conversation', id, `No such conversation: ${id}`);
+  const relSection = require('../lib/markdown').extractSection(rec.body, 'Relationships') || '';
+  const relTable = relSection ? require('../lib/markdown').extractHeaderTable(relSection) : {};
+  const bundle = baseBundle('conversation', rec.id);
+  bundle.title = rec.name;
+  bundle.canonical_document = rec.filePath;
+  bundle.status = rec.header['Status'] || 'Evidence pending';
+  bundle.source_tool = rec.header['Source tool'] || 'Evidence pending';
+  bundle.related_feature_ids = extractIds(String(relTable['Primary feature IDs'] || ''), 'feature').concat(extractIds(String(relTable['Secondary feature IDs'] || ''), 'feature'));
+  bundle.related_decision_ids = extractIds(String(relTable['Related decisions'] || ''), 'decision');
+  bundle.related_bug_ids = extractIds(String(relTable['Related bugs'] || ''), 'bug');
+  const summary = truncateText(rec.body.split('\n').slice(0, 12).join('\n'));
+  bundle.excerpt = summary.text;
+  if (summary.truncated) bundle.truncation_notices.push('body excerpt truncated');
+  bundle.evidence_gap_present = hasEvidenceGap(rec.body);
+  bundle.provenance = [rec.filePath];
+  bundle.implementation_constraints = ['Historical evidence only — never cite this record as authority for a current-behavior claim; cite the canonical record it explains instead (see docs/product/18_ENGINEERING_CONVERSATION_POLICY.md § 3).'];
+  return bundle;
+}
+
 function bugBundle(id, { parsed }) { return recordBundle('bug', parsed.bugs, id, 'Related feature(s)'); }
 function decisionBundle(id, { parsed }) { return recordBundle('decision', parsed.decisions, id, 'Related feature(s) / roadmap milestone'); }
 function postmortemBundle(id, { parsed }) { return recordBundle('postmortem', parsed.postmortems, id, 'Related feature(s)'); }
@@ -242,6 +279,7 @@ function resolveBundleFor(entityType, id, ctx) {
     case 'memory': return memoryBundle(id, ctx);
     case 'roadmap': return roadmapBundle(id, ctx);
     case 'subsystem': return subsystemBundle(id, ctx);
+    case 'engineering_conversation': return conversationBundle(id, ctx);
     default: return notFound(entityType, id, `Unsupported entity_type for a bundle: ${entityType}`);
   }
 }
@@ -269,6 +307,7 @@ function buildContext(kind, input) {
     case 'decision': return decisionBundle(input, ctx);
     case 'postmortem': return postmortemBundle(input, ctx);
     case 'memory': return memoryBundle(input, ctx);
+    case 'conversation': return conversationBundle(input, ctx);
     case 'release': return releaseBundle(input, ctx);
     case 'task': return taskBundle(input, ctx);
     case 'explain': return explainBundle(input, ctx);
@@ -297,6 +336,7 @@ module.exports = {
   decisionBundle,
   postmortemBundle,
   memoryBundle,
+  conversationBundle,
   releaseBundle,
   taskBundle,
   explainBundle,

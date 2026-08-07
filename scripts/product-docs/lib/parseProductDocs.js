@@ -181,6 +181,9 @@ function loadAll(root) {
   // directory, and that must not be a parse error — see
   // docs/product/16_ENGINEERING_MEMORY_POLICY.md § 5.
   const memoryDir = path.join(root, 'memory');
+  // Part 8 — docs/product/conversations/ is optional for the same reason.
+  // See docs/product/18_ENGINEERING_CONVERSATION_POLICY.md § 5.
+  const conversationDir = path.join(root, 'conversations');
 
   const featureFiles = fs.readdirSync(featureDir).filter((f) => f.endsWith('.md')).sort();
   const bugFiles = fs.readdirSync(bugDir).filter((f) => f.endsWith('.md') && f !== 'README.md').sort();
@@ -188,6 +191,9 @@ function loadAll(root) {
   const postmortemFiles = fs.readdirSync(postmortemDir).filter((f) => f.endsWith('.md') && f !== 'README.md').sort();
   const memoryFiles = fs.existsSync(memoryDir)
     ? fs.readdirSync(memoryDir).filter((f) => f.endsWith('.md') && f !== 'README.md' && f !== 'INDEX.md').sort()
+    : [];
+  const conversationFiles = fs.existsSync(conversationDir)
+    ? fs.readdirSync(conversationDir).filter((f) => f.endsWith('.md') && f !== 'README.md' && f !== 'INDEX.md' && f !== 'CHATGPT_HANDOFF.md').sort()
     : [];
 
   // idFilesSeen tracks every (id -> [filePath, ...]) pairing BEFORE collapsing
@@ -198,7 +204,7 @@ function loadAll(root) {
   // an ID within 01_FEATURE_REGISTRY.md / 02_MASTER_ROADMAP.md. One file plus
   // one row for the same ID is the expected, correct structure — not a
   // duplicate — so files and rows are deliberately never merged into one group.
-  const idFilesSeen = { feature: new Map(), bug: new Map(), decision: new Map(), postmortem: new Map(), memory: new Map() };
+  const idFilesSeen = { feature: new Map(), bug: new Map(), decision: new Map(), postmortem: new Map(), memory: new Map(), conversation: new Map() };
   const idRowsSeen = { feature: new Map(), roadmap: new Map() };
   const recordSeen = (bucket, family, id, location) => {
     if (!id) return;
@@ -245,6 +251,16 @@ function loadAll(root) {
     const parsed = parseRecordFile(path.join(memoryDir, f), 'memory', root);
     recordSeen(idFilesSeen, 'memory', parsed.id, parsed.filePath);
     if (parsed.id) memory.set(parsed.id, parsed);
+  }
+
+  // Part 8 — Engineering Conversations reuse the same generic record-file
+  // parser as bugs/decisions/postmortems/memory. A conversation's own header
+  // table uses "## Identity" as its first table, same as a memory capsule.
+  const conversations = new Map();
+  for (const f of conversationFiles) {
+    const parsed = parseRecordFile(path.join(conversationDir, f), 'conversation', root);
+    recordSeen(idFilesSeen, 'conversation', parsed.id, parsed.filePath);
+    if (parsed.id) conversations.set(parsed.id, parsed);
   }
 
   const registryCategories = parseRegistry(registryContent);
@@ -299,6 +315,8 @@ function loadAll(root) {
     postmortems,
     memory,
     memoryDirExists: fs.existsSync(memoryDir),
+    conversations,
+    conversationDirExists: fs.existsSync(conversationDir),
     allFiles,
   };
 }
