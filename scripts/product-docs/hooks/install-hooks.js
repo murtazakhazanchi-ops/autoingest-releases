@@ -112,13 +112,54 @@ function verify() {
   });
 }
 
-module.exports = { install, uninstall, verify, HOOK_NAMES, MARKER_START, MARKER_END };
+// Non-mutating preview of what `install()` would do — no file is written or
+// chmod'd. Part 7A's "hook-installation readiness report and dry-run"
+// requirement: an operator (or the harness that would otherwise install
+// automatically) can inspect exactly what would change before approving it.
+function readiness() {
+  const root = repoRoot();
+  const hooksDir = gitHooksDir();
+  let hooksDirWritable = true;
+  try {
+    fs.accessSync(hooksDir, fs.constants.W_OK);
+  } catch {
+    hooksDirWritable = false;
+  }
+  const perHook = HOOK_NAMES.map((name) => {
+    const target = path.join(hooksDir, name);
+    const backup = chainedBackupPath(hooksDir, name);
+    const exists = fs.existsSync(target);
+    const existingContent = exists ? fs.readFileSync(target, 'utf8') : null;
+    const alreadyOurs = exists && isOurs(existingContent);
+    const foreignHookPresent = exists && !alreadyOurs;
+    return {
+      name,
+      target,
+      currently_installed_by_us: alreadyOurs,
+      foreign_hook_present: foreignHookPresent,
+      would_chain_existing_hook: foreignHookPresent && !fs.existsSync(backup),
+      already_chained: fs.existsSync(backup),
+      preview: managedBlock(root, name),
+    };
+  });
+  return {
+    repo_root: root,
+    hooks_dir: hooksDir,
+    hooks_dir_writable: hooksDirWritable,
+    node_executable: process.execPath,
+    hooks: perHook,
+    would_mutate: perHook.filter((h) => !h.currently_installed_by_us || h.would_chain_existing_hook).map((h) => h.name),
+    note: 'Dry-run only — no files were written. Run "automation install-hooks" (without --dry-run) to apply.',
+  };
+}
+
+module.exports = { install, uninstall, verify, readiness, HOOK_NAMES, MARKER_START, MARKER_END };
 
 if (require.main === module) {
   const cmd = process.argv[2] || 'install';
-  const fn = { install, uninstall, verify }[cmd];
+  const fn = { install, uninstall, verify, readiness }[cmd];
   if (!fn) {
-    console.error(`Usage: install-hooks.js <install|uninstall|verify>`);
+    console.error(`Usage: install-hooks.js <install|uninstall|verify|readiness>`);
     process.exitCode = 1;
   } else {
     console.log(JSON.stringify(fn(), null, 2));

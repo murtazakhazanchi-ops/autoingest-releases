@@ -83,6 +83,42 @@ function changedFiles(fromRef, toRef) {
   return raw.split('\n').filter(Boolean).sort();
 }
 
+// Part 7D — release intelligence. Every tag reachable from `ref`, newest
+// first by commit date (not tag-creation order, which can be reordered by
+// a backdated/annotated tag) — `%(creatordate:iso-strict)` on a lightweight
+// tag falls back to the tagged commit's own date, which is what "reachable
+// history order" means for a release range.
+function tagsReachableFrom(ref) {
+  assertSafeRef(ref);
+  const raw = git(['tag', '--merged', ref, '--sort=-creatordate', '--format=%(refname:short)%09%(creatordate:iso-strict)']);
+  if (!raw) return [];
+  return raw.split('\n').filter(Boolean).map((line) => {
+    const [name, date] = line.split('\t');
+    return { name, date };
+  });
+}
+
+// The most recent tag reachable from `ref`, EXCLUDING a tag that points at
+// `ref` itself — this is "the prior release", not "the release being cut".
+function priorTag(ref) {
+  assertSafeRef(ref);
+  const resolved = resolveCommit(ref);
+  for (const t of tagsReachableFrom(ref)) {
+    if (resolveCommit(t.name) !== resolved) return t.name;
+  }
+  return null;
+}
+
+function tagExists(name) {
+  try {
+    assertSafeRef(name);
+    git(['rev-parse', '--verify', '--quiet', `refs/tags/${name}`]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 module.exports = {
   currentCommit,
   isWorkingTreeDirty,
@@ -92,4 +128,7 @@ module.exports = {
   commitSubject,
   log,
   changedFiles,
+  tagsReachableFrom,
+  priorTag,
+  tagExists,
 };

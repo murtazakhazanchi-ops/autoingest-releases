@@ -1,5 +1,5 @@
 {
-  "docsys_version": "1.0.0",
+  "docsys_version": "1.1.0",
   "edges": [
     {
       "evidence_status": "explicit",
@@ -4236,5 +4236,5 @@
       "type": "postmortem"
     }
   ],
-  "schema_version": "1.0.0"
+  "schema_version": "1.1.0"
 }

@@ -1,5 +1,5 @@
 {
-  "docsys_version": "1.0.0",
+  "docsys_version": "1.1.0",
   "entity_counts": {
     "bugs": 10,
     "decisions": 15,
@@ -7,13 +7,14 @@
     "memory_capsules": 1,
     "postmortems": 1,
     "roadmap_milestones": 9,
-    "search_index_records": 274,
+    "search_index_records": 275,
     "subsystems": 16
   },
   "generated_files": [
     "AUTHORITY_INDEX.md",
     "ENGINEERING_MEMORY_TIMELINE.md",
     "MEMORY_INDEX.md",
+    "OWNERSHIP_MANIFEST.md",
     "SUBSYSTEM_LOCATOR.md",
     "authority-index.json",
     "dependency-graph.json",
@@ -78,6 +79,7 @@
     "feature-timelines/AI-FEAT-056_TIMELINE.md",
     "memory-index.json",
     "memory-index.jsonl",
+    "ownership-manifest.json",
     "roadmap-dashboard.json",
     "roadmap-dashboard.md",
     "search-index.jsonl",
@@ -85,12 +87,12 @@
     "manifest.json"
   ],
   "generation_command": "node scripts/product-docs/cli.js build",
-  "generator_version": "1.0.0",
+  "generator_version": "1.1.0",
   "relationship_counts": {
     "dependency_graph_edges": 454,
     "dependency_graph_nodes": 100
   },
-  "schema_version": "1.0.0",
-  "source_commit": "b973436c9c7bdbc70f2ce8fa49920ccf8d92925b",
+  "schema_version": "1.1.0",
+  "source_commit": "bb23a28fd29446f95496bfaccc033ee7c1b125a4",
   "source_file_count": 108
 }

@@ -2,7 +2,7 @@
 
 > Generated artifact. Implements the 13 rules specified in [14_VALIDATION_SPECIFICATION.md](../14_VALIDATION_SPECIFICATION.md) plus Part 4 tooling-integrity checks. Regenerate with `node scripts/product-docs/cli.js validate`.
 
-Generated against source commit `b973436c9c7bdbc70f2ce8fa49920ccf8d92925b`.
+Generated against source commit `bb23a28fd29446f95496bfaccc033ee7c1b125a4`.
 
 ## Summary
 
@@ -10,7 +10,7 @@ Generated against source commit `b973436c9c7bdbc70f2ce8fa49920ccf8d92925b`.
 |---|---|---|
 | Error | 0 | Fails the build (non-zero exit) |
 | Warning | 14 | Reported, does not fail the build |
-| Information | 11 | Reported, does not fail the build |
+| Information | 12 | Reported, does not fail the build |
 | Evidence gap | 56 | Reported, does not fail the build — visibility only, per 14_VALIDATION_SPECIFICATION.md Rule 13 |
 
 **Result**: PASS
@@ -38,11 +38,12 @@ None.
 | missing-related-technical-docs | AI-FEAT-040 is Implemented but cites no Related technical docs | features/AI-FEAT-040_BACKUP_UPDATE_SCANNING.md | — |
 | missing-related-technical-docs | AI-FEAT-041 is Implemented but cites no Related technical docs | features/AI-FEAT-041_TRANSFER_BACKGROUND_MINIMIZE_OPERATION.md | — |
 
-## Information (11)
+## Information (12)
 
 | Rule | Message | File | Note |
 |---|---|---|---|
 | architecture-coverage | 38/56 features placed in the architectural-evolution relationship map | 11_ARCHITECTURAL_EVOLUTION.md | Unplaced: AI-FEAT-002, AI-FEAT-003, AI-FEAT-005, AI-FEAT-006, AI-FEAT-007, AI-FEAT-008, AI-FEAT-010, AI-FEAT-012, AI-FEAT-013, AI-FEAT-014, AI-FEAT-015, AI-FEAT-016, AI-FEAT-017, AI-FEAT-023, AI-FEAT-026, AI-FEAT-034, AI-FEAT-035, AI-FEAT-048 |
+| overlapping-active-decisions | 2 Accepted decisions (DEC-006, DEC-007) all govern the exact same feature/milestone set (AI-FEAT-029) — worth a human check that they don't contradict each other | DEC-006 | — |
 | shared-code-path | main/main.js is explicitly owned by 5 features (shared, not exclusive) | main/main.js | AI-FEAT-001, AI-FEAT-021, AI-FEAT-024, AI-FEAT-025, AI-FEAT-036 |
 | shared-code-path | renderer/theme-init.js is explicitly owned by 2 features (shared, not exclusive) | renderer/theme-init.js | AI-FEAT-001, AI-FEAT-003 |
 | shared-code-path | services/settings.js is explicitly owned by 3 features (shared, not exclusive) | services/settings.js | AI-FEAT-002, AI-FEAT-005, AI-FEAT-042 |

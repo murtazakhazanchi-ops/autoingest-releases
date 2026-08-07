@@ -1,5 +1,5 @@
 {
-  "docsys_version": "1.0.0",
+  "docsys_version": "1.1.0",
   "features": [
     {
       "aliases": [],
@@ -3180,5 +3180,5 @@
       "timeline_path": "generated/feature-timelines/AI-FEAT-056_TIMELINE.md"
     }
   ],
-  "schema_version": "1.0.0"
+  "schema_version": "1.1.0"
 }

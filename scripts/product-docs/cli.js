@@ -17,8 +17,13 @@ const gitInfo = require('./lib/gitInfo');
 const version = require('./lib/version');
 const automationCli = require('./automation/cli');
 const memoryCli = require('./automation/memoryCli');
+const releaseIntelligence = require('./automation/releaseIntelligence');
+// contextCli required lazily at its one call site (below) — Part 7E's
+// dispatcher wiring lands in its own commit, after Part 7D's `release`
+// command wiring, without this file referencing a module that doesn't
+// exist yet at that point in history.
 
-const HELP = `product-docs — Part 4/5 documentation intelligence & automation tooling for docs/product/
+const HELP = `product-docs — Part 4/5/7 documentation intelligence & automation tooling for docs/product/
 
 Usage: node scripts/product-docs/cli.js <command> [args]
 
@@ -29,8 +34,10 @@ Commands:
   impact <input>            Advisory impact analysis for a feature/roadmap/subsystem/source-path
   changes <fromRef> [toRef] Generate a "what changed" report between two git refs (default toRef: HEAD)
   all                       build, then validate
-  automation <sub>          Part 5 engineering-documentation orchestration — see "automation --help"
+  automation <sub>          Part 5/7 engineering-documentation orchestration — see "automation --help"
   memory <sub>              Part 6 engineering memory layer — see "memory --help"
+  release <sub>             Part 7D release intelligence (drafts only, never publishes) — see "release --help"
+  context <sub>             Part 7E universal repository context assistant — see "context --help"
 
 Run any command with --help for command-specific usage.
 `;
@@ -202,6 +209,91 @@ function cmdChanges(args) {
   console.log(`${report.commits.length} commit(s), ${report.files_changed.length} file(s) changed, ${report.affected_features.length} feature(s) affected.`);
 }
 
+const RELEASE_HELP = `release — Part 7D autonomous release intelligence (drafts only, never publishes)
+
+Usage: node scripts/product-docs/cli.js release <sub> [args]
+
+Subcommands:
+  prepare --to <ref> [--from <ref>|auto] [--dry-run] [--output-dir <dir>] [--json-only]
+      Generates a full release draft (Markdown + JSON) for the range from the
+      auto-detected prior Git tag (or --from) up to --to. --from defaults to
+      "auto" (newest tag reachable from --to, excluding --to itself).
+  status [--dir <dir>]
+      Lists previously generated release drafts.
+
+Never creates a GitHub release, never writes docs/release-notes-*.md, never
+completes a roadmap milestone. Publishing remains a separately authorized
+human action.
+`;
+
+function parseReleaseFlags(args) {
+  const flags = {};
+  const positional = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a.startsWith('--')) {
+      const key = a.slice(2);
+      const next = args[i + 1];
+      if (next === undefined || next.startsWith('--')) flags[key] = true;
+      else { flags[key] = next; i++; }
+    } else {
+      positional.push(a);
+    }
+  }
+  return { flags, positional };
+}
+
+function cmdReleasePrepare(args) {
+  const { flags } = parseReleaseFlags(args);
+  if (flags.help || !flags.to) {
+    console.log(RELEASE_HELP);
+    if (!flags.to) process.exitCode = 1;
+    return;
+  }
+  const toRef = flags.to;
+  if (!gitInfo.refExists(toRef)) {
+    console.error(`Unknown git ref: ${toRef}`);
+    process.exitCode = 1;
+    return;
+  }
+  const fromRef = flags.from || 'auto';
+  const result = releaseIntelligence.writeReleaseDraft(fromRef, toRef, {
+    dryRun: !!flags['dry-run'],
+    outputDir: flags['output-dir'],
+  });
+  if (result.dryRun) {
+    console.log(`[dry-run] release draft for ${result.draft.from_ref || '(no prior tag)'} → ${toRef} — no files written.`);
+    console.log(flags['json-only'] ? result.json : result.md);
+    return;
+  }
+  console.log(`Wrote release draft: ${result.mdPath}\n${result.jsonPath}`);
+  console.log(`From-ref resolution: ${result.draft.from_ref_resolution || result.draft.resolution}`);
+  console.log('DRAFT ONLY — review before publishing; this command never creates a GitHub release.');
+}
+
+function cmdReleaseStatus(args) {
+  const { flags } = parseReleaseFlags(args);
+  const drafts = releaseIntelligence.listReleaseDrafts(flags.dir);
+  console.log(`${drafts.length} release draft(s) found${flags.dir ? ` under ${flags.dir}` : ''}.`);
+  for (const d of drafts) console.log(`  - ${d}`);
+}
+
+function cmdRelease(args) {
+  const [sub, ...rest] = args;
+  if (!sub || sub === '--help' || sub === '-h') {
+    console.log(RELEASE_HELP);
+    return;
+  }
+  switch (sub) {
+    case 'prepare': return cmdReleasePrepare(rest);
+    case 'status': return cmdReleaseStatus(rest);
+    default:
+      console.error(`Unknown release subcommand: ${sub}\n`);
+      console.log(RELEASE_HELP);
+      process.exitCode = 1;
+  }
+}
+
 function main() {
   const [, , command, ...rest] = process.argv;
   if (!command || command === '--help' || command === '-h') {
@@ -236,6 +328,12 @@ function main() {
         break;
       case 'memory':
         memoryCli.run(rest);
+        break;
+      case 'release':
+        cmdRelease(rest);
+        break;
+      case 'context':
+        require('./automation/contextCli').run(rest);
         break;
       default:
         console.error(`Unknown command: ${command}\n`);

@@ -18,6 +18,7 @@ const { renderRoadmapDashboardMd } = require('./renderDashboard');
 const { compareIds } = require('./ids');
 const { buildMemoryIndex } = require('./memoryIndex');
 const { renderMemoryIndexMd, renderEngineeringMemoryTimelineMd } = require('./renderMemory');
+const { buildOwnershipManifest, renderOwnershipManifestMd } = require('./ownershipManifest');
 
 // Assembles every Part 4 generated artifact in memory. Returns:
 //   - `parsed`: the raw parsed docs/product/ structures (lib/parseProductDocs)
@@ -40,7 +41,9 @@ function assemble() {
   }
   timelines.sort((a, b) => compareIds(a.feature_id, b.feature_id));
 
-  const built = { subsystems, sourceIndex, featureIndex, authorityIndex, graph, searchIndex, dashboard, timelines, memoryIndex };
+  const ownershipManifest = buildOwnershipManifest(parsed, { featureIndex, subsystems, sourceIndex });
+
+  const built = { subsystems, sourceIndex, featureIndex, authorityIndex, graph, searchIndex, dashboard, timelines, memoryIndex, ownershipManifest };
 
   const files = new Map();
 
@@ -93,6 +96,13 @@ function assemble() {
   files.set('memory-index.jsonl', memoryIndex.map((r) => JSON.stringify(r)).join('\n') + (memoryIndex.length ? '\n' : ''));
   files.set('MEMORY_INDEX.md', renderMemoryIndexMd(memoryIndex, version.DOCSYS_VERSION));
   files.set('ENGINEERING_MEMORY_TIMELINE.md', renderEngineeringMemoryTimelineMd(memoryIndex, version.DOCSYS_VERSION));
+
+  files.set('ownership-manifest.json', stableStringify({
+    schema_version: version.SCHEMA_VERSION,
+    docsys_version: version.DOCSYS_VERSION,
+    ...ownershipManifest,
+  }));
+  files.set('OWNERSHIP_MANIFEST.md', renderOwnershipManifestMd(ownershipManifest));
 
   const manifest = {
     docsys_version: version.DOCSYS_VERSION,

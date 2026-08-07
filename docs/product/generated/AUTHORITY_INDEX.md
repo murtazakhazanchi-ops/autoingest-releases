@@ -1,6 +1,6 @@
 # Authority Index
 
-> Generated artifact — docsys version 1.0.0. Locator only; canonical Markdown under docs/product/ and docs/ remains authoritative. Never edit this file by hand — regenerate with `node scripts/product-docs/cli.js build`.
+> Generated artifact — docsys version 1.1.0. Locator only; canonical Markdown under docs/product/ and docs/ remains authoritative. Never edit this file by hand — regenerate with `node scripts/product-docs/cli.js build`.
 
 | Topic | Aliases | AI-FEAT | Roadmap | Canonical product doc | Canonical technical docs | Confidence |
 |---|---|---|---|---|---|---|

@@ -9,6 +9,11 @@ const evidencePacket = require('./evidencePacket');
 const recovery = require('./recovery');
 const installHooks = require('../hooks/install-hooks');
 const releaseIntelligence = require('./releaseIntelligence');
+// hookAutomation/decisionIntelligence/ownershipEngine are required lazily,
+// inside the specific command functions that use each one (below) rather
+// than at module top — lets each Part 7 milestone's dispatcher wiring land
+// in its own commit without any intermediate commit's `automation/cli.js`
+// referencing a module that doesn't exist yet at that point in history.
 
 const HELP = `automation — Part 5 documentation-automation orchestration
 
@@ -24,8 +29,20 @@ Subcommands:
   recover
   dry-run [sessionId | <fromRef> [toRef=HEAD]]
   reconcile
-  install-hooks | uninstall-hooks | verify-hooks
+  install-hooks [--dry-run] | uninstall-hooks | verify-hooks
   release-draft <fromRef> [toRef=HEAD]
+
+  Part 7 — Zero-Touch Git Integration:
+  pre-commit-gate                 Run the pre-commit checks against currently staged files
+  pre-push-gate                   Auto-finalize eligible sessions, validate, report push impact
+  post-commit-link                Link the just-made commit into any matching pending session
+
+  Part 7 — Decision Intelligence:
+  decision-scan [sessionId]       Detect architectural signals and plan a decision candidate/draft
+  decision-candidates             List locally-held (non-canonical) decision candidates
+
+  Part 7 — Ownership:
+  ownership <path>                Multi-signal ownership resolution for a source path
 
 Modes: STRICT blocks on any unmet requirement; STANDARD (default) updates docs
 and blocks only on hard validation errors; OBSERVE never writes canonical docs.
@@ -199,6 +216,77 @@ function cmdReleaseDraft(args) {
   console.log('DRAFT ONLY — review before publishing; this command never creates a GitHub release.');
 }
 
+function cmdInstallHooks(args) {
+  if (args.includes('--dry-run')) {
+    console.log(JSON.stringify(installHooks.readiness(), null, 2));
+    return;
+  }
+  console.log(JSON.stringify(installHooks.install(), null, 2));
+}
+
+// Prints ONLY the JSON result to stdout (mirroring cmdFinalize's own
+// convention) so a caller capturing combined stdout+stderr on a non-zero
+// exit — as tmpRepoHarness's `run()` and the version-controlled hook
+// scripts both do — still gets parseable JSON. Human-readable remediation
+// text lives inside the JSON's own `blocking[].message` fields; the shell
+// hook prints its own short banner around this.
+function cmdPreCommitGate() {
+  const result = require('./hookAutomation').preCommitGate();
+  console.log(JSON.stringify(result, null, 2));
+  if (!result.ok) process.exitCode = 1;
+}
+
+function cmdPrePushGate() {
+  const result = require('./hookAutomation').prePushGate();
+  console.log(JSON.stringify(result, null, 2));
+  // Printed to stderr, not stdout, so it stays visible in a developer's
+  // terminal (the shell hook's combined output) without breaking anything
+  // that parses stdout as pure JSON on the success path.
+  if (result.uncommitted_canonical_changes_note) {
+    console.error(`[autoingest-docs] NOTE: ${result.uncommitted_canonical_changes_note}`);
+    for (const f of result.uncommitted_canonical_changes) console.error(`[autoingest-docs]   - ${f}`);
+  }
+  if (!result.ok) process.exitCode = 1;
+}
+
+function cmdPostCommitLink() {
+  console.log(JSON.stringify(require('./hookAutomation').postCommitLink(), null, 2));
+}
+
+function cmdDecisionScan(args) {
+  const decisionIntelligence = require('./decisionIntelligence');
+  const { positional } = parseFlags(args);
+  const sessionId = positional[0] || (() => {
+    try { return resolveSingleSession(); } catch { return null; }
+  })();
+  if (!sessionId) {
+    console.log('Usage: automation decision-scan <sessionId>  (or run with exactly one pending session)');
+    process.exitCode = 1;
+    return;
+  }
+  const found = evidencePacket.loadPacket(sessionId);
+  if (!found) throw new Error(`No packet found for session ${sessionId}`);
+  const result = decisionIntelligence.scanPacket(found.packet);
+  if (result.state === 'draft' && found.dir === require('./paths').PENDING_DIR) {
+    found.packet.architectural_decision_draft_id = result.decision_id;
+    evidencePacket.persist(found.packet, { event: 'decision-scan' });
+  }
+  console.log(JSON.stringify(result, null, 2));
+}
+
+function cmdDecisionCandidates() {
+  console.log(JSON.stringify(require('./decisionIntelligence').listCandidates(), null, 2));
+}
+
+function cmdOwnership(args) {
+  if (args.length === 0) {
+    console.log('Usage: automation ownership <path>');
+    process.exitCode = 1;
+    return;
+  }
+  console.log(JSON.stringify(require('./ownershipEngine').resolveOwnership(args[0]), null, 2));
+}
+
 function run(args) {
   const [sub, ...rest] = args;
   if (!sub || sub === '--help' || sub === '-h') {
@@ -213,10 +301,16 @@ function run(args) {
     case 'recover': return cmdRecover();
     case 'dry-run': return cmdDryRun(rest);
     case 'reconcile': return cmdReconcile();
-    case 'install-hooks': return console.log(JSON.stringify(installHooks.install(), null, 2));
+    case 'install-hooks': return cmdInstallHooks(rest);
     case 'uninstall-hooks': return console.log(JSON.stringify(installHooks.uninstall(), null, 2));
     case 'verify-hooks': return console.log(JSON.stringify(installHooks.verify(), null, 2));
     case 'release-draft': return cmdReleaseDraft(rest);
+    case 'pre-commit-gate': return cmdPreCommitGate();
+    case 'pre-push-gate': return cmdPrePushGate();
+    case 'post-commit-link': return cmdPostCommitLink();
+    case 'decision-scan': return cmdDecisionScan(rest);
+    case 'decision-candidates': return cmdDecisionCandidates();
+    case 'ownership': return cmdOwnership(rest);
     default:
       console.error(`Unknown automation subcommand: ${sub}\n`);
       console.log(HELP);

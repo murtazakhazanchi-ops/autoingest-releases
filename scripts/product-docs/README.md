@@ -86,10 +86,10 @@ docs/product/generated/     — output; see docs/product/generated/README.md
 
 `test/` lives under `scripts/product-docs/` rather than the repository's top-level `test/` directory. That top-level directory tests application runtime modules (`main/`, `services/`) and is a plausible target for whatever discovers/runs the app's test suite; this tooling's tests are for a standalone dev tool with synthetic fixture trees under `test/fixtures/` and have no relationship to the Electron app. Keeping them adjacent to the tool they test — and clearly out of the application test suite's path — was judged clearer than forcing one shared `test/` convention across two unrelated systems.
 
-Run all tests:
+Run all tests (including `test/automation/` — the Part 5/6/7 automation/orchestration suite, previously and easy to forget since it's one directory deeper):
 
 ```bash
-for f in scripts/product-docs/test/*.test.js; do node "$f"; done
+node --test scripts/product-docs/test/*.test.js scripts/product-docs/test/automation/*.test.js
 ```
 
 Tests never mutate the real `docs/product/` tree. `test/fixtures/broken-product-docs/` is a small, intentionally-imperfect synthetic tree used only by `validators.test.js`; `integration.test.js` reads the real `docs/product/` tree read-only to assert whole-repository invariants (56 features present, deterministic rebuild, zero dangling graph edges, zero error-level health findings against the real content).
@@ -133,3 +133,36 @@ node scripts/product-docs/cli.js memory show AI-MEM-0001
 ```
 
 A capsule is only created when the work meets an evidence-gated significance bar (`automation/memory/significance.js`) — most sessions produce none, matching the "not for every session" rule. `automation/orchestrator.js`'s own `finalize()` calls this automatically for every finalized Evidence Packet; a memory session can also stand alone with no linked packet.
+
+## Part 7 — Autonomous Engineering Intelligence
+
+Five milestones extending Parts 4-6 into a zero-touch layer (see [docs/product/README.md](../../docs/product/README.md) § Autonomous Engineering Intelligence (Part 7) for the authority-model summary and [docs/product/CLAUDE.md](../../docs/product/CLAUDE.md) § 20 for what this obligates an AI agent to do). Introduces no new evidence-discipline rule of its own — every new capability reuses Part 4/5's existing parsers, atomic writes, record allocator, and evidence-gated "when to create a record" predicates.
+
+```bash
+# 7A — zero-touch git integration (the JS behind hooks/{pre-commit,post-commit,pre-push})
+node scripts/product-docs/cli.js automation pre-commit-gate     # normally run by the installed hook, not directly
+node scripts/product-docs/cli.js automation pre-push-gate
+node scripts/product-docs/cli.js automation post-commit-link
+node scripts/product-docs/cli.js automation install-hooks --dry-run   # non-mutating readiness report
+
+# 7B — architectural decision intelligence
+node scripts/product-docs/cli.js automation decision-scan [sessionId]
+node scripts/product-docs/cli.js automation decision-candidates       # local, non-canonical, review-required
+
+# 7C — evidence-based feature ownership (multi-signal, weighted, deterministic)
+node scripts/product-docs/cli.js automation ownership <path>
+
+# 7D — autonomous release intelligence (drafts only, never publishes)
+node scripts/product-docs/cli.js release prepare --to <ref> [--from <ref>|auto] [--dry-run] [--output-dir <dir>]
+node scripts/product-docs/cli.js release status
+
+# 7E — universal repository context assistant (tool-neutral, deterministic, no embeddings)
+node scripts/product-docs/cli.js context feature AI-FEAT-###
+node scripts/product-docs/cli.js context file <path>
+node scripts/product-docs/cli.js context task "<natural-language task>" [--json]
+node scripts/product-docs/cli.js context explain "<question>"
+```
+
+**Security**: identical non-goals to Parts 4-6 — no network calls, no external AI API, no `eval`, every git invocation uses `execFileSync` with argument arrays (never shell interpolation), every write is constrained inside the repository root (`automation/atomicWrite.js`'s existing `assertInsideRepo`), no automatic push/merge/release-publish, hooks are never installed into the real `.git/hooks/` except via the explicit, human-approved `automation install-hooks`.
+
+**A pre-existing bug found and fixed during Part 7's own verification**: `lib/validators.js`'s `checkGeneratedFreshness` used to compare `manifest.json` byte-for-byte including its own `source_commit` field, which can never correctly self-reference the commit that first introduces a given rebuild (a commit's hash is a function of its own tree). This made a freshly-committed `manifest.json` perpetually fail `validate` on the very next clean checkout — verified directly against this repository's real history. Fixed by excluding only that one field from the strict comparison (see `10_CHANGELOG.md`'s Part 7 entry for the full account); every other field, and every other generated file, remains a full byte-for-byte comparison.
