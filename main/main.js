@@ -1576,14 +1576,30 @@ ipcMain.handle('master:create', async (_event, basePath, folderName) => {
  * events" and callers must not treat the two interchangeably.
  */
 ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
-  if (!masterPath || typeof masterPath !== 'string') return { ok: true, events: [] };
+  // ── TEMPORARY DIAGNOSTICS (BUG-011 real-Windows/NAS RC follow-up) ─────────────
+  // See _diagnoseEventJsonValidation's comment above. Pure evidence-gathering —
+  // every branch/return below is byte-identical to the pre-diagnostic version;
+  // only `log(...)` calls and diagnostic-record bookkeeping were added. Remove
+  // this whole diagnostic layer once the real root cause is confirmed and fixed.
+  const _diagRecords = [];
+  const _diagLog = (msg) => log(`[EventDiscoveryDiagnostics] ${msg}`);
+
+  if (!masterPath || typeof masterPath !== 'string') {
+    _diagLog(`masterPath missing/invalid — returning {ok:true, events:[]} without scanning. typeof=${typeof masterPath}`);
+    return { ok: true, events: [] };
+  }
+
+  _diagLog(`scan start masterPath=${JSON.stringify(masterPath)} win32Normalized=${JSON.stringify(path.win32.normalize(masterPath))}`);
 
   let entries;
   try {
     entries = await fsp.readdir(masterPath, { withFileTypes: true });
   } catch (err) {
+    _diagLog(`readdir(masterPath) THREW code=${err.code || 'unknown'} message=${err.message}`);
     return { ok: false, events: [], errorReason: err.code || 'scan-failed' };
   }
+
+  _diagLog(`readdir(masterPath) returned ${entries.length} raw entr${entries.length === 1 ? 'y' : 'ies'}`);
 
   // Load lists ONCE for this scan; parser is a pure function of its inputs.
   const lists = {
@@ -1596,19 +1612,94 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
   const unparseable = [];
 
   for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
     const name = entry.name;
+    const entryFullPath = path.join(masterPath, name);
+
+    // Diagnostic-only cross-check: does a real stat() agree with the Dirent's
+    // own isDirectory()? This is the exact test for a known class of Windows/
+    // network-drive bug where withFileTypes Dirents can misreport file type.
+    // Never changes behavior — only ever logged.
+    let _statIsDirectory = null;
+    let _statError = null;
+    try {
+      const st = await fsp.stat(entryFullPath);
+      _statIsDirectory = st.isDirectory();
+    } catch (statErr) {
+      _statError = statErr.code || statErr.message;
+    }
+    if (entry.isDirectory() !== _statIsDirectory) {
+      _diagLog(`DIRENT/STAT MISMATCH name=${JSON.stringify(name)} dirent.isDirectory()=${entry.isDirectory()} stat.isDirectory()=${_statIsDirectory} statError=${_statError}`);
+    }
+
+    if (!entry.isDirectory()) {
+      _diagRecords.push({
+        folderName: name, folderPath: entryFullPath,
+        direntIsDirectory: entry.isDirectory(), direntIsFile: entry.isFile(),
+        statIsDirectory: _statIsDirectory, statError: _statError,
+        includedInEventList: false, rejectionStage: 'DIRENT_NOT_DIRECTORY',
+        rejectionReason: `entry.isDirectory() was false (statIsDirectory=${_statIsDirectory})`,
+      });
+      continue;
+    }
     // Skip macOS/system artefacts defensively (even though these aren't directories usually)
-    if (name.startsWith('.')) continue;
+    if (name.startsWith('.')) {
+      _diagRecords.push({
+        folderName: name, folderPath: entryFullPath,
+        direntIsDirectory: true, direntIsFile: false,
+        statIsDirectory: _statIsDirectory, statError: _statError,
+        includedInEventList: false, rejectionStage: 'DOTFILE', rejectionReason: 'folder name starts with "."',
+      });
+      continue;
+    }
 
     // Try event.json first (authoritative); fallback to parser for legacy events.
     const jsonPath = path.join(masterPath, name, 'event.json');
     let eventJson = null;
     let jsonCorrupt = false;
+    const _diag = {
+      folderName: name, folderPath: entryFullPath,
+      eventJsonPath: jsonPath, eventJsonExists: null,
+      readOk: null, readErrorCode: null,
+      parseOk: null, parseError: null,
+      eventJsonVersion: null, requiredFieldsPresent: null,
+      validationOk: null, validationReason: null,
+      normalizedFolderPath: path.win32.normalize(entryFullPath),
+      // No separate archive-identity/path resolver exists in this code path today —
+      // master:scanEvents receives masterPath as-is from the renderer and reads
+      // directly under it. These two fields are populated with the identity
+      // pass-through that actually happens, not a real resolver stage.
+      resolvedArchivePath: entryFullPath, resolverOk: true, resolverReason: 'no separate resolver stage in this code path',
+      direntIsDirectory: true, direntIsFile: false,
+      statIsDirectory: _statIsDirectory, statError: _statError,
+      includedInEventList: null, rejectionStage: null, rejectionReason: null,
+    };
+
     try {
       const raw = await fsp.readFile(jsonPath, 'utf8');
-      const obj = normalizeEventJson(JSON.parse(raw));
+      _diag.eventJsonExists = true;
+      _diag.readOk = true;
+      let obj;
+      try {
+        obj = normalizeEventJson(JSON.parse(raw));
+        _diag.parseOk = true;
+        _diag.eventJsonVersion = obj?.version ?? null;
+        _diag.requiredFieldsPresent = {
+          hijriDate:  typeof obj?.hijriDate === 'string' && !!obj.hijriDate,
+          sequence:   obj?.sequence !== undefined && obj?.sequence !== null,
+          eventName:  typeof obj?.eventName === 'string' && !!obj.eventName,
+          components: Array.isArray(obj?.components),
+        };
+      } catch (parseErr) {
+        _diag.parseOk = false;
+        _diag.parseError = parseErr.message;
+        jsonCorrupt = true;
+        _diagRecords.push({ ..._diag, includedInEventList: false, rejectionStage: 'JSON_PARSE_FAILED', rejectionReason: parseErr.message });
+        _diagLog(`entry=${JSON.stringify(name)} JSON.parse FAILED: ${parseErr.message}`);
+        continue;
+      }
+
       if (isValidEventJson(obj)) {
+        _diag.validationOk = true;
         eventJson = obj;
         hidePathBestEffort(jsonPath).catch(() => {});
         // Patch 3: crash recovery — reset stuck in-progress status on next startup.
@@ -1622,14 +1713,23 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
         }
       } else {
         jsonCorrupt = true;
+        _diag.validationOk = false;
+        _diag.validationReason = _diagnoseEventJsonValidation(obj);
         console.error('[scanEvents] isValidEventJson failed for', name, '— shape dump:', JSON.stringify(obj).slice(0, 400));
       }
     } catch (err) {
-      if (err.code !== 'ENOENT') {
+      if (err.code === 'ENOENT') {
+        _diag.eventJsonExists = false;
+        _diag.readOk = false;
+        _diag.readErrorCode = 'ENOENT';
+        // ENOENT = no JSON file → legacy event, fallback to parser below
+      } else {
         jsonCorrupt = true;
+        _diag.eventJsonExists = null; // unknown — the read itself failed for a non-ENOENT reason
+        _diag.readOk = false;
+        _diag.readErrorCode = err.code || 'unknown';
         console.error('[scanEvents] Failed to parse event.json for', name, ':', err.message);
       }
-      // ENOENT = no JSON file → legacy event, fallback to parser below
     }
 
     const parsed = parseEventName(name, lists);
@@ -1654,6 +1754,7 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
         needsReconciliation:  (eventJson.safeEventName || sanitizeForPath(eventJson.eventName || '')) !== name,
         _eventJson:           eventJsonMeta,
       });
+      _diagRecords.push({ ..._diag, includedInEventList: true, rejectionStage: null, rejectionReason: null });
     } else if (!jsonCorrupt && parsed.ok) {
       // No event.json (ENOENT) and folder name is parseable → legacy event, no components.
       // Components intentionally empty: event.json is the ONLY source. Legacy events must
@@ -1669,6 +1770,7 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
         isLegacy:     true,
         isCorrupt:    false,
       });
+      _diagRecords.push({ ..._diag, includedInEventList: true, rejectionStage: null, rejectionReason: 'legacy: no event.json, folder name parsed OK' });
     } else if (jsonCorrupt && parsed.ok) {
       // event.json exists but failed shape validation. Components intentionally empty.
       resolved.push({
@@ -1683,6 +1785,7 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
         isCorrupt:    true,
         _eventJson:   null,
       });
+      _diagRecords.push({ ..._diag, includedInEventList: true, rejectionStage: null, rejectionReason: 'event.json invalid but folder name parsed OK — still counted as an existing event (isCorrupt:true)' });
     } else {
       // Both JSON (if present) and parser failed.
       unparseable.push({
@@ -1690,6 +1793,10 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
         isParseable: false,
         reason:      parsed.ok ? 'corrupt-json' : parsed.reason,
         isCorrupt:   jsonCorrupt,
+      });
+      _diagRecords.push({
+        ..._diag, includedInEventList: false, rejectionStage: 'UNPARSEABLE_FOLDER_NAME',
+        rejectionReason: `folderNameParsed=${parsed.ok} (${parsed.ok ? '' : parsed.reason}); jsonCorrupt=${jsonCorrupt} — lands in "Unrecognised Folders", not "Existing Events"`,
       });
     }
   }
@@ -1700,6 +1807,25 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
     if (a.hijriDate !== b.hijriDate) return b.hijriDate.localeCompare(a.hijriDate);
     return b.sequence.localeCompare(a.sequence);
   });
+
+  // ── Diagnostic summary — one line per folder, then an aggregate. ─────────────
+  for (const rec of _diagRecords) {
+    _diagLog(`RECORD ${JSON.stringify(rec)}`);
+  }
+  const _rejectionCounts = {};
+  for (const rec of _diagRecords) {
+    if (rec.rejectionStage) _rejectionCounts[rec.rejectionStage] = (_rejectionCounts[rec.rejectionStage] || 0) + 1;
+  }
+  _diagLog(`SUMMARY collectionPath=${JSON.stringify(masterPath)} childrenEnumerated=${entries.length} `
+    + `processedAsEventCandidates=${_diagRecords.filter(r => r.eventJsonPath).length} `
+    + `eventJsonFound=${_diagRecords.filter(r => r.eventJsonExists === true).length} `
+    + `readOk=${_diagRecords.filter(r => r.readOk === true).length} `
+    + `parseOk=${_diagRecords.filter(r => r.parseOk === true).length} `
+    + `validationOk=${_diagRecords.filter(r => r.validationOk === true).length} `
+    + `includedInEventList=${_diagRecords.filter(r => r.includedInEventList === true).length} `
+    + `resolvedCount(=ExistingEvents shown in UI)=${resolved.length} `
+    + `unparseableCount(=UnrecognisedFolders shown in UI)=${unparseable.length} `
+    + `rejectionCounts=${JSON.stringify(_rejectionCounts)}`);
 
   return { ok: true, events: [...resolved, ...unparseable] };
 });
@@ -1730,6 +1856,35 @@ function sanitizeForPath(name) {
     .replace(/[:*?"<>|]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+// ── TEMPORARY DIAGNOSTIC INSTRUMENTATION (BUG-011 real-Windows/NAS RC follow-up) ──
+// Not a fix. Pure evidence-gathering for a tester report where 38 event.json-backed
+// folders are visible in Windows Explorer but master:scanEvents reports zero events
+// on the real NAS/UNC archive. Mirrors isValidEventJson's checks but returns a
+// human-readable reason instead of a bare boolean — used ONLY by the diagnostic
+// block in master:scanEvents below; isValidEventJson itself is untouched and still
+// the sole source of truth for actual validation behavior.
+// Remove this whole block (and the diagnostic block in master:scanEvents) once the
+// real root cause is found and the actual fix has landed.
+function _diagnoseEventJsonValidation(obj) {
+  if (obj === null || typeof obj !== 'object') return 'NOT_AN_OBJECT';
+  if (obj.version !== 1) return `VERSION_MISMATCH(got=${JSON.stringify(obj.version)})`;
+  if (!obj.hijriDate || typeof obj.hijriDate !== 'string') return 'HIJRI_DATE_MISSING_OR_NOT_STRING';
+  const seqNum = typeof obj.sequence === 'number' ? obj.sequence : parseInt(obj.sequence, 10);
+  if (!Number.isInteger(seqNum) || seqNum < 1) return `SEQUENCE_INVALID(got=${JSON.stringify(obj.sequence)})`;
+  if (!obj.eventName || typeof obj.eventName !== 'string') return 'EVENT_NAME_MISSING_OR_NOT_STRING';
+  if (!Array.isArray(obj.components)) return 'COMPONENTS_NOT_ARRAY';
+  for (let i = 0; i < obj.components.length; i++) {
+    const c = obj.components[i];
+    if (c === null || typeof c !== 'object') return `COMPONENT_${i}_NOT_OBJECT`;
+    if (!Array.isArray(c.types)) return `COMPONENT_${i}_TYPES_NOT_ARRAY`;
+    if (typeof c.city !== 'string') return `COMPONENT_${i}_CITY_NOT_STRING(got=${JSON.stringify(c.city)})`;
+    if (c.location !== null && c.location !== undefined && typeof c.location !== 'string') {
+      return `COMPONENT_${i}_LOCATION_INVALID`;
+    }
+  }
+  return null; // valid
 }
 
 function normalizeEventJson(data) {
@@ -2631,6 +2786,12 @@ const _NAS_SKIP_DIRS = new Set(['_Selected', '.autoingest', '__MACOSX']);
 async function _scanNasArchive(nasRoot) {
   const refreshedAt = new Date().toISOString();
 
+  // TEMPORARY DIAGNOSTIC (BUG-011 real-Windows/NAS RC follow-up) — logs the exact
+  // nasRoot and each collection's computed path, so it can be directly diffed
+  // against master:scanEvents's own "scan start masterPath=..." line for the same
+  // collection in the same app.log. Remove alongside the other diagnostic blocks.
+  log(`[EventDiscoveryDiagnostics] _scanNasArchive start nasRoot=${JSON.stringify(nasRoot)} win32Normalized=${JSON.stringify(path.win32.normalize(nasRoot))}`);
+
   let collectionEntries;
   try {
     collectionEntries = await fsp.readdir(nasRoot, { withFileTypes: true });
@@ -2656,6 +2817,7 @@ async function _scanNasArchive(nasRoot) {
 
     const collPath = path.join(nasRoot, collEntry.name);
     const collection = { name: collEntry.name, path: collPath, events: [], externalFolders: [] };
+    log(`[EventDiscoveryDiagnostics] _scanNasArchive collection name=${JSON.stringify(collEntry.name)} collPath=${JSON.stringify(collPath)}`);
 
     let eventEntries;
     try {
