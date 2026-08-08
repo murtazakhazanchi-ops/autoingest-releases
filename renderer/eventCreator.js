@@ -346,9 +346,13 @@ const EventCreator = (() => {
   // M3/M5: existing-event list + view state.
   //   _scannedEvents:  result of master:scanEvents for the current activeMaster,
   //                    null until a scan has run this Step-2 entry.
+  //   _scanError:      set when the most recent scan failed to read the archive
+  //                    (NAS hiccup etc). Never inferred from an empty _scannedEvents —
+  //                    a read failure and a genuinely empty collection are distinct.
   //   _viewingExisting: when set, the form starts read-only; M6 edit mode
   //                    can unlock it via _editMode flag.
   let _scannedEvents   = null;
+  let _scanError       = null;
   let _viewingExisting = null; // { folderName, hijriDate, sequence, isUnresolved, components } | null
   let _editMode        = false; // M6: when true in view-existing mode, form is editable
   let _repairMode      = false; // Phase 5: when true, form is repairing an unparseable folder
@@ -777,6 +781,9 @@ const EventCreator = (() => {
     }
     return changed;
   }
+
+  // Windows-safe "is childPath located under rootPath" check — see pathUtils.js.
+  const _isPathUnderRoot = window.PathUtils.isPathUnderRoot;
 
   // Returns the effective on-disk path for the current collection.
   // While archive is offline, returns staging path (coll._masterPath).
@@ -1689,8 +1696,21 @@ ${_offlineStagingMode ? '<p class="ec-subtext">Archive offline — showing colle
 
   async function _scanAndRenderEventList() {
     const _scanPath = _effectiveCollPath() || activeMaster?.path;
-    _scannedEvents = await window.api.scanMasterEvents(_scanPath);
-    if (!_scannedEvents) _scannedEvents = [];
+    const _scanResult = await window.api.scanMasterEvents(_scanPath);
+
+    if (_scanResult?.ok) {
+      _scannedEvents = Array.isArray(_scanResult.events) ? _scanResult.events : [];
+      _scanError     = null;
+    } else {
+      // Read failed (NAS hiccup, permission blip, disconnect, etc). This is NOT
+      // the same as "collection has zero events" — surface an error state and,
+      // if a previous scan of this collection already succeeded, keep showing
+      // that known-good list rather than wiping it because one re-scan glitched.
+      _scanError = _scanResult?.errorReason || 'scan-failed';
+      if (_scannedEvents === null) _scannedEvents = [];
+      _renderEventList();
+      return;
+    }
 
     // When archive is online, augment the list with Local Staging events that are
     // pending sync. These events were created while offline and exist only in Local
@@ -1824,9 +1844,14 @@ ${unparseable.map(ev => `
 
   <div class="ec-tab-panel" data-panel="current-device"${_activeTab !== 'current-device' ? ' hidden' : ''}>
     <p class="ec-section-title">Existing Events <span class="ec-hint" style="font-weight:normal">(${resolved.length})</span></p>
+    ${_scanError ? `
+    <p class="ec-hint ec-evl-warn-text" role="alert" style="display:flex;align-items:center;gap:8px;margin:4px 0 12px">
+      <span>Could not read events from the archive right now — this may be a temporary network issue.${resolved.length > 0 ? ' Showing the last known list.' : ''}</span>
+      <button type="button" id="ecEvlRetryScan" class="ec-bc-change" style="flex-shrink:0">Retry</button>
+    </p>` : ''}
     ${resolved.length > 0 ? '<input type="search" id="ecEvlSearch" class="ec-evl-search" placeholder="Search events…" autocomplete="off">' : ''}
     <div class="ec-evl-list" id="ecEvlList" role="listbox" aria-label="Events">
-      ${resolvedHTML || '<p class="ec-hint">No resolvable events yet.</p>'}
+      ${resolvedHTML || (_scanError ? '<p class="ec-hint">Events could not be loaded from the archive. Use Retry above once the connection is stable.</p>' : '<p class="ec-hint">No resolvable events yet.</p>')}
     </div>
     ${unparseableHTML}
   </div>
@@ -1874,10 +1899,19 @@ ${unparseable.map(ev => `
     // Collection bar: Change → go back to master step.
     document.getElementById('ecChangeCollection')?.addEventListener('click', () => {
       _scannedEvents = null;
+      _scanError = null;
       _viewingExisting = null;
       _selectedListFolder = null;
       _activeTab = 'current-device';
       showMasterStep();
+    });
+
+    // Retry a failed archive scan without losing the last known-good list until
+    // the retry itself resolves (see _scanAndRenderEventList's error handling).
+    document.getElementById('ecEvlRetryScan')?.addEventListener('click', () => {
+      _scanAndRenderEventList().catch(err => {
+        console.error('[EventCreator] retry scanMasterEvents failed:', err);
+      });
     });
 
     // Phase 5: wire "Fix & Convert →" buttons on unparseable items.
@@ -2190,6 +2224,19 @@ ${unparseable.map(ev => `
     if (typeof EventMgmt !== 'undefined' && EventMgmt.isOpen() && EventMgmt.getMode() === 'select') {
       console.warn('[EventCreator] _renderEventForm blocked — EventMgmt mode is select, expected edit/create/repair');
       return;
+    }
+
+    // Derive the footer mode from actual state instead of trusting every caller to
+    // have set it correctly beforehand. A stale mode here (e.g. 'master', left over
+    // from the collection-picker screen) makes the docked footer render with no
+    // primary action at all — the form still renders fine, so this failure is
+    // invisible except as a "missing" Create/Save/Repair button. See showEventStep(),
+    // which can reach this function directly (skipping the event list, where mode is
+    // normally set) whenever _eventComps/_scannedEvents are still populated from a
+    // prior visit to a different collection this session.
+    if (typeof EventMgmt !== 'undefined' && EventMgmt.isOpen()) {
+      const correctMode = _repairMode ? 'repair' : (_viewingExisting ? 'edit' : 'create');
+      if (EventMgmt.getMode() !== correctMode) EventMgmt.setMode(correctMode);
     }
 
     _navScreen = 'eventForm';
@@ -4292,6 +4339,13 @@ ${unparseable.map(ev => `
 
     const bannerEl = document.getElementById('ecEventError');
     if (bannerEl) { clearTimeout(bannerEl._hideTimer); bannerEl.classList.remove('visible'); }
+
+    // Invalidate the cached event-list scan: it was populated before this event
+    // existed on disk, so re-entering the event list must re-scan from durable
+    // archive evidence rather than reuse a snapshot that predates this creation.
+    _scannedEvents = null;
+    _scanError     = null;
+
     _proceedToPreviewStep();
   }
 
@@ -4863,7 +4917,7 @@ ${unparseable.map(ev => `
       const root = (typeof path === 'string' && path.length > 0) ? path : null;
       sessionArchiveRoot = root;
       // Clear activeMaster if it no longer lives under the new root
-      if (activeMaster && (!root || !activeMaster.path.startsWith(root + '/'))) {
+      if (activeMaster && (!root || !_isPathUnderRoot(activeMaster.path, root))) {
         activeMaster        = null;
         selectedCollection  = null;
         _scannedEvents      = null;
@@ -4879,7 +4933,7 @@ ${unparseable.map(ev => `
       if (sessionCollections.length > 0) {
         const kept = sessionCollections.filter(c =>
           (selectedCollection && c.name === selectedCollection) ||
-          (root && c._masterPath?.startsWith(root + '/')));
+          (root && _isPathUnderRoot(c._masterPath, root)));
         if (kept.length !== sessionCollections.length) {
           const dropped = sessionCollections.length - kept.length;
           sessionCollections.length = 0;

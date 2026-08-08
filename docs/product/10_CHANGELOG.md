@@ -6,6 +6,16 @@ Append newest first. Never edit or delete a prior entry — if something was wro
 
 ---
 
+
+## 2026-08-07 — Windows/NAS Event Management reliability — 3 independent root causes
+
+- **Task type**: bugfix — A real Windows tester using AutoIngest against a production-style NAS archive over a UNC path (Working Root = Main Archive Root) reported three Event Management symptoms: (1) existing and newly-created events did not appear in the "Existing Events" list; (2) a physically-existing collection intermittently disappeared, forcing "Create Collection"; (3) the Create Event primary action button was missing from the modal footer despite a fully valid, populated form. Investigated as one incident cluster per instructions, with an explicit requirement to prove or reject a shared root cause rather than assume one.
+- **Tests**: `test/pathUtils.test.js` (12/12 passed — Windows/UNC path fixtures), `test/eventManagementReliabilityLive.test.js` (real Electron app, isolated synthetic archive, TEST A–E all passed)
+- **Unresolved gaps**: Real-Windows-machine verification of the UNC path fix is still pending — flagged as a required tester follow-up rather than closed here.; The exact original trigger sequence for the footer-mode-desync bug (Bug 3) was not reproduced byte-for-byte in the live E2E test — the general safety-net invariant (footer never left with only Back) was proven instead, and the fix (deriving mode from state in _renderEventForm) closes the entire bug class regardless of the exact trigger path.
+- **Evidence confidence**: explicit (session `sess-2026-08-07T13-53-49-871Z-1bbbe4`)
+
+---
+
 ## 2026-08-07 — Part 8: Multi-AI Engineering Conversation Integration
 
 - **New durable record family**: `docs/product/conversations/ENG-CONV-####_*.md` (4-digit ID, same rationale as `AI-MEM-####`, allocated via `automation/recordAllocator.js`'s existing `FAMILY_CONFIG` extended with `conversation`) — preserves meaningful engineering discussions that happen **outside** an active local Claude Code session (ChatGPT, an external Claude conversation, Codex, Gemini, human meeting notes, imported Markdown/JSON). `ENG-CONV`, not `AI-CONV`, deliberately: the record describes engineering discourse, not necessarily AI discourse. New governing policy [18_ENGINEERING_CONVERSATION_POLICY.md](18_ENGINEERING_CONVERSATION_POLICY.md) and template [17_ENGINEERING_CONVERSATION_TEMPLATE.md](17_ENGINEERING_CONVERSATION_TEMPLATE.md) — same tier as Engineering Memory in the authority order (historical evidence, never a runtime contract).

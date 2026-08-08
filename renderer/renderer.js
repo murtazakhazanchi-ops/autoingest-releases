@@ -2897,7 +2897,13 @@ async function openActivityLogModal(opts = {}) {
   _alMasterPath = master.path;
   let rawList = [];
   try {
-    rawList = await window.api.scanMasterEvents(master.path);
+    const scanResult = await window.api.scanMasterEvents(master.path);
+    if (scanResult && scanResult.ok === false) {
+      // A read failure is not the same as "this collection has zero events" —
+      // never silently treat it as one, even for this secondary picker.
+      console.warn('[ActivityLog] scanMasterEvents failed, not a genuinely empty collection:', scanResult.errorReason);
+    }
+    rawList = scanResult?.events || [];
   } catch { rawList = []; }
 
   // Strip _eventJson immediately — store only lightweight picker data to prevent OOM.

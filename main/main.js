@@ -1566,20 +1566,23 @@ ipcMain.handle('master:create', async (_event, basePath, folderName) => {
  * controlled-vocabulary lists so the renderer can render resolvable events
  * directly and mark the rest as warnings.
  *
- * Returns an array sorted by (hijriDate, seq) DESCENDING so newest events
- * are listed first. Unparseable entries are appended at the end in the same
+ * `events` is sorted by (hijriDate, seq) DESCENDING so newest events are
+ * listed first. Unparseable entries are appended at the end in the same
  * insertion order (their hijriDate/seq are unreliable).
  *
- * Never throws for missing or unreadable masters — returns [] instead.
+ * Never throws — returns { ok: false, events: [], errorReason } when the
+ * master folder cannot be read (NAS hiccup, permission blip, disconnect,
+ * etc). A read failure is NOT the same as "this collection has zero
+ * events" and callers must not treat the two interchangeably.
  */
 ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
-  if (!masterPath || typeof masterPath !== 'string') return [];
+  if (!masterPath || typeof masterPath !== 'string') return { ok: true, events: [] };
 
   let entries;
   try {
     entries = await fsp.readdir(masterPath, { withFileTypes: true });
-  } catch {
-    return [];
+  } catch (err) {
+    return { ok: false, events: [], errorReason: err.code || 'scan-failed' };
   }
 
   // Load lists ONCE for this scan; parser is a pure function of its inputs.
@@ -1698,7 +1701,7 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
     return b.sequence.localeCompare(a.sequence);
   });
 
-  return [...resolved, ...unparseable];
+  return { ok: true, events: [...resolved, ...unparseable] };
 });
 
 // Parse a single event folder name and return its components array.
@@ -2631,10 +2634,12 @@ async function _scanNasArchive(nasRoot) {
   let collectionEntries;
   try {
     collectionEntries = await fsp.readdir(nasRoot, { withFileTypes: true });
-  } catch (err) {
-    const reason = (err.code === 'ENOENT' || err.code === 'ENOTCONN' || err.code === 'EIO')
-      ? 'nas-disconnected' : 'invalid-nas';
-    return { status: reason, refreshedAt, source: 'nas', collections: [] };
+  } catch {
+    // The only caller (_runNasScan) already validated the archive-root marker
+    // before invoking this function, so a readdir failure here is a transient
+    // reachability problem (NAS hiccup, SMB timeout), not evidence of an invalid
+    // archive — never report it the same way as "confirmed invalid".
+    return { status: 'nas-disconnected', refreshedAt, source: 'nas', collections: [] };
   }
 
   const lists = {
@@ -2656,7 +2661,9 @@ async function _scanNasArchive(nasRoot) {
     try {
       eventEntries = await fsp.readdir(collPath, { withFileTypes: true });
     } catch {
-      // Unreadable collection — skip silently
+      // Read failed for this one collection (NAS hiccup mid-scan) — flag it so
+      // callers don't mistake an unreadable collection for a genuinely empty one.
+      collection.scanError = true;
       collections.push(collection);
       continue;
     }
@@ -2749,14 +2756,14 @@ async function _runNasScan() {
     return { status: 'nas-not-set', refreshedAt: new Date().toISOString(), source: 'nas', collections: [] };
   }
 
-  // Validate the NAS root marker before scanning
+  // Validate the NAS root marker before scanning. Reading the marker and parsing
+  // it are handled as separate failure modes: a read failure (network hiccup,
+  // permission blip, SMB timeout) means "temporarily unreachable" and must not
+  // be reported the same way as a marker that is actually corrupt/absent-by-design.
+  let raw;
   try {
     const markerPath = path.join(nasRoot, '.autoingest', 'root', 'archive-root.json');
-    const raw  = await fsp.readFile(markerPath, 'utf8');
-    const mark = JSON.parse(raw);
-    if (mark.type !== 'autoingest-nas-root') {
-      return { status: 'invalid-nas', refreshedAt: new Date().toISOString(), source: 'nas', collections: [] };
-    }
+    raw = await fsp.readFile(markerPath, 'utf8');
   } catch (err) {
     if (err.code === 'ENOENT') {
       try {
@@ -2766,6 +2773,18 @@ async function _runNasScan() {
         return { status: 'nas-disconnected', refreshedAt: new Date().toISOString(), source: 'nas', collections: [] };
       }
     }
+    // Root exists but the marker read failed for a non-ENOENT reason — a transient
+    // reachability problem, not evidence the archive is misconfigured.
+    return { status: 'nas-disconnected', refreshedAt: new Date().toISOString(), source: 'nas', collections: [] };
+  }
+
+  try {
+    const mark = JSON.parse(raw);
+    if (mark.type !== 'autoingest-nas-root') {
+      return { status: 'invalid-nas', refreshedAt: new Date().toISOString(), source: 'nas', collections: [] };
+    }
+  } catch {
+    // Marker file exists but its contents are corrupt — genuinely invalid, not transient.
     return { status: 'invalid-nas', refreshedAt: new Date().toISOString(), source: 'nas', collections: [] };
   }
 
