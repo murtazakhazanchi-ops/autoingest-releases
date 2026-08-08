@@ -4,10 +4,26 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build purpose'
+        required: true
+        default: 'windows-tester'
+        type: choice
+        options:
+          - windows-tester
 
 jobs:
 
+  # ── Stable release path (unchanged) — triggered only by a v* tag push. ──────
+  # Publishes a real, public, non-draft, non-prerelease release for both
+  # platforms. Guarded with `if: github.event_name == 'push'` only so that
+  # adding workflow_dispatch above can never accidentally reach this path —
+  # no other change was made to this job or the two below it.
+
   create-release:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     outputs:
       upload_url: ${{ steps.create.outputs.upload_url }}
@@ -23,6 +39,7 @@ jobs:
 
   build-mac:
     needs: create-release
+    if: github.event_name == 'push'
     runs-on: macos-latest
     steps:
       - name: Checkout code
@@ -50,6 +67,7 @@ jobs:
 
   build-windows:
     needs: create-release
+    if: github.event_name == 'push'
     runs-on: windows-2022
     steps:
       - name: Checkout code
@@ -74,3 +92,82 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: npm run dist:win -- -p always
+
+  # ── Windows Tester Build (additive, manual only) ─────────────────────────────
+  # Manually triggered via workflow_dispatch for platform-specific acceptance
+  # testing before stable publication (e.g. BUG-011..014's real-Windows/NAS
+  # verification pass). Builds Windows only, using the same electron-builder
+  # config as the stable path above, but with publish explicitly disabled
+  # (`-p never` overrides package.json's build.publish regardless) — no tag,
+  # no GitHub Release, no upload to the public release repository. Output is
+  # an ephemeral GitHub Actions artifact only. Select the branch/commit to
+  # build via GitHub's normal "Run workflow from branch" control — this
+  # workflow does not accept an arbitrary ref as an input.
+  #
+  # Deliberately does NOT create the telemetry service-account key secret the
+  # stable jobs above use (services/telemetry.js is designed to no-op silently
+  # without it — "Until credentials are configured the queue drains silently
+  # — no crashes") — this keeps a real credential with write access to an
+  # internal tracker sheet out of a short-retention artifact-only build whose
+  # only purpose is exercising Event Management, which does not depend on it.
+  # Windows builds are unsigned in the stable path too (no certificateFile /
+  # forceCodeSigning in package.json's build.win config), so this tester
+  # build's signing posture matches the real stable build exactly.
+
+  windows-tester-build:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'windows-tester'
+    runs-on: windows-2022
+    timeout-minutes: 30
+    concurrency:
+      group: windows-tester-build-${{ github.ref }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Windows (no publish)
+        run: npm run dist:win -- -p never
+
+      - name: Get short commit SHA
+        id: sha
+        shell: bash
+        run: echo "short_sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Write BUILD_INFO.txt
+        shell: bash
+        # Context values are passed through env: rather than interpolated directly
+        # into the script (GitHub Actions script-injection hardening) — a workflow_dispatch
+        # ref name is not free text an attacker fully controls, but never splice
+        # github.* values straight into a run: block regardless.
+        env:
+          BUILD_BRANCH: ${{ github.ref_name }}
+          BUILD_COMMIT_SHA: ${{ github.sha }}
+        run: |
+          {
+            echo "Branch: $BUILD_BRANCH"
+            echo "Commit SHA: $BUILD_COMMIT_SHA"
+            echo "Build timestamp (UTC): $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "Package version: $(node -p "require('./package.json').version")"
+            echo "Purpose: Windows/NAS Event Management verification (BUG-011..014)"
+          } > dist/BUILD_INFO.txt
+
+      - name: Upload Windows tester artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AutoIngest-Windows-Tester-${{ steps.sha.outputs.short_sha }}
+          path: |
+            dist/*.exe
+            dist/*.exe.blockmap
+            dist/BUILD_INFO.txt
+          retention-days: 14
+          if-no-files-found: error
