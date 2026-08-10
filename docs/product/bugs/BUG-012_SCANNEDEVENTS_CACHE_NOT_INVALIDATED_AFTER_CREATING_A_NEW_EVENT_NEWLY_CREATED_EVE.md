@@ -3,10 +3,10 @@
 | Field | Value |
 |---|---|
 | Related feature(s) | AI-FEAT-009, AI-FEAT-010 |
-| Status | Fixed |
+| Status | Fixed — Waiting for Windows RC verification |
 | Severity | High |
 | Discovered | 2026-08-07 |
-| Fixed | 2026-08-07 |
+| Fixed | 2026-08-07 — re-verified locally 2026-08-10 (test/eventManagementReliabilityLive.test.js TEST C/F), not yet confirmed on real Windows/NAS hardware |
 | Evidence status | Recorded by automated documentation orchestration from session `sess-2026-08-07T13-53-49-871Z-1bbbe4`; evidence source(s): explicit-user-statement, code-diff, test-output |
 
 ## Symptom

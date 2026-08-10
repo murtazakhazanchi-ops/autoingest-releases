@@ -3,10 +3,10 @@
 | Field | Value |
 |---|---|
 | Related feature(s) | AI-FEAT-009, AI-FEAT-010 |
-| Status | Fixed |
+| Status | Fixed — Waiting for Windows RC verification |
 | Severity | High |
 | Discovered | 2026-08-07 |
-| Fixed | 2026-08-07 |
+| Fixed | 2026-08-07 — the tester's RC verification session did not reach the Create Event form (blocked earlier by BUG-011's still-open event-discovery defect), so this fix has real-Windows evidence pending, not yet contradicted or confirmed on the actual hardware. Re-verified locally 2026-08-10 (test/eventManagementReliabilityLive.test.js TEST D/E, unchanged, still passing). |
 | Evidence status | Recorded by automated documentation orchestration from session `sess-2026-08-07T13-53-49-871Z-1bbbe4`; evidence source(s): explicit-user-statement, code-diff, test-output |
 
 ## Symptom

@@ -3,10 +3,10 @@
 | Field | Value |
 |---|---|
 | Related feature(s) | AI-FEAT-009, AI-FEAT-010, AI-FEAT-005 |
-| Status | Fixed |
+| Status | Fixed — Verified on real Windows/NAS hardware |
 | Severity | Critical |
 | Discovered | 2026-08-07 |
-| Fixed | 2026-08-07 |
+| Fixed | 2026-08-07 — real-Windows confirmation received 2026-08-10: the tester's RC verification report explicitly stated "collection discovery works" and that the collection `1448-01-11 _UK Safar` is discovered correctly and remains selectable (does not fall back to "Create Collection"), across the RC-verification session. This is the one bug in this cluster with direct positive confirmation on the real Windows/NAS machine, distinct from BUG-011/012/014 which remain pending because the tester's session did not get far enough to exercise them (event discovery — a separate, still-open defect — blocked further progress). |
 | Evidence status | Recorded by automated documentation orchestration from session `sess-2026-08-07T13-53-49-871Z-1bbbe4`; evidence source(s): explicit-user-statement, code-diff, test-output |
 
 ## Symptom

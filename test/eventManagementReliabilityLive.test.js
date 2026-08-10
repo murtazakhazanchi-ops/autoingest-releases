@@ -29,6 +29,11 @@
 //            currently valid, including on the specific navigation path that
 //            used to leave the footer mode stuck on 'master' (switch collections
 //            after having already scanned a different collection's event list).
+//   TEST E — the footer never gets stuck showing only "Back" when switching
+//            collections mid-session (see below for the full description).
+//   TEST F — the renderer's "Existing Events (N)" summary count TEXT (not just
+//            DOM item count) matches the real list, both on first load and
+//            after cache invalidation following event creation.
 
 const { _electron: electron } = require('playwright-core');
 const fs = require('fs');
@@ -224,6 +229,7 @@ async function writeEventJsonFixture(dir, data) {
   }));
   log('list state after selecting existing collection:', JSON.stringify(listState1));
   check(listState1.evlItems === 1, 'Test C: existing event appears in the Event Management list via the real UI');
+  check(/\(1\)/.test(listState1.countText || ''), 'Test F: renderer "Existing Events (N)" summary count text matches the real DOM item count (1)');
 
   // ── Create a NEW event through the real form ────────────────────────────────
   await window.click('#ecNewEventFromList');
@@ -303,9 +309,13 @@ async function writeEventJsonFixture(dir, data) {
     await window.waitForTimeout(200);
     await window.click('#ecMasterContinue').catch(() => {});
     await window.waitForTimeout(800);
-    const listState2 = await window.evaluate(() => document.querySelectorAll('.ec-evl-item[data-folder]').length);
-    log('event count after reopening for the same collection:', listState2);
-    check(listState2 === 2, 'Test C: newly created event appears immediately on reopening Event Management (1 pre-existing + 1 new)');
+    const listState2 = await window.evaluate(() => ({
+      count: document.querySelectorAll('.ec-evl-item[data-folder]').length,
+      countText: document.querySelector('.ec-tab-panel[data-panel="current-device"] .ec-section-title')?.textContent || null,
+    }));
+    log('event count after reopening for the same collection:', JSON.stringify(listState2));
+    check(listState2.count === 2, 'Test C: newly created event appears immediately on reopening Event Management (1 pre-existing + 1 new)');
+    check(/\(2\)/.test(listState2.countText || ''), 'Test F: renderer "Existing Events (N)" summary count text updates to (2) after cache invalidation, matching the real DOM item count');
   } else {
     log('SKIP create/reopen check — form did not reach a valid state (see footer2 above); city dropdown selector likely needs adjustment for this build');
   }
