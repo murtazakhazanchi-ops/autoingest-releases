@@ -1575,14 +1575,44 @@ ipcMain.handle('master:create', async (_event, basePath, folderName) => {
  * etc). A read failure is NOT the same as "this collection has zero
  * events" and callers must not treat the two interchangeably.
  */
+// ── Diagnostic-only scan-stall tracking (BUG-011 real-Windows/NAS follow-up) ──
+// Observation only — never read by any code path that alters scan behavior,
+// timeouts, retries, or concurrency. Lets app.log show whether multiple
+// master:scanEvents invocations overlap. Remove alongside the rest of the
+// EventDiscoveryDiagnostics instrumentation once BUG-011 is closed.
+const _activeEventDiscoveryScans = new Set();
+let _eventDiscoveryScanSeq = 0;
+
 ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
   // ── TEMPORARY DIAGNOSTICS (BUG-011 real-Windows/NAS RC follow-up) ─────────────
   // See _diagnoseEventJsonValidation's comment above. Pure evidence-gathering —
   // every branch/return below is byte-identical to the pre-diagnostic version;
   // only `log(...)` calls and diagnostic-record bookkeeping were added. Remove
   // this whole diagnostic layer once the real root cause is confirmed and fixed.
+  //
+  // 2026-08-10 stall-investigation addendum: this handler body is now wrapped
+  // in try/finally (intentionally NOT re-indented, to keep this diff a pure
+  // addition that's trivial to review/revert) purely so the heartbeat timer
+  // and the active-scan tracking below are guaranteed to be cleaned up on
+  // every exit path, including the early-return branches.
   const _diagRecords = [];
-  const _diagLog = (msg) => log(`[EventDiscoveryDiagnostics] ${msg}`);
+  const _scanId = `scan-${Date.now()}-${++_eventDiscoveryScanSeq}`;
+  const _scanStartedAt = Date.now();
+  const _diagLog = (msg) => log(`[EventDiscoveryDiagnostics] scanId=${_scanId} ${msg}`);
+
+  const _activeScanIdsAtStart = Array.from(_activeEventDiscoveryScans);
+  if (_activeScanIdsAtStart.length > 0) {
+    log(`[EventDiscoveryConcurrentScan] newScanId=${_scanId} activeScanIds=${JSON.stringify(_activeScanIdsAtStart)}`);
+  }
+  _activeEventDiscoveryScans.add(_scanId);
+  let _hbCurrentEntryIndex = 0;
+  let _hbCurrentEntryTotal = 0;
+  let _hbCurrentOperation = 'none';
+  const _hbTimer = setInterval(() => {
+    log(`[EventDiscoveryHeartbeat] scanId=${_scanId} currentEntry=${_hbCurrentEntryIndex}/${_hbCurrentEntryTotal} currentOperation=${_hbCurrentOperation} elapsedMs=${Date.now() - _scanStartedAt}`);
+  }, 10000);
+
+  try {
 
   if (!masterPath || typeof masterPath !== 'string') {
     _diagLog(`masterPath missing/invalid — returning {ok:true, events:[]} without scanning. typeof=${typeof masterPath}`);
@@ -1628,10 +1658,22 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
 
   const resolved   = [];
   const unparseable = [];
+  // Diagnostic-only per-operation timing pools (BUG-011 stall investigation).
+  // Populated only on success, per the request that spawned this instrumentation.
+  const _statDurations = [];
+  const _realpathDurations = [];
+  const _readFileDurations = [];
 
-  for (const entry of entries) {
+  for (let _entryIdx = 0; _entryIdx < entries.length; _entryIdx++) {
+    const entry = entries[_entryIdx];
     const name = entry.name;
     const entryFullPath = path.join(masterPath, name);
+    const _entryDisplayIndex = _entryIdx + 1;
+    const _entryStartedAt = Date.now();
+    _hbCurrentEntryIndex = _entryDisplayIndex;
+    _hbCurrentEntryTotal = entries.length;
+    _hbCurrentOperation = 'none';
+    log(`[EventDiscoveryEntryStart] scanId=${_scanId} index=${_entryDisplayIndex} total=${entries.length} name=${JSON.stringify(name)} path=${JSON.stringify(entryFullPath)} timestamp=${new Date(_entryStartedAt).toISOString()}`);
 
     // Filesystem hardening (BUG-011 RC): Dirent.isDirectory() can misreport on
     // some network shares (a documented class of Node/libuv behavior — see
@@ -1644,12 +1686,20 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
     // previously caused a real folder to vanish with no explanation.
     let _statIsDirectory = null;
     let _statError = null;
+    _hbCurrentOperation = 'STAT';
+    const _statOpStartedAt = Date.now();
+    log(`[EventDiscoveryEntry] scanId=${_scanId} phase=STAT_START index=${_entryDisplayIndex} total=${entries.length} name=${JSON.stringify(name)} tEntryMs=${_statOpStartedAt - _entryStartedAt} tScanMs=${_statOpStartedAt - _scanStartedAt}`);
     try {
       const st = await fsp.stat(entryFullPath);
       _statIsDirectory = st.isDirectory();
+      const _statDuration = Date.now() - _statOpStartedAt;
+      _statDurations.push(_statDuration);
+      log(`[EventDiscoveryEntry] scanId=${_scanId} phase=STAT_OK index=${_entryDisplayIndex} name=${JSON.stringify(name)} durationMs=${_statDuration} tScanMs=${Date.now() - _scanStartedAt}`);
     } catch (statErr) {
       _statError = statErr.code || statErr.message;
+      log(`[EventDiscoveryEntry] scanId=${_scanId} phase=STAT_FAIL index=${_entryDisplayIndex} name=${JSON.stringify(name)} durationMs=${Date.now() - _statOpStartedAt} tScanMs=${Date.now() - _scanStartedAt} error=${JSON.stringify(_statError)}`);
     }
+    _hbCurrentOperation = 'none';
     const _direntSaysDir = entry.isDirectory();
     if (_direntSaysDir !== _statIsDirectory) {
       _diagLog(`DIRENT/STAT MISMATCH name=${JSON.stringify(name)} dirent.isDirectory()=${_direntSaysDir} stat.isDirectory()=${_statIsDirectory} statError=${_statError}`);
@@ -1687,11 +1737,19 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
     let eventJson = null;
     let jsonCorrupt = false;
     let _entryRealpath = null, _entryRealpathError = null;
+    _hbCurrentOperation = 'REALPATH';
+    const _realpathOpStartedAt = Date.now();
+    log(`[EventDiscoveryEntry] scanId=${_scanId} phase=REALPATH_START index=${_entryDisplayIndex} name=${JSON.stringify(name)} tEntryMs=${_realpathOpStartedAt - _entryStartedAt} tScanMs=${_realpathOpStartedAt - _scanStartedAt}`);
     try {
       _entryRealpath = await fsp.realpath(entryFullPath);
+      const _realpathDuration = Date.now() - _realpathOpStartedAt;
+      _realpathDurations.push(_realpathDuration);
+      log(`[EventDiscoveryEntry] scanId=${_scanId} phase=REALPATH_OK index=${_entryDisplayIndex} name=${JSON.stringify(name)} durationMs=${_realpathDuration} tScanMs=${Date.now() - _scanStartedAt}`);
     } catch (rpErr) {
       _entryRealpathError = rpErr.code || rpErr.message;
+      log(`[EventDiscoveryEntry] scanId=${_scanId} phase=REALPATH_FAIL index=${_entryDisplayIndex} name=${JSON.stringify(name)} durationMs=${Date.now() - _realpathOpStartedAt} tScanMs=${Date.now() - _scanStartedAt} error=${JSON.stringify(_entryRealpathError)}`);
     }
+    _hbCurrentOperation = 'none';
     const _entryShape = _diagPathShape(entryFullPath);
     const _diag = {
       folderName: name, folderPath: entryFullPath,
@@ -1729,8 +1787,14 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
       includedInEventList: null, rejectionStage: null, rejectionReason: null,
     };
 
+    _hbCurrentOperation = 'READ_EVENT_JSON';
+    const _readEventJsonOpStartedAt = Date.now();
+    log(`[EventDiscoveryEntry] scanId=${_scanId} phase=READ_EVENT_JSON_START index=${_entryDisplayIndex} name=${JSON.stringify(name)} tEntryMs=${_readEventJsonOpStartedAt - _entryStartedAt} tScanMs=${_readEventJsonOpStartedAt - _scanStartedAt}`);
     try {
       const raw = await fsp.readFile(jsonPath, 'utf8');
+      const _readEventJsonDuration = Date.now() - _readEventJsonOpStartedAt;
+      _readFileDurations.push(_readEventJsonDuration);
+      log(`[EventDiscoveryEntry] scanId=${_scanId} phase=READ_EVENT_JSON_OK index=${_entryDisplayIndex} name=${JSON.stringify(name)} durationMs=${_readEventJsonDuration} tScanMs=${Date.now() - _scanStartedAt}`);
       _diag.eventJsonExists = true;
       _diag.readOk = true;
       let obj;
@@ -1777,6 +1841,7 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
         console.error('[scanEvents] isValidEventJson failed for', name, '— shape dump:', JSON.stringify(obj).slice(0, 400));
       }
     } catch (err) {
+      log(`[EventDiscoveryEntry] scanId=${_scanId} phase=READ_EVENT_JSON_FAIL index=${_entryDisplayIndex} name=${JSON.stringify(name)} durationMs=${Date.now() - _readEventJsonOpStartedAt} tScanMs=${Date.now() - _scanStartedAt} error=${JSON.stringify(err.code || err.message)}`);
       if (err.code === 'ENOENT') {
         _diag.eventJsonExists = false;
         _diag.readOk = false;
@@ -1790,6 +1855,7 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
         console.error('[scanEvents] Failed to parse event.json for', name, ':', err.message);
       }
     }
+    _hbCurrentOperation = 'none';
 
     const parsed = parseEventName(name, lists);
 
@@ -1921,7 +1987,23 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
       + `unexplainedDelta=${resolved.length - _validatedCount - _legacyCount - _corruptButParseableCount}`);
   }
 
+  // Diagnostic-only per-operation-type aggregate timing (BUG-011 stall
+  // investigation). Only successful ops contribute a duration, per request.
+  const _aggStats = (arr) => {
+    if (arr.length === 0) return { count: 0, minMs: null, maxMs: null, avgMs: null };
+    const sum = arr.reduce((a, b) => a + b, 0);
+    return { count: arr.length, minMs: Math.min(...arr), maxMs: Math.max(...arr), avgMs: Math.round(sum / arr.length) };
+  };
+  _diagLog(`OPERATION_TIMING stat=${JSON.stringify(_aggStats(_statDurations))} `
+    + `realpath=${JSON.stringify(_aggStats(_realpathDurations))} `
+    + `readEventJson=${JSON.stringify(_aggStats(_readFileDurations))}`);
+  _diagLog(`SCAN_COMPLETE totalDurationMs=${Date.now() - _scanStartedAt}`);
+
   return { ok: true, events: [...resolved, ...unparseable] };
+  } finally {
+    clearInterval(_hbTimer);
+    _activeEventDiscoveryScans.delete(_scanId);
+  }
 });
 
 // Parse a single event folder name and return its components array.
