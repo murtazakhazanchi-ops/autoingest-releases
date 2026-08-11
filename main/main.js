@@ -1919,7 +1919,24 @@ async function _scanEventsCore(masterPath, _scanId) {
     if (eventJson) {
       // event.json is the SOLE source of components. Parser provides hijriDate+sequence only.
       const hijriDate = parsed.ok ? parsed.hijriDate : (eventJson.hijriDate || '');
-      const sequence  = parsed.ok ? parsed.sequence  : (eventJson.sequence  || '00');
+      // BUG-011 root cause (2026-08-11): parsed.sequence (from parseEventName's regex
+      // capture) is always a zero-padded string, but eventJson.sequence — used only
+      // when the folder name itself fails to parse — carries whatever type was last
+      // persisted to disk. The Create/Edit Event form always writes sequence as a
+      // number (renderer/eventCreator.js's `parseInt(seq, 10)` payloads), so a single
+      // unparseable folder name mixes a number into an otherwise all-string sequence
+      // set, and resolved.sort()'s `b.sequence.localeCompare(a.sequence)` below throws
+      // TypeError the moment it compares that entry against any normally-parsed one —
+      // silently aborting the entire scan for the whole collection, not just that one
+      // folder. Normalized once, here, at the same point _scanNasArchive (this file,
+      // ~line 3131) already normalizes the identical value for the identical reason —
+      // every downstream consumer (this function's own sort, the IPC payload, the
+      // renderer) then only ever sees the canonical zero-padded-string type the rest
+      // of this codebase already assumes (see eventNameParser.js's own comment on
+      // `sequence`). See test/bug011SequenceTypeMismatch.test.js for the regression
+      // coverage this fix is verified against.
+      const seqRaw    = parsed.ok ? parsed.sequence  : (eventJson.sequence  || '00');
+      const sequence  = typeof seqRaw === 'number' ? String(seqRaw).padStart(2, '0') : String(seqRaw);
       // Strip imports[] before sending over IPC — it can be hundreds of entries per event.
       // All consumers need only the metadata fields; imports are loaded on demand per-event.
       const { imports: _omit, ...eventJsonMeta } = eventJson;
