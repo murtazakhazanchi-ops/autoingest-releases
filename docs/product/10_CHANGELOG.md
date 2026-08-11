@@ -7,6 +7,15 @@ Append newest first. Never edit or delete a prior entry — if something was wro
 ---
 
 
+## 2026-08-11 (pre-merge documentation closure) — BUG-011: canonical Root Cause section corrected to lead with the confirmed final defect
+
+- **Task type**: documentation correction only, no code change. During the final pre-merge audit (Phase 4 documentation closure) ahead of merging `fix/windows-event-management-rc` into `main`, found that BUG-011's top-level `## Root Cause` section still stated only the **original** 2026-08-07 hypothesis (transient `fsp.readdir()` failures collapsing into an empty-events shape) — a real, separately-fixed defect, but not what the real Windows/NAS tester actually hit. The true final root cause (mixed `sequence` runtime type crashing `resolved.sort()`, confirmed 2026-08-11) was only stated inside the Investigation Log and Fix section, never promoted to the canonical summary a reader sees first.
+- **Correction**: `## Root Cause` now leads with the confirmed final defect (mixed `sequence` type — string from `parseEventName()` vs. number from `eventJson.sequence` — crashing `resolved.sort()`'s `localeCompare` call after filesystem discovery and event.json parsing had already succeeded for every entry), and retains the original 2026-08-07 hypothesis below it, explicitly labeled as investigated-and-fixed-but-not-the-tester's-actual-symptom — per this system's append-never-erase policy (§11), nothing was deleted.
+- **Verified during the same pass**: BUG-012, BUG-013, BUG-014 status fields already accurately distinguish hardware-verified (BUG-013, with a specific cited tester statement) from fix-applied-but-hardware-evidence-pending (BUG-012, BUG-014, each with an explicit note on why the tester's session never reached that code path) — no correction needed for those three.
+- **Evidence confidence**: direct re-reading of the full BUG-011 record against the real investigation timeline already documented within it.
+
+---
+
 ## 2026-08-11 (final stabilization pass) — L1–L7 closed: Canonical Representation Audit findings resolved before stable release
 
 - **Task type**: bugfix (L1) + hardening (L2, L3, L5) + deduplication (L6) + rename (L7) + investigation (L4, no change). Closes every finding from the standalone Canonical Representation Audit. Zero new confirmed production bugs found or introduced.
