@@ -20,6 +20,9 @@ function buildGraph(parsed) {
   for (const [id, b] of parsed.bugs) addNode(id, 'bug', b.name, b.filePath);
   for (const [id, d] of parsed.decisions) addNode(id, 'decision', d.name, d.filePath);
   for (const [id, p] of parsed.postmortems) addNode(id, 'postmortem', p.name, p.filePath);
+  if (parsed.memory) {
+    for (const [id, m] of parsed.memory) addNode(id, 'memory_capsule', m.name, m.filePath);
+  }
   if (parsed.conversations) {
     for (const [id, c] of parsed.conversations) addNode(id, 'engineering_conversation', c.name, c.filePath);
   }

@@ -2,14 +2,14 @@
 
 > Generated artifact. Implements the 13 rules specified in [14_VALIDATION_SPECIFICATION.md](../14_VALIDATION_SPECIFICATION.md) plus Part 4 tooling-integrity checks. Regenerate with `node scripts/product-docs/cli.js validate`.
 
-Generated against source commit `83cde48b6e5aa3bc8b433b42e7fc0cf6105007d4`.
+Generated against source commit `e6fe5483404f5332f700a73723c37d04225eae1c`.
 
 ## Summary
 
 | Level | Count | Exit policy |
 |---|---|---|
 | Error | 0 | Fails the build (non-zero exit) |
-| Warning | 14 | Reported, does not fail the build |
+| Warning | 15 | Reported, does not fail the build |
 | Information | 12 | Reported, does not fail the build |
 | Evidence gap | 56 | Reported, does not fail the build — visibility only, per 14_VALIDATION_SPECIFICATION.md Rule 13 |
 
@@ -19,13 +19,14 @@ Generated against source commit `83cde48b6e5aa3bc8b433b42e7fc0cf6105007d4`.
 
 None.
 
-## Warning (14)
+## Warning (15)
 
 | Rule | Message | File | Note |
 |---|---|---|---|
 | cyclic-dependency | Undocumented dependency cycle: AI-FEAT-006 -> AI-FEAT-007 -> AI-FEAT-006 | generated/dependency-graph.json | — |
 | cyclic-dependency | Undocumented dependency cycle: AI-FEAT-009 -> AI-FEAT-018 -> AI-FEAT-009 | generated/dependency-graph.json | — |
 | cyclic-dependency | Undocumented dependency cycle: AI-FEAT-032 -> AI-FEAT-039 -> AI-FEAT-032 | generated/dependency-graph.json | — |
+| decision-draft-missing-evidence | DEC-016 is Status: Draft but its Evidence status does not cite the originating session or detected signals | decisions/DEC-016_WINDOWS_NAS_EVENT_MANAGEMENT_RELIABILITY_INVESTIGATION_BUG_011_014_CHATGPT_SIDE_.md | — |
 | missing-related-technical-docs | AI-FEAT-005 is Implemented but cites no Related technical docs | features/AI-FEAT-005_APPLICATION_SETTINGS_CONFIGURATION_STORE.md | — |
 | missing-related-technical-docs | AI-FEAT-006 is Implemented but cites no Related technical docs | features/AI-FEAT-006_APPLICATION_AUTO_UPDATE.md | — |
 | missing-related-technical-docs | AI-FEAT-007 is Implemented but cites no Related technical docs | features/AI-FEAT-007_TELEMETRY_PIPELINE.md | — |
