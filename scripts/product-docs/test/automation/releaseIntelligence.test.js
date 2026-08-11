@@ -157,6 +157,76 @@ None recorded.
     });
   });
 
+  // release gate — the v0.9.11 release-process incident regression coverage.
+  // electron-builder derives its publish target/artifact names from
+  // package.json's version, never from the git tag that triggers the
+  // workflow — a v0.9.11 tag pushed while package.json still read 0.9.10
+  // built real artifacts but silently failed to publish any of them
+  // (electron-builder's own overwrite-protection guard skipped every
+  // upload against the already-published v0.9.10 release). This gate makes
+  // that precondition checkable before a tag is ever created.
+
+  await t('release gate PASSES when package.json version matches the target tag', async () => {
+    await withFixture(async (repo) => {
+      repo.writeFile('package.json', JSON.stringify({ name: 'fixture-app', version: '0.9.11' }, null, 2));
+      repo.commitAll('chore: set fixture package version to 0.9.11');
+
+      const r = repo.run(['release', 'gate', '--tag', 'v0.9.11', '--json']);
+      assert.equal(r.ok, true, r.output);
+      const result = JSON.parse(r.output);
+      assert.equal(result.ok, true);
+      assert.equal(result.packageVersion, '0.9.11');
+      assert.equal(result.targetVersion, '0.9.11');
+      assert.deepEqual(result.blocking, []);
+    });
+  });
+
+  await t('release gate BLOCKS when package.json version does not match the target tag (the actual v0.9.11 incident, reproduced)', async () => {
+    await withFixture(async (repo) => {
+      repo.writeFile('package.json', JSON.stringify({ name: 'fixture-app', version: '0.9.10' }, null, 2));
+      repo.commitAll('chore: fixture package version stays at 0.9.10');
+
+      const r = repo.run(['release', 'gate', '--tag', 'v0.9.11', '--json']);
+      assert.equal(r.ok, false, 'gate must exit non-zero on a version/tag mismatch');
+      const result = JSON.parse(r.output);
+      assert.equal(result.ok, false);
+      assert.equal(result.packageVersion, '0.9.10');
+      assert.equal(result.targetVersion, '0.9.11');
+      assert.ok(result.blocking.some((b) => b.includes('does not match the target release version')), 'blocking reason must name the mismatch');
+    });
+  });
+
+  await t('release gate BLOCKS when package-lock.json (which stores the project version) disagrees with package.json', async () => {
+    await withFixture(async (repo) => {
+      repo.writeFile('package.json', JSON.stringify({ name: 'fixture-app', version: '0.9.11' }, null, 2));
+      repo.writeFile('package-lock.json', JSON.stringify({
+        name: 'fixture-app', version: '0.9.10', lockfileVersion: 3,
+        packages: { '': { name: 'fixture-app', version: '0.9.10' } },
+      }, null, 2));
+      repo.commitAll('chore: fixture package-lock.json left stale at 0.9.10');
+
+      const r = repo.run(['release', 'gate', '--tag', 'v0.9.11', '--json']);
+      assert.equal(r.ok, false, 'gate must exit non-zero when the lockfile disagrees');
+      const result = JSON.parse(r.output);
+      assert.equal(result.ok, false);
+      assert.equal(result.packageVersion, '0.9.11');
+      assert.equal(result.lockVersion, '0.9.10');
+      assert.ok(result.blocking.some((b) => b.includes('package-lock.json version')), 'blocking reason must name the lockfile mismatch');
+    });
+  });
+
+  await t('release gate accepts a bare version (no leading "v") as the --tag value', async () => {
+    await withFixture(async (repo) => {
+      repo.writeFile('package.json', JSON.stringify({ name: 'fixture-app', version: '2.0.0' }, null, 2));
+      repo.commitAll('chore: fixture package version 2.0.0');
+
+      const r = repo.run(['release', 'gate', '--tag', '2.0.0', '--json']);
+      assert.equal(r.ok, true, r.output);
+      const result = JSON.parse(r.output);
+      assert.equal(result.ok, true);
+    });
+  });
+
   summarize('releaseIntelligence.test.js');
 }
 

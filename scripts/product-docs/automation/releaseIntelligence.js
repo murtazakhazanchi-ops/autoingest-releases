@@ -296,7 +296,71 @@ function listReleaseDrafts(dir) {
   return fs.readdirSync(target).filter((f) => f.endsWith('.json')).sort();
 }
 
+// The v0.9.11 release-process incident (docs/product/postmortems/, see the
+// commit that added this function): a v0.9.11 git tag was pushed while
+// package.json still read 0.9.10. electron-builder derives BOTH its
+// published artifact names and which GitHub release it targets from
+// package.json's own "version" field — never from the git tag that
+// triggered the workflow — so it built and attempted to publish
+// 0.9.10-named artifacts, found the already-published v0.9.10 release, and
+// its own overwrite-protection guard silently skipped every upload. The
+// resulting v0.9.11 release existed but had zero assets. This function
+// makes that specific mismatch a checkable, testable precondition instead
+// of tribal knowledge — run it BEFORE creating a release tag.
+function normalizeVersion(v) {
+  return String(v || '').trim().replace(/^v/i, '');
+}
+
+// repoRoot is a parameter (not the module-level REPO_ROOT) so this is
+// testable against a disposable fixture repo, the same pattern every other
+// automation/ module's tests already use (tmpRepoHarness.js).
+function checkVersionTagAlignment(repoRoot, tagOrVersion) {
+  const targetVersion = normalizeVersion(tagOrVersion);
+  const blocking = [];
+
+  const pkgPath = path.join(repoRoot, 'package.json');
+  if (!fs.existsSync(pkgPath)) {
+    return { ok: false, blocking: [`package.json not found at ${pkgPath}`], packageVersion: null, lockVersion: null, targetVersion };
+  }
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+  const packageVersion = normalizeVersion(pkg.version);
+  if (packageVersion !== targetVersion) {
+    blocking.push(
+      `package.json version (${packageVersion || '(missing)'}) does not match the target release version (${targetVersion}). ` +
+      `electron-builder derives its publish target and artifact names from package.json's version, not the git tag — ` +
+      `a mismatched tag will build and silently fail to publish (see the v0.9.11 release-process incident). ` +
+      `Run "npm version ${targetVersion} --no-git-tag-version" and commit before tagging.`
+    );
+  }
+
+  // package-lock.json's own root "version" and packages[""].version fields
+  // track the project version when npm manages it — only validated if the
+  // lockfile exists and actually carries a version field (an older/
+  // differently-structured lockfile without one is not itself an error).
+  let lockVersion = null;
+  const lockPath = path.join(repoRoot, 'package-lock.json');
+  if (fs.existsSync(lockPath)) {
+    const lock = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
+    const rootVersion = lock.version;
+    const rootPkgVersion = lock.packages && lock.packages[''] && lock.packages[''].version;
+    if (rootVersion !== undefined || rootPkgVersion !== undefined) {
+      lockVersion = normalizeVersion(rootVersion !== undefined ? rootVersion : rootPkgVersion);
+      if (lockVersion !== targetVersion) {
+        blocking.push(
+          `package-lock.json version (${lockVersion || '(missing)'}) does not match the target release version (${targetVersion}). ` +
+          `Regenerate it (e.g. "npm install" after bumping package.json) so both files agree.`
+        );
+      }
+      if (rootVersion !== undefined && rootPkgVersion !== undefined && normalizeVersion(rootVersion) !== normalizeVersion(rootPkgVersion)) {
+        blocking.push(`package-lock.json's own "version" (${rootVersion}) and packages[""].version (${rootPkgVersion}) disagree with each other.`);
+      }
+    }
+  }
+
+  return { ok: blocking.length === 0, blocking, packageVersion, lockVersion, targetVersion };
+}
+
 module.exports = {
   buildReleaseDraft, renderReleaseDraftMd, writeReleaseDraft, classifyCommitSubject,
-  resolveFromRef, listReleaseDrafts,
+  resolveFromRef, listReleaseDrafts, checkVersionTagAlignment,
 };

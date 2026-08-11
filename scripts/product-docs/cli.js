@@ -3,7 +3,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { GENERATED_ROOT, PRODUCT_DOCS_ROOT } = require('./lib/repoRoot');
+const { GENERATED_ROOT, PRODUCT_DOCS_ROOT, REPO_ROOT } = require('./lib/repoRoot');
 const build = require('./lib/build');
 const validators = require('./lib/validators');
 const { renderDocumentationHealthMd, summarize } = require('./lib/renderHealth');
@@ -222,6 +222,13 @@ Subcommands:
       "auto" (newest tag reachable from --to, excluding --to itself).
   status [--dir <dir>]
       Lists previously generated release drafts.
+  gate --tag <vX.Y.Z|X.Y.Z>
+      Checks package.json's (and package-lock.json's) version against the
+      given target release version BEFORE a tag is created. electron-builder
+      derives its publish target and artifact names from package.json's
+      version, never from the git tag — a mismatch builds real artifacts but
+      silently fails to publish them (see the v0.9.11 release-process
+      incident, docs/product/postmortems/). Exits non-zero on mismatch.
 
 Never creates a GitHub release, never writes docs/release-notes-*.md, never
 completes a roadmap milestone. Publishing remains a separately authorized
@@ -280,6 +287,25 @@ function cmdReleaseStatus(args) {
   for (const d of drafts) console.log(`  - ${d}`);
 }
 
+function cmdReleaseGate(args) {
+  const { flags } = parseReleaseFlags(args);
+  if (flags.help || !flags.tag) {
+    console.log(RELEASE_HELP);
+    if (!flags.tag) process.exitCode = 1;
+    return;
+  }
+  const result = releaseIntelligence.checkVersionTagAlignment(REPO_ROOT, flags.tag);
+  if (flags.json) {
+    console.log(JSON.stringify(result, null, 2));
+  } else if (result.ok) {
+    console.log(`PASS — package.json (${result.packageVersion})${result.lockVersion ? ` and package-lock.json (${result.lockVersion})` : ''} match target release version ${result.targetVersion}.`);
+  } else {
+    console.error(`BLOCKED — release version gate failed for target ${result.targetVersion}:`);
+    for (const b of result.blocking) console.error(`  - ${b}`);
+  }
+  if (!result.ok) process.exitCode = 1;
+}
+
 function cmdRelease(args) {
   const [sub, ...rest] = args;
   if (!sub || sub === '--help' || sub === '-h') {
@@ -288,6 +314,7 @@ function cmdRelease(args) {
   }
   switch (sub) {
     case 'prepare': return cmdReleasePrepare(rest);
+    case 'gate': return cmdReleaseGate(rest);
     case 'status': return cmdReleaseStatus(rest);
     default:
       console.error(`Unknown release subcommand: ${sub}\n`);
