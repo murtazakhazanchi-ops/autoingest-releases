@@ -122,7 +122,9 @@
       "featureId": "AI-FEAT-006",
       "relatedBugs": [],
       "relatedDecisions": [],
-      "relatedPostmortems": [],
+      "relatedPostmortems": [
+        "PM-002"
+      ],
       "roadmapIds": [],
       "topic": "Application Auto-Update"
     },

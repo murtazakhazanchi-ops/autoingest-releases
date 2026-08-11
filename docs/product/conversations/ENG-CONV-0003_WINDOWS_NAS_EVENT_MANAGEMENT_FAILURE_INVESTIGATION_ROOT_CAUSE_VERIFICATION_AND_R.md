@@ -431,6 +431,7 @@ None recorded — this importer does not yet accept binary image attachments; se
 ## Outcome
 
 - **2026-08-11** — Imported. Canonicalized from a "ecp"-format packet claiming source_tool "chatgpt".
+- **2026-08-11** — v0.9.11 published. The first `v0.9.11` tag was pushed while `package.json` still read `0.9.10`, causing `electron-builder` to build and silently skip-publish `0.9.10`-named artifacts against the already-published `v0.9.10` release — see [PM-002](../postmortems/PM-002_V0_9_11_FIRST_PUBLICATION_ATTEMPT_PRODUCED_AN_EMPTY_GITHUB_RELEASE.md) for the full incident record. The empty release/tag were removed, the application version was corrected, and `v0.9.11` was re-tagged and republished successfully (12 assets, correct updater metadata, `v0.9.10` unaffected throughout). This is a release-process incident, not an Event Management defect — it does not change BUG-011 through BUG-014's own statuses.
 
 ## Provenance
 

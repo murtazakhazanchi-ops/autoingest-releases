@@ -28,10 +28,10 @@ async function main() {
     assert.equal(parsed.roadmap.size, 9);
   });
 
-  await t('bug/decision/postmortem counts match the current repository (BUG-001..014, DEC-001..016, PM-001)', () => {
+  await t('bug/decision/postmortem counts match the current repository (BUG-001..014, DEC-001..016, PM-001..002)', () => {
     assert.equal(parsed.bugs.size, 14);
     assert.equal(parsed.decisions.size, 16);
-    assert.equal(parsed.postmortems.size, 1);
+    assert.equal(parsed.postmortems.size, 2);
   });
 
   await t('every generated JSON file is valid JSON and stableStringify is idempotent', () => {

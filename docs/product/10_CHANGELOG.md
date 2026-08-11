@@ -7,6 +7,18 @@ Append newest first. Never edit or delete a prior entry — if something was wro
 ---
 
 
+## 2026-08-11 (release incident) — v0.9.11's first publication attempt was empty; repaired and permanent release-gate added
+
+- **Task type**: release-process incident + corrective tooling. New record: [PM-002](postmortems/PM-002_V0_9_11_FIRST_PUBLICATION_ATTEMPT_PRODUCED_AN_EMPTY_GITHUB_RELEASE.md).
+- **Incident**: the first `v0.9.11` git tag was pushed while `package.json` still read `0.9.10`. `electron-builder` derives its publish target and artifact names from `package.json`'s version, not the git tag, so it built `0.9.10`-named artifacts and attempted to publish them against the already-published `v0.9.10` release; its own overwrite-protection guard silently skipped every upload. Net result: a real, public `v0.9.11` GitHub Release with zero assets. `v0.9.10` was not modified. No client could discover the empty release since no `latest.yml`/`latest-mac.yml` was ever published for it — no production update-corruption risk existed at any point.
+- **Repair**: `package.json`/`package-lock.json` bumped to `0.9.11` (commit `7bb6017`); the empty `v0.9.11` release and its tag deleted (`v0.9.10` re-confirmed intact before and after); a fresh, correctly-annotated `v0.9.11` tag created on the version-corrected commit and pushed, re-triggering the release workflow. Rebuild verified end-to-end: correct `0.9.11`-named artifacts, real (non-skipped) uploads for both platforms, correct `latest.yml`/`latest-mac.yml` metadata, 12 assets total.
+- **Permanent corrective action**: `node scripts/product-docs/cli.js release gate --tag <vX.Y.Z>` (`releaseIntelligence.checkVersionTagAlignment()`, commit `e634d9a`) checks `package.json`'s (and `package-lock.json`'s) version against a target release version before a tag is created, exiting non-zero on mismatch. 4 new regression tests, including a direct reproduction of this incident's exact mismatch.
+- **Cross-links**: [AI-FEAT-006](features/AI-FEAT-006_APPLICATION_AUTO_UPDATE.md) (Related postmortems + Known Bugs sections updated); [ENG-CONV-0003](conversations/ENG-CONV-0003_WINDOWS_NAS_EVENT_MANAGEMENT_FAILURE_INVESTIGATION_ROOT_CAUSE_VERIFICATION_AND_R.md) (Outcome section records the actual publication result).
+- **Not a product defect**: this is a release-process gap, not an Event Management bug — BUG-011 through BUG-014's statuses are unchanged.
+- **Evidence confidence**: explicit (GitHub Actions run logs quoting the exact `skipped publishing`/`existing release published more than 2 hours ago` lines, GitHub Releases/Tags API responses before and after repair, regression tests reproducing the exact mismatch).
+
+---
+
 ## 2026-08-11 (pre-merge documentation closure) — BUG-011: canonical Root Cause section corrected to lead with the confirmed final defect
 
 - **Task type**: documentation correction only, no code change. During the final pre-merge audit (Phase 4 documentation closure) ahead of merging `fix/windows-event-management-rc` into `main`, found that BUG-011's top-level `## Root Cause` section still stated only the **original** 2026-08-07 hypothesis (transient `fsp.readdir()` failures collapsing into an empty-events shape) — a real, separately-fixed defect, but not what the real Windows/NAS tester actually hit. The true final root cause (mixed `sequence` runtime type crashing `resolved.sort()`, confirmed 2026-08-11) was only stated inside the Investigation Log and Fix section, never promoted to the canonical summary a reader sees first.

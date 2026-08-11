@@ -291,6 +291,22 @@
     },
     {
       "evidence_status": "explicit",
+      "note": "postmortem",
+      "provenance_path": "features/AI-FEAT-006_APPLICATION_AUTO_UPDATE.md#lifecycle-metadata:Related-postmortems",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-006",
+      "target": "PM-002"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "postmortem",
+      "provenance_path": "postmortems/PM-002_V0_9_11_FIRST_PUBLICATION_ATTEMPT_PRODUCED_AN_EMPTY_GITHUB_RELEASE.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-006",
+      "target": "PM-002"
+    },
+    {
+      "evidence_status": "explicit",
       "note": null,
       "provenance_path": "features/AI-FEAT-007_TELEMETRY_PIPELINE.md#header-table:Dependencies",
       "relationship": "depends_on",
@@ -4651,6 +4667,12 @@
       "doc_path": "postmortems/PM-001_METADATA_CORRECTNESS_GAP_PRODUCTION_READINESS_REVIEW.md",
       "id": "PM-001",
       "label": "Metadata Correctness Gap Found in Production-Readiness Review",
+      "type": "postmortem"
+    },
+    {
+      "doc_path": "postmortems/PM-002_V0_9_11_FIRST_PUBLICATION_ATTEMPT_PRODUCED_AN_EMPTY_GITHUB_RELEASE.md",
+      "id": "PM-002",
+      "label": "v0.9.11 First Publication Attempt Produced an Empty GitHub Release",
       "type": "postmortem"
     }
   ],

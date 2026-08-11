@@ -324,13 +324,20 @@
         "Not yet covered in 11_ARCHITECTURAL_EVOLUTION.md's relationship map"
       ],
       "related_bugs": [],
-      "related_changelog_entries": [],
+      "related_changelog_entries": [
+        {
+          "date": "2026-08-11",
+          "excerpt": "**Cross-links**: [AI-FEAT-006](features/AI-FEAT-006_APPLICATION_AUTO_UPDATE.md) (Related postmortems + Known Bugs sections updated); [ENG-CONV-0003](conversations/ENG-CONV-0003_WINDOWS_NAS_EVENT_MANAG"
+        }
+      ],
       "related_code_paths": [
         "services/autoUpdater.js"
       ],
       "related_decisions": [],
       "related_features": [],
-      "related_postmortems": [],
+      "related_postmortems": [
+        "PM-002"
+      ],
       "related_technical_docs": [],
       "related_tests": [],
       "roadmap_ids": [],

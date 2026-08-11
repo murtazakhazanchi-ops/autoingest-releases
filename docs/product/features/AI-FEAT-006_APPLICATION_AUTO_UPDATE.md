@@ -24,7 +24,7 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 | Related features | None beyond Dependencies/Parent/Subfeatures already listed in the header table above |
 | Related decisions | None recorded |
 | Related bugs | None recorded |
-| Related postmortems | None |
+| Related postmortems | [PM-002](../postmortems/PM-002_V0_9_11_FIRST_PUBLICATION_ATTEMPT_PRODUCED_AN_EMPTY_GITHUB_RELEASE.md) |
 | Related architectural evolution sections | Not yet covered in 11_ARCHITECTURAL_EVOLUTION.md's relationship map |
 | Related release notes | Evidence pending — no release-notes file matched this feature's cited version(s) by filename; docs/product/10_CHANGELOG.md tracks the documentation system itself, not per-feature user-facing changes |
 | Testing coverage | No dedicated test file identified via automated search of `test/` (17 test files exist repository-wide, concentrated in the metadata subsystem — see AI-FEAT-029 through AI-FEAT-033) |
@@ -60,7 +60,7 @@ This section classifies this feature's already-evidenced history by milestone ty
 
 ## Known Bugs / Troubleshooting
 
-None recorded.
+Not a defect in this feature's own runtime code — see [PM-002](../postmortems/PM-002_V0_9_11_FIRST_PUBLICATION_ATTEMPT_PRODUCED_AN_EMPTY_GITHUB_RELEASE.md): the first `v0.9.11` release-publish attempt produced an empty GitHub Release (zero assets, no updater metadata) because `package.json`'s version was not bumped before tagging — `electron-builder` derives its publish target/artifact names from that field, not the git tag. No client could discover the empty release since no `latest.yml`/`latest-mac.yml` was ever published for it; the release-preparation gap was corrected and a permanent `release gate` check added to prevent recurrence.
 
 ## Decisions
 
