@@ -19,3 +19,12 @@
 - **Related commit(s)**: Evidence pending — source conversation unavailable
 - **Unresolved follow-up**: - Implement the full Part 8 pipeline: ECP schema, ENG-CONV identity/allocator, import pipeline (redaction, sanitization, dedup, significance gate, ownership resolution, decision/bug/memory linkage), CLI, generated indexes, dependency graph edges, context assistant integration, hook reconciliation, tests, and documentation.
 - **Capsule**: [AI-MEM-0002](../memory/AI-MEM-0002_PART_8_MULTI_AI_ENGINEERING_CONVERSATION_INTEGRATION_DESIGN_AND_IMPLEMENTATION_F.md)
+
+## 2026-08-07T13:53:49.889Z — AI-MEM-0003 — Windows/NAS Event Management reliability — 3 independent root causes
+
+- **Feature(s)**: None
+- **Accepted approach**: Evidence pending
+- **Rejected alternative(s)**: None recorded
+- **Related commit(s)**: Evidence pending — source conversation unavailable
+- **Unresolved follow-up**: None recorded.
+- **Capsule**: [AI-MEM-0003](../memory/AI-MEM-0003_WINDOWS_NAS_EVENT_MANAGEMENT_RELIABILITY_3_INDEPENDENT_ROOT_CAUSES.md)

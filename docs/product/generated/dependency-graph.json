@@ -260,6 +260,14 @@
     {
       "evidence_status": "explicit",
       "note": null,
+      "provenance_path": "bugs/BUG-013_SETSESSIONARCHIVEROOT_WINDOWS_UNC_PATH_PREFIX_CHECK_SILENTLY_DROPS_THE_ACTIVE_CO.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-005",
+      "target": "BUG-013"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
       "provenance_path": "features/AI-FEAT-006_APPLICATION_AUTO_UPDATE.md#header-table:Dependencies",
       "relationship": "depends_on",
       "source": "AI-FEAT-006",
@@ -348,6 +356,38 @@
     {
       "evidence_status": "explicit",
       "note": null,
+      "provenance_path": "bugs/BUG-011_MASTER_SCANEVENTS_NAS_ARCHIVE_SCAN_COLLAPSE_READ_FAILURE_INTO_ZERO_EVENTS_COLLEC.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-009",
+      "target": "BUG-011"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-012_SCANNEDEVENTS_CACHE_NOT_INVALIDATED_AFTER_CREATING_A_NEW_EVENT_NEWLY_CREATED_EVE.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-009",
+      "target": "BUG-012"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-013_SETSESSIONARCHIVEROOT_WINDOWS_UNC_PATH_PREFIX_CHECK_SILENTLY_DROPS_THE_ACTIVE_CO.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-009",
+      "target": "BUG-013"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-014_EVENT_MANAGEMENT_MODAL_FOOTER_MODE_NOT_DERIVED_FROM_SCREEN_STATE_PRIMARY_ACTION_.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-009",
+      "target": "BUG-014"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
       "provenance_path": "features/AI-FEAT-010_EVENT_MANAGEMENT_EDITING.md#header-table:Dependencies",
       "relationship": "depends_on",
       "source": "AI-FEAT-010",
@@ -392,6 +432,38 @@
       "relationship": "affected_by_bug",
       "source": "AI-FEAT-010",
       "target": "BUG-006"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-011_MASTER_SCANEVENTS_NAS_ARCHIVE_SCAN_COLLAPSE_READ_FAILURE_INTO_ZERO_EVENTS_COLLEC.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-010",
+      "target": "BUG-011"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-012_SCANNEDEVENTS_CACHE_NOT_INVALIDATED_AFTER_CREATING_A_NEW_EVENT_NEWLY_CREATED_EVE.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-010",
+      "target": "BUG-012"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-013_SETSESSIONARCHIVEROOT_WINDOWS_UNC_PATH_PREFIX_CHECK_SILENTLY_DROPS_THE_ACTIVE_CO.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-010",
+      "target": "BUG-013"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-014_EVENT_MANAGEMENT_MODAL_FOOTER_MODE_NOT_DERIVED_FROM_SCREEN_STATE_PRIMARY_ACTION_.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-010",
+      "target": "BUG-014"
     },
     {
       "evidence_status": "explicit",
@@ -4137,6 +4209,30 @@
       "doc_path": "bugs/BUG-010_METADATA_QUEUE_IN_MEMORY_LOSS_ON_CRASH.md",
       "id": "BUG-010",
       "label": "Metadata Batches Held Only In-Memory, Lost on Crash/Restart",
+      "type": "bug"
+    },
+    {
+      "doc_path": "bugs/BUG-011_MASTER_SCANEVENTS_NAS_ARCHIVE_SCAN_COLLAPSE_READ_FAILURE_INTO_ZERO_EVENTS_COLLEC.md",
+      "id": "BUG-011",
+      "label": "master:scanEvents / NAS archive scan collapse read-failure into \"zero events/collections\"",
+      "type": "bug"
+    },
+    {
+      "doc_path": "bugs/BUG-012_SCANNEDEVENTS_CACHE_NOT_INVALIDATED_AFTER_CREATING_A_NEW_EVENT_NEWLY_CREATED_EVE.md",
+      "id": "BUG-012",
+      "label": "_scannedEvents cache not invalidated after creating a new event — newly-created events invisible on reopen",
+      "type": "bug"
+    },
+    {
+      "doc_path": "bugs/BUG-013_SETSESSIONARCHIVEROOT_WINDOWS_UNC_PATH_PREFIX_CHECK_SILENTLY_DROPS_THE_ACTIVE_CO.md",
+      "id": "BUG-013",
+      "label": "setSessionArchiveRoot() Windows/UNC path prefix check silently drops the active collection and all session collections",
+      "type": "bug"
+    },
+    {
+      "doc_path": "bugs/BUG-014_EVENT_MANAGEMENT_MODAL_FOOTER_MODE_NOT_DERIVED_FROM_SCREEN_STATE_PRIMARY_ACTION_.md",
+      "id": "BUG-014",
+      "label": "Event Management modal footer mode not derived from screen state — primary action can render with no visible button",
       "type": "bug"
     },
     {

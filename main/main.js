@@ -18,6 +18,13 @@ const crashReporter = require('../services/crashReporter');
 const perf          = require('../services/performanceMonitor');
 const autoUpdater   = require('../services/autoUpdater');
 const settings        = require('../services/settings');
+// Canonical Representation Audit, L1 (2026-08-11): the ONE path-containment
+// implementation for this whole codebase — already proven correct under
+// BUG-013 for the renderer's own UNC/case-sensitivity handling. Dual-exported
+// (CJS module.exports here, window.PathUtils for the renderer's own
+// <script>-tag load) specifically so both processes share it instead of each
+// maintaining its own ad hoc `x.startsWith(root + path.sep)` check.
+const PathUtils        = require('../renderer/pathUtils.js');
 const nasEventCache       = require('../services/nasEventCache');
 const localMirrorService  = require('../services/localMirrorService');
 const localSyncManifest   = require('../services/localSyncManifest');
@@ -1545,10 +1552,7 @@ ipcMain.handle('master:create', async (_event, basePath, folderName) => {
   realtimeOps.emitCollectionVisible({ collectionName: folderName });
   // Emit full registry entry so other devices can prepare locally
   const _nasRoot = settings.getNasRoot();
-  const _isNasPath = _nasRoot && (
-    path.resolve(basePath) === path.resolve(_nasRoot) ||
-    path.resolve(basePath).startsWith(path.resolve(_nasRoot) + path.sep)
-  );
+  const _isNasPath = _nasRoot && PathUtils.isPathUnderOrEqualToRoot(path.resolve(basePath), path.resolve(_nasRoot));
   realtimeOps.emitRegistryCollection({
     collectionName:      folderName,
     nasRoot:             _isNasPath ? _nasRoot : null,
@@ -1566,21 +1570,102 @@ ipcMain.handle('master:create', async (_event, basePath, folderName) => {
  * controlled-vocabulary lists so the renderer can render resolvable events
  * directly and mark the rest as warnings.
  *
- * Returns an array sorted by (hijriDate, seq) DESCENDING so newest events
- * are listed first. Unparseable entries are appended at the end in the same
+ * `events` is sorted by (hijriDate, seq) DESCENDING so newest events are
+ * listed first. Unparseable entries are appended at the end in the same
  * insertion order (their hijriDate/seq are unreliable).
  *
- * Never throws for missing or unreadable masters — returns [] instead.
+ * Never throws — returns { ok: false, events: [], errorReason } when the
+ * master folder cannot be read (NAS hiccup, permission blip, disconnect,
+ * etc). A read failure is NOT the same as "this collection has zero
+ * events" and callers must not treat the two interchangeably.
  */
+// Diagnostic-only, fire-and-forget (BUG-011 IPC-boundary investigation): forwards
+// renderer-side scan-invoke markers into app.log alongside the main-process
+// [EventDiscoveryIPC] lines. One-way (ipcMain.on/ipcRenderer.send, not
+// handle/invoke) — no response is ever sent back, so it cannot itself affect
+// scan behavior or add IPC round-trip latency. Input is coerced to a bounded-
+// length string before logging; never trusted as anything but display text.
+ipcMain.on('diag:rendererLog', (_event, msg) => {
+  log(`[EventDiscoveryRenderer] ${String(msg).slice(0, 2000)}`);
+});
+
+// ── Diagnostic-only scan-stall tracking (BUG-011 real-Windows/NAS follow-up) ──
+// Observation only — never read by any code path that alters scan behavior,
+// timeouts, retries, or concurrency. Lets app.log show whether multiple
+// master:scanEvents invocations overlap. Remove alongside the rest of the
+// EventDiscoveryDiagnostics instrumentation once BUG-011 is closed.
+const _activeEventDiscoveryScans = new Set();
+let _eventDiscoveryScanSeq = 0;
+
+// The handler is a thin wrapper around _scanEventsCore(): it exists to log
+// unexpected errors surfacing at the IPC boundary (see BUG-011's investigation
+// log — this is exactly the mechanism that caught the actual root cause, a
+// TypeError thrown from inside the scan). `throw err` preserves the exact
+// prior behavior of letting ipcMain.handle reject the renderer's invoke().
 ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
-  if (!masterPath || typeof masterPath !== 'string') return [];
+  const _scanId = `scan-${Date.now()}-${++_eventDiscoveryScanSeq}`;
+  try {
+    return await _scanEventsCore(masterPath, _scanId);
+  } catch (err) {
+    log(`[EventDiscoveryIPC] phase=IPC_HANDLER_ERROR scanId=${_scanId} error=${JSON.stringify((err && err.message) || String(err))}`);
+    throw err;
+  }
+});
+
+async function _scanEventsCore(masterPath, _scanId) {
+  // Retains BUG-011's high-value diagnostics only (scan summary, unexpected-
+  // state assertions, concurrent-scan detection) — the exhaustive per-entry/
+  // per-operation trace logging used during that investigation was removed
+  // once the root cause was confirmed and fixed (2026-08-11); see BUG-011's
+  // Prevention/Reusable Lesson section and 10_CHANGELOG.md for what was
+  // removed and why. Wrapped in try/finally so the active-scan tracking below
+  // is guaranteed to be cleaned up on every exit path.
+  const _diagRecords = [];
+  const _scanStartedAt = Date.now();
+  const _diagLog = (msg) => log(`[EventDiscoveryDiagnostics] scanId=${_scanId} ${msg}`);
+
+  const _activeScanIdsAtStart = Array.from(_activeEventDiscoveryScans);
+  if (_activeScanIdsAtStart.length > 0) {
+    log(`[EventDiscoveryConcurrentScan] newScanId=${_scanId} activeScanIds=${JSON.stringify(_activeScanIdsAtStart)}`);
+  }
+  _activeEventDiscoveryScans.add(_scanId);
+
+  try {
+
+  if (!masterPath || typeof masterPath !== 'string') {
+    _diagLog(`masterPath missing/invalid — returning {ok:true, events:[]} without scanning. typeof=${typeof masterPath}`);
+    return { ok: true, events: [] };
+  }
+
+  // Archive-root context (settings, not derived from masterPath) — logged once
+  // per scan for full path-diagnostic context, per BUG-011 RC request. Read-only,
+  // no behavior implication.
+  const _diagNasRoot  = settings.getNasRoot();
+  const _diagMainRoot = settings.getMainArchiveRoot();
+  const _diagShape     = _diagPathShape(masterPath);
+  let _diagRealpath = null, _diagRealpathError = null, _diagMasterExists = null;
+  try {
+    _diagRealpath = await fsp.realpath(masterPath);
+    _diagMasterExists = true;
+  } catch (rpErr) {
+    _diagRealpathError = rpErr.code || rpErr.message;
+    _diagMasterExists = rpErr.code !== 'ENOENT';
+  }
+  _diagLog(`scan start masterPath=${JSON.stringify(masterPath)} `
+    + `archiveRoot(nasRoot)=${JSON.stringify(_diagNasRoot)} mainArchiveRoot=${JSON.stringify(_diagMainRoot)} `
+    + `win32Normalized=${JSON.stringify(path.win32.normalize(masterPath))} `
+    + `realpath=${JSON.stringify(_diagRealpath)} realpathError=${JSON.stringify(_diagRealpathError)} `
+    + `exists=${_diagMasterExists} isUNCPath=${_diagShape.isUNC} isDriveLetterPath=${_diagShape.isDriveLetter}`);
 
   let entries;
   try {
     entries = await fsp.readdir(masterPath, { withFileTypes: true });
-  } catch {
-    return [];
+  } catch (err) {
+    _diagLog(`readdir(masterPath) THREW code=${err.code || 'unknown'} message=${err.message}`);
+    return { ok: false, events: [], errorReason: err.code || 'scan-failed' };
   }
+
+  _diagLog(`readdir(masterPath) returned ${entries.length} raw entr${entries.length === 1 ? 'y' : 'ies'} (directory listing target=${JSON.stringify(masterPath)})`);
 
   // Load lists ONCE for this scan; parser is a pure function of its inputs.
   const lists = {
@@ -1592,20 +1677,137 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
   const resolved   = [];
   const unparseable = [];
 
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
+  for (let _entryIdx = 0; _entryIdx < entries.length; _entryIdx++) {
+    const entry = entries[_entryIdx];
     const name = entry.name;
+    const entryFullPath = path.join(masterPath, name);
+
+    // Filesystem hardening (BUG-011 RC): Dirent.isDirectory() can misreport on
+    // some network shares (a documented class of Node/libuv behavior — see
+    // BUG-011's investigation log for the cited sources). If the Dirent says
+    // "not a directory" but a real stat() on the same path says otherwise,
+    // trust the stat() result and continue treating the entry as a directory,
+    // instead of silently dropping a real, present event. This does not
+    // change behavior for any entry where Dirent and stat agree (the normal
+    // case on local disks) — it only recovers a specific disagreement that
+    // previously caused a real folder to vanish with no explanation.
+    let _statIsDirectory = null;
+    let _statError = null;
+    try {
+      const st = await fsp.stat(entryFullPath);
+      _statIsDirectory = st.isDirectory();
+    } catch (statErr) {
+      _statError = statErr.code || statErr.message;
+    }
+    const _direntSaysDir = entry.isDirectory();
+    if (_direntSaysDir !== _statIsDirectory) {
+      _diagLog(`DIRENT/STAT MISMATCH name=${JSON.stringify(name)} dirent.isDirectory()=${_direntSaysDir} stat.isDirectory()=${_statIsDirectory} statError=${_statError}`);
+    }
+    const _recoveredViaStat = !_direntSaysDir && _statIsDirectory === true;
+    if (_recoveredViaStat) {
+      log(`[EventDiscoveryDiagnostics] DIR_ENTRY_TYPE_MISMATCH name=${JSON.stringify(name)} path=${JSON.stringify(entryFullPath)} `
+        + `dirent.isDirectory()=false stat.isDirectory()=true — accepting stat() result, treating as a directory`);
+    }
+    const _treatedAsDirectory = _direntSaysDir || _recoveredViaStat;
+
+    if (!_treatedAsDirectory) {
+      _diagRecords.push({
+        folderName: name, folderPath: entryFullPath,
+        direntIsDirectory: _direntSaysDir, direntIsFile: entry.isFile(),
+        statIsDirectory: _statIsDirectory, statError: _statError,
+        includedInEventList: false, rejectionStage: 'DIRENT_NOT_DIRECTORY',
+        rejectionReason: `entry.isDirectory() was false and stat() did not confirm a directory either (statIsDirectory=${_statIsDirectory}, statError=${_statError})`,
+      });
+      continue;
+    }
     // Skip macOS/system artefacts defensively (even though these aren't directories usually)
-    if (name.startsWith('.')) continue;
+    if (name.startsWith('.')) {
+      _diagRecords.push({
+        folderName: name, folderPath: entryFullPath,
+        direntIsDirectory: true, direntIsFile: false,
+        statIsDirectory: _statIsDirectory, statError: _statError,
+        includedInEventList: false, rejectionStage: 'DOTFILE', rejectionReason: 'folder name starts with "."',
+      });
+      continue;
+    }
 
     // Try event.json first (authoritative); fallback to parser for legacy events.
     const jsonPath = path.join(masterPath, name, 'event.json');
     let eventJson = null;
     let jsonCorrupt = false;
+    let _entryRealpath = null, _entryRealpathError = null;
+    try {
+      _entryRealpath = await fsp.realpath(entryFullPath);
+    } catch (rpErr) {
+      _entryRealpathError = rpErr.code || rpErr.message;
+    }
+    const _entryShape = _diagPathShape(entryFullPath);
+    const _diag = {
+      folderName: name, folderPath: entryFullPath,
+      folderExists: true, // reached only when _treatedAsDirectory is true, i.e. stat() confirmed it
+      directoryTypeRecoveredViaStat: _recoveredViaStat,
+      realpath: _entryRealpath, realpathError: _entryRealpathError,
+      isUNCPath: _entryShape.isUNC, isDriveLetterPath: _entryShape.isDriveLetter,
+      eventJsonPath: jsonPath, eventJsonExists: null,
+      readOk: null, readErrorCode: null,
+      parseOk: null, parseError: null,
+      eventJsonVersion: null, requiredFieldsPresent: null,
+      eventName: null, safeEventName: null, status: null, componentsCount: null,
+      validationOk: null, validationReason: null,
+      normalizedFolderPath: path.win32.normalize(entryFullPath),
+      normalizedCollectionPath: path.win32.normalize(masterPath),
+      relativeToCollection: path.win32.relative(path.win32.normalize(masterPath), path.win32.normalize(entryFullPath)),
+      relativeToArchiveRoot: _diagNasRoot ? path.win32.relative(path.win32.normalize(_diagNasRoot), path.win32.normalize(entryFullPath)) : null,
+      // No separate archive-identity/path resolver exists in this code path today —
+      // master:scanEvents receives masterPath as-is from the renderer and reads
+      // directly under it. These fields document that fact explicitly rather than
+      // silently omitting a stage the caller's schema asked about.
+      resolvedArchivePath: entryFullPath, resolverOk: true, resolverReason: 'no separate resolver stage in this code path',
+      archiveResolutionAttempted: false, archiveResolutionOk: null,
+      archiveResolutionReason: 'no separate archive-resolution stage exists in master:scanEvents — masterPath is used as-is, verified by code reading and by test/bug011RealEventJsonReproduction.test.js',
+      // "Current Device" IS this IPC result, unfiltered — see renderer/eventCreator.js
+      // _renderEventList(): resolved = _scannedEvents.filter(e => e.isParseable).
+      // No registry/lastEvent/resolveArchiveEventPath/session-collection gate exists
+      // between this response and what renders under the Current Device tab.
+      currentDeviceEligible: null, currentDeviceReason: 'no Current-Device-specific gate exists downstream of this IPC response — it mirrors includedInEventList exactly',
+      // Online Registry is a fully separate, unrelated data source (other devices'
+      // published events via realtime sync) — never evaluated here.
+      onlineRegistryEligible: null, onlineRegistryReason: 'not applicable — Online Registry does not consult master:scanEvents',
+      direntIsDirectory: true, direntIsFile: false,
+      statIsDirectory: _statIsDirectory, statError: _statError,
+      includedInEventList: null, rejectionStage: null, rejectionReason: null,
+    };
+
     try {
       const raw = await fsp.readFile(jsonPath, 'utf8');
-      const obj = normalizeEventJson(JSON.parse(raw));
+      _diag.eventJsonExists = true;
+      _diag.readOk = true;
+      let obj;
+      try {
+        obj = normalizeEventJson(JSON.parse(raw));
+        _diag.parseOk = true;
+        _diag.eventJsonVersion = obj?.version ?? null;
+        _diag.eventName        = obj?.eventName ?? null;
+        _diag.safeEventName    = obj?.safeEventName ?? null;
+        _diag.status           = obj?.status ?? null;
+        _diag.componentsCount  = Array.isArray(obj?.components) ? obj.components.length : null;
+        _diag.requiredFieldsPresent = {
+          hijriDate:  typeof obj?.hijriDate === 'string' && !!obj.hijriDate,
+          sequence:   obj?.sequence !== undefined && obj?.sequence !== null,
+          eventName:  typeof obj?.eventName === 'string' && !!obj.eventName,
+          components: Array.isArray(obj?.components),
+        };
+      } catch (parseErr) {
+        _diag.parseOk = false;
+        _diag.parseError = parseErr.message;
+        jsonCorrupt = true;
+        _diagRecords.push({ ..._diag, includedInEventList: false, rejectionStage: 'JSON_PARSE_FAILED', rejectionReason: parseErr.message });
+        _diagLog(`entry=${JSON.stringify(name)} JSON.parse FAILED: ${parseErr.message}`);
+        continue;
+      }
+
       if (isValidEventJson(obj)) {
+        _diag.validationOk = true;
         eventJson = obj;
         hidePathBestEffort(jsonPath).catch(() => {});
         // Patch 3: crash recovery — reset stuck in-progress status on next startup.
@@ -1619,14 +1821,23 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
         }
       } else {
         jsonCorrupt = true;
+        _diag.validationOk = false;
+        _diag.validationReason = _diagnoseEventJsonValidation(obj);
         console.error('[scanEvents] isValidEventJson failed for', name, '— shape dump:', JSON.stringify(obj).slice(0, 400));
       }
     } catch (err) {
-      if (err.code !== 'ENOENT') {
+      if (err.code === 'ENOENT') {
+        _diag.eventJsonExists = false;
+        _diag.readOk = false;
+        _diag.readErrorCode = 'ENOENT';
+        // ENOENT = no JSON file → legacy event, fallback to parser below
+      } else {
         jsonCorrupt = true;
+        _diag.eventJsonExists = null; // unknown — the read itself failed for a non-ENOENT reason
+        _diag.readOk = false;
+        _diag.readErrorCode = err.code || 'unknown';
         console.error('[scanEvents] Failed to parse event.json for', name, ':', err.message);
       }
-      // ENOENT = no JSON file → legacy event, fallback to parser below
     }
 
     const parsed = parseEventName(name, lists);
@@ -1634,7 +1845,24 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
     if (eventJson) {
       // event.json is the SOLE source of components. Parser provides hijriDate+sequence only.
       const hijriDate = parsed.ok ? parsed.hijriDate : (eventJson.hijriDate || '');
-      const sequence  = parsed.ok ? parsed.sequence  : (eventJson.sequence  || '00');
+      // BUG-011 root cause (2026-08-11): parsed.sequence (from parseEventName's regex
+      // capture) is always a zero-padded string, but eventJson.sequence — used only
+      // when the folder name itself fails to parse — carries whatever type was last
+      // persisted to disk. The Create/Edit Event form always writes sequence as a
+      // number (renderer/eventCreator.js's `parseInt(seq, 10)` payloads), so a single
+      // unparseable folder name mixes a number into an otherwise all-string sequence
+      // set, and resolved.sort()'s `b.sequence.localeCompare(a.sequence)` below throws
+      // TypeError the moment it compares that entry against any normally-parsed one —
+      // silently aborting the entire scan for the whole collection, not just that one
+      // folder. Normalized once, here, at the same point _scanNasArchive (this file,
+      // ~line 3131) already normalizes the identical value for the identical reason —
+      // every downstream consumer (this function's own sort, the IPC payload, the
+      // renderer) then only ever sees the canonical zero-padded-string type the rest
+      // of this codebase already assumes (see eventNameParser.js's own comment on
+      // `sequence`). See test/bug011SequenceTypeMismatch.test.js for the regression
+      // coverage this fix is verified against.
+      const seqRaw    = parsed.ok ? parsed.sequence  : (eventJson.sequence  || '00');
+      const sequence  = typeof seqRaw === 'number' ? String(seqRaw).padStart(2, '0') : String(seqRaw);
       // Strip imports[] before sending over IPC — it can be hundreds of entries per event.
       // All consumers need only the metadata fields; imports are loaded on demand per-event.
       const { imports: _omit, ...eventJsonMeta } = eventJson;
@@ -1651,6 +1879,7 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
         needsReconciliation:  (eventJson.safeEventName || sanitizeForPath(eventJson.eventName || '')) !== name,
         _eventJson:           eventJsonMeta,
       });
+      _diagRecords.push({ ..._diag, includedInEventList: true, rejectionStage: null, rejectionReason: null });
     } else if (!jsonCorrupt && parsed.ok) {
       // No event.json (ENOENT) and folder name is parseable → legacy event, no components.
       // Components intentionally empty: event.json is the ONLY source. Legacy events must
@@ -1666,6 +1895,7 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
         isLegacy:     true,
         isCorrupt:    false,
       });
+      _diagRecords.push({ ..._diag, includedInEventList: true, rejectionStage: null, rejectionReason: 'legacy: no event.json, folder name parsed OK' });
     } else if (jsonCorrupt && parsed.ok) {
       // event.json exists but failed shape validation. Components intentionally empty.
       resolved.push({
@@ -1680,6 +1910,7 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
         isCorrupt:    true,
         _eventJson:   null,
       });
+      _diagRecords.push({ ..._diag, includedInEventList: true, rejectionStage: null, rejectionReason: 'event.json invalid but folder name parsed OK — still counted as an existing event (isCorrupt:true)' });
     } else {
       // Both JSON (if present) and parser failed.
       unparseable.push({
@@ -1687,6 +1918,10 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
         isParseable: false,
         reason:      parsed.ok ? 'corrupt-json' : parsed.reason,
         isCorrupt:   jsonCorrupt,
+      });
+      _diagRecords.push({
+        ..._diag, includedInEventList: false, rejectionStage: 'UNPARSEABLE_FOLDER_NAME',
+        rejectionReason: `folderNameParsed=${parsed.ok} (${parsed.ok ? '' : parsed.reason}); jsonCorrupt=${jsonCorrupt} — lands in "Unrecognised Folders", not "Existing Events"`,
       });
     }
   }
@@ -1698,8 +1933,66 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
     return b.sequence.localeCompare(a.sequence);
   });
 
-  return [...resolved, ...unparseable];
-});
+  // ── Diagnostic summary — one aggregate line, plus loud assertions for any
+  // internal-invariant violation. ────────────────────────────────────────────
+  // currentDeviceEligible mirrors includedInEventList exactly (see the
+  // currentDeviceReason field's own explanation) — computed once here rather
+  // than at every push site above, since the mirroring is unconditional for
+  // every record this function ever produces.
+  // Development assertion: a validated event.json that still didn't make it
+  // into the final list would mean the branch logic and the diagnostic record
+  // disagree — under current code this should never fire (validationOk===true
+  // always routes into the `if (eventJson)` branch, which always pushes to
+  // `resolved`), but it's cheap insurance against a future edit silently
+  // breaking that invariant.
+  for (const rec of _diagRecords) {
+    rec.currentDeviceEligible = rec.includedInEventList;
+    if (rec.validationOk === true && rec.includedInEventList !== true) {
+      _diagLog(`UNEXPECTED_EVENT_REJECTION folderName=${JSON.stringify(rec.folderName)} `
+        + `validationOk=true but includedInEventList=${rec.includedInEventList} `
+        + `rejectionStage=${JSON.stringify(rec.rejectionStage)} rejectionReason=${JSON.stringify(rec.rejectionReason)}`);
+    }
+  }
+  const _rejectionCounts = {};
+  for (const rec of _diagRecords) {
+    if (rec.rejectionStage) _rejectionCounts[rec.rejectionStage] = (_rejectionCounts[rec.rejectionStage] || 0) + 1;
+  }
+  const _directoriesAccepted = _diagRecords.filter(r => r.rejectionStage !== 'DIRENT_NOT_DIRECTORY' && r.rejectionStage !== 'DOTFILE').length;
+  const _directoryTypeRecoveredCount = _diagRecords.filter(r => r.directoryTypeRecoveredViaStat === true).length;
+  _diagLog(`EVENT_DISCOVERY_SUMMARY collection=${JSON.stringify(masterPath)} `
+    + `entriesEnumerated=${entries.length} `
+    + `directoriesAccepted=${_directoriesAccepted} `
+    + `directoryTypeRecoveredViaStat=${_directoryTypeRecoveredCount} `
+    + `eventJsonFound=${_diagRecords.filter(r => r.eventJsonExists === true).length} `
+    + `eventJsonReadOk=${_diagRecords.filter(r => r.readOk === true).length} `
+    + `eventJsonParsed=${_diagRecords.filter(r => r.parseOk === true).length} `
+    + `eventJsonValidated=${_diagRecords.filter(r => r.validationOk === true).length} `
+    + `rendered=${resolved.length} `
+    + `rejectedFromExistingEvents=${_diagRecords.filter(r => r.includedInEventList === false).length} `
+    + `unparseableFolders(shown as "Unrecognised Folders" in UI)=${unparseable.length} `
+    + `rejectionCounts=${JSON.stringify(_rejectionCounts)}`);
+
+  // Development assertion: rendered vs. validated counts legitimately differ
+  // (legacy events with no event.json, and corrupt-but-parseable-folder-name
+  // events, both render without validationOk===true) — but an unexplained gap
+  // is worth a loud line rather than silent arithmetic the tester's app.log
+  // reader would otherwise have to reconstruct by hand.
+  const _validatedCount = _diagRecords.filter(r => r.validationOk === true).length;
+  if (resolved.length !== _validatedCount) {
+    const _legacyCount = _diagRecords.filter(r => r.rejectionReason === 'legacy: no event.json, folder name parsed OK').length;
+    const _corruptButParseableCount = _diagRecords.filter(r =>
+      typeof r.rejectionReason === 'string' && r.rejectionReason.startsWith('event.json invalid but folder name parsed OK')).length;
+    _diagLog(`RENDER_COUNT_MISMATCH rendered=${resolved.length} validated=${_validatedCount} `
+      + `explainedByLegacyEvents=${_legacyCount} explainedByCorruptButParseable=${_corruptButParseableCount} `
+      + `unexplainedDelta=${resolved.length - _validatedCount - _legacyCount - _corruptButParseableCount}`);
+  }
+  _diagLog(`SCAN_COMPLETE totalDurationMs=${Date.now() - _scanStartedAt}`);
+
+  return { ok: true, events: [...resolved, ...unparseable] };
+  } finally {
+    _activeEventDiscoveryScans.delete(_scanId);
+  }
+}
 
 // Parse a single event folder name and return its components array.
 // Used at startup to restore component data from the canonical source (the
@@ -1727,6 +2020,47 @@ function sanitizeForPath(name) {
     .replace(/[:*?"<>|]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+// ── TEMPORARY DIAGNOSTIC INSTRUMENTATION (BUG-011 real-Windows/NAS RC follow-up) ──
+// Not a fix. Pure evidence-gathering for a tester report where 38 event.json-backed
+// folders are visible in Windows Explorer but master:scanEvents reports zero events
+// on the real NAS/UNC archive. Mirrors isValidEventJson's checks but returns a
+// human-readable reason instead of a bare boolean — used ONLY by the diagnostic
+// block in master:scanEvents below; isValidEventJson itself is untouched and still
+// the sole source of truth for actual validation behavior.
+// Remove this whole block (and the diagnostic block in master:scanEvents) once the
+// real root cause is found and the actual fix has landed.
+function _diagnoseEventJsonValidation(obj) {
+  if (obj === null || typeof obj !== 'object') return 'NOT_AN_OBJECT';
+  if (obj.version !== 1) return `VERSION_MISMATCH(got=${JSON.stringify(obj.version)})`;
+  if (!obj.hijriDate || typeof obj.hijriDate !== 'string') return 'HIJRI_DATE_MISSING_OR_NOT_STRING';
+  const seqNum = typeof obj.sequence === 'number' ? obj.sequence : parseInt(obj.sequence, 10);
+  if (!Number.isInteger(seqNum) || seqNum < 1) return `SEQUENCE_INVALID(got=${JSON.stringify(obj.sequence)})`;
+  if (!obj.eventName || typeof obj.eventName !== 'string') return 'EVENT_NAME_MISSING_OR_NOT_STRING';
+  if (!Array.isArray(obj.components)) return 'COMPONENTS_NOT_ARRAY';
+  for (let i = 0; i < obj.components.length; i++) {
+    const c = obj.components[i];
+    if (c === null || typeof c !== 'object') return `COMPONENT_${i}_NOT_OBJECT`;
+    if (!Array.isArray(c.types)) return `COMPONENT_${i}_TYPES_NOT_ARRAY`;
+    if (typeof c.city !== 'string') return `COMPONENT_${i}_CITY_NOT_STRING(got=${JSON.stringify(c.city)})`;
+    if (c.location !== null && c.location !== undefined && typeof c.location !== 'string') {
+      return `COMPONENT_${i}_LOCATION_INVALID`;
+    }
+  }
+  return null; // valid
+}
+
+// Diagnostic-only path-shape classifier (UNC vs. drive-letter vs. neither).
+// Renderer has its own equivalent in pathUtils.js (WINDOWS_SHAPED) — duplicated
+// here rather than shared, since main/renderer are separate Electron processes
+// and this is temporary diagnostic code, not a shared contract.
+function _diagPathShape(p) {
+  if (typeof p !== 'string') return { isUNC: false, isDriveLetter: false };
+  return {
+    isUNC: /^\\\\/.test(p) || /^\/\//.test(p),
+    isDriveLetter: /^[a-zA-Z]:[\\/]/.test(p),
+  };
 }
 
 function normalizeEventJson(data) {
@@ -1800,10 +2134,7 @@ ipcMain.handle('event:write', async (_event, eventFolderPath, eventData) => {
     // Emit full registry entry so other devices can prepare the same event locally
     const _evCollName = path.basename(path.dirname(eventFolderPath));
     const _nasRoot3   = settings.getNasRoot();
-    const _isNasEv    = _nasRoot3 && (
-      path.resolve(eventFolderPath) === path.resolve(_nasRoot3) ||
-      path.resolve(eventFolderPath).startsWith(path.resolve(_nasRoot3) + path.sep)
-    );
+    const _isNasEv    = _nasRoot3 && PathUtils.isPathUnderOrEqualToRoot(path.resolve(eventFolderPath), path.resolve(_nasRoot3));
     const _jsonShell  = {
       version:      eventData.version || 1,
       hijriDate:    eventData.hijriDate,
@@ -1851,7 +2182,7 @@ ipcMain.handle('event:publishRegistry', async (_event, { eventFolderPath, collec
   ].filter(Boolean).map(r => path.resolve(r));
   const realEvPath = path.resolve(eventFolderPath);
 
-  if (!_pubRoots.some(r => realEvPath === r || realEvPath.startsWith(r + path.sep))) {
+  if (!_pubRoots.some(r => PathUtils.isPathUnderOrEqualToRoot(realEvPath, r))) {
     console.warn('[publishRegistry] outside safe roots — not publishing');
     return { ok: false, reason: 'outside-roots' };
   }
@@ -1870,7 +2201,7 @@ ipcMain.handle('event:publishRegistry', async (_event, { eventFolderPath, collec
   }
 
   const _nasRoot4  = settings.getNasRoot();
-  const _isNasPub  = _nasRoot4 && (realEvPath === path.resolve(_nasRoot4) || realEvPath.startsWith(path.resolve(_nasRoot4) + path.sep));
+  const _isNasPub  = _nasRoot4 && PathUtils.isPathUnderOrEqualToRoot(realEvPath, path.resolve(_nasRoot4));
   const _origin    = _isNasPub ? 'archive-available' : 'remote-created';
   const _jsonShell = {
     version:       eventData.version || 1,
@@ -2139,10 +2470,10 @@ ipcMain.handle('dir:rename', async (_event, oldPath, newPath) => {
   }
 
   const _isInsideRoot = (resolved) =>
-    realRoots.some(r => resolved === r || resolved.startsWith(r + path.sep));
+    realRoots.some(r => PathUtils.isPathUnderOrEqualToRoot(resolved, r));
 
   const _isDescendantOfRoot = (resolved) =>
-    realRoots.some(r => resolved.startsWith(r + path.sep));
+    realRoots.some(r => PathUtils.isPathUnderRoot(resolved, r));
 
   // ── Resolve oldPath and confirm containment ───────────────────────────
   let realOld;
@@ -2628,13 +2959,31 @@ const _NAS_SKIP_DIRS = new Set(['_Selected', '.autoingest', '__MACOSX']);
 async function _scanNasArchive(nasRoot) {
   const refreshedAt = new Date().toISOString();
 
+  // TEMPORARY DIAGNOSTIC (BUG-011 real-Windows/NAS RC follow-up) — logs the exact
+  // nasRoot and each collection's computed path, so it can be directly diffed
+  // against master:scanEvents's own "scan start masterPath=..." line for the same
+  // collection in the same app.log. Remove alongside the other diagnostic blocks.
+  {
+    const _mainRoot = settings.getMainArchiveRoot();
+    const _shape = _diagPathShape(nasRoot);
+    let _rp = null, _rpErr = null, _exists = null;
+    try { _rp = await fsp.realpath(nasRoot); _exists = true; }
+    catch (e) { _rpErr = e.code || e.message; _exists = e.code !== 'ENOENT'; }
+    log(`[EventDiscoveryDiagnostics] _scanNasArchive start nasRoot(archiveRoot/workingRoot)=${JSON.stringify(nasRoot)} `
+      + `mainArchiveRoot=${JSON.stringify(_mainRoot)} win32Normalized=${JSON.stringify(path.win32.normalize(nasRoot))} `
+      + `realpath=${JSON.stringify(_rp)} realpathError=${JSON.stringify(_rpErr)} exists=${_exists} `
+      + `isUNCPath=${_shape.isUNC} isDriveLetterPath=${_shape.isDriveLetter}`);
+  }
+
   let collectionEntries;
   try {
     collectionEntries = await fsp.readdir(nasRoot, { withFileTypes: true });
-  } catch (err) {
-    const reason = (err.code === 'ENOENT' || err.code === 'ENOTCONN' || err.code === 'EIO')
-      ? 'nas-disconnected' : 'invalid-nas';
-    return { status: reason, refreshedAt, source: 'nas', collections: [] };
+  } catch {
+    // The only caller (_runNasScan) already validated the archive-root marker
+    // before invoking this function, so a readdir failure here is a transient
+    // reachability problem (NAS hiccup, SMB timeout), not evidence of an invalid
+    // archive — never report it the same way as "confirmed invalid".
+    return { status: 'nas-disconnected', refreshedAt, source: 'nas', collections: [] };
   }
 
   const lists = {
@@ -2651,12 +3000,15 @@ async function _scanNasArchive(nasRoot) {
 
     const collPath = path.join(nasRoot, collEntry.name);
     const collection = { name: collEntry.name, path: collPath, events: [], externalFolders: [] };
+    log(`[EventDiscoveryDiagnostics] _scanNasArchive collection name=${JSON.stringify(collEntry.name)} collPath=${JSON.stringify(collPath)}`);
 
     let eventEntries;
     try {
       eventEntries = await fsp.readdir(collPath, { withFileTypes: true });
     } catch {
-      // Unreadable collection — skip silently
+      // Read failed for this one collection (NAS hiccup mid-scan) — flag it so
+      // callers don't mistake an unreadable collection for a genuinely empty one.
+      collection.scanError = true;
       collections.push(collection);
       continue;
     }
@@ -2749,14 +3101,14 @@ async function _runNasScan() {
     return { status: 'nas-not-set', refreshedAt: new Date().toISOString(), source: 'nas', collections: [] };
   }
 
-  // Validate the NAS root marker before scanning
+  // Validate the NAS root marker before scanning. Reading the marker and parsing
+  // it are handled as separate failure modes: a read failure (network hiccup,
+  // permission blip, SMB timeout) means "temporarily unreachable" and must not
+  // be reported the same way as a marker that is actually corrupt/absent-by-design.
+  let raw;
   try {
     const markerPath = path.join(nasRoot, '.autoingest', 'root', 'archive-root.json');
-    const raw  = await fsp.readFile(markerPath, 'utf8');
-    const mark = JSON.parse(raw);
-    if (mark.type !== 'autoingest-nas-root') {
-      return { status: 'invalid-nas', refreshedAt: new Date().toISOString(), source: 'nas', collections: [] };
-    }
+    raw = await fsp.readFile(markerPath, 'utf8');
   } catch (err) {
     if (err.code === 'ENOENT') {
       try {
@@ -2766,6 +3118,18 @@ async function _runNasScan() {
         return { status: 'nas-disconnected', refreshedAt: new Date().toISOString(), source: 'nas', collections: [] };
       }
     }
+    // Root exists but the marker read failed for a non-ENOENT reason — a transient
+    // reachability problem, not evidence the archive is misconfigured.
+    return { status: 'nas-disconnected', refreshedAt: new Date().toISOString(), source: 'nas', collections: [] };
+  }
+
+  try {
+    const mark = JSON.parse(raw);
+    if (mark.type !== 'autoingest-nas-root') {
+      return { status: 'invalid-nas', refreshedAt: new Date().toISOString(), source: 'nas', collections: [] };
+    }
+  } catch {
+    // Marker file exists but its contents are corrupt — genuinely invalid, not transient.
     return { status: 'invalid-nas', refreshedAt: new Date().toISOString(), source: 'nas', collections: [] };
   }
 
@@ -2878,7 +3242,7 @@ ipcMain.handle('archive:writeSyncManifest', async (_event, { localEventPath, man
     }
   }
 
-  if (!realEventPath.startsWith(realRoot + path.sep)) {
+  if (!PathUtils.isPathUnderRoot(realEventPath, realRoot)) {
     return { ok: false, reason: 'localEventPath is outside the configured Local Staging Root.' };
   }
 
@@ -2914,7 +3278,7 @@ ipcMain.handle('archive:appendSyncJob', async (_event, { localEventPath, job }) 
     }
   }
 
-  if (!realEventPath.startsWith(realRoot + path.sep)) {
+  if (!PathUtils.isPathUnderRoot(realEventPath, realRoot)) {
     return { ok: false, reason: 'localEventPath is outside the configured Local Staging Root.' };
   }
 
@@ -3325,8 +3689,24 @@ ipcMain.handle('archive:clearSelfStaleLock', async (_event, { lockPath, force = 
 
 // ── EXIF metadata service ─────────────────────────────────────────────────────
 
+// Canonical Representation Audit, L5 (2026-08-11): exifService.getBatchStatus()
+// returns the internal batch object raw, including `_context` (whatever object
+// was passed to applyBatch() — currently always a plain, JSON-safe shape at
+// every verified call site, but never independently validated) and `_resolved`
+// (per-file frozen expectation snapshots, also internal-only). This handler is
+// the ONLY thing that sends that object over IPC — metadata:retry (below) also
+// calls exifService.getBatchStatus() directly, main-process-internal, and
+// still needs the real _context (it reads _context.eventJsonPath), so the
+// projection belongs here, at the IPC boundary, not inside exifService.js
+// itself. Does not change metadata behavior: the fields a status consumer
+// actually needs (total/done/skipped/failed/partial/ambiguous/excluded/files)
+// are unchanged; only the internal-only fields are no longer exposed to the
+// renderer.
 ipcMain.handle('metadata:getStatus', (_event, batchId) => {
-  return exifService.getBatchStatus(batchId);
+  const batch = exifService.getBatchStatus(batchId);
+  if (!batch) return batch;
+  const { _context, _resolved, ...publicStatus } = batch;
+  return publicStatus;
 });
 
 ipcMain.handle('metadata:retry', async (_event, batchId) => {
@@ -3647,10 +4027,10 @@ ipcMain.handle('files:deleteFromSource', async (_event, files, sourceRoot) => {
         src, dest, realSrc, realRoot,
         separator: JSON.stringify(path.sep),
         relative: path.relative(realRoot, realSrc),
-        passes: realSrc.startsWith(realRoot + path.sep),
+        passes: PathUtils.isPathUnderRoot(realSrc, realRoot),
       });
     }
-    if (!realSrc.startsWith(realRoot + path.sep)) {
+    if (!PathUtils.isPathUnderRoot(realSrc, realRoot)) {
       results.push({ src, deleted: false, error: 'Path outside source root' });
       continue;
     }
@@ -4205,8 +4585,7 @@ ipcMain.handle('archive:renameFolderOnTransferDrive', async (_event, { destAbsPa
   let realTransfer, realDest;
   try { realTransfer = await fsp.realpath(transferRoot); } catch { realTransfer = transferRoot; }
   try { realDest     = await fsp.realpath(destAbsPath);  } catch { realDest     = destAbsPath;  }
-  const sep = realTransfer.endsWith(path.sep) ? realTransfer : realTransfer + path.sep;
-  if (!realDest.startsWith(sep)) return { ok: false, reason: 'outside-transfer-root' };
+  if (!PathUtils.isPathUnderRoot(realDest, realTransfer)) return { ok: false, reason: 'outside-transfer-root' };
   // Target path must not already exist.
   const newPath = path.join(path.dirname(destAbsPath), newName);
   try { await fsp.access(newPath); return { ok: false, reason: 'target-already-exists' }; } catch {}
@@ -4519,7 +4898,7 @@ ipcMain.handle('collection:prepareOffline', async (_event, { nasCollectionPath, 
   // nasCollectionPath must be inside the current nasRoot
   const realNasRoot = path.resolve(nasRoot);
   const realNasColl = path.resolve(nasCollectionPath);
-  if (!realNasColl.startsWith(realNasRoot + path.sep) && realNasColl !== realNasRoot) {
+  if (!PathUtils.isPathUnderOrEqualToRoot(realNasColl, realNasRoot)) {
     return { ok: false, reason: 'nasCollectionPath is outside the configured Archive Root' };
   }
 
@@ -4552,8 +4931,7 @@ ipcMain.handle('collection:readLink', async (_event, { localCollectionPath } = {
   }
   const stagingRoot = settings.getLocalStagingRoot();
   if (stagingRoot) {
-    const rel = path.relative(stagingRoot, localCollectionPath);
-    if (rel.startsWith('..') || path.isAbsolute(rel)) {
+    if (!PathUtils.isPathUnderRoot(path.resolve(localCollectionPath), path.resolve(stagingRoot))) {
       return { ok: false, reason: 'localCollectionPath is outside staging root' };
     }
   }
@@ -4574,7 +4952,7 @@ ipcMain.handle('collection:matchToNas', async (_event, { localCollectionPath, na
 
   const realNasRoot = path.resolve(nasRoot);
   const realNasColl = path.resolve(nasCollectionPath);
-  if (!realNasColl.startsWith(realNasRoot + path.sep) && realNasColl !== realNasRoot) {
+  if (!PathUtils.isPathUnderOrEqualToRoot(realNasColl, realNasRoot)) {
     return { ok: false, reason: 'nasCollectionPath is outside the configured Archive Root' };
   }
 
@@ -4636,8 +5014,7 @@ ipcMain.handle('collection:writeProvisionalLink', async (_event, { localCollecti
   }
   const stagingRoot = settings.getLocalStagingRoot();
   if (stagingRoot) {
-    const rel = path.relative(stagingRoot, localCollectionPath);
-    if (rel.startsWith('..') || path.isAbsolute(rel)) {
+    if (!PathUtils.isPathUnderRoot(path.resolve(localCollectionPath), path.resolve(stagingRoot))) {
       return { ok: false, reason: 'localCollectionPath is outside staging root' };
     }
   }
@@ -4688,7 +5065,7 @@ ipcMain.handle('collection:prepareFromRegistry', async (_event, { entry } = {}) 
   if (nasCollectionPath && typeof nasCollectionPath === 'string' && nasRoot) {
     const realNasRoot = path.resolve(nasRoot);
     const realNasColl = path.resolve(nasCollectionPath);
-    if (realNasColl.startsWith(realNasRoot + path.sep) || realNasColl === realNasRoot) {
+    if (PathUtils.isPathUnderOrEqualToRoot(realNasColl, realNasRoot)) {
       validatedNasPath = nasCollectionPath;
     }
   }
@@ -4754,7 +5131,7 @@ ipcMain.handle('event:prepareFromRegistry', async (_event, { entry } = {}) => {
   if (nasCollectionPath && typeof nasCollectionPath === 'string' && nasRoot) {
     const realNasRoot = path.resolve(nasRoot);
     const realNasColl = path.resolve(nasCollectionPath);
-    if (realNasColl.startsWith(realNasRoot + path.sep) || realNasColl === realNasRoot) {
+    if (PathUtils.isPathUnderOrEqualToRoot(realNasColl, realNasRoot)) {
       validatedNasPath = nasCollectionPath;
     }
   }
@@ -4949,7 +5326,7 @@ ipcMain.handle('event:getPhotographerFolders', async (_event, { localEventPath }
   if (!_seqRoots.length) return { ok: false, reason: 'No archive root configured.' };
 
   const realEvent = path.resolve(localEventPath);
-  if (!_seqRoots.some(r => realEvent.startsWith(r + path.sep))) {
+  if (!_seqRoots.some(r => PathUtils.isPathUnderRoot(realEvent, r))) {
     return { ok: false, reason: 'Selected event folder is not accessible. Check archive location or reconnect the drive/NAS.' };
   }
 
@@ -4990,7 +5367,7 @@ ipcMain.handle('event:applyPhotographerSequence', async (_event, { localEventPat
   if (!_applySeqRoots.length) return { ok: false, reason: 'No archive root configured.' };
 
   const realEvent = path.resolve(localEventPath);
-  if (!_applySeqRoots.some(r => realEvent.startsWith(r + path.sep))) {
+  if (!_applySeqRoots.some(r => PathUtils.isPathUnderRoot(realEvent, r))) {
     return { ok: false, reason: 'Selected event folder is not accessible. Check archive location or reconnect the drive/NAS.' };
   }
 
@@ -5026,7 +5403,7 @@ ipcMain.handle('event:applyPhotographerSequence', async (_event, { localEventPat
         return { ok: false, reason: `scope key "${scope.scopeKey}" contains path separator characters.` };
       }
       scopeBaseDir = path.resolve(path.join(realEvent, scope.scopeKey));
-      if (!scopeBaseDir.startsWith(realEvent + path.sep)) {
+      if (!PathUtils.isPathUnderRoot(scopeBaseDir, realEvent)) {
         return { ok: false, reason: `scope key "${scope.scopeKey}" resolves outside event directory.` };
       }
     }
@@ -5049,7 +5426,7 @@ ipcMain.handle('event:applyPhotographerSequence', async (_event, { localEventPat
       }
       const folderName     = `${photographerSeqService.seqPrefix(entry.sequence)}-${trimmedCanonical}`;
       const resolvedFolder = path.resolve(path.join(scopeBaseDir, folderName));
-      if (!resolvedFolder.startsWith(scopeBaseDir + path.sep)) {
+      if (!PathUtils.isPathUnderRoot(resolvedFolder, scopeBaseDir)) {
         return { ok: false, reason: `scope "${scope.scopeKey}": folder name for "${entry.canonical}" resolves outside scope directory.` };
       }
       fullOrdered.push({ canonical: trimmedCanonical, sequence: entry.sequence, folderName });

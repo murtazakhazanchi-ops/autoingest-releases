@@ -2897,8 +2897,22 @@ async function openActivityLogModal(opts = {}) {
   _alMasterPath = master.path;
   let rawList = [];
   try {
-    rawList = await window.api.scanMasterEvents(master.path);
-  } catch { rawList = []; }
+    const scanResult = await window.api.scanMasterEvents(master.path);
+    if (scanResult && scanResult.ok === false) {
+      // A read failure is not the same as "this collection has zero events" —
+      // never silently treat it as one, even for this secondary picker.
+      console.warn('[ActivityLog] scanMasterEvents failed, not a genuinely empty collection:', scanResult.errorReason);
+    }
+    rawList = scanResult?.events || [];
+  } catch (invokeErr) {
+    // BUG-011 IPC-boundary investigation: this previously discarded a rejected
+    // invoke() silently (e.g. an IPC/structured-clone failure) with no log at
+    // all — the exact anti-pattern the fix for this same function's ok:false
+    // path already addressed above. Logging only; the [] fallback is unchanged.
+    console.error('[ActivityLog] scanMasterEvents invoke rejected:', invokeErr?.message || invokeErr);
+    window.api.diagLog?.(`phase=RENDERER_SCAN_INVOKE_ERROR source=ActivityLog error=${JSON.stringify(invokeErr?.message || String(invokeErr))}`);
+    rawList = [];
+  }
 
   // Strip _eventJson immediately — store only lightweight picker data to prevent OOM.
   // Full event.json is loaded on demand per-event when the picker selection changes.

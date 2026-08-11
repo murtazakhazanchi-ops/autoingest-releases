@@ -177,6 +177,10 @@ contextBridge.exposeInMainWorld('api', {
   checkMasterExists:        (basePath, folderName)   => ipcRenderer.invoke('master:checkExists', basePath, folderName),
   createMaster:             (basePath, folderName)   => ipcRenderer.invoke('master:create',      basePath, folderName),
   scanMasterEvents:         (masterPath)             => ipcRenderer.invoke('master:scanEvents',   masterPath),
+  // Diagnostic-only, fire-and-forget (BUG-011 IPC-boundary investigation): lets renderer-side
+  // scan-invoke markers land in the same app.log as the main-process [EventDiscoveryIPC] lines,
+  // so one tester log shows both sides of the boundary. Never read back by any code path.
+  diagLog:                  (msg)                    => ipcRenderer.send('diag:rendererLog', msg),
   parseEvent:               (folderName)             => ipcRenderer.invoke('master:parseEvent',   folderName),
   renameEvent:              (masterPath, oldName, newName) => ipcRenderer.invoke('master:renameEvent', masterPath, oldName, newName),
 

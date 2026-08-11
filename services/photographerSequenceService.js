@@ -4,6 +4,11 @@ const path = require('path');
 
 const { hidePathBestEffort } = require('./internalFileProtection');
 const localSyncManifest      = require('./localSyncManifest');
+// Canonical Representation Audit, L6 (2026-08-11): seqPrefix() now lives in
+// exactly one place, shared with the renderer via the same dual-export
+// pattern renderer/pathUtils.js already established for main/renderer
+// sharing — see that file for the full rationale.
+const { seqPrefix }          = require('../renderer/photographerSequenceUtils.js');
 
 // PC prefix pattern: PC01- … PC999-
 const PC_PREFIX_RE = /^PC(\d{2,3})-/;
@@ -21,17 +26,6 @@ const EVENT_ROOT_KEY = '__eventRoot__';
  */
 function canonicalName(name) {
   return (name || '').replace(PC_PREFIX_RE, '');
-}
-
-/**
- * Build the padded PC prefix string for a 1-based sequence number.
- * 1 → "PC01", 10 → "PC10", 100 → "PC100"
- * @param {number} seq  1-based sequence number (>= 1)
- * @returns {string}
- */
-function seqPrefix(seq) {
-  if (seq < 10)  return `PC0${seq}`;
-  return `PC${seq}`;
 }
 
 // Folder names that should never be treated as photographer or component folders.

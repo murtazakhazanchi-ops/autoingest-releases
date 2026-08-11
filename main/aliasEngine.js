@@ -20,7 +20,7 @@ function init(userDataPath) {
  * Normalize a string for comparison: lowercase, collapse whitespace,
  * treat punctuation characters as spaces so "al-ain" == "al ain" == "Al Ain".
  */
-function normalize(input) {
+function normalizeForAliasMatch(input) {
   if (typeof input !== 'string') return '';
   return input
     .trim()
@@ -144,7 +144,7 @@ const SCORE = {
 function match(input, listName, data) {
   if (!input || !input.trim()) return [];
 
-  const norm   = normalize(input);
+  const norm   = normalizeForAliasMatch(input);
   if (!norm) return [];
 
   const leaves   = flattenToLeaves(listName, data);
@@ -152,7 +152,7 @@ function match(input, listName, data) {
   const results  = [];
 
   for (const leaf of leaves) {
-    const leafNorm = normalize(leaf.label);
+    const leafNorm = normalizeForAliasMatch(leaf.label);
     const aliases  = aliasMap[leaf.id] || [];
 
     let score     = 0;
@@ -170,7 +170,7 @@ function match(input, listName, data) {
     // Check aliases (only if label didn't already match)
     if (!matchType) {
       for (const alias of aliases) {
-        const aNorm = normalize(alias);
+        const aNorm = normalizeForAliasMatch(alias);
         if (aNorm === norm) {
           score = SCORE.ALIAS_EXACT;    matchType = 'aliasExact';    break;
         } else if (aNorm.startsWith(norm)) {
@@ -197,15 +197,15 @@ function match(input, listName, data) {
  * Called by the renderer after a user makes a selection in the dropdown.
  */
 function learnAlias(listName, canonicalId, canonicalLabel, typedInput) {
-  const typedNorm = normalize(typedInput);
+  const typedNorm = normalizeForAliasMatch(typedInput);
   if (!typedNorm) return;
-  if (typedNorm === normalize(canonicalLabel)) return; // same as label — nothing to learn
+  if (typedNorm === normalizeForAliasMatch(canonicalLabel)) return; // same as label — nothing to learn
 
   const aliasMap = loadAliases(listName);
   if (!aliasMap[canonicalId]) aliasMap[canonicalId] = [];
 
   // Skip if this alias is already stored
-  const alreadyKnown = aliasMap[canonicalId].some(a => normalize(a) === typedNorm);
+  const alreadyKnown = aliasMap[canonicalId].some(a => normalizeForAliasMatch(a) === typedNorm);
   if (alreadyKnown) return;
 
   aliasMap[canonicalId].push(typedInput.trim());
@@ -214,4 +214,4 @@ function learnAlias(listName, canonicalId, canonicalLabel, typedInput) {
 
 // ── Exports ───────────────────────────────────────────────────────────────────
 
-module.exports = { init, normalize, slugify, flattenToLeaves, match, learnAlias };
+module.exports = { init, normalizeForAliasMatch, slugify, flattenToLeaves, match, learnAlias };
