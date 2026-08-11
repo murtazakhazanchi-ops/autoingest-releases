@@ -17,7 +17,7 @@
 
 const assert = require('node:assert/strict');
 const path = require('node:path');
-const { isPathUnderRoot } = require('../renderer/pathUtils');
+const { isPathUnderRoot, isPathUnderOrEqualToRoot } = require('../renderer/pathUtils');
 
 let passed = 0;
 function t(name, fn) {
@@ -142,6 +142,64 @@ t('null/undefined/empty inputs never throw and return false', () => {
   assert.equal(isPathUnderRoot('\\\\a\\b\\c', null), false);
   assert.equal(isPathUnderRoot('', ''), false);
   assert.equal(isPathUnderRoot(undefined, undefined), false);
+});
+
+// ── isPathUnderOrEqualToRoot — Canonical Representation Audit L1 (2026-08-11) ──
+// Several main-process containment gates (main.js: collection:prepareOffline,
+// collection:matchToNas, and others) previously used their own ad hoc
+// `x === root || x.startsWith(root + path.sep)` check with plain path.resolve()
+// — no case-folding, so a real Windows/SMB casing mismatch between the stored
+// nasRoot setting and a server-returned nasCollectionPath would incorrectly
+// reject a valid operation. Fixed by routing all of them through this one
+// shared function instead of each re-implementing the "or-equal" case.
+
+t('isPathUnderOrEqualToRoot: a descendant path is matched (same as isPathUnderRoot)', () => {
+  const root = '\\\\FQ_PhotoArchive\\02-Working-AJSS\\1448';
+  const coll = win32.join(root, '1448-01-11 _UK Safar');
+  assert.equal(isPathUnderOrEqualToRoot(coll, root), true);
+});
+
+t('isPathUnderOrEqualToRoot: the root path itself IS matched (the "or-equal" case isPathUnderRoot deliberately excludes)', () => {
+  const root = '\\\\FQ_PhotoArchive\\02-Working-AJSS\\1448';
+  assert.equal(isPathUnderOrEqualToRoot(root, root), true);
+  assert.equal(isPathUnderRoot(root, root), false); // confirms the two functions genuinely differ here
+});
+
+t('isPathUnderOrEqualToRoot: exact match with different casing on a Windows-shaped path is matched', () => {
+  const root = '\\\\FQ_PhotoArchive\\02-Working-AJSS\\1448';
+  const rootDiffCase = '\\\\fq_photoarchive\\02-working-ajss\\1448';
+  assert.equal(isPathUnderOrEqualToRoot(rootDiffCase, root), true);
+});
+
+t('isPathUnderOrEqualToRoot: a descendant path with different casing on the shared prefix is matched — the exact BUG-011-class case for collection:prepareOffline/matchToNas', () => {
+  const root = '\\\\FQ_PhotoArchive\\02-Working-AJSS';
+  const nasCollectionPath = '\\\\fq_photoarchive\\02-working-ajss\\1448\\1448-01-11 _UK Safar';
+  assert.equal(isPathUnderOrEqualToRoot(nasCollectionPath, root), true);
+});
+
+t('isPathUnderOrEqualToRoot: a sibling/unrelated path is still correctly rejected (no security broadening)', () => {
+  const root = '\\\\FQ_PhotoArchive\\02-Working-AJSS\\1448';
+  const other = '\\\\FQ_PhotoArchive\\02-Working-AJSS\\1449\\1449-01-01 _Something';
+  assert.equal(isPathUnderOrEqualToRoot(other, root), false);
+});
+
+t('isPathUnderOrEqualToRoot: a lookalike prefix (not a real path segment boundary) is still correctly rejected', () => {
+  const root = '\\\\FQ_PhotoArchive\\02-Working-AJSS\\1448';
+  const lookalike = '\\\\FQ_PhotoArchive\\02-Working-AJSS\\14489-01-01 _NotTheSameCollection';
+  assert.equal(isPathUnderOrEqualToRoot(lookalike, root), false);
+});
+
+t('isPathUnderOrEqualToRoot: POSIX-shaped paths remain case-sensitive (no broadening for Local Staging on case-sensitive filesystems)', () => {
+  const root = '/Users/tester/LocalStaging/1448';
+  const differentCase = '/Users/tester/localstaging/1448';
+  assert.equal(isPathUnderOrEqualToRoot(differentCase, root), false);
+});
+
+t('isPathUnderOrEqualToRoot: null/undefined/empty inputs never throw and return false', () => {
+  assert.equal(isPathUnderOrEqualToRoot(null, '\\\\a\\b'), false);
+  assert.equal(isPathUnderOrEqualToRoot('\\\\a\\b\\c', null), false);
+  assert.equal(isPathUnderOrEqualToRoot('', ''), false);
+  assert.equal(isPathUnderOrEqualToRoot(undefined, undefined), false);
 });
 
 console.log(`\n${passed} test(s) passed.`);

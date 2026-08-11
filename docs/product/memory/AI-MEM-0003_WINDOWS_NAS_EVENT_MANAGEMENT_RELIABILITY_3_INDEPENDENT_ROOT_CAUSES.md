@@ -56,6 +56,7 @@
 
 None recorded — no plan revision events captured for this session.
 - **Reopened** (2026-08-11): Continued forensic investigation after Windows RC verification failed: filesystem/Dirent hypotheses ruled out by direct measurement, IPC-boundary/structured-clone hypotheses ruled out by empirical audit, real root cause (mixed-type sequence crashing resolved.sort()) found via the IPC error instrumentation shipped for the boundary investigation, fixed, regression-tested, confirmed working on real Windows/NAS hardware, and debug-only diagnostics subsequently cleaned up.
+- **Reopened** (2026-08-11): Final stabilization pass: closed the standalone Canonical Representation Audit's 7 findings (L1 HIGH path-containment case-sensitivity gap, L2-L3 MEDIUM read-side type validation gaps, L4 investigated and documented as harmless, L5-L7 LOW hardening/deduplication/naming) before stable release. Zero new confirmed bugs; 42 new regression assertions across 7 new test files; full existing suite unchanged.
 
 ## Investigation Journal
 

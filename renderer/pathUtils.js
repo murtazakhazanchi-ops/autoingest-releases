@@ -24,17 +24,33 @@
   // genuinely case-sensitive filesystem (Linux, case-sensitive-formatted APFS),
   // where treating two differently-cased directories as the same one would be
   // a real false-positive containment match.
+  function _normalize(p, caseInsensitive) {
+    const slashed = p.replace(/\\/g, '/').replace(/\/+$/, '');
+    return caseInsensitive ? slashed.toLowerCase() : slashed;
+  }
+
   function isPathUnderRoot(childPath, rootPath) {
     if (!childPath || !rootPath) return false;
     const caseInsensitive = WINDOWS_SHAPED.test(childPath) || WINDOWS_SHAPED.test(rootPath);
-    function norm(p) {
-      const slashed = p.replace(/\\/g, '/').replace(/\/+$/, '');
-      return caseInsensitive ? slashed.toLowerCase() : slashed;
-    }
-    return norm(childPath).startsWith(norm(rootPath) + '/');
+    return _normalize(childPath, caseInsensitive).startsWith(_normalize(rootPath, caseInsensitive) + '/');
   }
 
-  const exportsObj = { isPathUnderRoot };
+  // Canonical Representation Audit, L1 (2026-08-11): several main-process
+  // containment gates need "childPath is rootPath itself, or a descendant of
+  // it" (e.g. selecting the archive root itself as a collection target is a
+  // legitimate case some of those gates explicitly allow) — a case they
+  // previously handled with their own ad hoc `x === root || x.startsWith(...)`
+  // check. Shares isPathUnderRoot's exact normalization via _normalize so
+  // there is still exactly one place that decides what "the same path" means.
+  function isPathUnderOrEqualToRoot(childPath, rootPath) {
+    if (!childPath || !rootPath) return false;
+    const caseInsensitive = WINDOWS_SHAPED.test(childPath) || WINDOWS_SHAPED.test(rootPath);
+    const child = _normalize(childPath, caseInsensitive);
+    const root  = _normalize(rootPath, caseInsensitive);
+    return child === root || child.startsWith(root + '/');
+  }
+
+  const exportsObj = { isPathUnderRoot, isPathUnderOrEqualToRoot };
 
   if (typeof module === 'object' && module.exports) {
     module.exports = exportsObj;

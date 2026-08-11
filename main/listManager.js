@@ -46,7 +46,7 @@ function writeJSON(filePath, data) {
 
 // ── Normalization ─────────────────────────────────────────────────────────────
 
-function normalize(str) {
+function normalizeListEntry(str) {
   return str.trim().replace(/\s+/g, ' ');
 }
 
@@ -119,7 +119,7 @@ function addToList(name, rawValue) {
     return { success: false, error: 'unknown list' };
   }
 
-  const value = properCase(normalize(rawValue));
+  const value = properCase(normalizeListEntry(rawValue));
   if (!value) return { success: false, error: 'empty value' };
 
   // Duplicate check against the full merged list

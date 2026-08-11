@@ -18,6 +18,13 @@ const crashReporter = require('../services/crashReporter');
 const perf          = require('../services/performanceMonitor');
 const autoUpdater   = require('../services/autoUpdater');
 const settings        = require('../services/settings');
+// Canonical Representation Audit, L1 (2026-08-11): the ONE path-containment
+// implementation for this whole codebase — already proven correct under
+// BUG-013 for the renderer's own UNC/case-sensitivity handling. Dual-exported
+// (CJS module.exports here, window.PathUtils for the renderer's own
+// <script>-tag load) specifically so both processes share it instead of each
+// maintaining its own ad hoc `x.startsWith(root + path.sep)` check.
+const PathUtils        = require('../renderer/pathUtils.js');
 const nasEventCache       = require('../services/nasEventCache');
 const localMirrorService  = require('../services/localMirrorService');
 const localSyncManifest   = require('../services/localSyncManifest');
@@ -1545,10 +1552,7 @@ ipcMain.handle('master:create', async (_event, basePath, folderName) => {
   realtimeOps.emitCollectionVisible({ collectionName: folderName });
   // Emit full registry entry so other devices can prepare locally
   const _nasRoot = settings.getNasRoot();
-  const _isNasPath = _nasRoot && (
-    path.resolve(basePath) === path.resolve(_nasRoot) ||
-    path.resolve(basePath).startsWith(path.resolve(_nasRoot) + path.sep)
-  );
+  const _isNasPath = _nasRoot && PathUtils.isPathUnderOrEqualToRoot(path.resolve(basePath), path.resolve(_nasRoot));
   realtimeOps.emitRegistryCollection({
     collectionName:      folderName,
     nasRoot:             _isNasPath ? _nasRoot : null,
@@ -2130,10 +2134,7 @@ ipcMain.handle('event:write', async (_event, eventFolderPath, eventData) => {
     // Emit full registry entry so other devices can prepare the same event locally
     const _evCollName = path.basename(path.dirname(eventFolderPath));
     const _nasRoot3   = settings.getNasRoot();
-    const _isNasEv    = _nasRoot3 && (
-      path.resolve(eventFolderPath) === path.resolve(_nasRoot3) ||
-      path.resolve(eventFolderPath).startsWith(path.resolve(_nasRoot3) + path.sep)
-    );
+    const _isNasEv    = _nasRoot3 && PathUtils.isPathUnderOrEqualToRoot(path.resolve(eventFolderPath), path.resolve(_nasRoot3));
     const _jsonShell  = {
       version:      eventData.version || 1,
       hijriDate:    eventData.hijriDate,
@@ -2181,7 +2182,7 @@ ipcMain.handle('event:publishRegistry', async (_event, { eventFolderPath, collec
   ].filter(Boolean).map(r => path.resolve(r));
   const realEvPath = path.resolve(eventFolderPath);
 
-  if (!_pubRoots.some(r => realEvPath === r || realEvPath.startsWith(r + path.sep))) {
+  if (!_pubRoots.some(r => PathUtils.isPathUnderOrEqualToRoot(realEvPath, r))) {
     console.warn('[publishRegistry] outside safe roots — not publishing');
     return { ok: false, reason: 'outside-roots' };
   }
@@ -2200,7 +2201,7 @@ ipcMain.handle('event:publishRegistry', async (_event, { eventFolderPath, collec
   }
 
   const _nasRoot4  = settings.getNasRoot();
-  const _isNasPub  = _nasRoot4 && (realEvPath === path.resolve(_nasRoot4) || realEvPath.startsWith(path.resolve(_nasRoot4) + path.sep));
+  const _isNasPub  = _nasRoot4 && PathUtils.isPathUnderOrEqualToRoot(realEvPath, path.resolve(_nasRoot4));
   const _origin    = _isNasPub ? 'archive-available' : 'remote-created';
   const _jsonShell = {
     version:       eventData.version || 1,
@@ -2469,10 +2470,10 @@ ipcMain.handle('dir:rename', async (_event, oldPath, newPath) => {
   }
 
   const _isInsideRoot = (resolved) =>
-    realRoots.some(r => resolved === r || resolved.startsWith(r + path.sep));
+    realRoots.some(r => PathUtils.isPathUnderOrEqualToRoot(resolved, r));
 
   const _isDescendantOfRoot = (resolved) =>
-    realRoots.some(r => resolved.startsWith(r + path.sep));
+    realRoots.some(r => PathUtils.isPathUnderRoot(resolved, r));
 
   // ── Resolve oldPath and confirm containment ───────────────────────────
   let realOld;
@@ -3241,7 +3242,7 @@ ipcMain.handle('archive:writeSyncManifest', async (_event, { localEventPath, man
     }
   }
 
-  if (!realEventPath.startsWith(realRoot + path.sep)) {
+  if (!PathUtils.isPathUnderRoot(realEventPath, realRoot)) {
     return { ok: false, reason: 'localEventPath is outside the configured Local Staging Root.' };
   }
 
@@ -3277,7 +3278,7 @@ ipcMain.handle('archive:appendSyncJob', async (_event, { localEventPath, job }) 
     }
   }
 
-  if (!realEventPath.startsWith(realRoot + path.sep)) {
+  if (!PathUtils.isPathUnderRoot(realEventPath, realRoot)) {
     return { ok: false, reason: 'localEventPath is outside the configured Local Staging Root.' };
   }
 
@@ -3688,8 +3689,24 @@ ipcMain.handle('archive:clearSelfStaleLock', async (_event, { lockPath, force = 
 
 // ── EXIF metadata service ─────────────────────────────────────────────────────
 
+// Canonical Representation Audit, L5 (2026-08-11): exifService.getBatchStatus()
+// returns the internal batch object raw, including `_context` (whatever object
+// was passed to applyBatch() — currently always a plain, JSON-safe shape at
+// every verified call site, but never independently validated) and `_resolved`
+// (per-file frozen expectation snapshots, also internal-only). This handler is
+// the ONLY thing that sends that object over IPC — metadata:retry (below) also
+// calls exifService.getBatchStatus() directly, main-process-internal, and
+// still needs the real _context (it reads _context.eventJsonPath), so the
+// projection belongs here, at the IPC boundary, not inside exifService.js
+// itself. Does not change metadata behavior: the fields a status consumer
+// actually needs (total/done/skipped/failed/partial/ambiguous/excluded/files)
+// are unchanged; only the internal-only fields are no longer exposed to the
+// renderer.
 ipcMain.handle('metadata:getStatus', (_event, batchId) => {
-  return exifService.getBatchStatus(batchId);
+  const batch = exifService.getBatchStatus(batchId);
+  if (!batch) return batch;
+  const { _context, _resolved, ...publicStatus } = batch;
+  return publicStatus;
 });
 
 ipcMain.handle('metadata:retry', async (_event, batchId) => {
@@ -4010,10 +4027,10 @@ ipcMain.handle('files:deleteFromSource', async (_event, files, sourceRoot) => {
         src, dest, realSrc, realRoot,
         separator: JSON.stringify(path.sep),
         relative: path.relative(realRoot, realSrc),
-        passes: realSrc.startsWith(realRoot + path.sep),
+        passes: PathUtils.isPathUnderRoot(realSrc, realRoot),
       });
     }
-    if (!realSrc.startsWith(realRoot + path.sep)) {
+    if (!PathUtils.isPathUnderRoot(realSrc, realRoot)) {
       results.push({ src, deleted: false, error: 'Path outside source root' });
       continue;
     }
@@ -4568,8 +4585,7 @@ ipcMain.handle('archive:renameFolderOnTransferDrive', async (_event, { destAbsPa
   let realTransfer, realDest;
   try { realTransfer = await fsp.realpath(transferRoot); } catch { realTransfer = transferRoot; }
   try { realDest     = await fsp.realpath(destAbsPath);  } catch { realDest     = destAbsPath;  }
-  const sep = realTransfer.endsWith(path.sep) ? realTransfer : realTransfer + path.sep;
-  if (!realDest.startsWith(sep)) return { ok: false, reason: 'outside-transfer-root' };
+  if (!PathUtils.isPathUnderRoot(realDest, realTransfer)) return { ok: false, reason: 'outside-transfer-root' };
   // Target path must not already exist.
   const newPath = path.join(path.dirname(destAbsPath), newName);
   try { await fsp.access(newPath); return { ok: false, reason: 'target-already-exists' }; } catch {}
@@ -4882,7 +4898,7 @@ ipcMain.handle('collection:prepareOffline', async (_event, { nasCollectionPath, 
   // nasCollectionPath must be inside the current nasRoot
   const realNasRoot = path.resolve(nasRoot);
   const realNasColl = path.resolve(nasCollectionPath);
-  if (!realNasColl.startsWith(realNasRoot + path.sep) && realNasColl !== realNasRoot) {
+  if (!PathUtils.isPathUnderOrEqualToRoot(realNasColl, realNasRoot)) {
     return { ok: false, reason: 'nasCollectionPath is outside the configured Archive Root' };
   }
 
@@ -4915,8 +4931,7 @@ ipcMain.handle('collection:readLink', async (_event, { localCollectionPath } = {
   }
   const stagingRoot = settings.getLocalStagingRoot();
   if (stagingRoot) {
-    const rel = path.relative(stagingRoot, localCollectionPath);
-    if (rel.startsWith('..') || path.isAbsolute(rel)) {
+    if (!PathUtils.isPathUnderRoot(path.resolve(localCollectionPath), path.resolve(stagingRoot))) {
       return { ok: false, reason: 'localCollectionPath is outside staging root' };
     }
   }
@@ -4937,7 +4952,7 @@ ipcMain.handle('collection:matchToNas', async (_event, { localCollectionPath, na
 
   const realNasRoot = path.resolve(nasRoot);
   const realNasColl = path.resolve(nasCollectionPath);
-  if (!realNasColl.startsWith(realNasRoot + path.sep) && realNasColl !== realNasRoot) {
+  if (!PathUtils.isPathUnderOrEqualToRoot(realNasColl, realNasRoot)) {
     return { ok: false, reason: 'nasCollectionPath is outside the configured Archive Root' };
   }
 
@@ -4999,8 +5014,7 @@ ipcMain.handle('collection:writeProvisionalLink', async (_event, { localCollecti
   }
   const stagingRoot = settings.getLocalStagingRoot();
   if (stagingRoot) {
-    const rel = path.relative(stagingRoot, localCollectionPath);
-    if (rel.startsWith('..') || path.isAbsolute(rel)) {
+    if (!PathUtils.isPathUnderRoot(path.resolve(localCollectionPath), path.resolve(stagingRoot))) {
       return { ok: false, reason: 'localCollectionPath is outside staging root' };
     }
   }
@@ -5051,7 +5065,7 @@ ipcMain.handle('collection:prepareFromRegistry', async (_event, { entry } = {}) 
   if (nasCollectionPath && typeof nasCollectionPath === 'string' && nasRoot) {
     const realNasRoot = path.resolve(nasRoot);
     const realNasColl = path.resolve(nasCollectionPath);
-    if (realNasColl.startsWith(realNasRoot + path.sep) || realNasColl === realNasRoot) {
+    if (PathUtils.isPathUnderOrEqualToRoot(realNasColl, realNasRoot)) {
       validatedNasPath = nasCollectionPath;
     }
   }
@@ -5117,7 +5131,7 @@ ipcMain.handle('event:prepareFromRegistry', async (_event, { entry } = {}) => {
   if (nasCollectionPath && typeof nasCollectionPath === 'string' && nasRoot) {
     const realNasRoot = path.resolve(nasRoot);
     const realNasColl = path.resolve(nasCollectionPath);
-    if (realNasColl.startsWith(realNasRoot + path.sep) || realNasColl === realNasRoot) {
+    if (PathUtils.isPathUnderOrEqualToRoot(realNasColl, realNasRoot)) {
       validatedNasPath = nasCollectionPath;
     }
   }
@@ -5312,7 +5326,7 @@ ipcMain.handle('event:getPhotographerFolders', async (_event, { localEventPath }
   if (!_seqRoots.length) return { ok: false, reason: 'No archive root configured.' };
 
   const realEvent = path.resolve(localEventPath);
-  if (!_seqRoots.some(r => realEvent.startsWith(r + path.sep))) {
+  if (!_seqRoots.some(r => PathUtils.isPathUnderRoot(realEvent, r))) {
     return { ok: false, reason: 'Selected event folder is not accessible. Check archive location or reconnect the drive/NAS.' };
   }
 
@@ -5353,7 +5367,7 @@ ipcMain.handle('event:applyPhotographerSequence', async (_event, { localEventPat
   if (!_applySeqRoots.length) return { ok: false, reason: 'No archive root configured.' };
 
   const realEvent = path.resolve(localEventPath);
-  if (!_applySeqRoots.some(r => realEvent.startsWith(r + path.sep))) {
+  if (!_applySeqRoots.some(r => PathUtils.isPathUnderRoot(realEvent, r))) {
     return { ok: false, reason: 'Selected event folder is not accessible. Check archive location or reconnect the drive/NAS.' };
   }
 
@@ -5389,7 +5403,7 @@ ipcMain.handle('event:applyPhotographerSequence', async (_event, { localEventPat
         return { ok: false, reason: `scope key "${scope.scopeKey}" contains path separator characters.` };
       }
       scopeBaseDir = path.resolve(path.join(realEvent, scope.scopeKey));
-      if (!scopeBaseDir.startsWith(realEvent + path.sep)) {
+      if (!PathUtils.isPathUnderRoot(scopeBaseDir, realEvent)) {
         return { ok: false, reason: `scope key "${scope.scopeKey}" resolves outside event directory.` };
       }
     }
@@ -5412,7 +5426,7 @@ ipcMain.handle('event:applyPhotographerSequence', async (_event, { localEventPat
       }
       const folderName     = `${photographerSeqService.seqPrefix(entry.sequence)}-${trimmedCanonical}`;
       const resolvedFolder = path.resolve(path.join(scopeBaseDir, folderName));
-      if (!resolvedFolder.startsWith(scopeBaseDir + path.sep)) {
+      if (!PathUtils.isPathUnderRoot(resolvedFolder, scopeBaseDir)) {
         return { ok: false, reason: `scope "${scope.scopeKey}": folder name for "${entry.canonical}" resolves outside scope directory.` };
       }
       fullOrdered.push({ canonical: trimmedCanonical, sequence: entry.sequence, folderName });

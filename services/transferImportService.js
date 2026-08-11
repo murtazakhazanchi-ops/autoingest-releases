@@ -313,10 +313,41 @@ async function _writeCheckpoint(mainArchiveRoot, data) {
   }
 }
 
+// Canonical Representation Audit, L2 (2026-08-11): checkpoint.batches already
+// gets an explicit Array.isArray guard before use (resumeImportFromCheckpoint,
+// below); these numeric progress counters did not — a checkpoint value that
+// somehow wasn't a genuine number (a hand-edited file, a future format, a
+// producer bug not yet written) would pass the `|| 0` fallback unchanged if
+// truthy, silently turning later `+=` progress arithmetic into string
+// concatenation instead of failing visibly — the same defect class as
+// BUG-011, just not yet triggered by any current writer. Normalized once,
+// here, at the single point every checkpoint read goes through. The on-disk
+// checkpoint format itself is never touched — only the in-memory object this
+// function returns.
+const CHECKPOINT_NUMERIC_FIELDS = ['currentBatchIdx', 'totalCopied', 'totalSkipped', 'totalRenamed', 'totalChangedSkipped', 'totalFiles'];
+
+function _normalizeCheckpointNumericFields(checkpoint) {
+  if (!checkpoint || typeof checkpoint !== 'object') return checkpoint;
+  const normalized = { ...checkpoint };
+  for (const field of CHECKPOINT_NUMERIC_FIELDS) {
+    const raw = normalized[field];
+    // Only a genuine number, or a non-blank string that looks like one, is a
+    // legitimate producer output (the BUG-011-class case this closes). Every
+    // other type — including booleans, which JS's own Number() would happily
+    // coerce to 0/1 — falls through to the same 0 default as missing/falsy
+    // values, rather than being silently accepted as real progress data.
+    let n = NaN;
+    if (typeof raw === 'number') n = raw;
+    else if (typeof raw === 'string' && raw.trim() !== '') n = Number(raw);
+    normalized[field] = Number.isFinite(n) ? n : 0;
+  }
+  return normalized;
+}
+
 async function _readCheckpoint(mainArchiveRoot) {
   try {
     const raw = await fsp.readFile(_checkpointPath(mainArchiveRoot), 'utf8');
-    return JSON.parse(raw);
+    return _normalizeCheckpointNumericFields(JSON.parse(raw));
   } catch {
     return null;
   }

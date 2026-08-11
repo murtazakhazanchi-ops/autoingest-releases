@@ -4471,12 +4471,13 @@ ${unparseable.map(ev => `
 
   // ── Photographer Folder Sequencing Modal ──────────────────────────────────
 
-  // Must stay in sync with photographerSequenceService.EVENT_ROOT_KEY
-  const _SEQ_EVENT_ROOT_KEY = '__eventRoot__';
-
-  function _seqPrefix(n) {
-    return n < 10 ? `PC0${n}` : `PC${n}`;
-  }
+  // Canonical Representation Audit, L6 (2026-08-11): seqPrefix() now lives in
+  // exactly one place (renderer/photographerSequenceUtils.js), shared with
+  // services/photographerSequenceService.js on the main-process side — no
+  // more comment-only "must stay in sync" duplication. The unused local
+  // `_SEQ_EVENT_ROOT_KEY` constant (dead code — never referenced elsewhere in
+  // this file) was removed rather than also shared, since nothing here needs it.
+  const _seqPrefix = window.PhotographerSequenceUtils.seqPrefix;
 
   async function _openSeqModal() {
     // Only valid from the event list (SELECT mode). Guards against being invoked
@@ -4530,8 +4531,18 @@ ${unparseable.map(ev => `
       const unsequenced = [];
       for (const ph of scope.photographers) {
         const seqData = scopeExisting[ph.canonical];
-        if (seqData?.sequence) {
-          sequenced.push({ canonical: ph.canonical, sequence: seqData.sequence });
+        // Canonical Representation Audit, L3 (2026-08-11): the write side
+        // (main.js's applyPhotographerSequence handler) enforces
+        // `typeof entry.sequence === 'number'` before persisting; this read
+        // side previously trusted that without re-checking, feeding whatever
+        // it found straight into the numeric sort comparator below. Normalized
+        // once, here, at the single point this data is first read — a
+        // non-numeric persisted value now safely falls back to "unsequenced"
+        // (the same path already used for genuinely-missing sequence data)
+        // instead of producing NaN and silently corrupting sort order.
+        const seqNum = typeof seqData?.sequence === 'number' ? seqData.sequence : Number(seqData?.sequence);
+        if (seqData?.sequence && Number.isFinite(seqNum)) {
+          sequenced.push({ canonical: ph.canonical, sequence: seqNum });
         } else {
           unsequenced.push({ canonical: ph.canonical });
         }

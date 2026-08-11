@@ -7,6 +7,22 @@ Append newest first. Never edit or delete a prior entry — if something was wro
 ---
 
 
+## 2026-08-11 (final stabilization pass) — L1–L7 closed: Canonical Representation Audit findings resolved before stable release
+
+- **Task type**: bugfix (L1) + hardening (L2, L3, L5) + deduplication (L6) + rename (L7) + investigation (L4, no change). Closes every finding from the standalone Canonical Representation Audit. Zero new confirmed production bugs found or introduced.
+- **L1 (HIGH)**: 20 main-process path-containment sites (broader than the audit's original 8 — a full sweep found 12 more of the same pattern plus 2 `path.relative()`-based sites) replaced with `renderer/pathUtils.js`'s `isPathUnderRoot()`/new `isPathUnderOrEqualToRoot()`, shared into `main.js` via `require()` — the same dual-export pattern BUG-013 established. Every site kept its existing `path.resolve()`/`fsp.realpath()` traversal-safety call; case-folding layers on top, doesn't replace it. `isPathUnderRoot()`'s own behavior confirmed byte-for-byte unchanged (14/14 prior assertions pass unmodified).
+- **L2 (MEDIUM)**: `transferImportService.js`'s checkpoint numeric fields normalized once, on read only — the persisted file format is never touched.
+- **L3 (MEDIUM)**: photographer-sequence read-side comparator now normalized at one point, matching the write-side guard; non-coercible values safely fall back to "unsequenced" instead of reaching the comparator as `NaN`.
+- **L4**: investigated — traced to `services/localMirrorService.js`'s `ensureLocalMirror()`; the flagged forward-slash-normalization pattern is used pervasively across `renderer.js` (dozens of sites, including the everyday local-first import path already exercised in real Windows testing) and Node's fs layer accepts forward-slash UNC paths on Windows. Documented as harmless, left unchanged. The *original* app.log evidence that raised L4 traced to a different, already-correct code path and remains formally unexplained.
+- **L5 (LOW)**: `metadata:getStatus`'s IPC response now projects out `_context`/`_resolved`; `metadata:retry`'s internal (non-IPC) use of the raw `_context` is untouched. `getMetadataStatus` currently has zero renderer callers — a structural fix for a not-yet-live consumer.
+- **L6 (LOW)**: `seqPrefix()` deduplicated into `renderer/photographerSequenceUtils.js` (same sharing pattern as L1/pathUtils.js) — `services/photographerSequenceService.js` re-exports it by reference, zero external call-site changes. An adjacent unused duplicate (`_SEQ_EVENT_ROOT_KEY`, dead code) removed rather than also shared.
+- **L7 (LOW)**: `main/aliasEngine.js`/`main/listManager.js`'s colliding `normalize()` functions renamed to `normalizeForAliasMatch()`/`normalizeListEntry()` — pure rename, zero external consumers of either by the old name, confirmed by repo-wide grep before the change.
+- **Tests**: 7 new test files (`l1PathContainmentRegression`, `l2CheckpointNumericNormalization`, `l3PhotographerSequenceNormalization`, `l5ExifBatchContextSanitization`, `l6SeqPrefixDeduplication`, `l7NormalizeNamingCollision`, plus 8 new assertions in `pathUtils.test.js`) — 42 new assertions total. Full existing suite (24 files) re-run and passing unchanged.
+- **Repository guarantees verified**: exactly one path-containment implementation; exactly one `seqPrefix()` implementation; no new duplicated normalization logic introduced; no behavioral regressions (confirmed by full suite + `git diff --check`).
+- **Evidence confidence**: code-level implementation + regression tests proven against the real modified code (not mirrors, except where a private renderer function made a live UI-driven test impractical — L3, L5 partially — documented as such in each test file).
+
+---
+
 ## 2026-08-11 (verified + cleanup) — BUG-011: real-Windows confirmation, 37-vs-36 audit closed, diagnostics cleaned up for stable release
 
 - **Task type**: verification + repo-wide audit + diagnostics cleanup, no functional behavior changed. A real Windows/NAS `app.log` and screenshot confirmed the sequence-normalization fix (previous entry) working: `1448-01-11 _UK Safar` now lists 36 real events, no crash, across multiple scan attempts.
