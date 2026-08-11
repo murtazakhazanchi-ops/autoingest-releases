@@ -1575,6 +1575,16 @@ ipcMain.handle('master:create', async (_event, basePath, folderName) => {
  * etc). A read failure is NOT the same as "this collection has zero
  * events" and callers must not treat the two interchangeably.
  */
+// Diagnostic-only, fire-and-forget (BUG-011 IPC-boundary investigation): forwards
+// renderer-side scan-invoke markers into app.log alongside the main-process
+// [EventDiscoveryIPC] lines. One-way (ipcMain.on/ipcRenderer.send, not
+// handle/invoke) — no response is ever sent back, so it cannot itself affect
+// scan behavior or add IPC round-trip latency. Input is coerced to a bounded-
+// length string before logging; never trusted as anything but display text.
+ipcMain.on('diag:rendererLog', (_event, msg) => {
+  log(`[EventDiscoveryRenderer] ${String(msg).slice(0, 2000)}`);
+});
+
 // ── Diagnostic-only scan-stall tracking (BUG-011 real-Windows/NAS follow-up) ──
 // Observation only — never read by any code path that alters scan behavior,
 // timeouts, retries, or concurrency. Lets app.log show whether multiple
@@ -1583,20 +1593,43 @@ ipcMain.handle('master:create', async (_event, basePath, folderName) => {
 const _activeEventDiscoveryScans = new Set();
 let _eventDiscoveryScanSeq = 0;
 
+// ── IPC boundary instrumentation (BUG-011 stall investigation, 2026-08-10) ───
+// The handler is now a thin wrapper around _scanEventsCore(): it exists solely
+// to log whether the scan's own promise resolves and what ipcMain.handle is
+// about to send back, distinctly from the scan's *internal* per-entry/post-loop
+// progress (already covered by [EventDiscoveryEntry]/[EventDiscoveryDiagnostics]
+// logging inside _scanEventsCore). Purely additive/observational — the returned
+// value and thrown-error behavior are unchanged; `throw err` below preserves the
+// exact prior behavior of letting ipcMain.handle reject the renderer's invoke().
 ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
+  const _scanId = `scan-${Date.now()}-${++_eventDiscoveryScanSeq}`;
+  log(`[EventDiscoveryIPC] phase=IPC_HANDLER_ENTER scanId=${_scanId} timestamp=${new Date().toISOString()} typeofMasterPath=${typeof masterPath}`);
+  try {
+    const scanPromise = _scanEventsCore(masterPath, _scanId);
+    log(`[EventDiscoveryIPC] phase=SCAN_PROMISE_CREATED scanId=${_scanId}`);
+    const result = await scanPromise;
+    log(`[EventDiscoveryIPC] phase=SCAN_PROMISE_RESOLVED scanId=${_scanId} ok=${result?.ok} events=${Array.isArray(result?.events) ? result.events.length : 'N/A'} typeofResult=${typeof result}`);
+    log(`[EventDiscoveryIPC] phase=BEFORE_IPC_RETURN scanId=${_scanId} events=${Array.isArray(result?.events) ? result.events.length : 'N/A'}`);
+    return result;
+  } catch (err) {
+    log(`[EventDiscoveryIPC] phase=IPC_HANDLER_ERROR scanId=${_scanId} error=${JSON.stringify((err && err.message) || String(err))}`);
+    throw err;
+  }
+});
+
+async function _scanEventsCore(masterPath, _scanId) {
   // ── TEMPORARY DIAGNOSTICS (BUG-011 real-Windows/NAS RC follow-up) ─────────────
   // See _diagnoseEventJsonValidation's comment above. Pure evidence-gathering —
   // every branch/return below is byte-identical to the pre-diagnostic version;
   // only `log(...)` calls and diagnostic-record bookkeeping were added. Remove
   // this whole diagnostic layer once the real root cause is confirmed and fixed.
   //
-  // 2026-08-10 stall-investigation addendum: this handler body is now wrapped
+  // 2026-08-10 stall-investigation addendum: this function body is now wrapped
   // in try/finally (intentionally NOT re-indented, to keep this diff a pure
   // addition that's trivial to review/revert) purely so the heartbeat timer
   // and the active-scan tracking below are guaranteed to be cleaned up on
   // every exit path, including the early-return branches.
   const _diagRecords = [];
-  const _scanId = `scan-${Date.now()}-${++_eventDiscoveryScanSeq}`;
   const _scanStartedAt = Date.now();
   const _diagLog = (msg) => log(`[EventDiscoveryDiagnostics] scanId=${_scanId} ${msg}`);
 
@@ -1799,7 +1832,15 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
       _diag.readOk = true;
       let obj;
       try {
-        obj = normalizeEventJson(JSON.parse(raw));
+        log(`[EventDiscoveryEntry] scanId=${_scanId} phase=JSON_PARSE_START index=${_entryDisplayIndex} name=${JSON.stringify(name)} tScanMs=${Date.now() - _scanStartedAt}`);
+        const _jsonParseStartedAt = Date.now();
+        const _parsedRaw = JSON.parse(raw);
+        log(`[EventDiscoveryEntry] scanId=${_scanId} phase=JSON_PARSE_OK index=${_entryDisplayIndex} name=${JSON.stringify(name)} durationMs=${Date.now() - _jsonParseStartedAt} tScanMs=${Date.now() - _scanStartedAt}`);
+
+        log(`[EventDiscoveryEntry] scanId=${_scanId} phase=NORMALIZE_START index=${_entryDisplayIndex} name=${JSON.stringify(name)} tScanMs=${Date.now() - _scanStartedAt}`);
+        const _normalizeStartedAt = Date.now();
+        obj = normalizeEventJson(_parsedRaw);
+        log(`[EventDiscoveryEntry] scanId=${_scanId} phase=NORMALIZE_OK index=${_entryDisplayIndex} name=${JSON.stringify(name)} durationMs=${Date.now() - _normalizeStartedAt} tScanMs=${Date.now() - _scanStartedAt}`);
         _diag.parseOk = true;
         _diag.eventJsonVersion = obj?.version ?? null;
         _diag.eventName        = obj?.eventName ?? null;
@@ -1821,7 +1862,12 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
         continue;
       }
 
-      if (isValidEventJson(obj)) {
+      log(`[EventDiscoveryEntry] scanId=${_scanId} phase=VALIDATE_START index=${_entryDisplayIndex} name=${JSON.stringify(name)} tScanMs=${Date.now() - _scanStartedAt}`);
+      const _validateStartedAt = Date.now();
+      const _isValidEventJsonResult = isValidEventJson(obj);
+      log(`[EventDiscoveryEntry] scanId=${_scanId} phase=VALIDATE_OK index=${_entryDisplayIndex} name=${JSON.stringify(name)} durationMs=${Date.now() - _validateStartedAt} tScanMs=${Date.now() - _scanStartedAt} result=${_isValidEventJsonResult}`);
+
+      if (_isValidEventJsonResult) {
         _diag.validationOk = true;
         eventJson = obj;
         hidePathBestEffort(jsonPath).catch(() => {});
@@ -1857,7 +1903,18 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
     }
     _hbCurrentOperation = 'none';
 
+    log(`[EventDiscoveryEntry] scanId=${_scanId} phase=PARSE_EVENT_NAME_START index=${_entryDisplayIndex} name=${JSON.stringify(name)} tScanMs=${Date.now() - _scanStartedAt}`);
+    const _parseEventNameStartedAt = Date.now();
     const parsed = parseEventName(name, lists);
+    log(`[EventDiscoveryEntry] scanId=${_scanId} phase=PARSE_EVENT_NAME_OK index=${_entryDisplayIndex} name=${JSON.stringify(name)} durationMs=${Date.now() - _parseEventNameStartedAt} tScanMs=${Date.now() - _scanStartedAt}`);
+
+    // BUILD_EVENT_RECORD and PUSH_EVENT are measured as one combined span below:
+    // record construction and its push into resolved[]/unparseable[] happen
+    // together inside each branch of this if/else-if/else chain, so splitting
+    // them into 8 near-duplicate per-branch markers would not add real
+    // granularity — see the accompanying report for why.
+    log(`[EventDiscoveryEntry] scanId=${_scanId} phase=BUILD_EVENT_RECORD_START index=${_entryDisplayIndex} name=${JSON.stringify(name)} tScanMs=${Date.now() - _scanStartedAt}`);
+    const _buildRecordStartedAt = Date.now();
 
     if (eventJson) {
       // event.json is the SOLE source of components. Parser provides hijriDate+sequence only.
@@ -1924,14 +1981,21 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
         rejectionReason: `folderNameParsed=${parsed.ok} (${parsed.ok ? '' : parsed.reason}); jsonCorrupt=${jsonCorrupt} — lands in "Unrecognised Folders", not "Existing Events"`,
       });
     }
+    log(`[EventDiscoveryEntry] scanId=${_scanId} phase=PUSH_EVENT_OK index=${_entryDisplayIndex} name=${JSON.stringify(name)} durationMs=${Date.now() - _buildRecordStartedAt} tScanMs=${Date.now() - _scanStartedAt}`);
+    log(`[EventDiscoveryEntry] scanId=${_scanId} phase=ENTRY_COMPLETE index=${_entryDisplayIndex} total=${entries.length} name=${JSON.stringify(name)} totalEntryMs=${Date.now() - _entryStartedAt} tScanMs=${Date.now() - _scanStartedAt}`);
   }
+
+  _diagLog(`POST_LOOP_START tScanMs=${Date.now() - _scanStartedAt}`);
 
   // Sort resolved newest-first by (hijriDate desc, sequence desc). Both are
   // fixed-width strings so lexicographic comparison is equivalent to numeric.
+  _diagLog(`SORT_START tScanMs=${Date.now() - _scanStartedAt}`);
+  const _sortStartedAt = Date.now();
   resolved.sort((a, b) => {
     if (a.hijriDate !== b.hijriDate) return b.hijriDate.localeCompare(a.hijriDate);
     return b.sequence.localeCompare(a.sequence);
   });
+  _diagLog(`SORT_OK durationMs=${Date.now() - _sortStartedAt} tScanMs=${Date.now() - _scanStartedAt}`);
 
   // ── Diagnostic summary — one line per folder, then an aggregate. ─────────────
   // currentDeviceEligible mirrors includedInEventList exactly (see the
@@ -1944,6 +2008,8 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
   // always routes into the `if (eventJson)` branch, which always pushes to
   // `resolved`), but it's cheap insurance against a future edit silently
   // breaking that invariant.
+  _diagLog(`DIAGNOSTIC_AGGREGATION_START tScanMs=${Date.now() - _scanStartedAt}`);
+  const _diagAggStartedAt = Date.now();
   for (const rec of _diagRecords) {
     rec.currentDeviceEligible = rec.includedInEventList;
     if (rec.validationOk === true && rec.includedInEventList !== true) {
@@ -1959,6 +2025,10 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
   }
   const _directoriesAccepted = _diagRecords.filter(r => r.rejectionStage !== 'DIRENT_NOT_DIRECTORY' && r.rejectionStage !== 'DOTFILE').length;
   const _directoryTypeRecoveredCount = _diagRecords.filter(r => r.directoryTypeRecoveredViaStat === true).length;
+  _diagLog(`DIAGNOSTIC_AGGREGATION_OK durationMs=${Date.now() - _diagAggStartedAt} tScanMs=${Date.now() - _scanStartedAt}`);
+
+  _diagLog(`SUMMARY_START tScanMs=${Date.now() - _scanStartedAt}`);
+  const _summaryStartedAt = Date.now();
   _diagLog(`EVENT_DISCOVERY_SUMMARY collection=${JSON.stringify(masterPath)} `
     + `entriesEnumerated=${entries.length} `
     + `directoriesAccepted=${_directoriesAccepted} `
@@ -1986,6 +2056,7 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
       + `explainedByLegacyEvents=${_legacyCount} explainedByCorruptButParseable=${_corruptButParseableCount} `
       + `unexplainedDelta=${resolved.length - _validatedCount - _legacyCount - _corruptButParseableCount}`);
   }
+  _diagLog(`SUMMARY_OK durationMs=${Date.now() - _summaryStartedAt} tScanMs=${Date.now() - _scanStartedAt}`);
 
   // Diagnostic-only per-operation-type aggregate timing (BUG-011 stall
   // investigation). Only successful ops contribute a duration, per request.
@@ -1999,12 +2070,13 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
     + `readEventJson=${JSON.stringify(_aggStats(_readFileDurations))}`);
   _diagLog(`SCAN_COMPLETE totalDurationMs=${Date.now() - _scanStartedAt}`);
 
+  _diagLog(`RETURN_START tScanMs=${Date.now() - _scanStartedAt}`);
   return { ok: true, events: [...resolved, ...unparseable] };
   } finally {
     clearInterval(_hbTimer);
     _activeEventDiscoveryScans.delete(_scanId);
   }
-});
+}
 
 // Parse a single event folder name and return its components array.
 // Used at startup to restore component data from the canonical source (the

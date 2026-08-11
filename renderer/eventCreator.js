@@ -1696,7 +1696,20 @@ ${_offlineStagingMode ? '<p class="ec-subtext">Archive offline — showing colle
 
   async function _scanAndRenderEventList() {
     const _scanPath = _effectiveCollPath() || activeMaster?.path;
-    const _scanResult = await window.api.scanMasterEvents(_scanPath);
+    // IPC-boundary instrumentation (BUG-011 investigation, 2026-08-10) — logging
+    // only, does not change control flow: on error, the caught error is
+    // re-thrown unchanged, preserving the exact prior propagation behavior to
+    // this function's own callers (showEventStep()'s .catch(), the retry path,
+    // etc.).
+    window.api.diagLog?.(`phase=RENDERER_SCAN_INVOKE_START scanPath=${JSON.stringify(_scanPath)}`);
+    let _scanResult;
+    try {
+      _scanResult = await window.api.scanMasterEvents(_scanPath);
+      window.api.diagLog?.(`phase=RENDERER_SCAN_INVOKE_RESOLVED payloadType=${typeof _scanResult} ok=${_scanResult?.ok} eventsLength=${Array.isArray(_scanResult?.events) ? _scanResult.events.length : 'N/A'}`);
+    } catch (invokeErr) {
+      window.api.diagLog?.(`phase=RENDERER_SCAN_INVOKE_ERROR error=${JSON.stringify(invokeErr?.message || String(invokeErr))}`);
+      throw invokeErr;
+    }
 
     if (_scanResult?.ok) {
       _scannedEvents = Array.isArray(_scanResult.events) ? _scanResult.events : [];
