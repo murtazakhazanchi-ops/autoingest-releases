@@ -48,7 +48,9 @@
       "conversation_type": "mixed",
       "date_completed": "Evidence pending — not present in imported packet",
       "date_started": "Evidence pending — not present in imported packet",
-      "decision_ids": [],
+      "decision_ids": [
+        "DEC-016"
+      ],
       "evidence_pending_summary": "Identity, Repository Context, Initial Understanding, Initial Proposal, Discussion Evolution, Alternatives, User Feedback, Implementation Handoff",
       "feature_ids": [
         "AI-FEAT-005",
@@ -74,20 +76,82 @@
         "engineering",
         "history"
       ],
-      "latest_outcome": "2026-08-11 — Imported. Canonicalized from a \"ecp\"-format packet claiming source_tool \"chatgpt\".",
+      "latest_outcome": "2026-08-11 — Superseded note: A richer, more complete Engineering Conversation Packet for this same underlying ChatGPT discussion was subsequently supplied (real source_conversation_id chatgpt-autoingest-windows-event-management-2026-08, real date range 2026-08-08..2026-08-11, and substantially more investigation/lesson detail) and imported as ENG-CONV-0003. The Part 8 continuation-detection check found a strong title-similarity match (score 500) between the two, confirmed by cross-linking. ENG-CONV-0002 is retained as historical evidence of the first-pass reconstruction; ENG-CONV-0003 should be treated as the more complete record of this conversation going forward.",
       "memory_ids": [
         "AI-MEM-0003"
       ],
       "open_questions_summary": "- Formal 'Verified' status for BUG-011, BUG-012, and BUG-014 still awaits a consolidated real-hardware acceptance pass covering steps the tester's session did not reach (new-event creation flow for BUG-012, footer-mode transitions for BUG-014).",
       "provenance_classification": "Imported packet — no secret pattern detected",
       "rejected_approach_count": 11,
-      "related_conversation_ids": [],
+      "related_conversation_ids": [
+        "ENG-CONV-0003"
+      ],
       "revision_count": 6,
       "roadmap_ids": [],
       "source_tool": "chatgpt",
       "status": "Imported",
       "summary": "Windows/NAS Event Management Reliability Investigation (BUG-011–014) — ChatGPT-side engineering history",
       "title": "Windows/NAS Event Management Reliability Investigation (BUG-011–014) — ChatGPT-side engineering history"
+    },
+    {
+      "aliases": [],
+      "bug_ids": [
+        "BUG-011",
+        "BUG-012",
+        "BUG-013",
+        "BUG-014"
+      ],
+      "canonical_path": "conversations/ENG-CONV-0003_WINDOWS_NAS_EVENT_MANAGEMENT_FAILURE_INVESTIGATION_ROOT_CAUSE_VERIFICATION_AND_R.md",
+      "conversation_id": "ENG-CONV-0003",
+      "conversation_type": "mixed",
+      "date_completed": "2026-08-11T00:00:00Z",
+      "date_started": "2026-08-08T00:00:00Z",
+      "decision_ids": [
+        "DEC-016"
+      ],
+      "evidence_pending_summary": "Identity, Repository Context, Initial Understanding, Initial Proposal, Discussion Evolution, Alternatives, User Feedback, Implementation Handoff",
+      "feature_ids": [
+        "AI-FEAT-005",
+        "AI-FEAT-009",
+        "AI-FEAT-010",
+        "AI-FEAT-022",
+        "AI-FEAT-029",
+        "AI-FEAT-031",
+        "AI-FEAT-039",
+        "AI-FEAT-042",
+        "AI-FEAT-054"
+      ],
+      "import_date": "2026-08-11T10:57:25.977Z",
+      "keywords": [
+        "windows",
+        "nas",
+        "event",
+        "management",
+        "failure",
+        "investigation",
+        "root",
+        "cause",
+        "verification",
+        "and",
+        "repository",
+        "stabilization"
+      ],
+      "latest_outcome": "2026-08-11 — Imported. Canonicalized from a \"ecp\"-format packet claiming source_tool \"chatgpt\".",
+      "memory_ids": [
+        "AI-MEM-0003"
+      ],
+      "open_questions_summary": "- A formal consolidated BUG-011-014 acceptance pass had not yet been completed at the time this packet was prepared.",
+      "provenance_classification": "Imported packet — no secret pattern detected",
+      "rejected_approach_count": 14,
+      "related_conversation_ids": [
+        "ENG-CONV-0002"
+      ],
+      "revision_count": 7,
+      "roadmap_ids": [],
+      "source_tool": "chatgpt",
+      "status": "Imported",
+      "summary": "Windows/NAS Event Management Failure — Investigation, Root Cause, Verification, and Repository Stabilization",
+      "title": "Windows/NAS Event Management Failure — Investigation, Root Cause, Verification, and Repository Stabilization"
     }
   ],
   "docsys_version": "1.2.0",

@@ -3,12 +3,12 @@
   "entity_counts": {
     "bugs": 14,
     "decisions": 16,
-    "engineering_conversations": 2,
+    "engineering_conversations": 3,
     "features": 56,
     "memory_capsules": 3,
     "postmortems": 1,
     "roadmap_milestones": 9,
-    "search_index_records": 296,
+    "search_index_records": 297,
     "subsystems": 16
   },
   "generated_files": [
@@ -96,10 +96,10 @@
   "generation_command": "node scripts/product-docs/cli.js build",
   "generator_version": "1.2.0",
   "relationship_counts": {
-    "dependency_graph_edges": 480,
-    "dependency_graph_nodes": 110
+    "dependency_graph_edges": 498,
+    "dependency_graph_nodes": 111
   },
   "schema_version": "1.2.0",
-  "source_commit": "e6fe5483404f5332f700a73723c37d04225eae1c",
-  "source_file_count": 122
+  "source_commit": "d10ec929e1e88f62e7870f949dae8e8d70e36ad5",
+  "source_file_count": 123
 }

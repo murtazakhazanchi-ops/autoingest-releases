@@ -10,10 +10,18 @@
 - **Open questions**: - Should ENG-CONV records eventually cross-link into feature Engineering Evolution sections once real corpus volume is better understood?
 - **Record**: [ENG-CONV-0001](../conversations/ENG-CONV-0001_PART_8_MULTI_AI_ENGINEERING_CONVERSATION_INTEGRATION_DESIGN_AND_IMPLEMENTATION.md)
 
+## 2026-08-08T00:00:00Z — ENG-CONV-0003 — Windows/NAS Event Management Failure — Investigation, Root Cause, Verification, and Repository Stabilization
+
+- **Source**: chatgpt (mixed)
+- **Feature(s)**: AI-FEAT-005, AI-FEAT-009, AI-FEAT-010, AI-FEAT-022, AI-FEAT-029, AI-FEAT-031, AI-FEAT-039, AI-FEAT-042, AI-FEAT-054
+- **Latest outcome**: 2026-08-11 — Imported. Canonicalized from a "ecp"-format packet claiming source_tool "chatgpt".
+- **Open questions**: - A formal consolidated BUG-011-014 acceptance pass had not yet been completed at the time this packet was prepared.
+- **Record**: [ENG-CONV-0003](../conversations/ENG-CONV-0003_WINDOWS_NAS_EVENT_MANAGEMENT_FAILURE_INVESTIGATION_ROOT_CAUSE_VERIFICATION_AND_R.md)
+
 ## Evidence pending — not present in imported packet — ENG-CONV-0002 — Windows/NAS Event Management Reliability Investigation (BUG-011–014) — ChatGPT-side engineering history
 
 - **Source**: chatgpt (mixed)
 - **Feature(s)**: AI-FEAT-005, AI-FEAT-009, AI-FEAT-010, AI-FEAT-022, AI-FEAT-029, AI-FEAT-039
-- **Latest outcome**: 2026-08-11 — Imported. Canonicalized from a "ecp"-format packet claiming source_tool "chatgpt".
+- **Latest outcome**: 2026-08-11 — Superseded note: A richer, more complete Engineering Conversation Packet for this same underlying ChatGPT discussion was subsequently supplied (real source_conversation_id chatgpt-autoingest-windows-event-management-2026-08, real date range 2026-08-08..2026-08-11, and substantially more investigation/lesson detail) and imported as ENG-CONV-0003. The Part 8 continuation-detection check found a strong title-similarity match (score 500) between the two, confirmed by cross-linking. ENG-CONV-0002 is retained as historical evidence of the first-pass reconstruction; ENG-CONV-0003 should be treated as the more complete record of this conversation going forward.
 - **Open questions**: - Formal 'Verified' status for BUG-011, BUG-012, and BUG-014 still awaits a consolidated real-hardware acceptance pass covering steps the tester's session did not reach (new-event creation flow for BUG-012, footer-mode transitions for BUG-014).
 - **Record**: [ENG-CONV-0002](../conversations/ENG-CONV-0002_WINDOWS_NAS_EVENT_MANAGEMENT_RELIABILITY_INVESTIGATION_BUG_011_014_CHATGPT_SIDE_.md)

@@ -234,8 +234,22 @@ function importPacket({ format, filePath, raw, sourceLabel, mode = 'standard' })
       memoryLinkResult = { state: 'error', error: err.message };
     }
 
+    // decisionLinkResult can name a decision_id (linked to an existing
+    // DEC-### or a freshly-drafted one) that didn't exist yet when
+    // analysis.ownership was resolved from the packet's own (necessarily
+    // prior) related_decision_ids claim — ownership resolution can't know
+    // about a decision this same import is about to link or draft. Without
+    // this merge, the Relationships table's "Related decisions" row (and
+    // therefore the dependency graph, which parses that table) would show
+    // "None" even though the Engineering Decisions section correctly
+    // reports the linkage — a real relationship silently invisible to
+    // every consumer that reads the structured table instead of the prose.
+    const finalOwnership = (decisionLinkResult && decisionLinkResult.decision_id && !analysis.ownership.decision_ids.includes(decisionLinkResult.decision_id))
+      ? { ...analysis.ownership, decision_ids: [...analysis.ownership.decision_ids, decisionLinkResult.decision_id] }
+      : analysis.ownership;
+
     const finalContent = compileConversationRecord(conversationId, {
-      packet: analysis.packet, ownership: analysis.ownership, importMeta,
+      packet: analysis.packet, ownership: finalOwnership, importMeta,
       decisionLinkResult, bugLinkResults,
     });
     atomicWriteFileSync(conversationFilePath, finalContent);
