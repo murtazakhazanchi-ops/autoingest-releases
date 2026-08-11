@@ -223,10 +223,8 @@ function findNonCloneSafeValues(value, pathStr, seen, violations) {
 
   // ── Drive the REAL UI so eventCreator.js's _scanAndRenderEventList() actually
   // runs (the direct window.api.scanMasterEvents() call above bypasses it
-  // entirely — RENDERER_SCAN_INVOKE_* markers live inside that function, not in
-  // the raw IPC call, so they can only be verified by going through Event
-  // Management the way a real user would). Same pattern as
-  // test/eventManagementReliabilityLive.test.js's TEST C.
+  // entirely). Same pattern as test/eventManagementReliabilityLive.test.js's
+  // TEST C.
   await window.evaluate(() => { document.getElementById('heroSecondaryBtn')?.click() || document.getElementById('emmOpenBtn')?.click(); });
   const emmVisible = await window.evaluate(() => document.getElementById('eventMgmtModal')?.classList.contains('open'));
   if (!emmVisible) {
@@ -264,13 +262,28 @@ function findNonCloneSafeValues(value, pathStr, seen, violations) {
   }
   check(forwardedLineSeen, 'Renderer log forwarding: window.api.diagLog() reaches app.log via diag:rendererLog -> ipcMain.on -> logger.js (not just devtools console)');
 
-  // ── Confirm every requested boundary marker actually appears in this build ──
+  // ── Confirm the Phase 4 diagnostic cleanup (2026-08-11) actually took effect ──
+  // BUG-011's exhaustive per-entry/per-operation trace markers (IPC_HANDLER_ENTER,
+  // SCAN_PROMISE_CREATED, SCAN_PROMISE_RESOLVED, BEFORE_IPC_RETURN,
+  // RENDERER_SCAN_INVOKE_START/RESOLVED, and everything under
+  // [EventDiscoveryEntry]/heartbeat/RECORD/OPERATION_TIMING) were deliberately
+  // removed once BUG-011's root cause was confirmed and fixed — see
+  // 10_CHANGELOG.md and BUG-011's Prevention/Reusable Lesson section. Only the
+  // high-value summary/error/assertion logging remains. This asserts both
+  // halves: the retained markers still fire, and the removed ones are gone.
   const fullLog = await fsp.readFile(appLogPath, 'utf8').catch(() => '');
-  const requiredMainMarkers = ['IPC_HANDLER_ENTER', 'SCAN_PROMISE_CREATED', 'SCAN_PROMISE_RESOLVED', 'BEFORE_IPC_RETURN'];
-  const requiredRendererMarkers = ['RENDERER_SCAN_INVOKE_START', 'RENDERER_SCAN_INVOKE_RESOLVED'];
-  for (const marker of [...requiredMainMarkers, ...requiredRendererMarkers]) {
-    check(fullLog.includes(marker), `Boundary marker present in app.log: ${marker}`);
+  const retainedMarkers = ['EVENT_DISCOVERY_SUMMARY', 'SCAN_COMPLETE'];
+  for (const marker of retainedMarkers) {
+    check(fullLog.includes(marker), `Retained summary marker present in app.log: ${marker}`);
   }
+  const removedMarkers = [
+    'IPC_HANDLER_ENTER', 'SCAN_PROMISE_CREATED', 'SCAN_PROMISE_RESOLVED', 'BEFORE_IPC_RETURN',
+    'RENDERER_SCAN_INVOKE_START', 'RENDERER_SCAN_INVOKE_RESOLVED',
+    '[EventDiscoveryEntry]', '[EventDiscoveryEntryStart]', '[EventDiscoveryHeartbeat]',
+    'RECORD {', 'OPERATION_TIMING', 'POST_LOOP_START', 'RETURN_START',
+  ];
+  const stillPresent = removedMarkers.filter((m) => fullLog.includes(m));
+  check(stillPresent.length === 0, 'Debug-only per-entry/per-operation markers no longer appear in app.log (Phase 4 cleanup verified)', stillPresent);
 
   await electronApp.close();
   await fsp.rm(userDataDir, { recursive: true, force: true }).catch(() => {});

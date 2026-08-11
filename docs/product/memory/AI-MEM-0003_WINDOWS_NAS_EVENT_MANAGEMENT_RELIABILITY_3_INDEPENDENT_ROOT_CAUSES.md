@@ -6,7 +6,7 @@
 |---|---|
 | Memory ID | AI-MEM-0003 |
 | Title | Windows/NAS Event Management reliability — 3 independent root causes |
-| Status | Compiled |
+| Status | Reopened |
 | Date started | 2026-08-07T13:53:49.889Z |
 | Date completed | 2026-08-07T13:53:50.088Z |
 | Source agents/tools | claude-code |
@@ -55,6 +55,7 @@
 ## Evolution Timeline
 
 None recorded — no plan revision events captured for this session.
+- **Reopened** (2026-08-11): Continued forensic investigation after Windows RC verification failed: filesystem/Dirent hypotheses ruled out by direct measurement, IPC-boundary/structured-clone hypotheses ruled out by empirical audit, real root cause (mixed-type sequence crashing resolved.sort()) found via the IPC error instrumentation shipped for the boundary investigation, fixed, regression-tested, confirmed working on real Windows/NAS hardware, and debug-only diagnostics subsequently cleaned up.
 
 ## Investigation Journal
 

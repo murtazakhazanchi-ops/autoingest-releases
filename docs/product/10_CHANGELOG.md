@@ -7,6 +7,18 @@ Append newest first. Never edit or delete a prior entry — if something was wro
 ---
 
 
+## 2026-08-11 (verified + cleanup) — BUG-011: real-Windows confirmation, 37-vs-36 audit closed, diagnostics cleaned up for stable release
+
+- **Task type**: verification + repo-wide audit + diagnostics cleanup, no functional behavior changed. A real Windows/NAS `app.log` and screenshot confirmed the sequence-normalization fix (previous entry) working: `1448-01-11 _UK Safar` now lists 36 real events, no crash, across multiple scan attempts.
+- **37-vs-36 audit**: closed as expected behavior. `events.length` (37) always equals `resolved.length` (36) + `unparseable.length` (1) by construction — the 37th item is a specific, named, correctly-classified folder (`01-QMZ`, no `event.json`, unparseable name) that lands in "Unrecognised Folders", not "Existing Events". No code change.
+- **Repository-wide sequence-type audit** (Phase 5, read-only): confirmed exactly three `.sequence.localeCompare()` sites exist codebase-wide — the just-fixed `_scanEventsCore`, the already-correct `_scanNasArchive`, and `renderer/eventCreator.js`'s pending-sync re-sort (safe by inheritance from the fix, not an independent risk). No other live mixed-type bug of this class found.
+- **Diagnostic instrumentation cleanup** (Phase 4): removed the exhaustive per-entry/per-operation trace logging built up across the whole stall investigation — per-entry START/OK markers, the 10-second heartbeat, the per-entry `RECORD` dump, `OPERATION_TIMING`, and the IPC-boundary happy-path markers (`IPC_HANDLER_ENTER`/`SCAN_PROMISE_CREATED`/`SCAN_PROMISE_RESOLVED`/`BEFORE_IPC_RETURN`/`RENDERER_SCAN_INVOKE_START`/`RENDERER_SCAN_INVOKE_RESOLVED`) — now that the root cause is confirmed and fixed, matching the code's own original stated intent to remove this layer once resolved. **Retained**: `EVENT_DISCOVERY_SUMMARY`, `SCAN_COMPLETE`, `UNEXPECTED_EVENT_REJECTION`/`RENDER_COUNT_MISMATCH` assertions, `DIRENT/STAT MISMATCH`/`DIR_ENTRY_TYPE_MISMATCH`, concurrent-scan detection, and both IPC error-path loggers (`IPC_HANDLER_ERROR`/`RENDERER_SCAN_INVOKE_ERROR` — the exact mechanism that caught the real bug). Net: ~93 lines removed from `main/main.js`, ~10 from `renderer/eventCreator.js`. `test/bug011ScanStallInstrumentation.test.js` removed (tested now-nonexistent scaffolding); `test/bug011IpcBoundaryAudit.test.js` updated to assert retained markers still fire and removed ones are gone.
+- **Tests**: full suite re-run and passing unchanged; sequence-normalization fix independently confirmed unaffected by the cleanup.
+- **Documentation**: AI-MEM-0003 reopened with an evolution-timeline entry summarizing this continuation. BUG-011 remains "Fixed — core defect confirmed on real hardware"; formal "Verified" status awaits the consolidated BUG-011–014 acceptance pass.
+- **Evidence confidence**: explicit (real tester `app.log` + screenshot) + code audit + regression tests.
+
+---
+
 ## 2026-08-11 (root cause confirmed) — BUG-011: mixed `sequence` type crashes master:scanEvents's sort — fixed and regression-tested
 
 - **Task type**: bugfix. The real Windows tester's `app.log`, captured via the IPC-boundary instrumentation shipped the prior round, caught the actual exception: `TypeError: b.sequence.localeCompare is not a function`, thrown from `master:scanEvents`'s `resolved.sort()` after all 52 entries were successfully discovered. Platform-independent JS type coercion, not a filesystem/IPC/serialization defect — every hypothesis from the two prior rounds was correctly ruled out; the crash simply lived one step further than any of them looked.

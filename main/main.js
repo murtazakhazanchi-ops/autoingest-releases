@@ -1593,24 +1593,15 @@ ipcMain.on('diag:rendererLog', (_event, msg) => {
 const _activeEventDiscoveryScans = new Set();
 let _eventDiscoveryScanSeq = 0;
 
-// ── IPC boundary instrumentation (BUG-011 stall investigation, 2026-08-10) ───
-// The handler is now a thin wrapper around _scanEventsCore(): it exists solely
-// to log whether the scan's own promise resolves and what ipcMain.handle is
-// about to send back, distinctly from the scan's *internal* per-entry/post-loop
-// progress (already covered by [EventDiscoveryEntry]/[EventDiscoveryDiagnostics]
-// logging inside _scanEventsCore). Purely additive/observational — the returned
-// value and thrown-error behavior are unchanged; `throw err` below preserves the
-// exact prior behavior of letting ipcMain.handle reject the renderer's invoke().
+// The handler is a thin wrapper around _scanEventsCore(): it exists to log
+// unexpected errors surfacing at the IPC boundary (see BUG-011's investigation
+// log — this is exactly the mechanism that caught the actual root cause, a
+// TypeError thrown from inside the scan). `throw err` preserves the exact
+// prior behavior of letting ipcMain.handle reject the renderer's invoke().
 ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
   const _scanId = `scan-${Date.now()}-${++_eventDiscoveryScanSeq}`;
-  log(`[EventDiscoveryIPC] phase=IPC_HANDLER_ENTER scanId=${_scanId} timestamp=${new Date().toISOString()} typeofMasterPath=${typeof masterPath}`);
   try {
-    const scanPromise = _scanEventsCore(masterPath, _scanId);
-    log(`[EventDiscoveryIPC] phase=SCAN_PROMISE_CREATED scanId=${_scanId}`);
-    const result = await scanPromise;
-    log(`[EventDiscoveryIPC] phase=SCAN_PROMISE_RESOLVED scanId=${_scanId} ok=${result?.ok} events=${Array.isArray(result?.events) ? result.events.length : 'N/A'} typeofResult=${typeof result}`);
-    log(`[EventDiscoveryIPC] phase=BEFORE_IPC_RETURN scanId=${_scanId} events=${Array.isArray(result?.events) ? result.events.length : 'N/A'}`);
-    return result;
+    return await _scanEventsCore(masterPath, _scanId);
   } catch (err) {
     log(`[EventDiscoveryIPC] phase=IPC_HANDLER_ERROR scanId=${_scanId} error=${JSON.stringify((err && err.message) || String(err))}`);
     throw err;
@@ -1618,17 +1609,13 @@ ipcMain.handle('master:scanEvents', async (_event, masterPath) => {
 });
 
 async function _scanEventsCore(masterPath, _scanId) {
-  // ── TEMPORARY DIAGNOSTICS (BUG-011 real-Windows/NAS RC follow-up) ─────────────
-  // See _diagnoseEventJsonValidation's comment above. Pure evidence-gathering —
-  // every branch/return below is byte-identical to the pre-diagnostic version;
-  // only `log(...)` calls and diagnostic-record bookkeeping were added. Remove
-  // this whole diagnostic layer once the real root cause is confirmed and fixed.
-  //
-  // 2026-08-10 stall-investigation addendum: this function body is now wrapped
-  // in try/finally (intentionally NOT re-indented, to keep this diff a pure
-  // addition that's trivial to review/revert) purely so the heartbeat timer
-  // and the active-scan tracking below are guaranteed to be cleaned up on
-  // every exit path, including the early-return branches.
+  // Retains BUG-011's high-value diagnostics only (scan summary, unexpected-
+  // state assertions, concurrent-scan detection) — the exhaustive per-entry/
+  // per-operation trace logging used during that investigation was removed
+  // once the root cause was confirmed and fixed (2026-08-11); see BUG-011's
+  // Prevention/Reusable Lesson section and 10_CHANGELOG.md for what was
+  // removed and why. Wrapped in try/finally so the active-scan tracking below
+  // is guaranteed to be cleaned up on every exit path.
   const _diagRecords = [];
   const _scanStartedAt = Date.now();
   const _diagLog = (msg) => log(`[EventDiscoveryDiagnostics] scanId=${_scanId} ${msg}`);
@@ -1638,12 +1625,6 @@ async function _scanEventsCore(masterPath, _scanId) {
     log(`[EventDiscoveryConcurrentScan] newScanId=${_scanId} activeScanIds=${JSON.stringify(_activeScanIdsAtStart)}`);
   }
   _activeEventDiscoveryScans.add(_scanId);
-  let _hbCurrentEntryIndex = 0;
-  let _hbCurrentEntryTotal = 0;
-  let _hbCurrentOperation = 'none';
-  const _hbTimer = setInterval(() => {
-    log(`[EventDiscoveryHeartbeat] scanId=${_scanId} currentEntry=${_hbCurrentEntryIndex}/${_hbCurrentEntryTotal} currentOperation=${_hbCurrentOperation} elapsedMs=${Date.now() - _scanStartedAt}`);
-  }, 10000);
 
   try {
 
@@ -1691,22 +1672,11 @@ async function _scanEventsCore(masterPath, _scanId) {
 
   const resolved   = [];
   const unparseable = [];
-  // Diagnostic-only per-operation timing pools (BUG-011 stall investigation).
-  // Populated only on success, per the request that spawned this instrumentation.
-  const _statDurations = [];
-  const _realpathDurations = [];
-  const _readFileDurations = [];
 
   for (let _entryIdx = 0; _entryIdx < entries.length; _entryIdx++) {
     const entry = entries[_entryIdx];
     const name = entry.name;
     const entryFullPath = path.join(masterPath, name);
-    const _entryDisplayIndex = _entryIdx + 1;
-    const _entryStartedAt = Date.now();
-    _hbCurrentEntryIndex = _entryDisplayIndex;
-    _hbCurrentEntryTotal = entries.length;
-    _hbCurrentOperation = 'none';
-    log(`[EventDiscoveryEntryStart] scanId=${_scanId} index=${_entryDisplayIndex} total=${entries.length} name=${JSON.stringify(name)} path=${JSON.stringify(entryFullPath)} timestamp=${new Date(_entryStartedAt).toISOString()}`);
 
     // Filesystem hardening (BUG-011 RC): Dirent.isDirectory() can misreport on
     // some network shares (a documented class of Node/libuv behavior — see
@@ -1719,20 +1689,12 @@ async function _scanEventsCore(masterPath, _scanId) {
     // previously caused a real folder to vanish with no explanation.
     let _statIsDirectory = null;
     let _statError = null;
-    _hbCurrentOperation = 'STAT';
-    const _statOpStartedAt = Date.now();
-    log(`[EventDiscoveryEntry] scanId=${_scanId} phase=STAT_START index=${_entryDisplayIndex} total=${entries.length} name=${JSON.stringify(name)} tEntryMs=${_statOpStartedAt - _entryStartedAt} tScanMs=${_statOpStartedAt - _scanStartedAt}`);
     try {
       const st = await fsp.stat(entryFullPath);
       _statIsDirectory = st.isDirectory();
-      const _statDuration = Date.now() - _statOpStartedAt;
-      _statDurations.push(_statDuration);
-      log(`[EventDiscoveryEntry] scanId=${_scanId} phase=STAT_OK index=${_entryDisplayIndex} name=${JSON.stringify(name)} durationMs=${_statDuration} tScanMs=${Date.now() - _scanStartedAt}`);
     } catch (statErr) {
       _statError = statErr.code || statErr.message;
-      log(`[EventDiscoveryEntry] scanId=${_scanId} phase=STAT_FAIL index=${_entryDisplayIndex} name=${JSON.stringify(name)} durationMs=${Date.now() - _statOpStartedAt} tScanMs=${Date.now() - _scanStartedAt} error=${JSON.stringify(_statError)}`);
     }
-    _hbCurrentOperation = 'none';
     const _direntSaysDir = entry.isDirectory();
     if (_direntSaysDir !== _statIsDirectory) {
       _diagLog(`DIRENT/STAT MISMATCH name=${JSON.stringify(name)} dirent.isDirectory()=${_direntSaysDir} stat.isDirectory()=${_statIsDirectory} statError=${_statError}`);
@@ -1770,19 +1732,11 @@ async function _scanEventsCore(masterPath, _scanId) {
     let eventJson = null;
     let jsonCorrupt = false;
     let _entryRealpath = null, _entryRealpathError = null;
-    _hbCurrentOperation = 'REALPATH';
-    const _realpathOpStartedAt = Date.now();
-    log(`[EventDiscoveryEntry] scanId=${_scanId} phase=REALPATH_START index=${_entryDisplayIndex} name=${JSON.stringify(name)} tEntryMs=${_realpathOpStartedAt - _entryStartedAt} tScanMs=${_realpathOpStartedAt - _scanStartedAt}`);
     try {
       _entryRealpath = await fsp.realpath(entryFullPath);
-      const _realpathDuration = Date.now() - _realpathOpStartedAt;
-      _realpathDurations.push(_realpathDuration);
-      log(`[EventDiscoveryEntry] scanId=${_scanId} phase=REALPATH_OK index=${_entryDisplayIndex} name=${JSON.stringify(name)} durationMs=${_realpathDuration} tScanMs=${Date.now() - _scanStartedAt}`);
     } catch (rpErr) {
       _entryRealpathError = rpErr.code || rpErr.message;
-      log(`[EventDiscoveryEntry] scanId=${_scanId} phase=REALPATH_FAIL index=${_entryDisplayIndex} name=${JSON.stringify(name)} durationMs=${Date.now() - _realpathOpStartedAt} tScanMs=${Date.now() - _scanStartedAt} error=${JSON.stringify(_entryRealpathError)}`);
     }
-    _hbCurrentOperation = 'none';
     const _entryShape = _diagPathShape(entryFullPath);
     const _diag = {
       folderName: name, folderPath: entryFullPath,
@@ -1820,27 +1774,13 @@ async function _scanEventsCore(masterPath, _scanId) {
       includedInEventList: null, rejectionStage: null, rejectionReason: null,
     };
 
-    _hbCurrentOperation = 'READ_EVENT_JSON';
-    const _readEventJsonOpStartedAt = Date.now();
-    log(`[EventDiscoveryEntry] scanId=${_scanId} phase=READ_EVENT_JSON_START index=${_entryDisplayIndex} name=${JSON.stringify(name)} tEntryMs=${_readEventJsonOpStartedAt - _entryStartedAt} tScanMs=${_readEventJsonOpStartedAt - _scanStartedAt}`);
     try {
       const raw = await fsp.readFile(jsonPath, 'utf8');
-      const _readEventJsonDuration = Date.now() - _readEventJsonOpStartedAt;
-      _readFileDurations.push(_readEventJsonDuration);
-      log(`[EventDiscoveryEntry] scanId=${_scanId} phase=READ_EVENT_JSON_OK index=${_entryDisplayIndex} name=${JSON.stringify(name)} durationMs=${_readEventJsonDuration} tScanMs=${Date.now() - _scanStartedAt}`);
       _diag.eventJsonExists = true;
       _diag.readOk = true;
       let obj;
       try {
-        log(`[EventDiscoveryEntry] scanId=${_scanId} phase=JSON_PARSE_START index=${_entryDisplayIndex} name=${JSON.stringify(name)} tScanMs=${Date.now() - _scanStartedAt}`);
-        const _jsonParseStartedAt = Date.now();
-        const _parsedRaw = JSON.parse(raw);
-        log(`[EventDiscoveryEntry] scanId=${_scanId} phase=JSON_PARSE_OK index=${_entryDisplayIndex} name=${JSON.stringify(name)} durationMs=${Date.now() - _jsonParseStartedAt} tScanMs=${Date.now() - _scanStartedAt}`);
-
-        log(`[EventDiscoveryEntry] scanId=${_scanId} phase=NORMALIZE_START index=${_entryDisplayIndex} name=${JSON.stringify(name)} tScanMs=${Date.now() - _scanStartedAt}`);
-        const _normalizeStartedAt = Date.now();
-        obj = normalizeEventJson(_parsedRaw);
-        log(`[EventDiscoveryEntry] scanId=${_scanId} phase=NORMALIZE_OK index=${_entryDisplayIndex} name=${JSON.stringify(name)} durationMs=${Date.now() - _normalizeStartedAt} tScanMs=${Date.now() - _scanStartedAt}`);
+        obj = normalizeEventJson(JSON.parse(raw));
         _diag.parseOk = true;
         _diag.eventJsonVersion = obj?.version ?? null;
         _diag.eventName        = obj?.eventName ?? null;
@@ -1862,12 +1802,7 @@ async function _scanEventsCore(masterPath, _scanId) {
         continue;
       }
 
-      log(`[EventDiscoveryEntry] scanId=${_scanId} phase=VALIDATE_START index=${_entryDisplayIndex} name=${JSON.stringify(name)} tScanMs=${Date.now() - _scanStartedAt}`);
-      const _validateStartedAt = Date.now();
-      const _isValidEventJsonResult = isValidEventJson(obj);
-      log(`[EventDiscoveryEntry] scanId=${_scanId} phase=VALIDATE_OK index=${_entryDisplayIndex} name=${JSON.stringify(name)} durationMs=${Date.now() - _validateStartedAt} tScanMs=${Date.now() - _scanStartedAt} result=${_isValidEventJsonResult}`);
-
-      if (_isValidEventJsonResult) {
+      if (isValidEventJson(obj)) {
         _diag.validationOk = true;
         eventJson = obj;
         hidePathBestEffort(jsonPath).catch(() => {});
@@ -1887,7 +1822,6 @@ async function _scanEventsCore(masterPath, _scanId) {
         console.error('[scanEvents] isValidEventJson failed for', name, '— shape dump:', JSON.stringify(obj).slice(0, 400));
       }
     } catch (err) {
-      log(`[EventDiscoveryEntry] scanId=${_scanId} phase=READ_EVENT_JSON_FAIL index=${_entryDisplayIndex} name=${JSON.stringify(name)} durationMs=${Date.now() - _readEventJsonOpStartedAt} tScanMs=${Date.now() - _scanStartedAt} error=${JSON.stringify(err.code || err.message)}`);
       if (err.code === 'ENOENT') {
         _diag.eventJsonExists = false;
         _diag.readOk = false;
@@ -1901,20 +1835,8 @@ async function _scanEventsCore(masterPath, _scanId) {
         console.error('[scanEvents] Failed to parse event.json for', name, ':', err.message);
       }
     }
-    _hbCurrentOperation = 'none';
 
-    log(`[EventDiscoveryEntry] scanId=${_scanId} phase=PARSE_EVENT_NAME_START index=${_entryDisplayIndex} name=${JSON.stringify(name)} tScanMs=${Date.now() - _scanStartedAt}`);
-    const _parseEventNameStartedAt = Date.now();
     const parsed = parseEventName(name, lists);
-    log(`[EventDiscoveryEntry] scanId=${_scanId} phase=PARSE_EVENT_NAME_OK index=${_entryDisplayIndex} name=${JSON.stringify(name)} durationMs=${Date.now() - _parseEventNameStartedAt} tScanMs=${Date.now() - _scanStartedAt}`);
-
-    // BUILD_EVENT_RECORD and PUSH_EVENT are measured as one combined span below:
-    // record construction and its push into resolved[]/unparseable[] happen
-    // together inside each branch of this if/else-if/else chain, so splitting
-    // them into 8 near-duplicate per-branch markers would not add real
-    // granularity — see the accompanying report for why.
-    log(`[EventDiscoveryEntry] scanId=${_scanId} phase=BUILD_EVENT_RECORD_START index=${_entryDisplayIndex} name=${JSON.stringify(name)} tScanMs=${Date.now() - _scanStartedAt}`);
-    const _buildRecordStartedAt = Date.now();
 
     if (eventJson) {
       // event.json is the SOLE source of components. Parser provides hijriDate+sequence only.
@@ -1998,23 +1920,17 @@ async function _scanEventsCore(masterPath, _scanId) {
         rejectionReason: `folderNameParsed=${parsed.ok} (${parsed.ok ? '' : parsed.reason}); jsonCorrupt=${jsonCorrupt} — lands in "Unrecognised Folders", not "Existing Events"`,
       });
     }
-    log(`[EventDiscoveryEntry] scanId=${_scanId} phase=PUSH_EVENT_OK index=${_entryDisplayIndex} name=${JSON.stringify(name)} durationMs=${Date.now() - _buildRecordStartedAt} tScanMs=${Date.now() - _scanStartedAt}`);
-    log(`[EventDiscoveryEntry] scanId=${_scanId} phase=ENTRY_COMPLETE index=${_entryDisplayIndex} total=${entries.length} name=${JSON.stringify(name)} totalEntryMs=${Date.now() - _entryStartedAt} tScanMs=${Date.now() - _scanStartedAt}`);
   }
-
-  _diagLog(`POST_LOOP_START tScanMs=${Date.now() - _scanStartedAt}`);
 
   // Sort resolved newest-first by (hijriDate desc, sequence desc). Both are
   // fixed-width strings so lexicographic comparison is equivalent to numeric.
-  _diagLog(`SORT_START tScanMs=${Date.now() - _scanStartedAt}`);
-  const _sortStartedAt = Date.now();
   resolved.sort((a, b) => {
     if (a.hijriDate !== b.hijriDate) return b.hijriDate.localeCompare(a.hijriDate);
     return b.sequence.localeCompare(a.sequence);
   });
-  _diagLog(`SORT_OK durationMs=${Date.now() - _sortStartedAt} tScanMs=${Date.now() - _scanStartedAt}`);
 
-  // ── Diagnostic summary — one line per folder, then an aggregate. ─────────────
+  // ── Diagnostic summary — one aggregate line, plus loud assertions for any
+  // internal-invariant violation. ────────────────────────────────────────────
   // currentDeviceEligible mirrors includedInEventList exactly (see the
   // currentDeviceReason field's own explanation) — computed once here rather
   // than at every push site above, since the mirroring is unconditional for
@@ -2025,8 +1941,6 @@ async function _scanEventsCore(masterPath, _scanId) {
   // always routes into the `if (eventJson)` branch, which always pushes to
   // `resolved`), but it's cheap insurance against a future edit silently
   // breaking that invariant.
-  _diagLog(`DIAGNOSTIC_AGGREGATION_START tScanMs=${Date.now() - _scanStartedAt}`);
-  const _diagAggStartedAt = Date.now();
   for (const rec of _diagRecords) {
     rec.currentDeviceEligible = rec.includedInEventList;
     if (rec.validationOk === true && rec.includedInEventList !== true) {
@@ -2034,7 +1948,6 @@ async function _scanEventsCore(masterPath, _scanId) {
         + `validationOk=true but includedInEventList=${rec.includedInEventList} `
         + `rejectionStage=${JSON.stringify(rec.rejectionStage)} rejectionReason=${JSON.stringify(rec.rejectionReason)}`);
     }
-    _diagLog(`RECORD ${JSON.stringify(rec)}`);
   }
   const _rejectionCounts = {};
   for (const rec of _diagRecords) {
@@ -2042,10 +1955,6 @@ async function _scanEventsCore(masterPath, _scanId) {
   }
   const _directoriesAccepted = _diagRecords.filter(r => r.rejectionStage !== 'DIRENT_NOT_DIRECTORY' && r.rejectionStage !== 'DOTFILE').length;
   const _directoryTypeRecoveredCount = _diagRecords.filter(r => r.directoryTypeRecoveredViaStat === true).length;
-  _diagLog(`DIAGNOSTIC_AGGREGATION_OK durationMs=${Date.now() - _diagAggStartedAt} tScanMs=${Date.now() - _scanStartedAt}`);
-
-  _diagLog(`SUMMARY_START tScanMs=${Date.now() - _scanStartedAt}`);
-  const _summaryStartedAt = Date.now();
   _diagLog(`EVENT_DISCOVERY_SUMMARY collection=${JSON.stringify(masterPath)} `
     + `entriesEnumerated=${entries.length} `
     + `directoriesAccepted=${_directoriesAccepted} `
@@ -2073,24 +1982,10 @@ async function _scanEventsCore(masterPath, _scanId) {
       + `explainedByLegacyEvents=${_legacyCount} explainedByCorruptButParseable=${_corruptButParseableCount} `
       + `unexplainedDelta=${resolved.length - _validatedCount - _legacyCount - _corruptButParseableCount}`);
   }
-  _diagLog(`SUMMARY_OK durationMs=${Date.now() - _summaryStartedAt} tScanMs=${Date.now() - _scanStartedAt}`);
-
-  // Diagnostic-only per-operation-type aggregate timing (BUG-011 stall
-  // investigation). Only successful ops contribute a duration, per request.
-  const _aggStats = (arr) => {
-    if (arr.length === 0) return { count: 0, minMs: null, maxMs: null, avgMs: null };
-    const sum = arr.reduce((a, b) => a + b, 0);
-    return { count: arr.length, minMs: Math.min(...arr), maxMs: Math.max(...arr), avgMs: Math.round(sum / arr.length) };
-  };
-  _diagLog(`OPERATION_TIMING stat=${JSON.stringify(_aggStats(_statDurations))} `
-    + `realpath=${JSON.stringify(_aggStats(_realpathDurations))} `
-    + `readEventJson=${JSON.stringify(_aggStats(_readFileDurations))}`);
   _diagLog(`SCAN_COMPLETE totalDurationMs=${Date.now() - _scanStartedAt}`);
 
-  _diagLog(`RETURN_START tScanMs=${Date.now() - _scanStartedAt}`);
   return { ok: true, events: [...resolved, ...unparseable] };
   } finally {
-    clearInterval(_hbTimer);
     _activeEventDiscoveryScans.delete(_scanId);
   }
 }
