@@ -14,7 +14,7 @@
 
 - **Source**: chatgpt (mixed)
 - **Feature(s)**: AI-FEAT-005, AI-FEAT-009, AI-FEAT-010, AI-FEAT-022, AI-FEAT-029, AI-FEAT-031, AI-FEAT-039, AI-FEAT-042, AI-FEAT-054
-- **Latest outcome**: 2026-08-11 — v0.9.11 published. The first `v0.9.11` tag was pushed while `package.json` still read `0.9.10`, causing `electron-builder` to build and silently skip-publish `0.9.10`-named artifacts against the already-published `v0.9.10` release — see [PM-002](../postmortems/PM-002_V0_9_11_FIRST_PUBLICATION_ATTEMPT_PRODUCED_AN_EMPTY_GITHUB_RELEASE.md) for the full incident record. The empty release/tag were removed, the application version was corrected, and `v0.9.11` was re-tagged and republished successfully (12 assets, correct updater metadata, `v0.9.10` unaffected throughout). This is a release-process incident, not an Event Management defect — it does not change BUG-011 through BUG-014's own statuses.
+- **Latest outcome**: 2026-08-12 — Implemented — commit `dfb91805` (post-commit reconciliation; changed file(s) resolved to AI-FEAT-005, AI-FEAT-022, AI-FEAT-029, AI-FEAT-039).
 - **Open questions**: - A formal consolidated BUG-011-014 acceptance pass had not yet been completed at the time this packet was prepared.
 - **Record**: [ENG-CONV-0003](../conversations/ENG-CONV-0003_WINDOWS_NAS_EVENT_MANAGEMENT_FAILURE_INVESTIGATION_ROOT_CAUSE_VERIFICATION_AND_R.md)
 
@@ -22,7 +22,7 @@
 
 - **Source**: claude-code (mixed)
 - **Feature(s)**: AI-FEAT-005, AI-FEAT-006, AI-FEAT-008, AI-FEAT-057
-- **Latest outcome**: 2026-08-12 — Imported. Canonicalized from a "ecp"-format packet claiming source_tool "claude-code".
+- **Latest outcome**: 2026-08-12 — Implemented — commit `dfb91805` (post-commit reconciliation; changed file(s) resolved to AI-FEAT-005, AI-FEAT-006, AI-FEAT-057).
 - **Open questions**: Whether release gate should eventually also be wired into a pre-tag local git hook, not only CI — not pursued in this session, consistent with Part 5's existing hook-installation being a separate, explicit, human-approved step.
 - **Record**: [ENG-CONV-0004](../conversations/ENG-CONV-0004_PART_9_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM_DESIGN_AND_IMPLEMENTATION.md)
 
@@ -30,6 +30,6 @@
 
 - **Source**: chatgpt (mixed)
 - **Feature(s)**: AI-FEAT-005, AI-FEAT-009, AI-FEAT-010, AI-FEAT-022, AI-FEAT-029, AI-FEAT-039
-- **Latest outcome**: 2026-08-11 — Superseded note: A richer, more complete Engineering Conversation Packet for this same underlying ChatGPT discussion was subsequently supplied (real source_conversation_id chatgpt-autoingest-windows-event-management-2026-08, real date range 2026-08-08..2026-08-11, and substantially more investigation/lesson detail) and imported as ENG-CONV-0003. The Part 8 continuation-detection check found a strong title-similarity match (score 500) between the two, confirmed by cross-linking. ENG-CONV-0002 is retained as historical evidence of the first-pass reconstruction; ENG-CONV-0003 should be treated as the more complete record of this conversation going forward.
+- **Latest outcome**: 2026-08-12 — Implemented — commit `dfb91805` (post-commit reconciliation; changed file(s) resolved to AI-FEAT-005, AI-FEAT-022, AI-FEAT-029, AI-FEAT-039).
 - **Open questions**: - Formal 'Verified' status for BUG-011, BUG-012, and BUG-014 still awaits a consolidated real-hardware acceptance pass covering steps the tester's session did not reach (new-event creation flow for BUG-012, footer-mode transitions for BUG-014).
 - **Record**: [ENG-CONV-0002](../conversations/ENG-CONV-0002_WINDOWS_NAS_EVENT_MANAGEMENT_RELIABILITY_INVESTIGATION_BUG_011_014_CHATGPT_SIDE_.md)

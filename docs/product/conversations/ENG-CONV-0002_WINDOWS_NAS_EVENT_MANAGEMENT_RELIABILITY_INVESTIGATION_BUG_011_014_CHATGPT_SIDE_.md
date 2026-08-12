@@ -6,7 +6,7 @@
 |---|---|
 | Conversation ID | ENG-CONV-0002 |
 | Title | Windows/NAS Event Management Reliability Investigation (BUG-011–014) — ChatGPT-side engineering history |
-| Status | Imported |
+| Status | Implemented |
 | Conversation type | mixed |
 | Source tool | chatgpt |
 | Source format | ecp |
@@ -356,6 +356,7 @@ None recorded — this importer does not yet accept binary image attachments; se
 
 - **2026-08-11** — Imported. Canonicalized from a "ecp"-format packet claiming source_tool "chatgpt".
 - **2026-08-11** — Superseded note: A richer, more complete Engineering Conversation Packet for this same underlying ChatGPT discussion was subsequently supplied (real source_conversation_id chatgpt-autoingest-windows-event-management-2026-08, real date range 2026-08-08..2026-08-11, and substantially more investigation/lesson detail) and imported as ENG-CONV-0003. The Part 8 continuation-detection check found a strong title-similarity match (score 500) between the two, confirmed by cross-linking. ENG-CONV-0002 is retained as historical evidence of the first-pass reconstruction; ENG-CONV-0003 should be treated as the more complete record of this conversation going forward.
+- **2026-08-12** — Implemented — commit `dfb91805` (post-commit reconciliation; changed file(s) resolved to AI-FEAT-005, AI-FEAT-022, AI-FEAT-029, AI-FEAT-039).
 
 ## Provenance
 

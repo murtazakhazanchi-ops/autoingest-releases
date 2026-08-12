@@ -6,7 +6,7 @@
 |---|---|
 | Conversation ID | ENG-CONV-0004 |
 | Title | Part 9 — Multi-Channel Release & Update System: design and implementation |
-| Status | Imported |
+| Status | Implemented |
 | Conversation type | mixed |
 | Source tool | claude-code |
 | Source format | ecp |
@@ -224,6 +224,7 @@ None recorded — this importer does not yet accept binary image attachments; se
 ## Outcome
 
 - **2026-08-12** — Imported. Canonicalized from a "ecp"-format packet claiming source_tool "claude-code".
+- **2026-08-12** — Implemented — commit `dfb91805` (post-commit reconciliation; changed file(s) resolved to AI-FEAT-005, AI-FEAT-006, AI-FEAT-057).
 
 ## Provenance
 

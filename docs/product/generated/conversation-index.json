@@ -76,7 +76,7 @@
         "engineering",
         "history"
       ],
-      "latest_outcome": "2026-08-11 — Superseded note: A richer, more complete Engineering Conversation Packet for this same underlying ChatGPT discussion was subsequently supplied (real source_conversation_id chatgpt-autoingest-windows-event-management-2026-08, real date range 2026-08-08..2026-08-11, and substantially more investigation/lesson detail) and imported as ENG-CONV-0003. The Part 8 continuation-detection check found a strong title-similarity match (score 500) between the two, confirmed by cross-linking. ENG-CONV-0002 is retained as historical evidence of the first-pass reconstruction; ENG-CONV-0003 should be treated as the more complete record of this conversation going forward.",
+      "latest_outcome": "2026-08-12 — Implemented — commit `dfb91805` (post-commit reconciliation; changed file(s) resolved to AI-FEAT-005, AI-FEAT-022, AI-FEAT-029, AI-FEAT-039).",
       "memory_ids": [
         "AI-MEM-0003"
       ],
@@ -89,7 +89,7 @@
       "revision_count": 6,
       "roadmap_ids": [],
       "source_tool": "chatgpt",
-      "status": "Imported",
+      "status": "Implemented",
       "summary": "Windows/NAS Event Management Reliability Investigation (BUG-011–014) — ChatGPT-side engineering history",
       "title": "Windows/NAS Event Management Reliability Investigation (BUG-011–014) — ChatGPT-side engineering history"
     },
@@ -136,7 +136,7 @@
         "repository",
         "stabilization"
       ],
-      "latest_outcome": "2026-08-11 — v0.9.11 published. The first `v0.9.11` tag was pushed while `package.json` still read `0.9.10`, causing `electron-builder` to build and silently skip-publish `0.9.10`-named artifacts against the already-published `v0.9.10` release — see [PM-002](../postmortems/PM-002_V0_9_11_FIRST_PUBLICATION_ATTEMPT_PRODUCED_AN_EMPTY_GITHUB_RELEASE.md) for the full incident record. The empty release/tag were removed, the application version was corrected, and `v0.9.11` was re-tagged and republished successfully (12 assets, correct updater metadata, `v0.9.10` unaffected throughout). This is a release-process incident, not an Event Management defect — it does not change BUG-011 through BUG-014's own statuses.",
+      "latest_outcome": "2026-08-12 — Implemented — commit `dfb91805` (post-commit reconciliation; changed file(s) resolved to AI-FEAT-005, AI-FEAT-022, AI-FEAT-029, AI-FEAT-039).",
       "memory_ids": [
         "AI-MEM-0003"
       ],
@@ -149,7 +149,7 @@
       "revision_count": 7,
       "roadmap_ids": [],
       "source_tool": "chatgpt",
-      "status": "Imported",
+      "status": "Implemented",
       "summary": "Windows/NAS Event Management Failure — Investigation, Root Cause, Verification, and Repository Stabilization",
       "title": "Windows/NAS Event Management Failure — Investigation, Root Cause, Verification, and Repository Stabilization"
     },
@@ -184,7 +184,7 @@
         "and",
         "implementation"
       ],
-      "latest_outcome": "2026-08-12 — Imported. Canonicalized from a \"ecp\"-format packet claiming source_tool \"claude-code\".",
+      "latest_outcome": "2026-08-12 — Implemented — commit `dfb91805` (post-commit reconciliation; changed file(s) resolved to AI-FEAT-005, AI-FEAT-006, AI-FEAT-057).",
       "memory_ids": [],
       "open_questions_summary": "Whether release gate should eventually also be wired into a pre-tag local git hook, not only CI — not pursued in this session, consistent with Part 5's existing hook-installation being a separate, explicit, human-approved step.",
       "provenance_classification": "Imported packet — no secret pattern detected",
@@ -195,7 +195,7 @@
         "AI-RM-010"
       ],
       "source_tool": "claude-code",
-      "status": "Imported",
+      "status": "Implemented",
       "summary": "Part 9 — Multi-Channel Release & Update System: design and implementation",
       "title": "Part 9 — Multi-Channel Release & Update System: design and implementation"
     }
