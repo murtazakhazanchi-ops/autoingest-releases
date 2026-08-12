@@ -259,6 +259,14 @@
     },
     {
       "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-010:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-005",
+      "target": "AI-RM-010"
+    },
+    {
+      "evidence_status": "explicit",
       "note": null,
       "provenance_path": "bugs/BUG-013_SETSESSIONARCHIVEROOT_WINDOWS_UNC_PATH_PREFIX_CHECK_SILENTLY_DROPS_THE_ACTIVE_CO.md#header-table:Related-feature(s)",
       "relationship": "affected_by_bug",
@@ -276,6 +284,14 @@
     {
       "evidence_status": "explicit",
       "note": null,
+      "provenance_path": "decisions/DEC-018_PART_9_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM_DESIGN_AND_IMPLEMENTATION.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-005",
+      "target": "DEC-018"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
       "provenance_path": "features/AI-FEAT-006_APPLICATION_AUTO_UPDATE.md#header-table:Dependencies",
       "relationship": "depends_on",
       "source": "AI-FEAT-006",
@@ -288,6 +304,46 @@
       "relationship": "depends_on",
       "source": "AI-FEAT-006",
       "target": "AI-FEAT-007"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "this feature extended by subfeature",
+      "provenance_path": "features/AI-FEAT-006_APPLICATION_AUTO_UPDATE.md#header-table:Subfeatures",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-006",
+      "target": "AI-FEAT-057"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "parent extended by this subfeature",
+      "provenance_path": "features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md#header-table:Parent-feature",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-006",
+      "target": "AI-FEAT-057"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-010:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-006",
+      "target": "AI-RM-010"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-006_APPLICATION_AUTO_UPDATE.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-006",
+      "target": "DEC-017"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-018_PART_9_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM_DESIGN_AND_IMPLEMENTATION.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-006",
+      "target": "DEC-018"
     },
     {
       "evidence_status": "explicit",
@@ -336,6 +392,14 @@
       "relationship": "related_to",
       "source": "AI-FEAT-008",
       "target": "AI-FEAT-034"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-018_PART_9_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM_DESIGN_AND_IMPLEMENTATION.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-008",
+      "target": "DEC-018"
     },
     {
       "evidence_status": "explicit",
@@ -3132,6 +3196,94 @@
     {
       "evidence_status": "explicit",
       "note": null,
+      "provenance_path": "features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-057",
+      "target": "AI-FEAT-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-057",
+      "target": "AI-FEAT-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-057",
+      "target": "AI-FEAT-006"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-057",
+      "target": "AI-FEAT-006"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md#header-table:Related-roadmap-milestone",
+      "relationship": "planned_in",
+      "source": "AI-FEAT-057",
+      "target": "AI-RM-010"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md#lifecycle-metadata:Related-architectural-evolution-sections",
+      "relationship": "documented_by",
+      "source": "AI-FEAT-057",
+      "target": "ARCH-multi-channel-release-architecture"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-057",
+      "target": "DEC-017"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-017_STABLE_RELEASES_REBUILD_FROM_VERIFIED_RC_SOURCE_NEVER_PROMOTE_EXACT_BINARIES.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-057",
+      "target": "DEC-017"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-057",
+      "target": "DEC-018"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-018_PART_9_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM_DESIGN_AND_IMPLEMENTATION.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-057",
+      "target": "DEC-018"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "postmortem",
+      "provenance_path": "features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md#lifecycle-metadata:Related-postmortems",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-057",
+      "target": "PM-002"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
       "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-001:Included-AI-FEAT-IDs",
       "relationship": "implements",
       "source": "AI-RM-001",
@@ -3408,6 +3560,30 @@
       "relationship": "governed_by",
       "source": "AI-RM-009",
       "target": "DEC-015"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-010:Included-AI-FEAT-IDs",
+      "relationship": "implements",
+      "source": "AI-RM-010",
+      "target": "AI-FEAT-057"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-017_STABLE_RELEASES_REBUILD_FROM_VERIFIED_RC_SOURCE_NEVER_PROMOTE_EXACT_BINARIES.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-RM-010",
+      "target": "DEC-017"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-018_PART_9_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM_DESIGN_AND_IMPLEMENTATION.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-RM-010",
+      "target": "DEC-018"
     },
     {
       "evidence_status": "explicit",
@@ -3771,6 +3947,22 @@
     },
     {
       "evidence_status": "explicit",
+      "note": "decision-to-decision body reference",
+      "provenance_path": "decisions/DEC-017_STABLE_RELEASES_REBUILD_FROM_VERIFIED_RC_SOURCE_NEVER_PROMOTE_EXACT_BINARIES.md#body",
+      "relationship": "related_to",
+      "source": "DEC-017",
+      "target": "DEC-018"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "decision-to-decision body reference",
+      "provenance_path": "decisions/DEC-018_PART_9_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM_DESIGN_AND_IMPLEMENTATION.md#body",
+      "relationship": "related_to",
+      "source": "DEC-018",
+      "target": "DEC-017"
+    },
+    {
+      "evidence_status": "explicit",
       "note": null,
       "provenance_path": "conversations/ENG-CONV-0002_WINDOWS_NAS_EVENT_MANAGEMENT_RELIABILITY_INVESTIGATION_BUG_011_014_CHATGPT_SIDE_.md#relationships",
       "relationship": "conversation_about_feature",
@@ -4000,6 +4192,62 @@
       "relationship": "conversation_follows_conversation",
       "source": "ENG-CONV-0003",
       "target": "ENG-CONV-0002"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "conversations/ENG-CONV-0004_PART_9_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM_DESIGN_AND_IMPLEMENTATION.md#relationships",
+      "relationship": "conversation_about_feature",
+      "source": "ENG-CONV-0004",
+      "target": "AI-FEAT-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "conversations/ENG-CONV-0004_PART_9_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM_DESIGN_AND_IMPLEMENTATION.md#relationships",
+      "relationship": "conversation_about_feature",
+      "source": "ENG-CONV-0004",
+      "target": "AI-FEAT-006"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "conversations/ENG-CONV-0004_PART_9_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM_DESIGN_AND_IMPLEMENTATION.md#relationships",
+      "relationship": "conversation_about_feature",
+      "source": "ENG-CONV-0004",
+      "target": "AI-FEAT-008"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "conversations/ENG-CONV-0004_PART_9_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM_DESIGN_AND_IMPLEMENTATION.md#relationships",
+      "relationship": "conversation_about_feature",
+      "source": "ENG-CONV-0004",
+      "target": "AI-FEAT-057"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "conversations/ENG-CONV-0004_PART_9_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM_DESIGN_AND_IMPLEMENTATION.md#relationships",
+      "relationship": "conversation_about_roadmap",
+      "source": "ENG-CONV-0004",
+      "target": "AI-RM-010"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "conversations/ENG-CONV-0004_PART_9_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM_DESIGN_AND_IMPLEMENTATION.md#relationships",
+      "relationship": "conversation_shapes_decision",
+      "source": "ENG-CONV-0004",
+      "target": "DEC-017"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "conversations/ENG-CONV-0004_PART_9_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM_DESIGN_AND_IMPLEMENTATION.md#relationships",
+      "relationship": "conversation_shapes_decision",
+      "source": "ENG-CONV-0004",
+      "target": "DEC-018"
     }
   ],
   "nodes": [
@@ -4340,6 +4588,12 @@
       "type": "feature"
     },
     {
+      "doc_path": "features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md",
+      "id": "AI-FEAT-057",
+      "label": "Multi-Channel Release & Update System",
+      "type": "feature"
+    },
+    {
       "doc_path": "memory/AI-MEM-0001_METADATA_MANAGEMENT_MODAL_AUDIT_REPAIR_EVOLUTION.md",
       "id": "AI-MEM-0001",
       "label": "Metadata Management Modal Consolidation and Audit & Repair Tab Evolution",
@@ -4412,6 +4666,12 @@
       "type": "milestone"
     },
     {
+      "doc_path": "02_MASTER_ROADMAP.md",
+      "id": "AI-RM-010",
+      "label": "Multi-Channel Release & Update System",
+      "type": "milestone"
+    },
+    {
       "doc_path": "11_ARCHITECTURAL_EVOLUTION.md#a-established-adobe-bridge-workflow-pre-autoingest",
       "id": "ARCH-a-established-adobe-bridge-workflow-pre-autoingest",
       "label": "A. Established Adobe Bridge Workflow (pre-AutoIngest)",
@@ -4463,6 +4723,12 @@
       "doc_path": "11_ARCHITECTURAL_EVOLUTION.md#i-planned-architectural-direction",
       "id": "ARCH-i-planned-architectural-direction",
       "label": "I. Planned Architectural Direction",
+      "type": "architecture_section"
+    },
+    {
+      "doc_path": "11_ARCHITECTURAL_EVOLUTION.md#multi-channel-release-architecture",
+      "id": "ARCH-multi-channel-release-architecture",
+      "label": "Multi-Channel Release Architecture",
       "type": "architecture_section"
     },
     {
@@ -4646,6 +4912,18 @@
       "type": "decision"
     },
     {
+      "doc_path": "decisions/DEC-017_STABLE_RELEASES_REBUILD_FROM_VERIFIED_RC_SOURCE_NEVER_PROMOTE_EXACT_BINARIES.md",
+      "id": "DEC-017",
+      "label": "Stable Releases Rebuild From Verified-RC Source; Never Promote Exact Binaries",
+      "type": "decision"
+    },
+    {
+      "doc_path": "decisions/DEC-018_PART_9_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM_DESIGN_AND_IMPLEMENTATION.md",
+      "id": "DEC-018",
+      "label": "Part 9 — Multi-Channel Release & Update System: design and implementation",
+      "type": "decision"
+    },
+    {
       "doc_path": "conversations/ENG-CONV-0001_PART_8_MULTI_AI_ENGINEERING_CONVERSATION_INTEGRATION_DESIGN_AND_IMPLEMENTATION.md",
       "id": "ENG-CONV-0001",
       "label": "Part 8 — Multi-AI Engineering Conversation Integration: design and implementation",
@@ -4661,6 +4939,12 @@
       "doc_path": "conversations/ENG-CONV-0003_WINDOWS_NAS_EVENT_MANAGEMENT_FAILURE_INVESTIGATION_ROOT_CAUSE_VERIFICATION_AND_R.md",
       "id": "ENG-CONV-0003",
       "label": "Windows/NAS Event Management Failure — Investigation, Root Cause, Verification, and Repository Stabilization",
+      "type": "engineering_conversation"
+    },
+    {
+      "doc_path": "conversations/ENG-CONV-0004_PART_9_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM_DESIGN_AND_IMPLEMENTATION.md",
+      "id": "ENG-CONV-0004",
+      "label": "Part 9 — Multi-Channel Release & Update System: design and implementation",
       "type": "engineering_conversation"
     },
     {

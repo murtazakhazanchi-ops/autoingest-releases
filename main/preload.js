@@ -196,6 +196,8 @@ contextBridge.exposeInMainWorld('api', {
   countEventsThisWeek:      ()                       => ipcRenderer.invoke('archive:countEventsThisWeek'),
   getAutoMetadataEnabled:   ()                       => ipcRenderer.invoke('settings:getAutoMetadataEnabled'),
   setAutoMetadataEnabled:   (v)                      => ipcRenderer.invoke('settings:setAutoMetadataEnabled', v),
+  getUpdateChannel:         ()                       => ipcRenderer.invoke('settings:getUpdateChannel'),
+  setUpdateChannel:         (v)                      => ipcRenderer.invoke('settings:setUpdateChannel', v),
 
   // ── Archive Operations ──
   getArchiveOperationsStatus: ()    => ipcRenderer.invoke('archive:getOperationsStatus'),

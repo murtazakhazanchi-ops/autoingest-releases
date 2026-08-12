@@ -9,20 +9,85 @@ on:
       build_type:
         description: 'Build purpose'
         required: true
-        default: 'windows-tester'
+        default: 'development'
         type: choice
         options:
-          - windows-tester
+          - development
+          - rc
+      rc_version:
+        description: 'RC version, shaped X.Y.Z-rc.N (e.g. 0.9.12-rc.1) — required when build_type is rc'
+        required: false
+        type: string
 
 jobs:
 
-  # ── Stable release path (unchanged) — triggered only by a v* tag push. ──────
+  # ── Stable release path — triggered only by a v* tag push. ──────────────────
   # Publishes a real, public, non-draft, non-prerelease release for both
   # platforms. Guarded with `if: github.event_name == 'push'` only so that
-  # adding workflow_dispatch above can never accidentally reach this path —
-  # no other change was made to this job or the two below it.
+  # workflow_dispatch can never accidentally reach this path. `build-mac`/
+  # `build-windows` below are byte-for-byte unchanged by Part 9. `create-release`
+  # gained exactly one line (`needs: stable-release-gate`) — architecture-
+  # review finding: without this, the release gate existed but was never
+  # actually invoked on the path that ships to real Stable users, so PM-002's
+  # exact failure mode (a version/tag mismatch reaching a real release) was
+  # still possible whenever a human forgot to run the gate manually. See
+  # docs/product/features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md.
+
+  stable-release-gate:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Extract override reason from the tag message (if present)
+        # This event (push: tags: v*) has no workflow_dispatch UI to collect
+        # an interactive --override-drift-check reason, so a legitimate
+        # no-preceding-RC release (e.g. an emergency hotfix) needs a
+        # git-native escape hatch instead: an annotated tag message
+        # containing a line "Override-Drift-Check: <reason>" is honored
+        # below. An operator's normal `git tag -a vX.Y.Z -m "AutoIngest
+        # vX.Y.Z"` (this repo's existing convention) has no such line and
+        # is correctly NOT treated as an override.
+        id: override
+        shell: bash
+        run: |
+          MSG=$(git tag -l --format='%(contents)' "${GITHUB_REF_NAME}")
+          REASON=$(printf '%s\n' "$MSG" | grep -m1 '^Override-Drift-Check:' | sed 's/^Override-Drift-Check:[[:space:]]*//')
+          {
+            echo "reason<<EOF_OVERRIDE_REASON"
+            echo "$REASON"
+            echo "EOF_OVERRIDE_REASON"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Release gate (Stable)
+        # --auto-rc-commit discovers the matching "vX.Y.Z-rc.*" tag from git
+        # history alone. A Stable release with no preceding RC tag AND no
+        # Override-Drift-Check tag-message trailer correctly BLOCKS here
+        # rather than publishing silently unverified — see `release gate
+        # --help` and DEC-017 for the full reasoning.
+        shell: bash
+        env:
+          OVERRIDE_REASON: ${{ steps.override.outputs.reason }}
+        run: |
+          if [ -n "$OVERRIDE_REASON" ]; then
+            node scripts/product-docs/cli.js release gate --tag "${GITHUB_REF_NAME}" --channel stable --auto-rc-commit --override-drift-check "$OVERRIDE_REASON"
+          else
+            node scripts/product-docs/cli.js release gate --tag "${GITHUB_REF_NAME}" --channel stable --auto-rc-commit
+          fi
 
   create-release:
+    needs: stable-release-gate
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     outputs:
@@ -93,33 +158,34 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: npm run dist:win -- -p always
 
-  # ── Windows Tester Build (additive, manual only) ─────────────────────────────
-  # Manually triggered via workflow_dispatch for platform-specific acceptance
-  # testing before stable publication (e.g. BUG-011..014's real-Windows/NAS
-  # verification pass). Builds Windows only, using the same electron-builder
-  # config as the stable path above, but with publish explicitly disabled
-  # (`-p never` overrides package.json's build.publish regardless) — no tag,
-  # no GitHub Release, no upload to the public release repository. Output is
-  # an ephemeral GitHub Actions artifact only. Select the branch/commit to
-  # build via GitHub's normal "Run workflow from branch" control — this
-  # workflow does not accept an arbitrary ref as an input.
+  # ── Development Build (additive, manual only) ────────────────────────────────
+  # Renamed from "windows-tester-build" (Part 9) — behavior is otherwise
+  # completely unchanged from the job that shipped during the BUG-011
+  # investigation. Manually triggered via workflow_dispatch (build_type:
+  # development) for internal engineering/testing. Builds Windows only, using
+  # the same electron-builder config as the stable path above, but with
+  # publish explicitly disabled (`-p never` overrides package.json's
+  # build.publish regardless) — no tag, no GitHub Release, no update-channel
+  # visibility whatsoever. Output is a short-retention Actions artifact only.
+  # Select the branch/commit to build via GitHub's normal "Run workflow from
+  # branch" control — this workflow does not accept an arbitrary ref as an
+  # input.
   #
   # Deliberately does NOT create the telemetry service-account key secret the
   # stable jobs above use (services/telemetry.js is designed to no-op silently
   # without it — "Until credentials are configured the queue drains silently
   # — no crashes") — this keeps a real credential with write access to an
-  # internal tracker sheet out of a short-retention artifact-only build whose
-  # only purpose is exercising Event Management, which does not depend on it.
+  # internal tracker sheet out of a short-retention artifact-only build.
   # Windows builds are unsigned in the stable path too (no certificateFile /
-  # forceCodeSigning in package.json's build.win config), so this tester
-  # build's signing posture matches the real stable build exactly.
+  # forceCodeSigning in package.json's build.win config), so this build's
+  # signing posture matches the real stable build exactly.
 
-  windows-tester-build:
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'windows-tester'
+  development-build:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'development'
     runs-on: windows-2022
     timeout-minutes: 30
     concurrency:
-      group: windows-tester-build-${{ github.ref }}
+      group: development-build-${{ github.ref }}
       cancel-in-progress: true
     permissions:
       contents: read
@@ -158,16 +224,174 @@ jobs:
             echo "Commit SHA: $BUILD_COMMIT_SHA"
             echo "Build timestamp (UTC): $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
             echo "Package version: $(node -p "require('./package.json').version")"
-            echo "Purpose: Windows/NAS Event Management verification (BUG-011..014)"
+            echo "Purpose: internal engineering/testing (Development channel)"
           } > dist/BUILD_INFO.txt
 
-      - name: Upload Windows tester artifact
+      - name: Upload development artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AutoIngest-Windows-Tester-${{ steps.sha.outputs.short_sha }}
+          name: AutoIngest-Development-${{ steps.sha.outputs.short_sha }}
           path: |
             dist/*.exe
             dist/*.exe.blockmap
             dist/BUILD_INFO.txt
           retention-days: 14
           if-no-files-found: error
+
+  # ── RC / Preview Build (Part 9, additive, manual only) ───────────────────────
+  # Manually triggered via workflow_dispatch (build_type: rc, rc_version: e.g.
+  # "0.9.12-rc.1") — real tester acceptance before Stable, isolated from it at
+  # every layer:
+  #   - separate GitHub Release, always prerelease:true (electron-publish's
+  #     GitHubPublisher only sets this from build.publish.releaseType, which
+  #     this job overrides per-invocation via -c.publish.releaseType=prerelease
+  #     — package.json's own static "release" default is untouched for Stable)
+  #   - separate update-channel feed files, rc.yml / rc-mac.yml, via
+  #     -c.publish.channel=rc (electron-builder's getUpdateInfoFileName is
+  #     "${channel}${platformSuffix}.yml" — verified from
+  #     app-builder-lib/out/publish/updateInfoBuilder.js — this NEVER writes
+  #     latest.yml/latest-mac.yml, so Stable's own feed is untouched)
+  #   - a Stable client (allowPrerelease=false, the default for any plain
+  #     "X.Y.Z" installed version) resolves updates via GitHub's
+  #     GET /releases/latest, which by definition excludes every
+  #     prerelease-flagged release (verified from electron-updater/out/
+  #     providers/GitHubProvider.js's getLatestTagName()) — a Stable client
+  #     cannot discover an RC release through the normal update-check path
+  #     regardless of any channel string. Only a Preview-opted-in client
+  #     (allowPrerelease=true, autoUpdater.channel='rc') will ever see it.
+  #
+  # The RC tag is created and pushed by THIS workflow (rc-tag job, below) —
+  # never left to electron-builder's own auto-create-release path, which
+  # omits target_commitish and would attach a newly-created tag to the
+  # repository's default branch rather than the exact commit this workflow
+  # ran against (verified from electron-publish/out/gitHubPublisher.js's
+  # createRelease()). Creating the real git tag first guarantees the release
+  # is pinned to the exact reviewed commit.
+  #
+  # package.json's version is bumped to rc_version in the build environment
+  # ONLY — never committed. The pushed git tag names which SOURCE commit this
+  # RC build is, not a claim that commit's own checked-in package.json
+  # already reads that version (see the "Stable rebuilds from the exact
+  # verified RC source, only the version string differs" promotion model in
+  # AI-FEAT-057 / DEC-017).
+
+  rc-tag:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'rc'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      rc_tag: ${{ steps.compute.outputs.rc_tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate rc_version and compute tag
+        id: compute
+        env:
+          RC_VERSION: ${{ github.event.inputs.rc_version }}
+        run: |
+          if [[ ! "$RC_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]]; then
+            echo "::error::rc_version must be shaped X.Y.Z-rc.N (e.g. 0.9.12-rc.1), got: '$RC_VERSION'"
+            exit 1
+          fi
+          echo "rc_tag=v$RC_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push RC tag
+        env:
+          RC_TAG: v${{ github.event.inputs.rc_version }}
+        run: |
+          if git rev-parse -q --verify "refs/tags/$RC_TAG" >/dev/null; then
+            echo "::error::Tag $RC_TAG already exists — choose a new RC number rather than reusing one (see PM-002's rollback runbook for the manual re-tag procedure if this RC genuinely needs to be replaced)."
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$RC_TAG" -m "AutoIngest RC $RC_TAG (commit $(git rev-parse HEAD))"
+          git push origin "$RC_TAG"
+
+  rc-build-windows:
+    needs: rc-tag
+    runs-on: windows-2022
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.rc-tag.outputs.rc_tag }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Create service account key
+        shell: bash
+        env:
+          SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
+        run: |
+          echo "$SERVICE_ACCOUNT_KEY" > config/service-account-key.json
+
+      - name: Set ephemeral RC version (not committed)
+        shell: bash
+        env:
+          RC_VERSION: ${{ github.event.inputs.rc_version }}
+        run: npm version "$RC_VERSION" --no-git-tag-version --allow-same-version
+
+      - name: Release gate (RC)
+        shell: bash
+        env:
+          RC_TAG: ${{ needs.rc-tag.outputs.rc_tag }}
+        run: node scripts/product-docs/cli.js release gate --tag "$RC_TAG" --channel rc
+
+      - name: Build and publish Windows RC
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: npm run dist:win -- -p always -c.publish.channel=rc -c.publish.releaseType=prerelease
+
+  rc-build-mac:
+    needs: rc-tag
+    runs-on: macos-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.rc-tag.outputs.rc_tag }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Create service account key
+        shell: bash
+        env:
+          SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
+        run: |
+          echo "$SERVICE_ACCOUNT_KEY" > config/service-account-key.json
+
+      - name: Set ephemeral RC version (not committed)
+        env:
+          RC_VERSION: ${{ github.event.inputs.rc_version }}
+        run: npm version "$RC_VERSION" --no-git-tag-version --allow-same-version
+
+      - name: Release gate (RC)
+        env:
+          RC_TAG: ${{ needs.rc-tag.outputs.rc_tag }}
+        run: node scripts/product-docs/cli.js release gate --tag "$RC_TAG" --channel rc
+
+      - name: Build and publish Mac RC
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: npm run dist:mac -- -p always -c.publish.channel=rc -c.publish.releaseType=prerelease

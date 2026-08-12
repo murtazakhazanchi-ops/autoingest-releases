@@ -4,8 +4,8 @@
     {
       "file": "11_ARCHITECTURAL_EVOLUTION.md",
       "level": "information",
-      "message": "38/56 features placed in the architectural-evolution relationship map",
-      "note": "Unplaced: AI-FEAT-002, AI-FEAT-003, AI-FEAT-005, AI-FEAT-006, AI-FEAT-007, AI-FEAT-008, AI-FEAT-010, AI-FEAT-012, AI-FEAT-013, AI-FEAT-014, AI-FEAT-015, AI-FEAT-016, AI-FEAT-017, AI-FEAT-023, AI-FEAT-026, AI-FEAT-034, AI-FEAT-035, AI-FEAT-048",
+      "message": "40/57 features placed in the architectural-evolution relationship map",
+      "note": "Unplaced: AI-FEAT-002, AI-FEAT-003, AI-FEAT-005, AI-FEAT-007, AI-FEAT-008, AI-FEAT-010, AI-FEAT-012, AI-FEAT-013, AI-FEAT-014, AI-FEAT-015, AI-FEAT-016, AI-FEAT-017, AI-FEAT-023, AI-FEAT-026, AI-FEAT-034, AI-FEAT-035, AI-FEAT-048",
       "rule": "architecture-coverage"
     },
     {
@@ -501,8 +501,15 @@
     {
       "file": "main/main.js",
       "level": "information",
-      "message": "main/main.js is explicitly owned by 5 features (shared, not exclusive)",
-      "note": "AI-FEAT-001, AI-FEAT-021, AI-FEAT-024, AI-FEAT-025, AI-FEAT-036",
+      "message": "main/main.js is explicitly owned by 6 features (shared, not exclusive)",
+      "note": "AI-FEAT-001, AI-FEAT-021, AI-FEAT-024, AI-FEAT-025, AI-FEAT-036, AI-FEAT-057",
+      "rule": "shared-code-path"
+    },
+    {
+      "file": "main/preload.js",
+      "level": "information",
+      "message": "main/preload.js is explicitly owned by 2 features (shared, not exclusive)",
+      "note": "AI-FEAT-001, AI-FEAT-057",
       "rule": "shared-code-path"
     },
     {
@@ -515,15 +522,15 @@
     {
       "file": "services/settings.js",
       "level": "information",
-      "message": "services/settings.js is explicitly owned by 3 features (shared, not exclusive)",
-      "note": "AI-FEAT-002, AI-FEAT-005, AI-FEAT-042",
+      "message": "services/settings.js is explicitly owned by 4 features (shared, not exclusive)",
+      "note": "AI-FEAT-002, AI-FEAT-005, AI-FEAT-042, AI-FEAT-057",
       "rule": "shared-code-path"
     },
     {
       "file": "renderer/renderer.js",
       "level": "information",
-      "message": "renderer/renderer.js is explicitly owned by 9 features (shared, not exclusive)",
-      "note": "AI-FEAT-003, AI-FEAT-012, AI-FEAT-016, AI-FEAT-023, AI-FEAT-026, AI-FEAT-027, AI-FEAT-028, AI-FEAT-035, AI-FEAT-047",
+      "message": "renderer/renderer.js is explicitly owned by 10 features (shared, not exclusive)",
+      "note": "AI-FEAT-003, AI-FEAT-012, AI-FEAT-016, AI-FEAT-023, AI-FEAT-026, AI-FEAT-027, AI-FEAT-028, AI-FEAT-035, AI-FEAT-047, AI-FEAT-057",
       "rule": "shared-code-path"
     },
     {
@@ -534,10 +541,17 @@
       "rule": "shared-code-path"
     },
     {
+      "file": "services/autoUpdater.js",
+      "level": "information",
+      "message": "services/autoUpdater.js is explicitly owned by 2 features (shared, not exclusive)",
+      "note": "AI-FEAT-006, AI-FEAT-057",
+      "rule": "shared-code-path"
+    },
+    {
       "file": "renderer/index.html",
       "level": "information",
-      "message": "renderer/index.html is explicitly owned by 3 features (shared, not exclusive)",
-      "note": "AI-FEAT-008, AI-FEAT-034, AI-FEAT-041",
+      "message": "renderer/index.html is explicitly owned by 4 features (shared, not exclusive)",
+      "note": "AI-FEAT-008, AI-FEAT-034, AI-FEAT-041, AI-FEAT-057",
       "rule": "shared-code-path"
     },
     {
@@ -576,6 +590,13 @@
       "rule": "decision-draft-missing-evidence"
     },
     {
+      "file": "decisions/DEC-018_PART_9_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM_DESIGN_AND_IMPLEMENTATION.md",
+      "level": "warning",
+      "message": "DEC-018 is Status: Draft but its Evidence status does not cite the originating session or detected signals",
+      "note": null,
+      "rule": "decision-draft-missing-evidence"
+    },
+    {
       "file": "DEC-006",
       "level": "information",
       "message": "2 Accepted decisions (DEC-006, DEC-007) all govern the exact same feature/milestone set (AI-FEAT-029) — worth a human check that they don't contradict each other",
@@ -584,11 +605,11 @@
     }
   ],
   "schema_version": "1.2.0",
-  "source_commit": "e634d9ab1889f1b5a3a38ab410c88901519a9a7a",
+  "source_commit": "942bce1273aea97ea52d2879ff843e9cf0425c5c",
   "summary": {
     "error": 0,
     "evidence_gap": 56,
-    "information": 12,
-    "warning": 15
+    "information": 14,
+    "warning": 16
   }
 }

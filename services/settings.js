@@ -310,6 +310,39 @@ async function setAutoMetadataEnabled(value) {
   await _save();
 }
 
+// ─── Update channel (Part 9) ───────────────────────────────────────────────────
+
+const VALID_UPDATE_CHANNELS = ['stable', 'preview'];
+
+/**
+ * Returns the user's opted-in update channel (default: "stable").
+ * Any missing, unrecognized, or legacy-absent value safely resolves to
+ * "stable" — an existing install upgrading into Part 9 never silently
+ * enters Preview. "development" is intentionally not a settable value here;
+ * development builds are never distributed through the updater at all.
+ * @returns {'stable' | 'preview'}
+ */
+function getUpdateChannel() {
+  if (!_loaded) init();
+  const v = _state.updateChannel;
+  return VALID_UPDATE_CHANNELS.includes(v) ? v : 'stable';
+}
+
+/**
+ * Persists the update channel preference. Only changes what the *next*
+ * update check considers — never triggers an immediate download or install.
+ * @param {'stable' | 'preview'} value
+ * @returns {Promise<void>}
+ */
+async function setUpdateChannel(value) {
+  if (!_loaded) init();
+  if (!VALID_UPDATE_CHANNELS.includes(value)) {
+    throw new Error(`setUpdateChannel: expected one of ${VALID_UPDATE_CHANNELS.join(', ')}, got "${value}"`);
+  }
+  _state.updateChannel = value;
+  await _save();
+}
+
 // ─── Archive Operations settings ──────────────────────────────────────────────
 
 /**
@@ -580,6 +613,7 @@ module.exports = {
   getWindowBounds, setWindowBounds, setWindowBoundsSync,
   getLastActiveUserId, setLastActiveUserId,
   getAutoMetadataEnabled, setAutoMetadataEnabled,
+  getUpdateChannel, setUpdateChannel,
   getNasRoot, setNasRoot,
   getLocalStagingRoot, setLocalStagingRoot,
   getDefaultImportMode, setDefaultImportMode,

@@ -22,6 +22,7 @@ IDs are assigned once and never reused or renumbered, even if a feature is later
 | AI-FEAT-005 | Application Settings & Configuration Store | Implemented | Foundational | — | — | [features/AI-FEAT-005_APPLICATION_SETTINGS_CONFIGURATION_STORE.md](features/AI-FEAT-005_APPLICATION_SETTINGS_CONFIGURATION_STORE.md) |
 | AI-FEAT-006 | Application Auto-Update | Implemented | Stable | — | — | [features/AI-FEAT-006_APPLICATION_AUTO_UPDATE.md](features/AI-FEAT-006_APPLICATION_AUTO_UPDATE.md) |
 | AI-FEAT-007 | Telemetry Pipeline | Implemented | Operational | — | — | [features/AI-FEAT-007_TELEMETRY_PIPELINE.md](features/AI-FEAT-007_TELEMETRY_PIPELINE.md) |
+| AI-FEAT-057 | Multi-Channel Release & Update System | Implemented | Evolving | AI-FEAT-006 | AI-RM-010 | [features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md](features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md) |
 
 ## Product UI
 
@@ -151,8 +152,9 @@ IDs are assigned once and never reused or renumbered, even if a feature is later
 
 ## Totals
 
-- **56 features registered**: 48 Implemented-family (44 plain "Implemented" + 4 "Implemented — evolving"), 0 "Partially implemented", 0 "In active development", 8 "Planned" (0% implementation confirmed for all 8).
+- **57 features registered**: 49 Implemented-family (45 plain "Implemented", including AI-FEAT-057 + 4 "Implemented — evolving"), 0 "Partially implemented", 0 "In active development", 8 "Planned" (0% implementation confirmed for all 8).
 - Planned: 8 (all mapped 1:1 to AI-RM-002 through AI-RM-009, except AI-RM-001 which has no dedicated "planned" row because it is already complete — see AI-FEAT-033)
+- AI-FEAT-057 maps to AI-RM-010, a parallel release-infrastructure track outside the AI-RM-001…009 archive-capability sequence — see 02_MASTER_ROADMAP.md.
 
 ## Cross-Cutting Patterns (documented, not given their own AI-FEAT ID)
 

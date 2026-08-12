@@ -9,13 +9,13 @@ Live project status. Update alongside meaningful feature work — see [05_DOCUME
 | Current branch | `main` |
 | Latest relevant commit | `a78b97c` — "docs(product): add queryable documentation intelligence tooling" (Part 4), merged to `main`. |
 | Documentation system status | Part 1 (feature registry, roadmap, dashboard) complete; Architectural Evolution complete; Part 2 (bugs/decisions/postmortems) complete; Part 3 (Documentation Intelligence & Lifecycle System) complete; Part 4 (Queryable Documentation & Engineering Intelligence — the `scripts/product-docs/` CLI's `build`/`validate`/`query`/`impact`/`changes` commands and the `docs/product/generated/` indexes) complete — all committed to `main` as of `a78b97c`. Part 5 (Autonomous Engineering Documentation Orchestration — `scripts/product-docs/automation/`, the `automation <sub>` CLI commands, Engineering Evidence Packets, and the version-controlled but not-yet-installed pre-commit/post-commit/pre-push hooks) implemented, reviewed, and locally validated 2026-08-05, committed to `main` 2026-08-06 — see [10_CHANGELOG.md](10_CHANGELOG.md) for the full entry. This documentation-system progress is independent of, and must not be read as advancing, the AutoIngest application roadmap below. |
-| Total registered features | 56 (`AI-FEAT-001` through `AI-FEAT-056`) |
-| Implemented features | 44 |
+| Total registered features | 57 (`AI-FEAT-001` through `AI-FEAT-057`) — this field and the rest of this dashboard were last fully reconciled 2026-08-05; only the counts directly touched by AI-FEAT-057/AI-RM-010 (2026-08-12) were updated here — the remaining fields below predate and are independent of that work and carry their own pre-existing staleness (see Documentation health row) |
+| Implemented features | 45 (includes AI-FEAT-057) |
 | Implemented — evolving | 4 (AI-FEAT-003, AI-FEAT-008, AI-FEAT-034, AI-FEAT-035) |
 | Partially implemented | 0 |
 | Planned features | 8 (AI-FEAT-049 through AI-FEAT-056, mapped 1:1 to AI-RM-002 through AI-RM-009) |
 | Overall roadmap progress | 1/9 milestones complete |
-| Completed roadmap milestones | AI-RM-001 (Metadata Audit & Repair) |
+| Completed roadmap milestones | AI-RM-001 (Metadata Audit & Repair); AI-RM-010 (Multi-Channel Release & Update System — a parallel infrastructure track, not part of the AI-RM-001…009 archive-capability sequence this dashboard otherwise tracks) |
 | Current roadmap milestone | AI-RM-002 (Archive Maintenance) — not started |
 | Active implementation task | None — not started (confirmed via exhaustive code/git search, see AI-FEAT-049) |
 | Next milestone | AI-RM-002 (Archive Maintenance) |

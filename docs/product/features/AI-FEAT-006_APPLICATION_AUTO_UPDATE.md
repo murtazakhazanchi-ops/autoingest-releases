@@ -7,7 +7,7 @@
 | Status | Implemented |
 | Maturity | Stable |
 | Parent feature | None |
-| Subfeatures | None |
+| Subfeatures | AI-FEAT-057 (Multi-Channel Release & Update System) |
 | Dependencies | AI-FEAT-005 (settings), AI-FEAT-007 (telemetry consumes update state) |
 | Related roadmap milestone | None |
 | Related technical docs | None dedicated |
@@ -22,7 +22,7 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 | Field | Value |
 |---|---|
 | Related features | None beyond Dependencies/Parent/Subfeatures already listed in the header table above |
-| Related decisions | None recorded |
+| Related decisions | [DEC-017](../decisions/DEC-017_STABLE_RELEASES_REBUILD_FROM_VERIFIED_RC_SOURCE_NEVER_PROMOTE_EXACT_BINARIES.md) (via AI-FEAT-057) |
 | Related bugs | None recorded |
 | Related postmortems | [PM-002](../postmortems/PM-002_V0_9_11_FIRST_PUBLICATION_ATTEMPT_PRODUCED_AN_EMPTY_GITHUB_RELEASE.md) |
 | Related architectural evolution sections | Not yet covered in 11_ARCHITECTURAL_EVOLUTION.md's relationship map |
@@ -36,7 +36,7 @@ Self-update mechanism using `electron-updater` against GitHub Releases. Checks 3
 
 ## Current Behavior
 
-`services/autoUpdater.js`: checks for updates 3s post-launch and every 4h thereafter; broadcasts `update-available`, `download-progress`, and `update:ready` IPC events to all open windows; `quitAndInstall()` is user-gated (not automatic); maintains `_lastUpdateState` so a renderer window that attaches late (e.g. a modal opened after the check already ran) can still see the current state on demand rather than missing the original broadcast.
+`services/autoUpdater.js`: checks for updates 3s post-launch and every 4h thereafter; broadcasts `update-available`, `download-progress`, and `update:ready` IPC events to all open windows; `quitAndInstall()` is user-gated (not automatic); maintains `_lastUpdateState` so a renderer window that attaches late (e.g. a modal opened after the check already ran) can still see the current state on demand rather than missing the original broadcast. As of AI-FEAT-057 (Part 9), `init()` also applies the user's Stable/Preview channel preference (`applyChannelSetting()`) before the first check ever runs — see AI-FEAT-057 for the full multi-channel design; this feature's own default (no setting present) behaves identically to before AI-FEAT-057 existed.
 
 ## Original Plan / Intent
 

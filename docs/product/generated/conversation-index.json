@@ -152,6 +152,52 @@
       "status": "Imported",
       "summary": "Windows/NAS Event Management Failure — Investigation, Root Cause, Verification, and Repository Stabilization",
       "title": "Windows/NAS Event Management Failure — Investigation, Root Cause, Verification, and Repository Stabilization"
+    },
+    {
+      "aliases": [],
+      "bug_ids": [],
+      "canonical_path": "conversations/ENG-CONV-0004_PART_9_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM_DESIGN_AND_IMPLEMENTATION.md",
+      "conversation_id": "ENG-CONV-0004",
+      "conversation_type": "mixed",
+      "date_completed": "2026-08-12T00:00:00Z",
+      "date_started": "2026-08-12T00:00:00Z",
+      "decision_ids": [
+        "DEC-017",
+        "DEC-018"
+      ],
+      "evidence_pending_summary": "Identity, Repository Context, Initial Understanding, Initial Proposal, Discussion Evolution, Alternatives, Implementation Handoff",
+      "feature_ids": [
+        "AI-FEAT-005",
+        "AI-FEAT-006",
+        "AI-FEAT-008",
+        "AI-FEAT-057"
+      ],
+      "import_date": "2026-08-12T13:02:11.222Z",
+      "keywords": [
+        "part",
+        "multi",
+        "channel",
+        "release",
+        "update",
+        "system",
+        "design",
+        "and",
+        "implementation"
+      ],
+      "latest_outcome": "2026-08-12 — Imported. Canonicalized from a \"ecp\"-format packet claiming source_tool \"claude-code\".",
+      "memory_ids": [],
+      "open_questions_summary": "Whether release gate should eventually also be wired into a pre-tag local git hook, not only CI — not pursued in this session, consistent with Part 5's existing hook-installation being a separate, explicit, human-approved step.",
+      "provenance_classification": "Imported packet — no secret pattern detected",
+      "rejected_approach_count": 3,
+      "related_conversation_ids": [],
+      "revision_count": 6,
+      "roadmap_ids": [
+        "AI-RM-010"
+      ],
+      "source_tool": "claude-code",
+      "status": "Imported",
+      "summary": "Part 9 — Multi-Channel Release & Update System: design and implementation",
+      "title": "Part 9 — Multi-Channel Release & Update System: design and implementation"
     }
   ],
   "docsys_version": "1.2.0",

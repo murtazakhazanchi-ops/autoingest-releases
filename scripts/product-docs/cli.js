@@ -217,18 +217,36 @@ Usage: node scripts/product-docs/cli.js release <sub> [args]
 
 Subcommands:
   prepare --to <ref> [--from <ref>|auto] [--dry-run] [--output-dir <dir>] [--json-only]
+          [--channel rc|stable] [--rc-commit <sha>]
       Generates a full release draft (Markdown + JSON) for the range from the
       auto-detected prior Git tag (or --from) up to --to. --from defaults to
       "auto" (newest tag reachable from --to, excluding --to itself).
+      --channel rc additionally renders a QA checklist (affected bugs/
+      features, tester instructions, required evidence). --channel stable
+      additionally renders a promotion-readiness section citing --rc-commit.
   status [--dir <dir>]
       Lists previously generated release drafts.
-  gate --tag <vX.Y.Z|X.Y.Z>
+  gate --tag <vX.Y.Z|X.Y.Z> [--channel rc|stable] [--rc-commit <sha>]
+       [--auto-rc-commit] [--stable-commit <ref>]
+       [--override-drift-check "<reason>"] [--json]
       Checks package.json's (and package-lock.json's) version against the
       given target release version BEFORE a tag is created. electron-builder
       derives its publish target and artifact names from package.json's
       version, never from the git tag — a mismatch builds real artifacts but
       silently fails to publish them (see the v0.9.11 release-process
-      incident, docs/product/postmortems/). Exits non-zero on mismatch.
+      incident, docs/product/postmortems/PM-002_*.md). Exits non-zero on
+      mismatch.
+      With --channel rc: additionally requires an "X.Y.Z-rc.N" version shape.
+      With --channel stable: additionally requires a plain "X.Y.Z" version,
+      zero source drift from --rc-commit/--auto-rc-commit (excluding the
+      version-bump files themselves) unless --override-drift-check gives an
+      explicit reason, and zero currently-Open/Investigating bugs. All
+      channel-gate failures are BLOCKING — there is no warning-only outcome
+      for these checks.
+      --auto-rc-commit discovers the highest-numbered "vX.Y.Z-rc.*" tag for
+      this Stable version from git tag history alone (no --rc-commit needed)
+      — used by the automated stable-release-gate CI job, since a plain
+      "push: tags: v*" event has no workflow_dispatch input to carry one.
 
 Never creates a GitHub release, never writes docs/release-notes-*.md, never
 completes a roadmap milestone. Publishing remains a separately authorized
@@ -269,6 +287,8 @@ function cmdReleasePrepare(args) {
   const result = releaseIntelligence.writeReleaseDraft(fromRef, toRef, {
     dryRun: !!flags['dry-run'],
     outputDir: flags['output-dir'],
+    channel: flags.channel || null,
+    verifiedRcCommit: flags['rc-commit'] || null,
   });
   if (result.dryRun) {
     console.log(`[dry-run] release draft for ${result.draft.from_ref || '(no prior tag)'} → ${toRef} — no files written.`);
@@ -294,13 +314,24 @@ function cmdReleaseGate(args) {
     if (!flags.tag) process.exitCode = 1;
     return;
   }
-  const result = releaseIntelligence.checkVersionTagAlignment(REPO_ROOT, flags.tag);
+  const result = flags.channel
+    ? releaseIntelligence.checkChannelReleaseGate(REPO_ROOT, {
+        channel: flags.channel,
+        tagOrVersion: flags.tag,
+        verifiedRcCommit: flags['rc-commit'] || null,
+        stableCommit: flags['stable-commit'] || 'HEAD',
+        overrideDriftReason: flags['override-drift-check'] || null,
+        autoDiscoverRcCommit: !!flags['auto-rc-commit'],
+      })
+    : releaseIntelligence.checkVersionTagAlignment(REPO_ROOT, flags.tag);
   if (flags.json) {
     console.log(JSON.stringify(result, null, 2));
   } else if (result.ok) {
-    console.log(`PASS — package.json (${result.packageVersion})${result.lockVersion ? ` and package-lock.json (${result.lockVersion})` : ''} match target release version ${result.targetVersion}.`);
+    console.log(`PASS${flags.channel ? ` (${flags.channel})` : ''} — package.json (${result.packageVersion})${result.lockVersion ? ` and package-lock.json (${result.lockVersion})` : ''} match target release version ${result.targetVersion}.`);
+    if (result.autoDiscoveredRcTag) console.log(`  Auto-discovered prior RC tag: ${result.autoDiscoveredRcTag}`);
+    if (result.overrideDriftReason) console.log(`  NOTE: drift/provenance check was overridden — reason: ${result.overrideDriftReason}`);
   } else {
-    console.error(`BLOCKED — release version gate failed for target ${result.targetVersion}:`);
+    console.error(`BLOCKED${flags.channel ? ` (${flags.channel})` : ''} — release gate failed for target ${result.targetVersion}:`);
     for (const b of result.blocking) console.error(`  - ${b}`);
   }
   if (!result.ok) process.exitCode = 1;

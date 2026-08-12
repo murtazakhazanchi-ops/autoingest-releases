@@ -5951,6 +5951,7 @@
     background: var(--accent-soft); border-color: var(--accent-border);
   }
   .settings-theme-radio { accent-color: var(--accent); cursor: pointer; }
+  .settings-channel-radio { accent-color: var(--accent); cursor: pointer; }
   .settings-theme-label { display: flex; flex-direction: column; gap: 2px; }
   .settings-theme-name { font-size: 0.82rem; font-weight: 500; color: var(--text); }
   .settings-theme-desc { font-size: 0.67rem; color: var(--text-muted); }
@@ -8025,6 +8026,25 @@
               <span class="settings-theme-label">
                 <span class="settings-theme-name">Dark</span>
                 <span class="settings-theme-desc">Always use dark mode</span>
+              </span>
+            </label>
+          </div>
+        </div>
+        <div class="settings-section">
+          <div class="settings-section-label">Update Channel</div>
+          <div class="settings-theme-group" role="radiogroup" aria-label="Update Channel">
+            <label class="settings-theme-option">
+              <input class="settings-channel-radio" type="radio" name="updateChannel" value="stable">
+              <span class="settings-theme-label">
+                <span class="settings-theme-name">Stable</span>
+                <span class="settings-theme-desc">Verified releases only. Recommended for everyone.</span>
+              </span>
+            </label>
+            <label class="settings-theme-option">
+              <input class="settings-channel-radio" type="radio" name="updateChannel" value="preview">
+              <span class="settings-theme-label">
+                <span class="settings-theme-name">Preview</span>
+                <span class="settings-theme-desc">Early release-candidate builds. May contain unverified changes — opt in only if you're helping test.</span>
               </span>
             </label>
           </div>

@@ -121,7 +121,9 @@
       "evidenceNote": "Derived directly from features/AI-FEAT-006_APPLICATION_AUTO_UPDATE.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-006",
       "relatedBugs": [],
-      "relatedDecisions": [],
+      "relatedDecisions": [
+        "DEC-017"
+      ],
       "relatedPostmortems": [
         "PM-002"
       ],
@@ -1236,6 +1238,41 @@
         "AI-RM-009"
       ],
       "topic": "AI Archive Intelligence"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md",
+      "canonicalTechnicalDocs": [
+        ".github/workflows/release.yml",
+        "scripts/product-docs/README.md"
+      ],
+      "codeAreas": [
+        ".github/workflows/release.yml",
+        "services/autoUpdater.js",
+        "services/settings.js",
+        "main/main.js",
+        "main/preload.js",
+        "renderer/index.html",
+        "renderer/renderer.js",
+        "scripts/product-docs/automation/releaseIntelligence.js",
+        "scripts/product-docs/lib/updateChannelModel.js",
+        "scripts/product-docs/cli.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-057",
+      "relatedBugs": [],
+      "relatedDecisions": [
+        "DEC-017",
+        "DEC-018"
+      ],
+      "relatedPostmortems": [
+        "PM-002"
+      ],
+      "roadmapIds": [
+        "AI-RM-010"
+      ],
+      "topic": "Multi-Channel Release & Update System"
     }
   ]
 }

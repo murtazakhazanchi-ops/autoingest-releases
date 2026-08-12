@@ -7,7 +7,7 @@ code_path_to_features only lists paths already explicitly authored in some featu
 ## Subsystem → Features
 
 - **SUBSYS-analytics-and-intelligence**: AI-FEAT-055, AI-FEAT-056
-- **SUBSYS-application-platform**: AI-FEAT-001, AI-FEAT-002, AI-FEAT-003, AI-FEAT-004, AI-FEAT-005, AI-FEAT-006, AI-FEAT-007
+- **SUBSYS-application-platform**: AI-FEAT-001, AI-FEAT-002, AI-FEAT-003, AI-FEAT-004, AI-FEAT-005, AI-FEAT-006, AI-FEAT-007, AI-FEAT-057
 - **SUBSYS-archive-operations**: AI-FEAT-042, AI-FEAT-043, AI-FEAT-044, AI-FEAT-045, AI-FEAT-046
 - **SUBSYS-collaboration-and-realtime-coordination**: AI-FEAT-048
 - **SUBSYS-event-management**: AI-FEAT-009, AI-FEAT-010
@@ -25,7 +25,7 @@ code_path_to_features only lists paths already explicitly authored in some featu
 
 ## IPC-layer subsystems (derived — main/)
 
-- **SUBSYS-application-platform**: AI-FEAT-001, AI-FEAT-002, AI-FEAT-003, AI-FEAT-004, AI-FEAT-005, AI-FEAT-006, AI-FEAT-007
+- **SUBSYS-application-platform**: AI-FEAT-001, AI-FEAT-002, AI-FEAT-003, AI-FEAT-004, AI-FEAT-005, AI-FEAT-006, AI-FEAT-007, AI-FEAT-057
 - **SUBSYS-source-acquisition**: AI-FEAT-011, AI-FEAT-012
 - **SUBSYS-media-browsing**: AI-FEAT-013, AI-FEAT-014, AI-FEAT-015, AI-FEAT-016
 - **SUBSYS-import-and-archive-writing**: AI-FEAT-019, AI-FEAT-020, AI-FEAT-021, AI-FEAT-022, AI-FEAT-023, AI-FEAT-024, AI-FEAT-025, AI-FEAT-026, AI-FEAT-027, AI-FEAT-028
@@ -34,7 +34,7 @@ code_path_to_features only lists paths already explicitly authored in some featu
 
 ## Service-layer subsystems (derived — services/)
 
-- **SUBSYS-application-platform**: AI-FEAT-001, AI-FEAT-002, AI-FEAT-003, AI-FEAT-004, AI-FEAT-005, AI-FEAT-006, AI-FEAT-007
+- **SUBSYS-application-platform**: AI-FEAT-001, AI-FEAT-002, AI-FEAT-003, AI-FEAT-004, AI-FEAT-005, AI-FEAT-006, AI-FEAT-007, AI-FEAT-057
 - **SUBSYS-media-browsing**: AI-FEAT-013, AI-FEAT-014, AI-FEAT-015, AI-FEAT-016
 - **SUBSYS-import-and-archive-writing**: AI-FEAT-019, AI-FEAT-020, AI-FEAT-021, AI-FEAT-022, AI-FEAT-023, AI-FEAT-024, AI-FEAT-025, AI-FEAT-026, AI-FEAT-027, AI-FEAT-028
 - **SUBSYS-metadata**: AI-FEAT-029, AI-FEAT-030, AI-FEAT-031, AI-FEAT-032, AI-FEAT-033, AI-FEAT-034, AI-FEAT-035, AI-FEAT-036, AI-FEAT-037
@@ -44,5 +44,5 @@ code_path_to_features only lists paths already explicitly authored in some featu
 
 ## Coverage
 
-- 56 explicitly-owned code path(s).
+- 60 explicitly-owned code path(s).
 - 15 test file(s) with a discoverable feature owner via Testing coverage citations.

@@ -2,11 +2,11 @@
 
 > Generated artifact — locator only. Regenerate with `node scripts/product-docs/cli.js build`. Full machine-readable graph: `dependency-graph.json`. Views below are deliberately bounded (one subsystem or milestone chain per diagram) rather than one unreadable graph of every node.
 
-Total: 112 nodes, 500 edges.
+Total: 118 nodes, 531 edges.
 
 ### Roadmap milestone relationships
 
-9 node(s), 8 edge(s) in this view.
+10 node(s), 8 edge(s) in this view.
 
 ```mermaid
 flowchart LR
@@ -20,6 +20,7 @@ flowchart LR
   AI_RM_007(("AI-RM-007: Archive Repair"))
   AI_RM_008(("AI-RM-008: Archive Analytics"))
   AI_RM_009(("AI-RM-009: AI Archive Intelligence"))
+  AI_RM_010(("AI-RM-010: Multi-Channel Release & Update System"))
   AI_RM_002 -->|depends_on| AI_RM_001
   AI_RM_003 -->|depends_on| AI_RM_002
   AI_RM_004 -->|depends_on| AI_RM_003
@@ -32,7 +33,7 @@ flowchart LR
 
 ### Feature dependency overview (features with a depends_on/extended_by edge)
 
-53 node(s), 142 edge(s) in this view.
+54 node(s), 148 edge(s) in this view.
 
 ```mermaid
 flowchart LR
@@ -90,6 +91,7 @@ flowchart LR
   AI_FEAT_054["AI-FEAT-054: Integrity Verification — Archive-Wide"]
   AI_FEAT_055["AI-FEAT-055: Archive Analytics"]
   AI_FEAT_056["AI-FEAT-056: AI Archive Intelligence"]
+  AI_FEAT_057["AI-FEAT-057: Multi-Channel Release & Update System"]
   AI_FEAT_002 -->|depends_on| AI_FEAT_005
   AI_FEAT_002 -->|related_to| AI_FEAT_022
   AI_FEAT_002 -->|related_to| AI_FEAT_027
@@ -107,6 +109,8 @@ flowchart LR
   AI_FEAT_005 -->|related_to| AI_FEAT_048
   AI_FEAT_006 -->|depends_on| AI_FEAT_005
   AI_FEAT_006 -->|depends_on| AI_FEAT_007
+  AI_FEAT_006 -->|extended_by| AI_FEAT_057
+  AI_FEAT_006 -->|extended_by| AI_FEAT_057
   AI_FEAT_007 -->|depends_on| AI_FEAT_005
   AI_FEAT_007 -->|depends_on| AI_FEAT_006
   AI_FEAT_008 -->|related_to| AI_FEAT_016
@@ -232,6 +236,10 @@ flowchart LR
   AI_FEAT_054 -->|depends_on| AI_FEAT_025
   AI_FEAT_055 -->|depends_on| AI_FEAT_043
   AI_FEAT_056 -->|depends_on| AI_FEAT_055
+  AI_FEAT_057 -->|depends_on| AI_FEAT_005
+  AI_FEAT_057 -->|related_to| AI_FEAT_005
+  AI_FEAT_057 -->|depends_on| AI_FEAT_006
+  AI_FEAT_057 -->|related_to| AI_FEAT_006
 ```
 
 ### Metadata subsystem
@@ -368,7 +376,7 @@ flowchart LR
 
 ### Planned archive-management direction
 
-16 node(s), 26 edge(s) in this view.
+17 node(s), 26 edge(s) in this view.
 
 ```mermaid
 flowchart LR
@@ -389,6 +397,7 @@ flowchart LR
   AI_RM_007(("AI-RM-007: Archive Repair"))
   AI_RM_008(("AI-RM-008: Archive Analytics"))
   AI_RM_009(("AI-RM-009: AI Archive Intelligence"))
+  AI_RM_010(("AI-RM-010: Multi-Channel Release & Update System"))
   AI_FEAT_049 -->|planned_in| AI_RM_002
   AI_FEAT_050 -->|planned_in| AI_RM_003
   AI_FEAT_051 -->|planned_in| AI_RM_004

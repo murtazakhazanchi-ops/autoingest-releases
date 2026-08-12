@@ -45,12 +45,30 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () 
   if ((localStorage.getItem('theme') || 'auto') === 'auto') applyTheme();
 });
 
+// ── Update channel (Part 9) — Stable/Preview opt-in ─────────────────────────
+// Deliberately its own class (.settings-channel-radio), not
+// .settings-theme-radio: the generic theme-radio selectors below sweep up
+// every element sharing that class and would otherwise misinterpret this
+// group's "stable"/"preview" values as a theme preference.
+async function _loadUpdateChannelSetting() {
+  let channel = 'stable';
+  try { channel = (await window.api.getUpdateChannel?.()) || 'stable'; } catch {}
+  document.querySelectorAll('.settings-channel-radio').forEach(r => { r.checked = r.value === channel; });
+}
+
+document.querySelectorAll('.settings-channel-radio').forEach(r => {
+  r.addEventListener('change', () => {
+    window.api.setUpdateChannel?.(r.value).catch(() => {});
+  });
+});
+
 // Settings modal open
 document.getElementById('settingsBtn')?.addEventListener('click', () => {
   const pref = localStorage.getItem('theme') || 'auto';
   document.querySelectorAll('.settings-theme-radio').forEach(r => { r.checked = r.value === pref; });
   document.getElementById('settingsModal').classList.add('visible');
   _rtLoadSettings();
+  _loadUpdateChannelSetting();
 });
 
 // Settings modal close

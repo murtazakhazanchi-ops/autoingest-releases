@@ -2,15 +2,15 @@
 
 > Generated artifact. Implements the 13 rules specified in [14_VALIDATION_SPECIFICATION.md](../14_VALIDATION_SPECIFICATION.md) plus Part 4 tooling-integrity checks. Regenerate with `node scripts/product-docs/cli.js validate`.
 
-Generated against source commit `e634d9ab1889f1b5a3a38ab410c88901519a9a7a`.
+Generated against source commit `942bce1273aea97ea52d2879ff843e9cf0425c5c`.
 
 ## Summary
 
 | Level | Count | Exit policy |
 |---|---|---|
 | Error | 0 | Fails the build (non-zero exit) |
-| Warning | 15 | Reported, does not fail the build |
-| Information | 12 | Reported, does not fail the build |
+| Warning | 16 | Reported, does not fail the build |
+| Information | 14 | Reported, does not fail the build |
 | Evidence gap | 56 | Reported, does not fail the build — visibility only, per 14_VALIDATION_SPECIFICATION.md Rule 13 |
 
 **Result**: PASS
@@ -19,7 +19,7 @@ Generated against source commit `e634d9ab1889f1b5a3a38ab410c88901519a9a7a`.
 
 None.
 
-## Warning (15)
+## Warning (16)
 
 | Rule | Message | File | Note |
 |---|---|---|---|
@@ -27,6 +27,7 @@ None.
 | cyclic-dependency | Undocumented dependency cycle: AI-FEAT-009 -> AI-FEAT-018 -> AI-FEAT-009 | generated/dependency-graph.json | — |
 | cyclic-dependency | Undocumented dependency cycle: AI-FEAT-032 -> AI-FEAT-039 -> AI-FEAT-032 | generated/dependency-graph.json | — |
 | decision-draft-missing-evidence | DEC-016 is Status: Draft but its Evidence status does not cite the originating session or detected signals | decisions/DEC-016_WINDOWS_NAS_EVENT_MANAGEMENT_RELIABILITY_INVESTIGATION_BUG_011_014_CHATGPT_SIDE_.md | — |
+| decision-draft-missing-evidence | DEC-018 is Status: Draft but its Evidence status does not cite the originating session or detected signals | decisions/DEC-018_PART_9_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM_DESIGN_AND_IMPLEMENTATION.md | — |
 | missing-related-technical-docs | AI-FEAT-005 is Implemented but cites no Related technical docs | features/AI-FEAT-005_APPLICATION_SETTINGS_CONFIGURATION_STORE.md | — |
 | missing-related-technical-docs | AI-FEAT-006 is Implemented but cites no Related technical docs | features/AI-FEAT-006_APPLICATION_AUTO_UPDATE.md | — |
 | missing-related-technical-docs | AI-FEAT-007 is Implemented but cites no Related technical docs | features/AI-FEAT-007_TELEMETRY_PIPELINE.md | — |
@@ -39,18 +40,20 @@ None.
 | missing-related-technical-docs | AI-FEAT-040 is Implemented but cites no Related technical docs | features/AI-FEAT-040_BACKUP_UPDATE_SCANNING.md | — |
 | missing-related-technical-docs | AI-FEAT-041 is Implemented but cites no Related technical docs | features/AI-FEAT-041_TRANSFER_BACKGROUND_MINIMIZE_OPERATION.md | — |
 
-## Information (12)
+## Information (14)
 
 | Rule | Message | File | Note |
 |---|---|---|---|
-| architecture-coverage | 38/56 features placed in the architectural-evolution relationship map | 11_ARCHITECTURAL_EVOLUTION.md | Unplaced: AI-FEAT-002, AI-FEAT-003, AI-FEAT-005, AI-FEAT-006, AI-FEAT-007, AI-FEAT-008, AI-FEAT-010, AI-FEAT-012, AI-FEAT-013, AI-FEAT-014, AI-FEAT-015, AI-FEAT-016, AI-FEAT-017, AI-FEAT-023, AI-FEAT-026, AI-FEAT-034, AI-FEAT-035, AI-FEAT-048 |
+| architecture-coverage | 40/57 features placed in the architectural-evolution relationship map | 11_ARCHITECTURAL_EVOLUTION.md | Unplaced: AI-FEAT-002, AI-FEAT-003, AI-FEAT-005, AI-FEAT-007, AI-FEAT-008, AI-FEAT-010, AI-FEAT-012, AI-FEAT-013, AI-FEAT-014, AI-FEAT-015, AI-FEAT-016, AI-FEAT-017, AI-FEAT-023, AI-FEAT-026, AI-FEAT-034, AI-FEAT-035, AI-FEAT-048 |
 | overlapping-active-decisions | 2 Accepted decisions (DEC-006, DEC-007) all govern the exact same feature/milestone set (AI-FEAT-029) — worth a human check that they don't contradict each other | DEC-006 | — |
-| shared-code-path | main/main.js is explicitly owned by 5 features (shared, not exclusive) | main/main.js | AI-FEAT-001, AI-FEAT-021, AI-FEAT-024, AI-FEAT-025, AI-FEAT-036 |
+| shared-code-path | main/main.js is explicitly owned by 6 features (shared, not exclusive) | main/main.js | AI-FEAT-001, AI-FEAT-021, AI-FEAT-024, AI-FEAT-025, AI-FEAT-036, AI-FEAT-057 |
+| shared-code-path | main/preload.js is explicitly owned by 2 features (shared, not exclusive) | main/preload.js | AI-FEAT-001, AI-FEAT-057 |
 | shared-code-path | renderer/theme-init.js is explicitly owned by 2 features (shared, not exclusive) | renderer/theme-init.js | AI-FEAT-001, AI-FEAT-003 |
-| shared-code-path | services/settings.js is explicitly owned by 3 features (shared, not exclusive) | services/settings.js | AI-FEAT-002, AI-FEAT-005, AI-FEAT-042 |
-| shared-code-path | renderer/renderer.js is explicitly owned by 9 features (shared, not exclusive) | renderer/renderer.js | AI-FEAT-003, AI-FEAT-012, AI-FEAT-016, AI-FEAT-023, AI-FEAT-026, AI-FEAT-027, AI-FEAT-028, AI-FEAT-035, AI-FEAT-047 |
+| shared-code-path | services/settings.js is explicitly owned by 4 features (shared, not exclusive) | services/settings.js | AI-FEAT-002, AI-FEAT-005, AI-FEAT-042, AI-FEAT-057 |
+| shared-code-path | renderer/renderer.js is explicitly owned by 10 features (shared, not exclusive) | renderer/renderer.js | AI-FEAT-003, AI-FEAT-012, AI-FEAT-016, AI-FEAT-023, AI-FEAT-026, AI-FEAT-027, AI-FEAT-028, AI-FEAT-035, AI-FEAT-047, AI-FEAT-057 |
 | shared-code-path | main/eventJsonStore.js is explicitly owned by 3 features (shared, not exclusive) | main/eventJsonStore.js | AI-FEAT-004, AI-FEAT-021, AI-FEAT-029 |
-| shared-code-path | renderer/index.html is explicitly owned by 3 features (shared, not exclusive) | renderer/index.html | AI-FEAT-008, AI-FEAT-034, AI-FEAT-041 |
+| shared-code-path | services/autoUpdater.js is explicitly owned by 2 features (shared, not exclusive) | services/autoUpdater.js | AI-FEAT-006, AI-FEAT-057 |
+| shared-code-path | renderer/index.html is explicitly owned by 4 features (shared, not exclusive) | renderer/index.html | AI-FEAT-008, AI-FEAT-034, AI-FEAT-041, AI-FEAT-057 |
 | shared-code-path | main/fileBrowser.js is explicitly owned by 2 features (shared, not exclusive) | main/fileBrowser.js | AI-FEAT-011, AI-FEAT-013 |
 | shared-code-path | main/fileManager.js is explicitly owned by 2 features (shared, not exclusive) | main/fileManager.js | AI-FEAT-019, AI-FEAT-020 |
 | shared-code-path | services/transferExportService.js is explicitly owned by 3 features (shared, not exclusive) | services/transferExportService.js | AI-FEAT-038, AI-FEAT-040, AI-FEAT-041 |

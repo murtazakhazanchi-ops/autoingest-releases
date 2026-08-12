@@ -12,6 +12,7 @@
       ],
       "canonicalProductDoc": "docs/product/01_FEATURE_REGISTRY.md",
       "canonicalTechnicalDocs": [
+        ".github/workflows/release.yml",
         "CLAUDE.md § Security Model",
         "docs/README.md § Security Model",
         "docs/data-model.md",
@@ -19,7 +20,8 @@
         "docs/features.md #7 \"UI Dashboard\"",
         "docs/history.md v0.8.1",
         "docs/system-contracts.md §1-2",
-        "docs/ui-system.md § Dashboard"
+        "docs/ui-system.md § Dashboard",
+        "scripts/product-docs/README.md"
       ],
       "changeImpactChecklist": [
         "Re-read the Related Files section of every primary feature listed above before changing shared source files.",
@@ -35,23 +37,33 @@
         "AI-FEAT-004",
         "AI-FEAT-005",
         "AI-FEAT-006",
-        "AI-FEAT-007"
+        "AI-FEAT-007",
+        "AI-FEAT-057"
       ],
       "relatedBugs": [],
       "relatedDecisions": [],
       "sourceDirectories": [
+        ".github/workflows",
         "main",
         "renderer",
+        "scripts/product-docs",
+        "scripts/product-docs/automation",
+        "scripts/product-docs/lib",
         "services"
       ],
       "sourceFiles": [
+        ".github/workflows/release.yml",
         "main/eventJsonStore.js",
         "main/main.js",
         "main/preload.js",
         "main/userManager.js",
+        "renderer/index.html",
         "renderer/renderer.js",
         "renderer/splash.html",
         "renderer/theme-init.js",
+        "scripts/product-docs/automation/releaseIntelligence.js",
+        "scripts/product-docs/cli.js",
+        "scripts/product-docs/lib/updateChannelModel.js",
         "services/autoUpdater.js",
         "services/settings.js",
         "services/telemetry.js"

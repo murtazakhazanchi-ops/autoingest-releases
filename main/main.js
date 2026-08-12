@@ -2606,6 +2606,14 @@ ipcMain.handle('settings:setAutoMetadataEnabled', async (_event, value) => {
   return { ok: true };
 });
 
+ipcMain.handle('settings:getUpdateChannel', () => settings.getUpdateChannel());
+
+ipcMain.handle('settings:setUpdateChannel', async (_event, value) => {
+  await settings.setUpdateChannel(value);
+  autoUpdater.applyChannelSetting(value);
+  return { ok: true };
+});
+
 // Checks that the collection folder (and optionally the event folder) still
 // exist on disk. Returns false if either is missing or inaccessible.
 ipcMain.handle('settings:verifyLastEvent', async (_event, collectionPath, eventFolderPath) => {

@@ -1,5 +1,18 @@
 {
   "code_path_to_features": {
+    ".github/workflows/release.yml": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-001",
+        "AI-FEAT-002",
+        "AI-FEAT-003",
+        "AI-FEAT-004",
+        "AI-FEAT-005",
+        "AI-FEAT-006",
+        "AI-FEAT-007",
+        "AI-FEAT-057"
+      ]
+    },
     "data/keywords.registry.json": {
       "confidence": "explicit",
       "features": [
@@ -49,7 +62,8 @@
         "AI-FEAT-034",
         "AI-FEAT-035",
         "AI-FEAT-036",
-        "AI-FEAT-037"
+        "AI-FEAT-037",
+        "AI-FEAT-057"
       ]
     },
     "main/exifService.js": {
@@ -120,7 +134,8 @@
         "AI-FEAT-034",
         "AI-FEAT-035",
         "AI-FEAT-036",
-        "AI-FEAT-037"
+        "AI-FEAT-037",
+        "AI-FEAT-057"
       ]
     },
     "main/metadataQueueRecovery.js": {
@@ -216,7 +231,8 @@
         "AI-FEAT-004",
         "AI-FEAT-005",
         "AI-FEAT-006",
-        "AI-FEAT-007"
+        "AI-FEAT-007",
+        "AI-FEAT-057"
       ]
     },
     "main/qmzService.js": {
@@ -243,7 +259,8 @@
         "AI-FEAT-004",
         "AI-FEAT-005",
         "AI-FEAT-006",
-        "AI-FEAT-007"
+        "AI-FEAT-007",
+        "AI-FEAT-057"
       ]
     },
     "main/videoThumbService.js": {
@@ -299,6 +316,13 @@
     "renderer/index.html": {
       "confidence": "explicit",
       "features": [
+        "AI-FEAT-001",
+        "AI-FEAT-002",
+        "AI-FEAT-003",
+        "AI-FEAT-004",
+        "AI-FEAT-005",
+        "AI-FEAT-006",
+        "AI-FEAT-007",
         "AI-FEAT-008",
         "AI-FEAT-029",
         "AI-FEAT-030",
@@ -312,7 +336,8 @@
         "AI-FEAT-038",
         "AI-FEAT-039",
         "AI-FEAT-040",
-        "AI-FEAT-041"
+        "AI-FEAT-041",
+        "AI-FEAT-057"
       ]
     },
     "renderer/renderer.js": {
@@ -350,7 +375,8 @@
         "AI-FEAT-035",
         "AI-FEAT-036",
         "AI-FEAT-037",
-        "AI-FEAT-047"
+        "AI-FEAT-047",
+        "AI-FEAT-057"
       ]
     },
     "renderer/splash.html": {
@@ -362,7 +388,8 @@
         "AI-FEAT-004",
         "AI-FEAT-005",
         "AI-FEAT-006",
-        "AI-FEAT-007"
+        "AI-FEAT-007",
+        "AI-FEAT-057"
       ]
     },
     "renderer/theme-init.js": {
@@ -374,7 +401,8 @@
         "AI-FEAT-004",
         "AI-FEAT-005",
         "AI-FEAT-006",
-        "AI-FEAT-007"
+        "AI-FEAT-007",
+        "AI-FEAT-057"
       ]
     },
     "renderer/treeAutocomplete.js": {
@@ -382,6 +410,45 @@
       "features": [
         "AI-FEAT-009",
         "AI-FEAT-010"
+      ]
+    },
+    "scripts/product-docs/automation/releaseIntelligence.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-001",
+        "AI-FEAT-002",
+        "AI-FEAT-003",
+        "AI-FEAT-004",
+        "AI-FEAT-005",
+        "AI-FEAT-006",
+        "AI-FEAT-007",
+        "AI-FEAT-057"
+      ]
+    },
+    "scripts/product-docs/cli.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-001",
+        "AI-FEAT-002",
+        "AI-FEAT-003",
+        "AI-FEAT-004",
+        "AI-FEAT-005",
+        "AI-FEAT-006",
+        "AI-FEAT-007",
+        "AI-FEAT-057"
+      ]
+    },
+    "scripts/product-docs/lib/updateChannelModel.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-001",
+        "AI-FEAT-002",
+        "AI-FEAT-003",
+        "AI-FEAT-004",
+        "AI-FEAT-005",
+        "AI-FEAT-006",
+        "AI-FEAT-007",
+        "AI-FEAT-057"
       ]
     },
     "services/adoptionDryRunService.js": {
@@ -463,7 +530,8 @@
         "AI-FEAT-004",
         "AI-FEAT-005",
         "AI-FEAT-006",
-        "AI-FEAT-007"
+        "AI-FEAT-007",
+        "AI-FEAT-057"
       ]
     },
     "services/localSyncManifest.js": {
@@ -574,7 +642,8 @@
         "AI-FEAT-043",
         "AI-FEAT-044",
         "AI-FEAT-045",
-        "AI-FEAT-046"
+        "AI-FEAT-046",
+        "AI-FEAT-057"
       ]
     },
     "services/syncQueueService.js": {
@@ -606,7 +675,8 @@
         "AI-FEAT-004",
         "AI-FEAT-005",
         "AI-FEAT-006",
-        "AI-FEAT-007"
+        "AI-FEAT-007",
+        "AI-FEAT-057"
       ]
     },
     "services/thumbnailCache.js": {
@@ -865,7 +935,19 @@
     "AI-FEAT-053": [],
     "AI-FEAT-054": [],
     "AI-FEAT-055": [],
-    "AI-FEAT-056": []
+    "AI-FEAT-056": [],
+    "AI-FEAT-057": [
+      ".github/workflows/release.yml",
+      "main/main.js",
+      "main/preload.js",
+      "renderer/index.html",
+      "renderer/renderer.js",
+      "scripts/product-docs/automation/releaseIntelligence.js",
+      "scripts/product-docs/cli.js",
+      "scripts/product-docs/lib/updateChannelModel.js",
+      "services/autoUpdater.js",
+      "services/settings.js"
+    ]
   },
   "feature_to_tests": {
     "AI-FEAT-001": [],
@@ -968,7 +1050,8 @@
     "AI-FEAT-053": [],
     "AI-FEAT-054": [],
     "AI-FEAT-055": [],
-    "AI-FEAT-056": []
+    "AI-FEAT-056": [],
+    "AI-FEAT-057": []
   },
   "ipc_to_features": {
     "SUBSYS-application-platform": {
@@ -980,7 +1063,8 @@
         "AI-FEAT-004",
         "AI-FEAT-005",
         "AI-FEAT-006",
-        "AI-FEAT-007"
+        "AI-FEAT-007",
+        "AI-FEAT-057"
       ]
     },
     "SUBSYS-import-and-archive-writing": {
@@ -1047,7 +1131,8 @@
         "AI-FEAT-004",
         "AI-FEAT-005",
         "AI-FEAT-006",
-        "AI-FEAT-007"
+        "AI-FEAT-007",
+        "AI-FEAT-057"
       ]
     },
     "SUBSYS-archive-operations": {
@@ -1126,7 +1211,8 @@
       "AI-FEAT-004",
       "AI-FEAT-005",
       "AI-FEAT-006",
-      "AI-FEAT-007"
+      "AI-FEAT-007",
+      "AI-FEAT-057"
     ],
     "SUBSYS-archive-operations": [
       "AI-FEAT-042",

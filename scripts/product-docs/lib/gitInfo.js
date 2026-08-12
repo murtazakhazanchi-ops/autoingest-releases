@@ -119,12 +119,25 @@ function tagExists(name) {
   }
 }
 
+// Part 9 — used to auto-discover a prior RC tag for a given Stable version
+// (e.g. pattern "v0.9.12-rc.*" for stable version "0.9.12") without any
+// human input. `git tag -l <pattern>` uses git's own glob matching, not a
+// shell glob — no injection risk — but the pattern is still validated
+// through assertSafeRef for the same leading-dash defense every other ref
+// argument in this file gets.
+function listTagsMatching(pattern) {
+  assertSafeRef(pattern);
+  const raw = git(['tag', '-l', pattern, '--sort=-v:refname']);
+  return raw ? raw.split('\n').filter(Boolean) : [];
+}
+
 module.exports = {
   currentCommit,
   isWorkingTreeDirty,
   refExists,
   resolveCommit,
   commitDate,
+  listTagsMatching,
   commitSubject,
   log,
   changedFiles,

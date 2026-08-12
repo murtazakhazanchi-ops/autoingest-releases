@@ -10,6 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const { GENERATED_ROOT } = require('../lib/repoRoot');
 const build = require('../lib/build');
+const parseProductDocs = require('../lib/parseProductDocs');
 const { buildChangeReport } = require('../lib/changeReport');
 const { stableStringify } = require('../lib/stableJson');
 const { atomicWriteFileSync, assertInsideRepo } = require('./atomicWrite');
@@ -147,7 +148,46 @@ function buildDocumentationHealthSummary(parsed, built) {
   return summary;
 }
 
-function buildReleaseDraft(fromRefInput, toRef) {
+// Part 9 — QA checklist (RC) / promotion readiness (stable) additions to the
+// release draft. Deliberately built ONLY from fields buildReleaseDraft
+// already computes (affected_features, bugs_referenced, known_issues,
+// report.to_commit) — no new data source, per the "do not duplicate
+// infrastructure" instruction.
+function buildQaChecklist(report, draft) {
+  return {
+    build_version: null, // filled in by the caller once package.json's version is known (CLI/CI context, not this pure builder)
+    commit_sha: report.to_commit,
+    affected_bug_ids: draft.bugs_referenced,
+    affected_feature_ids: draft.affected_features,
+    known_issues: draft.known_issues,
+    tester_instructions: [
+      'Install this RC build on the target platform(s).',
+      draft.affected_features.length
+        ? `Exercise the affected feature area(s): ${draft.affected_features.join(', ')}.`
+        : 'No specific feature area flagged — run the general smoke checklist.',
+      draft.bugs_referenced.length
+        ? `For each affected bug, follow that bug's own record for reproduction/verification steps: ${draft.bugs_referenced.join(', ')}.`
+        : 'No specific bug reproduction steps required.',
+      'Capture evidence (screenshots, app.log) for each step exercised — matching the evidence bar BUG-011-014 established.',
+      'Report PASS/FAIL per affected bug/feature, not just "worked overall".',
+    ],
+    required_evidence: ['Screenshots or screen recording of the exercised flow(s)', 'app.log covering the session', 'Exact build version and platform tested'],
+    risk_summary: draft.risk_assessment,
+  };
+}
+
+function buildPromotionReadiness(draft, verifiedRcCommit) {
+  return {
+    verified_rc_commit: verifiedRcCommit || null,
+    stable_commit: draft.release_manifest.to_commit,
+    note: verifiedRcCommit
+      ? 'Run `release gate --channel stable --rc-commit ' + verifiedRcCommit + '` before tagging to confirm zero source drift beyond the version bump.'
+      : 'No verified RC commit supplied to this draft — `release gate --channel stable` will require --override-drift-check with an explicit reason.',
+    known_issues: draft.known_issues,
+  };
+}
+
+function buildReleaseDraft(fromRefInput, toRef, opts = {}) {
   const { fromRef, resolution, note } = resolveFromRef(fromRefInput, toRef);
   if (!fromRef) {
     return {
@@ -193,6 +233,16 @@ function buildReleaseDraft(fromRefInput, toRef) {
     },
     publish_note: 'DRAFT ONLY. Does not create a GitHub release or docs/release-notes-*.md. Publishing remains a separately authorized human action.',
   };
+
+  if (opts.channel === 'rc') {
+    draft.channel = 'rc';
+    draft.qa_checklist = buildQaChecklist(report, draft);
+  } else if (opts.channel === 'stable') {
+    draft.channel = 'stable';
+    draft.promotion_readiness = buildPromotionReadiness(draft, opts.verifiedRcCommit);
+  } else if (opts.channel) {
+    draft.channel = opts.channel;
+  }
   return draft;
 }
 
@@ -249,6 +299,24 @@ function renderReleaseDraftMd(draft) {
   lines.push('## Affected Features');
   lines.push(draft.affected_features.length ? draft.affected_features.join(', ') : 'None detected.');
   lines.push('');
+  if (draft.qa_checklist) {
+    lines.push('## QA Checklist (RC)');
+    lines.push(`Build version: ${draft.qa_checklist.build_version || '(fill in at build time)'} — Commit: \`${draft.qa_checklist.commit_sha}\``);
+    lines.push('');
+    lines.push('Tester instructions:');
+    for (const step of draft.qa_checklist.tester_instructions) lines.push(`- ${step}`);
+    lines.push('');
+    lines.push('Required evidence:');
+    for (const item of draft.qa_checklist.required_evidence) lines.push(`- ${item}`);
+    lines.push('');
+  }
+  if (draft.promotion_readiness) {
+    lines.push('## Promotion Readiness (Stable)');
+    lines.push(`Verified RC commit: ${draft.promotion_readiness.verified_rc_commit || 'None supplied'}`);
+    lines.push(`Stable commit: \`${draft.promotion_readiness.stable_commit}\``);
+    lines.push(draft.promotion_readiness.note);
+    lines.push('');
+  }
   lines.push('## Release Manifest');
   lines.push('```json');
   lines.push(JSON.stringify(draft.release_manifest, null, 2));
@@ -263,9 +331,9 @@ function renderReleaseDraftMd(draft) {
 // default docs/product/generated/release-drafts/ (still validated to stay
 // inside the repository root by atomicWriteFileSync's own guard).
 function writeReleaseDraft(fromRef, toRef, opts = {}) {
-  const draft = buildReleaseDraft(fromRef, toRef);
+  const draft = buildReleaseDraft(fromRef, toRef, { channel: opts.channel, verifiedRcCommit: opts.verifiedRcCommit });
   const safe = (s) => String(s).replace(/[^a-zA-Z0-9._-]/g, '_');
-  const baseName = `${safe(draft.from_ref || 'NO_PRIOR_TAG')}_TO_${safe(toRef)}`;
+  const baseName = `${safe(draft.from_ref || 'NO_PRIOR_TAG')}_TO_${safe(toRef)}${opts.channel ? `_${safe(opts.channel)}` : ''}`;
   const md = renderReleaseDraftMd(draft);
   const json = stableStringify(draft);
   if (opts.dryRun) {
@@ -314,6 +382,17 @@ function normalizeVersion(v) {
 // repoRoot is a parameter (not the module-level REPO_ROOT) so this is
 // testable against a disposable fixture repo, the same pattern every other
 // automation/ module's tests already use (tmpRepoHarness.js).
+//
+// Reads package.json/package-lock.json off the actual WORKING TREE (not a
+// git ref) — code-review note (Part 9): checkChannelReleaseGate's stable
+// branch also accepts a --stable-commit override for its git-based
+// source-drift check, defaulting to 'HEAD'. If --stable-commit is ever
+// passed as a ref other than what's currently checked out, this function's
+// disk-based version check and that function's git-ref-based drift check
+// would be validating two different snapshots. Not a problem for the
+// documented/intended invocation (gate run immediately before tagging the
+// currently-checked-out commit), but a caller passing a non-default
+// --stable-commit should be aware of this.
 function checkVersionTagAlignment(repoRoot, tagOrVersion) {
   const targetVersion = normalizeVersion(tagOrVersion);
   const blocking = [];
@@ -360,7 +439,126 @@ function checkVersionTagAlignment(repoRoot, tagOrVersion) {
   return { ok: blocking.length === 0, blocking, packageVersion, lockVersion, targetVersion };
 }
 
+// Part 9 — channel-aware release gate. Wraps checkVersionTagAlignment with
+// the channel-shape and (for stable) source-drift checks docs/product's
+// Part 9 design calls for. Every failure here is BLOCKING (non-zero exit
+// from the CLI) — there is deliberately no warning-only path for a
+// release-critical mismatch, per the design's own explicit instruction.
+const RC_VERSION_SHAPE = /^\d+\.\d+\.\d+-rc\.\d+$/;
+const STABLE_VERSION_SHAPE = /^\d+\.\d+\.\d+$/;
+
+// Files whose version field is EXPECTED to differ between an RC commit and
+// its promoted Stable commit (the version bump itself) — excluded from the
+// source-drift comparison. Any other changed file means the Stable build
+// would not be building the exact source the RC was verified against.
+// MUST be kept in lockstep with whatever files a version bump actually
+// touches (currently `npm version` writes exactly these two) — if that ever
+// changes, every legitimate promotion will hit a false-positive drift block
+// (fail-closed, not a correctness hole, but repeated forced
+// --override-drift-check use is how a safety gate gets normalized into
+// background noise instead of caught).
+const VERSION_BUMP_ONLY_FILES = new Set(['package.json', 'package-lock.json']);
+
+function checkSourceDrift(verifiedRcCommit, stableCommit) {
+  if (!gitInfo.refExists(verifiedRcCommit)) {
+    return { checked: false, drifted: null, changedFiles: [], reason: `verifiedRcCommit "${verifiedRcCommit}" does not resolve to a real commit.` };
+  }
+  if (!gitInfo.refExists(stableCommit)) {
+    return { checked: false, drifted: null, changedFiles: [], reason: `stableCommit "${stableCommit}" does not resolve to a real commit.` };
+  }
+  const changed = gitInfo.changedFiles(verifiedRcCommit, stableCommit).filter((f) => !VERSION_BUMP_ONLY_FILES.has(f));
+  return { checked: true, drifted: changed.length > 0, changedFiles: changed, reason: null };
+}
+
+// Part 9 code-review follow-up: the Stable CI path (a plain `push: tags: v*`
+// event) has no workflow_dispatch inputs to carry an explicit --rc-commit,
+// so without this, wiring the gate into that path would always fall through
+// to "no verifiedRcCommit provided" and require a human to remember
+// --override-drift-check on every single Stable release — precisely the
+// kind of manual step PM-002 showed gets forgotten. Auto-discovers the
+// highest-numbered "vX.Y.Z-rc.*" tag for a given Stable version from git
+// tag history alone (no human input) via gitInfo.listTagsMatching(), which
+// routes through the same execFileSync-based safe git wrapper as every
+// other git call in this module. Returns null (not an error) when no RC
+// tag exists for this version — a Stable release with no preceding RC is
+// legitimate (e.g. an emergency hotfix) and the caller must still supply
+// --override-drift-check in that case, exactly as an explicit --rc-commit
+// omission already requires.
+function resolvePriorRcTag(stableVersion) {
+  const pattern = `v${stableVersion}-rc.*`;
+  const matches = gitInfo.listTagsMatching(pattern);
+  return matches.length > 0 ? matches[0] : null; // pre-sorted -v:refname (highest RC number first)
+}
+
+function checkChannelReleaseGate(repoRoot, opts) {
+  const { channel, tagOrVersion, stableCommit = 'HEAD', overrideDriftReason, autoDiscoverRcCommit } = opts;
+  const blocking = [];
+  const versionAlignment = checkVersionTagAlignment(repoRoot, tagOrVersion);
+  if (!versionAlignment.ok) blocking.push(...versionAlignment.blocking);
+
+  // Auto-discovery exists because the Stable CI path (a plain `push: tags:
+  // v*` event) has no workflow_dispatch inputs to carry an explicit
+  // --rc-commit — without this, wiring the gate into that path would always
+  // require a human to remember --override-drift-check on every release,
+  // exactly the kind of manual step PM-002 showed gets forgotten. Only used
+  // when the caller didn't already supply an explicit verifiedRcCommit.
+  let verifiedRcCommit = opts.verifiedRcCommit || null;
+  let autoDiscoveredRcTag = null;
+  if (!verifiedRcCommit && autoDiscoverRcCommit && STABLE_VERSION_SHAPE.test(versionAlignment.targetVersion)) {
+    autoDiscoveredRcTag = resolvePriorRcTag(versionAlignment.targetVersion);
+    if (autoDiscoveredRcTag) verifiedRcCommit = autoDiscoveredRcTag;
+  }
+
+  const result = { channel, ...versionAlignment, blocking, sourceDrift: null, overrideDriftReason: overrideDriftReason || null, autoDiscoveredRcTag };
+
+  if (channel === 'rc') {
+    if (!RC_VERSION_SHAPE.test(versionAlignment.targetVersion)) {
+      blocking.push(`RC channel requires a version shaped "X.Y.Z-rc.N" (e.g. "0.9.12-rc.1"), got "${versionAlignment.targetVersion}".`);
+    }
+  } else if (channel === 'stable') {
+    if (!STABLE_VERSION_SHAPE.test(versionAlignment.targetVersion)) {
+      blocking.push(`Stable channel requires a plain "X.Y.Z" version with no prerelease component, got "${versionAlignment.targetVersion}".`);
+    }
+    if (verifiedRcCommit) {
+      const drift = checkSourceDrift(verifiedRcCommit, stableCommit);
+      result.sourceDrift = drift;
+      if (!drift.checked) {
+        blocking.push(`Could not verify source drift against the approved RC commit: ${drift.reason}`);
+      } else if (drift.drifted && !overrideDriftReason) {
+        blocking.push(
+          `Stable commit differs from the approved RC commit (${verifiedRcCommit}${autoDiscoveredRcTag ? `, auto-discovered from tag ${autoDiscoveredRcTag}` : ''}) in ${drift.changedFiles.length} file(s) beyond the version bump: ${drift.changedFiles.join(', ')}. ` +
+          `Stable must build the exact source the RC was verified against — pass --override-drift-check "<reason>" only if this divergence is understood and intentional.`
+        );
+      }
+    } else if (!overrideDriftReason) {
+      blocking.push(
+        'No verifiedRcCommit provided and none could be auto-discovered from RC tag history — Stable release provenance could not be tied to an approved RC. ' +
+        'Pass --rc-commit <sha>, or --override-drift-check "<reason>" if this Stable release is intentionally not preceded by an RC (e.g. an emergency hotfix).'
+      );
+    }
+    // Deliberately parseProductDocs.loadAll() rather than build.assemble() —
+    // buildKnownIssues() only ever reads parsed.bugs, and build.assemble()
+    // additionally runs the roadmap-dashboard consistency check (throws
+    // DashboardDisagreementError on a real disagreement elsewhere in
+    // docs/product/, which has nothing to do with what this gate checks) and
+    // does the full generated-artifact build — real, avoidable cost and an
+    // unrelated failure mode this gate should never be able to trip
+    // (code-review finding, Part 9).
+    const openIssues = buildKnownIssues(parseProductDocs.loadAll(path.join(repoRoot, 'docs', 'product')));
+    if (openIssues.length > 0) {
+      blocking.push(`${openIssues.length} bug(s) are currently Open/Investigating and would block Stable: ${openIssues.map((b) => b.id).join(', ')}.`);
+      result.blockingBugs = openIssues;
+    }
+  } else {
+    blocking.push(`Unknown channel "${channel}" — expected "rc" or "stable".`);
+  }
+
+  result.ok = blocking.length === 0;
+  result.blocking = blocking;
+  return result;
+}
+
 module.exports = {
   buildReleaseDraft, renderReleaseDraftMd, writeReleaseDraft, classifyCommitSubject,
-  resolveFromRef, listReleaseDrafts, checkVersionTagAlignment,
+  resolveFromRef, listReleaseDrafts, checkVersionTagAlignment, checkChannelReleaseGate,
 };

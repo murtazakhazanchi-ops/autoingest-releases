@@ -2,17 +2,17 @@
 
 > Generated artifact — cross-checked against 01_FEATURE_REGISTRY.md, 02_MASTER_ROADMAP.md, 03_IMPLEMENTATION_TIMELINE.md, and 04_PROJECT_DASHBOARD.md at generation time; generation fails with a diagnostic instead of silently picking a side if those sources disagree. Regenerate with `node scripts/product-docs/cli.js build`.
 
-**Progress**: 1/9 milestones complete (11.1%)
+**Progress**: 2/10 milestones complete (20%)
 **Current milestone**: AI-RM-002
 **Following milestone**: AI-RM-003
-**Total features**: 56
+**Total features**: 57
 
 ## Feature status counts (overall)
 
 | Status | Count |
 |---|---|
 | Implemented — evolving | 4 |
-| Implemented | 44 |
+| Implemented | 45 |
 | Planned | 8 |
 
 ## Milestones
@@ -27,7 +27,8 @@
 | AI-RM-006 | Integrity Verification | Planned — not started | AI-FEAT-054 | AI-RM-005 | 3–4 weeks | Not started — follows AI-RM-005 |
 | AI-RM-007 | Archive Repair | Planned — not started | AI-FEAT-052 | AI-RM-006 | 4–6 weeks | Not started — follows AI-RM-006 |
 | AI-RM-008 | Archive Analytics | Planned — not started | AI-FEAT-055 | AI-RM-007 | 2–4 weeks | Not started — follows AI-RM-007 |
-| AI-RM-009 | AI Archive Intelligence | Planned — not started | AI-FEAT-056 | AI-RM-008 | 6–10 weeks | Not started — follows AI-RM-008; final milestone in the canonical order |
+| AI-RM-009 | AI Archive Intelligence | Planned — not started | AI-FEAT-056 | AI-RM-008 | 6–10 weeks | Not started — follows AI-RM-008; final milestone in the AI-RM-001…009 archive-capability sequence (AI-RM-010 is a separate, parallel release-infrastructure track — see below, not a continuation of this sequence) |
+| AI-RM-010 | Multi-Channel Release & Update System | **Completed** (logic-level; live pilot deferred) | AI-FEAT-057 | — | Single implementation session (2026-08-12) | Awaiting explicit authorization to run the live pilot (an actual `rc-build` `workflow_dispatch` run) — see the Part 9 final report. |
 
 ## Blockers and risks
 

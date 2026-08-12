@@ -5,24 +5,33 @@
 ## Application Platform (`SUBSYS-application-platform`)
 
 **Aliases**: electron shell, security model, settings store, auto-update, telemetry
-**Primary features**: AI-FEAT-001, AI-FEAT-002, AI-FEAT-003, AI-FEAT-004, AI-FEAT-005, AI-FEAT-006, AI-FEAT-007
-**Canonical technical docs**: CLAUDE.md § Security Model, docs/README.md § Security Model, docs/data-model.md, docs/event-system.md, docs/features.md #7 "UI Dashboard", docs/history.md v0.8.1, docs/system-contracts.md §1-2, docs/ui-system.md § Dashboard
+**Primary features**: AI-FEAT-001, AI-FEAT-002, AI-FEAT-003, AI-FEAT-004, AI-FEAT-005, AI-FEAT-006, AI-FEAT-007, AI-FEAT-057
+**Canonical technical docs**: .github/workflows/release.yml, CLAUDE.md § Security Model, docs/README.md § Security Model, docs/data-model.md, docs/event-system.md, docs/features.md #7 "UI Dashboard", docs/history.md v0.8.1, docs/system-contracts.md §1-2, docs/ui-system.md § Dashboard, scripts/product-docs/README.md
 **Related bugs**: None recorded
 **Related decisions**: None recorded
 
 **Source directories**:
+- `.github/workflows`
 - `main`
 - `renderer`
+- `scripts/product-docs`
+- `scripts/product-docs/automation`
+- `scripts/product-docs/lib`
 - `services`
 
 **Source files**:
+- `.github/workflows/release.yml`
 - `main/eventJsonStore.js`
 - `main/main.js`
 - `main/preload.js`
 - `main/userManager.js`
+- `renderer/index.html`
 - `renderer/renderer.js`
 - `renderer/splash.html`
 - `renderer/theme-init.js`
+- `scripts/product-docs/automation/releaseIntelligence.js`
+- `scripts/product-docs/cli.js`
+- `scripts/product-docs/lib/updateChannelModel.js`
 - `services/autoUpdater.js`
 - `services/settings.js`
 - `services/telemetry.js`

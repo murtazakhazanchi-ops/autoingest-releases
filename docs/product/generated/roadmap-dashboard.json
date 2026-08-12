@@ -1,15 +1,16 @@
 {
   "blockers": "None identified for AI-RM-002 beyond the absence of a defined scope",
-  "completed_count": 1,
+  "completed_count": 2,
   "completed_milestones": [
-    "AI-RM-001"
+    "AI-RM-001",
+    "AI-RM-010"
   ],
   "current_milestone_id": "AI-RM-002",
   "current_risks": "(1) AI-RM-007's planned service name collides with an existing, unrelated `archiveRepairService.js` (temp-file cleanup only) — needs resolution before implementation starts. (2) AI-RM-006's scope needs explicit disambiguation from the already-implemented AI-FEAT-025 (narrower checksum verification) to avoid duplicating existing work without a clear reason.",
   "docsys_version": "1.2.0",
   "evidence_gaps_note": "See each feature file's \"Evidence status\" field. Notable gaps: AI-FEAT-037 (Metadata Reapply/Sync — file-existence + learning-log evidence only, not independently code-audited), AI-FEAT-007 (Telemetry Pipeline — scope of data collected not yet audited), AI-FEAT-022 (Photographer-Folder Resolution — relationship to the v0.9.0 \"Photographer Folder Sequencing\" release-note item not yet confirmed as same-or-different code path)",
   "feature_status_counts_overall": {
-    "Implemented": 44,
+    "Implemented": 45,
     "Implemented — evolving": 4,
     "Planned": 8
   },
@@ -199,18 +200,38 @@
         "AI-FEAT-056"
       ],
       "name": "AI Archive Intelligence",
-      "next_action": "Not started — follows AI-RM-008; final milestone in the canonical order",
+      "next_action": "Not started — follows AI-RM-008; final milestone in the AI-RM-001…009 archive-capability sequence (AI-RM-010 is a separate, parallel release-infrastructure track — see below, not a continuation of this sequence)",
       "objective": "Evidence pending — not yet documented as fact",
       "planned_estimate": "6–10 weeks",
       "status": "Planned — not started"
+    },
+    {
+      "current_risks": "The live pilot has not been run — real-world CI behavior (GitHub API rate limits, actual tag-creation race conditions between the two RC platform jobs, real signing-free artifact acceptance by target OSes) is unverified beyond the logic-level model.",
+      "dependencies": [],
+      "existing_features_extended": [
+        "AI-FEAT-005",
+        "AI-FEAT-006"
+      ],
+      "feature_status_counts": {
+        "Implemented": 1
+      },
+      "id": "AI-RM-010",
+      "included_features": [
+        "AI-FEAT-057"
+      ],
+      "name": "Multi-Channel Release & Update System",
+      "next_action": "Awaiting explicit authorization to run the live pilot (an actual `rc-build` `workflow_dispatch` run) — see the Part 9 final report.",
+      "objective": "Formalize AutoIngest's release process into three isolated channels (Development, RC/Preview, Stable) so a tester-facing build can never reach Stable users, and a verified RC has an auditable, gated promotion path to Stable.",
+      "planned_estimate": "Single implementation session (2026-08-12)",
+      "status": "**Completed** (logic-level; live pilot deferred)"
     }
   ],
   "next_milestone_id": "AI-RM-002",
   "next_planned_action": "Discovery and specification for AI-RM-002 (Archive Maintenance) — no scope exists yet",
   "pending_decisions": "Naming collision for AI-RM-007's service (see Current risks); scope disambiguation for AI-RM-006 vs. AI-FEAT-025",
-  "progress_percent": 11.1,
+  "progress_percent": 20,
   "recently_completed_documentation_work": "UI polish to the Metadata Management Modal / Audit & Repair tab (commits `4446a30` → `c5d200f`, 2026-08-02 through 2026-08-04) — cosmetic/layout only, no behavior change, all part of the already-complete AI-RM-001",
   "schema_version": "1.2.0",
-  "total_features": 56,
-  "total_milestones": 9
+  "total_features": 57,
+  "total_milestones": 10
 }

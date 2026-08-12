@@ -19,8 +19,66 @@ const { autoUpdater } = require('electron-updater');
 const { app, ipcMain, BrowserWindow } = require('electron');
 const { log } = require('./logger');
 const telemetry = require('./telemetry');
+const settings = require('./settings');
 const fs   = require('fs');
 const path = require('path');
+
+// ── Part 9: update channel awareness ─────────────────────────────────────────
+// electron-updater's GitHub provider resolves updates through two
+// independent layers (verified from node_modules/electron-updater/out/
+// providers/GitHubProvider.js and AppUpdater.js, not from memory):
+//   Layer 1 — allowPrerelease=false (the default for any plain "X.Y.Z"
+//     currentVersion) resolves via GET {repo}/releases/latest, which is
+//     GitHub's own API and by definition excludes every prerelease/draft
+//     release. A Stable client cannot reach an RC release through this path
+//     regardless of any channel string.
+//   Layer 2 — allowPrerelease=true walks the full releases feed and picks
+//     the release whose tag's semver prerelease component matches
+//     autoUpdater.channel, then fetches "<channel>.yml"/"<channel>-mac.yml".
+// "preview" here maps to the "rc" release channel — the user-facing label
+// and the on-disk/CI channel name are deliberately different so the
+// Settings UI can rename the tier later without touching the release
+// pipeline's own vocabulary.
+const RC_UPDATE_CHANNEL = 'rc';
+
+// AppUpdater's `channel` setter throws if you try to reset an
+// already-set channel back to null (verified from AppUpdater.js: the
+// validation branch only runs "if (this._channel != null)", and rejects a
+// non-string new value in that case) — so returning to Stable must set the
+// channel to the literal string "latest" rather than attempting to unset
+// it. This resolves identically to leaving it unset (GitHubProvider's own
+// getDefaultChannelName() is exactly getCustomChannelName("latest")), so
+// there is no behavioral difference, only a valid-string requirement to
+// satisfy. allowPrerelease is a plain property with no such restriction and
+// is set explicitly both directions since it is the property that actually
+// gates Layer 1 vs Layer 2.
+function applyChannelSetting(channelPref) {
+  if (channelPref === 'preview') {
+    autoUpdater.channel = RC_UPDATE_CHANNEL;
+    autoUpdater.allowPrerelease = true;
+    // allowDowngrade=true is a deliberate side effect of the channel setter
+    // here (see the comment above it) — a Preview user's currently-installed
+    // RC can be numerically ahead of the latest Stable release (e.g.
+    // 0.9.13-rc.1 vs. Stable 0.9.12); without allowDowngrade, they could
+    // never receive Stable again after opting back out of Preview. Left as
+    // the setter's own default for this branch only.
+  } else {
+    autoUpdater.channel = 'latest';
+    autoUpdater.allowPrerelease = false;
+    // The channel setter (AppUpdater.js) unconditionally sets
+    // allowDowngrade=true as a side effect of ANY assignment — its own doc
+    // comment says "If this behavior is not suitable for you, simply set
+    // allowDowngrade explicitly after." Code-review-verified regression:
+    // without this line, applyChannelSetting('stable') — which runs at
+    // every app launch via init(), for every install, not just users who
+    // ever touch the Preview setting — would silently flip allowDowngrade
+    // to true for the entire existing install base, re-enabling an
+    // auto-downgrade code path (isUpdateAvailable(): `allowDowngrade &&
+    // isLatestVersionOlder`) that did not exist before this feature.
+    // Restoring electron-updater's own pre-existing default here.
+    autoUpdater.allowDowngrade = false;
+  }
+}
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const CHECK_ON_START_MS = 3_000;   // delay before first check
@@ -48,6 +106,12 @@ function init() {
 
   // Don't auto-install on quit — we let the user trigger it
   autoUpdater.autoInstallOnAppQuit = false;
+
+  // Apply the user's update-channel preference before the first check ever
+  // runs. A missing/unrecognized setting resolves to "stable" (see
+  // settings.getUpdateChannel()'s own default), so an existing install
+  // upgrading into Part 9 behaves identically to today.
+  applyChannelSetting(settings.getUpdateChannel());
 
   // ── Events ──
   autoUpdater.on('update-available', (info) => {
@@ -145,4 +209,4 @@ function scheduleFastRetry() {
 
 function getLastUpdateState() { return _lastUpdateState; }
 
-module.exports = { init, getLastUpdateState };
+module.exports = { init, getLastUpdateState, applyChannelSetting };
