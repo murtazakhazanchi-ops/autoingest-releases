@@ -3222,7 +3222,8 @@
         "[§ Multi-Channel Release Architecture](../11_ARCHITECTURAL_EVOLUTION.md#multi-channel-release-architecture)"
       ],
       "related_bugs": [
-        "BUG-015"
+        "BUG-015",
+        "BUG-016"
       ],
       "related_changelog_entries": [
         {

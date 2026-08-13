@@ -3260,6 +3260,22 @@
     {
       "evidence_status": "explicit",
       "note": null,
+      "provenance_path": "features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md#lifecycle-metadata:Related-bugs",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-057",
+      "target": "BUG-016"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-016_UNDECLARED_NPM_DEPENDENCY_IN_PRODUCT_DOCS_TOOLING_MASKED_BY_LOCALLY_HOISTED_NODE_MODULES.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-057",
+      "target": "BUG-016"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
       "provenance_path": "features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md#lifecycle-metadata:Related-decisions",
       "relationship": "governed_by",
       "source": "AI-FEAT-057",
@@ -3928,6 +3944,14 @@
       "relationship": "shaped_by_decision",
       "source": "BUG-010",
       "target": "DEC-008"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-016_UNDECLARED_NPM_DEPENDENCY_IN_PRODUCT_DOCS_TOOLING_MASKED_BY_LOCALLY_HOISTED_NODE_MODULES.md#related",
+      "relationship": "related_to",
+      "source": "BUG-016",
+      "target": "BUG-015"
     },
     {
       "evidence_status": "explicit",
@@ -4835,6 +4859,12 @@
       "doc_path": "bugs/BUG-015_WINDOWS_RUNNER_DEFAULT_POWERSHELL_SHELL_MANGLES_ELECTRON_BUILDER_DOT_NOTATION_CLI_OVERRIDES.md",
       "id": "BUG-015",
       "label": "Windows Runner Default PowerShell Shell Mangles electron-builder Dot-Notation CLI Overrides",
+      "type": "bug"
+    },
+    {
+      "doc_path": "bugs/BUG-016_UNDECLARED_NPM_DEPENDENCY_IN_PRODUCT_DOCS_TOOLING_MASKED_BY_LOCALLY_HOISTED_NODE_MODULES.md",
+      "id": "BUG-016",
+      "label": "Undeclared npm Dependency in product-docs Tooling Masked by Locally-Hoisted node_modules",
       "type": "bug"
     },
     {

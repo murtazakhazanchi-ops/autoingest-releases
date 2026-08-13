@@ -6,6 +6,16 @@ Append newest first. Never edit or delete a prior entry — if something was wro
 
 ---
 
+## 2026-08-13 — Fixed Product Documentation Validation CI failure (BUG-016)
+
+- **Task type**: small, targeted CI/tooling fix (systematic-debugging process: reproduced deterministically pre- and post-fix in a `node_modules`-less `git worktree` matching the real CI condition, not guessed).
+- **What broke**: `scripts/product-docs/lib/updateChannelModel.js` (added during Part 9) called `require('semver')`, an npm package never declared in `package.json` — it only resolved locally because it was hoisted as a transitive dependency of the Electron app's own `node_modules`. `product-docs.yml`'s CI job deliberately never runs `npm install`, so a fresh checkout has no `node_modules` at all, and the require failed with `MODULE_NOT_FOUND`. New record: [BUG-016](bugs/BUG-016_UNDECLARED_NPM_DEPENDENCY_IN_PRODUCT_DOCS_TOOLING_MASKED_BY_LOCALLY_HOISTED_NODE_MODULES.md).
+- **Fix**: replaced the one `semver` API used (`prerelease()`) with a minimal local reimplementation, cross-checked against the real package's output across 20 cases before substituting in. Commit `fed471d`.
+- **Verified**: local suite 32/32, and — the actual bar for this fix — GitHub Actions run `31668341182` itself green (`tests: 32, pass: 32, fail: 0`), not just local.
+- **Evidence confidence**: real CI run logs, deterministic reproduction in an isolated `node_modules`-less environment before and after the fix.
+
+---
+
 ## 2026-08-13 — Part 9 live CI pilot: RC published, Windows-shell bug found and fixed (AI-FEAT-057 / BUG-015)
 
 - **Task type**: live infrastructure pilot (no application code changed beyond a one-line CI fix), documentation reconciliation from real evidence.

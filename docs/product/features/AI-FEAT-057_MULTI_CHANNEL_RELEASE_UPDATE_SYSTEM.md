@@ -21,7 +21,7 @@
 |---|---|
 | Related features | AI-FEAT-006, AI-FEAT-005 |
 | Related decisions | [DEC-017](../decisions/DEC-017_STABLE_RELEASES_REBUILD_FROM_VERIFIED_RC_SOURCE_NEVER_PROMOTE_EXACT_BINARIES.md) (promotion model, detailed), [DEC-018](../decisions/DEC-018_PART_9_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM_DESIGN_AND_IMPLEMENTATION.md) (Accepted 2026-08-13, following live-pilot verification — broader design-session record: isolation mechanism, gate policy, CI wiring) |
-| Related bugs | [BUG-015](../bugs/BUG-015_WINDOWS_RUNNER_DEFAULT_POWERSHELL_SHELL_MANGLES_ELECTRON_BUILDER_DOT_NOTATION_CLI_OVERRIDES.md) (found and fixed during the live RC pilot) |
+| Related bugs | [BUG-015](../bugs/BUG-015_WINDOWS_RUNNER_DEFAULT_POWERSHELL_SHELL_MANGLES_ELECTRON_BUILDER_DOT_NOTATION_CLI_OVERRIDES.md), [BUG-016](../bugs/BUG-016_UNDECLARED_NPM_DEPENDENCY_IN_PRODUCT_DOCS_TOOLING_MASKED_BY_LOCALLY_HOISTED_NODE_MODULES.md) (both found and fixed following the live RC pilot) |
 | Related postmortems | [PM-002](../postmortems/PM-002_V0_9_11_FIRST_PUBLICATION_ATTEMPT_PRODUCED_AN_EMPTY_GITHUB_RELEASE.md) (the incident this feature's release gate directly closes the gap behind) |
 | Related architectural evolution sections | [§ Multi-Channel Release Architecture](../11_ARCHITECTURAL_EVOLUTION.md#multi-channel-release-architecture) |
 | Related release notes | Not yet in a published `docs/release-notes-*.md` — this feature ships ahead of the next stable version that will carry it in its own notes |
@@ -68,13 +68,14 @@ This section classifies this feature's already-evidenced history by milestone ty
 
 **Architectural / workflow decisions**: [DEC-017](../decisions/DEC-017_STABLE_RELEASES_REBUILD_FROM_VERIFIED_RC_SOURCE_NEVER_PROMOTE_EXACT_BINARIES.md) — Stable rebuilds from verified-RC source rather than promoting exact binaries.
 
-**Reliability / correctness fixes**: [BUG-015](../bugs/BUG-015_WINDOWS_RUNNER_DEFAULT_POWERSHELL_SHELL_MANGLES_ELECTRON_BUILDER_DOT_NOTATION_CLI_OVERRIDES.md) — Windows RC publish step failed under `pwsh`'s default argument tokenization; fixed with an explicit `shell: bash`, found only once the live pilot exercised this code path for the first time.
+**Reliability / correctness fixes**: [BUG-015](../bugs/BUG-015_WINDOWS_RUNNER_DEFAULT_POWERSHELL_SHELL_MANGLES_ELECTRON_BUILDER_DOT_NOTATION_CLI_OVERRIDES.md) — Windows RC publish step failed under `pwsh`'s default argument tokenization; fixed with an explicit `shell: bash`, found only once the live pilot exercised this code path for the first time. [BUG-016](../bugs/BUG-016_UNDECLARED_NPM_DEPENDENCY_IN_PRODUCT_DOCS_TOOLING_MASKED_BY_LOCALLY_HOISTED_NODE_MODULES.md) — `updateChannelModel.js`'s `require('semver')` broke `product-docs.yml`'s deliberate no-`npm install` CI contract, masked locally by a hoisted transitive dependency; fixed by replacing it with a minimal, cross-checked local reimplementation.
 
 **Other dated milestones**: 2026-08-13 — live CI pilot (see Evolution / Implementation Journal above): both RC publish paths proven end-to-end against real GitHub state; Stable isolation and the promotion gate's drift check both verified with real evidence, not simulated. Real-installed-client verification remains outstanding.
 
 ## Known Bugs / Troubleshooting
 
 - [BUG-015](../bugs/BUG-015_WINDOWS_RUNNER_DEFAULT_POWERSHELL_SHELL_MANGLES_ELECTRON_BUILDER_DOT_NOTATION_CLI_OVERRIDES.md) — Windows RC publish step failed under PowerShell's default argument tokenization. Fixed.
+- [BUG-016](../bugs/BUG-016_UNDECLARED_NPM_DEPENDENCY_IN_PRODUCT_DOCS_TOOLING_MASKED_BY_LOCALLY_HOISTED_NODE_MODULES.md) — `updateChannelModel.js` depended on an undeclared npm package (`semver`), which CI's dependency-free `product-docs.yml` workflow correctly rejected. Fixed.
 
 ## Decisions
 
