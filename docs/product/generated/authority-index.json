@@ -1316,7 +1316,9 @@
         "scripts/product-docs/lib/knowledgeEngine.js",
         "scripts/product-docs/lib/questionClassifier.js",
         "scripts/product-docs/test/knowledgeHallucinationV2.test.js",
-        "docs/product/generated/knowledge-gap-report-v2.json"
+        "docs/product/generated/knowledge-gap-report-v2.json",
+        "scripts/product-docs/knowledge-portal/server.js",
+        "scripts/product-docs/knowledge-portal/index.html"
       ],
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md's header table and Lifecycle Metadata section.",

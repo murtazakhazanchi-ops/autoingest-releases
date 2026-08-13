@@ -3,13 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AutoIngest Knowledge — Stage 1 Prototype</title>
+<title>AutoIngest Knowledge — Stage 2 Prototype</title>
 <style>
   /* Minimal, functional styling only — proving the information architecture,
      not the final portal's visual design (see AI-FEAT-058 Summary). */
   :root { color-scheme: light dark; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 780px; margin: 0 auto; padding: 1.5rem; line-height: 1.5; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 860px; margin: 0 auto; padding: 1.5rem; line-height: 1.5; }
   h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  h2 { font-size: 1.05rem; margin: 1.2rem 0 0.4rem; }
   .subtitle { color: #666; font-size: 0.85rem; margin-bottom: 1.5rem; }
   .ask-row { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
   #q { flex: 1; padding: 0.6rem; font-size: 1rem; }
@@ -23,22 +24,31 @@
   .badge.PLANNED { background: #dbe4ef; color: #33547a; }
   .badge.NOT_SUPPORTED { background: #f1dbd3; color: #8c3623; }
   .badge.UNKNOWN { background: #e6e3d6; color: #5f5c53; }
+  .badge.ROADMAP { background: #e3ddf2; color: #4b2f8c; }
   .quality-note { font-size: 0.78rem; color: #a15c00; margin-top: 0.4rem; }
   .section-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-top: 0.9rem; margin-bottom: 0.2rem; }
   .sources li, .related { font-size: 0.85rem; }
-  nav.tabs { margin: 1.5rem 0 1rem; border-bottom: 1px solid #ccc; }
-  nav.tabs button { background: none; border: none; padding: 0.5rem 0.8rem; font-size: 0.85rem; border-bottom: 2px solid transparent; }
+  nav.tabs { margin: 1.5rem 0 1rem; border-bottom: 1px solid #ccc; display: flex; flex-wrap: wrap; }
+  nav.tabs button { background: none; border: none; padding: 0.5rem 0.7rem; font-size: 0.82rem; border-bottom: 2px solid transparent; white-space: nowrap; }
   nav.tabs button.active { border-bottom-color: #333; font-weight: 600; }
   table { border-collapse: collapse; width: 100%; font-size: 0.82rem; }
   th, td { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid #eee; vertical-align: top; }
   .panel { display: none; }
   .panel.active { display: block; }
   .muted { color: #888; font-size: 0.8rem; }
+  .notice { background: #fdf3d8; border: 1px solid #e8cf8a; border-radius: 6px; padding: 0.7rem 0.9rem; font-size: 0.82rem; margin-bottom: 1rem; }
+  .card { border: 1px solid #ddd; border-radius: 6px; padding: 0.8rem 1rem; margin-bottom: 0.8rem; }
+  .card h3 { margin: 0 0 0.3rem; font-size: 0.95rem; }
+  .card .meta { font-size: 0.75rem; color: #888; margin-bottom: 0.4rem; }
+  .steps { padding-left: 1.2rem; font-size: 0.85rem; }
+  .filter-row { margin-bottom: 0.8rem; }
+  .filter-row input { width: 100%; padding: 0.5rem; font-size: 0.9rem; }
+  .kind-pill { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.03em; color: #666; }
 </style>
 </head>
 <body>
   <h1>AutoIngest Knowledge</h1>
-  <p class="subtitle">Stage 1 prototype — grounded, deterministic answers from AutoIngest's real documentation. No AI model, no invented instructions.</p>
+  <p class="subtitle">Stage 2 prototype — grounded, deterministic answers from AutoIngest's real documentation. No AI model, no live data, no invented instructions.</p>
 
   <div class="ask-row">
     <input id="q" type="text" placeholder="Ask anything about AutoIngest..." autocomplete="off">
@@ -50,13 +60,34 @@
 
   <nav class="tabs">
     <button data-panel="ask" class="active">Ask</button>
+    <button data-panel="getting-started">Getting Started</button>
     <button data-panel="capabilities">Capabilities</button>
+    <button data-panel="workflows">Workflows</button>
+    <button data-panel="teamwork">Teamwork &amp; Live Activity</button>
     <button data-panel="roadmap">Roadmap</button>
+    <button data-panel="status">Status</button>
+    <button data-panel="troubleshooting">Troubleshooting</button>
+    <button data-panel="directory">Directory</button>
   </nav>
+
+  <div id="panel-getting-started" class="panel">
+    <p class="muted">A small, curated starting set — not everything AutoIngest does, just the highest-value first steps. Every step below comes from an authored Workflow record, never invented here.</p>
+    <div id="gettingStartedList"></div>
+  </div>
 
   <div id="panel-capabilities" class="panel">
     <p class="muted">Every registered AutoIngest capability, with its status as resolved from the canonical feature registry — never hand-typed here.</p>
     <table id="capTable"><thead><tr><th>ID</th><th>Title</th><th>Status</th><th>Category</th></tr></thead><tbody></tbody></table>
+  </div>
+
+  <div id="panel-workflows" class="panel">
+    <p class="muted">Authored operator-guidance records (AI-WF-###) — real steps, verified against the app's own UI/onboarding text or a Capability's evidence. Distinct from a Capability record: a Capability describes WHAT exists; a Workflow describes HOW to do it.</p>
+    <div id="workflowsList"></div>
+  </div>
+
+  <div id="panel-teamwork" class="panel">
+    <div class="notice">This tab is documentation only. It never connects to a relay server, queries live presence, or shows real device/activity data — it renders the same authored Workflow record (AI-WF-006) that <code>Ask</code> and <code>Workflows</code> use, nothing more.</div>
+    <div id="teamworkContent"></div>
   </div>
 
   <div id="panel-roadmap" class="panel">
@@ -64,13 +95,29 @@
     <table id="roadmapTable"><thead><tr><th>Milestone</th><th>Name</th><th>Status</th></tr></thead><tbody></tbody></table>
   </div>
 
+  <div id="panel-status" class="panel">
+    <p class="muted">Project-level documentation status — feature/milestone counts, current risks, and next planned action, read live from the same generated dashboard as Roadmap.</p>
+    <div id="statusContent"></div>
+  </div>
+
+  <div id="panel-troubleshooting" class="panel">
+    <p class="muted">Grounded troubleshooting guidance: each Workflow's own authored Troubleshooting section, plus a directory of canonical known-issue (BUG-###) records with their citation path.</p>
+    <div id="troubleshootingContent"></div>
+  </div>
+
+  <div id="panel-directory" class="panel">
+    <p class="muted">Browse the full knowledge base by ID — for exploring without needing to phrase a question first (onboarding mode).</p>
+    <div class="filter-row"><input id="dirFilter" type="text" placeholder="Filter by ID, title, or category..."></div>
+    <table id="dirTable"><thead><tr><th>ID</th><th>Kind</th><th>Title</th><th>Category</th><th>Status</th></tr></thead><tbody></tbody></table>
+  </div>
+
   <script>
     const EXAMPLES = [
       'What is QMZ?',
       'How do I import photographs from an SD card?',
-      'Can AutoIngest repair missing metadata?',
+      'Can several people use the same archive at once?',
       'Can AutoIngest recognize faces?',
-      'What routine maintenance does AutoIngest do on my archive?',
+      "What's coming next for AutoIngest?",
       'Does AutoIngest offer cloud backup?',
     ];
 
@@ -97,6 +144,9 @@
       const limitations = answer.limitations.length
         ? '<div class="section-label">Limitations</div><ul>' + answer.limitations.map((l) => `<li>${escapeHtml(l)}</li>`).join('') + '</ul>'
         : '';
+      const steps = (answer.steps && answer.steps.length)
+        ? '<div class="section-label">Steps</div><ol class="steps">' + answer.steps.map((s) => `<li>${escapeHtml(s)}</li>`).join('') + '</ol>'
+        : '';
       const related = answer.relatedCapabilities.length
         ? `<div class="section-label">Related capabilities</div><div class="related">${answer.relatedCapabilities.map(escapeHtml).join(', ')}</div>`
         : '';
@@ -112,6 +162,7 @@
         ${qualityNote}
         <p>${escapeHtml(answer.directAnswer)}</p>
         ${answer.guidance ? `<p><em>${escapeHtml(answer.guidance)}</em></p>` : ''}
+        ${steps}
         ${limitations}
         ${related}
         ${sources}
@@ -172,8 +223,121 @@
         </tr>`).join('');
     }
 
+    function workflowCard(w) {
+      const steps = (w.steps && w.steps.length) ? '<ol class="steps">' + w.steps.map((s) => `<li>${escapeHtml(s)}</li>`).join('') + '</ol>' : '<p class="muted">No steps recorded.</p>';
+      return `
+        <div class="card">
+          <h3>${escapeHtml(w.id)} — ${escapeHtml(w.title)}</h3>
+          <div class="meta">${escapeHtml(w.domain)} · Navigation verified: ${escapeHtml(w.navigationVerified)}</div>
+          ${w.whenToUseIt ? `<p>${escapeHtml(w.whenToUseIt)}</p>` : ''}
+          ${steps}
+          ${w.limitations ? `<div class="section-label">Limitations</div><p class="muted">${escapeHtml(w.limitations)}</p>` : ''}
+        </div>`;
+    }
+
+    let WORKFLOWS_CACHE = null;
+    async function loadWorkflows() {
+      if (!WORKFLOWS_CACHE) {
+        const res = await fetch('/api/workflows');
+        WORKFLOWS_CACHE = (await res.json()).workflows;
+      }
+      document.getElementById('workflowsList').innerHTML = WORKFLOWS_CACHE.map(workflowCard).join('');
+      return WORKFLOWS_CACHE;
+    }
+
+    // Getting Started — a small, deliberately curated subset (first import,
+    // first event), not every workflow. Curated by ID, not by inventing new
+    // text; each entry is the same real Workflow record shown elsewhere.
+    const GETTING_STARTED_IDS = ['AI-WF-001', 'AI-WF-002', 'AI-WF-003'];
+    async function loadGettingStarted() {
+      const workflows = await loadWorkflows();
+      const picked = GETTING_STARTED_IDS.map((id) => workflows.find((w) => w.id === id)).filter(Boolean);
+      document.getElementById('gettingStartedList').innerHTML = picked.map(workflowCard).join('');
+    }
+
+    async function loadTeamwork() {
+      const workflows = await loadWorkflows();
+      const wf = workflows.find((w) => w.id === 'AI-WF-006');
+      if (!wf) {
+        document.getElementById('teamworkContent').innerHTML = '<p class="muted">No Online Registry / Teamwork workflow record found.</p>';
+        return;
+      }
+      document.getElementById('teamworkContent').innerHTML = workflowCard(wf) +
+        (wf.warnings ? `<div class="section-label">Warnings</div><p class="muted">${escapeHtml(wf.warnings)}</p>` : '') +
+        (wf.troubleshooting ? `<div class="section-label">Troubleshooting</div><p class="muted">${escapeHtml(wf.troubleshooting)}</p>` : '');
+    }
+
+    async function loadStatus() {
+      const res = await fetch('/api/status');
+      const s = await res.json();
+      const counts = Object.entries(s.featureStatusCounts || {}).map(([k, v]) => `${escapeHtml(k)}: ${v}`).join(' · ');
+      document.getElementById('statusContent').innerHTML = `
+        <div class="card">
+          <h3>Documentation status</h3>
+          <div class="meta">${s.totalFeatures} features · ${counts}</div>
+          <div class="meta">${s.completedMilestones}/${s.totalMilestones} roadmap milestones complete (${s.progressPercent}%) · current: ${escapeHtml(s.currentMilestoneId)} · next: ${escapeHtml(s.nextMilestoneId)}</div>
+        </div>
+        <div class="section-label">Current risks</div><p class="muted">${escapeHtml(s.currentRisks)}</p>
+        <div class="section-label">Blockers</div><p class="muted">${escapeHtml(s.blockers)}</p>
+        <div class="section-label">Recently completed</div><p class="muted">${escapeHtml(s.recentlyCompleted)}</p>
+        <div class="section-label">Next planned action</div><p class="muted">${escapeHtml(s.nextPlannedAction)}</p>
+      `;
+    }
+
+    async function loadTroubleshooting() {
+      const res = await fetch('/api/troubleshooting');
+      const data = await res.json();
+      const wfBlocks = data.workflowTroubleshooting.map((w) => `
+        <div class="card">
+          <h3>${escapeHtml(w.id)} — ${escapeHtml(w.title)}</h3>
+          <p>${escapeHtml(w.troubleshooting)}</p>
+        </div>`).join('');
+      const bugRows = data.bugs.map((b) => `
+        <tr>
+          <td>${escapeHtml(b.id)}</td>
+          <td>${escapeHtml(b.name)}</td>
+          <td>${escapeHtml(b.status)}</td>
+          <td>${escapeHtml(b.severity)}</td>
+          <td>${escapeHtml(b.relatedFeatures)}</td>
+        </tr>`).join('');
+      document.getElementById('troubleshootingContent').innerHTML = `
+        <h2>Workflow troubleshooting</h2>
+        ${wfBlocks || '<p class="muted">None recorded.</p>'}
+        <h2>Known issues (BUG-### records)</h2>
+        <table><thead><tr><th>ID</th><th>Name</th><th>Status</th><th>Severity</th><th>Related features</th></tr></thead>
+        <tbody>${bugRows}</tbody></table>
+      `;
+    }
+
+    let DIRECTORY_CACHE = null;
+    function renderDirectory(filterText) {
+      const f = (filterText || '').toLowerCase();
+      const rows = DIRECTORY_CACHE.filter((e) => !f || `${e.id} ${e.title} ${e.category}`.toLowerCase().includes(f));
+      document.querySelector('#dirTable tbody').innerHTML = rows.map((e) => `
+        <tr>
+          <td>${escapeHtml(e.id)}</td>
+          <td><span class="kind-pill">${escapeHtml(e.kind)}</span></td>
+          <td>${escapeHtml(e.title)}</td>
+          <td>${escapeHtml(e.category)}</td>
+          <td>${escapeHtml(e.status)}</td>
+        </tr>`).join('');
+    }
+    async function loadDirectory() {
+      if (!DIRECTORY_CACHE) {
+        const res = await fetch('/api/directory');
+        DIRECTORY_CACHE = (await res.json()).entries;
+      }
+      renderDirectory(document.getElementById('dirFilter').value);
+    }
+    document.getElementById('dirFilter').addEventListener('input', (e) => renderDirectory(e.target.value));
+
     loadCapabilities();
     loadRoadmap();
+    loadGettingStarted();
+    loadStatus();
+    loadTroubleshooting();
+    loadDirectory();
+    loadTeamwork();
   </script>
 </body>
 </html>

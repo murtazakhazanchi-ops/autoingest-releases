@@ -1127,6 +1127,8 @@
       "docs/product/workflows/README.md",
       "scripts/product-docs/cli.js",
       "scripts/product-docs/knowledge-portal/index.html",
+      "scripts/product-docs/knowledge-portal/index.html",
+      "scripts/product-docs/knowledge-portal/server.js",
       "scripts/product-docs/knowledge-portal/server.js",
       "scripts/product-docs/lib/build.js",
       "scripts/product-docs/lib/ids.js",
