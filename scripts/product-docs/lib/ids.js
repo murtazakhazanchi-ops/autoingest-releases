@@ -13,8 +13,12 @@
 // features or roadmap milestones (potentially one record per significant
 // session, over years). See docs/product/16_ENGINEERING_MEMORY_POLICY.md §
 // ID Model and docs/product/18_ENGINEERING_CONVERSATION_POLICY.md § ID Model.
+// AI-WF-### (Stage 2, Workflow knowledge — see docs/product/features/AI-FEAT-058_*.md
+// § Stage 2) is 3 digits, same width as feature/roadmap/bug/decision/postmortem —
+// authored deliberately, one at a time, not expected to accumulate at memory/
+// conversation volume.
 const ID_DIGIT_WIDTH = {
-  feature: 3, roadmap: 3, bug: 3, decision: 3, postmortem: 3, memory: 4, conversation: 4,
+  feature: 3, roadmap: 3, bug: 3, decision: 3, postmortem: 3, memory: 4, conversation: 4, workflow: 3,
 };
 
 const ID_PATTERNS = {
@@ -25,6 +29,7 @@ const ID_PATTERNS = {
   postmortem: /PM-(\d{3})/g,
   memory: /AI-MEM-(\d{4})/g,
   conversation: /ENG-CONV-(\d{4})/g,
+  workflow: /AI-WF-(\d{3})/g,
 };
 
 const ID_PREFIXES = {
@@ -35,6 +40,7 @@ const ID_PREFIXES = {
   postmortem: 'PM-',
   memory: 'AI-MEM-',
   conversation: 'ENG-CONV-',
+  workflow: 'AI-WF-',
 };
 
 function idType(id) {
@@ -45,6 +51,7 @@ function idType(id) {
   if (/^PM-\d{3}$/.test(id)) return 'postmortem';
   if (/^AI-MEM-\d{4}$/.test(id)) return 'memory';
   if (/^ENG-CONV-\d{4}$/.test(id)) return 'conversation';
+  if (/^AI-WF-\d{3}$/.test(id)) return 'workflow';
   return null;
 }
 

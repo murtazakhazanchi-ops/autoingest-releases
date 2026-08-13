@@ -23,6 +23,7 @@ const { buildConversationIndex } = require('./conversationIndex');
 const { renderConversationIndexMd, renderConversationTimelineMd } = require('./renderConversation');
 const { buildUnimplementedRequirements, renderUnimplementedRequirementsMd } = require('./unimplementedRequirements');
 const { buildKnowledgeIndex } = require('./knowledgeIndex');
+const { buildWorkflowIndex } = require('./workflowIndex');
 
 // Assembles every Part 4 generated artifact in memory. Returns:
 //   - `parsed`: the raw parsed docs/product/ structures (lib/parseProductDocs)
@@ -37,7 +38,11 @@ function assemble() {
   const graph = buildGraph(parsed);
   const memoryIndex = buildMemoryIndex(parsed);
   const conversationIndex = buildConversationIndex(parsed);
-  const searchIndex = buildSearchIndex(parsed, featureIndex, subsystems, memoryIndex, conversationIndex);
+  // Stage 2 — built before searchIndex so Workflow records are searchable
+  // through the same runQuery() path as everything else (no second retrieval
+  // implementation — see docs/product/decisions/DEC-020_*.md).
+  const workflowIndex = buildWorkflowIndex(parsed);
+  const searchIndex = buildSearchIndex(parsed, featureIndex, subsystems, memoryIndex, conversationIndex, workflowIndex);
   const dashboard = buildRoadmapDashboard(parsed); // throws DashboardDisagreementError on real disagreement
 
   const timelines = [];
@@ -53,7 +58,7 @@ function assemble() {
   // adds no new Markdown-parsing logic. See lib/knowledgeIndex.js.
   const knowledgeIndex = buildKnowledgeIndex(parsed, { featureIndex, dashboard });
 
-  const built = { subsystems, sourceIndex, featureIndex, authorityIndex, graph, searchIndex, dashboard, timelines, memoryIndex, ownershipManifest, conversationIndex, unimplementedRequirements, knowledgeIndex };
+  const built = { subsystems, sourceIndex, featureIndex, authorityIndex, graph, searchIndex, dashboard, timelines, memoryIndex, ownershipManifest, conversationIndex, unimplementedRequirements, knowledgeIndex, workflowIndex };
 
   const files = new Map();
 
@@ -139,6 +144,14 @@ function assemble() {
     capabilities: knowledgeIndex,
   }));
 
+  // Stage 2 — projection of docs/product/workflows/AI-WF-###_*.md. Same
+  // locator/never-authoritative rule; the Markdown files remain the source.
+  files.set('workflow-index.json', stableStringify({
+    schema_version: version.SCHEMA_VERSION,
+    docsys_version: version.DOCSYS_VERSION,
+    workflows: workflowIndex,
+  }));
+
   const manifest = {
     docsys_version: version.DOCSYS_VERSION,
     schema_version: version.SCHEMA_VERSION,
@@ -158,6 +171,7 @@ function assemble() {
       memory_capsules: memoryIndex.length,
       engineering_conversations: conversationIndex.length,
       knowledge_records: knowledgeIndex.length,
+      workflow_records: workflowIndex.length,
     },
     relationship_counts: {
       dependency_graph_edges: graph.edges.length,

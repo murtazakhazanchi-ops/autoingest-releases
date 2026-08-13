@@ -7,7 +7,7 @@
 // knowledgeEngine.js; all eval-corpus logic lives in knowledgeEval.js.
 
 const build = require('./build');
-const { answerQuestion, knowledgeIndexMap } = require('./knowledgeEngine');
+const { answerQuestion, buildEngineContext } = require('./knowledgeEngine');
 const { runEval } = require('./knowledgeEval');
 
 const HELP = `knowledge — Stage 1 AutoIngest Knowledge Engine prototype (AI-FEAT-058)
@@ -85,10 +85,7 @@ function cmdAsk(args) {
   }
   const question = positional.join(' ');
   const { built } = build.assemble();
-  const answer = answerQuestion(question, {
-    searchIndex: built.searchIndex,
-    knowledgeIndexById: knowledgeIndexMap(built.knowledgeIndex),
-  });
+  const answer = answerQuestion(question, buildEngineContext(built));
   if (flags.json) {
     console.log(JSON.stringify(answer, null, 2));
   } else {

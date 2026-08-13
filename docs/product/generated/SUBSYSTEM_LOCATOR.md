@@ -397,26 +397,41 @@
 **Related decisions**: None recorded
 
 **Source directories**:
+- `docs/product`
+- `docs/product/decisions`
 - `docs/product/generated`
+- `docs/product/workflows`
 - `scripts/product-docs`
 - `scripts/product-docs/knowledge-portal`
 - `scripts/product-docs/lib`
 - `scripts/product-docs/test`
 
 **Source files**:
+- `docs/product/19_WORKFLOW_TEMPLATE.md`
+- `docs/product/decisions/DEC-020_STAGE_2_KNOWLEDGE_ARCHITECTURE_WORKFLOW_RECORDS_AND_CONCEPT_LAYER.md`
 - `docs/product/generated/knowledge-gap-report.json`
 - `docs/product/generated/knowledge-index.json`
+- `docs/product/generated/workflow-index.json`
+- `docs/product/workflows/README.md`
 - `scripts/product-docs/cli.js`
 - `scripts/product-docs/knowledge-portal/index.html`
 - `scripts/product-docs/knowledge-portal/server.js`
 - `scripts/product-docs/lib/build.js`
+- `scripts/product-docs/lib/ids.js`
+- `scripts/product-docs/lib/intentConcepts.js`
 - `scripts/product-docs/lib/knowledgeCli.js`
 - `scripts/product-docs/lib/knowledgeEngine.js`
 - `scripts/product-docs/lib/knowledgeEval.js`
 - `scripts/product-docs/lib/knowledgeIndex.js`
 - `scripts/product-docs/lib/knowledgeTestCorpus.js`
+- `scripts/product-docs/lib/markdown.js`
+- `scripts/product-docs/lib/parseProductDocs.js`
+- `scripts/product-docs/lib/questionClassifier.js`
+- `scripts/product-docs/lib/searchIndex.js`
 - `scripts/product-docs/lib/statusResolution.js`
+- `scripts/product-docs/lib/validators.js`
 - `scripts/product-docs/lib/version.js`
+- `scripts/product-docs/lib/workflowIndex.js`
 - `scripts/product-docs/test/knowledge.test.js`
 
 **Change-impact checklist**:

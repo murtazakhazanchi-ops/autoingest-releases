@@ -13,7 +13,7 @@
 const fs = require('fs');
 const path = require('path');
 const build = require('./build');
-const { answerQuestion, knowledgeIndexMap } = require('./knowledgeEngine');
+const { answerQuestion, buildEngineContext } = require('./knowledgeEngine');
 const { CORPUS } = require('./knowledgeTestCorpus');
 const { stableStringify } = require('./stableJson');
 const { GENERATED_ROOT } = require('./repoRoot');
@@ -63,7 +63,7 @@ function renderTable(results) {
 
 function runEval({ outPath } = {}) {
   const { built } = build.assemble();
-  const ctx = { searchIndex: built.searchIndex, knowledgeIndexById: knowledgeIndexMap(built.knowledgeIndex) };
+  const ctx = buildEngineContext(built);
   const results = CORPUS.map((entry) => evaluateOne(entry, ctx));
 
   const passCount = results.filter((r) => r.pass).length;

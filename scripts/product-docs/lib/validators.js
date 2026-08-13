@@ -130,6 +130,47 @@ function checkFeatureReferences(parsed) {
   return findings;
 }
 
+// Stage 2 — Workflow reference integrity. Mirrors checkFeatureReferences'
+// pattern: every AI-FEAT/AI-WF ID a Workflow record cites must exist, and
+// every Workflow must cite at least one real capability (an orphan Workflow
+// with no capability grounding is exactly the kind of drift this system's
+// evidence discipline exists to catch).
+function checkWorkflowReferences(parsed) {
+  const findings = [];
+  if (!parsed.workflows) return findings;
+  for (const [id, w] of parsed.workflows) {
+    const relatedCaps = extractIds(String(w.header['Related capabilities'] || ''), 'feature');
+    const relatedRoadmap = extractIds(String(w.header['Related roadmap milestone'] || ''), 'roadmap');
+    if (relatedCaps.length === 0) {
+      findings.push(finding('error', 'orphan-workflow', `${id} cites no valid Related capability`, w.filePath));
+    }
+    for (const featId of relatedCaps) {
+      if (!parsed.features.has(featId)) {
+        findings.push(finding('error', 'missing-feature-reference', `${id} cites nonexistent feature ${featId}`, w.filePath));
+      }
+    }
+    for (const rmId of relatedRoadmap) {
+      if (!parsed.roadmap.has(rmId)) {
+        findings.push(finding('error', 'missing-roadmap-reference', `${id} cites nonexistent roadmap milestone ${rmId}`, w.filePath));
+      }
+    }
+    const relatedWfIds = extractIds(String(w.relatedActions || ''), 'workflow');
+    for (const wfId of relatedWfIds) {
+      if (wfId !== id && !parsed.workflows.has(wfId)) {
+        findings.push(finding('error', 'missing-workflow-reference', `${id}'s Related Actions cites nonexistent workflow ${wfId}`, w.filePath));
+      }
+    }
+    const navVerified = String(w.header['Navigation verified'] || '').trim();
+    if (!/^(Yes|Partial|Not verified in this pass)$/.test(navVerified)) {
+      findings.push(finding('warning', 'workflow-navigation-vocabulary', `${id}'s "Navigation verified" field ("${navVerified}") is not one of the expected values (Yes / Partial / Not verified in this pass)`, w.filePath));
+    }
+    if (!w.steps || w.steps.length === 0) {
+      findings.push(finding('information', 'workflow-no-steps', `${id} has no ordered Steps recorded`, w.filePath));
+    }
+  }
+  return findings;
+}
+
 // Rules 5-7 — Orphan bugs / decisions / postmortems
 function checkOrphans(parsed) {
   const findings = [];
@@ -458,6 +499,7 @@ function runAllChecks(parsed, built, opts = {}) {
     ...checkLinks(parsed),
     ...checkRoadmapReferences(parsed),
     ...checkFeatureReferences(parsed),
+    ...checkWorkflowReferences(parsed),
     ...checkOrphans(parsed),
     ...checkArchitectureCoverage(parsed),
     ...checkChangelogCoverage(parsed, opts.gitDocsCommits),
@@ -496,6 +538,7 @@ module.exports = {
   checkLinks,
   checkRoadmapReferences,
   checkFeatureReferences,
+  checkWorkflowReferences,
   checkOrphans,
   checkArchitectureCoverage,
   checkChangelogCoverage,

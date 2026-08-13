@@ -616,14 +616,21 @@
       "message": "2 Accepted decisions (DEC-006, DEC-007) all govern the exact same feature/milestone set (AI-FEAT-029) — worth a human check that they don't contradict each other",
       "note": null,
       "rule": "overlapping-active-decisions"
+    },
+    {
+      "file": "DEC-019",
+      "level": "information",
+      "message": "2 Accepted decisions (DEC-019, DEC-020) all govern the exact same feature/milestone set (AI-FEAT-058) — worth a human check that they don't contradict each other",
+      "note": null,
+      "rule": "overlapping-active-decisions"
     }
   ],
   "schema_version": "1.3.0",
-  "source_commit": "068c5583c9c5472db6ce8a023dbdbfb4105a07ce",
+  "source_commit": "56cfd1bd5ac266a1fe686140368182eadbe3d7b6",
   "summary": {
     "error": 0,
     "evidence_gap": 57,
-    "information": 15,
+    "information": 16,
     "warning": 16
   }
 }

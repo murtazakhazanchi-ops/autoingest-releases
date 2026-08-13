@@ -2920,13 +2920,13 @@
       "id": "AI-FEAT-058",
       "knownLimitations": {
         "evidenceGapCount": 2,
-        "futureEnhancements": "Documented, evidence-grounded, all deferred to a later stage per the Stage 1 brief's explicit stop condition — not implemented here:\n\n- **Retrieval precision.** The eval corpus surfaced three concrete, reproducible gaps in reusing `lib/query.js` unchanged for natural-language questions rather than short canonical lookups: (1) generic single-keyword overlaps (`event`, `import`, `archive`) frequently tie across several unrelated records, with the ascending-ID tiebreak sometimes surfacing a less-relevant record (e.g. \"How do I import photographs from an SD card?\" surfaces AI-FEAT-018 over the more directly relevant AI-FEAT-019); (2) ambiguous single words cause real topical drift (\"How do I switch between Stable and Preview versions?\" matches AI-FEAT-015/016 Media Preview, not AI-FEAT-057 Multi-Channel Release, via the word \"preview\"); (3) \"Can I search my entire archive?\" loses AI-FEAT-053 (Global Search, Planned — the genuinely relevant record) to five unrelated Archive Operations records that merely share the word \"archive.\" None of these caused a false confident answer (the weak-match hedge fired correctly in every case), but they measurably reduce answer relevance. A scoped, additive Stage 2 candidate: a lightweight re-ranking pass local to `knowledgeEngine.js` (e.g. weighting by distinct-token coverage of the full query, not just count) — still no embeddings, still no change to the shared `lib/query.js` ranker other commands depend on.\n- **Roadmap/dashboard routing.** \"What's coming next for AutoIngest?\" resolves `UNKNOWN` today — Stage 1's engine only matches `feature`-type search-index records, even though `roadmap-dashboard.json` answers this question well. Extending `answerQuestion` to also consider `roadmap`/`product_doc` entity types is a small, well-scoped Stage 2 item.\n- **Boundary table coverage.** The curated `NOT_SUPPORTED` table is deliberately small (6 entries). \"Can I have multiple people log in with different roles?\" is genuinely not supported (per `01_FEATURE_REGISTRY.md`'s own Reconciliation Notes) but is not in the table, and the engine reports `AVAILABLE` via a coincidental match on `AI-FEAT-027` (Activity Log, via the word \"log\") instead. Recorded as a known, evidenced gap in the eval corpus (Q20) rather than curated around it.\n- Workflow, Troubleshooting Entry, and Navigation Location record types (proposed in the Phase 1 audit's schema section) — none exist yet; every Stage 1 answer's `guidance` field is the honest fallback sentence for exactly this reason.\n- Screenshots/visual assets, the full 8-screen portal information architecture, and a conversational multi-turn layer — all explicitly deferred past Stage 1.",
+        "futureEnhancements": "Documented, evidence-grounded. Items below carry their Stage 1 or Stage 2 status explicitly — nothing is silently marked done:\n\n- **Retrieval precision** — *partially addressed in Stage 2.* The three Stage 1 gaps (generic single-keyword ties, ambiguous-word topical drift, archive-search tiebreak loss) are improved by the concept/hint layer and the stopword fix where a matching concept cluster exists, but the underlying `lib/query.js` scoring itself is unchanged — a genuinely novel paraphrase with no matching cluster and no stopword collision still exhibits the original Stage 1 behavior. Remaining as a real future candidate: a lightweight re-ranking pass local to `knowledgeEngine.js` weighting by distinct-token coverage rather than raw count — still no embeddings, still no change to the shared `lib/query.js` ranker other commands depend on.\n- **Roadmap/dashboard routing** — *done in Stage 2.* \"What's coming next for AutoIngest?\" and similarly `ROADMAP`-classified questions now answer directly from `roadmap-dashboard.json` via `roadmapAnswer()`; no longer resolves `UNKNOWN`.\n- **Boundary table coverage** — *partially addressed in Stage 2.* Q20's specific gap (\"multiple people log in with different roles\") is fixed via `BOUNDARY_CONCEPT_CLUSTERS`' `team-multi-role` cluster, with the additional hint-vs-raw-score safeguard described in DEC-020 to prevent a hint from ever silently overriding a boundary again. The underlying curated table remains deliberately small and is not claimed to be exhaustive — new boundary gaps found by future adversarial review should be added the same way, not inferred from search misses.\n- **Workflow, Troubleshooting Entry, and Navigation Location record types** — *Workflow done in Stage 2* (`AI-WF-###`, 8 records, `docs/product/workflows/`). Troubleshooting Entry and Navigation Location record types remain not implemented — still deferred.\n- Screenshots/visual assets, the full 8-screen portal information architecture, and a conversational multi-turn layer — remain deferred; the portal UX prototype and directory/onboarding browsing mode (Stage 2 Phases 22-23) are separate, still-in-progress Stage 2 work, not yet complete as of this documentation checkpoint.",
         "openBugs": []
       },
       "lastUpdated": {
-        "evidenceStatus": "Verified from current code (`scripts/product-docs/lib/knowledgeIndex.js`, `knowledgeEngine.js`, `statusResolution.js`, `knowledgeCli.js`, `knowledge-portal/server.js`+`index.html`) and `scripts/product-docs/test/knowledge.test.js` (18/18 passing, including the full existing 33-file suite unaffected), plus a live local-server smoke test (`knowledge serve`, `curl` against `/`, `/api/capabilities`, `/api/roadmap`, `/api/ask`) on 2026-08-13, and an independent forensic PR review (2026-08-13) that found and fixed one further defect (see Evolution Journal)",
+        "evidenceStatus": "Stage 1: verified from current code and `scripts/product-docs/test/knowledge.test.js`, plus an independent forensic PR review (2026-08-13) that found and fixed one defect (see Evolution Journal). Stage 2 (2026-08-13): verified from current code (`lib/intentConcepts.js`, `questionClassifier.js`, `workflowIndex.js`, extended `knowledgeEngine.js`), `docs/product/workflows/AI-WF-001..008_*.md` (each individually evidence-cited against real onboarding text or `renderer/` UI labels), the Online Registry architecture trace (`realtime-server/`, `services/realtimeOperationsService.js`, `main/main.js` emitter call sites), and `scripts/product-docs/test/knowledge.test.js` 18/18 passing under the full production context (`buildEngineContext`)",
         "introducedVersion": "2026-08-13",
-        "lastModifiedVersion": "2026-08-13"
+        "lastModifiedVersion": "2026-08-13 (Stage 2)"
       },
       "operatorStatus": "PARTIALLY_AVAILABLE",
       "relatedFeatures": [],
@@ -2937,33 +2937,47 @@
         }
       ],
       "searchTerms": [
+        "architecture",
         "engine",
         "knowledge",
         "knowledge & onboarding",
+        "operator",
         "prototype",
         "stage"
       ],
       "sourceAuthority": "canonical",
       "sourceFiles": [
+        "docs/product/19_WORKFLOW_TEMPLATE.md",
+        "docs/product/decisions/DEC-020_STAGE_2_KNOWLEDGE_ARCHITECTURE_WORKFLOW_RECORDS_AND_CONCEPT_LAYER.md",
         "docs/product/generated/knowledge-gap-report.json",
         "docs/product/generated/knowledge-index.json",
+        "docs/product/generated/workflow-index.json",
+        "docs/product/workflows/README.md",
         "features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md",
         "scripts/product-docs/cli.js",
         "scripts/product-docs/knowledge-portal/index.html",
         "scripts/product-docs/knowledge-portal/server.js",
         "scripts/product-docs/lib/build.js",
+        "scripts/product-docs/lib/ids.js",
+        "scripts/product-docs/lib/intentConcepts.js",
         "scripts/product-docs/lib/knowledgeCli.js",
         "scripts/product-docs/lib/knowledgeEngine.js",
         "scripts/product-docs/lib/knowledgeEval.js",
         "scripts/product-docs/lib/knowledgeIndex.js",
         "scripts/product-docs/lib/knowledgeTestCorpus.js",
+        "scripts/product-docs/lib/markdown.js",
+        "scripts/product-docs/lib/parseProductDocs.js",
+        "scripts/product-docs/lib/questionClassifier.js",
+        "scripts/product-docs/lib/searchIndex.js",
         "scripts/product-docs/lib/statusResolution.js",
+        "scripts/product-docs/lib/validators.js",
         "scripts/product-docs/lib/version.js",
+        "scripts/product-docs/lib/workflowIndex.js",
         "scripts/product-docs/test/knowledge.test.js"
       ],
       "status": "Implemented — evolving",
       "summary": "A Stage 1 prototype proving that AutoIngest's existing `docs/product/` documentation system — the feature registry, roadmap, and the deterministic offline search engine already built in `scripts/product-docs/lib/query.js` — can power a grounded, citation-honest, natural-language \"Ask AutoIngest\" answer engine **without** an LLM, embeddings, or any hosted service. This is explicitly **not** the final operator-facing portal (see the Phase 1 Knowledge & Onboarding Portal audit): no Workflow/Navigation/Tutorial content exists yet, no visual design work was done, and no conversational multi-turn layer was built. It is the smallest working slice that validates the two claims the larger portal initiative depends on: that the existing generated-index layer is sufficient retrieval infrastructure, and that a citation-honest answer contract is achievable on top of it.",
-      "title": "Knowledge Engine (Stage 1 Prototype)",
+      "title": "Knowledge Engine (Stage 1 Prototype → Stage 2 Operator Knowledge Architecture)",
       "whatItDoes": "A Stage 1 prototype proving that AutoIngest's existing `docs/product/` documentation system — the feature registry, roadmap, and the deterministic offline search engine already built in `scripts/product-docs/lib/query.js` — can power a grounded, citation-honest, natural-language \"Ask AutoIngest\" answer engine **without** an LLM, embeddings, or any hosted service. This is explicitly **not** the final operator-facing portal (see the Phase 1 Knowledge & Onboarding Portal audit): no Workflow/Navigation/Tutorial content exists yet, no visual design work was done, and no conversational multi-turn layer was built. It is the smallest working slice that validates the two claims the larger portal initiative depends on: that the existing generated-index layer is sufficient retrieval infrastructure, and that a citation-honest answer contract is achievable on top of it."
     }
   ],

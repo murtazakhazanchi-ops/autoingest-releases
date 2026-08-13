@@ -159,6 +159,39 @@ function parseFeatureFile(absPath, root) {
   };
 }
 
+// Stage 2 — docs/product/workflows/AI-WF-###_NAME.md. Same generic
+// header-table + named-section extraction pattern as parseFeatureFile,
+// specialized for Workflow's own section names (see
+// docs/product/19_WORKFLOW_TEMPLATE.md). Steps is an ORDERED list — the only
+// place in this tool that needs md.extractNumberedList instead of
+// extractBulletList, since step order is meaningful content, not incidental.
+function parseWorkflowFile(absPath, root) {
+  const content = readFile(absPath);
+  const header = md.extractHeaderTable(content);
+  const idMatch = /AI-WF-\d{3}/.exec(path.basename(absPath));
+  const nameMatch = /^#\s+AI-WF-\d{3}\s*—\s*(.+)$/m.exec(content);
+  return {
+    id: idMatch ? idMatch[0] : null,
+    name: nameMatch ? nameMatch[1].trim() : path.basename(absPath, '.md'),
+    filePath: relPath(absPath, root),
+    header,
+    whatItDoes: md.extractSection(content, 'What It Does'),
+    whenToUseIt: md.extractSection(content, 'When To Use It'),
+    beforeYouStart: md.extractSection(content, 'Before You Start'),
+    whereToGo: md.extractSection(content, 'Where To Go'),
+    steps: md.extractNumberedList(md.extractSection(content, 'Steps')),
+    expectedResult: md.extractSection(content, 'What Happens Next / Expected Result'),
+    limitations: md.extractSection(content, 'Important Limitations'),
+    warnings: md.extractSection(content, 'Warnings'),
+    troubleshooting: md.extractSection(content, 'Troubleshooting'),
+    relatedActions: md.extractSection(content, 'Related Actions'),
+    source: md.extractSection(content, 'Source'),
+    headings: md.extractHeadings(content),
+    allIds: ids.extractAllIds(content),
+    body: content,
+  };
+}
+
 function loadAll(root) {
   root = root || PRODUCT_DOCS_ROOT;
   const registryPath = path.join(root, '01_FEATURE_REGISTRY.md');
@@ -184,6 +217,9 @@ function loadAll(root) {
   // Part 8 — docs/product/conversations/ is optional for the same reason.
   // See docs/product/18_ENGINEERING_CONVERSATION_POLICY.md § 5.
   const conversationDir = path.join(root, 'conversations');
+  // Stage 2 — docs/product/workflows/ is optional for the same reason (a
+  // repository checked out before Stage 2 has no such directory).
+  const workflowDir = path.join(root, 'workflows');
 
   const featureFiles = fs.readdirSync(featureDir).filter((f) => f.endsWith('.md')).sort();
   const bugFiles = fs.readdirSync(bugDir).filter((f) => f.endsWith('.md') && f !== 'README.md').sort();
@@ -195,6 +231,9 @@ function loadAll(root) {
   const conversationFiles = fs.existsSync(conversationDir)
     ? fs.readdirSync(conversationDir).filter((f) => f.endsWith('.md') && f !== 'README.md' && f !== 'INDEX.md' && f !== 'CHATGPT_HANDOFF.md').sort()
     : [];
+  const workflowFiles = fs.existsSync(workflowDir)
+    ? fs.readdirSync(workflowDir).filter((f) => f.endsWith('.md') && f !== 'README.md').sort()
+    : [];
 
   // idFilesSeen tracks every (id -> [filePath, ...]) pairing BEFORE collapsing
   // into the by-id Maps below, so duplicate-ID detection (validators.js
@@ -204,7 +243,7 @@ function loadAll(root) {
   // an ID within 01_FEATURE_REGISTRY.md / 02_MASTER_ROADMAP.md. One file plus
   // one row for the same ID is the expected, correct structure — not a
   // duplicate — so files and rows are deliberately never merged into one group.
-  const idFilesSeen = { feature: new Map(), bug: new Map(), decision: new Map(), postmortem: new Map(), memory: new Map(), conversation: new Map() };
+  const idFilesSeen = { feature: new Map(), bug: new Map(), decision: new Map(), postmortem: new Map(), memory: new Map(), conversation: new Map(), workflow: new Map() };
   const idRowsSeen = { feature: new Map(), roadmap: new Map() };
   const recordSeen = (bucket, family, id, location) => {
     if (!id) return;
@@ -263,6 +302,16 @@ function loadAll(root) {
     if (parsed.id) conversations.set(parsed.id, parsed);
   }
 
+  // Stage 2 — Workflow records reuse parseWorkflowFile (its own dedicated
+  // section extractor, not the generic parseRecordFile — Workflow's section
+  // names/shapes are specific to it, particularly the ordered Steps list).
+  const workflows = new Map();
+  for (const f of workflowFiles) {
+    const parsed = parseWorkflowFile(path.join(workflowDir, f), root);
+    recordSeen(idFilesSeen, 'workflow', parsed.id, parsed.filePath);
+    if (parsed.id) workflows.set(parsed.id, parsed);
+  }
+
   const registryCategories = parseRegistry(registryContent);
   const categoryByFeatureId = new Map();
   for (const cat of registryCategories) {
@@ -317,12 +366,15 @@ function loadAll(root) {
     memoryDirExists: fs.existsSync(memoryDir),
     conversations,
     conversationDirExists: fs.existsSync(conversationDir),
+    workflows,
+    workflowDirExists: fs.existsSync(workflowDir),
     allFiles,
   };
 }
 
 module.exports = {
   loadAll,
+  parseWorkflowFile,
   parseRegistry,
   parseRoadmap,
   parseFeatureFile,

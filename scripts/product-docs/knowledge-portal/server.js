@@ -16,7 +16,7 @@ const fs = require('fs');
 const path = require('path');
 const { URL } = require('url');
 const build = require('../lib/build');
-const { answerQuestion, knowledgeIndexMap } = require('../lib/knowledgeEngine');
+const { answerQuestion, buildEngineContext } = require('../lib/knowledgeEngine');
 
 const STATIC_DIR = __dirname;
 const INDEX_FILE = path.join(STATIC_DIR, 'index.html');
@@ -53,6 +53,12 @@ function handleRequest(req, res) {
     return;
   }
 
+  if (parsed.pathname === '/api/workflows') {
+    const { built } = build.assemble();
+    sendJson(res, 200, { workflows: built.workflowIndex });
+    return;
+  }
+
   if (parsed.pathname === '/api/roadmap') {
     const { built } = build.assemble();
     sendJson(res, 200, { milestones: built.dashboard.milestones, currentMilestoneId: built.dashboard.current_milestone_id, progressPercent: built.dashboard.progress_percent });
@@ -66,10 +72,7 @@ function handleRequest(req, res) {
       return;
     }
     const { built } = build.assemble();
-    const answer = answerQuestion(question, {
-      searchIndex: built.searchIndex,
-      knowledgeIndexById: knowledgeIndexMap(built.knowledgeIndex),
-    });
+    const answer = answerQuestion(question, buildEngineContext(built));
     sendJson(res, 200, answer);
     return;
   }

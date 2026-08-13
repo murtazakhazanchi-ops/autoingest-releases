@@ -1,4 +1,4 @@
-# AI-FEAT-058 — Knowledge Engine (Stage 1 Prototype)
+# AI-FEAT-058 — Knowledge Engine (Stage 1 Prototype → Stage 2 Operator Knowledge Architecture)
 
 | Field | Value |
 |---|---|
@@ -8,12 +8,12 @@
 | Maturity | Experimental |
 | Parent feature | None |
 | Subfeatures | None |
-| Dependencies | None — reads the existing feature registry generically (all 57 `AI-FEAT` records) via `docs/product/generated/feature-index.json`, not a functional dependency on any single feature |
+| Dependencies | None — reads the existing feature registry generically (all 58 `AI-FEAT` records) via `docs/product/generated/feature-index.json`, not a functional dependency on any single feature |
 | Related roadmap milestone | AI-RM-011 |
 | Related technical docs | None — this feature's own documentation home is `scripts/product-docs/README.md`, not the `docs/` technical-doc tier |
-| Evidence status | Verified from current code (`scripts/product-docs/lib/knowledgeIndex.js`, `knowledgeEngine.js`, `statusResolution.js`, `knowledgeCli.js`, `knowledge-portal/server.js`+`index.html`) and `scripts/product-docs/test/knowledge.test.js` (18/18 passing, including the full existing 33-file suite unaffected), plus a live local-server smoke test (`knowledge serve`, `curl` against `/`, `/api/capabilities`, `/api/roadmap`, `/api/ask`) on 2026-08-13, and an independent forensic PR review (2026-08-13) that found and fixed one further defect (see Evolution Journal) |
+| Evidence status | Stage 1: verified from current code and `scripts/product-docs/test/knowledge.test.js`, plus an independent forensic PR review (2026-08-13) that found and fixed one defect (see Evolution Journal). Stage 2 (2026-08-13): verified from current code (`lib/intentConcepts.js`, `questionClassifier.js`, `workflowIndex.js`, extended `knowledgeEngine.js`), `docs/product/workflows/AI-WF-001..008_*.md` (each individually evidence-cited against real onboarding text or `renderer/` UI labels), the Online Registry architecture trace (`realtime-server/`, `services/realtimeOperationsService.js`, `main/main.js` emitter call sites), and `scripts/product-docs/test/knowledge.test.js` 18/18 passing under the full production context (`buildEngineContext`) |
 | First-known implementation | 2026-08-13 |
-| Latest major update | 2026-08-13 |
+| Latest major update | 2026-08-13 (Stage 2) |
 
 ## Lifecycle Metadata
 
@@ -73,26 +73,52 @@ This section classifies this feature's already-evidenced history by milestone ty
 
 **Other dated milestones**: 2026-08-13 — 20-question eval corpus run against the real engine: 18/20 passed exactly as expected, 2/20 documented known misses, 0/20 unexplained; full regression suite (`knowledge.test.js` 17/17, existing 33-file suite unaffected) and `validate` (0 errors) confirmed the same day.
 
+## Stage 2 — Operator Knowledge Architecture, Natural-Language Retrieval, Workflow Records, Online Registry Coverage
+
+Approved after review of the Stage 1 audit (Phases 0-3: operator intent map, knowledge/workflow schema proposal, Online Registry architecture trace — see PR history for the full presented findings). Builds directly on Stage 1 without replacing it — every Stage 1 file, test, and guarantee remains intact; this section documents what was added on top.
+
+**What was added**:
+- `lib/intentConcepts.js` — the Intent concept/synonym layer (~18 curated clusters mapping real paraphrase families to alternate "hint" query strings, still run entirely through the unchanged `lib/query.js` ranker; see [DEC-020](../decisions/DEC-020_STAGE_2_KNOWLEDGE_ARCHITECTURE_WORKFLOW_RECORDS_AND_CONCEPT_LAYER.md)).
+- `lib/questionClassifier.js` — deterministic question-type classification (HOW_TO/CAPABILITY/TROUBLESHOOTING/NAVIGATION/EXPLANATION/STATUS/ROADMAP/COMPARISON/TEAM_ACTIVITY/CONNECTIVITY/UNKNOWN).
+- A new canonical Workflow record family: `docs/product/workflows/AI-WF-###_*.md` (template: `19_WORKFLOW_TEMPLATE.md`), parsed via a new `parseWorkflowFile` reusing the existing generic section-extraction helpers, compiled to `docs/product/generated/workflow-index.json` (`lib/workflowIndex.js`), validated by a new `checkWorkflowReferences` rule wired into `validate`. 8 records authored for Stage 2 (Import ×2, Events, Metadata, Transfer & Backup, Online Registry & Teamwork, QMZ, Archive Management) — a deliberately bounded, non-exhaustive set covering the highest-value operator paths identified in the Phase 1-3 audit, not all ~50 identified intents (see `docs/product/workflows/README.md`'s own "Not yet covered" section).
+- Roadmap/status routing (Phase 19): a `ROADMAP`-classified question now answers directly from `roadmap-dashboard.json` — fixes Stage 1's own documented limitation #5 ("what's next" resolved `UNKNOWN`).
+- `knowledgeEngine.js`'s `answerQuestion` extended (backward-compatibly — `workflowIndexById`/`dashboard` are optional context fields; any caller passing only Stage 1's original `{searchIndex, knowledgeIndexById}` keeps working unchanged) to: search Workflow records alongside Capability records through the same multi-query concept-expanded search; prefer a Workflow's real, verified guidance over the generic fallback sentence for HOW_TO/TROUBLESHOOTING-classified questions when the workflow match is genuine evidence; attach a companion Workflow's guidance to a Capability-fronted answer when one exists and cites it.
+
+**Three real defects found and fixed during Stage 2's own testing, before commit** (full account below):
+1. `lib/searchIndex.js`'s `keywordsFrom()` had no stopword filtering — a richer Workflow record's prose (unlike a terse Capability summary) let `AI-WF-006` win "How do I switch between Stable and Preview versions?" confidently on the words "how"/"between"/"and" alone, zero topical relevance. Fixed with a small curated stopword list.
+2. A concept hint aimed at a legitimate paraphrase family ("team-collaboration": "several users... simultaneously") also fired for a genuine, correctly-detected `multi-user-roles` boundary question ("different roles") and, scoring strongly, silently overrode the boundary — reproducing the exact class of bug PR #5's forensic review caught for raw keyword luck, this time via a hint. Fixed by requiring boundary-overriding strength to come from the raw question itself (`rawFeatureMatches`), never a hint-boosted score — see DEC-020.
+3. The HOW_TO-only workflow-preference gate caused a WORSE answer than Stage 1 for "My transfer stopped halfway — what happens now?" (classified TROUBLESHOOTING, not HOW_TO): a clearly-superior `AI-WF-005` match (score 500) was ignored entirely, falling through to an unrelated, merely-tied feature winning only the ascending-ID tiebreak. Fixed by widening the workflow-preference gate to include TROUBLESHOOTING alongside HOW_TO.
+
+**Two concept-hint design mistakes found and corrected** (not defects in the mechanism itself, but in specific curated content): the original `import-video` hint ("import event component routing") and `transfer-resume` hint ("transfer background minimize operation") both artificially inflated confidence toward related-but-not-actually-relevant records. `import-video`'s hint was removed entirely (honest fallback to Stage 1's already-correct weak/hedged behavior — no canonical record confirms video-format support specifically); `transfer-resume`'s hint was retargeted to words verified present in `AI-WF-005`'s own indexed content.
+
+**One genuine, disclosed limitation found and NOT patched** (deliberately): "Can AutoIngest repair missing metadata?" now ties between the correct answer (`AI-WF-004`) and an unrelated one (`AI-WF-006`) at score 300, because `AI-WF-006`'s own required four-way-distinction text legitimately contains the words "metadata"/"audit"/"repair" in an explicitly *negating* context ("not Metadata, not Audit/Repair"). Pure keyword-overlap cannot distinguish a word's positive vs. negated usage. The top match is still correctly `AI-WF-004` (alphabetically first in the tie) and the hedge correctly fires — the system is appropriately conservative given a genuinely ambiguous lexical signal, not wrong. Recorded as a real candidate for smarter (still non-embedding) matching in a future stage, not patched here per the brief's own "do not accumulate question-specific keyword exceptions" instruction.
+
+**20-question corpus, re-verified against Stage 2's actual current behavior** (`lib/knowledgeTestCorpus.js`, superseding the Stage 1-era expectations where genuinely improved): 17/20 passed exactly as expected, 3/20 documented known limitations (all pre-existing or deliberately-not-boosted, not new defects), 0/20 unexplained. `scripts/product-docs/test/knowledge.test.js`: 18/18 passing under the FULL production context (`buildEngineContext`, exercising Workflow/roadmap/concept logic — not the reduced Stage 1-only context), including one Stage 1 assertion legitimately updated to recognize the new, controlled guidance forms (workflow citation, a real workflow's own "When To Use It" text) rather than only the original fixed fallback sentence.
+
+**Online Registry & Teamwork coverage**: `AI-WF-006` (See Who Else Is Online and What They're Working On) is the flagship Stage 2 Workflow record — built from a full architecture trace of `realtime-server/server.js`, `services/realtimeOperationsService.js`, and every `main/main.js` emitter call site. It explicitly documents and enforces (in its own text, which the answer engine surfaces verbatim) the four-way distinction required for this capability: presence (connection tracking) is separate from activity/progress visibility (currently published for Import and Transfer/Sync only — not QMZ/Metadata/Audit), which is separate from conflict detection (`conflict:warning` is wired into the protocol with **zero emitting code anywhere in this repository** — dormant, never described as active), which is separate from archive-level file locking (`AI-FEAT-045`, an entirely different mechanism). Also documents: no authentication by default (explicit, not glossed over), no photo/media bytes ever cross the relay, and import/sync never block on relay unavailability.
+
 ## Known Bugs / Troubleshooting
 
 None recorded as canonical `BUG-###` entries — every defect found during this feature's own construction (see Evolution above) was caught and fixed before the first commit, with no shipped/user-facing incident. Per `docs/product/CLAUDE.md` § 12, a `BUG-###` record is warranted when a fix pattern would help diagnose something similar faster later; the three fixes above are recorded in this file's own Evolution log instead, which is the more directly useful location for a feature that was never released in a broken state.
 
 ## Decisions
 
-See [DEC-019](../decisions/DEC-019_KNOWLEDGE_ENGINE_REUSES_EXISTING_RETRIEVAL_NO_NEW_SEARCH_SYSTEM.md) — the decision to reuse `lib/query.js` unchanged, add a local Node-core HTTP server rather than duplicate ranking logic in browser JavaScript or add a hosted backend, and use a small curated boundary table rather than infer `NOT_SUPPORTED` from zero search results.
+- [DEC-019](../decisions/DEC-019_KNOWLEDGE_ENGINE_REUSES_EXISTING_RETRIEVAL_NO_NEW_SEARCH_SYSTEM.md) — Stage 1: reuse `lib/query.js` unchanged, add a local Node-core HTTP server rather than duplicate ranking logic in browser JavaScript or add a hosted backend, use a small curated boundary table rather than infer `NOT_SUPPORTED` from zero search results.
+- [DEC-020](../decisions/DEC-020_STAGE_2_KNOWLEDGE_ARCHITECTURE_WORKFLOW_RECORDS_AND_CONCEPT_LAYER.md) — Stage 2: Workflow records as Markdown reusing the existing generic section-extraction pattern (not a bespoke record family, not JSON); the Intent/concept layer as a small curated trigger-phrase-to-hint map run through the same unchanged ranker (not embeddings, not a giant lookup table); a hint-boosted score may never override a curated `NOT_SUPPORTED` boundary — only the raw, un-hinted question's own score may.
 
 ## Future Enhancements
 
-Documented, evidence-grounded, all deferred to a later stage per the Stage 1 brief's explicit stop condition — not implemented here:
+Documented, evidence-grounded. Items below carry their Stage 1 or Stage 2 status explicitly — nothing is silently marked done:
 
-- **Retrieval precision.** The eval corpus surfaced three concrete, reproducible gaps in reusing `lib/query.js` unchanged for natural-language questions rather than short canonical lookups: (1) generic single-keyword overlaps (`event`, `import`, `archive`) frequently tie across several unrelated records, with the ascending-ID tiebreak sometimes surfacing a less-relevant record (e.g. "How do I import photographs from an SD card?" surfaces AI-FEAT-018 over the more directly relevant AI-FEAT-019); (2) ambiguous single words cause real topical drift ("How do I switch between Stable and Preview versions?" matches AI-FEAT-015/016 Media Preview, not AI-FEAT-057 Multi-Channel Release, via the word "preview"); (3) "Can I search my entire archive?" loses AI-FEAT-053 (Global Search, Planned — the genuinely relevant record) to five unrelated Archive Operations records that merely share the word "archive." None of these caused a false confident answer (the weak-match hedge fired correctly in every case), but they measurably reduce answer relevance. A scoped, additive Stage 2 candidate: a lightweight re-ranking pass local to `knowledgeEngine.js` (e.g. weighting by distinct-token coverage of the full query, not just count) — still no embeddings, still no change to the shared `lib/query.js` ranker other commands depend on.
-- **Roadmap/dashboard routing.** "What's coming next for AutoIngest?" resolves `UNKNOWN` today — Stage 1's engine only matches `feature`-type search-index records, even though `roadmap-dashboard.json` answers this question well. Extending `answerQuestion` to also consider `roadmap`/`product_doc` entity types is a small, well-scoped Stage 2 item.
-- **Boundary table coverage.** The curated `NOT_SUPPORTED` table is deliberately small (6 entries). "Can I have multiple people log in with different roles?" is genuinely not supported (per `01_FEATURE_REGISTRY.md`'s own Reconciliation Notes) but is not in the table, and the engine reports `AVAILABLE` via a coincidental match on `AI-FEAT-027` (Activity Log, via the word "log") instead. Recorded as a known, evidenced gap in the eval corpus (Q20) rather than curated around it.
-- Workflow, Troubleshooting Entry, and Navigation Location record types (proposed in the Phase 1 audit's schema section) — none exist yet; every Stage 1 answer's `guidance` field is the honest fallback sentence for exactly this reason.
-- Screenshots/visual assets, the full 8-screen portal information architecture, and a conversational multi-turn layer — all explicitly deferred past Stage 1.
+- **Retrieval precision** — *partially addressed in Stage 2.* The three Stage 1 gaps (generic single-keyword ties, ambiguous-word topical drift, archive-search tiebreak loss) are improved by the concept/hint layer and the stopword fix where a matching concept cluster exists, but the underlying `lib/query.js` scoring itself is unchanged — a genuinely novel paraphrase with no matching cluster and no stopword collision still exhibits the original Stage 1 behavior. Remaining as a real future candidate: a lightweight re-ranking pass local to `knowledgeEngine.js` weighting by distinct-token coverage rather than raw count — still no embeddings, still no change to the shared `lib/query.js` ranker other commands depend on.
+- **Roadmap/dashboard routing** — *done in Stage 2.* "What's coming next for AutoIngest?" and similarly `ROADMAP`-classified questions now answer directly from `roadmap-dashboard.json` via `roadmapAnswer()`; no longer resolves `UNKNOWN`.
+- **Boundary table coverage** — *partially addressed in Stage 2.* Q20's specific gap ("multiple people log in with different roles") is fixed via `BOUNDARY_CONCEPT_CLUSTERS`' `team-multi-role` cluster, with the additional hint-vs-raw-score safeguard described in DEC-020 to prevent a hint from ever silently overriding a boundary again. The underlying curated table remains deliberately small and is not claimed to be exhaustive — new boundary gaps found by future adversarial review should be added the same way, not inferred from search misses.
+- **Workflow, Troubleshooting Entry, and Navigation Location record types** — *Workflow done in Stage 2* (`AI-WF-###`, 8 records, `docs/product/workflows/`). Troubleshooting Entry and Navigation Location record types remain not implemented — still deferred.
+- Screenshots/visual assets, the full 8-screen portal information architecture, and a conversational multi-turn layer — remain deferred; the portal UX prototype and directory/onboarding browsing mode (Stage 2 Phases 22-23) are separate, still-in-progress Stage 2 work, not yet complete as of this documentation checkpoint.
 
 ## Related Files
 
+Stage 1:
 - `scripts/product-docs/lib/knowledgeIndex.js`
 - `scripts/product-docs/lib/statusResolution.js`
 - `scripts/product-docs/lib/knowledgeEngine.js`
@@ -107,3 +133,17 @@ Documented, evidence-grounded, all deferred to a later stage per the Stage 1 bri
 - `scripts/product-docs/test/knowledge.test.js`
 - `docs/product/generated/knowledge-index.json` (generated output)
 - `docs/product/generated/knowledge-gap-report.json` (generated output)
+
+Stage 2 (additions):
+- `scripts/product-docs/lib/intentConcepts.js` — Intent/concept-synonym layer
+- `scripts/product-docs/lib/questionClassifier.js` — question-type classification
+- `scripts/product-docs/lib/workflowIndex.js` — Workflow index compiler
+- `scripts/product-docs/lib/parseProductDocs.js` (extended — `parseWorkflowFile`)
+- `scripts/product-docs/lib/markdown.js` (extended — `extractNumberedList`)
+- `scripts/product-docs/lib/searchIndex.js` (extended — Workflow entity records, `STOPWORDS` fix)
+- `scripts/product-docs/lib/validators.js` (extended — `checkWorkflowReferences`)
+- `scripts/product-docs/lib/ids.js` (extended — `AI-WF-###` ID family)
+- `docs/product/19_WORKFLOW_TEMPLATE.md`
+- `docs/product/workflows/README.md` and `docs/product/workflows/AI-WF-001..008_*.md`
+- `docs/product/generated/workflow-index.json` (generated output)
+- `docs/product/decisions/DEC-020_STAGE_2_KNOWLEDGE_ARCHITECTURE_WORKFLOW_RECORDS_AND_CONCEPT_LAYER.md`

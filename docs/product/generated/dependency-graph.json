@@ -3340,6 +3340,14 @@
     {
       "evidence_status": "explicit",
       "note": null,
+      "provenance_path": "decisions/DEC-020_STAGE_2_KNOWLEDGE_ARCHITECTURE_WORKFLOW_RECORDS_AND_CONCEPT_LAYER.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-058",
+      "target": "DEC-020"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
       "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-001:Included-AI-FEAT-IDs",
       "relationship": "implements",
       "source": "AI-RM-001",
@@ -3672,6 +3680,14 @@
       "relationship": "governed_by",
       "source": "AI-RM-011",
       "target": "DEC-019"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-020_STAGE_2_KNOWLEDGE_ARCHITECTURE_WORKFLOW_RECORDS_AND_CONCEPT_LAYER.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-RM-011",
+      "target": "DEC-020"
     },
     {
       "evidence_status": "explicit",
@@ -4056,6 +4072,14 @@
       "relationship": "related_to",
       "source": "DEC-018",
       "target": "DEC-017"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "decision-to-decision body reference",
+      "provenance_path": "decisions/DEC-020_STAGE_2_KNOWLEDGE_ARCHITECTURE_WORKFLOW_RECORDS_AND_CONCEPT_LAYER.md#body",
+      "relationship": "related_to",
+      "source": "DEC-020",
+      "target": "DEC-019"
     },
     {
       "evidence_status": "explicit",
@@ -4692,7 +4716,7 @@
     {
       "doc_path": "features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md",
       "id": "AI-FEAT-058",
-      "label": "Knowledge Engine (Stage 1 Prototype)",
+      "label": "Knowledge Engine (Stage 1 Prototype → Stage 2 Operator Knowledge Architecture)",
       "type": "feature"
     },
     {
@@ -5047,6 +5071,12 @@
       "doc_path": "decisions/DEC-019_KNOWLEDGE_ENGINE_REUSES_EXISTING_RETRIEVAL_NO_NEW_SEARCH_SYSTEM.md",
       "id": "DEC-019",
       "label": "Knowledge Engine Reuses Existing Retrieval; No New Search System, No Hosted Backend",
+      "type": "decision"
+    },
+    {
+      "doc_path": "decisions/DEC-020_STAGE_2_KNOWLEDGE_ARCHITECTURE_WORKFLOW_RECORDS_AND_CONCEPT_LAYER.md",
+      "id": "DEC-020",
+      "label": "Stage 2 Knowledge Architecture: Workflow Records, Concept Layer, and Hint-vs-Raw Boundary Precedence",
       "type": "decision"
     },
     {
