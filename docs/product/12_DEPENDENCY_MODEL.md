@@ -31,7 +31,7 @@ Source: `02_MASTER_ROADMAP.md`'s `Included AI-FEAT IDs` and `Existing features e
 | **AI-RM-007** — Archive Repair | Planned — not started | [AI-FEAT-052](features/AI-FEAT-052_ARCHIVE_REPAIR.md) | [AI-FEAT-043](features/AI-FEAT-043_ARCHIVE_HEALTH_REPORTING.md) |
 | **AI-RM-008** — Archive Analytics | Planned — not started | [AI-FEAT-055](features/AI-FEAT-055_ARCHIVE_ANALYTICS.md) | [AI-FEAT-043](features/AI-FEAT-043_ARCHIVE_HEALTH_REPORTING.md) |
 | **AI-RM-009** — AI Archive Intelligence | Planned — not started | [AI-FEAT-056](features/AI-FEAT-056_AI_ARCHIVE_INTELLIGENCE.md) | [AI-FEAT-055](features/AI-FEAT-055_ARCHIVE_ANALYTICS.md) |
-| **AI-RM-010** — Multi-Channel Release & Update System (parallel track, not part of the AI-RM-001…009 sequence above) | **Completed** (logic-level; live pilot deferred) | [AI-FEAT-057](features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md) | [AI-FEAT-006](features/AI-FEAT-006_APPLICATION_AUTO_UPDATE.md), [AI-FEAT-005](features/AI-FEAT-005_APPLICATION_SETTINGS_CONFIGURATION_STORE.md) |
+| **AI-RM-010** — Multi-Channel Release & Update System (parallel track, not part of the AI-RM-001…009 sequence above) | **Completed** — verified on real Windows hardware | [AI-FEAT-057](features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md) | [AI-FEAT-006](features/AI-FEAT-006_APPLICATION_AUTO_UPDATE.md), [AI-FEAT-005](features/AI-FEAT-005_APPLICATION_SETTINGS_CONFIGURATION_STORE.md) |
 
 ## Decision → Decision
 

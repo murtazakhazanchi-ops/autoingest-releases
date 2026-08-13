@@ -1,0 +1,74 @@
+{
+  "affected_features": [],
+  "breaking_changes": {
+    "items": [],
+    "note": "No breaking-change evidence found (commit \"!\" marker, or a cited decision/bug record explicitly saying \"breaking\") in this range."
+  },
+  "bugs_referenced": [],
+  "categories": {},
+  "channel": "rc",
+  "decisions_referenced": [],
+  "documentation_health_summary": {
+    "error": 0,
+    "evidence_gap": 56,
+    "information": 14,
+    "warning": 15
+  },
+  "from_commit": "4669449357e48f7a62eeb9463437eb4753a2a842",
+  "from_ref": "v0.9.12-rc.2",
+  "from_ref_resolution": "auto-detected-prior-tag",
+  "generated_at": "2026-08-13T06:57:29.111Z",
+  "known_issues": [],
+  "migration_notes": {
+    "items": [],
+    "note": "No migration-note evidence found in cited decision/bug records for this range."
+  },
+  "publish_note": "DRAFT ONLY. Does not create a GitHub release or docs/release-notes-*.md. Publishing remains a separately authorized human action.",
+  "qa_checklist": {
+    "affected_bug_ids": [],
+    "affected_feature_ids": [],
+    "build_version": null,
+    "commit_sha": "66469f54c29d78e2d1e86331ee76c4fb992a92ed",
+    "known_issues": [],
+    "required_evidence": [
+      "Screenshots or screen recording of the exercised flow(s)",
+      "app.log covering the session",
+      "Exact build version and platform tested"
+    ],
+    "risk_summary": {
+      "high_risk_files": [],
+      "note": "Heuristic, evidence-labeled only — file touches a subsystem this system already treats as elevated-risk (event.json/security/ingestion/transaction/archive-writer, per changeClassifier.js), or has unresolved ownership. Not a substitute for human review.",
+      "unknown_ownership_files": []
+    },
+    "tester_instructions": [
+      "Install this RC build on the target platform(s).",
+      "No specific feature area flagged — run the general smoke checklist.",
+      "No specific bug reproduction steps required.",
+      "Capture evidence (screenshots, app.log) for each step exercised — matching the evidence bar BUG-011-014 established.",
+      "Report PASS/FAIL per affected bug/feature, not just \"worked overall\"."
+    ]
+  },
+  "release_manifest": {
+    "affected_feature_count": 0,
+    "commit_count": 0,
+    "docsys_version": "1.2.0",
+    "files_changed_count": 0,
+    "from_commit": "4669449357e48f7a62eeb9463437eb4753a2a842",
+    "generator_version": "1.2.0",
+    "to_commit": "66469f54c29d78e2d1e86331ee76c4fb992a92ed"
+  },
+  "risk_assessment": {
+    "high_risk_files": [],
+    "note": "Heuristic, evidence-labeled only — file touches a subsystem this system already treats as elevated-risk (event.json/security/ingestion/transaction/archive-writer, per changeClassifier.js), or has unresolved ownership. Not a substitute for human review.",
+    "unknown_ownership_files": []
+  },
+  "roadmap_impact": {
+    "affected_roadmap_ids": [],
+    "milestone_transitions_note": "A release never automatically completes a milestone — 02_MASTER_ROADMAP.md/04_PROJECT_DASHBOARD.md transitions require explicit human/agent-confirmed acceptance evidence (see docs/product/05_DOCUMENTATION_WORKFLOW.md § Automation and the Update Rule). This report only lists which milestones this range touches."
+  },
+  "test_verification_summary": {
+    "tests_changed": []
+  },
+  "to_commit": "66469f54c29d78e2d1e86331ee76c4fb992a92ed",
+  "to_ref": "66469f54c29d78e2d1e86331ee76c4fb992a92ed"
+}

@@ -3207,12 +3207,12 @@
       "dependents": [],
       "documentation_completeness": {
         "evidence_gap_count": 0,
-        "narrative": "Complete for the CI/publication-side scope, verified against real GitHub state. The real-installed-client verification (a Windows machine actually running the updater against the published RC) is still pending — see Future Enhancements"
+        "narrative": "Complete. Every claim in the Acceptance Matrix below is backed by source/SemVer proof, automated test, live CI/GitHub evidence, or real Windows-client evidence — no remaining \"logic-level only\" claims for this feature's own scope."
       },
       "evidence_status": "Verified from current code and `node_modules/electron-updater`/`node_modules/app-builder-lib`/`node_modules/electron-publish` source at the pinned installed versions (`electron-updater@6.8.3`, `electron-builder@26.8.1`) — not from memory or external documentation",
       "feature_id": "AI-FEAT-057",
       "introduced_version": "2026-08-12",
-      "last_modified_version": "2026-08-13 — live CI pilot (v0.9.12-rc.1/rc.2), Windows-shell bug found and fixed (BUG-015), Stable-isolation and promotion-gate verified against real GitHub state; real-client (installed Windows app) verification still pending",
+      "last_modified_version": "2026-08-13 — full live pilot closed. Three real RC publications (v0.9.12-rc.1/rc.2/rc.3), two CI-only bugs found and fixed (BUG-015, BUG-016), and real Windows-hardware verification of the complete Stable/Preview lifecycle: legacy isolation, manual bootstrap, in-place install with data preservation, Preview↔Stable switching, Preview→Preview automatic update, and no downgrade. See Acceptance Matrix below.",
       "maturity": "Evolving",
       "name": "Multi-Channel Release & Update System",
       "parent_feature": [
@@ -3226,6 +3226,22 @@
         "BUG-016"
       ],
       "related_changelog_entries": [
+        {
+          "date": "2026-08-13",
+          "excerpt": "## 2026-08-13 — Part 9 live-pilot closure: real Windows-client verification (AI-FEAT-057 / AI-RM-010)"
+        },
+        {
+          "date": "2026-08-13",
+          "excerpt": "**What happened**: published `v0.9.12-rc.3` — deliberately built from the exact same application source as `rc.2` (zero application-code diff, independently confirmed via `git diff --stat` and via `el"
+        },
+        {
+          "date": "2026-08-13",
+          "excerpt": "**Acceptance Matrix**: added to AI-FEAT-057 — 22 claims, each classified into one of five evidence tiers (real client / live CI-GitHub / automated test / source-SemVer / not verified). Every claim in "
+        },
+        {
+          "date": "2026-08-13",
+          "excerpt": "**Non-blocking finding**: the tester could not confidently confirm the exact in-app version string (including the `-rc.3` suffix) — Windows' own file-properties dialog has no field for a SemVer prerel"
+        },
         {
           "date": "2026-08-13",
           "excerpt": "## 2026-08-13 — Part 9 live CI pilot: RC published, Windows-shell bug found and fixed (AI-FEAT-057 / BUG-015)"

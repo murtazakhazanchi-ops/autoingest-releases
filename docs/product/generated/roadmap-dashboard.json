@@ -206,7 +206,7 @@
       "status": "Planned — not started"
     },
     {
-      "current_risks": "The live pilot has not been run — real-world CI behavior (GitHub API rate limits, actual tag-creation race conditions between the two RC platform jobs, real signing-free artifact acceptance by target OSes) is unverified beyond the logic-level model.",
+      "current_risks": "None blocking. Two CI-only bugs were found and fixed during the pilot ([BUG-015](bugs/BUG-015_WINDOWS_RUNNER_DEFAULT_POWERSHELL_SHELL_MANGLES_ELECTRON_BUILDER_DOT_NOTATION_CLI_OVERRIDES.md), [BUG-016](bugs/BUG-016_UNDECLARED_NPM_DEPENDENCY_IN_PRODUCT_DOCS_TOOLING_MASKED_BY_LOCALLY_HOISTED_NODE_MODULES.md)) — both closed. One accepted (non-blocking) structural note: `rc-build-windows`/`rc-build-mac` have no atomic dual-platform publish gate (see AI-FEAT-057's Decisions section). One non-blocking UX candidate identified (exact running version, including prerelease suffix, not confidently visible to a tester in-app — see AI-FEAT-057's Future Enhancements).",
       "dependencies": [],
       "existing_features_extended": [
         "AI-FEAT-005",
@@ -220,10 +220,10 @@
         "AI-FEAT-057"
       ],
       "name": "Multi-Channel Release & Update System",
-      "next_action": "Awaiting explicit authorization to run the live pilot (an actual `rc-build` `workflow_dispatch` run) — see the Part 9 final report.",
+      "next_action": "None — complete. A future real Stable release (whenever separately authorized) will automatically carry the Update Channel selector to the entire existing Stable install base as an ordinary update; no further migration work is required for that transition.",
       "objective": "Formalize AutoIngest's release process into three isolated channels (Development, RC/Preview, Stable) so a tester-facing build can never reach Stable users, and a verified RC has an auditable, gated promotion path to Stable.",
-      "planned_estimate": "Single implementation session (2026-08-12)",
-      "status": "**Completed** (logic-level; live pilot deferred)"
+      "planned_estimate": "Single implementation session (2026-08-12), plus a three-part live-pilot verification arc (2026-08-13)",
+      "status": "**Completed** — verified on real Windows hardware (2026-08-13)"
     }
   ],
   "next_milestone_id": "AI-RM-002",

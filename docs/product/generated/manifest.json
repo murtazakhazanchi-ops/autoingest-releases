@@ -8,7 +8,7 @@
     "memory_capsules": 3,
     "postmortems": 2,
     "roadmap_milestones": 10,
-    "search_index_records": 316,
+    "search_index_records": 317,
     "subsystems": 16
   },
   "generated_files": [
@@ -101,6 +101,6 @@
     "dependency_graph_nodes": 120
   },
   "schema_version": "1.2.0",
-  "source_commit": "fed471d5c7e2ac60b950460a52b6054fa0f092c1",
+  "source_commit": "dd959c6876a2c9e712b863240ce85a6b576ede93",
   "source_file_count": 130
 }

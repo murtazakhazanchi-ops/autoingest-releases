@@ -28,7 +28,7 @@
 | AI-RM-007 | Archive Repair | Planned — not started | AI-FEAT-052 | AI-RM-006 | 4–6 weeks | Not started — follows AI-RM-006 |
 | AI-RM-008 | Archive Analytics | Planned — not started | AI-FEAT-055 | AI-RM-007 | 2–4 weeks | Not started — follows AI-RM-007 |
 | AI-RM-009 | AI Archive Intelligence | Planned — not started | AI-FEAT-056 | AI-RM-008 | 6–10 weeks | Not started — follows AI-RM-008; final milestone in the AI-RM-001…009 archive-capability sequence (AI-RM-010 is a separate, parallel release-infrastructure track — see below, not a continuation of this sequence) |
-| AI-RM-010 | Multi-Channel Release & Update System | **Completed** (logic-level; live pilot deferred) | AI-FEAT-057 | — | Single implementation session (2026-08-12) | Awaiting explicit authorization to run the live pilot (an actual `rc-build` `workflow_dispatch` run) — see the Part 9 final report. |
+| AI-RM-010 | Multi-Channel Release & Update System | **Completed** — verified on real Windows hardware (2026-08-13) | AI-FEAT-057 | — | Single implementation session (2026-08-12), plus a three-part live-pilot verification arc (2026-08-13) | None — complete. A future real Stable release (whenever separately authorized) will automatically carry the Update Channel selector to the entire existing Stable install base as an ordinary update; no further migration work is required for that transition. |
 
 ## Blockers and risks
 
