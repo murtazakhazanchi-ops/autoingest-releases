@@ -1,6 +1,6 @@
 # Engineering Memory Timeline
 
-> Generated artifact — docsys version 1.2.0. A chronological project-level narrative index over docs/product/memory/, not a duplicate of any individual capsule — open the canonical capsule (linked below) for the full record. Never edit this file by hand — regenerate with `node scripts/product-docs/cli.js build`.
+> Generated artifact — docsys version 1.3.0. A chronological project-level narrative index over docs/product/memory/, not a duplicate of any individual capsule — open the canonical capsule (linked below) for the full record. Never edit this file by hand — regenerate with `node scripts/product-docs/cli.js build`.
 
 ## 2026-08-02 — AI-MEM-0001 — Metadata Management Modal Consolidation and Audit & Repair Tab Evolution
 

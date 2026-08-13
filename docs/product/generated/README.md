@@ -7,4 +7,4 @@ Canonical Markdown under `docs/product/` (and, one level further up the authorit
 Regenerate with: `node scripts/product-docs/cli.js build`
 Validate with: `node scripts/product-docs/cli.js validate`
 
-docsys version: 1.2.0
+docsys version: 1.3.0

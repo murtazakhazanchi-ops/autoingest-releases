@@ -97,7 +97,7 @@ Run all tests (including `test/automation/` — the Part 5/6/7 automation/orches
 node --test scripts/product-docs/test/*.test.js scripts/product-docs/test/automation/*.test.js
 ```
 
-Tests never mutate the real `docs/product/` tree. `test/fixtures/broken-product-docs/` is a small, intentionally-imperfect synthetic tree used only by `validators.test.js`; `integration.test.js` reads the real `docs/product/` tree read-only to assert whole-repository invariants (56 features present, deterministic rebuild, zero dangling graph edges, zero error-level health findings against the real content).
+Tests never mutate the real `docs/product/` tree. `test/fixtures/broken-product-docs/` is a small, intentionally-imperfect synthetic tree used only by `validators.test.js`; `integration.test.js` reads the real `docs/product/` tree read-only to assert whole-repository invariants (58 features present, deterministic rebuild, zero dangling graph edges, zero error-level health findings against the real content).
 
 ## Documentation-system version
 

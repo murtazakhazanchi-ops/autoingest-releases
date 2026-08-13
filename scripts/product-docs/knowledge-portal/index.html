@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AutoIngest Knowledge — Stage 1 Prototype</title>
+<style>
+  /* Minimal, functional styling only — proving the information architecture,
+     not the final portal's visual design (see AI-FEAT-058 Summary). */
+  :root { color-scheme: light dark; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 780px; margin: 0 auto; padding: 1.5rem; line-height: 1.5; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+  .subtitle { color: #666; font-size: 0.85rem; margin-bottom: 1.5rem; }
+  .ask-row { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
+  #q { flex: 1; padding: 0.6rem; font-size: 1rem; }
+  button { padding: 0.6rem 1rem; font-size: 1rem; cursor: pointer; }
+  .examples { font-size: 0.82rem; margin-bottom: 1.2rem; }
+  .examples button { font-size: 0.78rem; padding: 0.25rem 0.55rem; margin: 0.15rem 0.3rem 0.15rem 0; }
+  #result { border: 1px solid #ccc; border-radius: 6px; padding: 1rem; display: none; }
+  .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 3px; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; }
+  .badge.AVAILABLE { background: #dcecdf; color: #2f6b45; }
+  .badge.PARTIALLY_AVAILABLE { background: #f2e4c6; color: #94661c; }
+  .badge.PLANNED { background: #dbe4ef; color: #33547a; }
+  .badge.NOT_SUPPORTED { background: #f1dbd3; color: #8c3623; }
+  .badge.UNKNOWN { background: #e6e3d6; color: #5f5c53; }
+  .quality-note { font-size: 0.78rem; color: #a15c00; margin-top: 0.4rem; }
+  .section-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-top: 0.9rem; margin-bottom: 0.2rem; }
+  .sources li, .related { font-size: 0.85rem; }
+  nav.tabs { margin: 1.5rem 0 1rem; border-bottom: 1px solid #ccc; }
+  nav.tabs button { background: none; border: none; padding: 0.5rem 0.8rem; font-size: 0.85rem; border-bottom: 2px solid transparent; }
+  nav.tabs button.active { border-bottom-color: #333; font-weight: 600; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.82rem; }
+  th, td { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid #eee; vertical-align: top; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .muted { color: #888; font-size: 0.8rem; }
+</style>
+</head>
+<body>
+  <h1>AutoIngest Knowledge</h1>
+  <p class="subtitle">Stage 1 prototype — grounded, deterministic answers from AutoIngest's real documentation. No AI model, no invented instructions.</p>
+
+  <div class="ask-row">
+    <input id="q" type="text" placeholder="Ask anything about AutoIngest..." autocomplete="off">
+    <button id="askBtn">Ask</button>
+  </div>
+  <div class="examples" id="examples"></div>
+
+  <div id="result"></div>
+
+  <nav class="tabs">
+    <button data-panel="ask" class="active">Ask</button>
+    <button data-panel="capabilities">Capabilities</button>
+    <button data-panel="roadmap">Roadmap</button>
+  </nav>
+
+  <div id="panel-capabilities" class="panel">
+    <p class="muted">Every registered AutoIngest capability, with its status as resolved from the canonical feature registry — never hand-typed here.</p>
+    <table id="capTable"><thead><tr><th>ID</th><th>Title</th><th>Status</th><th>Category</th></tr></thead><tbody></tbody></table>
+  </div>
+
+  <div id="panel-roadmap" class="panel">
+    <p class="muted">From docs/product/generated/roadmap-dashboard.json — regenerated, never hand-edited.</p>
+    <table id="roadmapTable"><thead><tr><th>Milestone</th><th>Name</th><th>Status</th></tr></thead><tbody></tbody></table>
+  </div>
+
+  <script>
+    const EXAMPLES = [
+      'What is QMZ?',
+      'How do I import photographs from an SD card?',
+      'Can AutoIngest repair missing metadata?',
+      'Can AutoIngest recognize faces?',
+      'What routine maintenance does AutoIngest do on my archive?',
+      'Does AutoIngest offer cloud backup?',
+    ];
+
+    const examplesEl = document.getElementById('examples');
+    for (const ex of EXAMPLES) {
+      const b = document.createElement('button');
+      b.textContent = ex;
+      b.addEventListener('click', () => { document.getElementById('q').value = ex; ask(); });
+      examplesEl.appendChild(b);
+    }
+
+    function escapeHtml(s) {
+      const div = document.createElement('div');
+      div.textContent = String(s == null ? '' : s);
+      return div.innerHTML;
+    }
+
+    function renderAnswer(answer) {
+      const el = document.getElementById('result');
+      el.style.display = 'block';
+      const qualityNote = (answer.matchQuality === 'weak')
+        ? '<div class="quality-note">Weak match — the closest documented capability may not directly answer your question. See all matches below.</div>'
+        : '';
+      const limitations = answer.limitations.length
+        ? '<div class="section-label">Limitations</div><ul>' + answer.limitations.map((l) => `<li>${escapeHtml(l)}</li>`).join('') + '</ul>'
+        : '';
+      const related = answer.relatedCapabilities.length
+        ? `<div class="section-label">Related capabilities</div><div class="related">${answer.relatedCapabilities.map(escapeHtml).join(', ')}</div>`
+        : '';
+      const sources = answer.sources.length
+        ? '<div class="section-label">Sources</div><ul class="sources">' + answer.sources.map((s) => `<li>${escapeHtml(s.id)}${s.title ? ' — ' + escapeHtml(s.title) : ''}${s.path ? ' (' + escapeHtml(s.path) + ')' : ''}${s.note ? '<br><span class="muted">' + escapeHtml(s.note) + '</span>' : ''}</li>`).join('') + '</ul>'
+        : '<div class="section-label">Sources</div><div class="muted">No confident match — nothing to cite.</div>';
+      const matches = answer.matchedCapabilities.length
+        ? `<div class="section-label">All matched capabilities (ranked)</div><div class="muted">${answer.matchedCapabilities.map((m) => `${escapeHtml(m.id)} (${m.score})`).join(', ')}</div>`
+        : '';
+
+      el.innerHTML = `
+        <span class="badge ${escapeHtml(answer.capabilityStatus)}">${escapeHtml(answer.capabilityStatus)}</span>
+        ${qualityNote}
+        <p>${escapeHtml(answer.directAnswer)}</p>
+        ${answer.guidance ? `<p><em>${escapeHtml(answer.guidance)}</em></p>` : ''}
+        ${limitations}
+        ${related}
+        ${sources}
+        ${matches}
+      `;
+    }
+
+    async function ask() {
+      const q = document.getElementById('q').value.trim();
+      if (!q) return;
+      const el = document.getElementById('result');
+      el.style.display = 'block';
+      el.innerHTML = '<p class="muted">Asking…</p>';
+      try {
+        const res = await fetch('/api/ask?q=' + encodeURIComponent(q));
+        const answer = await res.json();
+        renderAnswer(answer);
+      } catch (err) {
+        el.innerHTML = `<p class="muted">Request failed: ${escapeHtml(err.message)}</p>`;
+      }
+    }
+    document.getElementById('askBtn').addEventListener('click', ask);
+    document.getElementById('q').addEventListener('keydown', (e) => { if (e.key === 'Enter') ask(); });
+
+    // Tabs
+    document.querySelectorAll('nav.tabs button').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('nav.tabs button').forEach((b) => b.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach((p) => p.classList.remove('active'));
+        btn.classList.add('active');
+        const panel = document.getElementById('panel-' + btn.dataset.panel);
+        if (panel) panel.classList.add('active');
+      });
+    });
+
+    async function loadCapabilities() {
+      const res = await fetch('/api/capabilities');
+      const data = await res.json();
+      const tbody = document.querySelector('#capTable tbody');
+      tbody.innerHTML = data.capabilities.map((c) => `
+        <tr>
+          <td>${escapeHtml(c.id)}</td>
+          <td>${escapeHtml(c.title)}</td>
+          <td><span class="badge ${escapeHtml(c.operatorStatus)}">${escapeHtml(c.operatorStatus)}</span></td>
+          <td>${escapeHtml(c.category)}</td>
+        </tr>`).join('');
+    }
+
+    async function loadRoadmap() {
+      const res = await fetch('/api/roadmap');
+      const data = await res.json();
+      const tbody = document.querySelector('#roadmapTable tbody');
+      tbody.innerHTML = data.milestones.map((m) => `
+        <tr>
+          <td>${escapeHtml(m.id)}${m.id === data.currentMilestoneId ? ' ←' : ''}</td>
+          <td>${escapeHtml(m.name)}</td>
+          <td>${escapeHtml(m.status)}</td>
+        </tr>`).join('');
+    }
+
+    loadCapabilities();
+    loadRoadmap();
+  </script>
+</body>
+</html>

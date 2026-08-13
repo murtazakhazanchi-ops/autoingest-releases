@@ -389,3 +389,38 @@
 - Check relatedBugs/relatedDecisions for constraints before altering resolver or write-path behavior.
 - Run: node scripts/product-docs/cli.js impact <changed-file-path> to confirm ownership before editing.
 
+## Knowledge & Onboarding (`SUBSYS-knowledge-onboarding`)
+
+**Primary features**: AI-FEAT-058
+**Canonical technical docs**: None cited
+**Related bugs**: None recorded
+**Related decisions**: None recorded
+
+**Source directories**:
+- `docs/product/generated`
+- `scripts/product-docs`
+- `scripts/product-docs/knowledge-portal`
+- `scripts/product-docs/lib`
+- `scripts/product-docs/test`
+
+**Source files**:
+- `docs/product/generated/knowledge-gap-report.json`
+- `docs/product/generated/knowledge-index.json`
+- `scripts/product-docs/cli.js`
+- `scripts/product-docs/knowledge-portal/index.html`
+- `scripts/product-docs/knowledge-portal/server.js`
+- `scripts/product-docs/lib/build.js`
+- `scripts/product-docs/lib/knowledgeCli.js`
+- `scripts/product-docs/lib/knowledgeEngine.js`
+- `scripts/product-docs/lib/knowledgeEval.js`
+- `scripts/product-docs/lib/knowledgeIndex.js`
+- `scripts/product-docs/lib/knowledgeTestCorpus.js`
+- `scripts/product-docs/lib/statusResolution.js`
+- `scripts/product-docs/lib/version.js`
+- `scripts/product-docs/test/knowledge.test.js`
+
+**Change-impact checklist**:
+- Re-read the Related Files section of every primary feature listed above before changing shared source files.
+- Check relatedBugs/relatedDecisions for constraints before altering resolver or write-path behavior.
+- Run: node scripts/product-docs/cli.js impact <changed-file-path> to confirm ownership before editing.
+

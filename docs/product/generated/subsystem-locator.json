@@ -1,6 +1,6 @@
 {
-  "docsys_version": "1.2.0",
-  "schema_version": "1.2.0",
+  "docsys_version": "1.3.0",
+  "schema_version": "1.3.0",
   "subsystems": [
     {
       "aliases": [
@@ -638,6 +638,46 @@
       "relatedDecisions": [],
       "sourceDirectories": [],
       "sourceFiles": []
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "docs/product/01_FEATURE_REGISTRY.md",
+      "canonicalTechnicalDocs": [],
+      "changeImpactChecklist": [
+        "Re-read the Related Files section of every primary feature listed above before changing shared source files.",
+        "Check relatedBugs/relatedDecisions for constraints before altering resolver or write-path behavior.",
+        "Run: node scripts/product-docs/cli.js impact <changed-file-path> to confirm ownership before editing."
+      ],
+      "id": "SUBSYS-knowledge-onboarding",
+      "name": "Knowledge & Onboarding",
+      "primaryFeatures": [
+        "AI-FEAT-058"
+      ],
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "sourceDirectories": [
+        "docs/product/generated",
+        "scripts/product-docs",
+        "scripts/product-docs/knowledge-portal",
+        "scripts/product-docs/lib",
+        "scripts/product-docs/test"
+      ],
+      "sourceFiles": [
+        "docs/product/generated/knowledge-gap-report.json",
+        "docs/product/generated/knowledge-index.json",
+        "scripts/product-docs/cli.js",
+        "scripts/product-docs/knowledge-portal/index.html",
+        "scripts/product-docs/knowledge-portal/server.js",
+        "scripts/product-docs/lib/build.js",
+        "scripts/product-docs/lib/knowledgeCli.js",
+        "scripts/product-docs/lib/knowledgeEngine.js",
+        "scripts/product-docs/lib/knowledgeEval.js",
+        "scripts/product-docs/lib/knowledgeIndex.js",
+        "scripts/product-docs/lib/knowledgeTestCorpus.js",
+        "scripts/product-docs/lib/statusResolution.js",
+        "scripts/product-docs/lib/version.js",
+        "scripts/product-docs/test/knowledge.test.js"
+      ]
     }
   ]
 }

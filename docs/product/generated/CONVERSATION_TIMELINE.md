@@ -1,6 +1,6 @@
 # Conversation Timeline
 
-> Generated artifact — docsys version 1.2.0. A chronological index over docs/product/conversations/, not a duplicate of any individual record — open the canonical record (linked below) for the full discussion. Never edit this file by hand — regenerate with `node scripts/product-docs/cli.js build`.
+> Generated artifact — docsys version 1.3.0. A chronological index over docs/product/conversations/, not a duplicate of any individual record — open the canonical record (linked below) for the full discussion. Never edit this file by hand — regenerate with `node scripts/product-docs/cli.js build`.
 
 ## 2026-08-07T00:00:00Z — ENG-CONV-0001 — Part 8 — Multi-AI Engineering Conversation Integration: design and implementation
 

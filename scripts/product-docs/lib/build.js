@@ -22,6 +22,7 @@ const { buildOwnershipManifest, renderOwnershipManifestMd } = require('./ownersh
 const { buildConversationIndex } = require('./conversationIndex');
 const { renderConversationIndexMd, renderConversationTimelineMd } = require('./renderConversation');
 const { buildUnimplementedRequirements, renderUnimplementedRequirementsMd } = require('./unimplementedRequirements');
+const { buildKnowledgeIndex } = require('./knowledgeIndex');
 
 // Assembles every Part 4 generated artifact in memory. Returns:
 //   - `parsed`: the raw parsed docs/product/ structures (lib/parseProductDocs)
@@ -47,8 +48,12 @@ function assemble() {
 
   const ownershipManifest = buildOwnershipManifest(parsed, { featureIndex, subsystems, sourceIndex });
   const unimplementedRequirements = buildUnimplementedRequirements(parsed, conversationIndex);
+  // Stage 1 Knowledge Engine (AI-FEAT-058) — a portal-oriented projection of
+  // featureIndex + dashboard. Derives from already-parsed structures only;
+  // adds no new Markdown-parsing logic. See lib/knowledgeIndex.js.
+  const knowledgeIndex = buildKnowledgeIndex(parsed, { featureIndex, dashboard });
 
-  const built = { subsystems, sourceIndex, featureIndex, authorityIndex, graph, searchIndex, dashboard, timelines, memoryIndex, ownershipManifest, conversationIndex, unimplementedRequirements };
+  const built = { subsystems, sourceIndex, featureIndex, authorityIndex, graph, searchIndex, dashboard, timelines, memoryIndex, ownershipManifest, conversationIndex, unimplementedRequirements, knowledgeIndex };
 
   const files = new Map();
 
@@ -125,6 +130,15 @@ function assemble() {
   }));
   files.set('UNIMPLEMENTED_CONVERSATION_REQUIREMENTS.md', renderUnimplementedRequirementsMd(unimplementedRequirements, version.DOCSYS_VERSION));
 
+  // Stage 1 Knowledge Engine (AI-FEAT-058) — a locator/projection layer,
+  // same authority rule as every other file in this directory: never
+  // authoritative, regenerated from canonical Markdown, never hand-edited.
+  files.set('knowledge-index.json', stableStringify({
+    schema_version: version.SCHEMA_VERSION,
+    docsys_version: version.DOCSYS_VERSION,
+    capabilities: knowledgeIndex,
+  }));
+
   const manifest = {
     docsys_version: version.DOCSYS_VERSION,
     schema_version: version.SCHEMA_VERSION,
@@ -143,6 +157,7 @@ function assemble() {
       search_index_records: searchIndex.length,
       memory_capsules: memoryIndex.length,
       engineering_conversations: conversationIndex.length,
+      knowledge_records: knowledgeIndex.length,
     },
     relationship_counts: {
       dependency_graph_edges: graph.edges.length,

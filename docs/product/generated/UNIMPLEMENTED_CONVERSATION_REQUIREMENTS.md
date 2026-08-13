@@ -1,6 +1,6 @@
 # Unimplemented Conversation Requirements
 
-> Generated artifact — docsys version 1.2.0. Every conversation whose Implementation Handoff names concrete work and whose Outcome log has not recorded "Implemented" from repository evidence. A missing keyword in source code is never used as evidence here — see docs/product/18_ENGINEERING_CONVERSATION_POLICY.md. Never edit this file by hand — regenerate with `node scripts/product-docs/cli.js build`.
+> Generated artifact — docsys version 1.3.0. Every conversation whose Implementation Handoff names concrete work and whose Outcome log has not recorded "Implemented" from repository evidence. A missing keyword in source code is never used as evidence here — see docs/product/18_ENGINEERING_CONVERSATION_POLICY.md. Never edit this file by hand — regenerate with `node scripts/product-docs/cli.js build`.
 
 ## implementation pending
 

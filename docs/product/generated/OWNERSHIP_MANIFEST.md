@@ -13,6 +13,7 @@ code_path_to_features only lists paths already explicitly authored in some featu
 - **SUBSYS-event-management**: AI-FEAT-009, AI-FEAT-010
 - **SUBSYS-grouping-and-routing**: AI-FEAT-017, AI-FEAT-018
 - **SUBSYS-import-and-archive-writing**: AI-FEAT-019, AI-FEAT-020, AI-FEAT-021, AI-FEAT-022, AI-FEAT-023, AI-FEAT-024, AI-FEAT-025, AI-FEAT-026, AI-FEAT-027, AI-FEAT-028
+- **SUBSYS-knowledge-onboarding**: AI-FEAT-058
 - **SUBSYS-media-browsing**: AI-FEAT-013, AI-FEAT-014, AI-FEAT-015, AI-FEAT-016
 - **SUBSYS-metadata**: AI-FEAT-029, AI-FEAT-030, AI-FEAT-031, AI-FEAT-032, AI-FEAT-033, AI-FEAT-034, AI-FEAT-035, AI-FEAT-036, AI-FEAT-037
 - **SUBSYS-planned-archive-management**: AI-FEAT-049, AI-FEAT-050, AI-FEAT-051, AI-FEAT-052
@@ -44,5 +45,5 @@ code_path_to_features only lists paths already explicitly authored in some featu
 
 ## Coverage
 
-- 60 explicitly-owned code path(s).
+- 73 explicitly-owned code path(s).
 - 15 test file(s) with a discoverable feature owner via Testing coverage citations.

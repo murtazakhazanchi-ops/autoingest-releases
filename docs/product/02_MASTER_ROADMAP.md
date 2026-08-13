@@ -8,6 +8,8 @@ Canonical, ordered implementation roadmap. Do not reorder unless the project own
 
 **AI-RM-010** (Multi-Channel Release & Update System) is a separate, parallel release-infrastructure track, not a continuation of the sequence above — see its own entry below. Status: **Completed** — verified on real Windows hardware (2026-08-13).
 
+**AI-RM-011** (AutoIngest Knowledge & Onboarding Portal — Stage 1) is also a separate, parallel track — a documentation/tooling initiative, not a continuation of the AI-RM-001…009 archive-capability sequence. Status: **In Progress** — Stage 1 (prototype) complete, Stage 2 not started (see AI-FEAT-058; the full multi-stage portal is not scheduled here as a single milestone, see that milestone's own entry for why).
+
 ---
 
 ## AI-RM-001 — Metadata Audit & Repair
@@ -177,3 +179,20 @@ Canonical, ordered implementation roadmap. Do not reorder unless the project own
 | Planned estimate | Single implementation session (2026-08-12), plus a three-part live-pilot verification arc (2026-08-13) |
 | Current risks | None blocking. Two CI-only bugs were found and fixed during the pilot ([BUG-015](bugs/BUG-015_WINDOWS_RUNNER_DEFAULT_POWERSHELL_SHELL_MANGLES_ELECTRON_BUILDER_DOT_NOTATION_CLI_OVERRIDES.md), [BUG-016](bugs/BUG-016_UNDECLARED_NPM_DEPENDENCY_IN_PRODUCT_DOCS_TOOLING_MASKED_BY_LOCALLY_HOISTED_NODE_MODULES.md)) — both closed. One accepted (non-blocking) structural note: `rc-build-windows`/`rc-build-mac` have no atomic dual-platform publish gate (see AI-FEAT-057's Decisions section). One non-blocking UX candidate identified (exact running version, including prerelease suffix, not confidently visible to a tester in-app — see AI-FEAT-057's Future Enhancements). |
 | Next action | None — complete. A future real Stable release (whenever separately authorized) will automatically carry the Update Channel selector to the entire existing Stable install base as an ordinary update; no further migration work is required for that transition. |
+
+---
+
+## AI-RM-011 — AutoIngest Knowledge & Onboarding Portal (Stage 1)
+
+| Field | Value |
+|---|---|
+| Status | In Progress — Stage 1 (prototype) complete; Stage 2 not started |
+| Objective | Prove that AutoIngest's existing `docs/product/` documentation system can power a grounded, citation-honest, natural-language operator answer engine without an LLM, embeddings, or a hosted service — before committing to the full multi-stage Knowledge & Onboarding Portal (Ask AutoIngest, browseable Capabilities/Workflows/Tutorials/Roadmap/Troubleshooting/What's New/Engineering Dashboard) scoped by the Phase 1 audit. |
+| Included AI-FEAT IDs | AI-FEAT-058 |
+| Existing features extended | None — Stage 1 reads the existing feature registry generically; no existing `AI-FEAT` record's own behavior changed |
+| Dependencies | None — a parallel documentation/tooling track, not a continuation of the AI-RM-001…009 archive-capability sequence above (deliberately not spelled out as a range in this field — see AI-RM-010's own note above for why) |
+| Deliverables | `docs/product/generated/knowledge-index.json` (new generated artifact, 57 records); `lib/knowledgeIndex.js`, `lib/statusResolution.js`, `lib/knowledgeEngine.js`, `lib/knowledgeCli.js`, `lib/knowledgeEval.js`, `lib/knowledgeTestCorpus.js`; `knowledge <sub>` CLI command (`ask`/`eval`/`serve`); minimal local static+API portal (`knowledge-portal/server.js`+`index.html`); `docs/product/generated/knowledge-gap-report.json`; [DEC-019](decisions/DEC-019_KNOWLEDGE_ENGINE_REUSES_EXISTING_RETRIEVAL_NO_NEW_SEARCH_SYSTEM.md) |
+| Acceptance criteria | `scripts/product-docs/test/knowledge.test.js` 17/17 passing (10 Phase-12-checklist assertions + 7 dedicated negative/hallucination tests), full existing 33-file `product-docs` suite unaffected (33/33), `validate` clean (0 errors, unchanged warning/info/evidence-gap baseline), and the 20-question eval corpus: 18/20 passed exactly as expected, 2/20 documented known misses, 0/20 unexplained. |
+| Planned estimate | Single implementation session (2026-08-13) |
+| Current risks | Retrieval-precision gaps in reusing `lib/query.js` unchanged for natural-language questions (generic-keyword ties, single-word topical drift, one Planned-vs-Available near-miss caught and fixed pre-commit) — see AI-FEAT-058's Future Enhancements for the full, evidenced list. No blocking risk to Stage 1 itself; a real scoping input for Stage 2. |
+| Next action | Not started — Stage 2 (full portal UI, authored Workflow/Troubleshooting/Navigation content, retrieval-precision improvements) requires separate review and authorization before beginning, per the Stage 1 brief's own stop condition. |
