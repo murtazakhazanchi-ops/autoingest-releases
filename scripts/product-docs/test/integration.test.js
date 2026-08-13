@@ -3,7 +3,7 @@
 
 // Run with: node scripts/product-docs/test/integration.test.js
 // Reads the real docs/product/ tree (read-only — never writes into it) and
-// asserts the whole-repository invariants Part 4 promises: all 56 features
+// asserts the whole-repository invariants Part 4 promises: all 58 features
 // present, deterministic rebuild, zero dangling graph edges, zero error-level
 // health findings, and evidence-pending timelines are handled honestly.
 const assert = require('node:assert/strict');
@@ -20,17 +20,17 @@ async function main() {
 
   const { parsed, built, files, manifest } = build.assemble();
 
-  await t('all 57 AI-FEAT records are present', () => {
-    assert.equal(parsed.features.size, 57);
+  await t('all 58 AI-FEAT records are present', () => {
+    assert.equal(parsed.features.size, 58);
   });
 
-  await t('all 10 AI-RM roadmap milestones are present', () => {
-    assert.equal(parsed.roadmap.size, 10);
+  await t('all 11 AI-RM roadmap milestones are present', () => {
+    assert.equal(parsed.roadmap.size, 11);
   });
 
-  await t('bug/decision/postmortem counts match the current repository (BUG-001..016, DEC-001..018, PM-001..002)', () => {
+  await t('bug/decision/postmortem counts match the current repository (BUG-001..016, DEC-001..019, PM-001..002)', () => {
     assert.equal(parsed.bugs.size, 16);
-    assert.equal(parsed.decisions.size, 18);
+    assert.equal(parsed.decisions.size, 19);
     assert.equal(parsed.postmortems.size, 2);
   });
 
@@ -96,9 +96,9 @@ async function main() {
     }
   });
 
-  await t('the roadmap dashboard matches the canonical current-position statement (AI-RM-001 + AI-RM-010 complete, AI-RM-002 next, 2/10)', () => {
+  await t('the roadmap dashboard matches the canonical current-position statement (AI-RM-001 + AI-RM-010 complete, AI-RM-002 next, 2/11)', () => {
     assert.equal(built.dashboard.completed_count, 2);
-    assert.equal(built.dashboard.total_milestones, 10);
+    assert.equal(built.dashboard.total_milestones, 11);
     assert.equal(built.dashboard.current_milestone_id, 'AI-RM-002');
   });
 
@@ -112,7 +112,7 @@ async function main() {
     assert.ok(manifest.schema_version);
     assert.ok(manifest.source_commit);
     assert.ok(manifest.generation_command);
-    assert.equal(manifest.entity_counts.features, 57);
+    assert.equal(manifest.entity_counts.features, 58);
   });
 
   summarize('integration.test.js');

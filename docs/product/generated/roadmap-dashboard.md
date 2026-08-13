@@ -2,16 +2,16 @@
 
 > Generated artifact — cross-checked against 01_FEATURE_REGISTRY.md, 02_MASTER_ROADMAP.md, 03_IMPLEMENTATION_TIMELINE.md, and 04_PROJECT_DASHBOARD.md at generation time; generation fails with a diagnostic instead of silently picking a side if those sources disagree. Regenerate with `node scripts/product-docs/cli.js build`.
 
-**Progress**: 2/10 milestones complete (20%)
+**Progress**: 2/11 milestones complete (18.2%)
 **Current milestone**: AI-RM-002
 **Following milestone**: AI-RM-003
-**Total features**: 57
+**Total features**: 58
 
 ## Feature status counts (overall)
 
 | Status | Count |
 |---|---|
-| Implemented — evolving | 4 |
+| Implemented — evolving | 5 |
 | Implemented | 45 |
 | Planned | 8 |
 
@@ -29,6 +29,7 @@
 | AI-RM-008 | Archive Analytics | Planned — not started | AI-FEAT-055 | AI-RM-007 | 2–4 weeks | Not started — follows AI-RM-007 |
 | AI-RM-009 | AI Archive Intelligence | Planned — not started | AI-FEAT-056 | AI-RM-008 | 6–10 weeks | Not started — follows AI-RM-008; final milestone in the AI-RM-001…009 archive-capability sequence (AI-RM-010 is a separate, parallel release-infrastructure track — see below, not a continuation of this sequence) |
 | AI-RM-010 | Multi-Channel Release & Update System | **Completed** — verified on real Windows hardware (2026-08-13) | AI-FEAT-057 | — | Single implementation session (2026-08-12), plus a three-part live-pilot verification arc (2026-08-13) | None — complete. A future real Stable release (whenever separately authorized) will automatically carry the Update Channel selector to the entire existing Stable install base as an ordinary update; no further migration work is required for that transition. |
+| AI-RM-011 | AutoIngest Knowledge & Onboarding Portal (Stage 1) | In Progress — Stage 1 (prototype) complete; Stage 2 not started | AI-FEAT-058 | AI-RM-001, AI-RM-010 | Single implementation session (2026-08-13) | Not started — Stage 2 (full portal UI, authored Workflow/Troubleshooting/Navigation content, retrieval-precision improvements) requires separate review and authorization before beginning, per the Stage 1 brief's own stop condition. |
 
 ## Blockers and risks
 

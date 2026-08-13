@@ -1,5 +1,5 @@
 {
-  "docsys_version": "1.2.0",
+  "docsys_version": "1.3.0",
   "edges": [
     {
       "evidence_status": "explicit",
@@ -3316,6 +3316,30 @@
     {
       "evidence_status": "explicit",
       "note": null,
+      "provenance_path": "features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md#header-table:Related-roadmap-milestone",
+      "relationship": "planned_in",
+      "source": "AI-FEAT-058",
+      "target": "AI-RM-011"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-058",
+      "target": "DEC-019"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-019_KNOWLEDGE_ENGINE_REUSES_EXISTING_RETRIEVAL_NO_NEW_SEARCH_SYSTEM.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-058",
+      "target": "DEC-019"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
       "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-001:Included-AI-FEAT-IDs",
       "relationship": "implements",
       "source": "AI-RM-001",
@@ -3616,6 +3640,38 @@
       "relationship": "governed_by",
       "source": "AI-RM-010",
       "target": "DEC-018"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-011:Included-AI-FEAT-IDs",
+      "relationship": "implements",
+      "source": "AI-RM-011",
+      "target": "AI-FEAT-058"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-011:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-RM-011",
+      "target": "AI-RM-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-011:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-RM-011",
+      "target": "AI-RM-010"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-019_KNOWLEDGE_ENGINE_REUSES_EXISTING_RETRIEVAL_NO_NEW_SEARCH_SYSTEM.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-RM-011",
+      "target": "DEC-019"
     },
     {
       "evidence_status": "explicit",
@@ -4634,6 +4690,12 @@
       "type": "feature"
     },
     {
+      "doc_path": "features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md",
+      "id": "AI-FEAT-058",
+      "label": "Knowledge Engine (Stage 1 Prototype)",
+      "type": "feature"
+    },
+    {
       "doc_path": "memory/AI-MEM-0001_METADATA_MANAGEMENT_MODAL_AUDIT_REPAIR_EVOLUTION.md",
       "id": "AI-MEM-0001",
       "label": "Metadata Management Modal Consolidation and Audit & Repair Tab Evolution",
@@ -4709,6 +4771,12 @@
       "doc_path": "02_MASTER_ROADMAP.md",
       "id": "AI-RM-010",
       "label": "Multi-Channel Release & Update System",
+      "type": "milestone"
+    },
+    {
+      "doc_path": "02_MASTER_ROADMAP.md",
+      "id": "AI-RM-011",
+      "label": "AutoIngest Knowledge & Onboarding Portal (Stage 1)",
       "type": "milestone"
     },
     {
@@ -4976,6 +5044,12 @@
       "type": "decision"
     },
     {
+      "doc_path": "decisions/DEC-019_KNOWLEDGE_ENGINE_REUSES_EXISTING_RETRIEVAL_NO_NEW_SEARCH_SYSTEM.md",
+      "id": "DEC-019",
+      "label": "Knowledge Engine Reuses Existing Retrieval; No New Search System, No Hosted Backend",
+      "type": "decision"
+    },
+    {
       "doc_path": "conversations/ENG-CONV-0001_PART_8_MULTI_AI_ENGINEERING_CONVERSATION_INTEGRATION_DESIGN_AND_IMPLEMENTATION.md",
       "id": "ENG-CONV-0001",
       "label": "Part 8 — Multi-AI Engineering Conversation Integration: design and implementation",
@@ -5012,5 +5086,5 @@
       "type": "postmortem"
     }
   ],
-  "schema_version": "1.2.0"
+  "schema_version": "1.3.0"
 }

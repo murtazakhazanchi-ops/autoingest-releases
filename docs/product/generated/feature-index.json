@@ -1,5 +1,5 @@
 {
-  "docsys_version": "1.2.0",
+  "docsys_version": "1.3.0",
   "features": [
     {
       "aliases": [],
@@ -22,7 +22,12 @@
         "[§3B — B. Initial AutoIngest Foundation](../11_ARCHITECTURAL_EVOLUTION.md#b-initial-autoingest-foundation)"
       ],
       "related_bugs": [],
-      "related_changelog_entries": [],
+      "related_changelog_entries": [
+        {
+          "date": "2026-08-13",
+          "excerpt": "**Also discovered, out of this feature's scope to fix**: AI-FEAT-001's \"Related technical docs\" field cites a nonexistent `docs/README.md` (found by this feature's own new source-resolution test, `scr"
+        }
+      ],
       "related_code_paths": [
         "main/main.js",
         "main/preload.js",
@@ -3310,7 +3315,80 @@
       "subfeatures": [],
       "summary": "Formalizes AutoIngest's release process into three isolated channels — Development (internal engineering builds, never published), RC/Preview (real tester acceptance before Stable, opt-in only), and Stable (the existing production release path, unchanged) — so a tester-facing build can exist without ever risking exposure to Stable users, and so a verified RC has an auditable, gated path to becoming the Stable release built from its exact source.",
       "timeline_path": "generated/feature-timelines/AI-FEAT-057_TIMELINE.md"
+    },
+    {
+      "aliases": [],
+      "canonical_document": "features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md",
+      "category": "Knowledge & Onboarding",
+      "dependencies": [],
+      "dependents": [],
+      "documentation_completeness": {
+        "evidence_gap_count": 2,
+        "narrative": "Complete — no unresolved \"Evidence pending\" markers in this file"
+      },
+      "evidence_status": "Verified from current code (`scripts/product-docs/lib/knowledgeIndex.js`, `knowledgeEngine.js`, `statusResolution.js`, `knowledgeCli.js`, `knowledge-portal/server.js`+`index.html`) and `scripts/product-docs/test/knowledge.test.js` (17/17 passing, including the full existing 33-file suite unaffected), plus a live local-server smoke test (`knowledge serve`, `curl` against `/`, `/api/capabilities`, `/api/roadmap`, `/api/ask`) on 2026-08-13",
+      "feature_id": "AI-FEAT-058",
+      "introduced_version": "2026-08-13",
+      "last_modified_version": "2026-08-13",
+      "maturity": "Experimental",
+      "name": "Knowledge Engine (Stage 1 Prototype)",
+      "parent_feature": [],
+      "related_architecture_sections": [
+        "Not yet covered in 11_ARCHITECTURAL_EVOLUTION.md's relationship map"
+      ],
+      "related_bugs": [],
+      "related_changelog_entries": [
+        {
+          "date": "2026-08-13",
+          "excerpt": "## 2026-08-13 — AutoIngest Knowledge Engine, Stage 1 prototype (AI-FEAT-058 / AI-RM-011)"
+        },
+        {
+          "date": "2026-08-13",
+          "excerpt": "**Four real defects found and fixed during the feature's own construction, before commit** (full detail in AI-FEAT-058's Evolution Journal): (1) an exact-match bug-status regex miscounted `BUG-006`'s "
+        },
+        {
+          "date": "2026-08-13",
+          "excerpt": "**New records**: [AI-FEAT-058](features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md), [AI-RM-011](02_MASTER_ROADMAP.md#ai-rm-011-autoingest-knowledge-onboarding-portal-stage-1), [DEC-019](decis"
+        }
+      ],
+      "related_code_paths": [
+        "scripts/product-docs/lib/knowledgeIndex.js",
+        "scripts/product-docs/lib/statusResolution.js",
+        "scripts/product-docs/lib/knowledgeEngine.js",
+        "scripts/product-docs/lib/knowledgeCli.js",
+        "scripts/product-docs/lib/knowledgeTestCorpus.js",
+        "scripts/product-docs/lib/knowledgeEval.js",
+        "scripts/product-docs/lib/build.js",
+        "scripts/product-docs/cli.js",
+        "scripts/product-docs/lib/version.js",
+        "scripts/product-docs/knowledge-portal/server.js",
+        "scripts/product-docs/knowledge-portal/index.html",
+        "scripts/product-docs/test/knowledge.test.js",
+        "docs/product/generated/knowledge-index.json",
+        "docs/product/generated/knowledge-gap-report.json"
+      ],
+      "related_decisions": [
+        "DEC-019"
+      ],
+      "related_features": [],
+      "related_postmortems": [],
+      "related_technical_docs": [],
+      "related_tests": [],
+      "roadmap_ids": [
+        "AI-RM-011"
+      ],
+      "search_keywords": [
+        "engine",
+        "knowledge",
+        "knowledge & onboarding",
+        "prototype",
+        "stage"
+      ],
+      "status": "Implemented — evolving",
+      "subfeatures": [],
+      "summary": "A Stage 1 prototype proving that AutoIngest's existing `docs/product/` documentation system — the feature registry, roadmap, and the deterministic offline search engine already built in `scripts/product-docs/lib/query.js` — can power a grounded, citation-honest, natural-language \"Ask AutoIngest\" answer engine **without** an LLM, embeddings, or any hosted service. This is explicitly **not** the final operator-facing portal (see the Phase 1 Knowledge & Onboarding Portal audit): no Workflow/Navigation/Tutorial content exists yet, no visual design work was done, and no conversational multi-turn layer was built. It is the smallest working slice that validates the two claims the larger portal initiative depends on: that the existing generated-index layer is sufficient retrieval infrastructure, and that a citation-honest answer contract is achievable on top of it.",
+      "timeline_path": "generated/feature-timelines/AI-FEAT-058_TIMELINE.md"
     }
   ],
-  "schema_version": "1.2.0"
+  "schema_version": "1.3.0"
 }

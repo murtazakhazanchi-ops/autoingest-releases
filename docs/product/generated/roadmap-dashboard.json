@@ -7,11 +7,11 @@
   ],
   "current_milestone_id": "AI-RM-002",
   "current_risks": "(1) AI-RM-007's planned service name collides with an existing, unrelated `archiveRepairService.js` (temp-file cleanup only) — needs resolution before implementation starts. (2) AI-RM-006's scope needs explicit disambiguation from the already-implemented AI-FEAT-025 (narrower checksum verification) to avoid duplicating existing work without a clear reason.",
-  "docsys_version": "1.2.0",
+  "docsys_version": "1.3.0",
   "evidence_gaps_note": "See each feature file's \"Evidence status\" field. Notable gaps: AI-FEAT-037 (Metadata Reapply/Sync — file-existence + learning-log evidence only, not independently code-audited), AI-FEAT-007 (Telemetry Pipeline — scope of data collected not yet audited), AI-FEAT-022 (Photographer-Folder Resolution — relationship to the v0.9.0 \"Photographer Folder Sequencing\" release-note item not yet confirmed as same-or-different code path)",
   "feature_status_counts_overall": {
     "Implemented": 45,
-    "Implemented — evolving": 4,
+    "Implemented — evolving": 5,
     "Planned": 8
   },
   "following_milestone_id": "AI-RM-003",
@@ -224,14 +224,34 @@
       "objective": "Formalize AutoIngest's release process into three isolated channels (Development, RC/Preview, Stable) so a tester-facing build can never reach Stable users, and a verified RC has an auditable, gated promotion path to Stable.",
       "planned_estimate": "Single implementation session (2026-08-12), plus a three-part live-pilot verification arc (2026-08-13)",
       "status": "**Completed** — verified on real Windows hardware (2026-08-13)"
+    },
+    {
+      "current_risks": "Retrieval-precision gaps in reusing `lib/query.js` unchanged for natural-language questions (generic-keyword ties, single-word topical drift, one Planned-vs-Available near-miss caught and fixed pre-commit) — see AI-FEAT-058's Future Enhancements for the full, evidenced list. No blocking risk to Stage 1 itself; a real scoping input for Stage 2.",
+      "dependencies": [
+        "AI-RM-001",
+        "AI-RM-010"
+      ],
+      "existing_features_extended": [],
+      "feature_status_counts": {
+        "Implemented — evolving": 1
+      },
+      "id": "AI-RM-011",
+      "included_features": [
+        "AI-FEAT-058"
+      ],
+      "name": "AutoIngest Knowledge & Onboarding Portal (Stage 1)",
+      "next_action": "Not started — Stage 2 (full portal UI, authored Workflow/Troubleshooting/Navigation content, retrieval-precision improvements) requires separate review and authorization before beginning, per the Stage 1 brief's own stop condition.",
+      "objective": "Prove that AutoIngest's existing `docs/product/` documentation system can power a grounded, citation-honest, natural-language operator answer engine without an LLM, embeddings, or a hosted service — before committing to the full multi-stage Knowledge & Onboarding Portal (Ask AutoIngest, browseable Capabilities/Workflows/Tutorials/Roadmap/Troubleshooting/What's New/Engineering Dashboard) scoped by the Phase 1 audit.",
+      "planned_estimate": "Single implementation session (2026-08-13)",
+      "status": "In Progress — Stage 1 (prototype) complete; Stage 2 not started"
     }
   ],
   "next_milestone_id": "AI-RM-002",
   "next_planned_action": "Discovery and specification for AI-RM-002 (Archive Maintenance) — no scope exists yet",
   "pending_decisions": "Naming collision for AI-RM-007's service (see Current risks); scope disambiguation for AI-RM-006 vs. AI-FEAT-025",
-  "progress_percent": 20,
+  "progress_percent": 18.2,
   "recently_completed_documentation_work": "UI polish to the Metadata Management Modal / Audit & Repair tab (commits `4446a30` → `c5d200f`, 2026-08-02 through 2026-08-04) — cosmetic/layout only, no behavior change, all part of the already-complete AI-RM-001",
-  "schema_version": "1.2.0",
-  "total_features": 57,
-  "total_milestones": 10
+  "schema_version": "1.3.0",
+  "total_features": 58,
+  "total_milestones": 11
 }

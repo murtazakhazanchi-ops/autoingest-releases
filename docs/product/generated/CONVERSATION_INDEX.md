@@ -1,6 +1,6 @@
 # Conversation Index
 
-> Generated artifact — docsys version 1.2.0. Locator only; canonical Markdown under docs/product/conversations/ remains authoritative — see docs/product/18_ENGINEERING_CONVERSATION_POLICY.md § 15. Never edit this file by hand — regenerate with `node scripts/product-docs/cli.js build`.
+> Generated artifact — docsys version 1.3.0. Locator only; canonical Markdown under docs/product/conversations/ remains authoritative — see docs/product/18_ENGINEERING_CONVERSATION_POLICY.md § 15. Never edit this file by hand — regenerate with `node scripts/product-docs/cli.js build`.
 
 | ID | Title | Status | Source | Features | Decisions | Latest outcome | Canonical path |
 |---|---|---|---|---|---|---|---|

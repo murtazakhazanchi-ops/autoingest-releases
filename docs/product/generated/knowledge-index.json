@@ -1,0 +1,2914 @@
+{
+  "capabilities": [
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Application Platform",
+      "id": "AI-FEAT-001",
+      "knownLimitations": {
+        "evidenceGapCount": 7,
+        "futureEnhancements": null,
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from current code",
+        "introducedVersion": "Evidence pending (predates all documents read in this audit)",
+        "lastModifiedVersion": "Evidence pending"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-003"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "application",
+        "application platform",
+        "electron",
+        "model",
+        "security",
+        "shell"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "CLAUDE.md § Security Model",
+        "docs/README.md § Security Model",
+        "features/AI-FEAT-001_ELECTRON_APPLICATION_SHELL_SECURITY_MODEL.md",
+        "main/main.js",
+        "main/preload.js",
+        "renderer/theme-init.js"
+      ],
+      "status": "Implemented",
+      "summary": "The Electron main-process shell that hosts AutoIngest's two `BrowserWindow` instances (main window, splash window) under a locked-down security model: no Node integration in the renderer, full context isolation, OS-level sandboxing, and a restrictive CSP. This is the platform every other feature runs inside.",
+      "title": "Electron Application Shell & Security Model",
+      "whatItDoes": "The Electron main-process shell that hosts AutoIngest's two `BrowserWindow` instances (main window, splash window) under a locked-down security model: no Node integration in the renderer, full context isolation, OS-level sandboxing, and a restrictive CSP. This is the platform every other feature runs inside."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Application Platform",
+      "id": "AI-FEAT-002",
+      "knownLimitations": {
+        "evidenceGapCount": 3,
+        "futureEnhancements": "`docs/features.md`'s \"Planned Features\" § Multi-User Handling (\"Support concurrent users or roles... Must prevent conflicting writes... Must maintain deterministic behavior\") remains genuinely unimplemented — `services/settings.js`'s `getLastActiveUserId()` returns a single value, confirming operator identity today is single-active-user, not concurrent or role-based. No AI-RM milestone currently targets this.",
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from current code and `docs/history.md`",
+        "introducedVersion": "v0.8.1",
+        "lastModifiedVersion": "v0.8.1"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-005",
+        "AI-FEAT-022",
+        "AI-FEAT-027",
+        "AI-FEAT-028"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "application platform",
+        "identity",
+        "login",
+        "operator"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/history.md v0.8.1",
+        "features/AI-FEAT-002_LOGIN_OPERATOR_IDENTITY.md",
+        "main/userManager.js",
+        "renderer/splash.html",
+        "services/settings.js"
+      ],
+      "status": "Implemented",
+      "summary": "Operator identity for AutoIngest: a dedicated splash screen for login/profile selection, an operator profile store, and attribution of imports to the operator who triggered them. Distinct from Photographer-Folder Resolution (AI-FEAT-022, archive folder naming) and Import Source Attribution (AI-FEAT-028, which memory card/drive/folder supplied the files) — three separate identity concepts that must not be collapsed into one (per `autoingest-architect` review).",
+      "title": "Login & Operator Identity",
+      "whatItDoes": "Operator identity for AutoIngest: a dedicated splash screen for login/profile selection, an operator profile store, and attribution of imports to the operator who triggered them. Distinct from Photographer-Folder Resolution (AI-FEAT-022, archive folder naming) and Import Source Attribution (AI-FEAT-028, which memory card/drive/folder supplied the files) — three separate identity concepts that must not be collapsed into one (per `autoingest-architect` review)."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented — evolving\""
+        ],
+        "operatorStatus": "PARTIALLY_AVAILABLE",
+        "reason": "Implemented, but the record's own status marks it evolving or partial."
+      },
+      "category": "Application Platform",
+      "id": "AI-FEAT-003",
+      "knownLimitations": {
+        "evidenceGapCount": 6,
+        "futureEnhancements": null,
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from current code, docs, and recent commit history",
+        "introducedVersion": "Evidence pending (pre-dates `docs/history.md`'s earliest entry)",
+        "lastModifiedVersion": "2026-08-03/04 (Metadata Health card, Audit & Repair tab spacing)"
+      },
+      "operatorStatus": "PARTIALLY_AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-001",
+        "AI-FEAT-004",
+        "AI-FEAT-031",
+        "AI-FEAT-034",
+        "AI-FEAT-035"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "application platform",
+        "dashboard",
+        "status",
+        "system"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/features.md #7 \"UI Dashboard\"",
+        "docs/ui-system.md § Dashboard",
+        "features/AI-FEAT-003_DASHBOARD_SYSTEM_STATUS.md",
+        "renderer/renderer.js",
+        "renderer/theme-init.js"
+      ],
+      "status": "Implemented — evolving",
+      "summary": "The landing surface of AutoIngest: hero card (event state), Event/Quick mode toggle, source cards, and overview stats. All displayed data must derive from `event.json` or system state — the dashboard has no independent or derived state of its own (`docs/ui-system.md`).",
+      "title": "Dashboard & System Status",
+      "whatItDoes": "The landing surface of AutoIngest: hero card (event state), Event/Quick mode toggle, source cards, and overview stats. All displayed data must derive from `event.json` or system state — the dashboard has no independent or derived state of its own (`docs/ui-system.md`)."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Application Platform",
+      "id": "AI-FEAT-004",
+      "knownLimitations": {
+        "evidenceGapCount": 2,
+        "futureEnhancements": "`docs/features.md`'s \"Planned Features\" § Persistence Enhancements (\"Improve state persistence across sessions... event.json must remain source of truth\") is too vague to map to a durable capability as currently documented — no specific mechanism, scope, or acceptance criteria exists in any doc read during this audit. Recorded here rather than invented as a new AI-FEAT.",
+        "openBugs": [
+          {
+            "id": "BUG-003",
+            "status": "Fixed"
+          },
+          {
+            "id": "BUG-006",
+            "status": "Fixed (recurring pattern — see Prevention)"
+          }
+        ]
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from current code and docs",
+        "introducedVersion": "v0.7.x (\"Major architectural shift... Introduced event.json as source of truth\" — `docs/history.md`)",
+        "lastModifiedVersion": "v0.7.4-dev (atomic transaction write introduced; see AI-FEAT-021)"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-003",
+        "AI-FEAT-009",
+        "AI-FEAT-010",
+        "AI-FEAT-017",
+        "AI-FEAT-018",
+        "AI-FEAT-019",
+        "AI-FEAT-021",
+        "AI-FEAT-023",
+        "AI-FEAT-027",
+        "AI-FEAT-029",
+        "AI-FEAT-043",
+        "AI-FEAT-046",
+        "AI-FEAT-050"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "application platform",
+        "contract",
+        "data",
+        "data model",
+        "event",
+        "event json",
+        "event.json",
+        "json",
+        "model",
+        "persistence",
+        "persistence contract"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/data-model.md",
+        "docs/event-system.md",
+        "docs/system-contracts.md §1-2",
+        "features/AI-FEAT-004_EVENT_JSON_DATA_MODEL_PERSISTENCE_CONTRACT.md",
+        "main/eventJsonStore.js"
+      ],
+      "status": "Implemented",
+      "summary": "`event.json` is the single, authoritative representation of event structure, sub-events, group mappings, and ingestion state for every AutoIngest event. All system behavior — UI, routing, metadata, archive operations — derives from it. This is the foundational contract every other feature in this registry is built on top of.",
+      "title": "event.json Data Model & Persistence Contract",
+      "whatItDoes": "`event.json` is the single, authoritative representation of event structure, sub-events, group mappings, and ingestion state for every AutoIngest event. All system behavior — UI, routing, metadata, archive operations — derives from it. This is the foundational contract every other feature in this registry is built on top of."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Application Platform",
+      "id": "AI-FEAT-005",
+      "knownLimitations": {
+        "evidenceGapCount": 6,
+        "futureEnhancements": null,
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from current code (`autoingest-architect` review pass)",
+        "introducedVersion": "Evidence pending",
+        "lastModifiedVersion": "2026-05-21 (\"v0.8.8 RC: Settings Atomic-Write Race, Save Error Handling, Staging Wording\" — learning-log)"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-001",
+        "AI-FEAT-002",
+        "AI-FEAT-004",
+        "AI-FEAT-006",
+        "AI-FEAT-007",
+        "AI-FEAT-029",
+        "AI-FEAT-042",
+        "AI-FEAT-048",
+        "AI-FEAT-057"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "application",
+        "application platform",
+        "configuration",
+        "settings",
+        "store"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "features/AI-FEAT-005_APPLICATION_SETTINGS_CONFIGURATION_STORE.md",
+        "services/settings.js"
+      ],
+      "status": "Implemented",
+      "summary": "`services/settings.js` is the general-purpose persistence layer for application configuration — distinct from `event.json` (AI-FEAT-004), which is per-event archival data. This was missed by both initial research passes and added after `autoingest-architect` review flagged it as a foundational entry other features silently depend on.",
+      "title": "Application Settings & Configuration Store",
+      "whatItDoes": "`services/settings.js` is the general-purpose persistence layer for application configuration — distinct from `event.json` (AI-FEAT-004), which is per-event archival data. This was missed by both initial research passes and added after `autoingest-architect` review flagged it as a foundational entry other features silently depend on."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Application Platform",
+      "id": "AI-FEAT-006",
+      "knownLimitations": {
+        "evidenceGapCount": 8,
+        "futureEnhancements": null,
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from current code (`autoingest-architect` review pass — missed by both initial research forks)",
+        "introducedVersion": "Evidence pending",
+        "lastModifiedVersion": "Evidence pending"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-005",
+        "AI-FEAT-007",
+        "AI-FEAT-057"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "application",
+        "application platform",
+        "auto",
+        "update"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "features/AI-FEAT-006_APPLICATION_AUTO_UPDATE.md",
+        "services/autoUpdater.js"
+      ],
+      "status": "Implemented",
+      "summary": "Self-update mechanism using `electron-updater` against GitHub Releases. Checks 3 seconds after launch, then every 4 hours, broadcasts state to all windows, and only installs on explicit user action.",
+      "title": "Application Auto-Update",
+      "whatItDoes": "Self-update mechanism using `electron-updater` against GitHub Releases. Checks 3 seconds after launch, then every 4 hours, broadcasts state to all windows, and only installs on explicit user action."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Application Platform",
+      "id": "AI-FEAT-007",
+      "knownLimitations": {
+        "evidenceGapCount": 9,
+        "futureEnhancements": "A full function-level audit of what data is collected, how consent/opt-out works from the user's perspective, and retention policy has not been performed in this pass — flagged as a follow-up for whoever next touches this feature, given telemetry's inherent privacy sensitivity.",
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from current code (`autoingest-architect` review pass — missed by both initial research forks; added rather than silently excluded, per the review's explicit instruction)",
+        "introducedVersion": "Evidence pending",
+        "lastModifiedVersion": "Evidence pending"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-005",
+        "AI-FEAT-006"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "application platform",
+        "pipeline",
+        "telemetry"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "features/AI-FEAT-007_TELEMETRY_PIPELINE.md",
+        "services/telemetry.js"
+      ],
+      "status": "Implemented",
+      "summary": "A settings-gated telemetry pipeline: `services/telemetry.js` exports `init`/`enqueue`/`flush`/`isEnabled`. Consumed by the auto-updater (AI-FEAT-006) and potentially other main-process services. This entry exists specifically so the capability isn't silently undocumented — it was flagged by `autoingest-architect` as needing an explicit decision (document or explicitly exclude), not omission.",
+      "title": "Telemetry Pipeline",
+      "whatItDoes": "A settings-gated telemetry pipeline: `services/telemetry.js` exports `init`/`enqueue`/`flush`/`isEnabled`. Consumed by the auto-updater (AI-FEAT-006) and potentially other main-process services. This entry exists specifically so the capability isn't silently undocumented — it was flagged by `autoingest-architect` as needing an explicit decision (document or explicitly exclude), not omission."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented — evolving\""
+        ],
+        "operatorStatus": "PARTIALLY_AVAILABLE",
+        "reason": "Implemented, but the record's own status marks it evolving or partial."
+      },
+      "category": "Product UI",
+      "id": "AI-FEAT-008",
+      "knownLimitations": {
+        "evidenceGapCount": 7,
+        "futureEnhancements": null,
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from docs and recent commit history",
+        "introducedVersion": "Evidence pending",
+        "lastModifiedVersion": "2026-08-02/04 (Metadata Management Modal shell height rule, Audit & Repair spacing polish)"
+      },
+      "operatorStatus": "PARTIALLY_AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-016",
+        "AI-FEAT-034"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "consistency",
+        "design",
+        "framework",
+        "product ui",
+        "system"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/design-system.md",
+        "docs/ui-system.md",
+        "features/AI-FEAT-008_DESIGN_SYSTEM_UI_CONSISTENCY_FRAMEWORK.md",
+        "renderer/index.html"
+      ],
+      "status": "Implemented — evolving",
+      "summary": "The shared visual and component system every UI surface in AutoIngest must follow: glassmorphism-based styling, consistent buttons/cards/modals, SVG-only icons, a defined spacing scale, and documented interaction-state rules. This is infrastructure that every feature's UI depends on, not a feature a user directly invokes.",
+      "title": "Design System & UI Consistency Framework",
+      "whatItDoes": "The shared visual and component system every UI surface in AutoIngest must follow: glassmorphism-based styling, consistent buttons/cards/modals, SVG-only icons, a defined spacing scale, and documented interaction-state rules. This is infrastructure that every feature's UI depends on, not a feature a user directly invokes."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Event Management",
+      "id": "AI-FEAT-009",
+      "knownLimitations": {
+        "evidenceGapCount": 2,
+        "futureEnhancements": null,
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from current code and docs",
+        "introducedVersion": "v0.7.x (event system introduction)",
+        "lastModifiedVersion": "v0.8.8 (Event Creator layout redesign)"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-004",
+        "AI-FEAT-008",
+        "AI-FEAT-010",
+        "AI-FEAT-018"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "creation",
+        "event",
+        "event management"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/event-system.md § EventCreator",
+        "docs/features.md #4",
+        "features/AI-FEAT-009_EVENT_CREATION.md",
+        "renderer/eventCreator.js",
+        "renderer/folderNameHelper.js",
+        "renderer/treeAutocomplete.js"
+      ],
+      "status": "Implemented",
+      "summary": "The Event Creator wizard: defines a Collection, then Event metadata via one or more Components (EventType, Location, City, Country, Additional Keywords), generates the `event.json` structure, and previews the final folder structure before commit.",
+      "title": "Event Creation",
+      "whatItDoes": "The Event Creator wizard: defines a Collection, then Event metadata via one or more Components (EventType, Location, City, Country, Additional Keywords), generates the `event.json` structure, and previews the final folder structure before commit."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Event Management",
+      "id": "AI-FEAT-010",
+      "knownLimitations": {
+        "evidenceGapCount": 6,
+        "futureEnhancements": null,
+        "openBugs": [
+          {
+            "id": "BUG-001",
+            "status": "Fixed"
+          },
+          {
+            "id": "BUG-006",
+            "status": "Fixed (recurring pattern — see Prevention)"
+          }
+        ]
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from current code, docs, and learning-log.md",
+        "introducedVersion": "Evidence pending (dedicated `eventMgmt.js` module existed by at least 2026-05-14 per learning-log Phase 13C-10)",
+        "lastModifiedVersion": "v0.8.6 (`reloadForImport` API addition)"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-004",
+        "AI-FEAT-009",
+        "AI-FEAT-027",
+        "AI-FEAT-050"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "editing",
+        "event",
+        "event management",
+        "management"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "#12",
+        "docs/event-system.md § Editing",
+        "docs/failure-patterns.md #1",
+        "features/AI-FEAT-010_EVENT_MANAGEMENT_EDITING.md",
+        "renderer/eventMgmt.js"
+      ],
+      "status": "Implemented",
+      "summary": "Selecting an existing event, editing it safely, and listing/picking events (`master:scanEvents`). Distinct from Event Creation (AI-FEAT-009) — has its own renderer module (`renderer/eventMgmt.js`) rather than being a mode of the creator wizard.",
+      "title": "Event Management & Editing",
+      "whatItDoes": "Selecting an existing event, editing it safely, and listing/picking events (`master:scanEvents`). Distinct from Event Creation (AI-FEAT-009) — has its own renderer module (`renderer/eventMgmt.js`) rather than being a mode of the creator wizard."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Source Acquisition",
+      "id": "AI-FEAT-011",
+      "knownLimitations": {
+        "evidenceGapCount": 8,
+        "futureEnhancements": null,
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from current code",
+        "introducedVersion": "Evidence pending",
+        "lastModifiedVersion": "Evidence pending"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-012"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "dcim",
+        "detection",
+        "drives",
+        "private",
+        "sony",
+        "source",
+        "source acquisition"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/architecture.md § Drive Detection",
+        "features/AI-FEAT-011_SOURCE_DETECTION.md",
+        "main/driveDetector.js",
+        "main/fileBrowser.js"
+      ],
+      "status": "Implemented",
+      "summary": "Detects connected storage devices eligible for import: polls for drives, filters by DCIM presence, and recognizes Sony camera folder conventions (PRIVATE/M4ROOT/CLIP for photos, PRIVATE/AVCHD/BDMV/STREAM for video). This is the backend detection layer consumed by Source Selection (AI-FEAT-012) — detection and selection are deliberately kept as separate registry entries because detection is genuinely distinct backend infrastructure (device polling, filesystem heuristics), while selection is a thin UI layer over the same underlying `activeSource` state regardless of source type.",
+      "title": "Source Detection (Drives, DCIM, Sony PRIVATE)",
+      "whatItDoes": "Detects connected storage devices eligible for import: polls for drives, filters by DCIM presence, and recognizes Sony camera folder conventions (PRIVATE/M4ROOT/CLIP for photos, PRIVATE/AVCHD/BDMV/STREAM for video). This is the backend detection layer consumed by Source Selection (AI-FEAT-012) — detection and selection are deliberately kept as separate registry entries because detection is genuinely distinct backend infrastructure (device polling, filesystem heuristics), while selection is a thin UI layer over the same underlying `activeSource` state regardless of source type."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Source Acquisition",
+      "id": "AI-FEAT-012",
+      "knownLimitations": {
+        "evidenceGapCount": 7,
+        "futureEnhancements": null,
+        "openBugs": [
+          {
+            "id": "BUG-001",
+            "status": "Fixed"
+          }
+        ]
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from current code (`autoingest-architect` review pass merged what was originally two proposed entries)",
+        "introducedVersion": "Evidence pending",
+        "lastModifiedVersion": "v0.8.7 (source card double-selection fix)"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-011",
+        "AI-FEAT-024",
+        "AI-FEAT-028"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "drive",
+        "external",
+        "folder",
+        "local",
+        "selection",
+        "source",
+        "source acquisition"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/failure-patterns.md #16",
+        "docs/system-contracts.md §4",
+        "features/AI-FEAT-012_SOURCE_SELECTION.md",
+        "renderer/renderer.js"
+      ],
+      "status": "Implemented",
+      "summary": "Activating a source for import, whether a local folder, external drive, or memory card. Originally proposed as two separate registry entries (\"Local Folder Source Selection\" and \"External Drive Source Selection\"); merged into one after `autoingest-architect` review found `selectLocalFolder()` is a thin wrapper calling the same `_setActiveSource()` used by `selectSource()`, writing into the same `activeSource` state with only the `type` discriminator changing — no independent backend or state shape exists for local folders specifically.",
+      "title": "Source Selection (Local Folder / External Drive)",
+      "whatItDoes": "Activating a source for import, whether a local folder, external drive, or memory card. Originally proposed as two separate registry entries (\"Local Folder Source Selection\" and \"External Drive Source Selection\"); merged into one after `autoingest-architect` review found `selectLocalFolder()` is a thin wrapper calling the same `_setActiveSource()` used by `selectSource()`, writing into the same `activeSource` state with only the `type` discriminator changing — no independent backend or state shape exists for local folders specifically."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Media Browsing",
+      "id": "AI-FEAT-013",
+      "knownLimitations": {
+        "evidenceGapCount": 2,
+        "futureEnhancements": null,
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from current code and docs",
+        "introducedVersion": "v0.6.0 (\"File Handling & UI\" — folder view, recursive scanner, UI improvements)",
+        "lastModifiedVersion": "v0.5.7 (large-source performance work, see Evolution)"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-017",
+        "AI-FEAT-051"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "browser",
+        "file",
+        "grid",
+        "list",
+        "media",
+        "media browsing",
+        "viewing"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/features.md #2",
+        "docs/ui-system.md § File Panel",
+        "features/AI-FEAT-013_FILE_BROWSER_MEDIA_GRID_LIST_VIEWING.md",
+        "main/fileBrowser.js"
+      ],
+      "status": "Implemented",
+      "summary": "Allows selection of files and folders for ingestion; presents them as grouped sections (RAW / Images / Video) in either grid or list view, with selection controls, always reflecting grouping and state from `GroupManager` (AI-FEAT-017).",
+      "title": "File Browser & Media Grid/List Viewing",
+      "whatItDoes": "Allows selection of files and folders for ingestion; presents them as grouped sections (RAW / Images / Video) in either grid or list view, with selection controls, always reflecting grouping and state from `GroupManager` (AI-FEAT-017)."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Media Browsing",
+      "id": "AI-FEAT-014",
+      "knownLimitations": {
+        "evidenceGapCount": 2,
+        "futureEnhancements": null,
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from current code and `docs/history.md`",
+        "introducedVersion": "v0.8.1 (video thumbnails)",
+        "lastModifiedVersion": "v0.8.1"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "caching",
+        "generation",
+        "media browsing",
+        "thumbnail"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "features/AI-FEAT-014_THUMBNAIL_GENERATION_CACHING.md",
+        "main/videoThumbService.js",
+        "services/thumbnailCache.js"
+      ],
+      "status": "Implemented",
+      "summary": "Two separate thumbnail pipelines: images (with an on-disk cache) and video (cached frame extraction with a play-badge overlay).",
+      "title": "Thumbnail Generation & Caching",
+      "whatItDoes": "Two separate thumbnail pipelines: images (with an on-disk cache) and video (cached frame extraction with a play-badge overlay)."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Media Browsing",
+      "id": "AI-FEAT-015",
+      "knownLimitations": {
+        "evidenceGapCount": 2,
+        "futureEnhancements": null,
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from `docs/features.md` and `docs/history.md`",
+        "introducedVersion": "v0.8.1",
+        "lastModifiedVersion": "v0.8.1"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-016"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "media",
+        "media browsing",
+        "preview"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/features.md #12",
+        "features/AI-FEAT-015_MEDIA_PREVIEW.md",
+        "main/rawPreviewService.js"
+      ],
+      "status": "Implemented",
+      "summary": "Space-bar opens a full-screen preview overlay for the focused file: full-resolution image via `file://` URL for JPEG/PNG, high-quality extracted preview for RAW, and a native `<video>` player for MP4/MOV.",
+      "title": "Media Preview",
+      "whatItDoes": "Space-bar opens a full-screen preview overlay for the focused file: full-resolution image via `file://` URL for JPEG/PNG, high-quality extracted preview for RAW, and a native `<video>` player for MP4/MOV."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Media Browsing",
+      "id": "AI-FEAT-016",
+      "knownLimitations": {
+        "evidenceGapCount": 3,
+        "futureEnhancements": null,
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from docs",
+        "introducedVersion": "v0.8.1",
+        "lastModifiedVersion": "v0.8.1"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-008",
+        "AI-FEAT-015"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "focus",
+        "media browsing",
+        "preview",
+        "selection",
+        "separation"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/features.md #13",
+        "docs/ui-system.md § Selection System",
+        "features/AI-FEAT-016_PREVIEW_FOCUS_SELECTION_SEPARATION.md",
+        "renderer/renderer.js"
+      ],
+      "status": "Implemented",
+      "summary": "Two deliberately separate concepts that must never be conflated: import selection (`selectedFiles: Set`, controlled by Cmd/Ctrl-click, Shift-click, checkboxes) and preview focus (`lastClickedPath`, set by any click or arrow-key navigation, used only to open the preview overlay). A normal click sets preview focus only — it does not select a file for import.",
+      "title": "Preview Focus / Selection Separation",
+      "whatItDoes": "Two deliberately separate concepts that must never be conflated: import selection (`selectedFiles: Set`, controlled by Cmd/Ctrl-click, Shift-click, checkboxes) and preview focus (`lastClickedPath`, set by any click or arrow-key navigation, used only to open the preview overlay). A normal click sets preview focus only — it does not select a file for import."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Grouping and Routing",
+      "id": "AI-FEAT-017",
+      "knownLimitations": {
+        "evidenceGapCount": 3,
+        "futureEnhancements": "Whether a keyboard-shortcut group-assignment mechanism should be added is an open question — not currently scoped in any roadmap milestone.",
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from current code and docs",
+        "introducedVersion": "v0.7.x",
+        "lastModifiedVersion": "Evidence pending"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-004",
+        "AI-FEAT-013",
+        "AI-FEAT-018"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "grouping",
+        "grouping and routing",
+        "system"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/features.md #3",
+        "docs/group-manager.md",
+        "features/AI-FEAT-017_GROUPING_SYSTEM.md",
+        "renderer/groupManager.js"
+      ],
+      "status": "Implemented",
+      "summary": "Assigns selected files into logical groups mapped to sub-events. A transient renderer state layer (`renderer/groupManager.js`) that must always sync with `event.json` and reset on event change.",
+      "title": "Grouping System",
+      "whatItDoes": "Assigns selected files into logical groups mapped to sub-events. A transient renderer state layer (`renderer/groupManager.js`) that must always sync with `event.json` and reset on event change."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Grouping and Routing",
+      "id": "AI-FEAT-018",
+      "knownLimitations": {
+        "evidenceGapCount": 3,
+        "futureEnhancements": null,
+        "openBugs": [
+          {
+            "id": "BUG-002",
+            "status": "Fixed"
+          }
+        ]
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from docs (already fully read as required context)",
+        "introducedVersion": "v0.7.x",
+        "lastModifiedVersion": "Evidence pending"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-004",
+        "AI-FEAT-009",
+        "AI-FEAT-017",
+        "AI-FEAT-019",
+        "AI-FEAT-022"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "component",
+        "event",
+        "grouping and routing",
+        "import",
+        "routing"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/event-system.md § Routing Relationship",
+        "docs/ingestion-flow.md § Routing",
+        "features/AI-FEAT-018_EVENT_COMPONENT_IMPORT_ROUTING.md",
+        "renderer/importRouter.js"
+      ],
+      "status": "Implemented",
+      "summary": "Derives archive folder paths purely from `event.json` — no dynamic path computation happens during import. Single-component events route to `Collection/Event/Photographer/`; multi-component events route to `Collection/Event/SubEvent/Photographer/`. Video files always land inside a `VIDEO` subfolder.",
+      "title": "Event-Component Import Routing",
+      "whatItDoes": "Derives archive folder paths purely from `event.json` — no dynamic path computation happens during import. Single-component events route to `Collection/Event/Photographer/`; multi-component events route to `Collection/Event/SubEvent/Photographer/`. Video files always land inside a `VIDEO` subfolder."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Import and Archive Writing",
+      "id": "AI-FEAT-019",
+      "knownLimitations": {
+        "evidenceGapCount": 4,
+        "futureEnhancements": null,
+        "openBugs": [
+          {
+            "id": "BUG-009",
+            "status": "Fixed"
+          }
+        ]
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from current code",
+        "introducedVersion": "v0.5.1 (\"Stabilization\" — \"Import pipeline hardening\") implies an earlier baseline; v0.7.x is the architectural rebuild",
+        "lastModifiedVersion": "Evidence pending"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-004",
+        "AI-FEAT-018",
+        "AI-FEAT-020",
+        "AI-FEAT-021",
+        "AI-FEAT-024",
+        "AI-FEAT-025",
+        "AI-FEAT-038",
+        "AI-FEAT-039",
+        "AI-FEAT-044"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "copy",
+        "engine",
+        "import",
+        "import and archive writing",
+        "pipeline"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/features.md #5",
+        "docs/ingestion-flow.md",
+        "docs/system-contracts.md §4-5",
+        "features/AI-FEAT-019_IMPORT_PIPELINE_COPY_ENGINE.md",
+        "main/fileManager.js"
+      ],
+      "status": "Implemented",
+      "summary": "Processes grouped files and copies them into the archive structure. No file is ever overwritten; same file skips, conflicts rename. The engine itself (`main/fileManager.js`) is not shared with every other copy operation in the app — Transfer Export/Import, Local-First Sync, and Local Mirror each implement their own copy function following the same no-overwrite contract, not one universal engine.",
+      "title": "Import Pipeline & Copy Engine",
+      "whatItDoes": "Processes grouped files and copies them into the archive structure. No file is ever overwritten; same file skips, conflicts rename. The engine itself (`main/fileManager.js`) is not shared with every other copy operation in the app — Transfer Export/Import, Local-First Sync, and Local Mirror each implement their own copy function following the same no-overwrite contract, not one universal engine."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Import and Archive Writing",
+      "id": "AI-FEAT-020",
+      "knownLimitations": {
+        "evidenceGapCount": 8,
+        "futureEnhancements": null,
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from current code",
+        "introducedVersion": "Evidence pending",
+        "lastModifiedVersion": "Evidence pending"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-019"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "detection",
+        "duplicate",
+        "import and archive writing"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/features.md #6",
+        "docs/ingestion-flow.md § Duplicate Handling",
+        "features/AI-FEAT-020_DUPLICATE_DETECTION.md",
+        "main/fileManager.js"
+      ],
+      "status": "Implemented",
+      "summary": "**Classification note**: this is documented as a separate feature file for lineage/continuity reasons — `docs/features.md` (an existing authoritative technical doc) lists it as its own top-level implemented feature (#6). Mechanically, it is entirely implemented inside AI-FEAT-019's `resolveDestPath()` — there is no independent service, state, or code path. Treat this as a **subfeature split out for documentation continuity**, not as an architecturally independent system. A reader should not assume this evolves separately from the Copy Engine.",
+      "title": "Duplicate Detection",
+      "whatItDoes": "**Classification note**: this is documented as a separate feature file for lineage/continuity reasons — `docs/features.md` (an existing authoritative technical doc) lists it as its own top-level implemented feature (#6). Mechanically, it is entirely implemented inside AI-FEAT-019's `resolveDestPath()` — there is no independent service, state, or code path. Treat this as a **subfeature split out for documentation continuity**, not as an architecturally independent system. A reader should not assume this evolves separately from the Copy Engine."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Import and Archive Writing",
+      "id": "AI-FEAT-021",
+      "knownLimitations": {
+        "evidenceGapCount": 3,
+        "futureEnhancements": null,
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from docs (already fully read as required context)",
+        "introducedVersion": "v0.7.4-dev",
+        "lastModifiedVersion": "v0.7.4-dev"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-004",
+        "AI-FEAT-019",
+        "AI-FEAT-028"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "atomic",
+        "import",
+        "import and archive writing",
+        "transaction"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "CLAUDE.md § Transactional Ingest Layer",
+        "docs/features.md #8",
+        "docs/system-contracts.md §13",
+        "features/AI-FEAT-021_ATOMIC_IMPORT_TRANSACTION.md",
+        "main/eventJsonStore.js",
+        "main/main.js"
+      ],
+      "status": "Implemented",
+      "summary": "`event.json` is written in a single atomic operation: `import → logs (including source and importedBy attribution) → lastImport → status`, committed together via `import:commitTransaction` using tmp→rename. No partial writes, no independent multi-step updates.",
+      "title": "Atomic Import Transaction",
+      "whatItDoes": "`event.json` is written in a single atomic operation: `import → logs (including source and importedBy attribution) → lastImport → status`, committed together via `import:commitTransaction` using tmp→rename. No partial writes, no independent multi-step updates."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Import and Archive Writing",
+      "id": "AI-FEAT-022",
+      "knownLimitations": {
+        "evidenceGapCount": 7,
+        "futureEnhancements": null,
+        "openBugs": [
+          {
+            "id": "BUG-002",
+            "status": "Fixed"
+          }
+        ]
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from current code",
+        "introducedVersion": "Evidence pending (v0.9.0 introduced \"Photographer Folder Sequencing\" as a related but distinct capability — see Evolution)",
+        "lastModifiedVersion": "Evidence pending"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-002",
+        "AI-FEAT-018",
+        "AI-FEAT-028"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "folder",
+        "import and archive writing",
+        "pcxx",
+        "photographer",
+        "photographer folder sequencing",
+        "photographer sequencing",
+        "resolution"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "features/AI-FEAT-022_PHOTOGRAPHER_FOLDER_RESOLUTION.md",
+        "services/photographerSequenceService.js"
+      ],
+      "status": "Implemented",
+      "summary": "Resolves the photographer-level folder within an event's directory structure. Distinct identity concept from Login/Operator Identity (AI-FEAT-002, who is using the app) and Import Source Attribution (AI-FEAT-028, which device supplied the files) — three separate concepts that must not be collapsed into one, per `autoingest-architect` review, because this codebase's own contract treats photographer identity, operator identity, and import source as three independently-tracked things.",
+      "title": "Photographer-Folder Resolution",
+      "whatItDoes": "Resolves the photographer-level folder within an event's directory structure. Distinct identity concept from Login/Operator Identity (AI-FEAT-002, who is using the app) and Import Source Attribution (AI-FEAT-028, which device supplied the files) — three separate concepts that must not be collapsed into one, per `autoingest-architect` review, because this codebase's own contract treats photographer identity, operator identity, and import source as three independently-tracked things."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Import and Archive Writing",
+      "id": "AI-FEAT-023",
+      "knownLimitations": {
+        "evidenceGapCount": 9,
+        "futureEnhancements": null,
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from current code and docs",
+        "introducedVersion": "Evidence pending",
+        "lastModifiedVersion": "Evidence pending"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-004",
+        "AI-FEAT-009",
+        "AI-FEAT-029",
+        "AI-FEAT-033"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "import",
+        "import and archive writing",
+        "quick",
+        "quick import"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/metadata-system.md § Non-Goals",
+        "features/AI-FEAT-023_QUICK_IMPORT.md",
+        "renderer/renderer.js"
+      ],
+      "status": "Implemented",
+      "summary": "A staging-only, non-archival import path with a materially different backend contract from Event Import (AI-FEAT-009/019): it creates no `event.json`, so its files are permanently outside Metadata Audit (AI-FEAT-033) coverage — the audit scanner's traversal is gated on `event.json` presence at every level — and are never eligible for event-based Metadata Repair.",
+      "title": "Quick Import",
+      "whatItDoes": "A staging-only, non-archival import path with a materially different backend contract from Event Import (AI-FEAT-009/019): it creates no `event.json`, so its files are permanently outside Metadata Audit (AI-FEAT-033) coverage — the audit scanner's traversal is gated on `event.json` presence at every level — and are never eligible for event-based Metadata Repair."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Import and Archive Writing",
+      "id": "AI-FEAT-024",
+      "knownLimitations": {
+        "evidenceGapCount": 7,
+        "futureEnhancements": null,
+        "openBugs": [
+          {
+            "id": "BUG-001",
+            "status": "Fixed"
+          }
+        ]
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from current code and docs (already fully read as required context)",
+        "introducedVersion": "Evidence pending",
+        "lastModifiedVersion": "v0.8.8 (cleanup root stability fix)"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-012",
+        "AI-FEAT-019"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "cleanup",
+        "import and archive writing",
+        "source",
+        "source cleanup"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/failure-patterns.md #16",
+        "docs/system-contracts.md §4",
+        "features/AI-FEAT-024_SOURCE_CLEANUP.md",
+        "main/main.js"
+      ],
+      "status": "Implemented",
+      "summary": "Post-import deletion of source files, gated by a strict 8-step validation order that must never delete a file that wasn't verifiably and completely copied.",
+      "title": "Source Cleanup",
+      "whatItDoes": "Post-import deletion of source files, gated by a strict 8-step validation order that must never delete a file that wasn't verifiably and completely copied."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Import and Archive Writing",
+      "id": "AI-FEAT-025",
+      "knownLimitations": {
+        "evidenceGapCount": 9,
+        "futureEnhancements": "The planned AI-RM-006 milestone (see AI-FEAT-054) targets a broader, archive-wide integrity-verification scope. This feature is prior art / foundation for that milestone, not a partial implementation of it — do not treat AI-RM-006 as \"in progress\" on the basis of this feature existing.",
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from current code",
+        "introducedVersion": "Evidence pending",
+        "lastModifiedVersion": "Evidence pending"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-019",
+        "AI-FEAT-026",
+        "AI-FEAT-044",
+        "AI-FEAT-054"
+      ],
+      "roadmapRelationship": [
+        {
+          "roadmapId": "AI-RM-006",
+          "status": "Planned — not started"
+        }
+      ],
+      "searchTerms": [
+        "based",
+        "checksum",
+        "file",
+        "import and archive writing",
+        "verification"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "features/AI-FEAT-025_CHECKSUM_BASED_FILE_VERIFICATION.md",
+        "main/main.js"
+      ],
+      "status": "Implemented",
+      "summary": "Two distinct, real, hash-based verification mechanisms, sharing `getFileHash()` but scoped differently: an import-batch checksum run and a Local-First sync-job checksum run. Named \"Checksum-Based\" specifically to disambiguate from AI-FEAT-026's count-only Audit Integrity Verification — the two do not share a mechanism and must not be conflated (confirmed by direct code reading, not merged despite the similar names).",
+      "title": "Checksum-Based File Verification",
+      "whatItDoes": "Two distinct, real, hash-based verification mechanisms, sharing `getFileHash()` but scoped differently: an import-batch checksum run and a Local-First sync-job checksum run. Named \"Checksum-Based\" specifically to disambiguate from AI-FEAT-026's count-only Audit Integrity Verification — the two do not share a mechanism and must not be conflated (confirmed by direct code reading, not merged despite the similar names)."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Import and Archive Writing",
+      "id": "AI-FEAT-026",
+      "knownLimitations": {
+        "evidenceGapCount": 9,
+        "futureEnhancements": null,
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from `docs/features.md` (already fully read as required context) and confirmed distinct from AI-FEAT-025 by direct code reading",
+        "introducedVersion": "Evidence pending",
+        "lastModifiedVersion": "Evidence pending"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-025",
+        "AI-FEAT-027"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "audit",
+        "based",
+        "count",
+        "import and archive writing",
+        "integrity",
+        "verification"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/features.md #10",
+        "features/AI-FEAT-026_AUDIT_INTEGRITY_VERIFICATION.md",
+        "renderer/renderer.js"
+      ],
+      "status": "Implemented",
+      "summary": "On-demand \"Verify Integrity\" button in the Activity Log. Compares the expected media count from `imports[].counts` totals against the actual files found on disk — **pure file-count comparison, no hashing at all**. Named \"(Count-Based)\" specifically to disambiguate from AI-FEAT-025's hash-based Checksum Verification.",
+      "title": "Audit Integrity Verification (Count-Based)",
+      "whatItDoes": "On-demand \"Verify Integrity\" button in the Activity Log. Compares the expected media count from `imports[].counts` totals against the actual files found on disk — **pure file-count comparison, no hashing at all**. Named \"(Count-Based)\" specifically to disambiguate from AI-FEAT-025's hash-based Checksum Verification."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Import and Archive Writing",
+      "id": "AI-FEAT-027",
+      "knownLimitations": {
+        "evidenceGapCount": 7,
+        "futureEnhancements": null,
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from docs (already fully read as required context)",
+        "introducedVersion": "Evidence pending",
+        "lastModifiedVersion": "v0.8.6 (OOM fix)"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-004",
+        "AI-FEAT-010",
+        "AI-FEAT-026"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "activity",
+        "import and archive writing",
+        "log"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/failure-patterns.md #12",
+        "docs/features.md #9",
+        "features/AI-FEAT-027_ACTIVITY_LOG.md",
+        "renderer/renderer.js"
+      ],
+      "status": "Implemented",
+      "summary": "On-demand audit view for any event in the master archive: import history grouped by date with event-level summary (photo count, video count, session count, last import attribution), with binary issue detection (amber \"Check\" badge on entries with missing/invalid fields).",
+      "title": "Activity Log",
+      "whatItDoes": "On-demand audit view for any event in the master archive: import history grouped by date with event-level summary (photo count, video count, session count, last import attribution), with binary issue detection (amber \"Check\" badge on entries with missing/invalid fields)."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Import and Archive Writing",
+      "id": "AI-FEAT-028",
+      "knownLimitations": {
+        "evidenceGapCount": 9,
+        "futureEnhancements": null,
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from docs (already fully read as required context)",
+        "introducedVersion": "Evidence pending",
+        "lastModifiedVersion": "Evidence pending"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-002",
+        "AI-FEAT-012",
+        "AI-FEAT-021",
+        "AI-FEAT-022",
+        "AI-FEAT-027"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "attribution",
+        "import",
+        "import and archive writing",
+        "source"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/data-model.md § Import Entry Schema",
+        "docs/features.md #11",
+        "features/AI-FEAT-028_IMPORT_SOURCE_ATTRIBUTION.md",
+        "renderer/renderer.js"
+      ],
+      "status": "Implemented",
+      "summary": "Each audit entry in `imports[]` records `source: {type, label, path}` identifying which memory card, external drive, or local folder was used. Distinct identity concept from Login/Operator Identity (AI-FEAT-002, who) and Photographer-Folder Resolution (AI-FEAT-022, whose folder) — deliberately kept as three separate registry entries.",
+      "title": "Import Source Attribution",
+      "whatItDoes": "Each audit entry in `imports[]` records `source: {type, label, path}` identifying which memory card, external drive, or local folder was used. Distinct identity concept from Login/Operator Identity (AI-FEAT-002, who) and Photographer-Folder Resolution (AI-FEAT-022, whose folder) — deliberately kept as three separate registry entries."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Metadata",
+      "id": "AI-FEAT-029",
+      "knownLimitations": {
+        "evidenceGapCount": 6,
+        "futureEnhancements": "- **Gregorian date** field is deliberately deferred — no authoritative conversion utility or source field exists yet (`docs/metadata-system.md` § Non-Goals).\n- **Field-consistency structural fix** (`FIELD_SPECS`-style shared table) — currently only a defensive test exists; consolidating the six sites into one shared table is documented as a real, open follow-up.",
+        "openBugs": [
+          {
+            "id": "BUG-007",
+            "status": "Fixed"
+          },
+          {
+            "id": "BUG-008",
+            "status": "Fixed"
+          },
+          {
+            "id": "BUG-009",
+            "status": "Fixed"
+          },
+          {
+            "id": "BUG-010",
+            "status": "Fixed"
+          }
+        ]
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from docs (already fully read as required context, full detail)",
+        "introducedVersion": "Evidence pending overall; hardened extensively 2026-05-05 through 2026-06-22 (learning-log)",
+        "lastModifiedVersion": "2026-06-22 (Phantom RAW Extension Support)"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-004",
+        "AI-FEAT-030",
+        "AI-FEAT-031",
+        "AI-FEAT-032",
+        "AI-FEAT-033",
+        "AI-FEAT-037",
+        "AI-FEAT-047"
+      ],
+      "roadmapRelationship": [
+        {
+          "roadmapId": "AI-RM-001",
+          "status": "**Completed**"
+        }
+      ],
+      "searchTerms": [
+        "engine",
+        "exif",
+        "iptc",
+        "metadata",
+        "metadata writing",
+        "raw metadata",
+        "raw sidecars",
+        "tagging",
+        "writing",
+        "xmp",
+        "xmp sidecars"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/metadata-system.md",
+        "features/AI-FEAT-029_METADATA_WRITING_ENGINE.md",
+        "main/eventJsonStore.js",
+        "main/exifService.js",
+        "services/metadataExpectationService.js"
+      ],
+      "status": "Implemented",
+      "summary": "The single shared engine and resolver that every metadata writer in the app consumes — Standard Import, QMZ, Reapply, crash-recovery resume, and Repair are all consumers of one code path, never independent write implementations. Covers JPEG/TIFF direct write, RAW XMP sidecar write, and video exclusion as one unified engine, not three separate systems.",
+      "title": "Metadata Writing Engine",
+      "whatItDoes": "The single shared engine and resolver that every metadata writer in the app consumes — Standard Import, QMZ, Reapply, crash-recovery resume, and Repair are all consumers of one code path, never independent write implementations. Covers JPEG/TIFF direct write, RAW XMP sidecar write, and video exclusion as one unified engine, not three separate systems."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Metadata",
+      "id": "AI-FEAT-030",
+      "knownLimitations": {
+        "evidenceGapCount": 8,
+        "futureEnhancements": null,
+        "openBugs": [
+          {
+            "id": "BUG-010",
+            "status": "Fixed"
+          }
+        ]
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from docs (already fully read as required context) and `test/metadataCrashRelaunch.test.js`, `test/metadataQueueResume.test.js`",
+        "introducedVersion": "Evidence pending",
+        "lastModifiedVersion": "Evidence pending"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-029",
+        "AI-FEAT-031",
+        "AI-FEAT-033"
+      ],
+      "roadmapRelationship": [
+        {
+          "roadmapId": "AI-RM-001",
+          "status": "**Completed**"
+        }
+      ],
+      "searchTerms": [
+        "crash",
+        "crash recovery",
+        "durable",
+        "durable queue",
+        "metadata",
+        "metadata queue",
+        "queue",
+        "recovery"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/metadata-system.md § Durable Queue Storage and Recovery Behavior",
+        "features/AI-FEAT-030_METADATA_DURABLE_QUEUE_CRASH_RECOVERY.md",
+        "main/metadataQueueRecovery.js",
+        "main/metadataQueueStore.js"
+      ],
+      "status": "Implemented",
+      "summary": "Metadata batches are durable, not in-memory-only, under `userData/metadata-queue/`. Crash-recoverable: proven via a real `SIGKILL` mid-batch + relaunch test, not only a hand-constructed simulation.",
+      "title": "Metadata Durable Queue & Crash Recovery",
+      "whatItDoes": "Metadata batches are durable, not in-memory-only, under `userData/metadata-queue/`. Crash-recoverable: proven via a real `SIGKILL` mid-batch + relaunch test, not only a hand-constructed simulation."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Metadata",
+      "id": "AI-FEAT-031",
+      "knownLimitations": {
+        "evidenceGapCount": 8,
+        "futureEnhancements": null,
+        "openBugs": [
+          {
+            "id": "BUG-008",
+            "status": "Fixed"
+          }
+        ]
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from docs (already fully read as required context) and `test/metadataStateService.test.js`",
+        "introducedVersion": "Evidence pending",
+        "lastModifiedVersion": "Evidence pending"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-029",
+        "AI-FEAT-030",
+        "AI-FEAT-033",
+        "AI-FEAT-034",
+        "AI-FEAT-035"
+      ],
+      "roadmapRelationship": [
+        {
+          "roadmapId": "AI-RM-001",
+          "status": "**Completed**"
+        }
+      ],
+      "searchTerms": [
+        "derivation",
+        "event",
+        "metadata",
+        "state"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/metadata-system.md § Event-Level Metadata State",
+        "features/AI-FEAT-031_METADATA_EVENT_STATE_DERIVATION.md",
+        "main/metadataStateService.js"
+      ],
+      "status": "Implemented",
+      "summary": "An event's `metadataState.state` is always a pure derivation from durable per-file counts, recomputed fresh every time — never a field one callback happens to overwrite last.",
+      "title": "Metadata Event-State Derivation",
+      "whatItDoes": "An event's `metadataState.state` is always a pure derivation from durable per-file counts, recomputed fresh every time — never a field one callback happens to overwrite last."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Metadata",
+      "id": "AI-FEAT-032",
+      "knownLimitations": {
+        "evidenceGapCount": 8,
+        "futureEnhancements": null,
+        "openBugs": [
+          {
+            "id": "BUG-009",
+            "status": "Fixed"
+          }
+        ]
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from docs (already fully read as required context) and `test/metadataVerificationService.test.js`",
+        "introducedVersion": "Evidence pending",
+        "lastModifiedVersion": "Evidence pending"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-029",
+        "AI-FEAT-039"
+      ],
+      "roadmapRelationship": [
+        {
+          "roadmapId": "AI-RM-001",
+          "status": "**Completed**"
+        }
+      ],
+      "searchTerms": [
+        "metadata",
+        "verification"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/metadata-system.md § Import Path Coverage",
+        "features/AI-FEAT-032_METADATA_VERIFICATION.md",
+        "main/metadataVerificationService.js"
+      ],
+      "status": "Implemented",
+      "summary": "Read-only, post-hoc verification for files that landed via copy-only paths (Transfer Import, same-size-skip on Standard Import) where the copy step itself never checked metadata correctness.",
+      "title": "Metadata Verification",
+      "whatItDoes": "Read-only, post-hoc verification for files that landed via copy-only paths (Transfer Import, same-size-skip on Standard Import) where the copy step itself never checked metadata correctness."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Metadata",
+      "id": "AI-FEAT-033",
+      "knownLimitations": {
+        "evidenceGapCount": 4,
+        "futureEnhancements": "None recorded — this milestone is complete; forward-looking archive-wide integrity/repair work is tracked separately under AI-RM-006 (AI-FEAT-054) and AI-RM-007 (AI-FEAT-052), which are distinct, broader-scope, unstarted milestones.",
+        "openBugs": [
+          {
+            "id": "BUG-007",
+            "status": "Fixed"
+          }
+        ]
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from docs (already fully read as required context) and recent commit history",
+        "introducedVersion": "Evidence pending overall architecture; recent UI polish 2026-08-03/04",
+        "lastModifiedVersion": "2026-08-04 (commit `c5d200f`, \"polish Audit & Repair spacing across window heights\")"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-029",
+        "AI-FEAT-030",
+        "AI-FEAT-031",
+        "AI-FEAT-034",
+        "AI-FEAT-035",
+        "AI-FEAT-052",
+        "AI-FEAT-054"
+      ],
+      "roadmapRelationship": [
+        {
+          "roadmapId": "AI-RM-001",
+          "status": "**Completed**"
+        }
+      ],
+      "searchTerms": [
+        "audit",
+        "audit and repair",
+        "metadata",
+        "metadata audit",
+        "metadata repair",
+        "repair"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/features.md #15",
+        "docs/metadata-system.md § Metadata Audit",
+        "features/AI-FEAT-033_METADATA_AUDIT_REPAIR.md",
+        "main/metadataRepairService.js",
+        "services/metadataAuditExport.js",
+        "services/metadataAuditService.js",
+        "§ Repair"
+      ],
+      "status": "Implemented",
+      "summary": "Read-only, streaming, resumable, cancellable archive-wide metadata audit (`services/metadataAuditService.js`), paired with frozen-snapshot metadata repair (`main/metadataRepairService.js`) that consumes only an audit's captured snapshot and never re-resolves against live state. **This is the deliverable behind roadmap milestone AI-RM-001, which is complete** — see [../02_MASTER_ROADMAP.md](../02_MASTER_ROADMAP.md).",
+      "title": "Metadata Audit & Repair",
+      "whatItDoes": "Read-only, streaming, resumable, cancellable archive-wide metadata audit (`services/metadataAuditService.js`), paired with frozen-snapshot metadata repair (`main/metadataRepairService.js`) that consumes only an audit's captured snapshot and never re-resolves against live state. **This is the deliverable behind roadmap milestone AI-RM-001, which is complete** — see [../02_MASTER_ROADMAP.md](../02_MASTER_ROADMAP.md)."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented — evolving\""
+        ],
+        "operatorStatus": "PARTIALLY_AVAILABLE",
+        "reason": "Implemented, but the record's own status marks it evolving or partial."
+      },
+      "category": "Metadata",
+      "id": "AI-FEAT-034",
+      "knownLimitations": {
+        "evidenceGapCount": 3,
+        "futureEnhancements": null,
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from recent commit history and `test/metadataManagementModalUI.test.js`",
+        "introducedVersion": "2026-08-02",
+        "lastModifiedVersion": "2026-08-04 (commit `c5d200f`)"
+      },
+      "operatorStatus": "PARTIALLY_AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-008",
+        "AI-FEAT-031",
+        "AI-FEAT-033",
+        "AI-FEAT-036"
+      ],
+      "roadmapRelationship": [
+        {
+          "roadmapId": "AI-RM-001",
+          "status": "**Completed**"
+        }
+      ],
+      "searchTerms": [
+        "management",
+        "metadata",
+        "modal"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "features/AI-FEAT-034_METADATA_MANAGEMENT_MODAL.md",
+        "renderer/index.html",
+        "test/metadataManagementModalUI.test.js"
+      ],
+      "status": "Implemented — evolving",
+      "summary": "A single tabbed modal consolidating three previously-separate metadata UI surfaces.",
+      "title": "Metadata Management Modal",
+      "whatItDoes": "A single tabbed modal consolidating three previously-separate metadata UI surfaces."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented — evolving\""
+        ],
+        "operatorStatus": "PARTIALLY_AVAILABLE",
+        "reason": "Implemented, but the record's own status marks it evolving or partial."
+      },
+      "category": "Metadata",
+      "id": "AI-FEAT-035",
+      "knownLimitations": {
+        "evidenceGapCount": 5,
+        "futureEnhancements": null,
+        "openBugs": [
+          {
+            "id": "BUG-008",
+            "status": "Fixed"
+          }
+        ]
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from recent commit history and `test/dashboardMetadataHealthCard.test.js`; note the date discrepancy below",
+        "introducedVersion": "2026-08-02 (learning-log label) / 2026-08-03 (commit `fc8fd39` committer timestamp) — same overnight work session, two evidence sources disagree by one calendar day",
+        "lastModifiedVersion": "Same as above"
+      },
+      "operatorStatus": "PARTIALLY_AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-003",
+        "AI-FEAT-031"
+      ],
+      "roadmapRelationship": [
+        {
+          "roadmapId": "AI-RM-001",
+          "status": "**Completed**"
+        }
+      ],
+      "searchTerms": [
+        "dashboard",
+        "health",
+        "metadata"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "features/AI-FEAT-035_DASHBOARD_METADATA_HEALTH.md",
+        "renderer/renderer.js",
+        "test/dashboardMetadataHealthCard.test.js"
+      ],
+      "status": "Implemented — evolving",
+      "summary": "The dashboard's Metadata tile, upgraded from a simple indicator into a \"truthful Health card\" reflecting the real, derived metadata state of the archive/current event.",
+      "title": "Dashboard Metadata Health",
+      "whatItDoes": "The dashboard's Metadata tile, upgraded from a simple indicator into a \"truthful Health card\" reflecting the real, derived metadata state of the archive/current event."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Metadata",
+      "id": "AI-FEAT-036",
+      "knownLimitations": {
+        "evidenceGapCount": 5,
+        "futureEnhancements": null,
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from current code",
+        "introducedVersion": "2026-05-09 (\"Keyword Registry ID Stabilization\" — learning-log)",
+        "lastModifiedVersion": "2026-05-09"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-034",
+        "AI-FEAT-037"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "controlled keywords",
+        "keyword",
+        "keyword registry",
+        "metadata",
+        "registry"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "data/keywords.registry.json",
+        "features/AI-FEAT-036_KEYWORD_REGISTRY.md",
+        "main/main.js"
+      ],
+      "status": "Implemented",
+      "summary": "The controlled-vocabulary registry backing metadata keyword resolution: keywords, cities, event types, locations, and photographers.",
+      "title": "Keyword Registry",
+      "whatItDoes": "The controlled-vocabulary registry backing metadata keyword resolution: keywords, cities, event types, locations, and photographers."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Metadata",
+      "id": "AI-FEAT-037",
+      "knownLimitations": {
+        "evidenceGapCount": 4,
+        "futureEnhancements": "A full function-level audit of `main/metadataSyncService.js` against the current codebase is an open follow-up — this entry's evidence status is deliberately marked lower than its siblings until that happens.",
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Known from project history (learning-log narrative + file existence); NOT independently function-level audited by either research fork in this pass — evidence status intentionally lower than most other Metadata entries",
+        "introducedVersion": "2026-05-09",
+        "lastModifiedVersion": "2026-05-11"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-029",
+        "AI-FEAT-036"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "metadata",
+        "metadata reapply",
+        "metadata sync",
+        "reapply",
+        "sync"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/metadata-system.md § Import Path Coverage",
+        "features/AI-FEAT-037_METADATA_REAPPLY_SYNC.md",
+        "main/metadataSyncService.js"
+      ],
+      "status": "Implemented",
+      "summary": "Detects when metadata needs to be reapplied to already-imported files (e.g. after an operator corrects event component location/city/country post-import) and syncs the corrected metadata across previously-imported files, with a preview modal showing affected folders and changed/removed fields. `docs/metadata-system.md`'s Import Path Coverage table lists \"Reapply\" as a synchronous write via the shared engine (AI-FEAT-029) — this feature is that Reapply capability plus its scan/sync/preview surface.",
+      "title": "Metadata Reapply / Sync",
+      "whatItDoes": "Detects when metadata needs to be reapplied to already-imported files (e.g. after an operator corrects event component location/city/country post-import) and syncs the corrected metadata across previously-imported files, with a preview modal showing affected folders and changed/removed fields. `docs/metadata-system.md`'s Import Path Coverage table lists \"Reapply\" as a synchronous write via the shared engine (AI-FEAT-029) — this feature is that Reapply capability plus its scan/sync/preview surface."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Transfer and Backup",
+      "id": "AI-FEAT-038",
+      "knownLimitations": {
+        "evidenceGapCount": 4,
+        "futureEnhancements": "None recorded — `docs/archive-operations-layer.md` § Known Limitations notes \"No bulk adoption: events are adopted one at a time\" (relevant to AI-FEAT-046, not this feature directly).",
+        "openBugs": [
+          {
+            "id": "BUG-005",
+            "status": "Fixed"
+          }
+        ]
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from docs (already fully read as required context) and current code",
+        "introducedVersion": "Phase 13D era (2026-05-14, per `docs/archive-operations-layer.md`'s phase numbering)",
+        "lastModifiedVersion": "Evidence pending beyond Phase 13D"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-039",
+        "AI-FEAT-040",
+        "AI-FEAT-041",
+        "AI-FEAT-042",
+        "AI-FEAT-045",
+        "AI-FEAT-046"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "export",
+        "transfer",
+        "transfer and backup",
+        "transfer export"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/archive-operations-layer.md § Transfer Workflow",
+        "features/AI-FEAT-038_TRANSFER_EXPORT.md",
+        "services/transferExportService.js"
+      ],
+      "status": "Implemented",
+      "summary": "Writes a clean mirror of selected events from the Active Archive Root to a Transfer Drive, for physical transport to the Main Archive Root.",
+      "title": "Transfer Export",
+      "whatItDoes": "Writes a clean mirror of selected events from the Active Archive Root to a Transfer Drive, for physical transport to the Main Archive Root."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Transfer and Backup",
+      "id": "AI-FEAT-039",
+      "knownLimitations": {
+        "evidenceGapCount": 3,
+        "futureEnhancements": null,
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from docs and current code (`test/transferImportOutcomeManifest.test.js`)",
+        "introducedVersion": "Phase 13D era",
+        "lastModifiedVersion": "2026-07-22"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-032",
+        "AI-FEAT-038",
+        "AI-FEAT-041",
+        "AI-FEAT-042"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "import",
+        "transfer",
+        "transfer and backup",
+        "transfer import"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/archive-operations-layer.md § Transfer Workflow",
+        "features/AI-FEAT-039_TRANSFER_IMPORT.md",
+        "services/transferImportService.js",
+        "test/transferImportOutcomeManifest.test.js"
+      ],
+      "status": "Implemented",
+      "summary": "Imports content from a Transfer Drive into the Main Archive Root. Idempotent — re-importing the same drive does not duplicate files.",
+      "title": "Transfer Import",
+      "whatItDoes": "Imports content from a Transfer Drive into the Main Archive Root. Idempotent — re-importing the same drive does not duplicate files."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Transfer and Backup",
+      "id": "AI-FEAT-040",
+      "knownLimitations": {
+        "evidenceGapCount": 8,
+        "futureEnhancements": null,
+        "openBugs": [
+          {
+            "id": "BUG-005",
+            "status": "Fixed"
+          }
+        ]
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from current code, git commit history, and git branch inspection",
+        "introducedVersion": "Evidence pending (10+ dedicated commits, dates not individually attributed in this pass)",
+        "lastModifiedVersion": "Evidence pending"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-038"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "backup",
+        "backup scanning",
+        "backup update",
+        "scanning",
+        "transfer and backup",
+        "update"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "features/AI-FEAT-040_BACKUP_UPDATE_SCANNING.md",
+        "services/transferExportService.js"
+      ],
+      "status": "Implemented",
+      "summary": "A distinct mode of Transfer Export (`backupUpdate` mode) with genuinely different conflict semantics: it never overwrites and never creates `_1`/`_2` renamed files — a stricter no-mutation contract than standard export. Real and substantial, not aspirational: confirmed via 10+ dedicated `feat(backup)`/`fix(backup)`-prefixed commits, all merged to `main`.",
+      "title": "Backup Update Scanning",
+      "whatItDoes": "A distinct mode of Transfer Export (`backupUpdate` mode) with genuinely different conflict semantics: it never overwrites and never creates `_1`/`_2` renamed files — a stricter no-mutation contract than standard export. Real and substantial, not aspirational: confirmed via 10+ dedicated `feat(backup)`/`fix(backup)`-prefixed commits, all merged to `main`."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Transfer and Backup",
+      "id": "AI-FEAT-041",
+      "knownLimitations": {
+        "evidenceGapCount": 4,
+        "futureEnhancements": "Extending background/minimize operation to standard Event Import is a plausible future enhancement but is not currently scoped in any roadmap milestone.",
+        "openBugs": [
+          {
+            "id": "BUG-005",
+            "status": "Fixed"
+          }
+        ]
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from git commit history (commit `848c867`, full message read)",
+        "introducedVersion": "Commit `848c867`, merged to `main`",
+        "lastModifiedVersion": "Same commit"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-038",
+        "AI-FEAT-039",
+        "AI-FEAT-040"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "background",
+        "minimize",
+        "operation",
+        "transfer",
+        "transfer and backup"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "features/AI-FEAT-041_TRANSFER_BACKGROUND_MINIMIZE_OPERATION.md",
+        "renderer/index.html",
+        "services/transferExportService.js"
+      ],
+      "status": "Implemented",
+      "summary": "Lets an operator run Transfer Export or Transfer Import in the background instead of being blocked by a modal, with a persistent status indicator. **Explicitly does not exist for standard Event Import** — confirmed by negative grep (only a generic OS-level window-minimize button exists for the main window) and by commit `848c867`'s own message, which scopes this capability to Transfer Export/Import only.",
+      "title": "Transfer Background/Minimize Operation",
+      "whatItDoes": "Lets an operator run Transfer Export or Transfer Import in the background instead of being blocked by a modal, with a persistent status indicator. **Explicitly does not exist for standard Event Import** — confirmed by negative grep (only a generic OS-level window-minimize button exists for the main window) and by commit `848c867`'s own message, which scopes this capability to Transfer Export/Import only."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Archive Operations",
+      "id": "AI-FEAT-042",
+      "knownLimitations": {
+        "evidenceGapCount": 2,
+        "futureEnhancements": null,
+        "openBugs": [
+          {
+            "id": "BUG-003",
+            "status": "Fixed"
+          }
+        ]
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from docs (already fully read as required context) and release notes",
+        "introducedVersion": "Phase 12A (per learning-log Phase numbering)",
+        "lastModifiedVersion": "v0.9.8 (2026-06-16)"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-005",
+        "AI-FEAT-038",
+        "AI-FEAT-039",
+        "AI-FEAT-043",
+        "AI-FEAT-044",
+        "AI-FEAT-046",
+        "AI-FEAT-049"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "active archive root",
+        "archive",
+        "archive operations",
+        "archive root configuration",
+        "archive root resolution",
+        "configuration",
+        "main archive root",
+        "resolution",
+        "root"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/archive-operations-layer.md § Three-Root Model",
+        "features/AI-FEAT-042_ARCHIVE_ROOT_CONFIGURATION_RESOLUTION.md",
+        "services/nasEventCache.js",
+        "services/offlineCollectionRegistryService.js",
+        "services/settings.js"
+      ],
+      "status": "Implemented",
+      "summary": "Configuration and automatic resolution of AutoIngest's four storage roots — Active Archive Root (portable NAS), Local Staging Root (operator SSD), Main Archive Root (permanent office server), Transfer Drive Root (migration carrier) — including auto-resolution, temporary override, and re-resolution when a saved root goes offline.",
+      "title": "Archive Root Configuration & Resolution",
+      "whatItDoes": "Configuration and automatic resolution of AutoIngest's four storage roots — Active Archive Root (portable NAS), Local Staging Root (operator SSD), Main Archive Root (permanent office server), Transfer Drive Root (migration carrier) — including auto-resolution, temporary override, and re-resolution when a saved root goes offline."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Archive Operations",
+      "id": "AI-FEAT-043",
+      "knownLimitations": {
+        "evidenceGapCount": 2,
+        "futureEnhancements": "This reporting layer is read-only and diagnostic-only by design — it does not auto-fix anything (`docs/archive-operations-layer.md`: \"No broad repair automation: the diagnostics layer reports issues but does not auto-fix them\"). That gap is the explicit scope of the planned AI-RM-007 Archive Repair milestone (AI-FEAT-052).",
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from docs (already fully read as required context)",
+        "introducedVersion": "Phase 13D-1 (2026-05-14)",
+        "lastModifiedVersion": "Phase 13D-5 (2026-05-14)"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-004",
+        "AI-FEAT-042",
+        "AI-FEAT-045",
+        "AI-FEAT-046",
+        "AI-FEAT-049",
+        "AI-FEAT-052",
+        "AI-FEAT-055"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "archive",
+        "archive health",
+        "archive health reporting",
+        "archive operations",
+        "diagnostics",
+        "health",
+        "reporting"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "13D-2",
+        "13D-4",
+        "13D-5)",
+        "docs/archive-operations-layer.md § Reporting Layer (Phases 13D-1",
+        "features/AI-FEAT-043_ARCHIVE_HEALTH_REPORTING.md",
+        "services/archiveConsistencyService.js"
+      ],
+      "status": "Implemented",
+      "summary": "Four read-only reporting and audit surfaces giving operators visibility into archive health, none of which mutate any file or service state: Consistency Report, Completeness Checklist, Archive Diagnostics, and Audit Timeline.",
+      "title": "Archive Health Reporting",
+      "whatItDoes": "Four read-only reporting and audit surfaces giving operators visibility into archive health, none of which mutate any file or service state: Consistency Report, Completeness Checklist, Archive Diagnostics, and Audit Timeline."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Archive Operations",
+      "id": "AI-FEAT-044",
+      "knownLimitations": {
+        "evidenceGapCount": 8,
+        "futureEnhancements": "`docs/archive-operations-layer.md` § Known Limitations: \"No automatic Local Staging Root cleanup after sync completes\" and \"No portable NAS wipe/reset tool for post-transfer teardown\" are both documented gaps for this feature area.",
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from docs (already fully read as required context)",
+        "introducedVersion": "Evidence pending",
+        "lastModifiedVersion": "Evidence pending"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-019",
+        "AI-FEAT-029",
+        "AI-FEAT-042",
+        "AI-FEAT-043"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "archive",
+        "archive operations",
+        "background",
+        "background archive sync",
+        "first",
+        "local",
+        "local-first sync",
+        "nas sync",
+        "sync"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/archive-operations-layer.md § Local First",
+        "features/AI-FEAT-044_LOCAL_FIRST_BACKGROUND_ARCHIVE_SYNC.md",
+        "services/archiveSyncService.js",
+        "services/localSyncManifest.js",
+        "services/syncQueueService.js",
+        "services/syncReviewService.js"
+      ],
+      "status": "Implemented",
+      "summary": "Background sync from the Local Staging Root to the Active Archive Root, used when an operator imports locally first rather than directly to the archive.",
+      "title": "Local-First Background Archive Sync",
+      "whatItDoes": "Background sync from the Local Staging Root to the Active Archive Root, used when an operator imports locally first rather than directly to the archive."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Archive Operations",
+      "id": "AI-FEAT-045",
+      "knownLimitations": {
+        "evidenceGapCount": 8,
+        "futureEnhancements": null,
+        "openBugs": [
+          {
+            "id": "BUG-004",
+            "status": "Fixed"
+          }
+        ]
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from current code",
+        "introducedVersion": "Evidence pending",
+        "lastModifiedVersion": "Evidence pending"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-038",
+        "AI-FEAT-043"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "archive",
+        "archive lock",
+        "archive operations",
+        "handling",
+        "lock",
+        "lock handling",
+        "recovery",
+        "stale",
+        "stale locks"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/archive-operations-layer.md § Direct Archive",
+        "features/AI-FEAT-045_ARCHIVE_LOCK_HANDLING_STALE_LOCK_RECOVERY.md",
+        "services/archiveLockService.js",
+        "§ Safety Guarantees"
+      ],
+      "status": "Implemented",
+      "summary": "Photographer-level write locks for Direct Archive imports, preventing concurrent imports into the same event folder, with automatic detection and recovery of stale locks.",
+      "title": "Archive Lock Handling & Stale-Lock Recovery",
+      "whatItDoes": "Photographer-level write locks for Direct Archive imports, preventing concurrent imports into the same event folder, with automatic detection and recovery of stale locks."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Archive Operations",
+      "id": "AI-FEAT-046",
+      "knownLimitations": {
+        "evidenceGapCount": 3,
+        "futureEnhancements": "`docs/archive-operations-layer.md` § Known Limitations: \"No bulk adoption: events are adopted one at a time\" is a documented, standing gap.",
+        "openBugs": [
+          {
+            "id": "BUG-006",
+            "status": "Fixed (recurring pattern — see Prevention)"
+          }
+        ]
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from current code and both dedicated docs (full read)",
+        "introducedVersion": "Phase 13C-7",
+        "lastModifiedVersion": "Phase 13C-9 (2026-05-14, adoption-block silent-drop fix)"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-004",
+        "AI-FEAT-042",
+        "AI-FEAT-047"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "adoption",
+        "archive",
+        "archive folder adoption",
+        "archive operations",
+        "folder"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/archive-adoption-contract.md",
+        "docs/archive-adoption-workflow.md",
+        "features/AI-FEAT-046_ARCHIVE_FOLDER_ADOPTION.md",
+        "services/adoptionDryRunService.js",
+        "services/adoptionPreviewService.js",
+        "services/adoptionWriteContract.js",
+        "services/adoptionWriteService.js"
+      ],
+      "status": "Implemented",
+      "summary": "Registers a pre-existing, manually-created archive folder as an AutoIngest-managed event by writing a minimal `event.json` into it — without moving, renaming, or restructuring any media. Reversible by deleting the written `event.json`. Conceptually distinct from AI-FEAT-047's QMZ-internal unsequenced-folder adoption (which adopts folders into QMZ's own `_Unsequenced` bucket, not the archive-wide event registry).",
+      "title": "Archive Folder Adoption",
+      "whatItDoes": "Registers a pre-existing, manually-created archive folder as an AutoIngest-managed event by writing a minimal `event.json` into it — without moving, renaming, or restructuring any media. Reversible by deleting the written `event.json`. Conceptually distinct from AI-FEAT-047's QMZ-internal unsequenced-folder adoption (which adopts folders into QMZ's own `_Unsequenced` bucket, not the archive-wide event registry)."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Special Workflows",
+      "id": "AI-FEAT-047",
+      "knownLimitations": {
+        "evidenceGapCount": 7,
+        "futureEnhancements": "`docs/metadata-system.md` § Non-Goals notes: \"the primary QMZ flow (assign → auto-queue metadata) has been verified live through the real UI; less common paths through the QMZ Sequence Manager have not each been individually driven live\" — an open verification gap, not a known bug.",
+        "openBugs": [
+          {
+            "id": "BUG-007",
+            "status": "Fixed"
+          }
+        ]
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from current code (`main/qmzService.js` full header + export list read) and `test/qmzLiveE2E.test.js`",
+        "introducedVersion": "Evidence pending",
+        "lastModifiedVersion": "Evidence pending"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-016",
+        "AI-FEAT-029",
+        "AI-FEAT-046"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "qmz",
+        "qmz sequencing",
+        "quick mobile zip",
+        "sequencing",
+        "special workflows",
+        "workspace"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/metadata-system.md § Import Path Coverage",
+        "features/AI-FEAT-047_QMZ_SEQUENCING_WORKSPACE.md",
+        "main/qmzService.js",
+        "renderer/renderer.js",
+        "test/qmzLiveE2E.test.js"
+      ],
+      "status": "Implemented",
+      "summary": "**QMZ = Qadam / Majlis / Ziyafat** — a standalone sequencing workspace distinct from standard Event Import, with its own root (`qmzRoot`), durable state file (`qmz-sequences.json`), namespaced renderer state/UI (`_qmz*` prefix throughout — explicitly documented in code comments as never touching Import's `sortKey`/`viewMode`), and its own IPC surface.",
+      "title": "QMZ Sequencing Workspace",
+      "whatItDoes": "**QMZ = Qadam / Majlis / Ziyafat** — a standalone sequencing workspace distinct from standard Event Import, with its own root (`qmzRoot`), durable state file (`qmz-sequences.json`), namespaced renderer state/UI (`_qmz*` prefix throughout — explicitly documented in code comments as never touching Import's `sortKey`/`viewMode`), and its own IPC surface."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Collaboration and Realtime Coordination",
+      "id": "AI-FEAT-048",
+      "knownLimitations": {
+        "evidenceGapCount": 3,
+        "futureEnhancements": null,
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from current code and multiple release notes",
+        "introducedVersion": "v0.9.1",
+        "lastModifiedVersion": "v0.9.7"
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-005"
+      ],
+      "roadmapRelationship": [],
+      "searchTerms": [
+        "collaboration and realtime coordination",
+        "online",
+        "presence",
+        "realtime",
+        "registry",
+        "team"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "features/AI-FEAT-048_REALTIME_TEAM_PRESENCE_ONLINE_REGISTRY.md",
+        "realtime-server/",
+        "realtime-server/README.md",
+        "services/offlineCollectionRegistryService.js",
+        "services/realtimeOperationsService.js"
+      ],
+      "status": "Implemented",
+      "summary": "A full realtime multi-device coordination system: a Socket.IO relay server for sync-slot negotiation, live activity, and device presence, explicitly documented as **advisory-only** — `services/realtimeOperationsService.js` \"never writes event.json, sync manifests, archive folders, metadata files, or any authoritative state.\" The app degrades gracefully to direct archive operations when the relay is unreachable.",
+      "title": "Realtime Team Presence & Online Registry",
+      "whatItDoes": "A full realtime multi-device coordination system: a Socket.IO relay server for sync-slot negotiation, live activity, and device presence, explicitly documented as **advisory-only** — `services/realtimeOperationsService.js` \"never writes event.json, sync manifests, archive folders, metadata files, or any authoritative state.\" The app degrades gracefully to direct archive operations when the relay is unreachable."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Planned\""
+        ],
+        "operatorStatus": "PLANNED",
+        "reason": "Feature record status is Planned — not yet implemented."
+      },
+      "category": "Planned Archive Management",
+      "id": "AI-FEAT-049",
+      "knownLimitations": {
+        "evidenceGapCount": 4,
+        "futureEnhancements": "Scope, design, and acceptance criteria for this milestone are pending discovery/specification — see [../04_PROJECT_DASHBOARD.md](../04_PROJECT_DASHBOARD.md)'s \"Next planned action.\"",
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Confirmed zero implementation: exhaustive grep for \"maintenance\"/camelCase variants across `main/`, `services/`, `renderer/` found no matches; `git log --all --oneline` search found no relevant commits",
+        "introducedVersion": "Not started",
+        "lastModifiedVersion": "Not applicable"
+      },
+      "operatorStatus": "PLANNED",
+      "relatedFeatures": [
+        "AI-FEAT-042",
+        "AI-FEAT-043"
+      ],
+      "roadmapRelationship": [
+        {
+          "roadmapId": "AI-RM-001",
+          "status": "**Completed**"
+        },
+        {
+          "roadmapId": "AI-RM-002",
+          "status": "Planned — not started"
+        }
+      ],
+      "searchTerms": [
+        "archive",
+        "archive maintenance",
+        "maintenance",
+        "planned archive management"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "features/AI-FEAT-049_ARCHIVE_MAINTENANCE.md"
+      ],
+      "status": "Planned",
+      "summary": "Planned archive-maintenance capability — the next roadmap milestone after the completed AI-RM-001 (Metadata Audit & Repair). No architecture, scope, or design has been finalized. This document intentionally does not invent implementation detail for unbuilt work.",
+      "title": "Archive Maintenance",
+      "whatItDoes": "Planned archive-maintenance capability — the next roadmap milestone after the completed AI-RM-001 (Metadata Audit & Repair). No architecture, scope, or design has been finalized. This document intentionally does not invent implementation detail for unbuilt work."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Planned\""
+        ],
+        "operatorStatus": "PLANNED",
+        "reason": "Feature record status is Planned — not yet implemented."
+      },
+      "category": "Planned Archive Management",
+      "id": "AI-FEAT-050",
+      "knownLimitations": {
+        "evidenceGapCount": 4,
+        "futureEnhancements": "Scope, design, and acceptance criteria are pending discovery/specification.",
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Confirmed zero implementation: exhaustive grep across `main/`, `services/`, `renderer/` found no matches; `git log --all --oneline` search found no relevant commits",
+        "introducedVersion": "Not started",
+        "lastModifiedVersion": "Not applicable"
+      },
+      "operatorStatus": "PLANNED",
+      "relatedFeatures": [
+        "AI-FEAT-004",
+        "AI-FEAT-010"
+      ],
+      "roadmapRelationship": [
+        {
+          "roadmapId": "AI-RM-003",
+          "status": "Planned — not started"
+        }
+      ],
+      "searchTerms": [
+        "event",
+        "event maintenance",
+        "maintenance",
+        "planned archive management"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "features/AI-FEAT-050_EVENT_MAINTENANCE.md"
+      ],
+      "status": "Planned",
+      "summary": "Planned event-level maintenance capability — third in the canonical roadmap order. No architecture, scope, or design has been finalized.",
+      "title": "Event Maintenance",
+      "whatItDoes": "Planned event-level maintenance capability — third in the canonical roadmap order. No architecture, scope, or design has been finalized."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Planned\""
+        ],
+        "operatorStatus": "PLANNED",
+        "reason": "Feature record status is Planned — not yet implemented."
+      },
+      "category": "Planned Archive Management",
+      "id": "AI-FEAT-051",
+      "knownLimitations": {
+        "evidenceGapCount": 4,
+        "futureEnhancements": "Scope, design, and acceptance criteria are pending discovery/specification.",
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Confirmed zero implementation: exhaustive grep across `main/`, `services/`, `renderer/` found no matches; `git log --all --oneline` search found no relevant commits",
+        "introducedVersion": "Not started",
+        "lastModifiedVersion": "Not applicable"
+      },
+      "operatorStatus": "PLANNED",
+      "relatedFeatures": [
+        "AI-FEAT-013",
+        "AI-FEAT-053"
+      ],
+      "roadmapRelationship": [
+        {
+          "roadmapId": "AI-RM-004",
+          "status": "Planned — not started"
+        }
+      ],
+      "searchTerms": [
+        "archive",
+        "archive browser",
+        "browser",
+        "planned archive management"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "features/AI-FEAT-051_ARCHIVE_BROWSER.md"
+      ],
+      "status": "Planned",
+      "summary": "Planned full-archive browsing capability — fourth in the canonical roadmap order, positioned after Archive/Event Maintenance and before Global Search. No architecture, scope, or design has been finalized.",
+      "title": "Archive Browser",
+      "whatItDoes": "Planned full-archive browsing capability — fourth in the canonical roadmap order, positioned after Archive/Event Maintenance and before Global Search. No architecture, scope, or design has been finalized."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Planned\""
+        ],
+        "operatorStatus": "PLANNED",
+        "reason": "Feature record status is Planned — not yet implemented."
+      },
+      "category": "Planned Archive Management",
+      "id": "AI-FEAT-052",
+      "knownLimitations": {
+        "evidenceGapCount": 4,
+        "futureEnhancements": "Scope, design, and acceptance criteria are pending discovery/specification.",
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Confirmed NOT started, despite a filename collision — verified directly by reading `services/archiveRepairService.js`",
+        "introducedVersion": "Not started",
+        "lastModifiedVersion": "Not applicable"
+      },
+      "operatorStatus": "PLANNED",
+      "relatedFeatures": [
+        "AI-FEAT-043"
+      ],
+      "roadmapRelationship": [
+        {
+          "roadmapId": "AI-RM-007",
+          "status": "Planned — not started"
+        }
+      ],
+      "searchTerms": [
+        "archive",
+        "archive repair",
+        "planned archive management",
+        "repair"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "features/AI-FEAT-052_ARCHIVE_REPAIR.md"
+      ],
+      "status": "Planned",
+      "summary": "Planned broad archive-repair automation — seventh in the canonical roadmap order. `docs/archive-operations-layer.md` explicitly documents this exact gap today: \"No broad repair automation: the diagnostics layer reports issues but does not auto-fix them\" (AI-FEAT-043).",
+      "title": "Archive Repair",
+      "whatItDoes": "Planned broad archive-repair automation — seventh in the canonical roadmap order. `docs/archive-operations-layer.md` explicitly documents this exact gap today: \"No broad repair automation: the diagnostics layer reports issues but does not auto-fix them\" (AI-FEAT-043)."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Planned\""
+        ],
+        "operatorStatus": "PLANNED",
+        "reason": "Feature record status is Planned — not yet implemented."
+      },
+      "category": "Search and Discovery",
+      "id": "AI-FEAT-053",
+      "knownLimitations": {
+        "evidenceGapCount": 4,
+        "futureEnhancements": "Scope, design, and acceptance criteria are pending discovery/specification.",
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Confirmed zero implementation: exhaustive grep across `main/`, `services/`, `renderer/` found no matches; `git log --all --oneline` search for \"global search\" found no relevant commits",
+        "introducedVersion": "Not started",
+        "lastModifiedVersion": "Not applicable"
+      },
+      "operatorStatus": "PLANNED",
+      "relatedFeatures": [
+        "AI-FEAT-051"
+      ],
+      "roadmapRelationship": [
+        {
+          "roadmapId": "AI-RM-005",
+          "status": "Planned — not started"
+        }
+      ],
+      "searchTerms": [
+        "global",
+        "global search",
+        "search",
+        "search and discovery"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "features/AI-FEAT-053_GLOBAL_SEARCH.md"
+      ],
+      "status": "Planned",
+      "summary": "Planned archive-wide search capability — fifth in the canonical roadmap order, positioned after Archive Browser. No architecture, scope, or design has been finalized.",
+      "title": "Global Search",
+      "whatItDoes": "Planned archive-wide search capability — fifth in the canonical roadmap order, positioned after Archive Browser. No architecture, scope, or design has been finalized."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Planned\""
+        ],
+        "operatorStatus": "PLANNED",
+        "reason": "Feature record status is Planned — not yet implemented."
+      },
+      "category": "Reliability and Recovery",
+      "id": "AI-FEAT-054",
+      "knownLimitations": {
+        "evidenceGapCount": 4,
+        "futureEnhancements": "Scope, design, and acceptance criteria are pending discovery/specification. Whether this milestone builds directly on AI-FEAT-025's `getFileHash()` primitive or introduces a new mechanism is an open design question for whoever scopes this milestone.",
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Confirmed zero implementation of the archive-wide scope; existing narrower prior art independently verified",
+        "introducedVersion": "Not started",
+        "lastModifiedVersion": "Not applicable"
+      },
+      "operatorStatus": "PLANNED",
+      "relatedFeatures": [
+        "AI-FEAT-025"
+      ],
+      "roadmapRelationship": [
+        {
+          "roadmapId": "AI-RM-006",
+          "status": "Planned — not started"
+        }
+      ],
+      "searchTerms": [
+        "archive",
+        "archive-wide verification",
+        "integrity",
+        "integrity verification",
+        "reliability and recovery",
+        "verification",
+        "wide"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "features/AI-FEAT-054_INTEGRITY_VERIFICATION_ARCHIVE_WIDE.md"
+      ],
+      "status": "Planned",
+      "summary": "Planned archive-wide (possibly scheduled) integrity verification — sixth in the canonical roadmap order. **Explicitly distinct in scope from AI-FEAT-025**, which is already implemented but scoped only to a single import batch or a single Local-First sync job, not the whole archive.",
+      "title": "Integrity Verification — Archive-Wide",
+      "whatItDoes": "Planned archive-wide (possibly scheduled) integrity verification — sixth in the canonical roadmap order. **Explicitly distinct in scope from AI-FEAT-025**, which is already implemented but scoped only to a single import batch or a single Local-First sync job, not the whole archive."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Planned\""
+        ],
+        "operatorStatus": "PLANNED",
+        "reason": "Feature record status is Planned — not yet implemented."
+      },
+      "category": "Analytics and Intelligence",
+      "id": "AI-FEAT-055",
+      "knownLimitations": {
+        "evidenceGapCount": 4,
+        "futureEnhancements": "Scope, design, and acceptance criteria are pending discovery/specification. Per `docs/design-system.md` § 8a, whenever this feature is built, \"data visualization [should be] treated as part of the design system, not an afterthought\" — noted here as a standing constraint from the design-quality rules, not a scoping decision.",
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Confirmed zero implementation: exhaustive grep across `main/`, `services/`, `renderer/` found no matches; `git log --all --oneline` search found no relevant commits",
+        "introducedVersion": "Not started",
+        "lastModifiedVersion": "Not applicable"
+      },
+      "operatorStatus": "PLANNED",
+      "relatedFeatures": [
+        "AI-FEAT-043",
+        "AI-FEAT-056"
+      ],
+      "roadmapRelationship": [
+        {
+          "roadmapId": "AI-RM-008",
+          "status": "Planned — not started"
+        }
+      ],
+      "searchTerms": [
+        "analytics",
+        "analytics and intelligence",
+        "archive",
+        "archive analytics"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "features/AI-FEAT-055_ARCHIVE_ANALYTICS.md"
+      ],
+      "status": "Planned",
+      "summary": "Planned archive analytics capability — eighth in the canonical roadmap order, positioned after Archive Repair and before AI Archive Intelligence. No architecture, scope, or design has been finalized.",
+      "title": "Archive Analytics",
+      "whatItDoes": "Planned archive analytics capability — eighth in the canonical roadmap order, positioned after Archive Repair and before AI Archive Intelligence. No architecture, scope, or design has been finalized."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Planned\""
+        ],
+        "operatorStatus": "PLANNED",
+        "reason": "Feature record status is Planned — not yet implemented."
+      },
+      "category": "Analytics and Intelligence",
+      "id": "AI-FEAT-056",
+      "knownLimitations": {
+        "evidenceGapCount": 4,
+        "futureEnhancements": "Scope, design, and acceptance criteria are pending discovery/specification.",
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Confirmed zero implementation: exhaustive grep across `main/`, `services/`, `renderer/` found no matches; `git log --all --oneline` search found no relevant commits",
+        "introducedVersion": "Not started",
+        "lastModifiedVersion": "Not applicable"
+      },
+      "operatorStatus": "PLANNED",
+      "relatedFeatures": [
+        "AI-FEAT-055"
+      ],
+      "roadmapRelationship": [
+        {
+          "roadmapId": "AI-RM-009",
+          "status": "Planned — not started"
+        }
+      ],
+      "searchTerms": [
+        "ai archive intelligence",
+        "analytics and intelligence",
+        "archive",
+        "intelligence"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "features/AI-FEAT-056_AI_ARCHIVE_INTELLIGENCE.md"
+      ],
+      "status": "Planned",
+      "summary": "Planned AI-assisted archive intelligence capability — final milestone in the canonical roadmap order. No architecture, scope, or design has been finalized. This is the furthest-out, least-scoped item in the entire registry; nothing about its eventual shape should be assumed from its name alone.",
+      "title": "AI Archive Intelligence",
+      "whatItDoes": "Planned AI-assisted archive intelligence capability — final milestone in the canonical roadmap order. No architecture, scope, or design has been finalized. This is the furthest-out, least-scoped item in the entire registry; nothing about its eventual shape should be assumed from its name alone."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented\""
+        ],
+        "operatorStatus": "AVAILABLE",
+        "reason": "Feature record status is Implemented with no open blocking bugs."
+      },
+      "category": "Application Platform",
+      "id": "AI-FEAT-057",
+      "knownLimitations": {
+        "evidenceGapCount": 0,
+        "futureEnhancements": "- **Version visibility (non-blocking UX candidate, not a Part 9 requirement).** During the rc.3 real-client test, the tester could not confidently confirm the exact running version (including the `-rc.3` prerelease suffix) from inside the app, and instead had to check Windows Explorer's file-properties dialog, which showed `File version: 0.9.12.0` / `Product version: 0.9.12.0` — Windows' PE version resource has no field for a SemVer prerelease suffix, so this is expected and not itself a defect. Audited whether the app already displays the exact version anywhere: it does attempt to — `renderer/index.html`'s always-visible global title bar has an `#appVersion` span, populated by `renderer.js` via `window.api.getVersion()` (`main/preload.js`: `getVersion: () => require('../package.json').version`, a synchronous, non-IPC `require()` call from within the preload script). Whether this reliably works is genuinely uncertain rather than confirmed either way: every `BrowserWindow` in `main/main.js` sets `sandbox: true`, and Electron's sandboxed-preload `require()` support for arbitrary local JSON files is version/context-dependent; the call is also wrapped in a bare `try { ... } catch { /* non-critical */ }` in `renderer.js`, so a failure would leave the title-bar version span silently empty with no visible symptom — which is consistent with, though not proof of, what the tester experienced. A more robust, already-proven alternative already exists in this same codebase: `getAppVersion` (`preload.js` → `ipcMain.handle('app:getVersion', () => app.getVersion())`, already used elsewhere for Team Live version-mismatch display) goes through the main process rather than a preload-context `require()`, and is not subject to the same sandbox uncertainty. Candidate enhancement: verify (and if needed, harden) the title-bar display — prefer routing it through the already-working `getAppVersion` IPC call instead of the uncertain synchronous `require()` path — in an unobtrusive location such as the title bar or Settings/About. Not implemented here; not a Part 9 blocker; not part of this feature's approved scope.",
+        "openBugs": [
+          {
+            "id": "BUG-015",
+            "status": "Fixed"
+          },
+          {
+            "id": "BUG-016",
+            "status": "Fixed"
+          }
+        ]
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from current code and `node_modules/electron-updater`/`node_modules/app-builder-lib`/`node_modules/electron-publish` source at the pinned installed versions (`electron-updater@6.8.3`, `electron-builder@26.8.1`) — not from memory or external documentation",
+        "introducedVersion": "2026-08-12",
+        "lastModifiedVersion": "2026-08-13 — full live pilot closed. Three real RC publications (v0.9.12-rc.1/rc.2/rc.3), two CI-only bugs found and fixed (BUG-015, BUG-016), and real Windows-hardware verification of the complete Stable/Preview lifecycle: legacy isolation, manual bootstrap, in-place install with data preservation, Preview↔Stable switching, Preview→Preview automatic update, and no downgrade. See Acceptance Matrix below."
+      },
+      "operatorStatus": "AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-005",
+        "AI-FEAT-006"
+      ],
+      "roadmapRelationship": [
+        {
+          "roadmapId": "AI-RM-010",
+          "status": "**Completed** — verified on real Windows hardware (2026-08-13)"
+        }
+      ],
+      "searchTerms": [
+        "application platform",
+        "channel",
+        "multi",
+        "release",
+        "system",
+        "update"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        ".github/workflows/release.yml",
+        "features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md",
+        "main/main.js",
+        "main/preload.js",
+        "renderer/index.html",
+        "renderer/renderer.js",
+        "scripts/product-docs/README.md",
+        "scripts/product-docs/automation/releaseIntelligence.js",
+        "scripts/product-docs/cli.js",
+        "scripts/product-docs/lib/updateChannelModel.js",
+        "services/autoUpdater.js",
+        "services/settings.js"
+      ],
+      "status": "Implemented",
+      "summary": "Formalizes AutoIngest's release process into three isolated channels — Development (internal engineering builds, never published), RC/Preview (real tester acceptance before Stable, opt-in only), and Stable (the existing production release path, unchanged) — so a tester-facing build can exist without ever risking exposure to Stable users, and so a verified RC has an auditable, gated path to becoming the Stable release built from its exact source.",
+      "title": "Multi-Channel Release & Update System",
+      "whatItDoes": "Formalizes AutoIngest's release process into three isolated channels — Development (internal engineering builds, never published), RC/Preview (real tester acceptance before Stable, opt-in only), and Stable (the existing production release path, unchanged) — so a tester-facing build can exist without ever risking exposure to Stable users, and so a verified RC has an auditable, gated path to becoming the Stable release built from its exact source."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Implemented — evolving\""
+        ],
+        "operatorStatus": "PARTIALLY_AVAILABLE",
+        "reason": "Implemented, but the record's own status marks it evolving or partial."
+      },
+      "category": "Knowledge & Onboarding",
+      "id": "AI-FEAT-058",
+      "knownLimitations": {
+        "evidenceGapCount": 2,
+        "futureEnhancements": "Documented, evidence-grounded, all deferred to a later stage per the Stage 1 brief's explicit stop condition — not implemented here:\n\n- **Retrieval precision.** The eval corpus surfaced three concrete, reproducible gaps in reusing `lib/query.js` unchanged for natural-language questions rather than short canonical lookups: (1) generic single-keyword overlaps (`event`, `import`, `archive`) frequently tie across several unrelated records, with the ascending-ID tiebreak sometimes surfacing a less-relevant record (e.g. \"How do I import photographs from an SD card?\" surfaces AI-FEAT-018 over the more directly relevant AI-FEAT-019); (2) ambiguous single words cause real topical drift (\"How do I switch between Stable and Preview versions?\" matches AI-FEAT-015/016 Media Preview, not AI-FEAT-057 Multi-Channel Release, via the word \"preview\"); (3) \"Can I search my entire archive?\" loses AI-FEAT-053 (Global Search, Planned — the genuinely relevant record) to five unrelated Archive Operations records that merely share the word \"archive.\" None of these caused a false confident answer (the weak-match hedge fired correctly in every case), but they measurably reduce answer relevance. A scoped, additive Stage 2 candidate: a lightweight re-ranking pass local to `knowledgeEngine.js` (e.g. weighting by distinct-token coverage of the full query, not just count) — still no embeddings, still no change to the shared `lib/query.js` ranker other commands depend on.\n- **Roadmap/dashboard routing.** \"What's coming next for AutoIngest?\" resolves `UNKNOWN` today — Stage 1's engine only matches `feature`-type search-index records, even though `roadmap-dashboard.json` answers this question well. Extending `answerQuestion` to also consider `roadmap`/`product_doc` entity types is a small, well-scoped Stage 2 item.\n- **Boundary table coverage.** The curated `NOT_SUPPORTED` table is deliberately small (6 entries). \"Can I have multiple people log in with different roles?\" is genuinely not supported (per `01_FEATURE_REGISTRY.md`'s own Reconciliation Notes) but is not in the table, and the engine reports `AVAILABLE` via a coincidental match on `AI-FEAT-027` (Activity Log, via the word \"log\") instead. Recorded as a known, evidenced gap in the eval corpus (Q20) rather than curated around it.\n- Workflow, Troubleshooting Entry, and Navigation Location record types (proposed in the Phase 1 audit's schema section) — none exist yet; every Stage 1 answer's `guidance` field is the honest fallback sentence for exactly this reason.\n- Screenshots/visual assets, the full 8-screen portal information architecture, and a conversational multi-turn layer — all explicitly deferred past Stage 1.",
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from current code (`scripts/product-docs/lib/knowledgeIndex.js`, `knowledgeEngine.js`, `statusResolution.js`, `knowledgeCli.js`, `knowledge-portal/server.js`+`index.html`) and `scripts/product-docs/test/knowledge.test.js` (17/17 passing, including the full existing 33-file suite unaffected), plus a live local-server smoke test (`knowledge serve`, `curl` against `/`, `/api/capabilities`, `/api/roadmap`, `/api/ask`) on 2026-08-13",
+        "introducedVersion": "2026-08-13",
+        "lastModifiedVersion": "2026-08-13"
+      },
+      "operatorStatus": "PARTIALLY_AVAILABLE",
+      "relatedFeatures": [],
+      "roadmapRelationship": [
+        {
+          "roadmapId": "AI-RM-011",
+          "status": "In Progress — Stage 1 (prototype) complete; Stage 2 not started"
+        }
+      ],
+      "searchTerms": [
+        "engine",
+        "knowledge",
+        "knowledge & onboarding",
+        "prototype",
+        "stage"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/product/generated/knowledge-gap-report.json",
+        "docs/product/generated/knowledge-index.json",
+        "features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md",
+        "scripts/product-docs/cli.js",
+        "scripts/product-docs/knowledge-portal/index.html",
+        "scripts/product-docs/knowledge-portal/server.js",
+        "scripts/product-docs/lib/build.js",
+        "scripts/product-docs/lib/knowledgeCli.js",
+        "scripts/product-docs/lib/knowledgeEngine.js",
+        "scripts/product-docs/lib/knowledgeEval.js",
+        "scripts/product-docs/lib/knowledgeIndex.js",
+        "scripts/product-docs/lib/knowledgeTestCorpus.js",
+        "scripts/product-docs/lib/statusResolution.js",
+        "scripts/product-docs/lib/version.js",
+        "scripts/product-docs/test/knowledge.test.js"
+      ],
+      "status": "Implemented — evolving",
+      "summary": "A Stage 1 prototype proving that AutoIngest's existing `docs/product/` documentation system — the feature registry, roadmap, and the deterministic offline search engine already built in `scripts/product-docs/lib/query.js` — can power a grounded, citation-honest, natural-language \"Ask AutoIngest\" answer engine **without** an LLM, embeddings, or any hosted service. This is explicitly **not** the final operator-facing portal (see the Phase 1 Knowledge & Onboarding Portal audit): no Workflow/Navigation/Tutorial content exists yet, no visual design work was done, and no conversational multi-turn layer was built. It is the smallest working slice that validates the two claims the larger portal initiative depends on: that the existing generated-index layer is sufficient retrieval infrastructure, and that a citation-honest answer contract is achievable on top of it.",
+      "title": "Knowledge Engine (Stage 1 Prototype)",
+      "whatItDoes": "A Stage 1 prototype proving that AutoIngest's existing `docs/product/` documentation system — the feature registry, roadmap, and the deterministic offline search engine already built in `scripts/product-docs/lib/query.js` — can power a grounded, citation-honest, natural-language \"Ask AutoIngest\" answer engine **without** an LLM, embeddings, or any hosted service. This is explicitly **not** the final operator-facing portal (see the Phase 1 Knowledge & Onboarding Portal audit): no Workflow/Navigation/Tutorial content exists yet, no visual design work was done, and no conversational multi-turn layer was built. It is the smallest working slice that validates the two claims the larger portal initiative depends on: that the existing generated-index layer is sufficient retrieval infrastructure, and that a citation-honest answer contract is achievable on top of it."
+    }
+  ],
+  "docsys_version": "1.3.0",
+  "schema_version": "1.3.0"
+}
