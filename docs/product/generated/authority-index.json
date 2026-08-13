@@ -1307,7 +1307,16 @@
         "docs/product/19_WORKFLOW_TEMPLATE.md",
         "docs/product/workflows/README.md",
         "docs/product/generated/workflow-index.json",
-        "docs/product/decisions/DEC-020_STAGE_2_KNOWLEDGE_ARCHITECTURE_WORKFLOW_RECORDS_AND_CONCEPT_LAYER.md"
+        "docs/product/decisions/DEC-020_STAGE_2_KNOWLEDGE_ARCHITECTURE_WORKFLOW_RECORDS_AND_CONCEPT_LAYER.md",
+        "scripts/product-docs/lib/knowledgeTestCorpusV2.js",
+        "scripts/product-docs/lib/knowledgeEval.js",
+        "scripts/product-docs/lib/knowledgeCli.js",
+        "scripts/product-docs/lib/statusResolution.js",
+        "scripts/product-docs/lib/intentConcepts.js",
+        "scripts/product-docs/lib/knowledgeEngine.js",
+        "scripts/product-docs/lib/questionClassifier.js",
+        "scripts/product-docs/test/knowledgeHallucinationV2.test.js",
+        "docs/product/generated/knowledge-gap-report-v2.json"
       ],
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md's header table and Lifecycle Metadata section.",

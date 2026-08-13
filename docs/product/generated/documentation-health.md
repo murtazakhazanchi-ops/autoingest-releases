@@ -2,7 +2,7 @@
 
 > Generated artifact. Implements the 13 rules specified in [14_VALIDATION_SPECIFICATION.md](../14_VALIDATION_SPECIFICATION.md) plus Part 4 tooling-integrity checks. Regenerate with `node scripts/product-docs/cli.js validate`.
 
-Generated against source commit `56cfd1bd5ac266a1fe686140368182eadbe3d7b6`.
+Generated against source commit `74297d20793b97af6571d67676471594c90ab2a7`.
 
 ## Summary
 
@@ -10,7 +10,7 @@ Generated against source commit `56cfd1bd5ac266a1fe686140368182eadbe3d7b6`.
 |---|---|---|
 | Error | 0 | Fails the build (non-zero exit) |
 | Warning | 16 | Reported, does not fail the build |
-| Information | 16 | Reported, does not fail the build |
+| Information | 22 | Reported, does not fail the build |
 | Evidence gap | 57 | Reported, does not fail the build — visibility only, per 14_VALIDATION_SPECIFICATION.md Rule 13 |
 
 **Result**: PASS
@@ -40,7 +40,7 @@ None.
 | missing-related-technical-docs | AI-FEAT-041 is Implemented but cites no Related technical docs | features/AI-FEAT-041_TRANSFER_BACKGROUND_MINIMIZE_OPERATION.md | — |
 | missing-related-technical-docs | AI-FEAT-058 is Implemented but cites no Related technical docs | features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md | — |
 
-## Information (16)
+## Information (22)
 
 | Rule | Message | File | Note |
 |---|---|---|---|
@@ -60,6 +60,12 @@ None.
 | shared-code-path | services/transferExportService.js is explicitly owned by 3 features (shared, not exclusive) | services/transferExportService.js | AI-FEAT-038, AI-FEAT-040, AI-FEAT-041 |
 | shared-code-path | services/offlineCollectionRegistryService.js is explicitly owned by 2 features (shared, not exclusive) | services/offlineCollectionRegistryService.js | AI-FEAT-042, AI-FEAT-048 |
 | shared-code-path | scripts/product-docs/cli.js is explicitly owned by 2 features (shared, not exclusive) | scripts/product-docs/cli.js | AI-FEAT-057, AI-FEAT-058 |
+| shared-code-path | scripts/product-docs/lib/statusResolution.js is explicitly owned by 2 features (shared, not exclusive) | scripts/product-docs/lib/statusResolution.js | AI-FEAT-058, AI-FEAT-058 |
+| shared-code-path | scripts/product-docs/lib/knowledgeEngine.js is explicitly owned by 2 features (shared, not exclusive) | scripts/product-docs/lib/knowledgeEngine.js | AI-FEAT-058, AI-FEAT-058 |
+| shared-code-path | scripts/product-docs/lib/knowledgeCli.js is explicitly owned by 2 features (shared, not exclusive) | scripts/product-docs/lib/knowledgeCli.js | AI-FEAT-058, AI-FEAT-058 |
+| shared-code-path | scripts/product-docs/lib/knowledgeEval.js is explicitly owned by 2 features (shared, not exclusive) | scripts/product-docs/lib/knowledgeEval.js | AI-FEAT-058, AI-FEAT-058 |
+| shared-code-path | scripts/product-docs/lib/intentConcepts.js is explicitly owned by 2 features (shared, not exclusive) | scripts/product-docs/lib/intentConcepts.js | AI-FEAT-058, AI-FEAT-058 |
+| shared-code-path | scripts/product-docs/lib/questionClassifier.js is explicitly owned by 2 features (shared, not exclusive) | scripts/product-docs/lib/questionClassifier.js | AI-FEAT-058, AI-FEAT-058 |
 
 ## Evidence gap (57)
 

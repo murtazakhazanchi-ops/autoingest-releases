@@ -353,7 +353,13 @@ function answerQuestion(question, ctx) {
   const topRawFeature = rawFeatureMatches[0];
   const topRawFeatureTied = topRawFeature ? rawFeatureMatches.filter((m) => m.score === topRawFeature.score).length : 0;
   const hasStrongRawFeatureMatch = !!topRawFeature && matchQualityFor(topRawFeature.score, topRawFeatureTied) === 'strong';
-  if (boundary && !hasStrongRawFeatureMatch) {
+  // Stage 2, Phase 20 — a `hardOverride: true` boundary (see
+  // statusResolution.js's registry-* entries) is never overridden by a raw
+  // feature match, however strong. Those boundaries make a narrower claim
+  // about a real feature's documented SCOPE, not "this capability doesn't
+  // exist" — a strong match on that same parent feature doesn't disprove
+  // the narrower claim, so it must not be treated as competing evidence.
+  if (boundary && (boundary.hardOverride || !hasStrongRawFeatureMatch)) {
     return boundaryAnswer(question, boundary, featureMatches, qType);
   }
 

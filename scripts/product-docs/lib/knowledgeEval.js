@@ -15,6 +15,7 @@ const path = require('path');
 const build = require('./build');
 const { answerQuestion, buildEngineContext } = require('./knowledgeEngine');
 const { CORPUS } = require('./knowledgeTestCorpus');
+const { CORPUS_V2 } = require('./knowledgeTestCorpusV2');
 const { stableStringify } = require('./stableJson');
 const { GENERATED_ROOT } = require('./repoRoot');
 
@@ -26,10 +27,13 @@ function evaluateOne(entry, ctx) {
   // only valid "instructions exist" signal is a non-fallback guidance
   // string, which never happens in Stage 1. Asserted explicitly so a future
   // stage that adds Workflow records changes this deliberately, not silently.
+  // V2 corpus entries (Phase 20) don't carry instructionsShouldExist/
+  // shouldAcknowledgeGap — those fields are undefined, treated as N/A
+  // (always matching) rather than forcing every V2 entry to declare them.
   const actualInstructionsExist = !!answer.guidance && answer.guidance !== 'AutoIngest supports this capability, but detailed operator instructions are not yet documented.';
-  const instructionsMatch = actualInstructionsExist === entry.instructionsShouldExist;
+  const instructionsMatch = entry.instructionsShouldExist === undefined ? true : (actualInstructionsExist === entry.instructionsShouldExist);
   const acknowledgesGap = answer.matchQuality === 'weak' || answer.matchQuality === 'none' || !!answer.guidance;
-  const gapAcknowledgementMatch = acknowledgesGap === entry.shouldAcknowledgeGap || entry.shouldAcknowledgeGap === false;
+  const gapAcknowledgementMatch = entry.shouldAcknowledgeGap === undefined ? true : (acknowledgesGap === entry.shouldAcknowledgeGap || entry.shouldAcknowledgeGap === false);
 
   const pass = statusMatch && qualityMatch && instructionsMatch;
 
@@ -61,10 +65,10 @@ function renderTable(results) {
   return rows.join('\n');
 }
 
-function runEval({ outPath } = {}) {
+function runEval({ outPath, corpus } = {}) {
   const { built } = build.assemble();
   const ctx = buildEngineContext(built);
-  const results = CORPUS.map((entry) => evaluateOne(entry, ctx));
+  const results = (corpus || CORPUS).map((entry) => evaluateOne(entry, ctx));
 
   const passCount = results.filter((r) => r.pass).length;
   const knownMissCount = results.filter((r) => !r.pass && r.knownLimitation).length;
@@ -102,4 +106,11 @@ function runEval({ outPath } = {}) {
   return { results, table, summary, outPath: resolvedOutPath, failures: unexplainedFailures };
 }
 
-module.exports = { runEval, evaluateOne, renderTable };
+// Stage 2, Phase 20 — runs the expanded 99-question corpus (superset of the
+// V1 20 — see knowledgeTestCorpusV2.js's own header) against the real
+// engine, writing a separate gap report so it never overwrites V1's.
+function runEvalV2({ outPath } = {}) {
+  return runEval({ outPath: outPath || path.join(GENERATED_ROOT, 'knowledge-gap-report-v2.json'), corpus: CORPUS_V2 });
+}
+
+module.exports = { runEval, runEvalV2, evaluateOne, renderTable };

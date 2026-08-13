@@ -2949,6 +2949,7 @@
       "sourceFiles": [
         "docs/product/19_WORKFLOW_TEMPLATE.md",
         "docs/product/decisions/DEC-020_STAGE_2_KNOWLEDGE_ARCHITECTURE_WORKFLOW_RECORDS_AND_CONCEPT_LAYER.md",
+        "docs/product/generated/knowledge-gap-report-v2.json",
         "docs/product/generated/knowledge-gap-report.json",
         "docs/product/generated/knowledge-index.json",
         "docs/product/generated/workflow-index.json",
@@ -2965,6 +2966,7 @@
         "scripts/product-docs/lib/knowledgeEval.js",
         "scripts/product-docs/lib/knowledgeIndex.js",
         "scripts/product-docs/lib/knowledgeTestCorpus.js",
+        "scripts/product-docs/lib/knowledgeTestCorpusV2.js",
         "scripts/product-docs/lib/markdown.js",
         "scripts/product-docs/lib/parseProductDocs.js",
         "scripts/product-docs/lib/questionClassifier.js",
@@ -2973,7 +2975,8 @@
         "scripts/product-docs/lib/validators.js",
         "scripts/product-docs/lib/version.js",
         "scripts/product-docs/lib/workflowIndex.js",
-        "scripts/product-docs/test/knowledge.test.js"
+        "scripts/product-docs/test/knowledge.test.js",
+        "scripts/product-docs/test/knowledgeHallucinationV2.test.js"
       ],
       "status": "Implemented — evolving",
       "summary": "A Stage 1 prototype proving that AutoIngest's existing `docs/product/` documentation system — the feature registry, roadmap, and the deterministic offline search engine already built in `scripts/product-docs/lib/query.js` — can power a grounded, citation-honest, natural-language \"Ask AutoIngest\" answer engine **without** an LLM, embeddings, or any hosted service. This is explicitly **not** the final operator-facing portal (see the Phase 1 Knowledge & Onboarding Portal audit): no Workflow/Navigation/Tutorial content exists yet, no visual design work was done, and no conversational multi-turn layer was built. It is the smallest working slice that validates the two claims the larger portal initiative depends on: that the existing generated-index layer is sufficient retrieval infrastructure, and that a citation-honest answer contract is achievable on top of it.",

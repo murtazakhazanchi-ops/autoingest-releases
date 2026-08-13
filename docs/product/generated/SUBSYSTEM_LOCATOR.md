@@ -409,6 +409,7 @@
 **Source files**:
 - `docs/product/19_WORKFLOW_TEMPLATE.md`
 - `docs/product/decisions/DEC-020_STAGE_2_KNOWLEDGE_ARCHITECTURE_WORKFLOW_RECORDS_AND_CONCEPT_LAYER.md`
+- `docs/product/generated/knowledge-gap-report-v2.json`
 - `docs/product/generated/knowledge-gap-report.json`
 - `docs/product/generated/knowledge-index.json`
 - `docs/product/generated/workflow-index.json`
@@ -424,6 +425,7 @@
 - `scripts/product-docs/lib/knowledgeEval.js`
 - `scripts/product-docs/lib/knowledgeIndex.js`
 - `scripts/product-docs/lib/knowledgeTestCorpus.js`
+- `scripts/product-docs/lib/knowledgeTestCorpusV2.js`
 - `scripts/product-docs/lib/markdown.js`
 - `scripts/product-docs/lib/parseProductDocs.js`
 - `scripts/product-docs/lib/questionClassifier.js`
@@ -433,6 +435,7 @@
 - `scripts/product-docs/lib/version.js`
 - `scripts/product-docs/lib/workflowIndex.js`
 - `scripts/product-docs/test/knowledge.test.js`
+- `scripts/product-docs/test/knowledgeHallucinationV2.test.js`
 
 **Change-impact checklist**:
 - Re-read the Related Files section of every primary feature listed above before changing shared source files.

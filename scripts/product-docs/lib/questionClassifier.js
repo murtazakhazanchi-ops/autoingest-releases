@@ -25,7 +25,7 @@ const QUESTION_TYPES = Object.freeze({
 // decisions (e.g. a team-connectivity phrase should classify as
 // CONNECTIVITY even though it might also loosely read as TROUBLESHOOTING).
 const RULES = [
-  { type: QUESTION_TYPES.ROADMAP, re: /\b(what'?s next|whats next|coming next|coming soon|planned features?|what is planned|roadmap|recent changes|what changed)\b/i },
+  { type: QUESTION_TYPES.ROADMAP, re: /\b(what'?s next|whats next|coming next|coming soon|planned features?|features?\s+(are|is)\s+planned|planned next|what is planned|roadmap|recent changes|what changed)\b/i },
   { type: QUESTION_TYPES.CONNECTIVITY, re: /\b(offline|reconnect|connection dropped|no internet|without internet|server unavailable|registry (down|unavailable)|can'?t connect)\b/i },
   { type: QUESTION_TYPES.TEAM_ACTIVITY, re: /\b(who('?s| is) (online|active|working)|another operator|other operators|team live|online registry|who else|see (what|who))\b/i },
   { type: QUESTION_TYPES.TROUBLESHOOTING, re: /\b(stopped|not working|isn'?t working|error|missing|failed|why (can'?t|won'?t|does(n'?t)?)|problem|stuck|wrong)\b/i },

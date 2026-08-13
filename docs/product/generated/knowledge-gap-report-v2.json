@@ -1,0 +1,942 @@
+{
+  "corpus_size": 99,
+  "gaps": [
+    {
+      "domain": "Import",
+      "gapType": "NO_MATCH",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": "Terse paraphrase produces zero match (UNKNOWN) rather than a weak hedge — safe (declines rather than invents) but less helpful than the canonical phrasing (P01a), which strongly matches AI-WF-001. A retrieval-recall gap, not a grounding defect.",
+      "pass": false,
+      "query": "What's the process for importing pictures from a card?",
+      "relatedFeature": null
+    },
+    {
+      "domain": "Import",
+      "gapType": "NO_MATCH",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": "Same recall gap as P01b — \"Does AutoIngest support importing video files?\" produces zero match. Safe (UNKNOWN, no invented claim) but misses the already-disclosed import-video documentation gap (see intentConcepts.js \"import-video\" cluster) entirely rather than surfacing it.",
+      "pass": false,
+      "query": "Does AutoIngest support importing video files?",
+      "relatedFeature": null
+    },
+    {
+      "domain": "Import",
+      "gapType": "NO_MATCH",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": "Same recall gap as P02a for the \"MP4s from my card\" phrasing — zero match, safe but unhelpful.",
+      "pass": false,
+      "query": "Can I bring in MP4s from my card?",
+      "relatedFeature": null
+    },
+    {
+      "domain": "Import",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "Why is the photographer name blank after I imported?",
+      "relatedFeature": "AI-FEAT-022(100)"
+    },
+    {
+      "domain": "Events",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "What's the way to start a new event?",
+      "relatedFeature": "AI-FEAT-004(100)"
+    },
+    {
+      "domain": "Events",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "how do i make an event",
+      "relatedFeature": "AI-WF-001(100)"
+    },
+    {
+      "domain": "Events",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": "Same class as Q05 (event deletion) — no record either way; weak tied match. Not a new defect.",
+      "pass": false,
+      "query": "Is there a way to remove an event?",
+      "relatedFeature": "AI-FEAT-004(100)"
+    },
+    {
+      "domain": "Events",
+      "gapType": "NO_MATCH",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "can events be deleted",
+      "relatedFeature": null
+    },
+    {
+      "domain": "Collections",
+      "gapType": "NO_MATCH",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "What does 'Collection' mean in AutoIngest?",
+      "relatedFeature": null
+    },
+    {
+      "domain": "Collections",
+      "gapType": "NO_MATCH",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "Explain Collections",
+      "relatedFeature": null
+    },
+    {
+      "domain": "Collections",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "Can I search across my whole archive?",
+      "relatedFeature": "AI-FEAT-042(100)"
+    },
+    {
+      "domain": "Collections",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": "CORRECTED ground truth during Phase 20 — this paraphrase actually reaches AI-FEAT-053 (Global Search, Planned) directly, a MORE correct and specific answer than the canonical Q07 phrasing (\"Can I search my entire archive?\"), which still loses its tiebreak to unrelated Archive Operations records (Stage 1's own documented, unfixed retrieval-precision gap). The original draft assumed AVAILABLE was correct; it was not — Global Search is Planned, not built.",
+      "pass": true,
+      "query": "search all events at once",
+      "relatedFeature": "AI-FEAT-053(100)"
+    },
+    {
+      "domain": "Future capabilities",
+      "gapType": "MISSING_OPERATOR_WORKFLOW",
+      "missingEvidence": [
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "What's on the roadmap?",
+      "relatedFeature": null
+    },
+    {
+      "domain": "Future capabilities",
+      "gapType": "MISSING_OPERATOR_WORKFLOW",
+      "missingEvidence": [
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "what features are planned next",
+      "relatedFeature": null
+    },
+    {
+      "domain": "Backup",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "Does the archive get backed up automatically?",
+      "relatedFeature": "AI-FEAT-042(100)"
+    },
+    {
+      "domain": "Backup",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "is backup automatic",
+      "relatedFeature": "AI-FEAT-040(100)"
+    },
+    {
+      "domain": "Transfer",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "My transfer got interrupted, what do I do?",
+      "relatedFeature": "AI-FEAT-038(100)"
+    },
+    {
+      "domain": "Unsupported",
+      "gapType": "MISSING_OPERATOR_WORKFLOW",
+      "missingEvidence": [
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "Does AutoIngest have face detection?",
+      "relatedFeature": "AI-FEAT-011(100)"
+    },
+    {
+      "domain": "Unsupported",
+      "gapType": "MISSING_OPERATOR_WORKFLOW",
+      "missingEvidence": [
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "can it recognize people in photos",
+      "relatedFeature": null
+    },
+    {
+      "domain": "Unsupported",
+      "gapType": "MISSING_OPERATOR_WORKFLOW",
+      "missingEvidence": [
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "Can I retouch photos in the app?",
+      "relatedFeature": null
+    },
+    {
+      "domain": "Unsupported",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": "Deliberately ambiguous phrasing — \"editing tools\" without \"photo\" specified is a genuinely different question from the photo-editing boundary (P12a); the engine's weak AVAILABLE citing AI-FEAT-010 (event metadata editing UI, which does exist) is a defensible reading, not a false claim about photo editing specifically.",
+      "pass": false,
+      "query": "does it have editing tools",
+      "relatedFeature": "AI-FEAT-010(100)"
+    },
+    {
+      "domain": "Unsupported",
+      "gapType": "MISSING_OPERATOR_WORKFLOW",
+      "missingEvidence": [
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "Can I back up to the cloud?",
+      "relatedFeature": null
+    },
+    {
+      "domain": "Unsupported",
+      "gapType": "MISSING_OPERATOR_WORKFLOW",
+      "missingEvidence": [
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "does it support Google Drive backup",
+      "relatedFeature": "AI-FEAT-012(100)"
+    },
+    {
+      "domain": "Unsupported",
+      "gapType": "MISSING_OPERATOR_WORKFLOW",
+      "missingEvidence": [
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "Is there a Linux version?",
+      "relatedFeature": null
+    },
+    {
+      "domain": "Unsupported",
+      "gapType": "MISSING_OPERATOR_WORKFLOW",
+      "missingEvidence": [
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "does it run on Ubuntu",
+      "relatedFeature": null
+    },
+    {
+      "domain": "Updates",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "How do I get preview builds?",
+      "relatedFeature": "AI-FEAT-015(100)"
+    },
+    {
+      "domain": "Updates",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "switching to RC channel",
+      "relatedFeature": "AI-FEAT-057(100)"
+    },
+    {
+      "domain": "Updates",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "Does the app update on its own?",
+      "relatedFeature": "AI-FEAT-006(100)"
+    },
+    {
+      "domain": "Metadata",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "Can missing metadata be fixed?",
+      "relatedFeature": "AI-WF-004(300)"
+    },
+    {
+      "domain": "Settings",
+      "gapType": "MISSING_OPERATOR_WORKFLOW",
+      "missingEvidence": [
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "Can different people log in with their own roles?",
+      "relatedFeature": "AI-FEAT-027(100)"
+    },
+    {
+      "domain": "Settings",
+      "gapType": "MISSING_OPERATOR_WORKFLOW",
+      "missingEvidence": [
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "role-based accounts",
+      "relatedFeature": "AI-FEAT-025(100)"
+    },
+    {
+      "domain": "Online Registry",
+      "gapType": "MISSING_OPERATOR_WORKFLOW",
+      "missingEvidence": [
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "Does the Online Registry store my photographs?",
+      "relatedFeature": "AI-FEAT-048(200)"
+    },
+    {
+      "domain": "Online Registry",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "What happens if the relay server is unavailable during import?",
+      "relatedFeature": "AI-FEAT-018(100)"
+    },
+    {
+      "domain": "Online Registry",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "Can I see who else is currently working on the archive?",
+      "relatedFeature": "AI-FEAT-042(100)"
+    },
+    {
+      "domain": "Online Registry",
+      "gapType": "MISSING_OPERATOR_WORKFLOW",
+      "missingEvidence": [
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "Does AutoIngest warn me if someone else is editing the same event?",
+      "relatedFeature": "AI-FEAT-010(200)"
+    },
+    {
+      "domain": "Online Registry",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "Is there a way to see import progress from another operator's machine?",
+      "relatedFeature": "AI-FEAT-002(100)"
+    },
+    {
+      "domain": "Online Registry",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": "Genuinely ambiguous: archive-level locking (AI-FEAT-045) is a coarser, separate mechanism from \"does the system lock files while someone else is importing\" — no canonical record confirms or denies file-level locking specifically during a concurrent import. PARTIALLY_AVAILABLE (via AI-FEAT-045) is a defensible partial answer, not a confident false claim. Documented gap, not patched — forcing a boundary here would invent a denial the evidence does not support.",
+      "pass": false,
+      "query": "Does the system lock files while someone else is importing?",
+      "relatedFeature": "AI-FEAT-003(100)"
+    },
+    {
+      "domain": "Online Registry",
+      "gapType": "MISSING_OPERATOR_WORKFLOW",
+      "missingEvidence": [
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "If two people import into the same archive at the same time, will there be a conflict warning?",
+      "relatedFeature": "AI-FEAT-018(100)"
+    },
+    {
+      "domain": "Online Registry",
+      "gapType": "MISSING_OPERATOR_WORKFLOW",
+      "missingEvidence": [
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "Does QMZ sorting show up as activity to other operators?",
+      "relatedFeature": "AI-FEAT-047(850)"
+    },
+    {
+      "domain": "Online Registry",
+      "gapType": "NO_MATCH",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": "The \"no authentication by default\" fact (AI-WF-006) is architectural narrative, not phrased as a queryable capability status anywhere — zero match (UNKNOWN) is the safe, honest outcome; ground truth corrected from the original draft (which mis-framed this as a capability AVAILABLE/NOT_SUPPORTED question).",
+      "pass": true,
+      "query": "Is authentication required for the relay server?",
+      "relatedFeature": null
+    },
+    {
+      "domain": "Online Registry",
+      "gapType": "MISSING_OPERATOR_WORKFLOW",
+      "missingEvidence": [
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "Can someone see my photos over the network while I'm importing?",
+      "relatedFeature": null
+    },
+    {
+      "domain": "Online Registry",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "What happens if my internet goes down mid-import?",
+      "relatedFeature": "AI-FEAT-018(100)"
+    },
+    {
+      "domain": "Online Registry",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "Does sync block if the relay is offline?",
+      "relatedFeature": "AI-FEAT-037(100)"
+    },
+    {
+      "domain": "Online Registry",
+      "gapType": "UNEXPECTED_RESULT",
+      "missingEvidence": [
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": "Genuinely unconfirmed either way: no canonical record states whether archive-lock status is surfaced inside the Online Registry UI specifically. The engine confidently answers AVAILABLE (strong, via AI-FEAT-045) — this OVERCLAIMS a combined fact neither AI-FEAT-045 nor AI-WF-006 individually confirms. A real, disclosed retrieval-precision limitation (compound-claim verification is beyond pure keyword matching) — same class as the already-documented Q17 negation-context limitation. Candidate for a future boundary once/if the Registry's lock-status surfacing is confirmed one way or the other; not patched speculatively here.",
+      "pass": false,
+      "query": "If the archive is locked, does the Online Registry show that?",
+      "relatedFeature": "AI-FEAT-045(500)"
+    },
+    {
+      "domain": "Online Registry",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "Can I tell if a teammate is online right now?",
+      "relatedFeature": "AI-FEAT-048(100)"
+    },
+    {
+      "domain": "Online Registry",
+      "gapType": "MISSING_OPERATOR_WORKFLOW",
+      "missingEvidence": [
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "Does metadata audit activity show up to other operators?",
+      "relatedFeature": "AI-FEAT-033(200)"
+    },
+    {
+      "domain": "Online Registry",
+      "gapType": "MISSING_OPERATOR_WORKFLOW",
+      "missingEvidence": [
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "Is conflict detection active in AutoIngest today?",
+      "relatedFeature": "AI-FEAT-011(100)"
+    },
+    {
+      "domain": "Online Registry",
+      "gapType": "MISSING_OPERATOR_WORKFLOW",
+      "missingEvidence": [
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": "CORRECTED ground truth — the registry-conflict-detection boundary correctly fires here (no conflict-warning mechanism is confirmed active for anything, including simultaneous event editing). The original draft's UNKNOWN was too conservative; NOT_SUPPORTED with the dormant-conflict-detection citation is the accurate, evidenced answer.",
+      "pass": true,
+      "query": "Can two operators edit the same event simultaneously without a warning?",
+      "relatedFeature": "AI-FEAT-048(400)"
+    },
+    {
+      "domain": "Online Registry",
+      "gapType": "NO_MATCH",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": "Zero match — the question uses \"importing\" (gerund) rather than \"import\"; lib/query.js performs no stemming (a pre-existing, structural, shared-ranker characteristic — see DEC-019's \"reuse lib/query.js unchanged\" — not something this stage changes). Safe (no invented claim) but misses surfacing the already-evidenced fact that import/sync do not block on relay unavailability (see R03/R14, which use \"import\"/\"internet\" verbatim and do surface a weak, hedged, on-topic answer).",
+      "pass": true,
+      "query": "Does going offline stop me from importing?",
+      "relatedFeature": null
+    },
+    {
+      "domain": "Archive operations",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "My archive says it is locked, what do I do?",
+      "relatedFeature": "AI-FEAT-042(100)"
+    },
+    {
+      "domain": "Events",
+      "gapType": "UNEXPECTED_RESULT",
+      "missingEvidence": [
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": "No feature or workflow record documents an event-details editing screen; weak generic tie via AI-FEAT-010. Honest documentation gap (same class as Q05/P05a), not a retrieval defect — Settings/event-editing UI workflows remain a disclosed, not-yet-authored area (see docs/product/workflows/README.md \"Not yet covered\").",
+      "pass": false,
+      "query": "Where do I go to edit event details?",
+      "relatedFeature": "AI-FEAT-010(300)"
+    },
+    {
+      "domain": "Events",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": "Same event-editing documentation gap as W09.",
+      "pass": false,
+      "query": "Can I rename an event after creating it?",
+      "relatedFeature": "AI-FEAT-004(100)"
+    },
+    {
+      "domain": "Settings",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": "No Settings-screen workflow exists yet (disclosed gap in workflows/README.md); weak generic tie via AI-WF-002/003/006 sharing only common words.",
+      "pass": false,
+      "query": "How do I find the settings screen?",
+      "relatedFeature": "AI-WF-002(100)"
+    },
+    {
+      "domain": "Settings",
+      "gapType": "NO_MATCH",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "Where are AutoIngest preferences located?",
+      "relatedFeature": null
+    },
+    {
+      "domain": "Metadata",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "How do I check the status of a metadata repair?",
+      "relatedFeature": "AI-WF-004(300)"
+    },
+    {
+      "domain": "Import",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "What are the steps to import from a memory card?",
+      "relatedFeature": "AI-FEAT-018(100)"
+    },
+    {
+      "domain": "Import",
+      "gapType": "UNEXPECTED_RESULT",
+      "missingEvidence": [
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": "AI-WF-007 (QMZ)'s \"verify sequence\" language happens to keyword-overlap with \"verify an import completed\" — an on-topic-adjacent but not exactly right Workflow citation. Not a false claim (import verification broadly is a real, sensible operator concern), but imprecise. A candidate for a dedicated verification-step Workflow in a future stage, not patched here.",
+      "pass": false,
+      "query": "How do I verify an import completed successfully?",
+      "relatedFeature": "AI-WF-007(200)"
+    },
+    {
+      "domain": "Import",
+      "gapType": "NO_MATCH",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": "Misspelled (\"hw do i imprt photos\") produces zero match — safe (UNKNOWN) but unhelpful; lib/query.js performs no fuzzy/typo correction (a pre-existing, structural, shared-ranker characteristic, not addressed in this stage).",
+      "pass": false,
+      "query": "hw do i imprt photos",
+      "relatedFeature": null
+    },
+    {
+      "domain": "Import",
+      "gapType": "NO_MATCH",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": "Same misspelling-tolerance gap as T01 (\"improt video?\").",
+      "pass": false,
+      "query": "improt video?",
+      "relatedFeature": null
+    },
+    {
+      "domain": "Backup",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "backup auto?",
+      "relatedFeature": "AI-FEAT-006(100)"
+    },
+    {
+      "domain": "Unsupported",
+      "gapType": "MISSING_OPERATOR_WORKFLOW",
+      "missingEvidence": [
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "linux support?",
+      "relatedFeature": null
+    },
+    {
+      "domain": "Unsupported",
+      "gapType": "MISSING_OPERATOR_WORKFLOW",
+      "missingEvidence": [
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "face recognision",
+      "relatedFeature": null
+    },
+    {
+      "domain": "Settings",
+      "gapType": "MISSING_OPERATOR_WORKFLOW",
+      "missingEvidence": [
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "multi user roles?",
+      "relatedFeature": "AI-FEAT-057(100)"
+    },
+    {
+      "domain": "Online Registry",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "whos online",
+      "relatedFeature": "AI-FEAT-048(100)"
+    },
+    {
+      "domain": "Adversarial",
+      "gapType": "NO_MATCH",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "Does AutoIngest use AI to organize my photos?",
+      "relatedFeature": null
+    },
+    {
+      "domain": "Adversarial",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": "No evidence either way on encryption-at-rest; weak match via AI-FEAT-004 (event.json contract) sharing only the generic word \"data\". Honest weak/hedged gap, not a confident false claim.",
+      "pass": false,
+      "query": "Is my data encrypted at rest?",
+      "relatedFeature": "AI-FEAT-004(100)"
+    },
+    {
+      "domain": "Adversarial",
+      "gapType": "NO_MATCH",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "Does AutoIngest have a mobile app?",
+      "relatedFeature": null
+    },
+    {
+      "domain": "Adversarial",
+      "gapType": "UNEXPECTED_RESULT",
+      "missingEvidence": [
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": "No evidence either way on running without an archive root configured; matches the already-disclosed generic \"archive\" bare-token retrieval-precision gap (see AI-FEAT-058 Stage 2 Future Enhancements) rather than being a new, distinct defect.",
+      "pass": false,
+      "query": "Can I use AutoIngest without an archive root configured?",
+      "relatedFeature": "AI-FEAT-042(200)"
+    },
+    {
+      "domain": "Adversarial",
+      "gapType": "MISSING_OPERATOR_WORKFLOW",
+      "missingEvidence": [
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "Does the Online Registry replace the archive as the source of truth?",
+      "relatedFeature": "AI-FEAT-048(200)"
+    },
+    {
+      "domain": "Adversarial",
+      "gapType": "MISSING_OPERATOR_WORKFLOW",
+      "missingEvidence": [
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "If presence shows someone online, are they editing my files right now?",
+      "relatedFeature": "AI-FEAT-048(200)"
+    },
+    {
+      "domain": "Adversarial",
+      "gapType": "MISSING_OPERATOR_WORKFLOW",
+      "missingEvidence": [
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "Does activity visibility mean my photos are being uploaded somewhere?",
+      "relatedFeature": "AI-FEAT-027(100)"
+    },
+    {
+      "domain": "Adversarial",
+      "gapType": "MISSING_OPERATOR_WORKFLOW",
+      "missingEvidence": [
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "Is conflict:warning something I will see in the app today?",
+      "relatedFeature": null
+    },
+    {
+      "domain": "Adversarial",
+      "gapType": "NO_MATCH",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": null,
+      "pass": true,
+      "query": "Can AutoIngest merge two archives together?",
+      "relatedFeature": null
+    },
+    {
+      "domain": "Adversarial",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": "No evidence either way on RAW format support; weak match via AI-FEAT-013/025 sharing only generic tokens. Honest weak/hedged gap.",
+      "pass": false,
+      "query": "Does AutoIngest support RAW file formats?",
+      "relatedFeature": "AI-FEAT-013(100)"
+    }
+  ],
+  "generated_at": "2026-08-13T17:24:39.621Z",
+  "known_miss_count": 16,
+  "pass_count": 83,
+  "schema_version": "1.0.0",
+  "unexplained_failure_count": 0
+}

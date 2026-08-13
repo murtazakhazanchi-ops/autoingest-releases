@@ -58,15 +58,17 @@ const CONCEPT_CLUSTERS = [
     ],
     hints: ['team live online registry offline reconnect degraded'],
   },
-  {
-    id: 'team-authority',
-    domain: 'Online Registry & Teamwork',
-    triggers: [
-      'does the registry store', 'registry replace the archive', 'registry the source of truth',
-      'synchronize the actual photographs', 'synchronize photos between',
-    ],
-    hints: ['team live online registry presence device online'],
-  },
+  // 'team-authority' was REMOVED here during Phase 20 (Stage 2 eval corpus
+  // expansion) testing — a real, found-and-fixed defect, not a refactor.
+  // It existed to recognize Registry-authority questions ("does the
+  // registry store [my photos]", "registry replace the archive", "registry
+  // the source of truth") but its hints boosted confidence toward AVAILABLE
+  // exactly backwards: every one of those questions has an already-evidenced
+  // NEGATIVE answer (see statusResolution.js's registry-media-storage and
+  // registry-not-source-of-truth boundaries, added in the same fix). The
+  // same trigger phrases now live in BOUNDARY_CONCEPT_CLUSTERS below,
+  // correctly routing to a NOT_SUPPORTED boundary citation instead of
+  // inflating an AVAILABLE match.
   {
     id: 'import-general',
     domain: 'Import',
@@ -176,12 +178,64 @@ const BOUNDARY_CONCEPT_CLUSTERS = [
   {
     id: 'cloud-storage',
     boundaryId: 'cloud-storage',
-    triggers: ['google drive', 'dropbox', 'cloud storage', 'cloud backup', 'onedrive', 'icloud', 'upload my archive'],
+    triggers: ['google drive', 'dropbox', 'cloud storage', 'cloud backup', 'onedrive', 'icloud', 'upload my archive', 'back up to the cloud', 'backup to the cloud'],
   },
   {
     id: 'team-multi-role',
     boundaryId: 'multi-user-roles',
-    triggers: ['multiple people log in', 'different roles', 'separate accounts', 'user roles', 'role-based'],
+    triggers: ['multiple people log in', 'different roles', 'separate accounts', 'user roles', 'role-based', 'people log in with their own roles', 'different people log in'],
+  },
+  // Stage 2, Phase 20 — four Registry authority/scope boundary-widening
+  // clusters, added alongside their statusResolution.js KNOWN_BOUNDARIES
+  // entries after the expanded eval corpus found several natural Registry
+  // questions confidently (sometimes "strong") mis-answered AVAILABLE.
+  // Every trigger phrase here widens recall for an ALREADY-evidenced
+  // exclusion — never invents a new one (same discipline as cloud-storage
+  // and team-multi-role above).
+  {
+    id: 'registry-media-storage',
+    boundaryId: 'registry-media-storage',
+    triggers: [
+      'does the registry store', 'registry store my photo', 'registry hold my photo',
+      'see my photos over the network', 'relay store my photo', 'relay transmit my photo',
+      'photos pass through the relay', 'photos go through the relay', 'upload to the registry',
+      'uploaded somewhere', 'being uploaded', 'photos uploaded to the relay',
+    ],
+  },
+  {
+    id: 'registry-source-of-truth',
+    boundaryId: 'registry-not-source-of-truth',
+    triggers: [
+      'registry replace the archive', 'replace the archive as', 'registry the source of truth',
+      'registry become the source of truth', 'source of truth instead of the archive',
+    ],
+  },
+  {
+    id: 'registry-conflict',
+    boundaryId: 'registry-conflict-detection',
+    triggers: [
+      'will there be a conflict', 'conflict warning', 'conflict detection', 'conflict:warning',
+      'warn me if someone else', 'warn if two people', 'warns about editing the same',
+      'flag a conflict', 'detect a conflict', 'without a warning', 'warn us about conflict',
+      'warn about conflict', 'registry warn', 'warn us if', 'warn if we',
+    ],
+  },
+  {
+    id: 'registry-activity-scope',
+    boundaryId: 'registry-activity-scope',
+    triggers: [
+      'show up as activity', 'visible to other operators', 'see qmz activity',
+      'see metadata activity', 'audit activity show up', 'qmz sorting show up',
+    ],
+  },
+  {
+    id: 'registry-presence-not-activity',
+    boundaryId: 'registry-presence-not-activity',
+    triggers: [
+      'are they editing my files', 'does presence mean', 'presence mean they',
+      'presence mean someone', 'stop me from also working', 'stop you from also working',
+      'block me from working on the same', 'prevent me from working on the same',
+    ],
   },
 ];
 
