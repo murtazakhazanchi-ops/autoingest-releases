@@ -82,6 +82,18 @@ function buildKnowledgeIndex(parsed, { featureIndex, dashboard }) {
         evidenceGapCount: (f.documentation_completeness && f.documentation_completeness.evidence_gap_count) || 0,
         futureEnhancements,
       },
+      // Kept distinct from sourceFiles below: `sourceFiles` is an
+      // alphabetically-sorted merge of the canonical document, related code
+      // paths, and related technical docs (for completeness/browsability),
+      // which means sourceFiles[0] is NOT reliably the canonical document —
+      // found during the PR #5 forensic review, where 39/58 records cited
+      // something other than their own feature file as the "primary"
+      // source, including 5 records citing a bare, pathless fragment (e.g.
+      // "#12", a pre-existing parsing artifact of a multi-footnote
+      // citation in lib/subsystems.js's parseRelatedTechnicalDocs — see
+      // that review's Phase 3 finding). knowledgeEngine.js's
+      // sourcesForRecord() must cite this field, never sourceFiles[0].
+      canonicalDocument: f.canonical_document,
       sourceFiles,
       sourceAuthority: 'canonical', // docs/product/features/ tier — see scripts/product-docs/README.md Authority model
       lastUpdated: {

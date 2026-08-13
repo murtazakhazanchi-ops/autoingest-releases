@@ -33,7 +33,12 @@ function classifyIntent(question) {
 }
 
 function sourcesForRecord(knowledgeRecord) {
-  const sources = [{ id: knowledgeRecord.id, title: knowledgeRecord.title, path: knowledgeRecord.sourceFiles[0] || null }];
+  // Cite the canonical document explicitly — NOT sourceFiles[0], which is
+  // an alphabetically-sorted merge of canonical doc + code paths + technical
+  // docs and is not reliably the canonical document itself (found during
+  // the PR #5 forensic review; see lib/knowledgeIndex.js's comment on the
+  // canonicalDocument field for the full account).
+  const sources = [{ id: knowledgeRecord.id, title: knowledgeRecord.title, path: knowledgeRecord.canonicalDocument || null }];
   for (const rel of knowledgeRecord.roadmapRelationship) {
     sources.push({ id: rel.roadmapId, title: `Roadmap milestone ${rel.roadmapId} (${rel.status})`, path: 'docs/product/02_MASTER_ROADMAP.md' });
   }

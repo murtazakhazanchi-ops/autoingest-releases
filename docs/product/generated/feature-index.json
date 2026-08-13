@@ -3326,7 +3326,7 @@
         "evidence_gap_count": 2,
         "narrative": "Complete — no unresolved \"Evidence pending\" markers in this file"
       },
-      "evidence_status": "Verified from current code (`scripts/product-docs/lib/knowledgeIndex.js`, `knowledgeEngine.js`, `statusResolution.js`, `knowledgeCli.js`, `knowledge-portal/server.js`+`index.html`) and `scripts/product-docs/test/knowledge.test.js` (17/17 passing, including the full existing 33-file suite unaffected), plus a live local-server smoke test (`knowledge serve`, `curl` against `/`, `/api/capabilities`, `/api/roadmap`, `/api/ask`) on 2026-08-13",
+      "evidence_status": "Verified from current code (`scripts/product-docs/lib/knowledgeIndex.js`, `knowledgeEngine.js`, `statusResolution.js`, `knowledgeCli.js`, `knowledge-portal/server.js`+`index.html`) and `scripts/product-docs/test/knowledge.test.js` (18/18 passing, including the full existing 33-file suite unaffected), plus a live local-server smoke test (`knowledge serve`, `curl` against `/`, `/api/capabilities`, `/api/roadmap`, `/api/ask`) on 2026-08-13, and an independent forensic PR review (2026-08-13) that found and fixed one further defect (see Evolution Journal)",
       "feature_id": "AI-FEAT-058",
       "introduced_version": "2026-08-13",
       "last_modified_version": "2026-08-13",

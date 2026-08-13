@@ -71,6 +71,22 @@ async function main() {
       assert.ok(realFeatureIds.has(rec.id), `${rec.id} has no matching parsed.features entry`);
       const feat = parsed.features.get(rec.id);
       assert.ok(rec.sourceFiles.includes(feat.filePath), `${rec.id}'s sourceFiles is missing its own canonical document ${feat.filePath}`);
+      assert.equal(rec.canonicalDocument, feat.filePath, `${rec.id}'s canonicalDocument field does not match its own feature file path`);
+    }
+  });
+
+  await t('2b. the primary cited source for every answer is always the matched record\'s own canonical document, never an arbitrary related file (PR #5 forensic-review regression guard)', () => {
+    // Found during PR #5's review: sourceFiles[0] (an alphabetically-sorted
+    // merge of canonical doc + code paths + technical docs) was being used
+    // as "the" primary citation — wrong for 39/58 records, and outright
+    // pathless/garbled ("#12") for 5 of them. Assert the fix holds for
+    // EVERY record, not just a sample: querying by each record's own exact
+    // title (a strong, unambiguous match) must cite exactly its own
+    // canonical document as sources[0].path.
+    for (const rec of built.knowledgeIndex) {
+      const answer = answerQuestion(rec.title, ctx);
+      assert.equal(answer.sources[0] && answer.sources[0].path, rec.canonicalDocument,
+        `${rec.id}: querying by its own exact title did not cite its own canonical document as the primary source (got "${answer.sources[0] && answer.sources[0].path}")`);
     }
   });
 
