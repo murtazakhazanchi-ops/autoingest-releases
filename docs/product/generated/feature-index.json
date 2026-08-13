@@ -3207,12 +3207,12 @@
       "dependents": [],
       "documentation_completeness": {
         "evidence_gap_count": 0,
-        "narrative": "Complete for the implemented scope; the live pilot (an actual `rc-build` workflow run) is explicitly deferred — see Future Enhancements"
+        "narrative": "Complete for the CI/publication-side scope, verified against real GitHub state. The real-installed-client verification (a Windows machine actually running the updater against the published RC) is still pending — see Future Enhancements"
       },
       "evidence_status": "Verified from current code and `node_modules/electron-updater`/`node_modules/app-builder-lib`/`node_modules/electron-publish` source at the pinned installed versions (`electron-updater@6.8.3`, `electron-builder@26.8.1`) — not from memory or external documentation",
       "feature_id": "AI-FEAT-057",
       "introduced_version": "2026-08-12",
-      "last_modified_version": "2026-08-12 — initial implementation",
+      "last_modified_version": "2026-08-13 — live CI pilot (v0.9.12-rc.1/rc.2), Windows-shell bug found and fixed (BUG-015), Stable-isolation and promotion-gate verified against real GitHub state; real-client (installed Windows app) verification still pending",
       "maturity": "Evolving",
       "name": "Multi-Channel Release & Update System",
       "parent_feature": [
@@ -3221,8 +3221,22 @@
       "related_architecture_sections": [
         "[§ Multi-Channel Release Architecture](../11_ARCHITECTURAL_EVOLUTION.md#multi-channel-release-architecture)"
       ],
-      "related_bugs": [],
+      "related_bugs": [
+        "BUG-015"
+      ],
       "related_changelog_entries": [
+        {
+          "date": "2026-08-13",
+          "excerpt": "## 2026-08-13 — Part 9 live CI pilot: RC published, Windows-shell bug found and fixed (AI-FEAT-057 / BUG-015)"
+        },
+        {
+          "date": "2026-08-13",
+          "excerpt": "**`v0.9.12-rc.1` disposition**: left published as-is (mac-only, partial) — not deleted or altered, per the rollback runbook now formalized in AI-FEAT-057's own \"Rollback / Recovery Runbook\" section. S"
+        },
+        {
+          "date": "2026-08-13",
+          "excerpt": "**Review**: `security-reviewer`, `autoingest-architect`, `code-reviewer` run against the real pilot diff — no CRITICAL/HIGH findings. One accepted structural note (no atomic dual-platform publish gate"
+        },
         {
           "date": "2026-08-12",
           "excerpt": "## 2026-08-12 — Part 9: Multi-Channel Release & Update System (AI-FEAT-057 / AI-RM-010)"

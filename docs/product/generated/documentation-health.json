@@ -590,13 +590,6 @@
       "rule": "decision-draft-missing-evidence"
     },
     {
-      "file": "decisions/DEC-018_PART_9_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM_DESIGN_AND_IMPLEMENTATION.md",
-      "level": "warning",
-      "message": "DEC-018 is Status: Draft but its Evidence status does not cite the originating session or detected signals",
-      "note": null,
-      "rule": "decision-draft-missing-evidence"
-    },
-    {
       "file": "DEC-006",
       "level": "information",
       "message": "2 Accepted decisions (DEC-006, DEC-007) all govern the exact same feature/milestone set (AI-FEAT-029) — worth a human check that they don't contradict each other",
@@ -605,11 +598,11 @@
     }
   ],
   "schema_version": "1.2.0",
-  "source_commit": "dfb918052ea29dcfe2395a11ea9101294bf7d201",
+  "source_commit": "66469f54c29d78e2d1e86331ee76c4fb992a92ed",
   "summary": {
     "error": 0,
     "evidence_gap": 56,
     "information": 14,
-    "warning": 16
+    "warning": 15
   }
 }

@@ -28,8 +28,8 @@ async function main() {
     assert.equal(parsed.roadmap.size, 10);
   });
 
-  await t('bug/decision/postmortem counts match the current repository (BUG-001..014, DEC-001..018, PM-001..002)', () => {
-    assert.equal(parsed.bugs.size, 14);
+  await t('bug/decision/postmortem counts match the current repository (BUG-001..015, DEC-001..018, PM-001..002)', () => {
+    assert.equal(parsed.bugs.size, 15);
     assert.equal(parsed.decisions.size, 18);
     assert.equal(parsed.postmortems.size, 2);
   });

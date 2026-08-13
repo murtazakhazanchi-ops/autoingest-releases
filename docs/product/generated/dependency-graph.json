@@ -3244,6 +3244,22 @@
     {
       "evidence_status": "explicit",
       "note": null,
+      "provenance_path": "features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md#lifecycle-metadata:Related-bugs",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-057",
+      "target": "BUG-015"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-015_WINDOWS_RUNNER_DEFAULT_POWERSHELL_SHELL_MANGLES_ELECTRON_BUILDER_DOT_NOTATION_CLI_OVERRIDES.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-057",
+      "target": "BUG-015"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
       "provenance_path": "features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md#lifecycle-metadata:Related-decisions",
       "relationship": "governed_by",
       "source": "AI-FEAT-057",
@@ -4813,6 +4829,12 @@
       "doc_path": "bugs/BUG-014_EVENT_MANAGEMENT_MODAL_FOOTER_MODE_NOT_DERIVED_FROM_SCREEN_STATE_PRIMARY_ACTION_.md",
       "id": "BUG-014",
       "label": "Event Management modal footer mode not derived from screen state — primary action can render with no visible button",
+      "type": "bug"
+    },
+    {
+      "doc_path": "bugs/BUG-015_WINDOWS_RUNNER_DEFAULT_POWERSHELL_SHELL_MANGLES_ELECTRON_BUILDER_DOT_NOTATION_CLI_OVERRIDES.md",
+      "id": "BUG-015",
+      "label": "Windows Runner Default PowerShell Shell Mangles electron-builder Dot-Notation CLI Overrides",
       "type": "bug"
     },
     {

@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Related feature(s) / roadmap milestone | AI-FEAT-057, AI-FEAT-006, AI-FEAT-005, AI-FEAT-008, AI-RM-010 |
-| Status | Draft — auto-drafted from an imported Engineering Conversation Packet, pending review |
+| Status | Accepted (2026-08-13, following live-pilot verification — see Review Note) |
 | Date | 2026-08-12 |
 | Evidence status | Auto-drafted by Part 8 conversation decision linkage from ENG-CONV-0004; source packet's own recorded evidence cleared the two-alternatives-plus-accepted-solution bar |
 
@@ -32,3 +32,5 @@ Option 1 and the corresponding first bullet of the Decision section above restat
 ## Review Note
 
 Auto-drafted from an imported conversation (ENG-CONV-0004) — a human or a future agent session should confirm this Status should move to Accepted (or Rejected/Deferred) before this record is relied on as settled. This draft was never triggered by a git hook — see docs/product/18_ENGINEERING_CONVERSATION_POLICY.md § 10.
+
+**2026-08-13 — moved to Accepted.** The Decision section's isolation-mechanism claim was verified against real GitHub state, not only against library source: a real `workflow_dispatch` RC pilot (`v0.9.12-rc.1`/`v0.9.12-rc.2`) confirmed Stable's `/releases/latest` and `latest.yml`/`latest-mac.yml` were never affected by RC publication, including during a real partial-publish failure ([BUG-015](../bugs/BUG-015_WINDOWS_RUNNER_DEFAULT_POWERSHELL_SHELL_MANGLES_ELECTRON_BUILDER_DOT_NOTATION_CLI_OVERRIDES.md)). The Stable-CI-wiring decision (`stable-release-gate` with `needs:` on `create-release`) and the hard-blocking gate policy were both exercised via a local promotion-gate dry run (zero-drift pass, unrelated-drift block, both correct). The Decision section's closing sentence ("the live CI pilot... is explicitly deferred") is now historical — the CI/publication-side pilot has been performed; see [AI-FEAT-057](../features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md)'s Evolution / Implementation Journal for the full result. What remains outstanding is real-installed-client verification (an actual Windows machine's updater), not covered by this decision's own scope.

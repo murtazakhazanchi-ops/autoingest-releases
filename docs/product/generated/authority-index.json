@@ -1261,7 +1261,9 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-057",
-      "relatedBugs": [],
+      "relatedBugs": [
+        "BUG-015"
+      ],
       "relatedDecisions": [
         "DEC-017",
         "DEC-018"

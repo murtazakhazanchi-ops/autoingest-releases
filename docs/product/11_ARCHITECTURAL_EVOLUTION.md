@@ -116,6 +116,8 @@ AI-FEAT-057 replaced this with three structurally isolated channels — Developm
 
 This is deliberately not folded into §3A–§3I's lettering or the AI-RM-001…009 archive-capability sequence — it is release/CI infrastructure the whole application depends on, not an archive-management capability, and AI-RM-010 has no dependency relationship to that sequence.
 
+**Live-pilot confirmation (2026-08-13).** The isolation claim above was verified against real GitHub state, not only against installed-library source: a real `v0.9.12-rc.1`/`v0.9.12-rc.2` RC publication (triggered via `workflow_dispatch`) confirmed `/releases/latest` never stopped resolving to Stable's `v0.9.11` and Stable's `latest.yml`/`latest-mac.yml` remained byte-identical throughout — including during a real partial-publish failure on the Windows platform ([BUG-015](bugs/BUG-015_WINDOWS_RUNNER_DEFAULT_POWERSHELL_SHELL_MANGLES_ELECTRON_BUILDER_DOT_NOTATION_CLI_OVERRIDES.md), a Windows-runner default-shell/CLI-argument-parsing bug unrelated to the isolation mechanism itself, found and fixed the same day). This is the first real evidence that the isolation design holds under an actual failure condition, not only in the designed happy path. Real-installed-client verification (an actual Windows machine's updater, not just the GitHub-side publication) remains outstanding — see [AI-FEAT-057](features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md)'s Future Enhancements.
+
 ## 4. Architectural Lessons
 
 Durable lessons this history has produced, worth preserving independent of any single feature's own documentation:

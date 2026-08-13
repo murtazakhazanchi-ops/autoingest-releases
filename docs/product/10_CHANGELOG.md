@@ -6,6 +6,20 @@ Append newest first. Never edit or delete a prior entry — if something was wro
 
 ---
 
+## 2026-08-13 — Part 9 live CI pilot: RC published, Windows-shell bug found and fixed (AI-FEAT-057 / BUG-015)
+
+- **Task type**: live infrastructure pilot (no application code changed beyond a one-line CI fix), documentation reconciliation from real evidence.
+- **What happened**: triggered the real `rc-build` `workflow_dispatch` path for the first time. `v0.9.12-rc.1` (source commit `a507c47`) partially published — macOS assets succeeded, Windows publish failed with `ENOENT` on a literal file named `.publish.releaseType=prerelease`. Root cause: `windows-2022` runners default to `pwsh`, which mangles the single-token `-c.publish.channel=rc` electron-builder CLI override into two tokens. New record: [BUG-015](bugs/BUG-015_WINDOWS_RUNNER_DEFAULT_POWERSHELL_SHELL_MANGLES_ELECTRON_BUILDER_DOT_NOTATION_CLI_OVERRIDES.md).
+- **Fix**: added `shell: bash` to the affected step (commit `66469f5`) — the same shell every other step in that job already used. Also added `shell: bash` to the equivalent macOS step for consistency (behaviorally a no-op there, since macOS runners already default to bash) per two independent review agents' recommendation.
+- **Re-verified live**: `v0.9.12-rc.2` (source commit `66469f5`) published cleanly on both platforms — 12 assets, `rc.yml` + `rc-mac.yml`, `prerelease:true`. Confirmed via GitHub API throughout: `/releases/latest` never stopped resolving to `v0.9.11`; Stable's `latest.yml`/`latest-mac.yml` byte-identical before and after both RC runs (including the failed one) — isolation held under a real partial-failure condition, not just in the happy path.
+- **`v0.9.12-rc.1` disposition**: left published as-is (mac-only, partial) — not deleted or altered, per the rollback runbook now formalized in AI-FEAT-057's own "Rollback / Recovery Runbook" section. Serves as real evidence of the "partially uploaded RC" recovery scenario.
+- **Promotion gate dry run**: `release gate --channel stable` run locally (no `v0.9.12` tag created) against the verified RC commit — zero-drift case correctly `PASS`ed, unrelated-drift case correctly `BLOCK`ed (51 files listed). No Stable version was published.
+- **Review**: `security-reviewer`, `autoingest-architect`, `code-reviewer` run against the real pilot diff — no CRITICAL/HIGH findings. One accepted structural note (no atomic dual-platform publish gate — recorded in AI-FEAT-057, not a DEC-record, since no real alternative was weighed).
+- **Outstanding**: real-installed-client verification (Windows machine actually running the updater against Stable vs. Preview channel) not performed this session — tester instructions produced, results pending. Part 9 status: READY FOR ACTIVATION — WAITING FOR REAL CLIENT VERIFICATION, not yet ACTIVATED AND VERIFIED.
+- **Evidence confidence**: real GitHub API state (releases, assets, channel `.yml` content), real GitHub Actions run logs, direct comparison of Stable metadata before/after — not simulated.
+
+---
+
 
 ## 2026-08-12 — Part 9: Multi-Channel Release & Update System (AI-FEAT-057 / AI-RM-010)
 

@@ -393,6 +393,7 @@ jobs:
         run: node scripts/product-docs/cli.js release gate --tag "$RC_TAG" --channel rc
 
       - name: Build and publish Mac RC
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: npm run dist:mac -- -p always -c.publish.channel=rc -c.publish.releaseType=prerelease
