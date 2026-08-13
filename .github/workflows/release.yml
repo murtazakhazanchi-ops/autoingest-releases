@@ -351,6 +351,7 @@ jobs:
         run: node scripts/product-docs/cli.js release gate --tag "$RC_TAG" --channel rc
 
       - name: Build and publish Windows RC
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: npm run dist:win -- -p always -c.publish.channel=rc -c.publish.releaseType=prerelease
