@@ -3,7 +3,7 @@
   "gaps": [
     {
       "domain": "Import",
-      "gapType": "NO_MATCH",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
       "missingEvidence": [
         "unambiguous topical match",
         "step-by-step instructions",
@@ -12,7 +12,7 @@
       "note": "Terse paraphrase produces zero match (UNKNOWN) rather than a weak hedge — safe (declines rather than invents) but less helpful than the canonical phrasing (P01a), which strongly matches AI-WF-001. A retrieval-recall gap, not a grounding defect.",
       "pass": false,
       "query": "What's the process for importing pictures from a card?",
-      "relatedFeature": null
+      "relatedFeature": "AI-WF-001(100)"
     },
     {
       "domain": "Import",
@@ -63,19 +63,6 @@
       ],
       "note": null,
       "pass": true,
-      "query": "What's the way to start a new event?",
-      "relatedFeature": "AI-FEAT-004(100)"
-    },
-    {
-      "domain": "Events",
-      "gapType": "AMBIGUOUS_RETRIEVAL",
-      "missingEvidence": [
-        "unambiguous topical match",
-        "step-by-step instructions",
-        "UI navigation"
-      ],
-      "note": null,
-      "pass": true,
       "query": "how do i make an event",
       "relatedFeature": "AI-WF-001(100)"
     },
@@ -113,20 +100,7 @@
         "step-by-step instructions",
         "UI navigation"
       ],
-      "note": null,
-      "pass": true,
-      "query": "What does 'Collection' mean in AutoIngest?",
-      "relatedFeature": null
-    },
-    {
-      "domain": "Collections",
-      "gapType": "NO_MATCH",
-      "missingEvidence": [
-        "unambiguous topical match",
-        "step-by-step instructions",
-        "UI navigation"
-      ],
-      "note": null,
+      "note": "Diverges from the now-fixed canonical Q06 (\"What is a Collection...\") for a different, structural reason: this uses the plural \"Collections\" while AI-WF-002 is indexed under the singular \"collection\" — lib/query.js performs no stemming (same pre-existing, structural limitation as R24's \"importing\" vs \"import\"). Safe (UNKNOWN, no invented claim) but misses the real answer that P01a-style singular phrasing now correctly surfaces.",
       "pass": true,
       "query": "Explain Collections",
       "relatedFeature": null
@@ -697,19 +671,6 @@
     },
     {
       "domain": "Import",
-      "gapType": "AMBIGUOUS_RETRIEVAL",
-      "missingEvidence": [
-        "unambiguous topical match",
-        "step-by-step instructions",
-        "UI navigation"
-      ],
-      "note": null,
-      "pass": true,
-      "query": "What are the steps to import from a memory card?",
-      "relatedFeature": "AI-FEAT-018(100)"
-    },
-    {
-      "domain": "Import",
       "gapType": "UNEXPECTED_RESULT",
       "missingEvidence": [
         "step-by-step instructions",
@@ -934,7 +895,7 @@
       "relatedFeature": "AI-FEAT-013(100)"
     }
   ],
-  "generated_at": "2026-08-13T17:29:37.440Z",
+  "generated_at": "2026-08-13T17:40:29.748Z",
   "known_miss_count": 16,
   "pass_count": 83,
   "schema_version": "1.0.0",

@@ -25,7 +25,7 @@ const CONCEPT_CLUSTERS = [
       'several users', 'multiple people', 'multiple users', 'multiple operators',
       'two laptops', 'two computers', 'two devices', 'work together',
       'collaborative', 'work at the same time', 'simultaneously', 'same archive at once',
-      'coordinate', 'coordination', 'work as a team', 'team work',
+      'coordinate with', 'coordination between', 'work as a team', 'team work',
     ],
     hints: ['team live online registry teamwork presence', 'who else is online'],
   },
@@ -183,7 +183,7 @@ const BOUNDARY_CONCEPT_CLUSTERS = [
   {
     id: 'team-multi-role',
     boundaryId: 'multi-user-roles',
-    triggers: ['multiple people log in', 'different roles', 'separate accounts', 'user roles', 'role-based', 'people log in with their own roles', 'different people log in'],
+    triggers: ['multiple people log in', 'different roles', 'separate accounts', 'user roles', 'role-based', 'people log in with their own roles', 'different people log in', 'multiple user accounts', 'multiple accounts'],
   },
   // Stage 2, Phase 20 — four Registry authority/scope boundary-widening
   // clusters, added alongside their statusResolution.js KNOWN_BOUNDARIES
@@ -208,6 +208,7 @@ const BOUNDARY_CONCEPT_CLUSTERS = [
     triggers: [
       'registry replace the archive', 'replace the archive as', 'registry the source of truth',
       'registry become the source of truth', 'source of truth instead of the archive',
+      'registry replaces event.json', 'registry replace event.json',
     ],
   },
   {

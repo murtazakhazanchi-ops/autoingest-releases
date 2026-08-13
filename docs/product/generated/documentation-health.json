@@ -606,21 +606,28 @@
     {
       "file": "scripts/product-docs/lib/statusResolution.js",
       "level": "information",
-      "message": "scripts/product-docs/lib/statusResolution.js is explicitly owned by 2 features (shared, not exclusive)",
-      "note": "AI-FEAT-058, AI-FEAT-058",
+      "message": "scripts/product-docs/lib/statusResolution.js is explicitly owned by 3 features (shared, not exclusive)",
+      "note": "AI-FEAT-058, AI-FEAT-058, AI-FEAT-058",
       "rule": "shared-code-path"
     },
     {
       "file": "scripts/product-docs/lib/knowledgeEngine.js",
       "level": "information",
-      "message": "scripts/product-docs/lib/knowledgeEngine.js is explicitly owned by 2 features (shared, not exclusive)",
-      "note": "AI-FEAT-058, AI-FEAT-058",
+      "message": "scripts/product-docs/lib/knowledgeEngine.js is explicitly owned by 3 features (shared, not exclusive)",
+      "note": "AI-FEAT-058, AI-FEAT-058, AI-FEAT-058",
       "rule": "shared-code-path"
     },
     {
       "file": "scripts/product-docs/lib/knowledgeCli.js",
       "level": "information",
       "message": "scripts/product-docs/lib/knowledgeCli.js is explicitly owned by 2 features (shared, not exclusive)",
+      "note": "AI-FEAT-058, AI-FEAT-058",
+      "rule": "shared-code-path"
+    },
+    {
+      "file": "scripts/product-docs/lib/knowledgeTestCorpus.js",
+      "level": "information",
+      "message": "scripts/product-docs/lib/knowledgeTestCorpus.js is explicitly owned by 2 features (shared, not exclusive)",
       "note": "AI-FEAT-058, AI-FEAT-058",
       "rule": "shared-code-path"
     },
@@ -648,14 +655,21 @@
     {
       "file": "scripts/product-docs/lib/intentConcepts.js",
       "level": "information",
-      "message": "scripts/product-docs/lib/intentConcepts.js is explicitly owned by 2 features (shared, not exclusive)",
-      "note": "AI-FEAT-058, AI-FEAT-058",
+      "message": "scripts/product-docs/lib/intentConcepts.js is explicitly owned by 3 features (shared, not exclusive)",
+      "note": "AI-FEAT-058, AI-FEAT-058, AI-FEAT-058",
       "rule": "shared-code-path"
     },
     {
       "file": "scripts/product-docs/lib/questionClassifier.js",
       "level": "information",
-      "message": "scripts/product-docs/lib/questionClassifier.js is explicitly owned by 2 features (shared, not exclusive)",
+      "message": "scripts/product-docs/lib/questionClassifier.js is explicitly owned by 3 features (shared, not exclusive)",
+      "note": "AI-FEAT-058, AI-FEAT-058, AI-FEAT-058",
+      "rule": "shared-code-path"
+    },
+    {
+      "file": "scripts/product-docs/lib/knowledgeTestCorpusV2.js",
+      "level": "information",
+      "message": "scripts/product-docs/lib/knowledgeTestCorpusV2.js is explicitly owned by 2 features (shared, not exclusive)",
       "note": "AI-FEAT-058, AI-FEAT-058",
       "rule": "shared-code-path"
     },
@@ -682,11 +696,11 @@
     }
   ],
   "schema_version": "1.3.0",
-  "source_commit": "5e25b9ef65bf39fa7faa91942ef81afb09690681",
+  "source_commit": "00f04803b1ea80465f6c19caccd30a6215e62047",
   "summary": {
     "error": 0,
     "evidence_gap": 57,
-    "information": 24,
+    "information": 26,
     "warning": 16
   }
 }

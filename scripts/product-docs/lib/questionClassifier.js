@@ -34,7 +34,7 @@ const RULES = [
   { type: QUESTION_TYPES.HOW_TO, re: /^\s*(how do i|how to|how can i|how does one)\b/i },
   { type: QUESTION_TYPES.STATUS, re: /\b(does autoingest|can autoingest|is there|will autoingest|support(s)?)\b/i },
   { type: QUESTION_TYPES.CAPABILITY, re: /^\s*(can i|can we)\b/i },
-  { type: QUESTION_TYPES.EXPLANATION, re: /^\s*(what is|what'?s|what are|explain)\b/i },
+  { type: QUESTION_TYPES.EXPLANATION, re: /^\s*(what is|what'?s|what are|explain)\b|^\s*what does\b.+\bmean\b/i },
 ];
 
 function classifyQuestion(question) {

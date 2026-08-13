@@ -614,6 +614,12 @@
         "AI-FEAT-058"
       ]
     },
+    "scripts/product-docs/test/knowledgeAdversarialPhase24.test.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-058"
+      ]
+    },
     "scripts/product-docs/test/knowledgeHallucinationV2.test.js": {
       "confidence": "explicit",
       "features": [
@@ -1134,26 +1140,33 @@
       "scripts/product-docs/lib/ids.js",
       "scripts/product-docs/lib/intentConcepts.js",
       "scripts/product-docs/lib/intentConcepts.js",
+      "scripts/product-docs/lib/intentConcepts.js",
       "scripts/product-docs/lib/knowledgeCli.js",
       "scripts/product-docs/lib/knowledgeCli.js",
+      "scripts/product-docs/lib/knowledgeEngine.js",
       "scripts/product-docs/lib/knowledgeEngine.js",
       "scripts/product-docs/lib/knowledgeEngine.js",
       "scripts/product-docs/lib/knowledgeEval.js",
       "scripts/product-docs/lib/knowledgeEval.js",
       "scripts/product-docs/lib/knowledgeIndex.js",
       "scripts/product-docs/lib/knowledgeTestCorpus.js",
+      "scripts/product-docs/lib/knowledgeTestCorpus.js",
+      "scripts/product-docs/lib/knowledgeTestCorpusV2.js",
       "scripts/product-docs/lib/knowledgeTestCorpusV2.js",
       "scripts/product-docs/lib/markdown.js",
       "scripts/product-docs/lib/parseProductDocs.js",
       "scripts/product-docs/lib/questionClassifier.js",
       "scripts/product-docs/lib/questionClassifier.js",
+      "scripts/product-docs/lib/questionClassifier.js",
       "scripts/product-docs/lib/searchIndex.js",
+      "scripts/product-docs/lib/statusResolution.js",
       "scripts/product-docs/lib/statusResolution.js",
       "scripts/product-docs/lib/statusResolution.js",
       "scripts/product-docs/lib/validators.js",
       "scripts/product-docs/lib/version.js",
       "scripts/product-docs/lib/workflowIndex.js",
       "scripts/product-docs/test/knowledge.test.js",
+      "scripts/product-docs/test/knowledgeAdversarialPhase24.test.js",
       "scripts/product-docs/test/knowledgeHallucinationV2.test.js"
     ]
   },

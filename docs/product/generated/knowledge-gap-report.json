@@ -41,16 +41,15 @@
     },
     {
       "domain": "Collections",
-      "gapType": "NO_MATCH",
+      "gapType": "UNEXPECTED_RESULT",
       "missingEvidence": [
-        "unambiguous topical match",
         "step-by-step instructions",
         "UI navigation"
       ],
-      "note": null,
-      "pass": true,
+      "note": "FIXED in Stage 2 (Phase 24 adversarial review) — was UNKNOWN/no-match in Stage 1 because no record contained the word \"Collection\" as a distinct topic. AI-WF-002 (Create a New Event) genuinely explains the real Collection → Event → Components hierarchy (verified against onboarding screen 2's own text), but Stage 1/early-Stage-2 answerQuestion() only preferred a Workflow answer for HOW_TO/TROUBLESHOOTING question types — \"What is a Collection?\" classifies EXPLANATION, so it fell through to feature-only matching (zero features mention \"Collection\", hence UNKNOWN). Broadening the workflow-preference gate to include EXPLANATION (found via a different adversarial question, \"What is a sync-slot?\", which had the identical structural problem) fixed this as a side effect — a genuine improvement, not a loosened expectation.",
+      "pass": false,
       "query": "What is a Collection in AutoIngest?",
-      "relatedFeature": null
+      "relatedFeature": "AI-WF-002(200)"
     },
     {
       "domain": "Collections",
@@ -190,9 +189,9 @@
       "relatedFeature": "AI-FEAT-048(400)"
     }
   ],
-  "generated_at": "2026-08-13T17:15:46.693Z",
-  "known_miss_count": 3,
-  "pass_count": 17,
+  "generated_at": "2026-08-13T17:39:21.087Z",
+  "known_miss_count": 4,
+  "pass_count": 16,
   "schema_version": "1.0.0",
   "unexplained_failure_count": 0
 }

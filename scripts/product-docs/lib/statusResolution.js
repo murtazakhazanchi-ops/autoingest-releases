@@ -77,40 +77,57 @@ function resolveFeatureOperatorStatus(featureRecord, { openBugCount = 0 } = {}) 
 const KNOWN_BOUNDARIES = Object.freeze([
   {
     id: 'face-recognition',
+    hardOverride: true,
     keywords: ['face', 'facial', 'recognize', 'recognition'],
     statement: 'AutoIngest has no face-recognition or facial-identification capability.',
     citation: 'No matching code, feature, or roadmap record for "face"/"facial"/"recognition" anywhere in main/, renderer/, services/, or docs/product/ (confirmed by direct repository search); 00_PROJECT_VISION.md scopes AutoIngest to structured archival ingestion, not photo analysis.',
   },
   {
     id: 'ai-auto-tagging',
+    hardOverride: true,
     keywords: ['auto-tag', 'autotag', 'ai tagging', 'image recognition', 'object detection'],
     statement: 'AutoIngest has no AI-based image recognition or automatic content tagging.',
     citation: 'Same absence of evidence as face-recognition; AI-FEAT-056 (AI Archive Intelligence) is Planned with no finalized scope — its name must not be read as implying this capability exists or is scoped to include it.',
   },
   {
     id: 'photo-editing',
+    hardOverride: true,
     keywords: ['edit photo', 'retouch', 'photo editing', 'crop photo', 'photo editor'],
     statement: 'AutoIngest does not edit, retouch, or otherwise modify photo content.',
     citation: '00_PROJECT_VISION.md: "built for structured archival workflows, not general-purpose photo management."',
   },
   {
     id: 'cloud-storage',
+    hardOverride: true,
     keywords: ['cloud backup', 'cloud storage', 'cloud sync', 'upload to cloud', 'client gallery', 'website upload'],
     statement: 'AutoIngest has no cloud storage, cloud backup, or external website/gallery upload capability.',
     citation: 'DEC-003 (Local-First and On-Premises Architecture): all four storage roots are local or NAS-based; "no fallback to a remote service when local storage is unavailable."',
   },
   {
     id: 'linux',
+    hardOverride: true,
     keywords: ['linux', 'ubuntu'],
     statement: 'AutoIngest does not support Linux.',
     citation: '00_PROJECT_VISION.md: "an Electron-based desktop application for macOS and Windows."',
   },
   {
     id: 'multi-user-roles',
-    keywords: ['multiple users log in', 'concurrent users', 'user roles', 'role-based access', 'multiple accounts at once'],
+    hardOverride: true,
+    keywords: ['multiple users log in', 'concurrent users', 'user roles', 'role-based access', 'multiple accounts at once', 'multiple user accounts', 'multiple accounts'],
     statement: 'AutoIngest does not support multiple concurrent user accounts or role-based access.',
     citation: '01_FEATURE_REGISTRY.md Reconciliation Notes: operator profiles are single-active-user (services/settings.js getLastActiveUserId() confirms a single value).',
   },
+  // Stage 2, Phase 24 — hardOverride extended to all six of these original
+  // Stage 1 boundaries after adversarial testing found the same class of
+  // regression the five new Registry boundaries already fixed: a compound
+  // question containing an explicit, unambiguous boundary phrase ("...does
+  // that mean it has cloud storage too?") was still overridden by a strong
+  // raw match on an unrelated feature mentioned earlier in the same
+  // sentence ("Online Registry"). The raw-override rule was designed as a
+  // safety valve for a hypothetical stale boundary; testing never found a
+  // real case where overriding was CORRECT, only cases where it caused a
+  // false AVAILABLE for an explicitly-excluded topic. See AI-FEAT-058
+  // Stage 2 Phase 24 evolution entry.
   // Stage 2 — four Online Registry authority/scope boundaries, added after
   // Phase 20's expanded eval corpus surfaced several boundary questions
   // that were confidently (sometimes "strong") answered AVAILABLE despite
@@ -144,7 +161,7 @@ const KNOWN_BOUNDARIES = Object.freeze([
   {
     id: 'registry-not-source-of-truth',
     hardOverride: true,
-    keywords: ['registry replace the archive', 'registry the source of truth', 'registry become the source of truth'],
+    keywords: ['registry replace the archive', 'registry the source of truth', 'registry become the source of truth', 'registry replaces event.json', 'registry replace event.json'],
     statement: 'The Online Registry never replaces or overrides the archive as the source of truth — event.json remains authoritative at all times, including when the relay is degraded or unavailable.',
     citation: 'AI-WF-006: "The archive\'s event.json remains the sole source of truth for event data; the Registry never replaces or overrides it."',
   },

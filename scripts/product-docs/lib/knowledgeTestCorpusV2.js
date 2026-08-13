@@ -59,7 +59,8 @@ const CORPUS_V2 = [
   {
     id: 'P04a', domain: 'Events', family: 'Q04',
     question: 'What\'s the way to start a new event?',
-    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
+    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'strong',
+    knownLimitation: 'IMPROVED during Phase 24 — this question classifies EXPLANATION (not HOW_TO), so it fell through to feature-only matching until the workflow-preference gate was broadened to include EXPLANATION (see AI-FEAT-058 Phase 24 evolution entry). Now correctly, strongly matches AI-WF-002.',
   },
   {
     id: 'P04b', domain: 'Events', family: 'Q04',
@@ -80,12 +81,14 @@ const CORPUS_V2 = [
   {
     id: 'P06a', domain: 'Collections', family: 'Q06',
     question: 'What does \'Collection\' mean in AutoIngest?',
-    expectedStatus: 'UNKNOWN', expectedMatchQuality: 'none',
+    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'strong',
+    knownLimitation: 'FIXED during Phase 24 — the raw search already found AI-WF-002 at an identical score to the canonical phrasing, but "What does X mean" was not recognized by the EXPLANATION classifier regex (only "what is/what\'s/what are/explain"), so the question classified UNKNOWN and never got workflow-preferred routing. Regex widened to also match "what does ... mean".',
   },
   {
     id: 'P06b', domain: 'Collections', family: 'Q06',
     question: 'Explain Collections',
     expectedStatus: 'UNKNOWN', expectedMatchQuality: 'none',
+    knownLimitation: 'Diverges from the now-fixed canonical Q06 ("What is a Collection...") for a different, structural reason: this uses the plural "Collections" while AI-WF-002 is indexed under the singular "collection" — lib/query.js performs no stemming (same pre-existing, structural limitation as R24\'s "importing" vs "import"). Safe (UNKNOWN, no invented claim) but misses the real answer that P01a-style singular phrasing now correctly surfaces.',
   },
   {
     id: 'P07a', domain: 'Collections', family: 'Q07',
@@ -425,7 +428,8 @@ const CORPUS_V2 = [
   {
     id: 'W14', domain: 'Import',
     question: 'What are the steps to import from a memory card?',
-    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
+    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'strong',
+    knownLimitation: 'IMPROVED during Phase 24 — same EXPLANATION-type workflow-preference broadening as P04a. Now correctly, strongly matches AI-WF-001.',
   },
   {
     id: 'W15', domain: 'Import',

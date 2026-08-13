@@ -3388,7 +3388,14 @@
         "scripts/product-docs/test/knowledgeHallucinationV2.test.js",
         "docs/product/generated/knowledge-gap-report-v2.json",
         "scripts/product-docs/knowledge-portal/server.js",
-        "scripts/product-docs/knowledge-portal/index.html"
+        "scripts/product-docs/knowledge-portal/index.html",
+        "scripts/product-docs/test/knowledgeAdversarialPhase24.test.js",
+        "scripts/product-docs/lib/statusResolution.js",
+        "scripts/product-docs/lib/intentConcepts.js",
+        "scripts/product-docs/lib/knowledgeEngine.js",
+        "scripts/product-docs/lib/questionClassifier.js",
+        "scripts/product-docs/lib/knowledgeTestCorpus.js",
+        "scripts/product-docs/lib/knowledgeTestCorpusV2.js"
       ],
       "related_decisions": [
         "DEC-019"

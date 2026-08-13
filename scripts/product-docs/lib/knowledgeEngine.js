@@ -363,9 +363,9 @@ function answerQuestion(question, ctx) {
     return boundaryAnswer(question, boundary, featureMatches, qType);
   }
 
-  // Stage 2 — a HOW_TO or TROUBLESHOOTING question is better served by a
-  // real Workflow record than by a Capability record's generic fallback
-  // sentence, provided the workflow match is genuine evidence (>=
+  // Stage 2 — a HOW_TO, TROUBLESHOOTING, or EXPLANATION question is better
+  // served by a real Workflow record than by a Capability record's generic
+  // fallback sentence, provided the workflow match is genuine evidence (>=
   // CONFIDENCE_FLOOR) and isn't clearly beaten by a strong, unambiguous
   // feature match with no comparable workflow score. TROUBLESHOOTING was
   // added after Stage 2's own testing found "My transfer stopped halfway —
@@ -373,11 +373,16 @@ function answerQuestion(question, ctx) {
   // clearly-superior AI-WF-005 match (score 500) entirely, falling through
   // to an unrelated, merely-tied feature (AI-FEAT-037, sharing nothing
   // topical, winning only the ascending-ID tiebreak) — a worse answer than
-  // Stage 1 gave for the same question. This never overrides a strong
-  // exact-title feature match with a merely-weak workflow guess.
+  // Stage 1 gave for the same question. EXPLANATION was added during Phase
+  // 24's adversarial review after "What is a sync-slot?" (a term that only
+  // exists inside AI-WF-006's own text, never in any Capability record)
+  // fell through the same way to an unrelated Metadata-Sync feature tied at
+  // a WEAK score, ignoring AI-WF-006's own clean, untied 200. This never
+  // overrides a strong exact-title feature match with a merely-weak
+  // workflow guess (workflowClearlyBeaten still gates on hasStrongFeatureMatch).
   const topWorkflow = workflowMatches[0];
   const workflowClearlyBeaten = hasStrongFeatureMatch && (!topWorkflow || topFeature.score > topWorkflow.score);
-  const workflowPreferredType = qType === QUESTION_TYPES.HOW_TO || qType === QUESTION_TYPES.TROUBLESHOOTING;
+  const workflowPreferredType = qType === QUESTION_TYPES.HOW_TO || qType === QUESTION_TYPES.TROUBLESHOOTING || qType === QUESTION_TYPES.EXPLANATION;
   if (workflowPreferredType && topWorkflow && topWorkflow.score >= CONFIDENCE_FLOOR && !workflowClearlyBeaten && workflowIndexById) {
     const wf = workflowIndexById.get(topWorkflow.id);
     if (wf) return answerFromWorkflow(question, wf, workflowMatches, featureMatches, qType);

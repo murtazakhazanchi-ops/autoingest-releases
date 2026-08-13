@@ -62,7 +62,8 @@ const CORPUS = [
   {
     id: 'Q06', domain: 'Collections',
     question: 'What is a Collection in AutoIngest?',
-    expectedStatus: 'UNKNOWN', expectedMatchQuality: 'none', instructionsShouldExist: false, shouldAcknowledgeGap: true,
+    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'strong', instructionsShouldExist: false, shouldAcknowledgeGap: false,
+    knownLimitation: 'FIXED in Stage 2 (Phase 24 adversarial review) — was UNKNOWN/no-match in Stage 1 because no record contained the word "Collection" as a distinct topic. AI-WF-002 (Create a New Event) genuinely explains the real Collection → Event → Components hierarchy (verified against onboarding screen 2\'s own text), but Stage 1/early-Stage-2 answerQuestion() only preferred a Workflow answer for HOW_TO/TROUBLESHOOTING question types — "What is a Collection?" classifies EXPLANATION, so it fell through to feature-only matching (zero features mention "Collection", hence UNKNOWN). Broadening the workflow-preference gate to include EXPLANATION (found via a different adversarial question, "What is a sync-slot?", which had the identical structural problem) fixed this as a side effect — a genuine improvement, not a loosened expectation.',
   },
   {
     id: 'Q07', domain: 'Collections',

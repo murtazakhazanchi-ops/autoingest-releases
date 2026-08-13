@@ -2976,6 +2976,7 @@
         "scripts/product-docs/lib/version.js",
         "scripts/product-docs/lib/workflowIndex.js",
         "scripts/product-docs/test/knowledge.test.js",
+        "scripts/product-docs/test/knowledgeAdversarialPhase24.test.js",
         "scripts/product-docs/test/knowledgeHallucinationV2.test.js"
       ],
       "status": "Implemented — evolving",
