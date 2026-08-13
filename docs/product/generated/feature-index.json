@@ -3340,6 +3340,14 @@
       "related_changelog_entries": [
         {
           "date": "2026-08-13",
+          "excerpt": "## 2026-08-13 — AutoIngest Knowledge Engine, Stage 2 Phases 4-24 (AI-FEAT-058 / AI-RM-011 / DEC-020)"
+        },
+        {
+          "date": "2026-08-13",
+          "excerpt": "**New/updated records**: [AI-FEAT-058](features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md) (Stage 2 evolution sections for Phases 4-24), [DEC-020](decisions/DEC-020_STAGE_2_KNOWLEDGE_ARCHITEC"
+        },
+        {
+          "date": "2026-08-13",
           "excerpt": "## 2026-08-13 — AutoIngest Knowledge Engine, Stage 1 prototype (AI-FEAT-058 / AI-RM-011)"
         },
         {
@@ -3348,7 +3356,7 @@
         },
         {
           "date": "2026-08-13",
-          "excerpt": "**New records**: [AI-FEAT-058](features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md), [AI-RM-011](02_MASTER_ROADMAP.md#ai-rm-011-autoingest-knowledge-onboarding-portal-stage-1), [DEC-019](decis"
+          "excerpt": "**New records**: [AI-FEAT-058](features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md), [AI-RM-011](02_MASTER_ROADMAP.md#ai-rm-011-autoingest-knowledge-onboarding-portal-stage-1-stage-2), [DEC-01"
         }
       ],
       "related_code_paths": [
