@@ -1,9 +1,10 @@
 {
   "blockers": "None identified for AI-RM-002 beyond the absence of a defined scope",
-  "completed_count": 2,
+  "completed_count": 3,
   "completed_milestones": [
     "AI-RM-001",
-    "AI-RM-010"
+    "AI-RM-010",
+    "AI-RM-011"
   ],
   "current_milestone_id": "AI-RM-002",
   "current_risks": "(1) AI-RM-007's planned service name collides with an existing, unrelated `archiveRepairService.js` (temp-file cleanup only) — needs resolution before implementation starts. (2) AI-RM-006's scope needs explicit disambiguation from the already-implemented AI-FEAT-025 (narrower checksum verification) to avoid duplicating existing work without a clear reason.",
@@ -226,7 +227,7 @@
       "status": "**Completed** — verified on real Windows hardware (2026-08-13)"
     },
     {
-      "current_risks": "Retrieval-precision gaps inherent to reusing `lib/query.js` unchanged remain for cases with no curated concept/boundary coverage (no stemming, no typo tolerance, no compound-claim verification) — disclosed per-question in both eval corpora's `knownLimitation` fields rather than silently patched; see AI-FEAT-058's Future Enhancements. No blocking risk to what has shipped — every disclosed gap resolves to an honest hedge or `UNKNOWN`, never a confident false claim, verified specifically by the Phase 21/24 hallucination/adversarial suites.",
+      "current_risks": "Retrieval-precision gaps inherent to reusing `lib/query.js` unchanged remain for cases with no curated concept/boundary coverage (no stemming, no typo tolerance, no compound-claim verification) — disclosed per-question in both eval corpora's `knownLimitation` fields rather than silently patched; see AI-FEAT-058's Future Enhancements. No blocking risk to what has shipped — every disclosed gap resolves to an honest hedge or `UNKNOWN`, never a confident false claim, verified specifically by the Phase 21/24/merge-readiness hallucination/adversarial suites.",
       "dependencies": [
         "AI-RM-001",
         "AI-RM-010"
@@ -240,16 +241,16 @@
         "AI-FEAT-058"
       ],
       "name": "AutoIngest Knowledge & Onboarding Portal (Stage 1 + Stage 2)",
-      "next_action": "Phase 25 (this update) in progress; Phase 26 (28-point Online Registry/Teamwork report) and Phase 27 (38-point full Stage 2 final report) remaining, then stop at the approved Stage 2 boundary — no Stage 3 work begins without separate review and authorization.",
+      "next_action": "None for this milestone — complete and merged. Deferred future-work items (true rendered-browser verification, remaining Workflow-record coverage, a production-integration decision, a semantic/AI-assisted-retrieval necessity review, a separate live-Registry-integration architecture decision, UX polish from real operator use, and an automatic-discoverability maintenance process) are recorded, not scheduled — see AI-FEAT-058's Future Enhancements. Any Stage 3 work requires separate review and authorization.",
       "objective": "Stage 1: prove that AutoIngest's existing `docs/product/` documentation system can power a grounded, citation-honest, natural-language operator answer engine without an LLM, embeddings, or a hosted service. Stage 2 (approved after Stage 1 + a dedicated Phase 1-3 audit): extend that engine with real operator-workflow knowledge, natural-language concept/synonym retrieval, roadmap-aware answers, and substantial, carefully-bounded Online Registry/teamwork coverage — still with no LLM, embeddings, or live service integration.",
-      "planned_estimate": "Stage 1: single implementation session (2026-08-13). Stage 2: single extended implementation session (2026-08-13), Phases 1-24 complete same day as Stage 1; Phases 25-27 (this entry's own update, plus the two mandatory report sections) in progress.",
-      "status": "In Progress — Stage 1 (prototype) complete; Stage 2 Phases 4–24 complete (concept/intent retrieval layer, Workflow record type, roadmap routing, Online Registry/teamwork coverage, 119-question eval corpus, hallucination/grounding suite, 9-tab portal UX + directory/onboarding mode, fresh adversarial review); Phases 25–27 (final documentation pass, two mandatory report sections) in progress in this same session, per the Stage 2 approval's explicit stop condition (no Stage 3, no LLM/embeddings/live Registry/production Electron integration, no new release)."
+      "planned_estimate": "Stage 1: single implementation session (2026-08-13). Stage 2: single extended implementation session spanning 2026-08-13 to 2026-08-14 (Phases 1-27 plus a user-directed pre-merge acceptance pass and merge).",
+      "status": "**Completed — Stage 1 + Stage 2 merged to `main`** (merge commit `765e9b8`, 2026-08-14). Stage 1 (prototype) and Stage 2 Phases 4–27 (concept/intent retrieval layer, Workflow record type, roadmap routing, Online Registry/teamwork coverage, 119-question eval corpus, hallucination/grounding + adversarial suites, 9-tab portal UX + directory/onboarding mode, mandatory final-report sections, and a pre-merge acceptance pass) all complete and verified from the actual merged `main` state. Stage 3 has not begun and requires separate approval."
     }
   ],
   "next_milestone_id": "AI-RM-002",
   "next_planned_action": "Discovery and specification for AI-RM-002 (Archive Maintenance) — no scope exists yet",
   "pending_decisions": "Naming collision for AI-RM-007's service (see Current risks); scope disambiguation for AI-RM-006 vs. AI-FEAT-025",
-  "progress_percent": 18.2,
+  "progress_percent": 27.3,
   "recently_completed_documentation_work": "UI polish to the Metadata Management Modal / Audit & Repair tab (commits `4446a30` → `c5d200f`, 2026-08-02 through 2026-08-04) — cosmetic/layout only, no behavior change, all part of the already-complete AI-RM-001",
   "schema_version": "1.3.0",
   "total_features": 58,

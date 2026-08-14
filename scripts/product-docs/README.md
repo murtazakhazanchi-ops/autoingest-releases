@@ -43,6 +43,7 @@ JSON-shape validation for generated artifacts is a small hand-rolled check (see 
 | `release <sub>` | Part 7D release intelligence (drafts only) — see § Part 7 |
 | `context <sub>` | Part 7E universal repository context assistant — see § Part 7 |
 | `conversation <sub>` | Part 8 multi-AI engineering conversation integration — see § Part 8 |
+| `knowledge <sub>` | Part 9 deterministic operator knowledge engine — see § Part 9 |
 
 Every command supports `--help`, exits non-zero on invalid use or on validation failure, and never performs a destructive filesystem operation outside `docs/product/generated/`.
 
@@ -201,5 +202,24 @@ New generated artifacts: `generated/conversation-index.{json,jsonl}`, `generated
 **Trust boundary (the one place Part 8 deliberately diverges from Part 7's live-session automation)**: conversation-import evidence is structurally isolated from the `evidencePacket`/`decisionIntelligence.scanPacket` auto-finalize pipeline `hookAutomation.js` drives at commit/push time. `automation/conversation/decisionLink.js`/`bugLink.js`/`memoryLink.js` are only ever reached from an explicit `conversation import`/`conversation finalize` CLI invocation — never from a git hook — so an untrusted external transcript can never indirectly shape a canonical `DEC-###` purely by entering the same automatic stream live-session evidence already uses. See [docs/product/18_ENGINEERING_CONVERSATION_POLICY.md](../../docs/product/18_ENGINEERING_CONVERSATION_POLICY.md) § 10 for the full rationale (a finding from this Part's own architecture review).
 
 **Security**: identical non-goals to Parts 4-7, extended for a stronger trust boundary (imported text originates entirely outside this repository) — no network calls, no external AI API, no `eval`, no code/Markdown/HTML execution over imported content, path-traversal- and symlink-escape-safe file loading, size- and JSON-depth-capped imports, automatic secret-pattern redaction before any write (canonical or raw), and data minimization (an unrecognized vendor-specific field never reaches the canonical record).
+
+## Part 9 — Knowledge Engine (Deterministic Operator Q&A, Stage 1 + Stage 2)
+
+A grounded, citation-honest, natural-language answer engine for AutoIngest operator questions — reusing this tool's own existing offline ranker (`lib/query.js`) unchanged, with **no LLM, no embeddings, no vector DB, and no network call**. Full architecture, evolution, and evidence: [docs/product/features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md](../../docs/product/features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md) (canonical — this section is a pointer, not a duplicate).
+
+```bash
+node scripts/product-docs/cli.js knowledge ask "<question>" [--json]
+node scripts/product-docs/cli.js knowledge eval [--out <path>]      # Stage 1's 20-question corpus
+node scripts/product-docs/cli.js knowledge eval-v2 [--out <path>]   # Stage 2's 99-question expansion
+node scripts/product-docs/cli.js knowledge serve [--port 5177]      # local portal, 127.0.0.1 only
+```
+
+**What it answers**: capability lookup (Implemented/Planned/Not Supported, never conflated), operator Workflow how-to guidance (`docs/product/workflows/AI-WF-###_*.md`, distinct from a Capability record), roadmap/status questions, and Online Registry/teamwork questions — including, as of the Stage 2 event-coordination reconciliation, **distributed event coordination** (a field operator's event becoming discoverable and locally adoptable by a separated operator without a shared NAS) as a first-class topic, not just presence.
+
+**Curated safety layer**: 11 hand-evidenced `KNOWN_BOUNDARIES` entries (`lib/statusResolution.js`) prevent a coincidental keyword match from presenting an explicitly-excluded capability as available — every boundary cites its evidence, and none is inferred from the absence of a search result.
+
+**Test coverage**: `test/knowledge.test.js`, `test/knowledgeHallucinationV2.test.js`, `test/knowledgeAdversarialPhase24.test.js`, `test/knowledgeMergeReadiness.test.js`, `test/knowledgeEventCoordination.test.js` — the full 119-question corpus plus dedicated hallucination/adversarial/merge-readiness/event-coordination regression suites, all re-run as part of `npm`-free `node test/<file>.test.js` invocations, no framework dependency.
+
+**Non-goals** (identical spirit to Parts 4-8 above, restated because this Part is the one most likely to be asked to add one): no LLM, no embeddings, no live Online Registry dashboard connection from the portal, no production Electron integration. The portal is a local, `127.0.0.1`-only prototype — never exposed, never a channel for photo/media bytes.
 
 **A bug found and fixed during this Part's own E2E testing**: an early version of `automation/conversation/decisionLink.js` could draft a canonical `Status: Draft` decision record from conversation evidence that named no feature or roadmap ownership, producing an `orphan-decision` validation error the moment `validate` ran (every canonical decision must cite at least one feature/milestone). Fixed by requiring resolved feature/roadmap ownership as part of the evidence bar for canonical drafting — with no ownership, the same evidence now becomes a local, non-canonical, review-required candidate instead.

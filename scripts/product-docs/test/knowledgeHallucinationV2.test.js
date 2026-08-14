@@ -100,9 +100,17 @@ async function main() {
     // related, cross-referenced mechanisms per AI-WF-006) but a question
     // specifically ABOUT one must never resolve as if it silently answered
     // the other with no distinction drawn.
+    //
+    // Updated 2026-08-14 (event-coordination reconciliation pass): the
+    // primary match changed from AI-FEAT-048 to AI-WF-006 once TEAM_ACTIVITY
+    // questions began preferring the Workflow record — a genuine
+    // improvement, since AI-WF-006 is the record that actually explains
+    // this exact distinction in its own text, not a regression. Either
+    // record correctly draws the distinction; the assertion now accepts
+    // the more specific one.
     const answer = answerQuestion('How does archive locking differ from the Online Registry?', ctx);
     assert.equal(answer.capabilityStatus, QUERY_STATUS.AVAILABLE);
-    assert.equal(answer.matchedCapabilities[0]?.id, 'AI-FEAT-048', 'expected the Online Registry feature (which documents the distinction) to be the primary match');
+    assert.equal(answer.matchedCapabilities[0]?.id, 'AI-WF-006', 'expected AI-WF-006 (which now documents the distinction in detail) to be the primary match');
   });
 
   // ── Synonyms/concept-hints cannot change availability ───────────────────

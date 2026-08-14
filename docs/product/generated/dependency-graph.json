@@ -4738,6 +4738,12 @@
       "type": "memory_capsule"
     },
     {
+      "doc_path": "memory/AI-MEM-0004_KNOWLEDGE_PORTAL_STAGE_2_OPERATOR_KNOWLEDGE_ARCHITECTURE.md",
+      "id": "AI-MEM-0004",
+      "label": "Knowledge Portal Stage 2: Operator Knowledge Architecture, Online Registry Coverage, and Merge",
+      "type": "memory_capsule"
+    },
+    {
       "doc_path": "02_MASTER_ROADMAP.md",
       "id": "AI-RM-001",
       "label": "Metadata Audit & Repair",

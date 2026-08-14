@@ -28,3 +28,12 @@
 - **Related commit(s)**: Evidence pending — source conversation unavailable
 - **Unresolved follow-up**: None recorded.
 - **Capsule**: [AI-MEM-0003](../memory/AI-MEM-0003_WINDOWS_NAS_EVENT_MANAGEMENT_RELIABILITY_3_INDEPENDENT_ROOT_CAUSES.md)
+
+## 2026-08-13 — AI-MEM-0004 — Knowledge Portal Stage 2: Operator Knowledge Architecture, Online Registry Coverage, and Merge
+
+- **Feature(s)**: AI-FEAT-045, AI-FEAT-048, AI-FEAT-058
+- **Accepted approach**: Evidence pending
+- **Rejected alternative(s)**: Accepted or rejected**: Rejected, per explicit user constraint, at every phase — never seriously reconsidered.; Accepted or rejected**: Rejected.
+- **Related commit(s)**: 765e9b83fba64593d07422f390f8b3a41046dc8b (merge commit); knowledge-portal-stage2 tip d89440bbd1576e4c2530fa76b4b791c9fe226997
+- **Unresolved follow-up**: True rendered-browser verification; remaining Workflow-record coverage (Class A: event editing/finding); a production-integration decision (standalone vs. AutoIngest-integrated); a decision on whether semantic/AI-assisted retrieval is actually needed given observed deterministic-retrieval quality; a live-Registry-integration decision (explicitly separate from this documentation portal); UX polish from real operator use; a maintenance process to keep new capabilities/workflows automatically discoverable; and — newly identified in Revision 6 — a full evidence review of `AI-FEAT-048`'s own canonical record, which this pass found to understate its actual implemented scope but deliberately did not rewrite (out of this investigation's mandate).
+- **Capsule**: [AI-MEM-0004](../memory/AI-MEM-0004_KNOWLEDGE_PORTAL_STAGE_2_OPERATOR_KNOWLEDGE_ARCHITECTURE.md)

@@ -2924,16 +2924,16 @@
         "openBugs": []
       },
       "lastUpdated": {
-        "evidenceStatus": "Stage 1: verified from current code and `scripts/product-docs/test/knowledge.test.js`, plus an independent forensic PR review (2026-08-13) that found and fixed one defect (see Evolution Journal). Stage 2 (2026-08-13): verified from current code (`lib/intentConcepts.js`, `questionClassifier.js`, `workflowIndex.js`, extended `knowledgeEngine.js`), `docs/product/workflows/AI-WF-001..008_*.md` (each individually evidence-cited against real onboarding text or `renderer/` UI labels), the Online Registry architecture trace (`realtime-server/`, `services/realtimeOperationsService.js`, `main/main.js` emitter call sites), and `scripts/product-docs/test/knowledge.test.js` 18/18 passing under the full production context (`buildEngineContext`)",
+        "evidenceStatus": "Stage 1: verified from current code and `scripts/product-docs/test/knowledge.test.js`, plus an independent forensic PR review (2026-08-13) that found and fixed one defect (see Evolution Journal). Stage 2 (2026-08-13 to 2026-08-14): verified from current code (`lib/intentConcepts.js`, `questionClassifier.js`, `workflowIndex.js`, extended `knowledgeEngine.js`), `docs/product/workflows/AI-WF-001..008_*.md` (each individually evidence-cited against real onboarding text or `renderer/` UI labels), the Online Registry architecture trace (`realtime-server/`, `services/realtimeOperationsService.js`, `main/main.js` emitter call sites), a dedicated merge-readiness pass re-verifying every test/corpus/security check from the actual merged `main` state in an independent worktree, and 354 total passing assertions across 35 test files at merge time. See [AI-MEM-0004](../memory/AI-MEM-0004_KNOWLEDGE_PORTAL_STAGE_2_OPERATOR_KNOWLEDGE_ARCHITECTURE.md) for the full engagement narrative.",
         "introducedVersion": "2026-08-13",
-        "lastModifiedVersion": "2026-08-13 (Stage 2)"
+        "lastModifiedVersion": "2026-08-14 (Stage 2 merged to main)"
       },
       "operatorStatus": "PARTIALLY_AVAILABLE",
       "relatedFeatures": [],
       "roadmapRelationship": [
         {
           "roadmapId": "AI-RM-011",
-          "status": "In Progress — Stage 1 (prototype) complete; Stage 2 Phases 4–24 complete (concept/intent retrieval layer, Workflow record type, roadmap routing, Online Registry/teamwork coverage, 119-question eval corpus, hallucination/grounding suite, 9-tab portal UX + directory/onboarding mode, fresh adversarial review); Phases 25–27 (final documentation pass, two mandatory report sections) in progress in this same session, per the Stage 2 approval's explicit stop condition (no Stage 3, no LLM/embeddings/live Registry/production Electron integration, no new release)."
+          "status": "**Completed — Stage 1 + Stage 2 merged to `main`** (merge commit `765e9b8`, 2026-08-14). Stage 1 (prototype) and Stage 2 Phases 4–27 (concept/intent retrieval layer, Workflow record type, roadmap routing, Online Registry/teamwork coverage, 119-question eval corpus, hallucination/grounding + adversarial suites, 9-tab portal UX + directory/onboarding mode, mandatory final-report sections, and a pre-merge acceptance pass) all complete and verified from the actual merged `main` state. Stage 3 has not begun and requires separate approval."
         }
       ],
       "searchTerms": [

@@ -96,8 +96,8 @@ async function main() {
     }
   });
 
-  await t('the roadmap dashboard matches the canonical current-position statement (AI-RM-001 + AI-RM-010 complete, AI-RM-002 next, 2/11)', () => {
-    assert.equal(built.dashboard.completed_count, 2);
+  await t('the roadmap dashboard matches the canonical current-position statement (AI-RM-001 + AI-RM-010 + AI-RM-011 complete, AI-RM-002 next, 3/11)', () => {
+    assert.equal(built.dashboard.completed_count, 3);
     assert.equal(built.dashboard.total_milestones, 11);
     assert.equal(built.dashboard.current_milestone_id, 'AI-RM-002');
   });

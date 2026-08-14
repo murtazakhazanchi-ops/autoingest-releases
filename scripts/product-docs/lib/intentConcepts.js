@@ -58,6 +58,36 @@ const CONCEPT_CLUSTERS = [
     ],
     hints: ['team live online registry offline reconnect degraded'],
   },
+  // Added 2026-08-14 per a product-owner clarification: the Registry's
+  // PRIMARY purpose is distributed event coordination (separated operators
+  // discovering and adopting a shared event identity without a common
+  // NAS/archive connection), not merely presence. A forensic trace of
+  // main.js/realtimeOperationsService.js/eventCreator.js confirmed this is
+  // a real, substantially-implemented capability (see AI-WF-006's own new
+  // "Event Discovery & Coordination" section) — this cluster exists to
+  // route natural operator questions about it there.
+  {
+    id: 'team-event-coordination',
+    domain: 'Online Registry & Teamwork',
+    triggers: [
+      'what is the online registry for', 'why do we need team live', 'why does team live exist',
+      'what is team live for', 'purpose of the online registry', 'purpose of team live',
+      'how will the office know', 'how will they know i created', 'how will they know about',
+      'already created this event', 'do i need to create it again', 'someone already created',
+      'event created by another', 'get an event created by', 'duplicate an online event',
+      'duplicate a registry event', 'adopt an online event', 'adopt a registry event',
+      'not connected to the same nas', 'not on the same nas', 'without a shared nas',
+      "aren't connected to the same nas", 'use the same event name', 'same event name across',
+      'different locations use the same event', 'prevent us from creating differently named',
+      'differently named versions of the same event', 'creating duplicate events',
+      'see what event another', 'what event is', 'just an online-user list',
+      'just a list of who is online', 'more than just a user list',
+      'collaborate without access to the main archive', 'without access to the main archive root',
+      'reconnect to the archive', 'when we reconnect to the archive',
+      'working in the field', 'field and created an event',
+    ],
+    hints: ['team live online registry event coordination discovery shared identity adopt prepare'],
+  },
   // 'team-authority' was REMOVED here during Phase 20 (Stage 2 eval corpus
   // expansion) testing — a real, found-and-fixed defect, not a refactor.
   // It existed to recognize Registry-authority questions ("does the
@@ -212,6 +242,9 @@ const BOUNDARY_CONCEPT_CLUSTERS = [
       'uploaded somewhere', 'being uploaded', 'photos uploaded to the relay',
       'photos get sent through', 'photos sent through', 'through the team live server',
       'sent through the team live', 'send my photos', 'photos through team live',
+      'copy their photos to me', 'copy photos to me', 'send me their photos',
+      'copy the photos', 'copy the photographs', 'sync the photos',
+      'automatically sync the photos', 'sync photos too',
     ],
   },
   {
@@ -223,6 +256,9 @@ const BOUNDARY_CONCEPT_CLUSTERS = [
       'registry replaces event.json', 'registry replace event.json',
       'basically my archive', 'registry basically', 'team live basically',
       'is the registry my archive', 'is team live my archive',
+      'registry replace the nas', 'registry replace my nas', 'replace the nas',
+      'sharing the same storage', 'share the same storage', 'same physical storage',
+      'shared physical storage',
     ],
   },
   {

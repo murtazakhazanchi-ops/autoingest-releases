@@ -94,6 +94,19 @@
     },
     {
       "domain": "Collections",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "missingEvidence": [
+        "unambiguous topical match",
+        "step-by-step instructions",
+        "UI navigation"
+      ],
+      "note": "FIXED during Phase 24 — the raw search already found AI-WF-002 at an identical score to the canonical phrasing, but \"What does X mean\" was not recognized by the EXPLANATION classifier regex (only \"what is/what's/what are/explain\"), so the question classified UNKNOWN and never got workflow-preferred routing. Regex widened to also match \"what does ... mean\".",
+      "pass": false,
+      "query": "What does 'Collection' mean in AutoIngest?",
+      "relatedFeature": "AI-WF-002(200)"
+    },
+    {
+      "domain": "Collections",
       "gapType": "NO_MATCH",
       "missingEvidence": [
         "unambiguous topical match",
@@ -394,19 +407,6 @@
     },
     {
       "domain": "Online Registry",
-      "gapType": "AMBIGUOUS_RETRIEVAL",
-      "missingEvidence": [
-        "unambiguous topical match",
-        "step-by-step instructions",
-        "UI navigation"
-      ],
-      "note": null,
-      "pass": true,
-      "query": "Can I see who else is currently working on the archive?",
-      "relatedFeature": "AI-FEAT-042(100)"
-    },
-    {
-      "domain": "Online Registry",
       "gapType": "MISSING_OPERATOR_WORKFLOW",
       "missingEvidence": [
         "step-by-step instructions",
@@ -416,19 +416,6 @@
       "pass": true,
       "query": "Does AutoIngest warn me if someone else is editing the same event?",
       "relatedFeature": "AI-FEAT-010(200)"
-    },
-    {
-      "domain": "Online Registry",
-      "gapType": "AMBIGUOUS_RETRIEVAL",
-      "missingEvidence": [
-        "unambiguous topical match",
-        "step-by-step instructions",
-        "UI navigation"
-      ],
-      "note": null,
-      "pass": true,
-      "query": "Is there a way to see import progress from another operator's machine?",
-      "relatedFeature": "AI-FEAT-002(100)"
     },
     {
       "domain": "Online Registry",
@@ -632,16 +619,15 @@
     },
     {
       "domain": "Settings",
-      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "gapType": "UNEXPECTED_RESULT",
       "missingEvidence": [
-        "unambiguous topical match",
         "step-by-step instructions",
         "UI navigation"
       ],
       "note": "No Settings-screen workflow exists yet (disclosed gap in workflows/README.md); weak generic tie via AI-WF-002/003/006 sharing only common words.",
       "pass": false,
       "query": "How do I find the settings screen?",
-      "relatedFeature": "AI-WF-002(100)"
+      "relatedFeature": "AI-WF-006(200)"
     },
     {
       "domain": "Settings",
@@ -767,7 +753,7 @@
       "note": null,
       "pass": true,
       "query": "whos online",
-      "relatedFeature": "AI-FEAT-048(100)"
+      "relatedFeature": "AI-WF-006(100)"
     },
     {
       "domain": "Adversarial",
@@ -895,9 +881,9 @@
       "relatedFeature": "AI-FEAT-013(100)"
     }
   ],
-  "generated_at": "2026-08-14T02:17:05.403Z",
-  "known_miss_count": 16,
-  "pass_count": 83,
+  "generated_at": "2026-08-14T03:01:12.767Z",
+  "known_miss_count": 17,
+  "pass_count": 82,
   "schema_version": "1.0.0",
   "unexplained_failure_count": 0
 }

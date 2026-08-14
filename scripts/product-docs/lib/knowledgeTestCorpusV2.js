@@ -250,7 +250,8 @@ const CORPUS_V2 = [
   {
     id: 'R04', domain: 'Online Registry',
     question: 'Can I see who else is currently working on the archive?',
-    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
+    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'strong',
+    knownLimitation: 'IMPROVED 2026-08-14 during the event-coordination reconciliation pass — AI-WF-006\'s expansion (adding Event Discovery & Coordination content, and TEAM_ACTIVITY questions now preferring the Workflow record) made it the correct, dominant, untied match (400) instead of a generic weak tie. Genuine improvement, re-verified against real engine output, not a loosened expectation.',
   },
   {
     id: 'R05', domain: 'Online Registry',
@@ -260,7 +261,8 @@ const CORPUS_V2 = [
   {
     id: 'R06', domain: 'Online Registry',
     question: 'Is there a way to see import progress from another operator\'s machine?',
-    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
+    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'strong',
+    knownLimitation: 'IMPROVED 2026-08-14 — same TEAM_ACTIVITY/AI-WF-006 expansion as R04. Now correctly, dominantly matches AI-WF-006 (400) instead of tying weakly.',
   },
   {
     id: 'R07', domain: 'Online Registry',

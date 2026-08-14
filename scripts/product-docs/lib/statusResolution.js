@@ -154,14 +154,14 @@ const KNOWN_BOUNDARIES = Object.freeze([
   {
     id: 'registry-media-storage',
     hardOverride: true,
-    keywords: ['registry store my photo', 'registry store photographs', 'photos over the network', 'photos through the relay', 'relay store', 'upload my photos to the registry', 'registry hold my photo'],
+    keywords: ['registry store my photo', 'registry store photographs', 'photos over the network', 'photos through the relay', 'relay store', 'upload my photos to the registry', 'registry hold my photo', 'copy their photos to me', 'copy photos to me', 'send me their photos', 'copy the photos', 'copy the photographs', 'sync the photos', 'automatically sync the photos', 'sync photos too'],
     statement: 'The Online Registry / relay never stores, transmits, or provides access to photograph or media file bytes — only small, size-capped presence/activity/status messages cross it.',
     citation: 'AI-WF-006 (See Who Else Is Online and What They\'re Working On): "No photographs or media files ever pass through this system. Only small, size-capped status/metadata messages are exchanged."',
   },
   {
     id: 'registry-not-source-of-truth',
     hardOverride: true,
-    keywords: ['registry replace the archive', 'registry the source of truth', 'registry become the source of truth', 'registry replaces event.json', 'registry replace event.json'],
+    keywords: ['registry replace the archive', 'registry the source of truth', 'registry become the source of truth', 'registry replaces event.json', 'registry replace event.json', 'registry replace the nas', 'registry replace my nas', 'sharing the same storage', 'share the same storage', 'same physical storage', 'shared physical storage'],
     statement: 'The Online Registry never replaces or overrides the archive as the source of truth — event.json remains authoritative at all times, including when the relay is degraded or unavailable.',
     citation: 'AI-WF-006: "The archive\'s event.json remains the sole source of truth for event data; the Registry never replaces or overrides it."',
   },

@@ -41,3 +41,12 @@ Workflow records: Markdown under `docs/product/workflows/`, parsed via the exist
 ## Reconciliation Note
 
 None recorded — consistent with `scripts/product-docs/README.md`'s existing non-goals (no embeddings, no external AI, no network) and with DEC-019's own architecture, which this extends rather than supersedes.
+
+## Post-Decision Evolution (2026-08-14)
+
+The raw-vs-hint boundary precedence rule described above (§ Decision) was itself found insufficient twice after this decision was accepted, both times through this feature's own adversarial testing discipline, not a later architectural rethink:
+
+- **Phase 20/24**: a strong match earned by the raw question itself (not a hint) could still override a boundary — the rule as written correctly blocked hint-inflated overrides, but a genuinely strong raw match on an unrelated real feature (e.g. "Online Registry" strongly title-matching its own parent feature `AI-FEAT-048`) could still suppress a narrower, correctly-matched boundary about that same feature's documented scope. Testing never found a case where this override was CORRECT (i.e., rescued a stale boundary) — only cases where it produced a false `AVAILABLE` for an explicitly-excluded topic.
+- **Fix**: an opt-in `hardOverride: true` flag (`lib/statusResolution.js`), applied first to the five Registry-scope boundaries (Phase 20), then extended to all eleven boundaries including the original six Stage 1 exclusions (Phase 24 adversarial review, then confirmed necessary again during the pre-merge acceptance pass) — a boundary carrying this flag is never overridden by any raw match, however strong, because such a boundary makes a narrower scope claim about a real feature rather than "this doesn't exist," and a strong match on the parent feature is not competing evidence against that narrower claim.
+
+This does not supersede the original Decision — the raw-vs-hint distinction itself remains exactly as decided (a hint may never override a boundary); `hardOverride` is an additional, narrower precedence rule layered on top for boundaries where even a raw match must not override. See [AI-FEAT-058](../features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md)'s Phase 20 and Phase 24 evolution entries, and [AI-MEM-0004](../memory/AI-MEM-0004_KNOWLEDGE_PORTAL_STAGE_2_OPERATOR_KNOWLEDGE_ARCHITECTURE.md) for the full narrative.
