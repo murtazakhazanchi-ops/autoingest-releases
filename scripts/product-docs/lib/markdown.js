@@ -153,6 +153,21 @@ function extractBulletList(sectionText) {
   return items;
 }
 
+// Ordered-list items under a section ("1. ", "2. ", ...), in source order —
+// same shape/rules as extractBulletList but for `1.`/`2.` markers (used for
+// Workflow records' Steps section, where order is meaningful).
+function extractNumberedList(sectionText) {
+  if (!sectionText) return [];
+  const lines = splitLines(sectionText);
+  const items = [];
+  for (const line of lines) {
+    const m = /^\s*\d+[.)]\s+(.+)$/.exec(line);
+    if (!m) continue;
+    items.push(m[1].trim());
+  }
+  return items;
+}
+
 module.exports = {
   slugify,
   extractHeadings,
@@ -161,5 +176,6 @@ module.exports = {
   extractHeaderTable,
   extractLinks,
   extractBulletList,
+  extractNumberedList,
   parseFirstTable,
 };

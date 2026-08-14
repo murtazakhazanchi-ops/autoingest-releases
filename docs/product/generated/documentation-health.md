@@ -2,7 +2,7 @@
 
 > Generated artifact. Implements the 13 rules specified in [14_VALIDATION_SPECIFICATION.md](../14_VALIDATION_SPECIFICATION.md) plus Part 4 tooling-integrity checks. Regenerate with `node scripts/product-docs/cli.js validate`.
 
-Generated against source commit `068c5583c9c5472db6ce8a023dbdbfb4105a07ce`.
+Generated against source commit `7f180e9068b022f190a61cb31ccac98eb7884758`.
 
 ## Summary
 
@@ -10,7 +10,7 @@ Generated against source commit `068c5583c9c5472db6ce8a023dbdbfb4105a07ce`.
 |---|---|---|
 | Error | 0 | Fails the build (non-zero exit) |
 | Warning | 16 | Reported, does not fail the build |
-| Information | 15 | Reported, does not fail the build |
+| Information | 26 | Reported, does not fail the build |
 | Evidence gap | 57 | Reported, does not fail the build — visibility only, per 14_VALIDATION_SPECIFICATION.md Rule 13 |
 
 **Result**: PASS
@@ -40,12 +40,13 @@ None.
 | missing-related-technical-docs | AI-FEAT-041 is Implemented but cites no Related technical docs | features/AI-FEAT-041_TRANSFER_BACKGROUND_MINIMIZE_OPERATION.md | — |
 | missing-related-technical-docs | AI-FEAT-058 is Implemented but cites no Related technical docs | features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md | — |
 
-## Information (15)
+## Information (26)
 
 | Rule | Message | File | Note |
 |---|---|---|---|
 | architecture-coverage | 40/58 features placed in the architectural-evolution relationship map | 11_ARCHITECTURAL_EVOLUTION.md | Unplaced: AI-FEAT-002, AI-FEAT-003, AI-FEAT-005, AI-FEAT-007, AI-FEAT-008, AI-FEAT-010, AI-FEAT-012, AI-FEAT-013, AI-FEAT-014, AI-FEAT-015, AI-FEAT-016, AI-FEAT-017, AI-FEAT-023, AI-FEAT-026, AI-FEAT-034, AI-FEAT-035, AI-FEAT-048, AI-FEAT-058 |
 | overlapping-active-decisions | 2 Accepted decisions (DEC-006, DEC-007) all govern the exact same feature/milestone set (AI-FEAT-029) — worth a human check that they don't contradict each other | DEC-006 | — |
+| overlapping-active-decisions | 2 Accepted decisions (DEC-019, DEC-020) all govern the exact same feature/milestone set (AI-FEAT-058) — worth a human check that they don't contradict each other | DEC-019 | — |
 | shared-code-path | main/main.js is explicitly owned by 6 features (shared, not exclusive) | main/main.js | AI-FEAT-001, AI-FEAT-021, AI-FEAT-024, AI-FEAT-025, AI-FEAT-036, AI-FEAT-057 |
 | shared-code-path | main/preload.js is explicitly owned by 2 features (shared, not exclusive) | main/preload.js | AI-FEAT-001, AI-FEAT-057 |
 | shared-code-path | renderer/theme-init.js is explicitly owned by 2 features (shared, not exclusive) | renderer/theme-init.js | AI-FEAT-001, AI-FEAT-003 |
@@ -59,6 +60,16 @@ None.
 | shared-code-path | services/transferExportService.js is explicitly owned by 3 features (shared, not exclusive) | services/transferExportService.js | AI-FEAT-038, AI-FEAT-040, AI-FEAT-041 |
 | shared-code-path | services/offlineCollectionRegistryService.js is explicitly owned by 2 features (shared, not exclusive) | services/offlineCollectionRegistryService.js | AI-FEAT-042, AI-FEAT-048 |
 | shared-code-path | scripts/product-docs/cli.js is explicitly owned by 2 features (shared, not exclusive) | scripts/product-docs/cli.js | AI-FEAT-057, AI-FEAT-058 |
+| shared-code-path | scripts/product-docs/lib/statusResolution.js is explicitly owned by 3 features (shared, not exclusive) | scripts/product-docs/lib/statusResolution.js | AI-FEAT-058, AI-FEAT-058, AI-FEAT-058 |
+| shared-code-path | scripts/product-docs/lib/knowledgeEngine.js is explicitly owned by 3 features (shared, not exclusive) | scripts/product-docs/lib/knowledgeEngine.js | AI-FEAT-058, AI-FEAT-058, AI-FEAT-058 |
+| shared-code-path | scripts/product-docs/lib/knowledgeCli.js is explicitly owned by 2 features (shared, not exclusive) | scripts/product-docs/lib/knowledgeCli.js | AI-FEAT-058, AI-FEAT-058 |
+| shared-code-path | scripts/product-docs/lib/knowledgeTestCorpus.js is explicitly owned by 2 features (shared, not exclusive) | scripts/product-docs/lib/knowledgeTestCorpus.js | AI-FEAT-058, AI-FEAT-058 |
+| shared-code-path | scripts/product-docs/lib/knowledgeEval.js is explicitly owned by 2 features (shared, not exclusive) | scripts/product-docs/lib/knowledgeEval.js | AI-FEAT-058, AI-FEAT-058 |
+| shared-code-path | scripts/product-docs/knowledge-portal/server.js is explicitly owned by 2 features (shared, not exclusive) | scripts/product-docs/knowledge-portal/server.js | AI-FEAT-058, AI-FEAT-058 |
+| shared-code-path | scripts/product-docs/knowledge-portal/index.html is explicitly owned by 3 features (shared, not exclusive) | scripts/product-docs/knowledge-portal/index.html | AI-FEAT-058, AI-FEAT-058, AI-FEAT-058 |
+| shared-code-path | scripts/product-docs/lib/intentConcepts.js is explicitly owned by 4 features (shared, not exclusive) | scripts/product-docs/lib/intentConcepts.js | AI-FEAT-058, AI-FEAT-058, AI-FEAT-058, AI-FEAT-058 |
+| shared-code-path | scripts/product-docs/lib/questionClassifier.js is explicitly owned by 3 features (shared, not exclusive) | scripts/product-docs/lib/questionClassifier.js | AI-FEAT-058, AI-FEAT-058, AI-FEAT-058 |
+| shared-code-path | scripts/product-docs/lib/knowledgeTestCorpusV2.js is explicitly owned by 2 features (shared, not exclusive) | scripts/product-docs/lib/knowledgeTestCorpusV2.js | AI-FEAT-058, AI-FEAT-058 |
 
 ## Evidence gap (57)
 

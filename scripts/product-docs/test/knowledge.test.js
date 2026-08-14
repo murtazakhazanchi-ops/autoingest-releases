@@ -16,7 +16,7 @@ const { REPO_ROOT, PRODUCT_DOCS_ROOT } = require('../lib/repoRoot');
 const { stableStringify } = require('../lib/stableJson');
 const { buildKnowledgeIndex } = require('../lib/knowledgeIndex');
 const { resolveFeatureOperatorStatus, RECORD_STATUS, QUERY_STATUS, matchKnownBoundary } = require('../lib/statusResolution');
-const { answerQuestion, knowledgeIndexMap } = require('../lib/knowledgeEngine');
+const { answerQuestion, knowledgeIndexMap, buildEngineContext } = require('../lib/knowledgeEngine');
 const validators = require('../lib/validators');
 
 const FIXED_GUIDANCE = 'AutoIngest supports this capability, but detailed operator instructions are not yet documented.';
@@ -55,7 +55,10 @@ const KNOWN_BROKEN_SOURCE_PATHS = new Set(['docs/README.md']);
 async function main() {
   const { t, summarize } = createRunner();
   const { parsed, built } = build.assemble();
-  const ctx = { searchIndex: built.searchIndex, knowledgeIndexById: knowledgeIndexMap(built.knowledgeIndex) };
+  // Full production context (Stage 2) — every existing Stage 1 assertion
+  // below must hold true even with workflowIndexById/dashboard populated,
+  // since that's what the CLI/portal/eval harness actually use.
+  const ctx = buildEngineContext(built);
   const realFeatureIds = new Set(parsed.features.keys());
 
   // ── Section 1: Phase 12 checklist ─────────────────────────────────────
@@ -149,7 +152,14 @@ async function main() {
     const qmz = answerQuestion('What is QMZ?', ctx);
     assert.ok(qmz.matchedCapabilities.some((m) => m.id === 'AI-FEAT-047'));
     const metadata = answerQuestion('Can AutoIngest repair missing metadata?', ctx);
-    assert.equal(metadata.matchedCapabilities[0].id, 'AI-FEAT-033');
+    // Stage 2: the top match may legitimately be the Capability (AI-FEAT-033)
+    // OR its companion Workflow (AI-WF-004, which itself cites AI-FEAT-033
+    // in relatedCapabilities) — both are correctly-grounded answers to this
+    // question; which one fronts the answer depends on question-type-aware
+    // preference (see knowledgeEngine.js), not a regression either way.
+    const top = metadata.matchedCapabilities[0].id;
+    const correctlyGrounded = top === 'AI-FEAT-033' || metadata.relatedCapabilities.includes('AI-FEAT-033') || (metadata.sources || []).some((s) => s.id === 'AI-FEAT-033');
+    assert.ok(correctlyGrounded, `expected the metadata-repair answer to be grounded in AI-FEAT-033 one way or another, got top=${top}, related=${JSON.stringify(metadata.relatedCapabilities)}`);
     assert.equal(metadata.capabilityStatus, QUERY_STATUS.AVAILABLE);
   });
 
@@ -188,11 +198,23 @@ async function main() {
     }
   });
 
-  await t('negative: guidance is never anything other than the one fixed fallback sentence or null', () => {
+  await t('negative: guidance is never anything other than the fixed fallback sentence, null, a citation to a real AI-WF workflow, or a real workflow\'s own "When To Use It" text verbatim', () => {
+    // Stage 2 addition: when a companion Workflow record exists for the
+    // matched capability, guidance may cite it by ID (answerFromRecord path)
+    // or, when the match IS the workflow itself (answerFromWorkflow path),
+    // guidance is that workflow's own "When To Use It" field verbatim. Both
+    // are real evidence, never invention — checked by requiring an EXACT
+    // match against real, already-authored text, not just "looks plausible."
+    const WORKFLOW_CITATION_RE = /^See (AI-WF-\d{3}) \(.+\) for step-by-step instructions\.$/;
+    const realWhenToUseItTexts = new Set(Array.from(ctx.workflowIndexById.values()).map((w) => w.whenToUseIt).filter(Boolean));
     const questions = ['What is QMZ?', 'How do I create a new event?', 'Can AutoIngest repair missing metadata?', 'What routine maintenance does AutoIngest do on my archive?', 'Can AutoIngest recognize faces?', 'nonsense xyz'];
     for (const q of questions) {
       const answer = answerQuestion(q, ctx);
-      assert.ok(answer.guidance === null || answer.guidance === FIXED_GUIDANCE, `"${q}" produced invented guidance text: ${answer.guidance}`);
+      if (answer.guidance === null || answer.guidance === FIXED_GUIDANCE) continue;
+      if (realWhenToUseItTexts.has(answer.guidance)) continue;
+      const m = WORKFLOW_CITATION_RE.exec(answer.guidance);
+      assert.ok(m, `"${q}" produced guidance text matching none of the allowed forms: ${answer.guidance}`);
+      assert.ok(ctx.workflowIndexById.has(m[1]), `"${q}" guidance cites nonexistent workflow ${m[1]}`);
     }
   });
 

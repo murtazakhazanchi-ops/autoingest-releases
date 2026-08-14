@@ -7,19 +7,25 @@
 // knowledgeEngine.js; all eval-corpus logic lives in knowledgeEval.js.
 
 const build = require('./build');
-const { answerQuestion, knowledgeIndexMap } = require('./knowledgeEngine');
-const { runEval } = require('./knowledgeEval');
+const { answerQuestion, buildEngineContext } = require('./knowledgeEngine');
+const { runEval, runEvalV2 } = require('./knowledgeEval');
 
-const HELP = `knowledge — Stage 1 AutoIngest Knowledge Engine prototype (AI-FEAT-058)
+const HELP = `knowledge — AutoIngest Knowledge Engine (AI-FEAT-058, Stage 1 + Stage 2)
 
 Usage: node scripts/product-docs/cli.js knowledge <sub> [args]
 
 Subcommands:
   ask "<question>" [--json]     Answer a natural-language operator question
-  eval [--out <path>]           Run the 20-question test corpus, print
-                                 expected-vs-actual, write a knowledge-gap
-                                 report (default:
+  eval [--out <path>]           Run the Stage 1 20-question test corpus,
+                                 print expected-vs-actual, write a
+                                 knowledge-gap report (default:
                                  docs/product/generated/knowledge-gap-report.json)
+  eval-v2 [--out <path>]        Run the Stage 2 Phase 20 expanded 99-question
+                                 corpus (paraphrase families, Online Registry/
+                                 teamwork/offline coverage, adversarial cases —
+                                 knowledgeTestCorpusV2.js), write a separate
+                                 gap report (default:
+                                 docs/product/generated/knowledge-gap-report-v2.json)
   serve [--port 5177]           Serve the minimal local static portal
                                  (Node core http only, no dependencies)
 
@@ -85,10 +91,7 @@ function cmdAsk(args) {
   }
   const question = positional.join(' ');
   const { built } = build.assemble();
-  const answer = answerQuestion(question, {
-    searchIndex: built.searchIndex,
-    knowledgeIndexById: knowledgeIndexMap(built.knowledgeIndex),
-  });
+  const answer = answerQuestion(question, buildEngineContext(built));
   if (flags.json) {
     console.log(JSON.stringify(answer, null, 2));
   } else {
@@ -99,6 +102,18 @@ function cmdAsk(args) {
 function cmdEval(args) {
   const { flags } = parseArgs(args);
   const result = runEval({ outPath: flags.out });
+  console.log(result.table);
+  console.log(`\n${result.summary}`);
+  console.log(`Wrote ${result.outPath}`);
+  if (result.failures.length) {
+    console.error(`\n${result.failures.length} question(s) did not match expectations — see table above.`);
+    process.exitCode = 1;
+  }
+}
+
+function cmdEvalV2(args) {
+  const { flags } = parseArgs(args);
+  const result = runEvalV2({ outPath: flags.out });
   console.log(result.table);
   console.log(`\n${result.summary}`);
   console.log(`Wrote ${result.outPath}`);
@@ -123,6 +138,7 @@ function run(args) {
   switch (sub) {
     case 'ask': return cmdAsk(rest);
     case 'eval': return cmdEval(rest);
+    case 'eval-v2': return cmdEvalV2(rest);
     case 'serve': return cmdServe(rest);
     default:
       console.error(`Unknown knowledge subcommand: ${sub}\n`);

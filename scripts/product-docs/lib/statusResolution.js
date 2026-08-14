@@ -77,39 +77,114 @@ function resolveFeatureOperatorStatus(featureRecord, { openBugCount = 0 } = {}) 
 const KNOWN_BOUNDARIES = Object.freeze([
   {
     id: 'face-recognition',
+    hardOverride: true,
     keywords: ['face', 'facial', 'recognize', 'recognition'],
     statement: 'AutoIngest has no face-recognition or facial-identification capability.',
     citation: 'No matching code, feature, or roadmap record for "face"/"facial"/"recognition" anywhere in main/, renderer/, services/, or docs/product/ (confirmed by direct repository search); 00_PROJECT_VISION.md scopes AutoIngest to structured archival ingestion, not photo analysis.',
   },
   {
     id: 'ai-auto-tagging',
+    hardOverride: true,
     keywords: ['auto-tag', 'autotag', 'ai tagging', 'image recognition', 'object detection'],
     statement: 'AutoIngest has no AI-based image recognition or automatic content tagging.',
     citation: 'Same absence of evidence as face-recognition; AI-FEAT-056 (AI Archive Intelligence) is Planned with no finalized scope — its name must not be read as implying this capability exists or is scoped to include it.',
   },
   {
     id: 'photo-editing',
+    hardOverride: true,
     keywords: ['edit photo', 'retouch', 'photo editing', 'crop photo', 'photo editor'],
     statement: 'AutoIngest does not edit, retouch, or otherwise modify photo content.',
     citation: '00_PROJECT_VISION.md: "built for structured archival workflows, not general-purpose photo management."',
   },
   {
     id: 'cloud-storage',
+    hardOverride: true,
     keywords: ['cloud backup', 'cloud storage', 'cloud sync', 'upload to cloud', 'client gallery', 'website upload'],
     statement: 'AutoIngest has no cloud storage, cloud backup, or external website/gallery upload capability.',
     citation: 'DEC-003 (Local-First and On-Premises Architecture): all four storage roots are local or NAS-based; "no fallback to a remote service when local storage is unavailable."',
   },
   {
     id: 'linux',
+    hardOverride: true,
     keywords: ['linux', 'ubuntu'],
     statement: 'AutoIngest does not support Linux.',
     citation: '00_PROJECT_VISION.md: "an Electron-based desktop application for macOS and Windows."',
   },
   {
     id: 'multi-user-roles',
-    keywords: ['multiple users log in', 'concurrent users', 'user roles', 'role-based access', 'multiple accounts at once'],
+    hardOverride: true,
+    keywords: ['multiple users log in', 'concurrent users', 'user roles', 'role-based access', 'multiple accounts at once', 'multiple user accounts', 'multiple accounts'],
     statement: 'AutoIngest does not support multiple concurrent user accounts or role-based access.',
     citation: '01_FEATURE_REGISTRY.md Reconciliation Notes: operator profiles are single-active-user (services/settings.js getLastActiveUserId() confirms a single value).',
+  },
+  // Stage 2, Phase 24 — hardOverride extended to all six of these original
+  // Stage 1 boundaries after adversarial testing found the same class of
+  // regression the five new Registry boundaries already fixed: a compound
+  // question containing an explicit, unambiguous boundary phrase ("...does
+  // that mean it has cloud storage too?") was still overridden by a strong
+  // raw match on an unrelated feature mentioned earlier in the same
+  // sentence ("Online Registry"). The raw-override rule was designed as a
+  // safety valve for a hypothetical stale boundary; testing never found a
+  // real case where overriding was CORRECT, only cases where it caused a
+  // false AVAILABLE for an explicitly-excluded topic. See AI-FEAT-058
+  // Stage 2 Phase 24 evolution entry.
+  // Stage 2 — four Online Registry authority/scope boundaries, added after
+  // Phase 20's expanded eval corpus surfaced several boundary questions
+  // that were confidently (sometimes "strong") answered AVAILABLE despite
+  // contradicting already-evidenced facts from the Online Registry
+  // architecture audit (AI-WF-006). Each citation traces to AI-WF-006's own
+  // verbatim text, which itself traces to the realtime-server/ and
+  // services/realtimeOperationsService.js emitter-call-site trace.
+  //
+  // All four carry `hardOverride: true` — a second real fix found in the
+  // same pass. The existing "a strong RAW feature match may override a
+  // boundary" rule (see knowledgeEngine.js answerQuestion) was designed for
+  // the Stage 1 cloud-backup lesson: a single GENERIC token (bare "backup")
+  // producing a coincidental match that, if wrong, would mean the boundary
+  // itself was stale. These four boundaries are different in kind: the
+  // phrase "Online Registry" legitimately, correctly, strongly matches its
+  // own parent feature (AI-FEAT-048) — but that match doesn't disprove the
+  // NARROWER claim the boundary makes about that feature's scope (it
+  // exists AND doesn't store photos; both true at once). A strong raw
+  // match on the parent feature is not competing evidence against a
+  // boundary about the parent feature's own documented limits, so it must
+  // never be allowed to override one. Each boundary's own keyword list is a
+  // specific multi-word phrase (not a generic single token), keeping
+  // false-positive risk low despite the hard override.
+  {
+    id: 'registry-media-storage',
+    hardOverride: true,
+    keywords: ['registry store my photo', 'registry store photographs', 'photos over the network', 'photos through the relay', 'relay store', 'upload my photos to the registry', 'registry hold my photo'],
+    statement: 'The Online Registry / relay never stores, transmits, or provides access to photograph or media file bytes — only small, size-capped presence/activity/status messages cross it.',
+    citation: 'AI-WF-006 (See Who Else Is Online and What They\'re Working On): "No photographs or media files ever pass through this system. Only small, size-capped status/metadata messages are exchanged."',
+  },
+  {
+    id: 'registry-not-source-of-truth',
+    hardOverride: true,
+    keywords: ['registry replace the archive', 'registry the source of truth', 'registry become the source of truth', 'registry replaces event.json', 'registry replace event.json'],
+    statement: 'The Online Registry never replaces or overrides the archive as the source of truth — event.json remains authoritative at all times, including when the relay is degraded or unavailable.',
+    citation: 'AI-WF-006: "The archive\'s event.json remains the sole source of truth for event data; the Registry never replaces or overrides it."',
+  },
+  {
+    id: 'registry-conflict-detection',
+    hardOverride: true,
+    keywords: ['conflict warning', 'conflict detection', 'conflict:warning', 'warn me if someone else is editing', 'warn if two people', 'warns about editing the same event', 'warn us about conflict', 'warn about conflict'],
+    statement: 'AutoIngest does not currently provide active conflict detection or conflict warnings. The conflict:warning message type is wired into the client/server protocol but has no confirmed emitting code path anywhere in the repository — it is dormant, not active.',
+    citation: 'AI-WF-006: "a conflict:warning message type is defined in the client/server protocol, but no code anywhere in this repository currently emits it. It is wired but dormant. Do not describe AutoIngest as detecting conflicts between operators on the basis of this alone."',
+  },
+  {
+    id: 'registry-activity-scope',
+    hardOverride: true,
+    keywords: ['qmz sorting show up as activity', 'metadata audit activity', 'show up as activity to other operators', 'visible to other operators as activity'],
+    statement: 'Real-time activity/progress visibility in the Online Registry is published only for Import and Transfer/Sync operations. QMZ sorting, metadata audit/repair, and other operations do not currently publish activity, so they are never visible to other operators as live activity.',
+    citation: 'Online Registry architecture audit (behind AI-WF-006): services/realtimeOperationsService.js\'s activity-emission call sites are limited to Import and Transfer/Sync flows only.',
+  },
+  {
+    id: 'registry-presence-not-activity',
+    hardOverride: true,
+    keywords: ['presence shows someone online, are they editing', 'does presence mean', 'presence mean they are editing', 'presence mean someone is working', 'stop me from also working', 'stop you from also working'],
+    statement: 'Presence (a device/operator being connected) is tracked separately from activity and does not mean that operator is actively editing your specific files. AutoIngest enforces no conflict prevention based on presence alone — seeing someone else online does not stop you from also working on the same event.',
+    citation: 'AI-WF-006: "Presence — is a device/operator currently connected. Tracked separately from activity." / "Seeing someone else\'s presence does not mean AutoIngest will stop you from also working on the same event."',
   },
 ]);
 

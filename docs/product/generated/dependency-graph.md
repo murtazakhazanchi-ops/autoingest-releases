@@ -2,7 +2,7 @@
 
 > Generated artifact — locator only. Regenerate with `node scripts/product-docs/cli.js build`. Full machine-readable graph: `dependency-graph.json`. Views below are deliberately bounded (one subsystem or milestone chain per diagram) rather than one unreadable graph of every node.
 
-Total: 123 nodes, 543 edges.
+Total: 124 nodes, 546 edges.
 
 ### Roadmap milestone relationships
 
@@ -21,7 +21,7 @@ flowchart LR
   AI_RM_008(("AI-RM-008: Archive Analytics"))
   AI_RM_009(("AI-RM-009: AI Archive Intelligence"))
   AI_RM_010(("AI-RM-010: Multi-Channel Release & Update System"))
-  AI_RM_011(("AI-RM-011: AutoIngest Knowledge & Onboarding Portal (Stage 1)"))
+  AI_RM_011(("AI-RM-011: AutoIngest Knowledge & Onboarding Portal (Stage 1 + Stage 2)"))
   AI_RM_002 -->|depends_on| AI_RM_001
   AI_RM_003 -->|depends_on| AI_RM_002
   AI_RM_004 -->|depends_on| AI_RM_003
@@ -401,7 +401,7 @@ flowchart LR
   AI_RM_008(("AI-RM-008: Archive Analytics"))
   AI_RM_009(("AI-RM-009: AI Archive Intelligence"))
   AI_RM_010(("AI-RM-010: Multi-Channel Release & Update System"))
-  AI_RM_011(("AI-RM-011: AutoIngest Knowledge & Onboarding Portal (Stage 1)"))
+  AI_RM_011(("AI-RM-011: AutoIngest Knowledge & Onboarding Portal (Stage 1 + Stage 2)"))
   AI_FEAT_049 -->|planned_in| AI_RM_002
   AI_FEAT_050 -->|planned_in| AI_RM_003
   AI_FEAT_051 -->|planned_in| AI_RM_004

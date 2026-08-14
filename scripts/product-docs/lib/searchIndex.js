@@ -18,19 +18,59 @@ function rec(entityType, stableId, title, canonicalPath, opts = {}) {
   };
 }
 
+// Stage 2 finding: workflow records (much richer prose than a feature's
+// name/category) exposed a real defect — a 3-word stopword collision ("how",
+// "between", "and") let AI-WF-006 (Online Registry) confidently win "How do
+// I switch between Stable and Preview versions?", a question about update
+// channels with zero real topical relevance. keywordsFrom() previously only
+// filtered by length (>2 chars), which passes almost every common English
+// connector word. This list is deliberately short — generic, high-frequency
+// words only, never a domain term — filtering more aggressively risks
+// removing real signal (e.g. "with", not listed, could plausibly matter for
+// some future record) for a problem this list already solves.
+const STOPWORDS = new Set([
+  'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'has', 'have', 'had',
+  'was', 'were', 'been', 'this', 'that', 'these', 'those', 'from', 'into', 'onto',
+  'with', 'without', 'how', 'what', 'when', 'where', 'which', 'who', 'whom', 'why',
+  'does', 'did', 'doing', 'done', 'own', 'now', 'only', 'than', 'then', 'them', 'they',
+  'their', 'there', 'here', 'its', 'his', 'her', 'she', 'him', 'out', 'off', 'over',
+  'under', 'again', 'further', 'once', 'about', 'above', 'below', 'between', 'both',
+  'each', 'few', 'more', 'most', 'other', 'some', 'such', 'nor', 'too', 'very', 'just',
+  'per', 'via', 'see', 'set', 'get', 'yet', 'any', 'also', 'may', 'must', 'shall',
+  'should', 'would', 'could', 'will', 'never', 'always', 'while', 'because', 'before',
+  'after', 'during', 'same', 'still', 'even', 'one', 'two', 'first', 'second', 'new',
+]);
+
 function keywordsFrom(...texts) {
   const words = new Set();
   for (const t of texts) {
     if (!t) continue;
     for (const w of String(t).toLowerCase().split(/[^a-z0-9]+/)) {
-      if (w.length > 2) words.add(w);
+      if (w.length > 2 && !STOPWORDS.has(w)) words.add(w);
     }
   }
   return Array.from(words).sort();
 }
 
-function buildSearchIndex(parsed, featureIndexRecords, subsystems, memoryIndexRecords, conversationIndexRecords) {
+function buildSearchIndex(parsed, featureIndexRecords, subsystems, memoryIndexRecords, conversationIndexRecords, workflowIndexRecords) {
   const records = [];
+
+  // Stage 2 — Workflow records join the same flat search index as every
+  // other entity type, so the existing runQuery()/answerQuestion() path
+  // finds them for free — no second retrieval implementation (DEC-020).
+  // Keywords are derived from the title/domain/steps text, same
+  // keywordsFrom() helper used below for roadmap milestones — Workflow
+  // records don't precompute their own search_keywords the way feature
+  // records do, since authoring one is a much rarer, more deliberate act.
+  for (const w of workflowIndexRecords || []) {
+    records.push(rec('workflow', w.id, w.title, w.canonicalDocument, {
+      keywords: keywordsFrom(w.title, w.domain, w.whatItDoes, w.whenToUseIt, ...(w.steps || [])),
+      summary: w.whatItDoes || '',
+      relatedIds: [...w.relatedCapabilities, ...w.roadmapRelationship, ...w.relatedActionIds.workflows, ...w.relatedActionIds.features],
+      authorityLevel: 'canonical', // docs/product/workflows/ — authored, human-reviewed, same tier as bugs/decisions
+      evidenceStatus: w.evidenceStatus,
+    }));
+  }
 
   // Part 6 — memory capsules join the same flat search index as every other
   // entity type, so `query`/`impact`/`lookupById` pick them up for free —

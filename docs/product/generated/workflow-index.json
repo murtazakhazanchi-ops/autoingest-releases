@@ -1,0 +1,297 @@
+{
+  "docsys_version": "1.3.0",
+  "schema_version": "1.3.0",
+  "workflows": [
+    {
+      "beforeYouStart": "An event must already exist or be created as part of this flow (see AI-WF-002). None beyond that is evidenced in this pass.",
+      "canonicalDocument": "workflows/AI-WF-001_IMPORT_PHOTOGRAPHS_FROM_A_MEMORY_CARD_OR_FOLDER.md",
+      "domain": "Import",
+      "evidenceStatus": "Verified from `renderer/renderer.js`'s onboarding overlay text (`OB_SCREENS`, lines 11678–11710) — this is the app's own real first-run instructions, not a paraphrase of engineering docs",
+      "expectedResult": "Files are routed into the event's archive folder structure by photographer (AI-FEAT-022) and component/group (AI-FEAT-017, AI-FEAT-018), then queued for metadata writing (AI-FEAT-029) automatically — evidenced by those features' own canonical records, not independently re-verified live in this pass.",
+      "id": "AI-WF-001",
+      "limitations": "- Duplicate files are detected during import (AI-FEAT-020); the exact skip/rename operator-facing behavior is not spelled out in onboarding text.\n- No step-by-step guidance exists beyond the four onboarding lines above — anything more granular (e.g. exactly which UI element to click for \"choose your source\") is not evidenced in this pass and is not stated here.",
+      "navigationVerified": "Partial",
+      "relatedActionIds": {
+        "features": [
+          "AI-FEAT-026"
+        ],
+        "workflows": [
+          "AI-WF-002",
+          "AI-WF-003"
+        ]
+      },
+      "relatedActions": "AI-WF-002 (Create a New Event), AI-WF-003 (Quick Import), AI-FEAT-026 (Audit Integrity Verification) as a natural next step after a large import.",
+      "relatedCapabilities": [
+        "AI-FEAT-011",
+        "AI-FEAT-012",
+        "AI-FEAT-017",
+        "AI-FEAT-018",
+        "AI-FEAT-019",
+        "AI-FEAT-022"
+      ],
+      "roadmapRelationship": [],
+      "sourceAuthority": "canonical",
+      "steps": [
+        "Connect or choose your source (card, drive, or folder).",
+        "Select the files you want to import.",
+        "For multi-component events, assign files to groups/sub-events.",
+        "Choose photographer and click Import."
+      ],
+      "title": "Import Photographs From a Memory Card or Folder",
+      "troubleshooting": "None recorded as a dedicated Troubleshooting Entry yet. If an import is interrupted, AI-FEAT-021 (Atomic Import Transaction) is the relevant capability — see that record directly; this workflow does not restate its guarantees.",
+      "warnings": "Per `CLAUDE.md`'s File Copy Rules (repository-wide, not workflow-specific): no file is ever overwritten; a same-name conflict is renamed, not replaced.",
+      "whatItDoes": "Copies photographs (and other supported media) from a connected source — a memory card, external drive, or local folder — into the correct archive folder structure for an event, routing multi-photographer or multi-component imports automatically.",
+      "whenToUseIt": "Whenever new photographs need to enter the archive under a real event (as opposed to a quick, un-structured copy — see AI-WF-003 for Quick Import instead).",
+      "whereToGo": "The app's home screen offers an **Event Import** mode, distinct from Quick Import (onboarding screen 1: *\"Choose Event Import or Quick Import\"*). The exact button/menu label for entering Event Import mode was **not independently re-verified in this pass** beyond the onboarding overlay's own framing — see AI-WF-003 for the confirmed Quick Import card entry point."
+    },
+    {
+      "beforeYouStart": "None identified beyond having archive access configured (AI-FEAT-042).",
+      "canonicalDocument": "workflows/AI-WF-002_CREATE_A_NEW_EVENT.md",
+      "domain": "Events",
+      "evidenceStatus": "Verified from `renderer/index.html` (home-screen button text, lines 7077–7081) and `renderer/renderer.js`'s onboarding screen 2",
+      "expectedResult": "The event becomes available as a destination for Import (AI-WF-001) and appears in Event Management for later editing (AI-FEAT-010).",
+      "id": "AI-WF-002",
+      "limitations": "Editing an existing event's fields has a known, documented edge case (BUG-006 — full-payload save can silently drop untracked fields; recorded as a recurring pattern) — relevant if this workflow leads into an edit, not creation itself.",
+      "navigationVerified": "Yes",
+      "relatedActionIds": {
+        "features": [
+          "AI-FEAT-010"
+        ],
+        "workflows": [
+          "AI-WF-001"
+        ]
+      },
+      "relatedActions": "AI-WF-001 (Import Photographs), AI-FEAT-010 (Event Management & Editing) for changes after creation.",
+      "relatedCapabilities": [
+        "AI-FEAT-009"
+      ],
+      "roadmapRelationship": [],
+      "sourceAuthority": "canonical",
+      "steps": [
+        "From the home screen, select **Create Event →**.",
+        "Choose or create a Collection.",
+        "Enter the event's identifying details. The wizard is real and present in code (`eventCreator.js`), but the exact field-by-field prompts (event type, location, city, country) were **not individually re-verified in this pass** beyond their presence — described generically here rather than inventing exact field labels.",
+        "Confirm to create the event. AutoIngest then uses this event structure to route future imports (onboarding screen 2's own stated guarantee)."
+      ],
+      "title": "Create a New Event",
+      "troubleshooting": "None recorded as a dedicated Troubleshooting Entry.",
+      "warnings": "None evidenced specific to event creation itself.",
+      "whatItDoes": "Establishes the event context — Collection → Event → Components — that AutoIngest uses to route every subsequently-imported file into the correct archive folder, without manual path entry (onboarding screen 2: *\"Set the event context\"*).",
+      "whenToUseIt": "Before importing photographs for a new event that doesn't already exist in the archive.",
+      "whereToGo": "Home screen: **\"Create New Event\"** pretitle above a **\"Create Event →\"** primary button (`renderer/index.html:7077-7081`, `#heroPrimaryBtn`). This opens the Event Creator wizard (`#eventCreatorPanel`, `renderer/eventCreator.js`)."
+    },
+    {
+      "beforeYouStart": "None identified.",
+      "canonicalDocument": "workflows/AI-WF-003_USE_QUICK_IMPORT_FOR_A_SMALL_BATCH.md",
+      "domain": "Import",
+      "evidenceStatus": "Verified from `renderer/index.html` (`.qi-title`, lines 520, 7090, 7118) and onboarding screen 1",
+      "expectedResult": "Files are copied to the chosen destination directly — no `event.json` is created for a Quick Import (per AI-FEAT-023's own canonical record).",
+      "id": "AI-WF-003",
+      "limitations": "**This is the single most important thing an operator should know before choosing Quick Import over Event Import**: a Quick Import is permanently excluded from AutoIngest's metadata audit coverage (AI-FEAT-033) because no event.json exists to audit against. This limitation is evidenced directly in AI-FEAT-023's own canonical record, not previously stated anywhere in the onboarding UI itself.",
+      "navigationVerified": "Yes",
+      "relatedActionIds": {
+        "features": [],
+        "workflows": [
+          "AI-WF-001"
+        ]
+      },
+      "relatedActions": "AI-WF-001 (full Event Import, if archival structure is actually needed).",
+      "relatedCapabilities": [
+        "AI-FEAT-023"
+      ],
+      "roadmapRelationship": [],
+      "sourceAuthority": "canonical",
+      "steps": [
+        "Select the **Quick Import** card on the home screen.",
+        "Choose a destination folder.",
+        "Select and copy the files."
+      ],
+      "title": "Use Quick Import for a Small Batch",
+      "troubleshooting": "None recorded.",
+      "warnings": "Per `CLAUDE.md`'s File Copy Rules: no file is ever overwritten regardless of import mode.",
+      "whatItDoes": "Simple, destination-based copying without setting up an event first (onboarding screen 1: *\"Quick Import — simple destination-based copying without event setup\"*).",
+      "whenToUseIt": "For a fast, small, one-off copy where full event-structured archiving isn't needed or wanted.",
+      "whereToGo": "A **\"Quick Import\"** card on the home screen (`renderer/index.html:7090`, `.qi-title`), separate from the Event Import mode used by AI-WF-001."
+    },
+    {
+      "beforeYouStart": "Files must already be imported into an event (this repairs existing archive metadata; it is not part of the import step itself).",
+      "canonicalDocument": "workflows/AI-WF-004_REPAIR_MISSING_OR_INCORRECT_METADATA.md",
+      "domain": "Metadata",
+      "evidenceStatus": "Verified from `renderer/index.html` (`#ovMetadataSync` aria-label, `#msTitle`, lines 7241, 7358)",
+      "expectedResult": "Metadata drift is corrected without touching or re-copying the original imported file (the core guarantee stated in AI-FEAT-033's Summary).",
+      "id": "AI-WF-004",
+      "limitations": "One documented, non-blocking limitation exists on this exact workflow (from AI-FEAT-033's own Known Bugs section): a preview-session identifier does not survive the Preview→Confirm round trip in some cases — cited here rather than re-derived, see that record directly for the current detail.",
+      "navigationVerified": "Yes",
+      "relatedActionIds": {
+        "features": [
+          "AI-FEAT-036"
+        ],
+        "workflows": [
+          "AI-WF-001"
+        ]
+      },
+      "relatedActions": "AI-FEAT-036 (Keyword Registry) if the repair concerns keywords specifically; AI-WF-001 if the real issue is that a re-import is actually needed.",
+      "relatedCapabilities": [
+        "AI-FEAT-031",
+        "AI-FEAT-033",
+        "AI-FEAT-034"
+      ],
+      "roadmapRelationship": [
+        "AI-RM-001"
+      ],
+      "sourceAuthority": "canonical",
+      "steps": [
+        "Open **Metadata Management** from the overview tile.",
+        "Review the event's metadata status — AI-FEAT-031 derives a 9-state event-level status; the exact tab/label an operator uses to trigger a repair scan was **not individually re-verified in this pass** beyond the modal's confirmed existence.",
+        "Run the audit/repair action for the affected event."
+      ],
+      "title": "Repair Missing or Incorrect Metadata",
+      "troubleshooting": "None recorded as a dedicated Troubleshooting Entry yet.",
+      "warnings": "None evidenced beyond the limitation above.",
+      "whatItDoes": "Audits archive-wide metadata correctness and repairs drift, without ever blocking or rolling back the original import copy (AI-FEAT-033's own canonical Summary — this workflow does not restate it differently).",
+      "whenToUseIt": "When an event shows a metadata warning/status badge, or after noticing metadata (keywords, photographer field, dates) looks wrong or missing on already-imported files.",
+      "whereToGo": "An overview tile labeled for opening **\"Open Metadata Management\"** (`#ovMetadataSync`, `renderer/index.html:7241`) opens the **Metadata Management** modal (`#msTitle`, `renderer/index.html:7358`) — a single tabbed modal consolidating three previously-separate metadata surfaces (AI-FEAT-034's own record)."
+    },
+    {
+      "beforeYouStart": "A destination drive must be connected and selected.",
+      "canonicalDocument": "workflows/AI-WF-005_EXPORT_OR_UPDATE_A_TRANSFER_DRIVE.md",
+      "domain": "Transfer & Backup",
+      "evidenceStatus": "Verified from `renderer/index.html` (`#alocTransferExportBtn`, `#txTitle`, `#txScanBtn`, lines 8332, 8430, 8575)",
+      "expectedResult": "A verified copy is written to the destination (checksum verification, AI-FEAT-025). If interrupted, resume-state handling exists (AI-FEAT-041) — the exact operator-visible resume prompt was not independently re-verified in this pass.",
+      "id": "AI-WF-005",
+      "limitations": "A real, historical divergence between displayed resume state and actual backend progress was found and fixed (BUG-005) — cited as evidence this path has real edge-case history, not to imply it's currently broken.",
+      "navigationVerified": "Yes",
+      "relatedActionIds": {
+        "features": [
+          "AI-FEAT-043"
+        ],
+        "workflows": []
+      },
+      "relatedActions": "AI-FEAT-043 (Archive Health Reporting) to confirm the source archive is healthy before a large transfer.",
+      "relatedCapabilities": [
+        "AI-FEAT-038",
+        "AI-FEAT-039",
+        "AI-FEAT-040",
+        "AI-FEAT-041"
+      ],
+      "roadmapRelationship": [],
+      "sourceAuthority": "canonical",
+      "steps": [
+        "Select **Transfer Export…**.",
+        "Choose the destination drive and the events to include.",
+        "To update an existing transfer drive instead of a fresh export, use **Scan for New Data** to compare against what's already there before copying.",
+        "Confirm to begin the copy. Transfer/sync can run in the background without blocking the rest of the app while it copies (AI-FEAT-041 — confirmed as a real, distinct capability from standard Import, which does not have this background/minimize behavior)."
+      ],
+      "title": "Export or Update a Transfer Drive",
+      "troubleshooting": "If a transfer appears stuck or resume state looks wrong, BUG-005's record documents the historical root cause and fix — consult it directly.",
+      "warnings": "Per `CLAUDE.md`'s File Copy Rules: no overwrite, ever, applies here too.",
+      "whatItDoes": "Writes a clean mirror of selected events to a portable drive (Transfer Export, AI-FEAT-038), or scans an existing transfer drive for what's changed since the last copy (Backup Update Scanning, AI-FEAT-040) — these are two distinct capabilities sharing this entry point, with different conflict semantics (Backup Update never overwrites or renames on conflict; Transfer Export's own record should be consulted for its exact behavior rather than assumed identical).",
+      "whenToUseIt": "Moving events to a portable drive for the first time (Export), or refreshing a drive that already has some of the same events on it (Update/Scan).",
+      "whereToGo": "A **\"Transfer Export…\"** button (`#alocTransferExportBtn`, `renderer/index.html:8332`) opens the **Transfer Export** modal (`#txTitle`, line 8430), which contains a **\"Scan for New Data\"** button (`#txScanBtn`, line 8575) for the update/comparison path."
+    },
+    {
+      "beforeYouStart": "**Team Live must be enabled first** — this is an explicit operator opt-in, not automatic. There is **no authentication by default**: the relay server accepts any connection unless an operator has separately configured a server key, and the server's own documentation states it is intended for LAN/VPN use only.",
+      "canonicalDocument": "workflows/AI-WF-006_SEE_WHO_ELSE_IS_ONLINE_AND_WHAT_THEYRE_WORKING_ON.md",
+      "domain": "Online Registry & Teamwork",
+      "evidenceStatus": "Verified from `renderer/index.html` (Settings toggle line 8058), `renderer/renderer.js` (`al-mode-tab` buttons, lines 2812–2813), `realtime-server/server.js`, `services/realtimeOperationsService.js`, and `main/main.js` emitter call sites — traced end-to-end during Stage 2's Online Registry architecture audit",
+      "expectedResult": "Devices currently connected appear with their operator name and device name. If another device is actively importing or syncing, its progress (files copied / total, where published) is visible in near-real-time. **A device that has finished an operation, or is running QMZ/Metadata/Audit work, will show as present but will not show meaningful activity detail for that specific operation** — this is expected, not a bug, per the activity-publishing scope confirmed above.",
+      "id": "AI-WF-006",
+      "limitations": "- No enforced conflict prevention exists today for two operators independently working on the same event, beyond the narrow, hint-only sync-slot gate for Transfer/Sync specifically. Seeing someone else's presence does **not** mean AutoIngest will stop you from also working on the same event.\n- Presence data is held only in server memory and is never persisted — a server restart clears it. Stale presence (a device that crashed without disconnecting cleanly) can take up to roughly 55 seconds to clear, governed by the underlying connection library's own ping-timeout, not an application-level staleness check.\n- **No photographs or media files ever pass through this system.** Only small, size-capped status/metadata messages are exchanged. The archive's `event.json` remains the sole source of truth for event data; the Registry never replaces or overrides it.",
+      "navigationVerified": "Yes",
+      "relatedActionIds": {
+        "features": [
+          "AI-FEAT-045"
+        ],
+        "workflows": [
+          "AI-WF-001",
+          "AI-WF-005"
+        ]
+      },
+      "relatedActions": "AI-WF-001 (Import) and AI-WF-005 (Transfer/Backup) are the two workflows whose progress is visible here; AI-FEAT-045 (Archive Lock Handling) if the real question is about a filesystem-level import lock rather than teamwork visibility.",
+      "relatedCapabilities": [
+        "AI-FEAT-048"
+      ],
+      "roadmapRelationship": [],
+      "sourceAuthority": "canonical",
+      "steps": [
+        "In Settings, enable **Team Live & Online Registry** and set the relay server address if not already configured.",
+        "Open the **Activity Log** panel.",
+        "Select the **Team Live** tab.",
+        "Review connected devices/operators and, where shown, their current activity and progress for Import/Transfer operations specifically. The panel refreshes automatically roughly every 30 seconds."
+      ],
+      "title": "See Who Else Is Online and What They're Working On",
+      "troubleshooting": "None recorded as a dedicated Troubleshooting Entry yet. Known, evidenced behavior for common questions: a stale \"still online\" entry after another operator's app crashed is expected for up to ~55 seconds, not a defect requiring a manual fix.",
+      "warnings": "If the relay server becomes unreachable, import and transfer/sync operations **continue normally** — they do not block on Registry connectivity (confirmed directly in the reconnect/fallback code). Team Live simply shows as offline/reconnecting until the connection returns.",
+      "whatItDoes": "Shows which other AutoIngest devices/operators are currently connected to a shared local relay server, and — for two specific operations only — live progress on what they're doing right now.\n\n**Read this before anything else in this workflow**: AutoIngest's Online Registry deliberately keeps four different things separate, and this workflow must never blur them into one:\n\n1. **Presence** — is a device/operator currently connected. Tracked separately from activity.\n2. **Activity / progress visibility** — what a connected device is currently doing, and how far along. Currently published for **Import and Transfer/Sync only** — not QMZ, not Metadata, not Audit/Repair.\n3. **Conflict detection** — a `conflict:warning` message type is defined in the client/server protocol, but **no code anywhere in this repository currently emits it**. It is wired but dormant. Do not describe AutoIngest as detecting conflicts between operators on the basis of this alone.\n4. **Archive-level file locking** (AI-FEAT-045) — an entirely separate mechanism (photographer-folder locks with a 30-minute TTL) that has no confirmed relationship to the Online Registry. A distinct **sync-slot** coordination mechanism (one concurrent sync at a time, server-arbitrated) does exist inside the Registry system for Transfer/Sync specifically — but the server's own code comment calls it \"a timing hint only, not a correctness guarantee.\"",
+      "whenToUseIt": "Before starting an import or transfer into a shared archive, to see whether someone else is already working on the same event or destination — or simply to check who's currently active.",
+      "whereToGo": "Settings: a toggle labeled **\"Enable Team Live & Online Registry\"** (`renderer/index.html:8058`). Once enabled and connected, the **Activity Log** panel has two tabs: **Local Activity** and **Team Live** (`renderer/renderer.js:2812-2813`) — select **Team Live** to see other devices."
+    },
+    {
+      "beforeYouStart": "None identified beyond having a QMZ-type event already established.",
+      "canonicalDocument": "workflows/AI-WF-007_SORT_QMZ_PHOTOGRAPHS.md",
+      "domain": "QMZ",
+      "evidenceStatus": "Verified from `renderer/index.html` (`#qmzTitle`, line 8135) for the workspace itself; the entry-point control that opens it was not located in this pass",
+      "expectedResult": "Sequence codes (e.g. `01Q`, `02M`) become the folder-naming convention for the sequence — confirmed these codes are never included in the keyword metadata set at any entry point (AI-FEAT-047's own record, itself verified live through the real UI per that record).",
+      "id": "AI-WF-007",
+      "limitations": "Unsequenced files can be adopted into a reserved bucket distinct from AutoIngest's separate, archive-wide Folder Adoption feature (AI-FEAT-046) — these two \"adoption\" concepts must not be conflated, per AI-FEAT-047's own explicit warning.",
+      "navigationVerified": "Partial",
+      "relatedActionIds": {
+        "features": [
+          "AI-FEAT-046"
+        ],
+        "workflows": []
+      },
+      "relatedActions": "AI-FEAT-046 (Archive Folder Adoption) — a different, archive-wide capability, not to be confused with QMZ's own Unsequenced-folder adoption.",
+      "relatedCapabilities": [
+        "AI-FEAT-047"
+      ],
+      "roadmapRelationship": [],
+      "sourceAuthority": "canonical",
+      "steps": [
+        "Sort QMZ Photos — assign photos into Q/M/Z sequences.",
+        "Review Cleanup.",
+        "Deep Verify."
+      ],
+      "title": "Sort QMZ Photographs",
+      "troubleshooting": "If keywords or Hijri dates appear to be missing after a QMZ sequence, BUG-007 documents the historical root cause (now fixed) — consult it directly rather than assuming a new, different issue.",
+      "warnings": "A real, historical metadata-loss bug existed in this exact workflow (BUG-007 — QMZ's early independent metadata-context construction silently dropped keywords/Hijri date) — fixed, and the fix is why QMZ now routes through the same shared metadata engine as every other workflow rather than a workflow-specific one (DEC-011's Consequences).",
+      "whatItDoes": "Sequences QMZ (Qadam/Majlis/Ziyafat) event photographs into numbered `01Q`/`02M`-style sequence codes, distinct from AutoIngest's standard Event Import grouping — its own dedicated workspace with its own root, state file, and IPC surface (AI-FEAT-047's own canonical Summary).",
+      "whenToUseIt": "For QMZ-type events specifically, which need explicit sequence modeling that the generic Event Import/grouping model does not provide (DEC-011's own stated rationale).",
+      "whereToGo": "The workspace itself is real and titled **\"Sort QMZ Photos\"** (`#qmzTitle`, `renderer/index.html:8135`) — a full-window overlay. **The specific button, menu item, or event-type condition that opens this overlay was not located during this pass** — this workflow does not guess it. If asked \"where do I find QMZ,\" the honest answer is that the workspace exists and is titled \"Sort QMZ Photos,\" but its exact entry point requires further verification before being stated as fact."
+    },
+    {
+      "beforeYouStart": "Confirm no import is genuinely still running against the same event/photographer combination before clearing a lock — this workflow does not state what happens if a lock is cleared while a real import is still active, because that isn't evidenced in this pass.",
+      "canonicalDocument": "workflows/AI-WF-008_RECOVER_FROM_AN_ARCHIVE_LOCK_ERROR.md",
+      "domain": "Archive Management",
+      "evidenceStatus": "Verified from `services/archiveLockService.js` (cited directly in AI-FEAT-045's Current Behavior section) and `renderer/index.html` (`#diagTitle`, line 8698)",
+      "expectedResult": "A genuinely stale lock (past its 30-minute TTL with no heartbeat renewal) is released, allowing import to proceed again for that event/photographer.",
+      "id": "AI-WF-008",
+      "limitations": "Lock-clearing is deliberately constrained (DEC-013, \"Lock Clearing Must Be Constrained\") — this is not an unrestricted \"force unlock\" action; consult DEC-013 directly for the exact constraint rationale rather than assuming it is unrestricted.",
+      "navigationVerified": "Yes",
+      "relatedActionIds": {
+        "features": [],
+        "workflows": [
+          "AI-WF-006"
+        ]
+      },
+      "relatedActions": "AI-WF-006 if the actual question is about Online Registry presence/coordination rather than this archive-level file lock — the two are separate mechanisms and should not be conflated.",
+      "relatedCapabilities": [
+        "AI-FEAT-043",
+        "AI-FEAT-045"
+      ],
+      "roadmapRelationship": [],
+      "sourceAuthority": "canonical",
+      "steps": [
+        "Open **Archive Diagnostics**.",
+        "Run diagnostics to surface the current lock state.",
+        "Use the lock-release capability once located and confirmed — not stated as a specific click sequence here, since it was not independently verified in this pass."
+      ],
+      "title": "Recover From an Archive Lock Error",
+      "troubleshooting": "If a lock error appears and you're confident it's stale, BUG-004's record documents the historical root cause and fix for the same-device case specifically.",
+      "warnings": "A real, historical bug existed here: a same-device stale lock could block all future imports (BUG-004) — fixed. This is direct evidence this exact failure mode is real and has occurred before, not hypothetical.",
+      "whatItDoes": "Recovers from a stale photographer-folder import lock — a real, evidenced, distinct mechanism from both the Online Registry's sync-slot coordination (see AI-WF-006) and from Transfer Export's own separate concurrency guard.",
+      "whenToUseIt": "When AutoIngest reports that an event/photographer folder is locked and you believe no other import is actually in progress against it (e.g. after a crash on the same or another device).",
+      "whereToGo": "**Archive Diagnostics** modal (`#diagTitle`, `renderer/index.html:8698`), reached from the Archive Health surface (AI-FEAT-043). The modal has a **\"Run Diagnostics\"** button (`#diagRunBtn`) confirmed in code. **The specific button/control used to release a stale lock from within this modal was not located in this pass** — the underlying capability (`releaseStaleLock()`, IPC channels `archive:releaseStaleLock` / `archive:clearSelfStaleLock`) is confirmed to exist in AI-FEAT-045's own record, but this workflow does not invent the exact UI control for triggering it."
+    }
+  ]
+}

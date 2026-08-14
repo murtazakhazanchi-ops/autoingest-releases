@@ -9,36 +9,22 @@
         "step-by-step instructions",
         "UI navigation"
       ],
-      "note": "Ties at score 100 across AI-FEAT-018/019/021/023/028 (all merely share the token \"import\"); ascending-ID tiebreak surfaces AI-FEAT-018 (Event-Component Import Routing) rather than the more directly relevant AI-FEAT-019 (Import Pipeline & Copy Engine). The engine correctly hedges rather than asserting confidently — but the specific capability surfaced is not the most relevant one.",
-      "pass": true,
-      "query": "How do I import photographs from an SD card?",
-      "relatedFeature": "AI-FEAT-018(100)"
-    },
-    {
-      "domain": "Import",
-      "gapType": "AMBIGUOUS_RETRIEVAL",
-      "missingEvidence": [
-        "unambiguous topical match",
-        "step-by-step instructions",
-        "UI navigation"
-      ],
-      "note": "Same tie set as Q01 (\"import\" token). Whether video specifically is supported is not confirmed by any matched feature record (only config/app.config.js has the extension list, which is not part of the canonical registry) — a genuine documentation gap, correctly not asserted.",
-      "pass": true,
+      "note": "Deliberately NOT concept-boosted in Stage 2 (see intentConcepts.js \"import-video\" cluster comment) — no canonical record confirms video-format support specifically, only config/app.config.js (non-canonical). An earlier hint artificially inflated confidence toward an unrelated routing feature; reverted during Stage 2's own testing rather than shipped. Remains an honest, disclosed documentation gap, not asserted either way.",
+      "pass": false,
       "query": "Can I import video?",
       "relatedFeature": "AI-FEAT-018(100)"
     },
     {
       "domain": "Import",
-      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "gapType": "UNEXPECTED_RESULT",
       "missingEvidence": [
-        "unambiguous topical match",
         "step-by-step instructions",
         "UI navigation"
       ],
-      "note": "AI-FEAT-022 (Photographer-Folder Resolution) — the genuinely relevant record — ties at score 100 with AI-FEAT-018/019/021/023 and loses the ascending-ID tiebreak.",
-      "pass": true,
+      "note": "AI-FEAT-022 (Photographer-Folder Resolution) still ties at score 100 with several other features sharing only \"import\"/\"photographer\" as isolated tokens; no concept cluster currently targets this exact troubleshooting phrasing (a real, scoped Stage 3 candidate — see AI-FEAT-058 Stage 2 Future Enhancements), and no Workflow record covers this specific symptom yet.",
+      "pass": false,
       "query": "My photographer information is missing after import.",
-      "relatedFeature": "AI-FEAT-018(100)"
+      "relatedFeature": "AI-WF-004(300)"
     },
     {
       "domain": "Events",
@@ -48,36 +34,22 @@
         "step-by-step instructions",
         "UI navigation"
       ],
-      "note": "AI-FEAT-009 (Event Creation) ties at 100 with AI-FEAT-004/010/018/031 (all share \"event\"); ascending-ID tiebreak surfaces AI-FEAT-004 (event.json data model — a backend contract, not the operator-facing creation flow).",
-      "pass": true,
-      "query": "How do I create a new event?",
-      "relatedFeature": "AI-FEAT-004(100)"
-    },
-    {
-      "domain": "Events",
-      "gapType": "AMBIGUOUS_RETRIEVAL",
-      "missingEvidence": [
-        "unambiguous topical match",
-        "step-by-step instructions",
-        "UI navigation"
-      ],
-      "note": "No feature record documents event deletion. The engine still surfaces a weak tied match (AI-FEAT-004/009/010/018/031, all sharing only \"event\") rather than a clean zero-result — the hedge language prevents this from being presented as a confident answer, but a human reviewer should read the hedged output, not just the capabilityStatus field, to see it correctly declines to claim deletion exists.",
+      "note": "Still no feature or workflow record documents event deletion. The engine still surfaces a weak tied match rather than a clean zero-result — the hedge language correctly declines to claim deletion exists. Unchanged from Stage 1: this is an honest documentation gap (no evidence either way), not a retrieval defect.",
       "pass": false,
       "query": "Can I delete an event?",
       "relatedFeature": "AI-FEAT-004(100)"
     },
     {
       "domain": "Collections",
-      "gapType": "NO_MATCH",
+      "gapType": "UNEXPECTED_RESULT",
       "missingEvidence": [
-        "unambiguous topical match",
         "step-by-step instructions",
         "UI navigation"
       ],
-      "note": null,
-      "pass": true,
+      "note": "FIXED in Stage 2 (Phase 24 adversarial review) — was UNKNOWN/no-match in Stage 1 because no record contained the word \"Collection\" as a distinct topic. AI-WF-002 (Create a New Event) genuinely explains the real Collection → Event → Components hierarchy (verified against onboarding screen 2's own text), but Stage 1/early-Stage-2 answerQuestion() only preferred a Workflow answer for HOW_TO/TROUBLESHOOTING question types — \"What is a Collection?\" classifies EXPLANATION, so it fell through to feature-only matching (zero features mention \"Collection\", hence UNKNOWN). Broadening the workflow-preference gate to include EXPLANATION (found via a different adversarial question, \"What is a sync-slot?\", which had the identical structural problem) fixed this as a side effect — a genuine improvement, not a loosened expectation.",
+      "pass": false,
       "query": "What is a Collection in AutoIngest?",
-      "relatedFeature": null
+      "relatedFeature": "AI-WF-002(200)"
     },
     {
       "domain": "Collections",
@@ -87,20 +59,19 @@
         "step-by-step instructions",
         "UI navigation"
       ],
-      "note": "AI-FEAT-053 (Global Search, the genuinely relevant — and Planned, not Available — record) scores 100 from \"search\" but LOSES the tiebreak to AI-FEAT-042/043/044/045/046 (which score 100 from the unrelated token \"archive\" and have lower IDs). This is the corpus's most consequential finding: the engine reports AVAILABLE (correct for the archive-operations features it actually surfaced) but a careless reading could be mistaken for \"archive search is available,\" when the actual archive-wide search capability is Planned. The weak-match hedge is the only thing preventing this from reading as confident. See AI-FEAT-058 Architectural Review.",
+      "note": "Unchanged from Stage 1: AI-FEAT-053 (Global Search, Planned — the genuinely relevant record) still loses the tiebreak to unrelated Archive Operations features sharing only \"archive\". No concept cluster currently targets this phrasing toward Global Search specifically — a real Stage 3 candidate, deliberately not patched with an overly-specific hint here.",
       "pass": true,
       "query": "Can I search my entire archive?",
       "relatedFeature": "AI-FEAT-042(100)"
     },
     {
       "domain": "Future capabilities",
-      "gapType": "NO_MATCH",
+      "gapType": "MISSING_OPERATOR_WORKFLOW",
       "missingEvidence": [
-        "unambiguous topical match",
         "step-by-step instructions",
         "UI navigation"
       ],
-      "note": "Stage 1's engine only matches feature-type records — it does not route \"what's next\" questions to roadmap-dashboard.json at all, even though that data exists and answers this question well. A real, scoped Stage 2 gap, not a bug: extend matching to roadmap/dashboard entity types.",
+      "note": "FIXED in Stage 2 (Phase 19, roadmap routing) — this exact gap was Stage 1's own documented limitation #5. The question classifier now recognizes ROADMAP-shaped questions and answers directly from roadmap-dashboard.json, never inferring a commitment from anything else.",
       "pass": true,
       "query": "What's coming next for AutoIngest?",
       "relatedFeature": null
@@ -113,23 +84,10 @@
         "step-by-step instructions",
         "UI navigation"
       ],
-      "note": "AI-FEAT-044 (Local-First Background Archive Sync — the genuinely relevant record) ties at 100 with AI-FEAT-042/043/045/046 (all share \"archive\"); ascending-ID surfaces AI-FEAT-042 (Archive Root Configuration) instead.",
+      "note": "Unchanged from Stage 1: AI-FEAT-044 (the genuinely relevant record) still ties with unrelated Archive Operations features sharing only \"archive\". No concept cluster currently targets this exact phrasing.",
       "pass": true,
       "query": "Does AutoIngest back up my archive automatically?",
       "relatedFeature": "AI-FEAT-042(100)"
-    },
-    {
-      "domain": "Transfer",
-      "gapType": "AMBIGUOUS_RETRIEVAL",
-      "missingEvidence": [
-        "unambiguous topical match",
-        "step-by-step instructions",
-        "UI navigation"
-      ],
-      "note": null,
-      "pass": true,
-      "query": "My transfer stopped halfway — what happens now?",
-      "relatedFeature": "AI-FEAT-038(100)"
     },
     {
       "domain": "Unsupported",
@@ -162,7 +120,7 @@
         "step-by-step instructions",
         "UI navigation"
       ],
-      "note": "Without the boundary-precedence fix made during Stage 1 implementation, this question keyword-matched AI-FEAT-040 (Backup Update Scanning) via the single token \"backup\" and would have reported AVAILABLE — a real near-miss on the \"never imply unsupported functionality is live\" rule, fixed before this corpus was run for the record (see AI-FEAT-058 Architectural Review).",
+      "note": null,
       "pass": true,
       "query": "Does AutoIngest offer cloud backup?",
       "relatedFeature": "AI-FEAT-040(100)"
@@ -187,7 +145,7 @@
         "step-by-step instructions",
         "UI navigation"
       ],
-      "note": "The genuinely relevant record (AI-FEAT-057, Multi-Channel Release & Update System) does not appear at all — \"preview\" keyword-matches AI-FEAT-015/016 (Media Preview / Preview Focus) instead, an unrelated feature that happens to share the ambiguous word \"preview.\" This is the corpus's clearest example of single-word topical drift; the weak-match hedge fires, but the underlying answer content is simply about the wrong feature. A real, reportable Stage 2 priority.",
+      "note": "Unchanged root cause from Stage 1 (\"preview\" drifts to Media Preview), but a REAL regression was found and fixed during Stage 2's own testing along the way: before a stopword filter was added to keywordsFrom() (searchIndex.js), the richer keyword surface of Workflow records let AI-WF-006 win this question confidently (score 300) purely on the stopwords \"how\"/\"between\"/\"and\" — a false-strong match with zero topical relevance. Fixed by excluding common connector words from generated keyword sets; this question correctly returned to Stage 1's honest weak/hedged behavior afterward.",
       "pass": true,
       "query": "How do I switch between Stable and Preview versions?",
       "relatedFeature": "AI-FEAT-015(100)"
@@ -200,41 +158,40 @@
         "step-by-step instructions",
         "UI navigation"
       ],
-      "note": "Ties at 100 across AI-FEAT-006/040/057; ascending-ID tiebreak happens to surface AI-FEAT-006 (Application Auto-Update), which is in fact the most relevant of the three here — a case where the tiebreak artifact does not cause a wrong answer.",
+      "note": "Unchanged from Stage 1: ties at 100 across AI-FEAT-006/040/057; ascending-ID tiebreak happens to surface AI-FEAT-006, the most relevant of the three — a case where the tiebreak artifact does not cause a wrong answer.",
       "pass": true,
       "query": "Will AutoIngest update itself automatically?",
       "relatedFeature": "AI-FEAT-006(100)"
     },
     {
-      "domain": "QMZ",
+      "domain": "Metadata",
       "gapType": "AMBIGUOUS_RETRIEVAL",
       "missingEvidence": [
         "unambiguous topical match",
         "step-by-step instructions",
         "UI navigation"
       ],
-      "note": "Initially expected \"strong\" (assuming the exact-alias tier, score 900, would fire for \"QMZ\") — corrected after running: lib/query.js's exact-id/alias/title tiers require the WHOLE query string to equal the term, so they can only ever fire on a bare lookup like \"qmz\", never on a natural sentence that merely contains it. \"What is QMZ?\" therefore only reaches the single-keyword-overlap tier (100, weak) despite QMZ being registered as an explicit alias. This is the single most consequential structural finding of this eval run: it explains why nearly every natural-language question in this corpus lands in \"weak,\" not just the ones with genuine ambiguity — see AI-FEAT-058 Architectural Review.",
+      "note": "Was \"strong\" in Stage 1 (AI-FEAT-033 alone at score 200). In Stage 2, the correct top match (AI-WF-004, Repair Missing or Incorrect Metadata, still correctly grounded in AI-FEAT-033) ties at score 300 with AI-WF-006 — a genuine, disclosed, hard limitation: AI-WF-006's own text legitimately contains the words \"metadata\"/\"audit\"/\"repair\" in a NEGATING context (\"not Metadata, not Audit/Repair\" — part of the Registry's own required four-way distinction). Pure keyword-overlap cannot distinguish a word appearing in a positive claim from a word appearing in an explicit exclusion. The primary match is still correctly AI-WF-004 (alphabetically first among the tie) and the answer is still correctly grounded and hedged — this is the system being appropriately conservative given a genuinely ambiguous lexical signal, not a wrong answer. A real candidate for smarter (still non-embedding) matching in a future stage, not a defect to patch here.",
       "pass": true,
-      "query": "What is QMZ?",
-      "relatedFeature": "AI-FEAT-047(100)"
+      "query": "Can AutoIngest repair missing metadata?",
+      "relatedFeature": "AI-WF-004(300)"
     },
     {
       "domain": "Settings",
-      "gapType": "AMBIGUOUS_RETRIEVAL",
+      "gapType": "MISSING_OPERATOR_WORKFLOW",
       "missingEvidence": [
-        "unambiguous topical match",
         "step-by-step instructions",
         "UI navigation"
       ],
-      "note": "Not in the curated boundary table (deliberately kept small — see lib/statusResolution.js). Query keyword-matches AI-FEAT-027 (Activity Log) via \"log,\" an unrelated coincidental match — expected to resolve AVAILABLE, not NOT_SUPPORTED, demonstrating the boundary table's real coverage limit. Included specifically to report this honestly rather than curate around it.",
-      "pass": false,
+      "note": "FIXED in Stage 2 — Stage 1 could not resolve this because the boundary table's keyword phrasing was too narrow (\"multiple users log in\", not \"multiple people log in with different roles\"). A boundary-widening concept cluster (intentConcepts.js BOUNDARY_CONCEPT_CLUSTERS, \"team-multi-role\") now recognizes \"different roles\" as a paraphrase of the SAME already-evidenced multi-user-roles exclusion — same citation, wider recall, never a new unevidenced claim. This same fix ALSO caught and required repairing a genuine regression: a \"team-collaboration\" concept hint aimed at a different, legitimate paraphrase family (\"several users... simultaneously\") was, before a fix, strong enough to override this correctly-detected boundary — see AI-FEAT-058 Stage 2 Evolution Journal for the full account of why hint-boosted scores must never override a boundary, only raw-question scores may.",
+      "pass": true,
       "query": "Can I have multiple people log in with different roles?",
-      "relatedFeature": "AI-FEAT-027(100)"
+      "relatedFeature": "AI-FEAT-048(400)"
     }
   ],
-  "generated_at": "2026-08-13T15:44:26.867Z",
-  "known_miss_count": 2,
-  "pass_count": 18,
+  "generated_at": "2026-08-14T02:10:48.256Z",
+  "known_miss_count": 4,
+  "pass_count": 16,
   "schema_version": "1.0.0",
   "unexplained_failure_count": 0
 }
