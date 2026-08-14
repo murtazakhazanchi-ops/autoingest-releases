@@ -15,6 +15,7 @@ const { buildChangeReport } = require('./lib/changeReport');
 const { renderChangeReportMd } = require('./lib/renderChanges');
 const gitInfo = require('./lib/gitInfo');
 const version = require('./lib/version');
+const { computeDependencyModelRegions, applyGeneratedRegions } = require('./lib/dependencyModelFragments');
 const automationCli = require('./automation/cli');
 const memoryCli = require('./automation/memoryCli');
 const conversationCli = require('./automation/conversationCli');
@@ -64,13 +65,35 @@ function readmeContent() {
     `docsys version: ${version.DOCSYS_VERSION}\n`;
 }
 
+// Part 2 remediation (Decision 5) — the hybrid dependency-model file lives
+// under docs/product/ (a canonical spine document, per docs/product/
+// CLAUDE.md's hierarchy), never under generated/, so it needs its own
+// read-modify-write step distinct from writeGeneratedFiles above: only the
+// content between a matching `<!-- GENERATED:BEGIN id --> ... <!--
+// GENERATED:END id -->` marker pair is ever replaced, every other byte
+// (interpretive prose, the Methodology section, tables not yet mechanized)
+// is preserved untouched. Returns null if the file has no generated regions
+// to update (nothing written) or the file already matches a fresh build.
+function updateDependencyModelFile(parsed, built) {
+  const docPath = path.join(PRODUCT_DOCS_ROOT, '12_DEPENDENCY_MODEL.md');
+  if (!fs.existsSync(docPath)) return null;
+  const before = fs.readFileSync(docPath, 'utf8');
+  const regions = computeDependencyModelRegions(parsed, built);
+  const after = applyGeneratedRegions(before, regions);
+  if (after === before) return null;
+  fs.writeFileSync(docPath, after);
+  return '12_DEPENDENCY_MODEL.md';
+}
+
 function cmdBuild() {
   const start = Date.now();
-  const { files, manifest } = build.assemble();
+  const { parsed, built, files, manifest } = build.assemble();
   files.set('README.md', readmeContent());
   const written = writeGeneratedFiles(files);
+  const dependencyModelUpdated = updateDependencyModelFile(parsed, built);
   const elapsed = Date.now() - start;
   console.log(`Built ${written.length} file(s) under docs/product/generated/ in ${elapsed}ms.`);
+  if (dependencyModelUpdated) console.log(`Updated generated regions in docs/product/${dependencyModelUpdated}.`);
   console.log(`Entities: ${JSON.stringify(manifest.entity_counts)}`);
   console.log(`Source commit: ${manifest.source_commit}`);
   return { files, manifest, elapsed };
@@ -82,6 +105,7 @@ function cmdValidate() {
   const gitIsDirty = gitInfo.isWorkingTreeDirty();
   const findings = validators.runAllChecks(parsed, built, { gitIsDirty });
   findings.push(...validators.checkGeneratedFreshness(files, GENERATED_ROOT));
+  findings.push(...validators.checkDependencyModelFreshness(parsed, built, PRODUCT_DOCS_ROOT));
   findings.push(...validators.checkManifestCommit(path.join(GENERATED_ROOT, 'manifest.json'), gitInfo.currentCommit()));
   findings.push(...checkGeneratedSchemas(files));
 

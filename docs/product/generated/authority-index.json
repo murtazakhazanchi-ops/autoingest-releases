@@ -17,6 +17,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-001_ELECTRON_APPLICATION_SHELL_SECURITY_MODEL.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-001",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [],
       "relatedPostmortems": [],
@@ -37,6 +38,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-002_LOGIN_OPERATOR_IDENTITY.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-002",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [],
       "relatedPostmortems": [],
@@ -57,6 +59,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-003_DASHBOARD_SYSTEM_STATUS.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-003",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [],
       "relatedPostmortems": [],
@@ -82,6 +85,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-004_EVENT_JSON_DATA_MODEL_PERSISTENCE_CONTRACT.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-004",
+      "recordType": "feature",
       "relatedBugs": [
         "BUG-003",
         "BUG-006"
@@ -104,6 +108,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-005_APPLICATION_SETTINGS_CONFIGURATION_STORE.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-005",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [],
       "relatedPostmortems": [],
@@ -120,6 +125,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-006_APPLICATION_AUTO_UPDATE.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-006",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [
         "DEC-017"
@@ -140,6 +146,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-007_TELEMETRY_PIPELINE.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-007",
+      "recordType": "feature",
       "relatedBugs": [
         "BUG-017",
         "BUG-018"
@@ -162,6 +169,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-008_DESIGN_SYSTEM_UI_CONSISTENCY_FRAMEWORK.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-008",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [],
       "relatedPostmortems": [],
@@ -183,6 +191,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-009_EVENT_CREATION.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-009",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [],
       "relatedPostmortems": [],
@@ -203,6 +212,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-010_EVENT_MANAGEMENT_EDITING.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-010",
+      "recordType": "feature",
       "relatedBugs": [
         "BUG-001",
         "BUG-006"
@@ -227,6 +237,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-011_SOURCE_DETECTION.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-011",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [],
       "relatedPostmortems": [],
@@ -246,6 +257,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-012_SOURCE_SELECTION.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-012",
+      "recordType": "feature",
       "relatedBugs": [
         "BUG-001"
       ],
@@ -267,6 +279,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-013_FILE_BROWSER_MEDIA_GRID_LIST_VIEWING.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-013",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [],
       "relatedPostmortems": [],
@@ -284,6 +297,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-014_THUMBNAIL_GENERATION_CACHING.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-014",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [],
       "relatedPostmortems": [],
@@ -302,6 +316,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-015_MEDIA_PREVIEW.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-015",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [],
       "relatedPostmortems": [],
@@ -321,6 +336,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-016_PREVIEW_FOCUS_SELECTION_SEPARATION.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-016",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [],
       "relatedPostmortems": [],
@@ -340,6 +356,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-017_GROUPING_SYSTEM.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-017",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [],
       "relatedPostmortems": [],
@@ -359,6 +376,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-018_EVENT_COMPONENT_IMPORT_ROUTING.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-018",
+      "recordType": "feature",
       "relatedBugs": [
         "BUG-002"
       ],
@@ -383,6 +401,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-019_IMPORT_PIPELINE_COPY_ENGINE.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-019",
+      "recordType": "feature",
       "relatedBugs": [
         "BUG-009"
       ],
@@ -407,6 +426,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-020_DUPLICATE_DETECTION.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-020",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [
         "DEC-005"
@@ -430,6 +450,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-021_ATOMIC_IMPORT_TRANSACTION.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-021",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [],
       "relatedPostmortems": [],
@@ -450,6 +471,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-022_PHOTOGRAPHER_FOLDER_RESOLUTION.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-022",
+      "recordType": "feature",
       "relatedBugs": [
         "BUG-002"
       ],
@@ -472,6 +494,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-023_QUICK_IMPORT.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-023",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [],
       "relatedPostmortems": [],
@@ -493,6 +516,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-024_SOURCE_CLEANUP.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-024",
+      "recordType": "feature",
       "relatedBugs": [
         "BUG-001"
       ],
@@ -513,6 +537,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-025_CHECKSUM_BASED_FILE_VERIFICATION.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-025",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [
         "DEC-005"
@@ -535,6 +560,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-026_AUDIT_INTEGRITY_VERIFICATION.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-026",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [],
       "relatedPostmortems": [],
@@ -554,6 +580,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-027_ACTIVITY_LOG.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-027",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [],
       "relatedPostmortems": [],
@@ -573,6 +600,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-028_IMPORT_SOURCE_ATTRIBUTION.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-028",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [],
       "relatedPostmortems": [],
@@ -602,6 +630,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-029_METADATA_WRITING_ENGINE.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-029",
+      "recordType": "feature",
       "relatedBugs": [
         "BUG-007",
         "BUG-008",
@@ -639,6 +668,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-030_METADATA_DURABLE_QUEUE_CRASH_RECOVERY.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-030",
+      "recordType": "feature",
       "relatedBugs": [
         "BUG-010"
       ],
@@ -665,6 +695,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-031_METADATA_EVENT_STATE_DERIVATION.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-031",
+      "recordType": "feature",
       "relatedBugs": [
         "BUG-008"
       ],
@@ -689,6 +720,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-032_METADATA_VERIFICATION.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-032",
+      "recordType": "feature",
       "relatedBugs": [
         "BUG-009"
       ],
@@ -723,6 +755,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-033_METADATA_AUDIT_REPAIR.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-033",
+      "recordType": "feature",
       "relatedBugs": [
         "BUG-007"
       ],
@@ -746,6 +779,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-034_METADATA_MANAGEMENT_MODAL.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-034",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [],
       "relatedPostmortems": [],
@@ -765,6 +799,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-035_DASHBOARD_METADATA_HEALTH.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-035",
+      "recordType": "feature",
       "relatedBugs": [
         "BUG-008"
       ],
@@ -789,6 +824,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-036_KEYWORD_REGISTRY.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-036",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [
         "DEC-004",
@@ -813,6 +849,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-037_METADATA_REAPPLY_SYNC.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-037",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [],
       "relatedPostmortems": [],
@@ -833,6 +870,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-038_TRANSFER_EXPORT.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-038",
+      "recordType": "feature",
       "relatedBugs": [
         "BUG-005"
       ],
@@ -858,6 +896,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-039_TRANSFER_IMPORT.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-039",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [
         "DEC-012"
@@ -879,6 +918,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-040_BACKUP_UPDATE_SCANNING.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-040",
+      "recordType": "feature",
       "relatedBugs": [
         "BUG-005"
       ],
@@ -900,6 +940,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-041_TRANSFER_BACKGROUND_MINIMIZE_OPERATION.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-041",
+      "recordType": "feature",
       "relatedBugs": [
         "BUG-005"
       ],
@@ -927,6 +968,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-042_ARCHIVE_ROOT_CONFIGURATION_RESOLUTION.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-042",
+      "recordType": "feature",
       "relatedBugs": [
         "BUG-003"
       ],
@@ -957,6 +999,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-043_ARCHIVE_HEALTH_REPORTING.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-043",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [],
       "relatedPostmortems": [],
@@ -982,6 +1025,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-044_LOCAL_FIRST_BACKGROUND_ARCHIVE_SYNC.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-044",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [
         "DEC-003"
@@ -1007,6 +1051,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-045_ARCHIVE_LOCK_HANDLING_STALE_LOCK_RECOVERY.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-045",
+      "recordType": "feature",
       "relatedBugs": [
         "BUG-004"
       ],
@@ -1035,6 +1080,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-046_ARCHIVE_FOLDER_ADOPTION.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-046",
+      "recordType": "feature",
       "relatedBugs": [
         "BUG-006"
       ],
@@ -1061,6 +1107,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-047_QMZ_SEQUENCING_WORKSPACE.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-047",
+      "recordType": "feature",
       "relatedBugs": [
         "BUG-007"
       ],
@@ -1087,6 +1134,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-048_REALTIME_TEAM_PRESENCE_ONLINE_REGISTRY.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-048",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [],
       "relatedPostmortems": [],
@@ -1103,6 +1151,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-049_ARCHIVE_MAINTENANCE.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-049",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [
         "DEC-015"
@@ -1124,6 +1173,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-050_EVENT_MAINTENANCE.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-050",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [],
       "relatedPostmortems": [],
@@ -1142,6 +1192,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-051_ARCHIVE_BROWSER.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-051",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [],
       "relatedPostmortems": [],
@@ -1160,6 +1211,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-052_ARCHIVE_REPAIR.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-052",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [],
       "relatedPostmortems": [],
@@ -1179,6 +1231,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-053_GLOBAL_SEARCH.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-053",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [],
       "relatedPostmortems": [],
@@ -1198,6 +1251,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-054_INTEGRITY_VERIFICATION_ARCHIVE_WIDE.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-054",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [],
       "relatedPostmortems": [],
@@ -1216,6 +1270,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-055_ARCHIVE_ANALYTICS.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-055",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [],
       "relatedPostmortems": [],
@@ -1234,6 +1289,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-056_AI_ARCHIVE_INTELLIGENCE.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-056",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [
         "DEC-015"
@@ -1266,6 +1322,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-057",
+      "recordType": "feature",
       "relatedBugs": [
         "BUG-015",
         "BUG-016"
@@ -1338,6 +1395,7 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-058",
+      "recordType": "feature",
       "relatedBugs": [],
       "relatedDecisions": [
         "DEC-019"
@@ -1347,6 +1405,159 @@
         "AI-RM-011"
       ],
       "topic": "Knowledge Engine (Stage 1 Prototype → Stage 2 Operator Knowledge Architecture)"
+    },
+    {
+      "canonicalProductDoc": "workflows/AI-WF-001_IMPORT_PHOTOGRAPHS_FROM_A_MEMORY_CARD_OR_FOLDER.md",
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from workflows/AI-WF-001_IMPORT_PHOTOGRAPHS_FROM_A_MEMORY_CARD_OR_FOLDER.md's header table.",
+      "recordType": "workflow",
+      "relatedFeatures": [
+        "AI-FEAT-011",
+        "AI-FEAT-012",
+        "AI-FEAT-017",
+        "AI-FEAT-018",
+        "AI-FEAT-019",
+        "AI-FEAT-022"
+      ],
+      "relatedWorkflows": [
+        "AI-WF-002",
+        "AI-WF-003"
+      ],
+      "roadmapIds": [],
+      "topic": "Import Photographs From a Memory Card or Folder",
+      "workflowId": "AI-WF-001"
+    },
+    {
+      "canonicalProductDoc": "workflows/AI-WF-002_CREATE_A_NEW_EVENT.md",
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from workflows/AI-WF-002_CREATE_A_NEW_EVENT.md's header table.",
+      "recordType": "workflow",
+      "relatedFeatures": [
+        "AI-FEAT-009"
+      ],
+      "relatedWorkflows": [
+        "AI-WF-001"
+      ],
+      "roadmapIds": [],
+      "topic": "Create a New Event",
+      "workflowId": "AI-WF-002"
+    },
+    {
+      "canonicalProductDoc": "workflows/AI-WF-003_USE_QUICK_IMPORT_FOR_A_SMALL_BATCH.md",
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from workflows/AI-WF-003_USE_QUICK_IMPORT_FOR_A_SMALL_BATCH.md's header table.",
+      "recordType": "workflow",
+      "relatedFeatures": [
+        "AI-FEAT-023"
+      ],
+      "relatedWorkflows": [
+        "AI-WF-001"
+      ],
+      "roadmapIds": [],
+      "topic": "Use Quick Import for a Small Batch",
+      "workflowId": "AI-WF-003"
+    },
+    {
+      "canonicalProductDoc": "workflows/AI-WF-004_REPAIR_MISSING_OR_INCORRECT_METADATA.md",
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from workflows/AI-WF-004_REPAIR_MISSING_OR_INCORRECT_METADATA.md's header table.",
+      "recordType": "workflow",
+      "relatedFeatures": [
+        "AI-FEAT-031",
+        "AI-FEAT-033",
+        "AI-FEAT-034"
+      ],
+      "relatedWorkflows": [
+        "AI-WF-001"
+      ],
+      "roadmapIds": [
+        "AI-RM-001"
+      ],
+      "topic": "Repair Missing or Incorrect Metadata",
+      "workflowId": "AI-WF-004"
+    },
+    {
+      "canonicalProductDoc": "workflows/AI-WF-005_EXPORT_OR_UPDATE_A_TRANSFER_DRIVE.md",
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from workflows/AI-WF-005_EXPORT_OR_UPDATE_A_TRANSFER_DRIVE.md's header table.",
+      "recordType": "workflow",
+      "relatedFeatures": [
+        "AI-FEAT-038",
+        "AI-FEAT-039",
+        "AI-FEAT-040",
+        "AI-FEAT-041"
+      ],
+      "relatedWorkflows": [
+        "AI-WF-009"
+      ],
+      "roadmapIds": [],
+      "topic": "Export or Update a Transfer Drive",
+      "workflowId": "AI-WF-005"
+    },
+    {
+      "canonicalProductDoc": "workflows/AI-WF-006_SEE_WHO_ELSE_IS_ONLINE_AND_WHAT_THEYRE_WORKING_ON.md",
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from workflows/AI-WF-006_SEE_WHO_ELSE_IS_ONLINE_AND_WHAT_THEYRE_WORKING_ON.md's header table.",
+      "recordType": "workflow",
+      "relatedFeatures": [
+        "AI-FEAT-048"
+      ],
+      "relatedWorkflows": [
+        "AI-WF-001",
+        "AI-WF-002",
+        "AI-WF-005"
+      ],
+      "roadmapIds": [],
+      "topic": "See Who Else Is Online, Coordinate Shared Events, and See What They're Working On",
+      "workflowId": "AI-WF-006"
+    },
+    {
+      "canonicalProductDoc": "workflows/AI-WF-007_SORT_QMZ_PHOTOGRAPHS.md",
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from workflows/AI-WF-007_SORT_QMZ_PHOTOGRAPHS.md's header table.",
+      "recordType": "workflow",
+      "relatedFeatures": [
+        "AI-FEAT-047"
+      ],
+      "relatedWorkflows": [],
+      "roadmapIds": [],
+      "topic": "Sort QMZ Photographs",
+      "workflowId": "AI-WF-007"
+    },
+    {
+      "canonicalProductDoc": "workflows/AI-WF-008_RECOVER_FROM_AN_ARCHIVE_LOCK_ERROR.md",
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from workflows/AI-WF-008_RECOVER_FROM_AN_ARCHIVE_LOCK_ERROR.md's header table.",
+      "recordType": "workflow",
+      "relatedFeatures": [
+        "AI-FEAT-043",
+        "AI-FEAT-045"
+      ],
+      "relatedWorkflows": [
+        "AI-WF-006"
+      ],
+      "roadmapIds": [],
+      "topic": "Recover From an Archive Lock Error",
+      "workflowId": "AI-WF-008"
+    },
+    {
+      "canonicalProductDoc": "workflows/AI-WF-009_IMPORT_OR_UPDATE_FROM_A_TRANSFER_DRIVE.md",
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from workflows/AI-WF-009_IMPORT_OR_UPDATE_FROM_A_TRANSFER_DRIVE.md's header table.",
+      "recordType": "workflow",
+      "relatedFeatures": [
+        "AI-FEAT-025",
+        "AI-FEAT-032",
+        "AI-FEAT-038",
+        "AI-FEAT-039",
+        "AI-FEAT-042"
+      ],
+      "relatedWorkflows": [
+        "AI-WF-005"
+      ],
+      "roadmapIds": [],
+      "topic": "Import or Update From a Transfer Drive",
+      "workflowId": "AI-WF-009"
     }
   ]
 }

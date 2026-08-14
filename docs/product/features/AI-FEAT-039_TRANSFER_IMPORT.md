@@ -13,7 +13,7 @@
 | Related technical docs | `docs/archive-operations-layer.md` § Transfer Workflow |
 | Evidence status | Verified from docs and current code (`test/transferImportOutcomeManifest.test.js`) |
 | First-known implementation | Phase 13D era |
-| Latest major update | 2026-07-22 |
+| Latest major update | 2026-08-14 — Summary now states the direct-Event vs Collection-nested resolution distinction (already documented in Current Behavior below since the same date; propagated here per Part 2 Knowledge Architecture remediation so it is discoverable through the same bounded Summary surface Decision 2 indexes for retrieval — see 10_CHANGELOG.md) |
 
 ## Lifecycle Metadata
 
@@ -32,7 +32,7 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 
 ## Summary
 
-Imports content from a Transfer Drive into the Main Archive Root. Idempotent — re-importing the same drive does not duplicate files. **Why this exists** (*Known from project history; repository evidence pending* — captured during the Product-Owner Purpose Capture interview, 2026-08-14): the receiving/consolidating counterpart to Transfer Export (AI-FEAT-038), designed broadly rather than as a narrow mirror-restore step — it consolidates event data accumulated on mobile drives during live events back into the main archive, and is also used for large datasets originating outside AutoIngest. **Stated product intent**: Transfer Import should recognize corresponding archival events based on reliable event identity and consolidate their contents without unnecessarily duplicating event/photographer structures, rather than relying on manual filesystem copying (Finder/Explorer/TeraCopy) with no awareness of what already exists at the destination.
+Imports content from a Transfer Drive into the Main Archive Root. Idempotent — re-importing the same drive does not duplicate files. **Why this exists** (*Known from project history; repository evidence pending* — captured during the Product-Owner Purpose Capture interview, 2026-08-14): the receiving/consolidating counterpart to Transfer Export (AI-FEAT-038), designed broadly rather than as a narrow mirror-restore step — it consolidates event data accumulated on mobile drives during live events back into the main archive, and is also used for large datasets originating outside AutoIngest. **Stated product intent**: Transfer Import should recognize corresponding archival events based on reliable event identity and consolidate their contents without unnecessarily duplicating event/photographer structures, rather than relying on manual filesystem copying (Finder/Explorer/TeraCopy) with no awareness of what already exists at the destination. **Current behavior differs by transfer shape** (confirmed 2026-08-14, forensic code verification — see Current Behavior below for the full account): this intent is substantially realized for direct-Event transfers (loose event folders at the transfer-drive root), which resolve destinations via a content-based identity key immune to folder renames; Collection-nested transfers (a transfer drive mirroring the archive's own Collection/Event structure) currently resolve by folder name only and do not yet have equivalent identity-based resolution — a confirmed implementation gap against stated intent, not yet fixed.
 
 ## Current Behavior
 

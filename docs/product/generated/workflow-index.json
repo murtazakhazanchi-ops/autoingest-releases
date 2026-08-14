@@ -13,6 +13,10 @@
       "navigationVerified": "Partial",
       "relatedActionIds": {
         "features": [
+          "AI-FEAT-013",
+          "AI-FEAT-014",
+          "AI-FEAT-015",
+          "AI-FEAT-016",
           "AI-FEAT-026"
         ],
         "workflows": [
@@ -20,7 +24,7 @@
           "AI-WF-003"
         ]
       },
-      "relatedActions": "AI-WF-002 (Create a New Event), AI-WF-003 (Quick Import), AI-FEAT-026 (Audit Integrity Verification) as a natural next step after a large import.",
+      "relatedActions": "AI-WF-002 (Create a New Event), AI-WF-003 (Quick Import), AI-FEAT-026 (Audit Integrity Verification) as a natural next step after a large import, AI-FEAT-013 (File Browser: Media Grid/List Viewing) with AI-FEAT-014 (Thumbnail Generation & Caching) to review what was just imported. Step 2's file selection is itself built on two further capabilities an operator uses in the same moment: AI-FEAT-015 (Media Preview) for visual inspection before deciding what to import, and AI-FEAT-016 (Preview Focus / Selection Separation) — the mechanism that keeps inspecting a file (preview focus) from accidentally changing what's selected for import, a deliberate safety design per that feature's own Summary.",
       "relatedCapabilities": [
         "AI-FEAT-011",
         "AI-FEAT-012",
@@ -124,13 +128,14 @@
       "navigationVerified": "Yes",
       "relatedActionIds": {
         "features": [
-          "AI-FEAT-036"
+          "AI-FEAT-036",
+          "AI-FEAT-037"
         ],
         "workflows": [
           "AI-WF-001"
         ]
       },
-      "relatedActions": "AI-FEAT-036 (Keyword Registry) if the repair concerns keywords specifically; AI-WF-001 if the real issue is that a re-import is actually needed.",
+      "relatedActions": "AI-FEAT-036 (Keyword Registry) if the repair concerns keywords specifically; AI-WF-001 if the real issue is that a re-import is actually needed; AI-FEAT-037 (Metadata Reapply / Sync) if the metadata itself is correct but was never propagated after an event field was corrected post-import — a related but distinct corrective mechanism from this workflow's audit/repair path, not independently confirmed to live in the same Metadata Management modal in this pass.",
       "relatedCapabilities": [
         "AI-FEAT-031",
         "AI-FEAT-033",
@@ -165,9 +170,11 @@
         "features": [
           "AI-FEAT-043"
         ],
-        "workflows": []
+        "workflows": [
+          "AI-WF-009"
+        ]
       },
-      "relatedActions": "AI-FEAT-043 (Archive Health Reporting) to confirm the source archive is healthy before a large transfer.",
+      "relatedActions": "AI-FEAT-043 (Archive Health Reporting) to confirm the source archive is healthy before a large transfer. [AI-WF-009](AI-WF-009_IMPORT_OR_UPDATE_FROM_A_TRANSFER_DRIVE.md) — the inbound counterpart (Transfer Import).",
       "relatedCapabilities": [
         "AI-FEAT-038",
         "AI-FEAT-039",
@@ -185,7 +192,7 @@
       "title": "Export or Update a Transfer Drive",
       "troubleshooting": "If a transfer appears stuck or resume state looks wrong, BUG-005's record documents the historical root cause and fix — consult it directly.",
       "warnings": "Per `CLAUDE.md`'s File Copy Rules: no overwrite, ever, applies here too.",
-      "whatItDoes": "Writes a clean mirror of selected events to a portable drive (Transfer Export, AI-FEAT-038), or scans an existing transfer drive for what's changed since the last copy (Backup Update Scanning, AI-FEAT-040) — these are two distinct capabilities sharing this entry point, with different conflict semantics (Backup Update never overwrites or renames on conflict; Transfer Export's own record should be consulted for its exact behavior rather than assumed identical).",
+      "whatItDoes": "Writes a clean mirror of selected events to a portable drive (Transfer Export, AI-FEAT-038), or scans an existing transfer drive for what's changed since the last copy (Backup Update Scanning, AI-FEAT-040, a `backupUpdate` mode whose own record lists AI-FEAT-038 as its Parent feature) — these are two distinct capabilities sharing this one entry point (`#alocTransferExportBtn` → the Transfer Export modal), with different conflict semantics (Backup Update never overwrites or renames on conflict; Transfer Export's own record should be consulted for its exact behavior rather than assumed identical). This workflow is outbound only (Active Archive Root → Transfer Drive) — for the inbound direction (Transfer Drive → Main Archive Root), see [AI-WF-009](AI-WF-009_IMPORT_OR_UPDATE_FROM_A_TRANSFER_DRIVE.md).",
       "whenToUseIt": "Moving events to a portable drive for the first time (Export), or refreshing a drive that already has some of the same events on it (Update/Scan).",
       "whereToGo": "A **\"Transfer Export…\"** button (`#alocTransferExportBtn`, `renderer/index.html:8332`) opens the **Transfer Export** modal (`#txTitle`, line 8430), which contains a **\"Scan for New Data\"** button (`#txScanBtn`, line 8575) for the update/comparison path."
     },
@@ -297,6 +304,48 @@
       "whatItDoes": "Recovers from a stale photographer-folder import lock — a real, evidenced, distinct mechanism from both the Online Registry's sync-slot coordination (see AI-WF-006) and from Transfer Export's own separate concurrency guard.",
       "whenToUseIt": "When AutoIngest reports that an event/photographer folder is locked and you believe no other import is actually in progress against it (e.g. after a crash on the same or another device).",
       "whereToGo": "**Archive Diagnostics** modal (`#diagTitle`, `renderer/index.html:8698`), reached from the Archive Health surface (AI-FEAT-043). The modal has a **\"Run Diagnostics\"** button (`#diagRunBtn`) confirmed in code. **The specific button/control used to release a stale lock from within this modal was not located in this pass** — the underlying capability (`releaseStaleLock()`, IPC channels `archive:releaseStaleLock` / `archive:clearSelfStaleLock`) is confirmed to exist in AI-FEAT-045's own record, but this workflow does not invent the exact UI control for triggering it."
+    },
+    {
+      "beforeYouStart": "Both a Transfer Drive (Transfer Root) and a Main Archive Root must already be configured elsewhere in Archive Operations — this workflow's modal only displays them read-only (`_tiOpen`, `renderer/renderer.js:14421-14443`); it does not offer a picker to set them here. A Transfer Export must not currently be running against the same drive: Import is blocked with \"A Transfer Export is currently running. Wait for it to finish before importing.\" if one is (`_tiStartImport`, checking `window.api.getTransferExportStatus()`).",
+      "canonicalDocument": "workflows/AI-WF-009_IMPORT_OR_UPDATE_FROM_A_TRANSFER_DRIVE.md",
+      "domain": "Transfer & Backup",
+      "evidenceStatus": "Verified from `renderer/index.html` (`#alocTransferImportBtn`, `#transferImportModal`, lines 8333, 8589) and `renderer/renderer.js` (`_tiOpen`, `_tiScanImport`, `_tiStartImport`, `_tiResumeFromCheckpoint`, `_tiPause`/`_tiResumeInline`, `_tiVerify`, `_tiMinimize`, lines 14360–15075)",
+      "expectedResult": "Files land via copy only, recorded in a durable per-file outcome manifest and an audit trail (`.autoingest/transfer-imports/imports.audit.jsonl` — see AI-FEAT-039's Current Behavior) rather than a silent partial state. A successful import also triggers AI-FEAT-032's post-transfer metadata verification pass.",
+      "id": "AI-WF-009",
+      "limitations": "Identity-based event matching — the mechanism that lets a renamed folder still be recognized as the same archival event — is substantially realized for direct-Event transfers (loose event folders at the transfer-drive root) but only partially realized for Collection-nested transfers (a drive mirroring the archive's own Collection/Event structure), which currently match by folder name only. This is a confirmed, not-yet-fixed implementation gap against stated product intent, not a documentation error — see [AI-FEAT-039](../features/AI-FEAT-039_TRANSFER_IMPORT.md)'s own Current Behavior and Future Enhancements for the full account. `event.json` itself is never field-merged: when both source and destination have an `event.json` for what's logically the same event, the destination's always wins.",
+      "navigationVerified": "Yes",
+      "relatedActionIds": {
+        "features": [
+          "AI-FEAT-043"
+        ],
+        "workflows": [
+          "AI-WF-005"
+        ]
+      },
+      "relatedActions": "[AI-WF-005](AI-WF-005_EXPORT_OR_UPDATE_A_TRANSFER_DRIVE.md) — the outbound counterpart (Transfer Export). AI-FEAT-043 (Archive Health Reporting) to confirm the destination archive is healthy before a large import.",
+      "relatedCapabilities": [
+        "AI-FEAT-025",
+        "AI-FEAT-032",
+        "AI-FEAT-038",
+        "AI-FEAT-039",
+        "AI-FEAT-042"
+      ],
+      "roadmapRelationship": [],
+      "sourceAuthority": "canonical",
+      "steps": [
+        "Select **Transfer Import…**. The modal shows the configured Transfer Drive and Main Archive Root (both read-only) and loads the Import Scope tree — Collection folders with their Events nested, direct Event folders at the root level, and any unresolved external folders (`_tiLoadTree`).",
+        "Choose which folders to import, using **Select all** / **Select none** or checking individual items in the scope tree.",
+        "Optionally click **Preview** to see counts before committing (Collections/Events/External/Files), or **Scan for New Data** (`window.api.scanImportSync`) to compare the selection against what the Main Archive Root already has. A scan reports new files, already-imported files, and files changed on both sides needing review, and turns the primary action into **Update Import** — copies only the missing files; changed files are never copied automatically.",
+        "Click **Import** (or **Update Import** after a scan) to begin. If a previous import was interrupted, the modal instead offers **Resume Import** (continues from the saved checkpoint) or **Start Fresh** (`#tiResumeOffer`) the next time it's opened.",
+        "While running, **Pause** / **Resume** are available, and **Run in Background** hides the modal without cancelling the job — it keeps running in the main process and stays visible via the transfer monitor.",
+        "After completion, **Verify Checksum** (`window.api.verifyTransferImport`) is available to independently confirm the copied files against source, and **Done** closes the modal."
+      ],
+      "title": "Import or Update From a Transfer Drive",
+      "troubleshooting": "None recorded in `docs/product/bugs/` yet specific to Transfer Import — see [AI-FEAT-039](../features/AI-FEAT-039_TRANSFER_IMPORT.md)'s own Known Bugs / Troubleshooting section.",
+      "warnings": "Per `CLAUDE.md`'s File Copy Rules: no overwrite, ever, applies here too. Starting an Import while a Transfer Export is running against the same drive is blocked, not queued.",
+      "whatItDoes": "Consolidates content from a Transfer Drive into the Main Archive Root (Transfer Import, AI-FEAT-039) — matching corresponding archival events by identity where possible and merging their contents without duplicating structures, rather than a blind file copy.",
+      "whenToUseIt": "Bringing event data accumulated on a mobile/portable drive during a live event back into the main archive, or refreshing an already-partially-imported drive with what's new since the last import.",
+      "whereToGo": "A **\"Transfer Import…\"** button (`#alocTransferImportBtn`, `renderer/index.html:8333`) opens the **Transfer Import** modal (`#tiTitle`, line 8592)."
     }
   ]
 }

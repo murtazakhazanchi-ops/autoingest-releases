@@ -62,7 +62,7 @@ This section classifies this feature's already-evidenced history by milestone ty
 
 ## Known Bugs / Troubleshooting
 
-See [BUG-006 — Event-Edit Full-Payload Save Silently Drops Untracked Fields](../bugs/BUG-006_EVENT_EDIT_FULL_PAYLOAD_FIELD_DROP.md) — a recurring architectural weakness in this feature's save path, found for two different fields (`adoption`, `status`) roughly three months apart. See also the Phase 13C-10 guard-bug learning-log entry above for narrative detail on a separate, unrelated selection/redirect bug.
+See [BUG-006 — Event-Edit Full-Payload Save Silently Drops Untracked Fields](../bugs/BUG-006_EVENT_EDIT_FULL_PAYLOAD_FIELD_DROP.md) — a recurring architectural weakness in this feature's own save path, found for two different fields (`adoption`, `status`) roughly three months apart. **Material consequence for this feature**: this save path constructs its output from a hardcoded field list rather than spreading the existing record, so any new `event.json` field this feature's Save action might touch needs both that hardcoded list and the session-capture object (`_viewingExisting`) audited before shipping — otherwise the field can silently vanish on the very next save. See BUG-006's own Prevention / Reusable Lesson section for the full diagnostic procedure. See also the Phase 13C-10 guard-bug learning-log entry above for narrative detail on a separate, unrelated selection/redirect bug.
 
 ## Decisions
 

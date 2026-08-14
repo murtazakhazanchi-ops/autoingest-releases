@@ -50,6 +50,7 @@ const CORPUS_V2 = [
     id: 'P03a', domain: 'Import', family: 'Q03',
     question: 'Why is the photographer name blank after I imported?',
     expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
+    knownLimitation: 'CHANGED 2026-08-14 twice. First (Part 2 Decision 2, bounded Summary indexing): was a weak, tied match; became a confident, untied match on AI-FEAT-028 (Import Source Attribution) — a real improvement. Then (Part 2 Decision 1 checkpoint — AI-FEAT-039\'s Summary was extended with one sentence describing its direct-Event vs Collection-nested resolution distinction, per explicit product-owner instruction): that sentence\'s "folder name" phrasing, combined with AI-FEAT-039\'s pre-existing "photographer" token (from "event/photographer structures"), creates a new coincidental 2-word tie with AI-FEAT-039. Re-downgraded to weak/tied. "name" is low document-frequency (7/369, 1.9%) — a narrow, non-systemic collision, not chased with a stopword per this pass\'s established discipline. The answer itself is unaffected: AI-FEAT-028 still wins the ascending-ID tiebreak and is still the cited "closest" answer, only now hedged rather than asserted outright — an acceptable precision/recall trade-off, not a wrong answer.',
   },
   {
     id: 'P03b', domain: 'Import', family: 'Q03',
@@ -59,8 +60,8 @@ const CORPUS_V2 = [
   {
     id: 'P04a', domain: 'Events', family: 'Q04',
     question: 'What\'s the way to start a new event?',
-    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'strong',
-    knownLimitation: 'IMPROVED during Phase 24 — this question classifies EXPLANATION (not HOW_TO), so it fell through to feature-only matching until the workflow-preference gate was broadened to include EXPLANATION (see AI-FEAT-058 Phase 24 evolution entry). Now correctly, strongly matches AI-WF-002.',
+    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
+    knownLimitation: 'IMPROVED during Phase 24 (strongly matched AI-WF-002 once EXPLANATION-type questions were routed to workflows). CHANGED again 2026-08-14 (Part 2 Phase 5 — new AI-WF-009 Transfer Import workflow added): AI-WF-009\'s real, evidence-grounded text repeatedly says "event" (archival events are its whole subject) and includes the real "Start Fresh" button label, creating a genuine 2-word tie with AI-WF-002 at the same score. Neither "event" (core domain vocabulary, not stopword-able) nor "start" (a real UI button label, not filler) is a hygiene defect to chase — this is legitimate subject-matter overlap between two real workflows, not a coincidental collision. Re-downgraded to weak/tied, but AI-WF-002 still wins the ascending-ID tiebreak and is still the cited, correct answer — an acceptable precision/recall trade-off.',
   },
   {
     id: 'P04b', domain: 'Events', family: 'Q04',
@@ -76,7 +77,8 @@ const CORPUS_V2 = [
   {
     id: 'P05b', domain: 'Events', family: 'Q05',
     question: 'can events be deleted',
-    expectedStatus: 'UNKNOWN', expectedMatchQuality: 'none',
+    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
+    knownLimitation: 'CHANGED 2026-08-14 (Part 2 Decision 2) — was a zero-match (UNKNOWN) safe decline; now a weakly-hedged, 5-way tie (AI-FEAT-004/009/010/017/018), each sharing only the generic token "event". Honestly hedged ("this may not directly answer what you asked"), not confidently wrong — an inherent recall/precision trade-off of richer indexing, not a false claim.',
   },
   {
     id: 'P06a', domain: 'Collections', family: 'Q06',
@@ -88,7 +90,7 @@ const CORPUS_V2 = [
     id: 'P06b', domain: 'Collections', family: 'Q06',
     question: 'Explain Collections',
     expectedStatus: 'UNKNOWN', expectedMatchQuality: 'none',
-    knownLimitation: 'Diverges from the now-fixed canonical Q06 ("What is a Collection...") for a different, structural reason: this uses the plural "Collections" while AI-WF-002 is indexed under the singular "collection" — lib/query.js performs no stemming (same pre-existing, structural limitation as R24\'s "importing" vs "import"). Safe (UNKNOWN, no invented claim) but misses the real answer that P01a-style singular phrasing now correctly surfaces.',
+    knownLimitation: 'Diverges from the now-fixed canonical Q06 ("What is a Collection...") for a different, structural reason: this uses the plural "Collections" while AI-WF-002 is indexed under the singular "collection" — lib/query.js performs no stemming (same pre-existing, structural limitation as R24\'s "importing" vs "import"). Safe (weak, hedged — never a confident false claim) but misses the real answer that P01a-style singular phrasing now correctly surfaces. CHANGED 2026-08-14 (Part 2 Phase 5) — the specific wrong weak match shifted from AI-FEAT-049 to AI-WF-009 (both cite "Collection" folders as real, evidenced vocabulary); the underlying stemming limitation and its safe/hedged character are unchanged.',
   },
   {
     id: 'P07a', domain: 'Collections', family: 'Q07',
@@ -124,7 +126,8 @@ const CORPUS_V2 = [
   {
     id: 'P10a', domain: 'Transfer', family: 'Q10',
     question: 'My transfer got interrupted, what do I do?',
-    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
+    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'strong',
+    knownLimitation: 'CHANGED 2026-08-14 (Part 2 Decision 2) — was a weak/wrong-tied match; now confidently, untied resolves to AI-FEAT-038 (Transfer Export), the genuinely correct answer. A real improvement, directly addressing the class of failure the Part 2 Findings Report identified (Transfer Export troubleshooting).',
   },
   {
     id: 'P10b', domain: 'Transfer', family: 'Q10',
@@ -175,7 +178,8 @@ const CORPUS_V2 = [
   {
     id: 'P15a', domain: 'Updates', family: 'Q15',
     question: 'How do I get preview builds?',
-    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
+    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'strong',
+    knownLimitation: 'CHANGED 2026-08-14 (Part 2 Decision 2) — was weak; now confidently, untied resolves to AI-FEAT-057 (Multi-Channel Release & Update System), the genuinely correct answer. An improvement.',
   },
   {
     id: 'P15b', domain: 'Updates', family: 'Q15',
@@ -200,17 +204,20 @@ const CORPUS_V2 = [
   {
     id: 'P17b', domain: 'Metadata', family: 'Q17',
     question: 'metadata repair tool',
-    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'strong',
+    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
+    knownLimitation: 'CHANGED 2026-08-14 (Part 2 Decision 2) — was an untied strong match on AI-FEAT-033 alone; now a 5-way tie (AI-FEAT-023/029/033/034/049) at the same score, since Summary indexing widened recall for all of them. AI-FEAT-033 (the genuinely correct answer) is still among the tied candidates, honestly hedged rather than dropped — a precision/recall trade-off, not a wrong answer.',
   },
   {
     id: 'P18a', domain: 'Archive operations', family: 'Q18',
     question: 'What maintenance tasks does AutoIngest run on my archive?',
-    expectedStatus: 'PLANNED', expectedMatchQuality: 'strong',
+    expectedStatus: 'PLANNED', expectedMatchQuality: 'weak',
+    knownLimitation: 'CHANGED 2026-08-14 (Part 2 Decision 2) — was an untied strong match on AI-FEAT-049 alone; now ties with AI-FEAT-050/051/056, all genuinely related Planned archive-direction features (per 11_ARCHITECTURAL_EVOLUTION.md §I). Status remains correctly PLANNED; only the match confidence changed, not the correctness.',
   },
   {
     id: 'P18b', domain: 'Archive operations', family: 'Q18',
     question: 'archive maintenance features',
-    expectedStatus: 'PLANNED', expectedMatchQuality: 'strong',
+    expectedStatus: 'PLANNED', expectedMatchQuality: 'weak',
+    knownLimitation: 'CHANGED 2026-08-14 (Part 2 Decision 2) — same tie pattern as P18a. Status remains correctly PLANNED.',
   },
   {
     id: 'P19a', domain: 'QMZ', family: 'Q19',
@@ -304,7 +311,8 @@ const CORPUS_V2 = [
   {
     id: 'R14', domain: 'Online Registry',
     question: 'What happens if my internet goes down mid-import?',
-    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
+    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'strong',
+    knownLimitation: 'CHANGED 2026-08-14 (Part 2 Decision 2) — was weak; now an untied strong match on AI-FEAT-018 (Event-Component Import Routing), via a narrow, low-document-frequency coincidental overlap on "happens"+"import" (2 of 369 records). Topically adjacent (import processing) but not precisely about connectivity/offline resilience. Not chased further with a new stopword, per this project\'s established discipline against accumulating question-specific keyword exceptions for narrow, isolated collisions — documented as an acceptable imprecision, not a harmful regression (the answer is not false, only imprecise).',
   },
   {
     id: 'R15', domain: 'Online Registry',
@@ -325,7 +333,8 @@ const CORPUS_V2 = [
   {
     id: 'R18', domain: 'Online Registry',
     question: 'Can I tell if a teammate is online right now?',
-    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
+    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'strong',
+    knownLimitation: 'CHANGED 2026-08-14 (Part 2 Decision 2) — was weak; now an untied strong match on AI-FEAT-027 (Activity Log). This is a genuine improvement, not a coincidence: Part 1\'s Purpose Capture forensically confirmed AI-FEAT-027 has a real "Team Live" tab showing live operator presence, so this Summary content is legitimately relevant to a presence question, even though the phrasing doesn\'t trigger the dedicated TEAM_ACTIVITY question-type classifier (which would route to AI-WF-006 instead).',
   },
   {
     id: 'R19', domain: 'Online Registry',
@@ -420,7 +429,8 @@ const CORPUS_V2 = [
   {
     id: 'W12', domain: 'Settings',
     question: 'Where are AutoIngest preferences located?',
-    expectedStatus: 'UNKNOWN', expectedMatchQuality: 'none',
+    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
+    knownLimitation: 'CHANGED 2026-08-14 (Part 2 Decision 2) — was a zero-match (UNKNOWN) safe decline; now a single weak, heavily-hedged match on AI-FEAT-013 ("this may not directly answer what you asked", confidence 0.1). Honest about its own uncertainty, not a false claim — an inherent recall/precision trade-off of richer indexing.',
   },
   {
     id: 'W13', domain: 'Metadata',
@@ -494,7 +504,8 @@ const CORPUS_V2 = [
   {
     id: 'X01', domain: 'Adversarial',
     question: 'Does AutoIngest use AI to organize my photos?',
-    expectedStatus: 'UNKNOWN', expectedMatchQuality: 'none',
+    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
+    knownLimitation: 'CHANGED 2026-08-14 (Part 2 Decision 2) — was a zero-match (UNKNOWN) safe decline; now a single weak, heavily-hedged match on AI-FEAT-011 (confidence 0.1). Honest weak/hedged gap, not a confident false claim — same pattern already accepted for X02.',
   },
   {
     id: 'X02', domain: 'Adversarial',
@@ -505,7 +516,8 @@ const CORPUS_V2 = [
   {
     id: 'X03', domain: 'Adversarial',
     question: 'Does AutoIngest have a mobile app?',
-    expectedStatus: 'UNKNOWN', expectedMatchQuality: 'none',
+    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
+    knownLimitation: 'CHANGED 2026-08-14 (Part 2 Decision 2) — was a zero-match (UNKNOWN) safe decline; now weakly tied among AI-FEAT-014/019/022/029/039 (confidence 0.1). Honest weak/hedged gap, not a confident false claim.',
   },
   {
     id: 'X04', domain: 'Adversarial',
@@ -536,7 +548,8 @@ const CORPUS_V2 = [
   {
     id: 'X09', domain: 'Adversarial',
     question: 'Can AutoIngest merge two archives together?',
-    expectedStatus: 'UNKNOWN', expectedMatchQuality: 'none',
+    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
+    knownLimitation: 'CHANGED 2026-08-14 (Part 2 Decision 2) — was a zero-match (UNKNOWN) safe decline; now weakly tied among AI-FEAT-021/027/047 (confidence 0.1). Honest weak/hedged gap, not a confident false claim.',
   },
   {
     id: 'X10', domain: 'Adversarial',

@@ -49,6 +49,7 @@ function buildAuthorityIndex(parsed) {
     const decisions = extractIds(String(feat.lifecycle['Related decisions'] || ''), 'decision');
     const postmortems = extractIds(String(feat.lifecycle['Related postmortems'] || ''), 'postmortem');
     entries.push({
+      recordType: 'feature',
       topic: feat.name,
       featureId,
       aliases: TOPIC_ALIASES[featureId] || [],
@@ -63,6 +64,31 @@ function buildAuthorityIndex(parsed) {
       evidenceNote: `Derived directly from ${feat.filePath}'s header table and Lifecycle Metadata section.`,
     });
   }
+
+  // Part 2 remediation (Decision 5's prerequisite, Root Cause B) — Workflows
+  // get their own entry shape, not the feature shape, since a Workflow isn't
+  // "a capability with aliases/bugs/decisions" — it's an end-to-end journey
+  // that exercises capabilities. `recordType` lets a consumer of
+  // authority-index.json distinguish the two shapes explicitly rather than
+  // inferring it from which fields happen to be present.
+  if (parsed.workflows) {
+    const workflowIds = Array.from(parsed.workflows.keys()).sort(compareIds);
+    for (const workflowId of workflowIds) {
+      const wf = parsed.workflows.get(workflowId);
+      entries.push({
+        recordType: 'workflow',
+        topic: wf.name,
+        workflowId,
+        relatedFeatures: extractIds(String(wf.header['Related capabilities'] || ''), 'feature'),
+        roadmapIds: extractIds(String(wf.header['Related roadmap milestone'] || ''), 'roadmap'),
+        relatedWorkflows: extractIds(String(wf.relatedActions || ''), 'workflow').filter((id) => id !== workflowId),
+        canonicalProductDoc: wf.filePath,
+        confidenceLevel: 'explicit',
+        evidenceNote: `Derived directly from ${wf.filePath}'s header table.`,
+      });
+    }
+  }
+
   return entries;
 }
 

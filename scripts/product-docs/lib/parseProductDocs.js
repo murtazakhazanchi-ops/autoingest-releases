@@ -110,12 +110,37 @@ function parseArchEvolutionRelationshipMap(content) {
   return out;
 }
 
+// Part 2 remediation (Decision 2) — the retrieval-surface fields approved
+// per record family: Bug = Symptom + Root Cause ("concise defect-defining
+// content"); Decision = Context + Decision ("problem/context/reason" plus
+// "the actual chosen decision where necessary" — Options Considered is
+// explicitly excluded per Decision 2, since rejected-alternative prose could
+// wrongly win a match for something not chosen); Postmortem = Summary +
+// Impact + Root Cause. Investigation Log/Fix/Prevention (bugs), Consequences/
+// Reconciliation Note (decisions), and Timeline/Resolution/Follow-up Actions
+// (postmortems) are deliberately excluded — either historical/fix-mechanics
+// detail or forward-looking advisory content, not "what identifies this
+// record," mirroring the same boundary already drawn for Features'
+// Evolution Journal exclusion. See docs/product/07_BUG_TEMPLATE.md,
+// 08_DECISION_TEMPLATE.md, 09_POSTMORTEM_TEMPLATE.md for the section names
+// this extracts from.
+const RETRIEVAL_SECTIONS_BY_FAMILY = {
+  bug: ['Symptom', 'Root Cause'],
+  decision: ['Context', 'Decision'],
+  postmortem: ['Summary', 'Impact', 'Root Cause'],
+};
+
 function parseRecordFile(absPath, family, root) {
   const content = readFile(absPath);
   const header = md.extractHeaderTable(content);
   const idMatch = new RegExp(ids.ID_PATTERNS[family].source).exec(path.basename(absPath));
   const id = idMatch ? idMatch[0] : null;
   const nameMatch = /^#\s+\S+\s*—\s*(.+)$/m.exec(content);
+  const retrievalSectionNames = RETRIEVAL_SECTIONS_BY_FAMILY[family] || [];
+  const retrievalSections = {};
+  for (const sectionName of retrievalSectionNames) {
+    retrievalSections[sectionName] = md.extractSection(content, sectionName) || '';
+  }
   return {
     id,
     name: nameMatch ? nameMatch[1].trim() : path.basename(absPath, '.md'),
@@ -125,6 +150,9 @@ function parseRecordFile(absPath, family, root) {
     headings: md.extractHeadings(content),
     allIds: ids.extractAllIds(content),
     related: md.extractSection(content, 'Related'),
+    // Keyed by exact section name (e.g. retrievalSections['Symptom']) so
+    // callers don't need to know per-family which sections exist.
+    retrievalSections,
   };
 }
 

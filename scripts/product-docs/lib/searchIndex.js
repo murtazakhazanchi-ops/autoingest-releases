@@ -2,6 +2,11 @@
 
 const { compareIds } = require('./ids');
 const { parseRelatedTechnicalDocs } = require('./subsystems');
+// Part 2 remediation — keywordsFrom/STOPWORDS moved to their own module so
+// featureIndex.js can use the identical tokenizer for Summary text (Decision
+// 2) rather than maintaining a second, potentially-drifting copy. See
+// textKeywords.js for the full history/rationale comment.
+const { keywordsFrom } = require('./textKeywords');
 
 function rec(entityType, stableId, title, canonicalPath, opts = {}) {
   return {
@@ -12,44 +17,20 @@ function rec(entityType, stableId, title, canonicalPath, opts = {}) {
     aliases: opts.aliases || [],
     keywords: opts.keywords || [],
     summary: opts.summary || '',
+    // Part 2 remediation (Decision 1) — a second, optional retrieval-only
+    // text field beyond `summary`, populated only for bug/decision/
+    // postmortem records (see below). `summary` alone (Symptom/Context/
+    // Summary) frames the problem; `detail` (Root Cause/Decision/Root
+    // Cause) carries the actual conclusion — a governance-record-primary
+    // answer (knowledgeEngine.js's answerFromGovernanceRecord) needs both
+    // to be a complete, grounded answer rather than half of one. Not added
+    // for feature/workflow records — their existing `summary` already IS
+    // the complete answer-worthy text for those types.
+    detail: opts.detail || '',
     related_ids: opts.relatedIds || [],
     authority_level: opts.authorityLevel || 'canonical',
     evidence_status: opts.evidenceStatus || 'Evidence pending',
   };
-}
-
-// Stage 2 finding: workflow records (much richer prose than a feature's
-// name/category) exposed a real defect — a 3-word stopword collision ("how",
-// "between", "and") let AI-WF-006 (Online Registry) confidently win "How do
-// I switch between Stable and Preview versions?", a question about update
-// channels with zero real topical relevance. keywordsFrom() previously only
-// filtered by length (>2 chars), which passes almost every common English
-// connector word. This list is deliberately short — generic, high-frequency
-// words only, never a domain term — filtering more aggressively risks
-// removing real signal (e.g. "with", not listed, could plausibly matter for
-// some future record) for a problem this list already solves.
-const STOPWORDS = new Set([
-  'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'has', 'have', 'had',
-  'was', 'were', 'been', 'this', 'that', 'these', 'those', 'from', 'into', 'onto',
-  'with', 'without', 'how', 'what', 'when', 'where', 'which', 'who', 'whom', 'why',
-  'does', 'did', 'doing', 'done', 'own', 'now', 'only', 'than', 'then', 'them', 'they',
-  'their', 'there', 'here', 'its', 'his', 'her', 'she', 'him', 'out', 'off', 'over',
-  'under', 'again', 'further', 'once', 'about', 'above', 'below', 'between', 'both',
-  'each', 'few', 'more', 'most', 'other', 'some', 'such', 'nor', 'too', 'very', 'just',
-  'per', 'via', 'see', 'set', 'get', 'yet', 'any', 'also', 'may', 'must', 'shall',
-  'should', 'would', 'could', 'will', 'never', 'always', 'while', 'because', 'before',
-  'after', 'during', 'same', 'still', 'even', 'one', 'two', 'first', 'second', 'new',
-]);
-
-function keywordsFrom(...texts) {
-  const words = new Set();
-  for (const t of texts) {
-    if (!t) continue;
-    for (const w of String(t).toLowerCase().split(/[^a-z0-9]+/)) {
-      if (w.length > 2 && !STOPWORDS.has(w)) words.add(w);
-    }
-  }
-  return Array.from(words).sort();
 }
 
 function buildSearchIndex(parsed, featureIndexRecords, subsystems, memoryIndexRecords, conversationIndexRecords, workflowIndexRecords) {
@@ -116,26 +97,53 @@ function buildSearchIndex(parsed, featureIndexRecords, subsystems, memoryIndexRe
     }));
   }
 
+  // Part 2 remediation (Decision 2) — bug keywords now draw from Symptom +
+  // Root Cause (the approved "concise defect-defining content"), not just
+  // the title. `summary` previously read `b.header['Symptom']`, which is
+  // always empty — Symptom is a Markdown section (## Symptom), not a header-
+  // table field, so that line silently never populated anything; fixed here
+  // to read the actual parsed section (b.retrievalSections['Symptom'],
+  // added to parseProductDocs.js's parseRecordFile in this same pass).
   for (const [id, b] of parsed.bugs) {
+    const symptom = (b.retrievalSections && b.retrievalSections['Symptom']) || '';
+    const rootCause = (b.retrievalSections && b.retrievalSections['Root Cause']) || '';
     records.push(rec('bug', id, b.name, b.filePath, {
-      keywords: keywordsFrom(b.name),
-      summary: b.header['Symptom'] || '',
+      keywords: keywordsFrom(b.name, symptom, rootCause),
+      summary: symptom,
+      detail: rootCause,
       relatedIds: require('./ids').extractIds(String(b.header['Related feature(s)'] || ''), 'feature'),
       evidenceStatus: b.header['Evidence status'] || 'Evidence pending',
     }));
   }
 
+  // Decision keywords draw from Context + Decision (the approved
+  // "problem/context/reason" plus "the actual chosen decision") —
+  // explicitly NOT Options Considered (rejected-alternative terminology
+  // must not win an ordinary semantic match — Decision 2's explicit
+  // exclusion).
   for (const [id, d] of parsed.decisions) {
+    const context = (d.retrievalSections && d.retrievalSections['Context']) || '';
+    const decisionText = (d.retrievalSections && d.retrievalSections['Decision']) || '';
     records.push(rec('decision', id, d.name, d.filePath, {
-      keywords: keywordsFrom(d.name),
+      keywords: keywordsFrom(d.name, context, decisionText),
+      summary: context,
+      detail: decisionText,
       relatedIds: require('./ids').extractIds(String(d.header['Related feature(s) / roadmap milestone'] || ''), 'feature'),
       evidenceStatus: d.header['Evidence status'] || 'Evidence pending',
     }));
   }
 
+  // Postmortem keywords draw from Summary + Impact + Root Cause (the
+  // approved "concise incident summary / impact / root-cause-defining
+  // content").
   for (const [id, p] of parsed.postmortems) {
+    const pmSummary = (p.retrievalSections && p.retrievalSections['Summary']) || '';
+    const impact = (p.retrievalSections && p.retrievalSections['Impact']) || '';
+    const pmRootCause = (p.retrievalSections && p.retrievalSections['Root Cause']) || '';
     records.push(rec('postmortem', id, p.name, p.filePath, {
-      keywords: keywordsFrom(p.name),
+      keywords: keywordsFrom(p.name, pmSummary, impact, pmRootCause),
+      summary: pmSummary,
+      detail: pmRootCause,
       relatedIds: require('./ids').extractIds(String(p.header['Related feature(s)'] || ''), 'feature'),
       evidenceStatus: p.header['Evidence status'] || 'Evidence pending',
     }));

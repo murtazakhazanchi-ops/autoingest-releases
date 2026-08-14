@@ -203,6 +203,101 @@ function answerFromWorkflow(question, workflowRecord, workflowMatches, featureMa
   };
 }
 
+// Part 2 remediation (Decision 1) — the real Feature this bug/decision/
+// postmortem is documented against, per its own "Related feature(s)" header
+// citation (already resolved into related_ids by lib/searchIndex.js). The
+// LOWEST feature ID is used deterministically when more than one is cited
+// (e.g. DEC-021 cites three) — a governance record's PRIMARY subject for
+// authority-preservation purposes, not an attempt to rank relevance among
+// them. Returns null (not a guess) when no citation resolves to a real,
+// known feature — see answerFromGovernanceRecord for why that means the
+// governance-primary path is not used at all rather than presenting a
+// half-grounded answer.
+function findPrimaryFeatureContext(relatedIds, knowledgeIndexById) {
+  if (!knowledgeIndexById) return null;
+  const featureIds = (relatedIds || []).filter((id) => /^AI-FEAT-/.test(id)).sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
+  for (const id of featureIds) {
+    const featRec = knowledgeIndexById.get(id);
+    if (featRec) return featRec;
+  }
+  return null;
+}
+
+const GOVERNANCE_LABEL = { bug: 'Known issue', decision: 'Documented decision', postmortem: 'Documented incident' };
+
+// Part 2 remediation (Decision 1) — authority-preserving answer for when a
+// bug/decision/postmortem is itself the strongest, most specific match
+// (see answerQuestion's governanceIsBestEvidence gate). Mirrors the
+// product owner's own worked examples (BUG-017/018 primary with AI-FEAT-007
+// context; DEC-021 primary with AI-FEAT-038 context): the governance
+// record's own Symptom/Root-Cause (or Context/Decision, or Summary/Root-
+// Cause) text is the PRIMARY content, with its cited feature surfaced as
+// supporting context — never the reverse, and never inventing a status this
+// record's own evidence doesn't state.
+//
+// Deliberately returns null — asking the caller to fall through to the
+// ordinary feature/workflow answer path — whenever no real feature citation
+// resolves. A bug/decision/postmortem with no resolvable feature context is
+// real evidence of a documentation gap in THAT record, not license to
+// invent a capabilityStatus for this answer; the existing invented-nothing
+// discipline (see this file's header comment) takes priority over
+// completeness here.
+function answerFromGovernanceRecord(question, searchRec, matches, qType, knowledgeIndexById) {
+  const featureContext = findPrimaryFeatureContext(searchRec.related_ids, knowledgeIndexById);
+  if (!featureContext) return null;
+
+  const tiedCount = matches.filter((m) => m.score === matches[0].score).length;
+  const quality = matchQualityFor(matches[0].score, tiedCount);
+  const entityType = searchRec.entity_type;
+  const label = GOVERNANCE_LABEL[entityType] || 'Documented record';
+
+  const parts = [`${label} — ${searchRec.stable_id} (${searchRec.title}): ${searchRec.summary}`.trim()];
+  if (searchRec.detail) parts.push(searchRec.detail);
+
+  const limitations = [];
+  if (entityType === 'bug') {
+    // Read the bug's live status off the SAME already-resolved data
+    // limitationsForRecord()/knowledgeIndex.js use for this exact feature
+    // (f.related_bugs -> parsed.bugs.get(id).header['Status']) — no second
+    // status source, no re-parsing. Reciprocal citation (the feature's own
+    // "Related bugs" field naming this bug back) is what the project's
+    // validators already enforce; when it's missing this simply omits the
+    // status line rather than guessing.
+    const openBug = (featureContext.knownLimitations.openBugs || []).find((b) => b.id === searchRec.stable_id);
+    if (openBug) {
+      parts.push(`Current status: ${openBug.status}.`);
+      if (!/^(Fixed|Resolved|Closed)\b/i.test(openBug.status)) {
+        limitations.push(`${searchRec.stable_id} is not yet marked Fixed (current status: ${openBug.status}).`);
+      }
+    }
+  }
+
+  parts.push(`Context: this relates to ${featureContext.title} (${featureContext.id}), which is ${featureContext.operatorStatus}.`);
+
+  const sources = [
+    { id: searchRec.stable_id, title: searchRec.title, path: searchRec.canonical_path },
+    { id: featureContext.id, title: featureContext.title, path: featureContext.canonicalDocument },
+  ];
+
+  return {
+    query: question,
+    classification: qType,
+    directAnswer: parts.join(' ').trim(),
+    // Anchored on the cited feature's own real operator status — this
+    // governance record is evidence ABOUT that feature (a defect, a
+    // decision, an incident), never a claim that the feature itself
+    // doesn't exist or isn't available.
+    capabilityStatus: featureContext.operatorStatus,
+    matchQuality: quality,
+    matchedCapabilities: matches,
+    guidance: null,
+    limitations,
+    relatedCapabilities: [featureContext.id],
+    sources,
+    confidence: quality === 'weak' ? Math.min(0.4, matches[0].score / 1000) : Math.min(1, matches[0].score / 1000),
+  };
+}
+
 function boundaryAnswer(question, boundary, matches, qType) {
   return {
     query: question,
@@ -276,12 +371,23 @@ function searchCandidates(question, searchIndex) {
   const candidateQueries = [question, ...(concept ? concept.hints : [])];
   const bestByRecord = new Map();
   const bestRawByRecord = new Map(); // raw-question-only scores — see note below
+  // Part 2 remediation (Decision 1) — the candidate pool now also admits
+  // bug/decision/postmortem records, not just feature/workflow. Approved
+  // scope: cross-type retrieval + authority preservation, so a question
+  // that is genuinely, specifically ABOUT a documented defect or decision
+  // (not merely coincidentally sharing a keyword with one) can surface that
+  // record instead of silently losing to an unrelated feature. See
+  // answerFromGovernanceRecord below for how a governance-type match is
+  // only ever allowed to become the primary answer when it wins on the
+  // SAME strong/untied evidence bar every other entity type already uses
+  // (no new classifier, no second confidence scale).
+  const GOVERNANCE_TYPES = new Set(['bug', 'decision', 'postmortem']);
   for (let i = 0; i < candidateQueries.length; i++) {
     const cq = candidateQueries[i];
     const isRaw = i === 0;
     const results = runQuery(cq, searchIndex, { limit: 20 });
     for (const r of results) {
-      if (r.record.entity_type !== 'feature' && r.record.entity_type !== 'workflow') continue;
+      if (r.record.entity_type !== 'feature' && r.record.entity_type !== 'workflow' && !GOVERNANCE_TYPES.has(r.record.entity_type)) continue;
       const prev = bestByRecord.get(r.record.stable_id);
       if (!prev || r.score > prev.score) {
         bestByRecord.set(r.record.stable_id, { id: r.record.stable_id, title: r.record.title, score: r.score, entityType: r.record.entity_type });
@@ -294,6 +400,7 @@ function searchCandidates(question, searchIndex) {
     concept,
     featureMatches: all.filter((m) => m.entityType === 'feature').slice(0, MAX_MATCHES),
     workflowMatches: all.filter((m) => m.entityType === 'workflow').slice(0, MAX_MATCHES),
+    governanceMatches: all.filter((m) => GOVERNANCE_TYPES.has(m.entityType)).slice(0, MAX_MATCHES),
     // Raw-question-only version of the same match lists — used ONLY to
     // decide whether a match is trustworthy enough to override a curated
     // boundary (see hasStrongFeatureMatch below). Found during Stage 2's
@@ -332,7 +439,7 @@ function answerQuestion(question, ctx) {
     return roadmapAnswer(question, dashboard);
   }
 
-  const { featureMatches, workflowMatches, rawFeatureMatches } = searchCandidates(question, searchIndex);
+  const { featureMatches, workflowMatches, governanceMatches, rawFeatureMatches } = searchCandidates(question, searchIndex);
 
   const topFeature = featureMatches[0];
   const topFeatureTied = topFeature ? featureMatches.filter((m) => m.score === topFeature.score).length : 0;
@@ -382,6 +489,50 @@ function answerQuestion(question, ctx) {
   // workflow guess (workflowClearlyBeaten still gates on hasStrongFeatureMatch).
   const topWorkflow = workflowMatches[0];
   const workflowClearlyBeaten = hasStrongFeatureMatch && (!topWorkflow || topFeature.score > topWorkflow.score);
+
+  // Part 2 remediation (Decision 1) — a bug/decision/postmortem becomes the
+  // PRIMARY answer only when it is the single best piece of evidence found
+  // anywhere in the whole candidate pool: a strong, untied match (the exact
+  // same bar every other entity type already needs — no new classifier, no
+  // separate confidence scale) that is not beaten by the top feature or
+  // workflow match. This is deliberately conservative: a bare keyword-
+  // overlap collision with some unrelated bug must never hijack a real
+  // feature/workflow answer, but a question that IS specifically about a
+  // documented defect or decision (an exact/near-exact ID or title match)
+  // gets to say so, per the product owner's own worked examples (BUG-017/
+  // 018 primary with AI-FEAT-007 context; DEC-021 primary with AI-FEAT-038
+  // context). Checked before the boundary-precedence workflow routing below
+  // since a curated NOT_SUPPORTED boundary already returned above if one
+  // applied — evidence about a real, existing defect/decision is never in
+  // tension with that check.
+  // The tie count must be computed ACROSS every entity type at the top
+  // governance score, not just within governanceMatches itself — found via
+  // a real regression: "What routine maintenance does AutoIngest do on my
+  // archive?" scored BUG-018 at 200 via a coincidental 2-token keyword
+  // overlap, genuinely untied among bug/decision/postmortem records (so a
+  // governance-only tie count called it "strong"), but that same score of
+  // 200 was ALSO shared by three real, topically-relevant Planned features
+  // (AI-FEAT-049/050/051) — exactly the kind of cross-type coincidence
+  // matchQualityFor's tiedCount check exists to hedge against. Silently
+  // preferred the bug and overrode a correct PLANNED answer with a
+  // fabricated-looking PARTIALLY_AVAILABLE one.
+  const topGovernance = governanceMatches[0];
+  const combinedTiedCount = topGovernance
+    ? [...featureMatches, ...workflowMatches, ...governanceMatches].filter((m) => m.score === topGovernance.score).length
+    : 0;
+  const hasStrongGovernanceMatch = !!topGovernance && matchQualityFor(topGovernance.score, combinedTiedCount) === 'strong';
+  const governanceIsBestEvidence = hasStrongGovernanceMatch
+    && (!topFeature || topGovernance.score > topFeature.score)
+    && (!topWorkflow || topGovernance.score > topWorkflow.score);
+  if (governanceIsBestEvidence) {
+    const searchRec = searchIndex.find((r) => r.stable_id === topGovernance.id);
+    const governanceAnswer = searchRec ? answerFromGovernanceRecord(question, searchRec, governanceMatches, qType, knowledgeIndexById) : null;
+    // answerFromGovernanceRecord returns null when it can't ground the
+    // record in a real cited feature — falls through to the ordinary
+    // feature/workflow logic below rather than answering half-grounded.
+    if (governanceAnswer) return governanceAnswer;
+  }
+
   // TEAM_ACTIVITY added 2026-08-14 during the event-coordination
   // reconciliation pass — this question type's own classifier regex is
   // narrowly scoped to Registry/team-live phrasing (see

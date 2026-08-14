@@ -49,7 +49,7 @@ None recorded as a dedicated Troubleshooting Entry yet.
 
 ## Related Actions
 
-AI-FEAT-036 (Keyword Registry) if the repair concerns keywords specifically; AI-WF-001 if the real issue is that a re-import is actually needed.
+AI-FEAT-036 (Keyword Registry) if the repair concerns keywords specifically; AI-WF-001 if the real issue is that a re-import is actually needed; AI-FEAT-037 (Metadata Reapply / Sync) if the metadata itself is correct but was never propagated after an event field was corrected post-import — a related but distinct corrective mechanism from this workflow's audit/repair path, not independently confirmed to live in the same Metadata Management modal in this pass.
 
 ## Source
 

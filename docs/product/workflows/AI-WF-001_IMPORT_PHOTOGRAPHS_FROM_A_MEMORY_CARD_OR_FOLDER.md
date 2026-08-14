@@ -53,7 +53,7 @@ None recorded as a dedicated Troubleshooting Entry yet. If an import is interrup
 
 ## Related Actions
 
-AI-WF-002 (Create a New Event), AI-WF-003 (Quick Import), AI-FEAT-026 (Audit Integrity Verification) as a natural next step after a large import.
+AI-WF-002 (Create a New Event), AI-WF-003 (Quick Import), AI-FEAT-026 (Audit Integrity Verification) as a natural next step after a large import, AI-FEAT-013 (File Browser: Media Grid/List Viewing) with AI-FEAT-014 (Thumbnail Generation & Caching) to review what was just imported. Step 2's file selection is itself built on two further capabilities an operator uses in the same moment: AI-FEAT-015 (Media Preview) for visual inspection before deciding what to import, and AI-FEAT-016 (Preview Focus / Selection Separation) — the mechanism that keeps inspecting a file (preview focus) from accidentally changing what's selected for import, a deliberate safety design per that feature's own Summary.
 
 ## Source
 

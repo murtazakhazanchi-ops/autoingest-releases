@@ -2,6 +2,8 @@
 
 > Generated artifact — docsys version 1.3.0. Locator only; canonical Markdown under docs/product/ and docs/ remains authoritative. Never edit this file by hand — regenerate with `node scripts/product-docs/cli.js build`.
 
+## Capabilities (Features)
+
 | Topic | Aliases | AI-FEAT | Roadmap | Canonical product doc | Canonical technical docs | Confidence |
 |---|---|---|---|---|---|---|
 | Electron Application Shell & Security Model | — | AI-FEAT-001 | — | [features/AI-FEAT-001_ELECTRON_APPLICATION_SHELL_SECURITY_MODEL.md](../features/AI-FEAT-001_ELECTRON_APPLICATION_SHELL_SECURITY_MODEL.md) | CLAUDE.md § Security Model, docs/README.md § Security Model | explicit |
@@ -62,4 +64,18 @@
 | AI Archive Intelligence | ai archive intelligence | AI-FEAT-056 | AI-RM-009 | [features/AI-FEAT-056_AI_ARCHIVE_INTELLIGENCE.md](../features/AI-FEAT-056_AI_ARCHIVE_INTELLIGENCE.md) | — | explicit |
 | Multi-Channel Release & Update System | — | AI-FEAT-057 | AI-RM-010 | [features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md](../features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md) | .github/workflows/release.yml, scripts/product-docs/README.md | explicit |
 | Knowledge Engine (Stage 1 Prototype → Stage 2 Operator Knowledge Architecture) | — | AI-FEAT-058 | AI-RM-011 | [features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md](../features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md) | — | explicit |
+
+## Operational Journeys (Workflows)
+
+| Topic | AI-WF | Exercises (Features) | Roadmap | Related workflows | Canonical product doc | Confidence |
+|---|---|---|---|---|---|---|
+| Import Photographs From a Memory Card or Folder | AI-WF-001 | AI-FEAT-011, AI-FEAT-012, AI-FEAT-017, AI-FEAT-018, AI-FEAT-019, AI-FEAT-022 | — | AI-WF-002, AI-WF-003 | [workflows/AI-WF-001_IMPORT_PHOTOGRAPHS_FROM_A_MEMORY_CARD_OR_FOLDER.md](../workflows/AI-WF-001_IMPORT_PHOTOGRAPHS_FROM_A_MEMORY_CARD_OR_FOLDER.md) | explicit |
+| Create a New Event | AI-WF-002 | AI-FEAT-009 | — | AI-WF-001 | [workflows/AI-WF-002_CREATE_A_NEW_EVENT.md](../workflows/AI-WF-002_CREATE_A_NEW_EVENT.md) | explicit |
+| Use Quick Import for a Small Batch | AI-WF-003 | AI-FEAT-023 | — | AI-WF-001 | [workflows/AI-WF-003_USE_QUICK_IMPORT_FOR_A_SMALL_BATCH.md](../workflows/AI-WF-003_USE_QUICK_IMPORT_FOR_A_SMALL_BATCH.md) | explicit |
+| Repair Missing or Incorrect Metadata | AI-WF-004 | AI-FEAT-031, AI-FEAT-033, AI-FEAT-034 | AI-RM-001 | AI-WF-001 | [workflows/AI-WF-004_REPAIR_MISSING_OR_INCORRECT_METADATA.md](../workflows/AI-WF-004_REPAIR_MISSING_OR_INCORRECT_METADATA.md) | explicit |
+| Export or Update a Transfer Drive | AI-WF-005 | AI-FEAT-038, AI-FEAT-039, AI-FEAT-040, AI-FEAT-041 | — | AI-WF-009 | [workflows/AI-WF-005_EXPORT_OR_UPDATE_A_TRANSFER_DRIVE.md](../workflows/AI-WF-005_EXPORT_OR_UPDATE_A_TRANSFER_DRIVE.md) | explicit |
+| See Who Else Is Online, Coordinate Shared Events, and See What They're Working On | AI-WF-006 | AI-FEAT-048 | — | AI-WF-001, AI-WF-002, AI-WF-005 | [workflows/AI-WF-006_SEE_WHO_ELSE_IS_ONLINE_AND_WHAT_THEYRE_WORKING_ON.md](../workflows/AI-WF-006_SEE_WHO_ELSE_IS_ONLINE_AND_WHAT_THEYRE_WORKING_ON.md) | explicit |
+| Sort QMZ Photographs | AI-WF-007 | AI-FEAT-047 | — | — | [workflows/AI-WF-007_SORT_QMZ_PHOTOGRAPHS.md](../workflows/AI-WF-007_SORT_QMZ_PHOTOGRAPHS.md) | explicit |
+| Recover From an Archive Lock Error | AI-WF-008 | AI-FEAT-043, AI-FEAT-045 | — | AI-WF-006 | [workflows/AI-WF-008_RECOVER_FROM_AN_ARCHIVE_LOCK_ERROR.md](../workflows/AI-WF-008_RECOVER_FROM_AN_ARCHIVE_LOCK_ERROR.md) | explicit |
+| Import or Update From a Transfer Drive | AI-WF-009 | AI-FEAT-025, AI-FEAT-032, AI-FEAT-038, AI-FEAT-039, AI-FEAT-042 | — | AI-WF-005 | [workflows/AI-WF-009_IMPORT_OR_UPDATE_FROM_A_TRANSFER_DRIVE.md](../workflows/AI-WF-009_IMPORT_OR_UPDATE_FROM_A_TRANSFER_DRIVE.md) | explicit |
 

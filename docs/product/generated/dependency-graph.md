@@ -2,7 +2,7 @@
 
 > Generated artifact — locator only. Regenerate with `node scripts/product-docs/cli.js build`. Full machine-readable graph: `dependency-graph.json`. Views below are deliberately bounded (one subsystem or milestone chain per diagram) rather than one unreadable graph of every node.
 
-Total: 127 nodes, 560 edges.
+Total: 137 nodes, 596 edges.
 
 ### Roadmap milestone relationships
 

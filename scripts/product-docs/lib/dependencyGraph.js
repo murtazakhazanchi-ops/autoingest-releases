@@ -20,6 +20,15 @@ function buildGraph(parsed) {
   for (const [id, b] of parsed.bugs) addNode(id, 'bug', b.name, b.filePath);
   for (const [id, d] of parsed.decisions) addNode(id, 'decision', d.name, d.filePath);
   for (const [id, p] of parsed.postmortems) addNode(id, 'postmortem', p.name, p.filePath);
+  // Part 2 remediation (Decision 5's prerequisite, Root Cause B) — Workflows
+  // were never added here even though workflowIndex.js/searchIndex.js were
+  // correctly extended for Stage 2. A distinct node type, not folded into
+  // 'feature', since a Workflow is a different kind of thing (an end-to-end
+  // journey, not a capability) — see docs/product/CLAUDE.md's Capability vs.
+  // Workflow distinction (DEC-020).
+  if (parsed.workflows) {
+    for (const [id, w] of parsed.workflows) addNode(id, 'workflow', w.name, w.filePath);
+  }
   if (parsed.memory) {
     for (const [id, m] of parsed.memory) addNode(id, 'memory_capsule', m.name, m.filePath);
   }
@@ -111,6 +120,30 @@ function buildGraph(parsed) {
   for (const [id, pm] of parsed.postmortems) {
     for (const featId of extractIds(String(pm.header['Related feature(s)'] || ''), 'feature')) {
       edges.push(edge(featId, id, 'affected_by_bug', `${pm.filePath}#header-table:Related-feature(s)`, 'explicit', 'postmortem'));
+    }
+  }
+
+  // Part 2 remediation — Workflow -> Feature / Roadmap / Workflow, read from
+  // the same header fields workflowIndex.js already parses (relatedCapabilities,
+  // roadmapRelationship, relatedActionIds.workflows) — no new parsing, this
+  // generator was simply never told these relationships exist. Deliberately
+  // NOT given the same edge vocabulary as Feature->Feature ('depends_on',
+  // 'governed_by') — a Workflow exercises a Feature, it doesn't depend on one
+  // the way one Feature depends on another; see the Part 2 Remediation Design
+  // Report's Workflow First-Class-Node Recommendation for why this is a
+  // distinct relationship vocabulary, not "make Workflows identical to
+  // Features."
+  if (parsed.workflows) {
+    for (const [id, w] of parsed.workflows) {
+      for (const featId of extractIds(String(w.header['Related capabilities'] || ''), 'feature')) {
+        edges.push(edge(id, featId, 'workflow_exercises_feature', `${w.filePath}#header-table:Related-capabilities`, 'explicit'));
+      }
+      for (const rm of extractIds(String(w.header['Related roadmap milestone'] || ''), 'roadmap')) {
+        edges.push(edge(id, rm, 'planned_in', `${w.filePath}#header-table:Related-roadmap-milestone`, 'explicit'));
+      }
+      for (const otherWf of extractIds(String(w.relatedActions || ''), 'workflow')) {
+        if (otherWf !== id) edges.push(edge(id, otherWf, 'workflow_relates_to_workflow', `${w.filePath}#related-actions`, 'explicit'));
+      }
     }
   }
 

@@ -6,12 +6,12 @@
     "engineering_conversations": 4,
     "features": 58,
     "knowledge_records": 58,
-    "memory_capsules": 3,
+    "memory_capsules": 4,
     "postmortems": 2,
     "roadmap_milestones": 11,
-    "search_index_records": 367,
+    "search_index_records": 371,
     "subsystems": 17,
-    "workflow_records": 8
+    "workflow_records": 9
   },
   "generated_files": [
     "AUTHORITY_INDEX.md",
@@ -102,10 +102,10 @@
   "generation_command": "node scripts/product-docs/cli.js build",
   "generator_version": "1.3.0",
   "relationship_counts": {
-    "dependency_graph_edges": 560,
-    "dependency_graph_nodes": 127
+    "dependency_graph_edges": 596,
+    "dependency_graph_nodes": 137
   },
   "schema_version": "1.3.0",
-  "source_commit": "d89440bbd1576e4c2530fa76b4b791c9fe226997",
-  "source_file_count": 146
+  "source_commit": "8b2ddb7ede7fc3b5eb0db368f6459c49a9f534b1",
+  "source_file_count": 148
 }

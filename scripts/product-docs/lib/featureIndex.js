@@ -3,12 +3,12 @@
 const { extractIds, compareIds } = require('./ids');
 const { parseRelatedTechnicalDocs } = require('./subsystems');
 const { TOPIC_ALIASES } = require('./authorityTopics');
-
-const EVIDENCE_MARKERS = [
-  'Evidence pending',
-  'Not yet documented as fact',
-  'Known from project history; repository evidence pending',
-];
+// Part 2 remediation (Decision 2, Root Cause A) — a feature's search surface
+// previously came only from its name/category/curated-alias list; Summary
+// text (the template's own "what this feature does and why it exists"
+// field) is now included, using the same stopword-aware tokenizer
+// searchIndex.js already uses for every other entity type.
+const { keywordsFrom, EVIDENCE_MARKERS } = require('./textKeywords');
 
 function countEvidenceGaps(text) {
   let count = 0;
@@ -65,6 +65,12 @@ function buildFeatureIndex(parsed, sourceIndex) {
       ...feat.name.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2),
       ...aliases.map((a) => a.toLowerCase()),
       category.toLowerCase(),
+      // Decision 2 — Summary is the template's own "what and why" field;
+      // Evolution Journal / Engineering Evolution / Known Bugs / Decisions /
+      // Future Enhancements / Related Files sections are deliberately NOT
+      // included (history/boilerplate/citation-only content — same boundary
+      // as the bug/decision/postmortem exclusions in parseProductDocs.js).
+      ...keywordsFrom(feat.summary),
     ]);
     records.push({
       feature_id: id,

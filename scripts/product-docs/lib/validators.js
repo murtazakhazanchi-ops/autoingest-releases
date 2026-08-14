@@ -345,7 +345,12 @@ function checkRelatedTechnicalDocs(parsed) {
 function checkDuplicateAliases(authorityIndex) {
   const findings = [];
   const byAlias = new Map();
+  // Part 2 remediation — authority-index.json now also carries workflow
+  // entries (recordType 'workflow'), which have no aliases field by design
+  // (aliases are a Feature-topic concept — see authorityTopics.js). Only
+  // feature entries participate in this check.
   for (const entry of authorityIndex) {
+    if (!Array.isArray(entry.aliases)) continue;
     for (const alias of entry.aliases) {
       const key = alias.toLowerCase();
       if (!byAlias.has(key)) byAlias.set(key, new Set());
@@ -482,6 +487,35 @@ function checkGeneratedFreshness(freshFiles, generatedRoot) {
   return findings;
 }
 
+// Part 2 remediation (Decision 5) — the hybrid dependency-model file's own
+// freshness check, mirroring checkGeneratedFreshness's byte-for-byte
+// comparison but scoped to only the marked `<!-- GENERATED:BEGIN id -->`
+// regions rather than a whole file — the surrounding hand-authored prose is
+// never compared or flagged, since a difference there is normal editorial
+// content, not staleness.
+function checkDependencyModelFreshness(parsed, built, productDocsRoot) {
+  const findings = [];
+  const { computeDependencyModelRegions, extractGeneratedRegions } = require('./dependencyModelFragments');
+  const docPath = path.join(productDocsRoot, '12_DEPENDENCY_MODEL.md');
+  if (!fs.existsSync(docPath)) {
+    findings.push(finding('information', 'no-dependency-model-baseline', '12_DEPENDENCY_MODEL.md does not exist yet', docPath));
+    return findings;
+  }
+  const content = fs.readFileSync(docPath, 'utf8');
+  const onDisk = extractGeneratedRegions(content);
+  const fresh = computeDependencyModelRegions(parsed, built);
+  for (const [id, freshContent] of Object.entries(fresh)) {
+    if (!Object.prototype.hasOwnProperty.call(onDisk, id)) {
+      findings.push(finding('warning', 'missing-dependency-model-region', `12_DEPENDENCY_MODEL.md has no <!-- GENERATED:BEGIN ${id} --> region — run \`build\` to add it`, '12_DEPENDENCY_MODEL.md'));
+      continue;
+    }
+    if (onDisk[id] !== freshContent) {
+      findings.push(finding('error', 'stale-dependency-model-region', `12_DEPENDENCY_MODEL.md's "${id}" generated region differs from a fresh rebuild — run \`build\` before committing`, '12_DEPENDENCY_MODEL.md'));
+    }
+  }
+  return findings;
+}
+
 function checkManifestCommit(manifestPath, currentCommit) {
   const findings = [];
   if (!fs.existsSync(manifestPath)) return findings;
@@ -532,6 +566,7 @@ module.exports = {
   finding,
   runAllChecks,
   checkGeneratedFreshness,
+  checkDependencyModelFreshness,
   checkManifestCommit,
   checkDuplicateIds,
   checkRegistryFileMismatch,

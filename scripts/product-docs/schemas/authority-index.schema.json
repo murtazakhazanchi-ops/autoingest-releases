@@ -9,14 +9,18 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["topic", "featureId", "aliases", "canonicalProductDoc", "confidenceLevel"],
+        "required": ["recordType", "topic", "canonicalProductDoc", "confidenceLevel"],
         "properties": {
+          "recordType": { "type": "string", "enum": ["feature", "workflow"] },
           "topic": { "type": "string" },
           "featureId": { "type": "string" },
           "aliases": { "type": "array" },
           "canonicalProductDoc": { "type": "string" },
           "canonicalTechnicalDocs": { "type": "array" },
           "roadmapIds": { "type": "array" },
+          "workflowId": { "type": "string" },
+          "relatedFeatures": { "type": "array" },
+          "relatedWorkflows": { "type": "array" },
           "confidenceLevel": { "type": "string", "enum": ["explicit", "inferred", "unknown"] }
         }
       }

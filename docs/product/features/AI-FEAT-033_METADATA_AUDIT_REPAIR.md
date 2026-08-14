@@ -68,7 +68,7 @@ This section classifies this feature's already-evidenced history by milestone ty
 
 **Known limitation** (documented directly in `docs/metadata-system.md`): the current UI does not preserve a preview-session identifier that survives the round trip from Preview to Confirm, so `previewedInThisSession` cannot prove which specific UI click-through produced a given repair run — only that a preview was generated for this job at some point in the session. Closing this fully would require a UI-level preview-session token, not implemented.
 
-This feature is the corrective deliverable for [PM-001 — Metadata Correctness Gap Found in Production-Readiness Review](../postmortems/PM-001_METADATA_CORRECTNESS_GAP_PRODUCTION_READINESS_REVIEW.md) and its underlying [BUG-007](../bugs/BUG-007_QMZ_METADATA_CONTEXT_SHAPE_MISMATCH.md).
+This feature is the corrective deliverable for [PM-001 — Metadata Correctness Gap Found in Production-Readiness Review](../postmortems/PM-001_METADATA_CORRECTNESS_GAP_PRODUCTION_READINESS_REVIEW.md) and its underlying [BUG-007](../bugs/BUG-007_QMZ_METADATA_CONTEXT_SHAPE_MISMATCH.md). **Material consequence for this feature**: before this audit capability existed, a file could look correctly imported (correct folder, correct size, present in `event.json`) while its metadata was silently wrong or absent — there was no independent, archive-wide mechanism to detect that drift after the fact, and neither the UI nor the archive filesystem structure gave any visible signal of the problem (PM-001's own "Why Existing Safeguards Failed"). This is why the audit here is deliberately independent of the write path that could have caused the defect, not merely a re-run of it.
 
 ## Decisions
 

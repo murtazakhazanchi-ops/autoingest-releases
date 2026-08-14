@@ -32,7 +32,7 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 
 ## Summary
 
-`event.json` is the single, authoritative representation of event structure, sub-events, group mappings, and ingestion state for every AutoIngest event. All system behavior — UI, routing, metadata, archive operations — derives from it. This is the foundational contract every other feature in this registry is built on top of.
+`event.json` is the single, authoritative representation of event structure, sub-events, group mappings, and ingestion state for every AutoIngest event. All system behavior — UI, routing, metadata, archive operations — derives from it. This is the foundational contract every other feature in this registry is built on top of. **Why this design** ([DEC-001](../decisions/DEC-001_EVENT_DATA_AS_DURABLE_ARCHIVE_TRUTH.md)): an archival ingestion system needs one place that authoritatively answers "what is true about this event" — without a single authoritative record, the UI, the filesystem, and any in-memory state could each drift into their own version of "current," with no way to know which is correct.
 
 ## Current Behavior
 
@@ -62,11 +62,11 @@ This section classifies this feature's already-evidenced history by milestone ty
 
 ## Known Bugs / Troubleshooting
 
-None recorded in `docs/product/bugs/` yet. `docs/failure-patterns.md` #5 and #9 map DATA-layer symptoms back to this contract.
+See [BUG-006 — Event-Edit Full-Payload Save Silently Drops Untracked Fields](../bugs/BUG-006_EVENT_EDIT_FULL_PAYLOAD_FIELD_DROP.md) — a recurring architectural weakness directly against this contract's persistence guarantee, found for two different `event.json` fields (`adoption`, `status`) roughly three months apart; both instances are Fixed, but the underlying hardcoded-field-list write pattern that caused them is not yet structurally closed. **Material consequence for this contract**: before adding any new field to `event.json` that Event Edit's full-payload save path might touch, both the hardcoded field list in `updateEventJson`'s full-payload write path and the session-capture object (`_viewingExisting`) must be audited — a field can otherwise be present immediately after its initiating write, then silently dropped on the next Event Edit save. See BUG-006's own Prevention / Reusable Lesson section for the full diagnostic procedure. `docs/failure-patterns.md` #5 and #9 also map DATA-layer symptoms back to this contract.
 
 ## Decisions
 
-None recorded.
+See [DEC-001 — Event Data as Durable Archive Truth](../decisions/DEC-001_EVENT_DATA_AS_DURABLE_ARCHIVE_TRUTH.md) — the foundational decision this entire contract implements (`event.json` as the single source of truth, UI as pure reflection).
 
 ## Future Enhancements
 

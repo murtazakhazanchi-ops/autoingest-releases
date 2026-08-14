@@ -15,6 +15,9 @@ const NODE_SHAPE = {
   decision: (id, label) => `${mermaidId(id)}[/"${mermaidLabel(id)}: ${mermaidLabel(label)}"/]`,
   postmortem: (id, label) => `${mermaidId(id)}[["${mermaidLabel(id)}: ${mermaidLabel(label)}"]]`,
   architecture_section: (id, label) => `${mermaidId(id)}>"${mermaidLabel(label)}"]`,
+  // Part 2 remediation — a distinct shape from 'feature' so a rendered
+  // diagram doesn't visually imply a Workflow is a capability.
+  workflow: (id, label) => `${mermaidId(id)}(["${mermaidLabel(id)}: ${mermaidLabel(label)}"])`,
 };
 
 function renderMermaid(nodeIds, graph, title) {

@@ -11,7 +11,7 @@
 
 ## What It Does
 
-Writes a clean mirror of selected events to a portable drive (Transfer Export, AI-FEAT-038), or scans an existing transfer drive for what's changed since the last copy (Backup Update Scanning, AI-FEAT-040) — these are two distinct capabilities sharing this entry point, with different conflict semantics (Backup Update never overwrites or renames on conflict; Transfer Export's own record should be consulted for its exact behavior rather than assumed identical).
+Writes a clean mirror of selected events to a portable drive (Transfer Export, AI-FEAT-038), or scans an existing transfer drive for what's changed since the last copy (Backup Update Scanning, AI-FEAT-040, a `backupUpdate` mode whose own record lists AI-FEAT-038 as its Parent feature) — these are two distinct capabilities sharing this one entry point (`#alocTransferExportBtn` → the Transfer Export modal), with different conflict semantics (Backup Update never overwrites or renames on conflict; Transfer Export's own record should be consulted for its exact behavior rather than assumed identical). This workflow is outbound only (Active Archive Root → Transfer Drive) — for the inbound direction (Transfer Drive → Main Archive Root), see [AI-WF-009](AI-WF-009_IMPORT_OR_UPDATE_FROM_A_TRANSFER_DRIVE.md).
 
 ## When To Use It
 
@@ -50,7 +50,7 @@ If a transfer appears stuck or resume state looks wrong, BUG-005's record docume
 
 ## Related Actions
 
-AI-FEAT-043 (Archive Health Reporting) to confirm the source archive is healthy before a large transfer.
+AI-FEAT-043 (Archive Health Reporting) to confirm the source archive is healthy before a large transfer. [AI-WF-009](AI-WF-009_IMPORT_OR_UPDATE_FROM_A_TRANSFER_DRIVE.md) — the inbound counterpart (Transfer Import).
 
 ## Source
 

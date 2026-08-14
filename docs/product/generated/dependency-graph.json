@@ -3788,6 +3788,294 @@
     {
       "evidence_status": "explicit",
       "note": null,
+      "provenance_path": "workflows/AI-WF-001_IMPORT_PHOTOGRAPHS_FROM_A_MEMORY_CARD_OR_FOLDER.md#header-table:Related-capabilities",
+      "relationship": "workflow_exercises_feature",
+      "source": "AI-WF-001",
+      "target": "AI-FEAT-011"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-001_IMPORT_PHOTOGRAPHS_FROM_A_MEMORY_CARD_OR_FOLDER.md#header-table:Related-capabilities",
+      "relationship": "workflow_exercises_feature",
+      "source": "AI-WF-001",
+      "target": "AI-FEAT-012"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-001_IMPORT_PHOTOGRAPHS_FROM_A_MEMORY_CARD_OR_FOLDER.md#header-table:Related-capabilities",
+      "relationship": "workflow_exercises_feature",
+      "source": "AI-WF-001",
+      "target": "AI-FEAT-017"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-001_IMPORT_PHOTOGRAPHS_FROM_A_MEMORY_CARD_OR_FOLDER.md#header-table:Related-capabilities",
+      "relationship": "workflow_exercises_feature",
+      "source": "AI-WF-001",
+      "target": "AI-FEAT-018"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-001_IMPORT_PHOTOGRAPHS_FROM_A_MEMORY_CARD_OR_FOLDER.md#header-table:Related-capabilities",
+      "relationship": "workflow_exercises_feature",
+      "source": "AI-WF-001",
+      "target": "AI-FEAT-019"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-001_IMPORT_PHOTOGRAPHS_FROM_A_MEMORY_CARD_OR_FOLDER.md#header-table:Related-capabilities",
+      "relationship": "workflow_exercises_feature",
+      "source": "AI-WF-001",
+      "target": "AI-FEAT-022"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-001_IMPORT_PHOTOGRAPHS_FROM_A_MEMORY_CARD_OR_FOLDER.md#related-actions",
+      "relationship": "workflow_relates_to_workflow",
+      "source": "AI-WF-001",
+      "target": "AI-WF-002"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-001_IMPORT_PHOTOGRAPHS_FROM_A_MEMORY_CARD_OR_FOLDER.md#related-actions",
+      "relationship": "workflow_relates_to_workflow",
+      "source": "AI-WF-001",
+      "target": "AI-WF-003"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-002_CREATE_A_NEW_EVENT.md#header-table:Related-capabilities",
+      "relationship": "workflow_exercises_feature",
+      "source": "AI-WF-002",
+      "target": "AI-FEAT-009"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-002_CREATE_A_NEW_EVENT.md#related-actions",
+      "relationship": "workflow_relates_to_workflow",
+      "source": "AI-WF-002",
+      "target": "AI-WF-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-003_USE_QUICK_IMPORT_FOR_A_SMALL_BATCH.md#header-table:Related-capabilities",
+      "relationship": "workflow_exercises_feature",
+      "source": "AI-WF-003",
+      "target": "AI-FEAT-023"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-003_USE_QUICK_IMPORT_FOR_A_SMALL_BATCH.md#related-actions",
+      "relationship": "workflow_relates_to_workflow",
+      "source": "AI-WF-003",
+      "target": "AI-WF-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-004_REPAIR_MISSING_OR_INCORRECT_METADATA.md#header-table:Related-capabilities",
+      "relationship": "workflow_exercises_feature",
+      "source": "AI-WF-004",
+      "target": "AI-FEAT-031"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-004_REPAIR_MISSING_OR_INCORRECT_METADATA.md#header-table:Related-capabilities",
+      "relationship": "workflow_exercises_feature",
+      "source": "AI-WF-004",
+      "target": "AI-FEAT-033"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-004_REPAIR_MISSING_OR_INCORRECT_METADATA.md#header-table:Related-capabilities",
+      "relationship": "workflow_exercises_feature",
+      "source": "AI-WF-004",
+      "target": "AI-FEAT-034"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-004_REPAIR_MISSING_OR_INCORRECT_METADATA.md#header-table:Related-roadmap-milestone",
+      "relationship": "planned_in",
+      "source": "AI-WF-004",
+      "target": "AI-RM-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-004_REPAIR_MISSING_OR_INCORRECT_METADATA.md#related-actions",
+      "relationship": "workflow_relates_to_workflow",
+      "source": "AI-WF-004",
+      "target": "AI-WF-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-005_EXPORT_OR_UPDATE_A_TRANSFER_DRIVE.md#header-table:Related-capabilities",
+      "relationship": "workflow_exercises_feature",
+      "source": "AI-WF-005",
+      "target": "AI-FEAT-038"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-005_EXPORT_OR_UPDATE_A_TRANSFER_DRIVE.md#header-table:Related-capabilities",
+      "relationship": "workflow_exercises_feature",
+      "source": "AI-WF-005",
+      "target": "AI-FEAT-039"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-005_EXPORT_OR_UPDATE_A_TRANSFER_DRIVE.md#header-table:Related-capabilities",
+      "relationship": "workflow_exercises_feature",
+      "source": "AI-WF-005",
+      "target": "AI-FEAT-040"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-005_EXPORT_OR_UPDATE_A_TRANSFER_DRIVE.md#header-table:Related-capabilities",
+      "relationship": "workflow_exercises_feature",
+      "source": "AI-WF-005",
+      "target": "AI-FEAT-041"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-005_EXPORT_OR_UPDATE_A_TRANSFER_DRIVE.md#related-actions",
+      "relationship": "workflow_relates_to_workflow",
+      "source": "AI-WF-005",
+      "target": "AI-WF-009"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-006_SEE_WHO_ELSE_IS_ONLINE_AND_WHAT_THEYRE_WORKING_ON.md#header-table:Related-capabilities",
+      "relationship": "workflow_exercises_feature",
+      "source": "AI-WF-006",
+      "target": "AI-FEAT-048"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-006_SEE_WHO_ELSE_IS_ONLINE_AND_WHAT_THEYRE_WORKING_ON.md#related-actions",
+      "relationship": "workflow_relates_to_workflow",
+      "source": "AI-WF-006",
+      "target": "AI-WF-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-006_SEE_WHO_ELSE_IS_ONLINE_AND_WHAT_THEYRE_WORKING_ON.md#related-actions",
+      "relationship": "workflow_relates_to_workflow",
+      "source": "AI-WF-006",
+      "target": "AI-WF-002"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-006_SEE_WHO_ELSE_IS_ONLINE_AND_WHAT_THEYRE_WORKING_ON.md#related-actions",
+      "relationship": "workflow_relates_to_workflow",
+      "source": "AI-WF-006",
+      "target": "AI-WF-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-007_SORT_QMZ_PHOTOGRAPHS.md#header-table:Related-capabilities",
+      "relationship": "workflow_exercises_feature",
+      "source": "AI-WF-007",
+      "target": "AI-FEAT-047"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-008_RECOVER_FROM_AN_ARCHIVE_LOCK_ERROR.md#header-table:Related-capabilities",
+      "relationship": "workflow_exercises_feature",
+      "source": "AI-WF-008",
+      "target": "AI-FEAT-043"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-008_RECOVER_FROM_AN_ARCHIVE_LOCK_ERROR.md#header-table:Related-capabilities",
+      "relationship": "workflow_exercises_feature",
+      "source": "AI-WF-008",
+      "target": "AI-FEAT-045"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-008_RECOVER_FROM_AN_ARCHIVE_LOCK_ERROR.md#related-actions",
+      "relationship": "workflow_relates_to_workflow",
+      "source": "AI-WF-008",
+      "target": "AI-WF-006"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-009_IMPORT_OR_UPDATE_FROM_A_TRANSFER_DRIVE.md#header-table:Related-capabilities",
+      "relationship": "workflow_exercises_feature",
+      "source": "AI-WF-009",
+      "target": "AI-FEAT-025"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-009_IMPORT_OR_UPDATE_FROM_A_TRANSFER_DRIVE.md#header-table:Related-capabilities",
+      "relationship": "workflow_exercises_feature",
+      "source": "AI-WF-009",
+      "target": "AI-FEAT-032"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-009_IMPORT_OR_UPDATE_FROM_A_TRANSFER_DRIVE.md#header-table:Related-capabilities",
+      "relationship": "workflow_exercises_feature",
+      "source": "AI-WF-009",
+      "target": "AI-FEAT-038"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-009_IMPORT_OR_UPDATE_FROM_A_TRANSFER_DRIVE.md#header-table:Related-capabilities",
+      "relationship": "workflow_exercises_feature",
+      "source": "AI-WF-009",
+      "target": "AI-FEAT-039"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-009_IMPORT_OR_UPDATE_FROM_A_TRANSFER_DRIVE.md#header-table:Related-capabilities",
+      "relationship": "workflow_exercises_feature",
+      "source": "AI-WF-009",
+      "target": "AI-FEAT-042"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "workflows/AI-WF-009_IMPORT_OR_UPDATE_FROM_A_TRANSFER_DRIVE.md#related-actions",
+      "relationship": "workflow_relates_to_workflow",
+      "source": "AI-WF-009",
+      "target": "AI-WF-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
       "provenance_path": "11_ARCHITECTURAL_EVOLUTION.md#5-relationship-map",
       "relationship": "related_to",
       "source": "ARCH-a-established-adobe-bridge-workflow-pre-autoingest",
@@ -4920,6 +5208,60 @@
       "id": "AI-RM-011",
       "label": "AutoIngest Knowledge & Onboarding Portal (Stage 1 + Stage 2)",
       "type": "milestone"
+    },
+    {
+      "doc_path": "workflows/AI-WF-001_IMPORT_PHOTOGRAPHS_FROM_A_MEMORY_CARD_OR_FOLDER.md",
+      "id": "AI-WF-001",
+      "label": "Import Photographs From a Memory Card or Folder",
+      "type": "workflow"
+    },
+    {
+      "doc_path": "workflows/AI-WF-002_CREATE_A_NEW_EVENT.md",
+      "id": "AI-WF-002",
+      "label": "Create a New Event",
+      "type": "workflow"
+    },
+    {
+      "doc_path": "workflows/AI-WF-003_USE_QUICK_IMPORT_FOR_A_SMALL_BATCH.md",
+      "id": "AI-WF-003",
+      "label": "Use Quick Import for a Small Batch",
+      "type": "workflow"
+    },
+    {
+      "doc_path": "workflows/AI-WF-004_REPAIR_MISSING_OR_INCORRECT_METADATA.md",
+      "id": "AI-WF-004",
+      "label": "Repair Missing or Incorrect Metadata",
+      "type": "workflow"
+    },
+    {
+      "doc_path": "workflows/AI-WF-005_EXPORT_OR_UPDATE_A_TRANSFER_DRIVE.md",
+      "id": "AI-WF-005",
+      "label": "Export or Update a Transfer Drive",
+      "type": "workflow"
+    },
+    {
+      "doc_path": "workflows/AI-WF-006_SEE_WHO_ELSE_IS_ONLINE_AND_WHAT_THEYRE_WORKING_ON.md",
+      "id": "AI-WF-006",
+      "label": "See Who Else Is Online, Coordinate Shared Events, and See What They're Working On",
+      "type": "workflow"
+    },
+    {
+      "doc_path": "workflows/AI-WF-007_SORT_QMZ_PHOTOGRAPHS.md",
+      "id": "AI-WF-007",
+      "label": "Sort QMZ Photographs",
+      "type": "workflow"
+    },
+    {
+      "doc_path": "workflows/AI-WF-008_RECOVER_FROM_AN_ARCHIVE_LOCK_ERROR.md",
+      "id": "AI-WF-008",
+      "label": "Recover From an Archive Lock Error",
+      "type": "workflow"
+    },
+    {
+      "doc_path": "workflows/AI-WF-009_IMPORT_OR_UPDATE_FROM_A_TRANSFER_DRIVE.md",
+      "id": "AI-WF-009",
+      "label": "Import or Update From a Transfer Drive",
+      "type": "workflow"
     },
     {
       "doc_path": "11_ARCHITECTURAL_EVOLUTION.md#a-established-adobe-bridge-workflow-pre-autoingest",
