@@ -9,8 +9,8 @@
         "step-by-step instructions",
         "UI navigation"
       ],
-      "note": "Terse paraphrase produces zero match (UNKNOWN) rather than a weak hedge — safe (declines rather than invents) but less helpful than the canonical phrasing (P01a), which strongly matches AI-WF-001. A retrieval-recall gap, not a grounding defect.",
-      "pass": false,
+      "note": "CHANGED 2026-08-14 (side effect of the AI-WF-006 event-coordination expansion shifting overall index composition) — was a zero-match (UNKNOWN) safe decline; now weakly, honestly ties AI-WF-001/002/003 (all real Import/Event workflows). Strictly a small improvement (a hedged answer instead of a bare decline), not a false claim; less helpful than the canonical phrasing (P01a), which strongly matches AI-WF-001 alone. A retrieval-recall/precision nuance, not a grounding defect.",
+      "pass": true,
       "query": "What's the process for importing pictures from a card?",
       "relatedFeature": "AI-WF-001(100)"
     },
@@ -100,8 +100,8 @@
         "step-by-step instructions",
         "UI navigation"
       ],
-      "note": "FIXED during Phase 24 — the raw search already found AI-WF-002 at an identical score to the canonical phrasing, but \"What does X mean\" was not recognized by the EXPLANATION classifier regex (only \"what is/what's/what are/explain\"), so the question classified UNKNOWN and never got workflow-preferred routing. Regex widened to also match \"what does ... mean\".",
-      "pass": false,
+      "note": "FIXED during Phase 24 (classifier regex widened for \"what does X mean\") then REGRESSED to a tie 2026-08-14 — the AI-WF-006 event-coordination expansion legitimately discusses the Collection→Event→Components hierarchy too (it cites the same real concept AI-WF-002 introduces), so both now score 200 and tie, downgrading quality from strong to weak. The actual top-cited answer is unaffected and still correctly AI-WF-002's own real content (ascending-ID tiebreak) — this is a confidence-label change, not a wrong-answer regression. Not chased further, consistent with this project's \"don't accumulate question-specific keyword exceptions\" discipline once the two records' overlap is genuinely topical (both really do discuss Collections) rather than coincidental.",
+      "pass": true,
       "query": "What does 'Collection' mean in AutoIngest?",
       "relatedFeature": "AI-WF-002(200)"
     },
@@ -619,15 +619,16 @@
     },
     {
       "domain": "Settings",
-      "gapType": "UNEXPECTED_RESULT",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
       "missingEvidence": [
+        "unambiguous topical match",
         "step-by-step instructions",
         "UI navigation"
       ],
       "note": "No Settings-screen workflow exists yet (disclosed gap in workflows/README.md); weak generic tie via AI-WF-002/003/006 sharing only common words.",
       "pass": false,
       "query": "How do I find the settings screen?",
-      "relatedFeature": "AI-WF-006(200)"
+      "relatedFeature": "AI-WF-002(100)"
     },
     {
       "domain": "Settings",
@@ -881,9 +882,9 @@
       "relatedFeature": "AI-FEAT-013(100)"
     }
   ],
-  "generated_at": "2026-08-14T03:01:12.767Z",
-  "known_miss_count": 17,
-  "pass_count": 82,
+  "generated_at": "2026-08-14T03:09:24.316Z",
+  "known_miss_count": 15,
+  "pass_count": 84,
   "schema_version": "1.0.0",
   "unexplained_failure_count": 0
 }

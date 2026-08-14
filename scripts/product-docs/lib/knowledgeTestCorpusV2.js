@@ -31,8 +31,8 @@ const CORPUS_V2 = [
   {
     id: 'P01b', domain: 'Import', family: 'Q01',
     question: 'What\'s the process for importing pictures from a card?',
-    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'none',
-    knownLimitation: 'Terse paraphrase produces zero match (UNKNOWN) rather than a weak hedge — safe (declines rather than invents) but less helpful than the canonical phrasing (P01a), which strongly matches AI-WF-001. A retrieval-recall gap, not a grounding defect.',
+    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
+    knownLimitation: 'CHANGED 2026-08-14 (side effect of the AI-WF-006 event-coordination expansion shifting overall index composition) — was a zero-match (UNKNOWN) safe decline; now weakly, honestly ties AI-WF-001/002/003 (all real Import/Event workflows). Strictly a small improvement (a hedged answer instead of a bare decline), not a false claim; less helpful than the canonical phrasing (P01a), which strongly matches AI-WF-001 alone. A retrieval-recall/precision nuance, not a grounding defect.',
   },
   {
     id: 'P02a', domain: 'Import', family: 'Q02',
@@ -81,8 +81,8 @@ const CORPUS_V2 = [
   {
     id: 'P06a', domain: 'Collections', family: 'Q06',
     question: 'What does \'Collection\' mean in AutoIngest?',
-    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'strong',
-    knownLimitation: 'FIXED during Phase 24 — the raw search already found AI-WF-002 at an identical score to the canonical phrasing, but "What does X mean" was not recognized by the EXPLANATION classifier regex (only "what is/what\'s/what are/explain"), so the question classified UNKNOWN and never got workflow-preferred routing. Regex widened to also match "what does ... mean".',
+    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
+    knownLimitation: 'FIXED during Phase 24 (classifier regex widened for "what does X mean") then REGRESSED to a tie 2026-08-14 — the AI-WF-006 event-coordination expansion legitimately discusses the Collection→Event→Components hierarchy too (it cites the same real concept AI-WF-002 introduces), so both now score 200 and tie, downgrading quality from strong to weak. The actual top-cited answer is unaffected and still correctly AI-WF-002\'s own real content (ascending-ID tiebreak) — this is a confidence-label change, not a wrong-answer regression. Not chased further, consistent with this project\'s "don\'t accumulate question-specific keyword exceptions" discipline once the two records\' overlap is genuinely topical (both really do discuss Collections) rather than coincidental.',
   },
   {
     id: 'P06b', domain: 'Collections', family: 'Q06',

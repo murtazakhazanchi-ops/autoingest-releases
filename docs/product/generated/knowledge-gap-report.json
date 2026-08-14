@@ -41,8 +41,9 @@
     },
     {
       "domain": "Collections",
-      "gapType": "UNEXPECTED_RESULT",
+      "gapType": "AMBIGUOUS_RETRIEVAL",
       "missingEvidence": [
+        "unambiguous topical match",
         "step-by-step instructions",
         "UI navigation"
       ],
@@ -189,7 +190,7 @@
       "relatedFeature": "AI-FEAT-048(400)"
     }
   ],
-  "generated_at": "2026-08-14T02:10:48.256Z",
+  "generated_at": "2026-08-14T03:09:11.815Z",
   "known_miss_count": 4,
   "pass_count": 16,
   "schema_version": "1.0.0",

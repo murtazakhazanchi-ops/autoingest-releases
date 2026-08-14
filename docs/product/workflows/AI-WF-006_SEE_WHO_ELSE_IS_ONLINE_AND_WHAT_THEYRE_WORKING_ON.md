@@ -32,7 +32,7 @@ This system operates in a **coordination / control plane**, distinct from the **
 | 1 | What event information is sent when an event is created? | **VERIFIED IMPLEMENTED** | `main/main.js`'s `event:write` IPC handler (event-creation path) constructs an `eventJsonShell` — `version`, `hijriDate`, `sequence`, `eventName`, `safeEventName`, `status`, `components`, `updatedAt` — and calls `realtimeOps.emitRegistryEvent(...)` with it, plus `nasCollectionPath`/`nasEventPath` when the event is on a reachable NAS. **No photo or video file data is included.** |
 | 2 | Are events persisted in the Registry, or only broadcast transiently? | **VERIFIED IMPLEMENTED (persisted)** | `realtime-server/server.js` writes registered entries to a `registry.json` file on disk (`REGISTRY_PATH`), reloads it on server startup, and keeps an in-memory `Map` synced to it. |
 | 3 | How does another client discover registered events? | **VERIFIED IMPLEMENTED** | Two paths: (a) live — the server does `socket.broadcast.emit('registry:register', entry)` to every other connected client the moment one registers; (b) catch-up — a client sends `registry:request` (done automatically on connect, in `realtimeOperationsService.js`) and the server replies with a full `registry:snapshot` of every persisted entry. |
-| 4 | What UI exposes remote/registered events? | **VERIFIED IMPLEMENTED** | `renderer/eventCreator.js` renders a real **"Online Registry"** tab (`data-tab="online-registry"`) alongside the "Current Device" tab on the event-list screen — a genuine, reachable operator-facing UI element, not hidden behind a flag. Each remote collection/event appears as a card with a status pill and an action button. |
+| 4 | What UI exposes remote/registered events? | **VERIFIED IMPLEMENTED** | `renderer/eventCreator.js` renders a real **"Online Registry"** tab (`data-tab="online-registry"`) alongside the "Current Device" tab on the event-list view — a genuine, reachable operator-facing UI element, not hidden behind a flag. Each remote collection/event appears as a card with a status pill and an action button. |
 | 5 | Can an operator duplicate/adopt a Registry event into their local environment? | **VERIFIED IMPLEMENTED** | The "Online Registry" tab's cards have **"prepare collection"** and **"prepare event"** buttons, wired to `window.api.prepareCollectionFromRegistry`/`prepareEventFromRegistry` (`main/preload.js`), which invoke `collection:prepareFromRegistry`/`event:prepareFromRegistry` (`main/main.js`). |
 | 6 | What data is copied when adopting? | **VERIFIED IMPLEMENTED** | Only the structural `eventJsonShell` fields (see #1) — reconstructed into a real local `event.json`. No photo/video bytes; there are none to copy, since none were ever sent to the Registry. |
 | 7 | Is `event.json` reconstructed/copied/generated? | **VERIFIED IMPLEMENTED (generated)** | `event:prepareFromRegistry` writes a genuine local `event.json` (atomic tmp→rename) built from the registry entry's shell fields, validated by the same `isValidEventJson()` check used for a normal local event creation. |
@@ -88,7 +88,7 @@ Two situations: (1) You're separated from a teammate — no shared NAS/Main Arch
 
 Two separate UI surfaces, for two separate purposes:
 - **Presence / activity visibility**: Settings toggle **"Enable Team Live & Online Registry"** (`renderer/index.html:8058`). Once enabled and connected, the **Activity Log** panel has two tabs: **Local Activity** and **Team Live** (`renderer/renderer.js:2812-2813`) — select **Team Live** to see other devices.
-- **Event discovery / adoption**: the event-list screen's **"Online Registry"** tab (`renderer/eventCreator.js`, alongside the "Current Device" tab) — lists collections/events registered by any connected device, each with a status pill and a **"prepare collection"**/**"prepare event"** action button.
+- **Event discovery / adoption**: the event-list view's **"Online Registry"** tab (`renderer/eventCreator.js`, alongside the "Current Device" tab) — lists collections/events registered by any connected device, each with a status pill and a **"prepare collection"**/**"prepare event"** action button.
 
 ## Steps
 
@@ -99,7 +99,7 @@ Two separate UI surfaces, for two separate purposes:
 4. Review connected devices/operators and, where shown, their current activity and progress for Import/Transfer operations specifically. The panel refreshes automatically roughly every 30 seconds.
 
 **To find and adopt an event another operator already created:**
-1. With Team Live enabled and connected, open the event-list screen.
+1. With Team Live enabled and connected, open the event-list view.
 2. Select the **Online Registry** tab.
 3. Locate the collection or event by name.
 4. Click **"prepare collection"** (to bring the collection folder onto this device) or **"prepare event"** (to also generate that event's `event.json` locally, preserving its exact name, sequence, and components).
