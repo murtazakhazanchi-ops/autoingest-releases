@@ -31,7 +31,7 @@
   nav.tabs { margin: 1.5rem 0 1rem; border-bottom: 1px solid #ccc; display: flex; flex-wrap: wrap; }
   nav.tabs button { background: none; border: none; padding: 0.5rem 0.7rem; font-size: 0.82rem; border-bottom: 2px solid transparent; white-space: nowrap; }
   nav.tabs button.active { border-bottom-color: #333; font-weight: 600; }
-  table { border-collapse: collapse; width: 100%; font-size: 0.82rem; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.82rem; display: block; overflow-x: auto; }
   th, td { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid #eee; vertical-align: top; }
   .panel { display: none; }
   .panel.active { display: block; }
@@ -44,6 +44,24 @@
   .filter-row { margin-bottom: 0.8rem; }
   .filter-row input { width: 100%; padding: 0.5rem; font-size: 0.9rem; }
   .kind-pill { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.03em; color: #666; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+  /* Merge-readiness pass — the hardcoded greys/borders/notice-background
+     above were tuned for light mode only; `color-scheme: light dark`
+     auto-adjusts the browser's own default canvas/text colors but never
+     touches an explicit custom color like `#666`, so a dark-mode reader
+     got low-contrast text against the (correctly darkened) page
+     background. Overriding just the affected declarations here, not
+     restructuring the stylesheet. */
+  @media (prefers-color-scheme: dark) {
+    .subtitle, .section-label, .muted, .card .meta, .kind-pill { color: #a8a29b; }
+    .quality-note { color: #e0a94a; }
+    #result, .card { border-color: #444; }
+    nav.tabs { border-bottom-color: #444; }
+    nav.tabs button.active { border-bottom-color: #ddd; }
+    th, td { border-bottom-color: #333; }
+    .notice { background: #3a2e14; border-color: #6b5424; }
+  }
 </style>
 </head>
 <body>
@@ -51,63 +69,64 @@
   <p class="subtitle">Stage 2 prototype — grounded, deterministic answers from AutoIngest's real documentation. No AI model, no live data, no invented instructions.</p>
 
   <div class="ask-row">
+    <label for="q" class="sr-only">Ask a question about AutoIngest</label>
     <input id="q" type="text" placeholder="Ask anything about AutoIngest..." autocomplete="off">
     <button id="askBtn">Ask</button>
   </div>
   <div class="examples" id="examples"></div>
 
-  <div id="result"></div>
+  <div id="result" role="status" aria-live="polite"></div>
 
-  <nav class="tabs">
-    <button data-panel="ask" class="active">Ask</button>
-    <button data-panel="getting-started">Getting Started</button>
-    <button data-panel="capabilities">Capabilities</button>
-    <button data-panel="workflows">Workflows</button>
-    <button data-panel="teamwork">Teamwork &amp; Live Activity</button>
-    <button data-panel="roadmap">Roadmap</button>
-    <button data-panel="status">Status</button>
-    <button data-panel="troubleshooting">Troubleshooting</button>
-    <button data-panel="directory">Directory</button>
+  <nav class="tabs" role="tablist" aria-label="Portal sections">
+    <button data-panel="ask" class="active" role="tab" aria-selected="true">Ask</button>
+    <button data-panel="getting-started" role="tab" aria-selected="false" aria-controls="panel-getting-started">Getting Started</button>
+    <button data-panel="capabilities" role="tab" aria-selected="false" aria-controls="panel-capabilities">Capabilities</button>
+    <button data-panel="workflows" role="tab" aria-selected="false" aria-controls="panel-workflows">Workflows</button>
+    <button data-panel="teamwork" role="tab" aria-selected="false" aria-controls="panel-teamwork">Teamwork &amp; Live Activity</button>
+    <button data-panel="roadmap" role="tab" aria-selected="false" aria-controls="panel-roadmap">Roadmap</button>
+    <button data-panel="status" role="tab" aria-selected="false" aria-controls="panel-status">Status</button>
+    <button data-panel="troubleshooting" role="tab" aria-selected="false" aria-controls="panel-troubleshooting">Troubleshooting</button>
+    <button data-panel="directory" role="tab" aria-selected="false" aria-controls="panel-directory">Directory</button>
   </nav>
 
-  <div id="panel-getting-started" class="panel">
+  <div id="panel-getting-started" class="panel" role="tabpanel">
     <p class="muted">A small, curated starting set — not everything AutoIngest does, just the highest-value first steps. Every step below comes from an authored Workflow record, never invented here.</p>
     <div id="gettingStartedList"></div>
   </div>
 
-  <div id="panel-capabilities" class="panel">
+  <div id="panel-capabilities" class="panel" role="tabpanel">
     <p class="muted">Every registered AutoIngest capability, with its status as resolved from the canonical feature registry — never hand-typed here.</p>
     <table id="capTable"><thead><tr><th>ID</th><th>Title</th><th>Status</th><th>Category</th></tr></thead><tbody></tbody></table>
   </div>
 
-  <div id="panel-workflows" class="panel">
+  <div id="panel-workflows" class="panel" role="tabpanel">
     <p class="muted">Authored operator-guidance records (AI-WF-###) — real steps, verified against the app's own UI/onboarding text or a Capability's evidence. Distinct from a Capability record: a Capability describes WHAT exists; a Workflow describes HOW to do it.</p>
     <div id="workflowsList"></div>
   </div>
 
-  <div id="panel-teamwork" class="panel">
+  <div id="panel-teamwork" class="panel" role="tabpanel">
     <div class="notice">This tab is documentation only. It never connects to a relay server, queries live presence, or shows real device/activity data — it renders the same authored Workflow record (AI-WF-006) that <code>Ask</code> and <code>Workflows</code> use, nothing more.</div>
     <div id="teamworkContent"></div>
   </div>
 
-  <div id="panel-roadmap" class="panel">
+  <div id="panel-roadmap" class="panel" role="tabpanel">
     <p class="muted">From docs/product/generated/roadmap-dashboard.json — regenerated, never hand-edited.</p>
     <table id="roadmapTable"><thead><tr><th>Milestone</th><th>Name</th><th>Status</th></tr></thead><tbody></tbody></table>
   </div>
 
-  <div id="panel-status" class="panel">
+  <div id="panel-status" class="panel" role="tabpanel">
     <p class="muted">Project-level documentation status — feature/milestone counts, current risks, and next planned action, read live from the same generated dashboard as Roadmap.</p>
     <div id="statusContent"></div>
   </div>
 
-  <div id="panel-troubleshooting" class="panel">
+  <div id="panel-troubleshooting" class="panel" role="tabpanel">
     <p class="muted">Grounded troubleshooting guidance: each Workflow's own authored Troubleshooting section, plus a directory of canonical known-issue (BUG-###) records with their citation path.</p>
     <div id="troubleshootingContent"></div>
   </div>
 
-  <div id="panel-directory" class="panel">
+  <div id="panel-directory" class="panel" role="tabpanel">
     <p class="muted">Browse the full knowledge base by ID — for exploring without needing to phrase a question first (onboarding mode).</p>
-    <div class="filter-row"><input id="dirFilter" type="text" placeholder="Filter by ID, title, or category..."></div>
+    <div class="filter-row"><label for="dirFilter" class="sr-only">Filter directory by ID, title, or category</label><input id="dirFilter" type="text" placeholder="Filter by ID, title, or category..."></div>
     <table id="dirTable"><thead><tr><th>ID</th><th>Kind</th><th>Title</th><th>Category</th><th>Status</th></tr></thead><tbody></tbody></table>
   </div>
 
@@ -190,9 +209,10 @@
     // Tabs
     document.querySelectorAll('nav.tabs button').forEach((btn) => {
       btn.addEventListener('click', () => {
-        document.querySelectorAll('nav.tabs button').forEach((b) => b.classList.remove('active'));
+        document.querySelectorAll('nav.tabs button').forEach((b) => { b.classList.remove('active'); b.setAttribute('aria-selected', 'false'); });
         document.querySelectorAll('.panel').forEach((p) => p.classList.remove('active'));
         btn.classList.add('active');
+        btn.setAttribute('aria-selected', 'true');
         const panel = document.getElementById('panel-' + btn.dataset.panel);
         if (panel) panel.classList.add('active');
       });

@@ -437,6 +437,7 @@
 - `scripts/product-docs/test/knowledge.test.js`
 - `scripts/product-docs/test/knowledgeAdversarialPhase24.test.js`
 - `scripts/product-docs/test/knowledgeHallucinationV2.test.js`
+- `scripts/product-docs/test/knowledgeMergeReadiness.test.js`
 
 **Change-impact checklist**:
 - Re-read the Related Files section of every primary feature listed above before changing shared source files.

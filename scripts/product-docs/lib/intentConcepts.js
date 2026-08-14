@@ -192,6 +192,16 @@ const BOUNDARY_CONCEPT_CLUSTERS = [
   // Every trigger phrase here widens recall for an ALREADY-evidenced
   // exclusion — never invents a new one (same discipline as cloud-storage
   // and team-multi-role above).
+  // Merge-readiness pass — "Team Live" is the actual operator-facing UI
+  // toggle name for this feature (AI-WF-006: "Team Live must be enabled
+  // first"), not just internal documentation shorthand for "Online
+  // Registry"/"relay". Operator acceptance testing (asking naturally,
+  // not in developer/documentation vocabulary) found several Registry
+  // boundary questions phrased with "Team Live" instead of "registry"/
+  // "relay" fell through to a generic strong match instead of the correct
+  // boundary. Added "team live" phrasing alongside the existing
+  // registry/relay phrasing wherever it was missing — widening recall for
+  // the SAME already-evidenced exclusions, never a new one.
   {
     id: 'registry-media-storage',
     boundaryId: 'registry-media-storage',
@@ -200,6 +210,8 @@ const BOUNDARY_CONCEPT_CLUSTERS = [
       'see my photos over the network', 'relay store my photo', 'relay transmit my photo',
       'photos pass through the relay', 'photos go through the relay', 'upload to the registry',
       'uploaded somewhere', 'being uploaded', 'photos uploaded to the relay',
+      'photos get sent through', 'photos sent through', 'through the team live server',
+      'sent through the team live', 'send my photos', 'photos through team live',
     ],
   },
   {
@@ -209,6 +221,8 @@ const BOUNDARY_CONCEPT_CLUSTERS = [
       'registry replace the archive', 'replace the archive as', 'registry the source of truth',
       'registry become the source of truth', 'source of truth instead of the archive',
       'registry replaces event.json', 'registry replace event.json',
+      'basically my archive', 'registry basically', 'team live basically',
+      'is the registry my archive', 'is team live my archive',
     ],
   },
   {
@@ -219,6 +233,8 @@ const BOUNDARY_CONCEPT_CLUSTERS = [
       'warn me if someone else', 'warn if two people', 'warns about editing the same',
       'flag a conflict', 'detect a conflict', 'without a warning', 'warn us about conflict',
       'warn about conflict', 'registry warn', 'warn us if', 'warn if we',
+      'get warned if', 'warned if my', 'tell me about conflicts', 'conflicts with other operators',
+      'conflicts with another operator', 'know about a conflict',
     ],
   },
   {
@@ -235,6 +251,7 @@ const BOUNDARY_CONCEPT_CLUSTERS = [
     triggers: [
       'are they editing my files', 'does presence mean', 'presence mean they',
       'presence mean someone', 'stop me from also working', 'stop you from also working',
+      'actively working on my files', 'actively working on', 'are they actively',
       'block me from working on the same', 'prevent me from working on the same',
     ],
   },

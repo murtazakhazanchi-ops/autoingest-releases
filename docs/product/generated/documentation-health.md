@@ -2,7 +2,7 @@
 
 > Generated artifact. Implements the 13 rules specified in [14_VALIDATION_SPECIFICATION.md](../14_VALIDATION_SPECIFICATION.md) plus Part 4 tooling-integrity checks. Regenerate with `node scripts/product-docs/cli.js validate`.
 
-Generated against source commit `bcc29ce5689a251b41ea997a4c77454606fdb242`.
+Generated against source commit `7f180e9068b022f190a61cb31ccac98eb7884758`.
 
 ## Summary
 
@@ -66,8 +66,8 @@ None.
 | shared-code-path | scripts/product-docs/lib/knowledgeTestCorpus.js is explicitly owned by 2 features (shared, not exclusive) | scripts/product-docs/lib/knowledgeTestCorpus.js | AI-FEAT-058, AI-FEAT-058 |
 | shared-code-path | scripts/product-docs/lib/knowledgeEval.js is explicitly owned by 2 features (shared, not exclusive) | scripts/product-docs/lib/knowledgeEval.js | AI-FEAT-058, AI-FEAT-058 |
 | shared-code-path | scripts/product-docs/knowledge-portal/server.js is explicitly owned by 2 features (shared, not exclusive) | scripts/product-docs/knowledge-portal/server.js | AI-FEAT-058, AI-FEAT-058 |
-| shared-code-path | scripts/product-docs/knowledge-portal/index.html is explicitly owned by 2 features (shared, not exclusive) | scripts/product-docs/knowledge-portal/index.html | AI-FEAT-058, AI-FEAT-058 |
-| shared-code-path | scripts/product-docs/lib/intentConcepts.js is explicitly owned by 3 features (shared, not exclusive) | scripts/product-docs/lib/intentConcepts.js | AI-FEAT-058, AI-FEAT-058, AI-FEAT-058 |
+| shared-code-path | scripts/product-docs/knowledge-portal/index.html is explicitly owned by 3 features (shared, not exclusive) | scripts/product-docs/knowledge-portal/index.html | AI-FEAT-058, AI-FEAT-058, AI-FEAT-058 |
+| shared-code-path | scripts/product-docs/lib/intentConcepts.js is explicitly owned by 4 features (shared, not exclusive) | scripts/product-docs/lib/intentConcepts.js | AI-FEAT-058, AI-FEAT-058, AI-FEAT-058, AI-FEAT-058 |
 | shared-code-path | scripts/product-docs/lib/questionClassifier.js is explicitly owned by 3 features (shared, not exclusive) | scripts/product-docs/lib/questionClassifier.js | AI-FEAT-058, AI-FEAT-058, AI-FEAT-058 |
 | shared-code-path | scripts/product-docs/lib/knowledgeTestCorpusV2.js is explicitly owned by 2 features (shared, not exclusive) | scripts/product-docs/lib/knowledgeTestCorpusV2.js | AI-FEAT-058, AI-FEAT-058 |
 

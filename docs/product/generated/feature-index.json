@@ -3403,7 +3403,10 @@
         "scripts/product-docs/lib/knowledgeEngine.js",
         "scripts/product-docs/lib/questionClassifier.js",
         "scripts/product-docs/lib/knowledgeTestCorpus.js",
-        "scripts/product-docs/lib/knowledgeTestCorpusV2.js"
+        "scripts/product-docs/lib/knowledgeTestCorpusV2.js",
+        "scripts/product-docs/test/knowledgeMergeReadiness.test.js",
+        "scripts/product-docs/lib/intentConcepts.js",
+        "scripts/product-docs/knowledge-portal/index.html"
       ],
       "related_decisions": [
         "DEC-019"

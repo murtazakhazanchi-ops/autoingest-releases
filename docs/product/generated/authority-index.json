@@ -1325,7 +1325,10 @@
         "scripts/product-docs/lib/knowledgeEngine.js",
         "scripts/product-docs/lib/questionClassifier.js",
         "scripts/product-docs/lib/knowledgeTestCorpus.js",
-        "scripts/product-docs/lib/knowledgeTestCorpusV2.js"
+        "scripts/product-docs/lib/knowledgeTestCorpusV2.js",
+        "scripts/product-docs/test/knowledgeMergeReadiness.test.js",
+        "scripts/product-docs/lib/intentConcepts.js",
+        "scripts/product-docs/knowledge-portal/index.html"
       ],
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md's header table and Lifecycle Metadata section.",

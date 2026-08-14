@@ -648,15 +648,15 @@
     {
       "file": "scripts/product-docs/knowledge-portal/index.html",
       "level": "information",
-      "message": "scripts/product-docs/knowledge-portal/index.html is explicitly owned by 2 features (shared, not exclusive)",
-      "note": "AI-FEAT-058, AI-FEAT-058",
+      "message": "scripts/product-docs/knowledge-portal/index.html is explicitly owned by 3 features (shared, not exclusive)",
+      "note": "AI-FEAT-058, AI-FEAT-058, AI-FEAT-058",
       "rule": "shared-code-path"
     },
     {
       "file": "scripts/product-docs/lib/intentConcepts.js",
       "level": "information",
-      "message": "scripts/product-docs/lib/intentConcepts.js is explicitly owned by 3 features (shared, not exclusive)",
-      "note": "AI-FEAT-058, AI-FEAT-058, AI-FEAT-058",
+      "message": "scripts/product-docs/lib/intentConcepts.js is explicitly owned by 4 features (shared, not exclusive)",
+      "note": "AI-FEAT-058, AI-FEAT-058, AI-FEAT-058, AI-FEAT-058",
       "rule": "shared-code-path"
     },
     {
@@ -696,7 +696,7 @@
     }
   ],
   "schema_version": "1.3.0",
-  "source_commit": "bcc29ce5689a251b41ea997a4c77454606fdb242",
+  "source_commit": "7f180e9068b022f190a61cb31ccac98eb7884758",
   "summary": {
     "error": 0,
     "evidence_gap": 57,
