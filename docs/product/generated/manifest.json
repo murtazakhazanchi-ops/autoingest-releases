@@ -1,15 +1,15 @@
 {
   "docsys_version": "1.3.0",
   "entity_counts": {
-    "bugs": 16,
-    "decisions": 20,
+    "bugs": 18,
+    "decisions": 21,
     "engineering_conversations": 4,
     "features": 58,
     "knowledge_records": 58,
     "memory_capsules": 3,
     "postmortems": 2,
     "roadmap_milestones": 11,
-    "search_index_records": 363,
+    "search_index_records": 367,
     "subsystems": 17,
     "workflow_records": 8
   },
@@ -102,10 +102,10 @@
   "generation_command": "node scripts/product-docs/cli.js build",
   "generator_version": "1.3.0",
   "relationship_counts": {
-    "dependency_graph_edges": 546,
-    "dependency_graph_nodes": 124
+    "dependency_graph_edges": 560,
+    "dependency_graph_nodes": 127
   },
   "schema_version": "1.3.0",
-  "source_commit": "7f180e9068b022f190a61cb31ccac98eb7884758",
-  "source_file_count": 143
+  "source_commit": "d89440bbd1576e4c2530fa76b4b791c9fe226997",
+  "source_file_count": 146
 }

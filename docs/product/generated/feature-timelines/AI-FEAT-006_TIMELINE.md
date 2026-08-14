@@ -7,4 +7,5 @@
 | Date | Event type | Summary | Related IDs | Confidence | Evidence source |
 |---|---|---|---|---|---|
 | 2026-08-12 | redesign | DEC-017 — Stable Releases Rebuild From Verified-RC Source; Never Promote Exact Binaries | DEC-017 | verified | decisions/DEC-017_STABLE_RELEASES_REBUILD_FROM_VERIFIED_RC_SOURCE_NEVER_PROMOTE_EXACT_BINARIES.md header table: Date |
+| 2026-08-14 | feature expansion | Purpose/history captured — Product-Owner Purpose Capture interview. Added the release-distribution-burden rationale in Summary above. No code changed. | — | verified | features/AI-FEAT-006_APPLICATION_AUTO_UPDATE.md § Evolution / Implementation Journal |
 

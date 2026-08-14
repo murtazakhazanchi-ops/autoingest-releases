@@ -23,3 +23,6 @@ Use this when a real alternative was considered and one was chosen — not for r
 | [DEC-013](DEC-013_LOCK_CLEARING_MUST_BE_CONSTRAINED.md) | Lock Clearing Must Be Constrained | Accepted | AI-FEAT-045 |
 | [DEC-014](DEC-014_CONTROLLED_KEYWORD_REGISTRY.md) | Controlled Keyword Registry | Accepted | AI-FEAT-036 |
 | [DEC-015](DEC-015_PLANNED_ARCHITECTURE_SEPARATE_FROM_IMPLEMENTED.md) | Planned Architecture Remains Separate From Implemented Behaviour | Accepted | AI-FEAT-049–056, AI-RM-002–009 |
+| [DEC-021](DEC-021_TRANSFER_EXPORT_PROCESS_LOCAL_LOCK_ACCEPTED_FOR_PRESENT_OPERATIONAL_MODEL.md) | Transfer Export Process-Local Lock Accepted for Present Operational Model | Accepted | AI-FEAT-038, AI-FEAT-039, AI-FEAT-045 |
+
+Note: this index table does not yet include DEC-016 through DEC-020 — a pre-existing gap from before this entry, not introduced or corrected here.

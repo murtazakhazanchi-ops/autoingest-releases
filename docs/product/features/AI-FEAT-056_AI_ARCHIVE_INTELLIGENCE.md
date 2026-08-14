@@ -13,7 +13,7 @@
 | Related technical docs | None — no implementation exists yet |
 | Evidence status | Confirmed zero implementation: exhaustive grep across `main/`, `services/`, `renderer/` found no matches; `git log --all --oneline` search found no relevant commits |
 | First-known implementation | Not started |
-| Latest major update | Not applicable |
+| Latest major update | Not applicable to implementation; 2026-08-14 documentation update — partial vision captured, local-VLM direction confirmed decided, relationship to AI-FEAT-051/053 documented |
 
 ## Lifecycle Metadata
 
@@ -34,6 +34,10 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 
 Planned AI-assisted archive intelligence capability — final milestone in the canonical roadmap order. No architecture, scope, or design has been finalized. This is the furthest-out, least-scoped item in the entire registry; nothing about its eventual shape should be assumed from its name alone.
 
+**Vision** (product-owner intent, captured 2026-08-14 — *Known from project history; repository evidence pending*; future-tense throughout): current directions discussed include face/person identification, automatic person-keyword application, intelligent metadata/tag suggestions, duplicate and near-duplicate detection, and visual similarity search across dates/years/events/locations, integrating with Archive Browser (AI-FEAT-051) and Global Search (AI-FEAT-053). **One architectural point is materially decided, distinct from the rest of this still-open vision**: the product owner has decided this would run as a **locally-running vision-language model (VLM)**, specifically because of the archive's large dataset scale and the sensitivity/privacy of archival media — mirroring the same local-processing principle already applied to AI-FEAT-058 (the Knowledge Engine, deliberately built without an LLM, embeddings, or a cloud dependency). Everything else — exact model choice, hardware requirements, embedding architecture, vector database, face-recognition model, indexing architecture, deployment topology — remains explicitly undecided; none of it should be invented or assumed from this note.
+
+**Relationship to AI-FEAT-051 and AI-FEAT-053**: see AI-FEAT-051's Summary for the full three-way relationship note. Kept as a distinct record, not merged.
+
 ## Current Behavior
 
 Not implemented. No code exists.
@@ -45,6 +49,8 @@ Named as "AI Archive Intelligence" in the canonical roadmap order (see [../02_MA
 ## Evolution / Implementation Journal
 
 Not started.
+
+- **2026-08-14 — Partial vision captured; local-VLM architectural direction confirmed as decided; relationship to AI-FEAT-051/053 documented.** A Product-Owner Purpose Capture interview supplied current directions under discussion, and confirmed the local-processing (on-device VLM) principle as a materially decided architectural direction — distinct from the still-fully-open rest of this feature's scope, which remains undecided. Status remains Planned; no code exists; this file's existing "nothing should be assumed from its name alone" caveat is preserved alongside this new information.
 
 ## Engineering Evolution
 

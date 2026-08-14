@@ -34,6 +34,8 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 
 Operator identity for AutoIngest: a dedicated splash screen for login/profile selection, an operator profile store, and attribution of imports to the operator who triggered them. Distinct from Photographer-Folder Resolution (AI-FEAT-022, archive folder naming) and Import Source Attribution (AI-FEAT-028, which memory card/drive/folder supplied the files) — three separate identity concepts that must not be collapsed into one (per `autoingest-architect` review).
 
+**Why this exists** (*Known from project history; repository evidence pending* — captured during the Product-Owner Purpose Capture interview, 2026-08-14): serves a dual purpose, not merely UI personalization or role permissions. First, historical accountability/provenance/traceability — the archive should retain evidence of who performed an ingestion, so that if missing/corrupt/problematic data is discovered later, it can be traced back to the responsible operator and investigated. Second, live multi-user coordination — the system needs to know both which person and which device/session is operating, so other connected operators can see who is working on which event during Team Live collaboration (AI-FEAT-027, AI-FEAT-048). Operator identity was conceived as part of AutoIngest itself from the start, not built to replace a prior manual attribution process. Note: this identity system is unrelated to the `reporter` field in AI-FEAT-007's telemetry pipeline — forensic verification confirmed telemetry has no linkage to this operator-identity system, defaulting to `'Auto-report'` for all passive reports.
+
 ## Current Behavior
 
 Dedicated frameless `BrowserWindow` (980×480, `renderer/splash.html` + `renderer/splash.js`) with three states: "Welcome back" (returning operator), operator picker, create-profile form. `main/userManager.js` is the operator profile store (list, create, get/set active user; persisted via `services/settings.js`). `splash:complete` IPC fades the splash out and the main window in (200ms CSS transition). In-app operator dropdown and add-user modal replace what was previously a `#loginSplash` overlay. Renderer holds `_activeUser: {id, name, role, initials}`. Each `imports[]` entry in `event.json` optionally carries `importedBy: {id, name}` — backward-compatible; older entries display "Imported by: Not recorded" in the Activity Log (AI-FEAT-027).
@@ -45,6 +47,7 @@ Evidence pending beyond what `docs/history.md`'s v0.8.1 entry documents (introdu
 ## Evolution / Implementation Journal
 
 - **v0.8.1** — introduced: splash screen states, `userManager.js`, in-app operator dropdown replacing the old `#loginSplash` overlay, `importedBy` attribution added to `imports[]` (backward-compatible). (`docs/history.md`)
+- **2026-08-14** — Purpose/history captured — Product-Owner Purpose Capture interview. Added the dual provenance/live-coordination rationale in Summary above, and the boundary note distinguishing this identity system from AI-FEAT-007's unrelated telemetry `reporter` field. No code changed.
 
 ## Engineering Evolution
 

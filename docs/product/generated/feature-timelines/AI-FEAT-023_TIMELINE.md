@@ -4,5 +4,7 @@
 
 **Feature**: Quick Import
 
-No verified chronology exists in the canonical feature file — see its own Evolution / Implementation Journal section for the authoritative record.
+| Date | Event type | Summary | Related IDs | Confidence | Evidence source |
+|---|---|---|---|---|---|
+| 2026-08-14 | UI/UX revision | Purpose/history captured — Product-Owner Purpose Capture interview. Product owner supplied the rationale now recorded in Summary above (fast, non-archival staging path for time-pressured or off-event circumstances) and reaffirmed the existing boundary against treating this as equivalent to Event Import. No code changed. | — | verified | features/AI-FEAT-023_QUICK_IMPORT.md § Evolution / Implementation Journal |
 

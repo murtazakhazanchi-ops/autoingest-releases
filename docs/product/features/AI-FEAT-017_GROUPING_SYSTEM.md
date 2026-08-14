@@ -34,6 +34,10 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 
 Assigns selected files into logical groups mapped to sub-events. A transient renderer state layer (`renderer/groupManager.js`) that must always sync with `event.json` and reset on event change.
 
+**Why this exists** (*Known from project history; repository evidence pending* — captured during the Product-Owner Purpose Capture interview, 2026-08-14; one of the most detailed, best-evidenced accounts captured in that interview): makes correct archival organization feasible *during* high-pressure live ingestion, rather than forcing error-prone cleanup later. Before this existed, multi-component events required extensive manual folder preparation: manually create the main event folder, manually create component/sub-event folders, manually create photographer folders within those, inspect source media, separately copy subsets into each destination, and repeat per component. During live events this was too slow — photographers could be waiting to hand over cards while an ingester was still manually constructing/sorting structures. As a practical workaround, ingesters sometimes dumped entire photographer datasets temporarily and postponed proper sorting, which created a *second* workflow later (reopen the dumped data, inspect it again, separate it into components, create the appropriate structures, move/copy it into final locations) — sometimes extending work beyond the event/day itself.
+
+Grouping collapses this: the operator selects media, assigns logical groups, maps groups to event components/sub-events, provides photographer identity, and starts the import — AutoIngest then performs the structural bifurcation and photographer-folder placement automatically, eliminating the need to run separate import/copy passes for each component. The objective is to make correct archival organization feasible during live ingestion itself, not something deferred to cleanup afterward. What became automated: structural bifurcation and photographer-folder placement from operator-assigned groups. What remains manual: the operator still selects the media, assigns it to groups/components, and supplies photographer identity — those judgment calls stay human; only the mechanical folder-creation and placement work is automated. Steps removed/consolidated are described qualitatively, not as a specific count: eliminated repeated folder creation and duplicate copy passes across components, and removed the "dump now, sort later" second workflow entirely when Grouping is used as intended.
+
 ## Current Behavior
 
 Group shape: `{id, label, colorIdx, files: Set, subEventId, metadataTags}`. Rules: groups never empty (auto-removed when empty), one group → one sub-event, files must belong to exactly one group (structural exclusivity via `_fileGroupMap`, one groupId per filePath — not a keyboard-shortcut mechanism), groups must have a valid `subEventId` before import. Operations: `createGroup`, `assignFiles`, `unassignFiles`, `setSubEvent` — invalid operations are rejected, never silently corrected. 10 pastel colors keyed to `--group-N` CSS vars, derived at render time from array position (no drift after deletions).
@@ -47,6 +51,7 @@ Introduced as part of the v0.7.x "Core System Architecture" milestone (`docs/his
 ## Evolution / Implementation Journal
 
 - **v0.7.x** — grouping system introduced.
+- **2026-08-14** — Purpose/history captured — Product-Owner Purpose Capture interview. Detailed pre-AutoIngest manual multi-step workflow (and the "dump now, sort later" workaround it replaced) recorded in Summary above, grounded in real live-event operational experience. No code changed.
 
 ## Engineering Evolution
 

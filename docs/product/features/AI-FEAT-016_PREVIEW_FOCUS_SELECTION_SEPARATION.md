@@ -34,6 +34,8 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 
 Two deliberately separate concepts that must never be conflated: import selection (`selectedFiles: Set`, controlled by Cmd/Ctrl-click, Shift-click, checkboxes) and preview focus (`lastClickedPath`, set by any click or arrow-key navigation, used only to open the preview overlay). A normal click sets preview focus only — it does not select a file for import.
 
+**Why this exists** (*Known from project history; repository evidence pending* — captured during the Product-Owner Purpose Capture interview, 2026-08-14): prevents the act of viewing/inspecting a file from accidentally changing what's selected for import — viewing and selecting are conceptually different actions, and conflating them risks an operator accidentally including or excluding a file from the import selection while merely inspecting it. This was confirmed as proactive, precautionary UX/safety design, built ahead of any incident — not a response to a real accidental-import event.
+
 ## Current Behavior
 
 `lastClickedPath` (preview focus) and `_selectionAnchor` (shift-range anchor) are independent variables. Cmd/Ctrl+D deselects all import selection while preserving preview focus. Arrow keys move preview focus through rendered order when the preview is closed. Visual indicator: `.pv-focused` CSS class (see AI-FEAT-008 § file tile visual states) — never implies import selection, and `.selected` never implies preview focus; both can coexist on the same tile.
@@ -45,6 +47,7 @@ Introduced in v0.8.1 (`docs/history.md`).
 ## Evolution / Implementation Journal
 
 - **v0.8.1** — `.pv-focused` preview focus ring (three visual states: primary/secondary/combined); O(1) `_setPreviewFocus` helper swaps CSS class via `tileMap` instead of DOM query; `_selectionAnchor`/`_prevFocusPath` module-level state added; keyboard arrow navigation added.
+- **2026-08-14** — Purpose/history captured — Product-Owner Purpose Capture interview. Confirmed this separation was proactive precautionary design, not a reaction to a real incident; recorded in Summary above. No code changed.
 
 ## Engineering Evolution
 

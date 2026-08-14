@@ -38,19 +38,22 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 
 A single tabbed modal consolidating three previously-separate metadata UI surfaces.
 
+**Why this exists**: primarily an internal UX/design consolidation decision (product-owner account, captured during the Product-Owner Purpose Capture interview, 2026-08-14 — *Known from project history; repository evidence pending*). **What the three surfaces were is separately repository-evidenced**, via [AI-MEM-0001](../memory/AI-MEM-0001_METADATA_MANAGEMENT_MODAL_AUDIT_REPAIR_EVOLUTION.md)'s reconstructed "Proposed workflow": the old 2-tab "Metadata Sync" modal (Bridge/XMP review + Keyword Registry), a standalone "Metadata Audit" modal, and a duplicated copy of Activity Log's session-scoped "Metadata" filter tab controls — consolidated into this one 3-tab modal (Metadata / Audit & Repair / Keyword Registry). **What remains genuinely unknown, in both the product-owner's own recollection and AI-MEM-0001's own reconstructed evidence**: whether this consolidation was driven by an operator complaint about the fragmentation or was purely internal engineering cleanup — AI-MEM-0001's own "Original Request" section independently states "User goal: Evidence pending — source conversation unavailable," so this is not a gap this documentation pass can close by asking further; it was asked directly and neither the product owner's memory nor the repository's own reconstructed record has the answer.
+
 ## Current Behavior
 
 Tabbed navigation over the metadata surfaces listed above; shared modal shell (`.emm-box`) with a scoped per-modal `height` rule (not `max-height` alone) to prevent visual jumping across tab switches when content height varies between tabs (see AI-FEAT-008's design-system rule, which this bug produced).
 
 ## Original Plan / Intent
 
-Evidence pending beyond the commit/learning-log trail below.
+Evidence pending beyond the commit/learning-log trail below, and AI-MEM-0001's reconstructed "Proposed workflow" cited in Summary above (which names the three consolidated surfaces but not the original motivating trigger).
 
 ## Evolution / Implementation Journal
 
 - **2026-08-02** — "Metadata Management Modal: Consolidating 3 UI Surfaces Into One Tabbed Modal" (learning-log; commit `4446a30` "consolidate metadata surfaces into a Metadata Management modal").
 - **2026-08-03** — "compact Run Audit button; remove obsolete Metadata Audit entry point" (commit `6349c62`).
 - **2026-08-03/04** — "rebalance Audit & Repair tab into a full-height flex layout with a single scroll region" (commit `2c2090a`); "polish Audit & Repair spacing across window heights" (commit `c5d200f`) — adds a media query so the documented minimum window height (700px) gets its own correctly-tuned spacing.
+- **2026-08-14** — Purpose/history captured — Product-Owner Purpose Capture interview. Product owner confirmed this was primarily an internal UX consolidation decision but did not recall the exact original surfaces or motivating trigger; cross-referenced against AI-MEM-0001, which independently supplies the surface identities (from its reconstructed commit-message/plan evidence) but confirms the motivating trigger is genuinely unrecoverable — not merely unasked. No code changed.
 
 ## Engineering Evolution
 

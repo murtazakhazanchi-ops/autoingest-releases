@@ -34,6 +34,8 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 
 **QMZ = Qadam / Majlis / Ziyafat** — a standalone sequencing workspace distinct from standard Event Import, with its own root (`qmzRoot`), durable state file (`qmz-sequences.json`), namespaced renderer state/UI (`_qmz*` prefix throughout — explicitly documented in code comments as never touching Import's `sortKey`/`viewMode`), and its own IPC surface.
 
+**Why this exists** (product-owner history, captured 2026-08-14 — *Known from project history; repository evidence pending* for the domain-specific rationale below, combined with [DEC-011](../decisions/DEC-011_QMZ_DEDICATED_DOMAIN_WORKFLOW.md)'s already-accepted "not every archival event fits the generic model" framing for why a dedicated workflow was warranted at all): a QMZ event can contain 10 to 50+ distinct real-world occurrences/sequences of Qadam, Majlis, or Ziyafat. Fully sequencing everything during live ingestion is counterproductive, so a photographer's material is initially ingested together and sequenced later by an archivist. Before this dedicated workspace existed, that later sequencing pass meant manually creating a sequence folder and photographer folders inside it, inspecting photographs, and moving/copy-sorting them — repeated per sequence, potentially 40+ times for a large event, using Finder, viewers, or Adobe Bridge. That repetition was tedious, mentally tiring, and therefore more prone to human error through fatigue — sequence order matters because the archive should correspond to the actual chronological occurrence order. This workspace exists to make that classification process focused, efficient, and less repetitive. The product owner explicitly noted this **remains an evolving workflow and may be improved further** — treat it as a first-generation solution, not a finished design; DEC-011 itself separately states evidence is still pending for the deeper history beyond this incremental-growth pattern.
+
 ## Current Behavior
 
 `LETTER_TYPE = {Q: 'Qadam', M: 'Majlis', Z: 'Ziyafat'}`; `LETTER_MAX = {Q: 50, M: 51, Z: 52}` (max sequence numbers per type). Sequence codes match `/^\d{2}[QMZ]$/` (e.g. `01Q`, `02M`) — folder-naming convention only, **never** included in the keyword set at any entry point (verified live through the real UI per `docs/metadata-system.md`). Reads embedded EXIF capture date via `exifr` (photos) or ExifTool (RAW, reusing AI-FEAT-029's singleton process pool) — deliberately not filesystem mtime, which doesn't survive cross-volume copy.
@@ -52,6 +54,7 @@ Evidence pending — not yet documented as fact. Git history confirms at least t
 
 - Commit `b56f6ba` — "feat(qmz): add QMZ Sequence Manager and event-list entry point."
 - Commit `a2e3b7a` — "feat(qmz): convert QMZ Sequence Manager to a full workspace with sequence review, timeline, and event context."
+- **2026-08-14** — Purpose captured — Product-Owner Purpose Capture interview. The product owner supplied the domain-specific rationale (fatigue-driven error reduction for high-volume, multi-occurrence events) now recorded in Summary above, directly resolving the audit's explicit "do not infer QMZ's pre-feature workflow" flag, and noted this remains an evolving workflow. No code changed.
 
 ## Engineering Evolution
 

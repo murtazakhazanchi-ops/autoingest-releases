@@ -8,6 +8,7 @@
 |---|---|---|---|---|---|
 | 2026-07-02 (commit `b56f6ba`, initial QMZ Sequence Manager) through 2026-07-03 (commit `a2e3b7a`, full workspace conversion) | redesign | DEC-011 — QMZ Requires a Dedicated Domain Workflow | DEC-011 | verified | decisions/DEC-011_QMZ_DEDICATED_DOMAIN_WORKFLOW.md header table: Date |
 | 2026-08-02 | major bug fix | BUG-007 — QMZ Metadata Context-Shape Mismatch Silently Drops Keywords/Hijri Date | BUG-007 | verified | bugs/BUG-007_QMZ_METADATA_CONTEXT_SHAPE_MISMATCH.md header table: Fixed |
+| 2026-08-14 | other dated milestone | Purpose captured — Product-Owner Purpose Capture interview. The product owner supplied the domain-specific rationale (fatigue-driven error reduction for high-volume, multi-occurrence events) now recorded in Summary above, directly resolving the audit's explicit "do not infer QMZ's pre-feature workflow" flag, and noted this remains an evolving workflow. No code changed. | — | verified | features/AI-FEAT-047_QMZ_SEQUENCING_WORKSPACE.md § Evolution / Implementation Journal |
 | Evidence pending | evidence pending | Commit `b56f6ba` — "feat(qmz): add QMZ Sequence Manager and event-list entry point." | — | undated | features/AI-FEAT-047_QMZ_SEQUENCING_WORKSPACE.md § Evolution / Implementation Journal |
 | Evidence pending | evidence pending | Commit `a2e3b7a` — "feat(qmz): convert QMZ Sequence Manager to a full workspace with sequence review, timeline, and event context." | — | undated | features/AI-FEAT-047_QMZ_SEQUENCING_WORKSPACE.md § Evolution / Implementation Journal |
 

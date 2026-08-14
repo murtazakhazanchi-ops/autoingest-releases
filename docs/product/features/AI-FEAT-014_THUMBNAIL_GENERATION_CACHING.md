@@ -34,6 +34,8 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 
 Two separate thumbnail pipelines: images (with an on-disk cache) and video (cached frame extraction with a play-badge overlay).
 
+**Why this exists** (*Known from project history; repository evidence pending* — captured during the Product-Owner Purpose Capture interview, 2026-08-14): lets operators visually inspect selections inside AutoIngest itself, without relying on OS-level thumbnail rendering. This was a proactive design choice, not a response to Finder/Explorer being incapable of thumbnails — it exists to provide a self-contained, precise, convenient in-app browsing experience. Caching specifically exists so already-generated thumbnails don't have to regenerate every time an operator scrolls or revisits media, which would be slow at scale on large import sources.
+
 ## Current Behavior
 
 Image pipeline: `services/thumbnailCache.js`, `services/thumbnailer.js`, `services/thumbWorker.js`. Video pipeline: `main/videoThumbService.js` generates cached video frame thumbnails; `thumbnail:getVideoThumb` IPC + preload exposure; video file tiles show a lazy-loaded frame thumbnail with a play-badge overlay.
@@ -45,6 +47,7 @@ Video thumbnails introduced in v0.8.1 alongside Media Preview and Operator Ident
 ## Evolution / Implementation Journal
 
 - **v0.8.1** — `main/videoThumbService.js` introduced: cached video frame thumbnails, `thumbnail:getVideoThumb` IPC, lazy-loaded tile thumbnails with play-badge overlay.
+- **2026-08-14** — Purpose/history captured — Product-Owner Purpose Capture interview. Product-owner rationale for why in-app thumbnailing (and caching specifically) exists was recorded in Summary above. No code changed.
 
 ## Engineering Evolution
 

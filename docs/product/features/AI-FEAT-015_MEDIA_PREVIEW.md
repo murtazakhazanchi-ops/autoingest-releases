@@ -34,6 +34,8 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 
 Space-bar opens a full-screen preview overlay for the focused file: full-resolution image via `file://` URL for JPEG/PNG, high-quality extracted preview for RAW, and a native `<video>` player for MP4/MOV.
 
+**Why this exists** (*Known from project history; repository evidence pending* — captured during the Product-Owner Purpose Capture interview, 2026-08-14): visual inspection inside the same working environment before deciding what to import. Before this existed, operators commonly used Adobe Bridge to enlarge/inspect photographs — a separate-application step that broke the ingestion workflow. This was explicitly part of AutoIngest's development vision from the start, not a reactive fix to any specific "wrong file imported" incident.
+
 ## Current Behavior
 
 RAW preview extraction: macOS uses `qlmanage` (QuickLook) at 1200px → PNG; Windows uses PowerShell + `System.Drawing` at 1200px → PNG (requires OS RAW codec support, with a thumbnail fallback when extraction fails or codecs are absent — see `docs/failure-patterns.md` #13). Persistent disk cache at `userData/raw-preview-cache/`, 30-day TTL, keyed by path+size+mtime. Caption text distinguishes "extracted preview" / "thumbnail preview" / "thumbnail preview (RAW codec not available)" on Windows. Arrow keys navigate between files in current rendered order; Esc/Space closes. Object URLs are revoked on close; video `src` is cleared to release memory.
@@ -45,6 +47,7 @@ Introduced in v0.8.1 alongside Operator Identity and video thumbnails (`docs/his
 ## Evolution / Implementation Journal
 
 - **v0.8.1** — `main/rawPreviewService.js` introduced; `files:getPreviewUrl` and `preview:getRawPreview` IPC handlers.
+- **2026-08-14** — Purpose/history captured — Product-Owner Purpose Capture interview. Product-owner rationale (in-app inspection replacing an Adobe Bridge workflow step, proactive design vision) recorded in Summary above. No code changed.
 
 ## Engineering Evolution
 

@@ -6,6 +6,7 @@
 
 | Date | Event type | Summary | Related IDs | Confidence | Evidence source |
 |---|---|---|---|---|---|
+| 2026-08-14 | other dated milestone | Purpose/history captured — Product-Owner Purpose Capture interview. Product-owner rationale (in-app inspection replacing an Adobe Bridge workflow step, proactive design vision) recorded in Summary above. No code changed. | — | verified | features/AI-FEAT-015_MEDIA_PREVIEW.md § Evolution / Implementation Journal |
 | v0.8.1 | initial implementation | First-known implementation of Media Preview | — | verified | features/AI-FEAT-015_MEDIA_PREVIEW.md header table: First-known implementation |
 | v0.8.1 | other dated milestone | Latest major update recorded for Media Preview | — | verified | features/AI-FEAT-015_MEDIA_PREVIEW.md header table: Latest major update |
 | Evidence pending | evidence pending | **v0.8.1** — `main/rawPreviewService.js` introduced; `files:getPreviewUrl` and `preview:getRawPreview` IPC handlers. | — | undated | features/AI-FEAT-015_MEDIA_PREVIEW.md § Evolution / Implementation Journal |

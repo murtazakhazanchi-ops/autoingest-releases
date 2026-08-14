@@ -140,7 +140,10 @@
       "confidenceLevel": "explicit",
       "evidenceNote": "Derived directly from features/AI-FEAT-007_TELEMETRY_PIPELINE.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-007",
-      "relatedBugs": [],
+      "relatedBugs": [
+        "BUG-017",
+        "BUG-018"
+      ],
       "relatedDecisions": [],
       "relatedPostmortems": [],
       "roadmapIds": [],
@@ -833,7 +836,9 @@
       "relatedBugs": [
         "BUG-005"
       ],
-      "relatedDecisions": [],
+      "relatedDecisions": [
+        "DEC-021"
+      ],
       "relatedPostmortems": [],
       "roadmapIds": [],
       "topic": "Transfer Export"

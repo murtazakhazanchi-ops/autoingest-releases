@@ -13,7 +13,7 @@
 | Related technical docs | None — no implementation exists yet |
 | Evidence status | Confirmed NOT started, despite a filename collision — verified directly by reading `services/archiveRepairService.js` |
 | First-known implementation | Not started |
-| Latest major update | Not applicable |
+| Latest major update | Not applicable to implementation; 2026-08-14 documentation update — hybrid repair philosophy captured as decided, exact scope confirmed undecided |
 
 ## Lifecycle Metadata
 
@@ -34,6 +34,10 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 
 Planned broad archive-repair automation — seventh in the canonical roadmap order. `docs/archive-operations-layer.md` explicitly documents this exact gap today: "No broad repair automation: the diagnostics layer reports issues but does not auto-fix them" (AI-FEAT-043).
 
+**Vision** (product-owner intent, captured 2026-08-14 — *Known from project history; repository evidence pending*; future-tense throughout, describing a planned capability, not current behavior): the repair philosophy is decided as HYBRID — AUTOMATIC repair for minor, deterministic, low-risk discrepancies (corrected automatically/in the background), and ASSISTED repair for significant issues or anything requiring archival judgment (explained to the operator, with AutoIngest proposing/guiding a repair and the human approving the consequential action). This automatic/assisted split is the decided philosophy; **the exact classification of which specific issue types fall into which category is NOT decided**. Example issue-type directions that have been discussed — incorrect folder structure, missing/damaged control files, misplaced material, naming discrepancies, incomplete event structures — are examples of the kind of thing this feature might eventually address, **not approved requirements or committed scope**, and must not be read as such.
+
+**Preserved from prior documentation**: the existing `archiveRepairService.js` naming-collision warning below remains accurate and unrelated to this vision note.
+
 ## Current Behavior
 
 Not implemented as this planned capability. **Important disambiguation**: `services/archiveRepairService.js` exists in the codebase, but its actual scope — read directly during this audit — is "Phase 13B-2: Temp File Cleanup." It only deletes files whose basename ends in `.autoingest-sync-tmp` or `.autoingest-tx-tmp`, explicitly never touching media, `event.json`, locks, or manifests. Single call site: `main/main.js:4466` via `archive:cleanupTempFile`. **This is unrelated narrow infrastructure — do not treat it as a head start on this planned milestone.**
@@ -45,6 +49,8 @@ Named as "Archive Repair" in the canonical roadmap order (see [../02_MASTER_ROAD
 ## Evolution / Implementation Journal
 
 Not started (for the planned broad-repair scope). The existing `archiveRepairService.js` temp-file-cleanup utility is a separate, already-shipped, narrow capability — not part of this feature's evolution.
+
+- **2026-08-14 — Repair philosophy captured as decided; exact scope confirmed undecided.** A Product-Owner Purpose Capture interview supplied the hybrid automatic/assisted repair philosophy now recorded in Summary above, and explicitly clarified that discussed example issue categories are directions, not committed scope. Status remains Planned; no code exists.
 
 ## Engineering Evolution
 
@@ -68,7 +74,7 @@ Not applicable.
 
 ## Future Enhancements
 
-Scope, design, and acceptance criteria are pending discovery/specification.
+Scope, design, and acceptance criteria are pending discovery/specification — specifically, which issue types fall under automatic vs. assisted repair (see Summary's Vision note) remains an open design question.
 
 ## Related Files
 

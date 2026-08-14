@@ -32,7 +32,7 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 
 ## Summary
 
-Two distinct, real, hash-based verification mechanisms, sharing `getFileHash()` but scoped differently: an import-batch checksum run and a Local-First sync-job checksum run. Named "Checksum-Based" specifically to disambiguate from AI-FEAT-026's count-only Audit Integrity Verification — the two do not share a mechanism and must not be conflated (confirmed by direct code reading, not merged despite the similar names).
+Two distinct, real, hash-based verification mechanisms, sharing `getFileHash()` but scoped differently: an import-batch checksum run and a Local-First sync-job checksum run. Named "Checksum-Based" specifically to disambiguate from AI-FEAT-026's count-only Audit Integrity Verification — the two do not share a mechanism and must not be conflated (confirmed by direct code reading, not merged despite the similar names). **Why this exists** (*Known from project history; repository evidence pending* — captured during the Product-Owner Purpose Capture interview, 2026-08-14): multiple historical instances occurred where copied data became corrupted or truncated — a risk count/presence checks alone would not catch. This is the deepest of three integrity layers alongside AI-FEAT-019's automatic per-file check and AI-FEAT-026's manual count audit (see that file's Current Behavior for the full three-layer model); SHA-256 was chosen for a practical balance of speed and reliability, not as a claim of cryptographic superiority. It is operator-triggered by deliberate design (not automatic) to avoid the added time cost on every routine transfer.
 
 ## Current Behavior
 

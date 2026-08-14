@@ -2,7 +2,7 @@
 
 > Generated artifact — locator only. Regenerate with `node scripts/product-docs/cli.js build`. Full machine-readable graph: `dependency-graph.json`. Views below are deliberately bounded (one subsystem or milestone chain per diagram) rather than one unreadable graph of every node.
 
-Total: 124 nodes, 546 edges.
+Total: 127 nodes, 560 edges.
 
 ### Roadmap milestone relationships
 
@@ -36,7 +36,7 @@ flowchart LR
 
 ### Feature dependency overview (features with a depends_on/extended_by edge)
 
-54 node(s), 148 edge(s) in this view.
+54 node(s), 151 edge(s) in this view.
 
 ```mermaid
 flowchart LR
@@ -156,6 +156,7 @@ flowchart LR
   AI_FEAT_025 -->|related_to| AI_FEAT_026
   AI_FEAT_025 -->|related_to| AI_FEAT_044
   AI_FEAT_025 -->|related_to| AI_FEAT_054
+  AI_FEAT_026 -->|depends_on| AI_FEAT_019
   AI_FEAT_026 -->|related_to| AI_FEAT_025
   AI_FEAT_026 -->|depends_on| AI_FEAT_027
   AI_FEAT_027 -->|depends_on| AI_FEAT_004
@@ -231,6 +232,8 @@ flowchart LR
   AI_FEAT_048 -->|depends_on| AI_FEAT_005
   AI_FEAT_049 -->|depends_on| AI_FEAT_042
   AI_FEAT_049 -->|depends_on| AI_FEAT_043
+  AI_FEAT_049 -->|extended_by| AI_FEAT_050
+  AI_FEAT_049 -->|extended_by| AI_FEAT_050
   AI_FEAT_050 -->|depends_on| AI_FEAT_004
   AI_FEAT_050 -->|depends_on| AI_FEAT_010
   AI_FEAT_051 -->|depends_on| AI_FEAT_013
@@ -294,7 +297,7 @@ flowchart LR
 
 ### Import and Archive Writing subsystem
 
-10 node(s), 14 edge(s) in this view.
+10 node(s), 15 edge(s) in this view.
 
 ```mermaid
 flowchart LR
@@ -317,6 +320,7 @@ flowchart LR
   AI_FEAT_024 -->|depends_on| AI_FEAT_019
   AI_FEAT_025 -->|depends_on| AI_FEAT_019
   AI_FEAT_025 -->|related_to| AI_FEAT_026
+  AI_FEAT_026 -->|depends_on| AI_FEAT_019
   AI_FEAT_026 -->|related_to| AI_FEAT_025
   AI_FEAT_026 -->|depends_on| AI_FEAT_027
   AI_FEAT_027 -->|extended_by| AI_FEAT_026
@@ -379,7 +383,7 @@ flowchart LR
 
 ### Planned archive-management direction
 
-18 node(s), 27 edge(s) in this view.
+18 node(s), 29 edge(s) in this view.
 
 ```mermaid
 flowchart LR
@@ -402,6 +406,8 @@ flowchart LR
   AI_RM_009(("AI-RM-009: AI Archive Intelligence"))
   AI_RM_010(("AI-RM-010: Multi-Channel Release & Update System"))
   AI_RM_011(("AI-RM-011: AutoIngest Knowledge & Onboarding Portal (Stage 1 + Stage 2)"))
+  AI_FEAT_049 -->|extended_by| AI_FEAT_050
+  AI_FEAT_049 -->|extended_by| AI_FEAT_050
   AI_FEAT_049 -->|planned_in| AI_RM_002
   AI_FEAT_050 -->|planned_in| AI_RM_003
   AI_FEAT_051 -->|planned_in| AI_RM_004

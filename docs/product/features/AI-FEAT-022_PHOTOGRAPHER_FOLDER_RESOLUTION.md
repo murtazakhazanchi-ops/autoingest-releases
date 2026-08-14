@@ -34,17 +34,20 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 
 Resolves the photographer-level folder within an event's directory structure. Distinct identity concept from Login/Operator Identity (AI-FEAT-002, who is using the app) and Import Source Attribution (AI-FEAT-028, which device supplied the files) — three separate concepts that must not be collapsed into one, per `autoingest-architect` review, because this codebase's own contract treats photographer identity, operator identity, and import source as three independently-tracked things.
 
+**Why this exists** (captured during the Product-Owner Purpose Capture interview, 2026-08-14): the final routing stage of the ingestion model — after an operator selects/groups media and assigns photographer identity (AI-FEAT-017, this feature's dependency), AutoIngest automatically places it into the correct event/component/photographer folder, completing the archival routing process in one operation instead of requiring manual nested-folder creation and placement. This continues the same pre-AutoIngest manual-folder-creation narrative documented in AI-FEAT-017's Summary (*Known from project history; repository evidence pending*) — photographer-level folders were part of that same manual, multi-step process, and this feature is its final routing step. `AI-FEAT-018` (this feature's own Dependency, cited in the header table above) and [§3B — Initial AutoIngest Foundation](../11_ARCHITECTURAL_EVOLUTION.md#b-initial-autoingest-foundation) (cited below) carry related repository-verified evolution context for the wider event/component routing model this feature completes; this file does not independently re-verify their specific historical claims and does not restate them beyond this cross-reference.
+
 ## Current Behavior
 
 `services/photographerSequenceService.js`: `PC_PREFIX_RE` matches a `PCxx-` prefix convention (`PC01-` through `PC999-`), stripped to resolve the canonical photographer name. `EVENT_ROOT_KEY` (`__eventRoot__`) is used as the scope key when photographer folders live directly under the event root — i.e., single-component events where there's no separate sub-event layer.
 
 ## Original Plan / Intent
 
-Evidence pending — not yet documented as fact.
+This file's originally-scoped requirements remain evidence-pending — not yet documented as fact. See Summary above for the product-owner-supplied purpose (why photographer-folder routing was automated), which is project history rather than a specific originally-scoped requirement.
 
 ## Evolution / Implementation Journal
 
 - **v0.9.0** — "Photographer Folder Sequencing" introduced as a related capability: a "Sequence Folders" action in Event Management letting an operator reorder photographer folders within an event via a drag-to-reorder modal (`docs/release-notes-v0.9.0.md`). Whether this is the same code path as the `PCxx-` prefix resolution or a separate later addition is evidence pending — flagged for a future pass rather than assumed.
+- **2026-08-14** — Purpose/history captured — Product-Owner Purpose Capture interview. Recorded this feature's purpose as the final automated routing step of the AI-FEAT-017 Grouping narrative (manual photographer-folder creation, replaced by automatic routing); resolves this file's previously-open "why does this exist" gap. No code changed.
 
 ## Engineering Evolution
 

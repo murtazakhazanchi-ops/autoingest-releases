@@ -6,14 +6,14 @@
 | Category | Planned Archive Management |
 | Status | Planned |
 | Maturity | Planned |
-| Parent feature | None |
+| Parent feature | AI-FEAT-049 (Archive Maintenance — this feature is the event-level structural-maintenance scope within that broader capability, not an independently-motivated feature; see Summary) |
 | Subfeatures | None |
 | Dependencies | AI-FEAT-004, AI-FEAT-010 (expected to build on the existing event data model and management UI) |
 | Related roadmap milestone | AI-RM-003 |
 | Related technical docs | None — no implementation exists yet |
 | Evidence status | Confirmed zero implementation: exhaustive grep across `main/`, `services/`, `renderer/` found no matches; `git log --all --oneline` search found no relevant commits |
 | First-known implementation | Not started |
-| Latest major update | Not applicable |
+| Latest major update | Not applicable to implementation; 2026-08-14 documentation update — parent/child relationship with AI-FEAT-049 made explicit |
 
 ## Lifecycle Metadata
 
@@ -34,6 +34,8 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 
 Planned event-level maintenance capability — third in the canonical roadmap order. No architecture, scope, or design has been finalized.
 
+**Relationship to AI-FEAT-049**: per explicit product-owner clarification (captured 2026-08-14), this is the event-level scope of the broader Archive Maintenance vision (AI-FEAT-049) — not a second, independently-motivated concept. The two canonical IDs are retained separately (each tied to its own roadmap milestone, AI-RM-003 and AI-RM-002 respectively), now with the parent/child relationship made explicit via the header table above, rather than inventing two unrelated purposes for what is one vision at two scopes. See AI-FEAT-049's Summary for the shared vision content (controlled structural modification of existing archive material — date/sequence changes, component additions, photographer-folder moves, re-sorting — currently only possible via manual, unmanaged filesystem work).
+
 ## Current Behavior
 
 Not implemented. No code exists.
@@ -45,6 +47,8 @@ Named as "Event Maintenance" in the canonical roadmap order (see [../02_MASTER_R
 ## Evolution / Implementation Journal
 
 Not started.
+
+- **2026-08-14 — Parent/child relationship with AI-FEAT-049 made explicit.** A Product-Owner Purpose Capture interview clarified that this feature is a sub-scope of AI-FEAT-049 (Archive Maintenance), not an independently-motivated concept. Header table's Parent feature field updated accordingly. Status remains Planned; no code exists.
 
 ## Engineering Evolution
 

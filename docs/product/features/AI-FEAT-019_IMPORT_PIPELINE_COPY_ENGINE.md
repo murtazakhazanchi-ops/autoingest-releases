@@ -38,6 +38,8 @@ Processes grouped files and copies them into the archive structure. No file is e
 
 Core functions in `main/fileManager.js`: `copyFiles()` (line 207) and `copyFileJobs()` (line 459), `resolveDestPath()` (line 157 — conflict/rename logic, also implements Duplicate Detection, AI-FEAT-020), `buildDestIndex()` (line 91 — resume fast-path), `verifyFile()` (line 135), `getFileHash()` (line 113), and adaptive concurrency tiers (150MB/s and 80MB/s throughput thresholds). `onProgress` callback reports `{total, index, completedCount, filename, status, eta, speedBps}` with exponential-moving-average speed smoothing (100ms throttle) — this is Import Progress and Completion (checklist item 24), folded into this feature rather than given a separate entry. Errors are caught per file; the loop continues; the final result reports copied/skipped/errored counts.
 
+**Automatic per-file validation — distinct from AI-FEAT-026** (confirmed 2026-08-14, forensic code verification): every file copy performed by `copyFiles()` runs through `verifyFile()`, which performs an automatic **per-file size check**, always on, requiring no operator action (`result.integrity = 'verified'` is set as part of the normal copy path). This is a genuinely automatic validation layer — but it is **not** the same thing as AI-FEAT-026's "Verify Integrity" audit, which is a separate, manually-triggered, count-based completeness check the operator runs on demand from the Activity Log. A product-owner recollection of "automatic post-import integrity flagging" during the Purpose Capture interview (2026-08-14) was traced to this per-file check (plus this pipeline's automatic error-telemetry firing on copy failures — see AI-FEAT-007), not to AI-FEAT-026. See AI-FEAT-026's Current Behavior for the full three-layer integrity model (this automatic per-file check → the manual count audit → AI-FEAT-025's manual SHA-256 verification).
+
 **Sibling copy engines** (do not assume these share code with this one): `services/archiveSyncService.js:_copyFile` (Local-First Sync, AI-FEAT-044), `services/localMirrorService.js:_copyFileIfNotConflict`, `services/transferExportService.js:_copyFileSafe` (AI-FEAT-038), `services/transferImportService.js:_copyFileSafe` (AI-FEAT-039).
 
 ## Original Plan / Intent
@@ -48,6 +50,7 @@ Evidence pending beyond `docs/history.md`'s v0.5.1 "Import pipeline hardening" e
 
 - **v0.5.1** — "Stabilization": import pipeline hardening, performance fixes, reduced import failures.
 - **v0.7.x** — pipeline structure re-established as part of the core architecture rebuild alongside `event.json`.
+- **2026-08-14 — Cross-referenced against AI-FEAT-026 to resolve a product-owner recollection conflict.** During the Product-Owner Purpose Capture interview, the product owner recalled automatic post-import integrity flagging; forensic verification traced this to this feature's own `verifyFile()` per-file check rather than to AI-FEAT-026 (which remains manual-only, confirmed and retained as such — see that file). Added the clarifying cross-reference above; no code changed.
 
 ## Engineering Evolution
 

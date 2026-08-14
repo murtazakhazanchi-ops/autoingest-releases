@@ -34,6 +34,8 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 
 The Event Creator wizard: defines a Collection, then Event metadata via one or more Components (EventType, Location, City, Country, Additional Keywords), generates the `event.json` structure, and previews the final folder structure before commit.
 
+**Why this exists** (*Known from project history; repository evidence pending* — captured during the Product-Owner Purpose Capture interview, 2026-08-14): standardizes event naming/structure so independently-created events converge deterministically instead of diverging by operator. The problem was not absence of a naming convention — an institutional convention already existed — it was human implementation error applying that convention by hand: operators manually typed the date, sequence number, event name/details, and prescribed folder structure, and different operators could spell the same noun, event, or place differently (e.g. one operator using "I," another "E"; locations misspelled). This became especially problematic when operators worked separately/off-site without a common NAS — multiple operators could independently create what was logically the same event with slightly different names, and later consolidation required a human to determine which spelling/structure was correct. This rationale is based on real, experienced discrepancies, not merely hypothetical risk.
+
 ## Current Behavior
 
 Component rows support drag-to-reorder (reorders `_eventComps` in-place, refreshes the folder-name preview immediately). Each component row is a 5-column grid: Event Type | Additional Keywords | Location | City | Country. Country uses the same `.tac-*` TreeAutocomplete structure as City but is excluded from the folder name. Additional Keywords with `useInFolderName: true` interleave around event tags per `folderPlacement` (`before-event-tag` / `after-event-tag` / `end-of-event-tags`); the in-editor preview and the final folder name share one source of truth via `folderNameHelper.js`. Naming: Collection = `{HijriDate}_{Label}`; Event name is deterministically generated from components and must remain stable once created. Validation before creation: all required components must exist, generated folder names must be valid, no duplicate subEvents.
@@ -46,6 +48,7 @@ Introduced as part of the v0.7.x "Core System Architecture" milestone (`docs/his
 
 - **v0.7.x** — event system introduction.
 - **v0.8.8** — widened modal to 1320px; component row switched 3-column → 5-column grid; Country control redesigned to match City's TreeAutocomplete structure; `buildFolderName` interleaving logic added; dropdown `z-index` stacking-context fix (see AI-FEAT-008 §8b); removed unwanted auto-focus on new component; `[hidden]` CSS override added for Chromium UA sheet conflict. (`docs/history.md`)
+- **2026-08-14** — Purpose/history captured — Product-Owner Purpose Capture interview. Added the naming-standardization rationale (real, experienced cross-operator spelling/structure discrepancies) in Summary above. No code changed.
 
 ## Engineering Evolution
 

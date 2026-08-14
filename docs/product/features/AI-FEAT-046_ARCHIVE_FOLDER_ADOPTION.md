@@ -38,13 +38,15 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 
 Registers a pre-existing, manually-created archive folder as an AutoIngest-managed event by writing a minimal `event.json` into it — without moving, renaming, or restructuring any media. Reversible by deleting the written `event.json`. Conceptually distinct from AI-FEAT-047's QMZ-internal unsequenced-folder adoption (which adopts folders into QMZ's own `_Unsequenced` bucket, not the archive-wide event registry).
 
+**Why this exists** (product-owner history, captured 2026-08-14 — *Known from project history; repository evidence pending*): serves two purposes, both now confirmed — legacy-archive migration (AutoIngest was introduced into an archive that already contained many historical, manually-created folders, and the archive shouldn't have to discard or rebuild that history just to become AutoIngest-managed) and ongoing adoption of externally-created event folders (contributors organizing folders outside AutoIngest still need a path to bring that material under management). This resolves what was previously an entirely unstated motivating scenario for this feature.
+
 ## Current Behavior
 
 `docs/archive-adoption-contract.md` states: "Phase 13C-7 — Implemented. Adoption write contract is complete." 16 dry-run validation checks; readiness classifications (Ready / Needs review / Blocked / Not adoptable); writes are atomic (tmp→rename); the written `event.json` deliberately has `components: []` by design. Supports ready candidates only — folders already following naming conventions (`docs/archive-operations-layer.md` § Known Limitations). No bulk adoption — events are adopted one at a time.
 
 ## Original Plan / Intent
 
-Evidence pending beyond the Phase 13C-7 contract statement.
+Evidence pending beyond the Phase 13C-7 contract statement, regarding this feature's specific originally-scoped requirements. See Summary above for the now-captured motivating scenario (project history, not a repository-verified original scoping document).
 
 ## Evolution / Implementation Journal
 
@@ -54,6 +56,7 @@ Evidence pending beyond the Phase 13C-7 contract statement.
 - **2026-05-14** — "Phase 13C-7.1: Refresh Event List After Adoption" (learning-log).
 - **2026-05-14** — "Phase 13C-9: Adoption Block Silent Drop on Full-Payload Save" (learning-log) — a real bug (a silent data-loss risk on save) found and fixed.
 - **2026-05-14** — "Phase 13C-11: Adopted Event 0→Multi Component Structure Warning" (learning-log).
+- **2026-08-14** — Purpose/history captured — Product-Owner Purpose Capture interview. The product owner confirmed the dual legacy-migration/ongoing-onboarding motivation now recorded in Summary above, resolving what the original Knowledge Purpose Audit had flagged as an entirely unknown motivating scenario. No code changed.
 
 ## Engineering Evolution
 

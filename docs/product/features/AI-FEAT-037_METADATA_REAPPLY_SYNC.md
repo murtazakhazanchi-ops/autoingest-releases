@@ -34,13 +34,15 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 
 Detects when metadata needs to be reapplied to already-imported files (e.g. after an operator corrects event component location/city/country post-import) and syncs the corrected metadata across previously-imported files, with a preview modal showing affected folders and changed/removed fields. `docs/metadata-system.md`'s Import Path Coverage table lists "Reapply" as a synchronous write via the shared engine (AI-FEAT-029) — this feature is that Reapply capability plus its scan/sync/preview surface.
 
+**Why this exists** (*Known from project history; repository evidence pending* — captured during the Product-Owner Purpose Capture interview, 2026-08-14): corrects metadata drift arising from two real scenarios — event information changing after files were already tagged, and initial metadata application being incomplete or partial in the first place. It is a corrective mechanism within AutoIngest's own metadata system, not a replacement for a pre-AutoIngest manual process. The product owner confirmed this arose from real-world experience/testing — a genuine, observed need, not a speculative addition. This resolves the purpose gap that made this the single lowest-confidence file in the registry; the separate, narrower implementation-detail gap noted above (full function-level audit of `main/metadataSyncService.js` still pending) remains open and is not resolved by this purpose capture.
+
 ## Current Behavior
 
 `main/metadataSyncService.js` exists as a dedicated file. Full current function-level behavior is evidence-pending — this entry is grounded in file existence, the learning-log narrative below, and the doc cross-reference, not an independent code audit. A future pass should verify current behavior directly against `main/metadataSyncService.js` before treating implementation details here as authoritative.
 
 ## Original Plan / Intent
 
-Evidence pending — not yet documented as fact.
+Evidence pending — not yet documented as fact regarding this feature's originally-scoped requirements. See Summary above for the now-captured purpose/motivation (project history, not a repository-verified original scoping document).
 
 ## Evolution / Implementation Journal
 
@@ -50,6 +52,7 @@ Evidence pending — not yet documented as fact.
 - **2026-05-10** — "previewEventMetadata Classification Fix (commit 1464c85)" (learning-log).
 - **2026-05-10** — "Metadata Sync Stabilization and Scan Performance Optimization" (learning-log).
 - **2026-05-11** — "Metadata Sync Hardening: Sync Resilience and Scan Reliability (commit b14d5fd)" (learning-log) — most recent dated entry found.
+- **2026-08-14** — Purpose/history captured — Product-Owner Purpose Capture interview. The product owner supplied the two-scenario metadata-drift rationale now recorded in Summary above, confirming it arose from real-world experience/testing. No code changed.
 
 ## Engineering Evolution
 

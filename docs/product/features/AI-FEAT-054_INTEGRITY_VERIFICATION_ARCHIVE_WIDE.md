@@ -13,7 +13,7 @@
 | Related technical docs | None — no implementation exists yet |
 | Evidence status | Confirmed zero implementation of the archive-wide scope; existing narrower prior art independently verified |
 | First-known implementation | Not started |
-| Latest major update | Not applicable |
+| Latest major update | Not applicable to implementation; 2026-08-14 documentation update — long-term preservation vision captured, both-sweep-types requirement confirmed |
 
 ## Lifecycle Metadata
 
@@ -34,6 +34,10 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 
 Planned archive-wide (possibly scheduled) integrity verification — sixth in the canonical roadmap order. **Explicitly distinct in scope from AI-FEAT-025**, which is already implemented but scoped only to a single import batch or a single Local-First sync job, not the whole archive.
 
+**Vision** (product-owner intent, captured 2026-08-14 — *Known from project history; repository evidence pending*; future-tense throughout, describing a planned capability, not current behavior): long-term digital preservation assurance — detecting silent corruption, missing/damaged files, and storage degradation over time, beyond what ingestion-time verification (AI-FEAT-025/AI-FEAT-026) can prove. Ingestion-time verification proves integrity at that one moment; it does not prove files remain healthy months or years later. The product owner explicitly wants **both** scheduled full archive sweeps **and** incremental/background verification — not one or the other. Scheduling cadence and resource-management details are **not yet designed**; no specific schedule should be assumed or invented.
+
+**Preserved from prior documentation**: the existing warning below not to read AI-FEAT-025 as partial progress toward this milestone remains accurate and applies equally to this vision note.
+
 ## Current Behavior
 
 Not implemented at archive-wide scope. AI-FEAT-025's `checksum:run` (import-batch) and `archive:verifyJobChecksum` (sync-job) are real, shipped, narrower-scoped prior art for this planned milestone — not a partial implementation of it. Do not treat AI-RM-006 as "in progress" on the basis of AI-FEAT-025 existing.
@@ -45,6 +49,8 @@ Named as "Integrity Verification" in the canonical roadmap order (see [../02_MAS
 ## Evolution / Implementation Journal
 
 Not started (for archive-wide scope). See AI-FEAT-025 for the existing narrower capability's history.
+
+- **2026-08-14 — Long-term preservation vision captured; both-sweep-types requirement confirmed.** A Product-Owner Purpose Capture interview supplied the long-term digital preservation vision now recorded in Summary above, and confirmed both scheduled full sweeps and incremental/background verification are wanted, with scheduling details still undesigned. Status remains Planned; no code exists.
 
 ## Engineering Evolution
 
@@ -68,7 +74,7 @@ None recorded.
 
 ## Future Enhancements
 
-Scope, design, and acceptance criteria are pending discovery/specification. Whether this milestone builds directly on AI-FEAT-025's `getFileHash()` primitive or introduces a new mechanism is an open design question for whoever scopes this milestone.
+Scope, design, and acceptance criteria are pending discovery/specification. Whether this milestone builds directly on AI-FEAT-025's `getFileHash()` primitive or introduces a new mechanism is an open design question for whoever scopes this milestone. Scheduling cadence and resource-management approach for the required scheduled-sweep + incremental-verification combination (see Summary's Vision note) is likewise undesigned.
 
 ## Related Files
 

@@ -34,17 +34,21 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 
 Self-update mechanism using `electron-updater` against GitHub Releases. Checks 3 seconds after launch, then every 4 hours, broadcasts state to all windows, and only installs on explicit user action.
 
+**Why this exists** (*Known from project history; repository evidence pending* — captured during the Product-Owner Purpose Capture interview, 2026-08-14): standardizes and automates release distribution across deployed AutoIngest machines, removing a recurring release-distribution maintenance burden. Before this existed, releases were distributed manually to each operator's machine. This was not built in response to one dramatic incident — the stated motivation was proactive relief of ongoing maintenance friction: "this is repetitive release-distribution work that should happen automatically rather than requiring me to worry about it after every release." The manual install-confirmation step (`quitAndInstall()` requiring an explicit operator click — see Current Behavior) is an intentionally preserved human decision point, not an oversight.
+
 ## Current Behavior
 
 `services/autoUpdater.js`: checks for updates 3s post-launch and every 4h thereafter; broadcasts `update-available`, `download-progress`, and `update:ready` IPC events to all open windows; `quitAndInstall()` is user-gated (not automatic); maintains `_lastUpdateState` so a renderer window that attaches late (e.g. a modal opened after the check already ran) can still see the current state on demand rather than missing the original broadcast. As of AI-FEAT-057 (Part 9), `init()` also applies the user's Stable/Preview channel preference (`applyChannelSetting()`) before the first check ever runs — see AI-FEAT-057 for the full multi-channel design; this feature's own default (no setting present) behaves identically to before AI-FEAT-057 existed.
 
 ## Original Plan / Intent
 
-Evidence pending — not yet documented as fact.
+Evidence pending regarding this feature's originally-scoped requirements. See Summary above for the product-owner rationale captured 2026-08-14 (proactive relief of recurring manual-distribution burden) — that describes currently-understood purpose, not necessarily original scoping.
 
 ## Evolution / Implementation Journal
 
-No entries yet — this feature's history was not part of either research pass's scope; only its current shape has been verified.
+No entries yet regarding implementation history — this feature's history was not part of either research pass's scope; only its current shape has been verified.
+
+- **2026-08-14** — Purpose/history captured — Product-Owner Purpose Capture interview. Added the release-distribution-burden rationale in Summary above. No code changed.
 
 ## Engineering Evolution
 

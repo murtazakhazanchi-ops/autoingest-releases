@@ -26,4 +26,7 @@ All ten records above were fixed prior to this documentation pass (2026-08-04); 
 | [BUG-015](BUG-015_WINDOWS_RUNNER_DEFAULT_POWERSHELL_SHELL_MANGLES_ELECTRON_BUILDER_DOT_NOTATION_CLI_OVERRIDES.md) | Windows Runner Default PowerShell Shell Mangles electron-builder Dot-Notation CLI Overrides | Fixed | High | AI-FEAT-057 |
 | [BUG-016](BUG-016_UNDECLARED_NPM_DEPENDENCY_IN_PRODUCT_DOCS_TOOLING_MASKED_BY_LOCALLY_HOISTED_NODE_MODULES.md) | Undeclared npm Dependency in product-docs Tooling Masked by Locally-Hoisted node_modules | Fixed | Medium | AI-FEAT-057 |
 
+| [BUG-017](BUG-017_TELEMETRY_HARDCODED_BUNDLED_SERVICE_ACCOUNT_CREDENTIAL.md) | Telemetry Pipeline Bundles a Hardcoded Google Service-Account Credential | Open | High | AI-FEAT-007 |
+| [BUG-018](BUG-018_TELEMETRY_IMPORT_FAILURE_REPORT_INCLUDES_ARCHIVE_DESTINATION_PATH.md) | Telemetry Import-Failure Report Includes the Real Archive Destination Path | Open | Medium | AI-FEAT-007, AI-FEAT-019 |
+
 Note: this index table does not yet include BUG-011 through BUG-014 (Windows/NAS Event Management investigation, 2026-08-11) — a pre-existing gap from before this entry, not introduced or corrected here.

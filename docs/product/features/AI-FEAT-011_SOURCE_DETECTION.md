@@ -34,17 +34,21 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 
 Detects connected storage devices eligible for import: polls for drives, filters by DCIM presence, and recognizes Sony camera folder conventions (PRIVATE/M4ROOT/CLIP for photos, PRIVATE/AVCHD/BDMV/STREAM for video). This is the backend detection layer consumed by Source Selection (AI-FEAT-012) — detection and selection are deliberately kept as separate registry entries because detection is genuinely distinct backend infrastructure (device polling, filesystem heuristics), while selection is a thin UI layer over the same underlying `activeSource` state regardless of source type.
 
+**Why this exists** (*Known from project history; repository evidence pending* — captured during the Product-Owner Purpose Capture interview, 2026-08-14): ensures all legitimate media on a connected source is discoverable, regardless of which folder convention a given camera or card uses — not a Sony-specific feature (Sony is the concrete, evidenced example, not the whole scope). Early AutoIngest intentionally narrowed source browsing primarily to DCIM to simplify ingestion and reduce clutter; that assumption later proved too narrow, since some cameras (Sony being the documented example) store video outside DCIM entirely, and operators may receive cards/drives with legitimate media in non-obvious folders. This is a reactive refinement — an internal AutoIngest evolution (an earlier, narrower DCIM-only mechanism replaced by the current broader one) rather than a manual pre-AutoIngest process being automated. The goal is to avoid the application silently hiding legitimate media merely because it isn't in the expected folder.
+
 ## Current Behavior
 
 `main/driveDetector.js` uses `drivelist`, polls every 5 seconds, filters by DCIM presence. IPC: `drives:get` / `drives:updated` / `drives:allUpdated`. `main/fileBrowser.js`'s `scanPrivateFolder()` (lines 376-410) checks exactly two known Sony subdirectory shapes — `PRIVATE/M4ROOT/CLIP` and `PRIVATE/AVCHD/BDMV/STREAM` — never recurses the full `PRIVATE` tree, filters junk files, applies a >500KB size floor, and tags results `source: 'private'`. A code comment in `main/main.js:406` notes this "naturally covers Sony PRIVATE/M4ROOT/CLIP, AVCHD/STREAM, any user-created subdirs."
 
 ## Original Plan / Intent
 
-Evidence pending — not yet documented as fact.
+Evidence pending regarding this feature's originally-scoped requirements. See Summary above for the product-owner rationale captured 2026-08-14 (broadened from an earlier DCIM-only scope after that assumption proved too narrow).
 
 ## Evolution / Implementation Journal
 
-No dated entries found in this pass. Sony PRIVATE folder support is referenced in current renderer UI copy (`renderer/renderer.js:11551`) but not dated.
+No dated entries found in this pass beyond the 2026-08-14 entry below. Sony PRIVATE folder support is referenced in current renderer UI copy (`renderer/renderer.js:11551`) but not dated.
+
+- **2026-08-14** — Purpose/history captured — Product-Owner Purpose Capture interview. Added the DCIM-only → universal-discovery evolution rationale in Summary above, with explicit correction that this must not be documented as Sony-only. No code changed.
 
 ## Engineering Evolution
 

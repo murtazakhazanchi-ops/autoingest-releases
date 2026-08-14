@@ -13,7 +13,7 @@
 | Related technical docs | None — no implementation exists yet |
 | Evidence status | Confirmed zero implementation: exhaustive grep across `main/`, `services/`, `renderer/` found no matches; `git log --all --oneline` search found no relevant commits |
 | First-known implementation | Not started |
-| Latest major update | Not applicable |
+| Latest major update | Not applicable to implementation; 2026-08-14 documentation update — vision captured, relationship to AI-FEAT-053/056 documented |
 
 ## Lifecycle Metadata
 
@@ -34,6 +34,10 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 
 Planned full-archive browsing capability — fourth in the canonical roadmap order, positioned after Archive/Event Maintenance and before Global Search. No architecture, scope, or design has been finalized.
 
+**Vision** (product-owner intent, captured 2026-08-14 — *Known from project history; repository evidence pending*; future-tense throughout): long-term, AutoIngest would become a broader archival working suite, not just an ingestion tool — this feature would support browsing already-archived material, visual review, archival ratings/stars/selections, metadata management, secondary descriptive keywording, and handoff to external editing tools (Camera Raw/Photoshop/Lightroom), eventually extending to remote/online browsing for authorized users beyond the local archive workstation. Today, AutoIngest applies primary keywords during ingestion, but secondary descriptive keywording is still performed externally (especially in Adobe Bridge) — a fragmented post-ingestion workflow this feature would aim to reduce. The remote/online-discovery aspect of this vision raises authentication/access-control questions not yet addressed anywhere in this documentation.
+
+**Relationship to AI-FEAT-053 and AI-FEAT-056**: distinct capabilities forming one long-term archival discovery/intelligence direction — Archive Browser is the navigation/visual-exploration route, Global Search (AI-FEAT-053) is the direct natural-language retrieval route, and AI Archive Intelligence (AI-FEAT-056) is the local AI/VLM layer intended to support both. Kept as three separate records rather than merged, since their eventual architectural shape differs materially (UI/browsing vs. natural-language query handling vs. a local AI model) — the same pattern already used for AI-FEAT-027/AI-FEAT-048, which share infrastructure while remaining distinct records.
+
 ## Current Behavior
 
 Not implemented. No code exists. AI-FEAT-013 (File Browser & Media Grid/List Viewing) currently only browses a selected *source* (memory card/drive/folder) for import, not the archive itself — this planned feature would be a materially different scope (archive-wide, post-import browsing), not an extension of the same code path by default.
@@ -45,6 +49,8 @@ Named as "Archive Browser" in the canonical roadmap order (see [../02_MASTER_ROA
 ## Evolution / Implementation Journal
 
 Not started.
+
+- **2026-08-14 — Vision captured; relationship to AI-FEAT-053/056 documented.** A Product-Owner Purpose Capture interview supplied the archival-working-suite vision now recorded in Summary above, and clarified this feature's relationship to Global Search and AI Archive Intelligence as three distinct-but-related capabilities, not a merge candidate. Status remains Planned; no code exists.
 
 ## Engineering Evolution
 

@@ -38,17 +38,20 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 
 The dashboard's Metadata tile, upgraded from a simple indicator into a "truthful Health card" reflecting the real, derived metadata state of the archive/current event.
 
+**Why this exists** (product-owner account, captured during the Product-Owner Purpose Capture interview, 2026-08-14 — *Known from project history; repository evidence pending*): real cases occurred where AutoIngest indicated metadata had been applied while some files were only partially tagged or missing metadata — the prior coarse, binary indicator was misleading in those cases. This was driven by real observed metadata incompleteness, not a hypothetical concern, though the exact prior incident(s) are not individually dated or named beyond the general pattern the product owner confirmed. The commit trail's own framing ("upgrade dashboard Metadata tile into a truthful Health card," `fc8fd39`, see Evolution below) is consistent with — but does not itself independently prove — this account.
+
 ## Current Behavior
 
 Evidence pending beyond the commit trail — full current field-by-field behavior of the health card was not independently re-derived in this pass; see `test/dashboardMetadataHealthCard.test.js` for behavioral coverage.
 
 ## Original Plan / Intent
 
-Evidence pending — not yet documented as fact.
+Evidence pending — not yet documented as fact regarding original scoping. See Summary above for the product-owner-supplied purpose captured 2026-08-14.
 
 ## Evolution / Implementation Journal
 
 - **2026-08-02 (learning-log) / 2026-08-03 (git commit timestamp)** — "Dashboard Metadata Health Card: Extend-in-Place Plan Correction + Text-Overflow Catch" (learning-log; commit `fc8fd39` "upgrade dashboard Metadata tile into a truthful Health card", committed 2026-08-03 01:15:48 +05:30). Both sources are legitimate evidence for the same overnight work session — recorded here rather than silently picking one, per the evidence-discipline rule.
+- **2026-08-14** — Purpose/history captured — Product-Owner Purpose Capture interview. Product owner confirmed the prior binary indicator was genuinely misleading in real observed cases, though specific incidents remain undated/unnamed. No code changed.
 
 ## Engineering Evolution
 

@@ -14,4 +14,5 @@
 | 2026-05-10 | performance improvement | "Metadata Sync Stabilization and Scan Performance Optimization" (learning-log). | — | verified | features/AI-FEAT-037_METADATA_REAPPLY_SYNC.md § Evolution / Implementation Journal |
 | 2026-05-11 | reliability improvement | "Metadata Sync Hardening: Sync Resilience and Scan Reliability (commit b14d5fd)" (learning-log) — most recent dated entry found. | — | verified | features/AI-FEAT-037_METADATA_REAPPLY_SYNC.md § Evolution / Implementation Journal |
 | 2026-05-11 | other dated milestone | Latest major update recorded for Metadata Reapply / Sync | — | verified | features/AI-FEAT-037_METADATA_REAPPLY_SYNC.md header table: Latest major update |
+| 2026-08-14 | other dated milestone | Purpose/history captured — Product-Owner Purpose Capture interview. The product owner supplied the two-scenario metadata-drift rationale now recorded in Summary above, confirming it arose from real-world experience/testing. No code changed. | — | verified | features/AI-FEAT-037_METADATA_REAPPLY_SYNC.md § Evolution / Implementation Journal |
 

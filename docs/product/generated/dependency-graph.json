@@ -380,6 +380,38 @@
     {
       "evidence_status": "explicit",
       "note": null,
+      "provenance_path": "features/AI-FEAT-007_TELEMETRY_PIPELINE.md#lifecycle-metadata:Related-bugs",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-007",
+      "target": "BUG-017"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-017_TELEMETRY_HARDCODED_BUNDLED_SERVICE_ACCOUNT_CREDENTIAL.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-007",
+      "target": "BUG-017"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-007_TELEMETRY_PIPELINE.md#lifecycle-metadata:Related-bugs",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-007",
+      "target": "BUG-018"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-018_TELEMETRY_IMPORT_FAILURE_REPORT_INCLUDES_ARCHIVE_DESTINATION_PATH.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-007",
+      "target": "BUG-018"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
       "provenance_path": "features/AI-FEAT-008_DESIGN_SYSTEM_UI_CONSISTENCY_FRAMEWORK.md#lifecycle-metadata:Related-features",
       "relationship": "related_to",
       "source": "AI-FEAT-008",
@@ -844,6 +876,14 @@
     {
       "evidence_status": "explicit",
       "note": null,
+      "provenance_path": "bugs/BUG-018_TELEMETRY_IMPORT_FAILURE_REPORT_INCLUDES_ARCHIVE_DESTINATION_PATH.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-019",
+      "target": "BUG-018"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
       "provenance_path": "features/AI-FEAT-019_IMPORT_PIPELINE_COPY_ENGINE.md#lifecycle-metadata:Related-decisions",
       "relationship": "governed_by",
       "source": "AI-FEAT-019",
@@ -1216,6 +1256,14 @@
       "relationship": "governed_by",
       "source": "AI-FEAT-025",
       "target": "DEC-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-026_AUDIT_INTEGRITY_VERIFICATION.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-026",
+      "target": "AI-FEAT-019"
     },
     {
       "evidence_status": "explicit",
@@ -2244,6 +2292,22 @@
     {
       "evidence_status": "explicit",
       "note": null,
+      "provenance_path": "features/AI-FEAT-038_TRANSFER_EXPORT.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-038",
+      "target": "DEC-021"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-021_TRANSFER_EXPORT_PROCESS_LOCAL_LOCK_ACCEPTED_FOR_PRESENT_OPERATIONAL_MODEL.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-038",
+      "target": "DEC-021"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
       "provenance_path": "features/AI-FEAT-039_TRANSFER_IMPORT.md#header-table:Dependencies",
       "relationship": "depends_on",
       "source": "AI-FEAT-039",
@@ -2304,6 +2368,14 @@
       "relationship": "governed_by",
       "source": "AI-FEAT-039",
       "target": "DEC-016"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-021_TRANSFER_EXPORT_PROCESS_LOCAL_LOCK_ACCEPTED_FOR_PRESENT_OPERATIONAL_MODEL.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-039",
+      "target": "DEC-021"
     },
     {
       "evidence_status": "explicit",
@@ -2724,6 +2796,14 @@
     {
       "evidence_status": "explicit",
       "note": null,
+      "provenance_path": "decisions/DEC-021_TRANSFER_EXPORT_PROCESS_LOCAL_LOCK_ACCEPTED_FOR_PRESENT_OPERATIONAL_MODEL.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-045",
+      "target": "DEC-021"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
       "provenance_path": "features/AI-FEAT-046_ARCHIVE_FOLDER_ADOPTION.md#header-table:Dependencies",
       "relationship": "depends_on",
       "source": "AI-FEAT-046",
@@ -2888,6 +2968,22 @@
       "relationship": "depends_on",
       "source": "AI-FEAT-049",
       "target": "AI-FEAT-043"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "this feature extended by subfeature",
+      "provenance_path": "features/AI-FEAT-049_ARCHIVE_MAINTENANCE.md#header-table:Subfeatures",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-049",
+      "target": "AI-FEAT-050"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "parent extended by this subfeature",
+      "provenance_path": "features/AI-FEAT-050_EVENT_MAINTENANCE.md#header-table:Parent-feature",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-049",
+      "target": "AI-FEAT-050"
     },
     {
       "evidence_status": "explicit",
@@ -4027,6 +4123,22 @@
     },
     {
       "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-017_TELEMETRY_HARDCODED_BUNDLED_SERVICE_ACCOUNT_CREDENTIAL.md#related",
+      "relationship": "related_to",
+      "source": "BUG-017",
+      "target": "BUG-018"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-018_TELEMETRY_IMPORT_FAILURE_REPORT_INCLUDES_ARCHIVE_DESTINATION_PATH.md#related",
+      "relationship": "related_to",
+      "source": "BUG-018",
+      "target": "BUG-017"
+    },
+    {
+      "evidence_status": "explicit",
       "note": "decision-to-decision body reference",
       "provenance_path": "decisions/DEC-003_LOCAL_FIRST_ON_PREMISES_ARCHITECTURE.md#body",
       "relationship": "related_to",
@@ -4960,6 +5072,18 @@
       "type": "bug"
     },
     {
+      "doc_path": "bugs/BUG-017_TELEMETRY_HARDCODED_BUNDLED_SERVICE_ACCOUNT_CREDENTIAL.md",
+      "id": "BUG-017",
+      "label": "Telemetry Pipeline Bundles a Hardcoded Google Service-Account Credential",
+      "type": "bug"
+    },
+    {
+      "doc_path": "bugs/BUG-018_TELEMETRY_IMPORT_FAILURE_REPORT_INCLUDES_ARCHIVE_DESTINATION_PATH.md",
+      "id": "BUG-018",
+      "label": "Telemetry Import-Failure Report Includes the Real Archive Destination Path",
+      "type": "bug"
+    },
+    {
       "doc_path": "decisions/DEC-001_EVENT_DATA_AS_DURABLE_ARCHIVE_TRUTH.md",
       "id": "DEC-001",
       "label": "Event Data as Durable Archive Truth",
@@ -5077,6 +5201,12 @@
       "doc_path": "decisions/DEC-020_STAGE_2_KNOWLEDGE_ARCHITECTURE_WORKFLOW_RECORDS_AND_CONCEPT_LAYER.md",
       "id": "DEC-020",
       "label": "Stage 2 Knowledge Architecture: Workflow Records, Concept Layer, and Hint-vs-Raw Boundary Precedence",
+      "type": "decision"
+    },
+    {
+      "doc_path": "decisions/DEC-021_TRANSFER_EXPORT_PROCESS_LOCAL_LOCK_ACCEPTED_FOR_PRESENT_OPERATIONAL_MODEL.md",
+      "id": "DEC-021",
+      "label": "Transfer Export Process-Local Lock Accepted for Present Operational Model",
       "type": "decision"
     },
     {

@@ -6,6 +6,7 @@
 
 | Date | Event type | Summary | Related IDs | Confidence | Evidence source |
 |---|---|---|---|---|---|
-| Not applicable | other dated milestone | Latest major update recorded for Event Maintenance | — | verified | features/AI-FEAT-050_EVENT_MAINTENANCE.md header table: Latest major update |
+| Not applicable to implementation; 2026-08-14 documentation update — parent/child relationship with AI-FEAT-049 made explicit | other dated milestone | Latest major update recorded for Event Maintenance | — | verified | features/AI-FEAT-050_EVENT_MAINTENANCE.md header table: Latest major update |
 | Not started | initial implementation | First-known implementation of Event Maintenance | — | verified | features/AI-FEAT-050_EVENT_MAINTENANCE.md header table: First-known implementation |
+| Evidence pending | evidence pending | **2026-08-14 — Parent/child relationship with AI-FEAT-049 made explicit.** A Product-Owner Purpose Capture interview clarified that this feature is a sub-scope of AI-FEAT-049 (Archive Maintenance), not an independently-motivated concept. Header table's Parent feature field updated accordingly. Status remains Planned; no code exists. | — | undated | features/AI-FEAT-050_EVENT_MAINTENANCE.md § Evolution / Implementation Journal |
 

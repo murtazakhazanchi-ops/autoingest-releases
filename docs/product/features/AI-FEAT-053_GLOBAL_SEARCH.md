@@ -13,7 +13,7 @@
 | Related technical docs | None — no implementation exists yet |
 | Evidence status | Confirmed zero implementation: exhaustive grep across `main/`, `services/`, `renderer/` found no matches; `git log --all --oneline` search for "global search" found no relevant commits |
 | First-known implementation | Not started |
-| Latest major update | Not applicable |
+| Latest major update | Not applicable to implementation; 2026-08-14 documentation update — vision captured, relationship to AI-FEAT-051/056 documented |
 
 ## Lifecycle Metadata
 
@@ -34,6 +34,12 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 
 Planned archive-wide search capability — fifth in the canonical roadmap order, positioned after Archive Browser. No architecture, scope, or design has been finalized.
 
+**Vision** (product-owner intent, captured 2026-08-14 — *Known from project history; repository evidence pending*; future-tense throughout): the direct-retrieval counterpart to Archive Browser's navigation-based route. Long-term vision is "Ask the Archive" — a natural-language query (e.g., "a photograph of [person] at [location] on [date], wearing [description], accompanied by [person]") interpreted, mapped to archive metadata/descriptive information, and used to retrieve likely matches or present useful candidates, without the operator needing to construct a manual metadata query or already know where an item is stored. Conceptually parallel to "Ask AutoIngest" (the Knowledge Engine, AI-FEAT-058) applied to archival discovery instead of product/operator documentation — a conceptual parallel worth noting without conflating the two systems, which would remain architecturally separate.
+
+**Relationship to AI-FEAT-051 and AI-FEAT-056**: see AI-FEAT-051's Summary for the full three-way relationship note (Archive Browser = navigation, Global Search = direct retrieval, AI Archive Intelligence = the AI layer feeding both). Kept as a distinct record, not merged.
+
+**Scope note preserved from prior documentation**: this feature is explicitly wider in scope than AI-FEAT-025 (Checksum-Based File Verification) — AI-FEAT-025's existence must not be read as partial progress toward this feature; the two are unrelated beyond sharing no code.
+
 ## Current Behavior
 
 Not implemented. No code exists.
@@ -45,6 +51,8 @@ Named as "Global Search" in the canonical roadmap order (see [../02_MASTER_ROADM
 ## Evolution / Implementation Journal
 
 Not started.
+
+- **2026-08-14 — Vision captured; relationship to AI-FEAT-051/056 documented.** A Product-Owner Purpose Capture interview supplied the "Ask the Archive" natural-language retrieval vision now recorded in Summary above, and clarified this feature's relationship to Archive Browser and AI Archive Intelligence as three distinct-but-related capabilities. Status remains Planned; no code exists.
 
 ## Engineering Evolution
 

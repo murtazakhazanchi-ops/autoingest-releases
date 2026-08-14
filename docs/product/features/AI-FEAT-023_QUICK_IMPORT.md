@@ -34,17 +34,21 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 
 A staging-only, non-archival import path with a materially different backend contract from Event Import (AI-FEAT-009/019): it creates no `event.json`, so its files are permanently outside Metadata Audit (AI-FEAT-033) coverage — the audit scanner's traversal is gated on `event.json` presence at every level — and are never eligible for event-based Metadata Repair.
 
+**Why this exists** (*Known from project history; repository evidence pending* — captured during the Product-Owner Purpose Capture interview, 2026-08-14): a fast, non-archival staging path for circumstances where full Event Import isn't appropriate at that moment — the right event isn't present on the device, the data doesn't belong to the currently-active event, there's no time to sort properly, or there's a queue of photographers waiting. It is not a replacement for a manual process; it was designed as a deliberate escape valve alongside the full archival flow, intended to reduce data-loss risk from delay rather than as a response to a specific incident. **Explicit boundary**: Quick Import must never be documented as equivalent to Event Import — it is a deliberate staging path, not a substitute, matching the metadata-blind, non-archival contract already described below.
+
 ## Current Behavior
 
 Renderer: `_renderQuickImportCard()`, `showQuickImportConfirmModal()`. UI: `#quickImportCard`, `#quickImportModal` + `qiModal*` sub-elements. Per `docs/metadata-system.md` § Non-Goals: "Quick Import is deliberately staging-only, non-archival... This is communicated directly in the Quick Import UI." Quick Import is also intentionally metadata-blind (see AI-FEAT-029's Import Path Coverage table) — this is stated directly in its own UI, not a silent gap.
 
 ## Original Plan / Intent
 
-Evidence pending — not yet documented as fact.
+Evidence pending — not yet documented as fact regarding original scoping. See Summary above for the product-owner-supplied purpose captured 2026-08-14.
 
 ## Evolution / Implementation Journal
 
-No dated entries found in this pass.
+No dated entries found in this pass beyond the entry below.
+
+- **2026-08-14** — Purpose/history captured — Product-Owner Purpose Capture interview. Product owner supplied the rationale now recorded in Summary above (fast, non-archival staging path for time-pressured or off-event circumstances) and reaffirmed the existing boundary against treating this as equivalent to Event Import. No code changed.
 
 ## Engineering Evolution
 

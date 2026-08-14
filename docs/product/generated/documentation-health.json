@@ -18,7 +18,7 @@
     {
       "file": "features/AI-FEAT-002_LOGIN_OPERATOR_IDENTITY.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-002 has 3 evidence-pending marker(s)",
+      "message": "AI-FEAT-002 has 5 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
@@ -46,14 +46,14 @@
     {
       "file": "features/AI-FEAT-006_APPLICATION_AUTO_UPDATE.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-006 has 8 evidence-pending marker(s)",
+      "message": "AI-FEAT-006 has 9 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
     {
       "file": "features/AI-FEAT-007_TELEMETRY_PIPELINE.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-007 has 9 evidence-pending marker(s)",
+      "message": "AI-FEAT-007 has 11 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
@@ -67,7 +67,7 @@
     {
       "file": "features/AI-FEAT-009_EVENT_CREATION.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-009 has 2 evidence-pending marker(s)",
+      "message": "AI-FEAT-009 has 4 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
@@ -81,7 +81,7 @@
     {
       "file": "features/AI-FEAT-011_SOURCE_DETECTION.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-011 has 8 evidence-pending marker(s)",
+      "message": "AI-FEAT-011 has 9 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
@@ -95,35 +95,35 @@
     {
       "file": "features/AI-FEAT-013_FILE_BROWSER_MEDIA_GRID_LIST_VIEWING.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-013 has 2 evidence-pending marker(s)",
+      "message": "AI-FEAT-013 has 4 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
     {
       "file": "features/AI-FEAT-014_THUMBNAIL_GENERATION_CACHING.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-014 has 2 evidence-pending marker(s)",
+      "message": "AI-FEAT-014 has 4 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
     {
       "file": "features/AI-FEAT-015_MEDIA_PREVIEW.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-015 has 2 evidence-pending marker(s)",
+      "message": "AI-FEAT-015 has 4 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
     {
       "file": "features/AI-FEAT-016_PREVIEW_FOCUS_SELECTION_SEPARATION.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-016 has 3 evidence-pending marker(s)",
+      "message": "AI-FEAT-016 has 5 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
     {
       "file": "features/AI-FEAT-017_GROUPING_SYSTEM.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-017 has 3 evidence-pending marker(s)",
+      "message": "AI-FEAT-017 has 5 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
@@ -158,14 +158,14 @@
     {
       "file": "features/AI-FEAT-022_PHOTOGRAPHER_FOLDER_RESOLUTION.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-022 has 7 evidence-pending marker(s)",
+      "message": "AI-FEAT-022 has 8 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
     {
       "file": "features/AI-FEAT-023_QUICK_IMPORT.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-023 has 9 evidence-pending marker(s)",
+      "message": "AI-FEAT-023 has 11 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
@@ -179,7 +179,7 @@
     {
       "file": "features/AI-FEAT-025_CHECKSUM_BASED_FILE_VERIFICATION.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-025 has 9 evidence-pending marker(s)",
+      "message": "AI-FEAT-025 has 11 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
@@ -200,7 +200,7 @@
     {
       "file": "features/AI-FEAT-028_IMPORT_SOURCE_ATTRIBUTION.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-028 has 9 evidence-pending marker(s)",
+      "message": "AI-FEAT-028 has 11 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
@@ -242,14 +242,14 @@
     {
       "file": "features/AI-FEAT-034_METADATA_MANAGEMENT_MODAL.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-034 has 3 evidence-pending marker(s)",
+      "message": "AI-FEAT-034 has 6 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
     {
       "file": "features/AI-FEAT-035_DASHBOARD_METADATA_HEALTH.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-035 has 5 evidence-pending marker(s)",
+      "message": "AI-FEAT-035 has 7 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
@@ -263,21 +263,21 @@
     {
       "file": "features/AI-FEAT-037_METADATA_REAPPLY_SYNC.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-037 has 4 evidence-pending marker(s)",
+      "message": "AI-FEAT-037 has 6 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
     {
       "file": "features/AI-FEAT-038_TRANSFER_EXPORT.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-038 has 4 evidence-pending marker(s)",
+      "message": "AI-FEAT-038 has 5 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
     {
       "file": "features/AI-FEAT-039_TRANSFER_IMPORT.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-039 has 3 evidence-pending marker(s)",
+      "message": "AI-FEAT-039 has 5 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
@@ -298,7 +298,7 @@
     {
       "file": "features/AI-FEAT-042_ARCHIVE_ROOT_CONFIGURATION_RESOLUTION.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-042 has 2 evidence-pending marker(s)",
+      "message": "AI-FEAT-042 has 4 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
@@ -312,7 +312,7 @@
     {
       "file": "features/AI-FEAT-044_LOCAL_FIRST_BACKGROUND_ARCHIVE_SYNC.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-044 has 8 evidence-pending marker(s)",
+      "message": "AI-FEAT-044 has 10 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
@@ -326,14 +326,14 @@
     {
       "file": "features/AI-FEAT-046_ARCHIVE_FOLDER_ADOPTION.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-046 has 3 evidence-pending marker(s)",
+      "message": "AI-FEAT-046 has 5 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
     {
       "file": "features/AI-FEAT-047_QMZ_SEQUENCING_WORKSPACE.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-047 has 7 evidence-pending marker(s)",
+      "message": "AI-FEAT-047 has 9 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
@@ -347,7 +347,7 @@
     {
       "file": "features/AI-FEAT-049_ARCHIVE_MAINTENANCE.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-049 has 4 evidence-pending marker(s)",
+      "message": "AI-FEAT-049 has 6 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
@@ -361,42 +361,42 @@
     {
       "file": "features/AI-FEAT-051_ARCHIVE_BROWSER.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-051 has 4 evidence-pending marker(s)",
+      "message": "AI-FEAT-051 has 6 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
     {
       "file": "features/AI-FEAT-052_ARCHIVE_REPAIR.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-052 has 4 evidence-pending marker(s)",
+      "message": "AI-FEAT-052 has 6 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
     {
       "file": "features/AI-FEAT-053_GLOBAL_SEARCH.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-053 has 4 evidence-pending marker(s)",
+      "message": "AI-FEAT-053 has 6 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
     {
       "file": "features/AI-FEAT-054_INTEGRITY_VERIFICATION_ARCHIVE_WIDE.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-054 has 4 evidence-pending marker(s)",
+      "message": "AI-FEAT-054 has 6 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
     {
       "file": "features/AI-FEAT-055_ARCHIVE_ANALYTICS.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-055 has 4 evidence-pending marker(s)",
+      "message": "AI-FEAT-055 has 6 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
     {
       "file": "features/AI-FEAT-056_AI_ARCHIVE_INTELLIGENCE.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-056 has 4 evidence-pending marker(s)",
+      "message": "AI-FEAT-056 has 6 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
@@ -696,7 +696,7 @@
     }
   ],
   "schema_version": "1.3.0",
-  "source_commit": "7f180e9068b022f190a61cb31ccac98eb7884758",
+  "source_commit": "d89440bbd1576e4c2530fa76b4b791c9fe226997",
   "summary": {
     "error": 0,
     "evidence_gap": 57,

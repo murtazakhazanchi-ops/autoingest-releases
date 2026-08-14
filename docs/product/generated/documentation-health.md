@@ -2,7 +2,7 @@
 
 > Generated artifact. Implements the 13 rules specified in [14_VALIDATION_SPECIFICATION.md](../14_VALIDATION_SPECIFICATION.md) plus Part 4 tooling-integrity checks. Regenerate with `node scripts/product-docs/cli.js validate`.
 
-Generated against source commit `7f180e9068b022f190a61cb31ccac98eb7884758`.
+Generated against source commit `d89440bbd1576e4c2530fa76b4b791c9fe226997`.
 
 ## Summary
 
@@ -76,60 +76,60 @@ None.
 | Rule | Message | File | Note |
 |---|---|---|---|
 | documentation-completeness | AI-FEAT-001 has 7 evidence-pending marker(s) | features/AI-FEAT-001_ELECTRON_APPLICATION_SHELL_SECURITY_MODEL.md | — |
-| documentation-completeness | AI-FEAT-002 has 3 evidence-pending marker(s) | features/AI-FEAT-002_LOGIN_OPERATOR_IDENTITY.md | — |
+| documentation-completeness | AI-FEAT-002 has 5 evidence-pending marker(s) | features/AI-FEAT-002_LOGIN_OPERATOR_IDENTITY.md | — |
 | documentation-completeness | AI-FEAT-003 has 6 evidence-pending marker(s) | features/AI-FEAT-003_DASHBOARD_SYSTEM_STATUS.md | — |
 | documentation-completeness | AI-FEAT-004 has 2 evidence-pending marker(s) | features/AI-FEAT-004_EVENT_JSON_DATA_MODEL_PERSISTENCE_CONTRACT.md | — |
 | documentation-completeness | AI-FEAT-005 has 6 evidence-pending marker(s) | features/AI-FEAT-005_APPLICATION_SETTINGS_CONFIGURATION_STORE.md | — |
-| documentation-completeness | AI-FEAT-006 has 8 evidence-pending marker(s) | features/AI-FEAT-006_APPLICATION_AUTO_UPDATE.md | — |
-| documentation-completeness | AI-FEAT-007 has 9 evidence-pending marker(s) | features/AI-FEAT-007_TELEMETRY_PIPELINE.md | — |
+| documentation-completeness | AI-FEAT-006 has 9 evidence-pending marker(s) | features/AI-FEAT-006_APPLICATION_AUTO_UPDATE.md | — |
+| documentation-completeness | AI-FEAT-007 has 11 evidence-pending marker(s) | features/AI-FEAT-007_TELEMETRY_PIPELINE.md | — |
 | documentation-completeness | AI-FEAT-008 has 7 evidence-pending marker(s) | features/AI-FEAT-008_DESIGN_SYSTEM_UI_CONSISTENCY_FRAMEWORK.md | — |
-| documentation-completeness | AI-FEAT-009 has 2 evidence-pending marker(s) | features/AI-FEAT-009_EVENT_CREATION.md | — |
+| documentation-completeness | AI-FEAT-009 has 4 evidence-pending marker(s) | features/AI-FEAT-009_EVENT_CREATION.md | — |
 | documentation-completeness | AI-FEAT-010 has 6 evidence-pending marker(s) | features/AI-FEAT-010_EVENT_MANAGEMENT_EDITING.md | — |
-| documentation-completeness | AI-FEAT-011 has 8 evidence-pending marker(s) | features/AI-FEAT-011_SOURCE_DETECTION.md | — |
+| documentation-completeness | AI-FEAT-011 has 9 evidence-pending marker(s) | features/AI-FEAT-011_SOURCE_DETECTION.md | — |
 | documentation-completeness | AI-FEAT-012 has 7 evidence-pending marker(s) | features/AI-FEAT-012_SOURCE_SELECTION.md | — |
-| documentation-completeness | AI-FEAT-013 has 2 evidence-pending marker(s) | features/AI-FEAT-013_FILE_BROWSER_MEDIA_GRID_LIST_VIEWING.md | — |
-| documentation-completeness | AI-FEAT-014 has 2 evidence-pending marker(s) | features/AI-FEAT-014_THUMBNAIL_GENERATION_CACHING.md | — |
-| documentation-completeness | AI-FEAT-015 has 2 evidence-pending marker(s) | features/AI-FEAT-015_MEDIA_PREVIEW.md | — |
-| documentation-completeness | AI-FEAT-016 has 3 evidence-pending marker(s) | features/AI-FEAT-016_PREVIEW_FOCUS_SELECTION_SEPARATION.md | — |
-| documentation-completeness | AI-FEAT-017 has 3 evidence-pending marker(s) | features/AI-FEAT-017_GROUPING_SYSTEM.md | — |
+| documentation-completeness | AI-FEAT-013 has 4 evidence-pending marker(s) | features/AI-FEAT-013_FILE_BROWSER_MEDIA_GRID_LIST_VIEWING.md | — |
+| documentation-completeness | AI-FEAT-014 has 4 evidence-pending marker(s) | features/AI-FEAT-014_THUMBNAIL_GENERATION_CACHING.md | — |
+| documentation-completeness | AI-FEAT-015 has 4 evidence-pending marker(s) | features/AI-FEAT-015_MEDIA_PREVIEW.md | — |
+| documentation-completeness | AI-FEAT-016 has 5 evidence-pending marker(s) | features/AI-FEAT-016_PREVIEW_FOCUS_SELECTION_SEPARATION.md | — |
+| documentation-completeness | AI-FEAT-017 has 5 evidence-pending marker(s) | features/AI-FEAT-017_GROUPING_SYSTEM.md | — |
 | documentation-completeness | AI-FEAT-018 has 3 evidence-pending marker(s) | features/AI-FEAT-018_EVENT_COMPONENT_IMPORT_ROUTING.md | — |
 | documentation-completeness | AI-FEAT-019 has 4 evidence-pending marker(s) | features/AI-FEAT-019_IMPORT_PIPELINE_COPY_ENGINE.md | — |
 | documentation-completeness | AI-FEAT-020 has 8 evidence-pending marker(s) | features/AI-FEAT-020_DUPLICATE_DETECTION.md | — |
 | documentation-completeness | AI-FEAT-021 has 3 evidence-pending marker(s) | features/AI-FEAT-021_ATOMIC_IMPORT_TRANSACTION.md | — |
-| documentation-completeness | AI-FEAT-022 has 7 evidence-pending marker(s) | features/AI-FEAT-022_PHOTOGRAPHER_FOLDER_RESOLUTION.md | — |
-| documentation-completeness | AI-FEAT-023 has 9 evidence-pending marker(s) | features/AI-FEAT-023_QUICK_IMPORT.md | — |
+| documentation-completeness | AI-FEAT-022 has 8 evidence-pending marker(s) | features/AI-FEAT-022_PHOTOGRAPHER_FOLDER_RESOLUTION.md | — |
+| documentation-completeness | AI-FEAT-023 has 11 evidence-pending marker(s) | features/AI-FEAT-023_QUICK_IMPORT.md | — |
 | documentation-completeness | AI-FEAT-024 has 7 evidence-pending marker(s) | features/AI-FEAT-024_SOURCE_CLEANUP.md | — |
-| documentation-completeness | AI-FEAT-025 has 9 evidence-pending marker(s) | features/AI-FEAT-025_CHECKSUM_BASED_FILE_VERIFICATION.md | — |
+| documentation-completeness | AI-FEAT-025 has 11 evidence-pending marker(s) | features/AI-FEAT-025_CHECKSUM_BASED_FILE_VERIFICATION.md | — |
 | documentation-completeness | AI-FEAT-026 has 9 evidence-pending marker(s) | features/AI-FEAT-026_AUDIT_INTEGRITY_VERIFICATION.md | — |
 | documentation-completeness | AI-FEAT-027 has 7 evidence-pending marker(s) | features/AI-FEAT-027_ACTIVITY_LOG.md | — |
-| documentation-completeness | AI-FEAT-028 has 9 evidence-pending marker(s) | features/AI-FEAT-028_IMPORT_SOURCE_ATTRIBUTION.md | — |
+| documentation-completeness | AI-FEAT-028 has 11 evidence-pending marker(s) | features/AI-FEAT-028_IMPORT_SOURCE_ATTRIBUTION.md | — |
 | documentation-completeness | AI-FEAT-029 has 6 evidence-pending marker(s) | features/AI-FEAT-029_METADATA_WRITING_ENGINE.md | — |
 | documentation-completeness | AI-FEAT-030 has 8 evidence-pending marker(s) | features/AI-FEAT-030_METADATA_DURABLE_QUEUE_CRASH_RECOVERY.md | — |
 | documentation-completeness | AI-FEAT-031 has 8 evidence-pending marker(s) | features/AI-FEAT-031_METADATA_EVENT_STATE_DERIVATION.md | — |
 | documentation-completeness | AI-FEAT-032 has 8 evidence-pending marker(s) | features/AI-FEAT-032_METADATA_VERIFICATION.md | — |
 | documentation-completeness | AI-FEAT-033 has 4 evidence-pending marker(s) | features/AI-FEAT-033_METADATA_AUDIT_REPAIR.md | — |
-| documentation-completeness | AI-FEAT-034 has 3 evidence-pending marker(s) | features/AI-FEAT-034_METADATA_MANAGEMENT_MODAL.md | — |
-| documentation-completeness | AI-FEAT-035 has 5 evidence-pending marker(s) | features/AI-FEAT-035_DASHBOARD_METADATA_HEALTH.md | — |
+| documentation-completeness | AI-FEAT-034 has 6 evidence-pending marker(s) | features/AI-FEAT-034_METADATA_MANAGEMENT_MODAL.md | — |
+| documentation-completeness | AI-FEAT-035 has 7 evidence-pending marker(s) | features/AI-FEAT-035_DASHBOARD_METADATA_HEALTH.md | — |
 | documentation-completeness | AI-FEAT-036 has 5 evidence-pending marker(s) | features/AI-FEAT-036_KEYWORD_REGISTRY.md | — |
-| documentation-completeness | AI-FEAT-037 has 4 evidence-pending marker(s) | features/AI-FEAT-037_METADATA_REAPPLY_SYNC.md | — |
-| documentation-completeness | AI-FEAT-038 has 4 evidence-pending marker(s) | features/AI-FEAT-038_TRANSFER_EXPORT.md | — |
-| documentation-completeness | AI-FEAT-039 has 3 evidence-pending marker(s) | features/AI-FEAT-039_TRANSFER_IMPORT.md | — |
+| documentation-completeness | AI-FEAT-037 has 6 evidence-pending marker(s) | features/AI-FEAT-037_METADATA_REAPPLY_SYNC.md | — |
+| documentation-completeness | AI-FEAT-038 has 5 evidence-pending marker(s) | features/AI-FEAT-038_TRANSFER_EXPORT.md | — |
+| documentation-completeness | AI-FEAT-039 has 5 evidence-pending marker(s) | features/AI-FEAT-039_TRANSFER_IMPORT.md | — |
 | documentation-completeness | AI-FEAT-040 has 8 evidence-pending marker(s) | features/AI-FEAT-040_BACKUP_UPDATE_SCANNING.md | — |
 | documentation-completeness | AI-FEAT-041 has 4 evidence-pending marker(s) | features/AI-FEAT-041_TRANSFER_BACKGROUND_MINIMIZE_OPERATION.md | — |
-| documentation-completeness | AI-FEAT-042 has 2 evidence-pending marker(s) | features/AI-FEAT-042_ARCHIVE_ROOT_CONFIGURATION_RESOLUTION.md | — |
+| documentation-completeness | AI-FEAT-042 has 4 evidence-pending marker(s) | features/AI-FEAT-042_ARCHIVE_ROOT_CONFIGURATION_RESOLUTION.md | — |
 | documentation-completeness | AI-FEAT-043 has 2 evidence-pending marker(s) | features/AI-FEAT-043_ARCHIVE_HEALTH_REPORTING.md | — |
-| documentation-completeness | AI-FEAT-044 has 8 evidence-pending marker(s) | features/AI-FEAT-044_LOCAL_FIRST_BACKGROUND_ARCHIVE_SYNC.md | — |
+| documentation-completeness | AI-FEAT-044 has 10 evidence-pending marker(s) | features/AI-FEAT-044_LOCAL_FIRST_BACKGROUND_ARCHIVE_SYNC.md | — |
 | documentation-completeness | AI-FEAT-045 has 8 evidence-pending marker(s) | features/AI-FEAT-045_ARCHIVE_LOCK_HANDLING_STALE_LOCK_RECOVERY.md | — |
-| documentation-completeness | AI-FEAT-046 has 3 evidence-pending marker(s) | features/AI-FEAT-046_ARCHIVE_FOLDER_ADOPTION.md | — |
-| documentation-completeness | AI-FEAT-047 has 7 evidence-pending marker(s) | features/AI-FEAT-047_QMZ_SEQUENCING_WORKSPACE.md | — |
+| documentation-completeness | AI-FEAT-046 has 5 evidence-pending marker(s) | features/AI-FEAT-046_ARCHIVE_FOLDER_ADOPTION.md | — |
+| documentation-completeness | AI-FEAT-047 has 9 evidence-pending marker(s) | features/AI-FEAT-047_QMZ_SEQUENCING_WORKSPACE.md | — |
 | documentation-completeness | AI-FEAT-048 has 3 evidence-pending marker(s) | features/AI-FEAT-048_REALTIME_TEAM_PRESENCE_ONLINE_REGISTRY.md | — |
-| documentation-completeness | AI-FEAT-049 has 4 evidence-pending marker(s) | features/AI-FEAT-049_ARCHIVE_MAINTENANCE.md | — |
+| documentation-completeness | AI-FEAT-049 has 6 evidence-pending marker(s) | features/AI-FEAT-049_ARCHIVE_MAINTENANCE.md | — |
 | documentation-completeness | AI-FEAT-050 has 4 evidence-pending marker(s) | features/AI-FEAT-050_EVENT_MAINTENANCE.md | — |
-| documentation-completeness | AI-FEAT-051 has 4 evidence-pending marker(s) | features/AI-FEAT-051_ARCHIVE_BROWSER.md | — |
-| documentation-completeness | AI-FEAT-052 has 4 evidence-pending marker(s) | features/AI-FEAT-052_ARCHIVE_REPAIR.md | — |
-| documentation-completeness | AI-FEAT-053 has 4 evidence-pending marker(s) | features/AI-FEAT-053_GLOBAL_SEARCH.md | — |
-| documentation-completeness | AI-FEAT-054 has 4 evidence-pending marker(s) | features/AI-FEAT-054_INTEGRITY_VERIFICATION_ARCHIVE_WIDE.md | — |
-| documentation-completeness | AI-FEAT-055 has 4 evidence-pending marker(s) | features/AI-FEAT-055_ARCHIVE_ANALYTICS.md | — |
-| documentation-completeness | AI-FEAT-056 has 4 evidence-pending marker(s) | features/AI-FEAT-056_AI_ARCHIVE_INTELLIGENCE.md | — |
+| documentation-completeness | AI-FEAT-051 has 6 evidence-pending marker(s) | features/AI-FEAT-051_ARCHIVE_BROWSER.md | — |
+| documentation-completeness | AI-FEAT-052 has 6 evidence-pending marker(s) | features/AI-FEAT-052_ARCHIVE_REPAIR.md | — |
+| documentation-completeness | AI-FEAT-053 has 6 evidence-pending marker(s) | features/AI-FEAT-053_GLOBAL_SEARCH.md | — |
+| documentation-completeness | AI-FEAT-054 has 6 evidence-pending marker(s) | features/AI-FEAT-054_INTEGRITY_VERIFICATION_ARCHIVE_WIDE.md | — |
+| documentation-completeness | AI-FEAT-055 has 6 evidence-pending marker(s) | features/AI-FEAT-055_ARCHIVE_ANALYTICS.md | — |
+| documentation-completeness | AI-FEAT-056 has 6 evidence-pending marker(s) | features/AI-FEAT-056_AI_ARCHIVE_INTELLIGENCE.md | — |
 | documentation-completeness | AI-FEAT-058 has 2 evidence-pending marker(s) | features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md | — |
 

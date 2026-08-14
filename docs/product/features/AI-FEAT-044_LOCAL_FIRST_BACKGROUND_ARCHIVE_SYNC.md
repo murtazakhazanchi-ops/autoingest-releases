@@ -34,6 +34,8 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 
 Background sync from the Local Staging Root to the Active Archive Root, used when an operator imports locally first rather than directly to the archive.
 
+**Why this exists** (product-owner history, captured 2026-08-14 — *Known from project history; repository evidence pending*): **this corrects an earlier assumption in this documentation system** — a prior audit pass had framed this feature as primarily a remote/offline-connectivity convenience. The product owner clarified that its primary motivation is a **high-volume, multi-operator live-event throughput problem**, not offline convenience: when 5 or more operators ingest directly to the same NAS simultaneously, network/NAS throughput becomes a bottleneck and photographer card-handover turnaround slows down. Before this capability existed, an operator working around that bottleneck would copy locally, then later have to manually locate that local data and manually copy/paste it into the archive as a separate operation — a step that could be forgotten or delayed. Local-first routes ingestion through the operator's fast local storage first, then syncs to the archive in the background, removing that manual second-copy step. Resilience to temporary NAS unavailability is a secondary benefit of the same mechanism, not the primary driver.
+
 ## Current Behavior
 
 Metadata (AI-FEAT-029) is written to the Local Staging Root **before** sync begins — the archive copy is never metadata-less. `event.sync.json` is the handoff manifest that drives background sync. The renderer shows per-event sync status; the operator can review before and after. Sync is idempotent — re-running sync on an already-synced event is safe. This is the one workflow (contrasted with Direct Archive) where metadata precedes rather than follows the archive write.
@@ -45,6 +47,8 @@ Evidence pending — not yet documented as fact.
 ## Evolution / Implementation Journal
 
 No dated entries beyond the general Archive Operations Layer timeline (see AI-FEAT-043) were independently traced for this specific subsystem in this pass.
+
+- **2026-08-14** — Purpose/history captured — Product-Owner Purpose Capture interview. The product owner corrected an earlier documentation-pass framing of this feature as primarily an offline-convenience capability, clarifying the primary motivation is multi-operator NAS-throughput at live events (see Summary above). No code changed.
 
 ## Engineering Evolution
 

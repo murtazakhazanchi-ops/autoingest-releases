@@ -13,7 +13,7 @@
 | Related technical docs | None — no implementation exists yet |
 | Evidence status | Confirmed zero implementation: exhaustive grep across `main/`, `services/`, `renderer/` found no matches; `git log --all --oneline` search found no relevant commits |
 | First-known implementation | Not started |
-| Latest major update | Not applicable |
+| Latest major update | Not applicable to implementation; 2026-08-14 documentation update — strategic-planning purpose captured, metric list and audience confirmed undecided |
 
 ## Lifecycle Metadata
 
@@ -34,6 +34,8 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 
 Planned archive analytics capability — eighth in the canonical roadmap order, positioned after Archive Repair and before AI Archive Intelligence. No architecture, scope, or design has been finalized.
 
+**Vision** (product-owner intent, captured 2026-08-14 — *Known from project history; repository evidence pending*; future-tense throughout, describing a planned capability, not current behavior): the primary purpose is data-driven **strategic archive planning and better data management** — explicitly **not** dashboards for their own sake. Intended to help answer questions such as: when should storage capacity be expanded, how quickly is the archive growing, where are resources being consumed, how are workflows performing, and how should AutoIngest itself evolve as archive needs change. Potential metrics discussed — archive size, file counts, growth over time, collections/events, media distribution, photographer statistics, event/location statistics, ingestion volumes, transfer volumes, operator activity, storage utilization, capacity trends, archive health/integrity, institutional reporting — are a **broad, evolving list, not an exhaustive or final scope**; it should not be read as committed. The intended audience (day-to-day operators vs. institutional/management stakeholders) is **not finalized**.
+
 ## Current Behavior
 
 Not implemented. No code exists.
@@ -45,6 +47,8 @@ Named as "Archive Analytics" in the canonical roadmap order (see [../02_MASTER_R
 ## Evolution / Implementation Journal
 
 Not started.
+
+- **2026-08-14 — Strategic-planning purpose captured; candidate metric list and audience question recorded as open.** A Product-Owner Purpose Capture interview supplied the strategic-planning primary purpose now recorded in Summary above, explicitly distinguishing it from dashboards-for-their-own-sake, and confirmed both the metric list and the intended audience remain undecided. Status remains Planned; no code exists.
 
 ## Engineering Evolution
 
@@ -68,7 +72,7 @@ None recorded.
 
 ## Future Enhancements
 
-Scope, design, and acceptance criteria are pending discovery/specification. Per `docs/design-system.md` § 8a, whenever this feature is built, "data visualization [should be] treated as part of the design system, not an afterthought" — noted here as a standing constraint from the design-quality rules, not a scoping decision.
+Scope, design, and acceptance criteria are pending discovery/specification — including which specific metrics (see Summary's Vision note for the candidate, non-final list) and which audience this ultimately serves. Per `docs/design-system.md` § 8a, whenever this feature is built, "data visualization [should be] treated as part of the design system, not an afterthought" — noted here as a standing constraint from the design-quality rules, not a scoping decision.
 
 ## Related Files
 

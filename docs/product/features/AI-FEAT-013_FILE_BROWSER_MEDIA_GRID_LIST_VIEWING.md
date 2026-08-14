@@ -34,6 +34,8 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 
 Allows selection of files and folders for ingestion; presents them as grouped sections (RAW / Images / Video) in either grid or list view, with selection controls, always reflecting grouping and state from `GroupManager` (AI-FEAT-017).
 
+**Why this exists** (*Known from project history; repository evidence pending* — captured during the Product-Owner Purpose Capture interview, 2026-08-14): flattens the nested-folder navigation burden that repetitive Finder/Explorer/Adobe Bridge browsing imposed — operators can see media located across nested folders on a drive/card in one scrollable environment, organized by useful media-type distinctions (RAW/JPEG/video), reducing the risk of overlooking a folder and the time spent traversing storage structure. The timeline/hour-based navigation view is specifically important: operators frequently know the approximate start/end time of an event, and this view lets them locate media by when the event occurred, selecting the relevant interval while ignoring unrelated material before/after it. This functionality was explicitly regarded as unavailable or insufficient for this specific workflow in Finder, Explorer, and even Adobe Bridge — the objective was event-oriented source selection that is fast, precise, and difficult to overlook, not merely "having a custom browser" for its own sake.
+
 ## Current Behavior
 
 Per `docs/ui-system.md` § File Panel: Grid/List view, grouped sections (RAW/Images/Video), selection controls. Grid/list is a view-mode toggle within this feature, not an independently durable capability (per research-pass verdict — folded in rather than given its own registry entry).
@@ -47,6 +49,7 @@ Introduced/expanded in v0.6.0 "File Handling & UI" (`docs/history.md`), noted at
 - **v0.6.0** — folder view, recursive scanner, UI improvements.
 - **2026-05-07** — "Large External Drive and Local Folder Source Entry Performance" and "Non-Recursive Folder Navigation for External Drive and Local Folder" (learning-log) — performance hardening for large sources.
 - **2026-05-07** — "View-Mode State Sync: Media↔Folder Toggle and Folder-Click in Media View" (learning-log).
+- **2026-08-14** — Purpose/history captured — Product-Owner Purpose Capture interview. Added the navigation-flattening/timeline-navigation rationale in Summary above, including the explicit product-owner claim that this workflow was unavailable/insufficient in Finder/Explorer/Bridge. No code changed.
 
 ## Engineering Evolution
 

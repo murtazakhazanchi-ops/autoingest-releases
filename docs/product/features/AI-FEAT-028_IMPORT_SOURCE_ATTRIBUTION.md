@@ -34,17 +34,21 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 
 Each audit entry in `imports[]` records `source: {type, label, path}` identifying which memory card, external drive, or local folder was used. Distinct identity concept from Login/Operator Identity (AI-FEAT-002, who) and Photographer-Folder Resolution (AI-FEAT-022, whose folder) — deliberately kept as three separate registry entries.
 
+**Why this exists** (*Known from project history; repository evidence pending* — captured during the Product-Owner Purpose Capture interview, 2026-08-14): three combined purposes — avoiding unnecessary re-import by identifying what's already been imported from a source, archival provenance for tracing missing/damaged data back to its origin, and informing source-cleanup readiness decisions (feeds AI-FEAT-024's cleanup checks). Built proactively as part of the archive's provenance design, not in response to a specific incident.
+
 ## Current Behavior
 
 Captured from the renderer's `activeSource` state at import time via `_buildImportSourceMeta()`. Backward-compatible: old entries without `source` remain valid; `isValidImportEntry` does not require it; the Activity Log displays "Source: Not recorded" for entries that lack it. Missing source never triggers a Check badge in the Activity Log (AI-FEAT-027).
 
 ## Original Plan / Intent
 
-Evidence pending — not yet documented as fact.
+Evidence pending — not yet documented as fact regarding original scoping. See Summary above for the product-owner-supplied purpose captured 2026-08-14.
 
 ## Evolution / Implementation Journal
 
-No dated entries found in this pass beyond its presence in the current `docs/data-model.md` schema.
+No dated entries found in this pass beyond its presence in the current `docs/data-model.md` schema, and the entry below.
+
+- **2026-08-14** — Purpose/history captured — Product-Owner Purpose Capture interview. Product owner supplied the three-part rationale (re-import avoidance, provenance, source-cleanup readiness) now recorded in Summary above. No code changed.
 
 ## Engineering Evolution
 
