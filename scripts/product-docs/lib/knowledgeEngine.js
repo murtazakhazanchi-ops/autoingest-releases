@@ -382,7 +382,16 @@ function answerQuestion(question, ctx) {
   // workflow guess (workflowClearlyBeaten still gates on hasStrongFeatureMatch).
   const topWorkflow = workflowMatches[0];
   const workflowClearlyBeaten = hasStrongFeatureMatch && (!topWorkflow || topFeature.score > topWorkflow.score);
-  const workflowPreferredType = qType === QUESTION_TYPES.HOW_TO || qType === QUESTION_TYPES.TROUBLESHOOTING || qType === QUESTION_TYPES.EXPLANATION;
+  // TEAM_ACTIVITY added 2026-08-14 during the event-coordination
+  // reconciliation pass — this question type's own classifier regex is
+  // narrowly scoped to Registry/team-live phrasing (see
+  // questionClassifier.js), and AI-WF-006 is the only Workflow in that
+  // domain, so broadening carries none of the cross-domain regression risk
+  // the EXPLANATION broadening had to be re-verified against. Without this,
+  // "What is the Online Registry for?" answered from AI-FEAT-048's generic
+  // capability summary instead of AI-WF-006's specific, evidence-rich
+  // collaboration-purpose content, even though guidance already cited it.
+  const workflowPreferredType = qType === QUESTION_TYPES.HOW_TO || qType === QUESTION_TYPES.TROUBLESHOOTING || qType === QUESTION_TYPES.EXPLANATION || qType === QUESTION_TYPES.TEAM_ACTIVITY;
   if (workflowPreferredType && topWorkflow && topWorkflow.score >= CONFIDENCE_FLOOR && !workflowClearlyBeaten && workflowIndexById) {
     const wf = workflowIndexById.get(topWorkflow.id);
     if (wf) return answerFromWorkflow(question, wf, workflowMatches, featureMatches, qType);

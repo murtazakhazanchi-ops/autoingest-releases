@@ -28,9 +28,9 @@ async function main() {
     assert.equal(parsed.roadmap.size, 11);
   });
 
-  await t('bug/decision/postmortem counts match the current repository (BUG-001..016, DEC-001..020, PM-001..002)', () => {
-    assert.equal(parsed.bugs.size, 16);
-    assert.equal(parsed.decisions.size, 20);
+  await t('bug/decision/postmortem counts match the current repository (BUG-001..018, DEC-001..021, PM-001..002)', () => {
+    assert.equal(parsed.bugs.size, 18);
+    assert.equal(parsed.decisions.size, 21);
     assert.equal(parsed.postmortems.size, 2);
   });
 
@@ -96,8 +96,8 @@ async function main() {
     }
   });
 
-  await t('the roadmap dashboard matches the canonical current-position statement (AI-RM-001 + AI-RM-010 complete, AI-RM-002 next, 2/11)', () => {
-    assert.equal(built.dashboard.completed_count, 2);
+  await t('the roadmap dashboard matches the canonical current-position statement (AI-RM-001 + AI-RM-010 + AI-RM-011 complete, AI-RM-002 next, 3/11)', () => {
+    assert.equal(built.dashboard.completed_count, 3);
     assert.equal(built.dashboard.total_milestones, 11);
     assert.equal(built.dashboard.current_milestone_id, 'AI-RM-002');
   });

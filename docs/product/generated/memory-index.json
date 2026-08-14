@@ -128,6 +128,58 @@
       "unresolved_items": [
         "None recorded."
       ]
+    },
+    {
+      "accepted_approach": "Evidence pending",
+      "aliases": [],
+      "bug_ids": [],
+      "canonical_path": "memory/AI-MEM-0004_KNOWLEDGE_PORTAL_STAGE_2_OPERATOR_KNOWLEDGE_ARCHITECTURE.md",
+      "commit_ids": [
+        "765e9b83fba64593d07422f390f8b3a41046dc8b (merge commit); knowledge-portal-stage2 tip d89440bbd1576e4c2530fa76b4b791c9fe226997"
+      ],
+      "date_completed": "2026-08-14",
+      "date_started": "2026-08-13",
+      "decision_ids": [
+        "DEC-019",
+        "DEC-020"
+      ],
+      "evidence_classification": "Full session capture — this capsule was compiled directly from the session's own conversation record, not reconstructed after the fact from repository artifacts alone",
+      "evidence_pending_summary": "Source session ID(s) (this repository's session-ID convention was not applied to this engagement); the exact date/time boundaries between phases (recorded only as \"2026-08-13\"/\"2026-08-14\" — the engagement spanned parts of both dates without more precise timestamps captured contemporaneously).",
+      "feature_ids": [
+        "AI-FEAT-045",
+        "AI-FEAT-048",
+        "AI-FEAT-058"
+      ],
+      "keywords": [
+        "knowledge",
+        "portal",
+        "stage",
+        "operator",
+        "knowledge",
+        "architecture",
+        "online",
+        "registry",
+        "coverage",
+        "and",
+        "merge"
+      ],
+      "memory_id": "AI-MEM-0004",
+      "postmortem_ids": [],
+      "rejected_approaches": [
+        "Accepted or rejected**: Rejected, per explicit user constraint, at every phase — never seriously reconsidered.",
+        "Accepted or rejected**: Rejected."
+      ],
+      "revision_count": 6,
+      "roadmap_ids": [
+        "AI-RM-011"
+      ],
+      "source_types": "Claude Code (background session), reconstructed from this session's own direct conversation record — not an imported external-tool packet",
+      "status": "Compiled",
+      "summary": "Knowledge Portal Stage 2: Operator Knowledge Architecture, Online Registry Coverage, and Merge",
+      "title": "Knowledge Portal Stage 2: Operator Knowledge Architecture, Online Registry Coverage, and Merge",
+      "unresolved_items": [
+        "True rendered-browser verification; remaining Workflow-record coverage (Class A: event editing/finding); a production-integration decision (standalone vs. AutoIngest-integrated); a decision on whether semantic/AI-assisted retrieval is actually needed given observed deterministic-retrieval quality; a live-Registry-integration decision (explicitly separate from this documentation portal); UX polish from real operator use; a maintenance process to keep new capabilities/workflows automatically discoverable; and — newly identified in Revision 6 — a full evidence review of `AI-FEAT-048`'s own canonical record, which this pass found to understate its actual implemented scope but deliberately did not rewrite (out of this investigation's mandate)."
+      ]
     }
   ],
   "schema_version": "1.3.0"
