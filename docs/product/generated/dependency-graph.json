@@ -4487,6 +4487,22 @@
       "provenance_path": "decisions/DEC-020_STAGE_2_KNOWLEDGE_ARCHITECTURE_WORKFLOW_RECORDS_AND_CONCEPT_LAYER.md#body",
       "relationship": "related_to",
       "source": "DEC-020",
+      "target": "DEC-009"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "decision-to-decision body reference",
+      "provenance_path": "decisions/DEC-020_STAGE_2_KNOWLEDGE_ARCHITECTURE_WORKFLOW_RECORDS_AND_CONCEPT_LAYER.md#body",
+      "relationship": "related_to",
+      "source": "DEC-020",
+      "target": "DEC-013"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "decision-to-decision body reference",
+      "provenance_path": "decisions/DEC-020_STAGE_2_KNOWLEDGE_ARCHITECTURE_WORKFLOW_RECORDS_AND_CONCEPT_LAYER.md#body",
+      "relationship": "related_to",
+      "source": "DEC-020",
       "target": "DEC-019"
     },
     {

@@ -102,10 +102,10 @@
   "generation_command": "node scripts/product-docs/cli.js build",
   "generator_version": "1.3.0",
   "relationship_counts": {
-    "dependency_graph_edges": 597,
+    "dependency_graph_edges": 599,
     "dependency_graph_nodes": 137
   },
   "schema_version": "1.3.0",
-  "source_commit": "9dec5178619c164aeb89ac6fad3051da531c6eac",
+  "source_commit": "e5c96c8269527284b13294506f5b33f3ef2c6ecd",
   "source_file_count": 148
 }

@@ -45,7 +45,41 @@ function classifyIntent(question) {
   return 'general';
 }
 
-function sourcesForRecord(knowledgeRecord) {
+// Part 5 Phase 5.1 (Decision 4) — Feature -> Decision/Postmortem visibility.
+// Deliberately NOT consolidated with knowledgeRecord.knownLimitations.openBugs
+// (Feature -> Bug's existing, pre-Phase-5.1 path): that field carries
+// distinct operational semantics (per-bug live status, "not yet marked
+// Fixed" limitation text) that decisions/postmortems have no equivalent
+// of — a decision is not "open" or "fixed", a postmortem is a historical
+// record, not a tracked defect. Consolidating onto one shape merely for
+// symmetry would either invent a fake status concept for decisions/
+// postmortems or silently drop the real one bugs already have. Verified
+// (fidelity audit, Phase 5.1 investigation): authorityIndex's relatedBugs
+// is byte-identical to knownLimitations.openBugs' own id list for every
+// one of the 58 canonical features — the two paths already agree on WHICH
+// bugs exist, they just carry that agreement through different, equally
+// legitimate shapes for different purposes.
+//
+// Reads ONLY the feature's own one-hop relatedDecisions/relatedPostmortems
+// (authorityIndex, itself a direct, unmodified projection of the feature's
+// own Lifecycle Metadata table) — never that decision/postmortem's own
+// further-related records (no recursive graph traversal; Decision 4's own
+// stated boundary, RF-5.1-004).
+function governanceRelationshipsForFeature(featureId, authorityIndexByFeatureId, searchIndexById) {
+  if (!authorityIndexByFeatureId || !searchIndexById) return { decisions: [], postmortems: [] };
+  const entry = authorityIndexByFeatureId.get(featureId);
+  if (!entry) return { decisions: [], postmortems: [] };
+  const resolve = (id) => {
+    const rec = searchIndexById.get(id);
+    return rec ? { id, title: rec.title, path: rec.canonical_path } : { id, title: id, path: null };
+  };
+  return {
+    decisions: (entry.relatedDecisions || []).map(resolve),
+    postmortems: (entry.relatedPostmortems || []).map(resolve),
+  };
+}
+
+function sourcesForRecord(knowledgeRecord, governanceRelationships) {
   // Cite the canonical document explicitly — NOT sourceFiles[0], which is
   // an alphabetically-sorted merge of canonical doc + code paths + technical
   // docs and is not reliably the canonical document itself (found during
@@ -57,6 +91,16 @@ function sourcesForRecord(knowledgeRecord) {
   }
   for (const bug of knowledgeRecord.knownLimitations.openBugs) {
     sources.push({ id: bug.id, title: `${bug.id} (${bug.status})`, path: 'docs/product/bugs/' });
+  }
+  // Part 5 Phase 5.1 — visibility only. This runs strictly AFTER primary
+  // record selection and quality/confidence are already fully decided
+  // above in answerQuestion(); appending here cannot retroactively change
+  // which record was chosen or how confidently. Relationship membership
+  // never adds ranking points (RF-5.1-003) — there are no points here to
+  // add, this function has no return value that feeds back into scoring.
+  if (governanceRelationships) {
+    for (const dec of governanceRelationships.decisions) sources.push({ id: dec.id, title: dec.title, path: dec.path });
+    for (const pm of governanceRelationships.postmortems) sources.push({ id: pm.id, title: pm.title, path: pm.path });
   }
   return sources;
 }
@@ -113,7 +157,7 @@ function findCompanionWorkflow(featureId, workflowIndexById) {
   return candidates[0] || null;
 }
 
-function answerFromRecord(question, knowledgeRecord, matches, qType, companionWorkflow) {
+function answerFromRecord(question, knowledgeRecord, matches, qType, companionWorkflow, governanceRelationships) {
   const status = knowledgeRecord.operatorStatus;
   const tiedCount = matches.filter((m) => m.score === matches[0].score).length;
   const quality = matchQualityFor(matches[0].score, tiedCount);
@@ -152,7 +196,7 @@ function answerFromRecord(question, knowledgeRecord, matches, qType, companionWo
     }
   }
 
-  const sources = sourcesForRecord(knowledgeRecord);
+  const sources = sourcesForRecord(knowledgeRecord, governanceRelationships);
   if (companionWorkflow) {
     sources.push({ id: companionWorkflow.id, title: companionWorkflow.title, path: companionWorkflow.canonicalDocument });
   }
@@ -499,7 +543,7 @@ function boundaryFromConcept(question) {
 // that only passes { searchIndex, knowledgeIndexById } keeps working
 // unchanged — this is a strictly additive extension of the same function.
 function answerQuestion(question, ctx) {
-  const { searchIndex, knowledgeIndexById, workflowIndexById, dashboard } = ctx;
+  const { searchIndex, knowledgeIndexById, workflowIndexById, dashboard, authorityIndexByFeatureId, searchIndexById } = ctx;
   const qType = classifyQuestion(question);
 
   if (qType === QUESTION_TYPES.ROADMAP && dashboard) {
@@ -667,7 +711,8 @@ function answerQuestion(question, ctx) {
   if (!knowledgeRecord) return unknownAnswer(question, featureMatches, qType);
 
   const companionWorkflow = findCompanionWorkflow(knowledgeRecord.id, workflowIndexById);
-  return answerFromRecord(question, knowledgeRecord, featureMatches, qType, companionWorkflow);
+  const governanceRelationships = governanceRelationshipsForFeature(knowledgeRecord.id, authorityIndexByFeatureId, searchIndexById);
+  return answerFromRecord(question, knowledgeRecord, featureMatches, qType, companionWorkflow, governanceRelationships);
 }
 
 function knowledgeIndexMap(knowledgeIndex) {
@@ -687,6 +732,18 @@ function buildEngineContext(built) {
     knowledgeIndexById: knowledgeIndexMap(built.knowledgeIndex),
     workflowIndexById: workflowIndexMap(built.workflowIndex),
     dashboard: built.dashboard,
+    // Part 5 Phase 5.1 (Decision 4) — the SAME already-built, already-
+    // fidelity-audited projection lib/authorityTopics.js's buildAuthorityIndex()
+    // produces (reused, never reparsed here). Feature entries only —
+    // Workflow entries in the same array carry no relatedBugs/relatedDecisions/
+    // relatedPostmortems fields at all (their own canonical header table has
+    // no such columns; see governanceRelationshipsForFeature's own comment).
+    authorityIndexByFeatureId: new Map(built.authorityIndex.filter((e) => e.recordType === 'feature').map((e) => [e.featureId, e])),
+    // Resolves a governance record's title/canonical path for citation —
+    // reuses the shared search index (already has every entity type's
+    // title/canonical_path), the same lookup answerFromGovernanceRecord()
+    // already performs via a linear searchIndex.find(), just memoized once.
+    searchIndexById: new Map(built.searchIndex.map((r) => [r.stable_id, r])),
   };
 }
 
@@ -707,6 +764,44 @@ function explainNormalization(question, searchIndex) {
     .sort((a, b) => b.adjustedScore - a.adjustedScore || a.id.localeCompare(b.id, 'en', { numeric: true }));
 }
 
+// Part 5 Phase 5.1 (Decision 4) — diagnostic-only observability seam,
+// same discipline as explainNormalization() above: runs the real
+// answerQuestion() pipeline and reports what it actually did, never a
+// second implementation of relationship lookup. Never consulted by
+// answerQuestion() itself. For each canonically-related Decision/Postmortem
+// on the resolved primary record (Feature-primary only — see the "workflow"
+// case below), reports:
+//   - canonicalSource: the related record's own id/title/canonical path
+//   - relationshipType: 'feature-decision' | 'feature-postmortem'
+//   - projectionSource: always 'authorityTopics.js buildAuthorityIndex()'
+//     (never a second parse)
+//   - visibility: always 'visible-not-admitted' in this phase — appears in
+//     `sources` (supporting context) but never in `matchedCapabilities`
+//     (scored candidates) and never influences which record is primary
+//   - influencedRanking: always false, provably — this function reads the
+//     already-finalized answer.matchedCapabilities/matches[0] score,
+//     computed entirely before any relationship lookup runs
+function explainRelationships(question, ctx) {
+  const answer = answerQuestion(question, ctx);
+  const primary = answer.matchedCapabilities[0];
+  if (!primary) return { primaryId: null, relationships: [], influencedRanking: false };
+  if (primary.entityType !== 'feature') {
+    // Workflow-primary (or Governance-primary): Decision 4's canonical
+    // evidence covers Feature -> Decision/Postmortem only — a Workflow's
+    // own header table has no relatedDecisions/relatedPostmortems columns
+    // (verified against the schema during the Phase 5.1 investigation), so
+    // there is no canonical basis to report a relationship here. Reporting
+    // none is the evidence-respecting answer, not a gap.
+    return { primaryId: primary.id, relationships: [], influencedRanking: false, note: `${primary.entityType}-primary: no canonical Governance-relationship field exists for this entity type in Phase 5.1's schema.` };
+  }
+  const rels = governanceRelationshipsForFeature(primary.id, ctx.authorityIndexByFeatureId, ctx.searchIndexById);
+  const relationships = [
+    ...rels.decisions.map((d) => ({ canonicalSource: d, relationshipType: 'feature-decision', projectionSource: 'authorityTopics.js buildAuthorityIndex()', visibility: 'visible-not-admitted' })),
+    ...rels.postmortems.map((p) => ({ canonicalSource: p, relationshipType: 'feature-postmortem', projectionSource: 'authorityTopics.js buildAuthorityIndex()', visibility: 'visible-not-admitted' })),
+  ];
+  return { primaryId: primary.id, relationships, influencedRanking: false };
+}
+
 module.exports = {
   answerQuestion,
   classifyIntent,
@@ -717,4 +812,6 @@ module.exports = {
   QUESTION_TYPES,
   classifyQuestion,
   explainNormalization,
+  explainRelationships,
+  governanceRelationshipsForFeature,
 };

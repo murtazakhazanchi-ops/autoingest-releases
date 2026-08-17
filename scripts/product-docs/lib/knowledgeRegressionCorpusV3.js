@@ -189,29 +189,31 @@ const REGRESSION_CORPUS_V3 = [
   // ---------------------------------------------------------------------
   {
     id: 'RF-5.1-001', targetPhase: '5.1', decisionRef: 'Decision 4 of 8', auditRef: 'Audit R14',
-    status: 'known-baseline-failure', category: 'relationship-visibility',
+    status: 'control', category: 'relationship-visibility',
     question: 'What went wrong with the same-size skip and metadata verification?',
-    rationale: 'DEC-009 (the decision that actually created the same-size-skip rule) never surfaces for AI-FEAT-032 today -- no feature-to-decision edge exists in the live path, only feature-to-bug (BUG-009 is cited).',
+    rationale: 'FIXED at Phase 5.1 (Decision 4) implementation time: DEC-009 (the decision that actually created the same-size-skip rule) now correctly appears in AI-FEAT-032\'s sources, alongside the pre-existing BUG-009 and the newly-visible PM-001 -- governanceRelationshipsForFeature() reads authorityIndex\'s relatedDecisions/relatedPostmortems (a direct, fidelity-audited projection of AI-FEAT-032\'s own canonical Lifecycle Metadata table), never a second parse. Visibility only -- AI-FEAT-032 remains primary at the identical score it had before this phase; DEC-009 never became a scored candidate. Promoted to a control so a later phase cannot silently regress it.',
     requiredMemberIds: ['DEC-009'],
   },
   {
     id: 'RF-5.1-002', targetPhase: '5.1', decisionRef: 'Decision 4 of 8', auditRef: 'Audit R21',
-    status: 'known-baseline-failure', category: 'relationship-visibility',
+    status: 'control', category: 'relationship-visibility',
     question: 'What is the current status of the QMZ dedicated domain workflow decision?',
-    rationale: 'DEC-011 never surfaces for AI-FEAT-047 today, for the same structural reason as RF-5.1-001.',
+    rationale: 'FIXED at Phase 5.1 (Decision 4) implementation time, same mechanism and same visibility-only proof as RF-5.1-001: DEC-011 now correctly appears in AI-FEAT-047\'s sources alongside pre-existing BUG-007 and newly-visible PM-001. AI-FEAT-047 remains primary at the identical score. Promoted to a control.',
     requiredMemberIds: ['DEC-011'],
   },
   {
     id: 'RF-5.1-003', targetPhase: '5.1', decisionRef: 'Decision 4 of 8', auditRef: "Decision 4's 'no score boosting from edge existence' rule",
-    status: 'schema-placeholder', category: 'relationship-visibility',
-    question: '(invariant, not a single question)',
-    rationale: 'Once relationship visibility exists, a case is needed proving a record\'s ranking score is unaffected by whether a relationship edge to it exists -- cannot be constructed until Phase 5.1 introduces the mechanism this would probe.',
+    status: 'control', category: 'relationship-visibility',
+    question: 'What is the current status of the QMZ dedicated domain workflow decision?',
+    rationale: 'GIVEN A REAL ASSERTION at Phase 5.1 implementation time (mechanism now exists to probe): AI-FEAT-047 confidence pinned to exactly 0.85 (= min(1, 850/1000), pure function of query.js/Phase 4.3\'s own score, computed and finalized entirely before governanceRelationshipsForFeature() ever runs). sourcesForRecord() appends relationship citations strictly after quality/confidence are already decided in answerFromRecord() -- there is no code path by which a visible DEC-011/PM-001 relationship could feed back into this number. Same mechanism proven for AI-FEAT-032 at RF-5.1-001 (confidence 0.4, also unaffected).',
+    requiredMemberIds: ['DEC-011'], expectedConfidenceRange: [0.85, 0.85],
   },
   {
     id: 'RF-5.1-004', targetPhase: '5.1', decisionRef: 'Decision 4 of 8', auditRef: "Decision 4's 'no recursive graph expansion' rule",
-    status: 'schema-placeholder', category: 'relationship-visibility',
-    question: '(invariant, not a single question)',
-    rationale: 'Once relationship visibility exists, a case is needed proving traversal stays single-hop (a Decision\'s own further-related records must not also become visible transitively) -- cannot be constructed until Phase 5.1 exists.',
+    status: 'control', category: 'relationship-visibility',
+    question: 'What went wrong with the same-size skip and metadata verification?',
+    rationale: 'GIVEN A REAL ASSERTION at Phase 5.1 implementation time: DEC-009 (visible via AI-FEAT-032, per RF-5.1-001) itself cites TWO related features in its own canonical header (AI-FEAT-019, AI-FEAT-032) -- the schema itself has no decision-to-decision or decision-to-bug field to recurse into (governance records only ever cite Feature(s), never each other), but this proves the one cross-feature edge that DOES exist (DEC-009 -> AI-FEAT-019) is never followed. The real (legitimate, non-recursive) source list is exactly 6: AI-FEAT-032 + AI-RM-001 (roadmap) + BUG-009 + DEC-009 + PM-001 + AI-WF-009 (companion workflow). expectedMaxSources pins this exact count -- if AI-FEAT-019 were incorrectly pulled in transitively via DEC-009\'s own citation, the count would be 7 and this control would fail. (forbiddenMemberIds cannot express this -- it only checks the PRIMARY position, and AI-FEAT-019 was never at risk of becoming primary; the real risk is a silent extra SOURCE, which only expectedMaxSources catches.) governanceRelationshipsForFeature() only ever reads the PRIMARY record\'s own relatedDecisions/relatedPostmortems list -- it never inspects what those decisions/postmortems themselves cite.',
+    requiredMemberIds: ['DEC-009'], expectedMaxSources: 6,
   },
 
   // ---------------------------------------------------------------------
@@ -221,8 +223,8 @@ const REGRESSION_CORPUS_V3 = [
     id: 'RF-5.2-001', targetPhase: '5.2', decisionRef: 'Decision 3 of 8', auditRef: "Decision 3's 'single-record stays default' requirement",
     status: 'control', category: 'neighborhood-admission',
     question: 'How do I recover from an archive lock error?',
-    rationale: 'A clean, currently-correct answer must NOT gain an unnecessary member once neighborhoods ship -- guards Decision 3\'s "minimum sufficient neighborhood," not "more records = better." Corrected at Phase 4.1 baseline time: sourcesForRecord() already, correctly, cites every linked bug regardless of status, not just open ones -- the real current baseline is 3 sources (AI-FEAT-045 + BUG-004 [Fixed, cited for traceability] + AI-WF-008 companion workflow), not 2. This is legitimate citation, not neighborhood bloat -- the cap guards against a FOURTH, unrelated member appearing.',
-    requiredMemberIds: ['AI-FEAT-045'], expectedMaxSources: 3,
+    rationale: 'A clean, currently-correct answer must NOT gain an unnecessary member once neighborhoods ship -- guards Decision 3\'s "minimum sufficient neighborhood," not "more records = better." Corrected at Phase 4.1 baseline time: sourcesForRecord() already, correctly, cites every linked bug regardless of status, not just open ones -- the real baseline then was 3 sources (AI-FEAT-045 + BUG-004 [Fixed, cited for traceability] + AI-WF-008 companion workflow). Corrected AGAIN at Phase 5.1 (Decision 4, relationship visibility): AI-FEAT-045\'s own canonical "Related decisions" field cites DEC-013 (Lock Clearing Must Be Constrained) -- directly on-topic for this exact question, not neighborhood bloat, the same legitimate-citation reasoning already applied to BUG-004 above. New baseline is 4 sources (AI-FEAT-045 + BUG-004 + DEC-013 + AI-WF-008). The cap still guards against a FIFTH, unrelated member appearing.',
+    requiredMemberIds: ['AI-FEAT-045'], expectedMaxSources: 4,
   },
   {
     id: 'RF-5.2-002', targetPhase: '5.2', decisionRef: 'Decision 3 of 8', auditRef: 'The Transfer Import flagship compound case -- category 7 of Decision 6\'s 10-category acceptance set',
@@ -307,8 +309,8 @@ const REGRESSION_CORPUS_V3 = [
     id: 'RF-5.4-008', targetPhase: '5.4', decisionRef: 'Decision 6 of 8', auditRef: 'Decision 6 category 8: simple control -- cross-references RF-5.2-001',
     status: 'control', category: 'compound-question',
     question: 'How do I recover from an archive lock error?',
-    rationale: 'A single-aspect question must remain single-record even inside the compound-question acceptance run -- see RF-5.2-001 for the corrected 3-source baseline (Feature + a Fixed-but-still-cited Bug + companion Workflow).',
-    requiredMemberIds: ['AI-FEAT-045'], expectedMaxSources: 3,
+    rationale: 'A single-aspect question must remain single-record even inside the compound-question acceptance run -- see RF-5.2-001 for the corrected 4-source baseline (Feature + a Fixed-but-still-cited Bug + a directly on-topic related Decision, DEC-013, visible since Phase 5.1 + companion Workflow).',
+    requiredMemberIds: ['AI-FEAT-045'], expectedMaxSources: 4,
   },
   {
     id: 'RF-5.4-009', targetPhase: '5.4', decisionRef: 'Decision 6 of 8', auditRef: 'Decision 6 category 9: compound wording, only one aspect evidenced',
