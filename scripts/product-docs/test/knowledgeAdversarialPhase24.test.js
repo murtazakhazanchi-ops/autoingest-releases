@@ -53,9 +53,25 @@ async function main() {
     assert.equal(answer.capabilityStatus, QUERY_STATUS.NOT_SUPPORTED);
   });
 
-  await t('a term that exists only inside a Workflow record (never a Capability record) is still findable via an EXPLANATION-classified question', () => {
+  await t('sync-slot is findable via an EXPLANATION-classified question, correctly grounded in whichever real record documents it', () => {
+    // Corrected 2026-08-17 during Part 4 closure / standalone-test
+    // reconciliation: the original premise ("sync-slot exists only inside
+    // AI-WF-006's own text") was proven false — AI-FEAT-048's canonical
+    // file has documented "sync-slot negotiation"/"sync-slot coordination"
+    // since the original feature-registry commit, predating both AI-WF-006
+    // and this test. Both records are genuinely, evidentially relevant
+    // (equal absolute evidence, 2 matched tokens each); this is the
+    // already-disclosed near-identical-evidence residual class Approach D
+    // (Phase 4.3) and the Phase 4.3 extension (Part 4 closure) both
+    // deliberately leave to surface-normalized ordering, not primary-ID
+    // brittleness. The real invariant: sync-slot must resolve to one of
+    // the two records that actually document it, confidently (not a
+    // decline), and AI-WF-006 must remain discoverable even when not
+    // primary — an unrelated record must never win via keyword collision.
     const answer = answerQuestion('What is a sync-slot?', ctx);
-    assert.equal(answer.matchedCapabilities[0]?.id, 'AI-WF-006', 'sync-slot should route to AI-WF-006, the only record that documents it');
+    assert.equal(answer.capabilityStatus, QUERY_STATUS.AVAILABLE);
+    assert.ok(['AI-WF-006', 'AI-FEAT-048'].includes(answer.matchedCapabilities[0]?.id), `sync-slot primary should be AI-WF-006 or AI-FEAT-048 (the two records that actually document it), got ${answer.matchedCapabilities[0]?.id}`);
+    assert.ok((answer.sources || []).some((s) => s.id === 'AI-WF-006'), 'AI-WF-006 must remain discoverable/cited even when AI-FEAT-048 is primary');
   });
 
   await t('"What does X mean" is classified the same as "What is X" (EXPLANATION)', () => {

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-17T06:49:14.753Z",
+  "generated_at": "2026-08-17T08:09:42.933Z",
   "note": "Part 3 Phase 4.1 (Decision 7) frozen baseline — every later phase's changed results get classified (Improvement/Acceptable change/Regression/Unexplained change/Unchanged, see knowledgeEvalClassification.js) against THIS snapshot.",
   "schema_version": "1.0.0",
   "v1": {
@@ -1121,16 +1121,15 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-WF-008(224.27822024466332)",
         "AI-WF-006(213.93315039953575)",
+        "AI-WF-008(224.27822024466332)",
         "AI-WF-004(142.03869016721708)",
         "AI-FEAT-038(196.0459043791212)",
         "AI-FEAT-053(184.66507748977136)"
       ],
       "actualSources": [
-        "AI-WF-008",
-        "AI-FEAT-043",
-        "AI-FEAT-045"
+        "AI-WF-006",
+        "AI-FEAT-048"
       ],
       "actualStatus": "AVAILABLE",
       "id": "R06",
@@ -1210,16 +1209,15 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-WF-008(224.27822024466332)",
         "AI-WF-006(213.93315039953575)",
+        "AI-WF-008(224.27822024466332)",
         "AI-FEAT-027(181.9026523831726)",
         "AI-FEAT-048(160)",
         "AI-FEAT-046(137.7563470352785)"
       ],
       "actualSources": [
-        "AI-WF-008",
-        "AI-FEAT-043",
-        "AI-FEAT-045"
+        "AI-WF-006",
+        "AI-FEAT-048"
       ],
       "actualStatus": "AVAILABLE",
       "id": "R11",
@@ -1299,15 +1297,15 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
+        "AI-WF-006(213.93315039953575)",
+        "AI-WF-008(224.27822024466332)",
         "AI-FEAT-048(240)",
         "AI-FEAT-027(181.9026523831726)",
-        "AI-FEAT-004(147.24939761718036)",
-        "AI-FEAT-046(137.7563470352785)",
-        "AI-FEAT-028(137.27262233448155)"
+        "AI-FEAT-004(147.24939761718036)"
       ],
       "actualSources": [
-        "AI-FEAT-048",
-        "AI-WF-006"
+        "AI-WF-006",
+        "AI-FEAT-048"
       ],
       "actualStatus": "AVAILABLE",
       "id": "R16",
@@ -1353,8 +1351,8 @@
       "actualMatchQuality": "boundary",
       "actualPrimaryMatches": [
         "AI-FEAT-034(196.0459043791212)",
-        "AI-FEAT-043(187.65975684015868)",
         "AI-FEAT-027(181.9026523831726)",
+        "AI-FEAT-043(187.65975684015868)",
         "AI-FEAT-033(172.70157140797886)",
         "AI-FEAT-048(160)"
       ],
@@ -2033,12 +2031,12 @@
   ],
   "v3": {
     "anomalies": [],
-    "controlCount": 15,
-    "controlsPassing": 15,
+    "controlCount": 17,
+    "controlsPassing": 17,
     "knownBaselineFailureCount": 15,
     "knownBaselineFailuresConfirmedFailing": 15,
     "schemaPlaceholderCount": 5,
-    "total": 35
+    "total": 37
   },
   "v3Cases": [
     {
@@ -2309,13 +2307,13 @@
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-010",
-            "score": 193.3533096486496
+            "id": "AI-FEAT-002",
+            "score": 187.3246068093537
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-002",
-            "score": 187.3246068093537
+            "id": "AI-FEAT-010",
+            "score": 193.3533096486496
           },
           {
             "entityType": "feature",
@@ -2555,16 +2553,16 @@
       "category": "ranking-normalization",
       "checks": [
         {
-          "actual": "AI-FEAT-041",
+          "actual": "AI-FEAT-039",
           "expected": [
             "AI-FEAT-039",
             "AI-WF-009"
           ],
           "name": "allowedPrimary",
-          "pass": false
+          "pass": true
         },
         {
-          "actual": "AI-FEAT-041",
+          "actual": "AI-FEAT-039",
           "expected": "not one of [AI-WF-006]",
           "name": "forbiddenPrimary",
           "pass": true
@@ -2574,18 +2572,18 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "EXPLANATION",
-        "confidence": 0.25410452796945177,
+        "confidence": 0.24923908508679596,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
             "entityType": "feature",
-            "id": "AI-FEAT-041",
-            "score": 254.10452796945177
+            "id": "AI-FEAT-039",
+            "score": 249.23908508679597
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-039",
-            "score": 249.23908508679597
+            "id": "AI-FEAT-041",
+            "score": 254.10452796945177
           },
           {
             "entityType": "feature",
@@ -2604,18 +2602,15 @@
           }
         ],
         "relatedCapabilities": [
+          "AI-FEAT-032",
           "AI-FEAT-038",
-          "AI-FEAT-039",
-          "AI-FEAT-040"
+          "AI-FEAT-041",
+          "AI-FEAT-042"
         ],
         "sources": [
           {
-            "id": "AI-FEAT-041",
-            "title": "Transfer Background/Minimize Operation"
-          },
-          {
-            "id": "BUG-005",
-            "title": "BUG-005 (Fixed)"
+            "id": "AI-FEAT-039",
+            "title": "Transfer Import"
           },
           {
             "id": "AI-WF-005",
@@ -2624,8 +2619,8 @@
         ]
       },
       "id": "RF-4.3-002",
-      "meetsTargetExpectation": false,
-      "status": "known-baseline-failure",
+      "meetsTargetExpectation": true,
+      "status": "control",
       "targetPhase": "4.3"
     },
     {
@@ -2809,11 +2804,6 @@
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-043",
-            "score": 281.489635260238
-          },
-          {
-            "entityType": "feature",
             "id": "AI-FEAT-055",
             "score": 255.46722184851112
           },
@@ -2821,6 +2811,11 @@
             "entityType": "feature",
             "id": "AI-FEAT-056",
             "score": 240.40802668332458
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-043",
+            "score": 281.489635260238
           },
           {
             "entityType": "feature",
@@ -3585,18 +3580,18 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "EXPLANATION",
-        "confidence": 0.25410452796945177,
+        "confidence": 0.24923908508679596,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
             "entityType": "feature",
-            "id": "AI-FEAT-041",
-            "score": 254.10452796945177
+            "id": "AI-FEAT-039",
+            "score": 249.23908508679597
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-039",
-            "score": 249.23908508679597
+            "id": "AI-FEAT-041",
+            "score": 254.10452796945177
           },
           {
             "entityType": "feature",
@@ -3615,18 +3610,15 @@
           }
         ],
         "relatedCapabilities": [
+          "AI-FEAT-032",
           "AI-FEAT-038",
-          "AI-FEAT-039",
-          "AI-FEAT-040"
+          "AI-FEAT-041",
+          "AI-FEAT-042"
         ],
         "sources": [
           {
-            "id": "AI-FEAT-041",
-            "title": "Transfer Background/Minimize Operation"
-          },
-          {
-            "id": "BUG-005",
-            "title": "BUG-005 (Fixed)"
+            "id": "AI-FEAT-039",
+            "title": "Transfer Import"
           },
           {
             "id": "AI-WF-005",
@@ -3672,13 +3664,13 @@
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-048",
-            "score": 320
+            "id": "AI-FEAT-037",
+            "score": 311.54885635849496
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-037",
-            "score": 311.54885635849496
+            "id": "AI-FEAT-048",
+            "score": 320
           },
           {
             "entityType": "feature",
@@ -4121,18 +4113,18 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "TEAM_ACTIVITY",
-        "confidence": 0.22427822024466332,
+        "confidence": 0.21393315039953575,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
             "entityType": "workflow",
-            "id": "AI-WF-008",
-            "score": 224.27822024466332
+            "id": "AI-WF-006",
+            "score": 213.93315039953575
           },
           {
             "entityType": "workflow",
-            "id": "AI-WF-006",
-            "score": 213.93315039953575
+            "id": "AI-WF-008",
+            "score": 224.27822024466332
           },
           {
             "entityType": "feature",
@@ -4151,20 +4143,15 @@
           }
         ],
         "relatedCapabilities": [
-          "AI-FEAT-043",
-          "AI-FEAT-045"
+          "AI-FEAT-048"
         ],
         "sources": [
           {
-            "id": "AI-WF-008",
-            "title": "Recover From an Archive Lock Error"
+            "id": "AI-WF-006",
+            "title": "See Who Else Is Online, Coordinate Shared Events, and See What They're Working On"
           },
           {
-            "id": "AI-FEAT-043",
-            "title": null
-          },
-          {
-            "id": "AI-FEAT-045",
+            "id": "AI-FEAT-048",
             "title": null
           }
         ]
@@ -4221,11 +4208,6 @@
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-032",
-            "score": 200
-          },
-          {
-            "entityType": "feature",
             "id": "AI-FEAT-025",
             "score": 195.0012934215747
           },
@@ -4233,6 +4215,11 @@
             "entityType": "feature",
             "id": "AI-FEAT-042",
             "score": 182.56810330552096
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-032",
+            "score": 200
           }
         ],
         "relatedCapabilities": [
@@ -4295,18 +4282,18 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "EXPLANATION",
-        "confidence": 0.25410452796945177,
+        "confidence": 0.24923908508679596,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
             "entityType": "feature",
-            "id": "AI-FEAT-041",
-            "score": 254.10452796945177
+            "id": "AI-FEAT-039",
+            "score": 249.23908508679597
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-039",
-            "score": 249.23908508679597
+            "id": "AI-FEAT-041",
+            "score": 254.10452796945177
           },
           {
             "entityType": "feature",
@@ -4325,18 +4312,15 @@
           }
         ],
         "relatedCapabilities": [
+          "AI-FEAT-032",
           "AI-FEAT-038",
-          "AI-FEAT-039",
-          "AI-FEAT-040"
+          "AI-FEAT-041",
+          "AI-FEAT-042"
         ],
         "sources": [
           {
-            "id": "AI-FEAT-041",
-            "title": "Transfer Background/Minimize Operation"
-          },
-          {
-            "id": "BUG-005",
-            "title": "BUG-005 (Fixed)"
+            "id": "AI-FEAT-039",
+            "title": "Transfer Import"
           },
           {
             "id": "AI-WF-005",
@@ -4446,11 +4430,6 @@
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-032",
-            "score": 200
-          },
-          {
-            "entityType": "feature",
             "id": "AI-FEAT-025",
             "score": 195.0012934215747
           },
@@ -4458,6 +4437,11 @@
             "entityType": "feature",
             "id": "AI-FEAT-039",
             "score": 186.92931381509698
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-032",
+            "score": 200
           },
           {
             "entityType": "feature",
@@ -4541,6 +4525,153 @@
       "meetsTargetExpectation": false,
       "status": "known-baseline-failure",
       "targetPhase": "5.4"
+    },
+    {
+      "category": "normalization-safety",
+      "checks": [
+        {
+          "actual": "strong",
+          "expected": "weak",
+          "name": "matchQuality",
+          "pass": false
+        }
+      ],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "STATUS",
+        "confidence": 0.2,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-032",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-018",
+            "score": 180.46634911362094
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-024",
+            "score": 100
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-021",
+            "score": 90.23317455681047
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-019",
+            "score": 83.20583907060379
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-029",
+          "AI-FEAT-039"
+        ],
+        "sources": [
+          {
+            "id": "AI-FEAT-032",
+            "title": "Metadata Verification"
+          },
+          {
+            "id": "AI-RM-001",
+            "title": "Roadmap milestone AI-RM-001 (**Completed**)"
+          },
+          {
+            "id": "BUG-009",
+            "title": "BUG-009 (Fixed)"
+          },
+          {
+            "id": "AI-WF-009",
+            "title": "Import or Update From a Transfer Drive"
+          }
+        ]
+      },
+      "id": "RF-4.3-EXT-001",
+      "meetsTargetExpectation": false,
+      "status": "known-baseline-failure",
+      "targetPhase": "4.3-ext"
+    },
+    {
+      "category": "normalization-safety",
+      "checks": [
+        {
+          "actual": "strong",
+          "expected": "strong",
+          "name": "matchQuality",
+          "pass": true
+        },
+        {
+          "actual": "AI-WF-006",
+          "expected": [
+            "AI-WF-006"
+          ],
+          "name": "allowedPrimary",
+          "pass": true
+        },
+        {
+          "actual": "AI-WF-006",
+          "expected": "not one of [AI-FEAT-048]",
+          "name": "forbiddenPrimary",
+          "pass": true
+        }
+      ],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "TEAM_ACTIVITY",
+        "confidence": 0.21393315039953575,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-006",
+            "score": 213.93315039953575
+          },
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-008",
+            "score": 224.27822024466332
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-048",
+            "score": 240
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-027",
+            "score": 181.9026523831726
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-004",
+            "score": 147.24939761718036
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-048"
+        ],
+        "sources": [
+          {
+            "id": "AI-WF-006",
+            "title": "See Who Else Is Online, Coordinate Shared Events, and See What They're Working On"
+          },
+          {
+            "id": "AI-FEAT-048",
+            "title": null
+          }
+        ]
+      },
+      "id": "RF-4.3-EXT-002",
+      "meetsTargetExpectation": true,
+      "status": "control",
+      "targetPhase": "4.3-ext"
     }
   ]
 }

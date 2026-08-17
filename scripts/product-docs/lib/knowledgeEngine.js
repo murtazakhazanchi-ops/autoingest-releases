@@ -424,7 +424,29 @@ function searchCandidates(question, searchIndex) {
       candidate.score = adjustKeywordOverlapScore(candidate.score, matchedTokenCount(candidate.reasons), candidate.surfaceSize, CONFIDENCE_FLOOR);
     }
   }
-  const all = Array.from(bestByRecord.values()).sort((a, b) => b.score - a.score || a.id.localeCompare(b.id, 'en', { numeric: true }));
+  // Part 4 closure / Phase 4.3 extension (Product Owner decision, absolute-
+  // evidence-first ordering) — surface-size normalization is a SECONDARY
+  // relevance calibration; it must never override a genuinely stronger
+  // absolute-evidence (matched-token) signal. Matched-token ordering is
+  // valid here ONLY because both candidates are keyword-overlap-tier
+  // normalization participants (isEligibleForNormalization gates this on
+  // the same test the normalization itself uses — never inferred from
+  // entity type alone; an exact-alias/title/higher-tier candidate must
+  // never be pulled into this keyword-tier comparison, see the archive-
+  // locking-vs-Registry investigation's own W07/W08 sandbox bug for why).
+  // When both are eligible: more matched tokens wins outright (the
+  // "absolute-evidence band"); within an equal-token band, the existing
+  // surface-normalized adjusted score still decides. Ineligible candidates
+  // (governance types, or higher-tier feature/workflow matches) are
+  // entirely unaffected and fall through to the pre-existing adjusted-
+  // score comparison unchanged.
+  const all = Array.from(bestByRecord.values()).sort((a, b) => {
+    if (isEligibleForNormalization(a.entityType, a.reasons) && isEligibleForNormalization(b.entityType, b.reasons)) {
+      const tokenDelta = matchedTokenCount(b.reasons) - matchedTokenCount(a.reasons);
+      if (tokenDelta !== 0) return tokenDelta;
+    }
+    return b.score - a.score || a.id.localeCompare(b.id, 'en', { numeric: true });
+  });
   // Part 3 Phase 4.3 — `all`'s entries now carry internal-only diagnostic
   // fields (reasons, surfaceSize, rawScore) alongside the original public
   // shape. Never let those leak into matchedCapabilities/sources on the
@@ -553,7 +575,27 @@ function answerQuestion(question, ctx) {
   // overrides a strong exact-title feature match with a merely-weak
   // workflow guess (workflowClearlyBeaten still gates on hasStrongFeatureMatch).
   const topWorkflow = workflowMatches[0];
-  const workflowClearlyBeaten = hasStrongFeatureMatch && (!topWorkflow || topFeature.score > topWorkflow.score);
+  // Part 4 closure / Phase 4.3 extension (Product Owner decision) — the
+  // same absolute-evidence-first principle as searchCandidates()'s `all`
+  // sort, applied to this specific cross-type-but-same-calibration
+  // (Feature-vs-Workflow) comparison. Matched-token ordering is valid here
+  // ONLY because both topFeature and topWorkflow are keyword-overlap-tier
+  // normalization participants — gated by isEligibleForNormalization,
+  // never inferred from entity type alone (an exact-alias/title-tier
+  // feature match, e.g. AI-FEAT-038 on "export photos to a transfer
+  // drive", must fall through to the existing raw `.score` comparison
+  // below unchanged). diagnosticCandidates (already computed above for
+  // rawScoreById) is reused, not a second search.
+  const topFeatureEligible = !!topFeature && isEligibleForNormalization(topFeature.entityType, diagnosticCandidates.find((c) => c.id === topFeature.id)?.reasons);
+  const topWorkflowEligible = !!topWorkflow && isEligibleForNormalization(topWorkflow.entityType, diagnosticCandidates.find((c) => c.id === topWorkflow.id)?.reasons);
+  let workflowClearlyBeaten;
+  if (hasStrongFeatureMatch && topWorkflow && topFeatureEligible && topWorkflowEligible) {
+    const topFeatureTokens = matchedTokenCount(diagnosticCandidates.find((c) => c.id === topFeature.id).reasons);
+    const topWorkflowTokens = matchedTokenCount(diagnosticCandidates.find((c) => c.id === topWorkflow.id).reasons);
+    workflowClearlyBeaten = topFeatureTokens !== topWorkflowTokens ? topFeatureTokens > topWorkflowTokens : topFeature.score > topWorkflow.score;
+  } else {
+    workflowClearlyBeaten = hasStrongFeatureMatch && (!topWorkflow || topFeature.score > topWorkflow.score);
+  }
 
   // Part 2 remediation (Decision 1) — a bug/decision/postmortem becomes the
   // PRIMARY answer only when it is the single best piece of evidence found

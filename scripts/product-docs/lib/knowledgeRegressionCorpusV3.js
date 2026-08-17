@@ -119,9 +119,9 @@ const REGRESSION_CORPUS_V3 = [
   },
   {
     id: 'RF-4.3-002', targetPhase: '4.3', decisionRef: 'Decision 2 of 8', auditRef: 'Gap C — Audit R02 (exact Remediation Plan / brief phrasing)',
-    status: 'known-baseline-failure', category: 'ranking-normalization',
+    status: 'control', category: 'ranking-normalization',
     question: 'Why does Transfer Import exist, what limitation does Collection-nested import have, and what should I do operationally?',
-    rationale: 'Live reproduction of the brief\'s own flagship worked example — AI-WF-006 ties AI-WF-009 at 400, decided by ascending-ID tiebreak, not relevance.',
+    rationale: 'FIXED as a side effect of the Part 4 closure / Phase 4.3 extension (absolute-evidence-first ordering, Product Owner approved): AI-WF-009/AI-FEAT-039 both carry 4 matched tokens versus AI-WF-006\'s same 4 -- previously decided by adjusted score alone (which favored AI-WF-006\'s smaller-delta damping); now AI-FEAT-039 (on the allowedMemberIds list) wins outright once the ascending-ID tiebreak among the equal-token group applies AFTER token parity is confirmed, no longer distorted by the unrelated AI-FEAT-041 (3 tokens) intruding above the 4-token group. Promoted to a control so a later phase cannot silently regress it. Originally: live reproduction of the brief\'s own flagship worked example — AI-WF-006 ties AI-WF-009 at 400, decided by ascending-ID tiebreak, not relevance.',
     allowedMemberIds: ['AI-FEAT-039', 'AI-WF-009'], forbiddenMemberIds: ['AI-WF-006'],
   },
   {
@@ -324,6 +324,36 @@ const REGRESSION_CORPUS_V3 = [
     rationale: "Mixes a Planned record (AI-FEAT-053, Global Search) and an Available one (AI-FEAT-058, Knowledge Engine) -- Decision 3's lifecycle-distinction preservation requirement must hold even inside the compound-question acceptance run, not just the ranking-only Phase 4.3 check in RF-4.3-004.",
     allowedMemberIds: ['AI-FEAT-058'],
   },
+
+  // ---------------------------------------------------------------------
+  // Phase 4.3 extension investigation (Part 4 closure / standalone-test
+  // reconciliation) — PROPOSED controls only, reproducing the two genuine
+  // regressions surfaced by the four standalone-test failures. Not yet
+  // authorized: these currently FAIL (status: known-baseline-failure) and
+  // must remain failing until a Product-Owner-approved safety guard is
+  // implemented. Added so the hardened harness — not only the four
+  // standalone unit tests, which V1/V2's coarser status/quality-only
+  // schema had already proven insufficient to catch C/D — has a permanent,
+  // committed reproduction of both regressions going forward.
+  // ---------------------------------------------------------------------
+  {
+    id: 'RF-4.3-EXT-001', targetPhase: '4.3-ext', decisionRef: 'Decision 2 of 8 (extension, Product Owner reviewed 2026-08-17)', auditRef: 'Part 4 closure reconciliation — standalone test A (knowledge.test.js drone-footage hallucination guard)',
+    status: 'known-baseline-failure', category: 'normalization-safety',
+    question: 'Does AutoIngest support drone footage import with GPS flight paths?',
+    rationale: 'HIGH-PRIORITY DEFERRED RETRIEVAL-SAFETY DEFECT — explicitly reviewed and left OPEN by Product Owner decision (2026-08-17), not accepted as correct behavior. No canonical Feature/Workflow documents drone footage or GPS flight-path import. Phase 4.2 baseline: AI-FEAT-032/AI-FEAT-018 raw-tied at 200 (2 tokens each, equal absolute evidence), matchQuality correctly "weak". Phase 4.3 normalization breaks the tie (AI-FEAT-032 surface 18, at/below REF, undamped at 200; AI-FEAT-018 surface 27, damped to ~180) into a confident, untied "strong" AVAILABLE — a hallucination-guard violation: an untied normalized winner is being read as stronger evidence when the underlying absolute evidence was, and remains, equal. The Part 4 closure investigation proved this cannot be fixed by blanket raw-tie-preserves-quality (Approach A) without an unacceptable trade: doing so also fixes this case but creates 3 new unexplained V2 regressions (P01a, R01, R08) and reverts three already-accepted improvements (Q18, R15, R23) — proven, not assumed, because raw score is always exactly 100x matchedTokenCount for this tier, so "raw tie" and "equal-token tie" are the identical, structurally indistinguishable condition in both the bad case (this one) and the good cases. Open architectural question for a future, separately-authorized retrieval-safety phase: "How should Ask AutoIngest determine that an untied normalized winner has enough topical evidence to justify STRONG AVAILABLE, rather than merely being the least-bad member of an originally ambiguous evidence set?" Do not weaken this assertion, add a knownLimitation to mask it, or mark it resolved without a new Product Owner-approved mechanism. (Note: the numeric `confidence` field is NOT a usable proxy for this check — at raw score 200 it computes to 0.2 regardless of quality label; matchQuality is the correct, and only, reliable signal here.)',
+    expectedMatchQuality: 'weak',
+  },
+  {
+    id: 'RF-4.3-EXT-002', targetPhase: '4.3-ext', decisionRef: 'Decision 2 of 8 (extension, Product Owner approved)', auditRef: 'Part 4 closure reconciliation — standalone tests C/D (knowledgeEventCoordination.test.js, knowledgeHallucinationV2.test.js)',
+    status: 'control', category: 'normalization-safety',
+    question: 'How does archive locking differ from the Online Registry?',
+    rationale: 'FIXED by the Part 4 closure / Phase 4.3 extension (absolute-evidence-first ordering, Product Owner approved 2026-08-17): AI-WF-006 (4 matched tokens) now correctly outranks AI-FEAT-048 (3 tokens) regardless of surface-size damping, both in searchCandidates()\'s ordering and in the workflowClearlyBeaten cross-type-but-same-calibration comparison. AI-WF-006 is primary again (213.9), matchQuality strong, matching this assertion. History: Phase 4.2 baseline had AI-WF-006 cleanly winning (raw 400/4 tokens vs AI-FEAT-048\'s raw 300/3 tokens, the only record whose own text draws this exact distinction — AI-FEAT-048 has zero occurrences of "lock"/"locking"). Phase 4.3\'s surface-size normalization alone (pre-extension) suppressed that genuine absolute-evidence advantage purely because AI-WF-006\'s surface (223) is larger than AI-FEAT-048\'s (40) — a real, previously-undisclosed regression, also present unasserted in V2\'s own R16 entry (which does not check primary identity). Promoted to a control so a later phase cannot silently regress it.',
+    allowedMemberIds: ['AI-WF-006'], forbiddenMemberIds: ['AI-FEAT-048'], expectedMatchQuality: 'strong',
+  },
+  // RF-4.3-000 (sync-slot, "What is the sync-slot and which workflow
+  // documents it?") is RETAINED UNCHANGED as the control proving any
+  // extension guard must not regress the already-approved Approach D
+  // behavior — see its own entry above, not duplicated here.
 ];
 
 module.exports = { REGRESSION_CORPUS_V3 };
