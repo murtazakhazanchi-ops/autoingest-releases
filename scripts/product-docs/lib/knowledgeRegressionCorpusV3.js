@@ -164,9 +164,9 @@ const REGRESSION_CORPUS_V3 = [
   // ---------------------------------------------------------------------
   {
     id: 'RF-4.4-001', targetPhase: '4.4', decisionRef: 'Decision 6 of 8', auditRef: 'Corrected audit finding -- label accuracy only, NOT a routing/outcome fix',
-    status: 'known-baseline-failure', category: 'classifier-hygiene',
+    status: 'control', category: 'classifier-hygiene',
     question: 'Why does Transfer Import exist?',
-    rationale: 'Classifies TROUBLESHOOTING today despite no failure/problem signal present. Per the interview correction: fixing this does NOT change routing (EXPLANATION is already workflowPreferredType too) -- this assertion checks the classification LABEL only. The retrieval outcome for this same question is separately covered by RF-4.3-001.',
+    rationale: 'FIXED at Phase 4.4 implementation time: narrowed questionClassifier.js\'s TROUBLESHOOTING rule from "why (can\'?t|won\'?t|does(n\'?t)?)" to "why (can\'?t|won\'?t|doesn\'?t)" (dropping the bare "does" alternative) and added a "why is/was/does ... exist/design/create/.../authoritative" alternative to the EXPLANATION rule. Classifies EXPLANATION now, matching this assertion. Per the interview correction: fixing this does NOT change routing (EXPLANATION is already workflowPreferredType too) -- this assertion checks the classification LABEL only. The retrieval outcome for this same question is separately covered by RF-4.3-001, which remains a known-baseline-failure (Gap C itself is unaffected -- this is a label-hygiene fix, not a ranking fix). Promoted to a control so a later phase cannot silently regress the classification.',
     expectedClassification: 'EXPLANATION',
   },
   {

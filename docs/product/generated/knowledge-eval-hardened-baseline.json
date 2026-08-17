@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-17T06:19:37.143Z",
+  "generated_at": "2026-08-17T06:49:14.753Z",
   "note": "Part 3 Phase 4.1 (Decision 7) frozen baseline — every later phase's changed results get classified (Improvement/Acceptable change/Regression/Unexplained change/Unchanged, see knowledgeEvalClassification.js) against THIS snapshot.",
   "schema_version": "1.0.0",
   "v1": {
@@ -2033,10 +2033,10 @@
   ],
   "v3": {
     "anomalies": [],
-    "controlCount": 14,
-    "controlsPassing": 14,
-    "knownBaselineFailureCount": 16,
-    "knownBaselineFailuresConfirmedFailing": 16,
+    "controlCount": 15,
+    "controlsPassing": 15,
+    "knownBaselineFailureCount": 15,
+    "knownBaselineFailuresConfirmedFailing": 15,
     "schemaPlaceholderCount": 5,
     "total": 35
   },
@@ -2496,7 +2496,7 @@
       "diagnostics": [],
       "evidence": {
         "capabilityStatus": "AVAILABLE",
-        "classification": "TROUBLESHOOTING",
+        "classification": "EXPLANATION",
         "confidence": 0.25410452796945177,
         "matchQuality": "strong",
         "matchedCapabilities": [
@@ -2573,7 +2573,7 @@
       "diagnostics": [],
       "evidence": {
         "capabilityStatus": "AVAILABLE",
-        "classification": "TROUBLESHOOTING",
+        "classification": "EXPLANATION",
         "confidence": 0.25410452796945177,
         "matchQuality": "strong",
         "matchedCapabilities": [
@@ -2980,16 +2980,16 @@
       "category": "classifier-hygiene",
       "checks": [
         {
-          "actual": "TROUBLESHOOTING",
+          "actual": "EXPLANATION",
           "expected": "EXPLANATION",
           "name": "classification",
-          "pass": false
+          "pass": true
         }
       ],
       "diagnostics": [],
       "evidence": {
         "capabilityStatus": "AVAILABLE",
-        "classification": "TROUBLESHOOTING",
+        "classification": "EXPLANATION",
         "confidence": 0.25410452796945177,
         "matchQuality": "strong",
         "matchedCapabilities": [
@@ -3040,8 +3040,8 @@
         ]
       },
       "id": "RF-4.4-001",
-      "meetsTargetExpectation": false,
-      "status": "known-baseline-failure",
+      "meetsTargetExpectation": true,
+      "status": "control",
       "targetPhase": "4.4"
     },
     {
@@ -3584,7 +3584,7 @@
       ],
       "evidence": {
         "capabilityStatus": "AVAILABLE",
-        "classification": "TROUBLESHOOTING",
+        "classification": "EXPLANATION",
         "confidence": 0.25410452796945177,
         "matchQuality": "strong",
         "matchedCapabilities": [
@@ -4294,7 +4294,7 @@
       ],
       "evidence": {
         "capabilityStatus": "AVAILABLE",
-        "classification": "TROUBLESHOOTING",
+        "classification": "EXPLANATION",
         "confidence": 0.25410452796945177,
         "matchQuality": "strong",
         "matchedCapabilities": [
@@ -4435,7 +4435,7 @@
       "diagnostics": [],
       "evidence": {
         "capabilityStatus": "NOT_SUPPORTED",
-        "classification": "TROUBLESHOOTING",
+        "classification": "EXPLANATION",
         "confidence": 1,
         "matchQuality": "boundary",
         "matchedCapabilities": [
