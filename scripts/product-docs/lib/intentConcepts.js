@@ -19,11 +19,19 @@
 
 const CONCEPT_CLUSTERS = [
   {
+    // Part 3 Phase 4.2 (Decision 1) — 'two operators' added to triggers
+    // below. Recall improvement (audit R15), not a correctness fix — this
+    // cluster only widens candidate-query discovery via a hint, never a
+    // hard override; per DEC-020's own hint-vs-raw-boundary-precedence rule
+    // a hint can never override a curated boundary, so this addition
+    // carries none of the risk profile the hard-override boundary audit
+    // above concerns itself with. Verified corpus-wide before being added
+    // (see the Phase 4.2 report) rather than assumed safe.
     id: 'team-collaboration',
     domain: 'Online Registry & Teamwork',
     triggers: [
       'several users', 'multiple people', 'multiple users', 'multiple operators',
-      'two laptops', 'two computers', 'two devices', 'work together',
+      'two laptops', 'two computers', 'two devices', 'two operators', 'work together',
       'collaborative', 'work at the same time', 'simultaneously', 'same archive at once',
       'coordinate with', 'coordination between', 'work as a team', 'team work',
     ],
@@ -276,9 +284,19 @@ const BOUNDARY_CONCEPT_CLUSTERS = [
   {
     id: 'registry-activity-scope',
     boundaryId: 'registry-activity-scope',
+    // Part 3 Phase 4.2 (Decision 1) — 'qmz sorting isn't showing up' and
+    // 'metadata audit isn't showing up' added below. Recall improvement
+    // (audit R16), deliberately kept anchored to 'qmz'/'metadata audit'
+    // context rather than a bare 'isn't showing up in the activity feed'
+    // phrase — Import/Transfer activity legitimately DOES publish per this
+    // same boundary's own definition, so an unanchored phrase would
+    // incorrectly block a genuine "why isn't my import showing up" question
+    // instead of only the QMZ/metadata-audit cases this boundary actually
+    // excludes. Verified corpus-wide before being added, not assumed safe.
     triggers: [
       'show up as activity', 'visible to other operators', 'see qmz activity',
       'see metadata activity', 'audit activity show up', 'qmz sorting show up',
+      "qmz sorting isn't showing up", "metadata audit isn't showing up",
     ],
   },
   {

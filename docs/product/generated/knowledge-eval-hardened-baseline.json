@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-17T02:38:20.260Z",
+  "generated_at": "2026-08-17T02:49:30.166Z",
   "note": "Part 3 Phase 4.1 (Decision 7) frozen baseline — every later phase's changed results get classified (Improvement/Acceptable change/Regression/Unexplained change/Unchanged, see knowledgeEvalClassification.js) against THIS snapshot.",
   "schema_version": "1.0.0",
   "v1": {
@@ -2103,11 +2103,11 @@
   ],
   "v3": {
     "anomalies": [],
-    "controlCount": 11,
-    "controlsPassing": 11,
-    "knownBaselineFailureCount": 17,
-    "knownBaselineFailuresConfirmedFailing": 17,
-    "schemaPlaceholderCount": 6,
+    "controlCount": 13,
+    "controlsPassing": 13,
+    "knownBaselineFailureCount": 16,
+    "knownBaselineFailuresConfirmedFailing": 16,
+    "schemaPlaceholderCount": 5,
     "total": 34
   },
   "v3Cases": [
@@ -2115,10 +2115,10 @@
       "category": "trigger-safety",
       "checks": [
         {
-          "actual": "face-recognition",
+          "actual": "AI-FEAT-038",
           "expected": "not one of [face-recognition]",
           "name": "forbiddenPrimary",
-          "pass": false
+          "pass": true
         },
         {
           "actual": "present",
@@ -2129,10 +2129,10 @@
       ],
       "diagnostics": [],
       "evidence": {
-        "capabilityStatus": "NOT_SUPPORTED",
+        "capabilityStatus": "AVAILABLE",
         "classification": "UNKNOWN",
-        "confidence": 1,
-        "matchQuality": "boundary",
+        "confidence": 0.9,
+        "matchQuality": "strong",
         "matchedCapabilities": [
           {
             "entityType": "feature",
@@ -2160,17 +2160,32 @@
             "score": 400
           }
         ],
-        "relatedCapabilities": [],
+        "relatedCapabilities": [
+          "AI-FEAT-039",
+          "AI-FEAT-040",
+          "AI-FEAT-041",
+          "AI-FEAT-042",
+          "AI-FEAT-045",
+          "AI-FEAT-046"
+        ],
         "sources": [
           {
-            "id": "face-recognition",
-            "title": "Documented boundary (curated, evidence-cited — see lib/statusResolution.js)"
+            "id": "AI-FEAT-038",
+            "title": "Transfer Export"
+          },
+          {
+            "id": "BUG-005",
+            "title": "BUG-005 (Fixed)"
+          },
+          {
+            "id": "AI-WF-005",
+            "title": "Export or Update a Transfer Drive"
           }
         ]
       },
       "id": "RF-4.2-001",
-      "meetsTargetExpectation": false,
-      "status": "known-baseline-failure",
+      "meetsTargetExpectation": true,
+      "status": "control",
       "targetPhase": "4.2"
     },
     {
@@ -2349,17 +2364,22 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "UNKNOWN",
-        "confidence": 0.3,
-        "matchQuality": "weak",
+        "confidence": 0.5,
+        "matchQuality": "strong",
         "matchedCapabilities": [
           {
             "entityType": "feature",
-            "id": "AI-FEAT-002",
-            "score": 300
+            "id": "AI-FEAT-027",
+            "score": 500
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-027",
+            "id": "AI-FEAT-048",
+            "score": 500
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-002",
             "score": 300
           },
           {
@@ -2371,23 +2391,17 @@
             "entityType": "feature",
             "id": "AI-FEAT-010",
             "score": 200
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-011",
-            "score": 200
           }
         ],
         "relatedCapabilities": [
-          "AI-FEAT-005",
-          "AI-FEAT-022",
-          "AI-FEAT-027",
-          "AI-FEAT-028"
+          "AI-FEAT-004",
+          "AI-FEAT-010",
+          "AI-FEAT-026"
         ],
         "sources": [
           {
-            "id": "AI-FEAT-002",
-            "title": "Login & Operator Identity"
+            "id": "AI-FEAT-027",
+            "title": "Activity Log"
           }
         ]
       },
@@ -2398,13 +2412,26 @@
     },
     {
       "category": "trigger-recall-candidate",
-      "checks": [],
+      "checks": [
+        {
+          "actual": "boundary",
+          "expected": "boundary",
+          "name": "matchQuality",
+          "pass": true
+        },
+        {
+          "actual": "present",
+          "expected": "registry-activity-scope",
+          "name": "required:registry-activity-scope",
+          "pass": true
+        }
+      ],
       "diagnostics": [],
       "evidence": {
-        "capabilityStatus": "AVAILABLE",
+        "capabilityStatus": "NOT_SUPPORTED",
         "classification": "UNKNOWN",
-        "confidence": 0.85,
-        "matchQuality": "strong",
+        "confidence": 1,
+        "matchQuality": "boundary",
         "matchedCapabilities": [
           {
             "entityType": "feature",
@@ -2432,29 +2459,17 @@
             "score": 100
           }
         ],
-        "relatedCapabilities": [
-          "AI-FEAT-016",
-          "AI-FEAT-029",
-          "AI-FEAT-046"
-        ],
+        "relatedCapabilities": [],
         "sources": [
           {
-            "id": "AI-FEAT-047",
-            "title": "QMZ Sequencing Workspace"
-          },
-          {
-            "id": "BUG-007",
-            "title": "BUG-007 (Fixed)"
-          },
-          {
-            "id": "AI-WF-007",
-            "title": "Sort QMZ Photographs"
+            "id": "registry-activity-scope",
+            "title": "Documented boundary (curated, evidence-cited — see lib/statusResolution.js)"
           }
         ]
       },
       "id": "RF-4.2-006",
-      "meetsTargetExpectation": null,
-      "status": "schema-placeholder",
+      "meetsTargetExpectation": true,
+      "status": "control",
       "targetPhase": "4.2"
     },
     {

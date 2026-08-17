@@ -78,7 +78,24 @@ const KNOWN_BOUNDARIES = Object.freeze([
   {
     id: 'face-recognition',
     hardOverride: true,
-    keywords: ['face', 'facial', 'recognize', 'recognition'],
+    // Part 3 Phase 4.2 (Decision 1) — 'face', 'recognize', and 'recognition'
+    // were removed as bare single-word keywords after audit found each
+    // demonstrably risky via corpus/adversarial-probe collision: 'face' is
+    // a literal substring of ordinary unrelated words ("interface",
+    // "surface", "preface", "face-to-face support"); 'recognize' is the
+    // confirmed R05 collision ("will Transfer Import still recognize
+    // renamed events correctly?"); 'recognition' collides with a plausible
+    // photographer-credit/attribution question ("photographer recognition
+    // through credit metadata"). Replaced with specific multi-word phrases
+    // that preserve exact coverage for every real corpus case this boundary
+    // must still fire on (Q11, P11a, P11b, T06's deliberate misspelling,
+    // RF-4.2-002) — see docs/product/decisions/DEC-020_*.md's Post-Decision
+    // Evolution entry for the governing hard-override specificity rule.
+    // 'facial' was audited too and left UNCHANGED — same single-word shape,
+    // but no false-positive collision was found despite the same
+    // adversarial probing applied to its siblings; per that rule, an
+    // unconfirmed risk is recorded as evidence, not speculatively edited.
+    keywords: ['facial', 'facial recognition', 'face recognition', 'face recognision', 'face detection', 'recognize faces', 'recognize people'],
     statement: 'AutoIngest has no face-recognition or facial-identification capability.',
     citation: 'No matching code, feature, or roadmap record for "face"/"facial"/"recognition" anywhere in main/, renderer/, services/, or docs/product/ (confirmed by direct repository search); 00_PROJECT_VISION.md scopes AutoIngest to structured archival ingestion, not photo analysis.',
   },

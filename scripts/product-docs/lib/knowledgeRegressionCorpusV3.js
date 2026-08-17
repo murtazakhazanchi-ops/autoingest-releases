@@ -59,9 +59,9 @@ const REGRESSION_CORPUS_V3 = [
   // ---------------------------------------------------------------------
   {
     id: 'RF-4.2-001', targetPhase: '4.2', decisionRef: 'Decision 1 of 8', auditRef: 'Audit R05 / the recognize collision',
-    status: 'known-baseline-failure', category: 'trigger-safety',
+    status: 'control', category: 'trigger-safety',
     question: 'If my transfer drive mirrors the Collection/Event folder structure, will Transfer Import still recognize renamed events correctly?',
-    rationale: 'Confirmed severe defect: the bare word "recognize" in face-recognition\'s KNOWN_BOUNDARIES keyword list hard-overrides genuinely on-topic evidence (AI-FEAT-039 scores 800-900 on this exact question) at maximum confidence (1.0), directly contradicting AI-FEAT-039\'s own documented "recognized as the same archival event" content.',
+    rationale: 'FIXED at Phase 4.2 implementation time: the bare word "recognize" (along with "face" and "recognition") was removed from face-recognition\'s KNOWN_BOUNDARIES keyword list and replaced with specific multi-word phrases, verified corpus-wide to introduce zero new collisions while preserving exact coverage for every real corpus case the boundary must still fire on. This question no longer triggers the boundary and correctly falls through to AI-FEAT-039 (which scores 800-900 on this exact question, matching AI-FEAT-039\'s own documented "recognized as the same archival event" content). Promoted to a control so later phases cannot silently regress it.',
     forbiddenMemberIds: ['face-recognition'],
     requiredMemberIds: ['AI-FEAT-039'],
   },
@@ -90,13 +90,14 @@ const REGRESSION_CORPUS_V3 = [
     id: 'RF-4.2-005', targetPhase: '4.2', decisionRef: 'Decision 1 of 8', auditRef: 'Audit R15 (two-operators recall gap)',
     status: 'schema-placeholder', category: 'trigger-recall-candidate',
     question: 'Can two operators safely import into the same event at the same time?',
-    rationale: 'Recorded per Decision 1\'s explicit instruction that R15/R16 are recall CANDIDATES, evaluated separately from the recognize correctness fix, and only added as a real assertion after regression-corpus verification shows the widened trigger helps without new collisions. Not yet a pass/fail assertion — a documented gap for Phase 4.2\'s own audit to consider. Candidate trigger phrase: "two operators" (currently team-collaboration\'s cluster lists "two laptops/computers/devices" but not "two operators").',
+    rationale: 'EVALUATED at Phase 4.2 implementation time: "two operators" was added to team-collaboration\'s CONCEPT_CLUSTERS triggers and verified corpus-wide to introduce zero collisions. Effect on THIS question: moved the top match from AI-FEAT-002 (Login & Operator Identity, clearly irrelevant) to a 500-point tie between AI-FEAT-027 (Activity Log) and AI-FEAT-048 (Realtime Team Presence & Online Registry, genuinely on-topic), decided by ascending-ID tiebreak to AI-FEAT-027. This is a genuine but PARTIAL recall improvement -- it does not reach AI-WF-006 (the workflow with the actual relevant coordination content) or fire the registry-conflict-detection boundary, and the ascending-ID tiebreak between AI-FEAT-027/048 is itself an unresolved fairness question, not something Phase 4.2 is scoped to fix. The trigger addition is kept (net positive, zero collision cost, no regression anywhere else in the 153-question corpus) but this case is deliberately left WITHOUT a committed pass/fail assertion, since R15 is not cleanly resolved -- full resolution likely needs Decision 2\'s ranking normalization (Phase 4.3) and/or a registry-conflict-detection trigger addition, both out of Phase 4.2\'s scope.',
   },
   {
     id: 'RF-4.2-006', targetPhase: '4.2', decisionRef: 'Decision 1 of 8', auditRef: 'Audit R16 (activity-feed recall gap)',
-    status: 'schema-placeholder', category: 'trigger-recall-candidate',
+    status: 'control', category: 'trigger-recall-candidate',
     question: "My QMZ sorting isn't showing up in the activity feed, why not?",
-    rationale: 'Same discipline as RF-4.2-005 — the registry-activity-scope boundary already says exactly this, but its trigger requires literal word-order "qmz sorting show up as activity" and misses natural phrasing. Candidate, not a committed assertion, pending Phase 4.2\'s own corpus-verified widening.',
+    rationale: 'RESOLVED at Phase 4.2 implementation time: "qmz sorting isn\'t showing up" and "metadata audit isn\'t showing up" were added to registry-activity-scope\'s BOUNDARY_CONCEPT_CLUSTERS triggers (deliberately anchored to QMZ/metadata-audit context, not a bare "isn\'t showing up in the activity feed" phrase, since Import/Transfer activity legitimately DOES publish per this same boundary\'s own definition and an unanchored phrase would have incorrectly blocked that legitimate case). Verified: this question now correctly fires the registry-activity-scope boundary (matchQuality: boundary, confidence: 1.0, capabilityStatus: NOT_SUPPORTED, exact correct explanatory text) with zero corpus-wide collisions found. A clean, complete fix -- promoted to a control so later phases cannot silently regress it.',
+    requiredMemberIds: ['registry-activity-scope'], expectedMatchQuality: 'boundary',
   },
 
   // ---------------------------------------------------------------------
