@@ -32,7 +32,7 @@ const CORPUS_V2 = [
     id: 'P01b', domain: 'Import', family: 'Q01',
     question: 'What\'s the process for importing pictures from a card?',
     expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
-    knownLimitation: 'CHANGED 2026-08-14 (side effect of the AI-WF-006 event-coordination expansion shifting overall index composition) — was a zero-match (UNKNOWN) safe decline; now weakly, honestly ties AI-WF-001/002/003 (all real Import/Event workflows). Strictly a small improvement (a hedged answer instead of a bare decline), not a false claim; less helpful than the canonical phrasing (P01a), which strongly matches AI-WF-001 alone. A retrieval-recall/precision nuance, not a grounding defect.',
+    knownLimitation: 'CHANGED 2026-08-14 (side effect of the AI-WF-006 event-coordination expansion shifting overall index composition) — was a zero-match (UNKNOWN) safe decline; now weakly, honestly ties AI-WF-001/002/003 (all real Import/Event workflows). Strictly a small improvement (a hedged answer instead of a bare decline), not a false claim; less helpful than the canonical phrasing (P01a), which strongly matches AI-WF-001 alone. A retrieval-recall/precision nuance, not a grounding defect. CHANGED AGAIN 2026-08-17 (Phase 4.3, Decision 2, surface-size normalization) — the three-way weak tie above is broken: primary is now AI-FEAT-002 (Login/Operator Identity — a real, evidenced overlap, since its own Summary discusses "attribution of imports to the operator" and "which memory card/drive/folder supplied the files," not a coincidental collision) at a confident, untied "strong". This is the least precise of the tied candidates to win — AI-WF-001 (the actual Import workflow) and AI-FEAT-011 (Source Detection) are the more directly on-point answers and are still present as close runners-up (120.8 vs 124.9, effectively a near-tie the "strong" label overstates). matchQuality now mismatches the corpus\'s weak expectation. A residual calibration/quality-tier effect of Decision 2\'s normalization mechanism, not a new governance intrusion and not a fabricated claim — but a real, disclosed precision cost, not merely a confidence-label formality.',
   },
   {
     id: 'P02a', domain: 'Import', family: 'Q02',
@@ -50,7 +50,7 @@ const CORPUS_V2 = [
     id: 'P03a', domain: 'Import', family: 'Q03',
     question: 'Why is the photographer name blank after I imported?',
     expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
-    knownLimitation: 'CHANGED 2026-08-14 twice. First (Part 2 Decision 2, bounded Summary indexing): was a weak, tied match; became a confident, untied match on AI-FEAT-028 (Import Source Attribution) — a real improvement. Then (Part 2 Decision 1 checkpoint — AI-FEAT-039\'s Summary was extended with one sentence describing its direct-Event vs Collection-nested resolution distinction, per explicit product-owner instruction): that sentence\'s "folder name" phrasing, combined with AI-FEAT-039\'s pre-existing "photographer" token (from "event/photographer structures"), creates a new coincidental 2-word tie with AI-FEAT-039. Re-downgraded to weak/tied. "name" is low document-frequency (7/369, 1.9%) — a narrow, non-systemic collision, not chased with a stopword per this pass\'s established discipline. The answer itself is unaffected: AI-FEAT-028 still wins the ascending-ID tiebreak and is still the cited "closest" answer, only now hedged rather than asserted outright — an acceptable precision/recall trade-off, not a wrong answer.',
+    knownLimitation: 'CHANGED 2026-08-14 twice. First (Part 2 Decision 2, bounded Summary indexing): was a weak, tied match; became a confident, untied match on AI-FEAT-028 (Import Source Attribution) — a real improvement. Then (Part 2 Decision 1 checkpoint — AI-FEAT-039\'s Summary was extended with one sentence describing its direct-Event vs Collection-nested resolution distinction, per explicit product-owner instruction): that sentence\'s "folder name" phrasing, combined with AI-FEAT-039\'s pre-existing "photographer" token (from "event/photographer structures"), creates a new coincidental 2-word tie with AI-FEAT-039. Re-downgraded to weak/tied. "name" is low document-frequency (7/369, 1.9%) — a narrow, non-systemic collision, not chased with a stopword per this pass\'s established discipline. The answer itself is unaffected: AI-FEAT-028 still wins the ascending-ID tiebreak and is still the cited "closest" answer, only now hedged rather than asserted outright — an acceptable precision/recall trade-off, not a wrong answer. CHANGED AGAIN 2026-08-17 (Phase 4.3, Decision 2, surface-size normalization) — the AI-FEAT-039 tie described above is broken: primary is unchanged (still AI-FEAT-028, Import Source Attribution — the genuinely correct answer), now confidently untied at "strong" instead of tied at "weak". Unlike the other 11 cases in this cleanup pass, this one is a clean confidence-tier improvement with no change of primary record — matchQuality now mismatches the corpus\'s weak expectation only because the answer got more precise, not less.',
   },
   {
     id: 'P03b', domain: 'Import', family: 'Q03',
@@ -61,12 +61,13 @@ const CORPUS_V2 = [
     id: 'P04a', domain: 'Events', family: 'Q04',
     question: 'What\'s the way to start a new event?',
     expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
-    knownLimitation: 'IMPROVED during Phase 24 (strongly matched AI-WF-002 once EXPLANATION-type questions were routed to workflows). CHANGED again 2026-08-14 (Part 2 Phase 5 — new AI-WF-009 Transfer Import workflow added): AI-WF-009\'s real, evidence-grounded text repeatedly says "event" (archival events are its whole subject) and includes the real "Start Fresh" button label, creating a genuine 2-word tie with AI-WF-002 at the same score. Neither "event" (core domain vocabulary, not stopword-able) nor "start" (a real UI button label, not filler) is a hygiene defect to chase — this is legitimate subject-matter overlap between two real workflows, not a coincidental collision. Re-downgraded to weak/tied, but AI-WF-002 still wins the ascending-ID tiebreak and is still the cited, correct answer — an acceptable precision/recall trade-off.',
+    knownLimitation: 'IMPROVED during Phase 24 (strongly matched AI-WF-002 once EXPLANATION-type questions were routed to workflows). CHANGED again 2026-08-14 (Part 2 Phase 5 — new AI-WF-009 Transfer Import workflow added): AI-WF-009\'s real, evidence-grounded text repeatedly says "event" (archival events are its whole subject) and includes the real "Start Fresh" button label, creating a genuine 2-word tie with AI-WF-002 at the same score. Neither "event" (core domain vocabulary, not stopword-able) nor "start" (a real UI button label, not filler) is a hygiene defect to chase — this is legitimate subject-matter overlap between two real workflows, not a coincidental collision. Re-downgraded to weak/tied, but AI-WF-002 still wins the ascending-ID tiebreak and is still the cited, correct answer — an acceptable precision/recall trade-off. CHANGED AGAIN 2026-08-17 (Phase 4.3, Decision 2, surface-size normalization) — the AI-WF-002/AI-WF-009 tie above is broken, but not in AI-WF-002\'s favor: primary is now AI-FEAT-004 (event.json Data Model Persistence Contract), a real record (event creation genuinely writes through this contract) but a backend/schema feature, not the user-facing "how do I start an event" workflow — a materially less precise answer than the pre-Phase-4.3 AI-WF-002. AI-WF-002 itself drops out of the top-5 entirely. This is the most significant precision cost among this cleanup batch\'s six Class-1 cases; flagged accordingly rather than described with the same boilerplate as the others. Still AVAILABLE/not a false claim, still a residual calibration effect of Decision 2 rather than a governance intrusion — but a real answer-quality regression at the quality-tier level, not merely a label formality.',
   },
   {
     id: 'P04b', domain: 'Events', family: 'Q04',
     question: 'how do i make an event',
     expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
+    knownLimitation: 'RESIDUAL (Phase 4.3, Decision 2) — was correctly weak/tied (AI-FEAT-017) before Phase 4.3\'s surface-size normalization. Now resolves confidently to AI-FEAT-047 (QMZ, unrelated) — a Feature-vs-Feature near-tie between two records of almost-identical surface size, the same class of limitation as Gap-C-short\'s AI-FEAT-041 case (documented in AI-FEAT-058\'s Phase 4.3 evolution entry). Not a Governance-intrusion case — E1-B\'s Approach D does not touch Feature-vs-Feature comparisons, by design (both sides share the same calibration, so adjusted-vs-adjusted is the correct comparison there). A genuine residual limitation of the normalization mechanism, not fixed in Phase 4.3, not to be chased by tuning REF/damping.',
   },
   {
     id: 'P05a', domain: 'Events', family: 'Q05',
@@ -78,13 +79,13 @@ const CORPUS_V2 = [
     id: 'P05b', domain: 'Events', family: 'Q05',
     question: 'can events be deleted',
     expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
-    knownLimitation: 'CHANGED 2026-08-14 (Part 2 Decision 2) — was a zero-match (UNKNOWN) safe decline; now a weakly-hedged, 5-way tie (AI-FEAT-004/009/010/017/018), each sharing only the generic token "event". Honestly hedged ("this may not directly answer what you asked"), not confidently wrong — an inherent recall/precision trade-off of richer indexing, not a false claim.',
+    knownLimitation: 'CHANGED 2026-08-14 (Part 2 Decision 2) — was a zero-match (UNKNOWN) safe decline; now a weakly-hedged, 5-way tie (AI-FEAT-004/009/010/017/018), each sharing only the generic token "event". Honestly hedged ("this may not directly answer what you asked"), not confidently wrong — an inherent recall/precision trade-off of richer indexing, not a false claim. CHANGED AGAIN 2026-08-17 (Phase 4.3, Decision 2, surface-size normalization) — the single-token "event" evidence behind that 5-way tie is now dampened below the confidence floor; the answer returns UNKNOWN/none instead of the hedged weak AVAILABLE tie above. This is the approved conservative precision trade-off of Decision 2 — silencing a low-confidence signal rather than presenting it as a hedge — not ideal behavior, only an accepted residual consequence of the current normalization mechanism. Not a new false claim: the prior weak match was already only a generic-token collision, not a specific answer.',
   },
   {
     id: 'P06a', domain: 'Collections', family: 'Q06',
     question: 'What does \'Collection\' mean in AutoIngest?',
     expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
-    knownLimitation: 'FIXED during Phase 24 (classifier regex widened for "what does X mean") then REGRESSED to a tie 2026-08-14 — the AI-WF-006 event-coordination expansion legitimately discusses the Collection→Event→Components hierarchy too (it cites the same real concept AI-WF-002 introduces), so both now score 200 and tie, downgrading quality from strong to weak. The actual top-cited answer is unaffected and still correctly AI-WF-002\'s own real content (ascending-ID tiebreak) — this is a confidence-label change, not a wrong-answer regression. Not chased further, consistent with this project\'s "don\'t accumulate question-specific keyword exceptions" discipline once the two records\' overlap is genuinely topical (both really do discuss Collections) rather than coincidental.',
+    knownLimitation: 'FIXED during Phase 24 (classifier regex widened for "what does X mean") then REGRESSED to a tie 2026-08-14 — the AI-WF-006 event-coordination expansion legitimately discusses the Collection→Event→Components hierarchy too (it cites the same real concept AI-WF-002 introduces), so both now score 200 and tie, downgrading quality from strong to weak. The actual top-cited answer is unaffected and still correctly AI-WF-002\'s own real content (ascending-ID tiebreak) — this is a confidence-label change, not a wrong-answer regression. Not chased further, consistent with this project\'s "don\'t accumulate question-specific keyword exceptions" discipline once the two records\' overlap is genuinely topical (both really do discuss Collections) rather than coincidental. CHANGED AGAIN 2026-08-17 (Phase 4.3, Decision 2, surface-size normalization) — the AI-WF-002/AI-WF-006 tie described above is now dampened below the confidence floor entirely (both were single/near-single-token "Collection" matches once normalized); the answer returns UNKNOWN/none rather than the weak, hedged AVAILABLE tie above. The approved conservative precision trade-off of Decision 2 — not ideal (the pre-Phase-4.3 hedge was more helpful), only an accepted residual consequence of the current normalization mechanism.',
   },
   {
     id: 'P06b', domain: 'Collections', family: 'Q06',
@@ -96,6 +97,7 @@ const CORPUS_V2 = [
     id: 'P07a', domain: 'Collections', family: 'Q07',
     question: 'Can I search across my whole archive?',
     expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
+    knownLimitation: 'FIXED then RESIDUAL (Phase 4.3, Decision 2 / E1-B). Mid-Phase-4.3, before Approach D, this briefly regressed to BUG-011 (an unrelated scan-failure bug) via Governance-over-favoring — E1-B\'s Approach D fixes that: primary is AI-FEAT-042 again (Governance no longer intrudes), matching the pre-Phase-4.3 answer exactly. Quality is now "strong" rather than "weak" because Feature-vs-Feature normalization broke the pre-existing tie among Archive Operations records — same residual near-tie class as P04b, not a Governance issue. AI-FEAT-053 (Global Search, the ideally-correct answer) still loses this tiebreak, which is an UNRELATED, pre-existing Stage-1 gap (see Q07\'s own knownLimitation in knowledgeTestCorpus.js) — not caused by, and not fixed by, any Phase 4.3 work.',
   },
   {
     id: 'P07b', domain: 'Collections', family: 'Q07',
@@ -117,11 +119,13 @@ const CORPUS_V2 = [
     id: 'P09a', domain: 'Backup', family: 'Q09',
     question: 'Does the archive get backed up automatically?',
     expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
+    knownLimitation: 'RESIDUAL (Phase 4.3, Decision 2) — was correctly weak/tied (AI-FEAT-042) before Phase 4.3. Now resolves confidently to AI-FEAT-052 (Archive Repair, unrelated) — a Feature-vs-Feature near-tie, same class as P04b/P09a, unaffected by E1-B\'s Governance fix since no Governance record is involved. Genuine residual limitation, not fixed in Phase 4.3.',
   },
   {
     id: 'P09b', domain: 'Backup', family: 'Q09',
     question: 'is backup automatic',
     expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
+    knownLimitation: 'RESIDUAL (Phase 4.3, Decision 2) — was correctly weak (AI-FEAT-040, score exactly 100, a single-token match) before Phase 4.3. Normalization\'s absolute-evidence floor (ABSOLUTE_EVIDENCE_FLOOR_TOKENS=2) does not protect single-token matches by design (they can never reach "strong" quality anyway, so there was no false-confidence risk to correct) — dampening a large-surface single-token match below CONFIDENCE_FLOOR is an intended, honest consequence, not a bug. Now returns UNKNOWN rather than a weak, hedged AVAILABLE claim — a real loss of recall for a genuinely relevant capability (AI-FEAT-040 does exist), classified Acceptable Change (stays within the "do not overclaim" band) rather than Regression, but recorded as residual, not silently accepted as ideal.',
   },
   {
     id: 'P10a', domain: 'Transfer', family: 'Q10',
@@ -185,11 +189,13 @@ const CORPUS_V2 = [
     id: 'P15b', domain: 'Updates', family: 'Q15',
     question: 'switching to RC channel',
     expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
+    knownLimitation: 'RESIDUAL (Phase 4.3, Decision 2) — same single-token-floor pattern as P09b: was weak (AI-FEAT-057, score 100) before Phase 4.3, now UNKNOWN. Topically correct signal suppressed to silence rather than converted to false confidence — Acceptable Change, but a real recall loss, recorded as residual.',
   },
   {
     id: 'P16a', domain: 'Updates', family: 'Q16',
     question: 'Does the app update on its own?',
     expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
+    knownLimitation: 'RESIDUAL (Phase 4.3, Decision 2) — same single-token-floor pattern as P09b/P15b: was weak (AI-FEAT-006, score 100) before Phase 4.3, now UNKNOWN (via a different single-token match, AI-FEAT-040, that also falls below the floor). Acceptable Change, recall loss recorded as residual.',
   },
   {
     id: 'P16b', domain: 'Updates', family: 'Q16',
@@ -200,24 +206,25 @@ const CORPUS_V2 = [
     id: 'P17a', domain: 'Metadata', family: 'Q17',
     question: 'Can missing metadata be fixed?',
     expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
+    knownLimitation: 'FIXED then RESIDUAL (Phase 4.3, Decision 2 / E1-B). Mid-Phase-4.3, before Approach D, this briefly regressed to PM-001 (a postmortem) via Governance-over-favoring, losing direct how-to instructions — E1-B\'s Approach D fixes that: primary is now AI-FEAT-033 (Metadata Audit & Repair), Governance no longer intrudes. AI-FEAT-033 rather than the pre-Phase-4.3 AI-WF-004 (the workflow) is a residual Feature-vs-Workflow near-tie, not a Governance issue — AI-WF-004\'s own steps are still cited via the companion-workflow mechanism regardless of which one wins primary, so this residual is low-impact.',
   },
   {
     id: 'P17b', domain: 'Metadata', family: 'Q17',
     question: 'metadata repair tool',
     expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
-    knownLimitation: 'CHANGED 2026-08-14 (Part 2 Decision 2) — was an untied strong match on AI-FEAT-033 alone; now a 5-way tie (AI-FEAT-023/029/033/034/049) at the same score, since Summary indexing widened recall for all of them. AI-FEAT-033 (the genuinely correct answer) is still among the tied candidates, honestly hedged rather than dropped — a precision/recall trade-off, not a wrong answer.',
+    knownLimitation: 'CHANGED 2026-08-14 (Part 2 Decision 2) — was an untied strong match on AI-FEAT-033 alone; now a 5-way tie (AI-FEAT-023/029/033/034/049) at the same score, since Summary indexing widened recall for all of them. AI-FEAT-033 (the genuinely correct answer) is still among the tied candidates, honestly hedged rather than dropped — a precision/recall trade-off, not a wrong answer. CHANGED AGAIN 2026-08-17 (Phase 4.3, Decision 2, surface-size normalization) — the 5-way tie above is broken, and in this case favorably: primary is now AI-FEAT-033 (Metadata Audit & Repair) itself, confidently untied at "strong" — the correct answer, no longer merely one of five hedged candidates. matchQuality now mismatches the corpus\'s weak expectation only because the answer got more precise, not less; a genuine improvement in answer quality even though it fails the exact-quality-tier check.',
   },
   {
     id: 'P18a', domain: 'Archive operations', family: 'Q18',
     question: 'What maintenance tasks does AutoIngest run on my archive?',
     expectedStatus: 'PLANNED', expectedMatchQuality: 'weak',
-    knownLimitation: 'CHANGED 2026-08-14 (Part 2 Decision 2) — was an untied strong match on AI-FEAT-049 alone; now ties with AI-FEAT-050/051/056, all genuinely related Planned archive-direction features (per 11_ARCHITECTURAL_EVOLUTION.md §I). Status remains correctly PLANNED; only the match confidence changed, not the correctness.',
+    knownLimitation: 'CHANGED 2026-08-14 (Part 2 Decision 2) — was an untied strong match on AI-FEAT-049 alone; now ties with AI-FEAT-050/051/056, all genuinely related Planned archive-direction features (per 11_ARCHITECTURAL_EVOLUTION.md §I). Status remains correctly PLANNED; only the match confidence changed, not the correctness. CHANGED AGAIN 2026-08-17 (Phase 4.3, Decision 2, surface-size normalization) — the AI-FEAT-049/050/051 tie above is broken: primary is now AI-FEAT-050 (Event Maintenance) rather than AI-FEAT-049 (Archive Maintenance), confidently untied at "strong". A lateral shift within the same genuinely-related Planned archive-maintenance cluster documented above, not a jump to an unrelated record — status remains correctly PLANNED. matchQuality now mismatches the corpus\'s weak expectation only because the answer got more confident, not because it became wrong.',
   },
   {
     id: 'P18b', domain: 'Archive operations', family: 'Q18',
     question: 'archive maintenance features',
     expectedStatus: 'PLANNED', expectedMatchQuality: 'weak',
-    knownLimitation: 'CHANGED 2026-08-14 (Part 2 Decision 2) — same tie pattern as P18a. Status remains correctly PLANNED.',
+    knownLimitation: 'CHANGED 2026-08-14 (Part 2 Decision 2) — same tie pattern as P18a. Status remains correctly PLANNED. CHANGED AGAIN 2026-08-17 (Phase 4.3, Decision 2, surface-size normalization) — same tie-break pattern as P18a: primary is now AI-FEAT-050 (Event Maintenance) rather than AI-FEAT-049, confidently untied at "strong", still within the same genuinely-related Planned archive-maintenance cluster. Status remains correctly PLANNED; matchQuality now mismatches the corpus\'s weak expectation only because the answer got more confident.',
   },
   {
     id: 'P19a', domain: 'QMZ', family: 'Q19',
@@ -253,6 +260,7 @@ const CORPUS_V2 = [
     id: 'R03', domain: 'Online Registry',
     question: 'What happens if the relay server is unavailable during import?',
     expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
+    knownLimitation: 'FIXED (Phase 4.3, Decision 2 / E1-B). Mid-Phase-4.3, before Approach D, this briefly regressed to DEC-003 (Local-First and On-Premises Architecture, topically tangential) via Governance-over-favoring — E1-B\'s Approach D fixes it exactly: primary is AI-FEAT-018, matching the pre-Phase-4.3 answer precisely. No residual for this case.',
   },
   {
     id: 'R04', domain: 'Online Registry',
@@ -318,6 +326,7 @@ const CORPUS_V2 = [
     id: 'R15', domain: 'Online Registry',
     question: 'Does sync block if the relay is offline?',
     expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
+    knownLimitation: 'IMPROVEMENT (Phase 4.3, Decision 2) — was weak/tied (AI-FEAT-044) before Phase 4.3. Normalization now confidently, untied resolves to AI-FEAT-048 (Realtime Team Presence & Online Registry) — the genuinely more relevant record for a question specifically about relay/sync behavior. Not a Governance-related case; unaffected by, and unaffected the need for, E1-B.',
   },
   {
     id: 'R16', domain: 'Online Registry',
@@ -430,12 +439,13 @@ const CORPUS_V2 = [
     id: 'W12', domain: 'Settings',
     question: 'Where are AutoIngest preferences located?',
     expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
-    knownLimitation: 'CHANGED 2026-08-14 (Part 2 Decision 2) — was a zero-match (UNKNOWN) safe decline; now a single weak, heavily-hedged match on AI-FEAT-013 ("this may not directly answer what you asked", confidence 0.1). Honest about its own uncertainty, not a false claim — an inherent recall/precision trade-off of richer indexing.',
+    knownLimitation: 'CHANGED 2026-08-14 (Part 2 Decision 2) — was a zero-match (UNKNOWN) safe decline; now a single weak, heavily-hedged match on AI-FEAT-013 ("this may not directly answer what you asked", confidence 0.1). Honest about its own uncertainty, not a false claim — an inherent recall/precision trade-off of richer indexing. CHANGED AGAIN 2026-08-17 (Phase 4.3, Decision 2, surface-size normalization) — the single-token AI-FEAT-013 evidence above is now dampened below the confidence floor; the answer returns UNKNOWN/none instead of the heavily-hedged weak AVAILABLE match. The approved conservative precision trade-off of Decision 2 — not ideal (the prior hedge, while weak, at least surfaced a real candidate), only an accepted residual consequence of the current normalization mechanism.',
   },
   {
     id: 'W13', domain: 'Metadata',
     question: 'How do I check the status of a metadata repair?',
     expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
+    knownLimitation: 'IMPROVEMENT (Phase 4.3, Decision 2) — was weak/tied at AI-WF-004 (score 300, tied with another candidate) before Phase 4.3. Normalization now confidently, untied resolves to the SAME correct record, AI-WF-004 — deconflicted honestly rather than a different record winning. Not Governance-related.',
   },
   {
     id: 'W14', domain: 'Import',
@@ -470,6 +480,7 @@ const CORPUS_V2 = [
     id: 'T04', domain: 'Backup',
     question: 'backup auto?',
     expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
+    knownLimitation: 'RESIDUAL (Phase 4.3, Decision 2) — same single-token-floor pattern as P09b/P15b/P16a: was weak (AI-FEAT-002, score 100) before Phase 4.3, now UNKNOWN (via AI-FEAT-040, also single-token, also below floor). Acceptable Change, recall loss recorded as residual.',
   },
   {
     id: 'T05', domain: 'Unsupported',
@@ -500,12 +511,13 @@ const CORPUS_V2 = [
     id: 'T10', domain: 'Online Registry',
     question: 'whos online',
     expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
+    knownLimitation: 'RESIDUAL (Phase 4.3, Decision 2) — same single-token-floor pattern: was weak (AI-WF-006, score 100) before Phase 4.3, now UNKNOWN (via AI-FEAT-048, also single-token, also below floor). Topically-correct signal suppressed to silence rather than converted to false confidence — Acceptable Change, recall loss recorded as residual.',
   },
   {
     id: 'X01', domain: 'Adversarial',
     question: 'Does AutoIngest use AI to organize my photos?',
     expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
-    knownLimitation: 'CHANGED 2026-08-14 (Part 2 Decision 2) — was a zero-match (UNKNOWN) safe decline; now a single weak, heavily-hedged match on AI-FEAT-011 (confidence 0.1). Honest weak/hedged gap, not a confident false claim — same pattern already accepted for X02.',
+    knownLimitation: 'CHANGED 2026-08-14 (Part 2 Decision 2) — was a zero-match (UNKNOWN) safe decline; now a single weak, heavily-hedged match on AI-FEAT-011 (confidence 0.1). Honest weak/hedged gap, not a confident false claim — same pattern already accepted for X02. CHANGED AGAIN 2026-08-17 (Phase 4.3, Decision 2, surface-size normalization) — the single-token AI-FEAT-011 evidence above is now dampened below the confidence floor; the answer returns UNKNOWN/none instead of the heavily-hedged weak AVAILABLE match. The approved conservative precision trade-off of Decision 2, not ideal, only an accepted residual consequence of the current normalization mechanism.',
   },
   {
     id: 'X02', domain: 'Adversarial',
@@ -517,7 +529,7 @@ const CORPUS_V2 = [
     id: 'X03', domain: 'Adversarial',
     question: 'Does AutoIngest have a mobile app?',
     expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
-    knownLimitation: 'CHANGED 2026-08-14 (Part 2 Decision 2) — was a zero-match (UNKNOWN) safe decline; now weakly tied among AI-FEAT-014/019/022/029/039 (confidence 0.1). Honest weak/hedged gap, not a confident false claim.',
+    knownLimitation: 'CHANGED 2026-08-14 (Part 2 Decision 2) — was a zero-match (UNKNOWN) safe decline; now weakly tied among AI-FEAT-014/019/022/029/039 (confidence 0.1). Honest weak/hedged gap, not a confident false claim. CHANGED AGAIN 2026-08-17 (Phase 4.3, Decision 2, surface-size normalization) — the 5-way single-token tie above is now dampened below the confidence floor; the answer returns UNKNOWN/none instead of the weak, hedged AVAILABLE tie. The approved conservative precision trade-off of Decision 2, not ideal, only an accepted residual consequence of the current normalization mechanism.',
   },
   {
     id: 'X04', domain: 'Adversarial',
@@ -549,7 +561,7 @@ const CORPUS_V2 = [
     id: 'X09', domain: 'Adversarial',
     question: 'Can AutoIngest merge two archives together?',
     expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
-    knownLimitation: 'CHANGED 2026-08-14 (Part 2 Decision 2) — was a zero-match (UNKNOWN) safe decline; now weakly tied among AI-FEAT-021/027/047 (confidence 0.1). Honest weak/hedged gap, not a confident false claim.',
+    knownLimitation: 'CHANGED 2026-08-14 (Part 2 Decision 2) — was a zero-match (UNKNOWN) safe decline; now weakly tied among AI-FEAT-021/027/047 (confidence 0.1). Honest weak/hedged gap, not a confident false claim. CHANGED AGAIN 2026-08-17 (Phase 4.3, Decision 2, surface-size normalization) — the 3-way single-token tie above is now dampened below the confidence floor; the answer returns UNKNOWN/none instead of the weak, hedged AVAILABLE tie. The approved conservative precision trade-off of Decision 2, not ideal, only an accepted residual consequence of the current normalization mechanism.',
   },
   {
     id: 'X10', domain: 'Adversarial',

@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-08-17T02:49:30.166Z",
+  "generated_at": "2026-08-17T06:19:37.143Z",
   "note": "Part 3 Phase 4.1 (Decision 7) frozen baseline — every later phase's changed results get classified (Improvement/Acceptable change/Regression/Unexplained change/Unchanged, see knowledgeEvalClassification.js) against THIS snapshot.",
   "schema_version": "1.0.0",
   "v1": {
-    "knownMiss": 8,
-    "pass": 12,
+    "knownMiss": 9,
+    "pass": 11,
     "total": 20,
     "unexplained": 0
   },
@@ -12,11 +12,11 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-WF-001(600)",
-        "AI-WF-003(400)",
-        "AI-WF-002(300)",
-        "AI-WF-006(300)",
-        "AI-WF-007(300)"
+        "AI-WF-001(470.1884221106821)",
+        "AI-WF-003(356.7107572256184)",
+        "AI-WF-007(232.11168434072496)",
+        "AI-WF-008(224.27822024466332)",
+        "AI-WF-002(214.86267810124966)"
       ],
       "actualSources": [
         "AI-WF-001",
@@ -33,16 +33,17 @@
       "pass": true
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-011(200)",
-        "AI-FEAT-014(200)",
-        "AI-FEAT-015(200)",
-        "AI-FEAT-018(200)",
-        "AI-FEAT-027(200)"
+        "AI-FEAT-018(180.46634911362094)",
+        "AI-FEAT-029(155.71765475229668)",
+        "AI-FEAT-014(138.75555957834737)",
+        "AI-FEAT-015(138.75555957834737)",
+        "AI-FEAT-027(121.26843492211508)"
       ],
       "actualSources": [
-        "AI-FEAT-011",
+        "AI-FEAT-018",
+        "BUG-002",
         "AI-WF-001"
       ],
       "actualStatus": "AVAILABLE",
@@ -53,11 +54,11 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-WF-004(300)",
-        "AI-WF-001(200)",
-        "AI-WF-006(200)",
-        "AI-WF-008(200)",
-        "AI-WF-009(200)"
+        "AI-WF-004(213.0580352508256)",
+        "AI-WF-001(156.72947403689403)",
+        "AI-WF-008(149.51881349644222)",
+        "AI-WF-009(121.7120688703473)",
+        "AI-WF-006(106.96657519976787)"
       ],
       "actualSources": [
         "AI-WF-004",
@@ -73,11 +74,11 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-WF-002(200)",
-        "AI-FEAT-009(200)",
-        "AI-FEAT-017(200)",
-        "AI-FEAT-002(100)",
-        "AI-FEAT-003(100)"
+        "AI-WF-002(143.2417854008331)",
+        "AI-FEAT-009(127.429427149228)",
+        "AI-FEAT-017(115.19313262359476)",
+        "AI-FEAT-010(96.6766548243248)",
+        "AI-FEAT-003(95.20106063897916)"
       ],
       "actualSources": [
         "AI-WF-002",
@@ -91,14 +92,15 @@
     {
       "actualMatchQuality": "weak",
       "actualPrimaryMatches": [
-        "AI-FEAT-002(100)",
-        "AI-FEAT-003(100)",
-        "AI-FEAT-004(100)",
-        "AI-FEAT-005(100)",
-        "AI-FEAT-009(100)"
+        "AI-FEAT-024(100)",
+        "AI-FEAT-031(100)",
+        "AI-FEAT-036(100)",
+        "AI-FEAT-010(96.6766548243248)",
+        "AI-FEAT-003(95.20106063897916)"
       ],
       "actualSources": [
-        "AI-FEAT-002"
+        "AI-FEAT-024",
+        "BUG-001"
       ],
       "actualStatus": "AVAILABLE",
       "id": "Q05",
@@ -106,19 +108,14 @@
       "pass": false
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "none",
       "actualPrimaryMatches": [
-        "AI-WF-002(100)",
-        "AI-WF-006(100)",
-        "AI-WF-009(100)",
-        "AI-FEAT-009(100)",
-        "AI-FEAT-018(100)"
+        "AI-FEAT-018(90.23317455681047)",
+        "AI-FEAT-009(63.714713574614)",
+        "AI-FEAT-039(62.30977127169899)"
       ],
-      "actualSources": [
-        "AI-WF-002",
-        "AI-FEAT-009"
-      ],
-      "actualStatus": "AVAILABLE",
+      "actualSources": [],
+      "actualStatus": "UNKNOWN",
       "id": "Q06",
       "knownLimitation": "FIXED in Stage 2 (Phase 24 adversarial review) — was UNKNOWN/no-match in Stage 1 because no record contained the word \"Collection\" as a distinct topic. AI-WF-002 (Create a New Event) genuinely explains the real Collection → Event → Components hierarchy (verified against onboarding screen 2's own text), but Stage 1/early-Stage-2 answerQuestion() only preferred a Workflow answer for HOW_TO/TROUBLESHOOTING question types — \"What is a Collection?\" classifies EXPLANATION, so it fell through to feature-only matching (zero features mention \"Collection\", hence UNKNOWN). Broadening the workflow-preference gate to include EXPLANATION (found via a different adversarial question, \"What is a sync-slot?\", which had the identical structural problem) fixed this as a side effect — a genuine improvement, not a loosened expectation.",
       "pass": false
@@ -126,11 +123,11 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-056(300)",
-        "AI-FEAT-051(200)",
-        "AI-FEAT-053(200)",
-        "AI-FEAT-002(100)",
-        "AI-FEAT-004(100)"
+        "AI-FEAT-056(180.30602001249343)",
+        "AI-FEAT-053(123.11005165984757)",
+        "AI-FEAT-051(119.00394841533502)",
+        "AI-FEAT-043(93.82987842007934)",
+        "AI-FEAT-018(90.23317455681047)"
       ],
       "actualSources": [
         "AI-FEAT-056",
@@ -155,11 +152,11 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-042(300)",
-        "AI-FEAT-002(200)",
-        "AI-FEAT-028(200)",
-        "AI-FEAT-039(200)",
-        "AI-FEAT-052(200)"
+        "AI-FEAT-042(182.56810330552096)",
+        "AI-FEAT-028(137.27262233448155)",
+        "AI-FEAT-002(124.8830712062358)",
+        "AI-FEAT-039(124.61954254339798)",
+        "AI-FEAT-052(124.35955978443555)"
       ],
       "actualSources": [
         "AI-FEAT-042",
@@ -174,11 +171,11 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-WF-005(500)",
-        "AI-WF-006(300)",
-        "AI-WF-009(300)",
-        "AI-WF-008(200)",
-        "AI-FEAT-019(200)"
+        "AI-WF-005(334.34457782909334)",
+        "AI-WF-009(182.56810330552096)",
+        "AI-WF-006(160.4498627996518)",
+        "AI-WF-008(149.51881349644222)",
+        "AI-FEAT-040(169.40301864630118)"
       ],
       "actualSources": [
         "AI-WF-005",
@@ -195,10 +192,10 @@
     {
       "actualMatchQuality": "boundary",
       "actualPrimaryMatches": [
-        "AI-FEAT-007(100)",
-        "AI-FEAT-015(100)",
-        "AI-FEAT-039(100)",
-        "AI-FEAT-047(100)"
+        "AI-FEAT-015(69.37777978917369)",
+        "AI-FEAT-007(66.46812738936292)",
+        "AI-FEAT-039(62.30977127169899)",
+        "AI-FEAT-047(58.759974260177884)"
       ],
       "actualSources": [
         "face-recognition"
@@ -211,11 +208,11 @@
     {
       "actualMatchQuality": "boundary",
       "actualPrimaryMatches": [
-        "AI-FEAT-001(100)",
-        "AI-FEAT-011(100)",
-        "AI-FEAT-014(100)",
-        "AI-FEAT-015(100)",
-        "AI-FEAT-018(100)"
+        "AI-FEAT-018(90.23317455681047)",
+        "AI-FEAT-001(87.24171679421262)",
+        "AI-FEAT-020(78.88940555307344)",
+        "AI-FEAT-014(69.37777978917369)",
+        "AI-FEAT-015(69.37777978917369)"
       ],
       "actualSources": [
         "photo-editing"
@@ -228,9 +225,9 @@
     {
       "actualMatchQuality": "boundary",
       "actualPrimaryMatches": [
-        "AI-FEAT-040(100)",
-        "AI-FEAT-049(100)",
-        "AI-FEAT-056(100)"
+        "AI-FEAT-040(84.70150932315059)",
+        "AI-FEAT-049(60.63421746105754)",
+        "AI-FEAT-056(60.102006670831145)"
       ],
       "actualSources": [
         "cloud-storage"
@@ -243,11 +240,11 @@
     {
       "actualMatchQuality": "boundary",
       "actualPrimaryMatches": [
-        "AI-FEAT-006(100)",
-        "AI-FEAT-017(100)",
-        "AI-FEAT-049(100)",
-        "AI-FEAT-050(100)",
-        "AI-FEAT-058(100)"
+        "AI-FEAT-050(71.01934508360854)",
+        "AI-FEAT-058(69.12526379657446)",
+        "AI-FEAT-006(66.66666666666667)",
+        "AI-FEAT-049(60.63421746105754)",
+        "AI-FEAT-017(57.59656631179738)"
       ],
       "actualSources": [
         "linux"
@@ -260,10 +257,10 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-057(200)",
-        "AI-FEAT-015(100)",
-        "AI-FEAT-016(100)",
-        "AI-FEAT-037(100)"
+        "AI-FEAT-057(160)",
+        "AI-FEAT-016(69.6359300069872)",
+        "AI-FEAT-015(69.37777978917369)",
+        "AI-FEAT-037(62.30977127169899)"
       ],
       "actualSources": [
         "AI-FEAT-057",
@@ -277,67 +274,66 @@
       "pass": false
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-006(200)",
-        "AI-FEAT-017(200)",
-        "AI-FEAT-002(100)",
-        "AI-FEAT-007(100)",
-        "AI-FEAT-014(100)"
+        "AI-FEAT-006(133.33333333333334)",
+        "AI-FEAT-017(115.19313262359476)",
+        "AI-FEAT-032(100)",
+        "AI-FEAT-040(84.70150932315059)",
+        "AI-FEAT-019(83.20583907060379)"
       ],
       "actualSources": [
         "AI-FEAT-006"
       ],
       "actualStatus": "AVAILABLE",
       "id": "Q16",
-      "knownLimitation": "Unchanged from Stage 1: ties at 100 across AI-FEAT-006/040/057; ascending-ID tiebreak happens to surface AI-FEAT-006, the most relevant of the three — a case where the tiebreak artifact does not cause a wrong answer.",
-      "pass": true
-    },
-    {
-      "actualMatchQuality": "weak",
-      "actualPrimaryMatches": [
-        "AI-WF-004(300)",
-        "AI-WF-006(300)",
-        "AI-FEAT-023(300)",
-        "AI-FEAT-033(300)",
-        "AI-FEAT-034(300)"
-      ],
-      "actualSources": [
-        "AI-WF-004",
-        "AI-FEAT-031",
-        "AI-FEAT-033",
-        "AI-FEAT-034"
-      ],
-      "actualStatus": "AVAILABLE",
-      "id": "Q17",
-      "knownLimitation": "Was \"strong\" in Stage 1 (AI-FEAT-033 alone at score 200). In Stage 2, the correct top match (AI-WF-004, Repair Missing or Incorrect Metadata, still correctly grounded in AI-FEAT-033) ties at score 300 with AI-WF-006 — a genuine, disclosed, hard limitation: AI-WF-006's own text legitimately contains the words \"metadata\"/\"audit\"/\"repair\" in a NEGATING context (\"not Metadata, not Audit/Repair\" — part of the Registry's own required four-way distinction). Pure keyword-overlap cannot distinguish a word appearing in a positive claim from a word appearing in an explicit exclusion. The primary match is still correctly AI-WF-004 (alphabetically first among the tie) and the answer is still correctly grounded and hedged — this is the system being appropriately conservative given a genuinely ambiguous lexical signal, not a wrong answer. A real candidate for smarter (still non-embedding) matching in a future stage, not a defect to patch here.",
-      "pass": true
-    },
-    {
-      "actualMatchQuality": "weak",
-      "actualPrimaryMatches": [
-        "AI-FEAT-049(200)",
-        "AI-FEAT-050(200)",
-        "AI-FEAT-051(200)",
-        "AI-FEAT-002(100)",
-        "AI-FEAT-004(100)"
-      ],
-      "actualSources": [
-        "AI-FEAT-049",
-        "AI-RM-001",
-        "AI-RM-002"
-      ],
-      "actualStatus": "PLANNED",
-      "id": "Q18",
-      "knownLimitation": "DISCOVERED 2026-08-17 during Part 3 Phase 4.1 (Decision 7) harness hardening — pre-existing, not caused by that phase (independently reproduced against unmodified HEAD via a stash-isolated re-run before this note was added). Actual behavior today: capabilityStatus correctly PLANNED (status field matches), but matchQuality is weak, not strong — AI-FEAT-049/050/051 (Archive Maintenance / Event Maintenance / Archive Browser) tie at score 200, classification STATUS, confidence 0.2. This entry's own expectedMatchQuality was never previously annotated with a knownLimitation despite the tie, and no Phase 4.1 work fixed it — Decision 7 explicitly requires recording, not silently repairing, a runtime defect exposed by hardening the harness. A real candidate for whichever future phase addresses ambiguous multi-way keyword-overlap ties among genuinely topically-relevant Planned features (adjacent to, but distinct from, the Gap C/keyword-surface-size mechanism Decision 2/Phase 4.3 targets — here three SIMILARLY-sized records tie, not one large record beating a small one).",
+      "knownLimitation": "Unchanged from Stage 1: ties at 100 across AI-FEAT-006/040/057; ascending-ID tiebreak happens to surface AI-FEAT-006, the most relevant of the three — a case where the tiebreak artifact does not cause a wrong answer. CHANGED 2026-08-17 (Phase 4.3, Decision 2, surface-size normalization) — by Phase 4.2 this tie had already shifted to AI-FEAT-006/AI-FEAT-017 at score 200 (a pre-existing drift from the Stage 1 composition described above, not caused by Phase 4.3). Phase 4.3 breaks that tie: primary is now AI-FEAT-006 confidently untied at \"strong\" (133.3 vs AI-FEAT-017's 115.2) — the same, correct record as before, just no longer hedged as a tie. capabilityStatus remains correctly AVAILABLE; matchQuality now mismatches the corpus's weak expectation only because the answer got more confident, not because it became wrong — a residual calibration/quality-tier effect of Decision 2, not a new governance intrusion.",
       "pass": false
     },
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
+        "AI-FEAT-033(259.0523571119683)",
+        "AI-FEAT-023(196.58155617459335)",
+        "AI-FEAT-034(196.0459043791212)",
+        "AI-FEAT-049(181.9026523831726)",
+        "AI-FEAT-029(155.71765475229668)"
+      ],
+      "actualSources": [
+        "AI-FEAT-033",
+        "AI-RM-001",
+        "BUG-007",
+        "AI-WF-004"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "Q17",
+      "knownLimitation": "Was \"strong\" in Stage 1 (AI-FEAT-033 alone at score 200). In Stage 2, the correct top match (AI-WF-004, Repair Missing or Incorrect Metadata, still correctly grounded in AI-FEAT-033) ties at score 300 with AI-WF-006 — a genuine, disclosed, hard limitation: AI-WF-006's own text legitimately contains the words \"metadata\"/\"audit\"/\"repair\" in a NEGATING context (\"not Metadata, not Audit/Repair\" — part of the Registry's own required four-way distinction). Pure keyword-overlap cannot distinguish a word appearing in a positive claim from a word appearing in an explicit exclusion. The primary match is still correctly AI-WF-004 (alphabetically first among the tie) and the answer is still correctly grounded and hedged — this is the system being appropriately conservative given a genuinely ambiguous lexical signal, not a wrong answer. A real candidate for smarter (still non-embedding) matching in a future stage, not a defect to patch here. CHANGED 2026-08-17 (Phase 4.3, Decision 2, surface-size normalization) — the AI-WF-004/AI-WF-006 tie described above is broken, but not by resolving the AI-WF-006 negation-context ambiguity; instead, normalization shifts the flat 300/300 tie apart and a different competitor, AI-FEAT-033 (Metadata Audit & Repair), becomes primary at a confident, untied \"strong\" (259.1) — AI-WF-004 drops out of the top 5 entirely. This is not an overstated full correction: it is a residual Feature-vs-Workflow near-tie, the same class already documented for V2's P17a case, not fixed in Phase 4.3 and not chased by tuning REF/damping. The current answer remains topically valid — AI-FEAT-033 is the genuinely correct feature for \"repair missing metadata\" — but it loses AI-WF-004's concrete step-by-step repair instructions, so this is a real, disclosed precision/completeness trade-off, not a clean fix of the original hard limitation.",
+      "pass": false
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-FEAT-050(142.03869016721708)",
+        "AI-FEAT-049(121.26843492211508)",
+        "AI-FEAT-051(119.00394841533502)",
+        "AI-FEAT-043(93.82987842007934)",
+        "AI-FEAT-018(90.23317455681047)"
+      ],
+      "actualSources": [
+        "AI-FEAT-050",
+        "AI-RM-003"
+      ],
+      "actualStatus": "PLANNED",
+      "id": "Q18",
+      "knownLimitation": "DISCOVERED 2026-08-17 during Part 3 Phase 4.1 (Decision 7) harness hardening — pre-existing, not caused by that phase (independently reproduced against unmodified HEAD via a stash-isolated re-run before this note was added). Actual behavior today: capabilityStatus correctly PLANNED (status field matches), but matchQuality is weak, not strong — AI-FEAT-049/050/051 (Archive Maintenance / Event Maintenance / Archive Browser) tie at score 200, classification STATUS, confidence 0.2. This entry's own expectedMatchQuality was never previously annotated with a knownLimitation despite the tie, and no Phase 4.1 work fixed it — Decision 7 explicitly requires recording, not silently repairing, a runtime defect exposed by hardening the harness. A real candidate for whichever future phase addresses ambiguous multi-way keyword-overlap ties among genuinely topically-relevant Planned features (adjacent to, but distinct from, the Gap C/keyword-surface-size mechanism Decision 2/Phase 4.3 targets — here three SIMILARLY-sized records tie, not one large record beating a small one).",
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
         "AI-FEAT-047(850)",
-        "AI-FEAT-029(100)",
-        "AI-FEAT-046(100)"
+        "AI-FEAT-029(77.85882737614834)",
+        "AI-FEAT-046(68.87817351763925)"
       ],
       "actualSources": [
         "AI-FEAT-047",
@@ -352,11 +348,11 @@
     {
       "actualMatchQuality": "boundary",
       "actualPrimaryMatches": [
-        "AI-FEAT-027(500)",
-        "AI-FEAT-048(500)",
-        "AI-FEAT-002(200)",
-        "AI-FEAT-009(200)",
-        "AI-FEAT-011(200)"
+        "AI-FEAT-048(400)",
+        "AI-FEAT-027(303.1710873052877)",
+        "AI-FEAT-026(143.86639246024882)",
+        "AI-FEAT-009(127.429427149228)",
+        "AI-FEAT-002(124.8830712062358)"
       ],
       "actualSources": [
         "multi-user-roles"
@@ -368,8 +364,8 @@
     }
   ],
   "v2": {
-    "knownMiss": 19,
-    "pass": 80,
+    "knownMiss": 41,
+    "pass": 58,
     "total": 99,
     "unexplained": 0
   },
@@ -377,20 +373,16 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-WF-001(200)",
-        "AI-WF-003(100)",
-        "AI-WF-007(100)",
-        "AI-FEAT-002(200)",
-        "AI-FEAT-011(200)"
+        "AI-FEAT-012(160)",
+        "AI-FEAT-028(137.27262233448155)",
+        "AI-FEAT-002(124.8830712062358)",
+        "AI-FEAT-011(120.83521766849006)",
+        "AI-FEAT-030(96.6766548243248)"
       ],
       "actualSources": [
-        "AI-WF-001",
-        "AI-FEAT-011",
         "AI-FEAT-012",
-        "AI-FEAT-017",
-        "AI-FEAT-018",
-        "AI-FEAT-019",
-        "AI-FEAT-022"
+        "BUG-001",
+        "AI-WF-001"
       ],
       "actualStatus": "AVAILABLE",
       "id": "P01a",
@@ -398,27 +390,21 @@
       "pass": true
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-WF-001(100)",
-        "AI-FEAT-002(200)",
-        "AI-FEAT-011(200)",
-        "AI-FEAT-001(100)",
-        "AI-FEAT-003(100)"
+        "AI-FEAT-002(124.8830712062358)",
+        "AI-FEAT-011(120.83521766849006)",
+        "AI-FEAT-003(95.20106063897916)",
+        "AI-FEAT-001(87.24171679421262)",
+        "AI-FEAT-012(80)"
       ],
       "actualSources": [
-        "AI-WF-001",
-        "AI-FEAT-011",
-        "AI-FEAT-012",
-        "AI-FEAT-017",
-        "AI-FEAT-018",
-        "AI-FEAT-019",
-        "AI-FEAT-022"
+        "AI-FEAT-002"
       ],
       "actualStatus": "AVAILABLE",
       "id": "P01b",
-      "knownLimitation": "CHANGED 2026-08-14 (side effect of the AI-WF-006 event-coordination expansion shifting overall index composition) — was a zero-match (UNKNOWN) safe decline; now weakly, honestly ties AI-WF-001/002/003 (all real Import/Event workflows). Strictly a small improvement (a hedged answer instead of a bare decline), not a false claim; less helpful than the canonical phrasing (P01a), which strongly matches AI-WF-001 alone. A retrieval-recall/precision nuance, not a grounding defect.",
-      "pass": true
+      "knownLimitation": "CHANGED 2026-08-14 (side effect of the AI-WF-006 event-coordination expansion shifting overall index composition) — was a zero-match (UNKNOWN) safe decline; now weakly, honestly ties AI-WF-001/002/003 (all real Import/Event workflows). Strictly a small improvement (a hedged answer instead of a bare decline), not a false claim; less helpful than the canonical phrasing (P01a), which strongly matches AI-WF-001 alone. A retrieval-recall/precision nuance, not a grounding defect. CHANGED AGAIN 2026-08-17 (Phase 4.3, Decision 2, surface-size normalization) — the three-way weak tie above is broken: primary is now AI-FEAT-002 (Login/Operator Identity — a real, evidenced overlap, since its own Summary discusses \"attribution of imports to the operator\" and \"which memory card/drive/folder supplied the files,\" not a coincidental collision) at a confident, untied \"strong\". This is the least precise of the tied candidates to win — AI-WF-001 (the actual Import workflow) and AI-FEAT-011 (Source Detection) are the more directly on-point answers and are still present as close runners-up (120.8 vs 124.9, effectively a near-tie the \"strong\" label overstates). matchQuality now mismatches the corpus's weak expectation. A residual calibration/quality-tier effect of Decision 2's normalization mechanism, not a new governance intrusion and not a fabricated claim — but a real, disclosed precision cost, not merely a confidence-label formality.",
+      "pass": false
     },
     {
       "actualMatchQuality": "strong",
@@ -437,47 +423,45 @@
       "pass": false
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "none",
       "actualPrimaryMatches": [
-        "AI-FEAT-002(100)",
-        "AI-FEAT-003(100)",
-        "AI-FEAT-011(100)",
-        "AI-FEAT-012(100)",
-        "AI-FEAT-013(100)"
+        "AI-FEAT-003(95.20106063897916)",
+        "AI-FEAT-012(80)",
+        "AI-FEAT-035(70.4464484924597)",
+        "AI-FEAT-046(68.87817351763925)",
+        "AI-FEAT-028(68.63631116724078)"
       ],
-      "actualSources": [
-        "AI-FEAT-002"
-      ],
-      "actualStatus": "AVAILABLE",
+      "actualSources": [],
+      "actualStatus": "UNKNOWN",
       "id": "P02b",
       "knownLimitation": "Same recall gap as P02a for the \"MP4s from my card\" phrasing — zero match, safe but unhelpful.",
       "pass": false
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-028(200)",
-        "AI-FEAT-039(200)",
-        "AI-FEAT-002(100)",
-        "AI-FEAT-009(100)",
-        "AI-FEAT-015(100)"
+        "AI-FEAT-028(137.27262233448155)",
+        "AI-FEAT-039(124.61954254339798)",
+        "AI-FEAT-045(100)",
+        "AI-FEAT-018(90.23317455681047)",
+        "AI-FEAT-050(71.01934508360854)"
       ],
       "actualSources": [
         "AI-FEAT-028"
       ],
       "actualStatus": "AVAILABLE",
       "id": "P03a",
-      "knownLimitation": "CHANGED 2026-08-14 twice. First (Part 2 Decision 2, bounded Summary indexing): was a weak, tied match; became a confident, untied match on AI-FEAT-028 (Import Source Attribution) — a real improvement. Then (Part 2 Decision 1 checkpoint — AI-FEAT-039's Summary was extended with one sentence describing its direct-Event vs Collection-nested resolution distinction, per explicit product-owner instruction): that sentence's \"folder name\" phrasing, combined with AI-FEAT-039's pre-existing \"photographer\" token (from \"event/photographer structures\"), creates a new coincidental 2-word tie with AI-FEAT-039. Re-downgraded to weak/tied. \"name\" is low document-frequency (7/369, 1.9%) — a narrow, non-systemic collision, not chased with a stopword per this pass's established discipline. The answer itself is unaffected: AI-FEAT-028 still wins the ascending-ID tiebreak and is still the cited \"closest\" answer, only now hedged rather than asserted outright — an acceptable precision/recall trade-off, not a wrong answer.",
-      "pass": true
+      "knownLimitation": "CHANGED 2026-08-14 twice. First (Part 2 Decision 2, bounded Summary indexing): was a weak, tied match; became a confident, untied match on AI-FEAT-028 (Import Source Attribution) — a real improvement. Then (Part 2 Decision 1 checkpoint — AI-FEAT-039's Summary was extended with one sentence describing its direct-Event vs Collection-nested resolution distinction, per explicit product-owner instruction): that sentence's \"folder name\" phrasing, combined with AI-FEAT-039's pre-existing \"photographer\" token (from \"event/photographer structures\"), creates a new coincidental 2-word tie with AI-FEAT-039. Re-downgraded to weak/tied. \"name\" is low document-frequency (7/369, 1.9%) — a narrow, non-systemic collision, not chased with a stopword per this pass's established discipline. The answer itself is unaffected: AI-FEAT-028 still wins the ascending-ID tiebreak and is still the cited \"closest\" answer, only now hedged rather than asserted outright — an acceptable precision/recall trade-off, not a wrong answer. CHANGED AGAIN 2026-08-17 (Phase 4.3, Decision 2, surface-size normalization) — the AI-FEAT-039 tie described above is broken: primary is unchanged (still AI-FEAT-028, Import Source Attribution — the genuinely correct answer), now confidently untied at \"strong\" instead of tied at \"weak\". Unlike the other 11 cases in this cleanup pass, this one is a clean confidence-tier improvement with no change of primary record — matchQuality now mismatches the corpus's weak expectation only because the answer got more precise, not less.",
+      "pass": false
     },
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-WF-004(300)",
-        "AI-WF-001(200)",
-        "AI-WF-006(200)",
-        "AI-WF-008(200)",
-        "AI-WF-009(200)"
+        "AI-WF-004(213.0580352508256)",
+        "AI-WF-001(156.72947403689403)",
+        "AI-WF-008(149.51881349644222)",
+        "AI-WF-009(121.7120688703473)",
+        "AI-WF-006(106.96657519976787)"
       ],
       "actualSources": [
         "AI-WF-004",
@@ -491,49 +475,51 @@
       "pass": true
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-WF-002(200)",
-        "AI-WF-009(200)",
-        "AI-FEAT-002(200)",
-        "AI-FEAT-004(200)",
-        "AI-FEAT-009(200)"
+        "AI-FEAT-004(147.24939761718036)",
+        "AI-FEAT-009(127.429427149228)",
+        "AI-FEAT-013(125.6957963021281)",
+        "AI-FEAT-002(124.8830712062358)",
+        "AI-FEAT-017(115.19313262359476)"
       ],
       "actualSources": [
-        "AI-WF-002",
-        "AI-FEAT-009"
+        "AI-FEAT-004",
+        "BUG-003",
+        "BUG-006"
       ],
       "actualStatus": "AVAILABLE",
       "id": "P04a",
-      "knownLimitation": "IMPROVED during Phase 24 (strongly matched AI-WF-002 once EXPLANATION-type questions were routed to workflows). CHANGED again 2026-08-14 (Part 2 Phase 5 — new AI-WF-009 Transfer Import workflow added): AI-WF-009's real, evidence-grounded text repeatedly says \"event\" (archival events are its whole subject) and includes the real \"Start Fresh\" button label, creating a genuine 2-word tie with AI-WF-002 at the same score. Neither \"event\" (core domain vocabulary, not stopword-able) nor \"start\" (a real UI button label, not filler) is a hygiene defect to chase — this is legitimate subject-matter overlap between two real workflows, not a coincidental collision. Re-downgraded to weak/tied, but AI-WF-002 still wins the ascending-ID tiebreak and is still the cited, correct answer — an acceptable precision/recall trade-off.",
-      "pass": true
-    },
-    {
-      "actualMatchQuality": "weak",
-      "actualPrimaryMatches": [
-        "AI-FEAT-017(200)",
-        "AI-FEAT-047(200)",
-        "AI-FEAT-002(100)",
-        "AI-FEAT-003(100)",
-        "AI-FEAT-004(100)"
-      ],
-      "actualSources": [
-        "AI-FEAT-017",
-        "AI-WF-001"
-      ],
-      "actualStatus": "AVAILABLE",
-      "id": "P04b",
-      "knownLimitation": null,
-      "pass": true
+      "knownLimitation": "IMPROVED during Phase 24 (strongly matched AI-WF-002 once EXPLANATION-type questions were routed to workflows). CHANGED again 2026-08-14 (Part 2 Phase 5 — new AI-WF-009 Transfer Import workflow added): AI-WF-009's real, evidence-grounded text repeatedly says \"event\" (archival events are its whole subject) and includes the real \"Start Fresh\" button label, creating a genuine 2-word tie with AI-WF-002 at the same score. Neither \"event\" (core domain vocabulary, not stopword-able) nor \"start\" (a real UI button label, not filler) is a hygiene defect to chase — this is legitimate subject-matter overlap between two real workflows, not a coincidental collision. Re-downgraded to weak/tied, but AI-WF-002 still wins the ascending-ID tiebreak and is still the cited, correct answer — an acceptable precision/recall trade-off. CHANGED AGAIN 2026-08-17 (Phase 4.3, Decision 2, surface-size normalization) — the AI-WF-002/AI-WF-009 tie above is broken, but not in AI-WF-002's favor: primary is now AI-FEAT-004 (event.json Data Model Persistence Contract), a real record (event creation genuinely writes through this contract) but a backend/schema feature, not the user-facing \"how do I start an event\" workflow — a materially less precise answer than the pre-Phase-4.3 AI-WF-002. AI-WF-002 itself drops out of the top-5 entirely. This is the most significant precision cost among this cleanup batch's six Class-1 cases; flagged accordingly rather than described with the same boilerplate as the others. Still AVAILABLE/not a false claim, still a residual calibration effect of Decision 2 rather than a governance intrusion — but a real answer-quality regression at the quality-tier level, not merely a label formality.",
+      "pass": false
     },
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-004(200)",
-        "AI-FEAT-002(100)",
-        "AI-FEAT-003(100)",
-        "AI-FEAT-005(100)",
-        "AI-FEAT-009(100)"
+        "AI-FEAT-047(117.51994852035577)",
+        "AI-FEAT-017(115.19313262359476)",
+        "AI-FEAT-031(100)",
+        "AI-FEAT-036(100)",
+        "AI-FEAT-010(96.6766548243248)"
+      ],
+      "actualSources": [
+        "AI-FEAT-047",
+        "BUG-007",
+        "AI-WF-007"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "P04b",
+      "knownLimitation": "RESIDUAL (Phase 4.3, Decision 2) — was correctly weak/tied (AI-FEAT-017) before Phase 4.3's surface-size normalization. Now resolves confidently to AI-FEAT-047 (QMZ, unrelated) — a Feature-vs-Feature near-tie between two records of almost-identical surface size, the same class of limitation as Gap-C-short's AI-FEAT-041 case (documented in AI-FEAT-058's Phase 4.3 evolution entry). Not a Governance-intrusion case — E1-B's Approach D does not touch Feature-vs-Feature comparisons, by design (both sides share the same calibration, so adjusted-vs-adjusted is the correct comparison there). A genuine residual limitation of the normalization mechanism, not fixed in Phase 4.3, not to be chased by tuning REF/damping.",
+      "pass": false
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-FEAT-004(147.24939761718036)",
+        "AI-FEAT-031(100)",
+        "AI-FEAT-036(100)",
+        "AI-FEAT-010(96.6766548243248)",
+        "AI-FEAT-003(95.20106063897916)"
       ],
       "actualSources": [
         "AI-FEAT-004",
@@ -546,70 +532,54 @@
       "pass": false
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "none",
       "actualPrimaryMatches": [
-        "AI-FEAT-004(100)",
-        "AI-FEAT-009(100)",
-        "AI-FEAT-010(100)",
-        "AI-FEAT-017(100)",
-        "AI-FEAT-018(100)"
+        "AI-FEAT-010(96.6766548243248)",
+        "AI-FEAT-018(90.23317455681047)",
+        "AI-FEAT-004(73.62469880859018)",
+        "AI-FEAT-038(65.3486347930404)",
+        "AI-FEAT-055(63.86680546212778)"
       ],
-      "actualSources": [
-        "AI-FEAT-004",
-        "BUG-003",
-        "BUG-006"
-      ],
-      "actualStatus": "AVAILABLE",
+      "actualSources": [],
+      "actualStatus": "UNKNOWN",
       "id": "P05b",
-      "knownLimitation": "CHANGED 2026-08-14 (Part 2 Decision 2) — was a zero-match (UNKNOWN) safe decline; now a weakly-hedged, 5-way tie (AI-FEAT-004/009/010/017/018), each sharing only the generic token \"event\". Honestly hedged (\"this may not directly answer what you asked\"), not confidently wrong — an inherent recall/precision trade-off of richer indexing, not a false claim.",
-      "pass": true
-    },
-    {
-      "actualMatchQuality": "weak",
-      "actualPrimaryMatches": [
-        "AI-WF-002(100)",
-        "AI-WF-006(100)",
-        "AI-WF-009(100)",
-        "AI-FEAT-007(100)",
-        "AI-FEAT-009(100)"
-      ],
-      "actualSources": [
-        "AI-WF-002",
-        "AI-FEAT-009"
-      ],
-      "actualStatus": "AVAILABLE",
-      "id": "P06a",
-      "knownLimitation": "FIXED during Phase 24 (classifier regex widened for \"what does X mean\") then REGRESSED to a tie 2026-08-14 — the AI-WF-006 event-coordination expansion legitimately discusses the Collection→Event→Components hierarchy too (it cites the same real concept AI-WF-002 introduces), so both now score 200 and tie, downgrading quality from strong to weak. The actual top-cited answer is unaffected and still correctly AI-WF-002's own real content (ascending-ID tiebreak) — this is a confidence-label change, not a wrong-answer regression. Not chased further, consistent with this project's \"don't accumulate question-specific keyword exceptions\" discipline once the two records' overlap is genuinely topical (both really do discuss Collections) rather than coincidental.",
-      "pass": true
-    },
-    {
-      "actualMatchQuality": "weak",
-      "actualPrimaryMatches": [
-        "AI-WF-009(100)",
-        "AI-FEAT-049(100)",
-        "AI-FEAT-055(100)"
-      ],
-      "actualSources": [
-        "AI-WF-009",
-        "AI-FEAT-025",
-        "AI-FEAT-032",
-        "AI-FEAT-038",
-        "AI-FEAT-039",
-        "AI-FEAT-042"
-      ],
-      "actualStatus": "AVAILABLE",
-      "id": "P06b",
-      "knownLimitation": "Diverges from the now-fixed canonical Q06 (\"What is a Collection...\") for a different, structural reason: this uses the plural \"Collections\" while AI-WF-002 is indexed under the singular \"collection\" — lib/query.js performs no stemming (same pre-existing, structural limitation as R24's \"importing\" vs \"import\"). Safe (weak, hedged — never a confident false claim) but misses the real answer that P01a-style singular phrasing now correctly surfaces. CHANGED 2026-08-14 (Part 2 Phase 5) — the specific wrong weak match shifted from AI-FEAT-049 to AI-WF-009 (both cite \"Collection\" folders as real, evidenced vocabulary); the underlying stemming limitation and its safe/hedged character are unchanged.",
+      "knownLimitation": "CHANGED 2026-08-14 (Part 2 Decision 2) — was a zero-match (UNKNOWN) safe decline; now a weakly-hedged, 5-way tie (AI-FEAT-004/009/010/017/018), each sharing only the generic token \"event\". Honestly hedged (\"this may not directly answer what you asked\"), not confidently wrong — an inherent recall/precision trade-off of richer indexing, not a false claim. CHANGED AGAIN 2026-08-17 (Phase 4.3, Decision 2, surface-size normalization) — the single-token \"event\" evidence behind that 5-way tie is now dampened below the confidence floor; the answer returns UNKNOWN/none instead of the hedged weak AVAILABLE tie above. This is the approved conservative precision trade-off of Decision 2 — silencing a low-confidence signal rather than presenting it as a hedge — not ideal behavior, only an accepted residual consequence of the current normalization mechanism. Not a new false claim: the prior weak match was already only a generic-token collision, not a specific answer.",
       "pass": false
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "none",
       "actualPrimaryMatches": [
-        "AI-FEAT-042(300)",
-        "AI-FEAT-056(300)",
-        "AI-FEAT-051(200)",
-        "AI-FEAT-053(200)",
-        "AI-FEAT-054(200)"
+        "AI-FEAT-018(90.23317455681047)",
+        "AI-FEAT-007(66.46812738936292)",
+        "AI-FEAT-009(63.714713574614)",
+        "AI-FEAT-039(62.30977127169899)"
+      ],
+      "actualSources": [],
+      "actualStatus": "UNKNOWN",
+      "id": "P06a",
+      "knownLimitation": "FIXED during Phase 24 (classifier regex widened for \"what does X mean\") then REGRESSED to a tie 2026-08-14 — the AI-WF-006 event-coordination expansion legitimately discusses the Collection→Event→Components hierarchy too (it cites the same real concept AI-WF-002 introduces), so both now score 200 and tie, downgrading quality from strong to weak. The actual top-cited answer is unaffected and still correctly AI-WF-002's own real content (ascending-ID tiebreak) — this is a confidence-label change, not a wrong-answer regression. Not chased further, consistent with this project's \"don't accumulate question-specific keyword exceptions\" discipline once the two records' overlap is genuinely topical (both really do discuss Collections) rather than coincidental. CHANGED AGAIN 2026-08-17 (Phase 4.3, Decision 2, surface-size normalization) — the AI-WF-002/AI-WF-006 tie described above is now dampened below the confidence floor entirely (both were single/near-single-token \"Collection\" matches once normalized); the answer returns UNKNOWN/none rather than the weak, hedged AVAILABLE tie above. The approved conservative precision trade-off of Decision 2 — not ideal (the pre-Phase-4.3 hedge was more helpful), only an accepted residual consequence of the current normalization mechanism.",
+      "pass": false
+    },
+    {
+      "actualMatchQuality": "none",
+      "actualPrimaryMatches": [
+        "AI-FEAT-055(63.86680546212778)",
+        "AI-FEAT-049(60.63421746105754)"
+      ],
+      "actualSources": [],
+      "actualStatus": "UNKNOWN",
+      "id": "P06b",
+      "knownLimitation": "Diverges from the now-fixed canonical Q06 (\"What is a Collection...\") for a different, structural reason: this uses the plural \"Collections\" while AI-WF-002 is indexed under the singular \"collection\" — lib/query.js performs no stemming (same pre-existing, structural limitation as R24's \"importing\" vs \"import\"). Safe (weak, hedged — never a confident false claim) but misses the real answer that P01a-style singular phrasing now correctly surfaces. CHANGED 2026-08-14 (Part 2 Phase 5) — the specific wrong weak match shifted from AI-FEAT-049 to AI-WF-009 (both cite \"Collection\" folders as real, evidenced vocabulary); the underlying stemming limitation and its safe/hedged character are unchanged.",
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-FEAT-042(182.56810330552096)",
+        "AI-FEAT-056(180.30602001249343)",
+        "AI-FEAT-054(128.35609560947574)",
+        "AI-FEAT-053(123.11005165984757)",
+        "AI-FEAT-051(119.00394841533502)"
       ],
       "actualSources": [
         "AI-FEAT-042",
@@ -618,17 +588,17 @@
       ],
       "actualStatus": "AVAILABLE",
       "id": "P07a",
-      "knownLimitation": null,
-      "pass": true
+      "knownLimitation": "FIXED then RESIDUAL (Phase 4.3, Decision 2 / E1-B). Mid-Phase-4.3, before Approach D, this briefly regressed to BUG-011 (an unrelated scan-failure bug) via Governance-over-favoring — E1-B's Approach D fixes that: primary is AI-FEAT-042 again (Governance no longer intrudes), matching the pre-Phase-4.3 answer exactly. Quality is now \"strong\" rather than \"weak\" because Feature-vs-Feature normalization broke the pre-existing tie among Archive Operations records — same residual near-tie class as P04b, not a Governance issue. AI-FEAT-053 (Global Search, the ideally-correct answer) still loses this tiebreak, which is an UNRELATED, pre-existing Stage-1 gap (see Q07's own knownLimitation in knowledgeTestCorpus.js) — not caused by, and not fixed by, any Phase 4.3 work.",
+      "pass": false
     },
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-056(200)",
-        "AI-FEAT-004(100)",
-        "AI-FEAT-009(100)",
-        "AI-FEAT-010(100)",
-        "AI-FEAT-017(100)"
+        "AI-FEAT-056(120.20401334166229)",
+        "AI-FEAT-010(96.6766548243248)",
+        "AI-FEAT-018(90.23317455681047)",
+        "AI-FEAT-004(73.62469880859018)",
+        "AI-FEAT-058(69.12526379657446)"
       ],
       "actualSources": [
         "AI-FEAT-056",
@@ -662,48 +632,43 @@
       "pass": true
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-042(200)",
-        "AI-FEAT-052(200)",
-        "AI-FEAT-002(100)",
-        "AI-FEAT-004(100)",
-        "AI-FEAT-006(100)"
+        "AI-FEAT-052(124.35955978443555)",
+        "AI-FEAT-042(121.7120688703473)",
+        "AI-FEAT-018(90.23317455681047)",
+        "AI-FEAT-033(86.35078570398943)",
+        "AI-FEAT-019(83.20583907060379)"
       ],
       "actualSources": [
-        "AI-FEAT-042",
-        "BUG-003",
-        "AI-WF-009"
+        "AI-FEAT-052",
+        "AI-RM-007"
       ],
-      "actualStatus": "AVAILABLE",
+      "actualStatus": "PLANNED",
       "id": "P09a",
-      "knownLimitation": null,
-      "pass": true
+      "knownLimitation": "RESIDUAL (Phase 4.3, Decision 2) — was correctly weak/tied (AI-FEAT-042) before Phase 4.3. Now resolves confidently to AI-FEAT-052 (Archive Repair, unrelated) — a Feature-vs-Feature near-tie, same class as P04b/P09a, unaffected by E1-B's Governance fix since no Governance record is involved. Genuine residual limitation, not fixed in Phase 4.3.",
+      "pass": false
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "none",
       "actualPrimaryMatches": [
-        "AI-FEAT-040(100)",
-        "AI-FEAT-049(100)"
+        "AI-FEAT-040(84.70150932315059)",
+        "AI-FEAT-049(60.63421746105754)"
       ],
-      "actualSources": [
-        "AI-FEAT-040",
-        "BUG-005",
-        "AI-WF-005"
-      ],
-      "actualStatus": "AVAILABLE",
+      "actualSources": [],
+      "actualStatus": "UNKNOWN",
       "id": "P09b",
-      "knownLimitation": null,
-      "pass": true
+      "knownLimitation": "RESIDUAL (Phase 4.3, Decision 2) — was correctly weak (AI-FEAT-040, score exactly 100, a single-token match) before Phase 4.3. Normalization's absolute-evidence floor (ABSOLUTE_EVIDENCE_FLOOR_TOKENS=2) does not protect single-token matches by design (they can never reach \"strong\" quality anyway, so there was no false-confidence risk to correct) — dampening a large-surface single-token match below CONFIDENCE_FLOOR is an intended, honest consequence, not a bug. Now returns UNKNOWN rather than a weak, hedged AVAILABLE claim — a real loss of recall for a genuinely relevant capability (AI-FEAT-040 does exist), classified Acceptable Change (stays within the \"do not overclaim\" band) rather than Regression, but recorded as residual, not silently accepted as ideal.",
+      "pass": false
     },
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-038(200)",
-        "AI-FEAT-019(100)",
-        "AI-FEAT-025(100)",
+        "AI-FEAT-038(130.6972695860808)",
         "AI-FEAT-032(100)",
-        "AI-FEAT-039(100)"
+        "AI-FEAT-040(84.70150932315059)",
+        "AI-FEAT-041(84.70150932315059)",
+        "AI-FEAT-019(83.20583907060379)"
       ],
       "actualSources": [
         "AI-FEAT-038",
@@ -718,11 +683,11 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-WF-005(500)",
-        "AI-WF-006(300)",
-        "AI-WF-009(300)",
-        "AI-WF-008(200)",
-        "AI-FEAT-019(200)"
+        "AI-WF-005(334.34457782909334)",
+        "AI-WF-009(182.56810330552096)",
+        "AI-WF-006(160.4498627996518)",
+        "AI-WF-008(149.51881349644222)",
+        "AI-FEAT-040(169.40301864630118)"
       ],
       "actualSources": [
         "AI-WF-005",
@@ -739,11 +704,11 @@
     {
       "actualMatchQuality": "boundary",
       "actualPrimaryMatches": [
-        "AI-FEAT-056(200)",
-        "AI-FEAT-011(100)",
-        "AI-FEAT-020(100)",
-        "AI-FEAT-027(100)",
-        "AI-FEAT-045(100)"
+        "AI-FEAT-056(120.20401334166229)",
+        "AI-FEAT-045(100)",
+        "AI-FEAT-020(78.88940555307344)",
+        "AI-FEAT-027(60.63421746105754)",
+        "AI-FEAT-011(60.41760883424503)"
       ],
       "actualSources": [
         "face-recognition"
@@ -756,8 +721,8 @@
     {
       "actualMatchQuality": "boundary",
       "actualPrimaryMatches": [
-        "AI-FEAT-011(100)",
-        "AI-FEAT-039(100)"
+        "AI-FEAT-039(62.30977127169899)",
+        "AI-FEAT-011(60.41760883424503)"
       ],
       "actualSources": [
         "face-recognition"
@@ -770,11 +735,11 @@
     {
       "actualMatchQuality": "boundary",
       "actualPrimaryMatches": [
-        "AI-FEAT-011(100)",
-        "AI-FEAT-014(100)",
-        "AI-FEAT-019(100)",
-        "AI-FEAT-022(100)",
-        "AI-FEAT-029(100)"
+        "AI-FEAT-019(83.20583907060379)",
+        "AI-FEAT-048(80)",
+        "AI-FEAT-029(77.85882737614834)",
+        "AI-FEAT-014(69.37777978917369)",
+        "AI-FEAT-022(62.84789815106405)"
       ],
       "actualSources": [
         "photo-editing"
@@ -787,8 +752,8 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-051(200)",
-        "AI-FEAT-010(100)"
+        "AI-FEAT-051(119.00394841533502)",
+        "AI-FEAT-010(96.6766548243248)"
       ],
       "actualSources": [
         "AI-FEAT-051",
@@ -802,11 +767,11 @@
     {
       "actualMatchQuality": "boundary",
       "actualPrimaryMatches": [
-        "AI-FEAT-002(100)",
-        "AI-FEAT-028(100)",
-        "AI-FEAT-039(100)",
-        "AI-FEAT-042(100)",
-        "AI-FEAT-056(100)"
+        "AI-FEAT-028(68.63631116724078)",
+        "AI-FEAT-002(62.4415356031179)",
+        "AI-FEAT-039(62.30977127169899)",
+        "AI-FEAT-042(60.85603443517365)",
+        "AI-FEAT-056(60.102006670831145)"
       ],
       "actualSources": [
         "cloud-storage"
@@ -819,11 +784,11 @@
     {
       "actualMatchQuality": "boundary",
       "actualPrimaryMatches": [
-        "AI-FEAT-042(200)",
-        "AI-FEAT-002(100)",
-        "AI-FEAT-012(100)",
-        "AI-FEAT-013(100)",
-        "AI-FEAT-028(100)"
+        "AI-FEAT-042(121.7120688703473)",
+        "AI-FEAT-040(84.70150932315059)",
+        "AI-FEAT-012(80)",
+        "AI-FEAT-028(68.63631116724078)",
+        "AI-FEAT-038(65.3486347930404)"
       ],
       "actualSources": [
         "cloud-storage"
@@ -836,7 +801,7 @@
     {
       "actualMatchQuality": "boundary",
       "actualPrimaryMatches": [
-        "AI-FEAT-004(100)"
+        "AI-FEAT-004(73.62469880859018)"
       ],
       "actualSources": [
         "linux"
@@ -860,10 +825,10 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-057(200)",
-        "AI-FEAT-015(100)",
-        "AI-FEAT-016(100)",
-        "AI-FEAT-037(100)"
+        "AI-FEAT-057(160)",
+        "AI-FEAT-016(69.6359300069872)",
+        "AI-FEAT-015(69.37777978917369)",
+        "AI-FEAT-037(62.30977127169899)"
       ],
       "actualSources": [
         "AI-FEAT-057",
@@ -877,46 +842,39 @@
       "pass": true
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "none",
       "actualPrimaryMatches": [
-        "AI-FEAT-057(100)"
+        "AI-FEAT-057(80)"
       ],
-      "actualSources": [
-        "AI-FEAT-057",
-        "AI-RM-010",
-        "BUG-015",
-        "BUG-016"
-      ],
-      "actualStatus": "AVAILABLE",
+      "actualSources": [],
+      "actualStatus": "UNKNOWN",
       "id": "P15b",
-      "knownLimitation": null,
-      "pass": true
+      "knownLimitation": "RESIDUAL (Phase 4.3, Decision 2) — same single-token-floor pattern as P09b: was weak (AI-FEAT-057, score 100) before Phase 4.3, now UNKNOWN. Topically correct signal suppressed to silence rather than converted to false confidence — Acceptable Change, but a real recall loss, recorded as residual.",
+      "pass": false
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "none",
       "actualPrimaryMatches": [
-        "AI-FEAT-006(100)",
-        "AI-FEAT-014(100)",
-        "AI-FEAT-019(100)",
-        "AI-FEAT-022(100)",
-        "AI-FEAT-029(100)"
+        "AI-FEAT-040(84.70150932315059)",
+        "AI-FEAT-019(83.20583907060379)",
+        "AI-FEAT-048(80)",
+        "AI-FEAT-057(80)",
+        "AI-FEAT-029(77.85882737614834)"
       ],
-      "actualSources": [
-        "AI-FEAT-006"
-      ],
-      "actualStatus": "AVAILABLE",
+      "actualSources": [],
+      "actualStatus": "UNKNOWN",
       "id": "P16a",
-      "knownLimitation": null,
-      "pass": true
+      "knownLimitation": "RESIDUAL (Phase 4.3, Decision 2) — same single-token-floor pattern as P09b/P15b: was weak (AI-FEAT-006, score 100) before Phase 4.3, now UNKNOWN (via a different single-token match, AI-FEAT-040, that also falls below the floor). Acceptable Change, recall loss recorded as residual.",
+      "pass": false
     },
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-006(300)",
-        "AI-FEAT-007(200)",
-        "AI-FEAT-042(200)",
-        "AI-FEAT-049(200)",
-        "AI-FEAT-052(200)"
+        "AI-FEAT-006(200)",
+        "AI-FEAT-007(132.93625477872584)",
+        "AI-FEAT-052(124.35955978443555)",
+        "AI-FEAT-042(121.7120688703473)",
+        "AI-FEAT-049(121.26843492211508)"
       ],
       "actualSources": [
         "AI-FEAT-006"
@@ -927,87 +885,87 @@
       "pass": true
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-WF-004(300)",
-        "AI-WF-006(300)",
-        "AI-FEAT-023(300)",
-        "AI-FEAT-033(300)",
-        "AI-FEAT-034(300)"
+        "AI-FEAT-033(259.0523571119683)",
+        "AI-FEAT-023(196.58155617459335)",
+        "AI-FEAT-034(196.0459043791212)",
+        "AI-FEAT-049(181.9026523831726)",
+        "AI-FEAT-029(155.71765475229668)"
       ],
       "actualSources": [
-        "AI-WF-004",
-        "AI-FEAT-031",
         "AI-FEAT-033",
-        "AI-FEAT-034"
+        "AI-RM-001",
+        "BUG-007",
+        "AI-WF-004"
       ],
       "actualStatus": "AVAILABLE",
       "id": "P17a",
-      "knownLimitation": null,
-      "pass": true
+      "knownLimitation": "FIXED then RESIDUAL (Phase 4.3, Decision 2 / E1-B). Mid-Phase-4.3, before Approach D, this briefly regressed to PM-001 (a postmortem) via Governance-over-favoring, losing direct how-to instructions — E1-B's Approach D fixes that: primary is now AI-FEAT-033 (Metadata Audit & Repair), Governance no longer intrudes. AI-FEAT-033 rather than the pre-Phase-4.3 AI-WF-004 (the workflow) is a residual Feature-vs-Workflow near-tie, not a Governance issue — AI-WF-004's own steps are still cited via the companion-workflow mechanism regardless of which one wins primary, so this residual is low-impact.",
+      "pass": false
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-023(200)",
-        "AI-FEAT-029(200)",
-        "AI-FEAT-033(200)",
-        "AI-FEAT-034(200)",
-        "AI-FEAT-049(200)"
+        "AI-FEAT-033(172.70157140797886)",
+        "AI-FEAT-029(155.71765475229668)",
+        "AI-FEAT-023(131.0543707830622)",
+        "AI-FEAT-034(130.6972695860808)",
+        "AI-FEAT-049(121.26843492211508)"
       ],
       "actualSources": [
-        "AI-FEAT-023",
-        "AI-WF-003"
+        "AI-FEAT-033",
+        "AI-RM-001",
+        "BUG-007",
+        "AI-WF-004"
       ],
       "actualStatus": "AVAILABLE",
       "id": "P17b",
-      "knownLimitation": "CHANGED 2026-08-14 (Part 2 Decision 2) — was an untied strong match on AI-FEAT-033 alone; now a 5-way tie (AI-FEAT-023/029/033/034/049) at the same score, since Summary indexing widened recall for all of them. AI-FEAT-033 (the genuinely correct answer) is still among the tied candidates, honestly hedged rather than dropped — a precision/recall trade-off, not a wrong answer.",
-      "pass": true
+      "knownLimitation": "CHANGED 2026-08-14 (Part 2 Decision 2) — was an untied strong match on AI-FEAT-033 alone; now a 5-way tie (AI-FEAT-023/029/033/034/049) at the same score, since Summary indexing widened recall for all of them. AI-FEAT-033 (the genuinely correct answer) is still among the tied candidates, honestly hedged rather than dropped — a precision/recall trade-off, not a wrong answer. CHANGED AGAIN 2026-08-17 (Phase 4.3, Decision 2, surface-size normalization) — the 5-way tie above is broken, and in this case favorably: primary is now AI-FEAT-033 (Metadata Audit & Repair) itself, confidently untied at \"strong\" — the correct answer, no longer merely one of five hedged candidates. matchQuality now mismatches the corpus's weak expectation only because the answer got more precise, not less; a genuine improvement in answer quality even though it fails the exact-quality-tier check.",
+      "pass": false
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-049(200)",
-        "AI-FEAT-050(200)",
-        "AI-FEAT-051(200)",
-        "AI-FEAT-002(100)",
-        "AI-FEAT-004(100)"
+        "AI-FEAT-050(142.03869016721708)",
+        "AI-FEAT-049(121.26843492211508)",
+        "AI-FEAT-051(119.00394841533502)",
+        "AI-FEAT-045(100)",
+        "AI-FEAT-043(93.82987842007934)"
       ],
       "actualSources": [
-        "AI-FEAT-049",
-        "AI-RM-001",
-        "AI-RM-002"
+        "AI-FEAT-050",
+        "AI-RM-003"
       ],
       "actualStatus": "PLANNED",
       "id": "P18a",
-      "knownLimitation": "CHANGED 2026-08-14 (Part 2 Decision 2) — was an untied strong match on AI-FEAT-049 alone; now ties with AI-FEAT-050/051/056, all genuinely related Planned archive-direction features (per 11_ARCHITECTURAL_EVOLUTION.md §I). Status remains correctly PLANNED; only the match confidence changed, not the correctness.",
-      "pass": true
+      "knownLimitation": "CHANGED 2026-08-14 (Part 2 Decision 2) — was an untied strong match on AI-FEAT-049 alone; now ties with AI-FEAT-050/051/056, all genuinely related Planned archive-direction features (per 11_ARCHITECTURAL_EVOLUTION.md §I). Status remains correctly PLANNED; only the match confidence changed, not the correctness. CHANGED AGAIN 2026-08-17 (Phase 4.3, Decision 2, surface-size normalization) — the AI-FEAT-049/050/051 tie above is broken: primary is now AI-FEAT-050 (Event Maintenance) rather than AI-FEAT-049 (Archive Maintenance), confidently untied at \"strong\". A lateral shift within the same genuinely-related Planned archive-maintenance cluster documented above, not a jump to an unrelated record — status remains correctly PLANNED. matchQuality now mismatches the corpus's weak expectation only because the answer got more confident, not because it became wrong.",
+      "pass": false
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-049(200)",
-        "AI-FEAT-050(200)",
-        "AI-FEAT-051(200)",
-        "AI-FEAT-002(100)",
-        "AI-FEAT-004(100)"
+        "AI-FEAT-050(142.03869016721708)",
+        "AI-FEAT-049(121.26843492211508)",
+        "AI-FEAT-051(119.00394841533502)",
+        "AI-FEAT-018(90.23317455681047)",
+        "AI-FEAT-005(89.1776893064046)"
       ],
       "actualSources": [
-        "AI-FEAT-049",
-        "AI-RM-001",
-        "AI-RM-002"
+        "AI-FEAT-050",
+        "AI-RM-003"
       ],
       "actualStatus": "PLANNED",
       "id": "P18b",
-      "knownLimitation": "CHANGED 2026-08-14 (Part 2 Decision 2) — same tie pattern as P18a. Status remains correctly PLANNED.",
-      "pass": true
+      "knownLimitation": "CHANGED 2026-08-14 (Part 2 Decision 2) — same tie pattern as P18a. Status remains correctly PLANNED. CHANGED AGAIN 2026-08-17 (Phase 4.3, Decision 2, surface-size normalization) — same tie-break pattern as P18a: primary is now AI-FEAT-050 (Event Maintenance) rather than AI-FEAT-049, confidently untied at \"strong\", still within the same genuinely-related Planned archive-maintenance cluster. Status remains correctly PLANNED; matchQuality now mismatches the corpus's weak expectation only because the answer got more confident.",
+      "pass": false
     },
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
         "AI-FEAT-047(850)",
-        "AI-FEAT-029(100)",
-        "AI-FEAT-046(100)"
+        "AI-FEAT-029(77.85882737614834)",
+        "AI-FEAT-046(68.87817351763925)"
       ],
       "actualSources": [
         "AI-FEAT-047",
@@ -1023,9 +981,9 @@
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
         "AI-FEAT-047(850)",
-        "AI-FEAT-007(100)",
-        "AI-FEAT-029(100)",
-        "AI-FEAT-046(100)"
+        "AI-FEAT-029(77.85882737614834)",
+        "AI-FEAT-046(68.87817351763925)",
+        "AI-FEAT-007(66.46812738936292)"
       ],
       "actualSources": [
         "AI-FEAT-047",
@@ -1040,11 +998,11 @@
     {
       "actualMatchQuality": "boundary",
       "actualPrimaryMatches": [
-        "AI-FEAT-026(200)",
-        "AI-FEAT-009(100)",
-        "AI-FEAT-016(100)",
-        "AI-FEAT-023(100)",
-        "AI-FEAT-027(100)"
+        "AI-FEAT-026(143.86639246024882)",
+        "AI-FEAT-040(84.70150932315059)",
+        "AI-FEAT-016(69.6359300069872)",
+        "AI-FEAT-023(65.5271853915311)",
+        "AI-FEAT-034(65.3486347930404)"
       ],
       "actualSources": [
         "multi-user-roles"
@@ -1057,11 +1015,11 @@
     {
       "actualMatchQuality": "boundary",
       "actualPrimaryMatches": [
-        "AI-FEAT-002(100)",
-        "AI-FEAT-008(100)",
-        "AI-FEAT-009(100)",
-        "AI-FEAT-013(100)",
-        "AI-FEAT-017(100)"
+        "AI-FEAT-008(84.70150932315059)",
+        "AI-FEAT-026(71.93319623012441)",
+        "AI-FEAT-023(65.5271853915311)",
+        "AI-FEAT-025(65.0004311405249)",
+        "AI-FEAT-009(63.714713574614)"
       ],
       "actualSources": [
         "multi-user-roles"
@@ -1074,14 +1032,15 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-027(500)",
-        "AI-FEAT-048(500)",
-        "AI-FEAT-002(200)",
-        "AI-FEAT-011(200)",
-        "AI-FEAT-042(200)"
+        "AI-FEAT-048(400)",
+        "AI-FEAT-027(303.1710873052877)",
+        "AI-FEAT-002(124.8830712062358)",
+        "AI-FEAT-042(121.7120688703473)",
+        "AI-FEAT-011(120.83521766849006)"
       ],
       "actualSources": [
-        "AI-FEAT-027"
+        "AI-FEAT-048",
+        "AI-WF-006"
       ],
       "actualStatus": "AVAILABLE",
       "id": "R01",
@@ -1091,11 +1050,11 @@
     {
       "actualMatchQuality": "boundary",
       "actualPrimaryMatches": [
-        "AI-FEAT-011(200)",
-        "AI-FEAT-027(200)",
-        "AI-FEAT-048(200)",
-        "AI-FEAT-002(100)",
-        "AI-FEAT-004(100)"
+        "AI-FEAT-048(160)",
+        "AI-FEAT-027(121.26843492211508)",
+        "AI-FEAT-011(120.83521766849006)",
+        "AI-FEAT-036(100)",
+        "AI-FEAT-005(89.1776893064046)"
       ],
       "actualSources": [
         "registry-media-storage"
@@ -1106,13 +1065,13 @@
       "pass": true
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-018(200)",
-        "AI-FEAT-042(200)",
-        "AI-FEAT-048(200)",
-        "AI-FEAT-002(100)",
-        "AI-FEAT-011(100)"
+        "AI-FEAT-018(180.46634911362094)",
+        "AI-FEAT-048(160)",
+        "AI-FEAT-042(121.7120688703473)",
+        "AI-FEAT-024(100)",
+        "AI-FEAT-021(90.23317455681047)"
       ],
       "actualSources": [
         "AI-FEAT-018",
@@ -1121,17 +1080,17 @@
       ],
       "actualStatus": "AVAILABLE",
       "id": "R03",
-      "knownLimitation": null,
-      "pass": true
+      "knownLimitation": "FIXED (Phase 4.3, Decision 2 / E1-B). Mid-Phase-4.3, before Approach D, this briefly regressed to DEC-003 (Local-First and On-Premises Architecture, topically tangential) via Governance-over-favoring — E1-B's Approach D fixes it exactly: primary is AI-FEAT-018, matching the pre-Phase-4.3 answer precisely. No residual for this case.",
+      "pass": false
     },
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-WF-006(400)",
-        "AI-FEAT-002(200)",
-        "AI-FEAT-039(200)",
-        "AI-FEAT-044(200)",
-        "AI-FEAT-049(200)"
+        "AI-WF-006(213.93315039953575)",
+        "AI-FEAT-050(142.03869016721708)",
+        "AI-FEAT-044(128.99826366871602)",
+        "AI-FEAT-002(124.8830712062358)",
+        "AI-FEAT-039(124.61954254339798)"
       ],
       "actualSources": [
         "AI-WF-006",
@@ -1145,11 +1104,11 @@
     {
       "actualMatchQuality": "boundary",
       "actualPrimaryMatches": [
-        "AI-FEAT-010(200)",
-        "AI-FEAT-051(200)",
-        "AI-FEAT-002(100)",
-        "AI-FEAT-003(100)",
-        "AI-FEAT-004(100)"
+        "AI-FEAT-010(193.3533096486496)",
+        "AI-FEAT-051(119.00394841533502)",
+        "AI-FEAT-003(95.20106063897916)",
+        "AI-FEAT-018(90.23317455681047)",
+        "AI-FEAT-021(90.23317455681047)"
       ],
       "actualSources": [
         "registry-conflict-detection"
@@ -1162,15 +1121,16 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-WF-006(400)",
-        "AI-WF-008(300)",
-        "AI-WF-004(200)",
-        "AI-FEAT-038(300)",
-        "AI-FEAT-053(300)"
+        "AI-WF-008(224.27822024466332)",
+        "AI-WF-006(213.93315039953575)",
+        "AI-WF-004(142.03869016721708)",
+        "AI-FEAT-038(196.0459043791212)",
+        "AI-FEAT-053(184.66507748977136)"
       ],
       "actualSources": [
-        "AI-WF-006",
-        "AI-FEAT-048"
+        "AI-WF-008",
+        "AI-FEAT-043",
+        "AI-FEAT-045"
       ],
       "actualStatus": "AVAILABLE",
       "id": "R06",
@@ -1178,16 +1138,17 @@
       "pass": true
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-002(200)",
-        "AI-FEAT-017(200)",
-        "AI-FEAT-037(200)",
-        "AI-FEAT-039(200)",
-        "AI-FEAT-048(200)"
+        "AI-FEAT-048(160)",
+        "AI-FEAT-002(124.8830712062358)",
+        "AI-FEAT-037(124.61954254339798)",
+        "AI-FEAT-039(124.61954254339798)",
+        "AI-FEAT-017(115.19313262359476)"
       ],
       "actualSources": [
-        "AI-FEAT-002"
+        "AI-FEAT-048",
+        "AI-WF-006"
       ],
       "actualStatus": "AVAILABLE",
       "id": "R07",
@@ -1197,15 +1158,15 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-WF-006(400)",
-        "AI-WF-008(200)",
-        "AI-FEAT-027(400)",
-        "AI-FEAT-048(400)",
-        "AI-FEAT-011(200)"
+        "AI-FEAT-048(320)",
+        "AI-FEAT-027(242.53686984423015)",
+        "AI-FEAT-034(130.6972695860808)",
+        "AI-FEAT-011(120.83521766849006)",
+        "AI-FEAT-036(100)"
       ],
       "actualSources": [
-        "AI-WF-006",
-        "AI-FEAT-048"
+        "AI-FEAT-048",
+        "AI-WF-006"
       ],
       "actualStatus": "AVAILABLE",
       "id": "R08",
@@ -1215,11 +1176,11 @@
     {
       "actualMatchQuality": "boundary",
       "actualPrimaryMatches": [
-        "AI-FEAT-054(300)",
-        "AI-FEAT-002(200)",
-        "AI-FEAT-018(200)",
-        "AI-FEAT-019(200)",
-        "AI-FEAT-027(200)"
+        "AI-FEAT-054(192.53414341421362)",
+        "AI-FEAT-018(180.46634911362094)",
+        "AI-FEAT-019(166.41167814120757)",
+        "AI-FEAT-028(137.27262233448155)",
+        "AI-FEAT-002(124.8830712062358)"
       ],
       "actualSources": [
         "registry-conflict-detection"
@@ -1233,10 +1194,10 @@
       "actualMatchQuality": "boundary",
       "actualPrimaryMatches": [
         "AI-FEAT-047(850)",
-        "AI-FEAT-027(200)",
-        "AI-FEAT-055(200)",
-        "AI-FEAT-002(100)",
-        "AI-FEAT-009(100)"
+        "AI-FEAT-055(127.73361092425556)",
+        "AI-FEAT-027(121.26843492211508)",
+        "AI-FEAT-043(93.82987842007934)",
+        "AI-FEAT-048(80)"
       ],
       "actualSources": [
         "registry-activity-scope"
@@ -1249,15 +1210,16 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-WF-006(400)",
-        "AI-WF-008(300)",
-        "AI-FEAT-027(300)",
-        "AI-FEAT-034(200)",
-        "AI-FEAT-037(200)"
+        "AI-WF-008(224.27822024466332)",
+        "AI-WF-006(213.93315039953575)",
+        "AI-FEAT-027(181.9026523831726)",
+        "AI-FEAT-048(160)",
+        "AI-FEAT-046(137.7563470352785)"
       ],
       "actualSources": [
-        "AI-WF-006",
-        "AI-FEAT-048"
+        "AI-WF-008",
+        "AI-FEAT-043",
+        "AI-FEAT-045"
       ],
       "actualStatus": "AVAILABLE",
       "id": "R11",
@@ -1267,11 +1229,11 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-048(200)",
-        "AI-FEAT-007(100)",
-        "AI-FEAT-009(100)",
-        "AI-FEAT-017(100)",
-        "AI-FEAT-042(100)"
+        "AI-FEAT-048(160)",
+        "AI-FEAT-007(66.46812738936292)",
+        "AI-FEAT-009(63.714713574614)",
+        "AI-FEAT-042(60.85603443517365)",
+        "AI-FEAT-051(59.50197420766751)"
       ],
       "actualSources": [
         "AI-FEAT-048",
@@ -1285,9 +1247,9 @@
     {
       "actualMatchQuality": "boundary",
       "actualPrimaryMatches": [
-        "AI-FEAT-011(100)",
-        "AI-FEAT-039(100)",
-        "AI-FEAT-044(100)"
+        "AI-FEAT-044(64.49913183435801)",
+        "AI-FEAT-039(62.30977127169899)",
+        "AI-FEAT-011(60.41760883424503)"
       ],
       "actualSources": [
         "registry-media-storage"
@@ -1300,11 +1262,11 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-018(200)",
-        "AI-FEAT-001(100)",
-        "AI-FEAT-002(100)",
-        "AI-FEAT-011(100)",
-        "AI-FEAT-012(100)"
+        "AI-FEAT-018(180.46634911362094)",
+        "AI-FEAT-024(100)",
+        "AI-FEAT-030(96.6766548243248)",
+        "AI-FEAT-021(90.23317455681047)",
+        "AI-FEAT-001(87.24171679421262)"
       ],
       "actualSources": [
         "AI-FEAT-018",
@@ -1317,34 +1279,35 @@
       "pass": true
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-044(200)",
-        "AI-FEAT-048(200)",
-        "AI-FEAT-017(100)",
-        "AI-FEAT-019(100)",
-        "AI-FEAT-025(100)"
+        "AI-FEAT-048(160)",
+        "AI-FEAT-044(128.99826366871602)",
+        "AI-FEAT-019(83.20583907060379)",
+        "AI-FEAT-058(69.12526379657446)",
+        "AI-FEAT-034(65.3486347930404)"
       ],
       "actualSources": [
-        "AI-FEAT-044"
+        "AI-FEAT-048",
+        "AI-WF-006"
       ],
       "actualStatus": "AVAILABLE",
       "id": "R15",
-      "knownLimitation": null,
-      "pass": true
+      "knownLimitation": "IMPROVEMENT (Phase 4.3, Decision 2) — was weak/tied (AI-FEAT-044) before Phase 4.3. Normalization now confidently, untied resolves to AI-FEAT-048 (Realtime Team Presence & Online Registry) — the genuinely more relevant record for a question specifically about relay/sync behavior. Not a Governance-related case; unaffected by, and unaffected the need for, E1-B.",
+      "pass": false
     },
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-WF-006(400)",
-        "AI-WF-008(300)",
-        "AI-FEAT-027(300)",
-        "AI-FEAT-048(300)",
-        "AI-FEAT-004(200)"
+        "AI-FEAT-048(240)",
+        "AI-FEAT-027(181.9026523831726)",
+        "AI-FEAT-004(147.24939761718036)",
+        "AI-FEAT-046(137.7563470352785)",
+        "AI-FEAT-028(137.27262233448155)"
       ],
       "actualSources": [
-        "AI-WF-006",
-        "AI-FEAT-048"
+        "AI-FEAT-048",
+        "AI-WF-006"
       ],
       "actualStatus": "AVAILABLE",
       "id": "R16",
@@ -1355,10 +1318,10 @@
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
         "AI-FEAT-045(500)",
-        "AI-FEAT-027(300)",
-        "AI-FEAT-048(300)",
-        "AI-FEAT-049(300)",
-        "AI-FEAT-004(200)"
+        "AI-FEAT-048(240)",
+        "AI-FEAT-027(181.9026523831726)",
+        "AI-FEAT-049(181.9026523831726)",
+        "AI-FEAT-004(147.24939761718036)"
       ],
       "actualSources": [
         "AI-FEAT-045",
@@ -1373,10 +1336,10 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-027(200)",
-        "AI-FEAT-023(100)",
-        "AI-FEAT-048(100)",
-        "AI-FEAT-051(100)"
+        "AI-FEAT-027(121.26843492211508)",
+        "AI-FEAT-048(80)",
+        "AI-FEAT-023(65.5271853915311)",
+        "AI-FEAT-051(59.50197420766751)"
       ],
       "actualSources": [
         "AI-FEAT-027"
@@ -1389,11 +1352,11 @@
     {
       "actualMatchQuality": "boundary",
       "actualPrimaryMatches": [
-        "AI-FEAT-027(300)",
-        "AI-FEAT-034(300)",
-        "AI-FEAT-009(200)",
-        "AI-FEAT-023(200)",
-        "AI-FEAT-026(200)"
+        "AI-FEAT-034(196.0459043791212)",
+        "AI-FEAT-043(187.65975684015868)",
+        "AI-FEAT-027(181.9026523831726)",
+        "AI-FEAT-033(172.70157140797886)",
+        "AI-FEAT-048(160)"
       ],
       "actualSources": [
         "registry-activity-scope"
@@ -1406,11 +1369,11 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-038(400)",
-        "AI-FEAT-040(300)",
-        "AI-FEAT-019(200)",
-        "AI-FEAT-025(200)",
-        "AI-FEAT-039(200)"
+        "AI-FEAT-038(261.3945391721616)",
+        "AI-FEAT-040(254.10452796945177)",
+        "AI-FEAT-041(169.40301864630118)",
+        "AI-FEAT-019(166.41167814120757)",
+        "AI-FEAT-025(130.0008622810498)"
       ],
       "actualSources": [
         "AI-FEAT-038",
@@ -1425,11 +1388,11 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-WF-008(300)",
-        "AI-WF-006(200)",
-        "AI-FEAT-027(200)",
-        "AI-FEAT-048(200)",
-        "AI-FEAT-004(100)"
+        "AI-WF-008(224.27822024466332)",
+        "AI-WF-006(106.96657519976787)",
+        "AI-FEAT-048(160)",
+        "AI-FEAT-027(121.26843492211508)",
+        "AI-FEAT-036(100)"
       ],
       "actualSources": [
         "AI-WF-008",
@@ -1444,11 +1407,11 @@
     {
       "actualMatchQuality": "boundary",
       "actualPrimaryMatches": [
-        "AI-FEAT-007(100)",
-        "AI-FEAT-011(100)",
-        "AI-FEAT-020(100)",
-        "AI-FEAT-023(100)",
-        "AI-FEAT-027(100)"
+        "AI-FEAT-045(100)",
+        "AI-FEAT-040(84.70150932315059)",
+        "AI-FEAT-020(78.88940555307344)",
+        "AI-FEAT-007(66.46812738936292)",
+        "AI-FEAT-023(65.5271853915311)"
       ],
       "actualSources": [
         "registry-conflict-detection"
@@ -1461,11 +1424,11 @@
     {
       "actualMatchQuality": "boundary",
       "actualPrimaryMatches": [
-        "AI-FEAT-027(500)",
-        "AI-FEAT-048(500)",
-        "AI-FEAT-044(300)",
-        "AI-FEAT-002(200)",
-        "AI-FEAT-009(200)"
+        "AI-FEAT-048(400)",
+        "AI-FEAT-027(303.1710873052877)",
+        "AI-FEAT-044(193.49739550307405)",
+        "AI-FEAT-055(127.73361092425556)",
+        "AI-FEAT-009(127.429427149228)"
       ],
       "actualSources": [
         "registry-conflict-detection"
@@ -1476,30 +1439,27 @@
       "pass": true
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "none",
       "actualPrimaryMatches": [
-        "AI-FEAT-039(100)",
-        "AI-FEAT-042(100)",
-        "AI-FEAT-044(100)",
-        "AI-FEAT-058(100)"
+        "AI-FEAT-058(69.12526379657446)",
+        "AI-FEAT-044(64.49913183435801)",
+        "AI-FEAT-039(62.30977127169899)",
+        "AI-FEAT-042(60.85603443517365)"
       ],
-      "actualSources": [
-        "AI-FEAT-039",
-        "AI-WF-005"
-      ],
-      "actualStatus": "AVAILABLE",
+      "actualSources": [],
+      "actualStatus": "UNKNOWN",
       "id": "R24",
       "knownLimitation": "Zero match — the question uses \"importing\" (gerund) rather than \"import\"; lib/query.js performs no stemming (a pre-existing, structural, shared-ranker characteristic — see DEC-019's \"reuse lib/query.js unchanged\" — not something this stage changes). Safe (no invented claim) but misses surfacing the already-evidenced fact that import/sync do not block on relay unavailability (see R03/R14, which use \"import\"/\"internet\" verbatim and do surface a weak, hedged, on-topic answer).",
-      "pass": false
+      "pass": true
     },
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-WF-003(500)",
-        "AI-WF-001(200)",
-        "AI-WF-005(200)",
-        "AI-WF-006(200)",
-        "AI-WF-008(200)"
+        "AI-WF-003(445.888446532023)",
+        "AI-WF-001(156.72947403689403)",
+        "AI-WF-008(149.51881349644222)",
+        "AI-WF-005(133.73783113163734)",
+        "AI-WF-006(106.96657519976787)"
       ],
       "actualSources": [
         "AI-WF-003",
@@ -1513,11 +1473,11 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-023(200)",
-        "AI-FEAT-002(100)",
-        "AI-FEAT-003(100)",
-        "AI-FEAT-011(100)",
-        "AI-FEAT-012(100)"
+        "AI-FEAT-023(131.0543707830622)",
+        "AI-FEAT-024(100)",
+        "AI-FEAT-003(95.20106063897916)",
+        "AI-FEAT-018(90.23317455681047)",
+        "AI-FEAT-021(90.23317455681047)"
       ],
       "actualSources": [
         "AI-FEAT-023",
@@ -1532,10 +1492,10 @@
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
         "AI-FEAT-045(500)",
-        "AI-FEAT-049(300)",
-        "AI-FEAT-047(200)",
-        "AI-FEAT-051(200)",
-        "AI-FEAT-002(100)"
+        "AI-FEAT-049(181.9026523831726)",
+        "AI-FEAT-051(119.00394841533502)",
+        "AI-FEAT-047(117.51994852035577)",
+        "AI-FEAT-030(96.6766548243248)"
       ],
       "actualSources": [
         "AI-FEAT-045",
@@ -1550,14 +1510,16 @@
     {
       "actualMatchQuality": "weak",
       "actualPrimaryMatches": [
-        "AI-FEAT-001(100)",
-        "AI-FEAT-002(100)",
-        "AI-FEAT-004(100)",
-        "AI-FEAT-018(100)",
-        "AI-FEAT-019(100)"
+        "AI-FEAT-045(100)",
+        "AI-FEAT-043(93.82987842007934)",
+        "AI-FEAT-018(90.23317455681047)",
+        "AI-FEAT-001(87.24171679421262)",
+        "AI-FEAT-033(86.35078570398943)"
       ],
       "actualSources": [
-        "AI-FEAT-001"
+        "AI-FEAT-045",
+        "BUG-004",
+        "AI-WF-008"
       ],
       "actualStatus": "AVAILABLE",
       "id": "W04",
@@ -1568,10 +1530,10 @@
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
         "AI-FEAT-047(850)",
-        "AI-FEAT-007(100)",
-        "AI-FEAT-015(100)",
-        "AI-FEAT-017(100)",
-        "AI-FEAT-023(100)"
+        "AI-FEAT-029(77.85882737614834)",
+        "AI-FEAT-015(69.37777978917369)",
+        "AI-FEAT-046(68.87817351763925)",
+        "AI-FEAT-007(66.46812738936292)"
       ],
       "actualSources": [
         "AI-FEAT-047",
@@ -1587,10 +1549,10 @@
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
         "AI-FEAT-047(850)",
-        "AI-FEAT-017(200)",
-        "AI-FEAT-049(200)",
-        "AI-FEAT-013(100)",
-        "AI-FEAT-015(100)"
+        "AI-FEAT-049(121.26843492211508)",
+        "AI-FEAT-017(115.19313262359476)",
+        "AI-FEAT-029(77.85882737614834)",
+        "AI-FEAT-050(71.01934508360854)"
       ],
       "actualSources": [
         "AI-FEAT-047",
@@ -1606,10 +1568,10 @@
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
         "AI-FEAT-038(900)",
-        "AI-FEAT-039(300)",
-        "AI-FEAT-019(200)",
-        "AI-FEAT-040(200)",
-        "AI-FEAT-041(200)"
+        "AI-FEAT-039(186.92931381509698)",
+        "AI-FEAT-040(169.40301864630118)",
+        "AI-FEAT-041(169.40301864630118)",
+        "AI-FEAT-019(166.41167814120757)"
       ],
       "actualSources": [
         "AI-FEAT-038",
@@ -1625,10 +1587,10 @@
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
         "AI-FEAT-038(900)",
-        "AI-FEAT-042(300)",
-        "AI-FEAT-019(200)",
-        "AI-FEAT-039(200)",
-        "AI-FEAT-040(200)"
+        "AI-FEAT-042(182.56810330552096)",
+        "AI-FEAT-040(169.40301864630118)",
+        "AI-FEAT-041(169.40301864630118)",
+        "AI-FEAT-019(166.41167814120757)"
       ],
       "actualSources": [
         "AI-FEAT-038",
@@ -1641,13 +1603,13 @@
       "pass": true
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-010(300)",
-        "AI-FEAT-051(300)",
-        "AI-FEAT-009(200)",
-        "AI-FEAT-046(200)",
-        "AI-FEAT-055(200)"
+        "AI-FEAT-010(290.0299644729744)",
+        "AI-FEAT-051(178.50592262300253)",
+        "AI-FEAT-046(137.7563470352785)",
+        "AI-FEAT-055(127.73361092425556)",
+        "AI-FEAT-009(127.429427149228)"
       ],
       "actualSources": [
         "AI-FEAT-010",
@@ -1660,13 +1622,13 @@
       "pass": false
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-021(200)",
-        "AI-FEAT-047(200)",
-        "AI-FEAT-002(100)",
-        "AI-FEAT-003(100)",
-        "AI-FEAT-004(100)"
+        "AI-FEAT-021(180.46634911362094)",
+        "AI-FEAT-047(117.51994852035577)",
+        "AI-FEAT-031(100)",
+        "AI-FEAT-010(96.6766548243248)",
+        "AI-FEAT-003(95.20106063897916)"
       ],
       "actualSources": [
         "AI-FEAT-021"
@@ -1677,44 +1639,38 @@
       "pass": false
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "none",
       "actualPrimaryMatches": [
-        "AI-WF-002(100)",
-        "AI-WF-003(100)",
-        "AI-WF-006(100)",
-        "AI-FEAT-002(100)",
-        "AI-FEAT-005(100)"
+        "AI-FEAT-005(89.1776893064046)",
+        "AI-FEAT-015(69.37777978917369)",
+        "AI-FEAT-007(66.46812738936292)",
+        "AI-FEAT-002(62.4415356031179)"
       ],
-      "actualSources": [
-        "AI-WF-002",
-        "AI-FEAT-009"
-      ],
-      "actualStatus": "AVAILABLE",
+      "actualSources": [],
+      "actualStatus": "UNKNOWN",
       "id": "W11",
       "knownLimitation": "No Settings-screen workflow exists yet (disclosed gap in workflows/README.md); weak generic tie via AI-WF-002/003/006 sharing only common words.",
       "pass": false
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "none",
       "actualPrimaryMatches": [
-        "AI-FEAT-013(100)"
+        "AI-FEAT-013(62.84789815106405)"
       ],
-      "actualSources": [
-        "AI-FEAT-013"
-      ],
-      "actualStatus": "AVAILABLE",
+      "actualSources": [],
+      "actualStatus": "UNKNOWN",
       "id": "W12",
-      "knownLimitation": "CHANGED 2026-08-14 (Part 2 Decision 2) — was a zero-match (UNKNOWN) safe decline; now a single weak, heavily-hedged match on AI-FEAT-013 (\"this may not directly answer what you asked\", confidence 0.1). Honest about its own uncertainty, not a false claim — an inherent recall/precision trade-off of richer indexing.",
-      "pass": true
+      "knownLimitation": "CHANGED 2026-08-14 (Part 2 Decision 2) — was a zero-match (UNKNOWN) safe decline; now a single weak, heavily-hedged match on AI-FEAT-013 (\"this may not directly answer what you asked\", confidence 0.1). Honest about its own uncertainty, not a false claim — an inherent recall/precision trade-off of richer indexing. CHANGED AGAIN 2026-08-17 (Phase 4.3, Decision 2, surface-size normalization) — the single-token AI-FEAT-013 evidence above is now dampened below the confidence floor; the answer returns UNKNOWN/none instead of the heavily-hedged weak AVAILABLE match. The approved conservative precision trade-off of Decision 2 — not ideal (the prior hedge, while weak, at least surfaced a real candidate), only an accepted residual consequence of the current normalization mechanism.",
+      "pass": false
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-WF-004(300)",
-        "AI-WF-006(300)",
-        "AI-FEAT-023(200)",
-        "AI-FEAT-029(200)",
-        "AI-FEAT-033(200)"
+        "AI-WF-004(213.0580352508256)",
+        "AI-WF-006(160.4498627996518)",
+        "AI-FEAT-033(172.70157140797886)",
+        "AI-FEAT-029(155.71765475229668)",
+        "AI-FEAT-023(131.0543707830622)"
       ],
       "actualSources": [
         "AI-WF-004",
@@ -1724,26 +1680,22 @@
       ],
       "actualStatus": "AVAILABLE",
       "id": "W13",
-      "knownLimitation": null,
-      "pass": true
+      "knownLimitation": "IMPROVEMENT (Phase 4.3, Decision 2) — was weak/tied at AI-WF-004 (score 300, tied with another candidate) before Phase 4.3. Normalization now confidently, untied resolves to the SAME correct record, AI-WF-004 — deconflicted honestly rather than a different record winning. Not Governance-related.",
+      "pass": false
     },
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-WF-001(300)",
-        "AI-WF-003(200)",
-        "AI-FEAT-002(300)",
-        "AI-FEAT-012(300)",
-        "AI-FEAT-028(300)"
+        "AI-FEAT-012(240)",
+        "AI-FEAT-028(205.90893350172234)",
+        "AI-FEAT-002(187.3246068093537)",
+        "AI-FEAT-011(120.83521766849006)",
+        "AI-FEAT-017(115.19313262359476)"
       ],
       "actualSources": [
-        "AI-WF-001",
-        "AI-FEAT-011",
         "AI-FEAT-012",
-        "AI-FEAT-017",
-        "AI-FEAT-018",
-        "AI-FEAT-019",
-        "AI-FEAT-022"
+        "BUG-001",
+        "AI-WF-001"
       ],
       "actualStatus": "AVAILABLE",
       "id": "W14",
@@ -1753,11 +1705,11 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-049(300)",
-        "AI-FEAT-022(200)",
-        "AI-FEAT-002(100)",
-        "AI-FEAT-011(100)",
-        "AI-FEAT-012(100)"
+        "AI-FEAT-049(181.9026523831726)",
+        "AI-FEAT-022(125.6957963021281)",
+        "AI-FEAT-024(100)",
+        "AI-FEAT-018(90.23317455681047)",
+        "AI-FEAT-021(90.23317455681047)"
       ],
       "actualSources": [
         "AI-FEAT-049",
@@ -1770,33 +1722,27 @@
       "pass": false
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "none",
       "actualPrimaryMatches": [
-        "AI-FEAT-011(100)"
+        "AI-FEAT-011(60.41760883424503)"
       ],
-      "actualSources": [
-        "AI-FEAT-011",
-        "AI-WF-001"
-      ],
-      "actualStatus": "AVAILABLE",
+      "actualSources": [],
+      "actualStatus": "UNKNOWN",
       "id": "T01",
       "knownLimitation": "Misspelled (\"hw do i imprt photos\") produces zero match — safe (UNKNOWN) but unhelpful; lib/query.js performs no fuzzy/typo correction (a pre-existing, structural, shared-ranker characteristic, not addressed in this stage).",
       "pass": false
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "none",
       "actualPrimaryMatches": [
-        "AI-FEAT-011(100)",
-        "AI-FEAT-013(100)",
-        "AI-FEAT-014(100)",
-        "AI-FEAT-015(100)",
-        "AI-FEAT-018(100)"
+        "AI-FEAT-018(90.23317455681047)",
+        "AI-FEAT-029(77.85882737614834)",
+        "AI-FEAT-014(69.37777978917369)",
+        "AI-FEAT-015(69.37777978917369)",
+        "AI-FEAT-013(62.84789815106405)"
       ],
-      "actualSources": [
-        "AI-FEAT-011",
-        "AI-WF-001"
-      ],
-      "actualStatus": "AVAILABLE",
+      "actualSources": [],
+      "actualStatus": "UNKNOWN",
       "id": "T02",
       "knownLimitation": "Same misspelling-tolerance gap as T01 (\"improt video?\").",
       "pass": false
@@ -1805,8 +1751,8 @@
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
         "AI-FEAT-047(850)",
-        "AI-FEAT-029(100)",
-        "AI-FEAT-046(100)"
+        "AI-FEAT-029(77.85882737614834)",
+        "AI-FEAT-046(68.87817351763925)"
       ],
       "actualSources": [
         "AI-FEAT-047",
@@ -1819,27 +1765,25 @@
       "pass": true
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "none",
       "actualPrimaryMatches": [
-        "AI-FEAT-002(100)",
-        "AI-FEAT-006(100)",
-        "AI-FEAT-007(100)",
-        "AI-FEAT-040(100)",
-        "AI-FEAT-042(100)"
+        "AI-FEAT-040(84.70150932315059)",
+        "AI-FEAT-006(66.66666666666667)",
+        "AI-FEAT-007(66.46812738936292)",
+        "AI-FEAT-002(62.4415356031179)",
+        "AI-FEAT-052(62.17977989221777)"
       ],
-      "actualSources": [
-        "AI-FEAT-002"
-      ],
-      "actualStatus": "AVAILABLE",
+      "actualSources": [],
+      "actualStatus": "UNKNOWN",
       "id": "T04",
-      "knownLimitation": null,
-      "pass": true
+      "knownLimitation": "RESIDUAL (Phase 4.3, Decision 2) — same single-token-floor pattern as P09b/P15b/P16a: was weak (AI-FEAT-002, score 100) before Phase 4.3, now UNKNOWN (via AI-FEAT-040, also single-token, also below floor). Acceptable Change, recall loss recorded as residual.",
+      "pass": false
     },
     {
       "actualMatchQuality": "boundary",
       "actualPrimaryMatches": [
-        "AI-FEAT-042(100)",
-        "AI-FEAT-051(100)"
+        "AI-FEAT-042(60.85603443517365)",
+        "AI-FEAT-051(59.50197420766751)"
       ],
       "actualSources": [
         "linux"
@@ -1852,7 +1796,7 @@
     {
       "actualMatchQuality": "boundary",
       "actualPrimaryMatches": [
-        "AI-FEAT-056(100)"
+        "AI-FEAT-056(60.102006670831145)"
       ],
       "actualSources": [
         "face-recognition"
@@ -1865,11 +1809,11 @@
     {
       "actualMatchQuality": "boundary",
       "actualPrimaryMatches": [
-        "AI-FEAT-002(200)",
-        "AI-FEAT-027(200)",
-        "AI-FEAT-006(100)",
-        "AI-FEAT-008(100)",
-        "AI-FEAT-017(100)"
+        "AI-FEAT-002(124.8830712062358)",
+        "AI-FEAT-027(121.26843492211508)",
+        "AI-FEAT-018(90.23317455681047)",
+        "AI-FEAT-021(90.23317455681047)",
+        "AI-FEAT-008(84.70150932315059)"
       ],
       "actualSources": [
         "multi-user-roles"
@@ -1883,10 +1827,10 @@
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
         "AI-FEAT-045(500)",
-        "AI-FEAT-049(300)",
-        "AI-FEAT-047(200)",
-        "AI-FEAT-051(200)",
-        "AI-FEAT-052(200)"
+        "AI-FEAT-049(181.9026523831726)",
+        "AI-FEAT-052(124.35955978443555)",
+        "AI-FEAT-051(119.00394841533502)",
+        "AI-FEAT-047(117.51994852035577)"
       ],
       "actualSources": [
         "AI-FEAT-045",
@@ -1902,10 +1846,10 @@
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
         "AI-FEAT-038(900)",
-        "AI-FEAT-019(200)",
-        "AI-FEAT-039(200)",
-        "AI-FEAT-040(200)",
-        "AI-FEAT-041(200)"
+        "AI-FEAT-040(169.40301864630118)",
+        "AI-FEAT-041(169.40301864630118)",
+        "AI-FEAT-019(166.41167814120757)",
+        "AI-FEAT-039(124.61954254339798)"
       ],
       "actualSources": [
         "AI-FEAT-038",
@@ -1918,79 +1862,67 @@
       "pass": true
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "none",
       "actualPrimaryMatches": [
-        "AI-WF-006(100)",
-        "AI-WF-008(100)",
-        "AI-FEAT-027(100)",
-        "AI-FEAT-048(100)",
-        "AI-FEAT-051(100)"
+        "AI-FEAT-048(80)",
+        "AI-FEAT-027(60.63421746105754)",
+        "AI-FEAT-051(59.50197420766751)"
       ],
-      "actualSources": [
-        "AI-WF-006",
-        "AI-FEAT-048"
-      ],
-      "actualStatus": "AVAILABLE",
+      "actualSources": [],
+      "actualStatus": "UNKNOWN",
       "id": "T10",
-      "knownLimitation": null,
-      "pass": true
+      "knownLimitation": "RESIDUAL (Phase 4.3, Decision 2) — same single-token-floor pattern: was weak (AI-WF-006, score 100) before Phase 4.3, now UNKNOWN (via AI-FEAT-048, also single-token, also below floor). Topically-correct signal suppressed to silence rather than converted to false confidence — Acceptable Change, recall loss recorded as residual.",
+      "pass": false
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "none",
       "actualPrimaryMatches": [
-        "AI-FEAT-011(100)"
+        "AI-FEAT-011(60.41760883424503)"
       ],
-      "actualSources": [
-        "AI-FEAT-011",
-        "AI-WF-001"
-      ],
-      "actualStatus": "AVAILABLE",
+      "actualSources": [],
+      "actualStatus": "UNKNOWN",
       "id": "X01",
-      "knownLimitation": "CHANGED 2026-08-14 (Part 2 Decision 2) — was a zero-match (UNKNOWN) safe decline; now a single weak, heavily-hedged match on AI-FEAT-011 (confidence 0.1). Honest weak/hedged gap, not a confident false claim — same pattern already accepted for X02.",
-      "pass": true
+      "knownLimitation": "CHANGED 2026-08-14 (Part 2 Decision 2) — was a zero-match (UNKNOWN) safe decline; now a single weak, heavily-hedged match on AI-FEAT-011 (confidence 0.1). Honest weak/hedged gap, not a confident false claim — same pattern already accepted for X02. CHANGED AGAIN 2026-08-17 (Phase 4.3, Decision 2, surface-size normalization) — the single-token AI-FEAT-011 evidence above is now dampened below the confidence floor; the answer returns UNKNOWN/none instead of the heavily-hedged weak AVAILABLE match. The approved conservative precision trade-off of Decision 2, not ideal, only an accepted residual consequence of the current normalization mechanism.",
+      "pass": false
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "none",
       "actualPrimaryMatches": [
-        "AI-FEAT-002(100)",
-        "AI-FEAT-003(100)",
-        "AI-FEAT-004(100)",
-        "AI-FEAT-005(100)",
-        "AI-FEAT-017(100)"
+        "AI-FEAT-003(95.20106063897916)",
+        "AI-FEAT-005(89.1776893064046)",
+        "AI-FEAT-004(73.62469880859018)",
+        "AI-FEAT-028(68.63631116724078)",
+        "AI-FEAT-023(65.5271853915311)"
       ],
-      "actualSources": [
-        "AI-FEAT-002"
-      ],
-      "actualStatus": "AVAILABLE",
+      "actualSources": [],
+      "actualStatus": "UNKNOWN",
       "id": "X02",
       "knownLimitation": "No evidence either way on encryption-at-rest; weak match via AI-FEAT-004 (event.json contract) sharing only the generic word \"data\". Honest weak/hedged gap, not a confident false claim.",
       "pass": false
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "none",
       "actualPrimaryMatches": [
-        "AI-FEAT-014(100)",
-        "AI-FEAT-019(100)",
-        "AI-FEAT-022(100)",
-        "AI-FEAT-029(100)",
-        "AI-FEAT-039(100)"
+        "AI-FEAT-019(83.20583907060379)",
+        "AI-FEAT-048(80)",
+        "AI-FEAT-029(77.85882737614834)",
+        "AI-FEAT-014(69.37777978917369)",
+        "AI-FEAT-022(62.84789815106405)"
       ],
-      "actualSources": [
-        "AI-FEAT-014"
-      ],
-      "actualStatus": "AVAILABLE",
+      "actualSources": [],
+      "actualStatus": "UNKNOWN",
       "id": "X03",
-      "knownLimitation": "CHANGED 2026-08-14 (Part 2 Decision 2) — was a zero-match (UNKNOWN) safe decline; now weakly tied among AI-FEAT-014/019/022/029/039 (confidence 0.1). Honest weak/hedged gap, not a confident false claim.",
-      "pass": true
+      "knownLimitation": "CHANGED 2026-08-14 (Part 2 Decision 2) — was a zero-match (UNKNOWN) safe decline; now weakly tied among AI-FEAT-014/019/022/029/039 (confidence 0.1). Honest weak/hedged gap, not a confident false claim. CHANGED AGAIN 2026-08-17 (Phase 4.3, Decision 2, surface-size normalization) — the 5-way single-token tie above is now dampened below the confidence floor; the answer returns UNKNOWN/none instead of the weak, hedged AVAILABLE tie. The approved conservative precision trade-off of Decision 2, not ideal, only an accepted residual consequence of the current normalization mechanism.",
+      "pass": false
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-038(200)",
-        "AI-FEAT-039(200)",
-        "AI-FEAT-042(200)",
-        "AI-FEAT-044(200)",
-        "AI-FEAT-047(200)"
+        "AI-FEAT-038(130.6972695860808)",
+        "AI-FEAT-044(128.99826366871602)",
+        "AI-FEAT-039(124.61954254339798)",
+        "AI-FEAT-042(121.7120688703473)",
+        "AI-FEAT-047(117.51994852035577)"
       ],
       "actualSources": [
         "AI-FEAT-038",
@@ -2005,11 +1937,11 @@
     {
       "actualMatchQuality": "boundary",
       "actualPrimaryMatches": [
-        "AI-FEAT-002(300)",
-        "AI-FEAT-004(300)",
-        "AI-FEAT-027(300)",
-        "AI-FEAT-028(300)",
-        "AI-FEAT-048(300)"
+        "AI-FEAT-048(240)",
+        "AI-FEAT-004(220.87409642577055)",
+        "AI-FEAT-028(205.90893350172234)",
+        "AI-FEAT-002(187.3246068093537)",
+        "AI-FEAT-027(181.9026523831726)"
       ],
       "actualSources": [
         "registry-not-source-of-truth"
@@ -2022,11 +1954,11 @@
     {
       "actualMatchQuality": "boundary",
       "actualPrimaryMatches": [
-        "AI-FEAT-023(300)",
-        "AI-FEAT-027(300)",
-        "AI-FEAT-048(300)",
-        "AI-FEAT-051(200)",
-        "AI-FEAT-002(100)"
+        "AI-FEAT-048(240)",
+        "AI-FEAT-023(196.58155617459335)",
+        "AI-FEAT-027(181.9026523831726)",
+        "AI-FEAT-051(119.00394841533502)",
+        "AI-FEAT-010(96.6766548243248)"
       ],
       "actualSources": [
         "registry-presence-not-activity"
@@ -2039,11 +1971,11 @@
     {
       "actualMatchQuality": "boundary",
       "actualPrimaryMatches": [
-        "AI-FEAT-011(200)",
-        "AI-FEAT-055(200)",
-        "AI-FEAT-007(100)",
-        "AI-FEAT-010(100)",
-        "AI-FEAT-014(100)"
+        "AI-FEAT-055(127.73361092425556)",
+        "AI-FEAT-011(120.83521766849006)",
+        "AI-FEAT-010(96.6766548243248)",
+        "AI-FEAT-043(93.82987842007934)",
+        "AI-FEAT-041(84.70150932315059)"
       ],
       "actualSources": [
         "registry-media-storage"
@@ -2056,11 +1988,11 @@
     {
       "actualMatchQuality": "boundary",
       "actualPrimaryMatches": [
-        "AI-FEAT-052(200)",
-        "AI-FEAT-007(100)",
-        "AI-FEAT-014(100)",
-        "AI-FEAT-017(100)",
-        "AI-FEAT-019(100)"
+        "AI-FEAT-052(124.35955978443555)",
+        "AI-FEAT-040(84.70150932315059)",
+        "AI-FEAT-019(83.20583907060379)",
+        "AI-FEAT-048(80)",
+        "AI-FEAT-029(77.85882737614834)"
       ],
       "actualSources": [
         "registry-conflict-detection"
@@ -2071,19 +2003,17 @@
       "pass": true
     },
     {
-      "actualMatchQuality": "weak",
+      "actualMatchQuality": "none",
       "actualPrimaryMatches": [
-        "AI-FEAT-021(100)",
-        "AI-FEAT-027(100)",
-        "AI-FEAT-047(100)"
+        "AI-FEAT-021(90.23317455681047)",
+        "AI-FEAT-027(60.63421746105754)",
+        "AI-FEAT-047(58.759974260177884)"
       ],
-      "actualSources": [
-        "AI-FEAT-021"
-      ],
-      "actualStatus": "AVAILABLE",
+      "actualSources": [],
+      "actualStatus": "UNKNOWN",
       "id": "X09",
-      "knownLimitation": "CHANGED 2026-08-14 (Part 2 Decision 2) — was a zero-match (UNKNOWN) safe decline; now weakly tied among AI-FEAT-021/027/047 (confidence 0.1). Honest weak/hedged gap, not a confident false claim.",
-      "pass": true
+      "knownLimitation": "CHANGED 2026-08-14 (Part 2 Decision 2) — was a zero-match (UNKNOWN) safe decline; now weakly tied among AI-FEAT-021/027/047 (confidence 0.1). Honest weak/hedged gap, not a confident false claim. CHANGED AGAIN 2026-08-17 (Phase 4.3, Decision 2, surface-size normalization) — the 3-way single-token tie above is now dampened below the confidence floor; the answer returns UNKNOWN/none instead of the weak, hedged AVAILABLE tie. The approved conservative precision trade-off of Decision 2, not ideal, only an accepted residual consequence of the current normalization mechanism.",
+      "pass": false
     },
     {
       "actualMatchQuality": "strong",
@@ -2103,12 +2033,12 @@
   ],
   "v3": {
     "anomalies": [],
-    "controlCount": 13,
-    "controlsPassing": 13,
+    "controlCount": 14,
+    "controlsPassing": 14,
     "knownBaselineFailureCount": 16,
     "knownBaselineFailuresConfirmedFailing": 16,
     "schemaPlaceholderCount": 5,
-    "total": 34
+    "total": 35
   },
   "v3Cases": [
     {
@@ -2142,22 +2072,22 @@
           {
             "entityType": "feature",
             "id": "AI-FEAT-039",
-            "score": 900
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-009",
-            "score": 500
+            "score": 560.7879414452909
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-018",
-            "score": 500
+            "score": 451.16587278405234
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-002",
-            "score": 400
+            "id": "AI-FEAT-009",
+            "score": 318.57356787307003
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-013",
+            "score": 251.3915926042562
           }
         ],
         "relatedCapabilities": [
@@ -2220,12 +2150,12 @@
           {
             "entityType": "feature",
             "id": "AI-FEAT-011",
-            "score": 100
+            "score": 60.41760883424503
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-056",
-            "score": 100
+            "score": 60.102006670831145
           }
         ],
         "relatedCapabilities": [],
@@ -2272,28 +2202,28 @@
         "matchedCapabilities": [
           {
             "entityType": "feature",
-            "id": "AI-FEAT-002",
-            "score": 200
+            "id": "AI-FEAT-019",
+            "score": 166.41167814120757
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-019",
-            "score": 200
+            "id": "AI-FEAT-048",
+            "score": 160
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-028",
-            "score": 200
+            "score": 137.27262233448155
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-038",
-            "score": 200
+            "score": 130.6972695860808
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-039",
-            "score": 200
+            "id": "AI-FEAT-044",
+            "score": 128.99826366871602
           }
         ],
         "relatedCapabilities": [],
@@ -2341,7 +2271,7 @@
           {
             "entityType": "feature",
             "id": "AI-FEAT-004",
-            "score": 100
+            "score": 73.62469880859018
           }
         ],
         "relatedCapabilities": [],
@@ -2364,44 +2294,46 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "UNKNOWN",
-        "confidence": 0.5,
+        "confidence": 0.4,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
             "entityType": "feature",
-            "id": "AI-FEAT-027",
-            "score": 500
-          },
-          {
-            "entityType": "feature",
             "id": "AI-FEAT-048",
-            "score": 500
+            "score": 400
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-002",
-            "score": 300
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-009",
-            "score": 200
+            "id": "AI-FEAT-027",
+            "score": 303.1710873052877
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-010",
-            "score": 200
+            "score": 193.3533096486496
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-002",
+            "score": 187.3246068093537
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-018",
+            "score": 180.46634911362094
           }
         ],
         "relatedCapabilities": [
-          "AI-FEAT-004",
-          "AI-FEAT-010",
-          "AI-FEAT-026"
+          "AI-FEAT-005"
         ],
         "sources": [
           {
-            "id": "AI-FEAT-027",
-            "title": "Activity Log"
+            "id": "AI-FEAT-048",
+            "title": "Realtime Team Presence & Online Registry"
+          },
+          {
+            "id": "AI-WF-006",
+            "title": "See Who Else Is Online, Coordinate Shared Events, and See What They're Working On"
           }
         ]
       },
@@ -2441,22 +2373,22 @@
           {
             "entityType": "feature",
             "id": "AI-FEAT-027",
-            "score": 200
+            "score": 121.26843492211508
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-011",
-            "score": 100
+            "id": "AI-FEAT-048",
+            "score": 80
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-017",
-            "score": 100
+            "id": "AI-FEAT-029",
+            "score": 77.85882737614834
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-023",
-            "score": 100
+            "id": "AI-FEAT-026",
+            "score": 71.93319623012441
           }
         ],
         "relatedCapabilities": [],
@@ -2473,55 +2405,54 @@
       "targetPhase": "4.2"
     },
     {
-      "category": "ranking-normalization",
+      "category": "cross-type-authority-gating",
       "checks": [
         {
           "actual": "AI-WF-006",
           "expected": [
-            "AI-FEAT-039",
-            "AI-WF-009"
+            "AI-WF-006"
           ],
           "name": "allowedPrimary",
-          "pass": false
+          "pass": true
         },
         {
           "actual": "AI-WF-006",
-          "expected": "not one of [AI-WF-006]",
+          "expected": "not one of [DEC-003]",
           "name": "forbiddenPrimary",
-          "pass": false
+          "pass": true
         }
       ],
       "diagnostics": [],
       "evidence": {
         "capabilityStatus": "AVAILABLE",
-        "classification": "TROUBLESHOOTING",
-        "confidence": 0.3,
+        "classification": "EXPLANATION",
+        "confidence": 0.16044986279965182,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
             "entityType": "workflow",
             "id": "AI-WF-006",
-            "score": 300
-          },
-          {
-            "entityType": "workflow",
-            "id": "AI-WF-005",
-            "score": 200
+            "score": 160.4498627996518
           },
           {
             "entityType": "workflow",
             "id": "AI-WF-008",
-            "score": 200
+            "score": 149.51881349644222
           },
           {
             "entityType": "workflow",
-            "id": "AI-WF-009",
-            "score": 200
+            "id": "AI-WF-005",
+            "score": 133.73783113163734
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-041",
-            "score": 300
+            "id": "AI-FEAT-048",
+            "score": 160
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-034",
+            "score": 130.6972695860808
           }
         ],
         "relatedCapabilities": [
@@ -2538,6 +2469,83 @@
           }
         ]
       },
+      "id": "RF-4.3-000",
+      "meetsTargetExpectation": true,
+      "status": "control",
+      "targetPhase": "4.3"
+    },
+    {
+      "category": "ranking-normalization",
+      "checks": [
+        {
+          "actual": "AI-FEAT-041",
+          "expected": [
+            "AI-FEAT-039",
+            "AI-WF-009"
+          ],
+          "name": "allowedPrimary",
+          "pass": false
+        },
+        {
+          "actual": "AI-FEAT-041",
+          "expected": "not one of [AI-WF-006]",
+          "name": "forbiddenPrimary",
+          "pass": true
+        }
+      ],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "TROUBLESHOOTING",
+        "confidence": 0.25410452796945177,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-041",
+            "score": 254.10452796945177
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-032",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-019",
+            "score": 166.41167814120757
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-025",
+            "score": 130.0008622810498
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-039",
+            "score": 124.61954254339798
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-038",
+          "AI-FEAT-039",
+          "AI-FEAT-040"
+        ],
+        "sources": [
+          {
+            "id": "AI-FEAT-041",
+            "title": "Transfer Background/Minimize Operation"
+          },
+          {
+            "id": "BUG-005",
+            "title": "BUG-005 (Fixed)"
+          },
+          {
+            "id": "AI-WF-005",
+            "title": "Export or Update a Transfer Drive"
+          }
+        ]
+      },
       "id": "RF-4.3-001",
       "meetsTargetExpectation": false,
       "status": "known-baseline-failure",
@@ -2547,7 +2555,7 @@
       "category": "ranking-normalization",
       "checks": [
         {
-          "actual": "AI-WF-006",
+          "actual": "AI-FEAT-041",
           "expected": [
             "AI-FEAT-039",
             "AI-WF-009"
@@ -2556,56 +2564,62 @@
           "pass": false
         },
         {
-          "actual": "AI-WF-006",
+          "actual": "AI-FEAT-041",
           "expected": "not one of [AI-WF-006]",
           "name": "forbiddenPrimary",
-          "pass": false
+          "pass": true
         }
       ],
       "diagnostics": [],
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "TROUBLESHOOTING",
-        "confidence": 0.4,
-        "matchQuality": "weak",
+        "confidence": 0.25410452796945177,
+        "matchQuality": "strong",
         "matchedCapabilities": [
           {
-            "entityType": "workflow",
-            "id": "AI-WF-006",
-            "score": 400
+            "entityType": "feature",
+            "id": "AI-FEAT-041",
+            "score": 254.10452796945177
           },
           {
-            "entityType": "workflow",
-            "id": "AI-WF-009",
-            "score": 400
+            "entityType": "feature",
+            "id": "AI-FEAT-039",
+            "score": 249.23908508679597
           },
           {
-            "entityType": "workflow",
-            "id": "AI-WF-002",
+            "entityType": "feature",
+            "id": "AI-FEAT-032",
             "score": 200
           },
           {
-            "entityType": "workflow",
-            "id": "AI-WF-005",
-            "score": 200
+            "entityType": "feature",
+            "id": "AI-FEAT-018",
+            "score": 180.46634911362094
           },
           {
-            "entityType": "workflow",
-            "id": "AI-WF-008",
-            "score": 200
+            "entityType": "feature",
+            "id": "AI-FEAT-019",
+            "score": 166.41167814120757
           }
         ],
         "relatedCapabilities": [
-          "AI-FEAT-048"
+          "AI-FEAT-038",
+          "AI-FEAT-039",
+          "AI-FEAT-040"
         ],
         "sources": [
           {
-            "id": "AI-WF-006",
-            "title": "See Who Else Is Online, Coordinate Shared Events, and See What They're Working On"
+            "id": "AI-FEAT-041",
+            "title": "Transfer Background/Minimize Operation"
           },
           {
-            "id": "AI-FEAT-048",
-            "title": null
+            "id": "BUG-005",
+            "title": "BUG-005 (Fixed)"
+          },
+          {
+            "id": "AI-WF-005",
+            "title": "Export or Update a Transfer Drive"
           }
         ]
       },
@@ -2647,22 +2661,22 @@
           {
             "entityType": "feature",
             "id": "AI-FEAT-039",
-            "score": 800
+            "score": 498.47817017359193
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-018",
-            "score": 300
+            "score": 270.6995236704314
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-022",
-            "score": 300
+            "id": "AI-FEAT-041",
+            "score": 254.10452796945177
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-025",
-            "score": 300
+            "score": 195.0012934215747
           }
         ],
         "relatedCapabilities": [
@@ -2709,33 +2723,33 @@
       "evidence": {
         "capabilityStatus": "PLANNED",
         "classification": "EXPLANATION",
-        "confidence": 0.4,
-        "matchQuality": "weak",
+        "confidence": 0.24622010331969515,
+        "matchQuality": "strong",
         "matchedCapabilities": [
           {
             "entityType": "feature",
             "id": "AI-FEAT-053",
-            "score": 400
+            "score": 246.22010331969514
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-056",
-            "score": 400
+            "score": 240.40802668332458
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-058",
-            "score": 300
+            "score": 207.37579138972336
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-051",
-            "score": 200
+            "score": 119.00394841533502
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-019",
-            "score": 100
+            "score": 83.20583907060379
           }
         ],
         "relatedCapabilities": [
@@ -2785,33 +2799,33 @@
       "evidence": {
         "capabilityStatus": "PLANNED",
         "classification": "EXPLANATION",
-        "confidence": 0.5,
+        "confidence": 0.3031710873052877,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
             "entityType": "feature",
             "id": "AI-FEAT-049",
-            "score": 500
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-055",
-            "score": 400
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-056",
-            "score": 400
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-004",
-            "score": 300
+            "score": 303.1710873052877
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-043",
-            "score": 300
+            "score": 281.489635260238
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-055",
+            "score": 255.46722184851112
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-056",
+            "score": 240.40802668332458
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-004",
+            "score": 220.87409642577055
           }
         ],
         "relatedCapabilities": [
@@ -2876,22 +2890,22 @@
           {
             "entityType": "feature",
             "id": "AI-FEAT-049",
-            "score": 300
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-047",
-            "score": 200
+            "score": 181.9026523831726
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-051",
-            "score": 200
+            "score": 119.00394841533502
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-002",
-            "score": 100
+            "id": "AI-FEAT-047",
+            "score": 117.51994852035577
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-030",
+            "score": 96.6766548243248
           }
         ],
         "relatedCapabilities": [
@@ -2923,66 +2937,39 @@
       "checks": [],
       "diagnostics": [],
       "evidence": {
-        "capabilityStatus": "AVAILABLE",
+        "capabilityStatus": "UNKNOWN",
         "classification": "UNKNOWN",
-        "confidence": 0.1,
-        "matchQuality": "weak",
+        "confidence": 0,
+        "matchQuality": "none",
         "matchedCapabilities": [
           {
             "entityType": "feature",
-            "id": "AI-FEAT-004",
-            "score": 100
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-009",
-            "score": 100
-          },
-          {
-            "entityType": "feature",
             "id": "AI-FEAT-018",
-            "score": 100
+            "score": 90.23317455681047
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-021",
-            "score": 100
+            "score": 90.23317455681047
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-029",
-            "score": 100
-          }
-        ],
-        "relatedCapabilities": [
-          "AI-FEAT-003",
-          "AI-FEAT-009",
-          "AI-FEAT-010",
-          "AI-FEAT-017",
-          "AI-FEAT-018",
-          "AI-FEAT-019",
-          "AI-FEAT-021",
-          "AI-FEAT-023",
-          "AI-FEAT-027",
-          "AI-FEAT-029",
-          "AI-FEAT-043",
-          "AI-FEAT-046",
-          "AI-FEAT-050"
-        ],
-        "sources": [
+            "score": 77.85882737614834
+          },
           {
+            "entityType": "feature",
             "id": "AI-FEAT-004",
-            "title": "event.json Data Model & Persistence Contract"
+            "score": 73.62469880859018
           },
           {
-            "id": "BUG-003",
-            "title": "BUG-003 (Fixed)"
-          },
-          {
-            "id": "BUG-006",
-            "title": "BUG-006 (Fixed (recurring pattern — see Prevention))"
+            "entityType": "feature",
+            "id": "AI-FEAT-034",
+            "score": 65.3486347930404
           }
-        ]
+        ],
+        "relatedCapabilities": [],
+        "sources": []
       },
       "id": "RF-4.3-007",
       "meetsTargetExpectation": null,
@@ -3003,46 +2990,52 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "TROUBLESHOOTING",
-        "confidence": 0.3,
+        "confidence": 0.25410452796945177,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
-            "entityType": "workflow",
-            "id": "AI-WF-006",
-            "score": 300
+            "entityType": "feature",
+            "id": "AI-FEAT-041",
+            "score": 254.10452796945177
           },
           {
-            "entityType": "workflow",
-            "id": "AI-WF-005",
-            "score": 200
-          },
-          {
-            "entityType": "workflow",
-            "id": "AI-WF-008",
-            "score": 200
-          },
-          {
-            "entityType": "workflow",
-            "id": "AI-WF-009",
+            "entityType": "feature",
+            "id": "AI-FEAT-032",
             "score": 200
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-041",
-            "score": 300
+            "id": "AI-FEAT-019",
+            "score": 166.41167814120757
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-025",
+            "score": 130.0008622810498
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-039",
+            "score": 124.61954254339798
           }
         ],
         "relatedCapabilities": [
-          "AI-FEAT-048"
+          "AI-FEAT-038",
+          "AI-FEAT-039",
+          "AI-FEAT-040"
         ],
         "sources": [
           {
-            "id": "AI-WF-006",
-            "title": "See Who Else Is Online, Coordinate Shared Events, and See What They're Working On"
+            "id": "AI-FEAT-041",
+            "title": "Transfer Background/Minimize Operation"
           },
           {
-            "id": "AI-FEAT-048",
-            "title": null
+            "id": "BUG-005",
+            "title": "BUG-005 (Fixed)"
+          },
+          {
+            "id": "AI-WF-005",
+            "title": "Export or Update a Transfer Drive"
           }
         ]
       },
@@ -3065,33 +3058,33 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "TROUBLESHOOTING",
-        "confidence": 0.6,
+        "confidence": 0.4701884221106821,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
             "entityType": "workflow",
             "id": "AI-WF-001",
-            "score": 600
+            "score": 470.1884221106821
           },
           {
             "entityType": "workflow",
             "id": "AI-WF-003",
-            "score": 400
-          },
-          {
-            "entityType": "workflow",
-            "id": "AI-WF-002",
-            "score": 300
-          },
-          {
-            "entityType": "workflow",
-            "id": "AI-WF-006",
-            "score": 300
+            "score": 356.7107572256184
           },
           {
             "entityType": "workflow",
             "id": "AI-WF-007",
-            "score": 300
+            "score": 232.11168434072496
+          },
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-008",
+            "score": 224.27822024466332
+          },
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-002",
+            "score": 214.86267810124966
           }
         ],
         "relatedCapabilities": [
@@ -3152,33 +3145,33 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "TROUBLESHOOTING",
-        "confidence": 0.3,
+        "confidence": 0.25905235711196833,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
             "entityType": "feature",
             "id": "AI-FEAT-033",
-            "score": 300
+            "score": 259.0523571119683
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-023",
-            "score": 200
+            "score": 131.0543707830622
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-034",
-            "score": 200
+            "score": 130.6972695860808
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-037",
-            "score": 200
+            "score": 124.61954254339798
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-049",
-            "score": 200
+            "score": 121.26843492211508
           }
         ],
         "relatedCapabilities": [
@@ -3251,22 +3244,22 @@
           {
             "entityType": "feature",
             "id": "AI-FEAT-053",
-            "score": 200
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-002",
-            "score": 100
+            "score": 123.11005165984757
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-004",
-            "score": 100
+            "score": 73.62469880859018
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-009",
-            "score": 100
+            "id": "AI-FEAT-015",
+            "score": 69.37777978917369
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-023",
+            "score": 65.5271853915311
           }
         ],
         "relatedCapabilities": [
@@ -3334,22 +3327,22 @@
           {
             "entityType": "feature",
             "id": "AI-FEAT-006",
-            "score": 200
+            "score": 133.33333333333334
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-034",
-            "score": 200
+            "score": 130.6972695860808
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-038",
-            "score": 200
+            "score": 130.6972695860808
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-049",
-            "score": 200
+            "score": 121.26843492211508
           }
         ],
         "relatedCapabilities": [
@@ -3518,22 +3511,22 @@
           {
             "entityType": "feature",
             "id": "AI-FEAT-049",
-            "score": 300
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-047",
-            "score": 200
+            "score": 181.9026523831726
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-051",
-            "score": 200
+            "score": 119.00394841533502
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-002",
-            "score": 100
+            "id": "AI-FEAT-047",
+            "score": 117.51994852035577
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-030",
+            "score": 96.6766548243248
           }
         ],
         "relatedCapabilities": [
@@ -3564,16 +3557,16 @@
       "category": "neighborhood-admission",
       "checks": [
         {
-          "actual": "absent",
+          "actual": "present",
           "expected": "AI-FEAT-039",
           "name": "required:AI-FEAT-039",
-          "pass": false
+          "pass": true
         },
         {
-          "actual": "present",
+          "actual": "absent",
           "expected": "AI-WF-009",
           "name": "required:AI-WF-009",
-          "pass": true
+          "pass": false
         }
       ],
       "diagnostics": [
@@ -3586,52 +3579,58 @@
           "note": "Not a scored ranker candidate, but a canonical citation exists (via AI-WF-005) — do not conclude this is a retrieval/ranking defect. Decision 4 introduces relationship-based discovery independent of ranker scoring; whether the eventual fix comes from improved retrieval, Decision 4's relationship lookup (Phase 5.1), or Decision 3's admission logic (Phase 5.2) cannot be determined until Phase 5.1 exists.",
           "presentInCandidates": false,
           "presentInSources": false,
-          "requiredId": "AI-FEAT-039"
+          "requiredId": "AI-WF-009"
         }
       ],
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "TROUBLESHOOTING",
-        "confidence": 0.4,
-        "matchQuality": "weak",
+        "confidence": 0.25410452796945177,
+        "matchQuality": "strong",
         "matchedCapabilities": [
           {
-            "entityType": "workflow",
-            "id": "AI-WF-006",
-            "score": 400
+            "entityType": "feature",
+            "id": "AI-FEAT-041",
+            "score": 254.10452796945177
           },
           {
-            "entityType": "workflow",
-            "id": "AI-WF-009",
-            "score": 400
+            "entityType": "feature",
+            "id": "AI-FEAT-039",
+            "score": 249.23908508679597
           },
           {
-            "entityType": "workflow",
-            "id": "AI-WF-002",
+            "entityType": "feature",
+            "id": "AI-FEAT-032",
             "score": 200
           },
           {
-            "entityType": "workflow",
-            "id": "AI-WF-005",
-            "score": 200
+            "entityType": "feature",
+            "id": "AI-FEAT-018",
+            "score": 180.46634911362094
           },
           {
-            "entityType": "workflow",
-            "id": "AI-WF-008",
-            "score": 200
+            "entityType": "feature",
+            "id": "AI-FEAT-019",
+            "score": 166.41167814120757
           }
         ],
         "relatedCapabilities": [
-          "AI-FEAT-048"
+          "AI-FEAT-038",
+          "AI-FEAT-039",
+          "AI-FEAT-040"
         ],
         "sources": [
           {
-            "id": "AI-WF-006",
-            "title": "See Who Else Is Online, Coordinate Shared Events, and See What They're Working On"
+            "id": "AI-FEAT-041",
+            "title": "Transfer Background/Minimize Operation"
           },
           {
-            "id": "AI-FEAT-048",
-            "title": null
+            "id": "BUG-005",
+            "title": "BUG-005 (Fixed)"
+          },
+          {
+            "id": "AI-WF-005",
+            "title": "Export or Update a Transfer Drive"
           }
         ]
       },
@@ -3663,33 +3662,33 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "TEAM_ACTIVITY",
-        "confidence": 0.6,
+        "confidence": 0.3638053047663452,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
             "entityType": "feature",
             "id": "AI-FEAT-027",
-            "score": 600
+            "score": 363.8053047663452
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-048",
+            "score": 320
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-037",
-            "score": 500
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-002",
-            "score": 400
+            "score": 311.54885635849496
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-016",
-            "score": 400
+            "score": 278.5437200279488
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-028",
-            "score": 400
+            "score": 274.5452446689631
           }
         ],
         "relatedCapabilities": [
@@ -3735,33 +3734,33 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "UNKNOWN",
-        "confidence": 0.3,
+        "confidence": 0.20663452055291776,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
             "entityType": "feature",
             "id": "AI-FEAT-046",
-            "score": 300
+            "score": 206.63452055291776
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-002",
+            "id": "AI-FEAT-045",
             "score": 200
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-018",
-            "score": 200
+            "score": 180.46634911362094
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-050",
+            "score": 142.03869016721708
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-028",
-            "score": 200
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-039",
-            "score": 200
+            "score": 137.27262233448155
           }
         ],
         "relatedCapabilities": [
@@ -3789,47 +3788,31 @@
       "category": "compound-question",
       "checks": [
         {
+          "actual": "AI-FEAT-032",
+          "expected": "not one of [AI-FEAT-032]",
+          "name": "forbiddenPrimary",
+          "pass": false
+        },
+        {
           "actual": "present",
           "expected": "AI-FEAT-039",
           "name": "required:AI-FEAT-039",
           "pass": true
         },
         {
-          "actual": "absent",
+          "actual": "present",
           "expected": "AI-WF-009",
           "name": "required:AI-WF-009",
-          "pass": false
+          "pass": true
         }
       ],
-      "diagnostics": [
-        {
-          "category": "PENDING_PHASE_5",
-          "groundTruthCitation": {
-            "citedBy": "AI-WF-005",
-            "recordType": "workflow"
-          },
-          "note": "Not a scored ranker candidate, but a canonical citation exists (via AI-WF-005) — do not conclude this is a retrieval/ranking defect. Decision 4 introduces relationship-based discovery independent of ranker scoring; whether the eventual fix comes from improved retrieval, Decision 4's relationship lookup (Phase 5.1), or Decision 3's admission logic (Phase 5.2) cannot be determined until Phase 5.1 exists.",
-          "presentInCandidates": false,
-          "presentInSources": false,
-          "requiredId": "AI-WF-009"
-        }
-      ],
+      "diagnostics": [],
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "UNKNOWN",
         "confidence": 0.2,
-        "matchQuality": "weak",
+        "matchQuality": "strong",
         "matchedCapabilities": [
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-019",
-            "score": 200
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-025",
-            "score": 200
-          },
           {
             "entityType": "feature",
             "id": "AI-FEAT-032",
@@ -3837,39 +3820,45 @@
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-039",
-            "score": 200
+            "id": "AI-FEAT-041",
+            "score": 169.40301864630118
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-041",
-            "score": 200
+            "id": "AI-FEAT-019",
+            "score": 166.41167814120757
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-025",
+            "score": 130.0008622810498
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-039",
+            "score": 124.61954254339798
           }
         ],
         "relatedCapabilities": [
-          "AI-FEAT-004",
-          "AI-FEAT-018",
-          "AI-FEAT-020",
-          "AI-FEAT-021",
-          "AI-FEAT-024",
-          "AI-FEAT-025",
-          "AI-FEAT-026",
-          "AI-FEAT-038",
-          "AI-FEAT-039",
-          "AI-FEAT-044"
+          "AI-FEAT-029",
+          "AI-FEAT-039"
         ],
         "sources": [
           {
-            "id": "AI-FEAT-019",
-            "title": "Import Pipeline & Copy Engine"
+            "id": "AI-FEAT-032",
+            "title": "Metadata Verification"
+          },
+          {
+            "id": "AI-RM-001",
+            "title": "Roadmap milestone AI-RM-001 (**Completed**)"
           },
           {
             "id": "BUG-009",
             "title": "BUG-009 (Fixed)"
           },
           {
-            "id": "AI-WF-001",
-            "title": "Import Photographs From a Memory Card or Folder"
+            "id": "AI-WF-009",
+            "title": "Import or Update From a Transfer Drive"
           }
         ]
       },
@@ -3966,33 +3955,33 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "STATUS",
-        "confidence": 0.5,
+        "confidence": 0.326743173965202,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
             "entityType": "feature",
             "id": "AI-FEAT-038",
-            "score": 500
+            "score": 326.743173965202
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-039",
-            "score": 400
+            "score": 249.23908508679597
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-025",
-            "score": 300
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-042",
-            "score": 300
+            "score": 195.0012934215747
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-055",
-            "score": 300
+            "score": 191.60041638638336
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-042",
+            "score": 182.56810330552096
           }
         ],
         "relatedCapabilities": [
@@ -4055,33 +4044,33 @@
       "evidence": {
         "capabilityStatus": "PLANNED",
         "classification": "UNKNOWN",
-        "confidence": 0.5,
+        "confidence": 0.3031710873052877,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
             "entityType": "feature",
             "id": "AI-FEAT-049",
-            "score": 500
+            "score": 303.1710873052877
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-023",
-            "score": 400
+            "score": 262.1087415661244
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-033",
-            "score": 300
+            "score": 259.0523571119683
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-034",
-            "score": 300
+            "score": 196.0459043791212
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-052",
-            "score": 300
+            "score": 186.53933967665333
           }
         ],
         "relatedCapabilities": [
@@ -4132,45 +4121,50 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "TEAM_ACTIVITY",
-        "confidence": 0.4,
+        "confidence": 0.22427822024466332,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
             "entityType": "workflow",
-            "id": "AI-WF-006",
-            "score": 400
+            "id": "AI-WF-008",
+            "score": 224.27822024466332
           },
           {
             "entityType": "workflow",
-            "id": "AI-WF-008",
-            "score": 300
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-011",
-            "score": 300
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-027",
-            "score": 300
+            "id": "AI-WF-006",
+            "score": 213.93315039953575
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-042",
-            "score": 300
+            "score": 182.56810330552096
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-027",
+            "score": 181.9026523831726
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-011",
+            "score": 181.2528265027351
           }
         ],
         "relatedCapabilities": [
-          "AI-FEAT-048"
+          "AI-FEAT-043",
+          "AI-FEAT-045"
         ],
         "sources": [
           {
-            "id": "AI-WF-006",
-            "title": "See Who Else Is Online, Coordinate Shared Events, and See What They're Working On"
+            "id": "AI-WF-008",
+            "title": "Recover From an Archive Lock Error"
           },
           {
-            "id": "AI-FEAT-048",
+            "id": "AI-FEAT-043",
+            "title": null
+          },
+          {
+            "id": "AI-FEAT-045",
             "title": null
           }
         ]
@@ -4223,22 +4217,22 @@
           {
             "entityType": "feature",
             "id": "AI-FEAT-039",
-            "score": 700
+            "score": 436.16839890189294
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-032",
+            "score": 200
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-025",
-            "score": 300
+            "score": 195.0012934215747
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-042",
-            "score": 300
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-002",
-            "score": 200
+            "score": 182.56810330552096
           }
         ],
         "relatedCapabilities": [
@@ -4273,16 +4267,16 @@
       "category": "compound-question",
       "checks": [
         {
-          "actual": "absent",
+          "actual": "present",
           "expected": "AI-FEAT-039",
           "name": "required:AI-FEAT-039",
-          "pass": false
+          "pass": true
         },
         {
-          "actual": "present",
+          "actual": "absent",
           "expected": "AI-WF-009",
           "name": "required:AI-WF-009",
-          "pass": true
+          "pass": false
         }
       ],
       "diagnostics": [
@@ -4295,52 +4289,58 @@
           "note": "Not a scored ranker candidate, but a canonical citation exists (via AI-WF-005) — do not conclude this is a retrieval/ranking defect. Decision 4 introduces relationship-based discovery independent of ranker scoring; whether the eventual fix comes from improved retrieval, Decision 4's relationship lookup (Phase 5.1), or Decision 3's admission logic (Phase 5.2) cannot be determined until Phase 5.1 exists.",
           "presentInCandidates": false,
           "presentInSources": false,
-          "requiredId": "AI-FEAT-039"
+          "requiredId": "AI-WF-009"
         }
       ],
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "TROUBLESHOOTING",
-        "confidence": 0.4,
-        "matchQuality": "weak",
+        "confidence": 0.25410452796945177,
+        "matchQuality": "strong",
         "matchedCapabilities": [
           {
-            "entityType": "workflow",
-            "id": "AI-WF-006",
-            "score": 400
+            "entityType": "feature",
+            "id": "AI-FEAT-041",
+            "score": 254.10452796945177
           },
           {
-            "entityType": "workflow",
-            "id": "AI-WF-009",
-            "score": 400
+            "entityType": "feature",
+            "id": "AI-FEAT-039",
+            "score": 249.23908508679597
           },
           {
-            "entityType": "workflow",
-            "id": "AI-WF-002",
+            "entityType": "feature",
+            "id": "AI-FEAT-032",
             "score": 200
           },
           {
-            "entityType": "workflow",
-            "id": "AI-WF-005",
-            "score": 200
+            "entityType": "feature",
+            "id": "AI-FEAT-018",
+            "score": 180.46634911362094
           },
           {
-            "entityType": "workflow",
-            "id": "AI-WF-008",
-            "score": 200
+            "entityType": "feature",
+            "id": "AI-FEAT-019",
+            "score": 166.41167814120757
           }
         ],
         "relatedCapabilities": [
-          "AI-FEAT-048"
+          "AI-FEAT-038",
+          "AI-FEAT-039",
+          "AI-FEAT-040"
         ],
         "sources": [
           {
-            "id": "AI-WF-006",
-            "title": "See Who Else Is Online, Coordinate Shared Events, and See What They're Working On"
+            "id": "AI-FEAT-041",
+            "title": "Transfer Background/Minimize Operation"
           },
           {
-            "id": "AI-FEAT-048",
-            "title": null
+            "id": "BUG-005",
+            "title": "BUG-005 (Fixed)"
+          },
+          {
+            "id": "AI-WF-005",
+            "title": "Export or Update a Transfer Drive"
           }
         ]
       },
@@ -4380,22 +4380,22 @@
           {
             "entityType": "feature",
             "id": "AI-FEAT-049",
-            "score": 300
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-047",
-            "score": 200
+            "score": 181.9026523831726
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-051",
-            "score": 200
+            "score": 119.00394841533502
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-002",
-            "score": 100
+            "id": "AI-FEAT-047",
+            "score": 117.51994852035577
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-030",
+            "score": 96.6766548243248
           }
         ],
         "relatedCapabilities": [
@@ -4441,28 +4441,28 @@
         "matchedCapabilities": [
           {
             "entityType": "feature",
+            "id": "AI-FEAT-041",
+            "score": 254.10452796945177
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-032",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
             "id": "AI-FEAT-025",
-            "score": 300
+            "score": 195.0012934215747
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-039",
-            "score": 300
+            "score": 186.92931381509698
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-041",
-            "score": 300
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-002",
-            "score": 200
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-011",
-            "score": 200
+            "id": "AI-FEAT-019",
+            "score": 166.41167814120757
           }
         ],
         "relatedCapabilities": [],
@@ -4494,33 +4494,33 @@
       "evidence": {
         "capabilityStatus": "PLANNED",
         "classification": "EXPLANATION",
-        "confidence": 0.4,
-        "matchQuality": "weak",
+        "confidence": 0.24622010331969515,
+        "matchQuality": "strong",
         "matchedCapabilities": [
           {
             "entityType": "feature",
             "id": "AI-FEAT-053",
-            "score": 400
+            "score": 246.22010331969514
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-056",
-            "score": 400
+            "score": 240.40802668332458
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-058",
-            "score": 300
+            "score": 207.37579138972336
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-051",
-            "score": 200
+            "score": 119.00394841533502
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-019",
-            "score": 100
+            "score": 83.20583907060379
           }
         ],
         "relatedCapabilities": [

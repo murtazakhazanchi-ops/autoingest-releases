@@ -104,6 +104,13 @@ const REGRESSION_CORPUS_V3 = [
   // Phase 4.3 — keyword-surface-size normalization (Decision 2 of 8)
   // ---------------------------------------------------------------------
   {
+    id: 'RF-4.3-000', targetPhase: '4.3', decisionRef: 'Decision 2 of 8 / E1-B (Approach D)', auditRef: 'The sync-slot legitimate-large-record control -- the case central to the E1 conservative-damping decision, and the exact case whose cross-type failure (DEC-003 displacing AI-WF-006) motivated E1-B',
+    status: 'control', category: 'cross-type-authority-gating',
+    question: 'What is the sync-slot and which workflow documents it?',
+    rationale: "AI-WF-006 is large (surface 223) but genuinely, uniquely authoritative for this question -- 'sync-slot' exists exclusively in its own text. Before E1-B (Approach D), surface-size dampening reduced AI-WF-006's score enough that DEC-003 (Local-First and On-Premises Architecture, a decision whose raw score was never touched by normalization) wrongly displaced it as primary -- the exact regression that exposed the cross-entity comparability gap. Approach D (raw-score cross-type gating, adjusted-score intra-type ordering) restores AI-WF-006 as primary. Asserted via primary-record identity, not status/quality alone, so a future change cannot silently reintroduce this exact regression while still passing a looser assertion.",
+    allowedMemberIds: ['AI-WF-006'], forbiddenMemberIds: ['DEC-003'],
+  },
+  {
     id: 'RF-4.3-001', targetPhase: '4.3', decisionRef: 'Decision 2 of 8', auditRef: 'Gap C — Audit R01',
     status: 'known-baseline-failure', category: 'ranking-normalization',
     question: 'Why does Transfer Import exist?',
@@ -251,8 +258,8 @@ const REGRESSION_CORPUS_V3 = [
     id: 'RF-5.4-001', targetPhase: '5.4', decisionRef: 'Decision 6 of 8', auditRef: 'Decision 6 category 1: Feature + Workflow',
     status: 'known-baseline-failure', category: 'compound-question',
     question: 'What does Transfer Import do and how do I use it?',
-    rationale: 'What-it-is (AI-FEAT-039) and how-to-use-it (AI-WF-009) are materially distinct aspects a single record cannot both authoritatively supply.',
-    requiredMemberIds: ['AI-FEAT-039', 'AI-WF-009'],
+    rationale: 'What-it-is (AI-FEAT-039) and how-to-use-it (AI-WF-009) are materially distinct aspects a single record cannot both authoritatively supply. STRENGTHENED at Phase 4.3 (E1-B): the original requiredMemberIds-only assertion passed even though the real primary is AI-FEAT-032 (Metadata Verification, unrelated) -- a Decision 7 harness-coverage gap exposed by Phase 4.3, not a Phase 4.3 regression itself (this is the same pre-existing feature-vs-feature near-tie limitation as Gap-C-short, unaffected by the E1-B governance fix since no governance record is involved here). AI-FEAT-039/AI-WF-009 are both still present as required (AI-FEAT-039 in matchedCapabilities, AI-WF-009 in sources), but the assertion now also confirms the wrong primary is not silently accepted.',
+    requiredMemberIds: ['AI-FEAT-039', 'AI-WF-009'], forbiddenMemberIds: ['AI-FEAT-032'],
   },
   {
     id: 'RF-5.4-002', targetPhase: '5.4', decisionRef: 'Decision 6 of 8', auditRef: 'Decision 6 category 2: Feature + Decision',

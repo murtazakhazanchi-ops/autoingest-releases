@@ -22,6 +22,7 @@ const { runQuery } = require('./query');
 const { RECORD_STATUS, QUERY_STATUS, matchKnownBoundary, KNOWN_BOUNDARIES } = require('./statusResolution');
 const { findConcept, findBoundaryConcept } = require('./intentConcepts');
 const { QUESTION_TYPES, classifyQuestion } = require('./questionClassifier');
+const { isEligibleForNormalization, matchedTokenCount, adjustKeywordOverlapScore, explainCandidate } = require('./knowledgeSurfaceNormalization');
 
 // Below this score, a match is not confident enough to answer from — see
 // scripts/product-docs/README.md's ranking table: 100 is the minimum score
@@ -390,17 +391,55 @@ function searchCandidates(question, searchIndex) {
       if (r.record.entity_type !== 'feature' && r.record.entity_type !== 'workflow' && !GOVERNANCE_TYPES.has(r.record.entity_type)) continue;
       const prev = bestByRecord.get(r.record.stable_id);
       if (!prev || r.score > prev.score) {
-        bestByRecord.set(r.record.stable_id, { id: r.record.stable_id, title: r.record.title, score: r.score, entityType: r.record.entity_type });
+        bestByRecord.set(r.record.stable_id, { id: r.record.stable_id, title: r.record.title, score: r.score, entityType: r.record.entity_type, reasons: r.reasons, surfaceSize: r.record.keywords.length });
       }
       if (isRaw) bestRawByRecord.set(r.record.stable_id, r.score);
     }
   }
+  // Part 3 Phase 4.3 (Decision 2, E1 resolved: Option A) — bounded, local
+  // relevance adjustment, applied once here to the WINNING raw score per
+  // record (whichever candidate query — raw question or a concept hint —
+  // produced it), never to the max-selection above. lib/query.js's own
+  // ranker and the raw-vs-hint merge logic above are both completely
+  // unmodified — this only re-weights the already-decided winning score
+  // for candidates whose win is attributable purely to the keyword-overlap
+  // tier (see lib/knowledgeSurfaceNormalization.js's header for the full
+  // governing rationale and why REF=20/DAMPING=0.25 is the conservative
+  // operating point). `bestRawByRecord` (used only for the boundary raw-
+  // match override check, Decision 1/Phase 4.2's territory) is
+  // deliberately left untouched below.
+  //
+  // Restricted to feature/workflow entity types only (see
+  // isEligibleForNormalization's own comment) — every case investigated
+  // and evidenced during Phase 4.3 (Gap A, Gap C, R23, R29, R05, the
+  // sync-slot control) was a feature/workflow candidate. Governance records
+  // (bug/decision/postmortem, Part 2's Decision 1) were never tested
+  // against this mechanism; applying it there was found during
+  // implementation to unexpectedly let a governance record become the
+  // governance-primary winner in cases it previously wasn't (a real
+  // regression, caught and excluded, not deliberately scoped in).
+  for (const candidate of bestByRecord.values()) {
+    candidate.rawScore = candidate.score;
+    if (isEligibleForNormalization(candidate.entityType, candidate.reasons)) {
+      candidate.score = adjustKeywordOverlapScore(candidate.score, matchedTokenCount(candidate.reasons), candidate.surfaceSize, CONFIDENCE_FLOOR);
+    }
+  }
   const all = Array.from(bestByRecord.values()).sort((a, b) => b.score - a.score || a.id.localeCompare(b.id, 'en', { numeric: true }));
+  // Part 3 Phase 4.3 — `all`'s entries now carry internal-only diagnostic
+  // fields (reasons, surfaceSize, rawScore) alongside the original public
+  // shape. Never let those leak into matchedCapabilities/sources on the
+  // final answer object (no premature commitment to a richer public answer
+  // shape — Decision 3's territory) — every list consumed downstream by
+  // answerQuestion() and eventually exposed publicly is trimmed back to
+  // exactly the pre-Phase-4.3 shape here. explainNormalization() (below)
+  // is the one, clearly-separate diagnostic surface that reads the full
+  // fields — it calls searchCandidates() itself, independent of this trim.
+  const toPublicMatch = (m) => ({ id: m.id, title: m.title, score: m.score, entityType: m.entityType });
   return {
     concept,
-    featureMatches: all.filter((m) => m.entityType === 'feature').slice(0, MAX_MATCHES),
-    workflowMatches: all.filter((m) => m.entityType === 'workflow').slice(0, MAX_MATCHES),
-    governanceMatches: all.filter((m) => GOVERNANCE_TYPES.has(m.entityType)).slice(0, MAX_MATCHES),
+    featureMatches: all.filter((m) => m.entityType === 'feature').slice(0, MAX_MATCHES).map(toPublicMatch),
+    workflowMatches: all.filter((m) => m.entityType === 'workflow').slice(0, MAX_MATCHES).map(toPublicMatch),
+    governanceMatches: all.filter((m) => GOVERNANCE_TYPES.has(m.entityType)).slice(0, MAX_MATCHES).map(toPublicMatch),
     // Raw-question-only version of the same match lists — used ONLY to
     // decide whether a match is trustworthy enough to override a curated
     // boundary (see hasStrongFeatureMatch below). Found during Stage 2's
@@ -412,11 +451,17 @@ function searchCandidates(question, searchIndex) {
     // caught for raw keyword luck, this time via a hint. A hint is a recall
     // aid, not a confidence authority high enough to override curated,
     // evidenced exclusion data — only a match the RAW question itself
-    // earns, unaided, may do that.
+    // earns, unaided, may do that. Deliberately built from bestRawByRecord's
+    // untouched raw scores, never the Phase 4.3-adjusted ones.
     rawFeatureMatches: all.filter((m) => m.entityType === 'feature' && bestRawByRecord.has(m.id))
-      .map((m) => ({ ...m, score: bestRawByRecord.get(m.id) }))
+      .map((m) => toPublicMatch({ ...m, score: bestRawByRecord.get(m.id) }))
       .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id, 'en', { numeric: true }))
       .slice(0, MAX_MATCHES),
+    // Diagnostic-only — the full, untrimmed candidate list (with reasons,
+    // surfaceSize, rawScore, and Phase 4.3-adjusted score all present).
+    // Never read by answerQuestion() itself; exists solely for
+    // explainNormalization() below and equivalent test/report tooling.
+    diagnosticCandidates: all,
   };
 }
 
@@ -439,7 +484,27 @@ function answerQuestion(question, ctx) {
     return roadmapAnswer(question, dashboard);
   }
 
-  const { featureMatches, workflowMatches, governanceMatches, rawFeatureMatches } = searchCandidates(question, searchIndex);
+  const { featureMatches, workflowMatches, governanceMatches, rawFeatureMatches, diagnosticCandidates } = searchCandidates(question, searchIndex);
+  // Part 3 Phase 4.3 (Decision 2, E1-B resolved: Approach D) — a score may
+  // only be directly compared across candidate classes when those scores
+  // remain on a common calibration basis. Feature/Workflow keyword-overlap
+  // scores are surface-normalized (adjusted) for intra-type relevance
+  // ordering (see knowledgeSurfaceNormalization.js); Bug/Decision/
+  // Postmortem scores are never touched. Comparing an adjusted
+  // Feature/Workflow score directly against an untouched Governance score
+  // is therefore NOT a like-for-like comparison — it silently favors
+  // whichever side happens to still be on the larger scale. `rawScoreById`
+  // exists ONLY to restore a common basis for the specific cross-type
+  // comparisons below (governanceIsBestEvidence and its tie count). DO NOT
+  // replace it with `.score` there merely because `.score` looks like the
+  // newer/more-processed value — `.score` is intentionally the RIGHT choice
+  // for intra-type (Feature-vs-Feature, Workflow-vs-Workflow, and
+  // Feature-vs-Workflow, which share the same calibration) comparisons
+  // elsewhere in this function, and the WRONG choice for Governance-vs-
+  // Feature/Workflow specifically. See AI-FEAT-058's Phase 4.3 evolution
+  // entry for the full empirical account (the sync-slot regression this
+  // fixes) — do not "simplify" this away.
+  const rawScoreById = new Map(diagnosticCandidates.map((c) => [c.id, c.rawScore]));
 
   const topFeature = featureMatches[0];
   const topFeatureTied = topFeature ? featureMatches.filter((m) => m.score === topFeature.score).length : 0;
@@ -516,14 +581,19 @@ function answerQuestion(question, ctx) {
   // matchQualityFor's tiedCount check exists to hedge against. Silently
   // preferred the bug and overrode a correct PLANNED answer with a
   // fabricated-looking PARTIALLY_AVAILABLE one.
+  // Part 3 Phase 4.3 (E1-B, Approach D) — this tie count and the beat-checks
+  // below are the cross-type Governance-authority gate, so they read
+  // rawScoreById (common calibration basis), never the Feature/Workflow
+  // entries' own (adjusted, intra-type-only) .score. topGovernance.score
+  // is already raw — Governance is never normalized — so it's used as-is.
   const topGovernance = governanceMatches[0];
   const combinedTiedCount = topGovernance
-    ? [...featureMatches, ...workflowMatches, ...governanceMatches].filter((m) => m.score === topGovernance.score).length
+    ? [...featureMatches, ...workflowMatches, ...governanceMatches].filter((m) => rawScoreById.get(m.id) === topGovernance.score).length
     : 0;
   const hasStrongGovernanceMatch = !!topGovernance && matchQualityFor(topGovernance.score, combinedTiedCount) === 'strong';
   const governanceIsBestEvidence = hasStrongGovernanceMatch
-    && (!topFeature || topGovernance.score > topFeature.score)
-    && (!topWorkflow || topGovernance.score > topWorkflow.score);
+    && (!topFeature || topGovernance.score > rawScoreById.get(topFeature.id))
+    && (!topWorkflow || topGovernance.score > rawScoreById.get(topWorkflow.id));
   if (governanceIsBestEvidence) {
     const searchRec = searchIndex.find((r) => r.stable_id === topGovernance.id);
     const governanceAnswer = searchRec ? answerFromGovernanceRecord(question, searchRec, governanceMatches, qType, knowledgeIndexById) : null;
@@ -578,6 +648,23 @@ function buildEngineContext(built) {
   };
 }
 
+// Part 3 Phase 4.3 (Decision 2) — diagnostic-only observability seam. Runs
+// the exact same candidate discovery searchCandidates() already performs
+// (raw question + concept hints, through the unmodified shared ranker) and
+// returns, per candidate, the full breakdown named in Phase 4.3's
+// observability requirement: raw score/tier, absolute matching evidence,
+// surface-size measurement, the normalization adjustment, and why. Never
+// consulted by answerQuestion() itself — this exists solely so the
+// transformation can be inspected without reverse-engineering it, per the
+// same "diagnostic observability, not a second implementation" discipline
+// established for the Phase 4.1 A/B/C/D framework.
+function explainNormalization(question, searchIndex) {
+  const { diagnosticCandidates } = searchCandidates(question, searchIndex);
+  return diagnosticCandidates
+    .map((c) => explainCandidate({ id: c.id, entityType: c.entityType, score: c.rawScore, reasons: c.reasons, surfaceSize: c.surfaceSize }, CONFIDENCE_FLOOR))
+    .sort((a, b) => b.adjustedScore - a.adjustedScore || a.id.localeCompare(b.id, 'en', { numeric: true }));
+}
+
 module.exports = {
   answerQuestion,
   classifyIntent,
@@ -587,4 +674,5 @@ module.exports = {
   CONFIDENCE_FLOOR,
   QUESTION_TYPES,
   classifyQuestion,
+  explainNormalization,
 };
