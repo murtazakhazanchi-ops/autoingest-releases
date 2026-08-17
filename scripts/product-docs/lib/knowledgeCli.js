@@ -8,7 +8,7 @@
 
 const build = require('./build');
 const { answerQuestion, buildEngineContext } = require('./knowledgeEngine');
-const { runEval, runEvalV2 } = require('./knowledgeEval');
+const { runEval, runEvalV2, runHardenedEval } = require('./knowledgeEval');
 
 const HELP = `knowledge — AutoIngest Knowledge Engine (AI-FEAT-058, Stage 1 + Stage 2)
 
@@ -26,6 +26,16 @@ Subcommands:
                                  knowledgeTestCorpusV2.js), write a separate
                                  gap report (default:
                                  docs/product/generated/knowledge-gap-report-v2.json)
+  eval-hardened [--out <path>]  Part 3 Phase 4.1 (Decision 7) — re-runs the
+                                 full 119-question V1+V2 corpus unchanged
+                                 (regression proof) plus the new decision-
+                                 specific regression-family corpus
+                                 (knowledgeRegressionCorpusV3.js) through the
+                                 hardened evaluator, writes the frozen
+                                 baseline snapshot every later phase's
+                                 Improvement/Acceptable/Regression
+                                 classification compares against (default:
+                                 docs/product/generated/knowledge-eval-hardened-baseline.json)
   serve [--port 5177]           Serve the minimal local static portal
                                  (Node core http only, no dependencies)
 
@@ -123,6 +133,24 @@ function cmdEvalV2(args) {
   }
 }
 
+function cmdEvalHardened(args) {
+  const { flags } = parseArgs(args);
+  const result = runHardenedEval({ outPath: flags.out });
+  console.log(`V1 (20-question baseline): ${result.v1Summary.pass}/${result.v1Summary.total} pass, ${result.v1Summary.knownMiss} known-miss, ${result.v1Summary.unexplained} unexplained`);
+  console.log(`V2 (99-question expanded):  ${result.v2Summary.pass}/${result.v2Summary.total} pass, ${result.v2Summary.knownMiss} known-miss, ${result.v2Summary.unexplained} unexplained`);
+  console.log(`V3 (regression families):   ${result.v3Summary.controlsPassing}/${result.v3Summary.controlCount} controls passing, ${result.v3Summary.knownBaselineFailuresConfirmedFailing}/${result.v3Summary.knownBaselineFailureCount} known-baseline-failures confirmed still failing, ${result.v3Summary.schemaPlaceholderCount} schema-placeholders recorded`);
+  if (result.v3Summary.anomalies.length) {
+    console.error(`\n${result.v3Summary.anomalies.length} anomaly(ies) — needs review before Phase 4.1 can close:`);
+    for (const a of result.v3Summary.anomalies) console.error(`  [${a.kind}] ${a.id}: ${a.note}`);
+    process.exitCode = 1;
+  }
+  console.log(`\nWrote ${result.outPath}`);
+  if (result.v1Summary.unexplained || result.v2Summary.unexplained) {
+    console.error(`\n${result.v1Summary.unexplained + result.v2Summary.unexplained} unexplained failure(s) in the existing V1/V2 corpus — this must be zero for Phase 4.1 to have introduced no regressions.`);
+    process.exitCode = 1;
+  }
+}
+
 function cmdServe(args) {
   const { flags } = parseArgs(args);
   const port = Number(flags.port) || 5177;
@@ -139,6 +167,7 @@ function run(args) {
     case 'ask': return cmdAsk(rest);
     case 'eval': return cmdEval(rest);
     case 'eval-v2': return cmdEvalV2(rest);
+    case 'eval-hardened': return cmdEvalHardened(rest);
     case 'serve': return cmdServe(rest);
     default:
       console.error(`Unknown knowledge subcommand: ${sub}\n`);

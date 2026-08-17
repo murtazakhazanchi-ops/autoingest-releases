@@ -131,6 +131,7 @@ const CORPUS = [
     id: 'Q18', domain: 'Archive operations',
     question: 'What routine maintenance does AutoIngest do on my archive?',
     expectedStatus: 'PLANNED', expectedMatchQuality: 'strong', instructionsShouldExist: false, shouldAcknowledgeGap: true,
+    knownLimitation: 'DISCOVERED 2026-08-17 during Part 3 Phase 4.1 (Decision 7) harness hardening — pre-existing, not caused by that phase (independently reproduced against unmodified HEAD via a stash-isolated re-run before this note was added). Actual behavior today: capabilityStatus correctly PLANNED (status field matches), but matchQuality is weak, not strong — AI-FEAT-049/050/051 (Archive Maintenance / Event Maintenance / Archive Browser) tie at score 200, classification STATUS, confidence 0.2. This entry\'s own expectedMatchQuality was never previously annotated with a knownLimitation despite the tie, and no Phase 4.1 work fixed it — Decision 7 explicitly requires recording, not silently repairing, a runtime defect exposed by hardening the harness. A real candidate for whichever future phase addresses ambiguous multi-way keyword-overlap ties among genuinely topically-relevant Planned features (adjacent to, but distinct from, the Gap C/keyword-surface-size mechanism Decision 2/Phase 4.3 targets — here three SIMILARLY-sized records tie, not one large record beating a small one).',
   },
   {
     id: 'Q19', domain: 'QMZ',

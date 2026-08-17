@@ -1,0 +1,4531 @@
+{
+  "generated_at": "2026-08-17T02:38:20.260Z",
+  "note": "Part 3 Phase 4.1 (Decision 7) frozen baseline — every later phase's changed results get classified (Improvement/Acceptable change/Regression/Unexplained change/Unchanged, see knowledgeEvalClassification.js) against THIS snapshot.",
+  "schema_version": "1.0.0",
+  "v1": {
+    "knownMiss": 8,
+    "pass": 12,
+    "total": 20,
+    "unexplained": 0
+  },
+  "v1Cases": [
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-WF-001(600)",
+        "AI-WF-003(400)",
+        "AI-WF-002(300)",
+        "AI-WF-006(300)",
+        "AI-WF-007(300)"
+      ],
+      "actualSources": [
+        "AI-WF-001",
+        "AI-FEAT-011",
+        "AI-FEAT-012",
+        "AI-FEAT-017",
+        "AI-FEAT-018",
+        "AI-FEAT-019",
+        "AI-FEAT-022"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "Q01",
+      "knownLimitation": "FIXED in Stage 2 — was a weak, wrong-record tiebreak in Stage 1 (AI-FEAT-018 via bare \"import\" token). The concept/synonym layer (lib/intentConcepts.js, \"import-general\" cluster) now expands this question toward a curated hint that scores strongly and specifically against AI-WF-001 (Import Photographs From a Memory Card or Folder) — the actually-relevant Workflow, with real steps sourced from the app's own onboarding text.",
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-FEAT-011(200)",
+        "AI-FEAT-014(200)",
+        "AI-FEAT-015(200)",
+        "AI-FEAT-018(200)",
+        "AI-FEAT-027(200)"
+      ],
+      "actualSources": [
+        "AI-FEAT-011",
+        "AI-WF-001"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "Q02",
+      "knownLimitation": "Deliberately NOT concept-boosted in Stage 2 (see intentConcepts.js \"import-video\" cluster comment) — no canonical record confirms video-format support specifically, only config/app.config.js (non-canonical). An earlier hint artificially inflated confidence toward an unrelated routing feature; reverted during Stage 2's own testing rather than shipped. Remains an honest, disclosed documentation gap, not asserted either way.",
+      "pass": false
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-WF-004(300)",
+        "AI-WF-001(200)",
+        "AI-WF-006(200)",
+        "AI-WF-008(200)",
+        "AI-WF-009(200)"
+      ],
+      "actualSources": [
+        "AI-WF-004",
+        "AI-FEAT-031",
+        "AI-FEAT-033",
+        "AI-FEAT-034"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "Q03",
+      "knownLimitation": "AI-FEAT-022 (Photographer-Folder Resolution) still ties at score 100 with several other features sharing only \"import\"/\"photographer\" as isolated tokens; no concept cluster currently targets this exact troubleshooting phrasing (a real, scoped Stage 3 candidate — see AI-FEAT-058 Stage 2 Future Enhancements), and no Workflow record covers this specific symptom yet.",
+      "pass": false
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-WF-002(200)",
+        "AI-FEAT-009(200)",
+        "AI-FEAT-017(200)",
+        "AI-FEAT-002(100)",
+        "AI-FEAT-003(100)"
+      ],
+      "actualSources": [
+        "AI-WF-002",
+        "AI-FEAT-009"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "Q04",
+      "knownLimitation": "FIXED in Stage 2 — was a weak, wrong-record tiebreak in Stage 1 (AI-FEAT-004, a backend contract, not the creation flow). The \"event-create\" concept cluster now correctly and strongly surfaces AI-WF-002 (Create a New Event), with real steps verified against renderer/index.html's home-screen button.",
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-FEAT-002(100)",
+        "AI-FEAT-003(100)",
+        "AI-FEAT-004(100)",
+        "AI-FEAT-005(100)",
+        "AI-FEAT-009(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-002"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "Q05",
+      "knownLimitation": "Still no feature or workflow record documents event deletion. The engine still surfaces a weak tied match rather than a clean zero-result — the hedge language correctly declines to claim deletion exists. Unchanged from Stage 1: this is an honest documentation gap (no evidence either way), not a retrieval defect.",
+      "pass": false
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-WF-002(100)",
+        "AI-WF-006(100)",
+        "AI-WF-009(100)",
+        "AI-FEAT-009(100)",
+        "AI-FEAT-018(100)"
+      ],
+      "actualSources": [
+        "AI-WF-002",
+        "AI-FEAT-009"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "Q06",
+      "knownLimitation": "FIXED in Stage 2 (Phase 24 adversarial review) — was UNKNOWN/no-match in Stage 1 because no record contained the word \"Collection\" as a distinct topic. AI-WF-002 (Create a New Event) genuinely explains the real Collection → Event → Components hierarchy (verified against onboarding screen 2's own text), but Stage 1/early-Stage-2 answerQuestion() only preferred a Workflow answer for HOW_TO/TROUBLESHOOTING question types — \"What is a Collection?\" classifies EXPLANATION, so it fell through to feature-only matching (zero features mention \"Collection\", hence UNKNOWN). Broadening the workflow-preference gate to include EXPLANATION (found via a different adversarial question, \"What is a sync-slot?\", which had the identical structural problem) fixed this as a side effect — a genuine improvement, not a loosened expectation.",
+      "pass": false
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-FEAT-056(300)",
+        "AI-FEAT-051(200)",
+        "AI-FEAT-053(200)",
+        "AI-FEAT-002(100)",
+        "AI-FEAT-004(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-056",
+        "AI-RM-009"
+      ],
+      "actualStatus": "PLANNED",
+      "id": "Q07",
+      "knownLimitation": "Unchanged from Stage 1: AI-FEAT-053 (Global Search, Planned — the genuinely relevant record) still loses the tiebreak to unrelated Archive Operations features sharing only \"archive\". No concept cluster currently targets this phrasing toward Global Search specifically — a real Stage 3 candidate, deliberately not patched with an overly-specific hint here.",
+      "pass": false
+    },
+    {
+      "actualMatchQuality": "roadmap",
+      "actualPrimaryMatches": [],
+      "actualSources": [
+        "roadmap-dashboard"
+      ],
+      "actualStatus": "ROADMAP",
+      "id": "Q08",
+      "knownLimitation": "FIXED in Stage 2 (Phase 19, roadmap routing) — this exact gap was Stage 1's own documented limitation #5. The question classifier now recognizes ROADMAP-shaped questions and answers directly from roadmap-dashboard.json, never inferring a commitment from anything else.",
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-FEAT-042(300)",
+        "AI-FEAT-002(200)",
+        "AI-FEAT-028(200)",
+        "AI-FEAT-039(200)",
+        "AI-FEAT-052(200)"
+      ],
+      "actualSources": [
+        "AI-FEAT-042",
+        "BUG-003",
+        "AI-WF-009"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "Q09",
+      "knownLimitation": "Unchanged from Stage 1: AI-FEAT-044 (the genuinely relevant record) still ties with unrelated Archive Operations features sharing only \"archive\". No concept cluster currently targets this exact phrasing.",
+      "pass": false
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-WF-005(500)",
+        "AI-WF-006(300)",
+        "AI-WF-009(300)",
+        "AI-WF-008(200)",
+        "AI-FEAT-019(200)"
+      ],
+      "actualSources": [
+        "AI-WF-005",
+        "AI-FEAT-038",
+        "AI-FEAT-039",
+        "AI-FEAT-040",
+        "AI-FEAT-041"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "Q10",
+      "knownLimitation": "FIXED in Stage 2 — Stage 1 gave a generic, on-topic-but-not-specific answer (AI-FEAT-038). The \"transfer-resume\" concept cluster now surfaces AI-WF-005 (Export or Update a Transfer Drive), which discusses this exact scenario including BUG-005's resume-state history. Also the case that found and fixed the Stage 2 TROUBLESHOOTING/HOW_TO workflow-preference gap — see AI-FEAT-058 Stage 2 Evolution Journal.",
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "boundary",
+      "actualPrimaryMatches": [
+        "AI-FEAT-007(100)",
+        "AI-FEAT-015(100)",
+        "AI-FEAT-039(100)",
+        "AI-FEAT-047(100)"
+      ],
+      "actualSources": [
+        "face-recognition"
+      ],
+      "actualStatus": "NOT_SUPPORTED",
+      "id": "Q11",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "boundary",
+      "actualPrimaryMatches": [
+        "AI-FEAT-001(100)",
+        "AI-FEAT-011(100)",
+        "AI-FEAT-014(100)",
+        "AI-FEAT-015(100)",
+        "AI-FEAT-018(100)"
+      ],
+      "actualSources": [
+        "photo-editing"
+      ],
+      "actualStatus": "NOT_SUPPORTED",
+      "id": "Q12",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "boundary",
+      "actualPrimaryMatches": [
+        "AI-FEAT-040(100)",
+        "AI-FEAT-049(100)",
+        "AI-FEAT-056(100)"
+      ],
+      "actualSources": [
+        "cloud-storage"
+      ],
+      "actualStatus": "NOT_SUPPORTED",
+      "id": "Q13",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "boundary",
+      "actualPrimaryMatches": [
+        "AI-FEAT-006(100)",
+        "AI-FEAT-017(100)",
+        "AI-FEAT-049(100)",
+        "AI-FEAT-050(100)",
+        "AI-FEAT-058(100)"
+      ],
+      "actualSources": [
+        "linux"
+      ],
+      "actualStatus": "NOT_SUPPORTED",
+      "id": "Q14",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-FEAT-057(200)",
+        "AI-FEAT-015(100)",
+        "AI-FEAT-016(100)",
+        "AI-FEAT-037(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-057",
+        "AI-RM-010",
+        "BUG-015",
+        "BUG-016"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "Q15",
+      "knownLimitation": "Unchanged root cause from Stage 1 (\"preview\" drifts to Media Preview), but a REAL regression was found and fixed during Stage 2's own testing along the way: before a stopword filter was added to keywordsFrom() (searchIndex.js), the richer keyword surface of Workflow records let AI-WF-006 win this question confidently (score 300) purely on the stopwords \"how\"/\"between\"/\"and\" — a false-strong match with zero topical relevance. Fixed by excluding common connector words from generated keyword sets; this question correctly returned to Stage 1's honest weak/hedged behavior afterward.",
+      "pass": false
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-FEAT-006(200)",
+        "AI-FEAT-017(200)",
+        "AI-FEAT-002(100)",
+        "AI-FEAT-007(100)",
+        "AI-FEAT-014(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-006"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "Q16",
+      "knownLimitation": "Unchanged from Stage 1: ties at 100 across AI-FEAT-006/040/057; ascending-ID tiebreak happens to surface AI-FEAT-006, the most relevant of the three — a case where the tiebreak artifact does not cause a wrong answer.",
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-WF-004(300)",
+        "AI-WF-006(300)",
+        "AI-FEAT-023(300)",
+        "AI-FEAT-033(300)",
+        "AI-FEAT-034(300)"
+      ],
+      "actualSources": [
+        "AI-WF-004",
+        "AI-FEAT-031",
+        "AI-FEAT-033",
+        "AI-FEAT-034"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "Q17",
+      "knownLimitation": "Was \"strong\" in Stage 1 (AI-FEAT-033 alone at score 200). In Stage 2, the correct top match (AI-WF-004, Repair Missing or Incorrect Metadata, still correctly grounded in AI-FEAT-033) ties at score 300 with AI-WF-006 — a genuine, disclosed, hard limitation: AI-WF-006's own text legitimately contains the words \"metadata\"/\"audit\"/\"repair\" in a NEGATING context (\"not Metadata, not Audit/Repair\" — part of the Registry's own required four-way distinction). Pure keyword-overlap cannot distinguish a word appearing in a positive claim from a word appearing in an explicit exclusion. The primary match is still correctly AI-WF-004 (alphabetically first among the tie) and the answer is still correctly grounded and hedged — this is the system being appropriately conservative given a genuinely ambiguous lexical signal, not a wrong answer. A real candidate for smarter (still non-embedding) matching in a future stage, not a defect to patch here.",
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-FEAT-049(200)",
+        "AI-FEAT-050(200)",
+        "AI-FEAT-051(200)",
+        "AI-FEAT-002(100)",
+        "AI-FEAT-004(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-049",
+        "AI-RM-001",
+        "AI-RM-002"
+      ],
+      "actualStatus": "PLANNED",
+      "id": "Q18",
+      "knownLimitation": "DISCOVERED 2026-08-17 during Part 3 Phase 4.1 (Decision 7) harness hardening — pre-existing, not caused by that phase (independently reproduced against unmodified HEAD via a stash-isolated re-run before this note was added). Actual behavior today: capabilityStatus correctly PLANNED (status field matches), but matchQuality is weak, not strong — AI-FEAT-049/050/051 (Archive Maintenance / Event Maintenance / Archive Browser) tie at score 200, classification STATUS, confidence 0.2. This entry's own expectedMatchQuality was never previously annotated with a knownLimitation despite the tie, and no Phase 4.1 work fixed it — Decision 7 explicitly requires recording, not silently repairing, a runtime defect exposed by hardening the harness. A real candidate for whichever future phase addresses ambiguous multi-way keyword-overlap ties among genuinely topically-relevant Planned features (adjacent to, but distinct from, the Gap C/keyword-surface-size mechanism Decision 2/Phase 4.3 targets — here three SIMILARLY-sized records tie, not one large record beating a small one).",
+      "pass": false
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-FEAT-047(850)",
+        "AI-FEAT-029(100)",
+        "AI-FEAT-046(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-047",
+        "BUG-007",
+        "AI-WF-007"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "Q19",
+      "knownLimitation": "Was \"weak\" in Stage 1 for a real, documented structural reason (lib/query.js's exact-alias tier cannot fire on a full sentence). Stage 2's \"qmz\" concept cluster hint (\"qmz sequencing workspace\") now reaches AI-FEAT-047 at score 850 — genuine, specific evidence (3 real, meaningful keyword matches), not the exact-alias tier itself, but strong by the same score-based quality rule regardless of which mechanism produced it.",
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "boundary",
+      "actualPrimaryMatches": [
+        "AI-FEAT-027(500)",
+        "AI-FEAT-048(500)",
+        "AI-FEAT-002(200)",
+        "AI-FEAT-009(200)",
+        "AI-FEAT-011(200)"
+      ],
+      "actualSources": [
+        "multi-user-roles"
+      ],
+      "actualStatus": "NOT_SUPPORTED",
+      "id": "Q20",
+      "knownLimitation": "FIXED in Stage 2 — Stage 1 could not resolve this because the boundary table's keyword phrasing was too narrow (\"multiple users log in\", not \"multiple people log in with different roles\"). A boundary-widening concept cluster (intentConcepts.js BOUNDARY_CONCEPT_CLUSTERS, \"team-multi-role\") now recognizes \"different roles\" as a paraphrase of the SAME already-evidenced multi-user-roles exclusion — same citation, wider recall, never a new unevidenced claim. This same fix ALSO caught and required repairing a genuine regression: a \"team-collaboration\" concept hint aimed at a different, legitimate paraphrase family (\"several users... simultaneously\") was, before a fix, strong enough to override this correctly-detected boundary — see AI-FEAT-058 Stage 2 Evolution Journal for the full account of why hint-boosted scores must never override a boundary, only raw-question scores may.",
+      "pass": true
+    }
+  ],
+  "v2": {
+    "knownMiss": 19,
+    "pass": 80,
+    "total": 99,
+    "unexplained": 0
+  },
+  "v2Cases": [
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-WF-001(200)",
+        "AI-WF-003(100)",
+        "AI-WF-007(100)",
+        "AI-FEAT-002(200)",
+        "AI-FEAT-011(200)"
+      ],
+      "actualSources": [
+        "AI-WF-001",
+        "AI-FEAT-011",
+        "AI-FEAT-012",
+        "AI-FEAT-017",
+        "AI-FEAT-018",
+        "AI-FEAT-019",
+        "AI-FEAT-022"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "P01a",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-WF-001(100)",
+        "AI-FEAT-002(200)",
+        "AI-FEAT-011(200)",
+        "AI-FEAT-001(100)",
+        "AI-FEAT-003(100)"
+      ],
+      "actualSources": [
+        "AI-WF-001",
+        "AI-FEAT-011",
+        "AI-FEAT-012",
+        "AI-FEAT-017",
+        "AI-FEAT-018",
+        "AI-FEAT-019",
+        "AI-FEAT-022"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "P01b",
+      "knownLimitation": "CHANGED 2026-08-14 (side effect of the AI-WF-006 event-coordination expansion shifting overall index composition) — was a zero-match (UNKNOWN) safe decline; now weakly, honestly ties AI-WF-001/002/003 (all real Import/Event workflows). Strictly a small improvement (a hedged answer instead of a bare decline), not a false claim; less helpful than the canonical phrasing (P01a), which strongly matches AI-WF-001 alone. A retrieval-recall/precision nuance, not a grounding defect.",
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "DEC-004(300)",
+        "BUG-001(200)",
+        "BUG-002(200)"
+      ],
+      "actualSources": [
+        "DEC-004",
+        "AI-FEAT-029"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "P02a",
+      "knownLimitation": "Same recall gap as P01b — \"Does AutoIngest support importing video files?\" produces zero match. Safe (UNKNOWN, no invented claim) but misses the already-disclosed import-video documentation gap (see intentConcepts.js \"import-video\" cluster) entirely rather than surfacing it.",
+      "pass": false
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-FEAT-002(100)",
+        "AI-FEAT-003(100)",
+        "AI-FEAT-011(100)",
+        "AI-FEAT-012(100)",
+        "AI-FEAT-013(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-002"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "P02b",
+      "knownLimitation": "Same recall gap as P02a for the \"MP4s from my card\" phrasing — zero match, safe but unhelpful.",
+      "pass": false
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-FEAT-028(200)",
+        "AI-FEAT-039(200)",
+        "AI-FEAT-002(100)",
+        "AI-FEAT-009(100)",
+        "AI-FEAT-015(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-028"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "P03a",
+      "knownLimitation": "CHANGED 2026-08-14 twice. First (Part 2 Decision 2, bounded Summary indexing): was a weak, tied match; became a confident, untied match on AI-FEAT-028 (Import Source Attribution) — a real improvement. Then (Part 2 Decision 1 checkpoint — AI-FEAT-039's Summary was extended with one sentence describing its direct-Event vs Collection-nested resolution distinction, per explicit product-owner instruction): that sentence's \"folder name\" phrasing, combined with AI-FEAT-039's pre-existing \"photographer\" token (from \"event/photographer structures\"), creates a new coincidental 2-word tie with AI-FEAT-039. Re-downgraded to weak/tied. \"name\" is low document-frequency (7/369, 1.9%) — a narrow, non-systemic collision, not chased with a stopword per this pass's established discipline. The answer itself is unaffected: AI-FEAT-028 still wins the ascending-ID tiebreak and is still the cited \"closest\" answer, only now hedged rather than asserted outright — an acceptable precision/recall trade-off, not a wrong answer.",
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-WF-004(300)",
+        "AI-WF-001(200)",
+        "AI-WF-006(200)",
+        "AI-WF-008(200)",
+        "AI-WF-009(200)"
+      ],
+      "actualSources": [
+        "AI-WF-004",
+        "AI-FEAT-031",
+        "AI-FEAT-033",
+        "AI-FEAT-034"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "P03b",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-WF-002(200)",
+        "AI-WF-009(200)",
+        "AI-FEAT-002(200)",
+        "AI-FEAT-004(200)",
+        "AI-FEAT-009(200)"
+      ],
+      "actualSources": [
+        "AI-WF-002",
+        "AI-FEAT-009"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "P04a",
+      "knownLimitation": "IMPROVED during Phase 24 (strongly matched AI-WF-002 once EXPLANATION-type questions were routed to workflows). CHANGED again 2026-08-14 (Part 2 Phase 5 — new AI-WF-009 Transfer Import workflow added): AI-WF-009's real, evidence-grounded text repeatedly says \"event\" (archival events are its whole subject) and includes the real \"Start Fresh\" button label, creating a genuine 2-word tie with AI-WF-002 at the same score. Neither \"event\" (core domain vocabulary, not stopword-able) nor \"start\" (a real UI button label, not filler) is a hygiene defect to chase — this is legitimate subject-matter overlap between two real workflows, not a coincidental collision. Re-downgraded to weak/tied, but AI-WF-002 still wins the ascending-ID tiebreak and is still the cited, correct answer — an acceptable precision/recall trade-off.",
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-FEAT-017(200)",
+        "AI-FEAT-047(200)",
+        "AI-FEAT-002(100)",
+        "AI-FEAT-003(100)",
+        "AI-FEAT-004(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-017",
+        "AI-WF-001"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "P04b",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-FEAT-004(200)",
+        "AI-FEAT-002(100)",
+        "AI-FEAT-003(100)",
+        "AI-FEAT-005(100)",
+        "AI-FEAT-009(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-004",
+        "BUG-003",
+        "BUG-006"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "P05a",
+      "knownLimitation": "Same class as Q05 (event deletion) — no record either way; weak tied match. Not a new defect.",
+      "pass": false
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-FEAT-004(100)",
+        "AI-FEAT-009(100)",
+        "AI-FEAT-010(100)",
+        "AI-FEAT-017(100)",
+        "AI-FEAT-018(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-004",
+        "BUG-003",
+        "BUG-006"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "P05b",
+      "knownLimitation": "CHANGED 2026-08-14 (Part 2 Decision 2) — was a zero-match (UNKNOWN) safe decline; now a weakly-hedged, 5-way tie (AI-FEAT-004/009/010/017/018), each sharing only the generic token \"event\". Honestly hedged (\"this may not directly answer what you asked\"), not confidently wrong — an inherent recall/precision trade-off of richer indexing, not a false claim.",
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-WF-002(100)",
+        "AI-WF-006(100)",
+        "AI-WF-009(100)",
+        "AI-FEAT-007(100)",
+        "AI-FEAT-009(100)"
+      ],
+      "actualSources": [
+        "AI-WF-002",
+        "AI-FEAT-009"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "P06a",
+      "knownLimitation": "FIXED during Phase 24 (classifier regex widened for \"what does X mean\") then REGRESSED to a tie 2026-08-14 — the AI-WF-006 event-coordination expansion legitimately discusses the Collection→Event→Components hierarchy too (it cites the same real concept AI-WF-002 introduces), so both now score 200 and tie, downgrading quality from strong to weak. The actual top-cited answer is unaffected and still correctly AI-WF-002's own real content (ascending-ID tiebreak) — this is a confidence-label change, not a wrong-answer regression. Not chased further, consistent with this project's \"don't accumulate question-specific keyword exceptions\" discipline once the two records' overlap is genuinely topical (both really do discuss Collections) rather than coincidental.",
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-WF-009(100)",
+        "AI-FEAT-049(100)",
+        "AI-FEAT-055(100)"
+      ],
+      "actualSources": [
+        "AI-WF-009",
+        "AI-FEAT-025",
+        "AI-FEAT-032",
+        "AI-FEAT-038",
+        "AI-FEAT-039",
+        "AI-FEAT-042"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "P06b",
+      "knownLimitation": "Diverges from the now-fixed canonical Q06 (\"What is a Collection...\") for a different, structural reason: this uses the plural \"Collections\" while AI-WF-002 is indexed under the singular \"collection\" — lib/query.js performs no stemming (same pre-existing, structural limitation as R24's \"importing\" vs \"import\"). Safe (weak, hedged — never a confident false claim) but misses the real answer that P01a-style singular phrasing now correctly surfaces. CHANGED 2026-08-14 (Part 2 Phase 5) — the specific wrong weak match shifted from AI-FEAT-049 to AI-WF-009 (both cite \"Collection\" folders as real, evidenced vocabulary); the underlying stemming limitation and its safe/hedged character are unchanged.",
+      "pass": false
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-FEAT-042(300)",
+        "AI-FEAT-056(300)",
+        "AI-FEAT-051(200)",
+        "AI-FEAT-053(200)",
+        "AI-FEAT-054(200)"
+      ],
+      "actualSources": [
+        "AI-FEAT-042",
+        "BUG-003",
+        "AI-WF-009"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "P07a",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-FEAT-056(200)",
+        "AI-FEAT-004(100)",
+        "AI-FEAT-009(100)",
+        "AI-FEAT-010(100)",
+        "AI-FEAT-017(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-056",
+        "AI-RM-009"
+      ],
+      "actualStatus": "PLANNED",
+      "id": "P07b",
+      "knownLimitation": "CORRECTED ground truth during Phase 20 — this paraphrase actually reaches AI-FEAT-053 (Global Search, Planned) directly, a MORE correct and specific answer than the canonical Q07 phrasing (\"Can I search my entire archive?\"), which still loses its tiebreak to unrelated Archive Operations records (Stage 1's own documented, unfixed retrieval-precision gap). The original draft assumed AVAILABLE was correct; it was not — Global Search is Planned, not built.",
+      "pass": false
+    },
+    {
+      "actualMatchQuality": "roadmap",
+      "actualPrimaryMatches": [],
+      "actualSources": [
+        "roadmap-dashboard"
+      ],
+      "actualStatus": "ROADMAP",
+      "id": "P08a",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "roadmap",
+      "actualPrimaryMatches": [],
+      "actualSources": [
+        "roadmap-dashboard"
+      ],
+      "actualStatus": "ROADMAP",
+      "id": "P08b",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-FEAT-042(200)",
+        "AI-FEAT-052(200)",
+        "AI-FEAT-002(100)",
+        "AI-FEAT-004(100)",
+        "AI-FEAT-006(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-042",
+        "BUG-003",
+        "AI-WF-009"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "P09a",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-FEAT-040(100)",
+        "AI-FEAT-049(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-040",
+        "BUG-005",
+        "AI-WF-005"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "P09b",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-FEAT-038(200)",
+        "AI-FEAT-019(100)",
+        "AI-FEAT-025(100)",
+        "AI-FEAT-032(100)",
+        "AI-FEAT-039(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-038",
+        "BUG-005",
+        "AI-WF-005"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "P10a",
+      "knownLimitation": "CHANGED 2026-08-14 (Part 2 Decision 2) — was a weak/wrong-tied match; now confidently, untied resolves to AI-FEAT-038 (Transfer Export), the genuinely correct answer. A real improvement, directly addressing the class of failure the Part 2 Findings Report identified (Transfer Export troubleshooting).",
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-WF-005(500)",
+        "AI-WF-006(300)",
+        "AI-WF-009(300)",
+        "AI-WF-008(200)",
+        "AI-FEAT-019(200)"
+      ],
+      "actualSources": [
+        "AI-WF-005",
+        "AI-FEAT-038",
+        "AI-FEAT-039",
+        "AI-FEAT-040",
+        "AI-FEAT-041"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "P10b",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "boundary",
+      "actualPrimaryMatches": [
+        "AI-FEAT-056(200)",
+        "AI-FEAT-011(100)",
+        "AI-FEAT-020(100)",
+        "AI-FEAT-027(100)",
+        "AI-FEAT-045(100)"
+      ],
+      "actualSources": [
+        "face-recognition"
+      ],
+      "actualStatus": "NOT_SUPPORTED",
+      "id": "P11a",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "boundary",
+      "actualPrimaryMatches": [
+        "AI-FEAT-011(100)",
+        "AI-FEAT-039(100)"
+      ],
+      "actualSources": [
+        "face-recognition"
+      ],
+      "actualStatus": "NOT_SUPPORTED",
+      "id": "P11b",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "boundary",
+      "actualPrimaryMatches": [
+        "AI-FEAT-011(100)",
+        "AI-FEAT-014(100)",
+        "AI-FEAT-019(100)",
+        "AI-FEAT-022(100)",
+        "AI-FEAT-029(100)"
+      ],
+      "actualSources": [
+        "photo-editing"
+      ],
+      "actualStatus": "NOT_SUPPORTED",
+      "id": "P12a",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-FEAT-051(200)",
+        "AI-FEAT-010(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-051",
+        "AI-RM-004"
+      ],
+      "actualStatus": "PLANNED",
+      "id": "P12b",
+      "knownLimitation": "Deliberately ambiguous phrasing — \"editing tools\" without \"photo\" specified is a genuinely different question from the photo-editing boundary (P12a); the engine's weak AVAILABLE citing AI-FEAT-010 (event metadata editing UI, which does exist) is a defensible reading, not a false claim about photo editing specifically.",
+      "pass": false
+    },
+    {
+      "actualMatchQuality": "boundary",
+      "actualPrimaryMatches": [
+        "AI-FEAT-002(100)",
+        "AI-FEAT-028(100)",
+        "AI-FEAT-039(100)",
+        "AI-FEAT-042(100)",
+        "AI-FEAT-056(100)"
+      ],
+      "actualSources": [
+        "cloud-storage"
+      ],
+      "actualStatus": "NOT_SUPPORTED",
+      "id": "P13a",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "boundary",
+      "actualPrimaryMatches": [
+        "AI-FEAT-042(200)",
+        "AI-FEAT-002(100)",
+        "AI-FEAT-012(100)",
+        "AI-FEAT-013(100)",
+        "AI-FEAT-028(100)"
+      ],
+      "actualSources": [
+        "cloud-storage"
+      ],
+      "actualStatus": "NOT_SUPPORTED",
+      "id": "P13b",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "boundary",
+      "actualPrimaryMatches": [
+        "AI-FEAT-004(100)"
+      ],
+      "actualSources": [
+        "linux"
+      ],
+      "actualStatus": "NOT_SUPPORTED",
+      "id": "P14a",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "boundary",
+      "actualPrimaryMatches": [],
+      "actualSources": [
+        "linux"
+      ],
+      "actualStatus": "NOT_SUPPORTED",
+      "id": "P14b",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-FEAT-057(200)",
+        "AI-FEAT-015(100)",
+        "AI-FEAT-016(100)",
+        "AI-FEAT-037(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-057",
+        "AI-RM-010",
+        "BUG-015",
+        "BUG-016"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "P15a",
+      "knownLimitation": "CHANGED 2026-08-14 (Part 2 Decision 2) — was weak; now confidently, untied resolves to AI-FEAT-057 (Multi-Channel Release & Update System), the genuinely correct answer. An improvement.",
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-FEAT-057(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-057",
+        "AI-RM-010",
+        "BUG-015",
+        "BUG-016"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "P15b",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-FEAT-006(100)",
+        "AI-FEAT-014(100)",
+        "AI-FEAT-019(100)",
+        "AI-FEAT-022(100)",
+        "AI-FEAT-029(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-006"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "P16a",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-FEAT-006(300)",
+        "AI-FEAT-007(200)",
+        "AI-FEAT-042(200)",
+        "AI-FEAT-049(200)",
+        "AI-FEAT-052(200)"
+      ],
+      "actualSources": [
+        "AI-FEAT-006"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "P16b",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-WF-004(300)",
+        "AI-WF-006(300)",
+        "AI-FEAT-023(300)",
+        "AI-FEAT-033(300)",
+        "AI-FEAT-034(300)"
+      ],
+      "actualSources": [
+        "AI-WF-004",
+        "AI-FEAT-031",
+        "AI-FEAT-033",
+        "AI-FEAT-034"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "P17a",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-FEAT-023(200)",
+        "AI-FEAT-029(200)",
+        "AI-FEAT-033(200)",
+        "AI-FEAT-034(200)",
+        "AI-FEAT-049(200)"
+      ],
+      "actualSources": [
+        "AI-FEAT-023",
+        "AI-WF-003"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "P17b",
+      "knownLimitation": "CHANGED 2026-08-14 (Part 2 Decision 2) — was an untied strong match on AI-FEAT-033 alone; now a 5-way tie (AI-FEAT-023/029/033/034/049) at the same score, since Summary indexing widened recall for all of them. AI-FEAT-033 (the genuinely correct answer) is still among the tied candidates, honestly hedged rather than dropped — a precision/recall trade-off, not a wrong answer.",
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-FEAT-049(200)",
+        "AI-FEAT-050(200)",
+        "AI-FEAT-051(200)",
+        "AI-FEAT-002(100)",
+        "AI-FEAT-004(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-049",
+        "AI-RM-001",
+        "AI-RM-002"
+      ],
+      "actualStatus": "PLANNED",
+      "id": "P18a",
+      "knownLimitation": "CHANGED 2026-08-14 (Part 2 Decision 2) — was an untied strong match on AI-FEAT-049 alone; now ties with AI-FEAT-050/051/056, all genuinely related Planned archive-direction features (per 11_ARCHITECTURAL_EVOLUTION.md §I). Status remains correctly PLANNED; only the match confidence changed, not the correctness.",
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-FEAT-049(200)",
+        "AI-FEAT-050(200)",
+        "AI-FEAT-051(200)",
+        "AI-FEAT-002(100)",
+        "AI-FEAT-004(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-049",
+        "AI-RM-001",
+        "AI-RM-002"
+      ],
+      "actualStatus": "PLANNED",
+      "id": "P18b",
+      "knownLimitation": "CHANGED 2026-08-14 (Part 2 Decision 2) — same tie pattern as P18a. Status remains correctly PLANNED.",
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-FEAT-047(850)",
+        "AI-FEAT-029(100)",
+        "AI-FEAT-046(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-047",
+        "BUG-007",
+        "AI-WF-007"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "P19a",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-FEAT-047(850)",
+        "AI-FEAT-007(100)",
+        "AI-FEAT-029(100)",
+        "AI-FEAT-046(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-047",
+        "BUG-007",
+        "AI-WF-007"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "P19b",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "boundary",
+      "actualPrimaryMatches": [
+        "AI-FEAT-026(200)",
+        "AI-FEAT-009(100)",
+        "AI-FEAT-016(100)",
+        "AI-FEAT-023(100)",
+        "AI-FEAT-027(100)"
+      ],
+      "actualSources": [
+        "multi-user-roles"
+      ],
+      "actualStatus": "NOT_SUPPORTED",
+      "id": "P20a",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "boundary",
+      "actualPrimaryMatches": [
+        "AI-FEAT-002(100)",
+        "AI-FEAT-008(100)",
+        "AI-FEAT-009(100)",
+        "AI-FEAT-013(100)",
+        "AI-FEAT-017(100)"
+      ],
+      "actualSources": [
+        "multi-user-roles"
+      ],
+      "actualStatus": "NOT_SUPPORTED",
+      "id": "P20b",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-FEAT-027(500)",
+        "AI-FEAT-048(500)",
+        "AI-FEAT-002(200)",
+        "AI-FEAT-011(200)",
+        "AI-FEAT-042(200)"
+      ],
+      "actualSources": [
+        "AI-FEAT-027"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "R01",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "boundary",
+      "actualPrimaryMatches": [
+        "AI-FEAT-011(200)",
+        "AI-FEAT-027(200)",
+        "AI-FEAT-048(200)",
+        "AI-FEAT-002(100)",
+        "AI-FEAT-004(100)"
+      ],
+      "actualSources": [
+        "registry-media-storage"
+      ],
+      "actualStatus": "NOT_SUPPORTED",
+      "id": "R02",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-FEAT-018(200)",
+        "AI-FEAT-042(200)",
+        "AI-FEAT-048(200)",
+        "AI-FEAT-002(100)",
+        "AI-FEAT-011(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-018",
+        "BUG-002",
+        "AI-WF-001"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "R03",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-WF-006(400)",
+        "AI-FEAT-002(200)",
+        "AI-FEAT-039(200)",
+        "AI-FEAT-044(200)",
+        "AI-FEAT-049(200)"
+      ],
+      "actualSources": [
+        "AI-WF-006",
+        "AI-FEAT-048"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "R04",
+      "knownLimitation": "IMPROVED 2026-08-14 during the event-coordination reconciliation pass — AI-WF-006's expansion (adding Event Discovery & Coordination content, and TEAM_ACTIVITY questions now preferring the Workflow record) made it the correct, dominant, untied match (400) instead of a generic weak tie. Genuine improvement, re-verified against real engine output, not a loosened expectation.",
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "boundary",
+      "actualPrimaryMatches": [
+        "AI-FEAT-010(200)",
+        "AI-FEAT-051(200)",
+        "AI-FEAT-002(100)",
+        "AI-FEAT-003(100)",
+        "AI-FEAT-004(100)"
+      ],
+      "actualSources": [
+        "registry-conflict-detection"
+      ],
+      "actualStatus": "NOT_SUPPORTED",
+      "id": "R05",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-WF-006(400)",
+        "AI-WF-008(300)",
+        "AI-WF-004(200)",
+        "AI-FEAT-038(300)",
+        "AI-FEAT-053(300)"
+      ],
+      "actualSources": [
+        "AI-WF-006",
+        "AI-FEAT-048"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "R06",
+      "knownLimitation": "IMPROVED 2026-08-14 — same TEAM_ACTIVITY/AI-WF-006 expansion as R04. Now correctly, dominantly matches AI-WF-006 (400) instead of tying weakly.",
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-FEAT-002(200)",
+        "AI-FEAT-017(200)",
+        "AI-FEAT-037(200)",
+        "AI-FEAT-039(200)",
+        "AI-FEAT-048(200)"
+      ],
+      "actualSources": [
+        "AI-FEAT-002"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "R07",
+      "knownLimitation": "Genuinely ambiguous: archive-level locking (AI-FEAT-045) is a coarser, separate mechanism from \"does the system lock files while someone else is importing\" — no canonical record confirms or denies file-level locking specifically during a concurrent import. PARTIALLY_AVAILABLE (via AI-FEAT-045) is a defensible partial answer, not a confident false claim. Documented gap, not patched — forcing a boundary here would invent a denial the evidence does not support.",
+      "pass": false
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-WF-006(400)",
+        "AI-WF-008(200)",
+        "AI-FEAT-027(400)",
+        "AI-FEAT-048(400)",
+        "AI-FEAT-011(200)"
+      ],
+      "actualSources": [
+        "AI-WF-006",
+        "AI-FEAT-048"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "R08",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "boundary",
+      "actualPrimaryMatches": [
+        "AI-FEAT-054(300)",
+        "AI-FEAT-002(200)",
+        "AI-FEAT-018(200)",
+        "AI-FEAT-019(200)",
+        "AI-FEAT-027(200)"
+      ],
+      "actualSources": [
+        "registry-conflict-detection"
+      ],
+      "actualStatus": "NOT_SUPPORTED",
+      "id": "R09",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "boundary",
+      "actualPrimaryMatches": [
+        "AI-FEAT-047(850)",
+        "AI-FEAT-027(200)",
+        "AI-FEAT-055(200)",
+        "AI-FEAT-002(100)",
+        "AI-FEAT-009(100)"
+      ],
+      "actualSources": [
+        "registry-activity-scope"
+      ],
+      "actualStatus": "NOT_SUPPORTED",
+      "id": "R10",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-WF-006(400)",
+        "AI-WF-008(300)",
+        "AI-FEAT-027(300)",
+        "AI-FEAT-034(200)",
+        "AI-FEAT-037(200)"
+      ],
+      "actualSources": [
+        "AI-WF-006",
+        "AI-FEAT-048"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "R11",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-FEAT-048(200)",
+        "AI-FEAT-007(100)",
+        "AI-FEAT-009(100)",
+        "AI-FEAT-017(100)",
+        "AI-FEAT-042(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-048",
+        "AI-WF-006"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "R12",
+      "knownLimitation": "The \"no authentication by default\" fact (AI-WF-006) is architectural narrative, not phrased as a queryable capability status anywhere — zero match (UNKNOWN) is the safe, honest outcome; ground truth corrected from the original draft (which mis-framed this as a capability AVAILABLE/NOT_SUPPORTED question).",
+      "pass": false
+    },
+    {
+      "actualMatchQuality": "boundary",
+      "actualPrimaryMatches": [
+        "AI-FEAT-011(100)",
+        "AI-FEAT-039(100)",
+        "AI-FEAT-044(100)"
+      ],
+      "actualSources": [
+        "registry-media-storage"
+      ],
+      "actualStatus": "NOT_SUPPORTED",
+      "id": "R13",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-FEAT-018(200)",
+        "AI-FEAT-001(100)",
+        "AI-FEAT-002(100)",
+        "AI-FEAT-011(100)",
+        "AI-FEAT-012(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-018",
+        "BUG-002",
+        "AI-WF-001"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "R14",
+      "knownLimitation": "CHANGED 2026-08-14 (Part 2 Decision 2) — was weak; now an untied strong match on AI-FEAT-018 (Event-Component Import Routing), via a narrow, low-document-frequency coincidental overlap on \"happens\"+\"import\" (2 of 369 records). Topically adjacent (import processing) but not precisely about connectivity/offline resilience. Not chased further with a new stopword, per this project's established discipline against accumulating question-specific keyword exceptions for narrow, isolated collisions — documented as an acceptable imprecision, not a harmful regression (the answer is not false, only imprecise).",
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-FEAT-044(200)",
+        "AI-FEAT-048(200)",
+        "AI-FEAT-017(100)",
+        "AI-FEAT-019(100)",
+        "AI-FEAT-025(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-044"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "R15",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-WF-006(400)",
+        "AI-WF-008(300)",
+        "AI-FEAT-027(300)",
+        "AI-FEAT-048(300)",
+        "AI-FEAT-004(200)"
+      ],
+      "actualSources": [
+        "AI-WF-006",
+        "AI-FEAT-048"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "R16",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-FEAT-045(500)",
+        "AI-FEAT-027(300)",
+        "AI-FEAT-048(300)",
+        "AI-FEAT-049(300)",
+        "AI-FEAT-004(200)"
+      ],
+      "actualSources": [
+        "AI-FEAT-045",
+        "BUG-004",
+        "AI-WF-008"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "R17",
+      "knownLimitation": "Genuinely unconfirmed either way: no canonical record states whether archive-lock status is surfaced inside the Online Registry UI specifically. The engine confidently answers AVAILABLE (strong, via AI-FEAT-045) — this OVERCLAIMS a combined fact neither AI-FEAT-045 nor AI-WF-006 individually confirms. A real, disclosed retrieval-precision limitation (compound-claim verification is beyond pure keyword matching) — same class as the already-documented Q17 negation-context limitation. Candidate for a future boundary once/if the Registry's lock-status surfacing is confirmed one way or the other; not patched speculatively here.",
+      "pass": false
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-FEAT-027(200)",
+        "AI-FEAT-023(100)",
+        "AI-FEAT-048(100)",
+        "AI-FEAT-051(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-027"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "R18",
+      "knownLimitation": "CHANGED 2026-08-14 (Part 2 Decision 2) — was weak; now an untied strong match on AI-FEAT-027 (Activity Log). This is a genuine improvement, not a coincidence: Part 1's Purpose Capture forensically confirmed AI-FEAT-027 has a real \"Team Live\" tab showing live operator presence, so this Summary content is legitimately relevant to a presence question, even though the phrasing doesn't trigger the dedicated TEAM_ACTIVITY question-type classifier (which would route to AI-WF-006 instead).",
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "boundary",
+      "actualPrimaryMatches": [
+        "AI-FEAT-027(300)",
+        "AI-FEAT-034(300)",
+        "AI-FEAT-009(200)",
+        "AI-FEAT-023(200)",
+        "AI-FEAT-026(200)"
+      ],
+      "actualSources": [
+        "registry-activity-scope"
+      ],
+      "actualStatus": "NOT_SUPPORTED",
+      "id": "R19",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-FEAT-038(400)",
+        "AI-FEAT-040(300)",
+        "AI-FEAT-019(200)",
+        "AI-FEAT-025(200)",
+        "AI-FEAT-039(200)"
+      ],
+      "actualSources": [
+        "AI-FEAT-038",
+        "BUG-005",
+        "AI-WF-005"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "R20",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-WF-008(300)",
+        "AI-WF-006(200)",
+        "AI-FEAT-027(200)",
+        "AI-FEAT-048(200)",
+        "AI-FEAT-004(100)"
+      ],
+      "actualSources": [
+        "AI-WF-008",
+        "AI-FEAT-043",
+        "AI-FEAT-045"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "R21",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "boundary",
+      "actualPrimaryMatches": [
+        "AI-FEAT-007(100)",
+        "AI-FEAT-011(100)",
+        "AI-FEAT-020(100)",
+        "AI-FEAT-023(100)",
+        "AI-FEAT-027(100)"
+      ],
+      "actualSources": [
+        "registry-conflict-detection"
+      ],
+      "actualStatus": "NOT_SUPPORTED",
+      "id": "R22",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "boundary",
+      "actualPrimaryMatches": [
+        "AI-FEAT-027(500)",
+        "AI-FEAT-048(500)",
+        "AI-FEAT-044(300)",
+        "AI-FEAT-002(200)",
+        "AI-FEAT-009(200)"
+      ],
+      "actualSources": [
+        "registry-conflict-detection"
+      ],
+      "actualStatus": "NOT_SUPPORTED",
+      "id": "R23",
+      "knownLimitation": "CORRECTED ground truth — the registry-conflict-detection boundary correctly fires here (no conflict-warning mechanism is confirmed active for anything, including simultaneous event editing). The original draft's UNKNOWN was too conservative; NOT_SUPPORTED with the dormant-conflict-detection citation is the accurate, evidenced answer.",
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-FEAT-039(100)",
+        "AI-FEAT-042(100)",
+        "AI-FEAT-044(100)",
+        "AI-FEAT-058(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-039",
+        "AI-WF-005"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "R24",
+      "knownLimitation": "Zero match — the question uses \"importing\" (gerund) rather than \"import\"; lib/query.js performs no stemming (a pre-existing, structural, shared-ranker characteristic — see DEC-019's \"reuse lib/query.js unchanged\" — not something this stage changes). Safe (no invented claim) but misses surfacing the already-evidenced fact that import/sync do not block on relay unavailability (see R03/R14, which use \"import\"/\"internet\" verbatim and do surface a weak, hedged, on-topic answer).",
+      "pass": false
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-WF-003(500)",
+        "AI-WF-001(200)",
+        "AI-WF-005(200)",
+        "AI-WF-006(200)",
+        "AI-WF-008(200)"
+      ],
+      "actualSources": [
+        "AI-WF-003",
+        "AI-FEAT-023"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "W01",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-FEAT-023(200)",
+        "AI-FEAT-002(100)",
+        "AI-FEAT-003(100)",
+        "AI-FEAT-011(100)",
+        "AI-FEAT-012(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-023",
+        "AI-WF-003"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "W02",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-FEAT-045(500)",
+        "AI-FEAT-049(300)",
+        "AI-FEAT-047(200)",
+        "AI-FEAT-051(200)",
+        "AI-FEAT-002(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-045",
+        "BUG-004",
+        "AI-WF-008"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "W03",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-FEAT-001(100)",
+        "AI-FEAT-002(100)",
+        "AI-FEAT-004(100)",
+        "AI-FEAT-018(100)",
+        "AI-FEAT-019(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-001"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "W04",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-FEAT-047(850)",
+        "AI-FEAT-007(100)",
+        "AI-FEAT-015(100)",
+        "AI-FEAT-017(100)",
+        "AI-FEAT-023(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-047",
+        "BUG-007",
+        "AI-WF-007"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "W05",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-FEAT-047(850)",
+        "AI-FEAT-017(200)",
+        "AI-FEAT-049(200)",
+        "AI-FEAT-013(100)",
+        "AI-FEAT-015(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-047",
+        "BUG-007",
+        "AI-WF-007"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "W06",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-FEAT-038(900)",
+        "AI-FEAT-039(300)",
+        "AI-FEAT-019(200)",
+        "AI-FEAT-040(200)",
+        "AI-FEAT-041(200)"
+      ],
+      "actualSources": [
+        "AI-FEAT-038",
+        "BUG-005",
+        "AI-WF-005"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "W07",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-FEAT-038(900)",
+        "AI-FEAT-042(300)",
+        "AI-FEAT-019(200)",
+        "AI-FEAT-039(200)",
+        "AI-FEAT-040(200)"
+      ],
+      "actualSources": [
+        "AI-FEAT-038",
+        "BUG-005",
+        "AI-WF-005"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "W08",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-FEAT-010(300)",
+        "AI-FEAT-051(300)",
+        "AI-FEAT-009(200)",
+        "AI-FEAT-046(200)",
+        "AI-FEAT-055(200)"
+      ],
+      "actualSources": [
+        "AI-FEAT-010",
+        "BUG-001",
+        "BUG-006"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "W09",
+      "knownLimitation": "No feature or workflow record documents an event-details editing screen; weak generic tie via AI-FEAT-010. Honest documentation gap (same class as Q05/P05a), not a retrieval defect — Settings/event-editing UI workflows remain a disclosed, not-yet-authored area (see docs/product/workflows/README.md \"Not yet covered\").",
+      "pass": false
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-FEAT-021(200)",
+        "AI-FEAT-047(200)",
+        "AI-FEAT-002(100)",
+        "AI-FEAT-003(100)",
+        "AI-FEAT-004(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-021"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "W10",
+      "knownLimitation": "Same event-editing documentation gap as W09.",
+      "pass": false
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-WF-002(100)",
+        "AI-WF-003(100)",
+        "AI-WF-006(100)",
+        "AI-FEAT-002(100)",
+        "AI-FEAT-005(100)"
+      ],
+      "actualSources": [
+        "AI-WF-002",
+        "AI-FEAT-009"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "W11",
+      "knownLimitation": "No Settings-screen workflow exists yet (disclosed gap in workflows/README.md); weak generic tie via AI-WF-002/003/006 sharing only common words.",
+      "pass": false
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-FEAT-013(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-013"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "W12",
+      "knownLimitation": "CHANGED 2026-08-14 (Part 2 Decision 2) — was a zero-match (UNKNOWN) safe decline; now a single weak, heavily-hedged match on AI-FEAT-013 (\"this may not directly answer what you asked\", confidence 0.1). Honest about its own uncertainty, not a false claim — an inherent recall/precision trade-off of richer indexing.",
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-WF-004(300)",
+        "AI-WF-006(300)",
+        "AI-FEAT-023(200)",
+        "AI-FEAT-029(200)",
+        "AI-FEAT-033(200)"
+      ],
+      "actualSources": [
+        "AI-WF-004",
+        "AI-FEAT-031",
+        "AI-FEAT-033",
+        "AI-FEAT-034"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "W13",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-WF-001(300)",
+        "AI-WF-003(200)",
+        "AI-FEAT-002(300)",
+        "AI-FEAT-012(300)",
+        "AI-FEAT-028(300)"
+      ],
+      "actualSources": [
+        "AI-WF-001",
+        "AI-FEAT-011",
+        "AI-FEAT-012",
+        "AI-FEAT-017",
+        "AI-FEAT-018",
+        "AI-FEAT-019",
+        "AI-FEAT-022"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "W14",
+      "knownLimitation": "IMPROVED during Phase 24 — same EXPLANATION-type workflow-preference broadening as P04a. Now correctly, strongly matches AI-WF-001.",
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-FEAT-049(300)",
+        "AI-FEAT-022(200)",
+        "AI-FEAT-002(100)",
+        "AI-FEAT-011(100)",
+        "AI-FEAT-012(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-049",
+        "AI-RM-001",
+        "AI-RM-002"
+      ],
+      "actualStatus": "PLANNED",
+      "id": "W15",
+      "knownLimitation": "AI-WF-007 (QMZ)'s \"verify sequence\" language happens to keyword-overlap with \"verify an import completed\" — an on-topic-adjacent but not exactly right Workflow citation. Not a false claim (import verification broadly is a real, sensible operator concern), but imprecise. A candidate for a dedicated verification-step Workflow in a future stage, not patched here.",
+      "pass": false
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-FEAT-011(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-011",
+        "AI-WF-001"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "T01",
+      "knownLimitation": "Misspelled (\"hw do i imprt photos\") produces zero match — safe (UNKNOWN) but unhelpful; lib/query.js performs no fuzzy/typo correction (a pre-existing, structural, shared-ranker characteristic, not addressed in this stage).",
+      "pass": false
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-FEAT-011(100)",
+        "AI-FEAT-013(100)",
+        "AI-FEAT-014(100)",
+        "AI-FEAT-015(100)",
+        "AI-FEAT-018(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-011",
+        "AI-WF-001"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "T02",
+      "knownLimitation": "Same misspelling-tolerance gap as T01 (\"improt video?\").",
+      "pass": false
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-FEAT-047(850)",
+        "AI-FEAT-029(100)",
+        "AI-FEAT-046(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-047",
+        "BUG-007",
+        "AI-WF-007"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "T03",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-FEAT-002(100)",
+        "AI-FEAT-006(100)",
+        "AI-FEAT-007(100)",
+        "AI-FEAT-040(100)",
+        "AI-FEAT-042(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-002"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "T04",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "boundary",
+      "actualPrimaryMatches": [
+        "AI-FEAT-042(100)",
+        "AI-FEAT-051(100)"
+      ],
+      "actualSources": [
+        "linux"
+      ],
+      "actualStatus": "NOT_SUPPORTED",
+      "id": "T05",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "boundary",
+      "actualPrimaryMatches": [
+        "AI-FEAT-056(100)"
+      ],
+      "actualSources": [
+        "face-recognition"
+      ],
+      "actualStatus": "NOT_SUPPORTED",
+      "id": "T06",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "boundary",
+      "actualPrimaryMatches": [
+        "AI-FEAT-002(200)",
+        "AI-FEAT-027(200)",
+        "AI-FEAT-006(100)",
+        "AI-FEAT-008(100)",
+        "AI-FEAT-017(100)"
+      ],
+      "actualSources": [
+        "multi-user-roles"
+      ],
+      "actualStatus": "NOT_SUPPORTED",
+      "id": "T07",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-FEAT-045(500)",
+        "AI-FEAT-049(300)",
+        "AI-FEAT-047(200)",
+        "AI-FEAT-051(200)",
+        "AI-FEAT-052(200)"
+      ],
+      "actualSources": [
+        "AI-FEAT-045",
+        "BUG-004",
+        "AI-WF-008"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "T08",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-FEAT-038(900)",
+        "AI-FEAT-019(200)",
+        "AI-FEAT-039(200)",
+        "AI-FEAT-040(200)",
+        "AI-FEAT-041(200)"
+      ],
+      "actualSources": [
+        "AI-FEAT-038",
+        "BUG-005",
+        "AI-WF-005"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "T09",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-WF-006(100)",
+        "AI-WF-008(100)",
+        "AI-FEAT-027(100)",
+        "AI-FEAT-048(100)",
+        "AI-FEAT-051(100)"
+      ],
+      "actualSources": [
+        "AI-WF-006",
+        "AI-FEAT-048"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "T10",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-FEAT-011(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-011",
+        "AI-WF-001"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "X01",
+      "knownLimitation": "CHANGED 2026-08-14 (Part 2 Decision 2) — was a zero-match (UNKNOWN) safe decline; now a single weak, heavily-hedged match on AI-FEAT-011 (confidence 0.1). Honest weak/hedged gap, not a confident false claim — same pattern already accepted for X02.",
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-FEAT-002(100)",
+        "AI-FEAT-003(100)",
+        "AI-FEAT-004(100)",
+        "AI-FEAT-005(100)",
+        "AI-FEAT-017(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-002"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "X02",
+      "knownLimitation": "No evidence either way on encryption-at-rest; weak match via AI-FEAT-004 (event.json contract) sharing only the generic word \"data\". Honest weak/hedged gap, not a confident false claim.",
+      "pass": false
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-FEAT-014(100)",
+        "AI-FEAT-019(100)",
+        "AI-FEAT-022(100)",
+        "AI-FEAT-029(100)",
+        "AI-FEAT-039(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-014"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "X03",
+      "knownLimitation": "CHANGED 2026-08-14 (Part 2 Decision 2) — was a zero-match (UNKNOWN) safe decline; now weakly tied among AI-FEAT-014/019/022/029/039 (confidence 0.1). Honest weak/hedged gap, not a confident false claim.",
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-FEAT-038(200)",
+        "AI-FEAT-039(200)",
+        "AI-FEAT-042(200)",
+        "AI-FEAT-044(200)",
+        "AI-FEAT-047(200)"
+      ],
+      "actualSources": [
+        "AI-FEAT-038",
+        "BUG-005",
+        "AI-WF-005"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "X04",
+      "knownLimitation": "No evidence either way on running without an archive root configured; matches the already-disclosed generic \"archive\" bare-token retrieval-precision gap (see AI-FEAT-058 Stage 2 Future Enhancements) rather than being a new, distinct defect.",
+      "pass": false
+    },
+    {
+      "actualMatchQuality": "boundary",
+      "actualPrimaryMatches": [
+        "AI-FEAT-002(300)",
+        "AI-FEAT-004(300)",
+        "AI-FEAT-027(300)",
+        "AI-FEAT-028(300)",
+        "AI-FEAT-048(300)"
+      ],
+      "actualSources": [
+        "registry-not-source-of-truth"
+      ],
+      "actualStatus": "NOT_SUPPORTED",
+      "id": "X05",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "boundary",
+      "actualPrimaryMatches": [
+        "AI-FEAT-023(300)",
+        "AI-FEAT-027(300)",
+        "AI-FEAT-048(300)",
+        "AI-FEAT-051(200)",
+        "AI-FEAT-002(100)"
+      ],
+      "actualSources": [
+        "registry-presence-not-activity"
+      ],
+      "actualStatus": "NOT_SUPPORTED",
+      "id": "X06",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "boundary",
+      "actualPrimaryMatches": [
+        "AI-FEAT-011(200)",
+        "AI-FEAT-055(200)",
+        "AI-FEAT-007(100)",
+        "AI-FEAT-010(100)",
+        "AI-FEAT-014(100)"
+      ],
+      "actualSources": [
+        "registry-media-storage"
+      ],
+      "actualStatus": "NOT_SUPPORTED",
+      "id": "X07",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "boundary",
+      "actualPrimaryMatches": [
+        "AI-FEAT-052(200)",
+        "AI-FEAT-007(100)",
+        "AI-FEAT-014(100)",
+        "AI-FEAT-017(100)",
+        "AI-FEAT-019(100)"
+      ],
+      "actualSources": [
+        "registry-conflict-detection"
+      ],
+      "actualStatus": "NOT_SUPPORTED",
+      "id": "X08",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "weak",
+      "actualPrimaryMatches": [
+        "AI-FEAT-021(100)",
+        "AI-FEAT-027(100)",
+        "AI-FEAT-047(100)"
+      ],
+      "actualSources": [
+        "AI-FEAT-021"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "X09",
+      "knownLimitation": "CHANGED 2026-08-14 (Part 2 Decision 2) — was a zero-match (UNKNOWN) safe decline; now weakly tied among AI-FEAT-021/027/047 (confidence 0.1). Honest weak/hedged gap, not a confident false claim.",
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "DEC-006(300)",
+        "DEC-002(200)"
+      ],
+      "actualSources": [
+        "DEC-006",
+        "AI-FEAT-029"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "X10",
+      "knownLimitation": "No evidence either way on RAW format support; weak match via AI-FEAT-013/025 sharing only generic tokens. Honest weak/hedged gap.",
+      "pass": false
+    }
+  ],
+  "v3": {
+    "anomalies": [],
+    "controlCount": 11,
+    "controlsPassing": 11,
+    "knownBaselineFailureCount": 17,
+    "knownBaselineFailuresConfirmedFailing": 17,
+    "schemaPlaceholderCount": 6,
+    "total": 34
+  },
+  "v3Cases": [
+    {
+      "category": "trigger-safety",
+      "checks": [
+        {
+          "actual": "face-recognition",
+          "expected": "not one of [face-recognition]",
+          "name": "forbiddenPrimary",
+          "pass": false
+        },
+        {
+          "actual": "present",
+          "expected": "AI-FEAT-039",
+          "name": "required:AI-FEAT-039",
+          "pass": true
+        }
+      ],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "NOT_SUPPORTED",
+        "classification": "UNKNOWN",
+        "confidence": 1,
+        "matchQuality": "boundary",
+        "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-038",
+            "score": 900
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-039",
+            "score": 900
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-009",
+            "score": 500
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-018",
+            "score": 500
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-002",
+            "score": 400
+          }
+        ],
+        "relatedCapabilities": [],
+        "sources": [
+          {
+            "id": "face-recognition",
+            "title": "Documented boundary (curated, evidence-cited — see lib/statusResolution.js)"
+          }
+        ]
+      },
+      "id": "RF-4.2-001",
+      "meetsTargetExpectation": false,
+      "status": "known-baseline-failure",
+      "targetPhase": "4.2"
+    },
+    {
+      "category": "trigger-safety",
+      "checks": [
+        {
+          "actual": "NOT_SUPPORTED",
+          "expected": "NOT_SUPPORTED",
+          "name": "status",
+          "pass": true
+        },
+        {
+          "actual": "boundary",
+          "expected": "boundary",
+          "name": "matchQuality",
+          "pass": true
+        },
+        {
+          "actual": "present",
+          "expected": "face-recognition",
+          "name": "required:face-recognition",
+          "pass": true
+        }
+      ],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "NOT_SUPPORTED",
+        "classification": "STATUS",
+        "confidence": 1,
+        "matchQuality": "boundary",
+        "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-011",
+            "score": 100
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-056",
+            "score": 100
+          }
+        ],
+        "relatedCapabilities": [],
+        "sources": [
+          {
+            "id": "face-recognition",
+            "title": "Documented boundary (curated, evidence-cited — see lib/statusResolution.js)"
+          }
+        ]
+      },
+      "id": "RF-4.2-002",
+      "meetsTargetExpectation": true,
+      "status": "control",
+      "targetPhase": "4.2"
+    },
+    {
+      "category": "trigger-safety",
+      "checks": [
+        {
+          "actual": "NOT_SUPPORTED",
+          "expected": "NOT_SUPPORTED",
+          "name": "status",
+          "pass": true
+        },
+        {
+          "actual": "boundary",
+          "expected": "boundary",
+          "name": "matchQuality",
+          "pass": true
+        },
+        {
+          "actual": "present",
+          "expected": "cloud-storage",
+          "name": "required:cloud-storage",
+          "pass": true
+        }
+      ],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "NOT_SUPPORTED",
+        "classification": "CAPABILITY",
+        "confidence": 1,
+        "matchQuality": "boundary",
+        "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-002",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-019",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-028",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-038",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-039",
+            "score": 200
+          }
+        ],
+        "relatedCapabilities": [],
+        "sources": [
+          {
+            "id": "cloud-storage",
+            "title": "Documented boundary (curated, evidence-cited — see lib/statusResolution.js)"
+          }
+        ]
+      },
+      "id": "RF-4.2-003",
+      "meetsTargetExpectation": true,
+      "status": "control",
+      "targetPhase": "4.2"
+    },
+    {
+      "category": "trigger-safety",
+      "checks": [
+        {
+          "actual": "NOT_SUPPORTED",
+          "expected": "NOT_SUPPORTED",
+          "name": "status",
+          "pass": true
+        },
+        {
+          "actual": "boundary",
+          "expected": "boundary",
+          "name": "matchQuality",
+          "pass": true
+        },
+        {
+          "actual": "present",
+          "expected": "linux",
+          "name": "required:linux",
+          "pass": true
+        }
+      ],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "NOT_SUPPORTED",
+        "classification": "STATUS",
+        "confidence": 1,
+        "matchQuality": "boundary",
+        "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-004",
+            "score": 100
+          }
+        ],
+        "relatedCapabilities": [],
+        "sources": [
+          {
+            "id": "linux",
+            "title": "Documented boundary (curated, evidence-cited — see lib/statusResolution.js)"
+          }
+        ]
+      },
+      "id": "RF-4.2-004",
+      "meetsTargetExpectation": true,
+      "status": "control",
+      "targetPhase": "4.2"
+    },
+    {
+      "category": "trigger-recall-candidate",
+      "checks": [],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "UNKNOWN",
+        "confidence": 0.3,
+        "matchQuality": "weak",
+        "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-002",
+            "score": 300
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-027",
+            "score": 300
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-009",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-010",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-011",
+            "score": 200
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-005",
+          "AI-FEAT-022",
+          "AI-FEAT-027",
+          "AI-FEAT-028"
+        ],
+        "sources": [
+          {
+            "id": "AI-FEAT-002",
+            "title": "Login & Operator Identity"
+          }
+        ]
+      },
+      "id": "RF-4.2-005",
+      "meetsTargetExpectation": null,
+      "status": "schema-placeholder",
+      "targetPhase": "4.2"
+    },
+    {
+      "category": "trigger-recall-candidate",
+      "checks": [],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "UNKNOWN",
+        "confidence": 0.85,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-047",
+            "score": 850
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-027",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-011",
+            "score": 100
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-017",
+            "score": 100
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-023",
+            "score": 100
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-016",
+          "AI-FEAT-029",
+          "AI-FEAT-046"
+        ],
+        "sources": [
+          {
+            "id": "AI-FEAT-047",
+            "title": "QMZ Sequencing Workspace"
+          },
+          {
+            "id": "BUG-007",
+            "title": "BUG-007 (Fixed)"
+          },
+          {
+            "id": "AI-WF-007",
+            "title": "Sort QMZ Photographs"
+          }
+        ]
+      },
+      "id": "RF-4.2-006",
+      "meetsTargetExpectation": null,
+      "status": "schema-placeholder",
+      "targetPhase": "4.2"
+    },
+    {
+      "category": "ranking-normalization",
+      "checks": [
+        {
+          "actual": "AI-WF-006",
+          "expected": [
+            "AI-FEAT-039",
+            "AI-WF-009"
+          ],
+          "name": "allowedPrimary",
+          "pass": false
+        },
+        {
+          "actual": "AI-WF-006",
+          "expected": "not one of [AI-WF-006]",
+          "name": "forbiddenPrimary",
+          "pass": false
+        }
+      ],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "TROUBLESHOOTING",
+        "confidence": 0.3,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-006",
+            "score": 300
+          },
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-005",
+            "score": 200
+          },
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-008",
+            "score": 200
+          },
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-009",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-041",
+            "score": 300
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-048"
+        ],
+        "sources": [
+          {
+            "id": "AI-WF-006",
+            "title": "See Who Else Is Online, Coordinate Shared Events, and See What They're Working On"
+          },
+          {
+            "id": "AI-FEAT-048",
+            "title": null
+          }
+        ]
+      },
+      "id": "RF-4.3-001",
+      "meetsTargetExpectation": false,
+      "status": "known-baseline-failure",
+      "targetPhase": "4.3"
+    },
+    {
+      "category": "ranking-normalization",
+      "checks": [
+        {
+          "actual": "AI-WF-006",
+          "expected": [
+            "AI-FEAT-039",
+            "AI-WF-009"
+          ],
+          "name": "allowedPrimary",
+          "pass": false
+        },
+        {
+          "actual": "AI-WF-006",
+          "expected": "not one of [AI-WF-006]",
+          "name": "forbiddenPrimary",
+          "pass": false
+        }
+      ],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "TROUBLESHOOTING",
+        "confidence": 0.4,
+        "matchQuality": "weak",
+        "matchedCapabilities": [
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-006",
+            "score": 400
+          },
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-009",
+            "score": 400
+          },
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-002",
+            "score": 200
+          },
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-005",
+            "score": 200
+          },
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-008",
+            "score": 200
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-048"
+        ],
+        "sources": [
+          {
+            "id": "AI-WF-006",
+            "title": "See Who Else Is Online, Coordinate Shared Events, and See What They're Working On"
+          },
+          {
+            "id": "AI-FEAT-048",
+            "title": null
+          }
+        ]
+      },
+      "id": "RF-4.3-002",
+      "meetsTargetExpectation": false,
+      "status": "known-baseline-failure",
+      "targetPhase": "4.3"
+    },
+    {
+      "category": "ranking-normalization",
+      "checks": [
+        {
+          "actual": "AI-FEAT-038",
+          "expected": [
+            "AI-FEAT-039"
+          ],
+          "name": "allowedPrimary",
+          "pass": false
+        },
+        {
+          "actual": "AI-FEAT-038",
+          "expected": "not one of [AI-FEAT-038]",
+          "name": "forbiddenPrimary",
+          "pass": false
+        }
+      ],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "UNKNOWN",
+        "confidence": 0.9,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-038",
+            "score": 900
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-039",
+            "score": 800
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-018",
+            "score": 300
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-022",
+            "score": 300
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-025",
+            "score": 300
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-039",
+          "AI-FEAT-040",
+          "AI-FEAT-041",
+          "AI-FEAT-042",
+          "AI-FEAT-045",
+          "AI-FEAT-046"
+        ],
+        "sources": [
+          {
+            "id": "AI-FEAT-038",
+            "title": "Transfer Export"
+          },
+          {
+            "id": "BUG-005",
+            "title": "BUG-005 (Fixed)"
+          },
+          {
+            "id": "AI-WF-005",
+            "title": "Export or Update a Transfer Drive"
+          }
+        ]
+      },
+      "id": "RF-4.3-003",
+      "meetsTargetExpectation": false,
+      "status": "known-baseline-failure",
+      "targetPhase": "4.3"
+    },
+    {
+      "category": "ranking-normalization",
+      "checks": [
+        {
+          "actual": "AI-FEAT-053",
+          "expected": [
+            "AI-FEAT-058"
+          ],
+          "name": "allowedPrimary",
+          "pass": false
+        }
+      ],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "PLANNED",
+        "classification": "EXPLANATION",
+        "confidence": 0.4,
+        "matchQuality": "weak",
+        "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-053",
+            "score": 400
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-056",
+            "score": 400
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-058",
+            "score": 300
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-051",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-019",
+            "score": 100
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-051"
+        ],
+        "sources": [
+          {
+            "id": "AI-FEAT-053",
+            "title": "Global Search"
+          },
+          {
+            "id": "AI-RM-005",
+            "title": "Roadmap milestone AI-RM-005 (Planned — not started)"
+          }
+        ]
+      },
+      "id": "RF-4.3-004",
+      "meetsTargetExpectation": false,
+      "status": "known-baseline-failure",
+      "targetPhase": "4.3"
+    },
+    {
+      "category": "ranking-normalization",
+      "checks": [
+        {
+          "actual": "PLANNED",
+          "expected": "PLANNED",
+          "name": "status",
+          "pass": true
+        },
+        {
+          "actual": "AI-FEAT-049",
+          "expected": [
+            "AI-FEAT-043"
+          ],
+          "name": "allowedPrimary",
+          "pass": false
+        },
+        {
+          "actual": "AI-FEAT-049",
+          "expected": "not one of [AI-FEAT-049]",
+          "name": "forbiddenPrimary",
+          "pass": false
+        }
+      ],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "PLANNED",
+        "classification": "EXPLANATION",
+        "confidence": 0.5,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-049",
+            "score": 500
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-055",
+            "score": 400
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-056",
+            "score": 400
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-004",
+            "score": 300
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-043",
+            "score": 300
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-042",
+          "AI-FEAT-043",
+          "AI-FEAT-050"
+        ],
+        "sources": [
+          {
+            "id": "AI-FEAT-049",
+            "title": "Archive Maintenance"
+          },
+          {
+            "id": "AI-RM-001",
+            "title": "Roadmap milestone AI-RM-001 (**Completed**)"
+          },
+          {
+            "id": "AI-RM-002",
+            "title": "Roadmap milestone AI-RM-002 (Planned — not started)"
+          }
+        ]
+      },
+      "id": "RF-4.3-005",
+      "meetsTargetExpectation": false,
+      "status": "known-baseline-failure",
+      "targetPhase": "4.3"
+    },
+    {
+      "category": "ranking-normalization",
+      "checks": [
+        {
+          "actual": "AVAILABLE",
+          "expected": "AVAILABLE",
+          "name": "status",
+          "pass": true
+        },
+        {
+          "actual": "strong",
+          "expected": "strong",
+          "name": "matchQuality",
+          "pass": true
+        },
+        {
+          "actual": "present",
+          "expected": "AI-FEAT-045",
+          "name": "required:AI-FEAT-045",
+          "pass": true
+        }
+      ],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "TROUBLESHOOTING",
+        "confidence": 0.5,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-045",
+            "score": 500
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-049",
+            "score": 300
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-047",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-051",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-002",
+            "score": 100
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-038",
+          "AI-FEAT-043"
+        ],
+        "sources": [
+          {
+            "id": "AI-FEAT-045",
+            "title": "Archive Lock Handling & Stale-Lock Recovery"
+          },
+          {
+            "id": "BUG-004",
+            "title": "BUG-004 (Fixed)"
+          },
+          {
+            "id": "AI-WF-008",
+            "title": "Recover From an Archive Lock Error"
+          }
+        ]
+      },
+      "id": "RF-4.3-006",
+      "meetsTargetExpectation": true,
+      "status": "control",
+      "targetPhase": "4.3"
+    },
+    {
+      "category": "ranking-normalization",
+      "checks": [],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "UNKNOWN",
+        "confidence": 0.1,
+        "matchQuality": "weak",
+        "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-004",
+            "score": 100
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-009",
+            "score": 100
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-018",
+            "score": 100
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-021",
+            "score": 100
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-029",
+            "score": 100
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-003",
+          "AI-FEAT-009",
+          "AI-FEAT-010",
+          "AI-FEAT-017",
+          "AI-FEAT-018",
+          "AI-FEAT-019",
+          "AI-FEAT-021",
+          "AI-FEAT-023",
+          "AI-FEAT-027",
+          "AI-FEAT-029",
+          "AI-FEAT-043",
+          "AI-FEAT-046",
+          "AI-FEAT-050"
+        ],
+        "sources": [
+          {
+            "id": "AI-FEAT-004",
+            "title": "event.json Data Model & Persistence Contract"
+          },
+          {
+            "id": "BUG-003",
+            "title": "BUG-003 (Fixed)"
+          },
+          {
+            "id": "BUG-006",
+            "title": "BUG-006 (Fixed (recurring pattern — see Prevention))"
+          }
+        ]
+      },
+      "id": "RF-4.3-007",
+      "meetsTargetExpectation": null,
+      "status": "schema-placeholder",
+      "targetPhase": "4.3"
+    },
+    {
+      "category": "classifier-hygiene",
+      "checks": [
+        {
+          "actual": "TROUBLESHOOTING",
+          "expected": "EXPLANATION",
+          "name": "classification",
+          "pass": false
+        }
+      ],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "TROUBLESHOOTING",
+        "confidence": 0.3,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-006",
+            "score": 300
+          },
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-005",
+            "score": 200
+          },
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-008",
+            "score": 200
+          },
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-009",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-041",
+            "score": 300
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-048"
+        ],
+        "sources": [
+          {
+            "id": "AI-WF-006",
+            "title": "See Who Else Is Online, Coordinate Shared Events, and See What They're Working On"
+          },
+          {
+            "id": "AI-FEAT-048",
+            "title": null
+          }
+        ]
+      },
+      "id": "RF-4.4-001",
+      "meetsTargetExpectation": false,
+      "status": "known-baseline-failure",
+      "targetPhase": "4.4"
+    },
+    {
+      "category": "classifier-hygiene",
+      "checks": [
+        {
+          "actual": "TROUBLESHOOTING",
+          "expected": "TROUBLESHOOTING",
+          "name": "classification",
+          "pass": true
+        }
+      ],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "TROUBLESHOOTING",
+        "confidence": 0.6,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-001",
+            "score": 600
+          },
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-003",
+            "score": 400
+          },
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-002",
+            "score": 300
+          },
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-006",
+            "score": 300
+          },
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-007",
+            "score": 300
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-011",
+          "AI-FEAT-012",
+          "AI-FEAT-017",
+          "AI-FEAT-018",
+          "AI-FEAT-019",
+          "AI-FEAT-022"
+        ],
+        "sources": [
+          {
+            "id": "AI-WF-001",
+            "title": "Import Photographs From a Memory Card or Folder"
+          },
+          {
+            "id": "AI-FEAT-011",
+            "title": null
+          },
+          {
+            "id": "AI-FEAT-012",
+            "title": null
+          },
+          {
+            "id": "AI-FEAT-017",
+            "title": null
+          },
+          {
+            "id": "AI-FEAT-018",
+            "title": null
+          },
+          {
+            "id": "AI-FEAT-019",
+            "title": null
+          },
+          {
+            "id": "AI-FEAT-022",
+            "title": null
+          }
+        ]
+      },
+      "id": "RF-4.4-002",
+      "meetsTargetExpectation": true,
+      "status": "control",
+      "targetPhase": "4.4"
+    },
+    {
+      "category": "classifier-hygiene",
+      "checks": [
+        {
+          "actual": "TROUBLESHOOTING",
+          "expected": "TROUBLESHOOTING",
+          "name": "classification",
+          "pass": true
+        }
+      ],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "TROUBLESHOOTING",
+        "confidence": 0.3,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-033",
+            "score": 300
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-023",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-034",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-037",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-049",
+            "score": 200
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-029",
+          "AI-FEAT-030",
+          "AI-FEAT-031",
+          "AI-FEAT-034",
+          "AI-FEAT-035",
+          "AI-FEAT-052",
+          "AI-FEAT-054"
+        ],
+        "sources": [
+          {
+            "id": "AI-FEAT-033",
+            "title": "Metadata Audit & Repair"
+          },
+          {
+            "id": "AI-RM-001",
+            "title": "Roadmap milestone AI-RM-001 (**Completed**)"
+          },
+          {
+            "id": "BUG-007",
+            "title": "BUG-007 (Fixed)"
+          },
+          {
+            "id": "AI-WF-004",
+            "title": "Repair Missing or Incorrect Metadata"
+          }
+        ]
+      },
+      "id": "RF-4.4-003",
+      "meetsTargetExpectation": true,
+      "status": "control",
+      "targetPhase": "4.4"
+    },
+    {
+      "category": "relationship-visibility",
+      "checks": [
+        {
+          "actual": "absent",
+          "expected": "DEC-009",
+          "name": "required:DEC-009",
+          "pass": false
+        }
+      ],
+      "diagnostics": [
+        {
+          "category": "PENDING_PHASE_5",
+          "groundTruthCitation": {
+            "citedBy": "AI-FEAT-019",
+            "recordType": "feature"
+          },
+          "note": "Not a scored ranker candidate, but a canonical citation exists (via AI-FEAT-019) — do not conclude this is a retrieval/ranking defect. Decision 4 introduces relationship-based discovery independent of ranker scoring; whether the eventual fix comes from improved retrieval, Decision 4's relationship lookup (Phase 5.1), or Decision 3's admission logic (Phase 5.2) cannot be determined until Phase 5.1 exists.",
+          "presentInCandidates": false,
+          "presentInSources": false,
+          "requiredId": "DEC-009"
+        }
+      ],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "TROUBLESHOOTING",
+        "confidence": 0.4,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-032",
+            "score": 400
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-053",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-002",
+            "score": 100
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-004",
+            "score": 100
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-009",
+            "score": 100
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-029",
+          "AI-FEAT-039"
+        ],
+        "sources": [
+          {
+            "id": "AI-FEAT-032",
+            "title": "Metadata Verification"
+          },
+          {
+            "id": "AI-RM-001",
+            "title": "Roadmap milestone AI-RM-001 (**Completed**)"
+          },
+          {
+            "id": "BUG-009",
+            "title": "BUG-009 (Fixed)"
+          },
+          {
+            "id": "AI-WF-009",
+            "title": "Import or Update From a Transfer Drive"
+          }
+        ]
+      },
+      "id": "RF-5.1-001",
+      "meetsTargetExpectation": false,
+      "status": "known-baseline-failure",
+      "targetPhase": "5.1"
+    },
+    {
+      "category": "relationship-visibility",
+      "checks": [
+        {
+          "actual": "absent",
+          "expected": "DEC-011",
+          "name": "required:DEC-011",
+          "pass": false
+        }
+      ],
+      "diagnostics": [
+        {
+          "category": "PENDING_PHASE_5",
+          "groundTruthCitation": {
+            "citedBy": "AI-FEAT-047",
+            "recordType": "feature"
+          },
+          "note": "Not a scored ranker candidate, but a canonical citation exists (via AI-FEAT-047) — do not conclude this is a retrieval/ranking defect. Decision 4 introduces relationship-based discovery independent of ranker scoring; whether the eventual fix comes from improved retrieval, Decision 4's relationship lookup (Phase 5.1), or Decision 3's admission logic (Phase 5.2) cannot be determined until Phase 5.1 exists.",
+          "presentInCandidates": false,
+          "presentInSources": false,
+          "requiredId": "DEC-011"
+        }
+      ],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "EXPLANATION",
+        "confidence": 0.85,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-047",
+            "score": 850
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-006",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-034",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-038",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-049",
+            "score": 200
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-016",
+          "AI-FEAT-029",
+          "AI-FEAT-046"
+        ],
+        "sources": [
+          {
+            "id": "AI-FEAT-047",
+            "title": "QMZ Sequencing Workspace"
+          },
+          {
+            "id": "BUG-007",
+            "title": "BUG-007 (Fixed)"
+          },
+          {
+            "id": "AI-WF-007",
+            "title": "Sort QMZ Photographs"
+          }
+        ]
+      },
+      "id": "RF-5.1-002",
+      "meetsTargetExpectation": false,
+      "status": "known-baseline-failure",
+      "targetPhase": "5.1"
+    },
+    {
+      "category": "relationship-visibility",
+      "checks": [],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "PARTIALLY_AVAILABLE",
+        "classification": "UNKNOWN",
+        "confidence": 0.2,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "decision",
+            "id": "DEC-019",
+            "score": 200
+          },
+          {
+            "entityType": "bug",
+            "id": "BUG-009",
+            "score": 100
+          },
+          {
+            "entityType": "bug",
+            "id": "BUG-011",
+            "score": 100
+          },
+          {
+            "entityType": "bug",
+            "id": "BUG-015",
+            "score": 100
+          },
+          {
+            "entityType": "bug",
+            "id": "BUG-016",
+            "score": 100
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-058"
+        ],
+        "sources": [
+          {
+            "id": "DEC-019",
+            "title": "Knowledge Engine Reuses Existing Retrieval; No New Search System, No Hosted Backend"
+          },
+          {
+            "id": "AI-FEAT-058",
+            "title": "Knowledge Engine (Stage 1 Prototype → Stage 2 Operator Knowledge Architecture)"
+          }
+        ]
+      },
+      "id": "RF-5.1-003",
+      "meetsTargetExpectation": null,
+      "status": "schema-placeholder",
+      "targetPhase": "5.1"
+    },
+    {
+      "category": "relationship-visibility",
+      "checks": [],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "PARTIALLY_AVAILABLE",
+        "classification": "UNKNOWN",
+        "confidence": 0.2,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "decision",
+            "id": "DEC-019",
+            "score": 200
+          },
+          {
+            "entityType": "bug",
+            "id": "BUG-009",
+            "score": 100
+          },
+          {
+            "entityType": "bug",
+            "id": "BUG-011",
+            "score": 100
+          },
+          {
+            "entityType": "bug",
+            "id": "BUG-015",
+            "score": 100
+          },
+          {
+            "entityType": "bug",
+            "id": "BUG-016",
+            "score": 100
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-058"
+        ],
+        "sources": [
+          {
+            "id": "DEC-019",
+            "title": "Knowledge Engine Reuses Existing Retrieval; No New Search System, No Hosted Backend"
+          },
+          {
+            "id": "AI-FEAT-058",
+            "title": "Knowledge Engine (Stage 1 Prototype → Stage 2 Operator Knowledge Architecture)"
+          }
+        ]
+      },
+      "id": "RF-5.1-004",
+      "meetsTargetExpectation": null,
+      "status": "schema-placeholder",
+      "targetPhase": "5.1"
+    },
+    {
+      "category": "neighborhood-admission",
+      "checks": [
+        {
+          "actual": "present",
+          "expected": "AI-FEAT-045",
+          "name": "required:AI-FEAT-045",
+          "pass": true
+        },
+        {
+          "actual": 3,
+          "expected": "<= 3",
+          "name": "maxSources",
+          "pass": true
+        }
+      ],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "TROUBLESHOOTING",
+        "confidence": 0.5,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-045",
+            "score": 500
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-049",
+            "score": 300
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-047",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-051",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-002",
+            "score": 100
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-038",
+          "AI-FEAT-043"
+        ],
+        "sources": [
+          {
+            "id": "AI-FEAT-045",
+            "title": "Archive Lock Handling & Stale-Lock Recovery"
+          },
+          {
+            "id": "BUG-004",
+            "title": "BUG-004 (Fixed)"
+          },
+          {
+            "id": "AI-WF-008",
+            "title": "Recover From an Archive Lock Error"
+          }
+        ]
+      },
+      "id": "RF-5.2-001",
+      "meetsTargetExpectation": true,
+      "status": "control",
+      "targetPhase": "5.2"
+    },
+    {
+      "category": "neighborhood-admission",
+      "checks": [
+        {
+          "actual": "absent",
+          "expected": "AI-FEAT-039",
+          "name": "required:AI-FEAT-039",
+          "pass": false
+        },
+        {
+          "actual": "present",
+          "expected": "AI-WF-009",
+          "name": "required:AI-WF-009",
+          "pass": true
+        }
+      ],
+      "diagnostics": [
+        {
+          "category": "PENDING_PHASE_5",
+          "groundTruthCitation": {
+            "citedBy": "AI-WF-005",
+            "recordType": "workflow"
+          },
+          "note": "Not a scored ranker candidate, but a canonical citation exists (via AI-WF-005) — do not conclude this is a retrieval/ranking defect. Decision 4 introduces relationship-based discovery independent of ranker scoring; whether the eventual fix comes from improved retrieval, Decision 4's relationship lookup (Phase 5.1), or Decision 3's admission logic (Phase 5.2) cannot be determined until Phase 5.1 exists.",
+          "presentInCandidates": false,
+          "presentInSources": false,
+          "requiredId": "AI-FEAT-039"
+        }
+      ],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "TROUBLESHOOTING",
+        "confidence": 0.4,
+        "matchQuality": "weak",
+        "matchedCapabilities": [
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-006",
+            "score": 400
+          },
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-009",
+            "score": 400
+          },
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-002",
+            "score": 200
+          },
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-005",
+            "score": 200
+          },
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-008",
+            "score": 200
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-048"
+        ],
+        "sources": [
+          {
+            "id": "AI-WF-006",
+            "title": "See Who Else Is Online, Coordinate Shared Events, and See What They're Working On"
+          },
+          {
+            "id": "AI-FEAT-048",
+            "title": null
+          }
+        ]
+      },
+      "id": "RF-5.2-002",
+      "meetsTargetExpectation": false,
+      "status": "known-baseline-failure",
+      "targetPhase": "5.2"
+    },
+    {
+      "category": "memory-context",
+      "checks": [
+        {
+          "actual": "absent",
+          "expected": "AI-MEM-0004",
+          "name": "required:AI-MEM-0004",
+          "pass": false
+        }
+      ],
+      "diagnostics": [
+        {
+          "category": "D_EVIDENCE_GAP",
+          "groundTruthCitation": false,
+          "note": "No canonical record anywhere cites this relationship — an honest documentation gap, true regardless of whether it happened to score as a retrieval candidate.",
+          "presentInCandidates": false,
+          "presentInSources": false,
+          "requiredId": "AI-MEM-0004"
+        }
+      ],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "TEAM_ACTIVITY",
+        "confidence": 0.6,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-027",
+            "score": 600
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-037",
+            "score": 500
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-002",
+            "score": 400
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-016",
+            "score": 400
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-028",
+            "score": 400
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-004",
+          "AI-FEAT-010",
+          "AI-FEAT-026"
+        ],
+        "sources": [
+          {
+            "id": "AI-FEAT-027",
+            "title": "Activity Log"
+          }
+        ]
+      },
+      "id": "RF-5.3-001",
+      "meetsTargetExpectation": false,
+      "status": "known-baseline-failure",
+      "targetPhase": "5.3"
+    },
+    {
+      "category": "memory-context",
+      "checks": [
+        {
+          "actual": "AVAILABLE",
+          "expected": "AVAILABLE",
+          "name": "status",
+          "pass": true
+        },
+        {
+          "actual": "present",
+          "expected": "AI-FEAT-046",
+          "name": "required:AI-FEAT-046",
+          "pass": true
+        },
+        {
+          "actual": "absent",
+          "expected": "no AI-MEM-#### present",
+          "name": "noMemoryRecord",
+          "pass": true
+        }
+      ],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "UNKNOWN",
+        "confidence": 0.3,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-046",
+            "score": 300
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-002",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-018",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-028",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-039",
+            "score": 200
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-004",
+          "AI-FEAT-042",
+          "AI-FEAT-047"
+        ],
+        "sources": [
+          {
+            "id": "AI-FEAT-046",
+            "title": "Archive Folder Adoption"
+          },
+          {
+            "id": "BUG-006",
+            "title": "BUG-006 (Fixed (recurring pattern — see Prevention))"
+          }
+        ]
+      },
+      "id": "RF-5.3-002",
+      "meetsTargetExpectation": true,
+      "status": "control",
+      "targetPhase": "5.3"
+    },
+    {
+      "category": "compound-question",
+      "checks": [
+        {
+          "actual": "present",
+          "expected": "AI-FEAT-039",
+          "name": "required:AI-FEAT-039",
+          "pass": true
+        },
+        {
+          "actual": "absent",
+          "expected": "AI-WF-009",
+          "name": "required:AI-WF-009",
+          "pass": false
+        }
+      ],
+      "diagnostics": [
+        {
+          "category": "PENDING_PHASE_5",
+          "groundTruthCitation": {
+            "citedBy": "AI-WF-005",
+            "recordType": "workflow"
+          },
+          "note": "Not a scored ranker candidate, but a canonical citation exists (via AI-WF-005) — do not conclude this is a retrieval/ranking defect. Decision 4 introduces relationship-based discovery independent of ranker scoring; whether the eventual fix comes from improved retrieval, Decision 4's relationship lookup (Phase 5.1), or Decision 3's admission logic (Phase 5.2) cannot be determined until Phase 5.1 exists.",
+          "presentInCandidates": false,
+          "presentInSources": false,
+          "requiredId": "AI-WF-009"
+        }
+      ],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "UNKNOWN",
+        "confidence": 0.2,
+        "matchQuality": "weak",
+        "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-019",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-025",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-032",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-039",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-041",
+            "score": 200
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-004",
+          "AI-FEAT-018",
+          "AI-FEAT-020",
+          "AI-FEAT-021",
+          "AI-FEAT-024",
+          "AI-FEAT-025",
+          "AI-FEAT-026",
+          "AI-FEAT-038",
+          "AI-FEAT-039",
+          "AI-FEAT-044"
+        ],
+        "sources": [
+          {
+            "id": "AI-FEAT-019",
+            "title": "Import Pipeline & Copy Engine"
+          },
+          {
+            "id": "BUG-009",
+            "title": "BUG-009 (Fixed)"
+          },
+          {
+            "id": "AI-WF-001",
+            "title": "Import Photographs From a Memory Card or Folder"
+          }
+        ]
+      },
+      "id": "RF-5.4-001",
+      "meetsTargetExpectation": false,
+      "status": "known-baseline-failure",
+      "targetPhase": "5.4"
+    },
+    {
+      "category": "compound-question",
+      "checks": [
+        {
+          "actual": "present",
+          "expected": "AI-FEAT-038",
+          "name": "required:AI-FEAT-038",
+          "pass": true
+        },
+        {
+          "actual": "present",
+          "expected": "DEC-021",
+          "name": "required:DEC-021",
+          "pass": true
+        }
+      ],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "UNKNOWN",
+        "confidence": 0.4,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "decision",
+            "id": "DEC-021",
+            "score": 400
+          },
+          {
+            "entityType": "bug",
+            "id": "BUG-005",
+            "score": 200
+          },
+          {
+            "entityType": "decision",
+            "id": "DEC-003",
+            "score": 200
+          },
+          {
+            "entityType": "decision",
+            "id": "DEC-004",
+            "score": 200
+          },
+          {
+            "entityType": "decision",
+            "id": "DEC-007",
+            "score": 200
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-038"
+        ],
+        "sources": [
+          {
+            "id": "DEC-021",
+            "title": "Transfer Export Process-Local Lock Accepted for Present Operational Model"
+          },
+          {
+            "id": "AI-FEAT-038",
+            "title": "Transfer Export"
+          }
+        ]
+      },
+      "id": "RF-5.4-002",
+      "meetsTargetExpectation": true,
+      "status": "control",
+      "targetPhase": "5.4"
+    },
+    {
+      "category": "compound-question",
+      "checks": [
+        {
+          "actual": "present",
+          "expected": "AI-FEAT-038",
+          "name": "required:AI-FEAT-038",
+          "pass": true
+        },
+        {
+          "actual": "present",
+          "expected": "BUG-005",
+          "name": "required:BUG-005",
+          "pass": true
+        }
+      ],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "STATUS",
+        "confidence": 0.5,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-038",
+            "score": 500
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-039",
+            "score": 400
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-025",
+            "score": 300
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-042",
+            "score": 300
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-055",
+            "score": 300
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-039",
+          "AI-FEAT-040",
+          "AI-FEAT-041",
+          "AI-FEAT-042",
+          "AI-FEAT-045",
+          "AI-FEAT-046"
+        ],
+        "sources": [
+          {
+            "id": "AI-FEAT-038",
+            "title": "Transfer Export"
+          },
+          {
+            "id": "BUG-005",
+            "title": "BUG-005 (Fixed)"
+          },
+          {
+            "id": "AI-WF-005",
+            "title": "Export or Update a Transfer Drive"
+          }
+        ]
+      },
+      "id": "RF-5.4-003",
+      "meetsTargetExpectation": true,
+      "status": "control",
+      "targetPhase": "5.4"
+    },
+    {
+      "category": "compound-question",
+      "checks": [
+        {
+          "actual": "present",
+          "expected": "AI-FEAT-033",
+          "name": "required:AI-FEAT-033",
+          "pass": true
+        },
+        {
+          "actual": "absent",
+          "expected": "PM-001",
+          "name": "required:PM-001",
+          "pass": false
+        }
+      ],
+      "diagnostics": [
+        {
+          "category": "PENDING_PHASE_5",
+          "groundTruthCitation": {
+            "citedBy": "AI-FEAT-029",
+            "recordType": "feature"
+          },
+          "note": "Not a scored ranker candidate, but a canonical citation exists (via AI-FEAT-029) — do not conclude this is a retrieval/ranking defect. Decision 4 introduces relationship-based discovery independent of ranker scoring; whether the eventual fix comes from improved retrieval, Decision 4's relationship lookup (Phase 5.1), or Decision 3's admission logic (Phase 5.2) cannot be determined until Phase 5.1 exists.",
+          "presentInCandidates": false,
+          "presentInSources": false,
+          "requiredId": "PM-001"
+        }
+      ],
+      "evidence": {
+        "capabilityStatus": "PLANNED",
+        "classification": "UNKNOWN",
+        "confidence": 0.5,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-049",
+            "score": 500
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-023",
+            "score": 400
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-033",
+            "score": 300
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-034",
+            "score": 300
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-052",
+            "score": 300
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-042",
+          "AI-FEAT-043",
+          "AI-FEAT-050"
+        ],
+        "sources": [
+          {
+            "id": "AI-FEAT-049",
+            "title": "Archive Maintenance"
+          },
+          {
+            "id": "AI-RM-001",
+            "title": "Roadmap milestone AI-RM-001 (**Completed**)"
+          },
+          {
+            "id": "AI-RM-002",
+            "title": "Roadmap milestone AI-RM-002 (Planned — not started)"
+          }
+        ]
+      },
+      "id": "RF-5.4-004",
+      "meetsTargetExpectation": false,
+      "status": "known-baseline-failure",
+      "targetPhase": "5.4"
+    },
+    {
+      "category": "compound-question",
+      "checks": [
+        {
+          "actual": "absent",
+          "expected": "AI-MEM-0004",
+          "name": "required:AI-MEM-0004",
+          "pass": false
+        }
+      ],
+      "diagnostics": [
+        {
+          "category": "D_EVIDENCE_GAP",
+          "groundTruthCitation": false,
+          "note": "No canonical record anywhere cites this relationship — an honest documentation gap, true regardless of whether it happened to score as a retrieval candidate.",
+          "presentInCandidates": false,
+          "presentInSources": false,
+          "requiredId": "AI-MEM-0004"
+        }
+      ],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "TEAM_ACTIVITY",
+        "confidence": 0.4,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-006",
+            "score": 400
+          },
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-008",
+            "score": 300
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-011",
+            "score": 300
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-027",
+            "score": 300
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-042",
+            "score": 300
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-048"
+        ],
+        "sources": [
+          {
+            "id": "AI-WF-006",
+            "title": "See Who Else Is Online, Coordinate Shared Events, and See What They're Working On"
+          },
+          {
+            "id": "AI-FEAT-048",
+            "title": null
+          }
+        ]
+      },
+      "id": "RF-5.4-005",
+      "meetsTargetExpectation": false,
+      "status": "known-baseline-failure",
+      "targetPhase": "5.4"
+    },
+    {
+      "category": "compound-question",
+      "checks": [
+        {
+          "actual": "absent",
+          "expected": "AI-WF-009",
+          "name": "required:AI-WF-009",
+          "pass": false
+        },
+        {
+          "actual": "present",
+          "expected": "AI-FEAT-039",
+          "name": "required:AI-FEAT-039",
+          "pass": true
+        }
+      ],
+      "diagnostics": [
+        {
+          "category": "PENDING_PHASE_5",
+          "groundTruthCitation": {
+            "citedBy": "AI-WF-005",
+            "recordType": "workflow"
+          },
+          "note": "Not a scored ranker candidate, but a canonical citation exists (via AI-WF-005) — do not conclude this is a retrieval/ranking defect. Decision 4 introduces relationship-based discovery independent of ranker scoring; whether the eventual fix comes from improved retrieval, Decision 4's relationship lookup (Phase 5.1), or Decision 3's admission logic (Phase 5.2) cannot be determined until Phase 5.1 exists.",
+          "presentInCandidates": false,
+          "presentInSources": false,
+          "requiredId": "AI-WF-009"
+        }
+      ],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "HOW_TO",
+        "confidence": 0.9,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-038",
+            "score": 900
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-039",
+            "score": 700
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-025",
+            "score": 300
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-042",
+            "score": 300
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-002",
+            "score": 200
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-039",
+          "AI-FEAT-040",
+          "AI-FEAT-041",
+          "AI-FEAT-042",
+          "AI-FEAT-045",
+          "AI-FEAT-046"
+        ],
+        "sources": [
+          {
+            "id": "AI-FEAT-038",
+            "title": "Transfer Export"
+          },
+          {
+            "id": "BUG-005",
+            "title": "BUG-005 (Fixed)"
+          },
+          {
+            "id": "AI-WF-005",
+            "title": "Export or Update a Transfer Drive"
+          }
+        ]
+      },
+      "id": "RF-5.4-006",
+      "meetsTargetExpectation": false,
+      "status": "known-baseline-failure",
+      "targetPhase": "5.4"
+    },
+    {
+      "category": "compound-question",
+      "checks": [
+        {
+          "actual": "absent",
+          "expected": "AI-FEAT-039",
+          "name": "required:AI-FEAT-039",
+          "pass": false
+        },
+        {
+          "actual": "present",
+          "expected": "AI-WF-009",
+          "name": "required:AI-WF-009",
+          "pass": true
+        }
+      ],
+      "diagnostics": [
+        {
+          "category": "PENDING_PHASE_5",
+          "groundTruthCitation": {
+            "citedBy": "AI-WF-005",
+            "recordType": "workflow"
+          },
+          "note": "Not a scored ranker candidate, but a canonical citation exists (via AI-WF-005) — do not conclude this is a retrieval/ranking defect. Decision 4 introduces relationship-based discovery independent of ranker scoring; whether the eventual fix comes from improved retrieval, Decision 4's relationship lookup (Phase 5.1), or Decision 3's admission logic (Phase 5.2) cannot be determined until Phase 5.1 exists.",
+          "presentInCandidates": false,
+          "presentInSources": false,
+          "requiredId": "AI-FEAT-039"
+        }
+      ],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "TROUBLESHOOTING",
+        "confidence": 0.4,
+        "matchQuality": "weak",
+        "matchedCapabilities": [
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-006",
+            "score": 400
+          },
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-009",
+            "score": 400
+          },
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-002",
+            "score": 200
+          },
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-005",
+            "score": 200
+          },
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-008",
+            "score": 200
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-048"
+        ],
+        "sources": [
+          {
+            "id": "AI-WF-006",
+            "title": "See Who Else Is Online, Coordinate Shared Events, and See What They're Working On"
+          },
+          {
+            "id": "AI-FEAT-048",
+            "title": null
+          }
+        ]
+      },
+      "id": "RF-5.4-007",
+      "meetsTargetExpectation": false,
+      "status": "known-baseline-failure",
+      "targetPhase": "5.4"
+    },
+    {
+      "category": "compound-question",
+      "checks": [
+        {
+          "actual": "present",
+          "expected": "AI-FEAT-045",
+          "name": "required:AI-FEAT-045",
+          "pass": true
+        },
+        {
+          "actual": 3,
+          "expected": "<= 3",
+          "name": "maxSources",
+          "pass": true
+        }
+      ],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "TROUBLESHOOTING",
+        "confidence": 0.5,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-045",
+            "score": 500
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-049",
+            "score": 300
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-047",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-051",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-002",
+            "score": 100
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-038",
+          "AI-FEAT-043"
+        ],
+        "sources": [
+          {
+            "id": "AI-FEAT-045",
+            "title": "Archive Lock Handling & Stale-Lock Recovery"
+          },
+          {
+            "id": "BUG-004",
+            "title": "BUG-004 (Fixed)"
+          },
+          {
+            "id": "AI-WF-008",
+            "title": "Recover From an Archive Lock Error"
+          }
+        ]
+      },
+      "id": "RF-5.4-008",
+      "meetsTargetExpectation": true,
+      "status": "control",
+      "targetPhase": "5.4"
+    },
+    {
+      "category": "compound-question",
+      "checks": [
+        {
+          "actual": "present",
+          "expected": "AI-FEAT-039",
+          "name": "required:AI-FEAT-039",
+          "pass": true
+        }
+      ],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "NOT_SUPPORTED",
+        "classification": "TROUBLESHOOTING",
+        "confidence": 1,
+        "matchQuality": "boundary",
+        "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-025",
+            "score": 300
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-039",
+            "score": 300
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-041",
+            "score": 300
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-002",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-011",
+            "score": 200
+          }
+        ],
+        "relatedCapabilities": [],
+        "sources": [
+          {
+            "id": "ai-auto-tagging",
+            "title": "Documented boundary (curated, evidence-cited — see lib/statusResolution.js)"
+          }
+        ]
+      },
+      "id": "RF-5.4-009",
+      "meetsTargetExpectation": true,
+      "status": "schema-placeholder",
+      "targetPhase": "5.4"
+    },
+    {
+      "category": "compound-question",
+      "checks": [
+        {
+          "actual": "AI-FEAT-053",
+          "expected": [
+            "AI-FEAT-058"
+          ],
+          "name": "allowedPrimary",
+          "pass": false
+        }
+      ],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "PLANNED",
+        "classification": "EXPLANATION",
+        "confidence": 0.4,
+        "matchQuality": "weak",
+        "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-053",
+            "score": 400
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-056",
+            "score": 400
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-058",
+            "score": 300
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-051",
+            "score": 200
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-019",
+            "score": 100
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-051"
+        ],
+        "sources": [
+          {
+            "id": "AI-FEAT-053",
+            "title": "Global Search"
+          },
+          {
+            "id": "AI-RM-005",
+            "title": "Roadmap milestone AI-RM-005 (Planned — not started)"
+          }
+        ]
+      },
+      "id": "RF-5.4-010",
+      "meetsTargetExpectation": false,
+      "status": "known-baseline-failure",
+      "targetPhase": "5.4"
+    }
+  ]
+}

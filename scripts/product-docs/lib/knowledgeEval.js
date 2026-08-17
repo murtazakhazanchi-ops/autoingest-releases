@@ -16,6 +16,8 @@ const build = require('./build');
 const { answerQuestion, buildEngineContext } = require('./knowledgeEngine');
 const { CORPUS } = require('./knowledgeTestCorpus');
 const { CORPUS_V2 } = require('./knowledgeTestCorpusV2');
+const { REGRESSION_CORPUS_V3 } = require('./knowledgeRegressionCorpusV3');
+const { captureEvidence, diagnoseMissingMember } = require('./knowledgeEvalDiagnostics');
 const { stableStringify } = require('./stableJson');
 const { GENERATED_ROOT } = require('./repoRoot');
 
@@ -113,4 +115,132 @@ function runEvalV2({ outPath } = {}) {
   return runEval({ outPath: outPath || path.join(GENERATED_ROOT, 'knowledge-gap-report-v2.json'), corpus: CORPUS_V2 });
 }
 
-module.exports = { runEval, runEvalV2, evaluateOne, renderTable };
+// Part 3 Phase 4.1 (Decision 7) — the hardened evaluator. Extends, never
+// replaces, evaluateOne() above: same answerQuestion() call, same
+// observe-and-assert discipline (see knowledgeEvalDiagnostics.js's header
+// comment on harness independence — no scoring/admission/relationship
+// algorithm is reimplemented here). Only checks a test entry actually
+// declares are evaluated — an entry with no applicable fields (a pure
+// 'schema-placeholder') returns meetsTargetExpectation: null, never a false
+// failure for an assertion that was never made.
+function evaluateOneHardened(entry, ctx, authorityIndex) {
+  const answer = answerQuestion(entry.question, ctx);
+  const evidence = captureEvidence(answer);
+  const checks = [];
+  const diagnostics = [];
+
+  const candidateIds = new Set(evidence.matchedCapabilities.map((m) => m.id));
+  const sourceIds = evidence.sources.map((s) => s.id);
+  const primaryId = sourceIds[0] || (evidence.matchedCapabilities[0] && evidence.matchedCapabilities[0].id) || null;
+
+  if (entry.expectedStatus !== undefined) {
+    checks.push({ name: 'status', pass: answer.capabilityStatus === entry.expectedStatus, expected: entry.expectedStatus, actual: answer.capabilityStatus });
+  }
+  if (entry.expectedMatchQuality !== undefined) {
+    checks.push({ name: 'matchQuality', pass: answer.matchQuality === entry.expectedMatchQuality, expected: entry.expectedMatchQuality, actual: answer.matchQuality });
+  }
+  if (entry.expectedClassification !== undefined) {
+    checks.push({ name: 'classification', pass: answer.classification === entry.expectedClassification, expected: entry.expectedClassification, actual: answer.classification });
+  }
+  if (entry.allowedMemberIds && entry.allowedMemberIds.length) {
+    checks.push({ name: 'allowedPrimary', pass: entry.allowedMemberIds.includes(primaryId), expected: entry.allowedMemberIds, actual: primaryId });
+  }
+  if (entry.forbiddenMemberIds && entry.forbiddenMemberIds.length) {
+    checks.push({ name: 'forbiddenPrimary', pass: !entry.forbiddenMemberIds.includes(primaryId), expected: `not one of [${entry.forbiddenMemberIds.join(', ')}]`, actual: primaryId });
+  }
+  if (entry.requiredMemberIds && entry.requiredMemberIds.length) {
+    for (const reqId of entry.requiredMemberIds) {
+      const present = candidateIds.has(reqId) || sourceIds.includes(reqId);
+      checks.push({ name: `required:${reqId}`, pass: present, expected: reqId, actual: present ? 'present' : 'absent' });
+      if (!present) diagnostics.push(diagnoseMissingMember(reqId, evidence, authorityIndex));
+    }
+  }
+  if (entry.expectedMaxSources !== undefined) {
+    checks.push({ name: 'maxSources', pass: evidence.sources.length <= entry.expectedMaxSources, expected: `<= ${entry.expectedMaxSources}`, actual: evidence.sources.length });
+  }
+  if (entry.mustNotContainMemoryRecord) {
+    const hasMemory = sourceIds.some((id) => /^AI-MEM-/.test(id)) || evidence.matchedCapabilities.some((m) => /^AI-MEM-/.test(m.id));
+    checks.push({ name: 'noMemoryRecord', pass: !hasMemory, expected: 'no AI-MEM-#### present', actual: hasMemory ? 'present' : 'absent' });
+  }
+  if (entry.expectedConfidenceRange) {
+    const [min, max] = entry.expectedConfidenceRange;
+    checks.push({ name: 'confidenceRange', pass: answer.confidence >= min && answer.confidence <= max, expected: entry.expectedConfidenceRange, actual: answer.confidence });
+  }
+
+  const meetsTargetExpectation = checks.length > 0 ? checks.every((c) => c.pass) : null;
+
+  return {
+    id: entry.id, targetPhase: entry.targetPhase, decisionRef: entry.decisionRef, auditRef: entry.auditRef,
+    status: entry.status, category: entry.category, question: entry.question,
+    checks, meetsTargetExpectation, diagnostics, evidence,
+  };
+}
+
+// Classifies each V3 result against what its own declared `status` predicts,
+// flagging anomalies rather than silently accepting them — a 'control' that
+// fails today, or a 'known-baseline-failure' that unexpectedly already
+// passes, both need a human look before Phase 4.1 can close (see this
+// phase's own baseline-gate procedure: "prove deterministic... document the
+// baseline").
+function summarizeHardenedResults(results) {
+  const byStatus = { control: [], 'known-baseline-failure': [], 'schema-placeholder': [] };
+  const anomalies = [];
+  for (const r of results) {
+    (byStatus[r.status] || (byStatus[r.status] = [])).push(r);
+    if (r.status === 'control' && r.meetsTargetExpectation === false) {
+      anomalies.push({ id: r.id, kind: 'CONTROL_FAILING', note: 'A control case (expected to already pass today) is failing — investigate before closing Phase 4.1.' });
+    }
+    if (r.status === 'known-baseline-failure' && r.meetsTargetExpectation === true) {
+      anomalies.push({ id: r.id, kind: 'BASELINE_ALREADY_PASSES', note: 'A known-baseline-failure case unexpectedly already meets its target expectation today — either already fixed by a prior pass, or the assertion needs re-checking.' });
+    }
+  }
+  return {
+    total: results.length,
+    controlCount: byStatus.control.length,
+    controlsPassing: byStatus.control.filter((r) => r.meetsTargetExpectation === true).length,
+    knownBaselineFailureCount: byStatus['known-baseline-failure'].length,
+    knownBaselineFailuresConfirmedFailing: byStatus['known-baseline-failure'].filter((r) => r.meetsTargetExpectation === false).length,
+    schemaPlaceholderCount: byStatus['schema-placeholder'].length,
+    anomalies,
+  };
+}
+
+// Phase 4.1's own baseline-gate procedure: run the EXISTING V1+V2 corpus
+// through the UNCHANGED evaluateOne() (proving this phase's additions
+// regressed nothing), run the NEW regression-family corpus through the
+// hardened evaluator, and write one consolidated baseline snapshot that
+// every later phase's classifyRun() (knowledgeEvalClassification.js) will
+// be compared against.
+function runHardenedEval({ outPath } = {}) {
+  const { built } = build.assemble();
+  const ctx = buildEngineContext(built);
+  const authorityIndex = built.authorityIndex;
+
+  const v1Results = CORPUS.map((e) => evaluateOne(e, ctx));
+  const v2Results = CORPUS_V2.map((e) => evaluateOne(e, ctx));
+  const v3Results = REGRESSION_CORPUS_V3.map((e) => evaluateOneHardened(e, ctx, authorityIndex));
+  const v3Summary = summarizeHardenedResults(v3Results);
+
+  const v1Summary = { total: v1Results.length, pass: v1Results.filter((r) => r.pass).length, knownMiss: v1Results.filter((r) => !r.pass && r.knownLimitation).length, unexplained: v1Results.filter((r) => !r.pass && !r.knownLimitation).length };
+  const v2Summary = { total: v2Results.length, pass: v2Results.filter((r) => r.pass).length, knownMiss: v2Results.filter((r) => !r.pass && r.knownLimitation).length, unexplained: v2Results.filter((r) => !r.pass && !r.knownLimitation).length };
+
+  const baseline = {
+    schema_version: '1.0.0',
+    generated_at: new Date().toISOString(),
+    note: 'Part 3 Phase 4.1 (Decision 7) frozen baseline — every later phase\'s changed results get classified (Improvement/Acceptable change/Regression/Unexplained change/Unchanged, see knowledgeEvalClassification.js) against THIS snapshot.',
+    v1: v1Summary,
+    v2: v2Summary,
+    v3: v3Summary,
+    v1Cases: v1Results.map((r) => ({ id: r.id, pass: r.pass, knownLimitation: r.knownLimitation, actualStatus: r.actualStatus, actualMatchQuality: r.actualMatchQuality, actualPrimaryMatches: r.actualPrimaryMatches, actualSources: r.actualSources })),
+    v2Cases: v2Results.map((r) => ({ id: r.id, pass: r.pass, knownLimitation: r.knownLimitation, actualStatus: r.actualStatus, actualMatchQuality: r.actualMatchQuality, actualPrimaryMatches: r.actualPrimaryMatches, actualSources: r.actualSources })),
+    v3Cases: v3Results.map((r) => ({ id: r.id, targetPhase: r.targetPhase, status: r.status, category: r.category, meetsTargetExpectation: r.meetsTargetExpectation, checks: r.checks, diagnostics: r.diagnostics, evidence: r.evidence })),
+  };
+
+  const resolvedOutPath = outPath || path.join(GENERATED_ROOT, 'knowledge-eval-hardened-baseline.json');
+  fs.mkdirSync(path.dirname(resolvedOutPath), { recursive: true });
+  fs.writeFileSync(resolvedOutPath, stableStringify(baseline));
+
+  return { v1Results, v2Results, v3Results, v1Summary, v2Summary, v3Summary, baseline, outPath: resolvedOutPath };
+}
+
+module.exports = { runEval, runEvalV2, evaluateOne, renderTable, evaluateOneHardened, runHardenedEval, summarizeHardenedResults };
