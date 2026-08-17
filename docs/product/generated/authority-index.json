@@ -15,6 +15,9 @@
         "renderer/theme-init.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-001_ELECTRON_APPLICATION_SHELL_SECURITY_MODEL.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-001",
       "recordType": "feature",
@@ -36,6 +39,9 @@
         "services/settings.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-002_LOGIN_OPERATOR_IDENTITY.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-002",
       "recordType": "feature",
@@ -57,6 +63,9 @@
         "renderer/theme-init.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-003_DASHBOARD_SYSTEM_STATUS.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-003",
       "recordType": "feature",
@@ -83,6 +92,9 @@
         "main/eventJsonStore.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-004_EVENT_JSON_DATA_MODEL_PERSISTENCE_CONTRACT.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-004",
       "recordType": "feature",
@@ -106,6 +118,9 @@
         "services/settings.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-005_APPLICATION_SETTINGS_CONFIGURATION_STORE.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-005",
       "recordType": "feature",
@@ -123,6 +138,13 @@
         "services/autoUpdater.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [
+        "DEC-017"
+      ],
+      "directPostmortems": [
+        "PM-002"
+      ],
       "evidenceNote": "Derived directly from features/AI-FEAT-006_APPLICATION_AUTO_UPDATE.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-006",
       "recordType": "feature",
@@ -144,6 +166,12 @@
         "services/telemetry.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [
+        "BUG-017",
+        "BUG-018"
+      ],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-007_TELEMETRY_PIPELINE.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-007",
       "recordType": "feature",
@@ -167,6 +195,9 @@
         "renderer/index.html"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-008_DESIGN_SYSTEM_UI_CONSISTENCY_FRAMEWORK.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-008",
       "recordType": "feature",
@@ -189,6 +220,9 @@
         "renderer/treeAutocomplete.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-009_EVENT_CREATION.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-009",
       "recordType": "feature",
@@ -210,6 +244,13 @@
         "renderer/eventMgmt.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [
+        "BUG-006"
+      ],
+      "directDecisions": [
+        "DEC-001"
+      ],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-010_EVENT_MANAGEMENT_EDITING.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-010",
       "recordType": "feature",
@@ -235,6 +276,9 @@
         "main/fileBrowser.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-011_SOURCE_DETECTION.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-011",
       "recordType": "feature",
@@ -255,6 +299,9 @@
         "renderer/renderer.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-012_SOURCE_SELECTION.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-012",
       "recordType": "feature",
@@ -277,6 +324,9 @@
         "main/fileBrowser.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-013_FILE_BROWSER_MEDIA_GRID_LIST_VIEWING.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-013",
       "recordType": "feature",
@@ -295,6 +345,9 @@
         "main/videoThumbService.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-014_THUMBNAIL_GENERATION_CACHING.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-014",
       "recordType": "feature",
@@ -314,6 +367,9 @@
         "main/rawPreviewService.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-015_MEDIA_PREVIEW.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-015",
       "recordType": "feature",
@@ -334,6 +390,9 @@
         "renderer/renderer.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-016_PREVIEW_FOCUS_SELECTION_SEPARATION.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-016",
       "recordType": "feature",
@@ -354,6 +413,9 @@
         "renderer/groupManager.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-017_GROUPING_SYSTEM.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-017",
       "recordType": "feature",
@@ -374,6 +436,9 @@
         "renderer/importRouter.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-018_EVENT_COMPONENT_IMPORT_ROUTING.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-018",
       "recordType": "feature",
@@ -399,6 +464,9 @@
         "main/fileManager.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-019_IMPORT_PIPELINE_COPY_ENGINE.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-019",
       "recordType": "feature",
@@ -424,6 +492,9 @@
         "main/fileManager.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-020_DUPLICATE_DETECTION.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-020",
       "recordType": "feature",
@@ -448,6 +519,9 @@
         "main/main.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-021_ATOMIC_IMPORT_TRANSACTION.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-021",
       "recordType": "feature",
@@ -469,6 +543,11 @@
         "services/photographerSequenceService.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [
+        "BUG-002"
+      ],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-022_PHOTOGRAPHER_FOLDER_RESOLUTION.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-022",
       "recordType": "feature",
@@ -492,6 +571,9 @@
         "renderer/renderer.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-023_QUICK_IMPORT.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-023",
       "recordType": "feature",
@@ -514,6 +596,13 @@
         "main/main.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [
+        "BUG-001"
+      ],
+      "directDecisions": [
+        "DEC-005"
+      ],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-024_SOURCE_CLEANUP.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-024",
       "recordType": "feature",
@@ -535,6 +624,9 @@
         "main/main.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-025_CHECKSUM_BASED_FILE_VERIFICATION.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-025",
       "recordType": "feature",
@@ -558,6 +650,9 @@
         "renderer/renderer.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-026_AUDIT_INTEGRITY_VERIFICATION.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-026",
       "recordType": "feature",
@@ -578,6 +673,9 @@
         "renderer/renderer.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-027_ACTIVITY_LOG.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-027",
       "recordType": "feature",
@@ -598,6 +696,9 @@
         "renderer/renderer.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-028_IMPORT_SOURCE_ATTRIBUTION.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-028",
       "recordType": "feature",
@@ -628,6 +729,19 @@
         "main/eventJsonStore.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [
+        "BUG-007",
+        "BUG-008",
+        "BUG-009",
+        "BUG-010"
+      ],
+      "directDecisions": [
+        "DEC-006",
+        "DEC-007"
+      ],
+      "directPostmortems": [
+        "PM-001"
+      ],
       "evidenceNote": "Derived directly from features/AI-FEAT-029_METADATA_WRITING_ENGINE.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-029",
       "recordType": "feature",
@@ -666,6 +780,15 @@
         "main/metadataQueueStore.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [
+        "BUG-010"
+      ],
+      "directDecisions": [
+        "DEC-008"
+      ],
+      "directPostmortems": [
+        "PM-001"
+      ],
       "evidenceNote": "Derived directly from features/AI-FEAT-030_METADATA_DURABLE_QUEUE_CRASH_RECOVERY.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-030",
       "recordType": "feature",
@@ -693,6 +816,13 @@
         "main/metadataStateService.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [
+        "BUG-008"
+      ],
+      "directDecisions": [],
+      "directPostmortems": [
+        "PM-001"
+      ],
       "evidenceNote": "Derived directly from features/AI-FEAT-031_METADATA_EVENT_STATE_DERIVATION.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-031",
       "recordType": "feature",
@@ -718,6 +848,15 @@
         "main/metadataVerificationService.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [
+        "BUG-009"
+      ],
+      "directDecisions": [
+        "DEC-009"
+      ],
+      "directPostmortems": [
+        "PM-001"
+      ],
       "evidenceNote": "Derived directly from features/AI-FEAT-032_METADATA_VERIFICATION.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-032",
       "recordType": "feature",
@@ -753,6 +892,13 @@
         "services/metadataAuditExport.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [
+        "BUG-007"
+      ],
+      "directDecisions": [],
+      "directPostmortems": [
+        "PM-001"
+      ],
       "evidenceNote": "Derived directly from features/AI-FEAT-033_METADATA_AUDIT_REPAIR.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-033",
       "recordType": "feature",
@@ -777,6 +923,9 @@
         "test/metadataManagementModalUI.test.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-034_METADATA_MANAGEMENT_MODAL.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-034",
       "recordType": "feature",
@@ -797,6 +946,9 @@
         "test/dashboardMetadataHealthCard.test.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-035_DASHBOARD_METADATA_HEALTH.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-035",
       "recordType": "feature",
@@ -822,6 +974,12 @@
         "main/main.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [
+        "DEC-004",
+        "DEC-014"
+      ],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-036_KEYWORD_REGISTRY.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-036",
       "recordType": "feature",
@@ -847,6 +1005,9 @@
         "main/metadataSyncService.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-037_METADATA_REAPPLY_SYNC.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-037",
       "recordType": "feature",
@@ -868,6 +1029,13 @@
         "services/transferExportService.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [
+        "BUG-005"
+      ],
+      "directDecisions": [
+        "DEC-021"
+      ],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-038_TRANSFER_EXPORT.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-038",
       "recordType": "feature",
@@ -894,6 +1062,9 @@
         "test/transferImportOutcomeManifest.test.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-039_TRANSFER_IMPORT.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-039",
       "recordType": "feature",
@@ -916,6 +1087,13 @@
         "services/transferExportService.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [
+        "BUG-005"
+      ],
+      "directDecisions": [
+        "DEC-010"
+      ],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-040_BACKUP_UPDATE_SCANNING.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-040",
       "recordType": "feature",
@@ -938,6 +1116,9 @@
         "renderer/index.html"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-041_TRANSFER_BACKGROUND_MINIMIZE_OPERATION.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-041",
       "recordType": "feature",
@@ -966,6 +1147,13 @@
         "services/offlineCollectionRegistryService.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [
+        "BUG-003"
+      ],
+      "directDecisions": [
+        "DEC-012"
+      ],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-042_ARCHIVE_ROOT_CONFIGURATION_RESOLUTION.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-042",
       "recordType": "feature",
@@ -997,6 +1185,9 @@
         "services/archiveConsistencyService.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-043_ARCHIVE_HEALTH_REPORTING.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-043",
       "recordType": "feature",
@@ -1023,6 +1214,9 @@
         "services/localSyncManifest.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-044_LOCAL_FIRST_BACKGROUND_ARCHIVE_SYNC.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-044",
       "recordType": "feature",
@@ -1049,6 +1243,13 @@
         "services/archiveLockService.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [
+        "BUG-004"
+      ],
+      "directDecisions": [
+        "DEC-013"
+      ],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-045_ARCHIVE_LOCK_HANDLING_STALE_LOCK_RECOVERY.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-045",
       "recordType": "feature",
@@ -1078,6 +1279,11 @@
         "services/adoptionWriteService.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [
+        "BUG-006"
+      ],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-046_ARCHIVE_FOLDER_ADOPTION.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-046",
       "recordType": "feature",
@@ -1105,6 +1311,15 @@
         "test/qmzLiveE2E.test.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [
+        "BUG-007"
+      ],
+      "directDecisions": [
+        "DEC-011"
+      ],
+      "directPostmortems": [
+        "PM-001"
+      ],
       "evidenceNote": "Derived directly from features/AI-FEAT-047_QMZ_SEQUENCING_WORKSPACE.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-047",
       "recordType": "feature",
@@ -1132,6 +1347,9 @@
         "services/offlineCollectionRegistryService.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-048_REALTIME_TEAM_PRESENCE_ONLINE_REGISTRY.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-048",
       "recordType": "feature",
@@ -1149,6 +1367,9 @@
       "canonicalTechnicalDocs": [],
       "codeAreas": [],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-049_ARCHIVE_MAINTENANCE.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-049",
       "recordType": "feature",
@@ -1171,6 +1392,9 @@
       "canonicalTechnicalDocs": [],
       "codeAreas": [],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-050_EVENT_MAINTENANCE.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-050",
       "recordType": "feature",
@@ -1190,6 +1414,9 @@
       "canonicalTechnicalDocs": [],
       "codeAreas": [],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-051_ARCHIVE_BROWSER.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-051",
       "recordType": "feature",
@@ -1209,6 +1436,9 @@
       "canonicalTechnicalDocs": [],
       "codeAreas": [],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-052_ARCHIVE_REPAIR.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-052",
       "recordType": "feature",
@@ -1229,6 +1459,9 @@
       "canonicalTechnicalDocs": [],
       "codeAreas": [],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-053_GLOBAL_SEARCH.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-053",
       "recordType": "feature",
@@ -1249,6 +1482,9 @@
       "canonicalTechnicalDocs": [],
       "codeAreas": [],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-054_INTEGRITY_VERIFICATION_ARCHIVE_WIDE.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-054",
       "recordType": "feature",
@@ -1268,6 +1504,9 @@
       "canonicalTechnicalDocs": [],
       "codeAreas": [],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-055_ARCHIVE_ANALYTICS.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-055",
       "recordType": "feature",
@@ -1287,6 +1526,9 @@
       "canonicalTechnicalDocs": [],
       "codeAreas": [],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-056_AI_ARCHIVE_INTELLIGENCE.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-056",
       "recordType": "feature",
@@ -1320,6 +1562,17 @@
         "scripts/product-docs/cli.js"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [
+        "BUG-015",
+        "BUG-016"
+      ],
+      "directDecisions": [
+        "DEC-017",
+        "DEC-018"
+      ],
+      "directPostmortems": [
+        "PM-002"
+      ],
       "evidenceNote": "Derived directly from features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-057",
       "recordType": "feature",
@@ -1393,6 +1646,11 @@
         "scripts/product-docs/knowledge-portal/index.html"
       ],
       "confidenceLevel": "explicit",
+      "directBugs": [],
+      "directDecisions": [
+        "DEC-019"
+      ],
+      "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md's header table and Lifecycle Metadata section.",
       "featureId": "AI-FEAT-058",
       "recordType": "feature",

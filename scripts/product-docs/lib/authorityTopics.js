@@ -38,6 +38,37 @@ const TOPIC_ALIASES = {
   'AI-FEAT-056': ['ai archive intelligence'],
 };
 
+// Part 5 Phase 5.2 (Decision 3) materiality correction — a PURE ADDITION,
+// never touching the existing relatedBugs/relatedDecisions/relatedPostmortems
+// fields Phase 5.1 already fidelity-audited (byte-identical, 0/58 mismatches
+// — unchanged by this function). Captures a second, already-EXISTING,
+// systematically-used canonical-text signal that extractIds() alone
+// discards: many features' own "Related decisions"/"Related bugs"/"Related
+// postmortems" cells mark a specific citation "*(found via reverse lookup —
+// not yet cross-linked in the ... section above)*" — an auto-discovered,
+// secondary relationship, distinct from a directly-curated one. This is
+// NOT invented: the exact phrase already appears, hand-authored, across 18+
+// feature files (verified via direct grep during the Phase 5.2 materiality
+// investigation), sometimes mixed within the SAME cell (e.g. AI-FEAT-042
+// cites both DEC-003 *(reverse lookup)* and DEC-012, no caveat, in one
+// cell) — hence the semicolon-segment-aware extraction below, never a
+// per-cell blanket flag. No new schema, no new authoring requirement —
+// every word consumed here was already written by a prior documentation
+// pass for exactly this purpose.
+const REVERSE_LOOKUP_MARKER = /reverse lookup/i;
+
+function extractDirectIds(text, family) {
+  const raw = String(text || '');
+  if (!raw.trim()) return [];
+  const segments = raw.split(';');
+  const direct = new Set();
+  for (const segment of segments) {
+    if (REVERSE_LOOKUP_MARKER.test(segment)) continue;
+    for (const id of extractIds(segment, family)) direct.add(id);
+  }
+  return Array.from(direct).sort(compareIds);
+}
+
 function buildAuthorityIndex(parsed) {
   const entries = [];
   const featureIds = Array.from(parsed.features.keys()).sort(compareIds);
@@ -59,6 +90,14 @@ function buildAuthorityIndex(parsed) {
       relatedBugs: bugs,
       relatedDecisions: decisions,
       relatedPostmortems: postmortems,
+      // Phase 5.2 addition (see extractDirectIds' own comment) — subsets of
+      // the three fields above, excluding any citation the canonical text
+      // itself marks as "found via reverse lookup" (auto-discovered,
+      // secondary). relatedBugs/relatedDecisions/relatedPostmortems
+      // themselves are completely unchanged.
+      directBugs: extractDirectIds(feat.lifecycle['Related bugs'], 'bug'),
+      directDecisions: extractDirectIds(feat.lifecycle['Related decisions'], 'decision'),
+      directPostmortems: extractDirectIds(feat.lifecycle['Related postmortems'], 'postmortem'),
       codeAreas: feat.relatedFiles,
       confidenceLevel: 'explicit',
       evidenceNote: `Derived directly from ${feat.filePath}'s header table and Lifecycle Metadata section.`,
@@ -92,4 +131,4 @@ function buildAuthorityIndex(parsed) {
   return entries;
 }
 
-module.exports = { buildAuthorityIndex, TOPIC_ALIASES };
+module.exports = { buildAuthorityIndex, TOPIC_ALIASES, extractDirectIds };

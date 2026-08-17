@@ -228,10 +228,10 @@ const REGRESSION_CORPUS_V3 = [
   },
   {
     id: 'RF-5.2-002', targetPhase: '5.2', decisionRef: 'Decision 3 of 8', auditRef: 'The Transfer Import flagship compound case -- category 7 of Decision 6\'s 10-category acceptance set',
-    status: 'known-baseline-failure', category: 'neighborhood-admission',
+    status: 'control', category: 'neighborhood-admission',
     question: 'Why does Transfer Import exist, what limitation does Collection-nested import have, and what should I do operationally?',
-    rationale: 'The flagship three-aspect worked example named throughout the interview: purpose+limitation should be answered by AI-FEAT-039, operational procedure by AI-WF-009 -- both must be admitted with distinct authority roles, neither absorbing the other\'s voice.',
-    requiredMemberIds: ['AI-FEAT-039', 'AI-WF-009'],
+    rationale: 'FIXED at Phase 5.2 (Decision 3) implementation time: findCompanionWorkflow() now prefers the independently-highest-scoring candidate (in the SAME single retrieval pass, no decomposition) when a Feature has more than one real candidate companion Workflow -- found: AI-FEAT-039 is cited by both AI-WF-005 ("Export...") and AI-WF-009 ("Import..."), and the old lowest-ID tiebreak picked AI-WF-005 (wrong direction) purely because "05" < "09". AI-WF-009 (raw 400/4 tokens, adjusted 243.4) now correctly wins over AI-WF-005 (raw 200/2 tokens, adjusted 133.7) for this import-focused question. Purpose+limitation are both already answered by AI-FEAT-039\'s own existing canonical Summary/Current-Behavior text (the direct-Event-vs-Collection-nested distinction is already explicit there, unchanged) -- no Decision/Bug was required or fabricated for the "limitation" aspect. Current real neighborhood: AI-FEAT-039 (primary) + DEC-012 (Phase 5.1 visibility, Archive Root Resolution Requires Evidence -- a real but tangential related decision; disclosed known imprecision of the classification-based materiality gate, see DEC-020) + AI-WF-009 (procedure). Promoted to a control; expectedMaxSources guards against further, unrelated growth.',
+    requiredMemberIds: ['AI-FEAT-039', 'AI-WF-009'], expectedMaxSources: 3,
   },
 
   // ---------------------------------------------------------------------
@@ -293,17 +293,17 @@ const REGRESSION_CORPUS_V3 = [
   },
   {
     id: 'RF-5.4-006', targetPhase: '5.4', decisionRef: 'Decision 6 of 8', auditRef: 'Decision 6 category 6: Workflow + limitation/status',
-    status: 'known-baseline-failure', category: 'compound-question',
+    status: 'control', category: 'compound-question',
     question: 'How do I import from a transfer drive, and what is the current constraint with Collection-nested transfers?',
-    rationale: 'Operational procedure (AI-WF-009) plus the current documented limitation (already in AI-FEAT-039\'s own Summary per Part 2) -- both must be reachable together.',
+    rationale: 'FIXED as a side effect of Phase 5.2\'s findCompanionWorkflow() improvement (see RF-5.2-002): AI-WF-009 now correctly appears (this question\'s primary is AI-FEAT-038 via the pre-existing, disclosed, out-of-scope Gap-A/R05 concept-hint mechanism -- unaffected by, and unrelated to, this fix; AI-FEAT-039 was already independently present in matchedCapabilities at score 436, satisfying its own requirement). Operational procedure (AI-WF-009) plus the current documented limitation (already in AI-FEAT-039\'s own Summary) both reachable together. Promoted to a control.',
     requiredMemberIds: ['AI-WF-009', 'AI-FEAT-039'],
   },
   {
     id: 'RF-5.4-007', targetPhase: '5.4', decisionRef: 'Decision 6 of 8', auditRef: 'Decision 6 category 7: three-aspect flagship -- cross-references RF-5.2-002',
-    status: 'known-baseline-failure', category: 'compound-question',
+    status: 'control', category: 'compound-question',
     question: 'Why does Transfer Import exist, what limitation does Collection-nested import have, and what should I do operationally?',
-    rationale: 'The named flagship acceptance case for the whole Part 5 effort -- see RF-5.2-002 and RF-4.3-002 for the same question tested at earlier phases.',
-    requiredMemberIds: ['AI-FEAT-039', 'AI-WF-009'],
+    rationale: 'FIXED at Phase 5.2 -- identical question and identical fix as RF-5.2-002 (see that entry for the full account). The named flagship acceptance case for the whole Part 5 effort. Promoted to a control.',
+    requiredMemberIds: ['AI-FEAT-039', 'AI-WF-009'], expectedMaxSources: 3,
   },
   {
     id: 'RF-5.4-008', targetPhase: '5.4', decisionRef: 'Decision 6 of 8', auditRef: 'Decision 6 category 8: simple control -- cross-references RF-5.2-001',
@@ -314,9 +314,9 @@ const REGRESSION_CORPUS_V3 = [
   },
   {
     id: 'RF-5.4-009', targetPhase: '5.4', decisionRef: 'Decision 6 of 8', auditRef: 'Decision 6 category 9: compound wording, only one aspect evidenced',
-    status: 'schema-placeholder', category: 'compound-question',
+    status: 'control', category: 'compound-question',
     question: 'Why does Transfer Import exist, and what AI-based auto-tagging does it apply to imported photos?',
-    rationale: 'The second half has no supporting evidence at all -- AI-based tagging is an explicit NOT_SUPPORTED boundary (ai-auto-tagging). A correct answer supplies the first half honestly (AI-FEAT-039) without manufacturing a tagging capability for the second. Genuinely complex interaction between Phase 4.2\'s boundary handling and Phase 5.2\'s neighborhood construction -- deferred as schema-placeholder pending both phases landing, not evaluated for pass/fail yet.',
+    rationale: 'EVALUATED at Phase 5.2 implementation time (the assertion vocabulary now exists; promoted from schema-placeholder to a real, passing assertion): the boundary-precedence check in answerQuestion() (Phase 4.2 territory) runs before Feature-primary resolution, so this question\'s top-level directAnswer/capabilityStatus is the ai-auto-tagging NOT_SUPPORTED boundary decline -- correctly honest, never manufactures a tagging capability. AI-FEAT-039 IS present (boundaryAnswer() passes the full scored featureMatches through as matchedCapabilities, unchanged Phase 4.2 behavior), satisfying this assertion\'s presence-only bar. DISCLOSED, NOT FIXED, genuinely narrower finding: the directAnswer PROSE itself narrates only the boundary decline, never surfacing AI-FEAT-039\'s own "why Transfer Import exists" content in the user-facing text, even though the record is structurally present in the data. The corpus\'s requiredMemberIds vocabulary checks structural presence, not prose narration, and does not capture this gap -- recorded here honestly rather than silently assumed solved. Fixing the boundary-answer\'s own directAnswer synthesis to layer in a co-supported aspect is Phase-4.2-adjacent, tested, protected logic, out of Decision 3\'s narrow remit -- left open for a future, separately-authorized phase.',
     requiredMemberIds: ['AI-FEAT-039'],
   },
   {

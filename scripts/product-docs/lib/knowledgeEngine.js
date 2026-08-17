@@ -23,6 +23,7 @@ const { RECORD_STATUS, QUERY_STATUS, matchKnownBoundary, KNOWN_BOUNDARIES } = re
 const { findConcept, findBoundaryConcept } = require('./intentConcepts');
 const { QUESTION_TYPES, classifyQuestion } = require('./questionClassifier');
 const { isEligibleForNormalization, matchedTokenCount, adjustKeywordOverlapScore, explainCandidate } = require('./knowledgeSurfaceNormalization');
+const { explainNeighborhood: labelNeighborhood } = require('./knowledgeNeighborhood');
 
 // Below this score, a match is not confident enough to answer from — see
 // scripts/product-docs/README.md's ranking table: 100 is the minimum score
@@ -149,12 +150,36 @@ function matchQualityFor(topScore, tiedCount) {
 // it in its own Related capabilities field. At most one is used (the
 // lowest AI-WF ID, deterministic) — never invented, only ever a real,
 // already-authored record.
-function findCompanionWorkflow(featureId, workflowIndexById) {
+// Part 5 Phase 5.2 (Decision 3) — when a Feature legitimately has more than
+// one candidate companion Workflow (found: AI-FEAT-038/AI-FEAT-039, each
+// cited by both AI-WF-005 "Export..." and AI-WF-009 "Import..." — 2 of 22
+// features with any candidate at all), the lowest-ID tiebreak alone is
+// arbitrary and can pick the objectively weaker match for THIS question
+// (e.g. AI-WF-005 over AI-WF-009 for an import-focused question, purely
+// because "05" < "09"). `workflowMatches` is the SAME single retrieval
+// pass already scored for this exact question — no second query, no
+// decomposition — so when more than one candidate exists, prefer whichever
+// one independently clears CONFIDENCE_FLOOR with the highest score in that
+// pass (Workflow's own authority role: "how to perform the operation" is
+// best filled by whichever workflow the question's own wording most
+// strongly, independently invokes). Falls back to the original
+// deterministic lowest-ID behavior when workflowMatches isn't supplied, or
+// when no candidate clears the floor there (preserves 100% of pre-Phase-5.2
+// behavior for the 20/22 features with only one candidate, and for the
+// weak-evidence case on the 2 ambiguous ones).
+function findCompanionWorkflow(featureId, workflowIndexById, workflowMatches) {
   if (!workflowIndexById) return null;
   const candidates = Array.from(workflowIndexById.values())
-    .filter((w) => w.relatedCapabilities.includes(featureId))
-    .sort((a, b) => a.id.localeCompare(b.id, 'en', { numeric: true }));
-  return candidates[0] || null;
+    .filter((w) => w.relatedCapabilities.includes(featureId));
+  if (!candidates.length) return null;
+  if (workflowMatches && workflowMatches.length) {
+    const scoreById = new Map(workflowMatches.map((m) => [m.id, m.score]));
+    const independentlyStrong = candidates
+      .filter((c) => scoreById.has(c.id) && scoreById.get(c.id) >= CONFIDENCE_FLOOR)
+      .sort((a, b) => scoreById.get(b.id) - scoreById.get(a.id) || a.id.localeCompare(b.id, 'en', { numeric: true }));
+    if (independentlyStrong.length) return independentlyStrong[0];
+  }
+  return candidates.sort((a, b) => a.id.localeCompare(b.id, 'en', { numeric: true }))[0];
 }
 
 function answerFromRecord(question, knowledgeRecord, matches, qType, companionWorkflow, governanceRelationships) {
@@ -710,7 +735,7 @@ function answerQuestion(question, ctx) {
   const knowledgeRecord = knowledgeIndexById.get(topFeature.id);
   if (!knowledgeRecord) return unknownAnswer(question, featureMatches, qType);
 
-  const companionWorkflow = findCompanionWorkflow(knowledgeRecord.id, workflowIndexById);
+  const companionWorkflow = findCompanionWorkflow(knowledgeRecord.id, workflowIndexById, workflowMatches);
   const governanceRelationships = governanceRelationshipsForFeature(knowledgeRecord.id, authorityIndexByFeatureId, searchIndexById);
   return answerFromRecord(question, knowledgeRecord, featureMatches, qType, companionWorkflow, governanceRelationships);
 }
@@ -802,6 +827,16 @@ function explainRelationships(question, ctx) {
   return { primaryId: primary.id, relationships, influencedRanking: false };
 }
 
+// Part 5 Phase 5.2 (Decision 3) — diagnostic-only observability seam, same
+// discipline as explainNormalization()/explainRelationships() above: runs
+// the real answerQuestion() once and labels what it already produced
+// (see lib/knowledgeNeighborhood.js's own header for the full rationale).
+// Never consulted by answerQuestion() itself.
+function explainNeighborhood(question, ctx) {
+  const answer = answerQuestion(question, ctx);
+  return labelNeighborhood(question, answer, ctx);
+}
+
 module.exports = {
   answerQuestion,
   classifyIntent,
@@ -814,4 +849,5 @@ module.exports = {
   explainNormalization,
   explainRelationships,
   governanceRelationshipsForFeature,
+  explainNeighborhood,
 };

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-17T08:50:47.282Z",
+  "generated_at": "2026-08-17T10:27:42.557Z",
   "note": "Part 3 Phase 4.1 (Decision 7) frozen baseline — every later phase's changed results get classified (Improvement/Acceptable change/Regression/Unexplained change/Unchanged, see knowledgeEvalClassification.js) against THIS snapshot.",
   "schema_version": "1.0.0",
   "v1": {
@@ -696,7 +696,7 @@
         "AI-FEAT-038",
         "BUG-005",
         "DEC-021",
-        "AI-WF-005"
+        "AI-WF-009"
       ],
       "actualStatus": "AVAILABLE",
       "id": "P10a",
@@ -2084,11 +2084,11 @@
   ],
   "v3": {
     "anomalies": [],
-    "controlCount": 21,
-    "controlsPassing": 21,
-    "knownBaselineFailureCount": 13,
-    "knownBaselineFailuresConfirmedFailing": 13,
-    "schemaPlaceholderCount": 3,
+    "controlCount": 25,
+    "controlsPassing": 25,
+    "knownBaselineFailureCount": 10,
+    "knownBaselineFailuresConfirmedFailing": 10,
+    "schemaPlaceholderCount": 2,
     "total": 37
   },
   "v3Cases": [
@@ -2163,8 +2163,8 @@
             "title": "Transfer Export Process-Local Lock Accepted for Present Operational Model"
           },
           {
-            "id": "AI-WF-005",
-            "title": "Export or Update a Transfer Drive"
+            "id": "AI-WF-009",
+            "title": "Import or Update From a Transfer Drive"
           }
         ]
       },
@@ -2674,8 +2674,8 @@
             "title": "Archive Root Resolution Requires Evidence"
           },
           {
-            "id": "AI-WF-005",
-            "title": "Export or Update a Transfer Drive"
+            "id": "AI-WF-009",
+            "title": "Import or Update From a Transfer Drive"
           }
         ]
       },
@@ -2757,8 +2757,8 @@
             "title": "Transfer Export Process-Local Lock Accepted for Present Operational Model"
           },
           {
-            "id": "AI-WF-005",
-            "title": "Export or Update a Transfer Drive"
+            "id": "AI-WF-009",
+            "title": "Import or Update From a Transfer Drive"
           }
         ]
       },
@@ -3691,25 +3691,19 @@
           "pass": true
         },
         {
-          "actual": "absent",
+          "actual": "present",
           "expected": "AI-WF-009",
           "name": "required:AI-WF-009",
-          "pass": false
-        }
-      ],
-      "diagnostics": [
+          "pass": true
+        },
         {
-          "category": "PENDING_PHASE_5",
-          "groundTruthCitation": {
-            "citedBy": "AI-WF-005",
-            "recordType": "workflow"
-          },
-          "note": "Not a scored ranker candidate, but a canonical citation exists (via AI-WF-005) — do not conclude this is a retrieval/ranking defect. Decision 4 introduces relationship-based discovery independent of ranker scoring; whether the eventual fix comes from improved retrieval, Decision 4's relationship lookup (Phase 5.1), or Decision 3's admission logic (Phase 5.2) cannot be determined until Phase 5.1 exists.",
-          "presentInCandidates": false,
-          "presentInSources": false,
-          "requiredId": "AI-WF-009"
+          "actual": 3,
+          "expected": "<= 3",
+          "name": "maxSources",
+          "pass": true
         }
       ],
+      "diagnostics": [],
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "EXPLANATION",
@@ -3758,14 +3752,14 @@
             "title": "Archive Root Resolution Requires Evidence"
           },
           {
-            "id": "AI-WF-005",
-            "title": "Export or Update a Transfer Drive"
+            "id": "AI-WF-009",
+            "title": "Import or Update From a Transfer Drive"
           }
         ]
       },
       "id": "RF-5.2-002",
-      "meetsTargetExpectation": false,
-      "status": "known-baseline-failure",
+      "meetsTargetExpectation": true,
+      "status": "control",
       "targetPhase": "5.2"
     },
     {
@@ -4318,10 +4312,10 @@
       "category": "compound-question",
       "checks": [
         {
-          "actual": "absent",
+          "actual": "present",
           "expected": "AI-WF-009",
           "name": "required:AI-WF-009",
-          "pass": false
+          "pass": true
         },
         {
           "actual": "present",
@@ -4330,19 +4324,7 @@
           "pass": true
         }
       ],
-      "diagnostics": [
-        {
-          "category": "PENDING_PHASE_5",
-          "groundTruthCitation": {
-            "citedBy": "AI-WF-005",
-            "recordType": "workflow"
-          },
-          "note": "Not a scored ranker candidate, but a canonical citation exists (via AI-WF-005) — do not conclude this is a retrieval/ranking defect. Decision 4 introduces relationship-based discovery independent of ranker scoring; whether the eventual fix comes from improved retrieval, Decision 4's relationship lookup (Phase 5.1), or Decision 3's admission logic (Phase 5.2) cannot be determined until Phase 5.1 exists.",
-          "presentInCandidates": false,
-          "presentInSources": false,
-          "requiredId": "AI-WF-009"
-        }
-      ],
+      "diagnostics": [],
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "HOW_TO",
@@ -4397,14 +4379,14 @@
             "title": "Transfer Export Process-Local Lock Accepted for Present Operational Model"
           },
           {
-            "id": "AI-WF-005",
-            "title": "Export or Update a Transfer Drive"
+            "id": "AI-WF-009",
+            "title": "Import or Update From a Transfer Drive"
           }
         ]
       },
       "id": "RF-5.4-006",
-      "meetsTargetExpectation": false,
-      "status": "known-baseline-failure",
+      "meetsTargetExpectation": true,
+      "status": "control",
       "targetPhase": "5.4"
     },
     {
@@ -4417,25 +4399,19 @@
           "pass": true
         },
         {
-          "actual": "absent",
+          "actual": "present",
           "expected": "AI-WF-009",
           "name": "required:AI-WF-009",
-          "pass": false
-        }
-      ],
-      "diagnostics": [
+          "pass": true
+        },
         {
-          "category": "PENDING_PHASE_5",
-          "groundTruthCitation": {
-            "citedBy": "AI-WF-005",
-            "recordType": "workflow"
-          },
-          "note": "Not a scored ranker candidate, but a canonical citation exists (via AI-WF-005) — do not conclude this is a retrieval/ranking defect. Decision 4 introduces relationship-based discovery independent of ranker scoring; whether the eventual fix comes from improved retrieval, Decision 4's relationship lookup (Phase 5.1), or Decision 3's admission logic (Phase 5.2) cannot be determined until Phase 5.1 exists.",
-          "presentInCandidates": false,
-          "presentInSources": false,
-          "requiredId": "AI-WF-009"
+          "actual": 3,
+          "expected": "<= 3",
+          "name": "maxSources",
+          "pass": true
         }
       ],
+      "diagnostics": [],
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "EXPLANATION",
@@ -4484,14 +4460,14 @@
             "title": "Archive Root Resolution Requires Evidence"
           },
           {
-            "id": "AI-WF-005",
-            "title": "Export or Update a Transfer Drive"
+            "id": "AI-WF-009",
+            "title": "Import or Update From a Transfer Drive"
           }
         ]
       },
       "id": "RF-5.4-007",
-      "meetsTargetExpectation": false,
-      "status": "known-baseline-failure",
+      "meetsTargetExpectation": true,
+      "status": "control",
       "targetPhase": "5.4"
     },
     {
@@ -4624,7 +4600,7 @@
       },
       "id": "RF-5.4-009",
       "meetsTargetExpectation": true,
-      "status": "schema-placeholder",
+      "status": "control",
       "targetPhase": "5.4"
     },
     {
