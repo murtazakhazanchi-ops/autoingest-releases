@@ -46,7 +46,12 @@ function captureEvidence(answer) {
     matchQuality: answer.matchQuality,
     confidence: answer.confidence,
     matchedCapabilities: (answer.matchedCapabilities || []).map((m) => ({ id: m.id, entityType: m.entityType, score: m.score })),
-    sources: (answer.sources || []).map((s) => ({ id: s.id, title: s.title || null })),
+    // Part 5 Phase 5.3 (Decision 5) — role/historicalType/evidenceQualification
+    // are additive, optional fields only present on historical-context
+    // sources[] entries (see lib/knowledgeHistoricalContext.js); undefined
+    // for every other source, exactly the extensibility this function's own
+    // header comment already anticipated.
+    sources: (answer.sources || []).map((s) => ({ id: s.id, title: s.title || null, role: s.role, historicalType: s.historicalType, evidenceQualification: s.evidenceQualification })),
     relatedCapabilities: answer.relatedCapabilities || [],
   };
 }

@@ -149,9 +149,27 @@ function buildSearchIndex(parsed, featureIndexRecords, subsystems, memoryIndexRe
     }));
   }
 
+  // Part 5 Phase 5.3 (Decision 5/Decision C closure, Product Owner-authorized
+  // body-indexing correction) — keywords now draw from the section's own
+  // canonical body text too (parsed.archHeadings[].body, computed once in
+  // lib/parseProductDocs.js via the existing md.extractSection() helper),
+  // not just its heading title. Investigated and empirically verified
+  // (Phase 5.3 closure): heading-title-only keywords were too sparse to
+  // ever retrieve genuinely relevant historical material (e.g. §3A's own
+  // "Aljamea"/archival-practice narrative lives entirely in its body, never
+  // its five-word title) — this is the SAME `keywordsFrom()` tokenizer
+  // every other entity type's rich text (Bug Symptom+RootCause, Decision
+  // Context+Decision, Postmortem Summary+Impact+RootCause) already uses,
+  // not a new mechanism. `summary`/`detail`/`related_ids` remain empty —
+  // this is a retrieval-surface enrichment only, not a new relationship or
+  // authority claim. Never consumed for Feature/Workflow/Governance primary
+  // selection (searchCandidates()'s own entity-type filter excludes
+  // 'architecture_section' regardless of keyword richness) — verified via a
+  // 162-question corpus simulation to produce zero primary/status/sources
+  // changes anywhere before this was authorized.
   for (const h of parsed.archHeadings) {
     records.push(rec('architecture_section', 'ARCH-' + h.slug, h.text, parsed.archPath + '#' + h.slug, {
-      keywords: keywordsFrom(h.text),
+      keywords: keywordsFrom(h.text, h.body),
       authorityLevel: 'canonical',
       evidenceStatus: 'Verified from 11_ARCHITECTURAL_EVOLUTION.md',
     }));

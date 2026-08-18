@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-17T10:27:42.557Z",
+  "generated_at": "2026-08-18T05:09:38.591Z",
   "note": "Part 3 Phase 4.1 (Decision 7) frozen baseline — every later phase's changed results get classified (Improvement/Acceptable change/Regression/Unexplained change/Unchanged, see knowledgeEvalClassification.js) against THIS snapshot.",
   "schema_version": "1.0.0",
   "v1": {
@@ -128,8 +128,8 @@
         "AI-FEAT-056(180.30602001249343)",
         "AI-FEAT-053(123.11005165984757)",
         "AI-FEAT-051(119.00394841533502)",
-        "AI-FEAT-043(93.82987842007934)",
-        "AI-FEAT-018(90.23317455681047)"
+        "AI-FEAT-018(90.23317455681047)",
+        "AI-FEAT-033(86.35078570398943)"
       ],
       "actualSources": [
         "AI-FEAT-056",
@@ -327,8 +327,8 @@
         "AI-FEAT-050(142.03869016721708)",
         "AI-FEAT-049(121.26843492211508)",
         "AI-FEAT-051(119.00394841533502)",
-        "AI-FEAT-043(93.82987842007934)",
-        "AI-FEAT-018(90.23317455681047)"
+        "AI-FEAT-018(90.23317455681047)",
+        "AI-FEAT-033(86.35078570398943)"
       ],
       "actualSources": [
         "AI-FEAT-050",
@@ -457,7 +457,7 @@
         "AI-FEAT-039(124.61954254339798)",
         "AI-FEAT-045(100)",
         "AI-FEAT-018(90.23317455681047)",
-        "AI-FEAT-050(71.01934508360854)"
+        "AI-FEAT-015(69.37777978917369)"
       ],
       "actualSources": [
         "AI-FEAT-028"
@@ -514,8 +514,8 @@
         "AI-FEAT-047(117.51994852035577)",
         "AI-FEAT-017(115.19313262359476)",
         "AI-FEAT-031(100)",
-        "AI-FEAT-036(100)",
-        "AI-FEAT-010(96.6766548243248)"
+        "AI-FEAT-010(96.6766548243248)",
+        "AI-FEAT-003(95.20106063897916)"
       ],
       "actualSources": [
         "AI-FEAT-047",
@@ -960,8 +960,8 @@
         "AI-FEAT-050(142.03869016721708)",
         "AI-FEAT-049(121.26843492211508)",
         "AI-FEAT-051(119.00394841533502)",
-        "AI-FEAT-045(100)",
-        "AI-FEAT-043(93.82987842007934)"
+        "AI-FEAT-043(93.82987842007934)",
+        "AI-FEAT-018(90.23317455681047)"
       ],
       "actualSources": [
         "AI-FEAT-050",
@@ -1531,7 +1531,7 @@
         "AI-FEAT-049(181.9026523831726)",
         "AI-FEAT-051(119.00394841533502)",
         "AI-FEAT-047(117.51994852035577)",
-        "AI-FEAT-030(96.6766548243248)"
+        "AI-FEAT-018(90.23317455681047)"
       ],
       "actualSources": [
         "AI-FEAT-045",
@@ -2084,12 +2084,12 @@
   ],
   "v3": {
     "anomalies": [],
-    "controlCount": 25,
-    "controlsPassing": 25,
+    "controlCount": 34,
+    "controlsPassing": 34,
     "knownBaselineFailureCount": 10,
     "knownBaselineFailuresConfirmedFailing": 10,
     "schemaPlaceholderCount": 2,
-    "total": 37
+    "total": 46
   },
   "v3Cases": [
     {
@@ -2968,8 +2968,8 @@
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-030",
-            "score": 96.6766548243248
+            "id": "AI-FEAT-018",
+            "score": 90.23317455681047
           }
         ],
         "relatedCapabilities": [
@@ -3305,21 +3305,6 @@
             "entityType": "feature",
             "id": "AI-FEAT-053",
             "score": 123.11005165984757
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-004",
-            "score": 73.62469880859018
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-015",
-            "score": 69.37777978917369
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-023",
-            "score": 65.5271853915311
           }
         ],
         "relatedCapabilities": [
@@ -3551,21 +3536,6 @@
             "entityType": "feature",
             "id": "AI-FEAT-053",
             "score": 123.11005165984757
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-004",
-            "score": 73.62469880859018
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-015",
-            "score": 69.37777978917369
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-023",
-            "score": 65.5271853915311
           }
         ],
         "relatedCapabilities": [
@@ -3649,8 +3619,8 @@
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-030",
-            "score": 96.6766548243248
+            "id": "AI-FEAT-018",
+            "score": 90.23317455681047
           }
         ],
         "relatedCapabilities": [
@@ -3823,6 +3793,13 @@
           {
             "id": "AI-FEAT-027",
             "title": "Activity Log"
+          },
+          {
+            "evidenceQualification": null,
+            "historicalType": "architecture_section",
+            "id": "ARCH-d-archive-integrity-and-transaction-safety",
+            "role": "historical-context",
+            "title": "D. Archive Integrity and Transaction Safety"
           }
         ]
       },
@@ -3903,6 +3880,848 @@
         ]
       },
       "id": "RF-5.3-002",
+      "meetsTargetExpectation": true,
+      "status": "control",
+      "targetPhase": "5.3"
+    },
+    {
+      "category": "memory-context",
+      "checks": [
+        {
+          "actual": "AVAILABLE",
+          "expected": "AVAILABLE",
+          "name": "status",
+          "pass": true
+        },
+        {
+          "actual": "present",
+          "expected": "AI-FEAT-048",
+          "name": "required:AI-FEAT-048",
+          "pass": true
+        },
+        {
+          "actual": "present",
+          "expected": "AI-MEM-0004",
+          "name": "required:AI-MEM-0004",
+          "pass": true
+        },
+        {
+          "actual": "historical-context",
+          "expected": "historical-context",
+          "name": "historicalRole:AI-MEM-0004",
+          "pass": true
+        }
+      ],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "TEAM_ACTIVITY",
+        "confidence": 0.16,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-048",
+            "score": 160
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-058",
+            "score": 138.25052759314892
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-034",
+            "score": 130.6972695860808
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-027",
+            "score": 121.26843492211508
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-051",
+            "score": 119.00394841533502
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-005"
+        ],
+        "sources": [
+          {
+            "id": "AI-FEAT-048",
+            "title": "Realtime Team Presence & Online Registry"
+          },
+          {
+            "evidenceQualification": "Full session capture — this capsule was compiled directly from the session's own conversation record, not reconstructed after the fact from repository artifacts alone",
+            "historicalType": "memory",
+            "id": "AI-MEM-0004",
+            "role": "historical-context",
+            "title": "Knowledge Portal Stage 2: Operator Knowledge Architecture, Online Registry Coverage, and Merge"
+          },
+          {
+            "id": "AI-WF-006",
+            "title": "See Who Else Is Online, Coordinate Shared Events, and See What They're Working On"
+          }
+        ]
+      },
+      "id": "RF-5.3-003",
+      "meetsTargetExpectation": true,
+      "status": "control",
+      "targetPhase": "5.3"
+    },
+    {
+      "category": "memory-context",
+      "checks": [
+        {
+          "actual": "present",
+          "expected": "AI-FEAT-058",
+          "name": "required:AI-FEAT-058",
+          "pass": true
+        },
+        {
+          "actual": "present",
+          "expected": "DEC-019",
+          "name": "required:DEC-019",
+          "pass": true
+        },
+        {
+          "actual": "present",
+          "expected": "AI-MEM-0004",
+          "name": "required:AI-MEM-0004",
+          "pass": true
+        },
+        {
+          "actual": "historical-context",
+          "expected": "historical-context",
+          "name": "historicalRole:AI-MEM-0004",
+          "pass": true
+        }
+      ],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "PARTIALLY_AVAILABLE",
+        "classification": "EXPLANATION",
+        "confidence": 0.41475158277944674,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-058",
+            "score": 414.7515827794467
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-053",
+            "score": 307.7751291496189
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-020",
+            "score": 236.66821665922035
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-056",
+            "score": 180.30602001249343
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-057",
+            "score": 160
+          }
+        ],
+        "relatedCapabilities": [],
+        "sources": [
+          {
+            "id": "AI-FEAT-058",
+            "title": "Knowledge Engine (Stage 1 Prototype → Stage 2 Operator Knowledge Architecture)"
+          },
+          {
+            "id": "AI-RM-011",
+            "title": "Roadmap milestone AI-RM-011 (**Completed — Stage 1 + Stage 2 merged to `main`** (merge commit `765e9b8`, 2026-08-14). Stage 1 (prototype) and Stage 2 Phases 4–27 (concept/intent retrieval layer, Workflow record type, roadmap routing, Online Registry/teamwork coverage, 119-question eval corpus, hallucination/grounding + adversarial suites, 9-tab portal UX + directory/onboarding mode, mandatory final-report sections, and a pre-merge acceptance pass) all complete and verified from the actual merged `main` state. Stage 3 has not begun and requires separate approval.)"
+          },
+          {
+            "id": "DEC-019",
+            "title": "Knowledge Engine Reuses Existing Retrieval; No New Search System, No Hosted Backend"
+          },
+          {
+            "evidenceQualification": "Full session capture — this capsule was compiled directly from the session's own conversation record, not reconstructed after the fact from repository artifacts alone",
+            "historicalType": "memory",
+            "id": "AI-MEM-0004",
+            "role": "historical-context",
+            "title": "Knowledge Portal Stage 2: Operator Knowledge Architecture, Online Registry Coverage, and Merge"
+          }
+        ]
+      },
+      "id": "RF-5.3-004",
+      "meetsTargetExpectation": true,
+      "status": "control",
+      "targetPhase": "5.3"
+    },
+    {
+      "category": "memory-context",
+      "checks": [
+        {
+          "actual": "AVAILABLE",
+          "expected": "AVAILABLE",
+          "name": "status",
+          "pass": true
+        },
+        {
+          "actual": "EXPLANATION",
+          "expected": "EXPLANATION",
+          "name": "classification",
+          "pass": true
+        },
+        {
+          "actual": "AI-FEAT-029",
+          "expected": "not one of [ARCH-a-established-adobe-bridge-workflow-pre-autoingest, ARCH-c-metadata-automation]",
+          "name": "forbiddenPrimary",
+          "pass": true
+        },
+        {
+          "actual": "present",
+          "expected": "AI-FEAT-029",
+          "name": "required:AI-FEAT-029",
+          "pass": true
+        }
+      ],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "EXPLANATION",
+        "confidence": 0.23357648212844503,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-029",
+            "score": 233.57648212844504
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-037",
+            "score": 124.61954254339798
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-053",
+            "score": 123.11005165984757
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-056",
+            "score": 120.20401334166229
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-031",
+            "score": 100
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-004",
+          "AI-FEAT-030",
+          "AI-FEAT-031",
+          "AI-FEAT-032",
+          "AI-FEAT-033",
+          "AI-FEAT-037",
+          "AI-FEAT-047"
+        ],
+        "sources": [
+          {
+            "id": "AI-FEAT-029",
+            "title": "Metadata Writing Engine"
+          },
+          {
+            "id": "AI-RM-001",
+            "title": "Roadmap milestone AI-RM-001 (**Completed**)"
+          },
+          {
+            "id": "BUG-007",
+            "title": "BUG-007 (Fixed)"
+          },
+          {
+            "id": "BUG-008",
+            "title": "BUG-008 (Fixed)"
+          },
+          {
+            "id": "BUG-009",
+            "title": "BUG-009 (Fixed)"
+          },
+          {
+            "id": "BUG-010",
+            "title": "BUG-010 (Fixed)"
+          },
+          {
+            "id": "DEC-002",
+            "title": "Folder Structure Plus Embedded Metadata"
+          },
+          {
+            "id": "DEC-004",
+            "title": "Preserve Established Bridge-Based Archival Practice"
+          },
+          {
+            "id": "DEC-006",
+            "title": "RAW Files Use XMP Sidecars"
+          },
+          {
+            "id": "DEC-007",
+            "title": "Metadata Uses One Shared Engine/Resolver"
+          },
+          {
+            "id": "PM-001",
+            "title": "Metadata Correctness Gap Found in Production-Readiness Review"
+          }
+        ]
+      },
+      "id": "RF-5.3-005",
+      "meetsTargetExpectation": true,
+      "status": "control",
+      "targetPhase": "5.3"
+    },
+    {
+      "category": "memory-context",
+      "checks": [
+        {
+          "actual": "present",
+          "expected": "AI-FEAT-034",
+          "name": "required:AI-FEAT-034",
+          "pass": true
+        },
+        {
+          "actual": "present",
+          "expected": "AI-MEM-0001",
+          "name": "required:AI-MEM-0001",
+          "pass": true
+        },
+        {
+          "actual": "Reconstructed from repository evidence only — `.claude/learning-log.md`'s four dated entries (themselves agent-authored post-hoc summaries, not verbatim conversation transcripts) plus the commit history and `docs/product/features/AI-FEAT-033_METADATA_AUDIT_REPAIR.md`/`AI-FEAT-034_METADATA_MANAGEMENT_MODAL.md`/`AI-FEAT-008_DESIGN_SYSTEM_UI_CONSISTENCY_FRAMEWORK.md`'s own citations of the same commits. This is Part 6's first pilot migration (`16_ENGINEERING_MEMORY_POLICY.md` § 17) — no original chat transcript was available to migrate from.",
+          "expected": "contains \"Reconstructed from repository evidence only\"",
+          "name": "evidenceQualification:AI-MEM-0001",
+          "pass": true
+        }
+      ],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "PARTIALLY_AVAILABLE",
+        "classification": "UNKNOWN",
+        "confidence": 0.2613945391721616,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-034",
+            "score": 261.3945391721616
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-033",
+            "score": 259.0523571119683
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-023",
+            "score": 196.58155617459335
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-049",
+            "score": 181.9026523831726
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-029",
+            "score": 155.71765475229668
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-008",
+          "AI-FEAT-031",
+          "AI-FEAT-033",
+          "AI-FEAT-036"
+        ],
+        "sources": [
+          {
+            "id": "AI-FEAT-034",
+            "title": "Metadata Management Modal"
+          },
+          {
+            "id": "AI-RM-001",
+            "title": "Roadmap milestone AI-RM-001 (**Completed**)"
+          },
+          {
+            "evidenceQualification": "Reconstructed from repository evidence only — `.claude/learning-log.md`'s four dated entries (themselves agent-authored post-hoc summaries, not verbatim conversation transcripts) plus the commit history and `docs/product/features/AI-FEAT-033_METADATA_AUDIT_REPAIR.md`/`AI-FEAT-034_METADATA_MANAGEMENT_MODAL.md`/`AI-FEAT-008_DESIGN_SYSTEM_UI_CONSISTENCY_FRAMEWORK.md`'s own citations of the same commits. This is Part 6's first pilot migration (`16_ENGINEERING_MEMORY_POLICY.md` § 17) — no original chat transcript was available to migrate from.",
+            "historicalType": "memory",
+            "id": "AI-MEM-0001",
+            "role": "historical-context",
+            "title": "Metadata Management Modal Consolidation and Audit & Repair Tab Evolution"
+          },
+          {
+            "id": "AI-WF-004",
+            "title": "Repair Missing or Incorrect Metadata"
+          }
+        ]
+      },
+      "id": "RF-5.3-006",
+      "meetsTargetExpectation": true,
+      "status": "control",
+      "targetPhase": "5.3"
+    },
+    {
+      "category": "memory-context",
+      "checks": [
+        {
+          "actual": "AVAILABLE",
+          "expected": "AVAILABLE",
+          "name": "status",
+          "pass": true
+        },
+        {
+          "actual": "present",
+          "expected": "AI-FEAT-040",
+          "name": "required:AI-FEAT-040",
+          "pass": true
+        },
+        {
+          "actual": "present",
+          "expected": "ARCH-e-transfer-and-distributed-working",
+          "name": "required:ARCH-e-transfer-and-distributed-working",
+          "pass": true
+        },
+        {
+          "actual": "historical-context",
+          "expected": "historical-context",
+          "name": "historicalRole:ARCH-e-transfer-and-distributed-working",
+          "pass": true
+        }
+      ],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "UNKNOWN",
+        "confidence": 0.85,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-040",
+            "score": 850
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-049",
+            "score": 181.9026523831726
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-023",
+            "score": 131.0543707830622
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-022",
+            "score": 125.6957963021281
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-011",
+            "score": 120.83521766849006
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-038"
+        ],
+        "sources": [
+          {
+            "id": "AI-FEAT-040",
+            "title": "Backup Update Scanning"
+          },
+          {
+            "id": "BUG-005",
+            "title": "BUG-005 (Fixed)"
+          },
+          {
+            "id": "DEC-010",
+            "title": "Transfer Update Is Missing-Files-Only"
+          },
+          {
+            "evidenceQualification": null,
+            "historicalType": "architecture_section",
+            "id": "ARCH-e-transfer-and-distributed-working",
+            "role": "historical-context",
+            "title": "E. Transfer and Distributed Working"
+          },
+          {
+            "id": "AI-WF-005",
+            "title": "Export or Update a Transfer Drive"
+          }
+        ]
+      },
+      "id": "RF-5.3-007",
+      "meetsTargetExpectation": true,
+      "status": "control",
+      "targetPhase": "5.3"
+    },
+    {
+      "category": "memory-context",
+      "checks": [
+        {
+          "actual": "AVAILABLE",
+          "expected": "AVAILABLE",
+          "name": "status",
+          "pass": true
+        },
+        {
+          "actual": "present",
+          "expected": "DEC-004",
+          "name": "required:DEC-004",
+          "pass": true
+        },
+        {
+          "actual": "absent",
+          "expected": "unanchoredHistoricalContext key absent from the real public answer",
+          "name": "publicUnanchoredAbsent",
+          "pass": true
+        },
+        {
+          "actual": "present",
+          "expected": "ARCH-a-established-adobe-bridge-workflow-pre-autoingest",
+          "name": "requiredDiagnosticUnanchored:ARCH-a-established-adobe-bridge-workflow-pre-autoingest",
+          "pass": true
+        },
+        {
+          "actual": "absent",
+          "expected": "not present",
+          "name": "forbiddenDiagnosticUnanchored:ARCH-h-current-architectural-position",
+          "pass": true
+        },
+        {
+          "actual": "absent",
+          "expected": "not present",
+          "name": "forbiddenDiagnosticUnanchored:ARCH-c-metadata-automation",
+          "pass": true
+        },
+        {
+          "actual": "absent",
+          "expected": "not present",
+          "name": "forbiddenDiagnosticUnanchored:ARCH-f-specialized-archival-workflows",
+          "pass": true
+        },
+        {
+          "actual": "Architectural Evolution",
+          "expected": "Architectural Evolution",
+          "name": "diagnosticUnanchoredRole:ARCH-a-established-adobe-bridge-workflow-pre-autoingest",
+          "pass": true
+        }
+      ],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "UNKNOWN",
+        "confidence": 0.6,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "decision",
+            "id": "DEC-004",
+            "score": 600
+          },
+          {
+            "entityType": "decision",
+            "id": "DEC-003",
+            "score": 400
+          },
+          {
+            "entityType": "bug",
+            "id": "BUG-006",
+            "score": 200
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-029"
+        ],
+        "sources": [
+          {
+            "id": "DEC-004",
+            "title": "Preserve Established Bridge-Based Archival Practice"
+          },
+          {
+            "id": "AI-FEAT-029",
+            "title": "Metadata Writing Engine"
+          }
+        ]
+      },
+      "id": "RF-5.3-008",
+      "meetsTargetExpectation": true,
+      "status": "control",
+      "targetPhase": "5.3"
+    },
+    {
+      "category": "memory-context",
+      "checks": [
+        {
+          "actual": "AVAILABLE",
+          "expected": "AVAILABLE",
+          "name": "status",
+          "pass": true
+        },
+        {
+          "actual": "DEC-004",
+          "expected": "not one of [ARCH-a-established-adobe-bridge-workflow-pre-autoingest, ARCH-h-current-architectural-position, AI-MEM-0001, AI-MEM-0002, AI-MEM-0003, AI-MEM-0004]",
+          "name": "forbiddenPrimary",
+          "pass": true
+        },
+        {
+          "actual": "present",
+          "expected": "DEC-004",
+          "name": "required:DEC-004",
+          "pass": true
+        },
+        {
+          "actual": "absent",
+          "expected": "unanchoredHistoricalContext key absent from the real public answer",
+          "name": "publicUnanchoredAbsent",
+          "pass": true
+        }
+      ],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "UNKNOWN",
+        "confidence": 0.6,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "decision",
+            "id": "DEC-004",
+            "score": 600
+          },
+          {
+            "entityType": "decision",
+            "id": "DEC-003",
+            "score": 400
+          },
+          {
+            "entityType": "bug",
+            "id": "BUG-006",
+            "score": 200
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-029"
+        ],
+        "sources": [
+          {
+            "id": "DEC-004",
+            "title": "Preserve Established Bridge-Based Archival Practice"
+          },
+          {
+            "id": "AI-FEAT-029",
+            "title": "Metadata Writing Engine"
+          }
+        ]
+      },
+      "id": "RF-5.3-009",
+      "meetsTargetExpectation": true,
+      "status": "control",
+      "targetPhase": "5.3"
+    },
+    {
+      "category": "memory-context",
+      "checks": [
+        {
+          "actual": "AVAILABLE",
+          "expected": "AVAILABLE",
+          "name": "status",
+          "pass": true
+        },
+        {
+          "actual": "EXPLANATION",
+          "expected": "EXPLANATION",
+          "name": "classification",
+          "pass": true
+        },
+        {
+          "actual": "AI-FEAT-029",
+          "expected": "not one of [ARCH-a-established-adobe-bridge-workflow-pre-autoingest, ARCH-c-metadata-automation]",
+          "name": "forbiddenPrimary",
+          "pass": true
+        },
+        {
+          "actual": "present",
+          "expected": "AI-FEAT-029",
+          "name": "required:AI-FEAT-029",
+          "pass": true
+        }
+      ],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "EXPLANATION",
+        "confidence": 0.23357648212844503,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-029",
+            "score": 233.57648212844504
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-037",
+            "score": 124.61954254339798
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-053",
+            "score": 123.11005165984757
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-056",
+            "score": 120.20401334166229
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-031",
+            "score": 100
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-004",
+          "AI-FEAT-030",
+          "AI-FEAT-031",
+          "AI-FEAT-032",
+          "AI-FEAT-033",
+          "AI-FEAT-037",
+          "AI-FEAT-047"
+        ],
+        "sources": [
+          {
+            "id": "AI-FEAT-029",
+            "title": "Metadata Writing Engine"
+          },
+          {
+            "id": "AI-RM-001",
+            "title": "Roadmap milestone AI-RM-001 (**Completed**)"
+          },
+          {
+            "id": "BUG-007",
+            "title": "BUG-007 (Fixed)"
+          },
+          {
+            "id": "BUG-008",
+            "title": "BUG-008 (Fixed)"
+          },
+          {
+            "id": "BUG-009",
+            "title": "BUG-009 (Fixed)"
+          },
+          {
+            "id": "BUG-010",
+            "title": "BUG-010 (Fixed)"
+          },
+          {
+            "id": "DEC-002",
+            "title": "Folder Structure Plus Embedded Metadata"
+          },
+          {
+            "id": "DEC-004",
+            "title": "Preserve Established Bridge-Based Archival Practice"
+          },
+          {
+            "id": "DEC-006",
+            "title": "RAW Files Use XMP Sidecars"
+          },
+          {
+            "id": "DEC-007",
+            "title": "Metadata Uses One Shared Engine/Resolver"
+          },
+          {
+            "id": "PM-001",
+            "title": "Metadata Correctness Gap Found in Production-Readiness Review"
+          }
+        ]
+      },
+      "id": "RF-5.3-010",
+      "meetsTargetExpectation": true,
+      "status": "control",
+      "targetPhase": "5.3"
+    },
+    {
+      "category": "memory-context",
+      "checks": [
+        {
+          "actual": "AVAILABLE",
+          "expected": "AVAILABLE",
+          "name": "status",
+          "pass": true
+        },
+        {
+          "actual": "present",
+          "expected": "DEC-021",
+          "name": "required:DEC-021",
+          "pass": true
+        },
+        {
+          "actual": "absent",
+          "expected": "unanchoredHistoricalContext key absent from the real public answer",
+          "name": "publicUnanchoredAbsent",
+          "pass": true
+        },
+        {
+          "actual": "present",
+          "expected": "ARCH-e-transfer-and-distributed-working",
+          "name": "requiredDiagnosticUnanchored:ARCH-e-transfer-and-distributed-working",
+          "pass": true
+        }
+      ],
+      "diagnostics": [],
+      "evidence": {
+        "capabilityStatus": "AVAILABLE",
+        "classification": "UNKNOWN",
+        "confidence": 0.4,
+        "matchQuality": "strong",
+        "matchedCapabilities": [
+          {
+            "entityType": "decision",
+            "id": "DEC-021",
+            "score": 400
+          },
+          {
+            "entityType": "bug",
+            "id": "BUG-005",
+            "score": 200
+          },
+          {
+            "entityType": "decision",
+            "id": "DEC-003",
+            "score": 200
+          },
+          {
+            "entityType": "decision",
+            "id": "DEC-004",
+            "score": 200
+          }
+        ],
+        "relatedCapabilities": [
+          "AI-FEAT-038"
+        ],
+        "sources": [
+          {
+            "id": "DEC-021",
+            "title": "Transfer Export Process-Local Lock Accepted for Present Operational Model"
+          },
+          {
+            "id": "AI-FEAT-038",
+            "title": "Transfer Export"
+          }
+        ]
+      },
+      "id": "RF-5.3-011",
       "meetsTargetExpectation": true,
       "status": "control",
       "targetPhase": "5.3"
@@ -4039,11 +4858,6 @@
           {
             "entityType": "decision",
             "id": "DEC-004",
-            "score": 200
-          },
-          {
-            "entityType": "decision",
-            "id": "DEC-007",
             "score": 200
           }
         ],
@@ -4353,8 +5167,8 @@
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-032",
-            "score": 200
+            "id": "AI-FEAT-018",
+            "score": 180.46634911362094
           }
         ],
         "relatedCapabilities": [
@@ -4515,8 +5329,8 @@
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-030",
-            "score": 96.6766548243248
+            "id": "AI-FEAT-018",
+            "score": 90.23317455681047
           }
         ],
         "relatedCapabilities": [

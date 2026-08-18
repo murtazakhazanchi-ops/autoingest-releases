@@ -357,7 +357,16 @@ function loadAll(root) {
   }
 
   const archRelationshipMap = parseArchEvolutionRelationshipMap(archContent);
-  const archHeadings = md.extractHeadings(archContent).filter((h) => h.level === 3);
+  // Part 5 Phase 5.3 (Decision 5/Decision C closure, Product Owner-authorized
+  // body-indexing correction) — each §3 heading's own canonical body text,
+  // via the existing md.extractSection() helper (already used elsewhere for
+  // named-section extraction — no new parsing logic). Computed once here,
+  // where archContent is already in scope, rather than re-reading the file
+  // or exposing raw archContent further downstream. lib/searchIndex.js
+  // consumes `body` to enrich architecture_section keywords beyond the bare
+  // heading title — see that file's own comment for the retrieval rationale.
+  const archHeadings = md.extractHeadings(archContent).filter((h) => h.level === 3)
+    .map((h) => ({ ...h, body: md.extractSection(archContent, h.text) || '' }));
 
   const allFiles = listMarkdownFiles(root).map((absPath) => {
     const content = readFile(absPath);

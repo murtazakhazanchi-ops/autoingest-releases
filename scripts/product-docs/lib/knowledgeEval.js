@@ -13,7 +13,7 @@
 const fs = require('fs');
 const path = require('path');
 const build = require('./build');
-const { answerQuestion, buildEngineContext } = require('./knowledgeEngine');
+const { answerQuestion, buildEngineContext, explainHistoricalContext } = require('./knowledgeEngine');
 const { CORPUS } = require('./knowledgeTestCorpus');
 const { CORPUS_V2 } = require('./knowledgeTestCorpusV2');
 const { REGRESSION_CORPUS_V3 } = require('./knowledgeRegressionCorpusV3');
@@ -161,6 +161,53 @@ function evaluateOneHardened(entry, ctx, authorityIndex) {
   if (entry.mustNotContainMemoryRecord) {
     const hasMemory = sourceIds.some((id) => /^AI-MEM-/.test(id)) || evidence.matchedCapabilities.some((m) => /^AI-MEM-/.test(m.id));
     checks.push({ name: 'noMemoryRecord', pass: !hasMemory, expected: 'no AI-MEM-#### present', actual: hasMemory ? 'present' : 'absent' });
+  }
+  // Part 5 Phase 5.3 (Decision 5) — observes the real sources[] entry's own
+  // role/evidenceQualification fields (lib/knowledgeHistoricalContext.js
+  // appends these, never reimplemented here) rather than a second admission
+  // algorithm, same "harness independence" discipline as every other check
+  // in this function.
+  if (entry.requiredHistoricalRole) {
+    const src = evidence.sources.find((s) => s.id === entry.requiredHistoricalRole.id);
+    checks.push({ name: `historicalRole:${entry.requiredHistoricalRole.id}`, pass: !!src && src.role === entry.requiredHistoricalRole.expectedRole, expected: entry.requiredHistoricalRole.expectedRole, actual: src ? src.role : 'absent' });
+  }
+  if (entry.requiredEvidenceQualificationSubstring) {
+    const src = evidence.sources.find((s) => s.id === entry.requiredEvidenceQualificationSubstring.id);
+    const actual = src ? src.evidenceQualification : undefined;
+    const pass = !!actual && actual.includes(entry.requiredEvidenceQualificationSubstring.substring);
+    checks.push({ name: `evidenceQualification:${entry.requiredEvidenceQualificationSubstring.id}`, pass, expected: `contains "${entry.requiredEvidenceQualificationSubstring.substring}"`, actual: actual || 'absent' });
+  }
+  // Part 5 Phase 5.3 Decision C materiality safety closure (Product Owner
+  // directive) — unanchored Architecture/Memory historical context is
+  // deliberately never attached to the real public answer object anymore
+  // (retrieved != material != admitted; no existing deterministic signal
+  // reliably distinguishes materiality from mere strong, unique retrieval —
+  // see DEC-020's own Post-Decision Evolution entry for the full empirical
+  // account). `expectedPublicUnanchoredAbsent` asserts this structural
+  // withdrawal directly against the real answer object.
+  if (entry.expectedPublicUnanchoredAbsent) {
+    const present = Object.prototype.hasOwnProperty.call(answer, 'unanchoredHistoricalContext');
+    checks.push({ name: 'publicUnanchoredAbsent', pass: !present, expected: 'unanchoredHistoricalContext key absent from the real public answer', actual: present ? 'present' : 'absent' });
+  }
+  // The following three checks observe the DIAGNOSTIC seam
+  // (explainHistoricalContext(), unchanged, never consulted by
+  // answerQuestion() itself) rather than the real answer object — this is
+  // the only place withheld candidates remain inspectable/testable, exactly
+  // as intended. Computed lazily, only when an entry actually declares one
+  // of these fields, to avoid needless extra work for the other ~40 entries.
+  if (entry.requiredDiagnosticUnanchoredMemberIds || entry.forbiddenDiagnosticUnanchoredMemberIds || entry.requiredDiagnosticUnanchoredRole) {
+    const diag = explainHistoricalContext(entry.question, ctx);
+    const diagIds = diag.unanchored ? diag.unanchored.candidates.map((c) => c.id) : [];
+    for (const reqId of entry.requiredDiagnosticUnanchoredMemberIds || []) {
+      checks.push({ name: `requiredDiagnosticUnanchored:${reqId}`, pass: diagIds.includes(reqId), expected: reqId, actual: diagIds.includes(reqId) ? 'present' : 'absent' });
+    }
+    for (const forbiddenId of entry.forbiddenDiagnosticUnanchoredMemberIds || []) {
+      checks.push({ name: `forbiddenDiagnosticUnanchored:${forbiddenId}`, pass: !diagIds.includes(forbiddenId), expected: 'not present', actual: diagIds.includes(forbiddenId) ? 'present' : 'absent' });
+    }
+    if (entry.requiredDiagnosticUnanchoredRole) {
+      const cand = diag.unanchored ? diag.unanchored.candidates.find((c) => c.id === entry.requiredDiagnosticUnanchoredRole.id) : null;
+      checks.push({ name: `diagnosticUnanchoredRole:${entry.requiredDiagnosticUnanchoredRole.id}`, pass: !!cand && cand.role === entry.requiredDiagnosticUnanchoredRole.expectedRole, expected: entry.requiredDiagnosticUnanchoredRole.expectedRole, actual: cand ? cand.role : 'absent' });
+    }
   }
   if (entry.expectedConfidenceRange) {
     const [min, max] = entry.expectedConfidenceRange;

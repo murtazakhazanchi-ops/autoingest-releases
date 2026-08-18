@@ -69,6 +69,37 @@ function extractDirectIds(text, family) {
   return Array.from(direct).sort(compareIds);
 }
 
+// Part 5 Phase 5.3 (Decision 5) — a PURE ADDITION, same discipline as
+// extractDirectIds above: a second, already-existing, real structured field
+// this function newly reads, never touching relatedBugs/relatedDecisions/
+// relatedPostmortems/directBugs/directDecisions/directPostmortems (re-
+// verified 0/58 fidelity on all six after this addition). A feature's own
+// "Related architectural evolution sections" Lifecycle Metadata row (see
+// 06_FEATURE_TEMPLATE.md and e.g. AI-FEAT-001/029/036/040's own files) cites
+// one or more 11_ARCHITECTURAL_EVOLUTION.md §3 sections as Markdown links —
+// `[§3B — B. Initial AutoIngest Foundation](../11_ARCHITECTURAL_EVOLUTION.md#b-initial-autoingest-foundation)`,
+// semicolon-separated when more than one. The `#slug` fragment is the SAME
+// GitHub-style slug lib/markdown.js's extractHeadings() already computes for
+// every §3 heading (parseProductDocs.js's archHeadings) — searchIndex.js
+// already keys those records as `ARCH-<slug>`, so `ARCH-` + the extracted
+// slug is a real, existing, resolvable search-index ID, not a new namespace.
+// A feature with no citation ("Not yet covered..."/"None") yields []] — this
+// is a real, disclosed, expected outcome for the majority of features (only
+// ~20 of 58 currently carry this citation), not a parsing defect; Phase 5.3's
+// grounding logic (lib/knowledgeHistoricalContext.js) treats an empty array
+// as "no real relationship exists," never manufacturing one.
+const ARCH_LINK_RE = /\(\.\.\/11_ARCHITECTURAL_EVOLUTION\.md#([a-z0-9-]+)\)/g;
+
+function extractArchitectureSectionIds(text) {
+  const raw = String(text || '');
+  if (!raw.trim()) return [];
+  const ids = new Set();
+  let m;
+  ARCH_LINK_RE.lastIndex = 0;
+  while ((m = ARCH_LINK_RE.exec(raw))) ids.add('ARCH-' + m[1]);
+  return Array.from(ids).sort();
+}
+
 function buildAuthorityIndex(parsed) {
   const entries = [];
   const featureIds = Array.from(parsed.features.keys()).sort(compareIds);
@@ -98,6 +129,8 @@ function buildAuthorityIndex(parsed) {
       directBugs: extractDirectIds(feat.lifecycle['Related bugs'], 'bug'),
       directDecisions: extractDirectIds(feat.lifecycle['Related decisions'], 'decision'),
       directPostmortems: extractDirectIds(feat.lifecycle['Related postmortems'], 'postmortem'),
+      // Phase 5.3 addition (see extractArchitectureSectionIds' own comment).
+      relatedArchitectureSections: extractArchitectureSectionIds(feat.lifecycle['Related architectural evolution sections']),
       codeAreas: feat.relatedFiles,
       confidenceLevel: 'explicit',
       evidenceNote: `Derived directly from ${feat.filePath}'s header table and Lifecycle Metadata section.`,
@@ -131,4 +164,4 @@ function buildAuthorityIndex(parsed) {
   return entries;
 }
 
-module.exports = { buildAuthorityIndex, TOPIC_ALIASES, extractDirectIds };
+module.exports = { buildAuthorityIndex, TOPIC_ALIASES, extractDirectIds, extractArchitectureSectionIds };

@@ -61,6 +61,34 @@ function parseArgs(args) {
   return { positional, flags };
 }
 
+// Part 5 Phase 5.3 Decision B (Product Owner directive) — a concise,
+// non-rewriting excerpt of a Memory capsule's own evidence-classification
+// text. Truncation (never paraphrase, never a summary in different words)
+// is the only operation applied, so the qualification is never rewritten or
+// upgraded in meaning — just shortened to fit a one-line Sources entry, with
+// an ellipsis marking that more detail exists (full text remains available
+// verbatim via `--json`/`/api/ask`).
+const EVIDENCE_QUALIFICATION_EXCERPT_LENGTH = 70;
+function excerptEvidenceQualification(text) {
+  const s = String(text || '');
+  if (s.length <= EVIDENCE_QUALIFICATION_EXCERPT_LENGTH) return s;
+  const cut = s.slice(0, EVIDENCE_QUALIFICATION_EXCERPT_LENGTH);
+  const lastSpace = cut.lastIndexOf(' ');
+  return (lastSpace > 40 ? cut.slice(0, lastSpace) : cut) + '...';
+}
+
+// Renders one sources[] line, marking historical-context entries distinctly
+// from ordinary current sources (Decision 5's "visibly subordinate"
+// requirement) using ONLY the already-existing `role`/`evidenceQualification`
+// fields lib/knowledgeHistoricalContext.js already attaches — no new answer
+// field added for rendering.
+function formatSourceLine(s) {
+  const base = `  - ${s.id}${s.title ? ` — ${s.title}` : ''}${s.path ? ` (${s.path})` : ''}`;
+  if (s.role !== 'historical-context') return base;
+  const evidence = s.evidenceQualification ? ` (evidence: ${excerptEvidenceQualification(s.evidenceQualification)})` : '';
+  return `${base} [historical context]${evidence}`;
+}
+
 function renderAnswerText(answer) {
   const lines = [];
   lines.push(`Query: ${answer.query}`);
@@ -85,10 +113,18 @@ function renderAnswerText(answer) {
   lines.push('');
   lines.push('Sources:');
   if (answer.sources.length) {
-    for (const s of answer.sources) lines.push(`  - ${s.id}${s.title ? ` — ${s.title}` : ''}${s.path ? ` (${s.path})` : ''}`);
+    for (const s of answer.sources) lines.push(formatSourceLine(s));
   } else {
     lines.push('  (none — no confident match)');
   }
+  // Part 5 Phase 5.3 Decision C materiality safety closure (Product Owner
+  // directive) — unanchored Architecture/Memory historical context is
+  // deliberately NEVER attached to the real answer object (retrieved !=
+  // material != admitted; see lib/knowledgeEngine.js's own header comment
+  // on reconcileUnknownEvidenceWording for the full rationale). There is
+  // therefore nothing to render here beyond ordinary Sources: above — the
+  // withheld candidates remain inspectable only via the diagnostic seam
+  // (explainHistoricalContext()), never the public CLI/portal output.
   return lines.join('\n') + '\n';
 }
 
@@ -176,4 +212,4 @@ function run(args) {
   }
 }
 
-module.exports = { run, HELP, renderAnswerText };
+module.exports = { run, HELP, renderAnswerText, formatSourceLine, excerptEvidenceQualification };

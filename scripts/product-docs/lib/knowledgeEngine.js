@@ -24,6 +24,7 @@ const { findConcept, findBoundaryConcept } = require('./intentConcepts');
 const { QUESTION_TYPES, classifyQuestion } = require('./questionClassifier');
 const { isEligibleForNormalization, matchedTokenCount, adjustKeywordOverlapScore, explainCandidate } = require('./knowledgeSurfaceNormalization');
 const { explainNeighborhood: labelNeighborhood } = require('./knowledgeNeighborhood');
+const { explainHistoricalContext: labelHistoricalContext, historicalContextForFeature, unanchoredHistoricalContext } = require('./knowledgeHistoricalContext');
 
 // Below this score, a match is not confident enough to answer from — see
 // scripts/product-docs/README.md's ranking table: 100 is the minimum score
@@ -80,7 +81,7 @@ function governanceRelationshipsForFeature(featureId, authorityIndexByFeatureId,
   };
 }
 
-function sourcesForRecord(knowledgeRecord, governanceRelationships) {
+function sourcesForRecord(knowledgeRecord, governanceRelationships, historicalContext) {
   // Cite the canonical document explicitly — NOT sourceFiles[0], which is
   // an alphabetically-sorted merge of canonical doc + code paths + technical
   // docs and is not reliably the canonical document itself (found during
@@ -102,6 +103,20 @@ function sourcesForRecord(knowledgeRecord, governanceRelationships) {
   if (governanceRelationships) {
     for (const dec of governanceRelationships.decisions) sources.push({ id: dec.id, title: dec.title, path: dec.path });
     for (const pm of governanceRelationships.postmortems) sources.push({ id: pm.id, title: pm.title, path: pm.path });
+  }
+  // Part 5 Phase 5.3 (Decision 5) — unlike the unconditional governance
+  // append above, historicalContext.admitted already carries ONLY entries
+  // that cleared the full historical-intent + grounding + materiality test
+  // (lib/knowledgeHistoricalContext.js) — admission IS the visibility gate
+  // here, not a separate diagnostic layer on top of unconditional citation.
+  // Appended strictly after status/quality/confidence are decided, same
+  // guarantee as governanceRelationships above — never influences ranking,
+  // never touches capabilityStatus (computed earlier, from
+  // knowledgeRecord.operatorStatus alone, untouched by this function).
+  if (historicalContext) {
+    for (const item of historicalContext.admitted) {
+      sources.push({ id: item.id, title: item.title, path: item.path, role: 'historical-context', historicalType: item.type, evidenceQualification: item.evidenceQualification });
+    }
   }
   return sources;
 }
@@ -182,7 +197,7 @@ function findCompanionWorkflow(featureId, workflowIndexById, workflowMatches) {
   return candidates.sort((a, b) => a.id.localeCompare(b.id, 'en', { numeric: true }))[0];
 }
 
-function answerFromRecord(question, knowledgeRecord, matches, qType, companionWorkflow, governanceRelationships) {
+function answerFromRecord(question, knowledgeRecord, matches, qType, companionWorkflow, governanceRelationships, historicalContext) {
   const status = knowledgeRecord.operatorStatus;
   const tiedCount = matches.filter((m) => m.score === matches[0].score).length;
   const quality = matchQualityFor(matches[0].score, tiedCount);
@@ -221,7 +236,7 @@ function answerFromRecord(question, knowledgeRecord, matches, qType, companionWo
     }
   }
 
-  const sources = sourcesForRecord(knowledgeRecord, governanceRelationships);
+  const sources = sourcesForRecord(knowledgeRecord, governanceRelationships, historicalContext);
   if (companionWorkflow) {
     sources.push({ id: companionWorkflow.id, title: companionWorkflow.title, path: companionWorkflow.canonicalDocument });
   }
@@ -381,6 +396,63 @@ function boundaryAnswer(question, boundary, matches, qType) {
     relatedCapabilities: [],
     sources: [{ id: boundary.id, title: 'Documented boundary (curated, evidence-cited — see lib/statusResolution.js)', path: null, note: boundary.citation }],
     confidence: 1,
+  };
+}
+
+// Part 5 Phase 5.3 Decision C — materiality safety closure (Product Owner
+// directive, post body-indexing investigation). The unanchored fallback's
+// own admission gate (strong + untied retrieval) was empirically proven to
+// discriminate ELIGIBILITY, not MATERIALITY — a real, unanchored governance-
+// primary question ("What does Transfer Export do and why was its locking
+// kept process-local?", DEC-021 primary) admits ARCH-e on a genuine, unique,
+// strong retrieval match whose specific matched tokens are demonstrably
+// scattered across unrelated sentences in §3E's own body, not about the
+// locking decision the question actually asks about. No existing
+// deterministic signal (title-vs-body split, Feature-citation grounding,
+// governance-primary-to-Architecture relationship path, whole-record
+// keyword overlap) was found to reliably distinguish this from the genuine
+// positive case (§3A) — see the Architecture Body-Indexing Safety Decision
+// Report and the Unanchored Architecture Materiality Safety Report for the
+// full empirical account. The one signal that DID distinguish them
+// (sentence-level match concentration) would require inventing a new
+// parser and threshold — explicitly out of bounds.
+//
+// Memory was investigated independently, not withdrawn merely for symmetry
+// with Architecture (an explicit Product Owner instruction): a real, natural
+// question ("How did the Windows/NAS event management reliability
+// investigation evolve to resolve its three root causes?", DEC-016 primary)
+// demonstrates unanchoredHistoricalContext() admitting AI-MEM-0003 — a
+// capsule with ZERO real Feature/Decision/Bug grounding (its own Scope
+// table is "Evidence pending — source conversation unavailable" for every
+// field) — purely on a strong (700), unique raw retrieval score. Testing
+// whether Memory's OWN existing structured materiality signal
+// (memoryHasGenuineChronology()) would have caught this found a further,
+// independent defect: AI-MEM-0003's own `unresolved_items` field is the
+// literal placeholder array `['None recorded.']` (a non-empty array whose
+// only element is boilerplate text meaning "nothing"), which
+// memoryHasGenuineChronology()'s `.length > 0` check incorrectly counts as
+// genuine chronology. Memory therefore reaches the public answer through
+// the SAME retrieval-only admission weakness as Architecture, demonstrated
+// with real evidence, not assumed from implementation symmetry — per the
+// Product Owner's own second acceptable outcome.
+//
+// retrieved != material != admitted: this function computes the unanchored
+// fallback INTERNALLY, for exactly one narrow purpose — deciding whether
+// unknownAnswer()'s blanket "not enough evidence" wording would be false
+// for this specific question (real historical/background material WAS
+// found, just not confidently admittable) — and, if so, correcting that
+// wording narrowly, without naming internal scoring or diagnostics. The
+// full candidate/score/reason data returned by unanchoredHistoricalContext()
+// is NEVER attached to the real public answer object. explainHistoricalContext()
+// (the diagnostic seam, unchanged) remains the sole place this data is
+// inspectable, for observability/testing only.
+function reconcileUnknownEvidenceWording(answer, question, ctx) {
+  if (answer.matchQuality !== 'none') return answer; // only unknownAnswer()'s own shape ever needs this -- a governance-primary answer already presents real evidence, never claims "no evidence exists"
+  const uhc = unanchoredHistoricalContext(question, ctx, CONFIDENCE_FLOOR, matchQualityFor);
+  if (!uhc.candidates.length) return answer;
+  return {
+    ...answer,
+    directAnswer: 'AutoIngest\'s documentation does not have enough evidence to confidently answer what you asked about current capability. Related historical or background material exists but could not be confidently connected to this question, so it is not presented as part of the answer.',
   };
 }
 
@@ -711,7 +783,7 @@ function answerQuestion(question, ctx) {
     // answerFromGovernanceRecord returns null when it can't ground the
     // record in a real cited feature — falls through to the ordinary
     // feature/workflow logic below rather than answering half-grounded.
-    if (governanceAnswer) return governanceAnswer;
+    if (governanceAnswer) return reconcileUnknownEvidenceWording(governanceAnswer, question, ctx);
   }
 
   // TEAM_ACTIVITY added 2026-08-14 during the event-coordination
@@ -730,14 +802,20 @@ function answerQuestion(question, ctx) {
   }
 
   if (!topFeature || topFeature.score < CONFIDENCE_FLOOR) {
-    return unknownAnswer(question, featureMatches, qType);
+    return reconcileUnknownEvidenceWording(unknownAnswer(question, featureMatches, qType), question, ctx);
   }
   const knowledgeRecord = knowledgeIndexById.get(topFeature.id);
-  if (!knowledgeRecord) return unknownAnswer(question, featureMatches, qType);
+  if (!knowledgeRecord) return reconcileUnknownEvidenceWording(unknownAnswer(question, featureMatches, qType), question, ctx);
 
   const companionWorkflow = findCompanionWorkflow(knowledgeRecord.id, workflowIndexById, workflowMatches);
   const governanceRelationships = governanceRelationshipsForFeature(knowledgeRecord.id, authorityIndexByFeatureId, searchIndexById);
-  return answerFromRecord(question, knowledgeRecord, featureMatches, qType, companionWorkflow, governanceRelationships);
+  // Part 5 Phase 5.3 (Decision 5) — computed unconditionally per Feature-
+  // primary answer, same pattern as governanceRelationships above; the
+  // historical-intent/materiality gate inside historicalContextForFeature()
+  // itself is what keeps a non-historical question's admitted list empty,
+  // not a conditional call site here.
+  const historicalContext = historicalContextForFeature(knowledgeRecord.id, question, ctx);
+  return answerFromRecord(question, knowledgeRecord, featureMatches, qType, companionWorkflow, governanceRelationships, historicalContext);
 }
 
 function knowledgeIndexMap(knowledgeIndex) {
@@ -769,6 +847,15 @@ function buildEngineContext(built) {
     // title/canonical_path), the same lookup answerFromGovernanceRecord()
     // already performs via a linear searchIndex.find(), just memoized once.
     searchIndexById: new Map(built.searchIndex.map((r) => [r.stable_id, r])),
+    // Part 5 Phase 5.3 (Decision 5) — the same already-built, already-parsed
+    // lib/memoryIndex.js projection (never reparsed here). searchIndex's own
+    // 'memory' records carry only a title/summary/relatedIds/evidenceStatus
+    // projection (lib/searchIndex.js's rec() shape); this map exposes the
+    // FULLER memoryIndex record (revision_count, rejected_approaches,
+    // unresolved_items, evidence_classification) that
+    // lib/knowledgeHistoricalContext.js's materiality/evidence-qualification
+    // checks need but the flat search index doesn't carry.
+    memoryIndexById: new Map((built.memoryIndex || []).map((r) => [r.memory_id, r])),
   };
 }
 
@@ -837,6 +924,20 @@ function explainNeighborhood(question, ctx) {
   return labelNeighborhood(question, answer, ctx);
 }
 
+// Part 5 Phase 5.3 (Decision 5) — read-only observability seam, same shape
+// as explainNormalization()/explainRelationships()/explainNeighborhood()
+// above (runs the real answerQuestion() once and reports on it) — but
+// UNLIKE those three, its underlying admission logic (historicalContextForFeature(),
+// called from answerFromRecord() above) IS consulted by answerQuestion()
+// itself, not diagnostic-only; this wrapper's own added value is exposing
+// the REJECTED candidates and their reasons, which the real answer object
+// never carries. See lib/knowledgeHistoricalContext.js's own header for the
+// full rationale.
+function explainHistoricalContext(question, ctx) {
+  const answer = answerQuestion(question, ctx);
+  return labelHistoricalContext(question, answer, ctx, CONFIDENCE_FLOOR, matchQualityFor);
+}
+
 module.exports = {
   answerQuestion,
   classifyIntent,
@@ -850,4 +951,6 @@ module.exports = {
   explainRelationships,
   governanceRelationshipsForFeature,
   explainNeighborhood,
+  explainHistoricalContext,
+  reconcileUnknownEvidenceWording,
 };

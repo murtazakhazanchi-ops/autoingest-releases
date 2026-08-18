@@ -28,6 +28,7 @@
   .quality-note { font-size: 0.78rem; color: #a15c00; margin-top: 0.4rem; }
   .section-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-top: 0.9rem; margin-bottom: 0.2rem; }
   .sources li, .related { font-size: 0.85rem; }
+  .historical-badge { display: inline-block; margin-left: 0.4rem; padding: 0.05rem 0.35rem; border-radius: 3px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; background: #ece6f7; color: #5b3d94; }
   nav.tabs { margin: 1.5rem 0 1rem; border-bottom: 1px solid #ccc; display: flex; flex-wrap: wrap; }
   nav.tabs button { background: none; border: none; padding: 0.5rem 0.7rem; font-size: 0.82rem; border-bottom: 2px solid transparent; white-space: nowrap; }
   nav.tabs button.active { border-bottom-color: #333; font-weight: 600; }
@@ -154,6 +155,30 @@
       return div.innerHTML;
     }
 
+    // Part 5 Phase 5.3 Decision B — concise, non-rewriting excerpt of a
+    // Memory capsule's own evidence-classification text. Truncation only,
+    // never paraphrase, so meaning/qualification is never rewritten or
+    // upgraded — mirrors lib/knowledgeCli.js's excerptEvidenceQualification().
+    function excerptEvidenceQualification(text) {
+      const s = String(text || '');
+      if (s.length <= 70) return s;
+      const cut = s.slice(0, 70);
+      const lastSpace = cut.lastIndexOf(' ');
+      return (lastSpace > 40 ? cut.slice(0, lastSpace) : cut) + '...';
+    }
+
+    // Renders one sources[] entry, marking historical-context entries
+    // distinctly from ordinary current sources (Decision 5's "visibly
+    // subordinate" requirement) using only the already-existing
+    // role/evidenceQualification fields — no new answer field.
+    function renderSourceLi(s) {
+      const badge = s.role === 'historical-context' ? '<span class="historical-badge">historical context</span>' : '';
+      const evidence = (s.role === 'historical-context' && s.evidenceQualification)
+        ? `<br><span class="muted">evidence: ${escapeHtml(excerptEvidenceQualification(s.evidenceQualification))}</span>` : '';
+      const note = s.note ? '<br><span class="muted">' + escapeHtml(s.note) + '</span>' : '';
+      return `<li>${escapeHtml(s.id)}${s.title ? ' — ' + escapeHtml(s.title) : ''}${s.path ? ' (' + escapeHtml(s.path) + ')' : ''}${badge}${note}${evidence}</li>`;
+    }
+
     function renderAnswer(answer) {
       const el = document.getElementById('result');
       el.style.display = 'block';
@@ -170,11 +195,17 @@
         ? `<div class="section-label">Related capabilities</div><div class="related">${answer.relatedCapabilities.map(escapeHtml).join(', ')}</div>`
         : '';
       const sources = answer.sources.length
-        ? '<div class="section-label">Sources</div><ul class="sources">' + answer.sources.map((s) => `<li>${escapeHtml(s.id)}${s.title ? ' — ' + escapeHtml(s.title) : ''}${s.path ? ' (' + escapeHtml(s.path) + ')' : ''}${s.note ? '<br><span class="muted">' + escapeHtml(s.note) + '</span>' : ''}</li>`).join('') + '</ul>'
+        ? '<div class="section-label">Sources</div><ul class="sources">' + answer.sources.map(renderSourceLi).join('') + '</ul>'
         : '<div class="section-label">Sources</div><div class="muted">No confident match — nothing to cite.</div>';
       const matches = answer.matchedCapabilities.length
         ? `<div class="section-label">All matched capabilities (ranked)</div><div class="muted">${answer.matchedCapabilities.map((m) => `${escapeHtml(m.id)} (${m.score})`).join(', ')}</div>`
         : '';
+      // Part 5 Phase 5.3 Decision C materiality safety closure (Product
+      // Owner directive) — unanchored Architecture/Memory historical context
+      // is deliberately never attached to the real answer object (retrieved
+      // != material != admitted). Nothing to render here beyond ordinary
+      // Sources: above — withheld candidates remain inspectable only via
+      // the diagnostic seam (explainHistoricalContext()), never this portal.
 
       el.innerHTML = `
         <span class="badge ${escapeHtml(answer.capabilityStatus)}">${escapeHtml(answer.capabilityStatus)}</span>
