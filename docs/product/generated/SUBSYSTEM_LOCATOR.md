@@ -417,13 +417,20 @@
 - `scripts/product-docs/cli.js`
 - `scripts/product-docs/knowledge-portal/index.html`
 - `scripts/product-docs/knowledge-portal/server.js`
+- `scripts/product-docs/lib/authorityTopics.js`
 - `scripts/product-docs/lib/build.js`
 - `scripts/product-docs/lib/ids.js`
 - `scripts/product-docs/lib/intentConcepts.js`
 - `scripts/product-docs/lib/knowledgeCli.js`
 - `scripts/product-docs/lib/knowledgeEngine.js`
 - `scripts/product-docs/lib/knowledgeEval.js`
+- `scripts/product-docs/lib/knowledgeEvalClassification.js`
+- `scripts/product-docs/lib/knowledgeEvalDiagnostics.js`
+- `scripts/product-docs/lib/knowledgeHistoricalContext.js`
 - `scripts/product-docs/lib/knowledgeIndex.js`
+- `scripts/product-docs/lib/knowledgeNeighborhood.js`
+- `scripts/product-docs/lib/knowledgeRegressionCorpusV3.js`
+- `scripts/product-docs/lib/knowledgeSurfaceNormalization.js`
 - `scripts/product-docs/lib/knowledgeTestCorpus.js`
 - `scripts/product-docs/lib/knowledgeTestCorpusV2.js`
 - `scripts/product-docs/lib/markdown.js`
@@ -437,7 +444,10 @@
 - `scripts/product-docs/test/knowledge.test.js`
 - `scripts/product-docs/test/knowledgeAdversarialPhase24.test.js`
 - `scripts/product-docs/test/knowledgeHallucinationV2.test.js`
+- `scripts/product-docs/test/knowledgeHistoricalContext.test.js`
 - `scripts/product-docs/test/knowledgeMergeReadiness.test.js`
+- `scripts/product-docs/test/knowledgeNeighborhoodAdmission.test.js`
+- `scripts/product-docs/test/knowledgeRelationshipVisibility.test.js`
 
 **Change-impact checklist**:
 - Re-read the Related Files section of every primary feature listed above before changing shared source files.

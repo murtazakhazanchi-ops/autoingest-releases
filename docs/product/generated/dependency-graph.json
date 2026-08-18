@@ -3436,6 +3436,14 @@
     {
       "evidence_status": "explicit",
       "note": null,
+      "provenance_path": "features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-058",
+      "target": "DEC-020"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
       "provenance_path": "decisions/DEC-020_STAGE_2_KNOWLEDGE_ARCHITECTURE_WORKFLOW_RECORDS_AND_CONCEPT_LAYER.md#header-table:Related-feature(s)-/-roadmap-milestone",
       "relationship": "governed_by",
       "source": "AI-FEAT-058",

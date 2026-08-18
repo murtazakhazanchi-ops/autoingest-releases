@@ -7139,7 +7139,7 @@
       "evidence_status": "Stage 1: verified from current code and `scripts/product-docs/test/knowledge.test.js`, plus an independent forensic PR review (2026-08-13) that found and fixed one defect (see Evolution Journal). Stage 2 (2026-08-13 to 2026-08-14): verified from current code (`lib/intentConcepts.js`, `questionClassifier.js`, `workflowIndex.js`, extended `knowledgeEngine.js`), `docs/product/workflows/AI-WF-001..008_*.md` (each individually evidence-cited against real onboarding text or `renderer/` UI labels), the Online Registry architecture trace (`realtime-server/`, `services/realtimeOperationsService.js`, `main/main.js` emitter call sites), a dedicated merge-readiness pass re-verifying every test/corpus/security check from the actual merged `main` state in an independent worktree, and 354 total passing assertions across 35 test files at merge time. See [AI-MEM-0004](../memory/AI-MEM-0004_KNOWLEDGE_PORTAL_STAGE_2_OPERATOR_KNOWLEDGE_ARCHITECTURE.md) for the full engagement narrative.",
       "feature_id": "AI-FEAT-058",
       "introduced_version": "2026-08-13",
-      "last_modified_version": "2026-08-14 (Stage 2 merged to main)",
+      "last_modified_version": "2026-08-18 (Part 3 Knowledge Neighborhood Remediation closed — Decisions 1–7 of 8, plus the RF-5.4-005 authority-scope investigation; Stage 2 itself merged to main 2026-08-14)",
       "maturity": "Experimental",
       "name": "Knowledge Engine (Stage 1 Prototype → Stage 2 Operator Knowledge Architecture)",
       "parent_feature": [],
@@ -7148,6 +7148,18 @@
       ],
       "related_bugs": [],
       "related_changelog_entries": [
+        {
+          "date": "2026-08-18",
+          "excerpt": "**Task type**: two-part entry. (1) First changelog record of Part 3 Knowledge Neighborhood Remediation's own implementation work, spanning eight already-committed commits from 2026-08-17 to 2026-08-18"
+        },
+        {
+          "date": "2026-08-18",
+          "excerpt": "**New/updated records (this documentation-closure session, 2026-08-18)**: [AI-FEAT-058](features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md) (new Part 3 Evolution Journal section, Engineering "
+        },
+        {
+          "date": "2026-08-18",
+          "excerpt": "**Explicitly not done, per this closure's own scope control**: no application/runtime code changed; no `lib/*.js` or `test/*.test.js` file touched (the `RF-4.3-EXT-001`/`knowledge.test.js` disagreemen"
+        },
         {
           "date": "2026-08-14",
           "excerpt": "**Three evidence gaps discovered during implementation/closure, not fixed (deliberately out of scope for a documentation-only pass)**: (1) `lib/intentConcepts.js`'s pre-existing `transfer-export`/`tra"
@@ -7232,10 +7244,28 @@
         "scripts/product-docs/lib/knowledgeTestCorpusV2.js",
         "scripts/product-docs/test/knowledgeMergeReadiness.test.js",
         "scripts/product-docs/lib/intentConcepts.js",
-        "scripts/product-docs/knowledge-portal/index.html"
+        "scripts/product-docs/knowledge-portal/index.html",
+        "scripts/product-docs/lib/knowledgeEvalClassification.js",
+        "scripts/product-docs/lib/knowledgeRegressionCorpusV3.js",
+        "scripts/product-docs/lib/knowledgeSurfaceNormalization.js",
+        "scripts/product-docs/lib/knowledgeNeighborhood.js",
+        "scripts/product-docs/lib/knowledgeHistoricalContext.js",
+        "scripts/product-docs/lib/knowledgeEvalDiagnostics.js",
+        "scripts/product-docs/lib/statusResolution.js",
+        "scripts/product-docs/lib/questionClassifier.js",
+        "scripts/product-docs/lib/authorityTopics.js",
+        "scripts/product-docs/lib/parseProductDocs.js",
+        "scripts/product-docs/lib/searchIndex.js",
+        "scripts/product-docs/lib/knowledgeEngine.js",
+        "scripts/product-docs/lib/knowledgeCli.js",
+        "scripts/product-docs/knowledge-portal/index.html",
+        "scripts/product-docs/test/knowledgeRelationshipVisibility.test.js",
+        "scripts/product-docs/test/knowledgeNeighborhoodAdmission.test.js",
+        "scripts/product-docs/test/knowledgeHistoricalContext.test.js"
       ],
       "related_decisions": [
-        "DEC-019"
+        "DEC-019",
+        "DEC-020"
       ],
       "related_features": [],
       "related_postmortems": [],

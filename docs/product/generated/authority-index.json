@@ -1773,12 +1773,30 @@
         "scripts/product-docs/lib/knowledgeTestCorpusV2.js",
         "scripts/product-docs/test/knowledgeMergeReadiness.test.js",
         "scripts/product-docs/lib/intentConcepts.js",
-        "scripts/product-docs/knowledge-portal/index.html"
+        "scripts/product-docs/knowledge-portal/index.html",
+        "scripts/product-docs/lib/knowledgeEvalClassification.js",
+        "scripts/product-docs/lib/knowledgeRegressionCorpusV3.js",
+        "scripts/product-docs/lib/knowledgeSurfaceNormalization.js",
+        "scripts/product-docs/lib/knowledgeNeighborhood.js",
+        "scripts/product-docs/lib/knowledgeHistoricalContext.js",
+        "scripts/product-docs/lib/knowledgeEvalDiagnostics.js",
+        "scripts/product-docs/lib/statusResolution.js",
+        "scripts/product-docs/lib/questionClassifier.js",
+        "scripts/product-docs/lib/authorityTopics.js",
+        "scripts/product-docs/lib/parseProductDocs.js",
+        "scripts/product-docs/lib/searchIndex.js",
+        "scripts/product-docs/lib/knowledgeEngine.js",
+        "scripts/product-docs/lib/knowledgeCli.js",
+        "scripts/product-docs/knowledge-portal/index.html",
+        "scripts/product-docs/test/knowledgeRelationshipVisibility.test.js",
+        "scripts/product-docs/test/knowledgeNeighborhoodAdmission.test.js",
+        "scripts/product-docs/test/knowledgeHistoricalContext.test.js"
       ],
       "confidenceLevel": "explicit",
       "directBugs": [],
       "directDecisions": [
-        "DEC-019"
+        "DEC-019",
+        "DEC-020"
       ],
       "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md's header table and Lifecycle Metadata section.",
@@ -1787,7 +1805,8 @@
       "relatedArchitectureSections": [],
       "relatedBugs": [],
       "relatedDecisions": [
-        "DEC-019"
+        "DEC-019",
+        "DEC-020"
       ],
       "relatedPostmortems": [],
       "roadmapIds": [
