@@ -41,8 +41,15 @@ jobs:
           node-version: 20
 
       - name: Run Part 4/5 tooling test suite
+        # Includes test/askSynthesis/*.test.js (the Ask Synthesis / semantic
+        # capability-authority deterministic unit tests, added Phase C1,
+        # 2026-08-19) -- these are model-free (injected fake/stub judges
+        # only) and were previously omitted from this glob entirely,
+        # meaning they ran in zero CI despite being fully committed. This
+        # never downloads or loads a local model; the real, model-required
+        # benchmarks (bench/) remain manual/local-only by design.
         run: |
-          node --test scripts/product-docs/test/*.test.js scripts/product-docs/test/automation/*.test.js
+          node --test scripts/product-docs/test/*.test.js scripts/product-docs/test/automation/*.test.js scripts/product-docs/test/askSynthesis/*.test.js
 
       - name: Validate documentation health
         # `validate` rebuilds every generated artifact in memory and diffs it
