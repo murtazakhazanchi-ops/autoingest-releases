@@ -21,6 +21,7 @@
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const { execFileSync } = require('child_process');
 
 const FIXTURE_USER_DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-drawer-verify-userdata-'));
 const SCREENSHOT_DIR = process.argv[2] || path.join(os.tmpdir(), 'ai-drawer-screenshots');
@@ -35,7 +36,42 @@ function record(name, pass, detail) {
   console.log(`[drawer-verify] ${pass ? 'PASS' : 'FAIL'} — ${name}${detail ? ' :: ' + JSON.stringify(detail) : ''}`);
 }
 
+// Incident-driven addition (Ask AutoIngest — Missing Entry-Point Acceptance
+// Failure): a prior run of this harness reported the entry point as
+// visible, which was true for the checkout it actually ran against, but was
+// read as a claim about "the real AutoIngest application" in general. This
+// harness only ever loads renderer/index.html from the git worktree it runs
+// in -- it cannot detect that a DIFFERENT checkout (e.g. the primary
+// checkout on `main`, which had never merged this feature branch) lacks the
+// code entirely. Printing the exact branch/commit under test, loudly and
+// first, closes that silent gap: any future report reader can immediately
+// see which checkout a PASS does or does not cover.
+function _logVerificationScope() {
+  const repoRoot = path.join(__dirname, '..');
+  const git = (args) => execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8' }).trim();
+  let branch, commit, dirty;
+  try {
+    branch = git(['rev-parse', '--abbrev-ref', 'HEAD']);
+    commit = git(['rev-parse', 'HEAD']);
+    dirty = git(['status', '--porcelain']).length > 0;
+  } catch (err) {
+    branch = commit = '(unknown -- git command failed: ' + err.message + ')';
+    dirty = null;
+  }
+  console.log('[drawer-verify] ══════════════════════════════════════════════════════════');
+  console.log(`[drawer-verify] VERIFICATION SCOPE — this run only proves the button/drawer`);
+  console.log(`[drawer-verify] exist and work on THIS checkout: branch=${branch} commit=${commit}${dirty ? ' (dirty working tree)' : ''}`);
+  console.log(`[drawer-verify] repoRoot=${repoRoot}`);
+  console.log('[drawer-verify] A PASS here does NOT imply any other checkout (main, a');
+  console.log('[drawer-verify] different worktree, an installed/packaged build) contains this');
+  console.log('[drawer-verify] code. Confirm the checkout under test is the one that will');
+  console.log('[drawer-verify] actually be launched before treating this as production-ready.');
+  console.log('[drawer-verify] ══════════════════════════════════════════════════════════');
+  return { branch, commit, dirty };
+}
+
 async function main() {
+  const verificationScope = _logVerificationScope();
   require('./askAutoIngest').registerIpcHandlers();
 
   const win = new BrowserWindow({
@@ -229,7 +265,7 @@ async function main() {
   const failed = results.filter((r) => !r.pass);
   console.log(`\n[drawer-verify] ${results.length - failed.length}/${results.length} checks passed. Screenshots in ${SCREENSHOT_DIR}`);
   if (failed.length) console.log('[drawer-verify] FAILED:', JSON.stringify(failed, null, 2));
-  fs.writeFileSync(path.join(SCREENSHOT_DIR, 'results.json'), JSON.stringify({ results, perf, widthResults }, null, 2));
+  fs.writeFileSync(path.join(SCREENSHOT_DIR, 'results.json'), JSON.stringify({ verificationScope, results, perf, widthResults }, null, 2));
   app.exit(failed.length ? 1 : 0);
 }
 

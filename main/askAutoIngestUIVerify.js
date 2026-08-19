@@ -22,6 +22,7 @@
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const { execFileSync } = require('child_process');
 
 const FIXTURE_USER_DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-c4-ui-verify-userdata-'));
 const SCREENSHOT_DIR = process.argv[2] || path.join(os.tmpdir(), 'ai-c4-ui-screenshots');
@@ -34,6 +35,36 @@ const results = [];
 function record(name, pass, detail) {
   results.push({ name, pass, detail: detail || null });
   console.log(`[ui-verify] ${pass ? 'PASS' : 'FAIL'} — ${name}${detail ? ' :: ' + JSON.stringify(detail) : ''}`);
+}
+
+// Incident-driven addition (Ask AutoIngest — Missing Entry-Point Acceptance
+// Failure): this harness's "entry point (askAutoIngestBtn) is visible"
+// check is only ever true for the git checkout it runs in. It cannot detect
+// that a different checkout (e.g. `main`, which had never merged this
+// feature branch) lacks the code entirely. Logged loudly, first, so a PASS
+// here can never again be silently read as a claim about any checkout other
+// than the one actually under test.
+function _logVerificationScope() {
+  const repoRoot = path.join(__dirname, '..');
+  const git = (args) => execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8' }).trim();
+  let branch, commit, dirty;
+  try {
+    branch = git(['rev-parse', '--abbrev-ref', 'HEAD']);
+    commit = git(['rev-parse', 'HEAD']);
+    dirty = git(['status', '--porcelain']).length > 0;
+  } catch (err) {
+    branch = commit = '(unknown -- git command failed: ' + err.message + ')';
+    dirty = null;
+  }
+  console.log('[ui-verify] ══════════════════════════════════════════════════════════');
+  console.log(`[ui-verify] VERIFICATION SCOPE — this run only proves the app on THIS`);
+  console.log(`[ui-verify] checkout: branch=${branch} commit=${commit}${dirty ? ' (dirty working tree)' : ''}`);
+  console.log(`[ui-verify] repoRoot=${repoRoot}`);
+  console.log('[ui-verify] A PASS here does NOT imply any other checkout (main, a');
+  console.log('[ui-verify] different worktree, an installed/packaged build) contains this');
+  console.log('[ui-verify] code.');
+  console.log('[ui-verify] ══════════════════════════════════════════════════════════');
+  return { branch, commit, dirty };
 }
 
 async function setUpRealModel() {
@@ -51,6 +82,7 @@ async function setUpRealModel() {
 }
 
 async function main() {
+  const verificationScope = _logVerificationScope();
   const hasRealModel = await setUpRealModel();
 
   // Register ONLY the Ask AutoIngest IPC handlers (mirroring what main.js
@@ -237,7 +269,7 @@ async function main() {
   const failed = results.filter((r) => !r.pass);
   console.log(`\n[ui-verify] ${results.length - failed.length}/${results.length} checks passed. Screenshots in ${SCREENSHOT_DIR}`);
   if (failed.length) console.log('[ui-verify] FAILED:', JSON.stringify(failed, null, 2));
-  fs.writeFileSync(path.join(SCREENSHOT_DIR, 'results.json'), JSON.stringify({ results, realModelResults }, null, 2));
+  fs.writeFileSync(path.join(SCREENSHOT_DIR, 'results.json'), JSON.stringify({ verificationScope, results, realModelResults }, null, 2));
   app.exit(failed.length ? 1 : 0);
 }
 
