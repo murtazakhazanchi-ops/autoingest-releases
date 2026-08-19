@@ -94,6 +94,10 @@ function buildKnowledgeIndex(parsed, { featureIndex, dashboard }) {
       // that review's Phase 3 finding). knowledgeEngine.js's
       // sourcesForRecord() must cite this field, never sourceFiles[0].
       canonicalDocument: f.canonical_document,
+      // Verbatim "## Current Behavior" canonical section text, evidence-only
+      // (never included in searchTerms above -- see featureIndex.js's own
+      // comment on current_behavior for the retrieval-isolation guarantee).
+      currentBehavior: f.current_behavior,
       sourceFiles,
       sourceAuthority: 'canonical', // docs/product/features/ tier — see scripts/product-docs/README.md Authority model
       lastUpdated: {

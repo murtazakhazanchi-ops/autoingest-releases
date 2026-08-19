@@ -80,6 +80,12 @@ function buildFeatureIndex(parsed, sourceIndex) {
       status: feat.header['Status'] || 'Evidence pending',
       maturity: feat.header['Maturity'] || 'Evidence pending',
       summary: (feat.summary || '').trim() || 'Evidence pending — not yet documented as fact.',
+      // Verbatim "## Current Behavior" section text (already parsed at the
+      // parseFeatureFile() layer via md.extractSection() -- see
+      // parseProductDocs.js -- simply not previously forwarded here).
+      // Evidence-only: intentionally excluded from search_keywords below,
+      // so this addition cannot change retrieval/ranking.
+      current_behavior: (feat.currentBehavior || '').trim() || null,
       canonical_document: feat.filePath,
       roadmap_ids: extractIds(String(feat.header['Related roadmap milestone'] || ''), 'roadmap'),
       parent_feature: extractIds(String(feat.header['Parent feature'] || ''), 'feature'),
