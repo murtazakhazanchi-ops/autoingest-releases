@@ -6007,10 +6007,41 @@
     width: 0%; transition: width 0.2s ease;
   }
 
-  /* ── ASK AUTOINGEST ──────────────────────────────────────────────────────── */
-  #askAutoIngestOverlay .emm-box {
-    width: min(760px, calc(100vw - 48px));
-    max-height: calc(100vh - 90px);
+  /* ── ASK AUTOINGEST — right-side overlay drawer (Part D/E) ──────────────────
+     Reuses .emm-overlay/.emm-box's base transition/backdrop machinery (glass
+     depth, border, transform-transition) but overrides positioning, sizing,
+     scrim, and motion so this surface reads as an attached assistant panel
+     rather than a centered blocking dialog. All overrides are scoped to
+     #askAutoIngestOverlay / #askAutoIngestBox so every other .emm-* modal in
+     the app is untouched. */
+  #askAutoIngestOverlay {
+    background: transparent;               /* no scrim — background stays fully readable */
+    justify-content: flex-end;             /* anchor to the right edge */
+    align-items: flex-start;               /* anchor to the top; box supplies its own height */
+    pointer-events: none;                  /* let clicks reach the AutoIngest workspace behind it */
+    visibility: hidden;
+    transition: opacity 0.18s ease, visibility 0s linear 0.18s;
+  }
+  #askAutoIngestOverlay.open {
+    visibility: visible;
+    transition: opacity 0.18s ease, visibility 0s linear 0s;
+  }
+  #askAutoIngestBox {
+    pointer-events: auto;                  /* the drawer itself stays fully interactive */
+    width: min(440px, 92vw);
+    max-width: 100vw;
+    height: calc(100vh - var(--aa-statusbar-h, 34px));   /* stop above the status bar — Ask/Help/Settings stay reachable */
+    max-height: calc(100vh - var(--aa-statusbar-h, 34px));
+    border-radius: 14px 0 0 14px;          /* square on the two edges flush with the window; rounded on the inner edge */
+    box-shadow: -8px 0 24px rgba(0,0,0,0.22);
+    transform: translateX(100%);
+    transition: transform 0.22s cubic-bezier(0.16,1,0.3,1);
+  }
+  #askAutoIngestOverlay.open #askAutoIngestBox {
+    transform: translateX(0);
+  }
+  @media (max-width: 720px) {
+    #askAutoIngestBox { width: min(440px, 96vw); }
   }
   .aa-header-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
   .aa-title { font-size: 1rem; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
@@ -6117,7 +6148,7 @@
   .aa-tech-source-row { font-size: 0.74rem; color: var(--subtext); display: flex; gap: 6px; }
   .aa-tech-source-id { color: var(--text-muted); font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.68rem; }
 
-  [data-theme="light"] #askAutoIngestBox { box-shadow: 0 12px 40px rgba(0,0,0,0.12); }
+  [data-theme="light"] #askAutoIngestBox { box-shadow: -8px 0 24px rgba(0,0,0,0.10); }
 
   /* ══════════════════════════════════════════════════════════════════════════
      GLASS DEPTH SYSTEM — purely visual, no layout or logic changes
@@ -8229,7 +8260,7 @@
   </div>
 
   <!-- Ask AutoIngest -->
-  <div id="askAutoIngestOverlay" class="emm-overlay" role="dialog" aria-modal="true" aria-labelledby="aaTitle">
+  <div id="askAutoIngestOverlay" class="emm-overlay" role="complementary" aria-labelledby="aaTitle">
     <div class="emm-box" id="askAutoIngestBox">
       <div class="emm-header">
         <div class="aa-header-text">

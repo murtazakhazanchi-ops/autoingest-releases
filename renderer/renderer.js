@@ -16938,6 +16938,7 @@ const _transferMonitor = (() => {
 // ════════════════════════════════════════════════════════════════
 (function () {
   const overlay   = document.getElementById('askAutoIngestOverlay');
+  const box       = document.getElementById('askAutoIngestBox');
   const closeBtn  = document.getElementById('askAutoIngestClose');
   const input     = document.getElementById('aaQuestionInput');
   const askBtn    = document.getElementById('aaAskBtn');
@@ -16962,6 +16963,16 @@ const _transferMonitor = (() => {
 
   if (!overlay || !window.api?.askQuestion) return; // defensive -- preload API not present (e.g. an older build)
 
+  // The drawer height is derived from the real, rendered status-bar height
+  // (Part D.2/E) rather than a guessed constant, so the drawer never covers
+  // the Ask/Help/Settings buttons or the status bar underneath it.
+  function _syncStatusBarHeight() {
+    const sb = document.getElementById('statusBar');
+    if (sb) document.documentElement.style.setProperty('--aa-statusbar-h', sb.offsetHeight + 'px');
+  }
+  _syncStatusBarHeight();
+  window.addEventListener('resize', _syncStatusBarHeight);
+
   let _aaBusy = false;
 
   function _resetPanels() {
@@ -16976,29 +16987,46 @@ const _transferMonitor = (() => {
   }
   input?.addEventListener('input', _autoResize);
 
+  let _inputHadFocusBeforeBusy = false;
   function _setBusy(busy) {
     _aaBusy = busy;
     askBtn.disabled = busy;
     cancelBtn.hidden = !busy;
+    // Disabling a focused textarea forces a blur to document.body -- restore
+    // focus to it once the query settles so the operator can immediately
+    // type a follow-up, and so focus stays inside the drawer rather than
+    // silently escaping to the page (Part J).
+    if (busy) _inputHadFocusBeforeBusy = document.activeElement === input;
     input.disabled = busy;
+    if (!busy && _inputHadFocusBeforeBusy) { input.focus(); _inputHadFocusBeforeBusy = false; }
   }
 
   window._aaOpen = function _aaOpen(opts) {
+    // Reopening must not reset a useful active answer (Part D.10/I) --
+    // whatever was visible when the drawer was last closed (an answer, an
+    // error, or a still-in-flight loading state) stays exactly as it was.
     overlay.classList.add('open');
-    _resetPanels();
-    loading.hidden = true;
     if (opts && typeof opts.prefill === 'string') input.value = opts.prefill;
     requestAnimationFrame(() => input.focus());
   };
 
   window._aaClose = function _aaClose() {
+    const focusWasInside = box?.contains(document.activeElement);
     overlay.classList.remove('open');
     if (_aaBusy) { window.api.cancelAskQuery?.().catch(() => {}); _setBusy(false); }
+    // Return focus to the entry point only if focus was actually inside the
+    // drawer -- if the operator had already moved focus into the AutoIngest
+    // workspace behind it, leave it there (Part J.7).
+    if (focusWasInside) document.getElementById('askAutoIngestBtn')?.focus();
   };
 
   document.getElementById('askAutoIngestBtn')?.addEventListener('click', () => window._aaOpen());
   closeBtn?.addEventListener('click', () => window._aaClose());
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) window._aaClose(); });
+  // No outside-click dismissal (Part D.9): this is an attached assistant
+  // drawer, not a modal dialog -- interacting with the AutoIngest workspace
+  // behind it must not close it. (The overlay wrapper also has
+  // pointer-events: none, so background clicks never reach this element at
+  // all -- see the drawer CSS.)
 
   function _statusLabel(status) {
     // Fallback map mirrors main/askAutoIngestPresentation.js's
