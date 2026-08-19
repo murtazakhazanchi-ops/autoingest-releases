@@ -24,6 +24,51 @@
 //       | {type:'infer-error', requestId, message}
 //   in  {type:'unload'}
 //   out {type:'unloaded'}
+//
+// Reliability checkpoint (post-C4) -- forensic investigation into a
+// cancel-then-unload crash/hang found during C4's real-Electron
+// verification. Two things were tried and empirically evaluated with a
+// real reproduction matrix (real utilityProcess, real Phi-4-mini model):
+//
+// 1. Wiring node-llama-cpp's already-public `signal`/`stopOnAbortSignal`
+//    options on session.prompt() to actually interrupt an abandoned
+//    generation when cancelled, instead of leaving it running unowned in
+//    the background (which is what this integration does today -- see
+//    runtime.js's own onAbort comment). This was IMPLEMENTED, TESTED, AND
+//    REVERTED: it made the underlying native crash MORE frequent (from a
+//    ~40% reproduction rate at short cancel-delays to effectively 100%),
+//    and changed its signature from SIGABRT (ggml_uncaught_exception,
+//    inside model.dispose()) to SIGBUS/EXC_BAD_ACCESS inside
+//    llama_context::synchronize() -> ~llama_context() -> AddonContext::
+//    Dispose(), i.e. INSIDE context.dispose() itself, immediately after an
+//    actively-interrupted generation. This is assessed as a genuine
+//    upstream synchronization gap between node-llama-cpp's abort-signal
+//    early-stop and native (Metal) context teardown, not a bug in this
+//    integration's own message protocol or queueing -- see this
+//    checkpoint's own report for the full before/after evidence. No safe
+//    local workaround was found that does not amount to an arbitrary
+//    delay, which is explicitly not an acceptable fix. Per this
+//    checkpoint's own stop conditions, that half was reverted rather than
+//    shipped; this file therefore still does NOT actually interrupt an
+//    abandoned generation. A future checkpoint revisiting this should
+//    check for an updated node-llama-cpp release before retrying.
+//
+// 2. context.dispose() is now called from a try/finally around the whole
+//    grammar/context/session/prompt block (KEPT -- this part is safe and
+//    independent of (1) above): previously it only ran on the success
+//    path, so ANY exception -- a real model/grammar error, not just a
+//    cancellation -- silently leaked the context and, with it, its
+//    permanent hold on model.dispose()'s own internal DisposeGuard (an
+//    upstream, already-correct reference-counted async lock; see
+//    node_modules/node-llama-cpp/dist/utils/DisposeGuard.js), which is
+//    exactly what the reproduction matrix's ~20s HANGS traced back to.
+//    This half is unaffected by (1)'s revert: with no signal ever passed
+//    to session.prompt(), it can only ever reject via a genuine model/
+//    native error (same as before this checkpoint) or resolve normally --
+//    in both cases the underlying native decode loop has already
+//    quiesced through its OWN try/finally (LlamaContext.js's
+//    createPreventDisposalHandle()/dispose() pairing around each decode
+//    batch) before control reaches here, so disposing here is safe.
 
 let llama = null;
 let model = null;
@@ -53,9 +98,10 @@ async function handleInfer({ requestId, system, user, schema, maxTokens = 200, r
     process.parentPort.postMessage({ type: 'infer-error', requestId, message: 'model not loaded' });
     return;
   }
+  let context = null;
   try {
     const grammar = await llama.createGrammarForJsonSchema(schema);
-    const context = await model.createContext({ sequences: 1 });
+    context = await model.createContext({ sequences: 1 });
     const session = new LlamaChatSession({ contextSequence: context.getSequence(), systemPrompt: system });
 
     let firstTokenMs = null;
@@ -71,7 +117,6 @@ async function handleInfer({ requestId, system, user, schema, maxTokens = 200, r
       },
     });
     const totalMs = performance.now() - t0;
-    await context.dispose();
 
     let parsed = null;
     let parseError = null;
@@ -95,6 +140,13 @@ async function handleInfer({ requestId, system, user, schema, maxTokens = 200, r
     });
   } catch (err) {
     process.parentPort.postMessage({ type: 'infer-error', requestId, message: err && err.message ? err.message : String(err) });
+  } finally {
+    // ALWAYS runs, not only the success path (reliability checkpoint fix,
+    // see this file's header comment part 2) -- releases this context's
+    // hold on model.dispose()'s DisposeGuard promptly even after a genuine
+    // model/native error, closing the resource leak that otherwise hangs
+    // any later unload() forever.
+    if (context) await context.dispose().catch(() => {});
   }
 }
 

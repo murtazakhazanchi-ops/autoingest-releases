@@ -135,15 +135,35 @@ async function unload() {
     _loadedModelPath = null;
     return;
   }
+  const child = _child;
   await new Promise((resolve) => {
     const onMessage = (message) => {
       if (message && message.type === 'unloaded') {
-        _child.off('message', onMessage);
+        child.off('message', onMessage);
+        child.off('exit', onExit);
         resolve();
       }
     };
-    _child.on('message', onMessage);
-    _child.postMessage({ type: 'unload' });
+    // Reliability checkpoint (post-C4): before this handler existed, a
+    // child that died (crashed or was killed) while unload() awaited the
+    // 'unloaded' acknowledgement left this promise pending FOREVER -- the
+    // matrix's own stress probe measured this directly (20s+ hangs, 100%
+    // reproducible below ~900ms after a cancel, before the cancel-signal
+    // fix above). _spawn()'s own 'exit' listener already resets global
+    // state (_reset()) for this same child; this listener only needs to
+    // settle THIS specific pending unload() promise. Resolves rather than
+    // rejects -- a dead child means the model is unloaded by definition
+    // (matching _reset()'s own NOT_LOADED-on-exit philosophy), and a
+    // caller awaiting unload() only to see an unrelated crash surfaced as
+    // an error would be a confusing, unnecessary failure mode.
+    const onExit = () => {
+      child.off('message', onMessage);
+      child.off('exit', onExit);
+      resolve();
+    };
+    child.on('message', onMessage);
+    child.on('exit', onExit);
+    child.postMessage({ type: 'unload' });
   });
   _loadState = 'NOT_LOADED';
   _loadedModelPath = null;
@@ -192,11 +212,24 @@ function infer({ system, user, schema, maxTokens, repeatPenalty, modelPath, time
       const onAbort = () => {
         cleanup();
         reject(Object.assign(new Error('request cancelled'), { cancelled: true }));
-        // The child keeps generating for this now-abandoned request; its
-        // eventual 'result'/'infer-error' message will find no entry in
-        // _pending (already deleted above) and be safely ignored. A
+        // Reliability checkpoint (post-C4) investigated actually telling
+        // the child to stop generating here (a real 'cancel' message,
+        // using node-llama-cpp's own signal/stopOnAbortSignal support) --
+        // see runtimeWorker.js's header comment for the full evidence.
+        // That change was reverted: it turned an intermittent native
+        // crash into an almost-100%-reproducible one, with a DIFFERENT
+        // signature (SIGBUS inside context.dispose() itself, immediately
+        // after an actively-interrupted generation) that traces to
+        // node-llama-cpp's own native (Metal) context teardown, not to
+        // this file. The child therefore still keeps generating for this
+        // now-abandoned request, unchanged from before this checkpoint;
+        // its eventual 'result'/'infer-error' message will find no entry
+        // in _pending (already deleted above) and be safely ignored. A
         // subsequent request is not blocked by this -- the queue only
-        // waits for THIS promise to settle, which it just did.
+        // waits for THIS promise to settle, which it just did. What DID
+        // change this checkpoint is unload() below, which no longer hangs
+        // forever if the child crashes (for this or any other reason)
+        // while it's waiting for the model to actually unload.
       };
       if (signal) signal.addEventListener('abort', onAbort, { once: true });
       _pending.set(requestId, { resolve, reject, timer });

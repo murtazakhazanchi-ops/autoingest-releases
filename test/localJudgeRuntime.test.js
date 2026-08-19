@@ -251,6 +251,50 @@ async function main() {
     },
   );
 
+  // Reliability checkpoint (post-C4): a real reproduction matrix against
+  // the actual utilityProcess + real Phi model proved that if the child
+  // process dies (crashes, or is otherwise gone) WHILE unload() is
+  // awaiting the 'unloaded' acknowledgement, unload() hung forever --
+  // measured directly at 20+ seconds before this fix, with no ceiling of
+  // its own. This is what the checkpoint's own fix (an 'exit' listener
+  // inside unload(), alongside the pre-existing 'message' listener)
+  // targets; the test below reproduces the exact shape model-free, with a
+  // real timeout guard so a regression back to hanging fails loudly here
+  // instead of only ever surfacing as a real-model timeout somewhere else.
+  await withFreshRuntime(
+    () => (msg, child) => {
+      if (msg.type === 'load') setTimeout(() => child.emit('message', { type: 'loaded', loadMs: 1, gpu: 'metal' }), 1);
+      else if (msg.type === 'infer') setTimeout(() => child.emit('message', { type: 'result', requestId: msg.requestId, raw: '{}', parsed: { judgment: 'SUPPORTS', evidenceHandles: ['S1'], confidence: 'HIGH' }, parseError: null, timing: {} }), 1);
+      // Deliberately NEVER responds to 'unload' with {type:'unloaded'} --
+      // instead simulates the child dying mid-unload, exactly as the real
+      // reproduction matrix observed (a native crash during model.dispose()).
+      else if (msg.type === 'unload') setTimeout(() => child.emit('exit', 0), 5);
+    },
+    async () => {
+      await t("unload(): a child that dies (crashes) while unload() is waiting for the 'unloaded' ack settles the promise instead of hanging forever", async () => {
+        await runtime.ensureLoaded('/fake/model.gguf');
+        const t0 = Date.now();
+        await Promise.race([
+          runtime.unload(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('unload() did not settle within 2000ms -- regression to the hang this checkpoint fixed')), 2000)),
+        ]);
+        const elapsedMs = Date.now() - t0;
+        assert.ok(elapsedMs < 2000, `unload() took ${elapsedMs}ms -- expected near-instant settlement on child death`);
+        assert.equal(runtime.getLoadState().loadState, 'NOT_LOADED');
+      });
+
+      await t('unload(): a normal child that DOES respond with \'unloaded\' still resolves correctly (the exit-listener addition does not change the success path)', async () => {
+        runtime._setSpawnFnForTesting(() => makeFakeChild((msg, child) => {
+          if (msg.type === 'load') setTimeout(() => child.emit('message', { type: 'loaded', loadMs: 1, gpu: 'metal' }), 1);
+          else if (msg.type === 'unload') setTimeout(() => child.emit('message', { type: 'unloaded' }), 1);
+        }));
+        await runtime.ensureLoaded('/fake/model.gguf');
+        await runtime.unload();
+        assert.equal(runtime.getLoadState().loadState, 'NOT_LOADED');
+      });
+    },
+  );
+
   console.log(`localJudgeRuntime: ${passed} passed`);
 }
 
