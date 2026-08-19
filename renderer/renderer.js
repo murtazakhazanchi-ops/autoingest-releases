@@ -69,6 +69,7 @@ document.getElementById('settingsBtn')?.addEventListener('click', () => {
   document.getElementById('settingsModal').classList.add('visible');
   _rtLoadSettings();
   _loadUpdateChannelSetting();
+  window._aaLoadModelStatus?.();
 });
 
 // Settings modal close
@@ -9880,6 +9881,7 @@ function _isAnyBlockingOverlayOpen() {
   if (document.getElementById('settingsModal')?.classList.contains('visible')) return true;
   if (document.getElementById('onboardingOverlay')?.classList.contains('visible')) return true;
   if (document.getElementById('helpOverlay')?.classList.contains('visible')) return true;
+  if (document.getElementById('askAutoIngestOverlay')?.classList.contains('open')) return true;
   if (!document.getElementById('sourceCleanupOverlay')?.classList.contains('hidden')) return true;
   if (typeof EventMgmt !== 'undefined' && EventMgmt.isOpen?.()) return true;
   return false;
@@ -12725,6 +12727,8 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     const sm = document.getElementById('settingsModal');
     if (sm?.classList.contains('visible')) { sm.classList.remove('visible'); return; }
+    const aa = document.getElementById('askAutoIngestOverlay');
+    if (aa?.classList.contains('open') && typeof window._aaClose === 'function') { window._aaClose(); return; }
   }
 
   // Never intercept shortcuts when the user is typing in a form field.
@@ -16915,5 +16919,332 @@ const _transferMonitor = (() => {
                    : 'Release failed. Try running diagnostics again.';
       window.alert(reason);
     }
+  });
+})();
+
+// ════════════════════════════════════════════════════════════════
+// ASK AUTOINGEST (Phase C4) — one question -> one answer, no chat
+// transcript, no conversational memory. Renderer never imports
+// product-docs Node modules or touches the model runtime directly --
+// every real decision happens in main/askAutoIngest.js via the
+// preload-exposed window.api.ask* IPC calls.
+//
+// Future context-aware seam (Part U, not implemented in C4): a later
+// checkpoint can call window._aaOpen({ screen, contextKey }) to open this
+// same surface pre-scoped to a screen -- the parameter is accepted and
+// currently ignored beyond an optional prefill, so no redesign is needed
+// when contextual guidance is added. Nothing here sends app/screen state
+// to the model; C4 has no context-capture of any kind.
+// ════════════════════════════════════════════════════════════════
+(function () {
+  const overlay   = document.getElementById('askAutoIngestOverlay');
+  const closeBtn  = document.getElementById('askAutoIngestClose');
+  const input     = document.getElementById('aaQuestionInput');
+  const askBtn    = document.getElementById('aaAskBtn');
+  const cancelBtn = document.getElementById('aaCancelBtn');
+  const examples  = document.getElementById('aaExamples');
+  const loading   = document.getElementById('aaLoadingState');
+  const loadingText = document.getElementById('aaLoadingText');
+  const errorState = document.getElementById('aaErrorState');
+  const answerArea = document.getElementById('aaAnswerArea');
+  const statusBadge = document.getElementById('aaStatusBadge');
+  const directAnswerEl = document.getElementById('aaDirectAnswer');
+  const stepsSection = document.getElementById('aaStepsSection');
+  const stepsList = document.getElementById('aaStepsList');
+  const guidanceSection = document.getElementById('aaGuidanceSection');
+  const guidanceText = document.getElementById('aaGuidanceText');
+  const limitationsSection = document.getElementById('aaLimitationsSection');
+  const limitationsList = document.getElementById('aaLimitationsList');
+  const relatedSection = document.getElementById('aaRelatedSection');
+  const relatedList = document.getElementById('aaRelatedList');
+  const technicalDetails = document.getElementById('aaTechnicalDetails');
+  const technicalBody = document.getElementById('aaTechnicalBody');
+
+  if (!overlay || !window.api?.askQuestion) return; // defensive -- preload API not present (e.g. an older build)
+
+  let _aaBusy = false;
+
+  function _resetPanels() {
+    errorState.hidden = true; errorState.textContent = '';
+    answerArea.hidden = true;
+    technicalDetails.open = false;
+  }
+
+  function _autoResize() {
+    input.style.height = 'auto';
+    input.style.height = Math.min(140, input.scrollHeight) + 'px';
+  }
+  input?.addEventListener('input', _autoResize);
+
+  function _setBusy(busy) {
+    _aaBusy = busy;
+    askBtn.disabled = busy;
+    cancelBtn.hidden = !busy;
+    input.disabled = busy;
+  }
+
+  window._aaOpen = function _aaOpen(opts) {
+    overlay.classList.add('open');
+    _resetPanels();
+    loading.hidden = true;
+    if (opts && typeof opts.prefill === 'string') input.value = opts.prefill;
+    requestAnimationFrame(() => input.focus());
+  };
+
+  window._aaClose = function _aaClose() {
+    overlay.classList.remove('open');
+    if (_aaBusy) { window.api.cancelAskQuery?.().catch(() => {}); _setBusy(false); }
+  };
+
+  document.getElementById('askAutoIngestBtn')?.addEventListener('click', () => window._aaOpen());
+  closeBtn?.addEventListener('click', () => window._aaClose());
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) window._aaClose(); });
+
+  function _statusLabel(status) {
+    // Fallback map mirrors main/askAutoIngestPresentation.js's
+    // QUERY_STATUS_LABELS -- the renderer never requires that Node module,
+    // so this small, deliberately duplicated label map exists only as a
+    // defensive display fallback if a status code is ever missing a label
+    // from the main-process response (which already includes `status.label`
+    // in the normal case -- this function is not the source of truth).
+    const known = { AVAILABLE: 'Available', PARTIALLY_AVAILABLE: 'Partially available', PLANNED: 'Planned', NOT_SUPPORTED: 'Not supported', UNKNOWN: 'Uncertain' };
+    return known[status] || status;
+  }
+
+  function _renderAnswer(shaped) {
+    // A null status code (e.g. a ROADMAP-classified question, which has no
+    // available/planned/uncertain concept at all) hides the badge entirely
+    // rather than ever showing a raw, unrecognized enum string (Part F).
+    if (shaped.status && shaped.status.code) {
+      statusBadge.hidden = false;
+      statusBadge.className = 'aa-status-badge aa-status-badge--' + shaped.status.code;
+      statusBadge.textContent = shaped.status.label || _statusLabel(shaped.status.code);
+    } else {
+      statusBadge.hidden = true;
+    }
+
+    directAnswerEl.textContent = shaped.directAnswer || '';
+
+    if (shaped.steps && shaped.steps.length) {
+      stepsList.innerHTML = '';
+      for (const s of shaped.steps) {
+        const li = document.createElement('li');
+        li.textContent = s;
+        stepsList.appendChild(li);
+      }
+      stepsSection.hidden = false;
+    } else {
+      stepsSection.hidden = true;
+    }
+
+    if (shaped.guidance) {
+      guidanceText.textContent = shaped.guidance;
+      guidanceSection.hidden = false;
+    } else {
+      guidanceSection.hidden = true;
+    }
+
+    if (shaped.limitations && shaped.limitations.length) {
+      limitationsList.innerHTML = '';
+      for (const l of shaped.limitations) {
+        const li = document.createElement('li');
+        li.textContent = l;
+        limitationsList.appendChild(li);
+      }
+      limitationsSection.hidden = false;
+    } else {
+      limitationsSection.hidden = true;
+    }
+
+    if (shaped.relatedCapabilities && shaped.relatedCapabilities.length) {
+      relatedList.innerHTML = '';
+      for (const rc of shaped.relatedCapabilities) {
+        const chip = document.createElement('span');
+        chip.className = 'aa-related-chip';
+        chip.textContent = rc.title;
+        relatedList.appendChild(chip);
+      }
+      relatedSection.hidden = false;
+    } else {
+      relatedSection.hidden = true;
+    }
+
+    technicalBody.innerHTML = '';
+    const td = shaped.technicalDetails || {};
+    if (td.sources && td.sources.length) {
+      const label = document.createElement('div');
+      label.className = 'aa-tech-label';
+      label.textContent = 'Sources';
+      technicalBody.appendChild(label);
+      for (const s of td.sources) {
+        const row = document.createElement('div');
+        row.className = 'aa-tech-source-row';
+        const idSpan = document.createElement('span');
+        idSpan.className = 'aa-tech-source-id';
+        idSpan.textContent = s.id;
+        row.appendChild(idSpan);
+        row.appendChild(document.createTextNode(s.title || s.id));
+        technicalBody.appendChild(row);
+      }
+    }
+    if (td.authority) {
+      const a = td.authority;
+      const rows = [
+        ['Authority required', String(a.required)],
+        ['Deterministic status', a.deterministicCapabilityStatus || '—'],
+        ['Final status', a.finalCapabilityStatus || '—'],
+        ['Authority source', a.authoritySource || '—'],
+        ['Semantic judgment', a.judgment || '—'],
+        ['Confidence', a.confidence || '—'],
+        ['Model state', a.modelState || '—'],
+      ];
+      for (const [k, v] of rows) {
+        const row = document.createElement('div');
+        row.className = 'aa-tech-row';
+        const lab = document.createElement('div'); lab.className = 'aa-tech-label'; lab.textContent = k;
+        const val = document.createElement('div'); val.className = 'aa-tech-value'; val.textContent = v;
+        row.appendChild(lab); row.appendChild(val);
+        technicalBody.appendChild(row);
+      }
+    }
+
+    answerArea.hidden = false;
+  }
+
+  async function _submitQuestion(question) {
+    const q = (question || '').trim();
+    if (!q || _aaBusy) return;
+    _resetPanels();
+    _setBusy(true);
+    loading.hidden = false;
+    loadingText.textContent = 'Checking AutoIngest documentation…';
+    try {
+      const shaped = await window.api.askQuestion(q);
+      loading.hidden = true;
+      _renderAnswer(shaped);
+    } catch (err) {
+      loading.hidden = true;
+      if (err && /cancel/i.test(err.message || '')) {
+        // Cancelled -- no error state, just return to editable.
+      } else {
+        errorState.hidden = false;
+        errorState.textContent = 'Ask AutoIngest could not complete this request.';
+      }
+    } finally {
+      _setBusy(false);
+    }
+  }
+
+  askBtn?.addEventListener('click', () => _submitQuestion(input.value));
+  cancelBtn?.addEventListener('click', () => {
+    window.api.cancelAskQuery?.().catch(() => {});
+    loading.hidden = true;
+    _setBusy(false);
+  });
+
+  input?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      _submitQuestion(input.value);
+    }
+  });
+
+  examples?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.aa-example');
+    if (!btn) return;
+    input.value = btn.dataset.question || '';
+    _autoResize();
+    _submitQuestion(input.value);
+  });
+
+  // ── Settings → Local AI section ──────────────────────────────────────────
+  const modelDot = document.getElementById('aaModelStatusDot');
+  const modelText = document.getElementById('aaModelStatusText');
+  const modelInfoLine = document.getElementById('aaModelInfoLine');
+  const downloadBtn = document.getElementById('aaDownloadModelBtn');
+  const cancelDownloadBtn = document.getElementById('aaCancelDownloadBtn');
+  const retryBtn = document.getElementById('aaRetryModelBtn');
+  const removeBtn = document.getElementById('aaRemoveModelBtn');
+  const progressWrap = document.getElementById('aaModelProgressWrap');
+  const progressFill = document.getElementById('aaModelProgressFill');
+  const progressText = document.getElementById('aaModelProgressText');
+
+  const MODEL_DOT_CLASS = {
+    READY: 'settings-rt-dot--connected',
+    LOADED: 'settings-rt-dot--connected',
+    DOWNLOADING: 'settings-rt-dot--connecting',
+    VERIFYING: 'settings-rt-dot--connecting',
+    LOADING: 'settings-rt-dot--connecting',
+    ERROR: 'settings-rt-dot--offline',
+  };
+
+  function _renderModelStatus(s) {
+    modelDot.className = 'settings-rt-dot ' + (MODEL_DOT_CLASS[s.status] || '');
+    modelText.textContent = s.label || s.status;
+
+    [downloadBtn, cancelDownloadBtn, retryBtn, removeBtn].forEach((b) => { if (b) b.hidden = true; });
+    progressWrap.hidden = true;
+
+    if (s.status === 'NOT_DOWNLOADED') {
+      downloadBtn.hidden = false;
+      downloadBtn.disabled = !s.downloadSourceApproved;
+      downloadBtn.title = s.downloadSourceApproved ? '' : 'No approved model source is configured yet.';
+    } else if (s.status === 'DOWNLOADING') {
+      cancelDownloadBtn.hidden = false;
+    } else if (s.status === 'VERIFYING' || s.status === 'LOADING') {
+      // no duplicate actions while in progress
+    } else if (s.status === 'READY' || s.status === 'LOADED') {
+      removeBtn.hidden = false;
+    } else if (s.status === 'ERROR') {
+      retryBtn.hidden = false;
+      removeBtn.hidden = false;
+    }
+
+    modelInfoLine.textContent = s.modelId ? `${s.modelFilename || s.modelId} · ${s.expectedSizeBytes ? Math.round(s.expectedSizeBytes / 1e6) + ' MB' : ''}` : '';
+  }
+
+  window._aaLoadModelStatus = async function _aaLoadModelStatus() {
+    try {
+      const s = await window.api.getAskModelStatus();
+      _renderModelStatus(s);
+    } catch {
+      modelText.textContent = 'Local AI model status unavailable.';
+    }
+  };
+
+  downloadBtn?.addEventListener('click', async () => {
+    downloadBtn.disabled = true;
+    progressWrap.hidden = false;
+    progressText.textContent = 'Starting download…';
+    try {
+      const s = await window.api.downloadAskModel();
+      _renderModelStatus(s);
+    } catch (err) {
+      modelText.textContent = 'Download failed.';
+      progressWrap.hidden = true;
+    }
+  });
+  cancelDownloadBtn?.addEventListener('click', async () => {
+    await window.api.cancelAskModelDownload?.().catch(() => {});
+    window._aaLoadModelStatus();
+  });
+  retryBtn?.addEventListener('click', async () => {
+    retryBtn.disabled = true;
+    try { _renderModelStatus(await window.api.retryAskModelVerification()); }
+    finally { retryBtn.disabled = false; }
+  });
+  removeBtn?.addEventListener('click', async () => {
+    removeBtn.disabled = true;
+    try { _renderModelStatus(await window.api.removeAskModel()); }
+    finally { removeBtn.disabled = false; }
+  });
+
+  window.api.onAskModelDownloadProgress?.((progress) => {
+    if (progressWrap.hidden) return;
+    const pct = progress && progress.expectedBytes ? Math.round((progress.bytesDownloaded / progress.expectedBytes) * 100) : null;
+    progressFill.style.width = (pct != null ? pct : 0) + '%';
+    progressText.textContent = pct != null
+      ? `${pct}% (${Math.round((progress.bytesDownloaded || 0) / 1e6)} MB / ${Math.round((progress.expectedBytes || 0) / 1e6)} MB)`
+      : 'Downloading…';
   });
 })();

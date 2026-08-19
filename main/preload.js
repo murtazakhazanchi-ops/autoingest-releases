@@ -425,4 +425,17 @@ contextBridge.exposeInMainWorld('api', {
   onRealtimeStatus:         (cb)        => _register('realtime:statusChanged', (_e, s) => cb(s)),
   onRealtimeEvent:          (cb)        => _register('realtime:event',         (_e, ev) => cb(ev)),
 
+  // ── Ask AutoIngest (Phase C4) ──
+  // Every call takes either no arguments or a plain question string --
+  // the renderer has no way to supply a filesystem path, a download URL,
+  // or any other resource reference to the local judge/model layer.
+  askQuestion:            (question) => ipcRenderer.invoke('ask:query',             question),
+  cancelAskQuery:         ()         => ipcRenderer.invoke('ask:cancelQuery'),
+  getAskModelStatus:      ()         => ipcRenderer.invoke('ask:modelStatus'),
+  downloadAskModel:       ()         => ipcRenderer.invoke('ask:downloadModel'),
+  cancelAskModelDownload: ()         => ipcRenderer.invoke('ask:cancelDownload'),
+  retryAskModelVerification: ()      => ipcRenderer.invoke('ask:retryVerification'),
+  removeAskModel:         ()         => ipcRenderer.invoke('ask:removeModel'),
+  onAskModelDownloadProgress: (cb)   => _register('ask:downloadProgress', (_e, progress) => cb(progress)),
+
 });

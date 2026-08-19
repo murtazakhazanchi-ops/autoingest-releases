@@ -18,6 +18,7 @@ const crashReporter = require('../services/crashReporter');
 const perf          = require('../services/performanceMonitor');
 const autoUpdater   = require('../services/autoUpdater');
 const settings        = require('../services/settings');
+const askAutoIngest    = require('./askAutoIngest');
 // Canonical Representation Audit, L1 (2026-08-11): the ONE path-containment
 // implementation for this whole codebase — already proven correct under
 // BUG-013 for the renderer's own UNC/case-sensitivity handling. Dual-exported
@@ -314,6 +315,7 @@ app.on('window-all-closed', () => {
   shutdownWorkers();
   exifService.shutdown().catch(() => {});
   realtimeOps.shutdown();
+  askAutoIngest.shutdown().catch(() => {});
   if (pollHandle) clearInterval(pollHandle);
   if (process.platform !== 'darwin') app.quit();
 });
@@ -5546,4 +5548,7 @@ ipcMain.handle('qmz:queueMetadata', async (event, { batchId, files, context }) =
   exifService.applyBatch(batchId, copiedFiles, context, emitFn);
   return { ok: true };
 });
+
+// ── Ask AutoIngest (Phase C4) ───────────────────────────────────────────────
+askAutoIngest.registerIpcHandlers();
 
