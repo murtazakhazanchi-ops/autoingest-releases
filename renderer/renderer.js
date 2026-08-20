@@ -17248,6 +17248,22 @@ const _transferMonitor = (() => {
   async function _submitQuestion(question) {
     const q = (question || '').trim();
     if (!q || _aaBusy) return;
+    // Root cause (free-form input regression, Product Owner report): the
+    // field's value was never cleared once a question was dispatched --
+    // via the Ask button, Enter-to-submit, OR an example capsule (all
+    // three funnel through here) -- so the NEXT click+type landed the
+    // operator's new keystrokes at whatever cursor position fell inside
+    // the previous question's leftover text, producing a garbled mix of
+    // old and new characters. The field was never disabled/unfocusable at
+    // that point (verified live, real keystrokes via
+    // webContents.sendInputEvent -- disabled stayed false and focus
+    // landed correctly throughout); it just never started the next
+    // question from empty. Clearing here, at the moment submission
+    // actually begins (not on success/failure/cancel individually), gives
+    // one single place that guarantees the field is always empty the next
+    // time it becomes editable, regardless of how that submission resolves.
+    input.value = '';
+    _autoResize();
     _resetPanels();
     _setBusy(true);
     loading.hidden = false;

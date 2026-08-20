@@ -209,5 +209,6 @@ module.exports = {
   shouldApplyCapabilityAuthority,
   applyCapabilityAuthority,
   primaryAuthorityKind,
+  baseAuthorityDiagnostic,
   UNVERIFIED_HEDGE,
 };

@@ -2,16 +2,20 @@
 
 // Run with: node scripts/product-docs/test/answerForKnownRecord.test.js
 //
-// Ask AutoIngest — Related-topic direct-navigation checkpoint. Proves the
-// NEW, additive lookup path (knowledgeEngine.js's answerForKnownRecord()
-// and answerWithAuthority.js's answerKnownRecordWithAuthority()) that lets
-// the renderer navigate a Related capsule straight to its known canonical
+// Ask AutoIngest — Related-topic direct-navigation checkpoint, updated by
+// the Related-Record Content Correction checkpoint. Proves the additive
+// lookup path (knowledgeEngine.js's answerForKnownRecord() and
+// answerWithAuthority.js's answerKnownRecordWithAuthority()) that lets the
+// renderer navigate a Related capsule straight to its known canonical
 // record id, without ever routing the capsule's visible title back through
-// fuzzy retrieval (runQuery()/searchCandidates()) -- and without changing
-// answerQuestion()'s own retrieval/ranking/synthesis, which the sibling
-// test files (knowledge.test.js, capabilityAuthority.test.js,
-// answerWithAuthority.test.js, etc.) already prove is unaffected by this
-// checkpoint (rerun alongside this file, all still green).
+// fuzzy retrieval (runQuery()/searchCandidates()), and -- per the
+// correction -- WITHOUT ever routing it through capability-claim
+// verification either: known-record browsing shows the record's own real
+// canonical content unconditionally, never a generic authority hedge.
+// answerQuestion()'s own retrieval/ranking/synthesis is unaffected by any
+// of this, which the sibling test files (knowledge.test.js,
+// capabilityAuthority.test.js, answerWithAuthority.test.js, etc.) already
+// prove (rerun alongside this file, all still green).
 
 const assert = require('node:assert/strict');
 const { createRunner } = require('./testHarness');
@@ -20,16 +24,6 @@ const { buildEngineContext, answerQuestion, answerForKnownRecord, QUESTION_TYPES
 const { RECORD_STATUS } = require('../lib/statusResolution');
 const { primaryAuthorityKind } = require('../lib/capabilityAuthority');
 const { answerKnownRecordWithAuthority } = require('../lib/answerWithAuthority');
-
-const READY = () => ({ status: 'READY', detail: {} });
-const NEVER_CALL = async () => { throw new Error('must not be called'); };
-
-function spy(fn) {
-  const calls = [];
-  const wrapped = (...args) => { calls.push(args); return fn(...args); };
-  wrapped.calls = calls;
-  return wrapped;
-}
 
 async function main() {
   const { t, summarize } = createRunner();
@@ -99,35 +93,55 @@ async function main() {
   });
 
   // ---------------------------------------------------------------------
-  // Authority wiring — a Feature-primary direct navigation enters the SAME
-  // narrow, unmodified authority scope an ordinary capability question
-  // about that exact feature would (Part 9: the model loads if and only if
-  // the destination genuinely enters an authority-sensitive path).
+  // Authority wiring — CORRECTED (Related-Record Content Correction
+  // checkpoint, Product Owner acceptance-failure report). Related-topic
+  // browsing is known-record display, not a capability-existence claim:
+  // it must NEVER enter applyCapabilityAuthority()'s scope, for EITHER a
+  // Feature-primary or Workflow-primary record, and must NEVER touch the
+  // judge/model, so the record's own real canonical content (directAnswer/
+  // guidance/steps) is always shown -- never replaced by the generic
+  // "verification unavailable" hedge, regardless of whether a local model
+  // is installed, ready, or would even reject the claim if asked.
+  // answerKnownRecordWithAuthority() no longer accepts a judge/
+  // getModelAvailability options object at all (there is nothing left for
+  // it to inject into) -- calls below intentionally use the 2-arg form.
   // ---------------------------------------------------------------------
-  await t('answerKnownRecordWithAuthority: a Feature-primary AVAILABLE record enters authority scope exactly like an ordinary question would', async () => {
+  await t('answerKnownRecordWithAuthority: a Feature-primary AVAILABLE record NEVER enters authority scope — no judge, no model-availability check, real content preserved', async () => {
     const deterministic = answerForKnownRecord(relatedFeatureId, ctx);
-    assert.equal(primaryAuthorityKind(deterministic), 'feature', 'sanity: this fixture record must be in-scope for the assertion below to mean anything');
-    const availabilitySpy = spy(READY);
-    const judgeSpy = spy(async (pkg, handleMap) => ({ judgment: 'SUPPORTS', evidenceHandles: handleMap.validHandles.slice(0, 1), confidence: 'HIGH' }));
-    const result = await answerKnownRecordWithAuthority(relatedFeatureId, ctx, { judge: judgeSpy, getModelAvailability: availabilitySpy });
-    assert.ok(judgeSpy.calls.length > 0, 'the local judge must be invoked for an in-scope Feature-primary direct navigation');
-    assert.ok(availabilitySpy.calls.length > 0);
-    assert.equal(result.authority.required, true);
-    assert.equal(result.authority.ran, true);
-    assert.equal(result.capabilityStatus, RECORD_STATUS.AVAILABLE);
+    assert.equal(primaryAuthorityKind(deterministic), 'feature', 'sanity: this fixture record is exactly the kind of record the OLD behavior used to route through authority');
+    const result = await answerKnownRecordWithAuthority(relatedFeatureId, ctx);
+    assert.equal(result.authority.required, false, 'Related browsing must never be authority-required');
+    assert.equal(result.authority.ran, false, 'the judge must never run for Related browsing');
+    assert.equal(result.capabilityStatus, deterministic.capabilityStatus, 'record status is read straight from the record, never touched by authority');
+    assert.equal(result.directAnswer, deterministic.directAnswer, 'the record\'s own real canonical description must survive verbatim, never replaced by a hedge');
+    assert.deepEqual(result.steps, deterministic.steps);
+    assert.deepEqual(result.limitations, deterministic.limitations);
+  });
+
+  await t('answerKnownRecordWithAuthority: real content is preserved even when the local judge would reject or the model is unavailable (the exact Product Owner-reported failure)', async () => {
+    // These fakes prove the point structurally: if answerKnownRecordWithAuthority()
+    // ever again routed through applyCapabilityAuthority(), invoking either
+    // of these would flip capabilityStatus to UNKNOWN and replace
+    // directAnswer with the generic hedge -- exactly the regression this
+    // checkpoint fixes. They are never actually called.
+    const judgeThatWouldFail = async () => { throw Object.assign(new Error('unavailable'), { modelState: 'NOT_DOWNLOADED', modelUnavailable: true }); };
+    const deterministic = answerForKnownRecord(relatedFeatureId, ctx);
+    const result = await answerKnownRecordWithAuthority(relatedFeatureId, ctx);
+    assert.notEqual(result.directAnswer, 'Capability verification is currently unavailable. You can still view the related documentation below.');
+    assert.notEqual(result.capabilityStatus, 'UNKNOWN');
+    assert.equal(result.directAnswer, deterministic.directAnswer);
+    void judgeThatWouldFail; // documents the counterfactual; never invoked
   });
 
   await t('answerKnownRecordWithAuthority: a Workflow-primary direct navigation never loads the model (out of authority scope by entity type alone)', async () => {
     const workflowId = det.matchedCapabilities[0].id;
-    const availabilitySpy = spy(READY);
-    const result = await answerKnownRecordWithAuthority(workflowId, ctx, { judge: NEVER_CALL, getModelAvailability: availabilitySpy });
+    const result = await answerKnownRecordWithAuthority(workflowId, ctx);
     assert.equal(result.authority.required, false);
     assert.equal(result.authority.ran, false);
-    assert.equal(availabilitySpy.calls.length, 0, 'model availability must never even be checked for a Workflow-primary direct navigation');
   });
 
   await t('answerKnownRecordWithAuthority: an unresolvable id returns null, never invoking the judge or throwing', async () => {
-    const result = await answerKnownRecordWithAuthority('AI-FEAT-999999', ctx, { judge: NEVER_CALL, getModelAvailability: spy(READY) });
+    const result = await answerKnownRecordWithAuthority('AI-FEAT-999999', ctx);
     assert.equal(result, null);
   });
 

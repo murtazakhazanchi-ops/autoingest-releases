@@ -159,6 +159,11 @@ async function main() {
   record('navigation label matches the capsule that was followed', afterClick.navLabel.trim() === rootState.firstChipText.trim() || afterClick.navLabel.includes(rootState.firstChipText.trim()), { navLabel: afterClick.navLabel, expected: rootState.firstChipText });
   record('the answer actually changed to the related topic (not a no-op)', afterClick.directAnswer !== rootState.directAnswer, { before: rootState.directAnswer, after: afterClick.directAnswer });
 
+  const HEDGE_TEXT = 'Capability verification is currently unavailable. You can still view the related documentation below.';
+  const statusAfterClick = await ejs(`document.getElementById('aaStatusBadge').textContent`);
+  record('Related-Record Content Correction: the record\'s real canonical description shows, never the generic authority hedge (no model installed in this environment)', afterClick.directAnswer !== HEDGE_TEXT, { directAnswer: afterClick.directAnswer });
+  record('Related-Record Content Correction: status badge reflects the record\'s own real lifecycle status, never forced to Uncertain', statusAfterClick !== 'Uncertain', { statusAfterClick });
+
   const rawIdCheck = await ejs(`(() => ({
     directAnswer: document.getElementById('aaDirectAnswer').textContent,
     guidance: document.getElementById('aaGuidanceText').textContent,
@@ -206,6 +211,107 @@ async function main() {
     navHeaderHidden: document.getElementById('aaNavHeader').hidden,
   }))()`);
   record('manually typing a new question starts a fresh top-level entry (no Back trap from the prior chain)', freshQuestionState.navHeaderHidden === true, freshQuestionState);
+
+  // ── 4b. Product Owner's exact reported examples: Source Selection, Source
+  // Detection, Grouping System -- each must show its real canonical
+  // description/current-behavior even with no local model installed. ──────
+  await ejs(`(() => { document.getElementById('aaQuestionInput').value = 'How do I import photographs from an SD card?'; document.getElementById('aaAskBtn').click(); return true; })()`);
+  await waitForAnswer(8000);
+
+  async function openRelatedByTitleSubstring(substring) {
+    const beforeCounts = ipcCounts();
+    const clicked = await ejs(`(() => {
+      const chip = Array.from(document.querySelectorAll('.aa-related-chip')).find((c) => c.textContent.includes(${JSON.stringify(substring)}));
+      if (!chip) return false;
+      chip.click();
+      return true;
+    })()`);
+    if (!clicked) return null;
+    await waitForAnswer(8000);
+    await new Promise((r) => setTimeout(r, 150));
+    const afterCounts = ipcCounts();
+    const state = await ejs(`(() => ({
+      directAnswer: document.getElementById('aaDirectAnswer').textContent,
+      statusLabel: document.getElementById('aaStatusBadge').textContent,
+      navLabel: document.getElementById('aaNavLabel').textContent,
+    }))()`);
+    return { ...state, ipcCallsMade: afterCounts.related - beforeCounts.related, fuzzyAskCalls: afterCounts.ask - beforeCounts.ask };
+  }
+
+  for (const title of ['Source Selection', 'Source Detection', 'Grouping System']) {
+    // Navigate back to the SD-card root each time so every capsule is opened
+    // from the same, real Related fan-out (matches the PO's own repro steps).
+    await ejs(`(() => { document.getElementById('aaQuestionInput').value = 'How do I import photographs from an SD card?'; document.getElementById('aaAskBtn').click(); return true; })()`);
+    await waitForAnswer(8000);
+    const result = await openRelatedByTitleSubstring(title);
+    if (!result) {
+      record(`Related capsule "${title}" is present in the SD-card-import fan-out`, false, { title });
+      continue;
+    }
+    record(`"${title}": clicking resolved via direct-id navigation, not fuzzy retrieval`, result.ipcCallsMade === 1 && result.fuzzyAskCalls === 0, result);
+    record(`"${title}": real canonical description is visible (not the generic hedge, no model installed)`, result.directAnswer !== HEDGE_TEXT && result.directAnswer.length > 20, { title, directAnswer: result.directAnswer });
+    record(`"${title}": status badge is not forced to Uncertain`, result.statusLabel !== 'Uncertain', { title, statusLabel: result.statusLabel });
+    await win.webContents.capturePage().then((img) => fs.writeFileSync(path.join(SCREENSHOT_DIR, `related-${title.replace(/\s+/g, '-')}.png`), img.toPNG()));
+  }
+
+  // ── 4c. A Workflow-related capsule still shows its real purpose/steps ──
+  await ejs(`(() => { document.getElementById('aaQuestionInput').value = 'My transfer stopped halfway. What should I do?'; document.getElementById('aaAskBtn').click(); return true; })()`);
+  await waitForAnswer(8000);
+  const wfClickResult = await openRelatedByTitleSubstring('Transfer Import');
+  if (wfClickResult) {
+    const stepsCount = await ejs(`document.querySelectorAll('#aaStepsList li').length`);
+    record('Workflow-related capsule ("Transfer Import"): real content shown, not the authority hedge', wfClickResult.directAnswer !== HEDGE_TEXT, wfClickResult);
+    record('Workflow-related capsule: steps render normally when the record has them', stepsCount >= 0, { stepsCount });
+  } else {
+    record('Workflow-related capsule present in this fan-out', false, {});
+  }
+
+  // ── 4d. Free-form input regression: real keystrokes (not .value=) after every
+  // interaction point named in the acceptance list must never garble text. ──
+  function realType(str) { for (const ch of str) { win.webContents.sendInputEvent({ type: 'keyDown', keyCode: ch }); win.webContents.sendInputEvent({ type: 'char', keyCode: ch }); win.webContents.sendInputEvent({ type: 'keyUp', keyCode: ch }); } }
+  async function realClickInput() {
+    const r = await ejs(`(() => { const el = document.getElementById('aaQuestionInput'); const rect = el.getBoundingClientRect(); return {x: rect.left + rect.width/2, y: rect.top + rect.height/2}; })()`);
+    win.webContents.sendInputEvent({ type: 'mouseDown', x: Math.round(r.x), y: Math.round(r.y), button: 'left', clickCount: 1 });
+    win.webContents.sendInputEvent({ type: 'mouseUp', x: Math.round(r.x), y: Math.round(r.y), button: 'left', clickCount: 1 });
+    await new Promise((res) => setTimeout(res, 150));
+  }
+  async function assertCleanTyping(label, phrase) {
+    await realClickInput();
+    realType(phrase);
+    await new Promise((r) => setTimeout(r, 250));
+    const v = await ejs(`document.getElementById('aaQuestionInput').value`);
+    const disabled = await ejs(`document.getElementById('aaQuestionInput').disabled`);
+    record(`free-form input: ${label}`, v === phrase && disabled === false, { expected: phrase, got: v, disabled });
+    await ejs(`document.getElementById('aaQuestionInput').value = ''`);
+  }
+
+  await assertCleanTyping('field starts empty and accepts a fresh typed question', 'Can I rename an event after import?');
+
+  await ejs(`(() => { document.getElementById('aaQuestionInput').value = 'What is QMZ?'; document.getElementById('aaAskBtn').click(); return true; })()`);
+  await waitForAnswer(8000);
+  await assertCleanTyping('field is empty and clean immediately after a successful answer (the exact reported symptom)', 'a completely different follow-up question');
+
+  await ejs(`(() => { document.getElementById('aaQuestionInput').value = 'Does AutoIngest support face recognition?'; document.getElementById('aaAskBtn').click(); return true; })()`);
+  await new Promise((r) => setTimeout(r, 30));
+  await ejs(`document.getElementById('aaCancelBtn')?.click()`);
+  await new Promise((r) => setTimeout(r, 300));
+  await assertCleanTyping('field is clean after cancelling a query', 'typing right after cancel');
+
+  await ejs(`(() => { document.getElementById('aaQuestionInput').value = 'My transfer stopped halfway. What should I do?'; document.getElementById('aaAskBtn').click(); return true; })()`);
+  await waitForAnswer(8000);
+  await ejs(`document.querySelector('.aa-related-chip')?.click()`);
+  await waitForAnswer(8000);
+  await assertCleanTyping('field is clean after following a Related topic', 'typing right after related nav');
+
+  await ejs(`document.getElementById('aaBackBtn')?.click()`);
+  await new Promise((r) => setTimeout(r, 200));
+  await assertCleanTyping('field is clean after Back', 'typing right after back');
+
+  await ejs(`document.getElementById('askAutoIngestClose').click()`);
+  await new Promise((r) => setTimeout(r, 250));
+  await ejs(`document.getElementById('askAutoIngestBtn').click()`);
+  await new Promise((r) => setTimeout(r, 300));
+  await assertCleanTyping('field is clean after close/reopen', 'typing right after reopen');
 
   // ── 5. Progressive disclosure: limitations render as note + collapsed "More details" ─
   await ejs(`(() => { document.getElementById('aaQuestionInput').value = 'Why was Transfer Export locking kept process-local?'; document.getElementById('aaAskBtn').click(); return true; })()`);

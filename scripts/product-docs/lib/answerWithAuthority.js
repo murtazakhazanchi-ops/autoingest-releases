@@ -21,7 +21,7 @@
 // keep calling answerQuestion() exactly as before.
 
 const { answerQuestion, answerForKnownRecord } = require('./knowledgeEngine');
-const { applyCapabilityAuthority } = require('./capabilityAuthority');
+const { applyCapabilityAuthority, baseAuthorityDiagnostic } = require('./capabilityAuthority');
 // services/localJudge/* is side-effect-free at require time (Electron is
 // only ever touched lazily, inside function bodies, by modelManager.js and
 // runtime.js) -- safe to require eagerly here, including under plain
@@ -105,66 +105,68 @@ async function answerQuestionWithAuthority(question, ctx, options = {}) {
 }
 
 // Related-topic direct navigation checkpoint -- a second, deliberately
-// separate outer entrypoint mirroring answerQuestionWithAuthority() above
-// almost verbatim, NOT refactored to share a helper with it: this
-// checkpoint's own explicit boundary is "do not modify answerQuestion()
-// retrieval / answer synthesis / capability authority", and
-// answerQuestionWithAuthority() is the one function every existing test
-// above already exercises end to end against real production behavior --
-// extracting a shared helper would touch that proven function's body for
-// no behavioral gain. This wrapper differs from it in exactly one respect:
-// the deterministic answer comes from answerForKnownRecord(recordId, ctx)
-// (a direct id lookup, knowledgeEngine.js, above) instead of
-// answerQuestion(question, ctx) (fuzzy retrieval) -- everything after that
-// (judge injection, signal forwarding, model-state snapshotting) is
-// identical, so a Related-topic click still passes through the SAME
-// unmodified applyCapabilityAuthority() scope gate, and therefore still
-// invokes the local judge/model if and only if the destination record's
-// own classification genuinely enters its narrow authority-sensitive scope
-// -- never unconditionally.
+// separate outer entrypoint from answerQuestionWithAuthority() above, NOT
+// refactored to share its body: this checkpoint's own explicit boundary is
+// "do not modify answerQuestion() retrieval / answer synthesis / capability
+// authority", and answerQuestionWithAuthority() is the one function every
+// existing test above already exercises end to end against real production
+// behavior.
+//
+// Correction (Related-Record Content Correction checkpoint, following a
+// Product Owner-reported acceptance failure): an EARLIER version of this
+// function fed applyCapabilityAuthority() a synthetic "Does AutoIngest
+// support {title}?" question so a Related click would enter the SAME
+// authority scope an equivalent typed question would. That was the wrong
+// model for what Related navigation actually IS. Clicking a Related
+// capsule is known-record BROWSING ("show me the canonical information for
+// X"), not a new capability-existence CLAIM ("does AutoIngest support
+// X?") -- there is no user-authored claim to verify in the first place,
+// and the record's existence/identity was never in question: it was
+// resolved by its own id, taken directly from a PREVIOUS answer's own
+// relatedCapabilities/sources list (never operator-typed text, never a
+// fuzzy match). C1's whole authority layer exists to catch a NARROW,
+// documented failure mode -- the deterministic engine's retrieval-driven
+// AVAILABLE/PARTIALLY_AVAILABLE claim being a lexical-overlap false
+// affirmation for an ARBITRARY typed question (see capabilityAuthority.js's
+// own header comment) -- a failure mode that structurally cannot occur
+// here: answerForKnownRecord() never calls runQuery()/searchCandidates(),
+// so there is no lexical-overlap risk to guard against. Manufacturing a
+// synthetic question merely to force entry into that scope was solving a
+// problem (claim-template matching) that Related navigation was never
+// supposed to have, and its real-world cost was severe: whenever the local
+// judge/model is unavailable (the common case -- no approved production
+// model source exists yet, PRODUCTION_DOWNLOAD_SOURCE_APPROVED is false in
+// main/askAutoIngest.js), applyCapabilityAuthority()'s downgradeToUncertain()
+// unconditionally REPLACES the record's own real, already-authored
+// directAnswer/guidance/steps with a generic "verification unavailable"
+// hedge -- discarding the exact canonical content Related browsing exists
+// to show, for a record whose existence was never actually in doubt.
+//
+// The distinction the Product Owner draws is now load-bearing here: RECORD
+// STATUS (what the selected canonical Feature/Workflow itself already says
+// about its own lifecycle -- answer.capabilityStatus, sourced from the
+// record's own operatorStatus, computed entirely inside
+// answerForKnownRecord()/knowledgeEngine.js, never touched here) is not the
+// same thing as QUESTION-LEVEL CAPABILITY AUTHORITY (whether evidence
+// proves an arbitrary typed claim -- applyCapabilityAuthority()'s own,
+// still-unmodified, still fully exercised job for answerQuestionWithAuthority()
+// above). Related navigation only ever needs the first. This function
+// therefore never calls applyCapabilityAuthority() and never touches the
+// judge/model at all -- baseAuthorityDiagnostic() (capabilityAuthority.js,
+// unmodified, merely now exported) is the SAME shape
+// shouldApplyCapabilityAuthority() already produces for every
+// out-of-scope question, so a Related-browsed answer is indistinguishable,
+// authority-wise, from an ordinary out-of-scope question -- not a new
+// shape invented for this path.
 //
 // Returns null (never throws) when recordId doesn't resolve to a known
 // record -- the caller (main/askAutoIngest.js) is responsible for turning
 // that into an operator-facing "not found" error; this module never
 // invents a fallback answer for an unresolvable id.
-async function answerKnownRecordWithAuthority(recordId, ctx, options = {}) {
+async function answerKnownRecordWithAuthority(recordId, ctx) {
   const answer = answerForKnownRecord(recordId, ctx);
   if (!answer) return null;
-
-  const rawJudge = options.judge || productionJudge;
-  const availabilityCheck = options.getModelAvailability || getModelAvailability;
-  const signal = options.signal;
-
-  let observedModelState = null;
-  const instrumentedJudge = async (pkg, handleMap) => {
-    observedModelState = availabilityCheck().status;
-    return rawJudge(pkg, handleMap, { signal });
-  };
-
-  // applyCapabilityAuthority()'s claim extraction (claimNormalization.js's
-  // own unmodified TEMPLATES) only fires on templated interrogative
-  // phrasing ("Does AutoIngest support X?", etc.) -- answer.query here is
-  // just the record's own bare title (answerForKnownRecord() above), which
-  // matches none of those templates and would otherwise take the
-  // claim-unmatched branch unconditionally, silently downgrading every
-  // in-scope Feature-primary Related click to Uncertain regardless of what
-  // the local judge would have said. Feeding the SAME already-existing
-  // "Does AutoIngest support {title}?" template deterministically instead
-  // (never invented content -- {title} is the exact, already-known record
-  // title) lets a Feature-primary direct navigation reach the real judge
-  // exactly as an equivalent ordinary question about that same feature
-  // would. Workflow-primary direct navigation is unaffected either way --
-  // primaryAuthorityKind() only recognizes 'feature'/'governance', so
-  // shouldApplyCapabilityAuthority() never even reaches claim extraction
-  // for it.
-  const authorityQuestion = `Does AutoIngest support ${answer.query}?`;
-  const result = await applyCapabilityAuthority(authorityQuestion, answer, ctx, instrumentedJudge);
-
-  if (!result.authority.ran) {
-    return result;
-  }
-
-  return { ...result, authority: { ...result.authority, modelState: observedModelState } };
+  return { ...answer, authority: baseAuthorityDiagnostic(answer) };
 }
 
 module.exports = { answerQuestionWithAuthority, answerKnownRecordWithAuthority, describeAuthorityOutcome };

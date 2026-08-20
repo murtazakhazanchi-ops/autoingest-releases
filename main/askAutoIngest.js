@@ -92,12 +92,18 @@ async function handleAskRelatedNavigate(recordId) {
   if (typeof recordId !== 'string' || !RECORD_ID_RE.test(recordId)) {
     throw new Error('That related topic could not be opened.');
   }
+  // Shares the SAME single-in-flight-query controller as handleAskQuery
+  // above -- a Related click still cancels an overlapping typed ask (or
+  // vice versa) so a stale response can never land after a newer one.
+  // answerKnownRecordWithAuthority() itself is a fast, synchronous-under-
+  // the-hood id lookup (no judge/model call -- see its own header comment
+  // in answerWithAuthority.js) and takes no options/signal of its own.
   if (_activeController) _activeController.abort();
   const controller = new AbortController();
   _activeController = controller;
   try {
     const ctx = freshCtx();
-    const answer = await answerKnownRecordWithAuthority(recordId, ctx, { signal: controller.signal });
+    const answer = await answerKnownRecordWithAuthority(recordId, ctx);
     if (!answer) throw new Error('That related topic could not be opened.');
     return shapeAnswerForUI(answer, ctx);
   } finally {
