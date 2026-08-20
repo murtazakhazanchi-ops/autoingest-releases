@@ -16940,6 +16940,7 @@ const _transferMonitor = (() => {
   const overlay   = document.getElementById('askAutoIngestOverlay');
   const box       = document.getElementById('askAutoIngestBox');
   const closeBtn  = document.getElementById('askAutoIngestClose');
+  const body      = document.getElementById('askAutoIngestBody');
   const input     = document.getElementById('aaQuestionInput');
   const askBtn    = document.getElementById('aaAskBtn');
   const cancelBtn = document.getElementById('aaCancelBtn');
@@ -16948,13 +16949,19 @@ const _transferMonitor = (() => {
   const loadingText = document.getElementById('aaLoadingText');
   const errorState = document.getElementById('aaErrorState');
   const answerArea = document.getElementById('aaAnswerArea');
+  const navHeader = document.getElementById('aaNavHeader');
+  const backBtn = document.getElementById('aaBackBtn');
+  const forwardBtn = document.getElementById('aaForwardBtn');
+  const navLabel = document.getElementById('aaNavLabel');
   const statusBadge = document.getElementById('aaStatusBadge');
   const directAnswerEl = document.getElementById('aaDirectAnswer');
   const stepsSection = document.getElementById('aaStepsSection');
   const stepsList = document.getElementById('aaStepsList');
-  const guidanceSection = document.getElementById('aaGuidanceSection');
   const guidanceText = document.getElementById('aaGuidanceText');
-  const limitationsSection = document.getElementById('aaLimitationsSection');
+  const noteSection = document.getElementById('aaNoteSection');
+  const noteCallout = document.getElementById('aaNoteCallout');
+  const moreLimitations = document.getElementById('aaMoreLimitations');
+  const moreLimitationsSummary = document.getElementById('aaMoreLimitationsSummary');
   const limitationsList = document.getElementById('aaLimitationsList');
   const relatedSection = document.getElementById('aaRelatedSection');
   const relatedList = document.getElementById('aaRelatedList');
@@ -16992,6 +16999,10 @@ const _transferMonitor = (() => {
     _aaBusy = busy;
     askBtn.disabled = busy;
     cancelBtn.hidden = !busy;
+    // Back/Forward are cached, synchronous, and must never race an
+    // in-flight fetch that will itself push/replace history on completion.
+    if (backBtn) backBtn.disabled = busy;
+    if (forwardBtn) forwardBtn.disabled = busy;
     // Disabling a focused textarea forces a blur to document.body -- restore
     // focus to it once the query settles so the operator can immediately
     // type a follow-up, and so focus stays inside the drawer rather than
@@ -17065,31 +17076,51 @@ const _transferMonitor = (() => {
       stepsSection.hidden = true;
     }
 
+    // Guidance reads as a quiet continuation of the direct answer itself
+    // (Part 2/3) -- no separate section wrapper or uppercase label.
     if (shaped.guidance) {
       guidanceText.textContent = shaped.guidance;
-      guidanceSection.hidden = false;
+      guidanceText.hidden = false;
     } else {
-      guidanceSection.hidden = true;
+      guidanceText.hidden = true;
     }
 
-    if (shaped.limitations && shaped.limitations.length) {
-      limitationsList.innerHTML = '';
-      for (const l of shaped.limitations) {
-        const li = document.createElement('li');
-        li.textContent = l;
-        limitationsList.appendChild(li);
+    // Progressive disclosure (Part 4): the single most important note stays
+    // always visible as a calm callout; any further limitations collapse
+    // under "More details" rather than an unconditional bullet wall. The
+    // full original text is preserved either way -- nothing is summarized
+    // or dropped, only reordered/relocated.
+    const limitations = shaped.limitations || [];
+    if (limitations.length) {
+      noteCallout.textContent = limitations[0];
+      noteSection.hidden = false;
+      const rest = limitations.slice(1);
+      if (rest.length) {
+        limitationsList.innerHTML = '';
+        for (const l of rest) {
+          const li = document.createElement('li');
+          li.textContent = l;
+          limitationsList.appendChild(li);
+        }
+        moreLimitationsSummary.textContent = `More details (${rest.length})`;
+        moreLimitations.hidden = false;
+        moreLimitations.open = false;
+      } else {
+        moreLimitations.hidden = true;
       }
-      limitationsSection.hidden = false;
     } else {
-      limitationsSection.hidden = true;
+      noteSection.hidden = true;
     }
 
     if (shaped.relatedCapabilities && shaped.relatedCapabilities.length) {
       relatedList.innerHTML = '';
       for (const rc of shaped.relatedCapabilities) {
-        const chip = document.createElement('span');
+        const chip = document.createElement('button');
+        chip.type = 'button';
         chip.className = 'aa-related-chip';
         chip.textContent = rc.title;
+        chip.dataset.recordId = rc.id;
+        chip.setAttribute('aria-label', `Open related topic: ${rc.title}`);
         relatedList.appendChild(chip);
       }
       relatedSection.hidden = false;
@@ -17139,6 +17170,81 @@ const _transferMonitor = (() => {
     answerArea.hidden = false;
   }
 
+  // ── Related-topic navigation history (Part 5/10) ─────────────────────────
+  // A lightweight in-drawer stack, entirely in renderer memory -- no
+  // browser-style URLs, no router. Each entry holds the already-shaped
+  // answer object returned by main once, plus a display label and the
+  // drawer's scroll position at the moment the operator navigated away from
+  // it. Going Back/Forward only ever re-renders a cached entry -- it never
+  // re-invokes window.api.askQuestion/askRelated, so it never reruns
+  // retrieval or the local judge.
+  let _aaHistory = [];
+  let _aaHistoryPos = -1;
+
+  function _saveScrollForCurrentEntry() {
+    const entry = _aaHistory[_aaHistoryPos];
+    if (entry && body) entry.scrollTop = body.scrollTop;
+  }
+
+  function _updateNavHeader() {
+    const entry = _aaHistory[_aaHistoryPos];
+    const showBack = _aaHistoryPos > 0;
+    const showForward = _aaHistoryPos < _aaHistory.length - 1;
+    // The header itself must stay visible whenever EITHER direction has
+    // somewhere to go -- Back and Forward are independent children inside
+    // it, each hidden on its own, but a `hidden` parent would hide both
+    // regardless of their own state.
+    navHeader.hidden = !(showBack || showForward);
+    backBtn.hidden = !showBack;
+    navLabel.textContent = showBack ? (entry ? entry.label : '') : '';
+    forwardBtn.hidden = !showForward;
+  }
+
+  function _showCurrentHistoryEntry() {
+    const entry = _aaHistory[_aaHistoryPos];
+    if (!entry) return;
+    _resetPanels();
+    _renderAnswer(entry.shaped);
+    _updateNavHeader();
+    if (body) body.scrollTop = entry.scrollTop || 0;
+  }
+
+  // A freshly-typed, manually-submitted question always starts a brand new
+  // top-level navigation entry (Part 5's explicit requirement) -- it never
+  // gets trapped as a continuation of whatever Related-topic chain the
+  // operator was previously exploring.
+  function _startNewHistory(label, shaped) {
+    _aaHistory = [{ label, shaped, scrollTop: 0 }];
+    _aaHistoryPos = 0;
+    _showCurrentHistoryEntry();
+  }
+
+  // Navigating into a Related topic pushes onto the SAME chain, dropping
+  // any forward entries beyond the current position first (standard
+  // back-then-navigate history semantics).
+  function _pushHistory(label, shaped) {
+    _saveScrollForCurrentEntry();
+    _aaHistory = _aaHistory.slice(0, _aaHistoryPos + 1);
+    _aaHistory.push({ label, shaped, scrollTop: 0 });
+    _aaHistoryPos = _aaHistory.length - 1;
+    _showCurrentHistoryEntry();
+  }
+
+  backBtn?.addEventListener('click', () => {
+    if (_aaHistoryPos <= 0) return;
+    _saveScrollForCurrentEntry();
+    _aaHistoryPos--;
+    _showCurrentHistoryEntry();
+  });
+  backBtn?.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
+
+  forwardBtn?.addEventListener('click', () => {
+    if (_aaHistoryPos >= _aaHistory.length - 1) return;
+    _saveScrollForCurrentEntry();
+    _aaHistoryPos++;
+    _showCurrentHistoryEntry();
+  });
+
   async function _submitQuestion(question) {
     const q = (question || '').trim();
     if (!q || _aaBusy) return;
@@ -17149,7 +17255,7 @@ const _transferMonitor = (() => {
     try {
       const shaped = await window.api.askQuestion(q);
       loading.hidden = true;
-      _renderAnswer(shaped);
+      _startNewHistory(q, shaped);
     } catch (err) {
       loading.hidden = true;
       if (err && /cancel/i.test(err.message || '')) {
@@ -17162,6 +17268,42 @@ const _transferMonitor = (() => {
       _setBusy(false);
     }
   }
+
+  // Clicking a Related capsule navigates directly to that exact canonical
+  // record (Part A) -- the capsule already carries the known record id
+  // (rc.id, from the previous shaped answer's own relatedCapabilities), so
+  // this calls window.api.askRelated(id), which resolves the id directly
+  // against the deterministic engine's own indexes on the main-process side
+  // (answerForKnownRecord()/answerKnownRecordWithAuthority(),
+  // scripts/product-docs/lib/knowledgeEngine.js /
+  // answerWithAuthority.js) -- never the visible capsule title sent back
+  // through fuzzy retrieval.
+  async function _navigateToRelated(recordId, title) {
+    if (!recordId || _aaBusy) return;
+    _resetPanels();
+    _setBusy(true);
+    loading.hidden = false;
+    loadingText.textContent = `Opening ${title || 'related topic'}…`;
+    try {
+      const shaped = await window.api.askRelated(recordId);
+      loading.hidden = true;
+      _pushHistory(title || shaped.query || 'Related topic', shaped);
+    } catch (err) {
+      loading.hidden = true;
+      if (!(err && /cancel/i.test(err.message || ''))) {
+        errorState.hidden = false;
+        errorState.textContent = 'That related topic could not be opened.';
+      }
+    } finally {
+      _setBusy(false);
+    }
+  }
+
+  relatedList?.addEventListener('click', (e) => {
+    const chip = e.target.closest('.aa-related-chip');
+    if (!chip) return;
+    _navigateToRelated(chip.dataset.recordId, chip.textContent);
+  });
 
   askBtn?.addEventListener('click', () => _submitQuestion(input.value));
   cancelBtn?.addEventListener('click', () => {

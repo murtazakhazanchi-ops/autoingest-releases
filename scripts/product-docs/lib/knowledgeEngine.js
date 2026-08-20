@@ -818,6 +818,56 @@ function answerQuestion(question, ctx) {
   return answerFromRecord(question, knowledgeRecord, featureMatches, qType, companionWorkflow, governanceRelationships, historicalContext);
 }
 
+// Ask AutoIngest — Related-topic direct navigation checkpoint. Resolves a
+// KNOWN, already-cited canonical record id (a value that only ever appears
+// in an existing answer's own relatedCapabilities/sources array -- never
+// operator-typed text) directly against the two id-keyed indexes this
+// engine already builds, and formats it with the SAME existing
+// answerFromRecord()/answerFromWorkflow() synthesis the ordinary retrieval
+// path (answerQuestion(), above) already uses -- no runQuery(), no
+// searchCandidates(), no second ranking mechanism, no new answer shape.
+// The synthetic single-entry `matches` array below stands in for retrieval
+// evidence with the maximum possible score (a direct id lookup IS the
+// strongest possible evidence -- there is no stronger signal than "this is
+// the exact record"), so matchQualityFor() deterministically resolves it
+// to 'strong' via its own unmodified thresholds, never a new quality tier.
+//
+// classification is set to the real QUESTION_TYPES.CAPABILITY /
+// QUESTION_TYPES.HOW_TO constants (not a new "direct nav" pseudo-type) so
+// that capabilityAuthority.js's own unmodified shouldApplyCapabilityAuthority()
+// scope predicate applies exactly the SAME authority-sensitivity gate to a
+// Feature-primary direct navigation as it would to an ordinary "does
+// AutoIngest support X" question about that exact feature -- the local
+// judge/model is invoked here if and only if it would be for a normal
+// question resolving to this same record, never unconditionally.
+//
+// historicalContext is deliberately omitted (passed null) -- there is no
+// natural-language question text to run historicalContextForFeature()'s
+// own materiality gate against for a direct id lookup, so this simply
+// never admits historical material for this path, rather than inventing a
+// synthetic question to feed that gate.
+//
+// Returns null when the id resolves to neither index (a data-integrity
+// edge case the caller must handle, e.g. a stale/removed record) --
+// deliberately NOT a fallback to fuzzy search over the record's own title,
+// per this checkpoint's explicit instruction.
+function answerForKnownRecord(recordId, ctx) {
+  const { knowledgeIndexById, workflowIndexById, authorityIndexByFeatureId, searchIndexById } = ctx;
+  const feature = knowledgeIndexById ? knowledgeIndexById.get(recordId) : null;
+  if (feature) {
+    const matches = [{ id: feature.id, title: feature.title, score: 1000, entityType: 'feature' }];
+    const companionWorkflow = findCompanionWorkflow(feature.id, workflowIndexById);
+    const governanceRelationships = governanceRelationshipsForFeature(feature.id, authorityIndexByFeatureId, searchIndexById);
+    return answerFromRecord(feature.title, feature, matches, QUESTION_TYPES.CAPABILITY, companionWorkflow, governanceRelationships, null);
+  }
+  const workflow = workflowIndexById ? workflowIndexById.get(recordId) : null;
+  if (workflow) {
+    const matches = [{ id: workflow.id, title: workflow.title, score: 1000, entityType: 'workflow' }];
+    return answerFromWorkflow(workflow.title, workflow, matches, [], QUESTION_TYPES.HOW_TO);
+  }
+  return null;
+}
+
 function knowledgeIndexMap(knowledgeIndex) {
   return new Map(knowledgeIndex.map((r) => [r.id, r]));
 }
@@ -940,6 +990,7 @@ function explainHistoricalContext(question, ctx) {
 
 module.exports = {
   answerQuestion,
+  answerForKnownRecord,
   classifyIntent,
   knowledgeIndexMap,
   workflowIndexMap,

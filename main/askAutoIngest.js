@@ -26,7 +26,7 @@ const { ipcMain } = require('electron');
 const PRODUCT_DOCS = path.join(__dirname, '..', 'scripts', 'product-docs');
 const { assemble } = require(path.join(PRODUCT_DOCS, 'lib', 'build.js'));
 const { buildEngineContext } = require(path.join(PRODUCT_DOCS, 'lib', 'knowledgeEngine.js'));
-const { answerQuestionWithAuthority } = require(path.join(PRODUCT_DOCS, 'lib', 'answerWithAuthority.js'));
+const { answerQuestionWithAuthority, answerKnownRecordWithAuthority } = require(path.join(PRODUCT_DOCS, 'lib', 'answerWithAuthority.js'));
 
 const modelManager = require('../services/localJudge/modelManager');
 const judgeService = require('../services/localJudge/judgeService');
@@ -72,6 +72,33 @@ async function handleAskQuery(question) {
   try {
     const ctx = freshCtx();
     const answer = await answerQuestionWithAuthority(question.trim(), ctx, { signal: controller.signal });
+    return shapeAnswerForUI(answer, ctx);
+  } finally {
+    if (_activeController === controller) _activeController = null;
+  }
+}
+
+// Related-topic direct navigation checkpoint. `recordId` is never
+// operator-typed free text -- it only ever comes from a previous shaped
+// answer's own relatedCapabilities[].id (main/askAutoIngestPresentation.js's
+// shapeAnswerForUI already resolved those from the deterministic engine's
+// own real record ids). This validation is a plain system-boundary check
+// against a malformed/tampered IPC payload, not a lookup -- the actual
+// existence check happens inside answerForKnownRecord() (knowledgeEngine.js),
+// which returns null for anything that isn't a real record.
+const RECORD_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+
+async function handleAskRelatedNavigate(recordId) {
+  if (typeof recordId !== 'string' || !RECORD_ID_RE.test(recordId)) {
+    throw new Error('That related topic could not be opened.');
+  }
+  if (_activeController) _activeController.abort();
+  const controller = new AbortController();
+  _activeController = controller;
+  try {
+    const ctx = freshCtx();
+    const answer = await answerKnownRecordWithAuthority(recordId, ctx, { signal: controller.signal });
+    if (!answer) throw new Error('That related topic could not be opened.');
     return shapeAnswerForUI(answer, ctx);
   } finally {
     if (_activeController === controller) _activeController = null;
@@ -140,6 +167,7 @@ async function handleRemoveModel() {
 
 function registerIpcHandlers() {
   ipcMain.handle('ask:query', async (event, question) => handleAskQuery(question));
+  ipcMain.handle('ask:relatedNavigate', async (event, recordId) => handleAskRelatedNavigate(recordId));
   ipcMain.handle('ask:cancelQuery', () => handleCancelQuery());
   ipcMain.handle('ask:modelStatus', () => getModelStatus());
   ipcMain.handle('ask:downloadModel', async (event) => handleDownloadModel(event));

@@ -430,6 +430,7 @@ contextBridge.exposeInMainWorld('api', {
   // the renderer has no way to supply a filesystem path, a download URL,
   // or any other resource reference to the local judge/model layer.
   askQuestion:            (question) => ipcRenderer.invoke('ask:query',             question),
+  askRelated:             (recordId) => ipcRenderer.invoke('ask:relatedNavigate',    recordId),
   cancelAskQuery:         ()         => ipcRenderer.invoke('ask:cancelQuery'),
   getAskModelStatus:      ()         => ipcRenderer.invoke('ask:modelStatus'),
   downloadAskModel:       ()         => ipcRenderer.invoke('ask:downloadModel'),
