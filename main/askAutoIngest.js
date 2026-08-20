@@ -26,7 +26,15 @@ const { ipcMain } = require('electron');
 const PRODUCT_DOCS = path.join(__dirname, '..', 'scripts', 'product-docs');
 const { assemble } = require(path.join(PRODUCT_DOCS, 'lib', 'build.js'));
 const { buildEngineContext } = require(path.join(PRODUCT_DOCS, 'lib', 'knowledgeEngine.js'));
-const { answerQuestionWithAuthority, answerKnownRecordWithAuthority } = require(path.join(PRODUCT_DOCS, 'lib', 'answerWithAuthority.js'));
+// Phase C5: answerQuestionWithSynthesis()/answerKnownRecordWithSynthesis()
+// call the unmodified answerQuestionWithAuthority()/
+// answerKnownRecordWithAuthority() first, then attempt LLM synthesis on top
+// -- see scripts/product-docs/lib/answerWithSynthesis.js's own header for
+// the full pipeline and fallback contract. This file no longer calls
+// answerWithAuthority.js directly; every real decision (authority scope,
+// judge invocation, synthesis eligibility, safety validation) still lives
+// in those already-tested modules, none of it here.
+const { answerQuestionWithSynthesis, answerKnownRecordWithSynthesis } = require(path.join(PRODUCT_DOCS, 'lib', 'answerWithSynthesis.js'));
 
 const modelManager = require('../services/localJudge/modelManager');
 const judgeService = require('../services/localJudge/judgeService');
@@ -71,7 +79,7 @@ async function handleAskQuery(question) {
   _activeController = controller;
   try {
     const ctx = freshCtx();
-    const answer = await answerQuestionWithAuthority(question.trim(), ctx, { signal: controller.signal });
+    const answer = await answerQuestionWithSynthesis(question.trim(), ctx, { signal: controller.signal });
     return shapeAnswerForUI(answer, ctx);
   } finally {
     if (_activeController === controller) _activeController = null;
@@ -95,15 +103,15 @@ async function handleAskRelatedNavigate(recordId) {
   // Shares the SAME single-in-flight-query controller as handleAskQuery
   // above -- a Related click still cancels an overlapping typed ask (or
   // vice versa) so a stale response can never land after a newer one.
-  // answerKnownRecordWithAuthority() itself is a fast, synchronous-under-
-  // the-hood id lookup (no judge/model call -- see its own header comment
-  // in answerWithAuthority.js) and takes no options/signal of its own.
+  // The known-record lookup itself is a fast, synchronous-under-the-hood id
+  // lookup (no judge/model call -- see answerWithAuthority.js's own header
+  // comment); only the synthesis step on top of it is async/cancellable.
   if (_activeController) _activeController.abort();
   const controller = new AbortController();
   _activeController = controller;
   try {
     const ctx = freshCtx();
-    const answer = await answerKnownRecordWithAuthority(recordId, ctx);
+    const answer = await answerKnownRecordWithSynthesis(recordId, ctx, { signal: controller.signal });
     if (!answer) throw new Error('That related topic could not be opened.');
     return shapeAnswerForUI(answer, ctx);
   } finally {

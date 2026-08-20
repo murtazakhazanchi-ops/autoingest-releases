@@ -17146,6 +17146,15 @@ const _transferMonitor = (() => {
         technicalBody.appendChild(row);
       }
     }
+    if (td.synthesis) {
+      const row = document.createElement('div');
+      row.className = 'aa-tech-row';
+      const lab = document.createElement('div'); lab.className = 'aa-tech-label'; lab.textContent = 'Answer wording';
+      const val = document.createElement('div'); val.className = 'aa-tech-value';
+      val.textContent = td.synthesis.applied ? 'AI-refined from verified AutoIngest knowledge' : 'Deterministic (AutoIngest knowledge engine)';
+      row.appendChild(lab); row.appendChild(val);
+      technicalBody.appendChild(row);
+    }
     if (td.authority) {
       const a = td.authority;
       const rows = [

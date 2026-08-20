@@ -31,6 +31,17 @@ const TYPE_GUIDANCE = {
   COMPARISON: 'This is a comparison question. Compare only the specific items the evidence actually documents; if one side of the comparison has no evidence, say so rather than guessing.',
   CONNECTIVITY: 'This is a connectivity/offline-behavior question. State exactly what the evidence says happens when connectivity is lost, no more.',
   UNKNOWN: 'No confident classification exists for this question. Treat conservatively: if matchQuality is "none" or capabilityStatus is UNKNOWN, set refused=true.',
+  // Phase C5 -- known-record (Related-topic) browsing. answerForKnownRecord()
+  // (knowledgeEngine.js, unmodified) hardcodes QUESTION_TYPES.CAPABILITY for
+  // every Feature-primary known record, regardless of what the operator
+  // actually did (click a Related capsule -- browsing, not asking a yes/no
+  // question). evidencePackage.js's buildEvidencePackageForKnownRecord()
+  // remaps that one case to this dedicated guidance -- discovered necessary
+  // by this checkpoint's own real-model acceptance run, where the CAPABILITY
+  // guidance below ("lead with Yes/No") caused the model to synthesize a
+  // bare "Yes" with no explanation for "Source Selection"/"Source Detection"
+  // (bench/results/phase-c5-synthesis-related-real-model.json).
+  KNOWN_RECORD_BROWSE: 'The operator navigated directly to this record (e.g. clicked a Related-topic capsule) -- this is browsing, not a yes/no question. Describe what it is, why an operator would use it, and how it fits into the broader workflow, grounded only in directAnswer/guidance/limitations. Do NOT lead with or reduce the answer to "Yes"/"No" -- there is no capability claim being verified here.',
 };
 
 function buildSynthesisPrompt(evidencePackage) {

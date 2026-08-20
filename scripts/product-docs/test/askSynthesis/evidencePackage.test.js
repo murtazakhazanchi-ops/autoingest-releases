@@ -13,8 +13,9 @@ const assert = require('node:assert/strict');
 const { createRunner } = require('../testHarness');
 const build = require('../../lib/build');
 const { buildEngineContext, answerQuestion } = require('../../lib/knowledgeEngine');
-const { buildEvidencePackage, sanitizeIdsInProse } = require('../../lib/askSynthesis/evidencePackage');
+const { buildEvidencePackage, sanitizeIdsInProse, buildEvidencePackageForKnownRecord } = require('../../lib/askSynthesis/evidencePackage');
 const { ID_SHAPE_RE } = require('../../lib/askSynthesis/safetyValidation');
+const { answerForKnownRecord } = require('../../lib/knowledgeEngine');
 
 async function main() {
   const { t, summarize } = createRunner();
@@ -122,6 +123,39 @@ async function main() {
     if (pkg.historical.unanchoredDiagnosticOnly) {
       assert.equal(pkg.historical.admitted.length, 0, 'Phase 5.3 materiality-safety closure: unanchored candidates are never admitted to the real answer, structurally enforced here too');
     }
+  });
+
+  // -------------------------------------------------------------------
+  // Phase C5 -- buildEvidencePackageForKnownRecord() classification remap.
+  // Real-model finding (bench/results/phase-c5-synthesis-related-real-model.json):
+  // a Feature-primary known record's hardcoded CAPABILITY classification,
+  // fed unchanged into promptTemplates.js's "lead with Yes/No" guidance,
+  // caused the model to synthesize a bare "Yes" for known-record browsing.
+  // -------------------------------------------------------------------
+  await t('known-record evidence package: Feature-primary (CAPABILITY) is remapped to KNOWN_RECORD_BROWSE', () => {
+    const feature = built.knowledgeIndex[0];
+    const answer = answerForKnownRecord(feature.id, ctx);
+    assert.equal(answer.classification, 'CAPABILITY', 'test assumption: answerForKnownRecord() still hardcodes CAPABILITY for Feature-primary records');
+    const pkg = buildEvidencePackageForKnownRecord(answer, ctx);
+    assert.equal(pkg.classification, 'KNOWN_RECORD_BROWSE');
+    assert.equal(answer.classification, 'CAPABILITY', 'the remap must never mutate the real answer object');
+  });
+
+  await t('known-record evidence package: Workflow-primary (HOW_TO) is left untouched', () => {
+    const workflow = built.workflowIndex[0];
+    const answer = answerForKnownRecord(workflow.id, ctx);
+    assert.equal(answer.classification, 'HOW_TO');
+    const pkg = buildEvidencePackageForKnownRecord(answer, ctx);
+    assert.equal(pkg.classification, 'HOW_TO');
+  });
+
+  await t('known-record evidence package never computes retrievalDiagnostics or neighborhood/historical (bounded scope, no re-run of retrieval)', () => {
+    const feature = built.knowledgeIndex[0];
+    const answer = answerForKnownRecord(feature.id, ctx);
+    const pkg = buildEvidencePackageForKnownRecord(answer, ctx);
+    assert.equal(pkg.retrievalDiagnostics, null);
+    assert.deepEqual(pkg.admittedNeighborhood, []);
+    assert.deepEqual(pkg.historical.admitted, []);
   });
 
   summarize('askSynthesis/evidencePackage.test.js');

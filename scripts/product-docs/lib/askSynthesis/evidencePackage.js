@@ -282,4 +282,111 @@ function buildEvidencePackage(question, ctx) {
   };
 }
 
-module.exports = { buildEvidencePackage, displayNameFor, sanitizeIdsInProse };
+// Phase C5 — overlays the AUTHORITY-DECIDED capabilityStatus onto a fresh
+// Phase A/A.2 evidence package. Deliberately re-runs buildEvidencePackage()
+// rather than accepting a precomputed one: answerQuestion(question, ctx) is
+// a pure function of its two arguments (build.js's assemble()/
+// buildEngineContext() produce a fresh ctx per request -- see
+// main/askAutoIngest.js's freshCtx()), so recomputing it here reproduces
+// the EXACT SAME directAnswer/guidance/steps/limitations/primary that
+// answerQuestionWithAuthority() itself started from -- this is the same
+// "known, accepted redundancy" this file's own header comment already
+// documents for explainNeighborhood()/explainHistoricalContext(). The one
+// and only field capability authority can change is capabilityStatus
+// itself (see capabilityAuthority.js's confirmAffirmative()/
+// downgradeToUncertain() -- every other field on a CONFIRMED affirmative
+// answer is untouched); overlaying it here, rather than threading the
+// already-computed answer object through a rebuilt evidence package,
+// keeps this module's only public surface change a one-line addition.
+function buildEvidencePackageForAuthorityAnswer(question, authorityAnswer, ctx) {
+  const pkg = buildEvidencePackage(question, ctx);
+  return { ...pkg, capabilityStatus: authorityAnswer.capabilityStatus };
+}
+
+// Phase C5 — a deliberately MINIMAL evidence package for known-record
+// (Related-topic) browsing. Does NOT call explainNeighborhood()/
+// explainHistoricalContext() -- both internally call answerQuestion(question, ctx)
+// a second time, and feeding either of them a record's own title as if it
+// were operator-typed free text is exactly the synthetic-question pattern
+// answerWithAuthority.js's own header comment documents being removed for
+// causing a real Product Owner-reported acceptance failure (commit
+// 9e088c8). Known-record browsing is bounded to the record's own already-
+// resolved fields (directAnswer/guidance/steps/limitations/relatedCapabilities/
+// sources) -- exactly what Section K of this checkpoint requires ("grounded
+// solely in that known record and any explicitly permitted linked
+// evidence"). `answer` is the result of answerForKnownRecord()/
+// answerKnownRecordWithAuthority() -- the same answerFromRecord()/
+// answerFromWorkflow() shape answerQuestion() itself produces, just
+// resolved by id instead of by search.
+function buildEvidencePackageForKnownRecord(answer, ctx) {
+  const primaryMatch = answer.matchedCapabilities && answer.matchedCapabilities[0];
+  const primary = primaryMatch
+    ? {
+      id: primaryMatch.id,
+      displayName: primaryMatch.title || displayNameFor(primaryMatch.id, ctx),
+      entityType: primaryMatch.entityType,
+      score: primaryMatch.score,
+    }
+    : null;
+  const companionWorkflowId = primary && primary.entityType === 'workflow'
+    ? primary.id
+    : (answer.sources || []).find((s) => /^AI-WF-/.test(s.id));
+
+  const emptyHistorical = {
+    historicalIntent: null, admitted: [], notAdmitted: [], currentStatusAuthority: null, note: null, unanchoredDiagnosticOnly: null,
+  };
+
+  return {
+    question: answer.query,
+    // Feature-primary known records are hardcoded QUESTION_TYPES.CAPABILITY
+    // by answerForKnownRecord() (knowledgeEngine.js, unmodified) regardless
+    // of how the record was reached -- correct for a real typed "does X
+    // exist?" question, wrong for Related-topic BROWSING (there is no claim
+    // being verified). Remapped to a dedicated synthesis-only guidance key
+    // (promptTemplates.js's KNOWN_RECORD_BROWSE) -- this never changes
+    // answer.classification itself, which the rest of the app (and
+    // deterministicFallback below) never sees touched. Workflow-primary
+    // known records already classify HOW_TO, which reads naturally for
+    // browsing as-is and is left untouched.
+    classification: answer.classification === 'CAPABILITY' ? 'KNOWN_RECORD_BROWSE' : answer.classification,
+    primary,
+    capabilityStatus: answer.capabilityStatus,
+    matchQuality: answer.matchQuality,
+    confidence: answer.confidence,
+    // Deliberately null, not recomputed -- see header comment above.
+    retrievalDiagnostics: null,
+    directAnswer: sanitizeIdsInProse(answer.directAnswer, ctx),
+    guidance: sanitizeIdsInProse(answer.guidance, ctx),
+    steps: structuredStepsFor(
+      typeof companionWorkflowId === 'string' ? companionWorkflowId : (companionWorkflowId ? companionWorkflowId.id : null),
+      ctx,
+    ),
+    limitations: (answer.limitations || []).map((l) => sanitizeIdsInProse(l, ctx)),
+    // Bounded scope (see header comment) -- never populated for known-record browsing.
+    admittedNeighborhood: [],
+    visibleNotAdmitted: [],
+    historical: emptyHistorical,
+    relatedCapabilities: (answer.relatedCapabilities || []).map((id) => ({ id, displayName: displayNameFor(id, ctx) })),
+    sources: describeSources(answer.sources, ctx),
+    deterministicFallback: {
+      directAnswer: answer.directAnswer,
+      guidance: answer.guidance,
+      limitations: answer.limitations || [],
+      capabilityStatus: answer.capabilityStatus,
+      sources: describeSources(answer.sources, ctx),
+    },
+    legitimateSourceIds: Array.from(new Set([
+      ...(primary ? [primary.id] : []),
+      ...(answer.relatedCapabilities || []),
+      ...(answer.sources || []).map((s) => s.id),
+    ])),
+  };
+}
+
+module.exports = {
+  buildEvidencePackage,
+  displayNameFor,
+  sanitizeIdsInProse,
+  buildEvidencePackageForAuthorityAnswer,
+  buildEvidencePackageForKnownRecord,
+};

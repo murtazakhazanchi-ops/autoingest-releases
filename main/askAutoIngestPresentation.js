@@ -128,6 +128,11 @@ function shapeAnswerForUI(answer, ctx) {
     relatedCapabilities,
     technicalDetails: {
       sources,
+      // Phase C5 — diagnostic-only (Section Q: "do not clutter the main
+      // answer with AI diagnostics"). Never affects directAnswer/steps/
+      // limitations above, which are already the final text (synthesized
+      // or deterministic) by the time this function runs.
+      synthesis: answer.synthesis ? { applied: answer.synthesis.applied, reason: answer.synthesis.reason } : { applied: false, reason: null },
       authority: authority ? {
         required: authority.required,
         ran: authority.ran,
