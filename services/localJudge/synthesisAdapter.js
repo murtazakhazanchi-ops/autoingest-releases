@@ -22,24 +22,27 @@ const PRODUCT_DOCS = path.join(__dirname, '..', '..', 'scripts', 'product-docs')
 const { buildSynthesisPrompt } = require(path.join(PRODUCT_DOCS, 'lib', 'askSynthesis', 'promptTemplates'));
 const { buildSynthesisSchema } = require(path.join(PRODUCT_DOCS, 'lib', 'askSynthesis', 'synthesisSchema'));
 const { validateSynthesis } = require(path.join(PRODUCT_DOCS, 'lib', 'askSynthesis', 'safetyValidation'));
+const { resolveMaxTokens } = require(path.join(PRODUCT_DOCS, 'lib', 'askSynthesis', 'synthesisBudget'));
 const runtime = require('./runtime');
 
-// maxTokens=500: a synthesized answer plus steps/warnings/related is
-// substantially longer than the judge's single-word judgment (maxTokens=200
-// there) -- 500 is the real, measured value used throughout the
-// electronSynthesisBenchmark.js real-model run this checkpoint (see that
-// harness and synthesisService.js's own header comment for the timeout
-// derived from the same run). modelPath/timeoutMs remain required,
-// explicit constructor arguments, same discipline as judgeAdapter.js.
-function createSynthesisAdapter({ modelPath, timeoutMs, maxTokens = 500, repeatPenalty }) {
+// Phase C5.2: maxTokens is no longer a single fixed value -- it is resolved
+// per-request from the evidence package's own (already-deterministic)
+// classification via synthesisBudget.js's resolveMaxTokens(), which is
+// where the real-model-derived rationale and measurements live. `maxTokens`
+// remains an optional CONSTRUCTOR override (tests only -- no production
+// caller passes it) for parity with judgeAdapter.js's own override
+// discipline; when omitted (the production path), every call computes its
+// own budget fresh from that request's classification.
+function createSynthesisAdapter({ modelPath, timeoutMs, maxTokens, repeatPenalty }) {
   if (!modelPath) throw new Error('createSynthesisAdapter requires an explicit modelPath');
   if (!timeoutMs) throw new Error('createSynthesisAdapter requires an explicit, measurement-derived timeoutMs');
 
   return async function synthesize(evidencePackage, { signal } = {}) {
     const { system, user, handleMap } = buildSynthesisPrompt(evidencePackage);
     const schema = buildSynthesisSchema(evidencePackage, handleMap);
+    const effectiveMaxTokens = maxTokens || resolveMaxTokens(evidencePackage.classification);
 
-    const result = await runtime.infer({ system, user, schema, maxTokens, repeatPenalty, modelPath, timeoutMs, signal });
+    const result = await runtime.infer({ system, user, schema, maxTokens: effectiveMaxTokens, repeatPenalty, modelPath, timeoutMs, signal });
 
     if (result.parseError || !result.parsed) {
       throw new Error(result.parseError || 'synthesis model produced no parseable output');
