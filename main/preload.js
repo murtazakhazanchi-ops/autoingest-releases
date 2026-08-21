@@ -396,6 +396,10 @@ contextBridge.exposeInMainWorld('api', {
   qmzMoveToUnsequenced: (params) => ipcRenderer.invoke('qmz:moveToUnsequenced', params),
   qmzQueueMetadata:     (params) => ipcRenderer.invoke('qmz:queueMetadata',     params),
   onQmzMetadataProgress: (cb)    => _register('qmz:metadata:progress', (_e, data) => cb(data)),
+  // TEMPORARY (Bug 2 forensic investigation — remove once the Leicester
+  // "empty QMZ workspace" root cause is confirmed): logs which paths exist on
+  // disk around the exact moment a QMZ root is resolved, to app.log.
+  qmzDiagPaths:         (params) => ipcRenderer.invoke('qmz:diagPaths',        params),
 
   // ── Online Registry (advisory — prepare local shells from remote registry entries) ──
   registryGetAll:                ()       => ipcRenderer.invoke('registry:getAll'),

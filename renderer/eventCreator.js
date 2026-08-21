@@ -1951,6 +1951,13 @@ ${unparseable.map(ev => `
         // are required so queued metadata carries HijriDate and durably persists its
         // run to event.json — without them the resolver treats every field as absent.
         const hijriDate = evEntry?.hijriDate || evEntry?._eventJson?.hijriDate || null;
+        // TEMPORARY diagnostic logging (Bug 2 forensic investigation — remove
+        // once the Leicester "empty QMZ workspace" root cause is confirmed).
+        // Narrowly scoped to the QMZ open path only.
+        window.api.diagLog?.(`[qmz-open] eventFolder=${JSON.stringify(eventFolder)} eventName=${JSON.stringify(folder)} `
+          + `componentCount=${evEntry?.components?.length ?? 0} isMulti=${isMulti} compIdx=${compIdx} `
+          + `component.folderName=${JSON.stringify(comp?.folderName ?? null)} resolvedQmzRoot=${JSON.stringify(qmzRoot)}`);
+        window.api.qmzDiagPaths?.({ eventFolder, componentFolderName: comp?.folderName ?? null, qmzRoot }).catch?.(() => {});
         if (typeof window.openQMZManager === 'function') {
           window.openQMZManager(qmzRoot, { component: comp, isMulti, eventTitle, componentTitle, hijriDate, eventJsonPath: eventFolder });
         }

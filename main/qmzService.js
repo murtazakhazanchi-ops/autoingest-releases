@@ -327,14 +327,30 @@ async function saveState(qmzRoot, state) {
  *   state       — parsed qmz-sequences.json (or default)
  */
 async function scanRoot(qmzRoot) {
+  // TEMPORARY diagnostics (Bug 2 forensic investigation — remove once the
+  // Leicester "empty QMZ workspace" root cause is confirmed). Raw readdir
+  // names only (never file contents), so this stays safe to leave on for a
+  // real reproduction without flooding app.log.
+  let _rawRootEntries = null;
+  try { _rawRootEntries = (await fsp.readdir(qmzRoot, { withFileTypes: true })).map(e => `${e.name}${e.isDirectory() ? '/' : ''}`); }
+  catch (err) { _rawRootEntries = [`<readdir THREW: ${err.code || err.message}>`]; }
+  log(`[qmz-diag] scanRoot ENTER root=${JSON.stringify(qmzRoot)} rawReaddir=${JSON.stringify(_rawRootEntries)}`);
+
   const [childDirs, state] = await Promise.all([listChildDirs(qmzRoot), readState(qmzRoot)]);
+  log(`[qmz-diag] scanRoot hardened childDirs=${JSON.stringify(childDirs)}`);
   const sequences   = [];
   const unsequenced = {};
   const other       = [];
 
   for (const dir of childDirs) {
     if (dir === UNSEQUENCED) {
+      const unseqPath = path.join(qmzRoot, UNSEQUENCED);
+      let _rawUnseqEntries = null;
+      try { _rawUnseqEntries = (await fsp.readdir(unseqPath, { withFileTypes: true })).map(e => `${e.name}${e.isDirectory() ? '/' : ''}`); }
+      catch (err) { _rawUnseqEntries = [`<readdir THREW: ${err.code || err.message}>`]; }
+      log(`[qmz-diag] scanRoot _Unsequenced chosenPath=${JSON.stringify(unseqPath)} rawReaddir=${JSON.stringify(_rawUnseqEntries)}`);
       const pgDirs = await listChildDirs(path.join(qmzRoot, UNSEQUENCED));
+      log(`[qmz-diag] scanRoot _Unsequenced hardened children (classified as directories)=${JSON.stringify(pgDirs)}`);
       for (const pg of pgDirs) {
         const pgPath = path.join(qmzRoot, UNSEQUENCED, pg);
         // Recovery for archives affected by the (now-fixed) bug where running
@@ -347,9 +363,11 @@ async function scanRoot(qmzRoot) {
         // and read straight through it to the real nested photographer
         // folders. Read-only: no filesystem move is performed here.
         if (_stripPcPrefix(pg) === UNSEQUENCED) {
+          log(`[qmz-diag] scanRoot child=${JSON.stringify(pg)} classified=ALIAS(_Unsequenced) — reading through to nested photographers`);
           const nestedPgDirs = await listChildDirs(pgPath);
           for (const nestedPg of nestedPgDirs) {
             const files = await listMediaFiles(path.join(pgPath, nestedPg));
+            log(`[qmz-diag] scanRoot   nested photographer=${JSON.stringify(nestedPg)} canonical=${JSON.stringify(_stripPcPrefix(nestedPg))} mediaCount=${files.length}`);
             const existing = unsequenced[nestedPg];
             unsequenced[nestedPg] = existing
               ? { count: existing.count + files.length, files: [...existing.files, ...files] }
@@ -358,6 +376,7 @@ async function scanRoot(qmzRoot) {
           continue;
         }
         const files = await listMediaFiles(pgPath);
+        log(`[qmz-diag] scanRoot child=${JSON.stringify(pg)} classified=PHOTOGRAPHER canonical=${JSON.stringify(_stripPcPrefix(pg))} mediaCount=${files.length}`);
         unsequenced[pg] = { count: files.length, files };
       }
     } else if (SEQ_RE.test(dir)) {
@@ -375,6 +394,9 @@ async function scanRoot(qmzRoot) {
   }
 
   sequences.sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0));
+  log(`[qmz-diag] scanRoot RESULT root=${JSON.stringify(qmzRoot)} `
+    + `unsequenced=${JSON.stringify(Object.entries(unsequenced).map(([k, v]) => `${k}:${v.count}`))} `
+    + `sequences=${JSON.stringify(sequences.map(s => s.code))} other=${JSON.stringify(other)}`);
   return { sequences, unsequenced, other, state };
 }
 
@@ -416,6 +438,7 @@ async function _mergeDirFilesInto(srcDir, destDir, errors, label) {
  * safe per-file move as every other adoption path here.
  */
 async function initRoot(qmzRoot) {
+  log(`[qmz-diag] initRoot ENTER root=${JSON.stringify(qmzRoot)}`);
   const scan    = await scanRoot(qmzRoot);
   const adopted = [];
   const errors  = [];

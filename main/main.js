@@ -5495,6 +5495,38 @@ ipcMain.handle('event:applyPhotographerSequence', async (_event, { localEventPat
 
 // ── QMZ Sequence Manager ──────────────────────────────────────────────────────
 
+// TEMPORARY (Bug 2 forensic investigation — remove once the Leicester "empty
+// QMZ workspace" root cause is confirmed). Logs, to app.log, exactly which
+// paths exist on disk around the moment a QMZ root is resolved by the
+// renderer, so a real Windows/NAS reproduction can be correlated against the
+// literal filesystem tree without guessing.
+async function _diagPathExists(p) {
+  try { const st = await fsp.stat(p); return st.isDirectory() ? 'dir' : 'file'; }
+  catch (err) { return `absent(${err.code || err.message})`; }
+}
+ipcMain.handle('qmz:diagPaths', async (_e, { eventFolder, componentFolderName, qmzRoot }) => {
+  try {
+    const componentPath = componentFolderName ? path.join(eventFolder, componentFolderName) : null;
+    const [eventExists, eventUnseq, compExists, compUnseq, qmzRootExists] = await Promise.all([
+      _diagPathExists(eventFolder),
+      _diagPathExists(path.join(eventFolder, '_Unsequenced')),
+      componentPath ? _diagPathExists(componentPath) : Promise.resolve('n/a (no component folderName)'),
+      componentPath ? _diagPathExists(path.join(componentPath, '_Unsequenced')) : Promise.resolve('n/a'),
+      _diagPathExists(qmzRoot),
+    ]);
+    let realQmzRoot = null;
+    try { realQmzRoot = await fsp.realpath(qmzRoot); } catch (err) { realQmzRoot = `realpath THREW: ${err.code || err.message}`; }
+    log(`[qmz-diag] eventFolder=${JSON.stringify(eventFolder)} exists=${eventExists} `
+      + `eventFolder/_Unsequenced=${eventUnseq} `
+      + `componentFolderName=${JSON.stringify(componentFolderName)} componentPath=${compExists} componentPath/_Unsequenced=${compUnseq} `
+      + `resolvedQmzRoot=${JSON.stringify(qmzRoot)} qmzRootExists=${qmzRootExists} realpath(qmzRoot)=${JSON.stringify(realQmzRoot)}`);
+    return { ok: true };
+  } catch (err) {
+    log(`[qmz-diag] FAILED: ${err.message}`);
+    return { ok: false, error: err.message };
+  }
+});
+
 ipcMain.handle('qmz:scanRoot', async (_e, { qmzRoot }) => {
   return qmzService.scanRoot(qmzRoot);
 });
