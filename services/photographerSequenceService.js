@@ -4,6 +4,7 @@ const path = require('path');
 
 const { hidePathBestEffort } = require('./internalFileProtection');
 const localSyncManifest      = require('./localSyncManifest');
+const { log }                = require('./logger');
 // Canonical Representation Audit, L6 (2026-08-11): seqPrefix() now lives in
 // exactly one place, shared with the renderer via the same dual-export
 // pattern renderer/pathUtils.js already established for main/renderer
@@ -46,6 +47,26 @@ function _skipDir(name) {
   return SKIP_DIRS.has(name) || name.startsWith('.') || name.startsWith('#');
 }
 
+// Filesystem hardening (mirrors main/main.js's BUG-011 fix, and
+// main/qmzService.js's identical hardening for the same bug class):
+// Dirent.isDirectory() can misreport on some network shares. If Dirent says
+// "not a directory" but a real stat() on the same path says otherwise, trust
+// stat() — recovering a photographer folder a raw Dirent check alone would
+// have silently dropped from "Sequence Photographer Folders" candidate
+// discovery. Only adds a stat() call on the rare disagreement path.
+async function _directoryHardened(parentDir, entry) {
+  if (entry.isDirectory()) return true;
+  try {
+    const st = await fsp.stat(path.join(parentDir, entry.name));
+    if (st.isDirectory()) {
+      log(`[photographerSeq] DIRENT/STAT MISMATCH name=${JSON.stringify(entry.name)} parent=${JSON.stringify(parentDir)} `
+        + `dirent.isDirectory()=false stat.isDirectory()=true — accepting stat() result, treating as a directory`);
+      return true;
+    }
+  } catch { /* stat failed too — genuinely not a directory (or gone) */ }
+  return false;
+}
+
 /**
  * Scan photographer folders, component/sub-event aware.
  *
@@ -74,9 +95,14 @@ async function scanPhotographerFolders(localEventPath, components) {
   async function readPhotographerDirs(dirPath) {
     try {
       const entries = await fsp.readdir(dirPath, { withFileTypes: true });
-      return entries
-        .filter(e => e.isDirectory() && !_skipDir(e.name))
-        .map(e => ({ folderName: e.name, canonical: canonicalName(e.name) }));
+      const dirs = [];
+      for (const e of entries) {
+        if (_skipDir(e.name)) continue;
+        if (await _directoryHardened(dirPath, e)) {
+          dirs.push({ folderName: e.name, canonical: canonicalName(e.name) });
+        }
+      }
+      return dirs;
     } catch { return []; }
   }
 
@@ -154,7 +180,7 @@ async function _applyRenamesInDir(baseDir, ordered) {
     try {
       const dirs = await fsp.readdir(baseDir, { withFileTypes: true });
       for (const d of dirs) {
-        if (d.isDirectory() && canonicalName(d.name) === entry.canonical) {
+        if (canonicalName(d.name) === entry.canonical && await _directoryHardened(baseDir, d)) {
           currentFolder = d.name;
           break;
         }
@@ -334,4 +360,7 @@ module.exports = {
   applyRenames,
   updateManifestAfterRename,
   writeSequencesToEventJson,
+  // Test-only: mirrors main/qmzService.js's identical export for the same
+  // reason — see that file's export comment.
+  _directoryHardened,
 };

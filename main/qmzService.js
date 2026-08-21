@@ -203,10 +203,52 @@ async function removeIfEmptyIgnoringJunk(dir) {
   } catch { /* best-effort — never throw */ }
 }
 
+// Filesystem hardening (mirrors main/main.js's BUG-011 fix for master:scanEvents):
+// Dirent.isDirectory()/isFile() can misreport on some network shares — a
+// documented class of Node/libuv behavior, not specific to any one code path.
+// main.js's event scanner already recovers from this by falling back to a real
+// stat() when the Dirent disagrees; qmzService.js's own directory listing was
+// written independently and never got the same protection, so a QMZ component
+// whose _Unsequenced/photographer folders hit this on a real Windows/NAS
+// archive could silently report zero photographers/media even though the
+// folders and files are genuinely present on disk (bug: qmz-nested-unsequenced,
+// "already opened by old workspace" follow-up). Only adds a stat() call on the
+// rare disagreement path — the common case (Dirent and stat agree) is
+// unaffected.
+async function _directoryHardened(parentDir, entry) {
+  if (entry.isDirectory()) return true;
+  try {
+    const st = await fsp.stat(path.join(parentDir, entry.name));
+    if (st.isDirectory()) {
+      log(`[qmz] DIRENT/STAT MISMATCH name=${JSON.stringify(entry.name)} parent=${JSON.stringify(parentDir)} `
+        + `dirent.isDirectory()=false stat.isDirectory()=true — accepting stat() result, treating as a directory`);
+      return true;
+    }
+  } catch { /* stat failed too — genuinely not a directory (or gone) */ }
+  return false;
+}
+
+async function _fileHardened(parentDir, entry) {
+  if (entry.isFile()) return true;
+  try {
+    const st = await fsp.stat(path.join(parentDir, entry.name));
+    if (st.isFile()) {
+      log(`[qmz] DIRENT/STAT MISMATCH name=${JSON.stringify(entry.name)} parent=${JSON.stringify(parentDir)} `
+        + `dirent.isFile()=false stat.isFile()=true — accepting stat() result, treating as a file`);
+      return true;
+    }
+  } catch { /* stat failed too — genuinely not a file (or gone) */ }
+  return false;
+}
+
 async function listChildDirs(dir) {
   try {
     const entries = await fsp.readdir(dir, { withFileTypes: true });
-    return entries.filter(e => e.isDirectory()).map(e => e.name);
+    const result  = [];
+    for (const e of entries) {
+      if (await _directoryHardened(dir, e)) result.push(e.name);
+    }
+    return result;
   } catch { return []; }
 }
 
@@ -215,7 +257,8 @@ async function listMediaFiles(dir) {
     const entries = await fsp.readdir(dir, { withFileTypes: true });
     const files   = [];
     for (const e of entries) {
-      if (!e.isFile() || isJunkFile(e.name) || !MEDIA_EXT.has(path.extname(e.name).toLowerCase())) continue;
+      if (isJunkFile(e.name) || !MEDIA_EXT.has(path.extname(e.name).toLowerCase())) continue;
+      if (!(await _fileHardened(dir, e))) continue;
       const p    = path.join(dir, e.name);
       const type = mediaType(e.name);
       let size = 0;
@@ -348,7 +391,7 @@ async function _mergeDirFilesInto(srcDir, destDir, errors, label) {
   catch (err) { errors.push({ dir: label, error: err.message }); return; }
 
   for (const e of entries) {
-    if (!e.isFile()) continue;
+    if (!(await _fileHardened(srcDir, e))) continue;
     const r = await safeMoveFile(path.join(srcDir, e.name), path.join(destDir, e.name));
     if (!r.ok) errors.push({ dir: label, file: e.name, error: r.reason });
   }
@@ -388,7 +431,7 @@ async function initRoot(qmzRoot) {
       catch (err) { errors.push({ dir: dirName, error: err.message }); continue; }
 
       for (const child of children) {
-        if (!child.isDirectory()) continue; // stray files directly under the alias — leave in place, never guessed at
+        if (!(await _directoryHardened(aliasDir, child))) continue; // stray files directly under the alias — leave in place, never guessed at
         const childSrc  = path.join(aliasDir, child.name);
         const childDest = path.join(unsequencedDir, child.name);
         try {
@@ -594,4 +637,12 @@ module.exports = {
   removeSequence,
   moveFilesToSequence,
   moveFilesToUnsequenced,
+  // Test-only: exposes the Dirent/stat hardening helpers so
+  // test/qmzDirentMismatchRegression.test.js can exercise them directly
+  // against a real fs.stat() with a faked Dirent, mirroring
+  // test/bug011DirentMismatchRegression.test.js's established technique. Not
+  // part of the module's real public API — no other caller should use these
+  // directly; listChildDirs/listMediaFiles already apply them internally.
+  _directoryHardened,
+  _fileHardened,
 };
