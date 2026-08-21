@@ -131,14 +131,27 @@ async function main() {
   // Evidence-pending Memory preservation
   // -----------------------------------------------------------------
   await t('Evidence-pending Memory: AI-MEM-0001\'s qualified, less-grounded evidence classification ("Reconstructed from repository evidence only... no original chat transcript was available") is preserved VERBATIM, never silently promoted to full confidence', () => {
+    // Primary CHANGED at Phase C6 (lib/query.js's identity-mention tier):
+    // the question names AI-FEAT-033's own exact title ("Metadata Audit and
+    // Repair"), so AI-FEAT-033 now correctly wins over AI-FEAT-034
+    // (Metadata Management Modal, previously topped this tied question via
+    // sheer keyword-overlap luck) -- a real precision improvement, and
+    // thematically the more correct anchor for a memory record literally
+    // titled "...Audit & Repair Tab Evolution". AI-MEM-0001 remains
+    // admitted with its qualification preserved verbatim (this test's own
+    // actual purpose); ARCH-c-metadata-automation is now ALSO admitted, a
+    // real, pre-existing, grounded citation on AI-FEAT-033's own record
+    // (not AI-FEAT-034's), unlocked by the corrected anchor -- not a
+    // fabricated relationship.
     const q = 'How did the Metadata Audit and Repair tab evolve?';
     const answer = answerQuestion(q, ctx);
-    assert.equal(answer.matchedCapabilities[0].id, 'AI-FEAT-034');
+    assert.equal(answer.matchedCapabilities[0].id, 'AI-FEAT-033');
     const hc = explainHistoricalContext(q, ctx);
-    assert.deepEqual(hc.admitted.map((m) => m.id), ['AI-MEM-0001']);
-    assert.match(hc.admitted[0].evidenceQualification, /Reconstructed from repository evidence only/);
-    assert.match(hc.admitted[0].evidenceQualification, /no original chat transcript was available/);
-    assert.doesNotMatch(hc.admitted[0].evidenceQualification, /^Verified\b/, 'must never be silently rewritten as a verified/confident classification');
+    assert.deepEqual(hc.admitted.map((m) => m.id).sort(), ['AI-MEM-0001', 'ARCH-c-metadata-automation']);
+    const mem = hc.admitted.find((m) => m.id === 'AI-MEM-0001');
+    assert.match(mem.evidenceQualification, /Reconstructed from repository evidence only/);
+    assert.match(mem.evidenceQualification, /no original chat transcript was available/);
+    assert.doesNotMatch(mem.evidenceQualification, /^Verified\b/, 'must never be silently rewritten as a verified/confident classification');
   });
 
   // -----------------------------------------------------------------
@@ -349,15 +362,50 @@ async function main() {
     }
   });
 
-  await t('RF-5.4-002 forensic disposition: §3E remains a real, strong, untied diagnostic candidate (retrieval/grounding proven sound) but is NEVER exposed in the real public answer -- the exact case that proved unanchored Architecture materiality is unresolved; primary/status untouched, not an exception, not a regression', () => {
+  await t('PHASE C6 DISCLOSED FINDING (was RF-5.4-002/RF-5.3-011): governance-primary flipped to feature-primary for this exact question -- primary is now AI-FEAT-038, not DEC-021', () => {
+    // FLIPPED at Phase C6 (lib/query.js's identity-mention tier). "Transfer
+    // Export" is named verbatim in the question, so AI-FEAT-038 now scores
+    // 559 (raw) via genuine identity evidence -- higher than DEC-021's raw
+    // 400 -- so answerQuestion()'s cross-type governance-authority gate
+    // (governanceIsBestEvidence, this file's own knowledgeEngine.js
+    // ~line 777, strict `>` on raw scores) no longer routes this question
+    // through answerFromGovernanceRecord() at all. DEC-021 remains present
+    // in sources (3rd position, unchanged content, still cited) -- no data
+    // loss, no false claim, capabilityStatus still correctly AVAILABLE.
+    //
+    // SUBSTANTIVE SIDE EFFECT, DISCLOSED NOT HIDDEN: this question no
+    // longer exercises the "unanchored historical-context materiality
+    // safety closure" this test originally existed to guard (that
+    // mechanism itself -- explainHistoricalContext()'s unanchored fallback,
+    // reconcileUnknownEvidenceWording(), expectedPublicUnanchoredAbsent --
+    // is completely UNCHANGED and untouched by this fix; it simply isn't
+    // REACHED by this specific question anymore, because retrieval
+    // upstream now resolves differently). Instead, ARCH-e now surfaces via
+    // the SEPARATE, pre-existing, already-trusted Feature-anchored path
+    // (historicalContextForFeature() -- same mechanism verified safe for
+    // AI-FEAT-033/ARCH-c earlier in this file): AI-FEAT-038's own Lifecycle
+    // Metadata field genuinely, structurally cites ARCH-e (no invented
+    // relationship), and this question carries real historical intent, so
+    // admission is grounded exactly the way RF-5.3-005/010's controls
+    // already prove correct for that path. What is NOT independently
+    // re-verified here: whether ARCH-e's actual prose specifically
+    // addresses "process-local locking" as precisely as DEC-021's own text
+    // does -- RF-5.3-011's original forensic finding (the "local" token
+    // match landing in an unrelated "Local-First" sentence) was about a
+    // DIFFERENT, retrieval-strength-only admission path this question no
+    // longer takes; whether that same substance gap exists on the
+    // Feature-anchored path is a real open question, flagged here for
+    // Product Owner review, not silently assumed resolved.
     const q = 'What does Transfer Export do and why was its locking kept process-local?';
     const answer = answerQuestion(q, ctx);
-    assert.equal(answer.matchedCapabilities[0].id, 'DEC-021', 'Phase 5.4-owned primary is completely unaffected');
+    assert.equal(answer.matchedCapabilities[0].id, 'AI-FEAT-038');
     assert.equal(answer.capabilityStatus, 'AVAILABLE');
-    assert.equal(Object.prototype.hasOwnProperty.call(answer, 'unanchoredHistoricalContext'), false, 'withheld from the real public answer -- retrieval strength alone was proven insufficient for materiality');
+    assert.ok(answer.sources.some((s) => s.id === 'DEC-021'), 'DEC-021 remains present as a citation, just no longer primary');
+    assert.equal(Object.prototype.hasOwnProperty.call(answer, 'unanchoredHistoricalContext'), false, 'still structurally absent from the real public answer shape');
 
     const hc = explainHistoricalContext(q, ctx);
-    assert.deepEqual(hc.unanchored.candidates.map((c) => c.id), ['ARCH-e-transfer-and-distributed-working'], 'still correctly identified diagnostically, proving the withdrawal is an admission-safety choice, not a retrieval defect');
+    assert.equal(hc.unanchored, null, 'this question no longer reaches the unanchored fallback at all -- it is now Feature-anchored (see comment above)');
+    assert.deepEqual(hc.admitted.map((m) => m.id), ['ARCH-e-transfer-and-distributed-working'], 'admitted via the separate, pre-existing Feature-anchored grounding path, not the unanchored one this test originally targeted');
   });
 
   await t('Unanchored Memory has the SAME retrieval-only admission weakness as Architecture, demonstrated with real evidence, not assumed from symmetry: AI-MEM-0003 (zero grounding, "Evidence pending" for its entire Scope table) would be admitted on strong (700) unique retrieval alone if the field were exposed -- and the existing memoryHasGenuineChronology() check would NOT have caught it, due to a placeholder-string counting defect', () => {

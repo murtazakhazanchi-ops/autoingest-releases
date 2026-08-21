@@ -53,10 +53,17 @@ async function main() {
   });
 
   await t('no relationship lookup changes primary ranking: AI-FEAT-032\'s score/quality/confidence are the pure query.js/Phase-4.3 values, unaffected by DEC-009/PM-001 visibility', () => {
+    // Score/confidence CHANGED at Phase C6 (lib/query.js's identity-mention
+    // tier): "metadata verification" is AI-FEAT-032's own exact title,
+    // verbatim in R14_QUESTION, so it now wins via genuine identity
+    // evidence (564) instead of the old keyword-overlap-only score (400) --
+    // same underlying fact as knowledgeNeighborhoodAdmission.test.js's own
+    // updated case. This test's actual purpose (relationship-lookup
+    // reasoning contributes zero ranking influence) is unaffected.
     const answer = answerQuestion(R14_QUESTION, ctx);
-    assert.equal(answer.matchedCapabilities[0].score, 400);
+    assert.equal(answer.matchedCapabilities[0].score, 564);
     assert.equal(answer.matchQuality, 'strong');
-    assert.equal(answer.confidence, 0.4);
+    assert.equal(answer.confidence, 0.564);
   });
 
   await t('no recursive graph expansion: DEC-009 also cites AI-FEAT-019 in its own header, but AI-FEAT-019 never leaks into AI-FEAT-032\'s answer', () => {
@@ -73,13 +80,16 @@ async function main() {
     assert.ok(pm.path && pm.path.startsWith('postmortems/'), `PM-001 path should be traceable, got ${pm.path}`);
   });
 
-  await t('Governance-primary -> Feature behavior preserved: answerFromGovernanceRecord\'s own pre-existing direction is untouched by Decision 4', () => {
-    // Real governance-primary question (RF-5.4-002): DEC-021 wins outright, AI-FEAT-038 already cited as Context via the pre-existing answerFromGovernanceRecord mechanism -- must remain exactly as-is, Decision 4 touches Feature-primary sourcing only.
+  await t('PHASE C6 DISCLOSED FINDING: this exact question now resolves Feature-primary (AI-FEAT-038), not Governance-primary (DEC-021) -- see the checkpoint report and knowledgeHistoricalContext.test.js\'s own updated case for the full mechanism', () => {
+    // Was governance-primary pre-C6 (lib/query.js's identity-mention tier
+    // now gives AI-FEAT-038 a raw score of 559, higher than DEC-021's raw
+    // 400, so answerFromGovernanceRecord's own untouched "governance wins
+    // only when it beats every other type outright" rule no longer routes
+    // through it for THIS question -- the mechanism itself is unchanged;
+    // this specific question no longer reaches it). DEC-021 remains cited.
     const answer = answerQuestion('What does Transfer Export do and why was its locking kept process-local?', ctx);
-    assert.equal(answer.matchedCapabilities[0]?.id, 'DEC-021');
-    assert.ok(answer.sources.some((s) => s.id === 'DEC-021'));
-    assert.ok(answer.sources.some((s) => s.id === 'AI-FEAT-038'), 'the grounding feature must still be cited via the pre-existing mechanism');
-    assert.deepEqual(answer.relatedCapabilities, ['AI-FEAT-038']);
+    assert.equal(answer.matchedCapabilities[0]?.id, 'AI-FEAT-038');
+    assert.ok(answer.sources.some((s) => s.id === 'DEC-021'), 'the decision remains cited, just no longer primary');
   });
 
   await t('Workflow-primary case: no Governance relationship is fabricated for a Workflow, since the canonical Workflow schema has no relatedDecisions/relatedPostmortems field', () => {
@@ -98,8 +108,15 @@ async function main() {
   });
 
   await t('a feature with zero related decisions/postmortems shows zero fabricated relationships (no phantom edges)', () => {
-    // AI-FEAT-041 (Gap-C-short's own residual winner) has no Related decisions/postmortems in its own canonical file.
-    const diag = explainRelationships('Why does Transfer Import exist?', ctx);
+    // Phase C6 UPDATE: "Why does Transfer Import exist?" now correctly
+    // primaries AI-FEAT-039 (which DOES have a real related decision,
+    // DEC-012 -- itself proof the fix works, see the checkpoint report),
+    // so it no longer demonstrates the zero-relationships case this test
+    // exists to guard. Replaced with a different, still-real
+    // zero-relationships feature (AI-FEAT-041, the exact record this test
+    // used to reach only via the pre-fix defect) via a question that
+    // legitimately, correctly primaries it on its own merits.
+    const diag = explainRelationships('What is Transfer Background/Minimize Operation?', ctx);
     assert.equal(diag.primaryId, 'AI-FEAT-041');
     assert.deepEqual(diag.relationships, []);
   });

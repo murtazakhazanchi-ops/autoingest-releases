@@ -184,37 +184,62 @@ async function main() {
   });
 
   // ---------------------------------------------------------------------
-  // Phase C5.1 -- retrieval-confidence end-to-end: Q5 and Q13 (checkpoint
-  // Sections M/N) must NOT be able to reach synthesis with the wrong
-  // primary, through the real production entrypoint, not just the unit-
-  // level assessPrimaryFit() check.
+  // Phase C5.1 -- retrieval-confidence end-to-end (checkpoint Sections
+  // M/N): the safety gate must refuse synthesis on a wrong primary,
+  // through the real production entrypoint, not just the unit-level
+  // assessPrimaryFit() check.
+  //
+  // Phase C6 UPDATE: Q5 and Q13 (lib/query.js's identity-mention tier)
+  // no longer reproduce a wrong primary -- "Transfer Export"/"Transfer
+  // Import" are now correctly resolved, so these two are re-purposed
+  // below as POSITIVE proof the fix took effect end-to-end (retrieval ->
+  // synthesis-eligibility, not retrieval in isolation) and that the
+  // safety gate correctly steps out of the way once retrieval is right
+  // (Section Q: "correct retrieval should reduce how often it fires").
+  // The gate's own continued protection (Section Q: "but it should
+  // remain as defense-in-depth") is re-proven immediately after using a
+  // genuinely still-remaining mismatch case from the same investigation.
   // ---------------------------------------------------------------------
-  await t('Q5 end-to-end: "How do I create a Transfer Export?" cannot reach synthesis with the wrong primary', async () => {
+  await t('Q5 end-to-end, POST-C6: "How do I create a Transfer Export?" now resolves the correct primary and reaches synthesis normally', async () => {
     const q5 = 'How do I create a Transfer Export?';
     const det = answerQuestion(q5, ctx);
-    assert.equal(det.matchedCapabilities[0].id, 'AI-WF-008', 'test fixture assumption failed: the underlying retrieval defect this checkpoint fixed synthesis-eligibility for is no longer reproduced -- update this test');
+    assert.equal(det.matchedCapabilities[0].id, 'AI-FEAT-038', 'Phase C6 fix: identity-mention tier now correctly resolves the exact-named record');
     const result = await answerQuestionWithSynthesis(q5, ctx, {
       judge: NEVER_CALL,
       getModelAvailability: READY,
-      synthesize: NEVER_CALL, // must never even be invoked
+      synthesize: fakeSynthesizeEchoing(),
     });
-    assert.equal(result.synthesis.applied, false);
-    assert.equal(result.synthesis.reason, 'primary-mismatch-AI-FEAT-038');
-    assert.equal(result.directAnswer, det.directAnswer, 'the wrong deterministic answer still ships unpolished -- Section M outcome B, not C');
+    assert.equal(result.synthesis.applied, true, 'the retrieval-confidence gate no longer has a wrong primary to block -- synthesis proceeds normally');
   });
 
-  await t('Q13 end-to-end: "Why does Transfer Import exist?" cannot reach synthesis with the wrong primary', async () => {
+  await t('Q13 end-to-end, POST-C6: "Why does Transfer Import exist?" now resolves the correct primary and reaches synthesis normally', async () => {
     const q13 = 'Why does Transfer Import exist?';
     const det = answerQuestion(q13, ctx);
-    assert.equal(det.matchedCapabilities[0].id, 'AI-FEAT-041', 'test fixture assumption failed: update this test if the retrieval defect changes');
+    assert.equal(det.matchedCapabilities[0].id, 'AI-FEAT-039', 'Phase C6 fix: identity-mention tier now correctly resolves the exact-named record');
     const result = await answerQuestionWithSynthesis(q13, ctx, {
+      judge: NEVER_CALL,
+      getModelAvailability: READY,
+      synthesize: fakeSynthesizeEchoing(),
+    });
+    assert.equal(result.synthesis.applied, true);
+  });
+
+  await t('retrieval-confidence gate remains active as defense-in-depth (Section Q): a two-competing-title question is still refused end-to-end', async () => {
+    // Phase C6's identity-mention tier can boost BOTH named titles here
+    // ("Transfer Export" and "Backup Update Scanning"); only one wins
+    // primacy and the other is uncited, so the gate still correctly
+    // refuses synthesis -- proves the fix is bounded, not a blanket
+    // override of the safety gate.
+    const q = 'Is a Transfer Export the same thing as a backup from Backup Update Scanning?';
+    const det = answerQuestion(q, ctx);
+    assert.equal(det.matchedCapabilities[0].id, 'AI-FEAT-040');
+    const result = await answerQuestionWithSynthesis(q, ctx, {
       judge: NEVER_CALL,
       getModelAvailability: READY,
       synthesize: NEVER_CALL,
     });
     assert.equal(result.synthesis.applied, false);
-    assert.equal(result.synthesis.reason, 'primary-mismatch-AI-FEAT-039');
-    assert.equal(result.directAnswer, det.directAnswer);
+    assert.equal(result.directAnswer, det.directAnswer, 'the wrong deterministic answer still ships unpolished, never LLM-polished into something more convincing');
   });
 
   await t('a correctly-resolved HOW_TO question with a real confusable competitor still synthesizes end-to-end', async () => {

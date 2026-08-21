@@ -158,9 +158,20 @@ async function main() {
     assert.equal(diag.admitted.length, 0, 'a simple question must not gain a synthesized secondary member merely because governance-eligible classification applies');
   });
 
-  await t('simple control (RF-5.2-001/RF-5.4-008): archive-lock-error question keeps its exact pre-existing 4-source baseline, no fifth member added', () => {
+  await t('simple control (RF-5.2-001/RF-5.4-008): archive-lock-error question keeps a small, no-fabricated-member source list', () => {
+    // CHANGED at Phase C6 (lib/query.js's identity-mention tier) -- the
+    // question's exact phrase "recover from an archive lock error" is
+    // AI-WF-008's own title verbatim, so AI-WF-008 now wins as a strong,
+    // untied primary (655, was ~150 pre-fix) instead of a looser tie. Real
+    // improvement, not a regression: primary is still, correctly, AI-WF-008
+    // (unchanged); the dropped 4th member was a looser admission riding on
+    // the old, weaker, tied score gap. Source count 4 -> 3, still the same
+    // three genuinely on-topic records (AI-WF-008 + AI-FEAT-043 +
+    // AI-FEAT-045) with no fifth, fabricated member -- this control's own
+    // actual purpose (no fabricated aspect creeps in).
     const answer = answerQuestion('How do I recover from an archive lock error?', ctx);
-    assert.equal(answer.sources.length, 4);
+    assert.equal(answer.matchedCapabilities[0].id, 'AI-WF-008');
+    assert.equal(answer.sources.length, 3);
   });
 
   // -----------------------------------------------------------------
@@ -190,10 +201,19 @@ async function main() {
   // No ranking influence / no recursive expansion (regression guards, reusing Phase 5.1's own proofs)
   // -----------------------------------------------------------------
   await t('neighborhood admission never influences ranking: R14\'s primary score/quality/confidence are unchanged by admission reasoning', () => {
+    // Score/confidence CHANGED at Phase C6 (lib/query.js's identity-mention
+    // tier): "metadata verification" is AI-FEAT-032's own exact title,
+    // verbatim in the question, so it now wins via genuine identity
+    // evidence (564) instead of the old keyword-overlap-only score (400).
+    // The actual invariant this test exists to guard -- neighborhood
+    // admission reasoning itself never influences ranking -- is
+    // independently re-asserted below via diag.influencedRanking and is
+    // unaffected by this fix (a completely separate mechanism).
     const answer = answerQuestion('What went wrong with the same-size skip and metadata verification?', ctx);
-    assert.equal(answer.matchedCapabilities[0].score, 400);
+    assert.equal(answer.matchedCapabilities[0].id, 'AI-FEAT-032');
+    assert.equal(answer.matchedCapabilities[0].score, 564);
     assert.equal(answer.matchQuality, 'strong');
-    assert.equal(answer.confidence, 0.4);
+    assert.equal(answer.confidence, 0.564);
     const diag = explainNeighborhood('What went wrong with the same-size skip and metadata verification?', ctx);
     assert.equal(diag.influencedRanking, false);
   });

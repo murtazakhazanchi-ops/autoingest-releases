@@ -51,13 +51,21 @@ const KEYWORD_SURFACE_DAMPING = 0.25;
 
 // A record's winning score is eligible for this adjustment ONLY when the
 // keyword-overlap tier is the sole reason it matched — if any higher tier
-// (exact-id, exact-alias, exact-title, title-substring) also fired, that
-// tier's own score is what lib/query.js's Math.max() actually returned,
-// and this module must never touch it. This is the entire mechanism by
-// which "exact-ID, alias and title tiers remain untouched" is guaranteed
-// — not a separate exclusion list, but a structural property of when
-// normalization is even considered.
-const HIGHER_TIER_REASONS = new Set(['exact-id', 'exact-alias', 'exact-title', 'title-substring']);
+// (exact-id, exact-alias, exact-title, title-substring, identity-mention)
+// also fired, that tier's own score is what lib/query.js's Math.max()
+// actually returned, and this module must never touch it. This is the
+// entire mechanism by which "exact-ID, alias and title tiers remain
+// untouched" is guaranteed — not a separate exclusion list, but a
+// structural property of when normalization is even considered.
+//
+// Phase C6 — 'identity-mention' added (lib/query.js's own header comment
+// has the full forensic finding). It is the reverse direction of
+// title-substring (query contains the record's title/alias, instead of
+// the other way around) and must receive the exact same exemption for the
+// exact same reason: it is an identity signal, not an incidental keyword-
+// overlap accumulation, so surface-size opportunity-advantage reasoning
+// does not apply to it.
+const HIGHER_TIER_REASONS = new Set(['exact-id', 'exact-alias', 'exact-title', 'title-substring', 'identity-mention']);
 
 function isPureKeywordOverlapTier(reasons) {
   if (!reasons || !reasons.length) return false;
