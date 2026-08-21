@@ -3992,6 +3992,22 @@ ${unparseable.map(ev => `
 
   // ── Event name builder ─────────────────────────────────────────────────────
 
+  // Bug fix (event-sequence-drift): recover the sequence digits already encoded
+  // in an existing on-disk folder name, so repairing an unparseable folder never
+  // reassigns a fresh "next" sequence to an event that already has one. The disk
+  // folder name is authoritative for an existing event's identity unless the
+  // date itself is deliberately changed during repair (then it truly is a new
+  // date/sequence and falling back to _computeNextSequence is correct).
+  // Matches "_NN" right after the hijri date even when what follows deviates
+  // from the strict "_NN-" prefix format (e.g. "_01M-..." — the exact shape
+  // that made the folder unparseable in the first place).
+  function _extractOriginalSequence(folderName, expectedHijriDate) {
+    const m = /^(\d{4}-\d{2}-\d{2}) _(\d{2})/.exec(folderName || '');
+    if (!m) return null;
+    if (expectedHijriDate && m[1] !== expectedHijriDate) return null;
+    return m[2];
+  }
+
   // M7: compute the next sequence number for a given hijri date by scanning
   // both disk events (_scannedEvents) and in-session events (coll.events).
   function _computeNextSequence(hijriDate) {
@@ -4073,7 +4089,8 @@ ${unparseable.map(ev => `
       seq       = _viewingExisting.sequence;
     } else if (_newEventDate) {
       eventDate = _newEventDate;
-      seq       = _computeNextSequence(_newEventDate);
+      const recoveredSeq = _repairMode ? _extractOriginalSequence(_repairFolderName, _newEventDate) : null;
+      seq       = recoveredSeq || _computeNextSequence(_newEventDate);
     } else {
       eventDate = coll?.hijriDate || '?';
       seq       = '??';
@@ -4390,11 +4407,12 @@ ${unparseable.map(ev => `
     }
     const cleanComps = JSON.parse(JSON.stringify(_eventComps));
 
-    const seq         = _computeNextSequence(_newEventDate);
+    const oldName     = _repairFolderName;
+    const recoveredSeq = _extractOriginalSequence(oldName, _newEventDate);
+    const seq         = recoveredSeq || _computeNextSequence(_newEventDate);
     const parts       = _buildCompString(cleanComps);
     const newName     = `${_newEventDate} _${seq}-${parts}`;
     const safeNewName = sanitizeForPath(newName);
-    const oldName     = _repairFolderName;
 
     const result = await window.api.renameEvent(activeMaster.path, oldName, safeNewName);
     if (!result.ok) {
