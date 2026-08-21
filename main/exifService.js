@@ -212,6 +212,25 @@ function _buildTags(expectation, isRaw) {
   return tags;
 }
 
+// ── Path normalization ────────────────────────────────────────────────────────
+// Bug fix (metadata-xmp-write-failure): a forward-slash-shaped UNC path
+// ("//server/share/...") reaches this service on Windows/NAS archives —
+// `Error creating file: //FQ_PhotoArchive/...` in the tester's Activity Log.
+// Node's own fs tolerates that shape on Windows, but ExifTool's Perl child
+// process does not, so RAW copy + the pre-write XMP stub both succeed while
+// the actual tag write fails — leaving an empty sidecar that looks like
+// success in Explorer. path.win32.normalize repairs a UNC-shaped path into
+// proper "\\server\share\..." form, but must NOT be applied unconditionally:
+// on a POSIX host (tests, or a Mac-mounted archive) it would corrupt an
+// ordinary "/..." path by turning every "/" into "\". Only rewrite paths
+// that are already UNC-shaped (leading "\\\\" or "//"); local drive-letter
+// and POSIX paths pass through untouched on every platform.
+function _normalizeArchivePath(filePath) {
+  if (typeof filePath !== 'string') return filePath;
+  if (/^(\\\\|\/\/)/.test(filePath)) return path.win32.normalize(filePath);
+  return filePath;
+}
+
 // ── File writer ───────────────────────────────────────────────────────────────
 
 /**
@@ -231,6 +250,8 @@ async function _writeMetadata(filePath, tags, isRaw) {
   // -config is now a startup arg (exiftoolArgs in constructor). Only per-write flags here.
   const writeArgs = ['-overwrite_original'];
 
+  filePath = _normalizeArchivePath(filePath);
+
   if (isRaw) {
     // Guard: do not create sidecar unless the destination RAW is on disk.
     try { await fsp.access(filePath); } catch {
@@ -243,6 +264,7 @@ async function _writeMetadata(filePath, tags, isRaw) {
     // Create a minimal XMP stub if the sidecar doesn't exist yet.
     let sidecarExists = false;
     try { await fsp.access(sidecar); sidecarExists = true; } catch { /* not found */ }
+    let createdStub = false;
     if (!sidecarExists) {
       const stub =
         '<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>\n' +
@@ -250,9 +272,27 @@ async function _writeMetadata(filePath, tags, isRaw) {
         '</x:xmpmeta>\n' +
         '<?xpacket end="w"?>\n';
       await fsp.writeFile(sidecar, stub, 'utf8');
+      createdStub = true;
     }
 
-    await et.write(sidecar, tags, writeArgs);
+    try {
+      await et.write(sidecar, tags, writeArgs);
+    } catch (err) {
+      // The stub above always lands on disk regardless of whether the real
+      // ExifTool write below succeeds — so on failure it's a misleading
+      // "sidecar exists but carries none of the intended metadata" artifact.
+      // Only remove it when THIS call created it: a sidecar that already
+      // existed before this call (real prior content, or a previous
+      // successful write) must never be touched on a failed retry. Removing
+      // a freshly-created stub also keeps the operation retryable — the next
+      // attempt sees no sidecar and goes through the same create-then-write
+      // path cleanly, rather than skipping stub creation against a stale
+      // empty file.
+      if (createdStub) {
+        await fsp.unlink(sidecar).catch(() => {});
+      }
+      throw err;
+    }
     return sidecar;
   }
 
@@ -409,7 +449,7 @@ async function _writeAndVerify(file, status, expectation, isRaw) {
   // For RAW files this MUST read the sidecar path _writeMetadata returned, never
   // the RAW file's own embedded tags (exiftool-vendored reads embedded RAW tags
   // when pointed at the RAW path directly — proven in test/rawXmpReadback.test.js).
-  const verifyPath = sidecar || file.dest;
+  const verifyPath = sidecar || _normalizeArchivePath(file.dest);
   const et  = _getExifTool();
   const rb  = await et.read(verifyPath);
   return _compareReadback(rb, expectation, isRaw);
@@ -739,7 +779,7 @@ async function shutdown() {
  * @returns {Promise<object>}
  */
 function readFileTags(filePath) {
-  return _getExifTool().read(filePath);
+  return _getExifTool().read(_normalizeArchivePath(filePath));
 }
 
 /**
@@ -779,6 +819,7 @@ async function resumeFrozenFile(batchId, fileEntry) {
  *   sidecar path for RAW files (whether or not it exists yet) or destPath itself.
  */
 function classifyForVerification(destPath) {
+  destPath = _normalizeArchivePath(destPath);
   const { isRaw, isVideo } = _classify({ dest: destPath });
   if (!isRaw) return { isRaw, isVideo, verifyPath: destPath };
   const ext = path.extname(destPath);
