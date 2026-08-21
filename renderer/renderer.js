@@ -8833,6 +8833,28 @@ function _closeQMZManager() {
 async function _qmzRefresh() {
   if (!_qmzRoot) return;
   _qmzData = await window.api.qmzScanRoot({ qmzRoot: _qmzRoot });
+  // Defensive: if the previously-active photographer no longer resolves in
+  // the freshly-scanned data (e.g. a QMZ recovery adoption ran between opens
+  // and changed the underlying keys, or the last operation emptied/renamed
+  // it), clear the stale selection instead of leaving the sidebar (fresh
+  // data), header (stale _qmzActivePg name), and grid (empty lookup against
+  // the stale name) each showing a different, inconsistent photographer —
+  // exactly the "sidebar shows X, header shows Y, grid says no media"
+  // symptom this guards against. Never fabricates a fallback selection —
+  // just returns to the neutral "select a photographer" state, matching
+  // openQMZManager's own initial reset shape.
+  if (_qmzActivePg) {
+    const stillValid = _qmzViewScope === 'sequence'
+      ? !!(_qmzData.sequences.find(s => s.code === _qmzActiveLocation)?.photographers?.[_qmzActivePg])
+      : !!_qmzData.unsequenced[_qmzActivePg];
+    if (!stillValid) {
+      _qmzActivePg        = null;
+      _qmzSelectedFiles    = new Set();
+      _qmzSelectionAnchor  = null;
+      _qmzLastClickedPath  = null;
+      _qmzPrevFocusPath    = null;
+    }
+  }
   _renderQMZPhotographerList();
   _renderQMZCenter();
   _renderQMZRight();
