@@ -8800,6 +8800,23 @@ async function openQMZManager(qmzRoot, eventContext) {
   document.getElementById('qmzOverlay').classList.remove('hidden');
   _qmzSetStatus('Loading…');
 
+  // UI safety (Bug 2 forensic investigation): _qmzData is normally cleared by
+  // _closeQMZManager(), but openQMZManager() itself never cleared it — so if
+  // it's ever called again before a close (e.g. switching directly between
+  // two QMZ sessions), the sidebar/grid could keep showing a PREVIOUS event's
+  // photographers/media as real, clickable content while a slow scan (large
+  // photographer folders over SMB can take many seconds — see
+  // main/qmzService.js's listMediaFiles) is still in flight for the new one.
+  // Clearing here, plus an explicit loading placeholder, guarantees stale
+  // data can never be interacted with instead of a genuine "no media" state.
+  _qmzData = null;
+  const pgListEl = document.getElementById('qmzPhotographerList');
+  if (pgListEl) pgListEl.innerHTML = '<div class="qmz-empty">Loading…</div>';
+  const titleEl = document.getElementById('qmzCenterTitle');
+  if (titleEl) titleEl.textContent = 'Loading…';
+  const gridEl = document.getElementById('qmzFileGrid');
+  if (gridEl) gridEl.innerHTML = '<div class="qmz-empty">Loading…</div>';
+
   await window.api.qmzInitRoot({ qmzRoot });
   await _qmzRefresh();
   _qmzSetStatus('');

@@ -51,6 +51,16 @@ const VIDEO_EXTS  = new Set(config.VIDEO_EXTENSIONS);
 // below. Never writes anything — read-only, exactly like readFileTags itself.
 const EXIF_DATE_TIMEOUT_MS     = 500; // exifr — fast in-process parse
 const RAW_EXIF_TIMEOUT_MS      = 800; // ExifTool — persistent process + possible NAS round-trip
+// Bug 2 perf fix: listMediaFiles() used to read each RAW file's capture date
+// one at a time (`for (...) await readCaptureDate(...)`), serializing every
+// ExifTool round-trip — measured at 100-400ms+ each even against tiny
+// placeholder files, so a single ~1200-RAW photographer folder over SMB
+// stalled the entire QMZ workspace open for minutes. Bounded to match
+// main/exifService.js's own ExifTool pool size (`maxProcs: 4`) so this
+// actually exploits the pool's real parallel capacity instead of leaving
+// most of it idle, without over-saturating a pool shared with other
+// in-flight metadata work (import, repair).
+const CAPTURE_DATE_CONCURRENCY = 4;
 // Cache avoids re-reading EXIF on every _qmzRefresh() rescan for files that
 // haven't changed. Keyed like the thumbnail cache (path+size+mtime) so a
 // moved/renamed file (new path after sequence assignment) or a genuinely
@@ -139,6 +149,28 @@ function parseCode(code) {
 
 function letterToType(letter) {
   return LETTER_TYPE[String(letter ?? '').toUpperCase()] ?? null;
+}
+
+// Runs `worker` over `items` with at most `limit` concurrent in flight at
+// once, preserving input order in the returned array regardless of which
+// worker finishes first (each worker writes to its own fixed index). No new
+// dependency for a small, well-understood pattern — used by
+// listMediaFiles() to bound its ExifTool/stat round-trips (see
+// CAPTURE_DATE_CONCURRENCY) instead of a raw Promise.all (unbounded — would
+// fire hundreds/thousands of concurrent ExifTool calls at once) or a
+// sequential for-loop (the one-at-a-time stall this was written to fix).
+async function _mapWithConcurrency(items, limit, worker) {
+  const results = new Array(items.length);
+  let next = 0;
+  async function runOne() {
+    while (next < items.length) {
+      const idx = next++;
+      results[idx] = await worker(items[idx], idx);
+    }
+  }
+  const workerCount = Math.max(1, Math.min(limit, items.length));
+  await Promise.all(Array.from({ length: workerCount }, runOne));
+  return results;
 }
 
 // ── Filesystem helpers ────────────────────────────────────────────────────────
@@ -253,32 +285,98 @@ async function listChildDirs(dir) {
 }
 
 async function listMediaFiles(dir) {
+  // Perf diagnostics (Bug 2 forensic investigation — Leicester ~30s+ stall on
+  // a ~2400-entry photographer directory over SMB). Aggregate counts/timings
+  // only, logged once per directory — never per-file. Measurement proved the
+  // stall was NOT the Dirent hardening (statFallback count was 0 on a normal
+  // filesystem) but the per-file readCaptureDate()/ExifTool round-trip below
+  // — 99.7% of wall time in a 50-file measurement — run one at a time via a
+  // sequential `for...await` loop. Kept so a future regression is visible
+  // immediately in app.log rather than silently reintroducing the stall.
+  const _t0 = Date.now();
+  let _rawEntryCount = 0, _readdirMs = 0;
+  let _direntSaysFile = 0, _direntNotFile = 0;
+  let _statFallbackCount = 0, _statFallbackTotalMs = 0, _statFallbackMaxMs = 0;
+  let _mandatoryStatTotalMs = 0, _mandatoryStatMaxMs = 0;
+  let _captureDateCount = 0, _captureDateTotalMs = 0, _captureDateMaxMs = 0;
+  let _mediaFound = 0, _ignoredByExt = 0;
   try {
+    const _rd0 = Date.now();
     const entries = await fsp.readdir(dir, { withFileTypes: true });
-    const files   = [];
-    for (const e of entries) {
-      if (isJunkFile(e.name) || !MEDIA_EXT.has(path.extname(e.name).toLowerCase())) continue;
-      if (!(await _fileHardened(dir, e))) continue;
+    _readdirMs = Date.now() - _rd0;
+    _rawEntryCount = entries.length;
+
+    const candidates = entries.filter(e => {
+      if (isJunkFile(e.name) || !MEDIA_EXT.has(path.extname(e.name).toLowerCase())) { _ignoredByExt++; return false; }
+      return true;
+    });
+
+    // Bounded-concurrency classification + stat + capture-date read. This is
+    // the expensive part on a real network share — each ExifTool round-trip
+    // alone measured 100-400ms even against tiny placeholder files, and a
+    // Leicester-scale photographer folder (~1200 RAW files) has no video/
+    // sequential shortcut, so a naive one-at-a-time loop stalls the whole
+    // QMZ workspace open for minutes. Bounded to CAPTURE_DATE_CONCURRENCY —
+    // matching main/exifService.js's own ExifTool pool size (maxProcs: 4) —
+    // so this actually uses the pool's real parallel capacity instead of
+    // leaving 3 of 4 worker processes idle the entire time, without
+    // over-saturating a pool shared with other in-flight metadata work.
+    // _mapWithConcurrency preserves input order in its results regardless of
+    // completion order, so output stays deterministic.
+    const results = await _mapWithConcurrency(candidates, CAPTURE_DATE_CONCURRENCY, async (e) => {
+      if (e.isFile()) {
+        _direntSaysFile++;
+      } else {
+        _direntNotFile++;
+        const _sf0 = Date.now();
+        const hardened = await _fileHardened(dir, e);
+        const _sfMs = Date.now() - _sf0;
+        _statFallbackCount++;
+        _statFallbackTotalMs += _sfMs;
+        if (_sfMs > _statFallbackMaxMs) _statFallbackMaxMs = _sfMs;
+        if (!hardened) return null;
+      }
+      _mediaFound++;
       const p    = path.join(dir, e.name);
       const type = mediaType(e.name);
       let size = 0;
       let modifiedAt = null;
       let capturedAt = null;
       try {
+        const _st0 = Date.now();
         const stat = await fsp.stat(p);
+        const _stMs = Date.now() - _st0;
+        _mandatoryStatTotalMs += _stMs;
+        if (_stMs > _mandatoryStatMaxMs) _mandatoryStatMaxMs = _stMs;
         size       = stat.size;
         modifiedAt = stat.mtime.toISOString();
         // Preferred: original capture date, read per-type (see note above).
         // Fallback only: filesystem modified time — used below when this is
         // null, i.e. no embedded capture date could be read at all.
         if (type === 'photo' || type === 'raw') {
+          const _cd0 = Date.now();
           capturedAt = await readCaptureDate(p, stat.size, stat.mtimeMs, type);
+          const _cdMs = Date.now() - _cd0;
+          _captureDateCount++;
+          _captureDateTotalMs += _cdMs;
+          if (_cdMs > _captureDateMaxMs) _captureDateMaxMs = _cdMs;
         }
       } catch {}
-      files.push({ name: e.name, path: p, size, type, modifiedAt, capturedAt: capturedAt || modifiedAt });
-    }
+      return { name: e.name, path: p, size, type, modifiedAt, capturedAt: capturedAt || modifiedAt };
+    });
+    const files = results.filter(Boolean);
+
+    log(`[qmz-perf] listMediaFiles dir=${JSON.stringify(dir)} totalMs=${Date.now() - _t0} readdirMs=${_readdirMs} `
+      + `rawEntries=${_rawEntryCount} ignoredByExt=${_ignoredByExt} direntSaysFile=${_direntSaysFile} direntNotFile=${_direntNotFile} `
+      + `statFallback: count=${_statFallbackCount} totalMs=${_statFallbackTotalMs} maxMs=${_statFallbackMaxMs} `
+      + `mandatoryStat: totalMs=${_mandatoryStatTotalMs} maxMs=${_mandatoryStatMaxMs} `
+      + `captureDate(readCaptureDate/ExifTool): count=${_captureDateCount} totalMs=${_captureDateTotalMs} maxMs=${_captureDateMaxMs} `
+      + `mediaFound=${_mediaFound} concurrency=${CAPTURE_DATE_CONCURRENCY}`);
     return files;
-  } catch { return []; }
+  } catch (err) {
+    log(`[qmz-perf] listMediaFiles dir=${JSON.stringify(dir)} FAILED after ${Date.now() - _t0}ms: ${err.message}`);
+    return [];
+  }
 }
 
 // True if `code`'s sequence folder has any photographer subfolder containing
@@ -375,7 +473,12 @@ async function scanRoot(qmzRoot) {
           }
           continue;
         }
+        // TEMPORARY (Bug 2 perf investigation): times this specific await so
+        // a stall can be attributed precisely to listMediaFiles(pgPath), not
+        // to something else running between diagnostic log lines.
+        const _lmf0 = Date.now();
         const files = await listMediaFiles(pgPath);
+        log(`[qmz-perf] scanRoot await listMediaFiles(${JSON.stringify(pgPath)}) took ${Date.now() - _lmf0}ms`);
         log(`[qmz-diag] scanRoot child=${JSON.stringify(pg)} classified=PHOTOGRAPHER canonical=${JSON.stringify(_stripPcPrefix(pg))} mediaCount=${files.length}`);
         unsequenced[pg] = { count: files.length, files };
       }
