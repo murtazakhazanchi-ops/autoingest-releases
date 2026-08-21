@@ -9,6 +9,16 @@ const config = require('../config/app.config');
 const STATE_FILE  = 'qmz-sequences.json';
 const UNSEQUENCED = '_Unsequenced';
 const SEQ_RE      = /^\d{2}[QMZ]$/;
+// Mirrors services/photographerSequenceService.js's PC_PREFIX_RE — duplicated
+// locally rather than imported, matching this file's existing convention of
+// staying decoupled from other main-process modules (see mediaType/isJunkFile
+// above). Used only to recognize the malformed-but-unambiguous
+// "PCxx-_Unsequenced" shape a pre-fix photographer-sequencing run can have
+// left behind (bug: qmz-nested-unsequenced) — never to rename anything.
+const PC_PREFIX_RE = /^PC(\d{2,3})-/;
+function _stripPcPrefix(name) {
+  return (name || '').replace(PC_PREFIX_RE, '');
+}
 const LETTER_TYPE = { Q: 'Qadam', M: 'Majlis', Z: 'Ziyafat' };
 const LETTER_MAX  = { Q: 50, M: 51, Z: 52 };
 const MEDIA_EXT   = new Set([...config.PHOTO_EXTENSIONS, ...config.VIDEO_EXTENSIONS]);
@@ -283,7 +293,28 @@ async function scanRoot(qmzRoot) {
     if (dir === UNSEQUENCED) {
       const pgDirs = await listChildDirs(path.join(qmzRoot, UNSEQUENCED));
       for (const pg of pgDirs) {
-        const files = await listMediaFiles(path.join(qmzRoot, UNSEQUENCED, pg));
+        const pgPath = path.join(qmzRoot, UNSEQUENCED, pg);
+        // Recovery for archives affected by the (now-fixed) bug where running
+        // photographer sequencing against a QMZ root renamed "_Unsequenced"
+        // itself into "PCxx-_Unsequenced", which initRoot then nested INSIDE
+        // _Unsequenced/ as a plain adoption candidate — leaving real media two
+        // levels deeper than this scan expects (0 files reported). Recognize
+        // that malformed-but-unambiguous shape — a child of _Unsequenced whose
+        // canonical name (PCxx- prefix stripped) is itself "_Unsequenced" —
+        // and read straight through it to the real nested photographer
+        // folders. Read-only: no filesystem move is performed here.
+        if (_stripPcPrefix(pg) === UNSEQUENCED) {
+          const nestedPgDirs = await listChildDirs(pgPath);
+          for (const nestedPg of nestedPgDirs) {
+            const files = await listMediaFiles(path.join(pgPath, nestedPg));
+            const existing = unsequenced[nestedPg];
+            unsequenced[nestedPg] = existing
+              ? { count: existing.count + files.length, files: [...existing.files, ...files] }
+              : { count: files.length, files };
+          }
+          continue;
+        }
+        const files = await listMediaFiles(pgPath);
         unsequenced[pg] = { count: files.length, files };
       }
     } else if (SEQ_RE.test(dir)) {
@@ -306,38 +337,82 @@ async function scanRoot(qmzRoot) {
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 
+// Moves every FILE (not subdirectory) directly inside srcDir into destDir via
+// the same no-overwrite-safe safeMoveFile used everywhere else, then removes
+// srcDir if it ended up empty. Shared by the standard adoption-collision merge
+// and the "_Unsequenced" alias recovery merge below — both need the identical
+// safe, file-by-file behavior, just at a different nesting depth.
+async function _mergeDirFilesInto(srcDir, destDir, errors, label) {
+  let entries;
+  try { entries = await fsp.readdir(srcDir, { withFileTypes: true }); }
+  catch (err) { errors.push({ dir: label, error: err.message }); return; }
+
+  for (const e of entries) {
+    if (!e.isFile()) continue;
+    const r = await safeMoveFile(path.join(srcDir, e.name), path.join(destDir, e.name));
+    if (!r.ok) errors.push({ dir: label, file: e.name, error: r.reason });
+  }
+  try {
+    const rem = await fsp.readdir(srcDir);
+    if (rem.length === 0) await fsp.rmdir(srcDir);
+  } catch {}
+}
+
 /**
  * Adopt plain photographer folders (not sequence dirs, not _Unsequenced) into _Unsequenced/.
  * Uses atomic rename where possible; merges file-by-file when _Unsequenced/<dir> already exists.
+ *
+ * Recovery/prevention (bug: qmz-nested-unsequenced): a folder whose canonical
+ * name (PCxx- prefix stripped) is itself "_Unsequenced" is "_Unsequenced"
+ * mistakenly renamed by a (now-fixed) photographer-sequencing run against a
+ * QMZ root — it is NOT a real photographer folder. Adopting it as a single
+ * unit under _Unsequenced/ would create exactly the double-nesting this bug
+ * report is about (real media ending up two levels deeper than the scanner
+ * expects). Instead, its children — the real photographer folders — are
+ * merged directly into _Unsequenced/, one level flattened, using the same
+ * safe per-file move as every other adoption path here.
  */
 async function initRoot(qmzRoot) {
   const scan    = await scanRoot(qmzRoot);
   const adopted = [];
   const errors  = [];
 
-  await fsp.mkdir(path.join(qmzRoot, UNSEQUENCED), { recursive: true });
+  const unsequencedDir = path.join(qmzRoot, UNSEQUENCED);
+  await fsp.mkdir(unsequencedDir, { recursive: true });
 
   for (const dirName of scan.other) {
+    if (_stripPcPrefix(dirName) === UNSEQUENCED) {
+      const aliasDir = path.join(qmzRoot, dirName);
+      let children;
+      try { children = await fsp.readdir(aliasDir, { withFileTypes: true }); }
+      catch (err) { errors.push({ dir: dirName, error: err.message }); continue; }
+
+      for (const child of children) {
+        if (!child.isDirectory()) continue; // stray files directly under the alias — leave in place, never guessed at
+        const childSrc  = path.join(aliasDir, child.name);
+        const childDest = path.join(unsequencedDir, child.name);
+        try {
+          await fsp.rename(childSrc, childDest);
+        } catch {
+          await _mergeDirFilesInto(childSrc, childDest, errors, `${dirName}/${child.name}`);
+        }
+      }
+      try {
+        const rem = await fsp.readdir(aliasDir);
+        if (rem.length === 0) await fsp.rmdir(aliasDir);
+      } catch {}
+      adopted.push(dirName);
+      continue;
+    }
+
     const srcDir  = path.join(qmzRoot, dirName);
-    const destDir = path.join(qmzRoot, UNSEQUENCED, dirName);
+    const destDir = path.join(unsequencedDir, dirName);
     try {
       await fsp.rename(srcDir, destDir);
       adopted.push(dirName);
     } catch {
       // _Unsequenced/<dirName> already exists — merge file by file
-      let srcEntries;
-      try { srcEntries = await fsp.readdir(srcDir, { withFileTypes: true }); }
-      catch (err) { errors.push({ dir: dirName, error: err.message }); continue; }
-
-      for (const e of srcEntries) {
-        if (!e.isFile()) continue;
-        const r = await safeMoveFile(path.join(srcDir, e.name), path.join(destDir, e.name));
-        if (!r.ok) errors.push({ dir: dirName, file: e.name, error: r.reason });
-      }
-      try {
-        const rem = await fsp.readdir(srcDir);
-        if (rem.length === 0) await fsp.rmdir(srcDir);
-      } catch {}
+      await _mergeDirFilesInto(srcDir, destDir, errors, dirName);
       adopted.push(dirName);
     }
   }

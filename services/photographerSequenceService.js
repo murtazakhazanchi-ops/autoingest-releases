@@ -32,9 +32,13 @@ function canonicalName(name) {
 // _Selected/__MACOSX: mirror _NAS_SKIP_DIRS in main.js.
 // VIDEO: excluded at every archive-walk level; never a photographer folder.
 // .DS_Store/Thumbs.db: filesystem artefacts.
+// _Unsequenced: QMZ's own reserved holding folder (main/qmzService.js's
+// UNSEQUENCED constant) — sequencing a QMZ structure by mistake must never
+// rename this folder itself into "PCxx-_Unsequenced"; it is structural,
+// never a photographer.
 const SKIP_DIRS = new Set([
   '_Selected', '__MACOSX', 'VIDEO',
-  '.autoingest', '.DS_Store', 'Thumbs.db',
+  '.autoingest', '.DS_Store', 'Thumbs.db', '_Unsequenced',
 ]);
 
 function _skipDir(name) {
