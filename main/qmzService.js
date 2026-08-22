@@ -495,15 +495,6 @@ async function _classifyOtherFolders(qmzRoot) {
  *   state       — parsed qmz-sequences.json (or default)
  */
 async function scanRoot(qmzRoot) {
-  // TEMPORARY diagnostics (Bug 2 forensic investigation — remove once the
-  // Leicester "empty QMZ workspace" root cause is confirmed). Raw readdir
-  // names only (never file contents), so this stays safe to leave on for a
-  // real reproduction without flooding app.log.
-  let _rawRootEntries = null;
-  try { _rawRootEntries = (await fsp.readdir(qmzRoot, { withFileTypes: true })).map(e => `${e.name}${e.isDirectory() ? '/' : ''}`); }
-  catch (err) { _rawRootEntries = [`<readdir THREW: ${err.code || err.message}>`]; }
-  log(`[qmz-diag] scanRoot ENTER root=${JSON.stringify(qmzRoot)} rawReaddir=${JSON.stringify(_rawRootEntries)}`);
-
   const [childDirs, state] = await Promise.all([listChildDirs(qmzRoot), readState(qmzRoot)]);
   log(`[qmz-diag] scanRoot hardened childDirs=${JSON.stringify(childDirs)}`);
   const sequences   = [];
@@ -543,12 +534,7 @@ async function scanRoot(qmzRoot) {
           }
           continue;
         }
-        // TEMPORARY (Bug 2 perf investigation): times this specific await so
-        // a stall can be attributed precisely to listMediaFiles(pgPath), not
-        // to something else running between diagnostic log lines.
-        const _lmf0 = Date.now();
         const files = await listMediaFiles(pgPath);
-        log(`[qmz-perf] scanRoot await listMediaFiles(${JSON.stringify(pgPath)}) took ${Date.now() - _lmf0}ms`);
         log(`[qmz-diag] scanRoot child=${JSON.stringify(pg)} classified=PHOTOGRAPHER canonical=${JSON.stringify(_stripPcPrefix(pg))} mediaCount=${files.length}`);
         unsequenced[pg] = { count: files.length, files };
       }
