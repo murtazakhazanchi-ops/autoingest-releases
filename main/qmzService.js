@@ -284,21 +284,45 @@ async function listChildDirs(dir) {
   } catch { return []; }
 }
 
+// Bug 2 perf fix, round 2: real Windows/SMB measurement showed the bounded
+// concurrency from the first perf fix (round 1, matching maxProcs: 4) was
+// working exactly as designed (~4x wall-clock reduction vs sequential) but
+// was nowhere near enough — real per-file ExifTool round trips measured
+// ~300-500ms average on the tester's actual NAS (vs ~100-400ms against tiny
+// local placeholder files), so a several-hundred-file photographer folder
+// still took tens of seconds to minutes, and QMZ opens ALWAYS pay this twice
+// (see initRoot's own comment below) with only the second pass warmed by
+// _exifDateCache — explaining the observed "some scans become instant"
+// pattern precisely.
+//
+// Root architectural question (per the forensic investigation): is
+// authoritative EXIF capture date actually required before the QMZ
+// workspace can become usable? Traced every consumer — renderer/renderer.js
+// uses file.capturedAt in exactly three places, all display/ordering
+// concerns (default 'date' sort comparator, the date label under each tile,
+// and Timeline grouping) — never for photographer/folder discovery, RAW/XMP
+// pairing, or any move/assign/sequence operation. None of those require an
+// authoritative date to make the workspace interactive.
+//
+// listMediaFiles() therefore no longer blocks on readCaptureDate() at all —
+// every file gets an immediate capturedAt of its filesystem modifiedAt (already
+// available from the mandatory stat() below, at negligible cost) plus
+// capturedAtPending:true for RAW/photo types, so the workspace, file cards,
+// and default date-sort become available in the time it takes to stat the
+// directory, not to run ExifTool across it. Real EXIF dates are then
+// resolved by a separate, explicitly-triggered resolveCaptureDates() call —
+// see that function below — which the renderer fires in the background
+// immediately after the fast scan renders, and applies in place once ready
+// (re-sorting/re-labeling without blocking anything, including selection,
+// thumbnails, or sequence assignment in the meantime).
 async function listMediaFiles(dir) {
-  // Perf diagnostics (Bug 2 forensic investigation — Leicester ~30s+ stall on
-  // a ~2400-entry photographer directory over SMB). Aggregate counts/timings
-  // only, logged once per directory — never per-file. Measurement proved the
-  // stall was NOT the Dirent hardening (statFallback count was 0 on a normal
-  // filesystem) but the per-file readCaptureDate()/ExifTool round-trip below
-  // — 99.7% of wall time in a 50-file measurement — run one at a time via a
-  // sequential `for...await` loop. Kept so a future regression is visible
-  // immediately in app.log rather than silently reintroducing the stall.
+  // Perf diagnostics — aggregate counts/timings only, logged once per
+  // directory, never per-file.
   const _t0 = Date.now();
   let _rawEntryCount = 0, _readdirMs = 0;
   let _direntSaysFile = 0, _direntNotFile = 0;
   let _statFallbackCount = 0, _statFallbackTotalMs = 0, _statFallbackMaxMs = 0;
   let _mandatoryStatTotalMs = 0, _mandatoryStatMaxMs = 0;
-  let _captureDateCount = 0, _captureDateTotalMs = 0, _captureDateMaxMs = 0;
   let _mediaFound = 0, _ignoredByExt = 0;
   try {
     const _rd0 = Date.now();
@@ -311,18 +335,10 @@ async function listMediaFiles(dir) {
       return true;
     });
 
-    // Bounded-concurrency classification + stat + capture-date read. This is
-    // the expensive part on a real network share — each ExifTool round-trip
-    // alone measured 100-400ms even against tiny placeholder files, and a
-    // Leicester-scale photographer folder (~1200 RAW files) has no video/
-    // sequential shortcut, so a naive one-at-a-time loop stalls the whole
-    // QMZ workspace open for minutes. Bounded to CAPTURE_DATE_CONCURRENCY —
-    // matching main/exifService.js's own ExifTool pool size (maxProcs: 4) —
-    // so this actually uses the pool's real parallel capacity instead of
-    // leaving 3 of 4 worker processes idle the entire time, without
-    // over-saturating a pool shared with other in-flight metadata work.
-    // _mapWithConcurrency preserves input order in its results regardless of
-    // completion order, so output stays deterministic.
+    // Bounded-concurrency classification + stat (NOT capture-date — see the
+    // function-level comment above). Still bounded, still hardened against
+    // Windows/SMB Dirent misreports (BUG-011-class) exactly as round 1 left
+    // it — only the capture-date work moved out of this synchronous path.
     const results = await _mapWithConcurrency(candidates, CAPTURE_DATE_CONCURRENCY, async (e) => {
       if (e.isFile()) {
         _direntSaysFile++;
@@ -341,7 +357,6 @@ async function listMediaFiles(dir) {
       const type = mediaType(e.name);
       let size = 0;
       let modifiedAt = null;
-      let capturedAt = null;
       try {
         const _st0 = Date.now();
         const stat = await fsp.stat(p);
@@ -350,19 +365,16 @@ async function listMediaFiles(dir) {
         if (_stMs > _mandatoryStatMaxMs) _mandatoryStatMaxMs = _stMs;
         size       = stat.size;
         modifiedAt = stat.mtime.toISOString();
-        // Preferred: original capture date, read per-type (see note above).
-        // Fallback only: filesystem modified time — used below when this is
-        // null, i.e. no embedded capture date could be read at all.
-        if (type === 'photo' || type === 'raw') {
-          const _cd0 = Date.now();
-          capturedAt = await readCaptureDate(p, stat.size, stat.mtimeMs, type);
-          const _cdMs = Date.now() - _cd0;
-          _captureDateCount++;
-          _captureDateTotalMs += _cdMs;
-          if (_cdMs > _captureDateMaxMs) _captureDateMaxMs = _cdMs;
-        }
       } catch {}
-      return { name: e.name, path: p, size, type, modifiedAt, capturedAt: capturedAt || modifiedAt };
+      const needsCaptureDate = type === 'photo' || type === 'raw';
+      return {
+        name: e.name, path: p, size, type, modifiedAt,
+        // Provisional — filesystem mtime, not the camera's own capture
+        // timestamp. Corrected in place by resolveCaptureDates() once the
+        // real EXIF/embedded date is read, without blocking initial render.
+        capturedAt: modifiedAt,
+        capturedAtPending: needsCaptureDate,
+      };
     });
     const files = results.filter(Boolean);
 
@@ -370,13 +382,44 @@ async function listMediaFiles(dir) {
       + `rawEntries=${_rawEntryCount} ignoredByExt=${_ignoredByExt} direntSaysFile=${_direntSaysFile} direntNotFile=${_direntNotFile} `
       + `statFallback: count=${_statFallbackCount} totalMs=${_statFallbackTotalMs} maxMs=${_statFallbackMaxMs} `
       + `mandatoryStat: totalMs=${_mandatoryStatTotalMs} maxMs=${_mandatoryStatMaxMs} `
-      + `captureDate(readCaptureDate/ExifTool): count=${_captureDateCount} totalMs=${_captureDateTotalMs} maxMs=${_captureDateMaxMs} `
       + `mediaFound=${_mediaFound} concurrency=${CAPTURE_DATE_CONCURRENCY}`);
     return files;
   } catch (err) {
     log(`[qmz-perf] listMediaFiles dir=${JSON.stringify(dir)} FAILED after ${Date.now() - _t0}ms: ${err.message}`);
     return [];
   }
+}
+
+/**
+ * Resolves authoritative EXIF/embedded capture dates for a batch of files
+ * already discovered by scanRoot() (i.e. carrying capturedAtPending:true).
+ * Explicitly separate from listMediaFiles() so the initial scan never blocks
+ * on it — see that function's header comment for the full rationale.
+ *
+ * Reuses the SAME bounded-concurrency mechanism and cache (_exifDateCache,
+ * keyed path|size|mtimeMs) as before, so results are identical to what the
+ * old synchronous path would have produced — this only changes WHEN the
+ * work happens, not what it computes.
+ *
+ * @param {Array<{path:string, size:number, modifiedAt:string, type:string}>} files
+ * @returns {Promise<{ [path]: string|null }>} capturedAt per input path
+ *   (only for photo/raw entries — non-applicable entries are simply absent
+ *   from the result, callers should leave their existing capturedAt as-is).
+ */
+async function resolveCaptureDates(files) {
+  const _t0 = Date.now();
+  const candidates = (files || []).filter(f => f && f.path && (f.type === 'photo' || f.type === 'raw'));
+  const result = {};
+  await _mapWithConcurrency(candidates, CAPTURE_DATE_CONCURRENCY, async (f) => {
+    try {
+      const mtimeMs = f.modifiedAt ? new Date(f.modifiedAt).getTime() : null;
+      result[f.path] = await readCaptureDate(f.path, f.size, mtimeMs, f.type);
+    } catch {
+      result[f.path] = null;
+    }
+  });
+  log(`[qmz-perf] resolveCaptureDates count=${candidates.length} totalMs=${Date.now() - _t0} concurrency=${CAPTURE_DATE_CONCURRENCY}`);
+  return result;
 }
 
 // True if `code`'s sequence folder has any photographer subfolder containing
@@ -416,6 +459,33 @@ async function saveState(qmzRoot, state) {
 }
 
 // ── Scan ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Bug 2 perf fix, round 2: cheap top-level-only classification — readdir +
+ * Dirent-hardened directory check, nothing else. Used by initRoot(), which
+ * only ever needs the "other" (adoption-candidate) list; it never reads
+ * scan.unsequenced or scan.sequences. Before this fix, initRoot() called the
+ * FULL scanRoot() — which for every _Unsequenced/sequence child runs
+ * listMediaFiles() (a per-file stat, formerly also an ExifTool round trip) —
+ * purely to throw almost all of that expensive result away and use only
+ * `.other`. Every QMZ open therefore paid the full per-photographer
+ * discovery cost TWICE: once here (wasted), once more via the renderer's own
+ * explicit scanRoot() call in _qmzRefresh() (the one whose result is
+ * actually used) — this is the exact duplicate-scan mechanism behind the
+ * "some scans become instant" observation from the real Windows/SMB
+ * diagnostics: the second pass was fast only because _exifDateCache was
+ * already warmed by the first, wasted one.
+ */
+async function _classifyOtherFolders(qmzRoot) {
+  const childDirs = await listChildDirs(qmzRoot);
+  const other = [];
+  for (const dir of childDirs) {
+    if (dir === UNSEQUENCED) continue;
+    if (SEQ_RE.test(dir)) continue;
+    other.push(dir);
+  }
+  return other;
+}
 
 /**
  * Scan qmzRoot and return its current structure.
@@ -542,14 +612,14 @@ async function _mergeDirFilesInto(srcDir, destDir, errors, label) {
  */
 async function initRoot(qmzRoot) {
   log(`[qmz-diag] initRoot ENTER root=${JSON.stringify(qmzRoot)}`);
-  const scan    = await scanRoot(qmzRoot);
+  const other   = await _classifyOtherFolders(qmzRoot);
   const adopted = [];
   const errors  = [];
 
   const unsequencedDir = path.join(qmzRoot, UNSEQUENCED);
   await fsp.mkdir(unsequencedDir, { recursive: true });
 
-  for (const dirName of scan.other) {
+  for (const dirName of other) {
     if (_stripPcPrefix(dirName) === UNSEQUENCED) {
       const aliasDir = path.join(qmzRoot, dirName);
       let children;
@@ -763,6 +833,7 @@ module.exports = {
   removeSequence,
   moveFilesToSequence,
   moveFilesToUnsequenced,
+  resolveCaptureDates,
   // Test-only: exposes the Dirent/stat hardening helpers so
   // test/qmzDirentMismatchRegression.test.js can exercise them directly
   // against a real fs.stat() with a faked Dirent, mirroring

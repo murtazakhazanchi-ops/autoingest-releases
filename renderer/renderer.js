@@ -8876,6 +8876,57 @@ async function _qmzRefresh() {
   _renderQMZCenter();
   _renderQMZRight();
   _qmzUpdateActions();
+
+  // Bug 2 perf fix, round 2: real EXIF capture dates are resolved in the
+  // background, AFTER the workspace above has already rendered with each
+  // file's filesystem modifiedAt as a provisional capturedAt (see
+  // qmzService.js's listMediaFiles()) — never awaited here, so a
+  // several-hundred/thousand-file photographer folder over SMB no longer
+  // blocks the operator from seeing and using the workspace. Fire-and-forget
+  // is intentional; _qmzEnrichCaptureDatesInBackground() re-renders in place
+  // once real dates arrive.
+  _qmzEnrichCaptureDatesInBackground();
+}
+
+// Resolves real EXIF capture dates for every file the just-completed scan
+// marked capturedAtPending, then corrects them in place and re-renders —
+// without blocking selection, thumbnails, or sequence assignment, which
+// never depended on capturedAt (moves/assigns operate on file paths only).
+// Captures its own target (_qmzData/_qmzRoot) at call time and discards the
+// result if either changed by the time it resolves (QMZ closed, switched to
+// a different event, or a newer scan already replaced this data) — never
+// mutates or re-renders stale state.
+function _qmzEnrichCaptureDatesInBackground() {
+  if (!_qmzData) return;
+  const targetData = _qmzData;
+  const targetRoot = _qmzRoot;
+
+  const pending = [];
+  for (const pg of Object.values(targetData.unsequenced)) {
+    for (const f of pg.files) if (f.capturedAtPending) pending.push(f);
+  }
+  for (const seq of targetData.sequences) {
+    for (const pg of Object.values(seq.photographers)) {
+      for (const f of pg.files) if (f.capturedAtPending) pending.push(f);
+    }
+  }
+  if (!pending.length) return;
+
+  window.api.qmzResolveCaptureDates({
+    files: pending.map(f => ({ path: f.path, size: f.size, modifiedAt: f.modifiedAt, type: f.type })),
+  }).then(result => {
+    if (_qmzData !== targetData || _qmzRoot !== targetRoot) return; // stale — QMZ moved on, discard silently
+    let changed = false;
+    for (const f of pending) {
+      f.capturedAtPending = false;
+      const resolved = result[f.path];
+      if (resolved) { f.capturedAt = resolved; changed = true; }
+    }
+    if (changed) {
+      _renderQMZCenter();
+      _renderQMZRight();
+    }
+  }).catch(() => { /* best-effort background enrichment — files remain fully usable with their provisional date */ });
 }
 
 function _renderQMZPhotographerList() {

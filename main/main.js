@@ -5535,6 +5535,14 @@ ipcMain.handle('qmz:initRoot', async (_e, { qmzRoot }) => {
   return qmzService.initRoot(qmzRoot);
 });
 
+// Bug 2 perf fix, round 2: resolves authoritative EXIF capture dates for a
+// batch of already-discovered files, separately from scanRoot()/initRoot()
+// so the initial QMZ workspace never blocks on ExifTool — see
+// qmzService.js's listMediaFiles()/resolveCaptureDates() header comments.
+ipcMain.handle('qmz:resolveCaptureDates', async (_e, { files }) => {
+  return qmzService.resolveCaptureDates(files);
+});
+
 ipcMain.handle('qmz:createSequence', async (_e, { qmzRoot, number, letter }) => {
   return qmzService.createSequence(qmzRoot, number, letter);
 });

@@ -388,6 +388,9 @@ contextBridge.exposeInMainWorld('api', {
   // ── QMZ Sequence Manager ──
   qmzScanRoot:          (params) => ipcRenderer.invoke('qmz:scanRoot',          params),
   qmzInitRoot:          (params) => ipcRenderer.invoke('qmz:initRoot',          params),
+  // Bug 2 perf fix, round 2: separate from qmzScanRoot — resolves real EXIF
+  // capture dates for an already-scanned file list in the background.
+  qmzResolveCaptureDates: (params) => ipcRenderer.invoke('qmz:resolveCaptureDates', params),
   qmzCreateSequence:    (params) => ipcRenderer.invoke('qmz:createSequence',    params),
   qmzBulkCreate:        (params) => ipcRenderer.invoke('qmz:bulkCreate',        params),
   qmzEditSequence:      (params) => ipcRenderer.invoke('qmz:editSequence',      params),
