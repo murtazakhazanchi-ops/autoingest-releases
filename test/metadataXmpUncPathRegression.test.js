@@ -54,6 +54,27 @@
 //          behind, (b) a batch that failed is retryable — the very next
 //          attempt (failure removed) succeeds cleanly, producing a valid,
 //          non-empty sidecar with the correct tags.
+// TEST 5 — forensic regression for the v0.9.12-rc.10 real-Windows/UNC audit
+//          failure (source-drift guarded — cannot be exercised live without a
+//          real Windows host + real UNC share; see the fix commit's forensic
+//          report for the full trace). That audit proved fs.stat() succeeded
+//          on a plain-ASCII UNC sidecar path while ExifTool's own .read() on
+//          the SAME string failed "File not found" — i.e. _normalizeArchivePath
+//          was already producing a correct, existing path, and no further
+//          string-shape fix could have closed the gap. Tracing the vendored
+//          ExifTool Perl source (Image::ExifTool::EncodeFileName/Exists/Open)
+//          showed plain-ASCII filenames skip ExifTool's robust Win32 wide-file
+//          routines unless the WindowsWideFile API option forces it. This test
+//          guards that main/exifService.js's ExifTool singleton actually sends
+//          `-api windowswidefile=1` at spawn time, so this fix cannot silently
+//          regress. It does NOT (and cannot, on this host) prove the flag
+//          resolves the real Windows failure — that requires real-machine
+//          validation.
+// TEST 6 — the exact verifyPath shape from the rc.10 audit's representative
+//          failing file (SUL08303.xmp) survives normalization unchanged and
+//          idempotently, including when normalized a second time (matching
+//          the real call sequence: classifyForVerification computes verifyPath
+//          once, then readFileTags normalizes it again before the ExifTool call).
 //
 // Run with the real Electron binary (exifService.js transitively needs
 // Electron's app.getPath via services/logger.js and services/settings.js):
@@ -153,6 +174,51 @@ async function t(name, fn) {
     if (re.test(src)) ok(`TEST 1b: ${label} normalizes its path before use`);
     else fail(`TEST 1b: ${label} normalizes its path before use`, 'Expected pattern not found — fix may have been reverted or refactored');
   }
+})();
+
+// Guards the rc.10 forensic fix: ExifTool's singleton must force Windows wide-
+// character file I/O for every file (not just non-ASCII names), or a
+// plain-ASCII UNC path can be reported "not found" by ExifTool even though
+// fs.stat() on the identical string succeeds (see TEST 6 below and the fix
+// commit's forensic report for the full ExifTool.pm trace).
+(function test5() {
+  console.log('=== TEST 5: -api windowswidefile=1 forced at ExifTool spawn time (source-drift guarded) ===');
+  const src = fs.readFileSync(path.join(PROJECT_ROOT, 'main', 'exifService.js'), 'utf8');
+  const m = /function _getExifTool\(\)[\s\S]*?\n\}/.exec(src);
+  if (!m) {
+    fail('TEST 5: _getExifTool found in main/exifService.js source', 'Function not found — was it renamed or removed?');
+    return;
+  }
+  if (/exiftoolArgs:\s*\[[\s\S]*?['"]-api['"],\s*['"]windowswidefile=1['"][\s\S]*?\]/.test(m[0])) {
+    ok('TEST 5: ExifTool singleton spawns with -api windowswidefile=1');
+  } else {
+    fail('TEST 5: ExifTool singleton spawns with -api windowswidefile=1', 'Expected pattern not found in _getExifTool() — the rc.10 UNC-read fix may have been reverted');
+  }
+})();
+
+// The exact representative failing path from the rc.10 real-Windows audit
+// (verifyPath \\FQ_PhotoArchive\...\SUL08303.xmp — pure ASCII, no non-Latin
+// characters) must normalize to itself and stay stable under a second
+// normalization pass, matching the real call sequence:
+// classifyForVerification() computes verifyPath once, then readFileTags()
+// normalizes it again before invoking ExifTool.
+(function test6() {
+  console.log('=== TEST 6: rc.10 audit evidence path (SUL08303.xmp) is stable under normalization ===');
+  const src = fs.readFileSync(path.join(PROJECT_ROOT, 'main', 'exifService.js'), 'utf8');
+  const m = /function _normalizeArchivePath\(filePath\) \{[\s\S]*?\n\}/.exec(src);
+  if (!m) {
+    fail('TEST 6: _normalizeArchivePath found in source', 'Function not found');
+    return;
+  }
+  // eslint-disable-next-line no-new-func
+  const _normalizeArchivePath = new Function('path', `${m[0]}\nreturn _normalizeArchivePath;`)(path);
+
+  const verifyPath = '\\\\FQ_PhotoArchive\\02-Working-AJSS\\1448-03-01 Waaz Mubarak\\PC01-Aliasger Suleimanji\\SUL08303.xmp';
+  const once  = _normalizeArchivePath(verifyPath);
+  const twice = _normalizeArchivePath(once);
+  assert.equal(once, verifyPath, 'an already-correct backslash UNC path (as classifyForVerification produces) must be returned unchanged');
+  assert.equal(twice, verifyPath, 'normalizing the already-normalized verifyPath a second time (as readFileTags does) must not alter it further');
+  ok('TEST 6: rc.10 verifyPath shape (SUL08303.xmp) is unchanged and idempotent across both normalization call sites');
 })();
 
 // ── TESTS 2-4: real ExifTool integration ─────────────────────────────────────

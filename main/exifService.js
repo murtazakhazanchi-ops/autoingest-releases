@@ -83,13 +83,39 @@ function _getExifTool() {
     // We must inject -config before the required batch-mode flags
     // (-stay_open True -@ -) so the custom XMP-ajs namespace is registered
     // at startup.
+    //
+    // -api windowswidefile=1: forces ExifTool's own Perl process (see
+    // Image::ExifTool::EncodeFileName / Image::ExifTool::Exists in the vendored
+    // exiftool-vendored.pl distribution) to open EVERY file through the Windows
+    // wide-character Win32API::File::CreateFileW routines, not just filenames
+    // containing non-ASCII bytes. Root-caused from a v0.9.12-rc.10 real-machine
+    // audit: fs.stat() on a plain-ASCII UNC sidecar path succeeded (proving the
+    // path string itself was correctly formed — see _normalizeArchivePath below)
+    // while the exact same path handed to ExifTool's .read() failed with "File
+    // not found". Tracing ExifTool.pm confirms Exists()/Open() only route
+    // through CreateFileW when EncodeFileName() sees a byte >= 0x80 in the
+    // filename OR the WindowsWideFile option forces it — a pure-ASCII UNC path
+    // (as in the failing case) falls through to plain Perl -e / open(), which
+    // has long-standing limitations with Windows UNC/long paths that Node's own
+    // fs module does not share. This is the same option ExifTool added for
+    // forum report #15208 or similar UNC/long-path complaints. -charset
+    // filename=utf8 (already sent per-task by exiftool-vendored on Windows) is
+    // necessary but not sufficient — EncodeFileName() only activates when BOTH
+    // CharsetFileName is set AND (non-ASCII bytes present OR force). This flag
+    // supplies the "force" so ASCII UNC paths get the same robust file I/O.
+    // NOT validated against a real Windows/UNC archive yet — see the fix
+    // commit's PR notes / release report before treating this as confirmed.
     _ExifTool = new ExifTool({
       // 4 persistent processes let metadata reads/writes overlap NAS I/O latency
       // (each read is a network round-trip). The metadata-sync classify scan issues
       // reads with matching bounded concurrency to keep these busy without flooding.
       maxProcs: 4,
       taskTimeoutMillis: 30_000,
-      exiftoolArgs: ['-config', EXIFTOOL_CONFIG, '-stay_open', 'True', '-@', '-'],
+      exiftoolArgs: [
+        '-config', EXIFTOOL_CONFIG,
+        '-api', 'windowswidefile=1',
+        '-stay_open', 'True', '-@', '-',
+      ],
     });
   }
   return _ExifTool;
