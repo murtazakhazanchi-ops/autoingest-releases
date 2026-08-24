@@ -20,9 +20,9 @@
 
 const { runQuery } = require('./query');
 const { RECORD_STATUS, QUERY_STATUS, matchKnownBoundary, KNOWN_BOUNDARIES } = require('./statusResolution');
-const { findConcept, findBoundaryConcept } = require('./intentConcepts');
+const { findConcept, findAllConcepts, findBoundaryConcept } = require('./intentConcepts');
 const { QUESTION_TYPES, classifyQuestion } = require('./questionClassifier');
-const { isEligibleForNormalization, matchedTokenCount, adjustKeywordOverlapScore, explainCandidate } = require('./knowledgeSurfaceNormalization');
+const { isEligibleForNormalization, matchedTokenCount, adjustKeywordOverlapScore, explainCandidate, ABSOLUTE_EVIDENCE_FLOOR_TOKENS } = require('./knowledgeSurfaceNormalization');
 const { explainNeighborhood: labelNeighborhood } = require('./knowledgeNeighborhood');
 const { explainHistoricalContext: labelHistoricalContext, historicalContextForFeature, unanchoredHistoricalContext } = require('./knowledgeHistoricalContext');
 
@@ -509,10 +509,45 @@ function roadmapAnswer(question, dashboard) {
 // lookup table: a small number of curated alternate phrasings, not one
 // entry per expected question.
 function searchCandidates(question, searchIndex) {
-  const concept = findConcept(String(question || '').toLowerCase());
-  const candidateQueries = [question, ...(concept ? concept.hints : [])];
+  const questionLower = String(question || '').toLowerCase();
+  const concept = findConcept(questionLower); // kept for the returned diagnostic shape below — first match only, unchanged meaning
+  // Phase C6.2 — candidate queries now include EVERY matching cluster's
+  // hints (findAllConcepts), not just the first. See intentConcepts.js's
+  // own findAllConcepts header comment for the forensic finding. De-duped
+  // since two clusters occasionally share an identical hint string.
+  const allConcepts = findAllConcepts(questionLower);
+  const allHints = [...new Set(allConcepts.flatMap((c) => c.hints))];
+  const candidateQueries = [question, ...allHints];
   const bestByRecord = new Map();
   const bestRawByRecord = new Map(); // raw-question-only scores — see note below
+  // Phase C6.3 (Section G/Option 1) — FORENSIC FINDING: bestByRecord above
+  // picks whichever candidate query (the raw question OR a concept hint)
+  // produced a record's max score, with no record of WHICH query that was.
+  // The absolute-evidence-first tie-break below (and workflowClearlyBeaten
+  // in answerQuestion()) both read matchedTokenCount(reasons) off that
+  // max-scoring query's own reasons — so a record whose ENTIRE score came
+  // from a synthetic hint (the raw question itself barely or never matched
+  // it) competes on equal footing with a record whose evidence is real,
+  // original-question support. Proven concretely via N1 ("Where do my
+  // photos actually end up after an import finishes?"): AI-FEAT-002
+  // ("Login & Operator Identity") won the token-count tie-break over
+  // AI-FEAT-012 with 5 matched tokens vs 4 — but ALL 5 of AI-FEAT-002's
+  // tokens came from the injected import-general hint text (which shares
+  // generic attribution vocabulary — "import"/"memory"/"card"/"folder"/
+  // "event" — with AI-FEAT-002's own unusually broad 106-keyword surface);
+  // the raw question itself only ever scored 1 token (100) against it.
+  // Measured corpus-wide (this checkpoint's own forensic sweep across the
+  // C6.1/C6.2/C6.3 corpora, ~85 wrong-primary cases): this exact pattern
+  // ("SPURIOUS_HINT_WIN") accounts for 7 further cases beyond N1, a real,
+  // recurring failure mode, not a one-off. `bestOriginalReasonsByRecord`
+  // captures each record's reasons from candidateQueries[0] (the raw
+  // question) SPECIFICALLY, independent of whichever query won the max
+  // score, so the tie-break below can prefer original-question evidence
+  // without discarding hint-only evidence entirely (a record with ZERO
+  // original-question support still keeps its hint-derived score and
+  // reasons — hint-only recall, C6.2's own core mechanism, is untouched;
+  // only the TOKEN-COUNT TIE-BREAK's provenance changes).
+  const bestOriginalReasonsByRecord = new Map();
   // Part 2 remediation (Decision 1) — the candidate pool now also admits
   // bug/decision/postmortem records, not just feature/workflow. Approved
   // scope: cross-type retrieval + authority preservation, so a question
@@ -534,8 +569,24 @@ function searchCandidates(question, searchIndex) {
       if (!prev || r.score > prev.score) {
         bestByRecord.set(r.record.stable_id, { id: r.record.stable_id, title: r.record.title, score: r.score, entityType: r.record.entity_type, reasons: r.reasons, surfaceSize: r.record.keywords.length });
       }
-      if (isRaw) bestRawByRecord.set(r.record.stable_id, r.score);
+      if (isRaw) {
+        bestRawByRecord.set(r.record.stable_id, r.score);
+        bestOriginalReasonsByRecord.set(r.record.stable_id, r.reasons);
+      }
     }
+  }
+  // Phase C6.3 (Section G/Option 1) — the provenance-aware token count used
+  // by both tie-breaks below: original-question reasons when the raw
+  // question itself matched this record at all, falling back to the
+  // record's actual (possibly hint-sourced) winning reasons otherwise —
+  // never zero for a record that only ever matched via a hint, preserving
+  // 100% of C6.2's hint-only recall for records with no original-query
+  // support at all. Only changes which query's reasons feed the TIE-BREAK
+  // when both hint and original evidence exist for the same record.
+  function originalAwareTokenCount(recordId, fallbackReasons) {
+    const originalReasons = bestOriginalReasonsByRecord.get(recordId);
+    if (originalReasons && originalReasons.length) return matchedTokenCount(originalReasons);
+    return matchedTokenCount(fallbackReasons);
   }
   // Part 3 Phase 4.3 (Decision 2, E1 resolved: Option A) — bounded, local
   // relevance adjustment, applied once here to the WINNING raw score per
@@ -561,6 +612,12 @@ function searchCandidates(question, searchIndex) {
   // regression, caught and excluded, not deliberately scoped in).
   for (const candidate of bestByRecord.values()) {
     candidate.rawScore = candidate.score;
+    // Phase C6.3 (Section G/Option 1) — stored once here (not recomputed
+    // per comparison) so both this function's own tie-break below AND
+    // answerQuestion()'s workflowClearlyBeaten can read the same
+    // provenance-aware count off diagnosticCandidates without a second
+    // pass over bestOriginalReasonsByRecord.
+    candidate.originalTokenCount = originalAwareTokenCount(candidate.id, candidate.reasons);
     if (isEligibleForNormalization(candidate.entityType, candidate.reasons)) {
       candidate.score = adjustKeywordOverlapScore(candidate.score, matchedTokenCount(candidate.reasons), candidate.surfaceSize, CONFIDENCE_FLOOR);
     }
@@ -581,6 +638,20 @@ function searchCandidates(question, searchIndex) {
   // (governance types, or higher-tier feature/workflow matches) are
   // entirely unaffected and fall through to the pre-existing adjusted-
   // score comparison unchanged.
+  // Phase C6.3 (Section G/Option 1) — TESTED AND REJECTED as a blanket
+  // change to this tie-break: originalTokenCount (see this record's own
+  // comment above, and originalAwareTokenCount) correctly fixed N1 in
+  // isolation, but full-corpus regression proved it net HARMFUL when
+  // applied here — C6.2's entire hint-injection mechanism depends on a
+  // hint-derived token count legitimately outscoring a sparser/coincidental
+  // raw-question match for genuine paraphrase recall; forcing original-only
+  // provenance into this general tie-break regressed the C6.1 81-question
+  // corpus (77.8% -> 72.8%, confusable-pair 95.8% -> 91.7%) and the C6.2
+  // 100-question corpus (76% -> 66%) — far more damage than the ~7 spurious-
+  // hint-win cases it fixed. originalTokenCount remains computed (harmless,
+  // available on diagnosticCandidates for observability/explainNormalization)
+  // but is NOT consulted by this sort. See this checkpoint's report,
+  // rejected-options section, for the full before/after numbers.
   const all = Array.from(bestByRecord.values()).sort((a, b) => {
     if (isEligibleForNormalization(a.entityType, a.reasons) && isEligibleForNormalization(b.entityType, b.reasons)) {
       const tokenDelta = matchedTokenCount(b.reasons) - matchedTokenCount(a.reasons);
@@ -729,12 +800,70 @@ function answerQuestion(question, ctx) {
   // rawScoreById) is reused, not a second search.
   const topFeatureEligible = !!topFeature && isEligibleForNormalization(topFeature.entityType, diagnosticCandidates.find((c) => c.id === topFeature.id)?.reasons);
   const topWorkflowEligible = !!topWorkflow && isEligibleForNormalization(topWorkflow.entityType, diagnosticCandidates.find((c) => c.id === topWorkflow.id)?.reasons);
+  // Hoisted from below (was computed just above the HOW_TO/TROUBLESHOOTING/
+  // EXPLANATION/TEAM_ACTIVITY routing check) — needed here too as of
+  // Phase C6.3's tier-mismatch fix immediately below. NAVIGATION added
+  // (Section K) — see this checkpoint's NAVIGATION-routing audit: nothing
+  // in the codebase documents feature-only NAVIGATION routing as a
+  // deliberate design decision (unlike the boundary/authority exclusions
+  // elsewhere, which cite an explicit rationale); it is simply that this
+  // list was never extended to it. Corpus-wide audit (18 NAVIGATION-
+  // classified questions across every corpus this checkpoint touches)
+  // found multiple real cases whose best answer is a Workflow (most
+  // visibly N1 — "Where do my photos actually end up after an import
+  // finishes?" — see this checkpoint's N1 forensic trace: AI-WF-001 is the
+  // single best-scoring candidate in the entire pool, 470.2 adjusted vs.
+  // the next Feature's 320, yet was structurally invisible to primary
+  // selection before this change), verified zero regression on the
+  // Feature-appropriate majority (the existing score/confidence/
+  // workflowClearlyBeaten gates below already require a workflow to
+  // independently earn its win — most NAVIGATION questions have no
+  // competing companion workflow at all, so this addition is a no-op for
+  // them) via full regression across every existing corpus.
+  const workflowPreferredType = qType === QUESTION_TYPES.HOW_TO || qType === QUESTION_TYPES.TROUBLESHOOTING || qType === QUESTION_TYPES.EXPLANATION || qType === QUESTION_TYPES.TEAM_ACTIVITY || qType === QUESTION_TYPES.NAVIGATION;
   let workflowClearlyBeaten;
   if (hasStrongFeatureMatch && topWorkflow && topFeatureEligible && topWorkflowEligible) {
+    // Phase C6.3 (Section G/Option 1) — originalTokenCount tested here too
+    // and rejected for the same reason as the `all` sort above (see that
+    // comment) — reverted to matchedTokenCount(reasons) (whichever query
+    // won), unchanged from pre-C6.3 behavior. This branch is nonetheless
+    // exactly where N1 is actually resolved: N1's own topWorkflow
+    // (AI-WF-001) independently out-scores topFeature on token count (6 vs
+    // 5, both hint-derived) once NAVIGATION is included in
+    // workflowPreferredType (see that flag's own comment) and this branch
+    // runs at all — no provenance change was needed for N1 specifically,
+    // only visibility.
     const topFeatureTokens = matchedTokenCount(diagnosticCandidates.find((c) => c.id === topFeature.id).reasons);
     const topWorkflowTokens = matchedTokenCount(diagnosticCandidates.find((c) => c.id === topWorkflow.id).reasons);
     workflowClearlyBeaten = topFeatureTokens !== topWorkflowTokens ? topFeatureTokens > topWorkflowTokens : topFeature.score > topWorkflow.score;
   } else {
+    // Phase C6.3 (Section I/J, Option 3) — TESTED AND REJECTED: an earlier
+    // candidate here suppressed workflowClearlyBeaten whenever topWorkflow
+    // independently cleared ABSOLUTE_EVIDENCE_FLOOR_TOKENS, reasoning that
+    // a Feature's higher-tier (identity-mention) score and a Workflow's
+    // keyword-overlap score are not on a common calibration basis (proven
+    // true for several real "wrong-workflow-competitor" cases, e.g.
+    // AI-FEAT-033 beating AI-WF-004 for "steps to get missing metadata
+    // fixed"). REJECTED by full-corpus regression: it also regressed Q5
+    // ("How do I create a Transfer Export?", AI-FEAT-038 -> wrongly
+    // AI-WF-005) and Q13 ("Why does Transfer Import exist?", AI-FEAT-039 ->
+    // wrongly AI-WF-009) — C6.1's own two protected fixes, both of which
+    // ALSO have a companion workflow scoring >= 2 tokens. The distinguishing
+    // signal this checkpoint could NOT find a safe, non-arbitrary way to
+    // express: Q5/Q13's exact-title/exact-alias feature match is the
+    // record being named as ITSELF, and per this file's own
+    // answerFromRecord()/findCompanionWorkflow() design, a Feature-primary
+    // answer ALREADY cites its companion Workflow's steps as guidance
+    // (Q5/Q13 lose no practical instructions by staying Feature-primary) —
+    // whereas AI-FEAT-033's identity-mention on "metadata...archive" is a
+    // much looser, more incidental phrase match with no equivalent
+    // guarantee. Distinguishing "the record was deliberately named" from
+    // "a generic multi-word phrase happened to match" would require either
+    // a new invented threshold (forbidden, Section Q) or a change to
+    // identity-mention's own matching in query.js (out of this
+    // checkpoint's frozen-concept-layer scope, Section E). Left unfixed,
+    // disclosed as a rejected option with its supporting evidence intact —
+    // see this checkpoint's report Section 15 (rejected options).
     workflowClearlyBeaten = hasStrongFeatureMatch && (!topWorkflow || topFeature.score > topWorkflow.score);
   }
 
@@ -795,7 +924,8 @@ function answerQuestion(question, ctx) {
   // "What is the Online Registry for?" answered from AI-FEAT-048's generic
   // capability summary instead of AI-WF-006's specific, evidence-rich
   // collaboration-purpose content, even though guidance already cited it.
-  const workflowPreferredType = qType === QUESTION_TYPES.HOW_TO || qType === QUESTION_TYPES.TROUBLESHOOTING || qType === QUESTION_TYPES.EXPLANATION || qType === QUESTION_TYPES.TEAM_ACTIVITY;
+  // workflowPreferredType (NAVIGATION included, Phase C6.3 Section K) is
+  // now hoisted above, next to workflowClearlyBeaten — see that comment.
   if (workflowPreferredType && topWorkflow && topWorkflow.score >= CONFIDENCE_FLOOR && !workflowClearlyBeaten && workflowIndexById) {
     const wf = workflowIndexById.get(topWorkflow.id);
     if (wf) return answerFromWorkflow(question, wf, workflowMatches, featureMatches, qType);

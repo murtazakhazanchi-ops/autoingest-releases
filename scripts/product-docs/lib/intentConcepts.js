@@ -16,6 +16,21 @@
 // marks clusters that exist specifically to route a paraphrase family
 // toward an existing lib/statusResolution.js KNOWN_BOUNDARIES entry (see
 // intentConcepts.boundaryHints below) rather than toward a capability.
+//
+// Phase C6.2 — trigger matching widened from exact ordered substring to
+// ALSO accept full-token-set containment (see triggerMatches below).
+// FORENSIC FINDING that motivated this: real operator paraphrases
+// routinely reorder or rephrase a trigger's own words -- "transfer gets
+// interrupted" does not contain the literal substring "interrupted
+// transfer" even though it is obviously the same concept. The exact-
+// substring check (unchanged, tried first, cheapest) still wins when it
+// matches; the token-set check is the fallback, and is deliberately
+// restricted to MULTI-WORD triggers only (single-word triggers keep
+// substring-only matching) — a lone shared word is much weaker evidence
+// than every word of a real multi-word phrase appearing somewhere in the
+// question, and single-word triggers are exactly the shape most likely to
+// false-positive if loosened (the same class of risk already documented
+// and guarded against in lib/query.js's own identity-mention tier).
 
 const CONCEPT_CLUSTERS = [
   {
@@ -43,6 +58,10 @@ const CONCEPT_CLUSTERS = [
     triggers: [
       'who else is online', 'who is online', 'see other operators', 'see who is connected',
       'which computers are connected', 'is anyone else online', 'who is active',
+      // Phase C6.2 additions — same discipline as the rest of this cluster.
+      'who else is working right now', 'see who is working right now',
+      'shows a device as online', 'still showing a device as online',
+      'device as online even though',
     ],
     hints: ['team live online registry presence device online'],
   },
@@ -93,6 +112,12 @@ const CONCEPT_CLUSTERS = [
       'collaborate without access to the main archive', 'without access to the main archive root',
       'reconnect to the archive', 'when we reconnect to the archive',
       'working in the field', 'field and created an event',
+      // Phase C6.2 additions — same discipline as the rest of this cluster
+      // (widening recall for the ALREADY-evidenced AI-WF-006 "Event
+      // Discovery & Coordination" capability, never inventing a new claim).
+      'made this event on their', 'made this event on', 'get it onto mine',
+      'onto mine without redoing', 'different locations end up using',
+      'end up using the exact same event',
     ],
     hints: ['team live online registry event coordination discovery shared identity adopt prepare'],
   },
@@ -147,7 +172,18 @@ const CONCEPT_CLUSTERS = [
   {
     id: 'metadata-repair',
     domain: 'Metadata',
-    triggers: ['missing metadata', 'metadata is missing', 'fix metadata', 'repair metadata', 'metadata wrong', 'no metadata'],
+    // Phase C6.2 REGRESSION FINDING: 'metadata wrong' and 'fix metadata'
+    // narrowed to their fuller original phrasing. Both reduce to just two
+    // individually-common tokens ({metadata, wrong} / {fix, metadata})
+    // that can coincidentally co-occur in an unrelated sentence under the
+    // new token-set fallback (e.g. "What went WRONG with... METADATA
+    // verification?" — a real regression this fix resolves) — same risk
+    // class as the boundary-cluster finding above, just in a regular
+    // concept cluster instead. 'missing metadata'/'metadata is missing'/
+    // 'repair metadata'/'no metadata' are unaffected: each already
+    // contains 'metadata' adjacent to a genuinely metadata-specific word,
+    // not a generic one.
+    triggers: ['missing metadata', 'metadata is missing', 'fix the metadata', 'repair metadata', 'metadata came out wrong', 'no metadata'],
     hints: ['metadata audit repair'],
   },
   {
@@ -203,6 +239,319 @@ const CONCEPT_CLUSTERS = [
     domain: 'Application',
     triggers: ['update autoingest', 'new version', 'stable release', 'preview release', 'switch channel'],
     hints: ['multi channel release update system application auto-update'],
+  },
+
+  // ────────────────────────────────────────────────────────────────────
+  // Phase C6.2 — new clusters. Every trigger below is grounded in the
+  // target record's own canonical summary text (verified against
+  // lib/build.js's assembled searchIndex before writing, per this
+  // checkpoint's Section I discipline) — never copied from an acceptance
+  // or evaluation question, and never from the frozen external holdout
+  // (not consulted). Hints reuse each record's own real vocabulary.
+  // ────────────────────────────────────────────────────────────────────
+  {
+    // AI-FEAT-011's own summary: "Detects connected storage devices
+    // eligible for import: polls for drives, filters by DCIM presence,
+    // and recognizes Sony camera folder conventions."
+    id: 'source-detection',
+    domain: 'Import',
+    triggers: [
+      'not showing up', "doesn't notice", 'does not notice', 'notice the drive',
+      'detect the drive', 'detect the card', 'plugged in', 'connected devices',
+      'recognize the folder', 'recognize this source', 'sony camera folder',
+    ],
+    hints: ['source detection drives dcim sony private'],
+  },
+  {
+    // AI-FEAT-012's own summary: "Activating a source for import, whether
+    // a local folder, external drive, or memory card."
+    id: 'source-selection',
+    domain: 'Import',
+    triggers: [
+      'pick a folder', 'choose a folder', 'select a folder', 'choose a local drive',
+      'pick a source', 'choose a source', 'select a source', 'activate a source',
+    ],
+    hints: ['source selection local folder external drive'],
+  },
+  {
+    // AI-FEAT-019's own summary: "Processes grouped files and copies them
+    // into the archive structure." Covers RAW/JPEG/video-handling
+    // paraphrases — no record specifically singles out RAW vs JPEG, so
+    // this correctly routes to the general copy-engine record rather than
+    // inventing a format-specific one.
+    id: 'raw-jpeg-video-handling',
+    domain: 'Import',
+    triggers: [
+      'raw files', 'raw file', 'jpeg files', 'camera-native', 'camera native',
+      'video clips', 'video files', 'treated differently', 'special handling',
+      'copied any differently',
+    ],
+    hints: ['import pipeline copy engine processes grouped files'],
+  },
+  {
+    // AI-FEAT-017's own summary: "Assigns selected files into logical
+    // groups mapped to sub-events."
+    id: 'grouping',
+    domain: 'Import',
+    triggers: [
+      'split them apart', 'separate one photographer', "separate a photographer",
+      // 'sub-event' alone REMOVED (found during C6.1-corpus regression
+      // testing): too generic on its own — it's also core vocabulary for
+      // event-component-routing (a DIFFERENT concept about where the
+      // resulting folder ends up, not how files get assigned to groups in
+      // the first place) and collided with it on a real regression case.
+      'sort files into groups', 'sort files into their sub-event',
+      'assign files to groups', 'logical groups', 'undo a group', 'group assignment',
+    ],
+    hints: ['grouping system assigns files logical groups sub-events'],
+  },
+  {
+    // AI-FEAT-022's own summary: "Resolves the photographer-level folder
+    // within an event's directory structure."
+    id: 'photographer-routing',
+    domain: 'Import',
+    triggers: [
+      "photographer's folder", 'photographer folder', "photographer's name folder",
+      'which photographer', 'photographer-level folder',
+    ],
+    hints: ['photographer folder sequencing'],
+  },
+  {
+    // AI-FEAT-018's own summary: "Derives archive folder paths purely
+    // from event.json... Single-component events route to
+    // Collection/Event/Photographer/."
+    id: 'event-component-routing',
+    domain: 'Import',
+    triggers: [
+      'folder path', 'end up at', 'own folder inside the archive',
+      'folder structure', 'component gets its own folder',
+    ],
+    hints: ['event component import routing folder paths'],
+  },
+  {
+    // AI-FEAT-020's own classification: Duplicate Detection is its own
+    // top-level implemented feature.
+    id: 'duplicate-detection',
+    domain: 'Import',
+    triggers: [
+      'same photo copied in twice', 'copied in twice', 'duplicate photo',
+      'catch it if the exact same', 'same file exists at the destination',
+      'copied in by accident',
+    ],
+    hints: ['duplicate detection'],
+  },
+  {
+    // AI-FEAT-025's own summary: "Two distinct, real, hash-based
+    // verification mechanisms... Named Checksum-Based specifically..."
+    id: 'checksum-verification',
+    domain: 'Archive Management',
+    triggers: [
+      'file hash', 'made it across intact', "wasn't corrupted", 'was not corrupted',
+      'file actually safe', 'not damaged', 'confirm nothing is missing or broken',
+      'confirm nothing got damaged',
+    ],
+    hints: ['checksum-based file verification hash'],
+  },
+  {
+    // AI-FEAT-028's own summary: "Each audit entry in imports[] records
+    // source: {type, label, path} identifying which memory card, external
+    // drive, or local folder was used."
+    id: 'source-attribution',
+    domain: 'Import',
+    // 'which memory card' narrowed (found during full regression testing:
+    // after 'which' was added to GENERIC_DOMAIN_WORDS — see that list's
+    // own comment — this trigger collapsed to just {memory, card}, far too
+    // generic; it fired on ANY plain import question mentioning a memory
+    // card, not only genuine attribution/tracing questions).
+    triggers: [
+      'which memory card was used', 'which drive a given photo', 'trace a photo back',
+      'originally came from', 'record of which card',
+    ],
+    hints: ['import source attribution which card drive folder'],
+  },
+  {
+    // AI-FEAT-014's own summary domain: thumbnail generation/caching;
+    // AI-FEAT-015: media preview.
+    id: 'thumbnails-preview',
+    domain: 'Media',
+    triggers: [
+      'look at the photos before', 'preview images', 'small preview',
+      'preview before they get copied', 'thumbnail',
+    ],
+    hints: ['thumbnail generation caching media preview'],
+  },
+  {
+    // AI-FEAT-013's own title/domain: File Browser & Media Grid/List Viewing.
+    id: 'file-browser',
+    domain: 'Media',
+    triggers: [
+      'grid instead of a list', 'browse through everything', 'media grid',
+      'look through everything already in a folder',
+    ],
+    hints: ['file browser media grid list viewing'],
+  },
+  {
+    // AI-FEAT-021's own domain: no-overwrite/atomic-transaction guarantee
+    // during import.
+    id: 'atomic-import-safety',
+    domain: 'Import',
+    triggers: [
+      'crashes in the middle of copying', 'half an import', 'crash during import',
+      'partial import', 'interrupted mid-import',
+    ],
+    hints: ['atomic import transaction crash recovery'],
+  },
+  {
+    // AI-FEAT-029's own summary: "The single shared engine and resolver
+    // that every metadata writer in the app consumes."
+    id: 'metadata-writing',
+    domain: 'Metadata',
+    triggers: [
+      'keyword tags', 'tags that end up baked into', 'shared engine responsible for writing tags',
+      'where do those actually come from', 'metadata gets written',
+    ],
+    hints: ['metadata writing engine shared resolver'],
+  },
+  {
+    // AI-FEAT-032's own summary: "Read-only, post-hoc verification for
+    // files that landed via copy-only paths... where the copy step itself
+    // never checked metadata correctness."
+    id: 'metadata-verification',
+    domain: 'Metadata',
+    triggers: [
+      'tags actually got written correctly', 'confidence that the tags',
+      'metadata correctness', 'post-hoc verification',
+    ],
+    hints: ['metadata verification read-only post-hoc'],
+  },
+  {
+    // AI-FEAT-034's own title: Metadata Management Modal — the operator
+    // UI surface for reviewing metadata issues.
+    id: 'metadata-management-ui',
+    domain: 'Metadata',
+    triggers: [
+      'review metadata problems', 'where in the app do i go to review metadata',
+      'metadata management',
+    ],
+    hints: ['metadata management modal'],
+  },
+  {
+    // AI-WF-002/AI-FEAT-009's own summary language: Collection -> Event ->
+    // Components; "Establishes the event context."
+    id: 'event-create-extended',
+    domain: 'Events',
+    triggers: [
+      'brand new shoot', 'brand-new archival record', 'first screen for beginning',
+      'fresh archive entry', 'establish an event',
+    ],
+    hints: ['create new event collection components'],
+  },
+  {
+    // AI-FEAT-010's own summary: "Selecting an existing event, editing it
+    // safely." Distinct from Event Creation.
+    id: 'event-edit-extended',
+    domain: 'Events',
+    triggers: [
+      'got the location wrong', 'correct it after the fact', 'fix the details on a shoot',
+      'field is wrong', 'correcting it', 'tidy up an event',
+    ],
+    hints: ['event management editing selecting existing event'],
+  },
+  {
+    // AI-WF-003/AI-FEAT-023's own summary: "Simple, destination-based
+    // copying without setting up an event first."
+    id: 'quick-import-extended',
+    domain: 'Import',
+    triggers: [
+      'dump a handful of files', 'without building out a whole event',
+      'faster path than the full import wizard', 'lightweight copy mode',
+      'skips the usual event setup',
+    ],
+    hints: ['quick import destination-based copying without event setup'],
+  },
+  {
+    // AI-FEAT-002's own summary: "Operator identity for AutoIngest... a
+    // dedicated splash screen for login/profile selection."
+    id: 'login-operator',
+    domain: 'Application',
+    triggers: [
+      'which person is currently doing', 'operator profile', 'switch which operator',
+      'who is currently doing the importing', 'active profile',
+    ],
+    hints: ['login operator identity profile selection'],
+  },
+  {
+    // AI-FEAT-005's own domain: application settings/configuration store.
+    id: 'settings-persistence',
+    domain: 'Application',
+    triggers: [
+      'preferences carry over', 'remember my settings', 'settings between sessions',
+    ],
+    hints: ['application settings configuration store'],
+  },
+  {
+    // AI-FEAT-042's own summary: "Configuration and automatic resolution
+    // of AutoIngest's four storage roots."
+    id: 'archive-root-config',
+    domain: 'Archive Management',
+    triggers: [
+      'which server or nas', 'permanent archive', 'working drive i use day-to-day',
+      'storage roots', 'permanent office server',
+    ],
+    hints: ['archive root configuration resolution storage roots'],
+  },
+  {
+    // AI-FEAT-043's own summary: "Four read-only reporting and audit
+    // surfaces giving operators visibility into archive health."
+    id: 'archive-health',
+    domain: 'Archive Management',
+    triggers: [
+      'checks the archive for missing', 'overall picture of how healthy',
+      'confirm nothing is missing after', 'archive health', 'consistency report',
+    ],
+    hints: ['archive health reporting consistency completeness diagnostics'],
+  },
+  {
+    // AI-FEAT-049's own summary: "Planned archive-maintenance capability
+    // — the next roadmap milestone after the completed AI-RM-001."
+    id: 'archive-maintenance-extended',
+    domain: 'Archive Management',
+    triggers: [
+      'bigger cleanup pass', 'beyond fixing metadata', 'planned for the whole archive',
+    ],
+    hints: ['archive maintenance planned roadmap milestone'],
+  },
+  {
+    // AI-FEAT-053's own domain: natural-language search across the
+    // archive/knowledge base.
+    id: 'global-search',
+    domain: 'Application',
+    triggers: [
+      'plain-language question', 'search across the whole archive',
+      'look something up across every event', 'single box where i can look something up',
+    ],
+    hints: ['global search plain language query'],
+  },
+  {
+    // AI-FEAT-051's own domain: planned full-archive browsing.
+    id: 'archive-browser',
+    domain: 'Archive Management',
+    triggers: [
+      'browse through everything already sitting in the archive', 'proper viewer',
+      'browse already-archived material',
+    ],
+    hints: ['archive browser full-archive browsing planned'],
+  },
+  {
+    // AI-WF-009/AI-FEAT-039's own summary: "Consolidates content from a
+    // Transfer Drive into the Main Archive Root."
+    id: 'transfer-import',
+    domain: 'Transfer & Backup',
+    triggers: [
+      'physically arrives at the office', 'merging content from a portable drive',
+      'consolidate content from a transfer drive', 'merge back into the main archive',
+    ],
+    hints: ['transfer import consolidates main archive root'],
   },
 ];
 
@@ -311,19 +660,95 @@ const BOUNDARY_CONCEPT_CLUSTERS = [
   },
 ];
 
+// Domain-generic words excluded from the token-set fallback ONLY (never
+// from the exact-substring check above it, which stays untouched). Found
+// necessary during full 165-question regression testing — three separate,
+// real regressions traced to the same shape of defect: a multi-word
+// trigger reduces, after tokenizing, to just two individually-ubiquitous
+// words that coincidentally co-occur in an unrelated question:
+//   - 'update autoingest' -> {update, autoingest} matched "Will AutoIngest
+//     overwrite my archive if I run an update?" (autoingest is the
+//     product's own name — appears in nearly every question regardless
+//     of topic).
+//   - 'metadata wrong' -> {metadata, wrong} matched "What went WRONG with
+//     the same-size skip and METADATA verification?" (fixed by making
+//     that specific trigger more contextual instead — logged here as the
+//     general-word list only covers cross-cluster-wide generic terms).
+//   - 'what event is' -> {what, event} matched "What is Event Management
+//     and Editing?" ('event' is core, near-universal AutoIngest
+//     vocabulary; 'what' is a bare question word with zero topic signal
+//     on its own).
+// This list is deliberately small and reserved for words this specific,
+// concrete evidence showed are unsafe as a 2-token fuzzy-match signal —
+// not a general stopword list, and every exact-substring trigger using
+// these words is completely unaffected.
+const GENERIC_DOMAIN_WORDS = new Set(['autoingest', 'app', 'application', 'what', 'event', 'who', 'which']);
+
+function tokenize(s) {
+  return String(s).toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length > 2);
+}
+
+// See this file's own header comment (Phase C6.2) for the full rationale.
+function triggerMatches(questionLower, trigger) {
+  if (questionLower.includes(trigger)) return true;
+  const tTokens = tokenize(trigger).filter((t) => !GENERIC_DOMAIN_WORDS.has(t));
+  if (tTokens.length < 2) return false;
+  const qTokens = new Set(tokenize(questionLower));
+  return tTokens.every((t) => qTokens.has(t));
+}
+
 function findConcept(questionLower) {
   for (const c of CONCEPT_CLUSTERS) {
     for (const t of c.triggers) {
-      if (questionLower.includes(t)) return c;
+      if (triggerMatches(questionLower, t)) return c;
     }
   }
   return null;
+}
+
+// Phase C6.2 — returns EVERY matching cluster, not just the first. FORENSIC
+// FINDING: a real question can genuinely, legitimately match more than one
+// cluster's triggers at once (e.g. "portable drive" is real vocabulary
+// shared between transfer-export and transfer-import contexts) — with only
+// the first-array-order match's hint injected, the correct concept could
+// silently lose to whichever cluster merely happened to be declared
+// earlier in CONCEPT_CLUSTERS, an authoring-order coincidence with no
+// relevance signal behind it. Returning all matches and letting every
+// hint compete through the SAME unmodified lib/query.js ranker (exactly
+// as a single hint already did) fixes this without inventing a second
+// ranking mechanism — the scorer, not cluster order, decides which
+// concept's hint actually wins.
+function findAllConcepts(questionLower) {
+  const matched = [];
+  for (const c of CONCEPT_CLUSTERS) {
+    for (const t of c.triggers) {
+      if (triggerMatches(questionLower, t)) {
+        matched.push(c);
+        break;
+      }
+    }
+  }
+  return matched;
 }
 
 // Returns a matched boundary-widening trigger's underlying boundaryId (from
 // lib/statusResolution.js's KNOWN_BOUNDARIES), or null. Deliberately
 // separate from findConcept — this function's only job is widening
 // recognition of an ALREADY-evidenced exclusion, never inventing one.
+// Phase C6.2 REGRESSION FINDING: deliberately stays on exact-substring
+// matching ONLY (questionLower.includes(t)) — does NOT use triggerMatches'
+// token-set fallback, unlike findConcept above. Found during regression
+// testing: several existing boundary triggers (e.g. 'is the registry my
+// archive') reduce, after short-word filtering, to just two individually
+// generic content words ({registry, archive}) that co-occur in almost
+// any reasonable question comparing the two — fuzzy-matched a real
+// question ("How does archive locking differ from the Online Registry?")
+// into a false NOT_SUPPORTED exclusion, converting a correct AVAILABLE
+// answer into an incorrect denial. A boundary is a safety-critical
+// exclusion; a false positive here is far more costly than in an ordinary
+// concept hint (which only adds a candidate query, never denies a
+// capability), so boundaries keep the stricter, pre-C6.2 matching
+// discipline. Regular concept clusters are unaffected by this reversion.
 function findBoundaryConcept(questionLower) {
   for (const c of BOUNDARY_CONCEPT_CLUSTERS) {
     for (const t of c.triggers) {
@@ -333,4 +758,4 @@ function findBoundaryConcept(questionLower) {
   return null;
 }
 
-module.exports = { CONCEPT_CLUSTERS, BOUNDARY_CONCEPT_CLUSTERS, findConcept, findBoundaryConcept };
+module.exports = { CONCEPT_CLUSTERS, BOUNDARY_CONCEPT_CLUSTERS, findConcept, findAllConcepts, findBoundaryConcept, triggerMatches };

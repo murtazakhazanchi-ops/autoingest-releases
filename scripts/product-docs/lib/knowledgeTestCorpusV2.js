@@ -395,7 +395,8 @@ const CORPUS_V2 = [
   {
     id: 'W04', domain: 'Archive operations',
     question: 'My archive says it is locked, what do I do?',
-    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak',
+    expectedStatus: 'AVAILABLE', expectedMatchQuality: 'strong',
+    knownLimitation: 'CHANGED 2026-08-21 (Phase C6.2, lib/intentConcepts.js\'s existing archive-lock concept cluster + the checkpoint\'s multi-concept-hint fix) — was a weak, honestly-hedged match; now confidently, untied resolves to AI-FEAT-045 (Archive Lock Handling & Stale-Lock Recovery), the genuinely correct record. A real precision improvement, same class as several already-documented cases elsewhere in this file — not a new claim, the same correct answer with justified confidence.',
   },
   {
     id: 'W05', domain: 'QMZ',
