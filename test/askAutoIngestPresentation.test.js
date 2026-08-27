@@ -19,7 +19,7 @@ const PRODUCT_DOCS = path.join(__dirname, '..', 'scripts', 'product-docs');
 const build = require(path.join(PRODUCT_DOCS, 'lib', 'build.js'));
 const { buildEngineContext, answerQuestion } = require(path.join(PRODUCT_DOCS, 'lib', 'knowledgeEngine.js'));
 const { answerQuestionWithAuthority } = require(path.join(PRODUCT_DOCS, 'lib', 'answerWithAuthority.js'));
-const { shapeAnswerForUI, shapeModelStatus, QUERY_STATUS_LABELS, MODEL_STATE_LABELS } = require('../main/askAutoIngestPresentation');
+const { shapeAnswerForUI, shapeModelStatus, shapeConversationalResponse, QUERY_STATUS_LABELS, MODEL_STATE_LABELS } = require('../main/askAutoIngestPresentation');
 
 const RAW_ID_RE = /\b(AI-FEAT-\d+|AI-WF-\d+|AI-RM-\d+|DEC-\d+|BUG-\d+|PM-\d+|AI-MEM-\d+)\b/;
 const READY = () => ({ status: 'READY', detail: {} });
@@ -94,13 +94,24 @@ async function main() {
   // is still converted to its real display name) is what actually fixes
   // this -- this test pins that fix to the exact real citation, not just
   // the general substring sweep above.
+  //
+  // C8 corrective checkpoint (2026-08-24), Defect 2 update: that DEC-011
+  // citation lives entirely inside QMZ's own "**Why this exists**"
+  // narrative -- shapeAnswerForUI() now applies
+  // evidencePackage.js's splitCapabilityFromProvenance() before
+  // sanitization (see that function's own header comment), so this
+  // provenance/citation-carrying narrative no longer reaches directAnswer
+  // AT ALL for a plain "What is QMZ?" question, on any path (synthesized
+  // or deterministic-fallback alike) -- a strictly stronger guarantee than
+  // "converted to a display name", since citation/provenance commentary
+  // should never be operator-facing regardless of what it cites.
   // ---------------------------------------------------------------------
-  await t('regression: "What is QMZ?" no longer leaks DEC-011 via its markdown-link citation, and shows a real display name instead', async () => {
+  await t('regression: "What is QMZ?" no longer leaks DEC-011 via its markdown-link citation (its citing "Why this exists" narrative is provenance, never operator-facing)', async () => {
     const answer = answerQuestion('What is QMZ?', ctx);
     const shaped = shapeAnswerForUI(answer, ctx);
     assert.ok(!/DEC-011/.test(shaped.directAnswer), `directAnswer still contains the raw "DEC-011" substring: ${shaped.directAnswer}`);
     assert.ok(!/\]\(/.test(shaped.directAnswer), `directAnswer still contains raw markdown link syntax: ${shaped.directAnswer}`);
-    assert.ok(/Dedicated Domain Workflow/i.test(shaped.directAnswer), 'expected the real display name to survive in place of the stripped link');
+    assert.ok(!/Why this exists/i.test(shaped.directAnswer), 'the provenance/citation-carrying "Why this exists" narrative must not reach the primary answer at all');
   });
 
   // ---------------------------------------------------------------------
@@ -207,6 +218,35 @@ async function main() {
     const before = JSON.stringify(answer);
     shapeAnswerForUI(answer, ctx);
     assert.equal(JSON.stringify(answer), before);
+  });
+
+  // ---------------------------------------------------------------------
+  // Phase C8 — shapeConversationalResponse(): a clarification's `choices`
+  // must never leak a raw record id to the renderer, only the same
+  // human-readable titles the deterministic clarification-decision layer
+  // already computed. Also proves the 'final' case delegates entirely to
+  // shapeAnswerForUI's own already-proven sanitization above, rather than
+  // a second, divergent implementation.
+  // ---------------------------------------------------------------------
+  await t('shapeConversationalResponse (clarification): no raw record id ever appears in text or choices', () => {
+    const shaped = shapeConversationalResponse({
+      kind: 'clarification',
+      text: 'Could you tell me which one you mean: Export or Update a Transfer Drive, Import or Update From a Transfer Drive?',
+      choices: ['Export or Update a Transfer Drive', 'Import or Update From a Transfer Drive', 'Not sure'],
+    }, ctx);
+    assert.equal(shaped.kind, 'clarification');
+    assert.ok(!RAW_ID_RE.test(shaped.text));
+    for (const c of shaped.choices) assert.ok(!RAW_ID_RE.test(c));
+  });
+
+  await t('shapeConversationalResponse (final): delegates to shapeAnswerForUI unchanged, plus topicChanged/hedged flags', async () => {
+    const answer = await answerQuestionWithAuthority('How do I import photographs from an SD card?', ctx, { judge: async () => { throw new Error('n/a'); }, getModelAvailability: READY });
+    const direct = shapeAnswerForUI(answer, ctx);
+    const shaped = shapeConversationalResponse({ kind: 'final', answer, topicChanged: true, hedged: false }, ctx);
+    assert.equal(shaped.kind, 'final');
+    assert.deepEqual(shaped.answer, direct);
+    assert.equal(shaped.topicChanged, true);
+    assert.equal(shaped.hedged, false);
   });
 
   console.log(`askAutoIngestPresentation.test.js: ${passed} passed`);

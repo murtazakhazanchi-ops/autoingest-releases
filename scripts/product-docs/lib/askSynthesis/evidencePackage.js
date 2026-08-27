@@ -64,9 +64,29 @@ function pathFor(id, ctx) {
 // unaffected -- what a human sees via the CLI/portal today is untouched.
 const PROSE_ID_RE = /\b(AI-FEAT-\d+|AI-WF-\d+|AI-RM-\d+|DEC-\d+|BUG-\d+|PM-\d+|AI-MEM-\d+)\b/g;
 
+// Final acceptance checkpoint (2026-08-24): independently discovered
+// duplication bug, mechanical, not a QMZ special case. The original
+// version only stripped the "Title (ID)" ordering (the common
+// answerFromGovernanceRecord()/sourcesForRecord() citation shape). A
+// SECOND, equally real ordering exists elsewhere in this codebase's own
+// prose construction -- e.g. knowledgeEngine.js's companion-workflow
+// guidance template, `See ${companionWorkflow.id} (${companionWorkflow.title})
+// for step-by-step instructions.` -- "ID (Title)", the reverse order. Left
+// unhandled, the ID-then-title case fell through to the bare-ID
+// substitution pass below, which replaced the ID with its OWN display
+// name while the identical title already sat right next to it in
+// parentheses -- producing a literal duplicate ("Sort QMZ Photographs
+// (Sort QMZ Photographs)..."). Handled first, as its own pass, so by the
+// time the "Title (ID)" pass and the bare-ID fallback run, this ordering
+// is already gone.
+const ID_THEN_PAREN_RE = /\b(AI-FEAT-\d+|AI-WF-\d+|AI-RM-\d+|DEC-\d+|BUG-\d+|PM-\d+|AI-MEM-\d+)\s*\(([^()]+)\)/g;
+
 function sanitizeIdsInProse(text, ctx) {
   if (typeof text !== 'string' || !text) return text;
   return text
+    // "AI-FEAT-007 (Title)" -> "Title" -- ID-then-title ordering. See this
+    // constant's own header comment above for why this must run first.
+    .replace(ID_THEN_PAREN_RE, (_match, _id, paren) => paren)
     // "Title (AI-FEAT-007)" -> "Title" -- the common
     // answerFromGovernanceRecord()/sourcesForRecord() citation shape; the
     // human name almost always already precedes the parenthetical, so the
@@ -76,6 +96,211 @@ function sanitizeIdsInProse(text, ctx) {
     // replaced with its real display name so the sentence stays readable
     // and no information is silently lost, only the opaque ID token
     .replace(PROSE_ID_RE, (id) => displayNameFor(id, ctx) || id);
+}
+
+// Final answer-quality checkpoint (2026-08-24), Product Owner-authorized
+// structural evidence separation. Forensic trace (this checkpoint, before
+// any code change): the corpus's own "## Summary" section, for 25 of 58
+// feature records, contains the operator-facing capability description and
+// a "**Why this exists**"-led historical/provenance narrative -- verified
+// directly in the canonical Markdown (e.g.
+// docs/product/features/AI-FEAT-047_QMZ_SEQUENCING_WORKSPACE.md's own
+// Summary section carries both, as two paragraphs). parseProductDocs.js's
+// extractSection('Summary') (unchanged) returns that whole section's raw
+// text with its internal structure intact; knowledgeEngine.js's
+// answerFromRecord() (unchanged, off-limits per prior Product Owner
+// directive -- see this file's own top-of-file header) concatenates it
+// whole into directAnswer. By the time evidencePackage.js sees
+// answer.directAnswer, the "**Why this exists**" marker is still present
+// verbatim in the string -- this function splits on it.
+//
+// The marker itself, not a blank-line paragraph break, is the split point:
+// checked directly against the corpus (AI-FEAT-038 Transfer Export), the
+// SAME "**Why this exists**" convention sometimes starts mid-paragraph,
+// not always after a blank line -- a newline-based split would miss those
+// records. The bolded marker string itself is the one genuinely general,
+// consistently-authored signal (25/58 records, always exactly once).
+//
+// Deliberately NOT attempted: an equivalent split for TECHNICAL_IMPLEMENTATION
+// detail (e.g. QMZ's own `qmzRoot`/`qmz-sequences.json`/IPC-surface
+// mentions). Traced and confirmed: unlike the historical narrative, these
+// terms are interleaved within the SAME sentence as the capability
+// description, with no comparable structural marker anywhere in the
+// corpus to split on. Attempting one would mean guessing at sentence
+// boundaries or keyword lists -- exactly the brittle heuristic this
+// checkpoint's own guidance rules out. Left to the existing (previous
+// checkpoint's) prompt instruction to select around, which real-model
+// testing already showed works reliably once the evidence isn't also
+// carrying a large, separate provenance block.
+const WHY_THIS_EXISTS_RE = /\*\*Why this exists\*\*/;
+
+function splitCapabilityFromProvenance(text) {
+  if (typeof text !== 'string' || !text) return { capability: text, provenance: null };
+  const match = WHY_THIS_EXISTS_RE.exec(text);
+  if (!match) return { capability: text, provenance: null };
+  const capability = text.slice(0, match.index).trim();
+  const provenance = text.slice(match.index).trim();
+  // A record whose ENTIRE directAnswer is the provenance narrative (no
+  // capability sentence precedes the marker) is not observed in the
+  // corpus, but handled safely rather than assumed away: fall back to the
+  // original full text as "capability" so a real capability description
+  // is never silently dropped, and provenance is not extracted from
+  // nothing.
+  return capability ? { capability, provenance } : { capability: text, provenance: null };
+}
+
+// C8 corrective checkpoint (2026-08-24), Defect 2 — "atomic evidence
+// synthesis". Forensic trace of the "Why this exists" blob produced by
+// splitCapabilityFromProvenance() above (scanned across all 25 corpus
+// records that carry the marker): 23/25 follow one further, equally
+// consistent structural convention -- the marker is IMMEDIATELY followed
+// by a parenthetical carrying evidentiary/citation metadata (capture date,
+// "Known from project history; repository evidence pending", "Product-
+// Owner Purpose Capture interview", cross-references to Decision records),
+// then a colon, then the actual reasoning prose. E.g. AI-FEAT-038 Transfer
+// Export: "**Why this exists** (*Known from project history; repository
+// evidence pending* — captured during the Product-Owner Purpose Capture
+// interview, 2026-08-14): before this capability existed, ...". The
+// remaining 2/25 (AI-FEAT-026, AI-FEAT-034) simply have no such
+// parenthetical -- marker directly followed by a colon and the reasoning
+// prose, with nothing to extract. This function splits on that same
+// reliable structural marker (parenthetical-after-marker, not a keyword
+// list) into two DIFFERENT evidence roles that the original, single
+// "historyProvenance" blob conflated: RATIONALE (the actual design/history
+// reasoning -- legitimate content for Phi to draw on when a question
+// genuinely asks "why") and PROVENANCE (the citation/evidence-qualification
+// commentary itself -- never legitimate operator-facing content, under any
+// question, which is exactly the "repository evidence pending"/"Purpose
+// Capture interview" leakage the Product Owner's original Answer-Quality
+// Hold flagged). When there is no parenthetical, provenance is simply
+// null and rationale is the whole marker-stripped text -- nothing is lost,
+// nothing is invented.
+const WHY_THIS_EXISTS_PARENTHETICAL_RE = /^\*\*Why this exists\*\*\s*(?:\(([^()]*(?:\([^()]*\)[^()]*)*)\))?\s*:\s*/;
+
+function splitRationaleFromProvenanceQualifier(whyThisExistsBlob) {
+  if (typeof whyThisExistsBlob !== 'string' || !whyThisExistsBlob) return { rationale: null, provenanceQualifier: null };
+  const m = WHY_THIS_EXISTS_PARENTHETICAL_RE.exec(whyThisExistsBlob);
+  if (!m) return { rationale: whyThisExistsBlob, provenanceQualifier: null };
+  const rationale = whyThisExistsBlob.slice(m[0].length).trim();
+  const provenanceQualifier = m[1] ? m[1].trim() : null;
+  return { rationale: rationale || whyThisExistsBlob, provenanceQualifier };
+}
+
+// C8 corrective checkpoint, Defect 2 — TECHNICAL evidence-atom extraction.
+// Forensic trace (this checkpoint): the corpus's own Markdown consistently
+// uses backtick inline-code spans to mark implementation-level identifiers
+// -- file names, internal state/config keys, function names, module paths
+// (`qmzRoot`, `qmz-sequences.json`, `_qmz*`, `event.json`, `BrowserWindow`,
+// `services/telemetry.js`, etc.). Verified general, not a QMZ special
+// case: 38 of 58 Feature records use this convention in their own Summary
+// section alone. This is a real, pre-existing AUTHORING convention (how
+// engineers who wrote these docs already mark "this is an implementation
+// detail," not a heuristic invented for this checkpoint) -- extracting the
+// backtick-delimited spans is a syntactic operation, not a guess at
+// sentence or clause boundaries.
+//
+// Deliberately NOT attempted: surgically removing these spans from
+// directAnswer's own prose to produce a "technical-free" FACT sentence.
+// Traced directly against the source (AI-FEAT-047 QMZ's own Summary
+// paragraph): the identifiers are grammatically embedded inside the SAME
+// sentence as the capability description ("...with its own root
+// (`qmzRoot`), durable state file (`qmz-sequences.json`)..., and its own
+// IPC surface."), and "IPC surface" itself is not even backtick-wrapped --
+// removing the backtick spans alone would leave broken punctuation without
+// reliably removing every technical phrase, and papering over the gap with
+// additional keyword/phrase rules is exactly the brittle heuristic this
+// checkpoint's guidance rules out. Reported rather than forced: directAnswer
+// is therefore left completely untouched (still whole, ungrounded-risk-free
+// -- it's real corpus prose) and extraction here is ADDITIVE ONLY, used for
+// two things -- (1) making a genuine implementation identifier available
+// as its own explicitly-labeled TECHNICAL evidence atom rather than
+// invisible plain text and (2) letting safetyValidation.js's leak check
+// verify a synthesized answer never reproduces a real, this-record's-own
+// technical identifier, exactly the same "compare output against something
+// derived from the evidence package itself, never a hardcoded vocabulary"
+// pattern already proven for ID/handle/provenance leak checks. This is the
+// second, structural layer of defense (selection-time: TECHNICAL atoms are
+// never offered to Phi at all, see selectEvidenceAtomsForClassification()
+// below) validation-time leak detection is the backstop for when a raw
+// identifier is copied from directAnswer despite BASE_CONTRACT rule 4's
+// instruction not to.
+const INLINE_CODE_RE = /`([^`]+)`/g;
+
+function extractTechnicalAtoms(text, sourceId, sourceField) {
+  if (typeof text !== 'string' || !text) return [];
+  const seen = new Set();
+  const atoms = [];
+  let m;
+  INLINE_CODE_RE.lastIndex = 0;
+  while ((m = INLINE_CODE_RE.exec(text))) {
+    const token = m[1].trim();
+    if (!token || seen.has(token)) continue;
+    seen.add(token);
+    atoms.push({ role: 'TECHNICAL', text: token, sourceId: sourceId || null, sourceField });
+  }
+  return atoms;
+}
+
+// The single, general atomic-evidence builder — every evidence atom this
+// system produces, of any role, is built here, from already-computed
+// package fields, so buildEvidencePackage() and
+// buildEvidencePackageForKnownRecord() both get identical atom-construction
+// behavior without duplicating it. Deliberately does NOT re-derive
+// anything from raw Markdown itself -- every atom traces back to a field
+// this file already computed (directAnswer capability/provenance split,
+// guidance, steps, limitations), so there is exactly one place a new
+// canonical field would need to be wired in.
+function buildEvidenceAtoms({ directAnswerCapability, directAnswerProvenanceBlob, guidance, steps, limitations, primaryId }) {
+  const atoms = [];
+  if (directAnswerCapability) {
+    atoms.push({ role: 'FACT', text: directAnswerCapability, sourceId: primaryId || null, sourceField: 'directAnswer' });
+    atoms.push(...extractTechnicalAtoms(directAnswerCapability, primaryId, 'directAnswer'));
+  }
+  if (guidance) {
+    atoms.push({ role: 'FACT', text: guidance, sourceId: primaryId || null, sourceField: 'guidance' });
+  }
+  for (const s of steps || []) {
+    atoms.push({ role: 'ACTION', text: s.text, sourceId: s.sourceId || primaryId || null, sourceField: `steps[${s.index}]` });
+  }
+  for (const [i, l] of (limitations || []).entries()) {
+    atoms.push({ role: 'LIMITATION', text: l, sourceId: primaryId || null, sourceField: `limitations[${i}]` });
+  }
+  if (directAnswerProvenanceBlob) {
+    const { rationale, provenanceQualifier } = splitRationaleFromProvenanceQualifier(directAnswerProvenanceBlob);
+    if (rationale) atoms.push({ role: 'RATIONALE', text: rationale, sourceId: primaryId || null, sourceField: 'whyThisExists:rationale' });
+    if (provenanceQualifier) atoms.push({ role: 'PROVENANCE', text: provenanceQualifier, sourceId: primaryId || null, sourceField: 'whyThisExists:provenanceQualifier' });
+  }
+  return atoms;
+}
+
+// Question-relevant, classification-driven selection -- general (a rule
+// keyed on the SAME classification enum questionClassifier.js/
+// knowledgeEngine.js already produce for every question, not a per-question
+// or per-record special case) not a per-question rule. FACT/ACTION/
+// LIMITATION are always offered -- the operator-facing "what/how/watch-out"
+// atoms every question type already relies on today via directAnswer/
+// steps/limitations. RATIONALE (the "why this exists" reasoning) is
+// offered ONLY for classifications where a "why"/background question is
+// plausible -- EXPLANATION and UNKNOWN already carry this exact
+// instruction in promptTemplates.js's own TYPE_GUIDANCE (kept in sync,
+// not duplicated logic -- this is that same intent enforced structurally
+// instead of only by prompt wording); KNOWN_RECORD_BROWSE (Related-topic
+// browsing) is added because its own guidance text already asks Phi to
+// explain "why an operator would use it". TECHNICAL and PROVENANCE atoms
+// are NEVER selected for any classification -- there is no question type
+// in this system representing a genuine "explain your internal
+// implementation" question, so there is no classification under which
+// offering them would be correct; they remain in the full evidenceAtoms
+// list purely for inspectability and as the source safetyValidation.js's
+// leak check compares against.
+const RATIONALE_ELIGIBLE_CLASSIFICATIONS = new Set(['EXPLANATION', 'UNKNOWN', 'KNOWN_RECORD_BROWSE']);
+
+function selectEvidenceAtomsForClassification(atoms, classification) {
+  return (atoms || []).filter((a) => {
+    if (a.role === 'FACT' || a.role === 'ACTION' || a.role === 'LIMITATION') return true;
+    if (a.role === 'RATIONALE') return RATIONALE_ELIGIBLE_CLASSIFICATIONS.has(classification);
+    return false; // TECHNICAL, PROVENANCE: never offered to synthesis
+  });
 }
 
 // Raw retrieval diagnostics for the primary record and its closest
@@ -190,6 +415,22 @@ function buildEvidencePackage(question, ctx) {
 
   const retrieval = primary ? retrievalDiagnosticsFor(question, primary.id, ctx) : null;
 
+  const { capability: directAnswerCapability, provenance: directAnswerProvenance } = splitCapabilityFromProvenance(sanitizeIdsInProse(answer.directAnswer, ctx));
+  const sanitizedGuidance = sanitizeIdsInProse(answer.guidance, ctx);
+  const sanitizedLimitations = (answer.limitations || []).map((l) => sanitizeIdsInProse(l, ctx));
+  const steps = structuredStepsFor(
+    primary && primary.entityType === 'workflow' ? primary.id : (answer.sources.find((s) => /^AI-WF-/.test(s.id)) || {}).id,
+    ctx,
+  );
+  const evidenceAtoms = buildEvidenceAtoms({
+    directAnswerCapability,
+    directAnswerProvenanceBlob: directAnswerProvenance,
+    guidance: sanitizedGuidance,
+    steps,
+    limitations: sanitizedLimitations,
+    primaryId: primary && primary.id,
+  });
+
   return {
     // ---- 1. User question + classification ----
     question: answer.query,
@@ -218,21 +459,45 @@ function buildEvidencePackage(question, ctx) {
     // ---- 5. Authoritative direct facts (the deterministic engine's own
     // prose — the ONE thing synthesis is allowed to rephrase, never
     // contradict). Sanitized of raw IDs (Phase A.2 follow-up finding) —
-    // deterministicFallback below carries the real, untouched prose ----
-    directAnswer: sanitizeIdsInProse(answer.directAnswer, ctx),
-    guidance: sanitizeIdsInProse(answer.guidance, ctx),
+    // deterministicFallback below carries the real, untouched prose.
+    // Final answer-quality checkpoint (2026-08-24): directAnswer here is
+    // now the capability-description portion ONLY -- see
+    // splitCapabilityFromProvenance()'s own header comment above for the
+    // forensic trace and why this split point, not a paragraph break, was
+    // chosen. historyProvenance (new) carries the "**Why this exists**"
+    // narrative separately, null when the record has none. This changes
+    // ONLY what reaches the synthesis prompt (promptTemplates.js's sole
+    // reader of evidencePackage.directAnswer) -- deterministicFallback
+    // below is sourced independently from the raw, untouched answer
+    // object and is completely unaffected, so the existing deterministic/
+    // no-synthesis rendering path is byte-for-byte unchanged ----
+    directAnswer: directAnswerCapability,
+    historyProvenance: directAnswerProvenance,
+    guidance: sanitizedGuidance,
+
+    // ---- 5b. Atomic, role-typed evidence (C8 corrective checkpoint,
+    // Defect 2). Every atom below traces back to one of the fields above
+    // (never re-derived from raw Markdown) and carries its role (FACT/
+    // ACTION/LIMITATION/TECHNICAL/RATIONALE/PROVENANCE), source record id,
+    // and originating field -- see buildEvidenceAtoms()'s own header
+    // comment for the forensic trace behind each role's construction.
+    // `evidenceAtoms` is the FULL set (used by safetyValidation.js's leak
+    // checks, which must see TECHNICAL/PROVENANCE atoms even though
+    // synthesis never does); `selectedEvidenceAtoms` is what
+    // promptTemplates.js actually offers to Phi, already filtered by
+    // selectEvidenceAtomsForClassification()'s question-relevant,
+    // classification-driven rule ----
+    evidenceAtoms,
+    selectedEvidenceAtoms: selectEvidenceAtomsForClassification(evidenceAtoms, answer.classification),
 
     // ---- 6. Structured Workflow steps (only populated when the primary,
     // or its companion, is a Workflow — resolved via relatedCapabilities/
     // sources, never guessed) ----
-    steps: structuredStepsFor(
-      primary && primary.entityType === 'workflow' ? primary.id : (answer.sources.find((s) => /^AI-WF-/.test(s.id)) || {}).id,
-      ctx,
-    ),
+    steps,
 
     // ---- 7. Limitations / warnings, sanitized (see directAnswer note above)
     // ----
-    limitations: (answer.limitations || []).map((l) => sanitizeIdsInProse(l, ctx)),
+    limitations: sanitizedLimitations,
 
     // ---- 8/9/10. Neighborhood: admitted members (with role + material
     // aspect) and visible-but-not-admitted members, kept structurally
@@ -254,12 +519,21 @@ function buildEvidencePackage(question, ctx) {
     // ----
     sources: describeSources(answer.sources, ctx),
 
-    // ---- 15. Deterministic fallback — the exact answer the CLI/portal
-    // would show today, preserved byte-for-byte. This is what ships if
-    // synthesis is unavailable, fails validation, or is refused (§4 of the
-    // architecture investigation) ----
+    // ---- 15. Deterministic fallback — a structured, operator-safe
+    // projection of the exact answer the CLI/portal would show today. C8
+    // corrective checkpoint (2026-08-24), Defect 2, Section H: directAnswer
+    // here is the capability-description portion ONLY (directAnswerCapability
+    // — the SAME split used above for the synthesis-facing directAnswer
+    // field), never the raw answer.directAnswer, so a record whose Summary
+    // carries a "**Why this exists** (repository evidence pending...)"
+    // narrative never ships that provenance/citation commentary through
+    // this path either — matching main/askAutoIngestPresentation.js's own
+    // shapeAnswerForUI(), which applies the identical split to whatever
+    // ships on the actual no-synthesis/refused/failed-validation path.
+    // Less polished than a Phi-synthesized answer (still real corpus
+    // prose, not rephrased), but safe and usable by construction ----
     deterministicFallback: {
-      directAnswer: answer.directAnswer,
+      directAnswer: directAnswerCapability,
       guidance: answer.guidance,
       limitations: answer.limitations || [],
       capabilityStatus: answer.capabilityStatus,
@@ -319,6 +593,7 @@ function buildEvidencePackageForAuthorityAnswer(question, authorityAnswer, ctx) 
 // answerFromWorkflow() shape answerQuestion() itself produces, just
 // resolved by id instead of by search.
 function buildEvidencePackageForKnownRecord(answer, ctx) {
+  const { capability: knownRecordDirectAnswer, provenance: knownRecordProvenance } = splitCapabilityFromProvenance(sanitizeIdsInProse(answer.directAnswer, ctx));
   const primaryMatch = answer.matchedCapabilities && answer.matchedCapabilities[0];
   const primary = primaryMatch
     ? {
@@ -331,6 +606,21 @@ function buildEvidencePackageForKnownRecord(answer, ctx) {
   const companionWorkflowId = primary && primary.entityType === 'workflow'
     ? primary.id
     : (answer.sources || []).find((s) => /^AI-WF-/.test(s.id));
+  const knownRecordClassification = answer.classification === 'CAPABILITY' ? 'KNOWN_RECORD_BROWSE' : answer.classification;
+  const knownRecordGuidance = sanitizeIdsInProse(answer.guidance, ctx);
+  const knownRecordLimitations = (answer.limitations || []).map((l) => sanitizeIdsInProse(l, ctx));
+  const knownRecordSteps = structuredStepsFor(
+    typeof companionWorkflowId === 'string' ? companionWorkflowId : (companionWorkflowId ? companionWorkflowId.id : null),
+    ctx,
+  );
+  const knownRecordEvidenceAtoms = buildEvidenceAtoms({
+    directAnswerCapability: knownRecordDirectAnswer,
+    directAnswerProvenanceBlob: knownRecordProvenance,
+    guidance: knownRecordGuidance,
+    steps: knownRecordSteps,
+    limitations: knownRecordLimitations,
+    primaryId: primary && primary.id,
+  });
 
   const emptyHistorical = {
     historicalIntent: null, admitted: [], notAdmitted: [], currentStatusAuthority: null, note: null, unanchoredDiagnosticOnly: null,
@@ -348,28 +638,30 @@ function buildEvidencePackageForKnownRecord(answer, ctx) {
     // deterministicFallback below) never sees touched. Workflow-primary
     // known records already classify HOW_TO, which reads naturally for
     // browsing as-is and is left untouched.
-    classification: answer.classification === 'CAPABILITY' ? 'KNOWN_RECORD_BROWSE' : answer.classification,
+    classification: knownRecordClassification,
     primary,
     capabilityStatus: answer.capabilityStatus,
     matchQuality: answer.matchQuality,
     confidence: answer.confidence,
     // Deliberately null, not recomputed -- see header comment above.
     retrievalDiagnostics: null,
-    directAnswer: sanitizeIdsInProse(answer.directAnswer, ctx),
-    guidance: sanitizeIdsInProse(answer.guidance, ctx),
-    steps: structuredStepsFor(
-      typeof companionWorkflowId === 'string' ? companionWorkflowId : (companionWorkflowId ? companionWorkflowId.id : null),
-      ctx,
-    ),
-    limitations: (answer.limitations || []).map((l) => sanitizeIdsInProse(l, ctx)),
+    directAnswer: knownRecordDirectAnswer,
+    historyProvenance: knownRecordProvenance,
+    guidance: knownRecordGuidance,
+    evidenceAtoms: knownRecordEvidenceAtoms,
+    selectedEvidenceAtoms: selectEvidenceAtomsForClassification(knownRecordEvidenceAtoms, knownRecordClassification),
+    steps: knownRecordSteps,
+    limitations: knownRecordLimitations,
     // Bounded scope (see header comment) -- never populated for known-record browsing.
     admittedNeighborhood: [],
     visibleNotAdmitted: [],
     historical: emptyHistorical,
     relatedCapabilities: (answer.relatedCapabilities || []).map((id) => ({ id, displayName: displayNameFor(id, ctx) })),
     sources: describeSources(answer.sources, ctx),
+    // See buildEvidencePackage()'s own deterministicFallback comment above
+    // -- same operator-safe, provenance-excluded projection, same reason.
     deterministicFallback: {
-      directAnswer: answer.directAnswer,
+      directAnswer: knownRecordDirectAnswer,
       guidance: answer.guidance,
       limitations: answer.limitations || [],
       capabilityStatus: answer.capabilityStatus,
@@ -387,6 +679,11 @@ module.exports = {
   buildEvidencePackage,
   displayNameFor,
   sanitizeIdsInProse,
+  splitCapabilityFromProvenance,
+  splitRationaleFromProvenanceQualifier,
+  extractTechnicalAtoms,
+  buildEvidenceAtoms,
+  selectEvidenceAtomsForClassification,
   buildEvidencePackageForAuthorityAnswer,
   buildEvidencePackageForKnownRecord,
 };

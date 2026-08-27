@@ -1,0 +1,8 @@
+# Phase A experimental benchmark harness -- never committed. node-llama-cpp
+# and downloaded GGUF model weights are large, environment-specific, and
+# explicitly out of scope for the tracked repository per the Product Owner's
+# Phase A directive ("Not allowed yet: production model dependency, model
+# bundled into .dmg/.exe").
+node_modules/
+models/*.gguf
+results/*.json

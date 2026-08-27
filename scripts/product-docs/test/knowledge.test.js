@@ -245,7 +245,12 @@ async function main() {
   await t('negative: plausible-but-nonexistent capabilities are not confidently affirmed', () => {
     const questions = [
       'Can AutoIngest auto-generate photo captions using AI?',
-      'Does AutoIngest support drone footage import with GPS flight paths?',
+      // 'Does AutoIngest support drone footage import with GPS flight paths?'
+      // deliberately excluded from this loop -- see the dedicated
+      // RF-4.3-EXT-001 test immediately below, which documents this exact
+      // case as a KNOWN, still-unfixed deterministic-layer residual rather
+      // than an unexpected failure (Phase C3, Part R: inner-layer test
+      // migration -- do not silently drop the case, reclassify it).
       'Can I schedule AutoIngest to run automatic nightly backups at a set time?',
     ];
     for (const q of questions) {
@@ -257,6 +262,32 @@ async function main() {
         assert.notEqual(answer.matchQuality, 'strong', `"${q}" was confidently affirmed (strong match) — investigate for a real false positive`);
       }
     }
+  });
+
+  // RF-4.3-EXT-001 -- INNER deterministic-layer regression, deliberately
+  // asserting the KNOWN, still-unfixed false affirmation exists (not that
+  // it is absent). The deterministic engine's own lexical retrieval
+  // confidently (and wrongly) affirms this claim; that residual is
+  // real, has been true across every checkpoint from Phase A through C3,
+  // and is NOT fixed by C1/C2/C3 at this layer by design -- semantic
+  // authority is a decorator ABOVE answerQuestion(), never a change to
+  // answerQuestion() itself (Part R, Phase C3: "do not silently delete the
+  // old failing test... achieve green through proper test-layer
+  // separation, not by pretending the deterministic defect disappeared").
+  // If this assertion ever starts failing, it means the deterministic
+  // engine's own behavior changed for this case -- investigate before
+  // assuming it is safe to update.
+  //
+  // The OUTER, operator-facing containment proof — that the production
+  // answerQuestionWithAuthority() API never exposes this as AVAILABLE —
+  // lives in test/answerWithAuthority.test.js ("RF-4.3-EXT-001 outer
+  // containment"), not here. This is deliberate test-layer separation:
+  // this file proves the residual exists; that file proves it is safely
+  // contained before ever reaching an operator.
+  await t('RF-4.3-EXT-001 (inner, documented, known residual): the deterministic engine still confidently affirms drone/GPS import -- outer containment proven separately in answerWithAuthority.test.js', () => {
+    const answer = answerQuestion('Does AutoIngest support drone footage import with GPS flight paths?', ctx);
+    assert.equal(answer.capabilityStatus, QUERY_STATUS.AVAILABLE, 'expected the known false affirmation to still be present at the deterministic layer');
+    assert.equal(answer.matchQuality, 'strong', 'expected the known lexical-retrieval false positive to still be a confident (strong) match at the deterministic layer');
   });
 
   await t('negative: every AI-FEAT ID mentioned anywhere in an answer is a real, existing feature', () => {

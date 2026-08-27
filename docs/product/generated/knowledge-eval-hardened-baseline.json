@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-18T05:09:38.591Z",
+  "generated_at": "2026-08-21T12:00:24.612Z",
   "note": "Part 3 Phase 4.1 (Decision 7) frozen baseline — every later phase's changed results get classified (Improvement/Acceptable change/Regression/Unexplained change/Unchanged, see knowledgeEvalClassification.js) against THIS snapshot.",
   "schema_version": "1.0.0",
   "v1": {
@@ -35,17 +35,17 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
+        "AI-FEAT-045(563)",
+        "AI-FEAT-049(181.9026523831726)",
         "AI-FEAT-018(180.46634911362094)",
         "AI-FEAT-029(155.71765475229668)",
-        "AI-FEAT-014(138.75555957834737)",
-        "AI-FEAT-015(138.75555957834737)",
-        "AI-FEAT-027(121.26843492211508)"
+        "AI-FEAT-014(138.75555957834737)"
       ],
       "actualSources": [
-        "AI-FEAT-018",
-        "BUG-002",
-        "DEC-002",
-        "AI-WF-001"
+        "AI-FEAT-045",
+        "BUG-004",
+        "DEC-013",
+        "AI-WF-008"
       ],
       "actualStatus": "AVAILABLE",
       "id": "Q02",
@@ -75,7 +75,7 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-WF-002(143.2417854008331)",
+        "AI-WF-002(629)",
         "AI-FEAT-009(127.429427149228)",
         "AI-FEAT-017(115.19313262359476)",
         "AI-FEAT-010(96.6766548243248)",
@@ -303,7 +303,7 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-033(259.0523571119683)",
+        "AI-FEAT-033(633)",
         "AI-FEAT-023(196.58155617459335)",
         "AI-FEAT-034(196.0459043791212)",
         "AI-FEAT-049(181.9026523831726)",
@@ -422,13 +422,18 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "DEC-004(300)",
-        "BUG-001(200)",
-        "BUG-002(200)"
+        "AI-FEAT-019(582.4408734942265)",
+        "AI-FEAT-032(300)",
+        "AI-FEAT-002(187.3246068093537)",
+        "AI-FEAT-037(186.92931381509698)",
+        "AI-FEAT-017(172.78969893539215)"
       ],
       "actualSources": [
-        "DEC-004",
-        "AI-FEAT-029"
+        "AI-FEAT-019",
+        "BUG-009",
+        "DEC-005",
+        "DEC-009",
+        "AI-WF-001"
       ],
       "actualStatus": "AVAILABLE",
       "id": "P02a",
@@ -686,17 +691,17 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
+        "AI-FEAT-040(169.40301864630118)",
+        "AI-FEAT-019(166.41167814120757)",
         "AI-FEAT-038(130.6972695860808)",
-        "AI-FEAT-032(100)",
-        "AI-FEAT-040(84.70150932315059)",
-        "AI-FEAT-041(84.70150932315059)",
-        "AI-FEAT-019(83.20583907060379)"
+        "AI-FEAT-025(130.0008622810498)",
+        "AI-FEAT-037(124.61954254339798)"
       ],
       "actualSources": [
-        "AI-FEAT-038",
+        "AI-FEAT-040",
         "BUG-005",
-        "DEC-021",
-        "AI-WF-009"
+        "DEC-010",
+        "AI-WF-005"
       ],
       "actualStatus": "AVAILABLE",
       "id": "P10a",
@@ -915,7 +920,7 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-033(259.0523571119683)",
+        "AI-FEAT-033(633)",
         "AI-FEAT-023(196.58155617459335)",
         "AI-FEAT-034(196.0459043791212)",
         "AI-FEAT-049(181.9026523831726)",
@@ -936,11 +941,11 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-033(172.70157140797886)",
-        "AI-FEAT-029(155.71765475229668)",
-        "AI-FEAT-023(131.0543707830622)",
-        "AI-FEAT-034(130.6972695860808)",
-        "AI-FEAT-049(121.26843492211508)"
+        "AI-FEAT-033(650)",
+        "AI-FEAT-023(196.58155617459335)",
+        "AI-FEAT-034(196.0459043791212)",
+        "AI-FEAT-049(181.9026523831726)",
+        "AI-FEAT-029(155.71765475229668)"
       ],
       "actualSources": [
         "AI-FEAT-033",
@@ -975,15 +980,17 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
+        "AI-FEAT-049(636)",
         "AI-FEAT-050(142.03869016721708)",
-        "AI-FEAT-049(121.26843492211508)",
         "AI-FEAT-051(119.00394841533502)",
         "AI-FEAT-018(90.23317455681047)",
         "AI-FEAT-005(89.1776893064046)"
       ],
       "actualSources": [
-        "AI-FEAT-050",
-        "AI-RM-003"
+        "AI-FEAT-049",
+        "AI-RM-001",
+        "AI-RM-002",
+        "DEC-015"
       ],
       "actualStatus": "PLANNED",
       "id": "P18b",
@@ -1101,17 +1108,15 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
+        "AI-FEAT-048(320)",
+        "AI-FEAT-027(242.53686984423015)",
+        "AI-FEAT-042(182.56810330552096)",
         "AI-FEAT-018(180.46634911362094)",
-        "AI-FEAT-048(160)",
-        "AI-FEAT-042(121.7120688703473)",
-        "AI-FEAT-024(100)",
-        "AI-FEAT-021(90.23317455681047)"
+        "AI-FEAT-058(138.25052759314892)"
       ],
       "actualSources": [
-        "AI-FEAT-018",
-        "BUG-002",
-        "DEC-002",
-        "AI-WF-001"
+        "AI-FEAT-048",
+        "AI-WF-006"
       ],
       "actualStatus": "AVAILABLE",
       "id": "R03",
@@ -1156,11 +1161,11 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-WF-006(213.93315039953575)",
-        "AI-WF-008(224.27822024466332)",
+        "AI-WF-006(534.8328759988394)",
+        "AI-WF-008(299.03762699288444)",
+        "AI-WF-009(182.56810330552096)",
         "AI-WF-004(142.03869016721708)",
-        "AI-FEAT-038(196.0459043791212)",
-        "AI-FEAT-053(184.66507748977136)"
+        "AI-WF-005(133.73783113163734)"
       ],
       "actualSources": [
         "AI-WF-006",
@@ -1174,11 +1179,11 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-048(160)",
-        "AI-FEAT-002(124.8830712062358)",
-        "AI-FEAT-037(124.61954254339798)",
-        "AI-FEAT-039(124.61954254339798)",
-        "AI-FEAT-017(115.19313262359476)"
+        "AI-FEAT-048(400)",
+        "AI-FEAT-027(303.1710873052877)",
+        "AI-FEAT-002(249.7661424124716)",
+        "AI-FEAT-054(192.53414341421362)",
+        "AI-FEAT-017(172.78969893539215)"
       ],
       "actualSources": [
         "AI-FEAT-048",
@@ -1351,7 +1356,7 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-045(500)",
+        "AI-FEAT-045(563)",
         "AI-FEAT-048(240)",
         "AI-FEAT-027(181.9026523831726)",
         "AI-FEAT-049(181.9026523831726)",
@@ -1387,10 +1392,10 @@
     {
       "actualMatchQuality": "boundary",
       "actualPrimaryMatches": [
+        "AI-FEAT-033(550)",
         "AI-FEAT-034(196.0459043791212)",
         "AI-FEAT-027(181.9026523831726)",
         "AI-FEAT-043(187.65975684015868)",
-        "AI-FEAT-033(172.70157140797886)",
         "AI-FEAT-048(160)"
       ],
       "actualSources": [
@@ -1491,7 +1496,7 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-WF-003(445.888446532023)",
+        "AI-WF-003(655)",
         "AI-WF-001(156.72947403689403)",
         "AI-WF-008(149.51881349644222)",
         "AI-WF-005(133.73783113163734)",
@@ -1509,7 +1514,7 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-023(131.0543707830622)",
+        "AI-FEAT-023(539)",
         "AI-FEAT-024(100)",
         "AI-FEAT-003(95.20106063897916)",
         "AI-FEAT-018(90.23317455681047)",
@@ -1527,10 +1532,29 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-045(500)",
+        "AI-WF-008(655)",
+        "AI-FEAT-045(563)",
         "AI-FEAT-049(181.9026523831726)",
         "AI-FEAT-051(119.00394841533502)",
-        "AI-FEAT-047(117.51994852035577)",
+        "AI-FEAT-047(117.51994852035577)"
+      ],
+      "actualSources": [
+        "AI-WF-008",
+        "AI-FEAT-043",
+        "AI-FEAT-045"
+      ],
+      "actualStatus": "AVAILABLE",
+      "id": "W03",
+      "knownLimitation": null,
+      "pass": true
+    },
+    {
+      "actualMatchQuality": "strong",
+      "actualPrimaryMatches": [
+        "AI-FEAT-045(563)",
+        "AI-FEAT-049(181.9026523831726)",
+        "AI-FEAT-051(119.00394841533502)",
+        "AI-FEAT-043(93.82987842007934)",
         "AI-FEAT-018(90.23317455681047)"
       ],
       "actualSources": [
@@ -1540,28 +1564,8 @@
         "AI-WF-008"
       ],
       "actualStatus": "AVAILABLE",
-      "id": "W03",
-      "knownLimitation": null,
-      "pass": true
-    },
-    {
-      "actualMatchQuality": "weak",
-      "actualPrimaryMatches": [
-        "AI-FEAT-045(100)",
-        "AI-FEAT-043(93.82987842007934)",
-        "AI-FEAT-018(90.23317455681047)",
-        "AI-FEAT-001(87.24171679421262)",
-        "AI-FEAT-033(86.35078570398943)"
-      ],
-      "actualSources": [
-        "AI-FEAT-045",
-        "BUG-004",
-        "DEC-013",
-        "AI-WF-008"
-      ],
-      "actualStatus": "AVAILABLE",
       "id": "W04",
-      "knownLimitation": null,
+      "knownLimitation": "CHANGED 2026-08-21 (Phase C6.2, lib/intentConcepts.js's existing archive-lock concept cluster + the checkpoint's multi-concept-hint fix) — was a weak, honestly-hedged match; now confidently, untied resolves to AI-FEAT-045 (Archive Lock Handling & Stale-Lock Recovery), the genuinely correct record. A real precision improvement, same class as several already-documented cases elsewhere in this file — not a new claim, the same correct answer with justified confidence.",
       "pass": true
     },
     {
@@ -1711,17 +1715,18 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-WF-004(213.0580352508256)",
-        "AI-WF-006(160.4498627996518)",
-        "AI-FEAT-033(172.70157140797886)",
-        "AI-FEAT-029(155.71765475229668)",
-        "AI-FEAT-023(131.0543707830622)"
+        "AI-FEAT-033(633)",
+        "AI-FEAT-023(196.58155617459335)",
+        "AI-FEAT-034(196.0459043791212)",
+        "AI-FEAT-049(181.9026523831726)",
+        "AI-FEAT-029(155.71765475229668)"
       ],
       "actualSources": [
-        "AI-WF-004",
-        "AI-FEAT-031",
         "AI-FEAT-033",
-        "AI-FEAT-034"
+        "AI-RM-001",
+        "BUG-007",
+        "PM-001",
+        "AI-WF-004"
       ],
       "actualStatus": "AVAILABLE",
       "id": "W13",
@@ -1731,16 +1736,20 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-012(240)",
-        "AI-FEAT-028(205.90893350172234)",
-        "AI-FEAT-002(187.3246068093537)",
-        "AI-FEAT-011(120.83521766849006)",
-        "AI-FEAT-017(115.19313262359476)"
+        "AI-WF-001(470.1884221106821)",
+        "AI-WF-003(356.7107572256184)",
+        "AI-WF-007(232.11168434072496)",
+        "AI-WF-008(224.27822024466332)",
+        "AI-WF-002(214.86267810124966)"
       ],
       "actualSources": [
+        "AI-WF-001",
+        "AI-FEAT-011",
         "AI-FEAT-012",
-        "BUG-001",
-        "AI-WF-001"
+        "AI-FEAT-017",
+        "AI-FEAT-018",
+        "AI-FEAT-019",
+        "AI-FEAT-022"
       ],
       "actualStatus": "AVAILABLE",
       "id": "W14",
@@ -1874,7 +1883,7 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "AI-FEAT-045(500)",
+        "AI-FEAT-045(609)",
         "AI-FEAT-049(181.9026523831726)",
         "AI-FEAT-052(124.35955978443555)",
         "AI-FEAT-051(119.00394841533502)",
@@ -2069,12 +2078,18 @@
     {
       "actualMatchQuality": "strong",
       "actualPrimaryMatches": [
-        "DEC-006(300)",
-        "DEC-002(200)"
+        "AI-FEAT-019(582.4408734942265)",
+        "AI-FEAT-032(300)",
+        "AI-FEAT-002(187.3246068093537)",
+        "AI-FEAT-037(186.92931381509698)",
+        "AI-FEAT-017(172.78969893539215)"
       ],
       "actualSources": [
-        "DEC-006",
-        "AI-FEAT-029"
+        "AI-FEAT-019",
+        "BUG-009",
+        "DEC-005",
+        "DEC-009",
+        "AI-WF-001"
       ],
       "actualStatus": "AVAILABLE",
       "id": "X10",
@@ -2083,11 +2098,27 @@
     }
   ],
   "v3": {
-    "anomalies": [],
+    "anomalies": [
+      {
+        "id": "RF-4.3-001",
+        "kind": "BASELINE_ALREADY_PASSES",
+        "note": "A known-baseline-failure case unexpectedly already meets its target expectation today — either already fixed by a prior pass, or the assertion needs re-checking."
+      },
+      {
+        "id": "RF-5.3-011",
+        "kind": "CONTROL_FAILING",
+        "note": "A control case (expected to already pass today) is failing — investigate before closing Phase 4.1."
+      },
+      {
+        "id": "RF-5.4-004",
+        "kind": "BASELINE_ALREADY_PASSES",
+        "note": "A known-baseline-failure case unexpectedly already meets its target expectation today — either already fixed by a prior pass, or the assertion needs re-checking."
+      }
+    ],
     "controlCount": 34,
-    "controlsPassing": 34,
+    "controlsPassing": 33,
     "knownBaselineFailureCount": 10,
-    "knownBaselineFailuresConfirmedFailing": 10,
+    "knownBaselineFailuresConfirmedFailing": 8,
     "schemaPlaceholderCount": 2,
     "total": 46
   },
@@ -2123,22 +2154,22 @@
           {
             "entityType": "feature",
             "id": "AI-FEAT-039",
-            "score": 560.7879414452909
+            "score": 900
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-018",
-            "score": 451.16587278405234
+            "score": 541.3990473408628
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-011",
+            "score": 362.5056530054702
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-009",
             "score": 318.57356787307003
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-013",
-            "score": 251.3915926042562
           }
         ],
         "relatedCapabilities": [
@@ -2349,9 +2380,14 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "UNKNOWN",
-        "confidence": 0.4,
+        "confidence": 0.563,
         "matchQuality": "strong",
         "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-045",
+            "score": 563
+          },
           {
             "entityType": "feature",
             "id": "AI-FEAT-048",
@@ -2369,26 +2405,30 @@
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-010",
-            "score": 193.3533096486496
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-018",
-            "score": 180.46634911362094
+            "id": "AI-FEAT-049",
+            "score": 181.9026523831726
           }
         ],
         "relatedCapabilities": [
-          "AI-FEAT-005"
+          "AI-FEAT-038",
+          "AI-FEAT-043"
         ],
         "sources": [
           {
-            "id": "AI-FEAT-048",
-            "title": "Realtime Team Presence & Online Registry"
+            "id": "AI-FEAT-045",
+            "title": "Archive Lock Handling & Stale-Lock Recovery"
           },
           {
-            "id": "AI-WF-006",
-            "title": "See Who Else Is Online, Coordinate Shared Events, and See What They're Working On"
+            "id": "BUG-004",
+            "title": "BUG-004 (Fixed)"
+          },
+          {
+            "id": "DEC-013",
+            "title": "Lock Clearing Must Be Constrained"
+          },
+          {
+            "id": "AI-WF-008",
+            "title": "Recover From an Archive Lock Error"
           }
         ]
       },
@@ -2427,23 +2467,23 @@
           },
           {
             "entityType": "feature",
+            "id": "AI-FEAT-011",
+            "score": 362.5056530054702
+          },
+          {
+            "entityType": "feature",
             "id": "AI-FEAT-027",
             "score": 121.26843492211508
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-048",
-            "score": 80
+            "id": "AI-FEAT-024",
+            "score": 100
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-029",
-            "score": 77.85882737614834
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-026",
-            "score": 71.93319623012441
+            "id": "AI-FEAT-003",
+            "score": 95.20106063897916
           }
         ],
         "relatedCapabilities": [],
@@ -2533,16 +2573,16 @@
       "category": "ranking-normalization",
       "checks": [
         {
-          "actual": "AI-FEAT-041",
+          "actual": "AI-FEAT-039",
           "expected": [
             "AI-FEAT-039",
             "AI-WF-009"
           ],
           "name": "allowedPrimary",
-          "pass": false
+          "pass": true
         },
         {
-          "actual": "AI-FEAT-041",
+          "actual": "AI-FEAT-039",
           "expected": "not one of [AI-WF-006]",
           "name": "forbiddenPrimary",
           "pass": true
@@ -2552,9 +2592,14 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "EXPLANATION",
-        "confidence": 0.25410452796945177,
+        "confidence": 0.597,
         "matchQuality": "strong",
         "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-039",
+            "score": 597
+          },
           {
             "entityType": "feature",
             "id": "AI-FEAT-041",
@@ -2574,26 +2619,22 @@
             "entityType": "feature",
             "id": "AI-FEAT-025",
             "score": 130.0008622810498
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-039",
-            "score": 124.61954254339798
           }
         ],
         "relatedCapabilities": [
+          "AI-FEAT-032",
           "AI-FEAT-038",
-          "AI-FEAT-039",
-          "AI-FEAT-040"
+          "AI-FEAT-041",
+          "AI-FEAT-042"
         ],
         "sources": [
           {
-            "id": "AI-FEAT-041",
-            "title": "Transfer Background/Minimize Operation"
+            "id": "AI-FEAT-039",
+            "title": "Transfer Import"
           },
           {
-            "id": "BUG-005",
-            "title": "BUG-005 (Fixed)"
+            "id": "DEC-012",
+            "title": "Archive Root Resolution Requires Evidence"
           },
           {
             "id": "AI-WF-005",
@@ -2602,7 +2643,7 @@
         ]
       },
       "id": "RF-4.3-001",
-      "meetsTargetExpectation": false,
+      "meetsTargetExpectation": true,
       "status": "known-baseline-failure",
       "targetPhase": "4.3"
     },
@@ -2629,13 +2670,13 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "EXPLANATION",
-        "confidence": 0.24923908508679596,
+        "confidence": 0.525,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
             "entityType": "feature",
             "id": "AI-FEAT-039",
-            "score": 249.23908508679597
+            "score": 525
           },
           {
             "entityType": "feature",
@@ -2717,7 +2758,7 @@
           {
             "entityType": "feature",
             "id": "AI-FEAT-039",
-            "score": 498.47817017359193
+            "score": 800
           },
           {
             "entityType": "feature",
@@ -2783,13 +2824,13 @@
       "evidence": {
         "capabilityStatus": "PLANNED",
         "classification": "EXPLANATION",
-        "confidence": 0.24622010331969515,
+        "confidence": 0.538,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
             "entityType": "feature",
             "id": "AI-FEAT-053",
-            "score": 246.22010331969514
+            "score": 538
           },
           {
             "entityType": "feature",
@@ -2835,33 +2876,38 @@
       "category": "ranking-normalization",
       "checks": [
         {
-          "actual": "PLANNED",
+          "actual": "AVAILABLE",
           "expected": "PLANNED",
           "name": "status",
-          "pass": true
+          "pass": false
         },
         {
-          "actual": "AI-FEAT-049",
+          "actual": "AI-FEAT-043",
           "expected": [
             "AI-FEAT-043"
           ],
           "name": "allowedPrimary",
-          "pass": false
+          "pass": true
         },
         {
-          "actual": "AI-FEAT-049",
+          "actual": "AI-FEAT-043",
           "expected": "not one of [AI-FEAT-049]",
           "name": "forbiddenPrimary",
-          "pass": false
+          "pass": true
         }
       ],
       "diagnostics": [],
       "evidence": {
-        "capabilityStatus": "PLANNED",
+        "capabilityStatus": "AVAILABLE",
         "classification": "EXPLANATION",
-        "confidence": 0.3031710873052877,
+        "confidence": 0.6,
         "matchQuality": "strong",
         "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-043",
+            "score": 600
+          },
           {
             "entityType": "feature",
             "id": "AI-FEAT-049",
@@ -2879,36 +2925,27 @@
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-043",
-            "score": 281.489635260238
-          },
-          {
-            "entityType": "feature",
             "id": "AI-FEAT-004",
             "score": 220.87409642577055
           }
         ],
         "relatedCapabilities": [
+          "AI-FEAT-004",
           "AI-FEAT-042",
-          "AI-FEAT-043",
-          "AI-FEAT-050"
+          "AI-FEAT-045",
+          "AI-FEAT-046",
+          "AI-FEAT-049",
+          "AI-FEAT-052",
+          "AI-FEAT-055"
         ],
         "sources": [
           {
-            "id": "AI-FEAT-049",
-            "title": "Archive Maintenance"
+            "id": "AI-FEAT-043",
+            "title": "Archive Health Reporting"
           },
           {
-            "id": "AI-RM-001",
-            "title": "Roadmap milestone AI-RM-001 (**Completed**)"
-          },
-          {
-            "id": "AI-RM-002",
-            "title": "Roadmap milestone AI-RM-002 (Planned — not started)"
-          },
-          {
-            "id": "DEC-015",
-            "title": "Planned Architecture Remains Separate From Implemented Behaviour"
+            "id": "AI-WF-008",
+            "title": "Recover From an Archive Lock Error"
           }
         ]
       },
@@ -2943,13 +2980,18 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "TROUBLESHOOTING",
-        "confidence": 0.5,
+        "confidence": 0.655,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
+            "entityType": "workflow",
+            "id": "AI-WF-008",
+            "score": 655
+          },
+          {
             "entityType": "feature",
             "id": "AI-FEAT-045",
-            "score": 500
+            "score": 563
           },
           {
             "entityType": "feature",
@@ -2965,33 +3007,24 @@
             "entityType": "feature",
             "id": "AI-FEAT-047",
             "score": 117.51994852035577
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-018",
-            "score": 90.23317455681047
           }
         ],
         "relatedCapabilities": [
-          "AI-FEAT-038",
-          "AI-FEAT-043"
+          "AI-FEAT-043",
+          "AI-FEAT-045"
         ],
         "sources": [
           {
-            "id": "AI-FEAT-045",
-            "title": "Archive Lock Handling & Stale-Lock Recovery"
-          },
-          {
-            "id": "BUG-004",
-            "title": "BUG-004 (Fixed)"
-          },
-          {
-            "id": "DEC-013",
-            "title": "Lock Clearing Must Be Constrained"
-          },
-          {
             "id": "AI-WF-008",
             "title": "Recover From an Archive Lock Error"
+          },
+          {
+            "id": "AI-FEAT-043",
+            "title": null
+          },
+          {
+            "id": "AI-FEAT-045",
+            "title": null
           }
         ]
       },
@@ -3058,9 +3091,14 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "EXPLANATION",
-        "confidence": 0.25410452796945177,
+        "confidence": 0.597,
         "matchQuality": "strong",
         "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-039",
+            "score": 597
+          },
           {
             "entityType": "feature",
             "id": "AI-FEAT-041",
@@ -3080,26 +3118,22 @@
             "entityType": "feature",
             "id": "AI-FEAT-025",
             "score": 130.0008622810498
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-039",
-            "score": 124.61954254339798
           }
         ],
         "relatedCapabilities": [
+          "AI-FEAT-032",
           "AI-FEAT-038",
-          "AI-FEAT-039",
-          "AI-FEAT-040"
+          "AI-FEAT-041",
+          "AI-FEAT-042"
         ],
         "sources": [
           {
-            "id": "AI-FEAT-041",
-            "title": "Transfer Background/Minimize Operation"
+            "id": "AI-FEAT-039",
+            "title": "Transfer Import"
           },
           {
-            "id": "BUG-005",
-            "title": "BUG-005 (Fixed)"
+            "id": "DEC-012",
+            "title": "Archive Root Resolution Requires Evidence"
           },
           {
             "id": "AI-WF-005",
@@ -3126,71 +3160,55 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "TROUBLESHOOTING",
-        "confidence": 0.4701884221106821,
+        "confidence": 0.563,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
-            "entityType": "workflow",
-            "id": "AI-WF-001",
-            "score": 470.1884221106821
+            "entityType": "feature",
+            "id": "AI-FEAT-045",
+            "score": 563
           },
           {
-            "entityType": "workflow",
-            "id": "AI-WF-003",
-            "score": 356.7107572256184
+            "entityType": "feature",
+            "id": "AI-FEAT-002",
+            "score": 312.20767801558947
           },
           {
-            "entityType": "workflow",
-            "id": "AI-WF-007",
-            "score": 232.11168434072496
+            "entityType": "feature",
+            "id": "AI-FEAT-012",
+            "score": 320
           },
           {
-            "entityType": "workflow",
-            "id": "AI-WF-008",
-            "score": 224.27822024466332
+            "entityType": "feature",
+            "id": "AI-FEAT-028",
+            "score": 274.5452446689631
           },
           {
-            "entityType": "workflow",
-            "id": "AI-WF-002",
-            "score": 214.86267810124966
+            "entityType": "feature",
+            "id": "AI-FEAT-047",
+            "score": 235.03989704071154
           }
         ],
         "relatedCapabilities": [
-          "AI-FEAT-011",
-          "AI-FEAT-012",
-          "AI-FEAT-017",
-          "AI-FEAT-018",
-          "AI-FEAT-019",
-          "AI-FEAT-022"
+          "AI-FEAT-038",
+          "AI-FEAT-043"
         ],
         "sources": [
           {
-            "id": "AI-WF-001",
-            "title": "Import Photographs From a Memory Card or Folder"
+            "id": "AI-FEAT-045",
+            "title": "Archive Lock Handling & Stale-Lock Recovery"
           },
           {
-            "id": "AI-FEAT-011",
-            "title": null
+            "id": "BUG-004",
+            "title": "BUG-004 (Fixed)"
           },
           {
-            "id": "AI-FEAT-012",
-            "title": null
+            "id": "DEC-013",
+            "title": "Lock Clearing Must Be Constrained"
           },
           {
-            "id": "AI-FEAT-017",
-            "title": null
-          },
-          {
-            "id": "AI-FEAT-018",
-            "title": null
-          },
-          {
-            "id": "AI-FEAT-019",
-            "title": null
-          },
-          {
-            "id": "AI-FEAT-022",
-            "title": null
+            "id": "AI-WF-008",
+            "title": "Recover From an Archive Lock Error"
           }
         ]
       },
@@ -3213,13 +3231,13 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "TROUBLESHOOTING",
-        "confidence": 0.25905235711196833,
+        "confidence": 0.574,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
             "entityType": "feature",
             "id": "AI-FEAT-033",
-            "score": 259.0523571119683
+            "score": 574
           },
           {
             "entityType": "feature",
@@ -3293,13 +3311,13 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "TROUBLESHOOTING",
-        "confidence": 0.4,
+        "confidence": 0.564,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
             "entityType": "feature",
             "id": "AI-FEAT-032",
-            "score": 400
+            "score": 564
           },
           {
             "entityType": "feature",
@@ -3524,13 +3542,13 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "TROUBLESHOOTING",
-        "confidence": 0.4,
+        "confidence": 0.564,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
             "entityType": "feature",
             "id": "AI-FEAT-032",
-            "score": 400
+            "score": 564
           },
           {
             "entityType": "feature",
@@ -3584,7 +3602,7 @@
           "pass": true
         },
         {
-          "actual": 4,
+          "actual": 3,
           "expected": "<= 4",
           "name": "maxSources",
           "pass": true
@@ -3594,13 +3612,18 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "TROUBLESHOOTING",
-        "confidence": 0.5,
+        "confidence": 0.655,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
+            "entityType": "workflow",
+            "id": "AI-WF-008",
+            "score": 655
+          },
+          {
             "entityType": "feature",
             "id": "AI-FEAT-045",
-            "score": 500
+            "score": 563
           },
           {
             "entityType": "feature",
@@ -3616,33 +3639,24 @@
             "entityType": "feature",
             "id": "AI-FEAT-047",
             "score": 117.51994852035577
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-018",
-            "score": 90.23317455681047
           }
         ],
         "relatedCapabilities": [
-          "AI-FEAT-038",
-          "AI-FEAT-043"
+          "AI-FEAT-043",
+          "AI-FEAT-045"
         ],
         "sources": [
           {
-            "id": "AI-FEAT-045",
-            "title": "Archive Lock Handling & Stale-Lock Recovery"
-          },
-          {
-            "id": "BUG-004",
-            "title": "BUG-004 (Fixed)"
-          },
-          {
-            "id": "DEC-013",
-            "title": "Lock Clearing Must Be Constrained"
-          },
-          {
             "id": "AI-WF-008",
             "title": "Recover From an Archive Lock Error"
+          },
+          {
+            "id": "AI-FEAT-043",
+            "title": null
+          },
+          {
+            "id": "AI-FEAT-045",
+            "title": null
           }
         ]
       },
@@ -3677,13 +3691,13 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "EXPLANATION",
-        "confidence": 0.24923908508679596,
+        "confidence": 0.525,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
             "entityType": "feature",
             "id": "AI-FEAT-039",
-            "score": 249.23908508679597
+            "score": 525
           },
           {
             "entityType": "feature",
@@ -3755,51 +3769,46 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "TEAM_ACTIVITY",
-        "confidence": 0.3638053047663452,
+        "confidence": 0.5348328759988394,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
-            "entityType": "feature",
-            "id": "AI-FEAT-027",
-            "score": 363.8053047663452
+            "entityType": "workflow",
+            "id": "AI-WF-006",
+            "score": 534.8328759988394
           },
           {
-            "entityType": "feature",
-            "id": "AI-FEAT-037",
-            "score": 311.54885635849496
+            "entityType": "workflow",
+            "id": "AI-WF-008",
+            "score": 299.03762699288444
+          },
+          {
+            "entityType": "workflow",
+            "id": "AI-WF-009",
+            "score": 182.56810330552096
           },
           {
             "entityType": "feature",
             "id": "AI-FEAT-048",
-            "score": 320
+            "score": 480
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-016",
-            "score": 278.5437200279488
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-028",
-            "score": 274.5452446689631
+            "id": "AI-FEAT-027",
+            "score": 363.8053047663452
           }
         ],
         "relatedCapabilities": [
-          "AI-FEAT-004",
-          "AI-FEAT-010",
-          "AI-FEAT-026"
+          "AI-FEAT-048"
         ],
         "sources": [
           {
-            "id": "AI-FEAT-027",
-            "title": "Activity Log"
+            "id": "AI-WF-006",
+            "title": "See Who Else Is Online, Coordinate Shared Events, and See What They're Working On"
           },
           {
-            "evidenceQualification": null,
-            "historicalType": "architecture_section",
-            "id": "ARCH-d-archive-integrity-and-transaction-safety",
-            "role": "historical-context",
-            "title": "D. Archive Integrity and Transaction Safety"
+            "id": "AI-FEAT-048",
+            "title": null
           }
         ]
       },
@@ -3834,13 +3843,13 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "UNKNOWN",
-        "confidence": 0.20663452055291776,
+        "confidence": 0.612,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
             "entityType": "feature",
             "id": "AI-FEAT-046",
-            "score": 206.63452055291776
+            "score": 612
           },
           {
             "entityType": "feature",
@@ -4040,11 +4049,15 @@
           },
           {
             "id": "AI-RM-011",
-            "title": "Roadmap milestone AI-RM-011 (**Completed — Stage 1 + Stage 2 merged to `main`** (merge commit `765e9b8`, 2026-08-14). Stage 1 (prototype) and Stage 2 Phases 4–27 (concept/intent retrieval layer, Workflow record type, roadmap routing, Online Registry/teamwork coverage, 119-question eval corpus, hallucination/grounding + adversarial suites, 9-tab portal UX + directory/onboarding mode, mandatory final-report sections, and a pre-merge acceptance pass) all complete and verified from the actual merged `main` state. Stage 3 has not begun and requires separate approval.)"
+            "title": "Roadmap milestone AI-RM-011 (**Completed — Stage 1 + Stage 2 merged to `main`, plus two post-merge remediation passes.** Stage 1 (prototype) and Stage 2 Phases 4–27 (concept/intent retrieval layer, Workflow record type, roadmap routing, Online Registry/teamwork coverage, 119-question eval corpus, hallucination/grounding + adversarial suites, 9-tab portal UX + directory/onboarding mode, mandatory final-report sections, and a pre-merge acceptance pass) merged to `main` via commit `765e9b8` (2026-08-14). **Part 2 Knowledge Architecture Remediation** (cross-type retrieval, semantic keyword indexing, Transfer Import workflow, hybrid dependency model — 5 approved decisions) closed 2026-08-14. **Part 3 Knowledge Neighborhood Remediation** (retrieval-hardening, relationship visibility, minimum-sufficient neighborhoods, bounded historical context, decomposition-necessity gate — Decisions 1–7 of 8, plus a separately-gated RF-5.4-005 authority-scope investigation, closed unimplemented) closed 2026-08-18. All four stages verified from the actual repository state at their own closure, not assumed equivalent to an earlier pass. Stage 3 has not begun and requires separate approval.)"
           },
           {
             "id": "DEC-019",
             "title": "Knowledge Engine Reuses Existing Retrieval; No New Search System, No Hosted Backend"
+          },
+          {
+            "id": "DEC-020",
+            "title": "Stage 2 Knowledge Architecture: Workflow Records, Concept Layer, and Hint-vs-Raw Boundary Precedence"
           },
           {
             "evidenceQualification": "Full session capture — this capsule was compiled directly from the session's own conversation record, not reconstructed after the fact from repository artifacts alone",
@@ -4092,13 +4105,13 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "EXPLANATION",
-        "confidence": 0.23357648212844503,
+        "confidence": 0.628,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
             "entityType": "feature",
             "id": "AI-FEAT-029",
-            "score": 233.57648212844504
+            "score": 628
           },
           {
             "entityType": "feature",
@@ -4206,20 +4219,20 @@
       ],
       "diagnostics": [],
       "evidence": {
-        "capabilityStatus": "PARTIALLY_AVAILABLE",
+        "capabilityStatus": "AVAILABLE",
         "classification": "UNKNOWN",
-        "confidence": 0.2613945391721616,
+        "confidence": 0.633,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
             "entityType": "feature",
-            "id": "AI-FEAT-034",
-            "score": 261.3945391721616
+            "id": "AI-FEAT-033",
+            "score": 633
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-033",
-            "score": 259.0523571119683
+            "id": "AI-FEAT-034",
+            "score": 261.3945391721616
           },
           {
             "entityType": "feature",
@@ -4238,19 +4251,30 @@
           }
         ],
         "relatedCapabilities": [
-          "AI-FEAT-008",
+          "AI-FEAT-029",
+          "AI-FEAT-030",
           "AI-FEAT-031",
-          "AI-FEAT-033",
-          "AI-FEAT-036"
+          "AI-FEAT-034",
+          "AI-FEAT-035",
+          "AI-FEAT-052",
+          "AI-FEAT-054"
         ],
         "sources": [
           {
-            "id": "AI-FEAT-034",
-            "title": "Metadata Management Modal"
+            "id": "AI-FEAT-033",
+            "title": "Metadata Audit & Repair"
           },
           {
             "id": "AI-RM-001",
             "title": "Roadmap milestone AI-RM-001 (**Completed**)"
+          },
+          {
+            "id": "BUG-007",
+            "title": "BUG-007 (Fixed)"
+          },
+          {
+            "id": "PM-001",
+            "title": "Metadata Correctness Gap Found in Production-Readiness Review"
           },
           {
             "evidenceQualification": "Reconstructed from repository evidence only — `.claude/learning-log.md`'s four dated entries (themselves agent-authored post-hoc summaries, not verbatim conversation transcripts) plus the commit history and `docs/product/features/AI-FEAT-033_METADATA_AUDIT_REPAIR.md`/`AI-FEAT-034_METADATA_MANAGEMENT_MODAL.md`/`AI-FEAT-008_DESIGN_SYSTEM_UI_CONSISTENCY_FRAMEWORK.md`'s own citations of the same commits. This is Part 6's first pilot migration (`16_ENGINEERING_MEMORY_POLICY.md` § 17) — no original chat transcript was available to migrate from.",
@@ -4258,6 +4282,13 @@
             "id": "AI-MEM-0001",
             "role": "historical-context",
             "title": "Metadata Management Modal Consolidation and Audit & Repair Tab Evolution"
+          },
+          {
+            "evidenceQualification": null,
+            "historicalType": "architecture_section",
+            "id": "ARCH-c-metadata-automation",
+            "role": "historical-context",
+            "title": "C. Metadata Automation"
           },
           {
             "id": "AI-WF-004",
@@ -4561,13 +4592,13 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "EXPLANATION",
-        "confidence": 0.23357648212844503,
+        "confidence": 0.628,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
             "entityType": "feature",
             "id": "AI-FEAT-029",
-            "score": 233.57648212844504
+            "score": 628
           },
           {
             "entityType": "feature",
@@ -4673,56 +4704,81 @@
           "pass": true
         },
         {
-          "actual": "present",
+          "actual": "absent",
           "expected": "ARCH-e-transfer-and-distributed-working",
           "name": "requiredDiagnosticUnanchored:ARCH-e-transfer-and-distributed-working",
-          "pass": true
+          "pass": false
         }
       ],
       "diagnostics": [],
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "UNKNOWN",
-        "confidence": 0.4,
+        "confidence": 0.542,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
-            "entityType": "decision",
-            "id": "DEC-021",
-            "score": 400
+            "entityType": "feature",
+            "id": "AI-FEAT-038",
+            "score": 542
           },
           {
-            "entityType": "bug",
-            "id": "BUG-005",
-            "score": 200
+            "entityType": "feature",
+            "id": "AI-FEAT-019",
+            "score": 249.61751721181136
           },
           {
-            "entityType": "decision",
-            "id": "DEC-003",
-            "score": 200
+            "entityType": "feature",
+            "id": "AI-FEAT-040",
+            "score": 169.40301864630118
           },
           {
-            "entityType": "decision",
-            "id": "DEC-004",
-            "score": 200
+            "entityType": "feature",
+            "id": "AI-FEAT-041",
+            "score": 169.40301864630118
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-028",
+            "score": 137.27262233448155
           }
         ],
         "relatedCapabilities": [
-          "AI-FEAT-038"
+          "AI-FEAT-039",
+          "AI-FEAT-040",
+          "AI-FEAT-041",
+          "AI-FEAT-042",
+          "AI-FEAT-045",
+          "AI-FEAT-046"
         ],
         "sources": [
+          {
+            "id": "AI-FEAT-038",
+            "title": "Transfer Export"
+          },
+          {
+            "id": "BUG-005",
+            "title": "BUG-005 (Fixed)"
+          },
           {
             "id": "DEC-021",
             "title": "Transfer Export Process-Local Lock Accepted for Present Operational Model"
           },
           {
-            "id": "AI-FEAT-038",
-            "title": "Transfer Export"
+            "evidenceQualification": null,
+            "historicalType": "architecture_section",
+            "id": "ARCH-e-transfer-and-distributed-working",
+            "role": "historical-context",
+            "title": "E. Transfer and Distributed Working"
+          },
+          {
+            "id": "AI-WF-005",
+            "title": "Export or Update a Transfer Drive"
           }
         ]
       },
       "id": "RF-5.3-011",
-      "meetsTargetExpectation": true,
+      "meetsTargetExpectation": false,
       "status": "control",
       "targetPhase": "5.3"
     },
@@ -4730,10 +4786,10 @@
       "category": "compound-question",
       "checks": [
         {
-          "actual": "AI-FEAT-032",
+          "actual": "AI-FEAT-039",
           "expected": "not one of [AI-FEAT-032]",
           "name": "forbiddenPrimary",
-          "pass": false
+          "pass": true
         },
         {
           "actual": "present",
@@ -4742,19 +4798,36 @@
           "pass": true
         },
         {
-          "actual": "present",
+          "actual": "absent",
           "expected": "AI-WF-009",
           "name": "required:AI-WF-009",
-          "pass": true
+          "pass": false
         }
       ],
-      "diagnostics": [],
+      "diagnostics": [
+        {
+          "category": "PENDING_PHASE_5",
+          "groundTruthCitation": {
+            "citedBy": "AI-WF-005",
+            "recordType": "workflow"
+          },
+          "note": "Not a scored ranker candidate, but a canonical citation exists (via AI-WF-005) — do not conclude this is a retrieval/ranking defect. Decision 4 introduces relationship-based discovery independent of ranker scoring; whether the eventual fix comes from improved retrieval, Decision 4's relationship lookup (Phase 5.1), or Decision 3's admission logic (Phase 5.2) cannot be determined until Phase 5.1 exists.",
+          "presentInCandidates": false,
+          "presentInSources": false,
+          "requiredId": "AI-WF-009"
+        }
+      ],
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "UNKNOWN",
-        "confidence": 0.2,
+        "confidence": 0.561,
         "matchQuality": "strong",
         "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-039",
+            "score": 561
+          },
           {
             "entityType": "feature",
             "id": "AI-FEAT-032",
@@ -4774,41 +4847,26 @@
             "entityType": "feature",
             "id": "AI-FEAT-025",
             "score": 130.0008622810498
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-039",
-            "score": 124.61954254339798
           }
         ],
         "relatedCapabilities": [
-          "AI-FEAT-029",
-          "AI-FEAT-039"
+          "AI-FEAT-032",
+          "AI-FEAT-038",
+          "AI-FEAT-041",
+          "AI-FEAT-042"
         ],
         "sources": [
           {
-            "id": "AI-FEAT-032",
-            "title": "Metadata Verification"
+            "id": "AI-FEAT-039",
+            "title": "Transfer Import"
           },
           {
-            "id": "AI-RM-001",
-            "title": "Roadmap milestone AI-RM-001 (**Completed**)"
+            "id": "DEC-012",
+            "title": "Archive Root Resolution Requires Evidence"
           },
           {
-            "id": "BUG-009",
-            "title": "BUG-009 (Fixed)"
-          },
-          {
-            "id": "DEC-009",
-            "title": "Copy Idempotency Must Not Suppress Metadata Repair"
-          },
-          {
-            "id": "PM-001",
-            "title": "Metadata Correctness Gap Found in Production-Readiness Review"
-          },
-          {
-            "id": "AI-WF-009",
-            "title": "Import or Update From a Transfer Drive"
+            "id": "AI-WF-005",
+            "title": "Export or Update a Transfer Drive"
           }
         ]
       },
@@ -4837,41 +4895,66 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "UNKNOWN",
-        "confidence": 0.4,
+        "confidence": 0.542,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
-            "entityType": "decision",
-            "id": "DEC-021",
-            "score": 400
+            "entityType": "feature",
+            "id": "AI-FEAT-038",
+            "score": 542
           },
           {
-            "entityType": "bug",
-            "id": "BUG-005",
-            "score": 200
+            "entityType": "feature",
+            "id": "AI-FEAT-019",
+            "score": 249.61751721181136
           },
           {
-            "entityType": "decision",
-            "id": "DEC-003",
-            "score": 200
+            "entityType": "feature",
+            "id": "AI-FEAT-040",
+            "score": 169.40301864630118
           },
           {
-            "entityType": "decision",
-            "id": "DEC-004",
-            "score": 200
+            "entityType": "feature",
+            "id": "AI-FEAT-041",
+            "score": 169.40301864630118
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-028",
+            "score": 137.27262233448155
           }
         ],
         "relatedCapabilities": [
-          "AI-FEAT-038"
+          "AI-FEAT-039",
+          "AI-FEAT-040",
+          "AI-FEAT-041",
+          "AI-FEAT-042",
+          "AI-FEAT-045",
+          "AI-FEAT-046"
         ],
         "sources": [
+          {
+            "id": "AI-FEAT-038",
+            "title": "Transfer Export"
+          },
+          {
+            "id": "BUG-005",
+            "title": "BUG-005 (Fixed)"
+          },
           {
             "id": "DEC-021",
             "title": "Transfer Export Process-Local Lock Accepted for Present Operational Model"
           },
           {
-            "id": "AI-FEAT-038",
-            "title": "Transfer Export"
+            "evidenceQualification": null,
+            "historicalType": "architecture_section",
+            "id": "ARCH-e-transfer-and-distributed-working",
+            "role": "historical-context",
+            "title": "E. Transfer and Distributed Working"
+          },
+          {
+            "id": "AI-WF-005",
+            "title": "Export or Update a Transfer Drive"
           }
         ]
       },
@@ -4900,13 +4983,13 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "STATUS",
-        "confidence": 0.326743173965202,
+        "confidence": 0.534,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
             "entityType": "feature",
             "id": "AI-FEAT-038",
-            "score": 326.743173965202
+            "score": 534
           },
           {
             "entityType": "feature",
@@ -4971,31 +5054,24 @@
           "pass": true
         },
         {
-          "actual": "absent",
+          "actual": "present",
           "expected": "PM-001",
           "name": "required:PM-001",
-          "pass": false
+          "pass": true
         }
       ],
-      "diagnostics": [
-        {
-          "category": "PENDING_PHASE_5",
-          "groundTruthCitation": {
-            "citedBy": "AI-FEAT-029",
-            "recordType": "feature"
-          },
-          "note": "Not a scored ranker candidate, but a canonical citation exists (via AI-FEAT-029) — do not conclude this is a retrieval/ranking defect. Decision 4 introduces relationship-based discovery independent of ranker scoring; whether the eventual fix comes from improved retrieval, Decision 4's relationship lookup (Phase 5.1), or Decision 3's admission logic (Phase 5.2) cannot be determined until Phase 5.1 exists.",
-          "presentInCandidates": false,
-          "presentInSources": false,
-          "requiredId": "PM-001"
-        }
-      ],
+      "diagnostics": [],
       "evidence": {
-        "capabilityStatus": "PLANNED",
+        "capabilityStatus": "AVAILABLE",
         "classification": "UNKNOWN",
-        "confidence": 0.3031710873052877,
+        "confidence": 0.633,
         "matchQuality": "strong",
         "matchedCapabilities": [
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-033",
+            "score": 633
+          },
           {
             "entityType": "feature",
             "id": "AI-FEAT-049",
@@ -5005,11 +5081,6 @@
             "entityType": "feature",
             "id": "AI-FEAT-023",
             "score": 262.1087415661244
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-033",
-            "score": 259.0523571119683
           },
           {
             "entityType": "feature",
@@ -5023,31 +5094,39 @@
           }
         ],
         "relatedCapabilities": [
-          "AI-FEAT-042",
-          "AI-FEAT-043",
-          "AI-FEAT-050"
+          "AI-FEAT-029",
+          "AI-FEAT-030",
+          "AI-FEAT-031",
+          "AI-FEAT-034",
+          "AI-FEAT-035",
+          "AI-FEAT-052",
+          "AI-FEAT-054"
         ],
         "sources": [
           {
-            "id": "AI-FEAT-049",
-            "title": "Archive Maintenance"
+            "id": "AI-FEAT-033",
+            "title": "Metadata Audit & Repair"
           },
           {
             "id": "AI-RM-001",
             "title": "Roadmap milestone AI-RM-001 (**Completed**)"
           },
           {
-            "id": "AI-RM-002",
-            "title": "Roadmap milestone AI-RM-002 (Planned — not started)"
+            "id": "BUG-007",
+            "title": "BUG-007 (Fixed)"
           },
           {
-            "id": "DEC-015",
-            "title": "Planned Architecture Remains Separate From Implemented Behaviour"
+            "id": "PM-001",
+            "title": "Metadata Correctness Gap Found in Production-Readiness Review"
+          },
+          {
+            "id": "AI-WF-004",
+            "title": "Repair Missing or Incorrect Metadata"
           }
         ]
       },
       "id": "RF-5.4-004",
-      "meetsTargetExpectation": false,
+      "meetsTargetExpectation": true,
       "status": "known-baseline-failure",
       "targetPhase": "5.4"
     },
@@ -5074,33 +5153,33 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "TEAM_ACTIVITY",
-        "confidence": 0.21393315039953575,
+        "confidence": 0.5348328759988394,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
             "entityType": "workflow",
             "id": "AI-WF-006",
-            "score": 213.93315039953575
+            "score": 534.8328759988394
           },
           {
             "entityType": "workflow",
             "id": "AI-WF-008",
-            "score": 224.27822024466332
+            "score": 299.03762699288444
           },
           {
-            "entityType": "feature",
-            "id": "AI-FEAT-042",
+            "entityType": "workflow",
+            "id": "AI-WF-009",
             "score": 182.56810330552096
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-027",
-            "score": 181.9026523831726
+            "id": "AI-FEAT-048",
+            "score": 480
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-011",
-            "score": 181.2528265027351
+            "id": "AI-FEAT-027",
+            "score": 363.8053047663452
           }
         ],
         "relatedCapabilities": [
@@ -5229,13 +5308,13 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "EXPLANATION",
-        "confidence": 0.24923908508679596,
+        "confidence": 0.525,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
             "entityType": "feature",
             "id": "AI-FEAT-039",
-            "score": 249.23908508679597
+            "score": 525
           },
           {
             "entityType": "feature",
@@ -5294,7 +5373,7 @@
           "pass": true
         },
         {
-          "actual": 4,
+          "actual": 3,
           "expected": "<= 4",
           "name": "maxSources",
           "pass": true
@@ -5304,13 +5383,18 @@
       "evidence": {
         "capabilityStatus": "AVAILABLE",
         "classification": "TROUBLESHOOTING",
-        "confidence": 0.5,
+        "confidence": 0.655,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
+            "entityType": "workflow",
+            "id": "AI-WF-008",
+            "score": 655
+          },
+          {
             "entityType": "feature",
             "id": "AI-FEAT-045",
-            "score": 500
+            "score": 563
           },
           {
             "entityType": "feature",
@@ -5326,33 +5410,24 @@
             "entityType": "feature",
             "id": "AI-FEAT-047",
             "score": 117.51994852035577
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-018",
-            "score": 90.23317455681047
           }
         ],
         "relatedCapabilities": [
-          "AI-FEAT-038",
-          "AI-FEAT-043"
+          "AI-FEAT-043",
+          "AI-FEAT-045"
         ],
         "sources": [
           {
-            "id": "AI-FEAT-045",
-            "title": "Archive Lock Handling & Stale-Lock Recovery"
-          },
-          {
-            "id": "BUG-004",
-            "title": "BUG-004 (Fixed)"
-          },
-          {
-            "id": "DEC-013",
-            "title": "Lock Clearing Must Be Constrained"
-          },
-          {
             "id": "AI-WF-008",
             "title": "Recover From an Archive Lock Error"
+          },
+          {
+            "id": "AI-FEAT-043",
+            "title": null
+          },
+          {
+            "id": "AI-FEAT-045",
+            "title": null
           }
         ]
       },
@@ -5380,28 +5455,28 @@
         "matchedCapabilities": [
           {
             "entityType": "feature",
-            "id": "AI-FEAT-041",
-            "score": 254.10452796945177
-          },
-          {
-            "entityType": "feature",
-            "id": "AI-FEAT-025",
-            "score": 195.0012934215747
-          },
-          {
-            "entityType": "feature",
             "id": "AI-FEAT-039",
-            "score": 186.92931381509698
+            "score": 531
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-032",
-            "score": 200
+            "id": "AI-FEAT-002",
+            "score": 312.20767801558947
           },
           {
             "entityType": "feature",
-            "id": "AI-FEAT-019",
-            "score": 166.41167814120757
+            "id": "AI-FEAT-012",
+            "score": 320
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-028",
+            "score": 274.5452446689631
+          },
+          {
+            "entityType": "feature",
+            "id": "AI-FEAT-047",
+            "score": 235.03989704071154
           }
         ],
         "relatedCapabilities": [],
@@ -5433,13 +5508,13 @@
       "evidence": {
         "capabilityStatus": "PLANNED",
         "classification": "EXPLANATION",
-        "confidence": 0.24622010331969515,
+        "confidence": 0.538,
         "matchQuality": "strong",
         "matchedCapabilities": [
           {
             "entityType": "feature",
             "id": "AI-FEAT-053",
-            "score": 246.22010331969514
+            "score": 538
           },
           {
             "entityType": "feature",

@@ -57,13 +57,23 @@ async function main() {
   // -----------------------------------------------------------------
   // Decision + Memory overlap: distinct roles, no duplication
   // -----------------------------------------------------------------
-  await t('Decision + Memory overlap: DEC-019 (why-rationale, existing Phase 5.2 mechanism) and AI-MEM-0004 (historical-chronology, new Phase 5.3 mechanism) are BOTH admitted for AI-FEAT-058, via two independent mechanisms, with distinct roles -- neither duplicates the other', () => {
+  await t('Decision + Memory overlap: DEC-019 and DEC-020 (why-rationale, existing Phase 5.2 mechanism) and AI-MEM-0004 (historical-chronology, new Phase 5.3 mechanism) are BOTH admitted for AI-FEAT-058, via two independent mechanisms, with distinct roles -- neither duplicates the other', () => {
     const q = 'Why was the Knowledge Engine architected to reuse existing retrieval instead of building a new search system?';
     const answer = answerQuestion(q, ctx);
     assert.equal(answer.matchedCapabilities[0].id, 'AI-FEAT-058');
     const nb = explainNeighborhood(q, ctx);
-    assert.deepEqual(nb.admitted.map((m) => m.id), ['DEC-019'], 'the pre-existing Phase 5.2 governance mechanism, completely unmodified by Phase 5.3');
+    // Fixture updated (Phase A.2, 2026-08-18): AI-FEAT-058's own canonical
+    // "Related decisions" Lifecycle Metadata field legitimately grew a
+    // second real, direct, reciprocal citation (DEC-020) during the Part 3
+    // documentation closure (commit a1c5346) -- a real canonical-data
+    // change, not a behavior change. The governance admission mechanism
+    // itself (Phase 5.1/5.2, direct + reciprocal citation + classification
+    // eligibility) is completely unmodified and untouched by this fixture
+    // update -- verified directly against the real engine before editing
+    // this assertion, not assumed from the changelog alone.
+    assert.deepEqual(nb.admitted.map((m) => m.id), ['DEC-019', 'DEC-020'], 'the pre-existing Phase 5.2 governance mechanism, completely unmodified by Phase 5.3 -- now surfacing both of AI-FEAT-058\'s own real, direct, reciprocal Decision citations');
     assert.equal(nb.admitted[0].role, 'Decision');
+    assert.equal(nb.admitted[1].role, 'Decision');
     const hc = explainHistoricalContext(q, ctx);
     assert.deepEqual(hc.admitted.map((m) => m.id), ['AI-MEM-0004']);
     assert.equal(hc.admitted[0].role, 'Engineering Memory');

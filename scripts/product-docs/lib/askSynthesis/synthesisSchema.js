@@ -60,7 +60,7 @@ function buildSynthesisSchema(evidencePackage, handleMap) {
   const properties = {
     answer: {
       type: 'string',
-      description: 'One to three sentences, plain operator language. Must restate only facts present in the supplied evidence. Never write a handle (like "S1") inside this text -- handles belong only in sourceIds arrays.',
+      description: 'Plain operator language, in your own words -- not a restatement of the evidence\'s own document structure or wording. Length follows the question, not a fixed rule: a simple status/definition question usually needs one or two sentences; a genuine "why"/design explanation or a multi-step task may legitimately need more. Never pad for length, and never compress a real explanation down to a bare pointer sentence. Every fact must be grounded in the supplied evidence, but you do not have to mention every fact the evidence contains. Never write a handle (like "S1") inside this text -- handles belong only in sourceIds arrays.',
     },
     capabilityStatus: {
       type: 'string',

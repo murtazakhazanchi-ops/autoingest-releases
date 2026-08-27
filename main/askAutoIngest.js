@@ -35,10 +35,21 @@ const { buildEngineContext } = require(path.join(PRODUCT_DOCS, 'lib', 'knowledge
 // judge invocation, synthesis eligibility, safety validation) still lives
 // in those already-tested modules, none of it here.
 const { answerQuestionWithSynthesis, answerKnownRecordWithSynthesis } = require(path.join(PRODUCT_DOCS, 'lib', 'answerWithSynthesis.js'));
+// Phase C8 — the conversational entrypoint. Reuses answerQuestionWithAuthority/
+// trySynthesize/evaluateSynthesisEligibility internally (all unchanged); this
+// file only supplies the same production synthesizer/semantic/clarification
+// providers a one-shot ask already had access to, plus the SINGLE in-memory
+// conversation state this drawer instance holds (mirrors _activeController's
+// own "one thing at a time" precedent below, not session-persisted, not
+// written to disk).
+const { askConversational } = require(path.join(PRODUCT_DOCS, 'lib', 'conversationalAsk.js'));
+const CS = require(path.join(PRODUCT_DOCS, 'lib', 'conversationState.js'));
 
 const modelManager = require('../services/localJudge/modelManager');
 const judgeService = require('../services/localJudge/judgeService');
-const { shapeAnswerForUI, shapeModelStatus } = require('./askAutoIngestPresentation');
+const clarificationService = require('../services/localJudge/clarificationService');
+const semanticRetrievalService = require('../services/semanticRetrieval/semanticRetrievalService');
+const { shapeAnswerForUI, shapeModelStatus, shapeConversationalResponse } = require('./askAutoIngestPresentation');
 
 // No approved production hosting source exists yet for the exact pinned
 // artifact (Product Owner decision, C2/C3: modelManager.DOWNLOAD_URL is
@@ -119,6 +130,47 @@ async function handleAskRelatedNavigate(recordId) {
   }
 }
 
+// Phase C8 — the single, in-memory, session-local conversation this
+// drawer instance holds (checkpoint Section 2: NOT session-persistent,
+// never written to disk). Reset explicitly by the renderer (a fresh
+// question the operator marks as unrelated to the prior thread) or
+// implicitly by askConversational()'s own topic-change detection, which
+// is threaded through the returned state, not this module.
+let _conversationState = CS.createConversation();
+
+async function handleAskConverse(message) {
+  if (typeof message !== 'string' || !message.trim()) {
+    throw new Error('A message is required.');
+  }
+  if (message.length > 2000) {
+    throw new Error('Message is too long.');
+  }
+  if (_activeController) _activeController.abort();
+  const controller = new AbortController();
+  _activeController = controller;
+  try {
+    const ctx = freshCtx();
+    const { state, response } = await askConversational(_conversationState, message.trim(), ctx, {
+      signal: controller.signal,
+      // synthesize: intentionally omitted -- trySynthesize() (reused
+      // unchanged from answerWithSynthesis.js) already defaults to the
+      // real productionSynthesize provider when this is absent, exactly
+      // matching the one-shot ask:query path above.
+      semanticTopK: (question) => semanticRetrievalService.productionSemanticTopK(question),
+      formulateClarification: (input, opts) => clarificationService.productionFormulateClarification(input, opts),
+    });
+    _conversationState = state;
+    return shapeConversationalResponse(response, ctx);
+  } finally {
+    if (_activeController === controller) _activeController = null;
+  }
+}
+
+function handleResetConversation() {
+  _conversationState = CS.createConversation();
+  return { reset: true };
+}
+
 function handleCancelQuery() {
   if (_activeController) {
     _activeController.abort();
@@ -182,6 +234,8 @@ async function handleRemoveModel() {
 function registerIpcHandlers() {
   ipcMain.handle('ask:query', async (event, question) => handleAskQuery(question));
   ipcMain.handle('ask:relatedNavigate', async (event, recordId) => handleAskRelatedNavigate(recordId));
+  ipcMain.handle('ask:converse', async (event, message) => handleAskConverse(message));
+  ipcMain.handle('ask:resetConversation', () => handleResetConversation());
   ipcMain.handle('ask:cancelQuery', () => handleCancelQuery());
   ipcMain.handle('ask:modelStatus', () => getModelStatus());
   ipcMain.handle('ask:downloadModel', async (event) => handleDownloadModel(event));

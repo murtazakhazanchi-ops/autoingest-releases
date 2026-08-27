@@ -23,7 +23,7 @@
       "note": "Same recall gap as P01b — \"Does AutoIngest support importing video files?\" produces zero match. Safe (UNKNOWN, no invented claim) but misses the already-disclosed import-video documentation gap (see intentConcepts.js \"import-video\" cluster) entirely rather than surfacing it.",
       "pass": false,
       "query": "Does AutoIngest support importing video files?",
-      "relatedFeature": "DEC-004(300)"
+      "relatedFeature": "AI-FEAT-019(582.4408734942265)"
     },
     {
       "domain": "Import",
@@ -330,7 +330,7 @@
       "note": "FIXED then RESIDUAL (Phase 4.3, Decision 2 / E1-B). Mid-Phase-4.3, before Approach D, this briefly regressed to PM-001 (a postmortem) via Governance-over-favoring, losing direct how-to instructions — E1-B's Approach D fixes that: primary is now AI-FEAT-033 (Metadata Audit & Repair), Governance no longer intrudes. AI-FEAT-033 rather than the pre-Phase-4.3 AI-WF-004 (the workflow) is a residual Feature-vs-Workflow near-tie, not a Governance issue — AI-WF-004's own steps are still cited via the companion-workflow mechanism regardless of which one wins primary, so this residual is low-impact.",
       "pass": false,
       "query": "Can missing metadata be fixed?",
-      "relatedFeature": "AI-FEAT-033(259.0523571119683)"
+      "relatedFeature": "AI-FEAT-033(633)"
     },
     {
       "domain": "Metadata",
@@ -342,7 +342,7 @@
       "note": "CHANGED 2026-08-14 (Part 2 Decision 2) — was an untied strong match on AI-FEAT-033 alone; now a 5-way tie (AI-FEAT-023/029/033/034/049) at the same score, since Summary indexing widened recall for all of them. AI-FEAT-033 (the genuinely correct answer) is still among the tied candidates, honestly hedged rather than dropped — a precision/recall trade-off, not a wrong answer. CHANGED AGAIN 2026-08-17 (Phase 4.3, Decision 2, surface-size normalization) — the 5-way tie above is broken, and in this case favorably: primary is now AI-FEAT-033 (Metadata Audit & Repair) itself, confidently untied at \"strong\" — the correct answer, no longer merely one of five hedged candidates. matchQuality now mismatches the corpus's weak expectation only because the answer got more precise, not less; a genuine improvement in answer quality even though it fails the exact-quality-tier check.",
       "pass": false,
       "query": "metadata repair tool",
-      "relatedFeature": "AI-FEAT-033(172.70157140797886)"
+      "relatedFeature": "AI-FEAT-033(650)"
     },
     {
       "domain": "Archive operations",
@@ -366,7 +366,7 @@
       "note": "CHANGED 2026-08-14 (Part 2 Decision 2) — same tie pattern as P18a. Status remains correctly PLANNED. CHANGED AGAIN 2026-08-17 (Phase 4.3, Decision 2, surface-size normalization) — same tie-break pattern as P18a: primary is now AI-FEAT-050 (Event Maintenance) rather than AI-FEAT-049, confidently untied at \"strong\", still within the same genuinely-related Planned archive-maintenance cluster. Status remains correctly PLANNED; matchQuality now mismatches the corpus's weak expectation only because the answer got more confident.",
       "pass": false,
       "query": "archive maintenance features",
-      "relatedFeature": "AI-FEAT-050(142.03869016721708)"
+      "relatedFeature": "AI-FEAT-049(636)"
     },
     {
       "domain": "Settings",
@@ -414,7 +414,7 @@
       "note": "FIXED (Phase 4.3, Decision 2 / E1-B). Mid-Phase-4.3, before Approach D, this briefly regressed to DEC-003 (Local-First and On-Premises Architecture, topically tangential) via Governance-over-favoring — E1-B's Approach D fixes it exactly: primary is AI-FEAT-018, matching the pre-Phase-4.3 answer precisely. No residual for this case.",
       "pass": false,
       "query": "What happens if the relay server is unavailable during import?",
-      "relatedFeature": "AI-FEAT-018(180.46634911362094)"
+      "relatedFeature": "AI-FEAT-048(320)"
     },
     {
       "domain": "Online Registry",
@@ -438,7 +438,7 @@
       "note": "Genuinely ambiguous: archive-level locking (AI-FEAT-045) is a coarser, separate mechanism from \"does the system lock files while someone else is importing\" — no canonical record confirms or denies file-level locking specifically during a concurrent import. PARTIALLY_AVAILABLE (via AI-FEAT-045) is a defensible partial answer, not a confident false claim. Documented gap, not patched — forcing a boundary here would invent a denial the evidence does not support.",
       "pass": false,
       "query": "Does the system lock files while someone else is importing?",
-      "relatedFeature": "AI-FEAT-048(160)"
+      "relatedFeature": "AI-FEAT-048(400)"
     },
     {
       "domain": "Online Registry",
@@ -510,7 +510,7 @@
       "note": "Genuinely unconfirmed either way: no canonical record states whether archive-lock status is surfaced inside the Online Registry UI specifically. The engine confidently answers AVAILABLE (strong, via AI-FEAT-045) — this OVERCLAIMS a combined fact neither AI-FEAT-045 nor AI-WF-006 individually confirms. A real, disclosed retrieval-precision limitation (compound-claim verification is beyond pure keyword matching) — same class as the already-documented Q17 negation-context limitation. Candidate for a future boundary once/if the Registry's lock-status surfacing is confirmed one way or the other; not patched speculatively here.",
       "pass": false,
       "query": "If the archive is locked, does the Online Registry show that?",
-      "relatedFeature": "AI-FEAT-045(500)"
+      "relatedFeature": "AI-FEAT-045(563)"
     },
     {
       "domain": "Online Registry",
@@ -522,7 +522,7 @@
       "note": null,
       "pass": true,
       "query": "Does metadata audit activity show up to other operators?",
-      "relatedFeature": "AI-FEAT-034(196.0459043791212)"
+      "relatedFeature": "AI-FEAT-033(550)"
     },
     {
       "domain": "Online Registry",
@@ -560,19 +560,6 @@
       "pass": true,
       "query": "Does going offline stop me from importing?",
       "relatedFeature": "AI-FEAT-058(69.12526379657446)"
-    },
-    {
-      "domain": "Archive operations",
-      "gapType": "AMBIGUOUS_RETRIEVAL",
-      "missingEvidence": [
-        "unambiguous topical match",
-        "step-by-step instructions",
-        "UI navigation"
-      ],
-      "note": null,
-      "pass": true,
-      "query": "My archive says it is locked, what do I do?",
-      "relatedFeature": "AI-FEAT-045(100)"
     },
     {
       "domain": "Events",
@@ -634,7 +621,7 @@
       "note": "IMPROVEMENT (Phase 4.3, Decision 2) — was weak/tied at AI-WF-004 (score 300, tied with another candidate) before Phase 4.3. Normalization now confidently, untied resolves to the SAME correct record, AI-WF-004 — deconflicted honestly rather than a different record winning. Not Governance-related.",
       "pass": false,
       "query": "How do I check the status of a metadata repair?",
-      "relatedFeature": "AI-WF-004(213.0580352508256)"
+      "relatedFeature": "AI-FEAT-033(633)"
     },
     {
       "domain": "Import",
@@ -858,10 +845,10 @@
       "note": "No evidence either way on RAW format support; weak match via AI-FEAT-013/025 sharing only generic tokens. Honest weak/hedged gap.",
       "pass": false,
       "query": "Does AutoIngest support RAW file formats?",
-      "relatedFeature": "DEC-006(300)"
+      "relatedFeature": "AI-FEAT-019(582.4408734942265)"
     }
   ],
-  "generated_at": "2026-08-18T09:08:19.870Z",
+  "generated_at": "2026-08-27T05:02:19.232Z",
   "known_miss_count": 41,
   "pass_count": 58,
   "schema_version": "1.0.0",

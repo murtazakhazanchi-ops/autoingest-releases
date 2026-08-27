@@ -16948,6 +16948,9 @@ const _transferMonitor = (() => {
   const loading   = document.getElementById('aaLoadingState');
   const loadingText = document.getElementById('aaLoadingText');
   const errorState = document.getElementById('aaErrorState');
+  const clarificationArea = document.getElementById('aaClarificationArea');
+  const clarificationText = document.getElementById('aaClarificationText');
+  const clarificationChoices = document.getElementById('aaClarificationChoices');
   const answerArea = document.getElementById('aaAnswerArea');
   const navHeader = document.getElementById('aaNavHeader');
   const backBtn = document.getElementById('aaBackBtn');
@@ -16968,7 +16971,7 @@ const _transferMonitor = (() => {
   const technicalDetails = document.getElementById('aaTechnicalDetails');
   const technicalBody = document.getElementById('aaTechnicalBody');
 
-  if (!overlay || !window.api?.askQuestion) return; // defensive -- preload API not present (e.g. an older build)
+  if (!overlay || !window.api?.askQuestion || !window.api?.askConverse) return; // defensive -- preload API not present (e.g. an older build)
 
   // The drawer height is derived from the real, rendered status-bar height
   // (Part D.2/E) rather than a guessed constant, so the drawer never covers
@@ -16984,6 +16987,9 @@ const _transferMonitor = (() => {
 
   function _resetPanels() {
     errorState.hidden = true; errorState.textContent = '';
+    clarificationArea.hidden = true;
+    clarificationText.textContent = '';
+    clarificationChoices.innerHTML = '';
     answerArea.hidden = true;
     technicalDetails.open = false;
   }
@@ -17051,6 +17057,21 @@ const _transferMonitor = (() => {
   }
 
   function _renderAnswer(shaped) {
+    // Final answer-quality checkpoint (2026-08-24), Defect 1 forensic fix:
+    // every hidden-branch below now ALSO clears the element's own content,
+    // not only its `hidden` flag. Proven via a real Electron/real-Phi
+    // data-integrity probe that the underlying answer OBJECT was already
+    // fresh and uncontaminated for every turn (main/askAutoIngest.js's IPC
+    // response is rebuilt from scratch every call, never reused) -- this
+    // was purely a DOM-hygiene gap: an element hidden by a turn with no
+    // content for it kept the PREVIOUS turn's rendered content sitting in
+    // its (hidden) innerHTML/textContent. Invisible to a real operator
+    // (the container is hidden), but a real defect nonetheless -- any
+    // future direct DOM inspection (a test harness, an accessibility tool,
+    // a screen reader misreading hidden-but-populated content) would see
+    // stale data. Fixed generally, for every field, not just the ones a
+    // particular test happened to probe.
+
     // A null status code (e.g. a ROADMAP-classified question, which has no
     // available/planned/uncertain concept at all) hides the badge entirely
     // rather than ever showing a raw, unrecognized enum string (Part F).
@@ -17060,6 +17081,8 @@ const _transferMonitor = (() => {
       statusBadge.textContent = shaped.status.label || _statusLabel(shaped.status.code);
     } else {
       statusBadge.hidden = true;
+      statusBadge.className = 'aa-status-badge';
+      statusBadge.textContent = '';
     }
 
     directAnswerEl.textContent = shaped.directAnswer || '';
@@ -17074,6 +17097,7 @@ const _transferMonitor = (() => {
       stepsSection.hidden = false;
     } else {
       stepsSection.hidden = true;
+      stepsList.innerHTML = '';
     }
 
     // Guidance reads as a quiet continuation of the direct answer itself
@@ -17083,6 +17107,7 @@ const _transferMonitor = (() => {
       guidanceText.hidden = false;
     } else {
       guidanceText.hidden = true;
+      guidanceText.textContent = '';
     }
 
     // Progressive disclosure (Part 4): the single most important note stays
@@ -17107,9 +17132,13 @@ const _transferMonitor = (() => {
         moreLimitations.open = false;
       } else {
         moreLimitations.hidden = true;
+        limitationsList.innerHTML = '';
       }
     } else {
       noteSection.hidden = true;
+      noteCallout.textContent = '';
+      moreLimitations.hidden = true;
+      limitationsList.innerHTML = '';
     }
 
     if (shaped.relatedCapabilities && shaped.relatedCapabilities.length) {
@@ -17126,6 +17155,7 @@ const _transferMonitor = (() => {
       relatedSection.hidden = false;
     } else {
       relatedSection.hidden = true;
+      relatedList.innerHTML = '';
     }
 
     technicalBody.innerHTML = '';
@@ -17179,6 +17209,39 @@ const _transferMonitor = (() => {
     answerArea.hidden = false;
   }
 
+  // Phase C8 — a clarifying question from Ask AutoIngest. Deliberately NOT
+  // a chat bubble/transcript (Section 10): one restrained question-and-
+  // pills view, replacing the answer area exactly the way a direct answer
+  // would. `shaped.choices` are plain candidate titles only (never raw
+  // record ids -- see askAutoIngestPresentation.js's shapeConversationalResponse).
+  function _renderClarification(shaped) {
+    clarificationText.textContent = shaped.text || '';
+    clarificationChoices.innerHTML = '';
+    for (const choice of shaped.choices || []) {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'aa-clarification-chip';
+      chip.textContent = choice;
+      clarificationChoices.appendChild(chip);
+    }
+    clarificationArea.hidden = false;
+  }
+
+  // Dispatches a history entry to the right renderer by shape: a
+  // conversational 'final' response (askConverse), a conversational
+  // 'clarification' response (askConverse), or a raw pre-C8 answer object
+  // (askRelated -- Section 8, Related-topic navigation is unchanged exact-
+  // id lookup and was never wrapped in a conversational envelope).
+  function _renderEntry(shaped) {
+    if (shaped && shaped.kind === 'clarification') {
+      _renderClarification(shaped);
+    } else if (shaped && shaped.kind === 'final') {
+      _renderAnswer(shaped.answer);
+    } else {
+      _renderAnswer(shaped);
+    }
+  }
+
   // ── Related-topic navigation history (Part 5/10) ─────────────────────────
   // A lightweight in-drawer stack, entirely in renderer memory -- no
   // browser-style URLs, no router. Each entry holds the already-shaped
@@ -17213,7 +17276,7 @@ const _transferMonitor = (() => {
     const entry = _aaHistory[_aaHistoryPos];
     if (!entry) return;
     _resetPanels();
-    _renderAnswer(entry.shaped);
+    _renderEntry(entry.shaped);
     _updateNavHeader();
     if (body) body.scrollTop = entry.scrollTop || 0;
   }
@@ -17254,7 +17317,21 @@ const _transferMonitor = (() => {
     _showCurrentHistoryEntry();
   });
 
-  async function _submitQuestion(question) {
+  // Phase C8 — every typed/pill-clicked message goes through the SAME
+  // conversational entrypoint (window.api.askConverse), which continues
+  // whatever conversation the main process is already holding (accumulated
+  // facts, unresolved ambiguity, resolved subject -- see
+  // scripts/product-docs/lib/conversationState.js). This function no
+  // longer decides "is this a follow-up or a new topic" itself -- that
+  // decision (including topic-change detection) already lives in
+  // conversationalAsk.js's own orchestrator, which is what "Ask AutoIngest
+  // is now a conversation, not a series of unrelated one-shot lookups"
+  // (this checkpoint's own framing) actually means at the UI layer: the
+  // drawer just keeps asking and keeps rendering whatever comes back.
+  // `opts.freshConversation` is the one deliberate exception -- an example
+  // capsule click is an unambiguous "ignore anything before, ask this
+  // instead" signal, so it explicitly resets the held conversation first.
+  async function _submitQuestion(question, opts) {
     const q = (question || '').trim();
     if (!q || _aaBusy) return;
     // Root cause (free-form input regression, Product Owner report): the
@@ -17278,9 +17355,16 @@ const _transferMonitor = (() => {
     loading.hidden = false;
     loadingText.textContent = 'Checking AutoIngest documentation…';
     try {
-      const shaped = await window.api.askQuestion(q);
+      if (opts && opts.freshConversation) {
+        await window.api.resetAskConversation?.().catch(() => {});
+      }
+      const shaped = await window.api.askConverse(q);
       loading.hidden = true;
-      _startNewHistory(q, shaped);
+      if (opts && opts.freshConversation) {
+        _startNewHistory(q, shaped);
+      } else {
+        _pushHistory(q, shaped);
+      }
     } catch (err) {
       loading.hidden = true;
       if (err && /cancel/i.test(err.message || '')) {
@@ -17349,7 +17433,16 @@ const _transferMonitor = (() => {
     if (!btn) return;
     input.value = btn.dataset.question || '';
     _autoResize();
-    _submitQuestion(input.value);
+    _submitQuestion(input.value, { freshConversation: true });
+  });
+
+  clarificationChoices?.addEventListener('click', (e) => {
+    const chip = e.target.closest('.aa-clarification-chip');
+    if (!chip) return;
+    // A pill click is just a shortcut for typing the same text and
+    // submitting it (Section 4 -- pills are suggestions, never
+    // restrictions) -- same function, same conversation continuation.
+    _submitQuestion(chip.textContent);
   });
 
   // ── Settings → Local AI section ──────────────────────────────────────────

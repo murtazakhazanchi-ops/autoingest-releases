@@ -13,7 +13,7 @@
 
 const path = require('path');
 const PRODUCT_DOCS = path.join(__dirname, '..', 'scripts', 'product-docs');
-const { sanitizeIdsInProse, displayNameFor } = require(path.join(PRODUCT_DOCS, 'lib', 'askSynthesis', 'evidencePackage.js'));
+const { sanitizeIdsInProse, displayNameFor, splitCapabilityFromProvenance } = require(path.join(PRODUCT_DOCS, 'lib', 'askSynthesis', 'evidencePackage.js'));
 const { describeAuthorityOutcome } = require(path.join(PRODUCT_DOCS, 'lib', 'answerWithAuthority.js'));
 
 const QUERY_STATUS_LABELS = {
@@ -80,7 +80,27 @@ function shapeAnswerForUI(answer, ctx) {
   const authority = answer.authority || null;
   const isAuthorityDowngrade = !!(authority && authority.required && authority.finalCapabilityStatus === 'UNKNOWN');
 
-  let directAnswer = sanitizeForUI(answer.directAnswer, ctx);
+  // C8 corrective checkpoint (2026-08-24), Defect 2 forensic finding: this
+  // function is the ONLY place raw answer.directAnswer becomes operator-
+  // visible text, on EVERY path -- synthesized, deterministic-only
+  // (offline/no model), and post-refusal/failed-validation fallback alike
+  // (trySynthesize()'s catch-all returns the untouched `answer` object,
+  // which flows here unchanged). evidencePackage.js's own capability/
+  // provenance split (splitCapabilityFromProvenance(), used to build what
+  // reaches Phi) was NEVER applied here -- so a record whose canonical
+  // "## Summary" carries a "**Why this exists** (repository evidence
+  // pending, captured during the Product-Owner Purpose Capture
+  // interview...)" narrative reached the operator's screen verbatim
+  // (IDs stripped, but the provenance/citation commentary intact)
+  // whenever synthesis was unavailable, refused, or failed validation --
+  // independent of and unfixed by any prompt/guard work done at the
+  // synthesis layer, since that layer is never reached on this path. Split
+  // applied here, universally, keeps this operator-safe on every path: a
+  // synthesized answer (Phi's own natural-language prose) never contains
+  // the literal "**Why this exists**" marker, so the split is a safe no-op
+  // for that case (capability = the whole text, provenance = null).
+  const { capability: directAnswerCapability } = splitCapabilityFromProvenance(answer.directAnswer);
+  let directAnswer = sanitizeForUI(directAnswerCapability, ctx);
   let uncertaintyMessage = null;
   if (isAuthorityDowngrade) {
     // Part H: the operator-facing text for an authority DOWNGRADE is the
@@ -158,4 +178,29 @@ function shapeModelStatus(rawStatus, extra) {
   };
 }
 
-module.exports = { shapeAnswerForUI, shapeModelStatus, QUERY_STATUS_LABELS, MODEL_STATE_LABELS, GENERIC_UNCERTAIN_MESSAGE };
+// Phase C8 — shapes an askConversational() response for the renderer.
+// Reuses shapeAnswerForUI() verbatim for the 'final' case (identical
+// sanitization/ID-stripping contract to the one-shot path -- no second
+// implementation of that discipline). The 'clarification' case is new:
+// `choices` are already plain, human-readable candidate TITLES (never raw
+// record ids -- see clarificationDecision.js's own candidate shape and
+// conversationalAsk.js's response.choices, which maps `.title` only), but
+// still run through the same sanitizeForUI() pass as every other operator-
+// facing string here, for defense in depth.
+function shapeConversationalResponse(response, ctx) {
+  if (response.kind === 'clarification') {
+    return {
+      kind: 'clarification',
+      text: sanitizeForUI(response.text, ctx),
+      choices: (response.choices || []).map((c) => sanitizeForUI(c, ctx)),
+    };
+  }
+  return {
+    kind: 'final',
+    answer: shapeAnswerForUI(response.answer, ctx),
+    topicChanged: !!response.topicChanged,
+    hedged: !!response.hedged,
+  };
+}
+
+module.exports = { shapeAnswerForUI, shapeModelStatus, shapeConversationalResponse, QUERY_STATUS_LABELS, MODEL_STATE_LABELS, GENERIC_UNCERTAIN_MESSAGE };

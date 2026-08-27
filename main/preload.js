@@ -431,6 +431,14 @@ contextBridge.exposeInMainWorld('api', {
   // or any other resource reference to the local judge/model layer.
   askQuestion:            (question) => ipcRenderer.invoke('ask:query',             question),
   askRelated:             (recordId) => ipcRenderer.invoke('ask:relatedNavigate',    recordId),
+  // Phase C8 -- conversational turn. `message` is the operator's newest
+  // typed/pill-clicked text only; the main process holds the actual
+  // conversation state (candidate ids, accumulated facts) -- the renderer
+  // never sees or sends any of that, only plain question/answer/choice
+  // strings, matching this file's own existing "no raw internal state to
+  // the renderer" posture.
+  askConverse:            (message)  => ipcRenderer.invoke('ask:converse',           message),
+  resetAskConversation:   ()         => ipcRenderer.invoke('ask:resetConversation'),
   cancelAskQuery:         ()         => ipcRenderer.invoke('ask:cancelQuery'),
   getAskModelStatus:      ()         => ipcRenderer.invoke('ask:modelStatus'),
   downloadAskModel:       ()         => ipcRenderer.invoke('ask:downloadModel'),

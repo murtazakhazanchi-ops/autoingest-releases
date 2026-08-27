@@ -1,0 +1,9 @@
+{
+  "name": "ask-autoingest-phase-a-bench",
+  "private": true,
+  "description": "Experimental, non-production Phase A local-LLM benchmark harness for Ask AutoIngest. Deliberately isolated from the root Electron app's package.json and from scripts/product-docs' own zero-npm-dependency tooling convention -- this dependency must never leak into either. Not wired into any build, packaging, or normal CLI command.",
+  "version": "0.0.0-phase-a",
+  "dependencies": {
+    "node-llama-cpp": "^3.20.0"
+  }
+}

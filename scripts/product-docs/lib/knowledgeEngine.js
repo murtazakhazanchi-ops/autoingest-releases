@@ -1126,6 +1126,7 @@ module.exports = {
   workflowIndexMap,
   buildEngineContext,
   CONFIDENCE_FLOOR,
+  STRONG_MATCH_FLOOR,
   QUESTION_TYPES,
   classifyQuestion,
   explainNormalization,

@@ -18,6 +18,23 @@ const { URL } = require('url');
 const build = require('../lib/build');
 const md = require('../lib/markdown');
 const { answerQuestion, buildEngineContext } = require('../lib/knowledgeEngine');
+// Phase C3 -- the ONE new production caller wired to real semantic
+// authority in this checkpoint. Deliberately minimal: /api/ask is already
+// a plain async-friendly Node http handler, and unlike the CLI's `ask`
+// command (see lib/knowledgeCli.js's own header comment) this portal
+// never advertised a "deterministic only, no external AI" invariant of
+// its own -- it already exists to answer real operator-style questions.
+// NOTE: this server always runs under plain `node` (see this file's own
+// header comment -- never inside Electron), so the real local judge
+// runtime can never actually load here (utilityProcess is Electron-only);
+// answerQuestionWithAuthority() degrades every authority-sensitive
+// question to a safe UNKNOWN via the same model-unavailable path proven
+// in scripts/product-docs/test/answerWithAuthority.test.js. This still
+// proves the full scope-gate/availability-gate/safe-fallback code path
+// end to end in real production code; the "judge actually runs" path is
+// proven separately, inside a real Electron process, by
+// services/localJudge/electronBenchmark.js.
+const { answerQuestionWithAuthority } = require('../lib/answerWithAuthority');
 
 const STATIC_DIR = __dirname;
 const INDEX_FILE = path.join(STATIC_DIR, 'index.html');
@@ -34,7 +51,11 @@ function sendHtml(res, status, filePath) {
   res.end(content);
 }
 
-function handleRequest(req, res) {
+// Phase C3: async so /api/ask can await answerQuestionWithAuthority()
+// (every other branch remains fully synchronous, unchanged, and simply
+// resolves immediately). Callers must await/catch this -- see
+// startServer() below, updated accordingly.
+async function handleRequest(req, res) {
   let parsed;
   try {
     parsed = new URL(req.url, 'http://127.0.0.1');
@@ -135,7 +156,7 @@ function handleRequest(req, res) {
       return;
     }
     const { built } = build.assemble();
-    const answer = answerQuestion(question, buildEngineContext(built));
+    const answer = await answerQuestionWithAuthority(question, buildEngineContext(built));
     sendJson(res, 200, answer);
     return;
   }
@@ -145,11 +166,15 @@ function handleRequest(req, res) {
 
 function startServer(port) {
   const server = http.createServer((req, res) => {
-    try {
-      handleRequest(req, res);
-    } catch (err) {
-      sendJson(res, 500, { error: err.message });
-    }
+    // handleRequest() is now async (Phase C3) -- Promise.resolve(...).catch()
+    // ensures BOTH a synchronous throw (existing behavior) and an async
+    // rejection from an awaited answerQuestionWithAuthority() call are
+    // caught the same way, rather than becoming an unhandled rejection.
+    Promise.resolve()
+      .then(() => handleRequest(req, res))
+      .catch((err) => {
+        sendJson(res, 500, { error: err.message });
+      });
   });
   server.listen(port, '127.0.0.1', () => {
     console.log(`AutoIngest Knowledge Engine prototype — http://127.0.0.1:${port}`);

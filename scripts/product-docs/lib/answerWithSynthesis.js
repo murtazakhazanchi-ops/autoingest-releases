@@ -123,4 +123,11 @@ async function answerKnownRecordWithSynthesis(recordId, ctx, options = {}) {
   return trySynthesize(answer, () => buildEvidencePackageForKnownRecord(answer, ctx), options, null);
 }
 
-module.exports = { answerQuestionWithSynthesis, answerKnownRecordWithSynthesis, mergeSynthesizedAnswer };
+// trySynthesize is also exported directly (Phase C8): the conversational
+// orchestrator (conversationalAsk.js) needs to attempt synthesis on an
+// answer/primaryFit pair it already computed for the clarification
+// decision, without a second answerQuestionWithAuthority() retrieval pass
+// -- reusing this exact function keeps eligibility/fallback/production-
+// synthesizer-default behavior identical to the one-shot path rather than
+// maintaining a second copy of it.
+module.exports = { answerQuestionWithSynthesis, answerKnownRecordWithSynthesis, mergeSynthesizedAnswer, trySynthesize };
