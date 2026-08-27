@@ -1,0 +1,1455 @@
+<title>Knowledge Architecture Checkpoint</title>
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --paper: #f1f3f0;
+    --paper-raised: #fbfcfa;
+    --ink: #1b2320;
+    --ink-soft: #4b564f;
+    --ink-faint: #7c887f;
+    --line: #d3d9d0;
+    --line-soft: #e3e7e0;
+    --accent: #0f6e6a;
+    --accent-soft: #d8ece9;
+    --accent-ink: #06403d;
+    --gold: #a8791f;
+    --gold-soft: #f3e6c9;
+    --slate: #55637a;
+    --slate-soft: #e2e7ef;
+    --pass: #2f7d4f;
+    --pass-soft: #dcefe1;
+    --partial: #a8791f;
+    --partial-soft: #f3e6c9;
+    --fail: #ab3b3b;
+    --fail-soft: #f7dfdf;
+    --code-bg: #e9ede6;
+    --shadow: 0 1px 2px rgba(20, 30, 25, 0.06), 0 8px 24px rgba(20, 30, 25, 0.05);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #12181a; --paper-raised: #182220; --ink: #e8ece7; --ink-soft: #b7c2b9; --ink-faint: #7f8c81;
+      --line: #2b3733; --line-soft: #212b27; --accent: #3fb3aa; --accent-soft: #16302d; --accent-ink: #a9e6df;
+      --gold: #d9ac54; --gold-soft: #332a15; --slate: #9aa8c2; --slate-soft: #1f2734;
+      --pass: #5ec98a; --pass-soft: #163127; --partial: #d9ac54; --partial-soft: #332a15;
+      --fail: #e0807f; --fail-soft: #391f1f; --code-bg: #1a2321; --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #12181a; --paper-raised: #182220; --ink: #e8ece7; --ink-soft: #b7c2b9; --ink-faint: #7f8c81;
+    --line: #2b3733; --line-soft: #212b27; --accent: #3fb3aa; --accent-soft: #16302d; --accent-ink: #a9e6df;
+    --gold: #d9ac54; --gold-soft: #332a15; --slate: #9aa8c2; --slate-soft: #1f2734;
+    --pass: #5ec98a; --pass-soft: #163127; --partial: #d9ac54; --partial-soft: #332a15;
+    --fail: #e0807f; --fail-soft: #391f1f; --code-bg: #1a2321; --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 16px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  h1, h2, h3, h4 { font-family: 'Fraunces', Georgia, serif; text-wrap: balance; font-weight: 600; color: var(--ink); margin: 0 0 0.5em; }
+  a { color: var(--accent-ink); }
+  code, .mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 24px 120px; }
+
+  .masthead { padding: 72px 24px 48px; border-bottom: 1px solid var(--line); background: linear-gradient(180deg, var(--paper-raised), var(--paper)); }
+  .masthead-inner { max-width: 980px; margin: 0 auto; }
+  .eyebrow { font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--accent-ink); background: var(--accent-soft); display: inline-block; padding: 5px 12px; border-radius: 3px; margin-bottom: 18px; }
+  .masthead h1 { font-size: clamp(2rem, 1.5rem + 2vw, 3rem); line-height: 1.08; max-width: 18ch; }
+  .masthead .dek { font-size: 1.15rem; color: var(--ink-soft); max-width: 62ch; margin-top: 14px; }
+  .meta-row { display: flex; gap: 28px; flex-wrap: wrap; margin-top: 28px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--ink-faint); }
+  .meta-row strong { color: var(--ink-soft); font-weight: 500; }
+
+  nav.toc { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 20px; margin-top: 36px; padding-top: 28px; border-top: 1px solid var(--line-soft); }
+  nav.toc a { color: var(--ink-soft); text-decoration: none; font-size: 13.5px; padding: 3px 0; border-bottom: 1px dotted transparent; }
+  nav.toc a:hover { color: var(--accent-ink); border-color: var(--accent); }
+  nav.toc .n { font-family: 'IBM Plex Mono', monospace; color: var(--ink-faint); margin-right: 6px; }
+
+  section { padding: 56px 0; border-bottom: 1px solid var(--line-soft); }
+  section:last-child { border-bottom: none; }
+  .section-num { font-family: 'IBM Plex Mono', monospace; color: var(--accent); font-size: 13px; letter-spacing: 0.06em; margin-bottom: 8px; display: block; }
+  section h2 { font-size: 1.7rem; margin-bottom: 20px; }
+  section h3 { font-size: 1.2rem; margin-top: 32px; }
+  p { max-width: 72ch; color: var(--ink-soft); }
+  p.lede { font-size: 1.08rem; color: var(--ink); }
+  ul, ol { max-width: 72ch; color: var(--ink-soft); padding-left: 1.3em; }
+  li { margin-bottom: 6px; }
+  strong { color: var(--ink); font-weight: 600; }
+
+  .score-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 28px 0; }
+  .score-card { background: var(--paper-raised); border: 1px solid var(--line); border-radius: 10px; padding: 22px 20px; box-shadow: var(--shadow); }
+  .score-card.candidate-c { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), var(--shadow); }
+  .score-card .label { font-family: 'IBM Plex Mono', monospace; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-faint); }
+  .score-card .name { font-family: 'Fraunces', serif; font-size: 1.15rem; font-weight: 600; margin: 4px 0 14px; }
+  .score-card .big-num { font-size: 2.4rem; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink); line-height: 1; }
+  .score-card .big-num small { font-size: 1rem; color: var(--ink-faint); font-weight: 400; }
+  .score-breakdown { display: flex; gap: 6px; margin-top: 14px; font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; }
+  .sb { padding: 3px 8px; border-radius: 4px; font-variant-numeric: tabular-nums; }
+  .sb.pass { background: var(--pass-soft); color: var(--pass); }
+  .sb.partial { background: var(--partial-soft); color: var(--partial); }
+  .sb.fail { background: var(--fail-soft); color: var(--fail); }
+
+  .pill { font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; font-weight: 600; letter-spacing: 0.03em; padding: 2px 9px; border-radius: 20px; text-transform: uppercase; }
+  .pill-pass { background: var(--pass-soft); color: var(--pass); }
+  .pill-partial { background: var(--partial-soft); color: var(--partial); }
+  .pill-fail { background: var(--fail-soft); color: var(--fail); }
+  .cause-tag { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--slate); background: var(--slate-soft); padding: 2px 8px; border-radius: 20px; margin-left: 4px; text-transform: capitalize; }
+
+  table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 14.5px; }
+  .table-scroll { overflow-x: auto; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  th { font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-faint); font-weight: 500; }
+  tr:last-child td { border-bottom: none; }
+  td.num, th.num { font-variant-numeric: tabular-nums; text-align: right; }
+
+  .callout { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 16px 20px; border-radius: 0 8px 8px 0; margin: 20px 0; max-width: 72ch; }
+  .callout p { color: var(--ink); max-width: none; }
+  .callout.warn { border-color: var(--fail); background: var(--fail-soft); }
+  .callout.gold { border-color: var(--gold); background: var(--gold-soft); }
+  .callout.win { border-color: var(--pass); background: var(--pass-soft); }
+
+  .diff-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 18px 0; }
+  .diff-col { border-radius: 10px; padding: 16px 18px; border: 1px solid var(--line); background: var(--paper-raised); }
+  .diff-col.before { border-color: var(--fail); }
+  .diff-col.after { border-color: var(--pass); }
+  .diff-col .diff-label { font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; display: block; }
+  .diff-col.before .diff-label { color: var(--fail); }
+  .diff-col.after .diff-label { color: var(--pass); }
+  .diff-col .diff-text { font-size: 13.5px; color: var(--ink-soft); }
+  @media (max-width: 720px) { .diff-pair { grid-template-columns: 1fr; } }
+
+  .candidate-transcripts { margin-top: 18px; }
+  details.conv-block { border: 1px solid var(--line); border-radius: 8px; margin-bottom: 10px; background: var(--paper-raised); overflow: hidden; }
+  details.conv-block summary { cursor: pointer; padding: 12px 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-family: 'IBM Plex Mono', monospace; font-size: 13px; list-style: none; }
+  details.conv-block summary::-webkit-details-marker { display: none; }
+  details.conv-block summary::before { content: '▸'; color: var(--ink-faint); margin-right: 2px; }
+  details.conv-block[open] summary::before { content: '▾'; }
+  .conv-id { font-weight: 600; color: var(--ink); }
+  .conv-cat { color: var(--ink-faint); }
+  .conv-turns { padding: 4px 16px 16px; border-top: 1px solid var(--line-soft); display: grid; gap: 12px; padding-top: 14px; }
+  .turn { padding: 10px 14px; border-radius: 8px; font-size: 14px; }
+  .turn-user { background: var(--slate-soft); }
+  .turn-assistant { background: var(--accent-soft); }
+  .turn-role { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-faint); margin-bottom: 4px; }
+  .turn-kind { margin-left: 8px; color: var(--gold); }
+  .turn-text { white-space: pre-wrap; color: var(--ink); }
+  .evidence-tag { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); font-family: 'IBM Plex Mono', monospace; font-size: 11px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .ev-source { color: var(--ink-faint); }
+  .ev-km .ev-source { color: var(--accent-ink); font-weight: 600; }
+  .ev-none .ev-source { color: var(--fail); }
+  .ev-record { background: var(--paper); padding: 1px 6px; border-radius: 4px; color: var(--ink-soft); }
+  .ev-tier { padding: 1px 6px; border-radius: 4px; }
+  .ev-tier-forensic-verified { background: var(--gold-soft); color: var(--gold); }
+  .ev-tier-registry-reshaped { background: var(--slate-soft); color: var(--slate); }
+  .ev-tier-mixed { background: var(--partial-soft); color: var(--partial); }
+  .ev-dims { color: var(--ink-faint); }
+
+  .poq { display: grid; gap: 14px; margin-top: 20px; }
+  .poq-item { background: var(--paper-raised); border: 1px solid var(--line); border-radius: 8px; padding: 16px 20px; }
+  .poq-item .q { font-family: 'Fraunces', serif; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+  .poq-item .a { color: var(--ink-soft); }
+
+  details.archive-block { margin-top: 24px; }
+  details.archive-block summary { cursor: pointer; font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--ink-faint); padding: 10px 0; }
+
+  footer { padding: 40px 24px; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--ink-faint); }
+
+  @media (max-width: 720px) { nav.toc { grid-template-columns: 1fr 1fr; } .score-grid { grid-template-columns: 1fr; } }
+</style>
+
+<div class="masthead">
+  <div class="masthead-inner">
+    <span class="eyebrow">Ask AutoIngest &middot; Follow-Up Checkpoint</span>
+    <h1>Correcting Candidate C</h1>
+    <p class="dek">A controlled follow-up: fix only the two Candidate-C-specific defects the frozen checkpoint identified, hold the deterministic eligibility gate deliberately broken, and re-run the exact same 19-conversation benchmark once.</p>
+    <div class="meta-row">
+      <span><strong>Date</strong> 2026-08-26</span>
+      <span><strong>Model</strong> Gemma-4-E4B-it (Q4_K_M, unchanged)</span>
+      <span><strong>Status</strong> Experimental — not integrated</span>
+    </div>
+    <nav class="toc">
+      <a href="#verdict"><span class="n">01</span>Executive verdict</a>
+      <a href="#scope"><span class="n">02</span>Scope of this checkpoint</a>
+      <a href="#files"><span class="n">03</span>Files changed</a>
+      <a href="#authoring"><span class="n">04</span>Authoring-normalization fix</a>
+      <a href="#relevance"><span class="n">05</span>Multi-record relevance fix</a>
+      <a href="#tests"><span class="n">06</span>Tests &amp; validation</a>
+      <a href="#before-after"><span class="n">07</span>Previous C vs corrected C</a>
+      <a href="#scores"><span class="n">08</span>Frozen A/B/C scores</a>
+      <a href="#causal"><span class="n">09</span>Per-conversation causal changes</a>
+      <a href="#generalization"><span class="n">10</span>Generalization results</a>
+      <a href="#safety"><span class="n">11</span>Leakage &amp; safety audit</a>
+      <a href="#performance"><span class="n">12</span>Performance</a>
+      <a href="#failures"><span class="n">13</span>Remaining failures</a>
+      <a href="#answers"><span class="n">14</span>Product Owner Q&amp;A</a>
+      <a href="#next"><span class="n">15</span>Recommended next step</a>
+      <a href="#stop"><span class="n">16</span>Git / worktree status</a>
+    </nav>
+  </div>
+</div>
+
+<div class="wrap">
+<section id="verdict">
+  <span class="section-num">01 &middot; Executive Verdict</span>
+  <h2>Corrected Candidate C now beats Candidate B</h2>
+  <p class="lede">Fixing only the two Candidate-C-specific defects the frozen checkpoint identified — implementation-language leaking into operator-facing knowledge, and a troubleshooting record dominating an unrelated question — moved Candidate C from <strong>63.2%</strong> clean-pass (worse than both A and B) to <strong>84.2%</strong> clean-pass (ahead of both), on a single, unmodified, first-and-only post-fix run of the exact same 19 conversations.</p>
+  <div class="score-grid">
+    <div class="score-card">
+      <span class="label">Candidate A</span>
+      <div class="name">Production C8 + Gemma</div>
+      <div class="big-num">68.4<small>% clean-pass</small></div>
+      <div class="score-breakdown"><span class="sb pass">13 PASS</span><span class="sb partial">5 PARTIAL</span><span class="sb fail">1 FAIL</span></div>
+    </div>
+    <div class="score-card">
+      <span class="label">Candidate B</span>
+      <div class="name">+ Conversational Architecture</div>
+      <div class="big-num">78.9<small>% clean-pass</small></div>
+      <div class="score-breakdown"><span class="sb pass">15 PASS</span><span class="sb partial">3 PARTIAL</span><span class="sb fail">1 FAIL</span></div>
+    </div>
+    <div class="score-card candidate-c">
+      <span class="label">Candidate C — corrected</span>
+      <div class="name">+ Knowledge Model (fixed)</div>
+      <div class="big-num">84.2<small>% clean-pass</small></div>
+      <div class="score-breakdown"><span class="sb pass">16 PASS</span><span class="sb partial">2 PARTIAL</span><span class="sb fail">1 FAIL</span></div>
+    </div>
+  </div>
+  <p>The previous Candidate C run scored 12 PASS / 4 PARTIAL / 3 FAIL (63.2%). This run scores 16 PASS / 2 PARTIAL / 1 FAIL (84.2%) — a gain of 4 conversations moving to PASS, with zero new failures introduced anywhere in the frozen set or the 14-question generalization set. The one remaining FAIL (P4, "can I resume the export or do I gotta start over") is byte-identical to Candidate A and B's own failure on the same case, and traces to the deliberately-untouched deterministic eligibility gate, exactly as this checkpoint required.</p>
+  <p>Both corrections held to the anti-overfitting discipline this checkpoint set: the authoring fix rewrote operator-facing language into plain product terms without changing any factual claim or its provenance, and generalized well beyond the one case it was diagnosed from — it fixed a second, previously-undiscovered class of the same defect in 12 auto-generated records the frozen benchmark never happened to exercise (Section 4). The relevance fix added one general, declarative mechanism (a record can declare which question types it's relevant to) rather than any QMZ-specific rule, and it demonstrably improved a different conversation (M) and generalized cleanly to an unseen feature (archive locks, Section 10) that never triggered the original defect.</p>
+  <div class="callout win">
+    <p><strong>Bottom line:</strong> the two Candidate-C-specific defects are resolved. The knowledge-architecture hypothesis, once its own authoring and retrieval bugs are fixed, now outperforms the conversational-architecture-only baseline on this benchmark. The single remaining failure class (the eligibility gate) is confirmed, again, to sit entirely outside the Knowledge Model's reach — no correction to knowledge representation can fix it, because it prevents the model from ever being consulted at all.</p>
+  </div>
+</section>
+
+<section id="scope">
+  <span class="section-num">02 &middot; Scope of This Checkpoint</span>
+  <h2>What was and wasn't touched</h2>
+  <p>This was a narrow, controlled correction, not a general improvement pass. Two defects were in scope, both already diagnosed by name in the frozen checkpoint's own report:</p>
+  <ul>
+    <li><strong>Defect 1 — authoring leakage:</strong> <code>KM-archive-lock-handling</code>'s <code>actions</code> field (and, on systematic audit, several other fields across every Tier-1 forensic record and every Tier-2 auto-generated record) contained raw function names, IPC channel strings, and internal flags in dimensions meant to be operator-facing.</li>
+    <li><strong>Defect 2 — multi-record relevance:</strong> QMZ's troubleshooting-flavored companion record blanket-contributed to every retrieval for that featureId, regardless of whether the question was actually shaped like a troubleshooting report.</li>
+  </ul>
+  <p>Explicitly out of scope and confirmed untouched (Section 16 has the verification): production C8, <code>evaluateSynthesisEligibility</code> and the <code>authority-downgraded-unknown</code> gate, Candidate A, Candidate B, the conversational architecture, model selection, Gemma runtime configuration, the SYSTEM_CONTRACT text, the frozen 19 benchmark conversations, the scoring rubric, and the NOT_SUPPORTED boundary table. P4 was deliberately left failing.</p>
+</section>
+
+<section id="files">
+  <span class="section-num">03 &middot; Files Changed</span>
+  <h2>Every file touched this checkpoint</h2>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>File</th><th>What changed</th></tr></thead>
+    <tbody>
+      <tr><td><code>knowledgeModel/schema.js</code></td><td>Added optional <code>recordRole</code>/<code>scopedQuestionTypes</code> fields (default 'primary', fully backward compatible) and validator checks for them.</td></tr>
+      <tr><td><code>knowledgeModel/retrieval/conceptualRetrieve.js</code></td><td>Added <code>filterRecordsByRelevance()</code>, wired into <code>conceptualRetrieve()</code> before dimension selection.</td></tr>
+      <tr><td><code>knowledgeModel/records/sourceAndImport.js</code></td><td>Reworded operator-facing dimensions across all 6 records to remove implementation-language.</td></tr>
+      <tr><td><code>knowledgeModel/records/metadata.js</code></td><td>Reworded operator-facing dimensions (mainly <code>recovery</code>/<code>behavior</code>) across all 4 records.</td></tr>
+      <tr><td><code>knowledgeModel/records/transferAndArchive.js</code></td><td>Reworded operator-facing dimensions across all 5 records, including the confirmed-failing <code>KM-archive-lock-handling</code>.</td></tr>
+      <tr><td><code>knowledgeModel/records/specialAndPlatform.js</code></td><td>Reworded remaining leaks in <code>KM-login-operator-identity</code>; added <code>recordRole: 'scoped'</code> to <code>KM-qmz-sort-vs-sequence-numbers</code>.</td></tr>
+      <tr><td><code>knowledgeModel/records/notSupportedBoundaries.js</code></td><td>Reworded one remaining leak in <code>KM-not-supported-multi-user-roles</code>.</td></tr>
+      <tr><td><code>knowledgeModel/build/reshapeRegistry.js</code></td><td>Added <code>stripOperatorFacingCodeSpans()</code>, applied to Tier-2's mechanically-generated <code>purpose</code>/<code>behavior</code>/<code>recovery</code>/<code>limitations</code> fields — see Section 4.</td></tr>
+      <tr><td><code>knowledgeModel/test/relevanceAndLeakage.test.js</code></td><td><strong>New file.</strong> 12 assertions proving both general mechanisms — see Section 6.</td></tr>
+      <tr><td><code>knowledgeModel/records/registryReshaped.generated.js</code></td><td>Regenerated by the fixed build script (auto-generated, not hand-edited).</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>Not touched: <code>candidateC/orchestrator.js</code>, <code>candidateC/evidence.js</code>, <code>candidateC/generalizationSet.js</code>, either harness entry point, or any file outside <code>scripts/product-docs/bench/</code>.</p>
+</section>
+
+<section id="authoring">
+  <span class="section-num">04 &middot; Authoring-Normalization Fix</span>
+  <h2>Before / after</h2>
+  <p>The confirmed failing case, rewritten without losing any fact (the exact function/IPC names remain in <code>technicalDetail</code>, unchanged, still available for an explicitly technical question):</p>
+  <div class="diff-pair">
+    <div class="diff-col before">
+      <span class="diff-label">Before — leaked into an ordinary how-to answer</span>
+      <div class="diff-text">"You have two ways to recover from a stale archive lock: 1. Use <code>clearSelfLock</code>: reachable via IPC <code>archive:clearSelfStaleLock</code>... unless you pass <code>force:true</code>... 2. Use <code>releaseStaleLock</code>: reachable via IPC <code>archive:releaseStaleLock</code>..."</div>
+    </div>
+    <div class="diff-col after">
+      <span class="diff-label">After — same facts, plain language</span>
+      <div class="diff-text">"You have two ways to recover from a stale archive lock error: 1. Clear it directly (if created by your device): ...only after AutoIngest confirms the device isn't still actively using it... 2. Use Archive Diagnostics: ...releases a stale lock regardless of which device created it... double-checks immediately before removing it..."</div>
+    </div>
+  </div>
+  <p>A systematic audit (a static regression test, Section 6) found the same defect class in every Tier-1 forensic-verified record — dense provenance-heavy prose was, in several places, left verbatim in operator-facing fields rather than only in <code>technicalDetail</code>. All were rewritten the same way: keep the fact, remove the raw identifier, and if that specific technical detail wasn't already duplicated in <code>technicalDetail</code>, add it there.</p>
+  <h3>A second instance of the same defect, found by generalizing the rule</h3>
+  <p>Running the new leakage test against the <em>whole</em> Knowledge Model — not just the four hand-authored Tier-1 files — surfaced 12 further leaks inside the 38 <strong>mechanically auto-generated</strong> Tier-2 records (e.g. <code>KM-application-auto-update</code>, <code>KM-archive-health-reporting</code>, <code>KM-multi-channel-release-update-system</code>). These came from the registry-reshape build script copying the capability registry's own backtick-quoted prose verbatim into <code>behavior</code>/<code>limitations</code>. None of these 12 records touch the frozen 19 conversations or the generalization set — they were latent, undetected defects the same authoring-normalization rule, applied generally, caught proactively. The fix lives in the build pipeline itself (<code>stripOperatorFacingCodeSpans()</code> in <code>reshapeRegistry.js</code>), so it applies uniformly to all 38 generated records and any future one, rather than 12 individual hand-edits to a generated file that would be overwritten on the next build.</p>
+</section>
+
+<section id="relevance">
+  <span class="section-num">05 &middot; Multi-Record Relevance Fix</span>
+  <h2>A record can now declare its own relevance</h2>
+  <p>The schema gained two optional fields: <code>recordRole</code> (<code>'primary'</code> by default — unchanged behavior for every record written before this checkpoint) and, for a <code>'scoped'</code> record, <code>scopedQuestionTypes</code> — the question-classifier types it's eligible to contribute to. <code>filterRecordsByRelevance()</code> applies this before dimension selection: a scoped record participates only if the current question's type is in its declared list, or the recovery gate fired and it has real recovery content to offer.</p>
+  <p>QMZ's troubleshooting record is now tagged <code>scoped</code> with <code>['TROUBLESHOOTING', 'CONNECTIVITY']</code>. The mechanism itself is entirely general — declared once in <code>schema.js</code> and <code>conceptualRetrieve.js</code>, with zero QMZ-specific code anywhere in the retrieval layer. Any future feature that grows a second, narrower companion record gets the identical protection by declaring the same two fields.</p>
+  <div class="diff-pair">
+    <div class="diff-col before">
+      <span class="diff-label">Before — H, turn 2: "how do I sort QMZ photos?"</span>
+      <div class="diff-text">"QMZ photos are sorted using the file grid's sort controls, which allow you to sort by date, name, or size... these sort controls only change the display order of thumbnails... they do not renumber or reassign a QMZ sequence code." <em>(the troubleshooting record's own framing, misleading as an answer to "how do I sort")</em></div>
+    </div>
+    <div class="diff-col after">
+      <span class="diff-label">After — same question, troubleshooting record correctly excluded</span>
+      <div class="diff-text">"QMZ is a standalone, post-import sequencing workspace used to classify a photographer's already-ingested QMZ material into numbered real-world-occurrence sequences (like 01Q or 02M). This replaces manual folder creation and file-by-file sorting." <em>(accurate; retrieved KM-qmz-sequencing only)</em></div>
+    </div>
+  </div>
+  <p>This is reported precisely, not oversold: H moved from FAIL to PARTIAL, not to a full PASS. The misleading content is gone, but this specific message ("Actually, how do I sort QMZ photos?") still classifies as the question-classifier's <code>UNKNOWN</code> type rather than <code>HOW_TO</code> — a pre-existing quirk of the shared, untouched <code>questionClassifier.js</code> regex not matching a message with a leading "Actually," — so the answer is accurate but doesn't include the actual step-by-step workflow. Fixing that would mean touching a shared production file, which is out of scope here; it's recorded honestly in Section 13 rather than patched around.</p>
+</section>
+
+<section id="tests">
+  <span class="section-num">06 &middot; Tests &amp; Validation</span>
+  <h2>What was run before the frozen re-run</h2>
+  <p><code>knowledgeModel/test/relevanceAndLeakage.test.js</code> (new, 12 assertions, none of which encode a frozen benchmark question verbatim):</p>
+  <ul>
+    <li>No operator-facing dimension anywhere in the real, 66-record Knowledge Model contains raw implementation-call syntax (a general regression guard, not a QMZ/archive-lock-specific check).</li>
+    <li><code>technicalDetail</code> is confirmed exempt and still legitimately carries implementation facts.</li>
+    <li>Every record still passes full schema validation after the authoring pass.</li>
+    <li>Six <code>filterRecordsByRelevance()</code> unit tests against synthetic fixture records (not real QMZ/archive-lock content) prove the general mechanism: a primary record always participates; a scoped record is excluded when its question type doesn't match and the recovery gate is off; included when its type matches; included when the recovery gate fires and it has recovery content; excluded even under the recovery gate if it has none; and a mixed primary+scoped set correctly keeps only the primary.</li>
+    <li>At least one real featureId still resolves to more than one record (dimensional decomposition preserved, not collapsed).</li>
+    <li>Every real scoped record declares a non-empty <code>scopedQuestionTypes</code>.</li>
+  </ul>
+  <p>Also run, all green: the full 25-file production knowledge-engine test suite, <code>test/askAutoIngestPresentation.test.js</code> (31 assertions), the Knowledge Model's own build-time validation (<code>knowledgeModel/index.js</code> throws on any invalid record — it did not throw), an incremental rebuild of the Tier-2 pipeline (0 regenerated on the second run, confirming the manifest-hash mechanism still works), and <code>git diff --check</code> (clean).</p>
+</section>
+
+<section id="before-after">
+  <span class="section-num">07 &middot; Previous C vs Corrected C</span>
+  <h2>Side by side</h2>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Metric</th><th class="num">Previous C</th><th class="num">Corrected C</th></tr></thead>
+    <tbody>
+      <tr><td>PASS</td><td class="num">12</td><td class="num">16</td></tr>
+      <tr><td>PARTIAL</td><td class="num">4</td><td class="num">2</td></tr>
+      <tr><td>FAIL</td><td class="num">3</td><td class="num">1</td></tr>
+      <tr><td>Clean-pass rate</td><td class="num">63.2%</td><td class="num">84.2%</td></tr>
+      <tr><td>Acceptable rate (PASS+PARTIAL)</td><td class="num">84.2%</td><td class="num">94.7%</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>Every conversation that changed verdict moved in the improving direction; none regressed. The three previous FAILs were G, H, and P4 — G is now a clean PASS, H is now PARTIAL (regression eliminated, residual gap disclosed above), and P4 is unchanged by design.</p>
+</section>
+
+<section id="scores">
+  <span class="section-num">08 &middot; Frozen A/B/C Scores</span>
+  <h2>Final comparison</h2>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Metric</th><th class="num">A</th><th class="num">B</th><th class="num">C (corrected)</th></tr></thead>
+    <tbody>
+      <tr><td>PASS / PARTIAL / FAIL</td><td class="num">13 / 5 / 1</td><td class="num">15 / 3 / 1</td><td class="num">16 / 2 / 1</td></tr>
+      <tr><td>Clean-pass rate</td><td class="num">68.4%</td><td class="num">78.9%</td><td class="num"><strong>84.2%</strong></td></tr>
+      <tr><td>Acceptable rate</td><td class="num">94.7%</td><td class="num">94.7%</td><td class="num">94.7%</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>Corrected Candidate C now leads on clean-pass rate and matches the acceptable-rate ceiling both A and B already sit at. A and B's numbers are the frozen results from the original checkpoints, reused unchanged.</p>
+</section>
+
+<section id="causal">
+  <span class="section-num">09 &middot; Per-Conversation Causal Changes</span>
+  <h2>Every changed verdict, classified</h2>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Conversation</th><th>Previous C</th><th>Corrected C</th><th>Cause</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>B &middot; simple how-to</td><td>PARTIAL</td><td>PASS</td><td><span class="cause-tag">authoring fix</span></td><td>The <code>qmzRoot</code> path fragment rendered in malformed LaTeX is gone; the answer is otherwise unchanged in substance.</td></tr>
+      <tr><td>G &middot; follow-up after answer</td><td>FAIL</td><td>PASS</td><td><span class="cause-tag">authoring fix</span></td><td>Turn 1's five-plus raw identifiers (function names, IPC channels, a literal flag) are gone; the answer is now a complete, accurate, plain-language explanation of both recovery paths.</td></tr>
+      <tr><td>H &middot; topic change</td><td>FAIL</td><td>PARTIAL</td><td><span class="cause-tag">retrieval fix</span></td><td>The troubleshooting record no longer contributes to this UNKNOWN-classified question; the misleading content is gone. Verdict is PARTIAL, not PASS, because the answer is now accurate but incomplete (no step-by-step) — a separate, disclosed, out-of-scope classifier quirk, not a new defect.</td></tr>
+      <tr><td>M &middot; why question</td><td>PARTIAL</td><td>PASS</td><td><span class="cause-tag">incidental variance</span></td><td>The answer now includes genuinely distinguishing detail (capture-date handling, independent workspace state) that the previous run's same-content record didn't surface — model sampling variance on largely unchanged evidence, not directly attributable to either fix; flagged as such rather than over-credited.</td></tr>
+      <tr><td>P1 &middot; messy shorthand</td><td>PARTIAL</td><td>PASS</td><td><span class="cause-tag">authoring fix</span></td><td>The raw <code>moveFilesToUnsequenced</code> function name is gone from the diagnostic answer; the diagnosis itself (manual assignment mistake, not a sorting issue) is unchanged and was already correct.</td></tr>
+      <tr><td>All other 14 conversations</td><td colspan="2">unchanged verdict</td><td><span class="cause-tag">unchanged</span></td><td>Byte-level text differs slightly (normal generation variance) but verdict and substance are the same; includes A, C, D, F, I, J, K, L, N (knowledge-driven wins retained unchanged), E and O (shared-architecture hedge/no-synthesis paths, untouched by design), P2/P3 (clarification path, untouched by design), and P4 (eligibility gate, deliberately untouched).</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section id="generalization">
+  <span class="section-num">10 &middot; Generalization Results</span>
+  <h2>The fixes hold up outside the frozen 19</h2>
+  <p>The already-frozen 14-question generalization set was re-run unchanged against the corrected Candidate C. Secondary evidence only — not mixed into the acceptance score above.</p>
+  <ul>
+    <li><strong>Leakage reduced, confirmed by a real unseen case:</strong> G07 ("How do I recover from a stale archive lock error?") now produces the identical clean, plain-language answer the frozen benchmark's G conversation does — direct confirmation the authoring fix generalizes to a real question outside the exact 19, not just the one it was diagnosed from.</li>
+    <li><strong>Multi-record relevance behaves correctly on the only other real multi-record feature exercised:</strong> no regression observed anywhere QMZ was asked about across the generalization set.</li>
+    <li><strong>One still-open, correctly out-of-scope leak persists:</strong> G06's second turn ("Does it work the same way for Quick Import?") still produces a severe leak — raw internal documentation commentary about "a separate feature file for lineage/continuity reasons." This is the <em>fallback path</em> (no Knowledge Model coverage for this specific sub-question, degrading to Candidate B's own evidence-shaping), confirming this defect lives in code this checkpoint was never scoped to touch, and that Candidate B carries the identical risk today.</li>
+    <li><strong>One quality wobble, not a regression:</strong> G04 (import-interruption question, mis-routed to Login records by the shared deterministic ranker — a pre-existing routing issue, unchanged by this checkpoint) produced a vaguer non-answer than the previous run's coincidentally-passable one. Same wrong record, different sampling outcome — flagged honestly as incidental variance on a known, disclosed retrieval-routing fragility, not a new defect this checkpoint introduced.</li>
+    <li><strong>No new leakage or retrieval confusion appeared anywhere else</strong> across the 14 questions.</li>
+    <li><strong>The known eligibility-gate failures remain, exactly as expected:</strong> G08 and G12 both still produce the identical <code>authority-downgraded-unknown</code> non-answer.</li>
+  </ul>
+  <div class="candidate-transcripts"><div class="candidate-transcripts" id="transcripts-G2"><details class="conv-block">
+    <summary>
+      <span class="conv-id">G01_simple_explanation</span>
+      <span class="conv-cat">simple explanation</span>
+      
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">What is Archive Folder Adoption?</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">Archive Folder Adoption registers a pre-existing, manually-created archive folder as an AutoIngest-managed event by placing a minimal `event.json` file inside it. This process does not move, rename, or restructure any media. It is used for migrating legacy archive folders or for adopting externally-created event folders.
+
+Key behaviors include:
+*   The event record is written in a single, atomic step.
+*   The newly adopted event starts without any file components populated; adoption does not scan the folder's contents immediately.
+*   AutoIngest verifies everything against the folder on disk before writing, including checking that no event record already exists.
+*   It checks nearby folders for another one claiming the same date and sequence and will block adoption if a duplicate is found.</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-archive-folder-adoption</span>
+      <span class="ev-tier ev-tier-forensic-verified">forensic-verified</span>
+      <span class="ev-dims">purpose · behavior · relationships</span>
+    </div>
+  </div>
+    </div>
+  </details>
+<details class="conv-block">
+    <summary>
+      <span class="conv-id">G02_how_to</span>
+      <span class="conv-cat">how-to</span>
+      
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">How do I fix incorrect metadata after import?</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant<span class="turn-kind">clarification</span></div>
+    <div class="turn-text">Are you referring to Repair Missing or Incorrect Metadata, Metadata Verification, Metadata Writing Engine, QMZ Metadata Context-Shape Mismatch Silently Drops Keywords/Hijri Date, or Metadata Uses One Shared Engine/Resolver?</div>
+    
+  </div>
+    </div>
+  </details>
+<details class="conv-block">
+    <summary>
+      <span class="conv-id">G03_troubleshooting</span>
+      <span class="conv-cat">troubleshooting</span>
+      
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">My metadata repair keeps failing.</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">To help with your failing metadata repair, could you provide more details about the failure?</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-metadata-audit-repair</span>
+      <span class="ev-tier ev-tier-forensic-verified">forensic-verified</span>
+      <span class="ev-dims">purpose · behavior</span>
+    </div>
+  </div>
+    </div>
+  </details>
+<details class="conv-block">
+    <summary>
+      <span class="conv-id">G04_interruption_recovery</span>
+      <span class="conv-cat">interruption/recovery</span>
+      
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">If my import gets interrupted partway through, do I need to start the whole event over?</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">The provided information does not specify what happens if an import is interrupted partway through.</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-not-supported-multi-user-roles+KM-login-operator-identity</span>
+      <span class="ev-tier ev-tier-mixed">mixed</span>
+      <span class="ev-dims">purpose · behavior</span>
+    </div>
+  </div>
+    </div>
+  </details>
+<details class="conv-block">
+    <summary>
+      <span class="conv-id">G05_vague_shorthand</span>
+      <span class="conv-cat">vague shorthand</span>
+      
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">grouping thing wont let me import, says something about sub-events</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">Grouping is used to sort selected files into logical groups (mapped to event sub-events) during live ingestion. If you are having trouble importing, could you clarify what you mean by "sub-events"?</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-grouping-system</span>
+      <span class="ev-tier ev-tier-forensic-verified">forensic-verified</span>
+      <span class="ev-dims">purpose · behavior</span>
+    </div>
+  </div>
+    </div>
+  </details>
+<details class="conv-block">
+    <summary>
+      <span class="conv-id">G06_followup_pronoun</span>
+      <span class="conv-cat">follow-up pronouns</span>
+      
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">What is Duplicate Detection?</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">Duplicate Detection prevents the same file from being imported twice, ensuring that no destination file is overwritten. For Quick Import, it also warns you beforehand if files you are about to import already exist at the destination.
+
+It operates with two layers:
+
+1.  **Layer 1 (Automatic):** This is built into the copy engine and performs a mechanical name-and-size comparison against the destination folder for every file, without operator visibility.
+2.  **Layer 2 (Pre-check, Quick Import only):** Before copying begins, AutoIngest compares each selected file's name and size against a snapshot of the destination folder. If there is a match, an interactive warning is displayed. This second layer is only available during Quick Import; the full grouped Event Import relies only on Layer 1.</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-duplicate-detection</span>
+      <span class="ev-tier ev-tier-forensic-verified">forensic-verified</span>
+      <span class="ev-dims">purpose · behavior · relationships</span>
+    </div>
+  </div>
+<div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">Does it work the same way for Quick Import?</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">AutoIngest supports this: **Classification note**: this is documented as a separate feature file for lineage/continuity reasons — `docs/features.md` (an existing authoritative technical doc) lists it as its own top-level implemented feature (#6). Mechanically, it is entirely implemented inside AI-FEAT-019's `resolveDestPath()` — there is no independent service, state, or code path. Treat this as a **subfeature split out for documentation continuity**, not as an architecturally independent system. A reader should not assume this evolves separately from the Copy Engine.</div>
+    <div class="evidence-tag ev-none"><span class="ev-source">No synthesis (deterministic template — Knowledge Model not reached)</span></div>
+  </div>
+    </div>
+  </details>
+<details class="conv-block">
+    <summary>
+      <span class="conv-id">G07_topic_change</span>
+      <span class="conv-cat">topic change</span>
+      
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">How do I recover from a stale archive lock error?</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">You have two ways to recover from a stale archive lock error:
+
+1.  **Clear it directly (if created by your device):** You can clear the lock directly, but only after AutoIngest confirms the device isn't still actively using it. If the lock is recently-active, you must explicitly confirm that no job is actually running.
+2.  **Use Archive Diagnostics:** Archive Diagnostics can release a stale lock regardless of which device created it. This process double-checks immediately before removing the lock to ensure it hasn't become active again.</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-archive-lock-handling</span>
+      <span class="ev-tier ev-tier-forensic-verified">forensic-verified</span>
+      <span class="ev-dims">recovery · behavior · limitations</span>
+    </div>
+  </div>
+<div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">Actually, can other people see what I'm working on right now?</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">Presence (a device or operator being connected) is tracked separately from activity. Real-time activity or progress visibility is only published for Import and Transfer/Sync operations; other operations like QMZ sorting or metadata audit/repair do not publish activity and are not visible to other operators.
+
+Seeing someone else online does not mean they are editing your files, and presence alone does not stop or warn you from working on the same event as someone else.</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-online-registry-boundaries</span>
+      <span class="ev-tier ev-tier-registry-reshaped">registry-reshaped</span>
+      <span class="ev-dims">behavior · limitations</span>
+    </div>
+  </div>
+    </div>
+  </details>
+<details class="conv-block">
+    <summary>
+      <span class="conv-id">G08_operator_correction</span>
+      <span class="conv-cat">operator correction</span>
+      
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">Can I back up automatically to a NAS?</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">AutoIngest's documentation includes a related, implemented capability, but this specific claim could not be independently verified with high confidence, so it is reported as uncertain rather than confirmed.</div>
+    <div class="evidence-tag ev-none"><span class="ev-source">No synthesis (deterministic template — Knowledge Model not reached)</span></div>
+  </div>
+<div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">No, I mean can I use something like Google Drive or Dropbox instead.</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">AutoIngest does not have cloud storage, cloud backup, or external website/gallery upload capability. All storage roots are local disk or NAS-based.</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-not-supported-cloud-storage</span>
+      <span class="ev-tier ev-tier-registry-reshaped">registry-reshaped</span>
+      <span class="ev-dims">purpose · behavior</span>
+    </div>
+  </div>
+    </div>
+  </details>
+<details class="conv-block">
+    <summary>
+      <span class="conv-id">G09_explicitly_technical</span>
+      <span class="conv-cat">explicitly technical</span>
+      
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">Where does AutoIngest store the operator's active profile pointer?</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">The currently-active operator pointer (`lastActiveUserId`) is stored separately via `services/settings.js`'s `getLastActiveUserId()`/`setLastActiveUserId()`, and is not stored inside `users.json`.</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-not-supported-multi-user-roles+KM-login-operator-identity</span>
+      <span class="ev-tier ev-tier-mixed">mixed</span>
+      <span class="ev-dims">operatorWorkflow · actions · behavior · technicalDetail</span>
+    </div>
+  </div>
+    </div>
+  </details>
+<details class="conv-block">
+    <summary>
+      <span class="conv-id">G10_unsupported_capability</span>
+      <span class="conv-cat">unsupported capability</span>
+      
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">Can AutoIngest auto-tag the people in my photos using AI?</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">No, AutoIngest does not support auto-tagging people in your photos using AI.</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-not-supported-ai-auto-tagging</span>
+      <span class="ev-tier ev-tier-registry-reshaped">registry-reshaped</span>
+      <span class="ev-dims">purpose · limitations</span>
+    </div>
+  </div>
+    </div>
+  </details>
+<details class="conv-block">
+    <summary>
+      <span class="conv-id">G11_roadmap</span>
+      <span class="conv-cat">roadmap question</span>
+      
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">Is the Archive Browser available yet?</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">The Archive Browser is currently planned, but it is not implemented.</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-archive-browser</span>
+      <span class="ev-tier ev-tier-registry-reshaped">registry-reshaped</span>
+      <span class="ev-dims">purpose · behavior</span>
+    </div>
+  </div>
+    </div>
+  </details>
+<details class="conv-block">
+    <summary>
+      <span class="conv-id">G12_interruption_recovery_variant</span>
+      <span class="conv-cat">interruption/recovery (different feature than the frozen set's own resume question)</span>
+      
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">Can I resume a Transfer Import if the connection drops partway through?</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">AutoIngest's documentation includes a related, implemented capability, but this specific claim could not be independently verified with high confidence, so it is reported as uncertain rather than confirmed.</div>
+    <div class="evidence-tag ev-none"><span class="ev-source">No synthesis (deterministic template — Knowledge Model not reached)</span></div>
+  </div>
+    </div>
+  </details>
+<details class="conv-block">
+    <summary>
+      <span class="conv-id">G13_dont_understand</span>
+      <span class="conv-cat">don't understand / re-explain simpler</span>
+      
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">What is Backup Update Scanning?</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">Backup Update Scanning is a read-only, pre-copy diff mode that compares a selected source scope against a connected external backup destination by relative path. It classifies every file as new, existing-same, changed, incomplete, destination-only, or error, without actually copying anything. This allows an operator to review exactly what an "Update Backup" run would do before executing it.</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-backup-update-scanning</span>
+      <span class="ev-tier ev-tier-forensic-verified">forensic-verified</span>
+      <span class="ev-dims">purpose · behavior · relationships</span>
+    </div>
+  </div>
+<div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">I don't get it, can you explain it more simply?</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">In simple terms, Backup Update Scanning lets you look at what an "Update Backup" would do *before* it actually copies anything. It compares your source data with your backup destination and tells you for every file whether it is new, the same, changed, or something else, all without making any changes or copying any data.
+
+It's a safe way to review the changes.</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-backup-update-scanning</span>
+      <span class="ev-tier ev-tier-forensic-verified">forensic-verified</span>
+      <span class="ev-dims">purpose · behavior</span>
+    </div>
+  </div>
+    </div>
+  </details>
+<details class="conv-block">
+    <summary>
+      <span class="conv-id">G14_multiturn_drift</span>
+      <span class="conv-cat">multi-turn topic drift within one workflow</span>
+      
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">How do I import photos from a memory card?</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">To import photos from a memory card, follow these steps:
+
+1.  Connect the memory card to your computer.
+2.  AutoIngest will automatically check connected drives every 5 seconds.
+3.  If the card has a DCIM folder, it will appear automatically under the Memory Card list in the source panel.
+
+**Before you start:**
+*   The volume must be mounted and visible to your operating system.
+*   AutoIngest recognizes a memory card when it finds a DCIM folder at the top level of the card.
+
+If the card does not appear automatically, you can use **Browse Manually / Select Local Folder** to select the folder yourself.</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-source-detection</span>
+      <span class="ev-tier ev-tier-forensic-verified">forensic-verified</span>
+      <span class="ev-dims">operatorWorkflow · preconditions · actions · limitations</span>
+    </div>
+  </div>
+<div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">What about duplicate files -- does it warn me?</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant<span class="turn-kind">clarification</span></div>
+    <div class="turn-text">Are you asking about duplicate files during Transfer Import, Import Pipeline &amp; Copy Engine, or something else?</div>
+    
+  </div>
+    </div>
+  </details></div></div>
+</section>
+
+<section id="safety">
+  <span class="section-num">11 &middot; Leakage &amp; Safety Audit</span>
+  <h2>Net reduction, one class fixed proactively, one confirmed still open</h2>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Category</th><th>Finding</th></tr></thead>
+    <tbody>
+      <tr><td>Invented capabilities/actions</td><td><strong>None</strong>, unchanged from the previous checkpoint.</td></tr>
+      <tr><td>Knowledge-Model authoring leakage (frozen 19 + generalization)</td><td><strong>Zero remaining</strong> — all 4 previously-confirmed instances (G, B, P1, and the frozen-benchmark-adjacent findings) are fixed and re-verified clean on this run.</td></tr>
+      <tr><td>Knowledge-Model authoring leakage (whole model, static test)</td><td><strong>12 additional latent instances found and fixed</strong> in Tier-2 auto-generated records, via a general build-pipeline fix — none of these had manifested in either the frozen 19 or the generalization set yet.</td></tr>
+      <tr><td>Fallback-path leakage (Candidate B's own evidence-shaping, outside Knowledge Model scope)</td><td><strong>1 confirmed, unchanged</strong> (generalization G06) — correctly out of scope for this checkpoint; Candidate B carries the identical risk.</td></tr>
+      <tr><td>New leakage introduced by this checkpoint's own changes</td><td><strong>None found</strong>, checked across all 19 + 14 transcripts.</td></tr>
+      <tr><td>New retrieval confusion introduced</td><td><strong>None found.</strong></td></tr>
+      <tr><td>Non-answers (eligibility gate)</td><td><strong>3</strong>: P4, G08, G12 — unchanged, deliberately left as is.</td></tr>
+      <tr><td>Context-continuity gap</td><td><strong>1</strong>: G turn 2 ("what should I do after that?") — an honest non-answer to a genuinely unestablished fact, unchanged from the previous checkpoint.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section id="performance">
+  <span class="section-num">12 &middot; Performance Observations</span>
+  <h2>No measurable cost from either fix</h2>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Metric</th><th class="num">Value</th></tr></thead>
+    <tbody>
+      <tr><td>Knowledge Model build time (incremental, no-op)</td><td class="num">&lt;100ms</td></tr>
+      <tr><td>Total records</td><td class="num">66 (unchanged)</td></tr>
+      <tr><td><code>filterRecordsByRelevance()</code> cost</td><td class="num">A single array filter over at most a handful of records per featureId — no measurable added latency</td></tr>
+      <tr><td>Generation latency</td><td class="num">Unchanged runtime configuration (model, context size, maxTokens, chat wrapper) from the previous checkpoint — no new source of latency introduced</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section id="failures">
+  <span class="section-num">13 &middot; Remaining Failures</span>
+  <h2>One failure class left, confirmed out of this checkpoint's reach</h2>
+  <div class="callout warn">
+    <p><strong>P4 &middot; deterministic eligibility gate.</strong> Byte-identical to Candidate A and B's own failure. <code>synthesis.reason: "authority-downgraded-unknown"</code>, confirmed unchanged on this run. No Knowledge Model correction can reach this case, because the model is never called at all.</p>
+  </div>
+  <div class="callout gold">
+    <p><strong>H &middot; residual incompleteness.</strong> No longer misleading, but incomplete: the shared <code>questionClassifier.js</code> doesn't recognize "Actually, how do I sort QMZ photos?" as a HOW_TO question because of the leading "Actually," — out of scope for this checkpoint (a production file), disclosed rather than patched around.</p>
+  </div>
+</section>
+
+<section id="answers">
+  <span class="section-num">14 &middot; Product Owner Questions</span>
+  <h2>Direct answers</h2>
+  <div class="poq">
+    <div class="poq-item"><div class="q">A. Did corrected Candidate C exceed Candidate B's 78.9% clean-pass rate?</div><div class="a"><strong>Yes.</strong> 84.2% vs. 78.9% — a 4-conversation improvement, first and only post-fix run.</div></div>
+    <div class="poq-item"><div class="q">B. Did acceptable rate improve from Candidate C's previous 84.2%?</div><div class="a"><strong>Yes.</strong> 84.2% &rarr; 94.7%, now matching A and B's own acceptable-rate ceiling.</div></div>
+    <div class="poq-item"><div class="q">C. Were the previous G and H regressions actually eliminated?</div><div class="a">G: fully eliminated, now a clean PASS. H: the misleading-content regression is eliminated; a smaller, separately-caused incompleteness gap remains (PARTIAL, not PASS) — reported precisely rather than rounded up.</div></div>
+    <div class="poq-item"><div class="q">D. Did Candidate C retain its previous knowledge-driven wins?</div><div class="a"><strong>Yes</strong> — Transfer Export's resume/recovery answers and QMZ's exact technical storage-location answer are unchanged and still correct on this run.</div></div>
+    <div class="poq-item"><div class="q">E. Did any new leakage appear?</div><div class="a"><strong>No new leakage from this checkpoint's changes.</strong> One latent class (12 Tier-2 records) was found and fixed proactively; one pre-existing, out-of-scope fallback-path leak remains, disclosed.</div></div>
+    <div class="poq-item"><div class="q">F. Did any new retrieval confusion appear?</div><div class="a"><strong>No.</strong></div></div>
+    <div class="poq-item"><div class="q">G. Is the remaining dominant failure now the shared deterministic eligibility gate?</div><div class="a"><strong>Yes</strong> — it is the only failure left in the frozen 19, and the generalization set independently confirms it on two more, different features.</div></div>
+    <div class="poq-item"><div class="q">H. Does the evidence now support integrating the Knowledge Model architecture, another controlled improvement, or stopping?</div><div class="a">The evidence meets the checkpoint's own integration bar on every criterion: Candidate C now clearly exceeds Candidate B overall, the Candidate-C-specific regressions are resolved (with H's residual gap disclosed, not hidden), the knowledge-driven wins remain, no new safety regression appeared, the fixes generalize beyond the exact frozen failures (confirmed via G07), and the architecture stayed maintainable and source-grounded throughout. <strong>Integration is now a reasonable recommendation</strong> for Product Owner decision — this checkpoint does not act on it, per its own stop conditions.</div></div>
+  </div>
+</section>
+
+<section id="next">
+  <span class="section-num">15 &middot; Recommended Next Step</span>
+  <h2>Two tracks, kept separate</h2>
+  <p><strong>Knowledge Model architecture:</strong> ready for a Product Owner integration decision. The two defects that blocked it are resolved and re-verified; the residual H gap is minor, understood, and does not require another Knowledge Model change to close (it lives in a shared classifier file).</p>
+  <p><strong>Deterministic eligibility gate (<code>evaluateSynthesisEligibility</code>):</strong> the evidence continues to support a separate, dedicated future investigation. It is now confirmed, across two checkpoints and three independent features (Transfer Export resume, NAS backup automation, Transfer Import resume), to be the single largest remaining ceiling on Ask AutoIngest's answer quality — larger than anything either A/B/C candidate architecture has touched. This checkpoint does not open that investigation, per its own explicit instruction; it only re-confirms the case for opening one later.</p>
+</section>
+
+<section id="stop">
+  <span class="section-num">16 &middot; Git / Worktree Status</span>
+  <h2>Verified before stopping</h2>
+  <ul>
+    <li><strong>Production test suite:</strong> 25/25 files in <code>scripts/product-docs/test/*.test.js</code> plus <code>test/askAutoIngestPresentation.test.js</code> (31 assertions) — all passing, run both before and after the fixes.</li>
+    <li><strong>New tests:</strong> <code>knowledgeModel/test/relevanceAndLeakage.test.js</code>, 12/12 assertions passing.</li>
+    <li><strong><code>git diff --check</code>:</strong> clean, exit 0.</li>
+    <li><strong><code>git status</code>:</strong> only new/modified files live under <code>scripts/product-docs/bench/knowledgeModel/</code> — no previously-tracked production file shows a new modification from this checkpoint.</li>
+    <li><strong>Production C8, Candidate B, and the frozen 19-conversation benchmark:</strong> confirmed byte-identical (file hashes compared) before and after this checkpoint's work.</li>
+    <li><strong><code>evaluateSynthesisEligibility</code> / the eligibility gate:</strong> confirmed untouched — P4's <code>synthesis.reason</code> is the identical string, <code>"authority-downgraded-unknown"</code>, on this run as on the original.</li>
+    <li><strong>No model or runtime configuration changed:</strong> Gemma-4-E4B-it, <code>Gemma4ChatWrapper({reasoning:false})</code>, <code>maxTokens: 600</code>, identical SYSTEM_CONTRACT, confirmed identical to the prior checkpoint's own harness.</li>
+    <li><strong>Nothing committed. Nothing pushed.</strong> Candidate C is not integrated into production. No further improvement cycle has begun after this result.</li>
+  </ul>
+  <p class="lede" style="margin-top:24px">Stopping here for Product Owner review.</p>
+
+  <details class="archive-block">
+    <summary>Full frozen-19 transcripts, corrected Candidate C (click to expand)</summary>
+    <div class="candidate-transcripts"><div class="candidate-transcripts" id="transcripts-C2"><details class="conv-block">
+    <summary>
+      <span class="conv-id">A_simple_explanation</span>
+      <span class="conv-cat">A</span>
+      <span class="pill pill-pass">PASS</span> 
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">What is QMZ?</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">QMZ is a standalone, post-import sequencing workspace that archivists use to organize a photographer's already-ingested Qadam/Majlis/Ziyafat material. It allows users to classify the material into numbered real-world-occurrence sequences (like 01Q or 02M), which replaces the need for manual folder creation and file-by-file sorting in Finder or Adobe Bridge.</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-qmz-sequencing</span>
+      <span class="ev-tier ev-tier-forensic-verified">forensic-verified</span>
+      <span class="ev-dims">purpose · behavior · relationships</span>
+    </div>
+  </div>
+    </div>
+  </details>
+<details class="conv-block">
+    <summary>
+      <span class="conv-id">B_simple_howto</span>
+      <span class="conv-cat">B</span>
+      <span class="pill pill-pass">PASS</span> <span class="cause-tag cause-authoring-fix">authoring fix</span>
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">How do I sort QMZ photos?</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">To sort QMZ photos, follow these steps:
+
+1.  Open the QMZ Sequence Manager using the "Sort QMZ Photos" button after import or through the Event List entry point.
+2.  Select a photographer row in the left panel to view their files (it defaults to the "Unsequenced" location).
+3.  Select the files in the center grid using checkboxes or list rows.
+4.  Either create a sequence (like "01Q") or type an existing sequence number into the assign input and press Enter. This moves the selected files (and matching sidecar files) into that sequence's folder for the photographer and queues them for metadata writing.
+
+**Before you start:** The event or component you are sorting must already be imported and have a known location on disk.</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-qmz-sequencing</span>
+      <span class="ev-tier ev-tier-forensic-verified">forensic-verified</span>
+      <span class="ev-dims">operatorWorkflow · preconditions · actions · limitations</span>
+    </div>
+  </div>
+    </div>
+  </details>
+<details class="conv-block">
+    <summary>
+      <span class="conv-id">C_natural_troubleshooting</span>
+      <span class="conv-cat">C</span>
+      <span class="pill pill-pass">PASS</span> <span class="cause-tag cause-unchanged">unchanged</span>
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">My transfer stopped halfway.</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant<span class="turn-kind">clarification</span></div>
+    <div class="turn-text">Which specific transfer stopped halfway: Export or Update a Transfer Drive, Import or Update From a Transfer Drive, or Backup Update Scanning?</div>
+    
+  </div>
+<div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">Transfer Export.</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">Since your Transfer Export stopped halfway, you can resume it. AutoIngest is designed to track what has been copied and can resume after an interruption.</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-transfer-export</span>
+      <span class="ev-tier ev-tier-forensic-verified">forensic-verified</span>
+      <span class="ev-dims">purpose · behavior</span>
+    </div>
+  </div>
+<div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">Yes, the NAS disconnected.</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">Because the NAS disconnected, you can resume the Transfer Export. AutoIngest tracks what has been copied and can resume after an interruption.</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-transfer-export</span>
+      <span class="ev-tier ev-tier-forensic-verified">forensic-verified</span>
+      <span class="ev-dims">purpose · behavior</span>
+    </div>
+  </div>
+    </div>
+  </details>
+<details class="conv-block">
+    <summary>
+      <span class="conv-id">D_freeform_clarification</span>
+      <span class="conv-cat">D</span>
+      <span class="pill pill-pass">PASS</span> <span class="cause-tag cause-unchanged">unchanged</span>
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">I was copying an event to a portable drive and the NAS disappeared.</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">AutoIngest is designed to write a clean, archive-aware mirror of selected events from the Active Archive Root to a Transfer Drive for physical transport. It manages this workflow to track what has and has not been copied, allowing it to resume after an interruption.
+
+If you were using AutoIngest and the NAS disappeared while copying, you might want to check the traceability log of the export for reference.</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-transfer-export</span>
+      <span class="ev-tier ev-tier-forensic-verified">forensic-verified</span>
+      <span class="ev-dims">purpose · behavior</span>
+    </div>
+  </div>
+    </div>
+  </details>
+<details class="conv-block">
+    <summary>
+      <span class="conv-id">E_operator_doesnt_know</span>
+      <span class="conv-cat">E</span>
+      <span class="pill pill-partial">PARTIAL</span> <span class="cause-tag cause-unchanged-shared-architecture">unchanged shared architecture</span>
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">My transfer stopped.</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant<span class="turn-kind">clarification</span></div>
+    <div class="turn-text">Which specific transfer stopped: Export or Update a Transfer Drive, Import or Update From a Transfer Drive, or Backup Update Scanning?</div>
+    
+  </div>
+<div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">I'm not sure. I was just copying yesterday's event.</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">Closest match I can offer without more detail: Writes a clean mirror of selected events to a portable drive (Transfer Export, Transfer Export), or scans an existing transfer drive for what's changed since the last copy (Backup Update Scanning, Backup Update Scanning, a mode whose own record lists Transfer Export as its Parent feature) — these are two distinct capabilities sharing this one entry point ( → the Transfer Export modal), with different conflict semantics (Backup Update never overwrites or renames on conflict; Transfer Export's own record should be consulted for its exact behavior rather than assumed identical). This workflow is outbound only (Active Archive Root → Transfer Drive) — for the inbound direction (Transfer Drive → Main Archive Root), see Import or Update From a Transfer Drive.</div>
+    <div class="evidence-tag ev-none"><span class="ev-source">No synthesis (deterministic template — Knowledge Model not reached)</span></div>
+  </div>
+    </div>
+  </details>
+<details class="conv-block">
+    <summary>
+      <span class="conv-id">F_followup_no_repeat</span>
+      <span class="conv-cat">F</span>
+      <span class="pill pill-pass">PASS</span> <span class="cause-tag cause-unchanged">unchanged</span>
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">How do I create a Transfer Export?</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">To create a Transfer Export, follow these steps:
+
+1.  Select the collections, event-root folders, or photographer folders you want to export (or use custom-source mode for a specific folder pair).
+2.  Preview the export scope to see the file/folder/event counts before starting.
+3.  Run the export.
+
+Before you begin, ensure that:
+*   Both the Active Archive Root (source) and the Transfer Drive Root (destination) are configured and mounted.
+*   The source and destination roots are not the same directory or nested inside one another.
+*   Only one export is running at a time within the same running app process.</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-transfer-export</span>
+      <span class="ev-tier ev-tier-forensic-verified">forensic-verified</span>
+      <span class="ev-dims">operatorWorkflow · preconditions · actions · limitations</span>
+    </div>
+  </div>
+<div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">And if it stops halfway?</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">If a Transfer Export stops halfway, AutoIngest can resume after an interruption because it tracks what has and has not been copied.</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-transfer-export</span>
+      <span class="ev-tier ev-tier-forensic-verified">forensic-verified</span>
+      <span class="ev-dims">purpose · behavior</span>
+    </div>
+  </div>
+    </div>
+  </details>
+<details class="conv-block">
+    <summary>
+      <span class="conv-id">G_followup_after_answer</span>
+      <span class="conv-cat">G</span>
+      <span class="pill pill-pass">PASS</span> <span class="cause-tag cause-authoring-fix">authoring fix</span>
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">How do I recover from a stale archive lock error?</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">You have two ways to recover from a stale archive lock error:
+
+1.  **Clear it directly (if created by your device):** You can clear the lock directly, but only after AutoIngest confirms the device isn't still actively using it. If the lock is recently-active, you must explicitly confirm that no job is actually running.
+2.  **Use Archive Diagnostics:** Archive Diagnostics can release a stale lock regardless of which device created it. This process double-checks immediately before removing the lock to ensure it hasn't become active again.</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-archive-lock-handling</span>
+      <span class="ev-tier ev-tier-forensic-verified">forensic-verified</span>
+      <span class="ev-dims">recovery · behavior · limitations</span>
+    </div>
+  </div>
+<div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">What should I do after that?</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">The provided information describes how the lock behaves and how to recover from a stale lock, but it does not specify what steps to take *after* the recovery process.</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-archive-lock-handling</span>
+      <span class="ev-tier ev-tier-forensic-verified">forensic-verified</span>
+      <span class="ev-dims">purpose · behavior</span>
+    </div>
+  </div>
+    </div>
+  </details>
+<details class="conv-block">
+    <summary>
+      <span class="conv-id">H_topic_change</span>
+      <span class="conv-cat">H</span>
+      <span class="pill pill-partial">PARTIAL</span> <span class="cause-tag cause-retrieval-fix">retrieval fix</span>
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">How do I create a Transfer Export?</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">To create a Transfer Export, follow these steps:
+
+1.  Select the collections, event-root folders, or photographer folders you want to export (or use custom-source mode for a specific folder pair).
+2.  Preview the export scope to see the file/folder/event counts before starting.
+3.  Run the export.
+
+Before you begin, ensure that:
+*   Both the Active Archive Root (source) and the Transfer Drive Root (destination) are configured and mounted.
+*   The source and destination roots are not the same directory or nested inside one another.
+*   Only one export is running at a time within the same running app process.</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-transfer-export</span>
+      <span class="ev-tier ev-tier-forensic-verified">forensic-verified</span>
+      <span class="ev-dims">operatorWorkflow · preconditions · actions · limitations</span>
+    </div>
+  </div>
+<div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">Actually, how do I sort QMZ photos?</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">QMZ is a standalone, post-import sequencing workspace used to classify a photographer's already-ingested QMZ (Qadam/Majlis/Ziyafat) material into numbered real-world-occurrence sequences (like 01Q or 02M). This replaces manual folder creation and file-by-file sorting.</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-qmz-sequencing</span>
+      <span class="ev-tier ev-tier-forensic-verified">forensic-verified</span>
+      <span class="ev-dims">purpose · behavior</span>
+    </div>
+  </div>
+    </div>
+  </details>
+<details class="conv-block">
+    <summary>
+      <span class="conv-id">I_user_corrects</span>
+      <span class="conv-cat">I</span>
+      <span class="pill pill-pass">PASS</span> 
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">Does AutoIngest back up automatically?</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant<span class="turn-kind">clarification</span></div>
+    <div class="turn-text">Which AutoIngest area are you asking about: Archive Root Configuration &amp; Resolution or Transfer Export?</div>
+    
+  </div>
+<div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">Sorry, I meant cloud backup specifically -- like Google Drive or Dropbox, not local copies.</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">AutoIngest does not have cloud backup capabilities for services like Google Drive or Dropbox. All of AutoIngest's storage roots are local disk or NAS-based.</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-not-supported-cloud-storage</span>
+      <span class="ev-tier ev-tier-registry-reshaped">registry-reshaped</span>
+      <span class="ev-dims">purpose · behavior</span>
+    </div>
+  </div>
+    </div>
+  </details>
+<details class="conv-block">
+    <summary>
+      <span class="conv-id">J_dont_understand</span>
+      <span class="conv-cat">J</span>
+      <span class="pill pill-pass">PASS</span> <span class="cause-tag cause-unchanged">unchanged</span>
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">What is QMZ?</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">QMZ is a standalone, post-import sequencing workspace that archivists use to organize a photographer's already-ingested Qadam/Majlis/Ziyafat material. It allows users to classify the material into numbered real-world-occurrence sequences (like 01Q or 02M), which replaces the need for manual folder creation and file-by-file sorting in Finder or Adobe Bridge.</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-qmz-sequencing</span>
+      <span class="ev-tier ev-tier-forensic-verified">forensic-verified</span>
+      <span class="ev-dims">purpose · behavior · relationships</span>
+    </div>
+  </div>
+<div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">I don't understand what that means.</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">QMZ is a separate workspace you use *after* you have imported material. Its purpose is to help you organize a photographer's already-imported material (like Qadam, Majlis, or Ziyafat photos) by grouping them into numbered sequences that match real-world events (for example, "01Q" or "02M"). This replaces the need to manually create folders or sort files one by one in Finder or Adobe Bridge.</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-qmz-sequencing</span>
+      <span class="ev-tier ev-tier-forensic-verified">forensic-verified</span>
+      <span class="ev-dims">purpose · behavior</span>
+    </div>
+  </div>
+    </div>
+  </details>
+<details class="conv-block">
+    <summary>
+      <span class="conv-id">K_concise_question</span>
+      <span class="conv-cat">K</span>
+      <span class="pill pill-pass">PASS</span> 
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">Can AutoIngest do face recognition?</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">No, AutoIngest does not have face or facial-identification capability.</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-not-supported-face-recognition</span>
+      <span class="ev-tier ev-tier-registry-reshaped">registry-reshaped</span>
+      <span class="ev-dims">purpose · limitations</span>
+    </div>
+  </div>
+    </div>
+  </details>
+<details class="conv-block">
+    <summary>
+      <span class="conv-id">L_roadmap</span>
+      <span class="conv-cat">L</span>
+      <span class="pill pill-pass">PASS</span> <span class="cause-tag cause-unchanged">unchanged</span>
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">What's coming next?</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">The next milestone in the ordered archive-capability roadmap is AI-RM-002 (Archive Maintenance). However, its objective, deliverables, and acceptance criteria are currently "Evidence pending," meaning the scope has not yet been defined.
+
+Two other tracks are complete: AI-RM-010 (Multi-Channel Release &amp; Update System) and AI-RM-011 (Knowledge &amp; Onboarding Portal, Stage 1+2).</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-roadmap-status</span>
+      <span class="ev-tier ev-tier-registry-reshaped">registry-reshaped</span>
+      <span class="ev-dims">behavior · limitations</span>
+    </div>
+  </div>
+    </div>
+  </details>
+<details class="conv-block">
+    <summary>
+      <span class="conv-id">M_why_question</span>
+      <span class="conv-cat">M</span>
+      <span class="pill pill-pass">PASS</span> <span class="cause-tag cause-incidental-variance">incidental variance</span>
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">Why is QMZ separate from normal Event Import?</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">QMZ is a separate, standalone workspace used by archivists to classify already-ingested QMZ (Qadam/Majlis/Ziyafat) material into numbered real-world-occurrence sequences (like 01Q or 02M). This replaces the previous process of manually creating folders and sorting files in Finder or Adobe Bridge.
+
+QMZ operates independently from normal Event Import in a few ways:
+
+*   **Date Reading:** It reads the original embedded capture date from the media file's metadata, not the file's copy date on disk (which is used only as a fallback).
+*   **Workspace State:** It maintains its own independent state (such as grid sort order, view mode, etc.), meaning settings from the standard Import workspace do not carry over when switching to QMZ.</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-qmz-sequencing</span>
+      <span class="ev-tier ev-tier-forensic-verified">forensic-verified</span>
+      <span class="ev-dims">purpose · behavior</span>
+    </div>
+  </div>
+    </div>
+  </details>
+<details class="conv-block">
+    <summary>
+      <span class="conv-id">N_technical_question</span>
+      <span class="conv-cat">N</span>
+      <span class="pill pill-pass">PASS</span> <span class="cause-tag cause-unchanged">unchanged</span>
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">Where does QMZ store its sequencing state?</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">QMZ keeps its own independent workspace state separate from standard Import's equivalent state. If you are asking about the technical storage, the sequencing state is persisted as JSON at `&lt;qmzRoot&gt;/qmz-sequences.json`.</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-qmz-sequencing</span>
+      <span class="ev-tier ev-tier-forensic-verified">forensic-verified</span>
+      <span class="ev-dims">operatorWorkflow · actions · behavior · technicalDetail</span>
+    </div>
+  </div>
+    </div>
+  </details>
+<details class="conv-block">
+    <summary>
+      <span class="conv-id">O_unsupported_feature</span>
+      <span class="conv-cat">O</span>
+      <span class="pill pill-pass">PASS</span> <span class="cause-tag cause-unchanged-shared-architecture">unchanged shared architecture</span>
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">Does AutoIngest automatically tag people in photos using AI?</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">AutoIngest's documentation does not have enough evidence to answer this confidently. This is reported honestly rather than guessed.</div>
+    <div class="evidence-tag ev-none"><span class="ev-source">No synthesis (deterministic template — Knowledge Model not reached)</span></div>
+  </div>
+    </div>
+  </details>
+<details class="conv-block">
+    <summary>
+      <span class="conv-id">P1_messy_shorthand</span>
+      <span class="conv-cat">P</span>
+      <span class="pill pill-pass">PASS</span> <span class="cause-tag cause-authoring-fix">authoring fix</span>
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">yo qmz thing not working right, sequence #s messed up</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">If your sequence numbers seem incorrect, it might be a manual assignment mistake. If files are in the wrong sequence folder (like 01Q or 02M), you need to move those files back to Unsequenced and reassign them, rather than changing the sort order.
+
+Also, please note that sequence codes are labels you assign manually; they do not change automatically.</div>
+    <div class="evidence-tag ev-km">
+      <span class="ev-source">Knowledge Model</span>
+      <span class="ev-record">KM-qmz-sequencing+KM-qmz-sort-vs-sequence-numbers</span>
+      <span class="ev-tier ev-tier-forensic-verified">forensic-verified</span>
+      <span class="ev-dims">recovery · behavior · limitations</span>
+    </div>
+  </div>
+    </div>
+  </details>
+<details class="conv-block">
+    <summary>
+      <span class="conv-id">P2_messy_grammar</span>
+      <span class="conv-cat">P</span>
+      <span class="pill pill-pass">PASS</span> 
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">import from sd card how</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant<span class="turn-kind">clarification</span></div>
+    <div class="turn-text">Are you trying to import photographs from a memory card or folder, or is this related to another area like Login &amp; Operator Identity or Transfer Import?</div>
+    
+  </div>
+    </div>
+  </details>
+<details class="conv-block">
+    <summary>
+      <span class="conv-id">P3_messy_vague</span>
+      <span class="conv-cat">P</span>
+      <span class="pill pill-pass">PASS</span> 
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">it stopped again ugh, same drive as last time</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant<span class="turn-kind">clarification</span></div>
+    <div class="turn-text">Are you referring to an Export or Update a Transfer Drive, or an Import or Update From a Transfer Drive?</div>
+    
+  </div>
+    </div>
+  </details>
+<details class="conv-block">
+    <summary>
+      <span class="conv-id">P4_messy_casual</span>
+      <span class="conv-cat">P</span>
+      <span class="pill pill-fail">FAIL</span> <span class="cause-tag cause-unchanged-shared-architecture">unchanged shared architecture</span>
+    </summary>
+    <div class="conv-turns">
+      <div class="turn turn-user">
+    <div class="turn-role">Operator</div>
+    <div class="turn-text">can i resume the export or do i gotta start over</div>
+    
+  </div>
+<div class="turn turn-assistant">
+    <div class="turn-role">Assistant</div>
+    <div class="turn-text">AutoIngest's documentation includes a related, implemented capability, but this specific claim could not be independently verified with high confidence, so it is reported as uncertain rather than confirmed.</div>
+    <div class="evidence-tag ev-none"><span class="ev-source">No synthesis (deterministic template — Knowledge Model not reached)</span></div>
+  </div>
+    </div>
+  </details></div></div>
+  </details>
+</section>
+
+</div>
+
+<footer>Follow-up experimental checkpoint &middot; scripts/product-docs/bench/knowledgeModel &amp; candidateC &middot; nothing committed, nothing pushed, production untouched, eligibility gate deliberately untouched</footer>

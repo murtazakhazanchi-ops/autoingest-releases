@@ -1,0 +1,544 @@
+<title>Knowledge Model Integration Plan</title>
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --paper: #f1f3f0; --paper-raised: #fbfcfa; --ink: #1b2320; --ink-soft: #4b564f; --ink-faint: #7c887f;
+    --line: #d3d9d0; --line-soft: #e3e7e0; --accent: #0f6e6a; --accent-soft: #d8ece9; --accent-ink: #06403d;
+    --gold: #a8791f; --gold-soft: #f3e6c9; --slate: #55637a; --slate-soft: #e2e7ef;
+    --pass: #2f7d4f; --pass-soft: #dcefe1; --partial: #a8791f; --partial-soft: #f3e6c9;
+    --fail: #ab3b3b; --fail-soft: #f7dfdf; --code-bg: #e9ede6;
+    --shadow: 0 1px 2px rgba(20, 30, 25, 0.06), 0 8px 24px rgba(20, 30, 25, 0.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #12181a; --paper-raised: #182220; --ink: #e8ece7; --ink-soft: #b7c2b9; --ink-faint: #7f8c81;
+      --line: #2b3733; --line-soft: #212b27; --accent: #3fb3aa; --accent-soft: #16302d; --accent-ink: #a9e6df;
+      --gold: #d9ac54; --gold-soft: #332a15; --slate: #9aa8c2; --slate-soft: #1f2734;
+      --pass: #5ec98a; --pass-soft: #163127; --partial: #d9ac54; --partial-soft: #332a15;
+      --fail: #e0807f; --fail-soft: #391f1f; --code-bg: #1a2321; --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #12181a; --paper-raised: #182220; --ink: #e8ece7; --ink-soft: #b7c2b9; --ink-faint: #7f8c81;
+    --line: #2b3733; --line-soft: #212b27; --accent: #3fb3aa; --accent-soft: #16302d; --accent-ink: #a9e6df;
+    --gold: #d9ac54; --gold-soft: #332a15; --slate: #9aa8c2; --slate-soft: #1f2734;
+    --pass: #5ec98a; --pass-soft: #163127; --partial: #d9ac54; --partial-soft: #332a15;
+    --fail: #e0807f; --fail-soft: #391f1f; --code-bg: #1a2321; --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 16px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  h1, h2, h3, h4 { font-family: 'Fraunces', Georgia, serif; text-wrap: balance; font-weight: 600; color: var(--ink); margin: 0 0 0.5em; }
+  a { color: var(--accent-ink); }
+  code, .mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 24px 120px; }
+
+  .masthead { padding: 72px 24px 48px; border-bottom: 1px solid var(--line); background: linear-gradient(180deg, var(--paper-raised), var(--paper)); }
+  .masthead-inner { max-width: 1040px; margin: 0 auto; }
+  .eyebrow { font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--accent-ink); background: var(--accent-soft); display: inline-block; padding: 5px 12px; border-radius: 3px; margin-bottom: 18px; }
+  .masthead h1 { font-size: clamp(2rem, 1.5rem + 2vw, 3rem); line-height: 1.08; max-width: 20ch; }
+  .masthead .dek { font-size: 1.15rem; color: var(--ink-soft); max-width: 68ch; margin-top: 14px; }
+  .meta-row { display: flex; gap: 28px; flex-wrap: wrap; margin-top: 28px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--ink-faint); }
+  .meta-row strong { color: var(--ink-soft); font-weight: 500; }
+  .go-badge { display: inline-flex; align-items: center; gap: 10px; margin-top: 24px; padding: 10px 18px; border-radius: 8px; background: var(--pass-soft); border: 1px solid var(--pass); font-family: 'IBM Plex Mono', monospace; font-weight: 600; color: var(--pass); font-size: 14px; }
+
+  nav.toc { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 20px; margin-top: 36px; padding-top: 28px; border-top: 1px solid var(--line-soft); }
+  nav.toc a { color: var(--ink-soft); text-decoration: none; font-size: 13px; padding: 3px 0; border-bottom: 1px dotted transparent; }
+  nav.toc a:hover { color: var(--accent-ink); border-color: var(--accent); }
+  nav.toc .n { font-family: 'IBM Plex Mono', monospace; color: var(--ink-faint); margin-right: 6px; }
+
+  section { padding: 52px 0; border-bottom: 1px solid var(--line-soft); }
+  section:last-child { border-bottom: none; }
+  .section-num { font-family: 'IBM Plex Mono', monospace; color: var(--accent); font-size: 13px; letter-spacing: 0.06em; margin-bottom: 8px; display: block; }
+  section h2 { font-size: 1.6rem; margin-bottom: 18px; }
+  section h3 { font-size: 1.1rem; margin-top: 28px; }
+  p { max-width: 76ch; color: var(--ink-soft); }
+  p.lede { font-size: 1.06rem; color: var(--ink); }
+  ul, ol { max-width: 76ch; color: var(--ink-soft); padding-left: 1.3em; }
+  li { margin-bottom: 6px; }
+  strong { color: var(--ink); font-weight: 600; }
+
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+  .table-scroll { overflow-x: auto; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  th { font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-faint); font-weight: 500; }
+  tr:last-child td { border-bottom: none; }
+  td.num, th.num { font-variant-numeric: tabular-nums; text-align: right; }
+
+  .callout { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 16px 20px; border-radius: 0 8px 8px 0; margin: 20px 0; max-width: 76ch; }
+  .callout p { color: var(--ink); max-width: none; }
+  .callout.warn { border-color: var(--fail); background: var(--fail-soft); }
+  .callout.gold { border-color: var(--gold); background: var(--gold-soft); }
+  .callout.win { border-color: var(--pass); background: var(--pass-soft); }
+
+  .pill { font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; letter-spacing: 0.03em; padding: 2px 9px; border-radius: 20px; text-transform: uppercase; }
+  .pill-promote { background: var(--pass-soft); color: var(--pass); }
+  .pill-preserve { background: var(--gold-soft); color: var(--gold); }
+  .pill-discard { background: var(--fail-soft); color: var(--fail); }
+  .pill-inscope { background: var(--accent-soft); color: var(--accent-ink); }
+  .pill-outscope { background: var(--slate-soft); color: var(--slate); }
+
+  .flow-stage { display: grid; grid-template-columns: 160px 1fr; gap: 4px 20px; padding: 14px 0; border-bottom: 1px dashed var(--line); }
+  .flow-stage:last-child { border-bottom: none; }
+  .flow-stage .stage-name { font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; font-weight: 600; color: var(--accent-ink); text-transform: uppercase; letter-spacing: .03em; }
+  .flow-stage .stage-detail dl { margin: 0; display: grid; grid-template-columns: 140px 1fr; gap: 4px 12px; font-size: 13.5px; }
+  .flow-stage .stage-detail dt { font-family: 'IBM Plex Mono', monospace; color: var(--ink-faint); font-size: 11px; text-transform: uppercase; }
+  .flow-stage .stage-detail dd { margin: 0; color: var(--ink-soft); }
+  .flow-block { background: var(--paper-raised); border: 1px solid var(--line); border-radius: 10px; padding: 8px 20px; box-shadow: var(--shadow); margin: 20px 0; }
+  .flow-arrow { text-align: center; color: var(--ink-faint); font-family: 'IBM Plex Mono', monospace; font-size: 18px; margin: -6px 0; }
+
+  .file-card { background: var(--paper-raised); border: 1px solid var(--line); border-radius: 8px; padding: 14px 18px; margin: 10px 0; box-shadow: var(--shadow); }
+  .file-card .file-path { font-family: 'IBM Plex Mono', monospace; font-size: 13.5px; color: var(--ink); font-weight: 600; }
+  .file-card .file-note { font-size: 13.5px; color: var(--ink-soft); margin-top: 4px; }
+
+  .commit-card { background: var(--paper-raised); border: 1px solid var(--line); border-radius: 10px; padding: 18px 22px; margin: 14px 0; box-shadow: var(--shadow); }
+  .commit-card .commit-n { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .05em; }
+  .commit-card pre { font-family: 'IBM Plex Mono', monospace; font-size: 13px; background: var(--code-bg); padding: 12px 14px; border-radius: 6px; overflow-x: auto; margin: 10px 0 0; white-space: pre-wrap; }
+
+  footer { padding: 40px 24px; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--ink-faint); }
+  @media (max-width: 720px) { nav.toc { grid-template-columns: 1fr 1fr; } .flow-stage { grid-template-columns: 1fr; } }
+</style>
+
+<div class="masthead">
+  <div class="masthead-inner">
+    <span class="eyebrow">Ask AutoIngest &middot; Integration-Readiness Checkpoint</span>
+    <h1>Wiring the Knowledge Model Into Production</h1>
+    <p class="dek">A concrete plan for moving the accepted Knowledge Model architecture from experiment to production — what promotes, what stays evidence, where it plugs into the real request pipeline, and what still can't be touched until its own checkpoint.</p>
+    <div class="meta-row">
+      <span><strong>Date</strong> 2026-08-26</span>
+      <span><strong>Branch</strong> feature/ask-autoingest</span>
+      <span><strong>Status</strong> Planning only — nothing implemented</span>
+    </div>
+    <div class="go-badge">&#10003; GO — with a scoped, phased implementation sequence (Section 21)</div>
+    <nav class="toc">
+      <a href="#verdict"><span class="n">01</span>Executive recommendation</a>
+      <a href="#repo"><span class="n">02</span>Repository verification</a>
+      <a href="#architecture"><span class="n">03</span>Selected architecture</a>
+      <a href="#current-flow"><span class="n">04</span>Current production flow</a>
+      <a href="#proposed-flow"><span class="n">05</span>Proposed production flow</a>
+      <a href="#promote"><span class="n">06</span>Components to promote</a>
+      <a href="#preserve"><span class="n">07</span>Preserve as evidence only</a>
+      <a href="#discard"><span class="n">08</span>Do not promote</a>
+      <a href="#ownership"><span class="n">09</span>Knowledge Model ownership</a>
+      <a href="#authoring"><span class="n">10</span>Authoring contract</a>
+      <a href="#relevance"><span class="n">11</span>Multi-record contract</a>
+      <a href="#provenance"><span class="n">12</span>Provenance model</a>
+      <a href="#tests"><span class="n">13</span>Test strategy</a>
+      <a href="#regression"><span class="n">14</span>Benchmark regression strategy</a>
+      <a href="#known-issues"><span class="n">15</span>Known remaining issues</a>
+      <a href="#docs"><span class="n">16</span>Documentation / history</a>
+      <a href="#files"><span class="n">17</span>Files expected to change</a>
+      <a href="#sequence"><span class="n">18</span>Implementation sequence</a>
+      <a href="#commits"><span class="n">19</span>Commit boundaries</a>
+      <a href="#risks"><span class="n">20</span>Risks / rollback</a>
+      <a href="#stop"><span class="n">21</span>Stop conditions</a>
+    </nav>
+  </div>
+</div>
+
+<div class="wrap">
+<section id="verdict">
+  <span class="section-num">01 &middot; Executive Recommendation</span>
+  <h2>GO — but as a scoped evidence-layer change, not a pipeline replacement</h2>
+  <p class="lede">The Knowledge Model's real production contribution is narrower and lower-risk than "Candidate C wins" might suggest — and that is good news. Tracing the actual production request lifecycle (Section 4) found that the experimental harness never ran through production's real synthesis path at all: it bypassed the schema-constrained JSON generation, safety validation, and handle-resolution that <code>services/localJudge/synthesisAdapter.js</code> already provides today, in favor of raw chat completion. That means integration is not "replace the pipeline with what won the benchmark" — it is "give the existing, already-hardened pipeline better evidence to work from."</p>
+  <p>Three findings from tracing the real code, not assumed from the experiment reports, drove this recommendation:</p>
+  <ul>
+    <li><strong>Production's conversational orchestrator already exists and is already close to Candidate B.</strong> <code>lib/conversationalAsk.js</code> — topic-change detection, clarification decisioning, the "not sure" hedge — is live in <code>main/askAutoIngest.js</code> today. Candidate B's one real orchestration difference (the repeated-ambiguity hedge) and its chat-session-replay harness technique were never merged back. This shrinks the "conversational architecture" integration surface to nearly nothing.</li>
+    <li><strong>Production's model is not yet Gemma-4-E4B-it.</strong> <code>services/localJudge/modelManager.js</code> still resolves <code>phi-4-mini-instruct-Q4_K_M</code>. Every A/B/C measurement in both checkpoints ran exclusively on Gemma. The model swap is a real, separate, already-implied-but-unimplemented prerequisite — not something this integration can silently assume is done.</li>
+    <li><strong>Production's synthesis is schema-constrained JSON generation, not free-text chat.</strong> <code>promptTemplates.js</code>/<code>synthesisSchema.js</code>/<code>safetyValidation.js</code> already provide handle resolution and ID-leakage protection the experimental harness never exercised. The Knowledge Model's job is to feed better <em>evidence</em> into that existing, safer pipeline — not to become a second pipeline.</li>
+  </ul>
+  <div class="callout win">
+    <p><strong>Recommendation: GO</strong> for a phased integration that (1) promotes the Knowledge Model's schema, records, retrieval, and validation into a production module, (2) adapts <code>evidencePackage.js</code> to source from it when coverage exists, with the existing FACT/ACTION-atom path retained as the always-available fallback, and (3) treats the Gemma model swap as a parallel, explicitly-tracked prerequisite rather than an assumption. Full sequencing in Section 18.</p>
+  </div>
+</section>
+
+<section id="repo">
+  <span class="section-num">02 &middot; Repository / Worktree Verification</span>
+  <h2>Repository reality matches expectations — no discrepancy to report</h2>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Check</th><th>Result</th></tr></thead>
+    <tbody>
+      <tr><td>Current worktree</td><td><code>.claude/worktrees/knowledge-portal-stage2</code></td></tr>
+      <tr><td>Current branch</td><td><code>feature/ask-autoingest</code> — correct; not on <code>stable/0.9</code></td></tr>
+      <tr><td>HEAD</td><td><code>bba7925</code> "fix(knowledge): improve paraphrase concept resolution" — unchanged across this entire investigation</td></tr>
+      <tr><td>merge-base(<code>feature/ask-autoingest</code>, <code>main</code>)</td><td><code>e0eebd5</code> = <code>main</code>'s own current tip — the feature branch is 0 commits behind, 50 commits ahead of <code>main</code></td></tr>
+      <tr><td><code>stable/0.9</code></td><td>Present locally at <code>dd959c6</code>, a materially different, older lineage per this repo's own documented topology — not touched, not relevant to this work</td></tr>
+      <tr><td>Tracked modifications (<code>git status</code>)</td><td>23 files, identical set present before this entire multi-checkpoint investigation began — none newly introduced</td></tr>
+      <tr><td>Untracked experimental files</td><td>All fall under the expected Ask AutoIngest experimental scope (<code>main/askAutoIngest*Experiment.js</code>/<code>*Verify.js</code>, <code>scripts/product-docs/bench/</code>, <code>scripts/product-docs/lib/{conversationalAsk,conversationState,candidateGrouping,candidateRecall,semanticIndex}.js</code>, <code>services/{localJudge,semanticRetrieval}/</code>) — no unrelated dirty files found</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>No discrepancy between repository reality and expectations. Proceeding with planning.</p>
+</section>
+
+<section id="architecture">
+  <span class="section-num">03 &middot; Selected Architecture</span>
+  <h2>What "Knowledge Model wins" actually authorizes</h2>
+  <p>The selected architecture is <strong>the existing Ask AutoIngest deterministic pipeline, unchanged, plus the corrected Candidate C Knowledge Model as a new evidence source inside that pipeline's existing synthesis stage.</strong> This is deliberately narrower than "adopt Candidate B and Candidate C's harnesses as production" — neither harness is production-shaped code, and neither should become it verbatim (Section 8).</p>
+  <p>Concretely selected for promotion, refactored into production-appropriate modules rather than kept as experimental directory structure:</p>
+  <ol>
+    <li>The <code>KnowledgeRecord</code> schema and its validation (<code>assertValidRecord</code>)</li>
+    <li>Dimensional knowledge representation (purpose/operatorWorkflow/preconditions/actions/behavior/recovery/relationships/limitations/technicalDetail)</li>
+    <li>Source/provenance grounding, with the <code>forensic-verified</code> / <code>registry-reshaped</code> tier distinction</li>
+    <li>The 20 Tier-1 forensic records (re-reviewed once more before promotion — see Section 9)</li>
+    <li>The Tier-2 mechanical reshape pipeline, including the authoring-normalization fix</li>
+    <li>Conceptual retrieval (<code>conceptualRetrieve</code>) as an evidence-shaping function, not a replacement retrieval/ranking system</li>
+    <li>Question-aware dimension selection (<code>DIMENSIONS_BY_TYPE</code>)</li>
+    <li>Multi-record relevance/scoping (<code>recordRole</code>/<code>scopedQuestionTypes</code>/<code>filterRecordsByRelevance</code>)</li>
+    <li>Operator-facing vs. technical-detail separation (the authoring contract, Section 10)</li>
+    <li>The incremental, hash-manifested Tier-2 build</li>
+    <li>The static leakage/validation test as a permanent regression guard</li>
+  </ol>
+  <p>Not selected: the harness's own model-invocation technique (raw chat completion via <code>LlamaChatSession</code>/<code>setChatHistory</code>), the flat evidence-block string format, and the mock <code>{answer, capabilityStatus, sourceIds: [], steps: [], warnings: [], refused: false}</code> synthesis result shape — all of these exist only because the harness needed something simpler than production's real schema-constrained pipeline to iterate quickly. Production integration adapts the Knowledge Model to feed <em>into</em> the real pipeline's existing shapes, not the other way around.</p>
+</section>
+
+<section id="current-flow">
+  <span class="section-num">04 &middot; Current Production Request Flow</span>
+  <h2>Traced from the real code, not the experiment reports</h2>
+  <div class="flow-block">
+    <div class="flow-stage">
+      <div class="stage-name">Entry</div>
+      <div class="stage-detail"><dl>
+        <dt>Module</dt><dd><code>main/askAutoIngest.js</code> — <code>handleAskConverse()</code> / <code>handleAskQuery()</code></dd>
+        <dt>Truth source</dt><dd>IPC dispatcher only; owns the single in-flight <code>AbortController</code> and the in-memory <code>_conversationState</code>. Reimplements no logic.</dd>
+      </dl></div>
+    </div>
+    <div class="flow-stage">
+      <div class="stage-name">Orchestration</div>
+      <div class="stage-detail"><dl>
+        <dt>Module</dt><dd><code>lib/conversationalAsk.js</code> — <code>askConversational()</code></dd>
+        <dt>Does</dt><dd>"Not sure" hedge, topic-change detection, accumulated-context query text (<code>conversationState.js</code>), routes to clarification or synthesis</dd>
+        <dt>Candidate B status</dt><dd>Already production. The repeated-ambiguity hedge tweak and real per-turn chat-history replay are the only pieces still experimental (Section 15).</dd>
+      </dl></div>
+    </div>
+    <div class="flow-stage">
+      <div class="stage-name">Classification</div>
+      <div class="stage-detail"><dl>
+        <dt>Module</dt><dd><code>lib/questionClassifier.js</code> — <code>classifyQuestion()</code>, called inside <code>knowledgeEngine.answerQuestion()</code></dd>
+        <dt>Note</dt><dd>Not a separate pipeline stage — embedded inside retrieval. The "Actually, ..." prefix gap (Section 15.2) lives here.</dd>
+      </dl></div>
+    </div>
+    <div class="flow-stage">
+      <div class="stage-name">Retrieval / Authority</div>
+      <div class="stage-detail"><dl>
+        <dt>Module</dt><dd><code>lib/answerWithAuthority.js</code> &rarr; <code>lib/knowledgeEngine.js</code> (<code>answerQuestion</code>) + <code>lib/query.js</code> (deterministic ranker) + <code>lib/capabilityAuthority.js</code></dd>
+        <dt>Does</dt><dd>Keyword/alias/title ranking, boundary-table matching, capability-status resolution. For in-scope ambiguous matches, optionally invokes a real model call — <code>services/localJudge/judgeService.js</code>'s <code>productionJudge</code> — to confirm capability authority. The A/B/C experiment never exercised this judge call.</dd>
+      </dl></div>
+    </div>
+    <div class="flow-stage">
+      <div class="stage-name">Confidence / Clarify</div>
+      <div class="stage-detail"><dl>
+        <dt>Module</dt><dd><code>lib/askSynthesis/retrievalConfidence.js</code> (<code>assessPrimaryFit</code>) + <code>lib/askSynthesis/clarificationDecision.js</code> (<code>decideClarification</code>)</dd>
+        <dt>Does</dt><dd>CLEAR / AMBIGUOUS / MISSING_REQUIRED_DETAIL / UNSUPPORTED, using semantic candidates (BGE embeddings, <code>services/semanticRetrieval/</code>) only as supplementary signal, never as authority.</dd>
+      </dl></div>
+    </div>
+    <div class="flow-stage">
+      <div class="stage-name">Eligibility</div>
+      <div class="stage-detail"><dl>
+        <dt>Module</dt><dd><code>lib/askSynthesis/synthesisEligibility.js</code> — <code>evaluateSynthesisEligibility()</code>, called inside <code>trySynthesize()</code></dd>
+        <dt>Does</dt><dd>Decides whether to attempt synthesis at all. This is the gate behind P4's failure — <strong>explicitly out of scope, untouched</strong> (Section 15.1).</dd>
+      </dl></div>
+    </div>
+    <div class="flow-stage">
+      <div class="stage-name">Evidence Shaping</div>
+      <div class="stage-detail"><dl>
+        <dt>Module</dt><dd><code>lib/askSynthesis/evidencePackage.js</code> — <code>buildEvidencePackageForAuthorityAnswer()</code></dd>
+        <dt>Does</dt><dd>Extracts FACT/ACTION/LIMITATION/RATIONALE/TECHNICAL atoms from the canonical record's own text, deterministically (backtick-span detection for TECHNICAL atoms — the same signal the Knowledge Model's own leakage guard formalizes). This is the exact stage the Knowledge Model needs to plug into.</dd>
+      </dl></div>
+    </div>
+    <div class="flow-stage">
+      <div class="stage-name">Synthesis</div>
+      <div class="stage-detail"><dl>
+        <dt>Module</dt><dd><code>lib/answerWithSynthesis.js</code> (<code>trySynthesize</code>) &rarr; <code>services/localJudge/synthesisService.js</code> (<code>productionSynthesize</code>) &rarr; <code>synthesisAdapter.js</code> &rarr; <code>promptTemplates.js</code> + <code>synthesisSchema.js</code> + <code>runtime.infer()</code></dd>
+        <dt>Does</dt><dd>Builds a <strong>structured, schema-constrained</strong> prompt from the evidence package's specific field shape (<code>primary</code>, <code>selectedEvidenceAtoms</code>, <code>admittedNeighborhood</code>, <code>historical</code>, <code>steps</code>, <code>guidance</code>, <code>limitations</code>...), gets grammar-constrained JSON back from a <strong>single, stateless, per-request</strong> model call — no chat-history replay across turns today.</dd>
+        <dt>Model</dt><dd><strong>Phi-4-mini-instruct</strong> (<code>modelManager.MODEL_ID</code>) — not yet Gemma.</dd>
+      </dl></div>
+    </div>
+    <div class="flow-stage">
+      <div class="stage-name">Safety Validation</div>
+      <div class="stage-detail"><dl>
+        <dt>Module</dt><dd><code>lib/askSynthesis/safetyValidation.js</code> — <code>validateSynthesis()</code> / <code>resolveHandles()</code></dd>
+        <dt>Does</dt><dd>Handle-shaped-leak and raw-ID-shaped-leak detection, deterministic and mechanical, already stronger than anything the harness ran through. On failure, falls back to the untouched deterministic answer — never surfaces a broken synthesis to the operator.</dd>
+      </dl></div>
+    </div>
+    <div class="flow-stage">
+      <div class="stage-name">Presentation</div>
+      <div class="stage-detail"><dl>
+        <dt>Module</dt><dd><code>main/askAutoIngestPresentation.js</code> — <code>shapeAnswerForUI</code> / <code>shapeConversationalResponse</code></dd>
+        <dt>Does</dt><dd>Final UI-facing sanitization and status-label mapping. Pure, Electron-independent, unit-tested.</dd>
+      </dl></div>
+    </div>
+  </div>
+</section>
+
+<section id="proposed-flow">
+  <span class="section-num">05 &middot; Proposed Production Flow</span>
+  <h2>One new module, one new decision point — nothing else moves</h2>
+  <p>Every stage in Section 4 stays exactly where it is. The only change is <strong>inside</strong> the Evidence Shaping stage: <code>evidencePackage.js</code> gains a Knowledge-Model-aware branch, tried first, with the existing atom-extraction logic retained unconditionally as the fallback.</p>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Stage</th><th>Existing production module</th><th>Candidate B contribution</th><th>Candidate C contribution</th><th>Authoritative source of truth</th><th>Fallback</th><th>Failure behavior</th></tr></thead>
+    <tbody>
+      <tr><td>Orchestration</td><td><code>conversationalAsk.js</code></td><td>Already production; repeated-ambiguity hedge fix optionally ported (Section 15.2 discussion)</td><td>None</td><td><code>conversationalAsk.js</code>, unchanged</td><td>n/a</td><td>Unchanged</td></tr>
+      <tr><td>Retrieval/Authority</td><td><code>knowledgeEngine.js</code>, <code>query.js</code>, <code>capabilityAuthority.js</code></td><td>None</td><td><strong>None — deliberately unchanged</strong>, per this checkpoint's own repeated instruction not to re-decide WHICH record/status is correct</td><td>Existing deterministic ranker + boundary table</td><td>n/a</td><td>Unchanged</td></tr>
+      <tr><td>Eligibility</td><td><code>synthesisEligibility.js</code></td><td>None</td><td><strong>None — explicitly out of scope</strong> (Section 15.1)</td><td>Existing gate, unchanged</td><td>n/a</td><td>Unchanged; still produces the P4-class non-answer</td></tr>
+      <tr><td>Evidence Shaping</td><td><code>evidencePackage.js</code></td><td>None</td><td><strong>New: Knowledge Model lookup by resolved <code>featureId</code>/boundary/roadmap, question-aware dimension selection, multi-record relevance filtering</strong> — tried first</td><td>Knowledge Model when a covered record exists; otherwise existing FACT/ACTION-atom extraction</td><td><strong>Existing atom extraction, unconditionally, when no KM record covers the resolved subject</strong></td><td>A Knowledge Model lookup/build error must never throw past this stage — caught locally, falls back to existing atoms, logged</td></tr>
+      <tr><td>Synthesis</td><td><code>synthesisAdapter.js</code>, <code>promptTemplates.js</code>, <code>synthesisSchema.js</code></td><td>None</td><td>Consumes whichever evidence source Evidence Shaping produced, through the existing schema-constrained call — <strong>no new invocation pattern</strong></td><td><code>promptTemplates.js</code>, unchanged in its own contract</td><td>n/a</td><td>Unchanged — existing timeout/retry/error handling</td></tr>
+      <tr><td>Safety Validation</td><td><code>safetyValidation.js</code></td><td>None</td><td>None — Knowledge Model evidence passes through the exact same validation every other evidence source does</td><td>Existing validator, unchanged</td><td>n/a</td><td>Unchanged</td></tr>
+      <tr><td>Presentation</td><td><code>askAutoIngestPresentation.js</code></td><td>None</td><td>None</td><td>Unchanged</td><td>n/a</td><td>Unchanged</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>The Knowledge Model is deliberately positioned as a <strong>drop-in evidence provider</strong>, not a parallel decision-maker. It never sees a question the deterministic layer hasn't already resolved to a specific feature, boundary, or roadmap classification.</p>
+</section>
+
+<section id="promote">
+  <span class="section-num">06 &middot; Candidate C Components to Promote</span>
+  <h2>What becomes production code</h2>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Component</th><th>From</th><th>To (proposed)</th><th></th></tr></thead>
+    <tbody>
+      <tr><td>Schema + validator</td><td><code>bench/knowledgeModel/schema.js</code></td><td><code>lib/knowledgeModel/schema.js</code></td><td><span class="pill pill-promote">promote</span></td></tr>
+      <tr><td>Aggregate index + lookup</td><td><code>bench/knowledgeModel/index.js</code></td><td><code>lib/knowledgeModel/index.js</code></td><td><span class="pill pill-promote">promote</span></td></tr>
+      <tr><td>Conceptual retrieval</td><td><code>bench/knowledgeModel/retrieval/conceptualRetrieve.js</code></td><td><code>lib/knowledgeModel/retrieval.js</code></td><td><span class="pill pill-promote">promote</span></td></tr>
+      <tr><td>Tier-1 forensic records (20)</td><td><code>bench/knowledgeModel/records/{sourceAndImport,metadata,transferAndArchive,specialAndPlatform}.js</code></td><td><code>lib/knowledgeModel/records/*.js</code></td><td><span class="pill pill-promote">promote, re-reviewed</span></td></tr>
+      <tr><td>Not-supported / roadmap records</td><td><code>bench/knowledgeModel/records/{notSupportedBoundaries,roadmap}.js</code></td><td><code>lib/knowledgeModel/records/*.js</code></td><td><span class="pill pill-promote">promote</span></td></tr>
+      <tr><td>Tier-2 build pipeline</td><td><code>bench/knowledgeModel/build/reshapeRegistry.js</code></td><td><code>lib/knowledgeModel/build/reshapeRegistry.js</code>, wired into the existing docs-generation lifecycle (Section 9)</td><td><span class="pill pill-promote">promote</span></td></tr>
+      <tr><td>Leakage/relevance regression test</td><td><code>bench/knowledgeModel/test/relevanceAndLeakage.test.js</code></td><td><code>scripts/product-docs/test/knowledgeModelLeakageAndRelevance.test.js</code></td><td><span class="pill pill-promote">promote, permanent</span></td></tr>
+      <tr><td>Evidence-routing logic (concept only)</td><td><code>bench/candidateC/evidence.js</code>'s KM-first/fallback pattern</td><td>Ported into <code>evidencePackage.js</code> as a new internal function, <strong>not</strong> copied verbatim (it currently expects the harness's mock pkg shape)</td><td><span class="pill pill-promote">promote the pattern, rewrite the code</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section id="preserve">
+  <span class="section-num">07 &middot; Experimental Components to Preserve Only</span>
+  <h2>Historical evidence — never becomes production code</h2>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Component</th><th>Why preserved, not promoted</th></tr></thead>
+    <tbody>
+      <tr><td><code>main/askAutoIngestConversationTrial.js</code> (Candidate A harness)</td><td>Produced the frozen A baseline. Must remain runnable to reproduce A's exact numbers.</td></tr>
+      <tr><td><code>main/askAutoIngestArchitectureExperiment.js</code> + <code>bench/bakeoff/experimentalConversation.js</code>/<code>experimentalEvidence.js</code> (Candidate B harness)</td><td>Produced the frozen B baseline and the repeated-ambiguity hedge finding. The hedge finding itself may still get ported (Section 15.2); the harness code that discovered it does not.</td></tr>
+      <tr><td><code>main/askAutoIngestKnowledgeModelExperiment.js</code> / <code>...Generalization.js</code> + <code>bench/candidateC/orchestrator.js</code>/<code>evidence.js</code> (original + corrected Candidate C harness)</td><td>Produced both the failed original run and the accepted corrected run. This is the direct evidence trail for the architecture decision — must stay reproducible and byte-identical to what was scored.</td></tr>
+      <tr><td><code>bench/bakeoff/conversationTrial.js</code> (frozen 19) + <code>bench/candidateC/generalizationSet.js</code> (frozen 14)</td><td>The acceptance instrument itself. Becomes the permanent architecture regression suite (Section 14) — reused, not rewritten, but its harness-calling code stays separate from production.</td></tr>
+      <tr><td>All raw result JSON + transcripts (original C, corrected C, generalization &times;2, A, B)</td><td>The scored evidence. Needed to defend the 84.2%/94.7% numbers if ever questioned, and as the baseline for future regression comparison.</td></tr>
+      <tr><td>Both published experiment-report artifacts (architecture checkpoint, correction checkpoint)</td><td>Human-readable record of the investigation, including the deliberately-not-erased original Candidate C failure (Section 16).</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section id="discard">
+  <span class="section-num">08 &middot; Components Not to Promote</span>
+  <h2>Harness-only scaffolding</h2>
+  <ul>
+    <li><strong>The flat evidence-block string format</strong> (<code>conceptualRetrieve</code>'s <code>evidenceBlock</code> as literal chat-prompt text). Production needs structured fields feeding <code>promptTemplates.js</code>, not a pre-formatted string.</li>
+    <li><strong>The mock synthesis result shape</strong> (<code>{answer, capabilityStatus, sourceIds: [], steps: [], warnings: [], refused: false}</code>). Real synthesis output already has a richer, validated shape (<code>synthesisSchema.js</code>) that must not be bypassed.</li>
+    <li><strong>Raw <code>LlamaChatSession</code>/<code>setChatHistory</code> chat-completion invocation.</strong> Production's <code>runtime.infer()</code> contract is a stateless, schema-constrained, per-request call. Bringing chat-session replay into production is a real, separate runtime change (Section 15.2/18), not something to smuggle in via the Knowledge Model integration.</li>
+    <li><strong>The <code>KMEXP_CONV_LIMIT</code>/<code>ARCHEXP_CONV_LIMIT</code>-style env-var harness scaffolding, fixture userData directories, and symlink-based embedding-model setup</strong> in the harness entry points — purely test-harness plumbing.</li>
+  </ul>
+</section>
+
+<section id="ownership">
+  <span class="section-num">09 &middot; Knowledge Model Ownership / Build Lifecycle</span>
+  <h2>One source of truth per tier, no parallel manual truths</h2>
+  <h3>Tier 1 — forensic, hand-authored, source-backed</h3>
+  <ul>
+    <li><strong>Source of truth:</strong> the record file itself, hand-edited by whoever did the forensic source read.</li>
+    <li><strong>Generation process:</strong> manual — a directed research pass over actual source/tests for a specific feature. Not automatable, and should not be automated; this is where judgment about what's operator-relevant lives.</li>
+    <li><strong>Provenance requirement:</strong> every non-obvious claim cites a real file:line, test name, or doc section (unchanged, schema-enforced).</li>
+    <li><strong>Staleness detection:</strong> proposed new mechanism — a lightweight content-hash of each cited source file, stored per provenance entry (extending the existing manifest pattern from the Tier-2 build). A CI check flags a Tier-1 record whose cited file has changed since the hash was recorded, for human re-review — it does not auto-regenerate the record (that would defeat the point of a hand-authored, judgment-backed record).</li>
+    <li><strong>Belongs in git:</strong> yes, always — this is hand-authored source, not derived output.</li>
+  </ul>
+  <h3>Tier 2 — mechanically generated from the capability registry</h3>
+  <ul>
+    <li><strong>Source of truth:</strong> <code>docs/product/generated/knowledge-index.json</code> (the existing capability registry) — <strong>not</strong> the generated Tier-2 record file itself.</li>
+    <li><strong>Generation process:</strong> <code>reshapeRegistry.js</code>, run as an explicit step in the same lifecycle that already regenerates <code>docs/product/generated/*</code> (this repo already has a documented, controlled docs-generation pipeline per <code>CLAUDE.md</code>/<code>docs/product/05_DOCUMENTATION_WORKFLOW.md</code> conventions — Tier-2 generation slots into that existing step, not a new one).</li>
+    <li><strong>Incremental rebuild:</strong> already implemented — a per-capability content-hash manifest (<code>knowledgeBuildManifest.json</code>) skips regenerating a Tier-2 record whose source registry entry hasn't changed.</li>
+    <li><strong>Deleted/renamed capabilities:</strong> proposed addition — the build script should detect a manifest entry whose <code>featureId</code> no longer exists in the current registry and remove the corresponding generated record (with a logged warning), rather than leaving an orphaned record silently in place. Not yet implemented in the experimental script; needed before production promotion.</li>
+    <li><strong>Belongs in git:</strong> yes, generated output committed like any other build artifact in this repo's existing convention (<code>docs/product/generated/*</code> is already committed) — regenerated and re-committed as part of the same PR/process that updates the registry, never hand-edited.</li>
+  </ul>
+  <h3>How a future feature adds knowledge</h3>
+  <p>Default path: a new capability lands in the registry (already how every feature gets documented today) &rarr; the next Tier-2 regeneration picks it up automatically with no developer action. A developer or reviewer promotes a capability to Tier-1 only when a real operator-facing gap is found (missing recovery behavior, a wrong technical detail, a symptom worth a scoped companion record) — the same bar the original forensic pass used. This avoids two parallel manually-maintained truths: Tier-2 always reflects the registry; Tier-1 only exists where someone deliberately decided the registry's own text wasn't enough.</p>
+</section>
+
+<section id="authoring">
+  <span class="section-num">10 &middot; Authoring Contract</span>
+  <h2>Formalized, source-code-enforced</h2>
+  <div class="callout">
+    <p><strong>Operator-facing dimensions</strong> (<code>purpose</code>, <code>operatorWorkflow</code>, <code>actions</code>, <code>behavior</code>, <code>recovery</code>, <code>limitations</code>, <code>relationships</code>) must use AutoIngest/operator language. They must never expose function names, IPC channel strings, internal constants/flags, source-code call sequences, or internal documentation/audit-trail commentary.</p>
+    <p><strong><code>technicalDetail</code></strong> may contain implementation facts, provided they are source-backed by a <code>code</code>- or <code>test</code>-typed provenance entry and are only surfaced to the operator when the question is explicitly technical (the existing technical-question gate).</p>
+    <p><strong>Provenance</strong> must remain source-backed for every record, at both tiers, with no exception.</p>
+  </div>
+  <p><strong>The static leakage test should become a permanent production regression test — yes, by default, no concrete reason found otherwise.</strong> It caught 12 real latent defects in mechanically-generated content that neither the frozen benchmark nor the generalization set had yet exercised; it costs milliseconds to run; and it encodes a general rule (regex-detectable implementation-language patterns in specific fields), not any benchmark-specific string. It belongs in the same test directory and CI gate as the other <code>scripts/product-docs/test/*.test.js</code> files, run on every change to any Knowledge Model record.</p>
+</section>
+
+<section id="relevance">
+  <span class="section-num">11 &middot; Multi-Record Contract</span>
+  <h2><code>recordRole</code> / <code>scopedQuestionTypes</code> / <code>filterRecordsByRelevance()</code> — promote as-is</h2>
+  <p>The experimental API is already production-shaped and needs no semantic change, only relocation. Reviewed against the four future-case requirement:</p>
+  <ul>
+    <li><strong>Core workflow + troubleshooting companion:</strong> already demonstrated (QMZ) and tested (Section 13).</li>
+    <li><strong>Core workflow + recovery-specific companion:</strong> supported today — a <code>scoped</code> record with <code>scopedQuestionTypes</code> including <code>TROUBLESHOOTING</code>/<code>CONNECTIVITY</code> also participates when the recovery gate fires, regardless of declared type (already implemented, not a new case).</li>
+    <li><strong>Core workflow + technical companion:</strong> not yet exercised by any real record, but the mechanism generalizes without change — a scoped record tagged for no specific question type but relying purely on the technical-question gate would need one small addition: today <code>filterRecordsByRelevance</code> only special-cases the recovery gate, not the technical gate. <strong>Recommended small addition during integration</strong>: extend the same recovery-gate special-case pattern to the technical gate, so a scoped record with real <code>technicalDetail</code> can participate purely because the question is technical, even without a matching declared type. A one-line, symmetric change to an already-general function — not a new mechanism.</li>
+    <li><strong>N companion records for one feature, no contamination:</strong> the filter is per-record and additive; nothing about it caps at two records or assumes a specific pairing.</li>
+  </ul>
+  <p>No semantic changes recommended beyond the one addition above. File relocation only (<code>bench/knowledgeModel/</code> &rarr; <code>lib/knowledgeModel/</code>), consistent with the rest of the promoted code.</p>
+</section>
+
+<section id="provenance">
+  <span class="section-num">12 &middot; Provenance Model</span>
+  <h2>Unchanged, carried forward as-is</h2>
+  <p>Every record's <code>provenance</code> array (<code>{claim, source, type, confidence}</code>) is promoted unchanged. The schema's build-time validator — which already refuses to load a record with unprovenanced <code>recovery</code>/<code>technicalDetail</code> content — becomes a production build-time gate exactly as it is experimentally: <code>lib/knowledgeModel/index.js</code> throws at require-time on any invalid record, so a bad record cannot ship silently. No new provenance mechanism is needed; the existing one already satisfies "every knowledge claim traces to a real citation."</p>
+</section>
+
+<section id="tests">
+  <span class="section-num">13 &middot; Test Strategy</span>
+  <h2>Production test matrix</h2>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>#</th><th>Test class</th><th>Status</th><th>Location (proposed)</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Schema validation</td><td><span class="pill pill-promote">exists, promote</span></td><td><code>lib/knowledgeModel/schema.js</code>'s own <code>assertValidRecord</code>, exercised by every other test that loads the index</td></tr>
+      <tr><td>2</td><td>Provenance validation</td><td><span class="pill pill-promote">exists, promote</span></td><td>Same as above</td></tr>
+      <tr><td>3</td><td>Operator-language leakage detection</td><td><span class="pill pill-promote">exists, promote as permanent regression test</span></td><td><code>scripts/product-docs/test/knowledgeModelLeakageAndRelevance.test.js</code></td></tr>
+      <tr><td>4</td><td>Generated-record validation (Tier-2)</td><td><span class="pill pill-promote">exists, promote</span></td><td>Same file — already tests all 66 real records, both tiers</td></tr>
+      <tr><td>5</td><td>Incremental build tests</td><td><span class="pill pill-inscope">new, needed</span></td><td>New: assert the manifest correctly skips unchanged capabilities and correctly regenerates changed ones (currently proven manually via CLI output, not asserted)</td></tr>
+      <tr><td>6</td><td>Multi-record relevance tests</td><td><span class="pill pill-promote">exists, promote</span></td><td>Same file — 6 synthetic-fixture assertions</td></tr>
+      <tr><td>7</td><td>Question/dimension selection tests</td><td><span class="pill pill-inscope">new, needed</span></td><td>New: assert <code>DIMENSIONS_BY_TYPE</code> mapping and the technical/recovery gates directly (currently only exercised indirectly through the frozen benchmark)</td></tr>
+      <tr><td>8</td><td>Unsupported-feature boundary tests</td><td><span class="pill pill-promote">exists (production), unaffected</span></td><td><code>knowledgeAdversarialPhase24.test.js</code> and siblings — Knowledge Model boundary records must continue agreeing with <code>statusResolution.js</code>'s own table; add one assertion checking that agreement explicitly</td></tr>
+      <tr><td>9</td><td>Fallback behavior</td><td><span class="pill pill-inscope">new, needed</span></td><td>New: assert <code>evidencePackage.js</code> falls back cleanly to existing atom extraction when no Knowledge Model record covers the resolved subject, and that a thrown error inside KM lookup never propagates past this stage</td></tr>
+      <tr><td>10</td><td>Candidate B conversational continuity</td><td><span class="pill pill-promote">exists (production)</span></td><td><code>conversationalAsk.test.js</code> — unaffected by this integration, still the authority</td></tr>
+      <tr><td>11</td><td>Candidate C knowledge-driven cases</td><td><span class="pill pill-promote">covered by frozen benchmark</span></td><td>Section 14</td></tr>
+      <tr><td>12</td><td>Production presentation tests</td><td><span class="pill pill-promote">exists (production), unaffected</span></td><td><code>test/askAutoIngestPresentation.test.js</code></td></tr>
+      <tr><td>13</td><td>Deterministic/no-model paths</td><td><span class="pill pill-promote">exists (production), unaffected</span></td><td><code>knowledge.test.js</code> and siblings</td></tr>
+      <tr><td>14</td><td>Synthesis/model paths</td><td><span class="pill pill-inscope">extend existing</span></td><td><code>answerWithSynthesis.test.js</code> — add a case exercising the new KM-aware branch of <code>evidencePackage.js</code> with a real (test-fixture) KM record</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section id="regression">
+  <span class="section-num">14 &middot; Frozen Benchmark Regression Strategy</span>
+  <h2>Architectural regression suite, not unit tests</h2>
+  <p>The frozen 19-conversation benchmark and the 14-question generalization set remain exactly what they are — a scored, qualitative, model-in-the-loop acceptance instrument — not converted into fast implementation-specific unit-test assertions. Doing so would defeat their purpose (they test the whole pipeline's real behavior, including model output quality, which no mechanical assertion can substitute for).</p>
+  <p><strong>Proposed regression discipline going forward:</strong> after production integration lands, re-run both frozen sets once against the real production pipeline (not the harness) as a dedicated validation step before the integration PR merges. The accepted baseline — 16 PASS / 2 PARTIAL / 1 FAIL, 84.2% clean-pass, 94.7% acceptable — becomes the floor: <strong>any future change that would drop below this baseline requires explicit Product Owner review before merging</strong>, exactly as this checkpoint's own instruction states. P4's FAIL and H's PARTIAL are documented, accepted residuals at this baseline, not license to let new failures accumulate alongside them.</p>
+</section>
+
+<section id="known-issues">
+  <span class="section-num">15 &middot; Known Remaining Issues — Kept Separate</span>
+  <h2>Three findings, three futures, none touched here</h2>
+  <h3>15.1 — Eligibility gate (<code>evaluateSynthesisEligibility</code> / <code>authority-downgraded-unknown</code>)</h3>
+  <p>This gate sits <strong>upstream</strong> of the Evidence Shaping stage the Knowledge Model plugs into (Section 5's flow table). When it fires, synthesis is never attempted at all — the Knowledge Model is never consulted, no matter how good its coverage of the resolved feature is. This is why P4, and the generalization set's NAS-backup and Transfer-Import-resume cases, remain unanswerable regardless of Knowledge Model integration. <strong>This checkpoint creates a separate future-work item</strong>: investigate <code>synthesisEligibility.js</code>'s specific downgrade conditions, confirmed (across two checkpoints, three independent features) to be the single largest remaining ceiling on Ask AutoIngest's answer quality — larger than any architecture change made so far.</p>
+  <h3>15.2 — Question classifier ("Actually, ..." prefix)</h3>
+  <p><code>questionClassifier.js</code>'s <code>HOW_TO</code> regex requires the message to <em>start with</em> "how do I"/"how to"/etc. — a message like "Actually, how do I sort QMZ photos?" falls through to <code>UNKNOWN</code>. <strong>Recommendation: a separate, small production hardening task</strong>, not bundled into Knowledge Model integration and not investigated alongside broader conversational-query normalization (that would risk scope creep into the eligibility-gate-adjacent territory this checkpoint must not touch). The fix is narrow and mechanical — strip a small set of known conversational lead-in phrases ("actually,", "wait,", "sorry,") before classification, or add each pattern's own start-anchored variant — and should be scoped, tested, and reviewed on its own.</p>
+  <h3>15.3 — Fallback-path leakage (generalization G06)</h3>
+  <p>Traced precisely: when <code>evidencePackage.js</code>'s existing atom extraction (the <em>current production path</em>, not anything Candidate C introduces) selects a FACT atom whose source text includes internal documentation/authoring commentary (e.g. "documented as a separate feature file for lineage/continuity reasons"), that commentary can reach the operator-facing answer. This is <strong>a pre-existing production risk</strong>, surfaced by the experiment but not created by it, and it affects every Ask AutoIngest answer today, independent of any Knowledge Model coverage. <strong>Recommendation: a separate production safety-hardening task</strong> — extend <code>evidencePackage.js</code>'s existing atom-selection logic (or <code>safetyValidation.js</code>'s existing checks) with a general filter for documentation/audit-trail-style phrasing, mirroring the Knowledge Model's own authoring-contract regex but applied to the FACT-atom extraction path, not the Knowledge Model path. <strong>Not</strong> solved by adding a Knowledge Model record for the specific triggering question — that would fix one symptom of a general, pre-existing production gap while leaving the gap itself open for every other capability the Knowledge Model doesn't yet cover.</p>
+</section>
+
+<section id="docs">
+  <span class="section-num">16 &middot; Documentation / History Updates Required</span>
+  <h2>What gets written, and where — not yet edited</h2>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Content</th><th>Proposed location</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td>Candidate A/B/C results, corrected-C result, causal analysis</td><td>Both published experiment-report artifacts (already exist, already complete)</td><td>No edit needed — already the historical record</td></tr>
+      <tr><td>Architecture decision (Knowledge Model selected) + rationale</td><td>New: <code>docs/product/decisions/DEC-0XX_KNOWLEDGE_MODEL_ARCHITECTURE_SELECTED_FOR_ASK_AUTOINGEST.md</code>, matching this repo's existing DEC-### convention (see DEC-020, DEC-021 already referenced throughout the Knowledge Model's own provenance)</td><td>Draft during implementation, not this checkpoint</td></tr>
+      <tr><td>Original Candidate C failure + its two diagnosed defects</td><td>Referenced, not duplicated, from the new DEC file — links to the first published artifact</td><td>Preserve as-is; this is exactly the failure history the checkpoint instruction says must not be erased</td></tr>
+      <tr><td>Known remaining issues (eligibility gate, classifier, fallback leakage)</td><td>Three new entries in whatever this repo's existing "known limitations / follow-up" tracking uses (mirroring how <code>docs/product/bugs/</code> and roadmap "Current risks" fields already work for other features)</td><td>Draft during implementation</td></tr>
+      <tr><td>Ask AutoIngest's own feature documentation (AI-FEAT-058 lineage)</td><td><code>docs/product/features/AI-FEAT-058_*.md</code> — already the canonical Knowledge Engine feature doc, already has a "Stage 1 &rarr; Stage 2" evolution convention</td><td>Add a "Stage 2.5 / Knowledge Model" evolution entry once integration actually lands — not this checkpoint</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>None of these are edited during this checkpoint — this section is the plan for what to write once implementation begins, per the checkpoint's own instruction to stop at planning.</p>
+</section>
+
+<section id="files">
+  <span class="section-num">17 &middot; Exact Files Expected to Change During Integration</span>
+  <h2>Not touched today — the map for the next checkpoint</h2>
+  <div class="file-card"><div class="file-path">lib/knowledgeModel/ <span class="pill pill-inscope" style="margin-left:8px">new directory</span></div><div class="file-note">Promoted schema.js, index.js, retrieval.js, records/*.js, build/reshapeRegistry.js — relocated and lightly adapted from bench/knowledgeModel/.</div></div>
+  <div class="file-card"><div class="file-path">scripts/product-docs/lib/askSynthesis/evidencePackage.js</div><div class="file-note">New internal function: attempt Knowledge Model lookup + relevance-filtered dimension selection for the resolved feature/boundary/roadmap subject; on a hit, source <code>selectedEvidenceAtoms</code>/<code>directAnswer</code>-supporting fields from it; on a miss or any error, fall through unconditionally to the existing atom-extraction logic, unchanged.</div></div>
+  <div class="file-card"><div class="file-path">scripts/product-docs/lib/askSynthesis/promptTemplates.js</div><div class="file-note">Likely no structural change — Knowledge Model dimensions map onto existing prompt fields (recovery &rarr; limitations/guidance framing, purpose/behavior &rarr; the existing narrative fields). Confirm during implementation whether a new field is warranted for recovery-specific framing.</div></div>
+  <div class="file-card"><div class="file-path">scripts/product-docs/lib/conversationalAsk.js</div><div class="file-note">Only if the repeated-ambiguity hedge fix is separately approved for production (a small, self-contained orchestration change, independent of Knowledge Model wiring).</div></div>
+  <div class="file-card"><div class="file-path">scripts/product-docs/test/knowledgeModelLeakageAndRelevance.test.js <span class="pill pill-inscope" style="margin-left:8px">new</span></div><div class="file-note">Promoted from the experimental test, plus the new tests in Section 13 rows 5, 7, 9.</div></div>
+  <div class="file-card"><div class="file-path">docs/product/decisions/DEC-0XX_*.md <span class="pill pill-inscope" style="margin-left:8px">new</span></div><div class="file-note">Section 16.</div></div>
+  <div class="file-card"><div class="file-path">services/localJudge/modelManager.js, synthesisAdapter.js <span class="pill pill-gold" style="margin-left:8px">separate prerequisite, not part of this integration's diff</span></div><div class="file-note">The Gemma-4-E4B-it model swap this whole experiment assumed. Tracked as its own item because it changes model/runtime configuration — explicitly out of scope for this checkpoint and, arguably, for the Knowledge Model integration PR itself (should land as its own reviewable change, since it affects every Ask AutoIngest answer, not only Knowledge-Model-covered ones).</div></div>
+</section>
+
+<section id="sequence">
+  <span class="section-num">18 &middot; Recommended Implementation Sequence</span>
+  <h2>Five steps, each independently reviewable</h2>
+  <ol>
+    <li><strong>Promote the Knowledge Model as an inert module.</strong> Relocate <code>bench/knowledgeModel/</code> &rarr; <code>lib/knowledgeModel/</code>, add the deleted/renamed-capability detection (Section 9) and the technical-gate symmetry fix (Section 11), promote the test suite. No production request path touches it yet — pure addition, zero behavior change, trivially reviewable and revertible.</li>
+    <li><strong>Land the Gemma model swap as its own PR</strong>, independent of the Knowledge Model. Update <code>modelManager.js</code>/<code>synthesisAdapter.js</code>, re-verify production's existing test suite and a manual smoke pass. This can happen in parallel with step 1.</li>
+    <li><strong>Wire <code>evidencePackage.js</code>'s KM-first/fallback branch</strong>, behind a simple boolean feature flag if this codebase's existing patterns support one (mirroring <code>PRODUCTION_DOWNLOAD_SOURCE_APPROVED</code>'s own precedent in <code>main/askAutoIngest.js</code>) — allows shipping the code path dark before enabling it.</li>
+    <li><strong>Re-run the frozen 19 + generalization 14 against the real production pipeline</strong> (flag enabled), once, unmodified. Compare against the 84.2%/94.7% baseline. Any shortfall blocks merge pending Product Owner review, per the checkpoint's own acceptance-baseline instruction.</li>
+    <li><strong>Enable the flag, document the decision (Section 16), open the two separate follow-up items</strong> (eligibility gate, classifier hardening) as their own tracked work, not bundled into this integration.</li>
+  </ol>
+</section>
+
+<section id="commits">
+  <span class="section-num">19 &middot; Recommended Commit Boundaries</span>
+  <h2>Checkpoint the experiment before integration touches anything</h2>
+  <p>Nothing has been committed yet. Recommended boundary: <strong>one commit capturing the complete, accepted experimental evidence, before any production integration work begins</strong> — so the successful experiment has an immutable historical checkpoint, integration can be reviewed as its own diff, and future regressions have an exact implementation to compare against.</p>
+  <div class="commit-card">
+    <div class="commit-n">Commit 1 of 1 (recommended, this checkpoint) — experimental evidence</div>
+    <p style="margin:8px 0 0">Everything under <code>scripts/product-docs/bench/</code>, the <code>main/askAutoIngest*Experiment.js</code>/<code>*Verify.js</code>/<code>*Trial.js</code>/<code>*BakeOff.js</code> harness entry points, and the supporting <code>lib/</code>/<code>services/</code> files the harnesses depend on (<code>conversationalAsk.js</code>, <code>conversationState.js</code>, <code>candidateGrouping.js</code>, <code>candidateRecall.js</code>, <code>semanticIndex.js</code>, <code>askSynthesis/clarificationDecision.js</code>, <code>services/localJudge/*</code>, <code>services/semanticRetrieval/*</code>). This is the pre-existing uncommitted development this session found already in place, plus this session's own Knowledge Model work — treated as one historical unit since it was all produced as part of the same ask-autoingest research arc.</p>
+    <pre>feat(ask-autoingest): freeze A/B/C conversational-architecture experiment
+
+Records the complete, accepted experimental evidence for the Ask
+AutoIngest Knowledge Model architecture decision: Candidate A
+(production C8 + Gemma baseline), Candidate B (conversational
+architecture), Candidate C original (63.2% clean-pass, two defects
+found) and corrected (84.2% clean-pass, accepted), plus the frozen
+19-conversation benchmark and 14-question generalization set both
+remain used.
+
+Experimental only -- no production Ask AutoIngest behavior changes.
+Production integration follows as a separate, reviewable change.</pre>
+  </div>
+  <p>Production integration (Section 18's five steps) then lands as its own separate commit(s) — at minimum one per step, so the Gemma model swap, the Knowledge Model promotion, and the <code>evidencePackage.js</code> wiring can each be reviewed and, if needed, reverted independently.</p>
+</section>
+
+<section id="risks">
+  <span class="section-num">20 &middot; Risks / Rollback Strategy</span>
+  <h2>What could go wrong, and how to back out cleanly</h2>
+  <div class="table-scroll">
+  <table>
+    <thead><tr><th>Risk</th><th>Mitigation</th></tr></thead>
+    <tbody>
+      <tr><td>Real production synthesis (schema-constrained, safety-validated) produces different quality than the harness's raw chat completion, so the 84.2% doesn't transfer</td><td>Step 4's mandatory re-run against the real pipeline before merge — this is exactly why that step exists rather than trusting the harness numbers directly</td></tr>
+      <tr><td>Gemma-4-E4B-it behaves differently under <code>Gemma4ChatWrapper</code>'s grammar-constrained mode than under the harness's free-text chat mode (untested combination)</td><td>Step 2 lands and is smoke-tested independently of the Knowledge Model, isolating this specific risk before it's compounded with evidence-shaping changes</td></tr>
+      <tr><td>Knowledge Model lookup throws or hangs inside the request path</td><td>Section 5/17: caught locally in <code>evidencePackage.js</code>, falls back to existing atom extraction unconditionally — the Knowledge Model can never be a single point of failure for Ask AutoIngest</td></tr>
+      <tr><td>Tier-2 regeneration silently drifts from the registry over time</td><td>Manifest-hash staleness detection (Section 9), CI-enforced</td></tr>
+      <tr><td>A future Tier-1 or Tier-2 record reintroduces authoring leakage</td><td>Permanent regression test (Section 10), part of the standard test suite, not opt-in</td></tr>
+      <tr><td>Integration quietly regresses below the accepted 84.2%/94.7% baseline</td><td>Section 14's explicit floor + Product Owner review requirement before merge</td></tr>
+      <tr><td>Rollback needed after merge</td><td>Because the feature flag (step 3) gates the KM-first branch, disabling it reverts <code>evidencePackage.js</code> to its exact pre-integration behavior without a code revert; a full revert of the integration commits is also clean, since Section 6/17 keep the Knowledge Model module additive and isolated from the retrieval/authority/eligibility stages</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section id="stop">
+  <span class="section-num">21 &middot; Stop Conditions — Verified</span>
+  <h2>Planning only, confirmed</h2>
+  <ul>
+    <li><strong>No production Ask AutoIngest code was modified.</strong> Every file read this checkpoint (<code>main/askAutoIngest.js</code>, <code>lib/conversationalAsk.js</code>, <code>lib/answerWithAuthority.js</code>, <code>lib/askSynthesis/*</code>, <code>services/localJudge/*</code>) was read-only.</li>
+    <li><strong><code>evaluateSynthesisEligibility</code> / <code>synthesisEligibility.js</code>:</strong> not modified, documented as a separate future item (Section 15.1).</li>
+    <li><strong><code>questionClassifier.js</code>:</strong> not modified, documented as a separate future item (Section 15.2).</li>
+    <li><strong>Fallback-path leakage:</strong> not patched, documented as a separate future item (Section 15.3), no Knowledge Model record was added to paper over the triggering question.</li>
+    <li><strong>Model/runtime configuration:</strong> unchanged. The Gemma swap is documented as a prerequisite recommendation, not performed.</li>
+    <li><strong>Frozen benchmark, Candidate A/B/C results:</strong> unchanged, not re-run, not re-scored.</li>
+    <li><strong>Nothing committed. Nothing pushed. No branch merged.</strong></li>
+  </ul>
+  <p class="lede" style="margin-top:24px">Stopping here for Product Owner review of the integration plan.</p>
+</section>
+
+</div>
+
+<footer>Integration-planning checkpoint &middot; no production code changed &middot; nothing committed, nothing pushed, nothing merged</footer>

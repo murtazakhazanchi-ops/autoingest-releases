@@ -1,0 +1,968 @@
+{
+  "candidate": {
+    "id": "gemma-4-e4b-knowledge-model",
+    "label": "Gemma-4-E4B-it (Candidate C: Knowledge Model architecture)",
+    "file": "/Users/funun_pa/.claude/jobs/6629ed37/tmp/models/gemma-4-E4B-it-Q4_K_M.gguf"
+  },
+  "knowledgeModelStats": {
+    "total": 66,
+    "forensicVerified": 20,
+    "registryReshaped": 46
+  },
+  "loadMs": 5171,
+  "conversations": [
+    {
+      "id": "A_simple_explanation",
+      "category": "A",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "What is QMZ?"
+        },
+        {
+          "role": "assistant",
+          "text": "QMZ is a standalone, post-import sequencing workspace that archivists use to organize a photographer's already-ingested Qadam/Majlis/Ziyafat material. It allows users to classify the material into numbered real-world-occurrence sequences (like 01Q or 02M), which replaces the need for manual folder creation and file-by-file sorting in Finder or Adobe Bridge.",
+          "kind": "final",
+          "ms": 11275,
+          "meta": {
+            "classification": "EXPLANATION",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\nAVAILABLE\n\nWHAT IT'S FOR\nA standalone, post-import sequencing workspace an archivist uses to classify a photographer's already-ingested QMZ (Qadam/Majlis/Ziyafat) material into numbered real-world-occurrence sequences (e.g. 01Q, 02M), replacing what used to be manual folder creation and file-by-file sorting in Finder/Adobe Bridge.\n\nHOW IT BEHAVES\nQMZ reads each media file's original embedded capture date (from the photo or RAW file's own metadata) rather than the file's copy date on disk, because copying files during import does not reliably preserve the original date across drives (e.g. SD card to archive); the file's copy date on disk is used only as a last-resort fallback when no embedded date can be read. Sequence codes follow a fixed two-digit-number-plus-letter format (e.g. \"01Q\") with a maximum of 50 Qadam, 51 Majlis, and 52 Ziyafat sequences per event, and are a folder-naming convention only — verified live through the real UI that the sequence code is never written into the file's keyword metadata. QMZ keeps its own independent workspace state (grid sort order, view mode, selection, keyboard focus, thumbnail loading) completely separate from standard Import's equivalent state, so switching between the two workspaces never carries settings over from one to the other.\n\nHOW THIS RELATES TO OTHER FEATURES\n- distinctFrom null: Distinct from standard Event Import: QMZ has its own root (qmzRoot), durable state file, renderer namespace, and IPC surface — not a reuse of Import's equivalents. See DEC-011.\n- distinctFrom AI-FEAT-046: QMZ's _Unsequenced/<photographerName>/ adoption is folder-content adoption into QMZ's own bucket — unrelated to AI-FEAT-046's archive-wide Folder Adoption, which registers whole archive folders as AutoIngest events via event.json.\n- distinctFrom AI-FEAT-016: QMZ's arrow-key grid navigation/preview-focus system is its own implementation, explicitly separated from Import's equivalent (AI-FEAT-016).\n- uses AI-FEAT-029: File moves auto-queue into the shared metadata write engine/resolver (qmz:queueMetadata → applyBatch) rather than writing metadata independently.",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-qmz-sequencing",
+            "extractionTier": "forensic-verified",
+            "dimensionsUsed": [
+              "purpose",
+              "behavior",
+              "relationships"
+            ],
+            "technicalGateOpen": false,
+            "questionType": "EXPLANATION"
+          }
+        }
+      ]
+    },
+    {
+      "id": "B_simple_howto",
+      "category": "B",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "How do I sort QMZ photos?"
+        },
+        {
+          "role": "assistant",
+          "text": "To sort QMZ photos, follow these steps:\n\n1.  Open the QMZ Sequence Manager using the \"Sort QMZ Photos\" button after import or through the Event List entry point.\n2.  Select a photographer row in the left panel to view their files (it defaults to the \"Unsequenced\" location).\n3.  Select the files in the center grid using checkboxes or list rows.\n4.  Either create a sequence (like \"01Q\") or type an existing sequence number into the assign input and press Enter. This moves the selected files (and matching sidecar files) into that sequence's folder for the photographer and queues them for metadata writing.\n\n**Before you start:** The event or component you are sorting must already be imported and have a known location on disk.",
+          "kind": "final",
+          "ms": 6774,
+          "meta": {
+            "classification": "HOW_TO",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\nAVAILABLE\n\nHOW OPERATORS DO THIS\n- Open the QMZ Sequence Manager, either via the post-import \"Sort QMZ Photos\" button or the Event List entry point — both open the same workspace for that event.\n- On open, any loose, pre-existing photographer folders are automatically adopted into a reserved \"Unsequenced\" bucket for that photographer.\n- Select a photographer row in the left panel to view their files (defaults to the Unsequenced location).\n- Select files in the center grid (checkbox tiles or list rows, with shift-range select).\n- Create a sequence (e.g. number 1, letter Q) or type an existing sequence number into the assign input and press Enter — this moves the selected files (and any matching sidecar file) into that sequence's folder for that photographer, and automatically queues them for metadata writing.\n- An empty sequence (no real files in any photographer subfolder) can have its type edited or be removed; a non-empty sequence blocks both operations with an explicit message.\n\nBEFORE YOU START\n- The event/component being sorted must already be imported, with a known location on disk to open the workspace against.\n\nAVAILABLE ACTIONS\n- Create sequence: Creates one new sequence folder from a two-digit number and a Q/M/Z type letter (e.g. 01Q); several sequences can also be created at once.\n- Assign files to a sequence: Moves the selected files (plus any matching sidecar file) into the chosen sequence's folder for that photographer, and automatically queues them for metadata writing.\n- Return files to Unsequenced: The reverse/manual path back into the Unsequenced bucket for that photographer.\n- Edit or remove a sequence: Changes a sequence's type or removes it entirely — MVP scope: only permitted when AutoIngest can verify the sequence contains no files.\n\nLIMITATIONS\n- MVP scope: only an empty sequence (no real files in any photographer subfolder) may be edited or removed — no batch re-tagging or renumbering of a populated sequence.\n- AutoIngest cannot yet read an embedded capture date from video files, so QMZ falls back to the file's copy date on disk for video.\n- The product owner explicitly described this as an evolving, first-generation workflow, not a finished design (docs/product/features/AI-FEAT-047, 2026-08-14 capture).\n- Only the primary flow (assign → auto-queue metadata) has been driven live through the real UI end to end; less common paths through the Sequence Manager have not each been individually live-verified (docs/metadata-system.md § Non-Goals).",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-qmz-sequencing",
+            "extractionTier": "forensic-verified",
+            "dimensionsUsed": [
+              "operatorWorkflow",
+              "preconditions",
+              "actions",
+              "limitations"
+            ],
+            "technicalGateOpen": false,
+            "questionType": "HOW_TO"
+          }
+        }
+      ]
+    },
+    {
+      "id": "C_natural_troubleshooting",
+      "category": "C",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "My transfer stopped halfway."
+        },
+        {
+          "role": "assistant",
+          "text": "Which specific transfer stopped halfway: Export or Update a Transfer Drive, Import or Update From a Transfer Drive, or Backup Update Scanning?",
+          "kind": "clarification",
+          "choices": [
+            "Export or Update a Transfer Drive",
+            "Import or Update From a Transfer Drive",
+            "Backup Update Scanning",
+            "Not sure"
+          ],
+          "ms": 1445,
+          "evidenceMeta": null
+        },
+        {
+          "role": "user",
+          "text": "Transfer Export."
+        },
+        {
+          "role": "assistant",
+          "text": "Since your Transfer Export stopped halfway, you can resume it. AutoIngest is designed to track what has been copied and can resume after an interruption.",
+          "kind": "final",
+          "ms": 1605,
+          "meta": {
+            "classification": "TROUBLESHOOTING",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\nAVAILABLE\n\nWHAT IT'S FOR\nWrites a clean, archive-aware mirror of selected events from the Active Archive Root to a Transfer Drive, for physical transport to the Main Archive Root — replacing blind manual copying (Finder/Explorer/TeraCopy) with a managed workflow that tracks what has and has not been copied and can resume after an interruption.\n\nHOW IT BEHAVES\nAutoIngest never overwrites a file that already exists at the destination with matching size — it skips it. A same-named file with a different size is safely renamed instead of overwritten, unless the export is running in backup-update mode (see Backup Update Scanning), where a size mismatch is left untouched and flagged for review instead. AutoIngest's own internal working files and locks are never included in the exported mirror. A traceability log of the export is kept for later reference. Checksum-level verification is a separate, manually-run step, not automatic during the copy itself — the copy step only checks file size, a deliberate speed tradeoff.",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-transfer-export",
+            "extractionTier": "forensic-verified",
+            "dimensionsUsed": [
+              "purpose",
+              "behavior"
+            ],
+            "technicalGateOpen": false,
+            "questionType": "UNKNOWN"
+          }
+        },
+        {
+          "role": "user",
+          "text": "Yes, the NAS disconnected."
+        },
+        {
+          "role": "assistant",
+          "text": "Because the NAS disconnected, you can resume the Transfer Export. AutoIngest tracks what has been copied and can resume after an interruption.",
+          "kind": "final",
+          "ms": 1515,
+          "meta": {
+            "classification": "TROUBLESHOOTING",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\nAVAILABLE\n\nWHAT IT'S FOR\nWrites a clean, archive-aware mirror of selected events from the Active Archive Root to a Transfer Drive, for physical transport to the Main Archive Root — replacing blind manual copying (Finder/Explorer/TeraCopy) with a managed workflow that tracks what has and has not been copied and can resume after an interruption.\n\nHOW IT BEHAVES\nAutoIngest never overwrites a file that already exists at the destination with matching size — it skips it. A same-named file with a different size is safely renamed instead of overwritten, unless the export is running in backup-update mode (see Backup Update Scanning), where a size mismatch is left untouched and flagged for review instead. AutoIngest's own internal working files and locks are never included in the exported mirror. A traceability log of the export is kept for later reference. Checksum-level verification is a separate, manually-run step, not automatic during the copy itself — the copy step only checks file size, a deliberate speed tradeoff.",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-transfer-export",
+            "extractionTier": "forensic-verified",
+            "dimensionsUsed": [
+              "purpose",
+              "behavior"
+            ],
+            "technicalGateOpen": false,
+            "questionType": "UNKNOWN"
+          }
+        }
+      ]
+    },
+    {
+      "id": "D_freeform_clarification",
+      "category": "D",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "I was copying an event to a portable drive and the NAS disappeared."
+        },
+        {
+          "role": "assistant",
+          "text": "AutoIngest is designed to write a clean, archive-aware mirror of selected events from the Active Archive Root to a Transfer Drive for physical transport. It manages this workflow to track what has and has not been copied, allowing it to resume after an interruption.\n\nIf you were using AutoIngest and the NAS disappeared while copying, you might want to check the traceability log of the export for reference.",
+          "kind": "final",
+          "ms": 3370,
+          "meta": {
+            "classification": "UNKNOWN",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\nAVAILABLE\n\nWHAT IT'S FOR\nWrites a clean, archive-aware mirror of selected events from the Active Archive Root to a Transfer Drive, for physical transport to the Main Archive Root — replacing blind manual copying (Finder/Explorer/TeraCopy) with a managed workflow that tracks what has and has not been copied and can resume after an interruption.\n\nHOW IT BEHAVES\nAutoIngest never overwrites a file that already exists at the destination with matching size — it skips it. A same-named file with a different size is safely renamed instead of overwritten, unless the export is running in backup-update mode (see Backup Update Scanning), where a size mismatch is left untouched and flagged for review instead. AutoIngest's own internal working files and locks are never included in the exported mirror. A traceability log of the export is kept for later reference. Checksum-level verification is a separate, manually-run step, not automatic during the copy itself — the copy step only checks file size, a deliberate speed tradeoff.",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-transfer-export",
+            "extractionTier": "forensic-verified",
+            "dimensionsUsed": [
+              "purpose",
+              "behavior"
+            ],
+            "technicalGateOpen": false,
+            "questionType": "UNKNOWN"
+          }
+        }
+      ]
+    },
+    {
+      "id": "E_operator_doesnt_know",
+      "category": "E",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "My transfer stopped."
+        },
+        {
+          "role": "assistant",
+          "text": "Which specific transfer stopped: Export or Update a Transfer Drive, Import or Update From a Transfer Drive, or Backup Update Scanning?",
+          "kind": "clarification",
+          "choices": [
+            "Export or Update a Transfer Drive",
+            "Import or Update From a Transfer Drive",
+            "Backup Update Scanning",
+            "Not sure"
+          ],
+          "ms": 1410,
+          "evidenceMeta": null
+        },
+        {
+          "role": "user",
+          "text": "I'm not sure. I was just copying yesterday's event."
+        },
+        {
+          "role": "assistant",
+          "text": "Closest match I can offer without more detail: Writes a clean mirror of selected events to a portable drive (Transfer Export, Transfer Export), or scans an existing transfer drive for what's changed since the last copy (Backup Update Scanning, Backup Update Scanning, a mode whose own record lists Transfer Export as its Parent feature) — these are two distinct capabilities sharing this one entry point ( → the Transfer Export modal), with different conflict semantics (Backup Update never overwrites or renames on conflict; Transfer Export's own record should be consulted for its exact behavior rather than assumed identical). This workflow is outbound only (Active Archive Root → Transfer Drive) — for the inbound direction (Transfer Drive → Main Archive Root), see Import or Update From a Transfer Drive.",
+          "kind": "final",
+          "ms": 41,
+          "meta": {
+            "classification": "HOW_TO",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "weak",
+            "steps": [
+              "Select **Transfer Export…**.",
+              "Choose the destination drive and the events to include.",
+              "To update an existing transfer drive instead of a fresh export, use **Scan for New Data** to compare against what's already there before copying.",
+              "Confirm to begin the copy. Transfer/sync can run in the background without blocking the rest of the app while it copies (AI-FEAT-041 — confirmed as a real, distinct capability from standard Import, which does not have this background/minimize behavior)."
+            ],
+            "limitations": [
+              "A real, historical divergence between displayed resume state and actual backend progress was found and fixed (BUG-005) — cited as evidence this path has real edge-case history, not to imply it's currently broken.",
+              "Per `CLAUDE.md`'s File Copy Rules: no overwrite, ever, applies here too."
+            ],
+            "synthesis": {
+              "applied": false,
+              "reason": "weak-retrieval-weak"
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": true
+          },
+          "evidenceMeta": null
+        }
+      ]
+    },
+    {
+      "id": "F_followup_no_repeat",
+      "category": "F",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "How do I create a Transfer Export?"
+        },
+        {
+          "role": "assistant",
+          "text": "To create a Transfer Export, follow these steps:\n\n1.  Select the collections, event-root folders, or photographer folders you want to export (or use custom-source mode for a specific folder pair).\n2.  Preview the export scope to see the file/folder/event counts before starting.\n3.  Run the export.\n\nBefore you begin, ensure that:\n*   Both the Active Archive Root (source) and the Transfer Drive Root (destination) are configured and mounted.\n*   The source and destination roots are not the same directory or nested inside one another.\n*   Only one export is running at a time within the same running app process.",
+          "kind": "final",
+          "ms": 5743,
+          "meta": {
+            "classification": "HOW_TO",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\nAVAILABLE\n\nHOW OPERATORS DO THIS\n- Select collections, event-root folders, or photographer folders to export (or use custom-source mode for an arbitrary folder pair).\n- Preview the export scope (file/folder/event counts) before running.\n- Run the export; it proceeds in batches (one batch per event or per selected folder), showing live progress (copied/skipped/renamed/errors) and can be paused and resumed within the same run.\n- If the app is closed or crashes mid-export, reopen it and resume from the on-disk checkpoint rather than starting over.\n- Optionally run a separate verify step afterward (checksum-level, not automatic during copy).\n\nBEFORE YOU START\n- Active Archive Root (source) and Transfer Drive Root (destination) are both configured and mounted.\n- Source and destination roots must not be the same directory or nested inside one another.\n- Only one export may run at a time within the same running app process.\n\nAVAILABLE ACTIONS\n- Run Export: Starts a new export for the selected scope.\n- Pause / Resume (in-run): Pauses or resumes an export while it is running, in the current app session; takes effect between files or between batches.\n- Resume from Checkpoint: Resumes an export that was interrupted (for example, by an app restart) by picking up from its saved on-disk progress instead of starting over. Custom-source exports have their own separate resume/clear option.\n- Verify Export: Runs a separate checksum verification pass comparing copied files against the source. This is not automatic during the copy itself — the copy step only checks file size for speed.\n- Scan for Backup Update (Backup Update Scanning): A distinct read-only pre-copy diff mode — see KM-backup-update-scanning.\n\nLIMITATIONS\n- The single-export-at-a-time guard is process-local only, not a durable cross-device lock (DEC-021) — two AutoIngest instances on different machines are not prevented from exporting to the same destination simultaneously.\n- Checkpoint/resume granularity is per-batch (per event/folder), not per-file — an interrupted batch is re-walked in full on resume, though already-copied files within it are not re-copied due to the same-size-skip rule.\n- Checksum verification is a separate, manually-invoked step, not automatic during the copy.",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-transfer-export",
+            "extractionTier": "forensic-verified",
+            "dimensionsUsed": [
+              "operatorWorkflow",
+              "preconditions",
+              "actions",
+              "limitations"
+            ],
+            "technicalGateOpen": false,
+            "questionType": "HOW_TO"
+          }
+        },
+        {
+          "role": "user",
+          "text": "And if it stops halfway?"
+        },
+        {
+          "role": "assistant",
+          "text": "If a Transfer Export stops halfway, AutoIngest can resume after an interruption because it tracks what has and has not been copied.",
+          "kind": "final",
+          "ms": 1694,
+          "meta": {
+            "classification": "HOW_TO",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\nAVAILABLE\n\nWHAT IT'S FOR\nWrites a clean, archive-aware mirror of selected events from the Active Archive Root to a Transfer Drive, for physical transport to the Main Archive Root — replacing blind manual copying (Finder/Explorer/TeraCopy) with a managed workflow that tracks what has and has not been copied and can resume after an interruption.\n\nHOW IT BEHAVES\nAutoIngest never overwrites a file that already exists at the destination with matching size — it skips it. A same-named file with a different size is safely renamed instead of overwritten, unless the export is running in backup-update mode (see Backup Update Scanning), where a size mismatch is left untouched and flagged for review instead. AutoIngest's own internal working files and locks are never included in the exported mirror. A traceability log of the export is kept for later reference. Checksum-level verification is a separate, manually-run step, not automatic during the copy itself — the copy step only checks file size, a deliberate speed tradeoff.",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-transfer-export",
+            "extractionTier": "forensic-verified",
+            "dimensionsUsed": [
+              "purpose",
+              "behavior"
+            ],
+            "technicalGateOpen": false,
+            "questionType": "UNKNOWN"
+          }
+        }
+      ]
+    },
+    {
+      "id": "G_followup_after_answer",
+      "category": "G",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "How do I recover from a stale archive lock error?"
+        },
+        {
+          "role": "assistant",
+          "text": "You have two ways to recover from a stale archive lock error:\n\n1.  **Clear it directly (if created by your device):** You can clear the lock directly, but only after AutoIngest confirms the device isn't still actively using it. If the lock is recently-active, you must explicitly confirm that no job is actually running.\n2.  **Use Archive Diagnostics:** Archive Diagnostics can release a stale lock regardless of which device created it. This process double-checks immediately before removing the lock to ensure it hasn't become active again.",
+          "kind": "final",
+          "ms": 5013,
+          "meta": {
+            "classification": "TROUBLESHOOTING",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\nAVAILABLE\n\nIF INTERRUPTED / RECOVERY\nYes — this is precisely the recovery an operator uses for a stale archive lock error. There are two ways to recover, and both refuse to act on a lock that is still genuinely active (a live lock is always left alone): first, if the lock was created by this same device, the operator can clear it directly, but only once AutoIngest has confirmed the device isn't still actively using it — recently-active locks are refused unless the operator explicitly confirms no job is actually running. Second, Archive Diagnostics can release a stale lock regardless of which device created it, and double-checks immediately before removing it that the lock hasn't become active again in the meantime, so a lock that starts being used again right as it's being cleared is never pulled out from under a real, running job. A lock is never automatically deleted just because it expired — expiring only means a new import is now allowed to claim it; the old lock record stays in place until one of these two recovery actions (or a fresh successful lock) replaces it.\n\nHOW IT BEHAVES\nEach lock is scoped to one specific collection/event/photographer combination, so locking one photographer's folder never blocks work on a different photographer in the same event. A lock automatically expires after 30 minutes unless it is actively renewed, which happens roughly every 5 minutes while the import holding it is still running — so a lock only outlives its own import if that import genuinely crashed or was killed. Acquiring a lock is a safe, all-or-nothing operation: an active lock always blocks a conflicting new import outright rather than being silently overwritten, while an expired (stale) lock can be safely claimed by a new attempt. Releasing a lock is safe to attempt even if it's already gone — that is simply treated as already released, not an error.\n\nLIMITATIONS\n- Lock scope is photographer-folder-level only — it does not protect at the event or collection level beyond that.\n- The \"clear own stale lock\" action only ever clears locks created by this exact device — it cannot force-clear another device's lock; only the Archive Diagnostics release action (which still requires the lock to be genuinely stale) can do that.\n- A lock file that never becomes stale (its owning process keeps renewing the heartbeat) cannot be released by either recovery path while it remains active — this is by design, not a bug.",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-archive-lock-handling",
+            "extractionTier": "forensic-verified",
+            "dimensionsUsed": [
+              "recovery",
+              "behavior",
+              "limitations"
+            ],
+            "technicalGateOpen": false,
+            "questionType": "TROUBLESHOOTING"
+          }
+        },
+        {
+          "role": "user",
+          "text": "What should I do after that?"
+        },
+        {
+          "role": "assistant",
+          "text": "The provided information describes how the lock behaves and how to recover from a stale lock, but it does not specify what steps to take *after* the recovery process.",
+          "kind": "final",
+          "ms": 1879,
+          "meta": {
+            "classification": "TROUBLESHOOTING",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\nAVAILABLE\n\nWHAT IT'S FOR\nPhotographer-level write locks for Direct Archive imports, preventing two concurrent imports from writing into the same event/photographer folder simultaneously, with automatic detection and operator-facing recovery when a lock is stale (its owning process crashed or was killed without releasing it).\n\nHOW IT BEHAVES\nEach lock is scoped to one specific collection/event/photographer combination, so locking one photographer's folder never blocks work on a different photographer in the same event. A lock automatically expires after 30 minutes unless it is actively renewed, which happens roughly every 5 minutes while the import holding it is still running — so a lock only outlives its own import if that import genuinely crashed or was killed. Acquiring a lock is a safe, all-or-nothing operation: an active lock always blocks a conflicting new import outright rather than being silently overwritten, while an expired (stale) lock can be safely claimed by a new attempt. Releasing a lock is safe to attempt even if it's already gone — that is simply treated as already released, not an error.",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-archive-lock-handling",
+            "extractionTier": "forensic-verified",
+            "dimensionsUsed": [
+              "purpose",
+              "behavior"
+            ],
+            "technicalGateOpen": false,
+            "questionType": "UNKNOWN"
+          }
+        }
+      ]
+    },
+    {
+      "id": "H_topic_change",
+      "category": "H",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "How do I create a Transfer Export?"
+        },
+        {
+          "role": "assistant",
+          "text": "To create a Transfer Export, follow these steps:\n\n1.  Select the collections, event-root folders, or photographer folders you want to export (or use custom-source mode for a specific folder pair).\n2.  Preview the export scope to see the file/folder/event counts before starting.\n3.  Run the export.\n\nBefore you begin, ensure that:\n*   Both the Active Archive Root (source) and the Transfer Drive Root (destination) are configured and mounted.\n*   The source and destination roots are not the same directory or nested inside one another.\n*   Only one export is running at a time within the same running app process.",
+          "kind": "final",
+          "ms": 5702,
+          "meta": {
+            "classification": "HOW_TO",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\nAVAILABLE\n\nHOW OPERATORS DO THIS\n- Select collections, event-root folders, or photographer folders to export (or use custom-source mode for an arbitrary folder pair).\n- Preview the export scope (file/folder/event counts) before running.\n- Run the export; it proceeds in batches (one batch per event or per selected folder), showing live progress (copied/skipped/renamed/errors) and can be paused and resumed within the same run.\n- If the app is closed or crashes mid-export, reopen it and resume from the on-disk checkpoint rather than starting over.\n- Optionally run a separate verify step afterward (checksum-level, not automatic during copy).\n\nBEFORE YOU START\n- Active Archive Root (source) and Transfer Drive Root (destination) are both configured and mounted.\n- Source and destination roots must not be the same directory or nested inside one another.\n- Only one export may run at a time within the same running app process.\n\nAVAILABLE ACTIONS\n- Run Export: Starts a new export for the selected scope.\n- Pause / Resume (in-run): Pauses or resumes an export while it is running, in the current app session; takes effect between files or between batches.\n- Resume from Checkpoint: Resumes an export that was interrupted (for example, by an app restart) by picking up from its saved on-disk progress instead of starting over. Custom-source exports have their own separate resume/clear option.\n- Verify Export: Runs a separate checksum verification pass comparing copied files against the source. This is not automatic during the copy itself — the copy step only checks file size for speed.\n- Scan for Backup Update (Backup Update Scanning): A distinct read-only pre-copy diff mode — see KM-backup-update-scanning.\n\nLIMITATIONS\n- The single-export-at-a-time guard is process-local only, not a durable cross-device lock (DEC-021) — two AutoIngest instances on different machines are not prevented from exporting to the same destination simultaneously.\n- Checkpoint/resume granularity is per-batch (per event/folder), not per-file — an interrupted batch is re-walked in full on resume, though already-copied files within it are not re-copied due to the same-size-skip rule.\n- Checksum verification is a separate, manually-invoked step, not automatic during the copy.",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-transfer-export",
+            "extractionTier": "forensic-verified",
+            "dimensionsUsed": [
+              "operatorWorkflow",
+              "preconditions",
+              "actions",
+              "limitations"
+            ],
+            "technicalGateOpen": false,
+            "questionType": "HOW_TO"
+          }
+        },
+        {
+          "role": "user",
+          "text": "Actually, how do I sort QMZ photos?"
+        },
+        {
+          "role": "assistant",
+          "text": "QMZ is a standalone, post-import sequencing workspace used to classify a photographer's already-ingested QMZ (Qadam/Majlis/Ziyafat) material into numbered real-world-occurrence sequences (like 01Q or 02M). This replaces manual folder creation and file-by-file sorting.",
+          "kind": "final",
+          "ms": 3267,
+          "meta": {
+            "classification": "UNKNOWN",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": true,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\nAVAILABLE\n\nWHAT IT'S FOR\nA standalone, post-import sequencing workspace an archivist uses to classify a photographer's already-ingested QMZ (Qadam/Majlis/Ziyafat) material into numbered real-world-occurrence sequences (e.g. 01Q, 02M), replacing what used to be manual folder creation and file-by-file sorting in Finder/Adobe Bridge.\n\nHOW IT BEHAVES\nQMZ reads each media file's original embedded capture date (from the photo or RAW file's own metadata) rather than the file's copy date on disk, because copying files during import does not reliably preserve the original date across drives (e.g. SD card to archive); the file's copy date on disk is used only as a last-resort fallback when no embedded date can be read. Sequence codes follow a fixed two-digit-number-plus-letter format (e.g. \"01Q\") with a maximum of 50 Qadam, 51 Majlis, and 52 Ziyafat sequences per event, and are a folder-naming convention only — verified live through the real UI that the sequence code is never written into the file's keyword metadata. QMZ keeps its own independent workspace state (grid sort order, view mode, selection, keyboard focus, thumbnail loading) completely separate from standard Import's equivalent state, so switching between the two workspaces never carries settings over from one to the other.",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-qmz-sequencing",
+            "extractionTier": "forensic-verified",
+            "dimensionsUsed": [
+              "purpose",
+              "behavior"
+            ],
+            "technicalGateOpen": false,
+            "questionType": "UNKNOWN"
+          }
+        }
+      ]
+    },
+    {
+      "id": "I_user_corrects",
+      "category": "I",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "Does AutoIngest back up automatically?"
+        },
+        {
+          "role": "assistant",
+          "text": "Which AutoIngest area are you asking about: Archive Root Configuration & Resolution or Transfer Export?",
+          "kind": "clarification",
+          "choices": [
+            "Archive Root Configuration & Resolution",
+            "Transfer Export",
+            "Not sure"
+          ],
+          "ms": 1188,
+          "evidenceMeta": null
+        },
+        {
+          "role": "user",
+          "text": "Sorry, I meant cloud backup specifically -- like Google Drive or Dropbox, not local copies."
+        },
+        {
+          "role": "assistant",
+          "text": "AutoIngest does not have cloud backup capabilities for services like Google Drive or Dropbox. All of AutoIngest's storage roots are local disk or NAS-based.",
+          "kind": "final",
+          "ms": 1400,
+          "meta": {
+            "classification": "STATUS",
+            "capabilityStatus": "NOT_SUPPORTED",
+            "matchQuality": "boundary",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\nNOT_SUPPORTED\n\nWHAT IT'S FOR\nNot applicable — this capability does not exist in AutoIngest.\n\nHOW IT BEHAVES\nAutoIngest has no cloud storage, cloud backup, or external website/gallery upload capability. All storage roots (Active Archive Root, Main Archive Root, Transfer Drive, local staging) are local disk or NAS-based.",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-not-supported-cloud-storage",
+            "extractionTier": "registry-reshaped",
+            "dimensionsUsed": [
+              "purpose",
+              "behavior"
+            ],
+            "technicalGateOpen": false,
+            "questionType": "UNKNOWN"
+          }
+        }
+      ]
+    },
+    {
+      "id": "J_dont_understand",
+      "category": "J",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "What is QMZ?"
+        },
+        {
+          "role": "assistant",
+          "text": "QMZ is a standalone, post-import sequencing workspace that archivists use to organize a photographer's already-ingested Qadam/Majlis/Ziyafat material. It allows users to classify the material into numbered real-world-occurrence sequences (like 01Q or 02M), which replaces the need for manual folder creation and file-by-file sorting in Finder or Adobe Bridge.",
+          "kind": "final",
+          "ms": 4216,
+          "meta": {
+            "classification": "EXPLANATION",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\nAVAILABLE\n\nWHAT IT'S FOR\nA standalone, post-import sequencing workspace an archivist uses to classify a photographer's already-ingested QMZ (Qadam/Majlis/Ziyafat) material into numbered real-world-occurrence sequences (e.g. 01Q, 02M), replacing what used to be manual folder creation and file-by-file sorting in Finder/Adobe Bridge.\n\nHOW IT BEHAVES\nQMZ reads each media file's original embedded capture date (from the photo or RAW file's own metadata) rather than the file's copy date on disk, because copying files during import does not reliably preserve the original date across drives (e.g. SD card to archive); the file's copy date on disk is used only as a last-resort fallback when no embedded date can be read. Sequence codes follow a fixed two-digit-number-plus-letter format (e.g. \"01Q\") with a maximum of 50 Qadam, 51 Majlis, and 52 Ziyafat sequences per event, and are a folder-naming convention only — verified live through the real UI that the sequence code is never written into the file's keyword metadata. QMZ keeps its own independent workspace state (grid sort order, view mode, selection, keyboard focus, thumbnail loading) completely separate from standard Import's equivalent state, so switching between the two workspaces never carries settings over from one to the other.\n\nHOW THIS RELATES TO OTHER FEATURES\n- distinctFrom null: Distinct from standard Event Import: QMZ has its own root (qmzRoot), durable state file, renderer namespace, and IPC surface — not a reuse of Import's equivalents. See DEC-011.\n- distinctFrom AI-FEAT-046: QMZ's _Unsequenced/<photographerName>/ adoption is folder-content adoption into QMZ's own bucket — unrelated to AI-FEAT-046's archive-wide Folder Adoption, which registers whole archive folders as AutoIngest events via event.json.\n- distinctFrom AI-FEAT-016: QMZ's arrow-key grid navigation/preview-focus system is its own implementation, explicitly separated from Import's equivalent (AI-FEAT-016).\n- uses AI-FEAT-029: File moves auto-queue into the shared metadata write engine/resolver (qmz:queueMetadata → applyBatch) rather than writing metadata independently.",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-qmz-sequencing",
+            "extractionTier": "forensic-verified",
+            "dimensionsUsed": [
+              "purpose",
+              "behavior",
+              "relationships"
+            ],
+            "technicalGateOpen": false,
+            "questionType": "EXPLANATION"
+          }
+        },
+        {
+          "role": "user",
+          "text": "I don't understand what that means."
+        },
+        {
+          "role": "assistant",
+          "text": "QMZ is a separate workspace you use *after* you have imported material. Its purpose is to help you organize a photographer's already-imported material (like Qadam, Majlis, or Ziyafat photos) by grouping them into numbered sequences that match real-world events (for example, \"01Q\" or \"02M\"). This replaces the need to manually create folders or sort files one by one in Finder or Adobe Bridge.",
+          "kind": "final",
+          "ms": 3832,
+          "meta": {
+            "classification": "EXPLANATION",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\nAVAILABLE\n\nWHAT IT'S FOR\nA standalone, post-import sequencing workspace an archivist uses to classify a photographer's already-ingested QMZ (Qadam/Majlis/Ziyafat) material into numbered real-world-occurrence sequences (e.g. 01Q, 02M), replacing what used to be manual folder creation and file-by-file sorting in Finder/Adobe Bridge.\n\nHOW IT BEHAVES\nQMZ reads each media file's original embedded capture date (from the photo or RAW file's own metadata) rather than the file's copy date on disk, because copying files during import does not reliably preserve the original date across drives (e.g. SD card to archive); the file's copy date on disk is used only as a last-resort fallback when no embedded date can be read. Sequence codes follow a fixed two-digit-number-plus-letter format (e.g. \"01Q\") with a maximum of 50 Qadam, 51 Majlis, and 52 Ziyafat sequences per event, and are a folder-naming convention only — verified live through the real UI that the sequence code is never written into the file's keyword metadata. QMZ keeps its own independent workspace state (grid sort order, view mode, selection, keyboard focus, thumbnail loading) completely separate from standard Import's equivalent state, so switching between the two workspaces never carries settings over from one to the other.",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-qmz-sequencing",
+            "extractionTier": "forensic-verified",
+            "dimensionsUsed": [
+              "purpose",
+              "behavior"
+            ],
+            "technicalGateOpen": false,
+            "questionType": "UNKNOWN"
+          }
+        }
+      ]
+    },
+    {
+      "id": "K_concise_question",
+      "category": "K",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "Can AutoIngest do face recognition?"
+        },
+        {
+          "role": "assistant",
+          "text": "No, AutoIngest does not have face or facial-identification capability.",
+          "kind": "final",
+          "ms": 1065,
+          "meta": {
+            "classification": "STATUS",
+            "capabilityStatus": "NOT_SUPPORTED",
+            "matchQuality": "boundary",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\nNOT_SUPPORTED\n\nWHAT IT'S FOR\nNot applicable — this capability does not exist in AutoIngest.\n\nLIMITATIONS\n- No face or facial-identification capability exists, planned or implemented.",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-not-supported-face-recognition",
+            "extractionTier": "registry-reshaped",
+            "dimensionsUsed": [
+              "purpose",
+              "limitations"
+            ],
+            "technicalGateOpen": false,
+            "questionType": "STATUS"
+          }
+        }
+      ]
+    },
+    {
+      "id": "L_roadmap",
+      "category": "L",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "What's coming next?"
+        },
+        {
+          "role": "assistant",
+          "text": "The next milestone in the ordered archive-capability roadmap is AI-RM-002 (Archive Maintenance). However, its objective, deliverables, and acceptance criteria are currently \"Evidence pending,\" meaning the scope has not yet been defined.\n\nTwo other tracks are complete: AI-RM-010 (Multi-Channel Release & Update System) and AI-RM-011 (Knowledge & Onboarding Portal, Stage 1+2).",
+          "kind": "final",
+          "ms": 3769,
+          "meta": {
+            "classification": "ROADMAP",
+            "capabilityStatus": "ROADMAP",
+            "matchQuality": "roadmap",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\n(no fixed status -- this is a roadmap/dashboard question)\n\nHOW IT BEHAVES\nThe ordered archive-capability roadmap (AI-RM-001 through AI-RM-009) is 1 of 9 milestones complete. AI-RM-001 (Metadata Audit & Repair) is Completed. The next milestone is AI-RM-002 (Archive Maintenance), whose active implementation has Not started (scope itself is not yet defined — \"Evidence pending\" for objective/deliverables/acceptance criteria). AI-RM-003 (Event Maintenance) follows AI-RM-002 and depends on it; also not started. Two separate, parallel tracks outside this sequence are already complete: AI-RM-010 (Multi-Channel Release & Update System) and AI-RM-011 (Knowledge & Onboarding Portal, Stage 1+2).\n\nLIMITATIONS\n- AI-RM-002's objective, deliverables, and acceptance criteria are explicitly \"Evidence pending\" — scope has not yet been defined, only its position in sequence.",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-roadmap-status",
+            "extractionTier": "registry-reshaped",
+            "dimensionsUsed": [
+              "behavior",
+              "limitations"
+            ],
+            "technicalGateOpen": false,
+            "questionType": "ROADMAP"
+          }
+        }
+      ]
+    },
+    {
+      "id": "M_why_question",
+      "category": "M",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "Why is QMZ separate from normal Event Import?"
+        },
+        {
+          "role": "assistant",
+          "text": "QMZ is a separate, standalone workspace used by archivists to classify already-ingested QMZ (Qadam/Majlis/Ziyafat) material into numbered real-world-occurrence sequences (like 01Q or 02M). This replaces the previous process of manually creating folders and sorting files in Finder or Adobe Bridge.\n\nQMZ operates independently from normal Event Import in a few ways:\n\n*   **Date Reading:** It reads the original embedded capture date from the media file's metadata, not the file's copy date on disk (which is used only as a fallback).\n*   **Workspace State:** It maintains its own independent state (such as grid sort order, view mode, etc.), meaning settings from the standard Import workspace do not carry over when switching to QMZ.",
+          "kind": "final",
+          "ms": 6149,
+          "meta": {
+            "classification": "UNKNOWN",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\nAVAILABLE\n\nWHAT IT'S FOR\nA standalone, post-import sequencing workspace an archivist uses to classify a photographer's already-ingested QMZ (Qadam/Majlis/Ziyafat) material into numbered real-world-occurrence sequences (e.g. 01Q, 02M), replacing what used to be manual folder creation and file-by-file sorting in Finder/Adobe Bridge.\n\nHOW IT BEHAVES\nQMZ reads each media file's original embedded capture date (from the photo or RAW file's own metadata) rather than the file's copy date on disk, because copying files during import does not reliably preserve the original date across drives (e.g. SD card to archive); the file's copy date on disk is used only as a last-resort fallback when no embedded date can be read. Sequence codes follow a fixed two-digit-number-plus-letter format (e.g. \"01Q\") with a maximum of 50 Qadam, 51 Majlis, and 52 Ziyafat sequences per event, and are a folder-naming convention only — verified live through the real UI that the sequence code is never written into the file's keyword metadata. QMZ keeps its own independent workspace state (grid sort order, view mode, selection, keyboard focus, thumbnail loading) completely separate from standard Import's equivalent state, so switching between the two workspaces never carries settings over from one to the other.",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-qmz-sequencing",
+            "extractionTier": "forensic-verified",
+            "dimensionsUsed": [
+              "purpose",
+              "behavior"
+            ],
+            "technicalGateOpen": false,
+            "questionType": "UNKNOWN"
+          }
+        }
+      ]
+    },
+    {
+      "id": "N_technical_question",
+      "category": "N",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "Where does QMZ store its sequencing state?"
+        },
+        {
+          "role": "assistant",
+          "text": "QMZ keeps its own independent workspace state separate from standard Import's equivalent state. If you are asking about the technical storage, the sequencing state is persisted as JSON at `<qmzRoot>/qmz-sequences.json`.",
+          "kind": "final",
+          "ms": 4680,
+          "meta": {
+            "classification": "NAVIGATION",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\nAVAILABLE\n\nHOW OPERATORS DO THIS\n- Open the QMZ Sequence Manager, either via the post-import \"Sort QMZ Photos\" button or the Event List entry point — both open the same workspace for that event.\n- On open, any loose, pre-existing photographer folders are automatically adopted into a reserved \"Unsequenced\" bucket for that photographer.\n- Select a photographer row in the left panel to view their files (defaults to the Unsequenced location).\n- Select files in the center grid (checkbox tiles or list rows, with shift-range select).\n- Create a sequence (e.g. number 1, letter Q) or type an existing sequence number into the assign input and press Enter — this moves the selected files (and any matching sidecar file) into that sequence's folder for that photographer, and automatically queues them for metadata writing.\n- An empty sequence (no real files in any photographer subfolder) can have its type edited or be removed; a non-empty sequence blocks both operations with an explicit message.\n\nAVAILABLE ACTIONS\n- Create sequence: Creates one new sequence folder from a two-digit number and a Q/M/Z type letter (e.g. 01Q); several sequences can also be created at once.\n- Assign files to a sequence: Moves the selected files (plus any matching sidecar file) into the chosen sequence's folder for that photographer, and automatically queues them for metadata writing.\n- Return files to Unsequenced: The reverse/manual path back into the Unsequenced bucket for that photographer.\n- Edit or remove a sequence: Changes a sequence's type or removes it entirely — MVP scope: only permitted when AutoIngest can verify the sequence contains no files.\n\nHOW IT BEHAVES\nQMZ reads each media file's original embedded capture date (from the photo or RAW file's own metadata) rather than the file's copy date on disk, because copying files during import does not reliably preserve the original date across drives (e.g. SD card to archive); the file's copy date on disk is used only as a last-resort fallback when no embedded date can be read. Sequence codes follow a fixed two-digit-number-plus-letter format (e.g. \"01Q\") with a maximum of 50 Qadam, 51 Majlis, and 52 Ziyafat sequences per event, and are a folder-naming convention only — verified live through the real UI that the sequence code is never written into the file's keyword metadata. QMZ keeps its own independent workspace state (grid sort order, view mode, selection, keyboard focus, thumbnail loading) completely separate from standard Import's equivalent state, so switching between the two workspaces never carries settings over from one to the other.\n\nTECHNICAL DETAIL (only because the operator explicitly asked a technical question)\nSequencing state is persisted as JSON at <qmzRoot>/qmz-sequences.json (STATE_FILE constant, main/qmzService.js:9), written via a tmp-file-then-rename atomic pattern in saveState() (main/qmzService.js:254-265) and read via readState() (main/qmzService.js:245-252), which returns a default { version: 1, qmzRoot, sequences: [] } shape if the file does not yet exist. The file records each sequence's { code, number, letter, type } — it does not itself store which files are in a sequence; that is derived by scanning the qmzRoot folder structure on demand (scanRoot(), main/qmzService.js:276-305). Codes are the folder names directly: <2-digit number padded><Q|M|Z> (formatCode(), main/qmzService.js:118-120), e.g. \"01Q\" = Qadam sequence 1. LETTER_TYPE = { Q: \"Qadam\", M: \"Majlis\", Z: \"Ziyafat\" } and LETTER_MAX = { Q: 50, M: 51, Z: 52 } (main/qmzService.js:12-13). The IPC surface is qmz:scanRoot / qmz:initRoot / qmz:createSequence / qmz:bulkCreate / qmz:editSequence / qmz:removeSequence / qmz:moveToSequence / qmz:moveToUnsequenced / qmz:queueMetadata, registered in main/main.js:5500-5544 and exposed via main/preload.js:388-398. Capture-date reads use the exifr library for photos and ExifTool for RAW files, reusing AI-FEAT-029's singleton process pool rather than spawning a process per file (main/qmzService.js:19-49, :88-97); this preference over filesystem mtime exists because fs.copyFile() during import does not reliably preserve source mtime across a cross-volume copy (e.g. SD card → archive). Sequence codes must match /^\\d{2}[QMZ]$/ (SEQ_RE, main/qmzService.js:11) before being accepted. QMZ's renderer state is fully namespaced under a `_qmz*` prefix (grid sort, view mode, selection, arrow-key focus, thumbnail queue), explicitly documented in code comments as never touching standard Import's `sortKey`/`viewMode` state (renderer/renderer.js:343-363). The no-overwrite move safety and state/filesystem consistency check on removal are implemented in safeMoveFile() (main/qmzService.js:148-163) and removeSequence() (main/qmzService.js:426-460).",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-qmz-sequencing",
+            "extractionTier": "forensic-verified",
+            "dimensionsUsed": [
+              "operatorWorkflow",
+              "actions",
+              "behavior",
+              "technicalDetail"
+            ],
+            "technicalGateOpen": true,
+            "questionType": "NAVIGATION"
+          }
+        }
+      ]
+    },
+    {
+      "id": "O_unsupported_feature",
+      "category": "O",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "Does AutoIngest automatically tag people in photos using AI?"
+        },
+        {
+          "role": "assistant",
+          "text": "AutoIngest's documentation does not have enough evidence to answer this confidently. This is reported honestly rather than guessed.",
+          "kind": "final",
+          "ms": 16,
+          "meta": {
+            "classification": "STATUS",
+            "capabilityStatus": "UNKNOWN",
+            "matchQuality": "none",
+            "limitations": [],
+            "synthesis": {
+              "applied": false,
+              "reason": "deterministic-unknown"
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          },
+          "evidenceMeta": null
+        }
+      ]
+    },
+    {
+      "id": "P1_messy_shorthand",
+      "category": "P",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "yo qmz thing not working right, sequence #s messed up"
+        },
+        {
+          "role": "assistant",
+          "text": "If your sequence numbers seem incorrect, it might be a manual assignment mistake. If files are in the wrong sequence folder (like 01Q or 02M), you need to move those files back to Unsequenced and reassign them, rather than changing the sort order.\n\nAlso, please note that sequence codes are labels you assign manually; they do not change automatically.",
+          "kind": "final",
+          "ms": 4453,
+          "meta": {
+            "classification": "TROUBLESHOOTING",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\nAVAILABLE\n\nIF INTERRUPTED / RECOVERY\nMoving files never overwrites existing content: if a file with the same name and size already exists at the destination, the move is treated as already done and skipped; if a same-named file with a different size exists there, the incoming file is renamed with a _1, _2, etc. suffix instead of overwriting anything. Removing a sequence only clears it from AutoIngest's saved state after confirming its folder is actually gone from disk, so the two never fall out of sync — if cleanup is interrupted partway through, both the leftover folder and its state entry are left in place rather than silently losing track of content.\n\nHOW IT BEHAVES\nQMZ reads each media file's original embedded capture date (from the photo or RAW file's own metadata) rather than the file's copy date on disk, because copying files during import does not reliably preserve the original date across drives (e.g. SD card to archive); the file's copy date on disk is used only as a last-resort fallback when no embedded date can be read. Sequence codes follow a fixed two-digit-number-plus-letter format (e.g. \"01Q\") with a maximum of 50 Qadam, 51 Majlis, and 52 Ziyafat sequences per event, and are a folder-naming convention only — verified live through the real UI that the sequence code is never written into the file's keyword metadata. QMZ keeps its own independent workspace state (grid sort order, view mode, selection, keyboard focus, thumbnail loading) completely separate from standard Import's equivalent state, so switching between the two workspaces never carries settings over from one to the other.\nTwo different things share the word \"sequence\" in QMZ and are easy to mix up: (1) the sequence code (e.g. 01Q) is a label an archivist assigns manually, either by creating a new sequence or typing an existing sequence number into the assign field — it never changes by itself. (2) the file grid's sort controls (sort by date, name, or size, ascending or descending) only change the display order of thumbnails within the currently active photographer/location view — sorting by date compares each file's embedded capture date, sorting by name does an alphabetical comparison, and sorting by size compares file size. None of these sort options save anything to disk or move any file between sequence folders.\n\nLIMITATIONS\n- MVP scope: only an empty sequence (no real files in any photographer subfolder) may be edited or removed — no batch re-tagging or renumbering of a populated sequence.\n- AutoIngest cannot yet read an embedded capture date from video files, so QMZ falls back to the file's copy date on disk for video.\n- The product owner explicitly described this as an evolving, first-generation workflow, not a finished design (docs/product/features/AI-FEAT-047, 2026-08-14 capture).\n- Only the primary flow (assign → auto-queue metadata) has been driven live through the real UI end to end; less common paths through the Sequence Manager have not each been individually live-verified (docs/metadata-system.md § Non-Goals).\n- If sequence numbers genuinely look wrong (e.g. files landed in the wrong 01Q/02M folder), that is a manual-assignment mistake, not a sorting side effect — the fix is to move the affected files back to Unsequenced and reassign them, not to change sort order.",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-qmz-sequencing+KM-qmz-sort-vs-sequence-numbers",
+            "extractionTier": "forensic-verified",
+            "dimensionsUsed": [
+              "recovery",
+              "behavior",
+              "limitations"
+            ],
+            "technicalGateOpen": false,
+            "questionType": "TROUBLESHOOTING"
+          }
+        }
+      ]
+    },
+    {
+      "id": "P2_messy_grammar",
+      "category": "P",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "import from sd card how"
+        },
+        {
+          "role": "assistant",
+          "text": "Are you trying to import photographs from a memory card or folder, or is this related to another area like Login & Operator Identity or Transfer Import?",
+          "kind": "clarification",
+          "choices": [
+            "Login & Operator Identity",
+            "Import Photographs From a Memory Card or Folder",
+            "Transfer Import",
+            "Not sure"
+          ],
+          "ms": 1510,
+          "evidenceMeta": null
+        }
+      ]
+    },
+    {
+      "id": "P3_messy_vague",
+      "category": "P",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "it stopped again ugh, same drive as last time"
+        },
+        {
+          "role": "assistant",
+          "text": "Are you referring to an Export or Update a Transfer Drive, or an Import or Update From a Transfer Drive?",
+          "kind": "clarification",
+          "choices": [
+            "Export or Update a Transfer Drive",
+            "Import or Update From a Transfer Drive",
+            "Not sure"
+          ],
+          "ms": 1297,
+          "evidenceMeta": null
+        }
+      ]
+    },
+    {
+      "id": "P4_messy_casual",
+      "category": "P",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "can i resume the export or do i gotta start over"
+        },
+        {
+          "role": "assistant",
+          "text": "AutoIngest's documentation includes a related, implemented capability, but this specific claim could not be independently verified with high confidence, so it is reported as uncertain rather than confirmed.",
+          "kind": "final",
+          "ms": 22,
+          "meta": {
+            "classification": "CAPABILITY",
+            "capabilityStatus": "UNKNOWN",
+            "matchQuality": "strong",
+            "steps": null,
+            "limitations": [],
+            "synthesis": {
+              "applied": false,
+              "reason": "authority-downgraded-unknown"
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          },
+          "evidenceMeta": null
+        }
+      ]
+    }
+  ]
+}

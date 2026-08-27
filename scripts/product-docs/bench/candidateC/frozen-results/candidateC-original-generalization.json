@@ -1,0 +1,579 @@
+{
+  "candidate": {
+    "id": "gemma-4-e4b-knowledge-model-generalization",
+    "label": "Gemma-4-E4B-it (Candidate C, exploratory generalization set)"
+  },
+  "loadMs": 2217,
+  "conversations": [
+    {
+      "id": "G01_simple_explanation",
+      "shape": "simple explanation",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "What is Archive Folder Adoption?"
+        },
+        {
+          "role": "assistant",
+          "text": "Archive Folder Adoption registers a pre-existing, manually-created archive folder as an AutoIngest-managed event by placing a minimal `event.json` file inside it. This process does not move, rename, or restructure any media. It is used for migrating legacy archive folders or for adopting externally-created event folders.",
+          "kind": "final",
+          "ms": 6459,
+          "meta": {
+            "classification": "EXPLANATION",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "topicChanged": false
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\nAVAILABLE\n\nWHAT IT'S FOR\nRegisters a single pre-existing, manually-created archive folder as an AutoIngest-managed event by writing a minimal event.json into it — without moving, renaming, or restructuring any media. Serves both legacy-archive migration (folders that predate AutoIngest) and ongoing adoption of externally-created event folders.\n\nHOW IT BEHAVES\nWrites are atomic (write to jsonPath + \".tmp\", then fsp.rename to jsonPath — services/adoptionWriteService.js:225-254). The written event.json deliberately has components: [] by design (not populated from an actual scan of the folder's contents at adoption time). All renderer-supplied input is treated as untrusted and re-validated against the filesystem before the write proceeds — including a second event.json-absence check performed immediately before the rename, minimizing (not eliminating) the TOCTOU window. A duplicate-managed-event check scans sibling folders for another folder already claiming the same hijriDate+sequence with its own event.json, blocking the adoption if found.\n\nHOW THIS RELATES TO OTHER FEATURES\n- distinctFrom AI-FEAT-047: Conceptually distinct from QMZ-internal unsequenced-folder adoption (AI-FEAT-047), which adopts folders into QMZ's own _Unsequenced bucket, not the archive-wide event registry.",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-archive-folder-adoption",
+            "extractionTier": "forensic-verified",
+            "dimensionsUsed": [
+              "purpose",
+              "behavior",
+              "relationships"
+            ],
+            "technicalGateOpen": false,
+            "questionType": "EXPLANATION"
+          }
+        }
+      ]
+    },
+    {
+      "id": "G02_how_to",
+      "shape": "how-to",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "How do I fix incorrect metadata after import?"
+        },
+        {
+          "role": "assistant",
+          "text": "Are you referring to Repair Missing or Incorrect Metadata, Metadata Verification, Metadata Writing Engine, QMZ Metadata Context-Shape Mismatch Silently Drops Keywords/Hijri Date, or Metadata Uses One Shared Engine/Resolver?",
+          "kind": "clarification",
+          "choices": [
+            "Repair Missing or Incorrect Metadata",
+            "Metadata Verification",
+            "Metadata Writing Engine",
+            "QMZ Metadata Context-Shape Mismatch Silently Drops Keywords/Hijri Date",
+            "Metadata Uses One Shared Engine/Resolver",
+            "Not sure"
+          ],
+          "ms": 1926,
+          "evidenceMeta": null
+        }
+      ]
+    },
+    {
+      "id": "G03_troubleshooting",
+      "shape": "troubleshooting",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "My metadata repair keeps failing."
+        },
+        {
+          "role": "assistant",
+          "text": "To help troubleshoot the failing metadata repair, could you tell me what status the repair job is showing?",
+          "kind": "final",
+          "ms": 1724,
+          "meta": {
+            "classification": "UNKNOWN",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "topicChanged": false
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\nAVAILABLE\n\nWHAT IT'S FOR\nLets an operator independently detect, across the whole archive, which files have metadata that does not match what the resolver says they should have, then optionally fix only that specific, exhaustively-previewed set of files — without ever re-running or depending on the original write path that might itself be defective.\n\nHOW IT BEHAVES\nAudit (services/metadataAuditService.js) never writes a file and never calls an ExifTool write operation; results stream to a JSONL report incrementally, and a small state file commits only at event boundaries so a resume at worst re-scans the one event that was in flight. Repair (main/metadataRepairService.js) consumes only a completed audit job's frozen per-file snapshot (read via `_readAuditRecords`, main/metadataRepairService.js:53-67) and never calls the resolver again for the write decision. Before any write, `_staleCheck` (main/metadataRepairService.js:69-88) compares the current file/sidecar's size and mtime against exactly what the audit snapshot recorded; any mismatch — file changed, file disappeared, or file appeared where none existed at audit time — marks the file stale and it is skipped with a \"re-audit required\" reason, never silently overwritten. Only records with status \"partial\" or \"read-error\" are ever repairable (REPAIRABLE_STATUSES, main/metadataRepairService.js:24). Execution goes through `exifService.resumeFrozenFile` — the identical frozen-write path AI-FEAT-030's crash recovery uses — so a repair run is queued as an ordinary durable batch (manifest+journal under metadata-queue/) and inherits the same crash-recoverable resume behavior as any other metadata batch (main/metadataRepairService.js:1-13,249-270).",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-metadata-audit-repair",
+            "extractionTier": "forensic-verified",
+            "dimensionsUsed": [
+              "purpose",
+              "behavior"
+            ],
+            "technicalGateOpen": false,
+            "questionType": "UNKNOWN"
+          }
+        }
+      ]
+    },
+    {
+      "id": "G04_interruption_recovery",
+      "shape": "interruption/recovery",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "If my import gets interrupted partway through, do I need to start the whole event over?"
+        },
+        {
+          "role": "assistant",
+          "text": "If an import is interrupted, you do not need to start the whole event over. Each entry in `event.json` can optionally include `importedBy: {id, name}` to record which operator triggered that specific import.",
+          "kind": "final",
+          "ms": 2190,
+          "meta": {
+            "classification": "UNKNOWN",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "topicChanged": false
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\nAVAILABLE\n\nWHAT IT'S FOR\nNot applicable as described — AutoIngest tracks a single active operator identity, not concurrent roles or accounts.\nLets an operator establish and switch identity before working, so that ingestion activity can later be attributed to the operator who performed it — historical accountability/traceability first, live multi-user coordination (who else is online/working on what) second.\n\nHOW IT BEHAVES\nAutoIngest does not support multiple concurrent user accounts or role-based access. Operator profiles are single-active-user.\nEach imports[] entry in event.json can optionally carry importedBy: {id, name} for the operator who triggered that import — backward-compatible, so older entries without it display \"Imported by: Not recorded\" in the Activity Log (AI-FEAT-027). Operator identity is explicitly kept distinct from two other identity-adjacent concepts that must not be collapsed into it: Photographer-Folder Resolution (AI-FEAT-022, archive folder naming) and Import Source Attribution (AI-FEAT-028, which memory card/drive/folder supplied the files).",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-not-supported-multi-user-roles+KM-login-operator-identity",
+            "extractionTier": "mixed",
+            "dimensionsUsed": [
+              "purpose",
+              "behavior"
+            ],
+            "technicalGateOpen": false,
+            "questionType": "UNKNOWN"
+          }
+        }
+      ]
+    },
+    {
+      "id": "G05_vague_shorthand",
+      "shape": "vague shorthand",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "grouping thing wont let me import, says something about sub-events"
+        },
+        {
+          "role": "assistant",
+          "text": "The grouping feature is used to sort selected files into logical groups (mapped to event sub-events) during live ingestion so AutoIngest can automatically place them during import.\n\nIf you are having trouble importing, the evidence indicates that the system enforces a \"one-file-one-group\" exclusivity, which is structural. Could you clarify what you are trying to import or what specific issue you are encountering with the grouping?",
+          "kind": "final",
+          "ms": 3458,
+          "meta": {
+            "classification": "UNKNOWN",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "topicChanged": false
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\nAVAILABLE\n\nWHAT IT'S FOR\nLets the operator sort selected files into logical groups (mapped to event sub-events) during live ingestion, so AutoIngest can perform structural bifurcation and photographer-folder placement automatically at import time instead of the operator running a separate copy pass per component.\n\nHOW IT BEHAVES\nrenderer/groupManager.js is a self-contained module-singleton (IIFE) holding only in-memory state: `_groups` (array of {id, label, files: Set, subEventId, metadataTags}), `_fileGroupMap` (Map<filePath, groupId> — the structural mechanism enforcing that a file belongs to exactly one group), and `_activeTabId`. Every mutation (createGroup, removeGroup, assignFiles, unassignFiles) is synchronous and in-process; there is no async I/O, no disk write, and no network call anywhere in this file. 10 pastel colors are keyed to --group-N CSS variables and derived at render time from a group's array position, so color never drifts after a deletion. A dedicated numeric-keyboard-shortcut mechanism for group assignment was searched for directly in renderer/renderer.js and not found — the one-file-one-group exclusivity is real and structural, but no keyboard-shortcut UI for it currently exists.",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-grouping-system",
+            "extractionTier": "forensic-verified",
+            "dimensionsUsed": [
+              "purpose",
+              "behavior"
+            ],
+            "technicalGateOpen": false,
+            "questionType": "UNKNOWN"
+          }
+        }
+      ]
+    },
+    {
+      "id": "G06_followup_pronoun",
+      "shape": "follow-up pronouns",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "What is Duplicate Detection?"
+        },
+        {
+          "role": "assistant",
+          "text": "Duplicate Detection prevents the same file from being imported twice, ensuring that no destination file is overwritten. For Quick Import, it also warns you beforehand if files you are about to import already exist at the destination.\n\nIt operates with two layers:\n\n1.  **Layer 1 (Automatic):** This is an automatic check applied to every file during the import process, comparing it against the destination directory. This happens silently without operator visibility.\n2.  **Layer 2 (Quick Import Pre-check):** This layer specifically for Quick Import compares the filename and size of each selected file against a cache of files in the destination folder. If a match is found, an interactive modal will display a duplicate warning.\n\nThe full grouped Event Import path relies only on Layer 1's automatic handling during the copy time.",
+          "kind": "final",
+          "ms": 6462,
+          "meta": {
+            "classification": "EXPLANATION",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "topicChanged": false
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\nAVAILABLE\n\nWHAT IT'S FOR\nPrevents the same file from being imported (and any destination file from being overwritten) twice, and — for Quick Import specifically — warns the operator up front when files they are about to import already exist at the destination.\n\nHOW IT BEHAVES\nTwo layers exist, and only one of them is present in the prior registry snapshot. Layer 1 (automatic, all import paths): entirely implemented inside AI-FEAT-019's resolveDestPath() (main/fileManager.js:157-190) — this is not an independent service or state; it is a mechanical stat-and-compare against the destination directory, applied per file, with no operator visibility. Layer 2 (renderer-side pre-check, Quick Import only): detectDuplicates() (renderer/renderer.js:7838-7851) compares each selected file's filename+size against `destFileCache`, a Map populated by scanning the destination folder via refreshDestCache()/window.api.scanDest() (renderer/renderer.js:1107-1126); if any match, showDupWarning() (renderer/renderer.js:7853-7879) presents an interactive modal. This second layer is called only from the Quick Import code path (renderer/renderer.js:10469-10474) — the full grouped Event Import path has no equivalent pre-check modal and relies solely on Layer 1's silent automatic handling at copy time.\n\nHOW THIS RELATES TO OTHER FEATURES\n- uses KM-import-pipeline: Layer 1 (the actual no-overwrite guarantee) is resolveDestPath(), which lives inside and is exercised by the Import Pipeline's copy functions.\n- distinctFrom KM-import-pipeline: Layer 2 (the Quick-Import-only pre-import warning modal) is a separate renderer-side code path and state (destFileCache) not shared with the backend copy engine or with full Event Import.",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-duplicate-detection",
+            "extractionTier": "forensic-verified",
+            "dimensionsUsed": [
+              "purpose",
+              "behavior",
+              "relationships"
+            ],
+            "technicalGateOpen": false,
+            "questionType": "EXPLANATION"
+          }
+        },
+        {
+          "role": "user",
+          "text": "Does it work the same way for Quick Import?"
+        },
+        {
+          "role": "assistant",
+          "text": "AutoIngest supports this: **Classification note**: this is documented as a separate feature file for lineage/continuity reasons — `docs/features.md` (an existing authoritative technical doc) lists it as its own top-level implemented feature (#6). Mechanically, it is entirely implemented inside AI-FEAT-019's `resolveDestPath()` — there is no independent service, state, or code path. Treat this as a **subfeature split out for documentation continuity**, not as an architecturally independent system. A reader should not assume this evolves separately from the Copy Engine.",
+          "kind": "final",
+          "ms": 29,
+          "meta": {
+            "classification": "EXPLANATION",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "topicChanged": false
+          },
+          "evidenceMeta": null
+        }
+      ]
+    },
+    {
+      "id": "G07_topic_change",
+      "shape": "topic change",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "How do I recover from a stale archive lock error?"
+        },
+        {
+          "role": "assistant",
+          "text": "There are two ways to recover from a stale archive lock:\n\n1.  **Use `clearSelfLock`**: This is reachable via IPC archive:clearSelfStaleLock. This method only clears a lock if the recorded device name matches your device's hostname. It will only clear the lock if its last heartbeat is older than the heartbeat interval plus 30 seconds, unless you pass `force:true` after confirming no job is running.\n2.  **Use `releaseStaleLock`**: This is reachable via IPC archive:releaseStaleLock and is available through the Archive Diagnostics repair UI. This releases any device's stale lock, but it re-reads the lock file before deleting it and will abort if the lock has become active again.\n\nBoth recovery paths first validate that the lock path is within a configured archive root's `.autoingest/locks/` directory.",
+          "kind": "final",
+          "ms": 9209,
+          "meta": {
+            "classification": "TROUBLESHOOTING",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "topicChanged": false
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\nAVAILABLE\n\nIF INTERRUPTED / RECOVERY\nYes — this is precisely a stale-lock recovery mechanism, and it is the authoritative one an operator would use for a \"how do I recover from a stale archive lock\" question. Two distinct recovery paths exist, both requiring an active, non-stale lock check to fail first (a still-active lock is always refused): (1) clearSelfLock (services/archiveLockService.js:177-211), reachable via IPC archive:clearSelfStaleLock, only clears a lock whose recorded deviceName matches this device's own os.hostname() (reason: \"not-self-device\" otherwise), and additionally refuses (reason: \"may-still-active\") unless the lock's lastHeartbeatAt is older than LOCK_HEARTBEAT_INTERVAL_MS + 30 seconds — i.e. it will not clear a lock that a live process on this same device might still be actively renewing, unless the caller passes force:true after independently confirming no job is running. (2) releaseStaleLock (services/archiveLockService.js:227-252), reachable via IPC archive:releaseStaleLock and surfaced through the Archive Diagnostics repair UI (AI-FEAT-043), releases any device's stale lock (not limited to self), but re-reads the lock file immediately before deletion and aborts (reason: \"lock-active\") if it has since become active again — a TOCTOU guard. Both paths validate the lock path is genuinely inside a configured archive root's .autoingest/locks/ directory before touching anything (_isValidLockPath, services/archiveLockService.js:259-274), rejecting path traversal. A lock is never actively deleted by any automatic background process purely on TTL expiry — expiry only changes whether a new acquisition attempt is allowed to overwrite it; the stale lock file itself remains on disk until one of these two release paths (or a subsequent successful re-acquisition) removes/overwrites it.\n\nHOW IT BEHAVES\nLock key = SHA1 hash of collection + eventFolderName + photographerFolderName, truncated to 16 hex chars (services/archiveLockService.js:36-39). Lock files live at {activeArchiveRoot}/.autoingest/locks/<lockKey>.json. Lock lifetime (TTL) is 30 minutes (LOCK_TTL_MS, services/archiveLockService.js:29); a heartbeat renews an actively-held lock every 5 minutes (LOCK_HEARTBEAT_INTERVAL_MS, services/archiveLockService.js:30), always less than the TTL. Acquire is atomic (write .tmp, then rename, services/archiveLockService.js:102-104). An active, non-stale lock blocks a new acquisition attempt outright (acquired: false, reason: \"locked\") — it is never silently overwritten. A stale lock (expiresAt has passed) may be overwritten by a new acquisition. Release is best-effort and idempotent: ENOENT is never treated as an error (already released).\n\nLIMITATIONS\n- Lock scope is photographer-folder-level only — it does not protect at the event or collection level beyond that.\n- clearSelfLock only ever clears locks owned by this exact device (matched by os.hostname()); it cannot force-clear another device's lock — only releaseStaleLock (which still requires the lock to be genuinely stale) can do that.\n- A lock file that never becomes stale (its owning process keeps renewing the heartbeat) cannot be released by either recovery path while it remains active — this is by design, not a bug.",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-archive-lock-handling",
+            "extractionTier": "forensic-verified",
+            "dimensionsUsed": [
+              "recovery",
+              "behavior",
+              "limitations"
+            ],
+            "technicalGateOpen": false,
+            "questionType": "TROUBLESHOOTING"
+          }
+        },
+        {
+          "role": "user",
+          "text": "Actually, can other people see what I'm working on right now?"
+        },
+        {
+          "role": "assistant",
+          "text": "Presence (a device or operator being connected) is tracked separately from activity. Real-time activity or progress visibility is only published for Import and Transfer/Sync operations; other operations like QMZ sorting or metadata audit/repair do not publish activity and are not visible to other operators.\n\nSeeing someone else online does not mean they are editing your files, and presence alone does not stop or warn you from working on the same event as someone else.",
+          "kind": "final",
+          "ms": 4497,
+          "meta": {
+            "classification": "TEAM_ACTIVITY",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "topicChanged": true
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\nAVAILABLE\n\nHOW IT BEHAVES\nPresence (a device/operator being connected) is tracked separately from activity. Real-time activity/progress visibility is published only for Import and Transfer/Sync operations — QMZ sorting, metadata audit/repair, and other operations do not publish activity and are never visible as live activity to other operators. Seeing someone else online does not by itself mean they are editing your files.\n\nLIMITATIONS\n- The Online Registry never stores, transmits, or provides access to photograph or media file bytes.\n- The Online Registry never replaces or overrides the archive as the source of truth; event.json remains authoritative even when the relay is degraded or unavailable.\n- AutoIngest does not currently provide active conflict detection or conflict warnings — a conflict:warning message type is wired into the client/server protocol but has no confirmed emitting code path anywhere in the repository (dormant, not active).\n- Activity visibility is limited to Import and Transfer/Sync operations only.\n- Presence alone does not stop or warn you from also working on the same event as someone else.",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-online-registry-boundaries",
+            "extractionTier": "registry-reshaped",
+            "dimensionsUsed": [
+              "behavior",
+              "limitations"
+            ],
+            "technicalGateOpen": false,
+            "questionType": "TEAM_ACTIVITY"
+          }
+        }
+      ]
+    },
+    {
+      "id": "G08_operator_correction",
+      "shape": "operator correction",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "Can I back up automatically to a NAS?"
+        },
+        {
+          "role": "assistant",
+          "text": "AutoIngest's documentation includes a related, implemented capability, but this specific claim could not be independently verified with high confidence, so it is reported as uncertain rather than confirmed.",
+          "kind": "final",
+          "ms": 22,
+          "meta": {
+            "classification": "CAPABILITY",
+            "capabilityStatus": "UNKNOWN",
+            "matchQuality": "strong",
+            "topicChanged": false
+          },
+          "evidenceMeta": null
+        },
+        {
+          "role": "user",
+          "text": "No, I mean can I use something like Google Drive or Dropbox instead."
+        },
+        {
+          "role": "assistant",
+          "text": "AutoIngest does not have cloud storage, cloud backup, or external website/gallery upload capability. All storage roots are local disk or NAS-based.",
+          "kind": "final",
+          "ms": 1934,
+          "meta": {
+            "classification": "CAPABILITY",
+            "capabilityStatus": "NOT_SUPPORTED",
+            "matchQuality": "boundary",
+            "topicChanged": false
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\nNOT_SUPPORTED\n\nWHAT IT'S FOR\nNot applicable — this capability does not exist in AutoIngest.\n\nHOW IT BEHAVES\nAutoIngest has no cloud storage, cloud backup, or external website/gallery upload capability. All storage roots (Active Archive Root, Main Archive Root, Transfer Drive, local staging) are local disk or NAS-based.",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-not-supported-cloud-storage",
+            "extractionTier": "registry-reshaped",
+            "dimensionsUsed": [
+              "purpose",
+              "behavior"
+            ],
+            "technicalGateOpen": false,
+            "questionType": "UNKNOWN"
+          }
+        }
+      ]
+    },
+    {
+      "id": "G09_explicitly_technical",
+      "shape": "explicitly technical",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "Where does AutoIngest store the operator's active profile pointer?"
+        },
+        {
+          "role": "assistant",
+          "text": "The currently-active operator pointer is stored separately via `services/settings.js`'s `getLastActiveUserId()`/`setLastActiveUserId()`, not inside `users.json`.",
+          "kind": "final",
+          "ms": 3273,
+          "meta": {
+            "classification": "NAVIGATION",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "topicChanged": false
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\nAVAILABLE\n\nHOW OPERATORS DO THIS\n- On launch, a dedicated splash screen checks whether an operator was previously active on this machine.\n- If a last-active operator resolves, the \"Welcome back\" panel shows and a Continue button re-activates that same profile (setActiveUser(lastUser.id)).\n- If no last-active operator resolves but saved profiles exist, an operator picker panel lists them for selection, then Start session calls setActiveUser(id).\n- If no profiles exist at all, a create-profile form collects name and role (also reachable as \"New Profile\" from the picker panel); starting from there creates and activates the profile.\n- On completion, a splash:complete IPC signal fades the splash window out and the main window in (200ms CSS transition).\n- After login, an in-app operator dropdown and add-user modal (replacing the older #loginSplash overlay) let an operator switch/add profiles without relaunching.\n\nAVAILABLE ACTIONS\n- Create profile: createUser({name, role, initials}) — name required and must be unique (case-insensitive); initials auto-derived from name if not supplied.\n- Switch active operator: setActiveUser(id) updates lastUsedAt and persists the active-user pointer via services/settings.js.\n- List profiles: listUsers() returns all profiles sorted by lastUsedAt (falling back to createdAt) descending.\n\nHOW IT BEHAVES\nAutoIngest does not support multiple concurrent user accounts or role-based access. Operator profiles are single-active-user.\nEach imports[] entry in event.json can optionally carry importedBy: {id, name} for the operator who triggered that import — backward-compatible, so older entries without it display \"Imported by: Not recorded\" in the Activity Log (AI-FEAT-027). Operator identity is explicitly kept distinct from two other identity-adjacent concepts that must not be collapsed into it: Photographer-Folder Resolution (AI-FEAT-022, archive folder naming) and Import Source Attribution (AI-FEAT-028, which memory card/drive/folder supplied the files).\n\nTECHNICAL DETAIL (only because the operator explicitly asked a technical question)\nservices/settings.js exposes getLastActiveUserId(), which returns a single value, confirming single-active-user state rather than concurrent role-based accounts.\nmain/userManager.js is the operator-profile store: profiles persist to <userData>/users.json via an atomic tmp-file-then-rename write (main/userManager.js:45-56), matching the pattern used by importIndex.json/settings.json. The currently-active operator pointer (lastActiveUserId) is stored separately, via services/settings.js's getLastActiveUserId()/setLastActiveUserId(), not inside users.json itself (main/userManager.js:124-149). listUsers() sorts by lastUsedAt (falling back to createdAt) descending (main/userManager.js:78-85). createUser() rejects a duplicate name case-insensitively and auto-derives initials from the name's first/last word when not supplied (main/userManager.js:58-66, 92-117).",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-not-supported-multi-user-roles+KM-login-operator-identity",
+            "extractionTier": "mixed",
+            "dimensionsUsed": [
+              "operatorWorkflow",
+              "actions",
+              "behavior",
+              "technicalDetail"
+            ],
+            "technicalGateOpen": true,
+            "questionType": "NAVIGATION"
+          }
+        }
+      ]
+    },
+    {
+      "id": "G10_unsupported_capability",
+      "shape": "unsupported capability",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "Can AutoIngest auto-tag the people in my photos using AI?"
+        },
+        {
+          "role": "assistant",
+          "text": "No, AutoIngest does not support auto-tagging people in your photos using AI.",
+          "kind": "final",
+          "ms": 1267,
+          "meta": {
+            "classification": "STATUS",
+            "capabilityStatus": "NOT_SUPPORTED",
+            "matchQuality": "boundary",
+            "topicChanged": false
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\nNOT_SUPPORTED\n\nWHAT IT'S FOR\nNot applicable — this capability does not exist in AutoIngest.\n\nLIMITATIONS\n- No AI-based image recognition or auto-tagging exists, planned or implemented with defined scope.",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-not-supported-ai-auto-tagging",
+            "extractionTier": "registry-reshaped",
+            "dimensionsUsed": [
+              "purpose",
+              "limitations"
+            ],
+            "technicalGateOpen": false,
+            "questionType": "STATUS"
+          }
+        }
+      ]
+    },
+    {
+      "id": "G11_roadmap",
+      "shape": "roadmap question",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "Is the Archive Browser available yet?"
+        },
+        {
+          "role": "assistant",
+          "text": "The Archive Browser is currently planned, but it is not implemented.",
+          "kind": "final",
+          "ms": 1894,
+          "meta": {
+            "classification": "UNKNOWN",
+            "capabilityStatus": "PLANNED",
+            "matchQuality": "strong",
+            "topicChanged": false
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\nPLANNED\n\nWHAT IT'S FOR\nPlanned full-archive browsing capability — fourth in the canonical roadmap order, positioned after Archive/Event Maintenance and before Global Search. No architecture, scope, or design has been finalized.\n\n**Vision** (product-owner intent, captured 2026-08-14 — *Known from project history; repository evidence pending*; future-tense throughout): long-term, AutoIngest would become a broader archival working suite, not just an ingestion tool — this feature would support browsing already-archived material, visual review, archival ratings/stars/selections, metadata management, secondary descriptive keywording, and handoff to external editing tools (Camera Raw/Photoshop/Lightroom), eventually extending to remote/online browsing for authorized users beyond the local archive workstation. Today, AutoIngest applies primary keywords during ingestion, but secondary descriptive keywording is still performed externally (especially in Adobe Bridge) — a fragmented post-ingestion workflow this feature would aim to reduce. The remote/online-discovery aspect of this vision raises authentication/access-control questions not yet addressed anywhere in this documentation.\n\n**Relationship to AI-FEAT-053 and AI-FEAT-056**: distinct capabilities forming one long-term archival discovery/intelligence direction — Archive Browser is the navigation/visual-exploration route, Global Search (AI-FEAT-053) is the direct natural-language retrieval route, and AI Archive Intelligence (AI-FEAT-056) is the local AI/VLM layer intended to support both. Kept as three separate records rather than merged, since their eventual architectural shape differs materially (UI/browsing vs. natural-language query handling vs. a local AI model) — the same pattern already used for AI-FEAT-027/AI-FEAT-048, which share infrastructure while remaining distinct records.\n\nHOW IT BEHAVES\nNot implemented. No code exists. AI-FEAT-013 (File Browser & Media Grid/List Viewing) currently only browses a selected *source* (memory card/drive/folder) for import, not the archive itself — this planned feature would be a materially different scope (archive-wide, post-import browsing), not an extension of the same code path by default.",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-archive-browser",
+            "extractionTier": "registry-reshaped",
+            "dimensionsUsed": [
+              "purpose",
+              "behavior"
+            ],
+            "technicalGateOpen": false,
+            "questionType": "UNKNOWN"
+          }
+        }
+      ]
+    },
+    {
+      "id": "G12_interruption_recovery_variant",
+      "shape": "interruption/recovery (different feature than the frozen set's own resume question)",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "Can I resume a Transfer Import if the connection drops partway through?"
+        },
+        {
+          "role": "assistant",
+          "text": "AutoIngest's documentation includes a related, implemented capability, but this specific claim could not be independently verified with high confidence, so it is reported as uncertain rather than confirmed.",
+          "kind": "final",
+          "ms": 27,
+          "meta": {
+            "classification": "CAPABILITY",
+            "capabilityStatus": "UNKNOWN",
+            "matchQuality": "strong",
+            "topicChanged": false
+          },
+          "evidenceMeta": null
+        }
+      ]
+    },
+    {
+      "id": "G13_dont_understand",
+      "shape": "don't understand / re-explain simpler",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "What is Backup Update Scanning?"
+        },
+        {
+          "role": "assistant",
+          "text": "Backup Update Scanning is a read-only, pre-copy diff mode. It compares a selected source scope against a connected external backup destination by relative path, classifying each file as new, existing-same, changed, incomplete, destination-only, or error, without actually copying anything. This allows an operator to review exactly what an \"Update Backup\" run would do before executing it.",
+          "kind": "final",
+          "ms": 4150,
+          "meta": {
+            "classification": "EXPLANATION",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "topicChanged": false
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\nAVAILABLE\n\nWHAT IT'S FOR\nA read-only pre-copy diff mode that compares a selected source scope against a connected external backup destination by relative path, classifying every file (new / existing-same / changed / incomplete / destination-only / error) without copying anything — so an operator can review exactly what an \"Update Backup\" run would do before running it.\n\nHOW IT BEHAVES\nbackupUpdate mode has genuinely different, stricter conflict semantics than standard Transfer Export/Import: it never overwrites and never creates _1/_2 renamed files — a same-path/different-size file is left untouched and surfaced as \"changed\" for manual review, only genuinely missing files are copied (services/transferExportService.js:128-141 on the export side; services/transferImportService.js:181-188 on the import side for Update Import). Supports custom source/destination folders, not only the standard Active→Transfer path. Includes sequence-prefixed folder rename detection (event-level and nested-subfolder-level, scored 0-130 with a suggestion threshold of 54) so a renamed source folder is not treated as new content when a matching orphan destination folder exists. Includes a cross-device resume validation guard that confirms a resumed job's source root still matches the originating device.\n\nHOW THIS RELATES TO OTHER FEATURES\n- uses KM-transfer-export: Backup Update Scanning's copy step is literally backupUpdate mode inside transferExportService.js — same checkpoint mechanism, same file.\n- relatedTo KM-transfer-import: Update Import (scope.backupUpdate in transferImportService.js) is the import-side counterpart consuming a prior scan's approved worklist.",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-backup-update-scanning",
+            "extractionTier": "forensic-verified",
+            "dimensionsUsed": [
+              "purpose",
+              "behavior",
+              "relationships"
+            ],
+            "technicalGateOpen": false,
+            "questionType": "EXPLANATION"
+          }
+        },
+        {
+          "role": "user",
+          "text": "I don't get it, can you explain it more simply?"
+        },
+        {
+          "role": "assistant",
+          "text": "Backup Update Scanning is like a preview before you actually back up. It looks at what you want to back up and compares it to your existing backup destination without copying any files. It tells you exactly which files are new, which are the same, which have changed, and so on, so you can check what the backup will do before you run it.",
+          "kind": "final",
+          "ms": 3080,
+          "meta": {
+            "classification": "EXPLANATION",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "topicChanged": false
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\nAVAILABLE\n\nWHAT IT'S FOR\nA read-only pre-copy diff mode that compares a selected source scope against a connected external backup destination by relative path, classifying every file (new / existing-same / changed / incomplete / destination-only / error) without copying anything — so an operator can review exactly what an \"Update Backup\" run would do before running it.\n\nHOW IT BEHAVES\nbackupUpdate mode has genuinely different, stricter conflict semantics than standard Transfer Export/Import: it never overwrites and never creates _1/_2 renamed files — a same-path/different-size file is left untouched and surfaced as \"changed\" for manual review, only genuinely missing files are copied (services/transferExportService.js:128-141 on the export side; services/transferImportService.js:181-188 on the import side for Update Import). Supports custom source/destination folders, not only the standard Active→Transfer path. Includes sequence-prefixed folder rename detection (event-level and nested-subfolder-level, scored 0-130 with a suggestion threshold of 54) so a renamed source folder is not treated as new content when a matching orphan destination folder exists. Includes a cross-device resume validation guard that confirms a resumed job's source root still matches the originating device.",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-backup-update-scanning",
+            "extractionTier": "forensic-verified",
+            "dimensionsUsed": [
+              "purpose",
+              "behavior"
+            ],
+            "technicalGateOpen": false,
+            "questionType": "UNKNOWN"
+          }
+        }
+      ]
+    },
+    {
+      "id": "G14_multiturn_drift",
+      "shape": "multi-turn topic drift within one workflow",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "How do I import photos from a memory card?"
+        },
+        {
+          "role": "assistant",
+          "text": "To import photos from a memory card, you need to:\n\n1.  Connect the memory card to your computer.\n2.  AutoIngest will automatically poll mounted drives every 5 seconds.\n3.  The memory card, if it has a DCIM folder at the root, should appear automatically under the Memory Card list in the source panel.\n\nIf the card does not appear, you can use the **Browse Manually / Select Local Folder** option.",
+          "kind": "final",
+          "ms": 5073,
+          "meta": {
+            "classification": "HOW_TO",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "topicChanged": false
+          },
+          "evidenceMeta": {
+            "evidenceBlock": "STATUS\nAVAILABLE\n\nHOW OPERATORS DO THIS\n- Connect a memory card or external drive to the computer.\n- AutoIngest polls all mounted drives every 5 seconds in the background (main/main.js POLL_INTERVAL_MS=5000) — no manual refresh action exists or is needed.\n- Eligible devices appear automatically under the Memory Card list (DCIM present) or External Drive list (removable/USB volume) in the source panel.\n- A drive with no DCIM folder and no recognizable removable-drive signal (e.g. a Thunderbolt drive on Windows) will not appear in either list — the operator must use Browse Manually / Select Local Folder instead.\n\nBEFORE YOU START\n- Volume must be mounted and visible to the OS.\n- Memory-card classification requires a DCIM folder present at the mount root (main/driveDetector.js hasDCIM(), lines 40-47).\n- External-drive classification is OS-specific: macOS accepts anything mounted under /Volumes/; Windows requires a positive external signal (isUSB, isRemovable, isCard, or busType in {USB,SD,MMC,1394,FIBRE}) and conservatively excludes drives with no recognizable signal, including Thunderbolt drives (main/driveDetector.js _isWindowsExternalMount(), lines 105-119).\n\nAVAILABLE ACTIONS\n- Automatic memory-card detection: Any mounted volume with a DCIM folder at its root is listed as a Memory Card.\n- Automatic external-drive detection: Any mounted volume passing the platform-specific removable-drive signal check is listed as an External Drive.\n- Browse Manually / Select Local Folder: Escape hatch for drives that detection conservatively excludes (e.g. Thunderbolt on Windows) — bypasses detection entirely via a native folder picker.\n\nLIMITATIONS\n- Thunderbolt-connected drives on Windows have no recognizable positive external signal under the current classification rules and are excluded from the External Drive list by default; reachable only via Browse Manually.\n- Files smaller than 50KB (MIN_FILE_BYTES, main/fileBrowser.js:173) are silently excluded from every scan, including the memory-card scan — this affects thumbnail/metadata-stub files, not typical photo/video files.\n- main/fileBrowser.js exports a function named scanPrivateFolder() (lines 380-416) that specifically checks only two hardcoded Sony subdirectories (PRIVATE/M4ROOT/CLIP, PRIVATE/AVCHD/BDMV/STREAM) with a >500KB size floor and a source:\"private\" tag — but grep across main/, renderer/, and services/ found zero call sites for it outside its own definition/export. It is dead code, superseded by scanMediaRecursive()'s unconditional full-tree walk; the canonical AI-FEAT-011 doc describing scanPrivateFolder() as the current Sony-coverage mechanism is stale on this specific point.",
+            "source": "knowledge-model",
+            "kmRecordId": "KM-source-detection",
+            "extractionTier": "forensic-verified",
+            "dimensionsUsed": [
+              "operatorWorkflow",
+              "preconditions",
+              "actions",
+              "limitations"
+            ],
+            "technicalGateOpen": false,
+            "questionType": "HOW_TO"
+          }
+        },
+        {
+          "role": "user",
+          "text": "What about duplicate files -- does it warn me?"
+        },
+        {
+          "role": "assistant",
+          "text": "Are you asking about duplicate files during Transfer Import, Import Pipeline & Copy Engine, or something else?",
+          "kind": "clarification",
+          "choices": [
+            "Transfer Import",
+            "Import Pipeline & Copy Engine",
+            "Not sure"
+          ],
+          "ms": 1133,
+          "evidenceMeta": null
+        }
+      ]
+    }
+  ]
+}
