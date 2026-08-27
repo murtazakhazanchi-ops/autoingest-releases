@@ -1,0 +1,715 @@
+{
+  "candidate": {
+    "id": "gemma-4-e4b-experimental",
+    "label": "Gemma-4-E4B-it (experimental architecture)",
+    "file": "/Users/funun_pa/.claude/jobs/6629ed37/tmp/models/gemma-4-E4B-it-Q4_K_M.gguf"
+  },
+  "loadMs": 2063,
+  "conversations": [
+    {
+      "id": "A_simple_explanation",
+      "category": "A",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "What is QMZ?"
+        },
+        {
+          "role": "assistant",
+          "text": "QMZ stands for **Qadam / Majlis / Ziyafat**. It is a standalone sequencing workspace separate from standard Event Import.\n\nThis workspace is designed to help archivists efficiently sort photos into Qadam, Majlis, or Ziyafat sequences after initial ingestion, which is useful because a single event can contain many distinct occurrences. This process replaces the tedious, error-prone manual sorting that was previously required.\n\nActions available within QMZ include:\n*   Sort QMZ Photos (assigning photos into Q/M/Z sequences)\n*   Review Cleanup\n*   Deep Verify",
+          "kind": "final",
+          "ms": 7808,
+          "meta": {
+            "classification": "EXPLANATION",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "B_simple_howto",
+      "category": "B",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "How do I sort QMZ photos?"
+        },
+        {
+          "role": "assistant",
+          "text": "To sort QMZ photos, you can use the \"Sort QMZ Photos\" action to assign photos into Q/M/Z sequences. You can also review Cleanup or Deep Verify.",
+          "kind": "final",
+          "ms": 1800,
+          "meta": {
+            "classification": "HOW_TO",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "C_natural_troubleshooting",
+      "category": "C",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "My transfer stopped halfway."
+        },
+        {
+          "role": "assistant",
+          "text": "Which specific transfer stopped halfway: Export or Update a Transfer Drive, Import or Update From a Transfer Drive, or Backup Update Scanning?",
+          "kind": "clarification",
+          "choices": [
+            "Export or Update a Transfer Drive",
+            "Import or Update From a Transfer Drive",
+            "Backup Update Scanning",
+            "Not sure"
+          ],
+          "ms": 1260
+        },
+        {
+          "role": "user",
+          "text": "Transfer Export."
+        },
+        {
+          "role": "assistant",
+          "text": "To address the stopped Transfer Export, you can use the **Scan for New Data** action to compare against what is already on the destination drive before attempting to copy again.\n\nThe steps are:\n1. Select **Transfer Export…**.\n2. Choose the destination drive and the events to include.\n3. Use **Scan for New Data** to compare against what's already there.\n4. Confirm to begin the copy.",
+          "kind": "final",
+          "ms": 3168,
+          "meta": {
+            "classification": "TROUBLESHOOTING",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          }
+        },
+        {
+          "role": "user",
+          "text": "Yes, the NAS disconnected."
+        },
+        {
+          "role": "assistant",
+          "text": "Since the NAS disconnected, you should try running **Scan for New Data** first to see what data is available on the destination drive, and then select **Transfer Export…** again to begin the copy.",
+          "kind": "final",
+          "ms": 1971,
+          "meta": {
+            "classification": "TROUBLESHOOTING",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "D_freeform_clarification",
+      "category": "D",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "I was copying an event to a portable drive and the NAS disappeared."
+        },
+        {
+          "role": "assistant",
+          "text": "If your NAS disappeared while copying an event to a portable drive, you can use the **Transfer Export…** feature to copy a clean, archive-aware mirror of selected events from the Active Archive Root to a Transfer Drive.\n\nHere are the steps:\n1. Select **Transfer Export…**.\n2. Choose the destination drive and the events you want to include.\n3. If you are updating an existing transfer drive, use **Scan for New Data** to compare against what is already there before copying.\n4. Confirm to begin the copy.",
+          "kind": "final",
+          "ms": 4420,
+          "meta": {
+            "classification": "UNKNOWN",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "E_operator_doesnt_know",
+      "category": "E",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "My transfer stopped."
+        },
+        {
+          "role": "assistant",
+          "text": "Which specific transfer stopped: Export or Update a Transfer Drive, Import or Update From a Transfer Drive, or Backup Update Scanning?",
+          "kind": "clarification",
+          "choices": [
+            "Export or Update a Transfer Drive",
+            "Import or Update From a Transfer Drive",
+            "Backup Update Scanning",
+            "Not sure"
+          ],
+          "ms": 1228
+        },
+        {
+          "role": "user",
+          "text": "I'm not sure. I was just copying yesterday's event."
+        },
+        {
+          "role": "assistant",
+          "text": "Closest match I can offer without more detail: Writes a clean mirror of selected events to a portable drive (Transfer Export, Transfer Export), or scans an existing transfer drive for what's changed since the last copy (Backup Update Scanning, Backup Update Scanning, a mode whose own record lists Transfer Export as its Parent feature) — these are two distinct capabilities sharing this one entry point ( → the Transfer Export modal), with different conflict semantics (Backup Update never overwrites or renames on conflict; Transfer Export's own record should be consulted for its exact behavior rather than assumed identical). This workflow is outbound only (Active Archive Root → Transfer Drive) — for the inbound direction (Transfer Drive → Main Archive Root), see Import or Update From a Transfer Drive.",
+          "kind": "final",
+          "ms": 28,
+          "meta": {
+            "classification": "HOW_TO",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "weak",
+            "steps": [
+              "Select **Transfer Export…**.",
+              "Choose the destination drive and the events to include.",
+              "To update an existing transfer drive instead of a fresh export, use **Scan for New Data** to compare against what's already there before copying.",
+              "Confirm to begin the copy. Transfer/sync can run in the background without blocking the rest of the app while it copies (AI-FEAT-041 — confirmed as a real, distinct capability from standard Import, which does not have this background/minimize behavior)."
+            ],
+            "limitations": [
+              "A real, historical divergence between displayed resume state and actual backend progress was found and fixed (BUG-005) — cited as evidence this path has real edge-case history, not to imply it's currently broken.",
+              "Per `CLAUDE.md`'s File Copy Rules: no overwrite, ever, applies here too."
+            ],
+            "synthesis": {
+              "applied": false,
+              "reason": "weak-retrieval-weak"
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "F_followup_no_repeat",
+      "category": "F",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "How do I create a Transfer Export?"
+        },
+        {
+          "role": "assistant",
+          "text": "To create a Transfer Export, follow these steps:\n\n1. Select **Transfer Export…**.\n2. Choose the destination drive and the events you want to include.\n3. If you want to update an existing transfer drive instead of creating a new export, use **Scan for New Data** to compare against what is already there before copying.\n4. Confirm to begin the copy.\n\nThe transfer or sync can run in the background without blocking the rest of the application while it copies.",
+          "kind": "final",
+          "ms": 3837,
+          "meta": {
+            "classification": "HOW_TO",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          }
+        },
+        {
+          "role": "user",
+          "text": "And if it stops halfway?"
+        },
+        {
+          "role": "assistant",
+          "text": "If a Transfer Export stops halfway, the documentation notes a future enhancement for \"Durable, destination-level / cross-device locking\" to protect against simultaneous operations on the same transfer destination. Currently, the process uses a process-local guard.",
+          "kind": "final",
+          "ms": 2256,
+          "meta": {
+            "classification": "HOW_TO",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "G_followup_after_answer",
+      "category": "G",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "How do I recover from a stale archive lock error?"
+        },
+        {
+          "role": "assistant",
+          "text": "To recover from a stale archive lock error, you should:\n\n1.  Open **Archive Diagnostics**.\n2.  Run diagnostics to surface the current lock state.\n3.  Use the lock-release capability once the lock has been located and confirmed.",
+          "kind": "final",
+          "ms": 2094,
+          "meta": {
+            "classification": "TROUBLESHOOTING",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          }
+        },
+        {
+          "role": "user",
+          "text": "What should I do after that?"
+        },
+        {
+          "role": "assistant",
+          "text": "After using the lock-release capability, the provided information does not specify the next steps.",
+          "kind": "final",
+          "ms": 956,
+          "meta": {
+            "classification": "TROUBLESHOOTING",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "H_topic_change",
+      "category": "H",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "How do I create a Transfer Export?"
+        },
+        {
+          "role": "assistant",
+          "text": "To create a Transfer Export, follow these steps:\n\n1. Select **Transfer Export…**.\n2. Choose the destination drive and the events you want to include.\n3. If you want to update an existing transfer drive instead of creating a new export, use **Scan for New Data** to compare against what is already there before copying.\n4. Confirm to begin the copy.\n\nThe transfer or sync can run in the background without blocking the rest of the application while it copies.",
+          "kind": "final",
+          "ms": 3759,
+          "meta": {
+            "classification": "HOW_TO",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          }
+        },
+        {
+          "role": "user",
+          "text": "Actually, how do I sort QMZ photos?"
+        },
+        {
+          "role": "assistant",
+          "text": "To sort QMZ photos, you can use the **Sort QMZ Photos** action to assign photos into Q/M/Z sequences.",
+          "kind": "final",
+          "ms": 1851,
+          "meta": {
+            "classification": "UNKNOWN",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": true,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "I_user_corrects",
+      "category": "I",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "Does AutoIngest back up automatically?"
+        },
+        {
+          "role": "assistant",
+          "text": "Which AutoIngest area are you asking about: Archive Root Configuration & Resolution or Transfer Export?",
+          "kind": "clarification",
+          "choices": [
+            "Archive Root Configuration & Resolution",
+            "Transfer Export",
+            "Not sure"
+          ],
+          "ms": 1019
+        },
+        {
+          "role": "user",
+          "text": "Sorry, I meant cloud backup specifically -- like Google Drive or Dropbox, not local copies."
+        },
+        {
+          "role": "assistant",
+          "text": "AutoIngest does not have cloud storage, cloud backup, or external website/gallery upload capability.",
+          "kind": "final",
+          "ms": 795,
+          "meta": {
+            "classification": "STATUS",
+            "capabilityStatus": "NOT_SUPPORTED",
+            "matchQuality": "boundary",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "J_dont_understand",
+      "category": "J",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "What is QMZ?"
+        },
+        {
+          "role": "assistant",
+          "text": "QMZ stands for **Qadam / Majlis / Ziyafat**. It is a standalone sequencing workspace separate from standard Event Import.\n\nThis workspace is designed to help archivists efficiently sort photos into Qadam, Majlis, or Ziyafat sequences after initial ingestion, which is useful because a single event can contain many distinct occurrences. This process replaces the tedious, error-prone manual sorting that was previously required.\n\nActions available within QMZ include:\n*   Sort QMZ Photos (assigning photos into Q/M/Z sequences)\n*   Review Cleanup\n*   Deep Verify",
+          "kind": "final",
+          "ms": 4572,
+          "meta": {
+            "classification": "EXPLANATION",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          }
+        },
+        {
+          "role": "user",
+          "text": "I don't understand what that means."
+        },
+        {
+          "role": "assistant",
+          "text": "QMZ stands for **Qadam / Majlis / Ziyafat**. It is a separate workspace in AutoIngest designed to help archivists organize photos into specific sequences (Qadam, Majlis, or Ziyafat) after the photos have been initially ingested.\n\nEssentially, if one event has many different moments or occurrences (like a large gathering), QMZ allows you to sort those photos into the correct sequence without having to manually create and sort folders repeatedly, which was a tedious and error-prone process before this feature.\n\nWithin this workspace, you can:\n*   Sort QMZ Photos to assign them to Q/M/Z sequences.\n*   Review Cleanup.\n*   Deep Verify.",
+          "kind": "final",
+          "ms": 5204,
+          "meta": {
+            "classification": "EXPLANATION",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "K_concise_question",
+      "category": "K",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "Can AutoIngest do face recognition?"
+        },
+        {
+          "role": "assistant",
+          "text": "No, AutoIngest does not have face-recognition or facial-identification capability.",
+          "kind": "final",
+          "ms": 912,
+          "meta": {
+            "classification": "STATUS",
+            "capabilityStatus": "NOT_SUPPORTED",
+            "matchQuality": "boundary",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "L_roadmap",
+      "category": "L",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "What's coming next?"
+        },
+        {
+          "role": "assistant",
+          "text": "The next roadmap milestone is Archive Maintenance, which is currently planned but not started. Following that is Event Maintenance.",
+          "kind": "final",
+          "ms": 1208,
+          "meta": {
+            "classification": "ROADMAP",
+            "capabilityStatus": "ROADMAP",
+            "matchQuality": "roadmap",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "M_why_question",
+      "category": "M",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "Why is QMZ separate from normal Event Import?"
+        },
+        {
+          "role": "assistant",
+          "text": "QMZ (Qadam / Majlis / Ziyafat) is separate from standard Event Import because a single QMZ event can contain many distinct real-world occurrences (10 to 50+). Fully sequencing everything during live ingestion is counterproductive, so the material is initially ingested together and then sequenced later by an archivist.\n\nThis dedicated QMZ workspace was created to replace a tedious, error-prone manual process where archivists previously had to manually create sequence folders and move/copy photos for each sequence. This workspace makes the classification process focused, efficient, and less repetitive.",
+          "kind": "final",
+          "ms": 4525,
+          "meta": {
+            "classification": "UNKNOWN",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "N_technical_question",
+      "category": "N",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "Where does QMZ store its sequencing state?"
+        },
+        {
+          "role": "assistant",
+          "text": "QMZ stores its sequencing state in its own root, durable state file.",
+          "kind": "final",
+          "ms": 1195,
+          "meta": {
+            "classification": "NAVIGATION",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "O_unsupported_feature",
+      "category": "O",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "Does AutoIngest automatically tag people in photos using AI?"
+        },
+        {
+          "role": "assistant",
+          "text": "AutoIngest's documentation does not have enough evidence to answer this confidently. This is reported honestly rather than guessed.",
+          "kind": "final",
+          "ms": 14,
+          "meta": {
+            "classification": "STATUS",
+            "capabilityStatus": "UNKNOWN",
+            "matchQuality": "none",
+            "limitations": [],
+            "synthesis": {
+              "applied": false,
+              "reason": "deterministic-unknown"
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "P1_messy_shorthand",
+      "category": "P",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "yo qmz thing not working right, sequence #s messed up"
+        },
+        {
+          "role": "assistant",
+          "text": "To address the issue with your QMZ sequence numbers, you can try the following actions:\n\n*   Sort QMZ Photos to assign photos into Q/M/Z sequences.\n*   Review Cleanup.\n*   Deep Verify.",
+          "kind": "final",
+          "ms": 2117,
+          "meta": {
+            "classification": "TROUBLESHOOTING",
+            "capabilityStatus": "AVAILABLE",
+            "matchQuality": "strong",
+            "steps": [],
+            "limitations": [],
+            "synthesis": {
+              "applied": true,
+              "reason": null
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "P2_messy_grammar",
+      "category": "P",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "import from sd card how"
+        },
+        {
+          "role": "assistant",
+          "text": "Are you trying to import photographs from a memory card or folder, or is this related to another area like Login & Operator Identity or Transfer Import?",
+          "kind": "clarification",
+          "choices": [
+            "Login & Operator Identity",
+            "Import Photographs From a Memory Card or Folder",
+            "Transfer Import",
+            "Not sure"
+          ],
+          "ms": 1360
+        }
+      ]
+    },
+    {
+      "id": "P3_messy_vague",
+      "category": "P",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "it stopped again ugh, same drive as last time"
+        },
+        {
+          "role": "assistant",
+          "text": "Are you referring to an Export or Update a Transfer Drive, or an Import or Update From a Transfer Drive?",
+          "kind": "clarification",
+          "choices": [
+            "Export or Update a Transfer Drive",
+            "Import or Update From a Transfer Drive",
+            "Not sure"
+          ],
+          "ms": 1162
+        }
+      ]
+    },
+    {
+      "id": "P4_messy_casual",
+      "category": "P",
+      "transcript": [
+        {
+          "role": "user",
+          "text": "can i resume the export or do i gotta start over"
+        },
+        {
+          "role": "assistant",
+          "text": "AutoIngest's documentation includes a related, implemented capability, but this specific claim could not be independently verified with high confidence, so it is reported as uncertain rather than confirmed.",
+          "kind": "final",
+          "ms": 17,
+          "meta": {
+            "classification": "CAPABILITY",
+            "capabilityStatus": "UNKNOWN",
+            "matchQuality": "strong",
+            "steps": null,
+            "limitations": [],
+            "synthesis": {
+              "applied": false,
+              "reason": "authority-downgraded-unknown"
+            },
+            "topicChanged": false,
+            "experimentalHedgeAfterRepeatedAmbiguity": false
+          }
+        }
+      ]
+    }
+  ]
+}
