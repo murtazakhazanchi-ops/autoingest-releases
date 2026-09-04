@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Related feature(s) / roadmap milestone | Ask AutoIngest (feature/ask-autoingest), Knowledge Model / knowledge-engine track |
+| Related feature(s) / roadmap milestone | AI-FEAT-058 / AI-RM-011 |
 | Status | Accepted |
 | Date | 2026-09-04 |
 | Evidence status | Verified from code (`scripts/product-docs/lib/askRetrieval/*.js`), the frozen `retrieval250` benchmark (`scripts/product-docs/bench/orchestrator/retrieval250.js`), and this module's own test suite (`scripts/product-docs/test/askRetrieval/*.test.js`, 61 tests, 0 failures) |
