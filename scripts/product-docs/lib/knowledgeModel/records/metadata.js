@@ -155,10 +155,32 @@ const RECORDS = [
     actions: [],
     behavior: 'AutoIngest stores each event\'s data as a plain JSON file named event.json, located directly inside that event\'s own folder in the archive — one file per event, not a database and not a single archive-wide file. Key information it holds: the event\'s own metadata, its sub-events, its file groups and how they map to sub-events, its import history, its overall status, and feature-specific state such as metadata tracking. One group always maps to exactly one sub-event, with no orphaned groups and no duplicate mappings. The file must always be valid, structured JSON and stay compatible with older versions of itself.',
     recovery: 'Every write to event.json is atomic and crash-safe: AutoIngest never partially overwrites the file. It reads the current file, applies the intended change, writes the result to a temporary file first, then swaps that temporary file into place in one atomic step — if that final step is interrupted, the real file is never left half-written. On storage where that atomic swap isn\'t available (for example, some NAS or cloud-synced mounts), AutoIngest falls back to a safe copy-then-replace approach instead. If two parts of the app try to update the same event\'s file at nearly the same time (for example, an event edit and a metadata update happening together), AutoIngest queues those writes so they apply one after another rather than one silently overwriting the other. A failed write cleans up after itself rather than leaving a stray temporary file behind.',
+    // Stage 2.1 correction (2026-09-04, same defect class as the Transfer
+    // Export/Import correction -- see DEC-024): all three edges below
+    // previously used `writesTo`/`readsFrom` with this record (event.json)
+    // as the SUBJECT, which under this corpus's own subject-first-ordering
+    // convention literally asserted "event.json writes to/reads from X" --
+    // but every one of these three notes' own text describes the OPPOSITE
+    // direction (X writes into/reads from event.json). Found by a
+    // corpus-wide same-class audit (Stage 2.1 Section 4), not assumed
+    // isolated to the one previously-known Transfer Export/Import case.
+    // Corrected to `relatedTo`, the same treatment applied to the Transfer
+    // Import correction: the real fact stays exactly as each note already
+    // (correctly) describes it; only the structured type/direction, which
+    // contradicted that note, is corrected. The precise, asymmetric fact in
+    // each case is better asserted as its own edge on the WRITER/READER's
+    // own record (event-json-contract is never the subject of a real
+    // writesTo/readsFrom edge anywhere in this corpus -- every other record
+    // that touches event.json correctly asserts uses/writesTo/readsFrom
+    // FROM its own side, e.g. KM-metadata-writing-engine's own `uses`
+    // edge below) -- not invented here, since Section 4 of the governing
+    // brief explicitly forbids adding a relationship merely because it
+    // might be useful; only the three already-existing, already-backwards
+    // edges are corrected.
     relationships: [
-      { type: 'writesTo', targetId: 'KM-metadata-writing-engine', note: 'The Metadata Writing Engine\'s durable-state persistence writes into event.json\'s metadataState block exclusively through updateEventJsonAtomic.' },
-      { type: 'writesTo', targetId: 'KM-metadata-durable-queue', note: 'metadataQueueRecovery.js persists each event\'s durable metadata outcome into event.json before compacting the corresponding queue batch.' },
-      { type: 'readsFrom', targetId: 'KM-metadata-audit-repair', note: 'Repair reads each event\'s live event.json (via buildFileEvidence) for context/traceability, though its write decision itself comes from the frozen audit snapshot, not from this live read.' },
+      { type: 'relatedTo', targetId: 'KM-metadata-writing-engine', note: 'The Metadata Writing Engine writes into event.json\'s metadataState block exclusively through updateEventJsonAtomic -- see the Metadata Writing Engine\'s own uses edge for the asserted direction.' },
+      { type: 'relatedTo', targetId: 'KM-metadata-durable-queue', note: 'metadataQueueRecovery.js persists each event\'s durable metadata outcome into event.json before compacting the corresponding queue batch -- the durable queue writes into event.json, not the reverse.' },
+      { type: 'relatedTo', targetId: 'KM-metadata-audit-repair', note: 'Repair reads each event\'s live event.json (via buildFileEvidence) for context/traceability, though its write decision itself comes from the frozen audit snapshot, not from this live read -- Repair reads from event.json, not the reverse.' },
     ],
     limitations: [
       'A hardcoded field list in the full-payload Event Edit save path has caused two distinct silent field-drop bugs roughly three months apart (BUG-006, per docs/product/features/AI-FEAT-004); the underlying pattern is documented as not yet structurally closed, per the canonical feature doc (registry-level detail, not independently re-verified against current code in this checkpoint\'s source read).',

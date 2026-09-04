@@ -8,7 +8,7 @@
 const assert = require('node:assert/strict');
 const { createRunner } = require('../testHarness');
 const {
-  resolveRelationship, checkRelationship, describeEdge,
+  resolveRelationship, checkRelationship, describeEdge, classifyMatches,
   DIRECTIONAL_TYPES, SYMMETRIC_TYPES, PROCEDURAL_ORDERING_TYPES,
 } = require('../../lib/askKnowledge/relationships');
 const { HandleSession } = require('../../lib/askKnowledge/handles');
@@ -66,11 +66,68 @@ async function main() {
     assert.notEqual(result.status, 'CONFLICT');
   });
 
-  await t('integration: a real same-type bidirectional precedesInWorkflow pair (Transfer Export / Transfer Import) returns CONFLICT -- genuine temporal-asymmetry contradiction', () => {
+  await t('Stage 2.1 regression (DEC-024): Transfer Export/Import no longer produces a false CONFLICT now that the canonical data is corrected', () => {
     const result = resolveRelationship('AI-FEAT-038', 'AI-FEAT-039');
-    assert.equal(result.status, 'CONFLICT');
-    assert.match(result.note, /CONFLICTING/);
-    assert.ok(result.edges.length >= 2);
+    assert.equal(result.status, 'SUPPORTED');
+    assert.match(result.note, /directional/);
+    // The corrected edge must still be discoverable both ways -- Export's
+    // own precedesInWorkflow edge, plus Import's own relatedTo back-
+    // reference to the same fact.
+    assert.ok(result.edges.some((e) => e.type === 'precedesInWorkflow'));
+    assert.ok(result.edges.some((e) => e.type === 'relatedTo'));
+  });
+
+  await t('Stage 2.1 regression (DEC-024): event.json contract\'s three previously-backwards edges no longer produce a false CONFLICT', () => {
+    const pairs = [
+      ['AI-FEAT-004', 'AI-FEAT-029'], // event.json <-> Metadata Writing Engine
+      ['AI-FEAT-004', 'AI-FEAT-030'], // event.json <-> Metadata Durable Queue
+      ['AI-FEAT-004', 'AI-FEAT-033'], // event.json <-> Metadata Audit & Repair
+    ];
+    for (const [a, b] of pairs) {
+      const result = resolveRelationship(a, b);
+      assert.notEqual(result.status, 'CONFLICT', `${a}<->${b} should not be CONFLICT`);
+    }
+  });
+
+  await t('GENERAL regression (not corpus-specific): classifyMatches() detects a genuine same-type bidirectional precedesInWorkflow contradiction from synthetic fixture data', () => {
+    // Proves the CONFLICT-detection MECHANISM itself, independent of
+    // whatever the real corpus currently contains -- the real fixture that
+    // originally proved this (Transfer Export/Import) was itself corrected
+    // by DEC-024, so a test relying only on real data would silently stop
+    // exercising this path the moment that data defect was fixed.
+    const synthetic = classifyMatches([
+      { direction: 'subject->object', type: 'precedesInWorkflow', note: 'A happens before B.', meaning: 'A happens before B.' },
+      { direction: 'object->subject', type: 'precedesInWorkflow', note: 'B happens before A.', meaning: 'B happens before A.' },
+    ]);
+    assert.equal(synthetic.status, 'CONFLICT');
+    assert.match(synthetic.note, /CONFLICTING/);
+  });
+
+  await t('GENERAL regression: classifyMatches() does NOT flag a same-type bidirectional "uses" pair as CONFLICT (mutual usage is legitimate)', () => {
+    const synthetic = classifyMatches([
+      { direction: 'subject->object', type: 'uses', note: 'A uses B.', meaning: 'A uses B.' },
+      { direction: 'object->subject', type: 'uses', note: 'B uses A.', meaning: 'B uses A.' },
+    ]);
+    assert.notEqual(synthetic.status, 'CONFLICT');
+  });
+
+  await t('GENERAL regression: classifyMatches() does NOT flag distinctFrom co-occurring with a positive edge as CONFLICT (corpus convention, see DEC-023)', () => {
+    const synthetic = classifyMatches([
+      { direction: 'subject->object', type: 'precedesInWorkflow', note: 'A happens before B.', meaning: 'A happens before B.' },
+      { direction: 'subject->object', type: 'distinctFrom', note: 'A and B are distinct mechanisms.', meaning: 'A and B are distinct/separate.' },
+    ]);
+    assert.equal(synthetic.status, 'CONTRADICTED');
+  });
+
+  await t('GENERAL regression: a single one-directional precedesInWorkflow edge (no reverse) is SUPPORTED, never falsely flagged CONFLICT', () => {
+    const synthetic = classifyMatches([
+      { direction: 'subject->object', type: 'precedesInWorkflow', note: 'A happens before B.', meaning: 'A happens before B.' },
+    ]);
+    assert.equal(synthetic.status, 'SUPPORTED');
+  });
+
+  await t('GENERAL regression: classifyMatches() on an empty matches array returns UNKNOWN, never invents a status', () => {
+    assert.equal(classifyMatches([]).status, 'UNKNOWN');
   });
 
   await t('integration: a real directional pair (Import Pipeline precedesInWorkflow Audit Integrity Verification) returns SUPPORTED with a directional note', () => {

@@ -93,6 +93,21 @@ function resolveRelationship(subjectFeatureId, objectFeatureId) {
     }
   }
 
+  return classifyMatches(matches);
+}
+
+// Stage 2.1, Section 8: extracted as its own pure function -- takes only an
+// already-built `matches` array ({direction, type, note, meaning}[]),
+// never touching KNOWLEDGE_MODEL itself -- so the CONFLICT/CONTRADICTED/
+// SUPPORTED/UNKNOWN classification logic can be regression-tested directly
+// against synthetic fixtures, independent of whatever the real corpus's
+// own current data happens to contain. This matters concretely: the
+// specific real-data case (Transfer Export/Import) that originally proved
+// this logic works was ITSELF corrected in DEC-024, so a test relying only
+// on that real pair would silently stop testing the CONFLICT path the
+// moment the underlying data defect was fixed -- exactly what this
+// extraction exists to prevent recurring.
+function classifyMatches(matches) {
   if (!matches.length) {
     return {
       status: 'UNKNOWN',
@@ -189,6 +204,6 @@ function checkRelationship(subjectHandle, objectHandle, handleSession) {
 }
 
 module.exports = {
-  resolveRelationship, checkRelationship, describeEdge,
+  resolveRelationship, checkRelationship, describeEdge, classifyMatches,
   DIRECTIONAL_TYPES, SYMMETRIC_TYPES, PROCEDURAL_ORDERING_TYPES, identifiersFor,
 };

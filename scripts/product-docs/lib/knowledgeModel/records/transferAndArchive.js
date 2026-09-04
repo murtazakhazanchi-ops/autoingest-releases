@@ -95,7 +95,20 @@ const RECORDS = [
     behavior: 'A missing file at the destination is copied; an identical-size match is skipped as already present; a same-named file with a different size is safely renamed in a plain import, or left untouched and flagged as changed in an Update Import. A durable record of what happened to every file is kept, which later feeds AutoIngest\'s post-transfer metadata verification. How AutoIngest matches an incoming event folder to its destination differs by transfer layout: loose event folders sitting directly on the transfer drive are matched by their actual content identity against the whole main archive, so a renamed folder is still recognized correctly, and an ambiguous match is excluded rather than guessed at. Folders that mirror the archive\'s own nested Collection/Event structure, however, are currently matched by folder name only and do not benefit from that same content-identity matching — a confirmed gap against the intended behavior for that specific case, not a documentation error.',
     recovery: 'Yes — Transfer Import has its own independent resume mechanism, symmetric with Transfer Export\'s and equally real, not merely inherited from it. If interrupted (app crash, forced quit, power loss), it can resume from its own saved on-disk progress rather than starting the whole import over. Progress is tracked per batch: on resume, batches that already fully finished are skipped, and the import continues from the first batch that hadn\'t completed. Resume also confirms it is resuming against the same transfer source it originally started from, refusing to resume against a mismatched one. AutoIngest also keeps track of whether its own progress-saving is currently working correctly; if a progress save fails, that specific import may not be safely resumable from exactly where it left off if interrupted right after (files that already finished copying are unaffected either way), and a repeated save failure is recorded once, not repeatedly.',
     relationships: [
-      { type: 'precedesInWorkflow', targetId: 'AI-FEAT-038', note: 'Reverse direction of the same physical Transfer Drive workflow — Import reads what Export wrote.' },
+      // Stage 2.1 correction (2026-09-04, see DEC-024): this edge previously
+      // read `type: 'precedesInWorkflow'`, independently asserting "Import
+      // precedes Export" under this corpus's own established
+      // subject-first-ordering convention for that edge type -- directly
+      // contradicting Export's own correctly-encoded precedesInWorkflow
+      // edge (AI-FEAT-038 -> AI-FEAT-039) and this record's own note text
+      // ("Import reads what Export wrote", i.e. Export happens first).
+      // Corrected to `relatedTo`, matching this corpus's own established
+      // single-edge convention for precedesInWorkflow (the temporal fact is
+      // asserted once, on the earlier record -- see AI-FEAT-019/AI-FEAT-026
+      // for the same pattern) -- a non-directional back-reference to the
+      // SAME fact Export's own edge already establishes, never a second,
+      // independent (and here, backwards) ordering claim.
+      { type: 'relatedTo', targetId: 'AI-FEAT-038', note: 'Import reads what Export wrote to the Transfer Drive. The temporal ordering (Export happens before Import) is asserted once, on Export\'s own precedesInWorkflow edge; this is a non-directional back-reference to that same fact, not an independent ordering claim.' },
       { type: 'distinctFrom', targetId: 'AI-FEAT-040', note: 'Transfer Import is a separate service (transferImportService.js) from Backup Update Scanning, which lives inside transferExportService.js as a mode of export/scan — Update Import (scope.backupUpdate within transferImportService.js) consumes a prior scan\'s approved worklist but is not the same code as AI-FEAT-040.' },
     ],
     limitations: [

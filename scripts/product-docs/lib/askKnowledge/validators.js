@@ -123,8 +123,87 @@ function checkImpossibleStates(result) {
   return violations;
 }
 
+// --- Stage 2.1 (DEC-024) corpus-defect validators ---------------------------
+//
+// General, reusable checks for the exact defect classes DEC-024 found and
+// corrected -- promoted out of the one-off stage2CorpusAudit.js script so
+// they can be regression-tested directly (with both real and synthetic
+// fixture data) and reused everywhere a corpus scan is needed, rather than
+// existing only as inline audit-script logic. Each accepts an optional
+// `records` array (defaults to the real KNOWLEDGE_MODEL) specifically so
+// tests can exercise the detection logic against synthetic fixtures,
+// independent of whatever the real corpus currently contains -- the same
+// principle relationships.js's own classifyMatches() extraction follows,
+// and for the identical reason: the real fixture that once exercised this
+// path (KM-transfer-import's null-adjacent defects) was itself corrected.
+
+function findRecordByAnyId(records, id) {
+  return records.find((x) => x.id === id || x.featureId === id);
+}
+
+// Class: a relationship note names/implies a target but targetId is
+// null/undefined -- an incomplete reference, never silently guessed at.
+function findNullTargetEdges(records = KNOWLEDGE_MODEL) {
+  const found = [];
+  for (const r of records) {
+    for (const rel of r.relationships || []) {
+      if (rel.targetId === null || rel.targetId === undefined) {
+        found.push({ fromId: r.id, type: rel.type, note: rel.note });
+      }
+    }
+  }
+  return found;
+}
+
+// Class: a relationship targetId is present but resolves to no real record
+// (not in the Knowledge Model, and not even a recognized AI-FEAT-###/
+// AI-WF-### id shape a docs-tooling title lookup could still resolve).
+function findUnresolvedTargetEdges(records = KNOWLEDGE_MODEL) {
+  const found = [];
+  for (const r of records) {
+    for (const rel of r.relationships || []) {
+      if (rel.targetId === null || rel.targetId === undefined) continue;
+      const target = findRecordByAnyId(records, rel.targetId);
+      const looksLikeRealId = isRecognizedRecordIdShape(rel.targetId);
+      if (!target && !looksLikeRealId) found.push({ fromId: r.id, type: rel.type, targetId: rel.targetId });
+    }
+  }
+  return found;
+}
+
+// Class: a genuine same-type, opposite-direction temporal contradiction --
+// both subjects' own records assert a precedesInWorkflow edge pointing at
+// the other. Scoped to precedesInWorkflow specifically (see relationships
+// .js's own header comment on why uses/writesTo/readsFrom can legitimately
+// be mutual, while workflow ordering cannot).
+function findTemporalContradictions(records = KNOWLEDGE_MODEL) {
+  // Built from the passed-in `records` array only -- deliberately NOT
+  // relationships.js's own identifiersFor(), which resolves against the
+  // real, module-level KNOWLEDGE_MODEL and would silently ignore synthetic
+  // fixture data passed here, defeating this function's own testability
+  // goal.
+  function idsForLocal(rec) {
+    return new Set([rec.featureId, rec.id].filter(Boolean));
+  }
+  const found = [];
+  const seenPairs = new Set();
+  for (const r of records) {
+    for (const rel of r.relationships || []) {
+      if (rel.type !== 'precedesInWorkflow') continue;
+      const target = findRecordByAnyId(records, rel.targetId);
+      if (!target) continue;
+      const pairKey = [r.id, target.id].sort().join('|');
+      if (seenPairs.has(pairKey)) continue;
+      const reverse = (target.relationships || []).some((rr) => idsForLocal(r).has(rr.targetId) && rr.type === 'precedesInWorkflow');
+      if (reverse) { found.push({ pair: [r.id, target.id] }); seenPairs.add(pairKey); }
+    }
+  }
+  return found;
+}
+
 module.exports = {
   isWellFormedHandleShape, handleCollidesWithInternalIdShape,
   isValidRelationType, classifyRelationType, isRecognizedRecordIdShape,
   scanForLeaks, validateKnowledgeRecord, validateFullCorpus, checkImpossibleStates,
+  findNullTargetEdges, findUnresolvedTargetEdges, findTemporalContradictions,
 };

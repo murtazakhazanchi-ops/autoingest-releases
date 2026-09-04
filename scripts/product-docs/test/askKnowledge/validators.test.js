@@ -11,6 +11,7 @@ const {
   isWellFormedHandleShape, handleCollidesWithInternalIdShape,
   isValidRelationType, classifyRelationType, isRecognizedRecordIdShape,
   scanForLeaks, validateKnowledgeRecord, validateFullCorpus, checkImpossibleStates,
+  findNullTargetEdges, findUnresolvedTargetEdges, findTemporalContradictions,
 } = require('../../lib/askKnowledge/validators');
 const { STATUS, EXTRACTION_TIERS } = require('../../lib/knowledgeModel/schema');
 
@@ -105,6 +106,70 @@ async function main() {
     assert.deepEqual(checkImpossibleStates({ knowledgeState: 'DOCUMENTED', dimensions: { purpose: 'x' } }), []);
     assert.deepEqual(checkImpossibleStates({ error: 'invalid_handle', note: 'x' }), []);
     assert.deepEqual(checkImpossibleStates({ status: 'UNKNOWN', edges: [] }), []);
+  });
+
+  // --- Stage 2.1 (DEC-024) corpus-defect validators, tested with BOTH
+  // synthetic fixtures (general, not corpus-specific) and the real corpus
+  // (must now be clean, post-correction) ------------------------------------
+
+  await t('findNullTargetEdges: GENERAL synthetic fixture with a null targetId is detected', () => {
+    const synthetic = [{ id: 'A', featureId: 'FA', relationships: [{ type: 'distinctFrom', targetId: null, note: 'incomplete' }] }];
+    const found = findNullTargetEdges(synthetic);
+    assert.equal(found.length, 1);
+    assert.equal(found[0].fromId, 'A');
+  });
+
+  await t('findNullTargetEdges: a synthetic fixture with every targetId populated finds nothing', () => {
+    const synthetic = [{ id: 'A', featureId: 'FA', relationships: [{ type: 'relatedTo', targetId: 'FB', note: 'fine' }] }];
+    assert.deepEqual(findNullTargetEdges(synthetic), []);
+  });
+
+  await t('findNullTargetEdges: real corpus regression -- zero null targets after DEC-024\'s QMZ correction', () => {
+    assert.deepEqual(findNullTargetEdges(), []);
+  });
+
+  await t('findUnresolvedTargetEdges: GENERAL synthetic fixture with a dangling targetId is detected', () => {
+    const synthetic = [{ id: 'A', featureId: 'FA', relationships: [{ type: 'uses', targetId: 'NOT-A-REAL-ID', note: 'broken' }] }];
+    const found = findUnresolvedTargetEdges(synthetic);
+    assert.equal(found.length, 1);
+  });
+
+  await t('findUnresolvedTargetEdges: a targetId matching the recognized AI-FEAT/AI-WF shape is not flagged, even without a KM record for it', () => {
+    const synthetic = [{ id: 'A', featureId: 'FA', relationships: [{ type: 'uses', targetId: 'AI-FEAT-999999', note: 'no KM record but real id shape' }] }];
+    assert.deepEqual(findUnresolvedTargetEdges(synthetic), []);
+  });
+
+  await t('findUnresolvedTargetEdges: real corpus regression -- zero unresolved targets', () => {
+    assert.deepEqual(findUnresolvedTargetEdges(), []);
+  });
+
+  await t('findTemporalContradictions: GENERAL synthetic fixture with same-type opposite-direction precedesInWorkflow is detected', () => {
+    const synthetic = [
+      { id: 'A', featureId: 'FA', relationships: [{ type: 'precedesInWorkflow', targetId: 'FB', note: 'A before B' }] },
+      { id: 'B', featureId: 'FB', relationships: [{ type: 'precedesInWorkflow', targetId: 'FA', note: 'B before A' }] },
+    ];
+    const found = findTemporalContradictions(synthetic);
+    assert.equal(found.length, 1);
+  });
+
+  await t('findTemporalContradictions: a single one-directional edge (no reverse) is never flagged', () => {
+    const synthetic = [
+      { id: 'A', featureId: 'FA', relationships: [{ type: 'precedesInWorkflow', targetId: 'FB', note: 'A before B' }] },
+      { id: 'B', featureId: 'FB', relationships: [] },
+    ];
+    assert.deepEqual(findTemporalContradictions(synthetic), []);
+  });
+
+  await t('findTemporalContradictions: a same-type bidirectional "uses" pair is never flagged (only precedesInWorkflow is scoped in)', () => {
+    const synthetic = [
+      { id: 'A', featureId: 'FA', relationships: [{ type: 'uses', targetId: 'FB', note: 'A uses B' }] },
+      { id: 'B', featureId: 'FB', relationships: [{ type: 'uses', targetId: 'FA', note: 'B uses A' }] },
+    ];
+    assert.deepEqual(findTemporalContradictions(synthetic), []);
+  });
+
+  await t('findTemporalContradictions: real corpus regression -- zero temporal contradictions after DEC-024\'s Transfer Export/Import correction', () => {
+    assert.deepEqual(findTemporalContradictions(), []);
   });
 
   summarize('askKnowledge/validators.test.js');

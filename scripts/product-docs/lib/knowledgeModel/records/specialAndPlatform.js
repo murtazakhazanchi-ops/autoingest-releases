@@ -39,7 +39,23 @@ const RECORDS = [
     behavior: 'QMZ reads each media file\'s original embedded capture date (from the photo or RAW file\'s own metadata) rather than the file\'s copy date on disk, because copying files during import does not reliably preserve the original date across drives (e.g. SD card to archive); the file\'s copy date on disk is used only as a last-resort fallback when no embedded date can be read. Sequence codes follow a fixed two-digit-number-plus-letter format (e.g. "01Q") with a maximum of 50 Qadam, 51 Majlis, and 52 Ziyafat sequences per event, and are a folder-naming convention only — verified live through the real UI that the sequence code is never written into the file\'s keyword metadata. QMZ keeps its own independent workspace state (grid sort order, view mode, selection, keyboard focus, thumbnail loading) completely separate from standard Import\'s equivalent state, so switching between the two workspaces never carries settings over from one to the other.',
     recovery: 'Moving files never overwrites existing content: if a file with the same name and size already exists at the destination, the move is treated as already done and skipped; if a same-named file with a different size exists there, the incoming file is renamed with a _1, _2, etc. suffix instead of overwriting anything. Removing a sequence only clears it from AutoIngest\'s saved state after confirming its folder is actually gone from disk, so the two never fall out of sync — if cleanup is interrupted partway through, both the leftover folder and its state entry are left in place rather than silently losing track of content.',
     relationships: [
-      { type: 'distinctFrom', targetId: null, note: 'Distinct from standard Event Import: QMZ has its own root (qmzRoot), durable state file, renderer namespace, and IPC surface — not a reuse of Import\'s equivalents. See DEC-011.' },
+      // Stage 2.1 correction (2026-09-04, see DEC-024): targetId was
+      // previously null -- "standard Event Import" was never resolved to a
+      // canonical id. Repaired to AI-FEAT-019 (Import Pipeline & Copy
+      // Engine), the unambiguous referent: (1) DEC-011, cited directly in
+      // this note, uses the parallel phrase "the generic single/multi-
+      // component Event Import model"; (2) AI-FEAT-019's own record
+      // independently uses "full Event Import" in an identical-shape
+      // distinctFrom comparison against Quick Import -- the corpus's own
+      // established term for itself; (3) the comparison points here (own
+      // root/durable-state-file/IPC-surface) are backend-service-level,
+      // matching AI-FEAT-019's own nature as a real service
+      // (main/fileManager.js), not AI-FEAT-018's pure routing/derivation
+      // logic or AI-WF-001's end-to-end operator workflow; (4) a corpus-
+      // wide scan found zero other distinctFrom edges anywhere targeting a
+      // Workflow id -- every one targets a Feature/KM id, ruling out
+      // AI-WF-001 structurally, not just by inference.
+      { type: 'distinctFrom', targetId: 'AI-FEAT-019', note: 'Distinct from standard Event Import: QMZ has its own root (qmzRoot), durable state file, renderer namespace, and IPC surface — not a reuse of Import\'s equivalents. See DEC-011.' },
       { type: 'distinctFrom', targetId: 'AI-FEAT-046', note: 'QMZ\'s _Unsequenced/<photographerName>/ adoption is folder-content adoption into QMZ\'s own bucket — unrelated to AI-FEAT-046\'s archive-wide Folder Adoption, which registers whole archive folders as AutoIngest events via event.json.' },
       { type: 'distinctFrom', targetId: 'AI-FEAT-016', note: 'QMZ\'s arrow-key grid navigation/preview-focus system is its own implementation, explicitly separated from Import\'s equivalent (AI-FEAT-016).' },
       { type: 'uses', targetId: 'AI-FEAT-029', note: 'File moves auto-queue into the shared metadata write engine/resolver (qmz:queueMetadata → applyBatch) rather than writing metadata independently.' },

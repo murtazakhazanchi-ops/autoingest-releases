@@ -12,7 +12,10 @@ const path = require('path');
 const build = require('../../lib/build');
 const { buildEngineContext } = require('../../lib/knowledgeEngine');
 const { KNOWLEDGE_MODEL, findAllByFeatureId } = require('../../lib/knowledgeModel/index');
-const { classifyRelationType, validateFullCorpus, scanForLeaks, isRecognizedRecordIdShape } = require('../../lib/askKnowledge/validators');
+const {
+  classifyRelationType, validateFullCorpus, scanForLeaks, isRecognizedRecordIdShape,
+  findNullTargetEdges, findUnresolvedTargetEdges, findTemporalContradictions,
+} = require('../../lib/askKnowledge/validators');
 const { resolveRelationship, DIRECTIONAL_TYPES, PROCEDURAL_ORDERING_TYPES } = require('../../lib/askKnowledge/relationships');
 const { readAutoIngest, VALID_DIMENSIONS } = require('../../lib/askKnowledge/read');
 const { searchAutoIngest } = require('../../lib/askKnowledge/search');
@@ -55,17 +58,23 @@ function main() {
   let totalEdges = 0;
   const byClassification = { DIRECTIONAL: 0, SYMMETRIC: 0, GENERIC_UNKNOWN: 0 };
   const byType = {};
-  const unresolvedTargets = [];
   for (const r of KNOWLEDGE_MODEL) {
     for (const rel of r.relationships || []) {
       totalEdges++;
       byClassification[classifyRelationType(rel.type)]++;
       byType[rel.type] = (byType[rel.type] || 0) + 1;
-      const targetRecords = findAllByFeatureId(rel.targetId);
-      const targetById = KNOWLEDGE_MODEL.find((x) => x.id === rel.targetId);
-      if (!targetRecords.length && !targetById) unresolvedTargets.push({ fromRecord: r.id, targetId: rel.targetId, type: rel.type });
     }
   }
+  // Stage 2.1 (DEC-024): null-targetId edges and genuinely-unresolvable
+  // (non-null but no matching record) edges are two DISTINCT defect
+  // classes -- the original Stage 2 audit conflated them into one
+  // "unresolved" bucket, which is why the QMZ null-target case counted as
+  // "1 unresolved target" even though it is a different, more benign
+  // class (an incomplete reference, not a broken one). Reused, tested
+  // validators (validators.js), not reimplemented inline.
+  const nullTargetEdges = findNullTargetEdges();
+  const unresolvedTargets = findUnresolvedTargetEdges().map((e) => ({ fromRecord: e.fromId, targetId: e.targetId, type: e.type }));
+  const temporalContradictions = findTemporalContradictions();
 
   // --- Conflicting facts: relationship CONFLICT + capability-status source
   // inconsistency, both computed exhaustively (every Feature pair with any
@@ -157,7 +166,9 @@ function main() {
       total: totalEdges,
       byClassification,
       byType,
+      nullTargetEdges,
       unresolvedTargets,
+      temporalContradictions,
     },
     conflictingFacts: {
       relationshipConflicts,
@@ -188,7 +199,9 @@ function main() {
   console.log(`Features: ${report.featureRecordCount}, Workflows: ${report.workflowRecordCount}, KM records: ${report.knowledgeModelRecordCount}`);
   console.log(`Decisions considered/included: ${report.decisionRecordsConsidered}/${report.decisionRecordsIncluded}`);
   console.log(`Relationship edges: ${totalEdges} (directional=${byClassification.DIRECTIONAL}, symmetric=${byClassification.SYMMETRIC}, generic=${byClassification.GENERIC_UNKNOWN})`);
+  console.log(`Null-target relationship edges: ${nullTargetEdges.length}`);
   console.log(`Unresolved relationship targets: ${unresolvedTargets.length}`);
+  console.log(`Temporal contradictions (precedesInWorkflow): ${temporalContradictions.length}`);
   console.log(`Relationship conflicts: ${relationshipConflicts.length}`);
   console.log(`Bidirectional non-procedural edges (informational): ${bidirectionalNonProceduralEdges.length}`);
   console.log(`knowledgeState: EMPTY=${emptyCount} THIN=${thinCount} DOCUMENTED=${documentedCount}`);

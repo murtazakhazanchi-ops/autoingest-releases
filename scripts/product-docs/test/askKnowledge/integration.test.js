@@ -111,7 +111,7 @@ async function main() {
     assert.equal(forward.edges.length, inverse.edges.length);
   });
 
-  await t('replay CONFLICT (same-type opposite direction): Transfer Export/Import through the full operations surface', async () => {
+  await t('replay Stage 2.1 correction: Transfer Export/Import through the full operations surface no longer produces a false CONFLICT (DEC-024)', async () => {
     const hs = new HandleSession();
     const ops = createKnowledgeOperations(knowledgeContext, hs);
     const s1 = ops.search_autoingest('transfer export writes to drive');
@@ -120,13 +120,44 @@ async function main() {
     const h2 = s2.results.find((r) => r.title.includes('Transfer Import'))?.handle;
     if (h1 && h2) {
       const rel = ops.check_relationship(h1, h2);
-      assert.equal(rel.status, 'CONFLICT');
+      assert.equal(rel.status, 'SUPPORTED');
+      assert.match(rel.note, /directional/);
     } else {
       // Search ranking is not guaranteed to surface both exact titles for
       // every wording -- the deterministic pairing is already proven
       // directly in relationships.test.js; this replay is best-effort
       // end-to-end confirmation, not the sole proof.
       assert.ok(true);
+    }
+  });
+
+  await t('replay CONFLICT (general mechanism, synthetic data): the classification path itself is still reachable and correct end-to-end', () => {
+    // The real corpus no longer contains a CONFLICT case after DEC-024 --
+    // this proves the classification logic search_autoingest/
+    // check_relationship ultimately depend on (classifyMatches) still
+    // correctly reaches CONFLICT for genuinely conflicting data, so the
+    // safety net is proven live, not merely retired along with the one
+    // real case that used to exercise it.
+    const { classifyMatches } = require('../../lib/askKnowledge/relationships');
+    const result = classifyMatches([
+      { direction: 'subject->object', type: 'precedesInWorkflow', note: 'X before Y.', meaning: 'X before Y.' },
+      { direction: 'object->subject', type: 'precedesInWorkflow', note: 'Y before X.', meaning: 'Y before X.' },
+    ]);
+    assert.equal(result.status, 'CONFLICT');
+  });
+
+  await t('replay Stage 2.1 correction: QMZ vs standard Event Import resolves correctly through the full operations surface (DEC-024)', async () => {
+    const hs = new HandleSession();
+    const ops = createKnowledgeOperations(knowledgeContext, hs);
+    const s1 = ops.search_autoingest('QMZ sequencing workspace');
+    const s2 = ops.search_autoingest('import pipeline copy engine');
+    const h1 = s1.results.find((r) => r.title.includes('QMZ'))?.handle;
+    const h2 = s2.results.find((r) => r.title.includes('Import Pipeline'))?.handle;
+    if (h1 && h2) {
+      const rel = ops.check_relationship(h1, h2);
+      assert.equal(rel.status, 'CONTRADICTED');
+    } else {
+      assert.ok(true); // best-effort; the deterministic pairing is proven directly elsewhere
     }
   });
 
