@@ -75,8 +75,26 @@ const CONTEXT_SIZE = 24576;
 // request; these are the runtime-level defaults this module documents as
 // a single source of truth, not a claim that Stage 3 itself performs
 // conversational inference.
+//
+// sequences=2, NOT 1 -- a Stage 3.1 real-model finding, not the original
+// Stage 3 design. The parent (runtime.js) still only ever dispatches ONE
+// tracked, caller-visible request at a time (Section 20's "one active
+// generation" invariant, unchanged and still enforced by its own FIFO
+// queue) -- but this runtime's own cancellation strategy (Section 19,
+// DEC-025) deliberately lets a cancelled request's native generation keep
+// running in the background rather than interrupting it. With only 1
+// sequence slot, an immediately-following request would collide with that
+// still-running abandoned generation and fail with a real, reproduced
+// "No sequences left" error (found via real-model cancellation-stress
+// testing, not theorized). The second slot is a resource cushion for
+// exactly that transient overlap, not an invitation for the parent to run
+// two real concurrent generations -- each sequence still gets the full
+// pinned CONTEXT_SIZE (24576), confirmed directly: creating a context with
+// sequences:2 reports sequence.contextSize=24576 for each sequence, not a
+// value divided between them (only the underlying total allocated KV-cache
+// size doubles).
 const INFERENCE_DEFAULTS = Object.freeze({
-  sequences: 1, // one active generation per runtime (Section 20)
+  sequences: 2,
 });
 
 // Storage: the subdirectory name under Electron's app.getPath('userData')

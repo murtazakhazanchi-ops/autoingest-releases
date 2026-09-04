@@ -61,7 +61,7 @@
 //   in  {type:'diagnostics'}
 //   out {type:'diagnostics-result', ...}
 
-const { CONTEXT_SIZE, RUNTIME_COMPATIBILITY } = require('./modelManifest');
+const { CONTEXT_SIZE, RUNTIME_COMPATIBILITY, INFERENCE_DEFAULTS } = require('./modelManifest');
 
 let llama = null;
 let model = null;
@@ -106,12 +106,32 @@ async function handleCreateContext() {
     if (!model) throw new Error('model not loaded');
     if (context) throw new Error('a context already exists -- dispose it before creating another (Section 20: one context per runtime)');
     const t0 = performance.now();
-    context = await model.createContext({ sequences: 1, contextSize: CONTEXT_SIZE });
+    context = await model.createContext({ sequences: INFERENCE_DEFAULTS.sequences, contextSize: CONTEXT_SIZE });
     const createContextMs = performance.now() - t0;
     process.parentPort.postMessage({ type: 'context-created', createContextMs, contextSize: context.contextSize });
   } catch (err) {
     _lastErrorCategory = 'CONTEXT_CREATE_FAILED';
     process.parentPort.postMessage({ type: 'context-create-error', message: err && err.message ? err.message : String(err) });
+  }
+}
+
+// Stage 3.1 real-model finding: a burst of cancelled long generations can
+// transiently exhaust the sequence pool (see handleInfer's own header
+// comment below for the full reproduction). Polls context.sequencesLeft
+// on a short interval rather than failing immediately -- bounded by
+// SEQUENCE_WAIT_TIMEOUT_MS so a genuinely stuck pool (not just a
+// transient burst) still surfaces as a real, typed error rather than
+// hanging forever.
+const SEQUENCE_WAIT_POLL_MS = 50;
+const SEQUENCE_WAIT_TIMEOUT_MS = 30000;
+function wait(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
+async function waitForFreeSequence() {
+  const deadline = Date.now() + SEQUENCE_WAIT_TIMEOUT_MS;
+  while (context.sequencesLeft < 1) {
+    if (Date.now() >= deadline) {
+      throw new Error(`no sequence slot became free within ${SEQUENCE_WAIT_TIMEOUT_MS}ms (sequencesLeft=0, totalSequences=${context.totalSequences})`);
+    }
+    await wait(SEQUENCE_WAIT_POLL_MS);
   }
 }
 
@@ -123,6 +143,8 @@ async function handleCreateContext() {
 // wrapper defaults, and no tools.
 async function handleInfer({ requestId, prompt, maxTokens = 64 }) {
   _activeInferenceCount += 1;
+  let sequence = null;
+  let outcome = null; // { ok: true, text, timing } | { ok: false, message }
   try {
     const { LlamaChatSession, QwenChatWrapper } = await nllc();
     if (!model || !context) {
@@ -136,7 +158,44 @@ async function handleInfer({ requestId, prompt, maxTokens = 64 }) {
     // surface -- Stage 4 will own real persistent-conversation session
     // lifecycle; this worker only needs to prove a session/context CAN
     // run a real generation safely, not manage one across turns.
-    const session = new LlamaChatSession({ contextSequence: context.getSequence(), chatWrapper });
+    //
+    // Stage 3.1 real-model finding (a genuine concurrency bug, not a
+    // disposal-API mistake): the context was created with
+    // INFERENCE_DEFAULTS.sequences=1 (a single-sequence pool). The
+    // original code posted the 'result' message to the parent BEFORE
+    // disposing this call's sequence (in a `finally` block that ran
+    // after the postMessage). The parent's own FIFO queue treats
+    // "result received" as "ready for the next request" and immediately
+    // sends the next 'infer' message -- which can arrive and reach
+    // context.getSequence() in a SECOND, interleaved handleInfer()
+    // invocation before the FIRST call's own sequence.dispose() has
+    // actually completed (dispose is itself async and yields at least
+    // once), reliably throwing "No sequences left" on the second call.
+    // Reproduced and confirmed via direct child-process stderr
+    // instrumentation, not assumed. Fixed by disposing the sequence
+    // BEFORE posting the result/error message -- by the time the parent
+    // sees "this request is done," the pool slot is genuinely free.
+    //
+    // That ordering fix alone does not cover CANCELLATION: a cancelled
+    // request's generation keeps running in the background (Section 19's
+    // "stop waiting, don't interrupt" strategy), so an immediately-
+    // following new request can still collide with an abandoned-but-
+    // still-generating sequence. Bumping INFERENCE_DEFAULTS.sequences to 2
+    // (modelManifest.js) covers a single abandoned generation, but a
+    // real-model stress test of 10 rapid cancel-then-retry cycles against
+    // LONG (maxTokens:400) abandoned generations showed even 2 slots can
+    // still be transiently exhausted: an abandoned long generation runs to
+    // completion in the background regardless of how quickly the caller
+    // moves on, so a fast enough burst of cancellations can pile up more
+    // abandoned generations than any small fixed slot count. Rather than
+    // continuing to inflate the slot count (which cannot bound an
+    // unbounded burst), the general fix is to WAIT briefly for a slot to
+    // free up instead of failing immediately -- this degrades a genuine
+    // burst into a short, bounded delay rather than a hard error, and
+    // requires no change to the cancellation/interruption strategy itself.
+    await waitForFreeSequence();
+    sequence = context.getSequence();
+    const session = new LlamaChatSession({ contextSequence: sequence, chatWrapper });
 
     let firstTokenMs = null;
     const t0 = performance.now();
@@ -149,20 +208,28 @@ async function handleInfer({ requestId, prompt, maxTokens = 64 }) {
       },
     });
     const totalMs = performance.now() - t0;
-
-    process.parentPort.postMessage({
-      type: 'result', requestId, text,
-      timing: { firstTokenMs, totalMs, approxOutputTokens: tokenCount },
-    });
+    outcome = { ok: true, text, timing: { firstTokenMs, totalMs, approxOutputTokens: tokenCount } };
   } catch (err) {
     _lastErrorCategory = /context/i.test(err && err.message || '') ? 'CONTEXT_LIMIT' : 'INFERENCE_FAILED';
-    process.parentPort.postMessage({ type: 'infer-error', requestId, message: err && err.message ? err.message : String(err) });
-  } finally {
-    _activeInferenceCount -= 1;
-    // Deliberately NOT disposing the session/context here (Section 19's
-    // cancellation strategy above): the context is a longer-lived
-    // resource this worker's own createContext/disposeContext messages
-    // own explicitly, not torn down per-inference. See handleDisposeContext.
+    outcome = { ok: false, message: err && err.message ? err.message : String(err) };
+  }
+
+  // Release the sequence (this call's own pooled slot) BEFORE signaling
+  // completion to the parent -- see the ordering rationale above. Runs
+  // whether the call succeeded, failed, or was abandoned by a parent-side
+  // cancellation (Section 19's strategy: the child keeps running to
+  // natural completion regardless, so this still executes then, releasing
+  // the slot so a cancelled-and-abandoned request cannot permanently
+  // exhaust the pool either). The context itself is a longer-lived
+  // resource this worker's own createContext/disposeContext messages own
+  // explicitly, not torn down per-inference.
+  if (sequence) { try { await sequence.dispose(); } catch { /* already disposed/torn down with the context -- safe no-op */ } }
+  _activeInferenceCount -= 1;
+
+  if (outcome.ok) {
+    process.parentPort.postMessage({ type: 'result', requestId, text: outcome.text, timing: outcome.timing });
+  } else {
+    process.parentPort.postMessage({ type: 'infer-error', requestId, message: outcome.message });
   }
 }
 
