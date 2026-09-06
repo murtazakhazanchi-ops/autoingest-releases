@@ -6316,6 +6316,11 @@ document.querySelectorAll('.sort-btn').forEach(btn => {
 // Commit 9 implements real dispatch; Commits 10-11 add folder view content.
 
 function renderCurrentView() {
+  // Always in sync with TagRefinementManager.isActive() — shows/hides/updates itself,
+  // so every renderCurrentView() call path (enter, exit, validity-guard force-exit)
+  // gets the banner right without needing a separate call at each of those sites.
+  _updateRefinementBanner();
+
   // Tag Refinement mode: bypass the folder/media dispatch entirely and always show a
   // flat, group-filtered grid — hide folder-nav chrome so it can't be used to escape
   // the filter while refining (edge case: view/sort/folder changes must never reveal
@@ -7442,22 +7447,54 @@ function updateSelectionBar() {
 }
 
 /**
- * Cheap DOM text/disabled-state update for the refinement panel's "Selected: N files"
- * readout — called from the one universal selection-changed hook (updateSelectionBar)
- * instead of a full renderRefinementPanel() re-render, which would wipe the operator's
- * in-progress (not-yet-applied) checkbox choices.
+ * Cheap DOM update for the refinement panel's "Selected: N files" readout AND its
+ * per-tag checkbox states — called from the one universal selection-changed hook
+ * (updateSelectionBar) instead of a full renderRefinementPanel() re-render, which
+ * would tear down and rebuild the whole panel on every tile click.
+ *
+ * Chip states are recomputed from TagRefinementManager.getSelectionState() every time
+ * the selection changes, so they always reflect the truth for whatever is currently
+ * selected (uniform state shown as-is, mixed shown as indeterminate) — this is a
+ * read-only projection, it never writes to TagRefinementManager on its own. The
+ * operator can still edit checkboxes after this runs; those edits only take effect
+ * when they click one of the apply buttons.
  */
 function _syncRefinementSelectedCount() {
   if (!TagRefinementManager.isActive()) return;
-  const group = GroupManager.getGroups().find(g => g.id === TagRefinementManager.getActiveGroupId());
+  const groupId = TagRefinementManager.getActiveGroupId();
+  const group = GroupManager.getGroups().find(g => g.id === groupId);
   if (!group) return;
-  const n = [...selectedFiles].filter(p => group.files.has(p)).length;
+
+  const selPaths = [...selectedFiles].filter(p => group.files.has(p));
+  const n = selPaths.length;
+
+  const comp = EventCreator.getEventComps().find(c => c.folderName === group.subEventId);
+  const eventTypeLabels = (comp?.eventTypes || [])
+    .map(t => (typeof t === 'object' ? (t.label || '') : String(t))).filter(Boolean);
+  const additionalKeywordLabels = (comp?.additionalKeywords || [])
+    .map(k => (k && typeof k.label === 'string') ? k.label : '').filter(Boolean);
+  const selState = TagRefinementManager.getSelectionState(groupId, selPaths, eventTypeLabels, additionalKeywordLabels);
+  const statusLabel = _rpStatusLabel(selState);
+
+  // The selection just changed — any not-yet-applied chip edits are for the previous
+  // selection and no longer apply. Discard that intent and recompute from truth.
+  _rpDirty = false;
+
   const el = document.getElementById('rpSelectedCount');
-  if (el) el.textContent = `Selected: ${n} file${n === 1 ? '' : 's'}`;
-  ['rpApplyBtn', 'rpAllBtn', 'rpNoneBtn', 'rpResetBtn'].forEach(id => {
+  if (el) {
+    el.innerHTML = `Selected: ${n} file${n === 1 ? '' : 's'}${statusLabel ? ` <span class="rp-status rp-status-${selState.status}" id="rpSelectionStatus">${_esc(statusLabel)}</span>` : ''}`;
+  }
+  ['rpAllBtn', 'rpNoneBtn', 'rpResetBtn'].forEach(id => {
     const btn = document.getElementById(id);
     if (btn) btn.disabled = n === 0;
   });
+  const applyBtn = document.getElementById('rpApplyBtn');
+  if (applyBtn) applyBtn.disabled = _rpApplyBlocked(n, selState);
+  const hint = document.getElementById('rpMixedHint');
+  if (hint) hint.hidden = !(n > 0 && selState.status === 'mixed' && !_rpDirty);
+
+  const panel = document.getElementById('groupPanel');
+  if (panel) _applyChipStates(panel, selState);
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -12945,12 +12982,93 @@ function _exitRefinementMode() {
   renderGroupPanel();
 }
 
+/**
+ * Shows/hides/updates the persistent "Refining Tags · G3 · 24 files" banner above the
+ * grid (outside #fileGrid's own scroll container, so it stays visible while the grid
+ * scrolls). Fully derived from TagRefinementManager.isActive() each call — safe to
+ * call unconditionally from renderCurrentView() rather than threading a call through
+ * every entry/exit/force-exit site individually.
+ */
+function _updateRefinementBanner() {
+  const banner = document.getElementById('refinementBanner');
+  if (!banner) return;
+
+  if (!TagRefinementManager.isActive()) {
+    banner.style.display = 'none';
+    return;
+  }
+
+  const groupId = TagRefinementManager.getActiveGroupId();
+  const group = GroupManager.getGroups().find(g => g.id === groupId);
+  if (!group) { banner.style.display = 'none'; return; }
+
+  const fileCount = group.files.size;
+  const groupColor = GroupManager.getGroupColor(GroupManager.getGroupIndex(groupId));
+  banner.style.setProperty('--group-color', groupColor);
+  const textEl = document.getElementById('refinementBannerText');
+  if (textEl) {
+    const componentPart = group.subEventId ? ` · ${_esc(group.subEventId)}` : '';
+    textEl.innerHTML = `Refining Tags · <strong>${_esc(group.label)}</strong>${componentPart} · ${fileCount} file${fileCount === 1 ? '' : 's'}`;
+  }
+  banner.style.display = 'flex';
+}
+
 /** Builds one selectable tag chip for the refinement panel. */
 function _rpChipHtml(category, label) {
+  // No `checked` here — actual per-tag state (checked/unchecked/indeterminate) is
+  // applied after render by _applyChipStates(), driven by TagRefinementManager
+  // .getSelectionState() rather than a hardcoded default. This is what makes the
+  // panel reflect the truth of the current selection instead of always showing
+  // "everything checked".
   return `<label class="rp-chip">
-    <input type="checkbox" data-cat="${category}" value="${_esc(label)}" checked>
+    <input type="checkbox" data-cat="${category}" value="${_esc(label)}">
     <span>${_esc(label)}</span>
   </label>`;
+}
+
+/** Applies computed checked/indeterminate state to existing chip checkboxes in-place
+ * (no innerHTML rebuild) — matched by category+value read off each checkbox itself,
+ * never by embedding the label into a CSS selector. */
+function _applyChipStates(panel, selState) {
+  const apply = (category) => {
+    const map = (selState && selState[category]) || {};
+    panel.querySelectorAll(`input[data-cat="${category}"]`).forEach(cb => {
+      const st = map[cb.value];
+      cb.checked = st === 'checked';
+      cb.indeterminate = st === 'indeterminate';
+    });
+  };
+  apply('eventTypes');
+  apply('additionalKeywords');
+}
+
+/** Short human label for the current selection's refinement status, or null when empty. */
+function _rpStatusLabel(selState) {
+  switch (selState.status) {
+    case 'default': return 'Default';
+    case 'none':     return 'No Tags';
+    case 'refined': {
+      const tags = [...(selState.sampleOverride?.eventTypes || []), ...(selState.sampleOverride?.additionalKeywords || [])];
+      return tags.length ? `Refined: ${tags.join(', ')}` : 'Refined';
+    }
+    case 'mixed': return 'Mixed';
+    default: return null; // 'empty'
+  }
+}
+
+// Tracks whether the operator has intentionally changed the desired tag combination
+// (toggled a chip) since the current selection was last (re)computed. Only relevant
+// for a MIXED selection — a uniform selection's checkboxes already represent real,
+// applicable state, so Apply stays available immediately as before. Reset to false
+// on every full panel render and every selection change (_syncRefinementSelectedCount)
+// — merely selecting mixed files must never leave Apply already enabled.
+let _rpDirty = false;
+
+/** Whether "Apply to Selected" should be disabled: no selection, or a mixed selection
+ * the operator hasn't intentionally touched yet (checkboxes would otherwise read as
+ * unchecked-by-default and silently collapse the heterogeneous selection). */
+function _rpApplyBlocked(selCount, selState) {
+  return selCount === 0 || (selState.status === 'mixed' && !_rpDirty);
 }
 
 function renderRefinementPanel(groupId) {
@@ -12977,9 +13095,17 @@ function renderRefinementPanel(groupId) {
 
   const groupFilePaths = [...group.files];
   const summary = TagRefinementManager.getSummary(groupId, groupFilePaths);
-  const selCount = [...selectedFiles].filter(p => group.files.has(p)).length;
+  const selPaths = [...selectedFiles].filter(p => group.files.has(p));
+  const selCount = selPaths.length;
+  const selState = TagRefinementManager.getSelectionState(groupId, selPaths, eventTypeLabels, additionalKeywordLabels);
+  const statusLabel = _rpStatusLabel(selState);
   const groupIdx = GroupManager.getGroupIndex(groupId);
   const groupColor = GroupManager.getGroupColor(groupIdx);
+
+  // Fresh selection/render → no intentional edit has happened yet.
+  _rpDirty = false;
+  const applyBlocked = _rpApplyBlocked(selCount, selState);
+  const showMixedHint = selCount > 0 && selState.status === 'mixed' && !_rpDirty;
 
   panel.innerHTML = `
     <div class="gp-header">Refining Tags · ${_esc(group.label)}</div>
@@ -12998,9 +13124,10 @@ function renderRefinementPanel(groupId) {
         <div class="rp-section-title">Additional Keywords</div>
         <div class="rp-chip-list">${additionalKeywordLabels.map(l => _rpChipHtml('additionalKeywords', l)).join('')}</div>
       </div>` : ''}
-    <div class="rp-selected-count" id="rpSelectedCount">Selected: ${selCount} file${selCount === 1 ? '' : 's'}</div>
+    <div class="rp-selected-count" id="rpSelectedCount">Selected: ${selCount} file${selCount === 1 ? '' : 's'}${statusLabel ? ` <span class="rp-status rp-status-${selState.status}" id="rpSelectionStatus">${_esc(statusLabel)}</span>` : ''}</div>
     <div class="rp-actions">
-      <button id="rpApplyBtn" class="rp-btn rp-btn-primary" type="button" ${selCount === 0 ? 'disabled' : ''}>Apply to Selected</button>
+      <button id="rpApplyBtn" class="rp-btn rp-btn-primary" type="button" ${applyBlocked ? 'disabled' : ''}>Apply to Selected</button>
+      <div class="rp-mixed-hint" id="rpMixedHint" ${showMixedHint ? '' : 'hidden'}>Choose tags to apply to this mixed selection</div>
       <button id="rpAllBtn"   class="rp-btn" type="button" ${selCount === 0 ? 'disabled' : ''}>Use All Component Tags</button>
       <button id="rpNoneBtn"  class="rp-btn" type="button" ${selCount === 0 ? 'disabled' : ''}>Use No Refinable Tags</button>
       <button id="rpResetBtn" class="rp-btn" type="button" ${selCount === 0 ? 'disabled' : ''}>Reset Selected to Defaults</button>
@@ -13012,6 +13139,29 @@ function renderRefinementPanel(groupId) {
       <span>${summary.noTags} no tags</span>
     </div>
     <button id="rpDoneBtn" class="rp-done-btn" type="button">Done Refining</button>`;
+
+  _applyChipStates(panel, selState);
+
+  // Only an explicit operator interaction with a chip establishes intent — this never
+  // fires from _applyChipStates() above (that sets .checked/.indeterminate directly,
+  // which does not dispatch 'change'), only from a real click/keyboard toggle.
+  //
+  // Selection count is recomputed fresh here rather than closing over `selCount` —
+  // this listener is attached once per full render, but the selection (and therefore
+  // the true current count) keeps changing afterward via the lightweight
+  // _syncRefinementSelectedCount() path, which never re-renders the panel. A stale
+  // captured selCount (frequently 0, from the moment refinement mode was entered
+  // before anything was selected) would silently block this handler forever.
+  panel.addEventListener('change', e => {
+    if (!e.target.matches('input[data-cat]') || _rpDirty) return;
+    const currentSelCount = [...selectedFiles].filter(p => group.files.has(p)).length;
+    if (currentSelCount === 0) return;
+    _rpDirty = true;
+    const applyBtn = document.getElementById('rpApplyBtn');
+    if (applyBtn) applyBtn.disabled = false;
+    const hint = document.getElementById('rpMixedHint');
+    if (hint) hint.hidden = true;
+  });
 
   const _selectedInGroup = () => [...selectedFiles].filter(p => group.files.has(p));
 

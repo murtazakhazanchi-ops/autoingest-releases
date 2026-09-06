@@ -138,6 +138,64 @@ const TagRefinementManager = (() => {
     return { total: filePaths.length, default: filePaths.length - refined - noTags, refined, noTags };
   }
 
+  /**
+   * Effective per-tag checkbox state and an overall status for a batch of files,
+   * given the mapped component's full Event Type / Additional Keyword lists. A file
+   * with no override inherits ALL of `allEventTypes`/`allAdditionalKeywords` — so a
+   * default file has every tag "checked" for effective-membership purposes, same as
+   * an explicit all-tags override, but the two stay distinguishable via `status`.
+   *
+   * Read-only: never mutates any override. Callers use this purely to decide what to
+   * render — selecting files, mixed or not, never changes stored state on its own.
+   *
+   * @param {number|string} groupId
+   * @param {string[]} filePaths — the current selection, already scoped to this group
+   * @param {string[]} allEventTypes
+   * @param {string[]} allAdditionalKeywords
+   * @returns {{
+   *   status: 'empty'|'default'|'refined'|'none'|'mixed',
+   *   sampleOverride: {eventTypes:string[], additionalKeywords:string[]}|null,
+   *   eventTypes: Object<string,'checked'|'unchecked'|'indeterminate'>,
+   *   additionalKeywords: Object<string,'checked'|'unchecked'|'indeterminate'>,
+   * }}
+   */
+  function getSelectionState(groupId, filePaths, allEventTypes, allAdditionalKeywords) {
+    if (!filePaths || filePaths.length === 0) {
+      return { status: 'empty', sampleOverride: null, eventTypes: {}, additionalKeywords: {} };
+    }
+
+    const overrides = filePaths.map(p => getOverride(groupId, p));
+    const _key = o => o ? JSON.stringify({ e: [...o.eventTypes].sort(), a: [...o.additionalKeywords].sort() }) : null;
+    const firstKey = _key(overrides[0]);
+    const uniform = overrides.every(o => _key(o) === firstKey);
+
+    let status;
+    if (!uniform) status = 'mixed';
+    else if (overrides[0] === null) status = 'default';
+    else if (overrides[0].eventTypes.length === 0 && overrides[0].additionalKeywords.length === 0) status = 'none';
+    else status = 'refined';
+
+    const tagState = (allTags, pick) => {
+      const out = {};
+      for (const tag of allTags) {
+        let count = 0;
+        for (const o of overrides) {
+          const effective = o ? pick(o) : allTags; // no override → inherits every tag
+          if (effective.includes(tag)) count++;
+        }
+        out[tag] = count === 0 ? 'unchecked' : (count === overrides.length ? 'checked' : 'indeterminate');
+      }
+      return out;
+    };
+
+    return {
+      status,
+      sampleOverride: uniform ? overrides[0] : null,
+      eventTypes: tagState(allEventTypes, o => o.eventTypes),
+      additionalKeywords: tagState(allAdditionalKeywords, o => o.additionalKeywords),
+    };
+  }
+
   // ── IPC serialization ────────────────────────────────────────────────────
   // Plain object keyed by absolute source path — the same file identity
   // GroupManager's group.files carries, so it survives Electron's structured-
@@ -180,6 +238,7 @@ const TagRefinementManager = (() => {
     clearFiles,
     groupRefinementCount,
     getSummary,
+    getSelectionState,
     serializeGroupForImport,
     isActive,
     getActiveGroupId,
