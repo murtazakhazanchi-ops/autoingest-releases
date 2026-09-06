@@ -111,5 +111,113 @@ t('reset clears all override data and active mode across every group', () => {
   assert.equal(TagRefinementManager.isActive(), false);
 });
 
+// ── getSelectionState (mixed-selection safety) ──────────────────────────────
+
+const ALL_ET = ['Waaz', 'Bayan', 'Dua'];
+const ALL_AK = ['Children', 'Outdoor'];
+
+t('getSelectionState: empty selection', () => {
+  const s = TagRefinementManager.getSelectionState(1, [], ALL_ET, ALL_AK);
+  assert.equal(s.status, 'empty');
+});
+
+t('getSelectionState: uniform default (no override) — every tag reads checked, status default', () => {
+  const s = TagRefinementManager.getSelectionState(1, ['/a.jpg', '/b.jpg'], ALL_ET, ALL_AK);
+  assert.equal(s.status, 'default');
+  assert.equal(s.sampleOverride, null);
+  assert.deepEqual(s.eventTypes, { Waaz: 'checked', Bayan: 'checked', Dua: 'checked' });
+  assert.deepEqual(s.additionalKeywords, { Children: 'checked', Outdoor: 'checked' });
+});
+
+t('getSelectionState: uniform explicit subset — only that subset checked, status refined', () => {
+  TagRefinementManager.setOverride(1, ['/a.jpg', '/b.jpg'], { eventTypes: ['Waaz'], additionalKeywords: ['Children'] });
+  const s = TagRefinementManager.getSelectionState(1, ['/a.jpg', '/b.jpg'], ALL_ET, ALL_AK);
+  assert.equal(s.status, 'refined');
+  assert.deepEqual(s.sampleOverride, { eventTypes: ['Waaz'], additionalKeywords: ['Children'] });
+  assert.deepEqual(s.eventTypes, { Waaz: 'checked', Bayan: 'unchecked', Dua: 'unchecked' });
+  assert.deepEqual(s.additionalKeywords, { Children: 'checked', Outdoor: 'unchecked' });
+});
+
+t('getSelectionState: uniform explicit-none — every tag unchecked, status none', () => {
+  TagRefinementManager.setOverride(1, ['/a.jpg', '/b.jpg'], { eventTypes: [], additionalKeywords: [] });
+  const s = TagRefinementManager.getSelectionState(1, ['/a.jpg', '/b.jpg'], ALL_ET, ALL_AK);
+  assert.equal(s.status, 'none');
+  assert.deepEqual(s.eventTypes, { Waaz: 'unchecked', Bayan: 'unchecked', Dua: 'unchecked' });
+  assert.deepEqual(s.additionalKeywords, { Children: 'unchecked', Outdoor: 'unchecked' });
+});
+
+t('getSelectionState: default + refined mix → status mixed, per-tag indeterminate where they disagree', () => {
+  TagRefinementManager.setOverride(1, ['/a.jpg'], { eventTypes: ['Waaz'], additionalKeywords: [] });
+  // /b.jpg has no override → default (inherits all tags)
+  const s = TagRefinementManager.getSelectionState(1, ['/a.jpg', '/b.jpg'], ALL_ET, ALL_AK);
+  assert.equal(s.status, 'mixed');
+  assert.equal(s.sampleOverride, null);
+  // Waaz: both effectively have it (explicit + inherited) → checked
+  assert.equal(s.eventTypes.Waaz, 'checked');
+  // Bayan/Dua: only the default file effectively has them → indeterminate
+  assert.equal(s.eventTypes.Bayan, 'indeterminate');
+  assert.equal(s.eventTypes.Dua, 'indeterminate');
+  assert.equal(s.additionalKeywords.Children, 'indeterminate');
+});
+
+t('getSelectionState: refined + explicit-none mix → status mixed, disjoint tags indeterminate', () => {
+  TagRefinementManager.setOverride(1, ['/a.jpg'], { eventTypes: ['Waaz'], additionalKeywords: [] });
+  TagRefinementManager.setOverride(1, ['/b.jpg'], { eventTypes: [], additionalKeywords: [] });
+  const s = TagRefinementManager.getSelectionState(1, ['/a.jpg', '/b.jpg'], ALL_ET, ALL_AK);
+  assert.equal(s.status, 'mixed');
+  assert.equal(s.eventTypes.Waaz, 'indeterminate');
+  assert.equal(s.eventTypes.Bayan, 'unchecked');
+  assert.equal(s.additionalKeywords.Children, 'unchecked');
+});
+
+t('getSelectionState: default + explicit-none mix → status mixed', () => {
+  TagRefinementManager.setOverride(1, ['/a.jpg'], { eventTypes: [], additionalKeywords: [] });
+  // /b.jpg default
+  const s = TagRefinementManager.getSelectionState(1, ['/a.jpg', '/b.jpg'], ALL_ET, ALL_AK);
+  assert.equal(s.status, 'mixed');
+  assert.equal(s.eventTypes.Waaz, 'indeterminate');
+});
+
+t('getSelectionState: three different refined subsets → all mixed, no false uniform tag', () => {
+  TagRefinementManager.setOverride(1, ['/a.jpg'], { eventTypes: ['Waaz'], additionalKeywords: [] });
+  TagRefinementManager.setOverride(1, ['/b.jpg'], { eventTypes: ['Bayan'], additionalKeywords: [] });
+  TagRefinementManager.setOverride(1, ['/c.jpg'], { eventTypes: ['Dua'], additionalKeywords: [] });
+  const s = TagRefinementManager.getSelectionState(1, ['/a.jpg', '/b.jpg', '/c.jpg'], ALL_ET, ALL_AK);
+  assert.equal(s.status, 'mixed');
+  assert.equal(s.eventTypes.Waaz, 'indeterminate');
+  assert.equal(s.eventTypes.Bayan, 'indeterminate');
+  assert.equal(s.eventTypes.Dua, 'indeterminate');
+});
+
+t('getSelectionState: mixed Event Types but identical Additional Keywords — categories are independent', () => {
+  TagRefinementManager.setOverride(1, ['/a.jpg'], { eventTypes: ['Waaz'], additionalKeywords: ['Children'] });
+  TagRefinementManager.setOverride(1, ['/b.jpg'], { eventTypes: ['Bayan'], additionalKeywords: ['Children'] });
+  const s = TagRefinementManager.getSelectionState(1, ['/a.jpg', '/b.jpg'], ALL_ET, ALL_AK);
+  assert.equal(s.status, 'mixed'); // overall still mixed (eventTypes differ)
+  assert.equal(s.eventTypes.Waaz, 'indeterminate');
+  assert.equal(s.eventTypes.Bayan, 'indeterminate');
+  // Additional Keywords agree across the selection — reflected precisely per-tag despite overall mixed status
+  assert.equal(s.additionalKeywords.Children, 'checked');
+  assert.equal(s.additionalKeywords.Outdoor, 'unchecked');
+});
+
+t('getSelectionState: identical Event Types but mixed Additional Keywords — categories are independent', () => {
+  TagRefinementManager.setOverride(1, ['/a.jpg'], { eventTypes: ['Waaz'], additionalKeywords: ['Children'] });
+  TagRefinementManager.setOverride(1, ['/b.jpg'], { eventTypes: ['Waaz'], additionalKeywords: ['Outdoor'] });
+  const s = TagRefinementManager.getSelectionState(1, ['/a.jpg', '/b.jpg'], ALL_ET, ALL_AK);
+  assert.equal(s.status, 'mixed');
+  assert.equal(s.eventTypes.Waaz, 'checked');
+  assert.equal(s.eventTypes.Bayan, 'unchecked');
+  assert.equal(s.additionalKeywords.Children, 'indeterminate');
+  assert.equal(s.additionalKeywords.Outdoor, 'indeterminate');
+});
+
+t('getSelectionState never mutates stored overrides — pure read', () => {
+  TagRefinementManager.setOverride(1, ['/a.jpg'], { eventTypes: ['Waaz'], additionalKeywords: [] });
+  TagRefinementManager.getSelectionState(1, ['/a.jpg', '/b.jpg'], ALL_ET, ALL_AK);
+  assert.deepEqual(TagRefinementManager.getOverride(1, '/a.jpg'), { eventTypes: ['Waaz'], additionalKeywords: [] });
+  assert.equal(TagRefinementManager.getOverride(1, '/b.jpg'), null);
+});
+
 console.log(`${passed} passed`);
 if (process.exitCode) console.log('SOME TESTS FAILED');
