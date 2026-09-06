@@ -47,6 +47,35 @@ let _queueTail = Promise.resolve();
 let _loadCount = 0; // total successful loads this process lifetime (Section 26: tracked separately from current state)
 let _lastErrorCategory = null;
 
+// Stage 4 additions -- persistent-session / tool-calling state, routed
+// through the SAME child/queue as the stateless infer() path above (one
+// physical child process, one FIFO queue, regardless of whether a given
+// request is a Stage-3 style one-shot infer() or a Stage-4 session turn).
+let _pendingSessions = new Map(); // requestId -> { resolve, reject, timer }
+let _sessionRequestCounter = 0;
+// sessionId -> Map<toolName, async (params) => result>. Registered by the
+// orchestrator layer (never this file), which owns the REAL Stage-2
+// Knowledge Base operations -- this file only routes an already-arrived
+// {type:'tool-call'} to whichever handler was registered for it, exactly
+// mirroring _pending's own "look up by id, safe no-op if absent" pattern.
+let _sessionToolHandlers = new Map();
+
+// Found during Stage 4's own review, scoped to Stage 4's own new code
+// (never touches load/createContext/disposeContext/unload above, which
+// predate this and are already qualified): createSession/resetSession/
+// getSessionHistory/setSessionHistory/disposeSession each wait on a
+// one-shot ad hoc `_child.on('message', ...)` listener with no entry in
+// `_pending`/`_pendingSessions`, so a crash mid-request would never
+// settle their promise -- and because every one of them runs inside
+// `_enqueue()`, a permanently-unsettled promise would wedge the shared
+// FIFO queue forever, blocking ALL future work on the runtime (not just
+// that one call). `_pendingChildOps` is a small, function-scoped registry
+// of reject callbacks these five functions register themselves into
+// while waiting, so `_reset()` (already the single place a real child
+// crash is handled) can settle them the same way it already settles
+// `_pending`/`_pendingSessions`.
+let _pendingChildOps = new Set();
+
 function _reset(nextState) {
   _child = null;
   _state = nextState || STATE.FAILED;
@@ -58,6 +87,37 @@ function _reset(nextState) {
     entry.reject(new QwenRuntimeError('RUNTIME_CRASHED', 'Qwen runtime process exited unexpectedly'));
   }
   _pending.clear();
+  for (const [, entry] of _pendingSessions) {
+    clearTimeout(entry.timer);
+    entry.reject(new QwenRuntimeError('RUNTIME_CRASHED', 'Qwen runtime process exited unexpectedly'));
+  }
+  _pendingSessions.clear();
+  for (const rejectFn of _pendingChildOps) rejectFn();
+  _pendingChildOps.clear();
+  // Sessions themselves live inside the now-dead child -- nothing to
+  // dispose there, but the registered tool-handler lookup table is
+  // orchestrator-owned state, not runtime-owned, so it is deliberately
+  // NOT cleared here (Section 30: model lifecycle and conversation
+  // lifecycle are separate -- a crash/restart does not itself mean the
+  // orchestrator's own session bookkeeping should be forgotten; the
+  // orchestrator layer decides whether to recreate sessions after a
+  // crash, not this file).
+}
+
+// Wraps a one-shot ad hoc child-message wait so a crash during it settles
+// the promise instead of hanging (see _pendingChildOps above). `run`
+// receives (resolve, reject) exactly like a Promise executor; the
+// returned promise behaves identically except it also self-unregisters
+// from `_pendingChildOps` once settled through either path.
+function _awaitChildMessage(run) {
+  return new Promise((resolve, reject) => {
+    const onCrash = () => rejectFn(new QwenRuntimeError('RUNTIME_CRASHED', 'Qwen runtime process exited unexpectedly'));
+    const settle = (fn, value) => { _pendingChildOps.delete(onCrash); fn(value); };
+    const resolveFn = (value) => settle(resolve, value);
+    const rejectFn = (err) => settle(reject, err);
+    _pendingChildOps.add(onCrash);
+    run(resolveFn, rejectFn);
+  });
 }
 
 function _realSpawn() {
@@ -91,6 +151,31 @@ function _spawn() {
       clearTimeout(entry.timer);
       if (msg.type === 'infer-error') entry.reject(mapUnknownError(new Error(msg.message), ERROR_CODE.INFERENCE_FAILED));
       else entry.resolve(msg);
+    } else if (msg.type === 'session-result' || msg.type === 'session-error') {
+      const entry = _pendingSessions.get(msg.requestId);
+      if (!entry) return; // already timed out/cancelled -- a late response is a safe no-op (Section 19, same as infer())
+      _pendingSessions.delete(msg.requestId);
+      clearTimeout(entry.timer);
+      if (msg.type === 'session-error') entry.reject(mapUnknownError(new Error(msg.message), ERROR_CODE.INFERENCE_FAILED));
+      else entry.resolve(msg);
+    } else if (msg.type === 'tool-call') {
+      // Routes an already-arrived tool call to whichever handler the
+      // orchestrator layer registered for this session -- this file never
+      // executes a Knowledge Base operation itself, only relays. A
+      // missing session/tool (e.g. the session was disposed while a call
+      // was mid-flight) is reported back to the CHILD as an error, never
+      // silently dropped -- the child's own pending handler promise would
+      // otherwise hang forever.
+      const sessionHandlers = _sessionToolHandlers.get(msg.sessionId);
+      const handler = sessionHandlers && sessionHandlers.get(msg.toolName);
+      if (!handler) {
+        _child && _child.postMessage({ type: 'tool-result', callId: msg.callId, error: `no handler registered for tool "${msg.toolName}" in session "${msg.sessionId}"` });
+        return;
+      }
+      Promise.resolve().then(() => handler(msg.params)).then(
+        (result) => { _child && _child.postMessage({ type: 'tool-result', callId: msg.callId, result }); },
+        (err) => { _child && _child.postMessage({ type: 'tool-result', callId: msg.callId, error: (err && err.message) || String(err) }); },
+      );
     }
   });
   return child;
@@ -328,6 +413,177 @@ function infer({ prompt, maxTokens, timeoutMs, signal }) {
   });
 }
 
+// --- Stage 4: persistent-session / tool-calling API -----------------------
+//
+// Registered separately from the create/prompt/reset/dispose calls below
+// so the orchestrator can supply (and later swap, e.g. after a reset)
+// the real Stage-2 handler functions without this file ever importing
+// the Knowledge Base itself (Section 6's own boundary, preserved: this
+// file still never requires anything about search_autoingest/etc.).
+function registerSessionToolHandlers(sessionId, handlers) {
+  const map = new Map(Object.entries(handlers || {}));
+  _sessionToolHandlers.set(sessionId, map);
+}
+
+function unregisterSessionToolHandlers(sessionId) {
+  _sessionToolHandlers.delete(sessionId);
+}
+
+// createSession({sessionId, toolSchemas, systemInstruction}) -- routed
+// through the same FIFO queue as every other child request (Section 29:
+// one active operator generation at a time, enforced structurally by
+// this one queue regardless of whether the request is a legacy infer()
+// call or a Stage-4 session operation).
+function createSession({ sessionId, toolSchemas, systemInstruction }) {
+  return _enqueue(async () => {
+    if (_state !== STATE.READY && _state !== STATE.BUSY) {
+      throw new QwenRuntimeError('CONTEXT_CREATE_FAILED', `cannot create a session in state ${_state} -- call load() first`);
+    }
+    return _awaitChildMessage((resolve, reject) => {
+      const onMessage = (message) => {
+        if (message && message.type === 'session-created' && message.sessionId === sessionId) {
+          _child.off('message', onMessage);
+          resolve({ sessionId });
+        } else if (message && message.type === 'session-create-error' && message.sessionId === sessionId) {
+          _child.off('message', onMessage);
+          reject(mapUnknownError(new Error(message.message), ERROR_CODE.CONTEXT_CREATE_FAILED));
+        }
+      };
+      _child.on('message', onMessage);
+      _child.postMessage({ type: 'createSession', sessionId, toolSchemas, systemInstruction });
+    });
+  });
+}
+
+// promptSession({sessionId, message, maxTokens, timeoutMs, signal}) --
+// Cancellation follows the EXACT same "stop waiting, don't interrupt"
+// strategy as infer() (Section 19/28 of Stage 4's own brief: "do not
+// create orchestration logic that assumes native compute stopped
+// instantly" -- a cancelled turn's tool-calling/generation loop keeps
+// running in the isolated child in the background; its eventual
+// session-result finds no _pendingSessions entry and is safely
+// discarded).
+function promptSession({ sessionId, message, maxTokens, timeoutMs, signal, noFunctions }) {
+  return _enqueue(async () => {
+    if (signal && signal.aborted) {
+      throw new QwenRuntimeError('INFERENCE_CANCELLED', 'turn cancelled before it started');
+    }
+    if (_state !== STATE.READY) {
+      throw new QwenRuntimeError('MODEL_LOAD_FAILED', `cannot prompt a session in state ${_state} -- call load() first`);
+    }
+    _state = STATE.BUSY;
+    const requestId = ++_sessionRequestCounter;
+    try {
+      return await new Promise((resolve, reject) => {
+        const cleanup = () => {
+          _pendingSessions.delete(requestId);
+          clearTimeout(timer);
+          if (signal) signal.removeEventListener('abort', onAbort);
+        };
+        const timer = setTimeout(() => {
+          cleanup();
+          reject(new QwenRuntimeError('INFERENCE_FAILED', `Qwen session turn timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
+        const onAbort = () => {
+          cleanup();
+          reject(new QwenRuntimeError('INFERENCE_CANCELLED', 'turn cancelled'));
+        };
+        if (signal) signal.addEventListener('abort', onAbort, { once: true });
+        _pendingSessions.set(requestId, { resolve, reject, timer });
+        _child.postMessage({ type: 'promptSession', sessionId, requestId, message, maxTokens, noFunctions: !!noFunctions });
+      });
+    } finally {
+      if (_state === STATE.BUSY) _state = STATE.READY;
+    }
+  });
+}
+
+// resetSession (Section 30): clears conversational state without
+// unloading the model -- routed through the same queue so it safely
+// waits behind any in-flight turn on this (or another) session, exactly
+// like unload() already waits behind in-flight inference.
+function resetSession({ sessionId, toolSchemas, systemInstruction }) {
+  return _enqueue(async () => {
+    if (!_child) throw new QwenRuntimeError('CONTEXT_CREATE_FAILED', 'cannot reset a session -- runtime not loaded');
+    return _awaitChildMessage((resolve, reject) => {
+      const onMessage = (message) => {
+        if (message && message.type === 'session-reset' && message.sessionId === sessionId) {
+          _child.off('message', onMessage);
+          resolve({ sessionId });
+        } else if (message && message.type === 'session-reset-error' && message.sessionId === sessionId) {
+          _child.off('message', onMessage);
+          reject(mapUnknownError(new Error(message.message), ERROR_CODE.CONTEXT_CREATE_FAILED));
+        }
+      };
+      _child.on('message', onMessage);
+      _child.postMessage({ type: 'resetSession', sessionId, toolSchemas, systemInstruction });
+    });
+  });
+}
+
+// getSessionHistory/setSessionHistory (Section 16): a thin, mechanical
+// remote get/set over the real node-llama-cpp ChatHistoryItem[] living in
+// the child -- this file has no pruning POLICY of its own (that is
+// historyPruning.js's own job, in the orchestrator layer); it only
+// relays the real history across the process boundary.
+let _historyRequestCounter = 0;
+function getSessionHistory(sessionId) {
+  return _enqueue(async () => {
+    if (!_child) throw new QwenRuntimeError('CONTEXT_CREATE_FAILED', 'cannot read session history -- runtime not loaded');
+    const requestId = ++_historyRequestCounter;
+    return _awaitChildMessage((resolve, reject) => {
+      const onMessage = (message) => {
+        if (message && message.requestId === requestId && message.type === 'session-history-result') {
+          _child.off('message', onMessage);
+          resolve(message.history);
+        } else if (message && message.requestId === requestId && message.type === 'session-history-error') {
+          _child.off('message', onMessage);
+          reject(mapUnknownError(new Error(message.message)));
+        }
+      };
+      _child.on('message', onMessage);
+      _child.postMessage({ type: 'getSessionHistory', sessionId, requestId });
+    });
+  });
+}
+
+function setSessionHistory(sessionId, history) {
+  return _enqueue(async () => {
+    if (!_child) throw new QwenRuntimeError('CONTEXT_CREATE_FAILED', 'cannot write session history -- runtime not loaded');
+    const requestId = ++_historyRequestCounter;
+    return _awaitChildMessage((resolve, reject) => {
+      const onMessage = (message) => {
+        if (message && message.requestId === requestId && message.type === 'session-history-set') {
+          _child.off('message', onMessage);
+          resolve({ sessionId });
+        } else if (message && message.requestId === requestId && message.type === 'session-history-set-error') {
+          _child.off('message', onMessage);
+          reject(mapUnknownError(new Error(message.message)));
+        }
+      };
+      _child.on('message', onMessage);
+      _child.postMessage({ type: 'setSessionHistory', sessionId, requestId, history });
+    });
+  });
+}
+
+function disposeSession(sessionId) {
+  return _enqueue(async () => {
+    unregisterSessionToolHandlers(sessionId);
+    if (!_child) return { sessionId, alreadyDisposed: true };
+    return _awaitChildMessage((resolve) => {
+      const onMessage = (message) => {
+        if (message && message.type === 'session-disposed' && message.sessionId === sessionId) {
+          _child.off('message', onMessage);
+          resolve({ sessionId });
+        }
+      };
+      _child.on('message', onMessage);
+      _child.postMessage({ type: 'disposeSession', sessionId });
+    });
+  });
+}
+
 // Section 24: deterministic internal diagnostics. Parent-authoritative
 // (always answerable even if the child is slow/unresponsive) -- never
 // includes conversation contents, operator questions, or generated
@@ -344,6 +600,7 @@ function getDiagnostics() {
     pid: _child ? _child.pid : null,
     loadCount: _loadCount,
     activeInferenceCount: _pending.size,
+    activeSessionTurnCount: _pendingSessions.size,
     lastErrorCategory: _lastErrorCategory,
     mainProcessMemoryUsage: process.memoryUsage(),
   };
@@ -356,4 +613,7 @@ function getState() {
 module.exports = {
   STATE, load, unload, terminate, infer, createContext, disposeContext,
   getDiagnostics, getState, _setSpawnFnForTesting,
+  createSession, promptSession, resetSession, disposeSession,
+  registerSessionToolHandlers, unregisterSessionToolHandlers,
+  getSessionHistory, setSessionHistory,
 };

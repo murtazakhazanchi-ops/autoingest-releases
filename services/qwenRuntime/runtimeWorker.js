@@ -60,6 +60,38 @@
 //   out {type:'unloaded'}
 //   in  {type:'diagnostics'}
 //   out {type:'diagnostics-result', ...}
+//
+// Ask AutoIngest Stage 4 additions (Sections 6/13/18 of that stage's own
+// brief -- session/tool-calling support only; nothing above this line is
+// changed in behavior). Stage 3's own explicit "no Knowledge Base/tool
+// wiring... all of that is Stage 4 territory" is exactly the boundary
+// this addition fills, in Stage 4's own commit, on top of (never
+// rewriting) Stage 3's approved commit -- the same additive-extension
+// precedent Stage 3.1 itself already established in this same file for
+// the sequence-pool fix. A persistent LlamaChatSession per Stage-4
+// conversation reuses the SAME context/sequence-pool machinery above
+// (including the Stage 3.1 waitForFreeSequence() fix), rather than a
+// second, parallel, unqualified model-loading implementation. Tool
+// EXECUTION itself (the actual Stage-2 Knowledge Base operations) never
+// runs in this process -- a function `handler` here is a thin RPC proxy
+// that messages the parent and awaits a correlated response, keeping
+// this worker's own boundary exactly as narrow as Stage 3 left it (pure
+// Qwen runtime mechanics; zero Knowledge Base code or data in this
+// process):
+//   in  {type:'createSession', sessionId, toolSchemas, systemInstruction}
+//   out {type:'session-created', sessionId}
+//       | {type:'session-create-error', sessionId, message}
+//   in  {type:'tool-result', callId, result, error}  (reply to an
+//       earlier {type:'tool-call', ...} this worker sent to the parent)
+//   in  {type:'promptSession', sessionId, requestId, message, maxTokens}
+//   out {type:'tool-call', sessionId, callId, toolName, params}  (sent
+//       mid-turn, zero or more times, before the eventual session-result)
+//   out {type:'session-result', sessionId, requestId, text, toolCalls, stopReason}
+//       | {type:'session-error', sessionId, requestId, message}
+//   in  {type:'resetSession', sessionId}
+//   out {type:'session-reset', sessionId} | {type:'session-reset-error', sessionId, message}
+//   in  {type:'disposeSession', sessionId}
+//   out {type:'session-disposed', sessionId}
 
 const { CONTEXT_SIZE, RUNTIME_COMPATIBILITY, INFERENCE_DEFAULTS } = require('./modelManifest');
 
@@ -70,6 +102,13 @@ let _loadedModelPath = null;
 let _loadCount = 0;
 let _activeInferenceCount = 0;
 let _lastErrorCategory = null;
+
+// Stage 4 additions -- session/tool-calling state, entirely separate from
+// the stateless smoke-test inference path above (which remains untouched
+// and independently usable).
+let _sessions = new Map(); // sessionId -> { llamaSession, sequence }
+let _pendingToolCalls = new Map(); // callId -> { resolve, reject }
+let _toolCallCounter = 0;
 
 // node-llama-cpp is ESM-only -- a plain require() throws under Electron's
 // utilityProcess (which hosts this file as CommonJS). Loaded via dynamic
@@ -267,9 +306,181 @@ function handleDiagnostics() {
     contextSize: context ? context.contextSize : null,
     loadCount: _loadCount,
     activeInferenceCount: _activeInferenceCount,
+    sessionCount: _sessions.size,
     lastErrorCategory: _lastErrorCategory,
     memoryUsage: process.memoryUsage(),
   });
+}
+
+// --- Stage 4: persistent-session / tool-calling handlers ------------------
+
+// Builds a real node-llama-cpp ChatSessionModelFunctions object (verified
+// shape: {[name]: {description?, params?: GbnfJsonSchema, handler}}) from
+// the plain, serializable {name: {description, params}} schemas the
+// parent sent over IPC. Every handler is a thin RPC proxy -- it never
+// executes the real Knowledge Base operation itself (that code, and the
+// data it reads, never enters this process); it messages the parent with
+// a correlated callId and returns the promise that resolves when the
+// matching {type:'tool-result'} arrives.
+function buildFunctionsFromSchemas(sessionId, toolSchemas) {
+  const functions = {};
+  for (const [name, schema] of Object.entries(toolSchemas || {})) {
+    functions[name] = {
+      description: schema.description,
+      params: schema.params,
+      handler: (params) => new Promise((resolve, reject) => {
+        const callId = ++_toolCallCounter;
+        _pendingToolCalls.set(callId, { resolve, reject });
+        process.parentPort.postMessage({ type: 'tool-call', sessionId, callId, toolName: name, params });
+      }),
+    };
+  }
+  return functions;
+}
+
+async function handleCreateSession({ sessionId, toolSchemas, systemInstruction }) {
+  try {
+    if (_sessions.has(sessionId)) throw new Error(`session "${sessionId}" already exists`);
+    await handleCreateSessionInline({ sessionId, toolSchemas, systemInstruction });
+    process.parentPort.postMessage({ type: 'session-created', sessionId });
+  } catch (err) {
+    _lastErrorCategory = 'CONTEXT_CREATE_FAILED';
+    process.parentPort.postMessage({ type: 'session-create-error', sessionId, message: err && err.message ? err.message : String(err) });
+  }
+}
+
+// A reply to this worker's own earlier {type:'tool-call'} -- resolves (or
+// rejects) the specific pending handler promise it belongs to. A callId
+// with no pending entry is a safe no-op (e.g. the session was disposed
+// while the parent's own tool execution was still in flight).
+function handleToolResult({ callId, result, error }) {
+  const pending = _pendingToolCalls.get(callId);
+  if (!pending) return;
+  _pendingToolCalls.delete(callId);
+  if (error) pending.reject(new Error(error));
+  else pending.resolve(result);
+}
+
+// Runs one full conversational turn on a persistent session. node-llama-
+// cpp's own promptWithMeta() drives the ENTIRE tool-call loop internally
+// (calling each function's handler, feeding the result back to the
+// model, and repeating until the model produces a final text-only
+// response or a stop condition) -- this worker does not hand-rolled-parse
+// any tool-call JSON itself; that is exactly what the real `functions`
+// option (verified against node-llama-cpp 3.20.0's own
+// ChatSessionModelFunctions type) is for.
+async function handlePromptSession({ sessionId, requestId, message, maxTokens = 512, noFunctions = false }) {
+  const entry = _sessions.get(sessionId);
+  if (!entry) {
+    process.parentPort.postMessage({ type: 'session-error', sessionId, requestId, message: `session "${sessionId}" not found` });
+    return;
+  }
+  try {
+    const t0 = performance.now();
+    // Section 26: a bounded regeneration-without-leak attempt must not be
+    // able to re-enter the tool-calling cycle -- `noFunctions` omits the
+    // `functions` option entirely for this one call (not merely an
+    // instruction telling the model not to call tools), a structural
+    // guarantee rather than relying on instruction-following alone.
+    const result = await entry.llamaSession.promptWithMeta(message, {
+      ...(noFunctions ? {} : { functions: entry.functions }),
+      maxTokens,
+    });
+    const totalMs = performance.now() - t0;
+    // promptWithMeta's own `responseText` is already the plain visible
+    // text (verified directly against node-llama-cpp 3.20.0's own
+    // LlamaChatSession.d.ts) -- used directly rather than re-derived, so
+    // this worker never risks drifting from the library's own definition
+    // of "visible text" (e.g. how it excludes thought segments). `response`
+    // (the raw mixed array) is still walked separately, only to extract
+    // the structured tool-call log for the parent's own grounding
+    // bookkeeping.
+    const toolCalls = [];
+    for (const part of result.response) {
+      if (part && part.type === 'functionCall') toolCalls.push({ name: part.name, params: part.params, result: part.result });
+    }
+    process.parentPort.postMessage({ type: 'session-result', sessionId, requestId, text: result.responseText, toolCalls, stopReason: result.stopReason, timing: { totalMs } });
+  } catch (err) {
+    _lastErrorCategory = /context/i.test(err && err.message || '') ? 'CONTEXT_LIMIT' : 'INFERENCE_FAILED';
+    process.parentPort.postMessage({ type: 'session-error', sessionId, requestId, message: err && err.message ? err.message : String(err) });
+  }
+}
+
+// Section 30: reset must clear conversational state without unloading the
+// model. Implemented as dispose-and-recreate (a fresh LlamaChatSession +
+// a fresh sequence) rather than relying on the library's own
+// resetChatHistory() -- guarantees a genuinely clean state (including a
+// freshly re-seeded system prompt) rather than depending on that method's
+// own exact semantics.
+async function handleResetSession({ sessionId, toolSchemas, systemInstruction }) {
+  const entry = _sessions.get(sessionId);
+  try {
+    if (entry) {
+      try { entry.llamaSession.dispose({ disposeSequence: false }); } catch { /* already disposed -- safe no-op */ }
+      try { await entry.sequence.dispose(); } catch { /* already disposed -- safe no-op */ }
+      _sessions.delete(sessionId);
+    }
+    await handleCreateSessionInline({ sessionId, toolSchemas, systemInstruction });
+    process.parentPort.postMessage({ type: 'session-reset', sessionId });
+  } catch (err) {
+    process.parentPort.postMessage({ type: 'session-reset-error', sessionId, message: err && err.message ? err.message : String(err) });
+  }
+}
+
+// Shared by handleCreateSession's own message-driven entry point and
+// handleResetSession above (which needs the SAME creation logic without
+// re-triggering a duplicate 'session-created'/'session-create-error'
+// message pair).
+async function handleCreateSessionInline({ sessionId, toolSchemas, systemInstruction }) {
+  if (!model || !context) throw new Error('model/context not ready -- call load then createContext first');
+  const { LlamaChatSession, QwenChatWrapper } = await nllc();
+  await waitForFreeSequence();
+  const sequence = context.getSequence();
+  const chatWrapper = new QwenChatWrapper({
+    variation: RUNTIME_COMPATIBILITY.chatWrapper.variation,
+    thoughts: RUNTIME_COMPATIBILITY.chatWrapper.thoughts,
+  });
+  const functions = buildFunctionsFromSchemas(sessionId, toolSchemas);
+  const llamaSession = new LlamaChatSession({ contextSequence: sequence, chatWrapper, systemPrompt: systemInstruction });
+  _sessions.set(sessionId, { llamaSession, sequence, functions });
+}
+
+// Section 16: exposes node-llama-cpp's own real getChatHistory()/
+// setChatHistory() so the orchestrator (parent process) can apply its
+// own deterministic pruning policy (historyPruning.js) to the REAL
+// ChatHistoryItem[] and write the pruned result back -- this worker has
+// no pruning POLICY of its own, only the mechanical get/set.
+function handleGetSessionHistory({ sessionId, requestId }) {
+  const entry = _sessions.get(sessionId);
+  if (!entry) {
+    process.parentPort.postMessage({ type: 'session-history-error', sessionId, requestId, message: `session "${sessionId}" not found` });
+    return;
+  }
+  process.parentPort.postMessage({ type: 'session-history-result', sessionId, requestId, history: entry.llamaSession.getChatHistory() });
+}
+
+function handleSetSessionHistory({ sessionId, requestId, history }) {
+  const entry = _sessions.get(sessionId);
+  if (!entry) {
+    process.parentPort.postMessage({ type: 'session-history-set-error', sessionId, requestId, message: `session "${sessionId}" not found` });
+    return;
+  }
+  try {
+    entry.llamaSession.setChatHistory(history);
+    process.parentPort.postMessage({ type: 'session-history-set', sessionId, requestId });
+  } catch (err) {
+    process.parentPort.postMessage({ type: 'session-history-set-error', sessionId, requestId, message: err && err.message ? err.message : String(err) });
+  }
+}
+
+async function handleDisposeSession({ sessionId }) {
+  const entry = _sessions.get(sessionId);
+  if (entry) {
+    try { entry.llamaSession.dispose({ disposeSequence: false }); } catch { /* already disposed -- safe no-op */ }
+    try { await entry.sequence.dispose(); } catch { /* already disposed -- safe no-op */ }
+    _sessions.delete(sessionId);
+  }
+  process.parentPort.postMessage({ type: 'session-disposed', sessionId });
 }
 
 process.parentPort.on('message', (e) => {
@@ -281,4 +492,11 @@ process.parentPort.on('message', (e) => {
   else if (msg.type === 'disposeContext') handleDisposeContext();
   else if (msg.type === 'unload') handleUnload();
   else if (msg.type === 'diagnostics') handleDiagnostics();
+  else if (msg.type === 'createSession') handleCreateSession(msg);
+  else if (msg.type === 'tool-result') handleToolResult(msg);
+  else if (msg.type === 'promptSession') handlePromptSession(msg);
+  else if (msg.type === 'resetSession') handleResetSession(msg);
+  else if (msg.type === 'disposeSession') handleDisposeSession(msg);
+  else if (msg.type === 'getSessionHistory') handleGetSessionHistory(msg);
+  else if (msg.type === 'setSessionHistory') handleSetSessionHistory(msg);
 });
