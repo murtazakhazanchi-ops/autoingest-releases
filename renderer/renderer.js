@@ -1228,6 +1228,7 @@ function showEventCreator() {
   // Entering event creator invalidates any existing group→sub-event mappings
   _clearHeroLastImportArea();
   GroupManager.reset();
+  TagRefinementManager.reset();
   renderGroupPanel();
   _ecPanelOpen();
   EventCreator.start();
@@ -1237,6 +1238,7 @@ function showEventCreatorResume() {
   // Re-entering to change the event also invalidates existing group mappings
   _clearHeroLastImportArea();
   GroupManager.reset();
+  TagRefinementManager.reset();
   renderGroupPanel();
   _ecPanelOpen();
   EventCreator.resetToList();
@@ -1261,6 +1263,7 @@ function resetWorkspaceState() {
   activeSource = null;
   activeDrive  = null;
   GroupManager.reset();
+  TagRefinementManager.reset();
   setRailMode('card');
 }
 
@@ -3155,6 +3158,7 @@ document.addEventListener('eventcreator:done', () => {
     if (_savedEventPath) _metaOutdatedPath = _savedEventPath;
   }
   GroupManager.reset();
+  TagRefinementManager.reset();
   renderGroupPanel();
   showLanding();
   _renderMetaTitleIndicator();
@@ -5821,6 +5825,7 @@ async function selectSource({ type, path, label = null, driveObj = null }) {
   selectedFiles.clear(); currentFiles = []; lastClickedPath = null; _selectionAnchor = null; _prevFocusPath = null; tileMap = new Map();
   resetViewCache();
   GroupManager.reset();
+  TagRefinementManager.reset();
   renderGroupPanel();
 
   // ── External Drive / Local Folder: instant workspace, scan only on folder selection ──
@@ -5948,6 +5953,7 @@ function resetAppState({ preserveEvent = false } = {}) {
   destFileCache = new Map();
   resetViewCache();
   GroupManager.reset();
+  TagRefinementManager.reset();
   renderGroupPanel();
 
   // Clear tileMap and disconnect observer
@@ -6310,6 +6316,24 @@ document.querySelectorAll('.sort-btn').forEach(btn => {
 // Commit 9 implements real dispatch; Commits 10-11 add folder view content.
 
 function renderCurrentView() {
+  // Always in sync with TagRefinementManager.isActive() — shows/hides/updates itself,
+  // so every renderCurrentView() call path (enter, exit, validity-guard force-exit)
+  // gets the banner right without needing a separate call at each of those sites.
+  _updateRefinementBanner();
+
+  // Tag Refinement mode: bypass the folder/media dispatch entirely and always show a
+  // flat, group-filtered grid — hide folder-nav chrome so it can't be used to escape
+  // the filter while refining (edge case: view/sort/folder changes must never reveal
+  // another group's files during refinement).
+  if (TagRefinementManager.isActive()) {
+    const backBarEl = document.getElementById('folderBackBar');
+    if (backBarEl) backBarEl.style.display = 'none';
+    const sidebarEl = document.getElementById('sidebar');
+    if (sidebarEl) sidebarEl.style.display = 'none';
+    renderFileArea(getVisibleFiles());
+    return;
+  }
+
   // Commit 11 (v0.6.0): show folder-view back-bar only when inside a folder.
   const backBar = document.getElementById('folderBackBar');
   const insideFolder = (viewModeType === 'folder') && !currentFolderContext.isRoot;
@@ -6794,6 +6818,18 @@ function buildSectionHtml({ key, label, icon, files }) {
   </div>`;
 }
 
+// Tag Refinement — per-file badge state: null (default/inherited), 'refined'
+// (explicit subset), or 'none' (explicitly no refinable tags). Mirrors the
+// group-badge lookup pattern (GroupManager.getGroupForFile) so both the initial
+// tile-template render and the incremental syncRefinementBadge() stay consistent.
+function _refinementBadgeState(filePath) {
+  const g = GroupManager.getGroupForFile(filePath);
+  if (!g) return null;
+  const override = TagRefinementManager.getOverride(g.id, filePath);
+  if (!override) return null;
+  return (override.eventTypes.length === 0 && override.additionalKeywords.length === 0) ? 'none' : 'refined';
+}
+
 function buildIconTilesHtml(files, enablePairing = false) {
   return files.map((file, i) => {
     const checked  = selectedFiles.has(file.path);
@@ -6813,6 +6849,10 @@ function buildIconTilesHtml(files, enablePairing = false) {
     const grpBadge      = grp
       ? `<div class="file-group-badge" style="--group-color:${GroupManager.getGroupColor(GroupManager.getGroupIndex(grp.id))}">${grp.label}</div>`
       : '';
+    const refState  = _refinementBadgeState(file.path);
+    const refBadge  = refState
+      ? `<div class="file-refine-badge rb-${refState}" title="${refState === 'refined' ? 'Refined tags' : 'No refinable tags'}">${refState === 'refined' ? '✓' : '∅'}</div>`
+      : '';
 
     return `<div class="${tileCls}" data-path="${escapeHtml(file.path)}" data-size="${file.size}" data-base="${escapeHtml(base)}" draggable="true">
       <input type="checkbox" ${checked ? 'checked' : ''} data-path="${escapeHtml(file.path)}" />
@@ -6828,7 +6868,7 @@ function buildIconTilesHtml(files, enablePairing = false) {
             </div>
             <div class="file-date">${formatDate(file.modifiedAt)}</div>
           </div>
-          <div class="file-meta-right">${grpBadge}</div>
+          <div class="file-meta-right">${grpBadge}${refBadge}</div>
         </div>
       </div>
     </div>`;
@@ -6854,11 +6894,15 @@ function buildListRowsHtml(files, enablePairing = false) {
     const grpLabel = grpR
       ? `<span class="grp-badge-list" style="--group-color:${GroupManager.getGroupColor(GroupManager.getGroupIndex(grpR.id))}">${grpR.label}</span>`
       : '';
+    const refState = _refinementBadgeState(file.path);
+    const refLabel = refState
+      ? `<span class="rb-badge-list rb-${refState}" title="${refState === 'refined' ? 'Refined tags' : 'No refinable tags'}">${refState === 'refined' ? '✓' : '∅'}</span>`
+      : '';
 
     return `<tr class="${rowCls}" data-path="${escapeHtml(file.path)}" data-size="${file.size}" data-base="${escapeHtml(base)}" draggable="true">
       <td class="lt-check"><input type="checkbox" ${checked ? 'checked' : ''} data-path="${escapeHtml(file.path)}" /></td>
       <td class="lt-thumb"><div class="list-thumb">${thumbHtml(file)}</div></td>
-      <td class="lt-name"><span class="file-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</span>${dupLabel}${grpLabel}</td>
+      <td class="lt-name"><span class="file-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</span>${dupLabel}${grpLabel}${refLabel}</td>
       <td class="lt-type"><span class="file-ext-badge ${badgeCls}">${extUp}</span></td>
       <td class="lt-size">${formatSize(file.size)}</td>
       <td class="lt-date">${formatDate(file.modifiedAt)}</td>
@@ -7259,6 +7303,14 @@ function syncPairLinks() {
 // folder-root/non-leaf → [] (instruction panel, no tiles rendered).
 // ════════════════════════════════════════════════════════════════
 function getVisibleFiles() {
+  // Tag Refinement mode: the grid is filtered to one group's files regardless of the
+  // underlying folder/media view — ignore viewModeType entirely so switching folders
+  // or sort while refining can never leak another group's files into scope.
+  if (TagRefinementManager.isActive()) {
+    const group = GroupManager.getGroups().find(g => g.id === TagRefinementManager.getActiveGroupId());
+    if (!group) return [];
+    return (currentFiles || []).filter(f => group.files.has(f.path));
+  }
   if (viewModeType === 'folder') {
     return (currentFolderContext.isLeaf && !currentFolderContext.isRoot)
       ? currentFolderContext.files
@@ -7390,6 +7442,59 @@ function updateSelectionBar() {
   importBtn.innerHTML = hasGroupedFiles
     ? `${SVG.download} Import Groups`
     : `${SVG.download} Import Selected`;
+
+  _syncRefinementSelectedCount();
+}
+
+/**
+ * Cheap DOM update for the refinement panel's "Selected: N files" readout AND its
+ * per-tag checkbox states — called from the one universal selection-changed hook
+ * (updateSelectionBar) instead of a full renderRefinementPanel() re-render, which
+ * would tear down and rebuild the whole panel on every tile click.
+ *
+ * Chip states are recomputed from TagRefinementManager.getSelectionState() every time
+ * the selection changes, so they always reflect the truth for whatever is currently
+ * selected (uniform state shown as-is, mixed shown as indeterminate) — this is a
+ * read-only projection, it never writes to TagRefinementManager on its own. The
+ * operator can still edit checkboxes after this runs; those edits only take effect
+ * when they click one of the apply buttons.
+ */
+function _syncRefinementSelectedCount() {
+  if (!TagRefinementManager.isActive()) return;
+  const groupId = TagRefinementManager.getActiveGroupId();
+  const group = GroupManager.getGroups().find(g => g.id === groupId);
+  if (!group) return;
+
+  const selPaths = [...selectedFiles].filter(p => group.files.has(p));
+  const n = selPaths.length;
+
+  const comp = EventCreator.getEventComps().find(c => c.folderName === group.subEventId);
+  const eventTypeLabels = (comp?.eventTypes || [])
+    .map(t => (typeof t === 'object' ? (t.label || '') : String(t))).filter(Boolean);
+  const additionalKeywordLabels = (comp?.additionalKeywords || [])
+    .map(k => (k && typeof k.label === 'string') ? k.label : '').filter(Boolean);
+  const selState = TagRefinementManager.getSelectionState(groupId, selPaths, eventTypeLabels, additionalKeywordLabels);
+  const statusLabel = _rpStatusLabel(selState);
+
+  // The selection just changed — any not-yet-applied chip edits are for the previous
+  // selection and no longer apply. Discard that intent and recompute from truth.
+  _rpDirty = false;
+
+  const el = document.getElementById('rpSelectedCount');
+  if (el) {
+    el.innerHTML = `Selected: ${n} file${n === 1 ? '' : 's'}${statusLabel ? ` <span class="rp-status rp-status-${selState.status}" id="rpSelectionStatus">${_esc(statusLabel)}</span>` : ''}`;
+  }
+  ['rpAllBtn', 'rpNoneBtn', 'rpResetBtn'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) btn.disabled = n === 0;
+  });
+  const applyBtn = document.getElementById('rpApplyBtn');
+  if (applyBtn) applyBtn.disabled = _rpApplyBlocked(n, selState);
+  const hint = document.getElementById('rpMixedHint');
+  if (hint) hint.hidden = !(n > 0 && selState.status === 'mixed' && !_rpDirty);
+
+  const panel = document.getElementById('groupPanel');
+  if (panel) _applyChipStates(panel, selState);
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -10463,6 +10568,10 @@ document.getElementById('importBtn').addEventListener('click', async () => {
         subEventId: group.subEventId,
         metadataTags: group.metadataTags ?? null,
         files: [...group.files],
+        // Per-file Tag Refinement overrides for this group, keyed by absolute source
+        // path (same identity as `files` above) — null when the group carries none.
+        // Structured-clone-safe: a plain object, not a Map.
+        fileTagRefinements: TagRefinementManager.serializeGroupForImport(group.id),
       })),
       source: _buildImportSourceMeta(),
       importedBy: _activeUser ? { id: _activeUser.id, name: _activeUser.name } : null,
@@ -10634,6 +10743,25 @@ function showUnassignedWarningModal(count) {
     const onCancel   = () => close(false);
     document.getElementById('unassignedContinueBtn').addEventListener('click', onContinue, { once: true });
     document.getElementById('unassignedCancelBtn').addEventListener('click', onCancel,   { once: true });
+  });
+}
+
+function showClearRefinementsOnRemapModal(count) {
+  return new Promise(resolve => {
+    const overlay = document.getElementById('clearRefinementsOverlay');
+    document.getElementById('clearRefinementsCount').textContent = count;
+    overlay.classList.add('visible');
+
+    function close(result) {
+      overlay.classList.remove('visible');
+      document.getElementById('clearRefinementsConfirmBtn').removeEventListener('click', onConfirm);
+      document.getElementById('clearRefinementsCancelBtn').removeEventListener('click', onCancel);
+      resolve(result);
+    }
+    const onConfirm = () => close(true);
+    const onCancel  = () => close(false);
+    document.getElementById('clearRefinementsConfirmBtn').addEventListener('click', onConfirm, { once: true });
+    document.getElementById('clearRefinementsCancelBtn').addEventListener('click', onCancel,  { once: true });
   });
 }
 
@@ -10892,11 +11020,18 @@ async function showEventImportConfirmModal(groups, eventData) {
       mappingTable.innerHTML = groups.map((g, idx) => {
         const color = GroupManager.getGroupColor(idx);
         const count = g.files.size;
+        const refCount = TagRefinementManager.groupRefinementCount(g.id);
+        let refineHtml = '';
+        if (refCount > 0) {
+          const s = TagRefinementManager.getSummary(g.id, [...g.files]);
+          refineHtml = `<span class="ei-map-refine">${s.default} default · ${s.refined} refined · ${s.noTags} no tags</span>`;
+        }
         return `<div class="ei-map-row">
           <span class="ei-map-group" style="--group-color:${color}">${_esc(g.label)}</span>
           <span class="ei-map-arrow">→</span>
           <span class="ei-map-sub">${_esc(g.subEventId || '—')}</span>
           <span class="ei-map-count">${count} file${count !== 1 ? 's' : ''}</span>
+          ${refineHtml}
         </div>`;
       }).join('');
     } else {
@@ -11196,6 +11331,7 @@ function _continueImporting() {
   _prevFocusPath   = null;
 
   GroupManager.reset();
+  TagRefinementManager.reset();
   renderGroupPanel();
 
   _closeProgressModal(); // closes overlay, syncs badges, updates selection bar
@@ -11218,6 +11354,7 @@ function _exitToHome() {
   resetViewCache();
 
   GroupManager.reset();
+  TagRefinementManager.reset();
   renderGroupPanel();
 
   document.getElementById('workspace').classList.remove('visible');
@@ -12265,6 +12402,53 @@ function syncAllGroupBadges() {
   for (const [path] of tileMap) syncGroupBadge(path);
 }
 
+/**
+ * PERF — O(1) single-tile update via tileMap, mirrors syncGroupBadge exactly.
+ * Tag Refinement's incremental counterpart to the badge HTML baked into
+ * buildIconTilesHtml/buildListRowsHtml at initial render time.
+ */
+function syncRefinementBadge(path) {
+  const tile = tileMap.get(path);
+  if (!tile) return;
+  const state = _refinementBadgeState(path); // null | 'refined' | 'none'
+
+  if (viewMode === 'icon') {
+    let badge = tile.querySelector('.file-refine-badge');
+    if (state) {
+      if (!badge) {
+        badge = document.createElement('div');
+        const metaRight = tile.querySelector('.file-meta-right');
+        (metaRight || tile).appendChild(badge);
+      }
+      badge.className = `file-refine-badge rb-${state}`;
+      badge.textContent = state === 'refined' ? '✓' : '∅';
+      badge.title = state === 'refined' ? 'Refined tags' : 'No refinable tags';
+    } else if (badge) {
+      badge.remove();
+    }
+  } else {
+    const nameCell = tile.querySelector('.lt-name');
+    if (!nameCell) return;
+    let badge = nameCell.querySelector('.rb-badge-list');
+    if (state) {
+      if (!badge) {
+        badge = document.createElement('span');
+        nameCell.appendChild(badge);
+      }
+      badge.className = `rb-badge-list rb-${state}`;
+      badge.textContent = state === 'refined' ? '✓' : '∅';
+      badge.title = state === 'refined' ? 'Refined tags' : 'No refinable tags';
+    } else if (badge) {
+      badge.remove();
+    }
+  }
+}
+
+/** PERF — Bulk sync using tileMap.values(), mirrors syncAllGroupBadges. */
+function syncAllRefinementBadges() {
+  for (const [path] of tileMap) syncRefinementBadge(path);
+}
+
 // ── Portal dropdown (sub-event assignment) ────────────────────────────────
 
 const Dropdown = (() => {
@@ -12498,6 +12682,20 @@ document.addEventListener('click', e => {
     items,
     groupColor,
     onSelect(value) {
+      const newSubEventId = (value === '' || value == null) ? null : String(value);
+      const refCount = TagRefinementManager.groupRefinementCount(gid);
+      if (refCount > 0 && newSubEventId !== thisGroup.subEventId) {
+        // Changing the component invalidates any per-file refinements made against
+        // the old component's tag vocabulary — never carry them across silently.
+        showClearRefinementsOnRemapModal(refCount).then(proceed => {
+          if (!proceed) return;
+          TagRefinementManager.clearGroup(gid);
+          GroupManager.setSubEvent(gid, value);
+          syncAllRefinementBadges();
+          renderGroupPanel();
+        });
+        return;
+      }
       GroupManager.setSubEvent(gid, value);
       renderGroupPanel();
     },
@@ -12569,12 +12767,35 @@ function _updateMetaGroupHint() {
   }
 }
 
+/**
+ * Exits Tag Refinement mode if its active group has disappeared, been remapped to an
+ * ineligible (or no) component, or the whole workspace was reset — the safety net for
+ * every invalidation path that doesn't already call TagRefinementManager.reset()/
+ * clearGroup() directly (group removal, remap, event/drive/workspace reset all funnel
+ * through renderGroupPanel(), so a single guard here covers all of them).
+ */
+function _syncRefinementModeValidity() {
+  if (!TagRefinementManager.isActive()) return;
+  const group = GroupManager.getGroups().find(g => g.id === TagRefinementManager.getActiveGroupId());
+  let eligible = false;
+  if (group && group.subEventId) {
+    const comp = EventCreator.getEventComps().find(c => c.folderName === group.subEventId);
+    eligible = TagRefinementManager.isEligible(comp);
+  }
+  if (!group || !eligible) {
+    TagRefinementManager.exit();
+    renderCurrentView();
+  }
+}
+
 function renderGroupPanel() {
   Dropdown.close();        // close sub-event picker
   MetaPicker.closeQuiet(); // close keyword picker without triggering re-render
 
   const panel = document.getElementById('groupPanel');
   if (!panel) return;
+
+  _syncRefinementModeValidity();
 
   _updateMetaGroupHint();
 
@@ -12592,6 +12813,11 @@ function renderGroupPanel() {
     return;
   }
   panel.classList.add('visible');
+
+  if (TagRefinementManager.isActive()) {
+    renderRefinementPanel(TagRefinementManager.getActiveGroupId());
+    return;
+  }
 
   const groups   = GroupManager.getGroups();
   const subNames = EventCreator.getSubEventNames();
@@ -12629,6 +12855,28 @@ function renderGroupPanel() {
       const mapped      = g.subEventId !== null;
       const mappedEnt   = mapped ? subNames.find(s => s.id === g.subEventId) : null;
       const mappedLabel = mapped ? (mappedEnt?.name ?? g.subEventId) : null;
+
+      // Refine Tags is available only when the mapped component itself has more than
+      // one total refinable tag (Event Types + Additional Keywords) — per-component,
+      // not merely because the overall event is multi-component.
+      let refineHtml = '';
+      if (mapped) {
+        const comp = EventCreator.getEventComps().find(c => c.folderName === g.subEventId);
+        if (TagRefinementManager.isEligible(comp)) {
+          const summary  = TagRefinementManager.getSummary(g.id, [...g.files]);
+          const hasWork  = summary.refined > 0 || summary.noTags > 0;
+          const label    = hasWork ? 'Review / Refine Tags' : 'Refine Tags';
+          const counts   = hasWork
+            ? `<div class="gc-refine-counts">${summary.default} default · ${summary.refined} refined · ${summary.noTags} no tags</div>`
+            : '';
+          refineHtml = `
+            <div class="gc-refine-area">
+              <button class="gc-refine-trigger" data-gid="${g.id}" type="button">${_esc(label)}</button>
+              ${counts}
+            </div>`;
+        }
+      }
+
       selectorHtml = `
         <div class="gc-subevent">
           <div class="gc-subevent-row">
@@ -12643,7 +12891,8 @@ function renderGroupPanel() {
           <div class="gc-status ${mapped ? 'ok' : 'warn'}">
             ${mapped ? `${SVG.check} ${_esc(mappedLabel)}` : `${SVG.warn} Not mapped`}
           </div>
-        </div>`;
+        </div>
+        ${refineHtml}`;
     }
 
     // File rows
@@ -12693,12 +12942,271 @@ function renderGroupPanel() {
   // Remove buttons
   panel.querySelectorAll('.gc-remove-btn[data-gid]').forEach(btn => {
     btn.addEventListener('click', () => {
-      GroupManager.removeGroup(Number(btn.dataset.gid));
+      const gid = Number(btn.dataset.gid);
+      TagRefinementManager.clearGroup(gid);
+      GroupManager.removeGroup(gid);
       syncAllGroupBadges();
+      syncAllRefinementBadges();
       renderGroupPanel();
     });
   });
 
+}
+
+// ── Tag Refinement mode ─────────────────────────────────────────────────────
+// Conceptually: current media → filter by group → edit per-file metadata
+// overrides. Reuses the existing media grid (renderFileArea via getVisibleFiles())
+// and selection infrastructure entirely — no second grid/selection implementation.
+
+// Delegated handler for .gc-refine-trigger clicks (enter Tag Refinement mode)
+document.addEventListener('click', e => {
+  const trigger = e.target.closest('.gc-refine-trigger[data-gid]');
+  if (!trigger) return;
+  _enterRefinementMode(Number(trigger.dataset.gid));
+});
+
+function _enterRefinementMode(groupId) {
+  TagRefinementManager.enter(groupId);
+  selectedFiles.clear();
+  _selectionAnchor = null;
+  renderCurrentView();
+  syncAllRefinementBadges();
+  renderGroupPanel();
+}
+
+function _exitRefinementMode() {
+  TagRefinementManager.exit();
+  selectedFiles.clear();
+  _selectionAnchor = null;
+  renderCurrentView();
+  renderGroupPanel();
+}
+
+/**
+ * Shows/hides/updates the persistent "Refining Tags · G3 · 24 files" banner above the
+ * grid (outside #fileGrid's own scroll container, so it stays visible while the grid
+ * scrolls). Fully derived from TagRefinementManager.isActive() each call — safe to
+ * call unconditionally from renderCurrentView() rather than threading a call through
+ * every entry/exit/force-exit site individually.
+ */
+function _updateRefinementBanner() {
+  const banner = document.getElementById('refinementBanner');
+  if (!banner) return;
+
+  if (!TagRefinementManager.isActive()) {
+    banner.style.display = 'none';
+    return;
+  }
+
+  const groupId = TagRefinementManager.getActiveGroupId();
+  const group = GroupManager.getGroups().find(g => g.id === groupId);
+  if (!group) { banner.style.display = 'none'; return; }
+
+  const fileCount = group.files.size;
+  const groupColor = GroupManager.getGroupColor(GroupManager.getGroupIndex(groupId));
+  banner.style.setProperty('--group-color', groupColor);
+  const textEl = document.getElementById('refinementBannerText');
+  if (textEl) {
+    const componentPart = group.subEventId ? ` · ${_esc(group.subEventId)}` : '';
+    textEl.innerHTML = `Refining Tags · <strong>${_esc(group.label)}</strong>${componentPart} · ${fileCount} file${fileCount === 1 ? '' : 's'}`;
+  }
+  banner.style.display = 'flex';
+}
+
+/** Builds one selectable tag chip for the refinement panel. */
+function _rpChipHtml(category, label) {
+  // No `checked` here — actual per-tag state (checked/unchecked/indeterminate) is
+  // applied after render by _applyChipStates(), driven by TagRefinementManager
+  // .getSelectionState() rather than a hardcoded default. This is what makes the
+  // panel reflect the truth of the current selection instead of always showing
+  // "everything checked".
+  return `<label class="rp-chip">
+    <input type="checkbox" data-cat="${category}" value="${_esc(label)}">
+    <span>${_esc(label)}</span>
+  </label>`;
+}
+
+/** Applies computed checked/indeterminate state to existing chip checkboxes in-place
+ * (no innerHTML rebuild) — matched by category+value read off each checkbox itself,
+ * never by embedding the label into a CSS selector. */
+function _applyChipStates(panel, selState) {
+  const apply = (category) => {
+    const map = (selState && selState[category]) || {};
+    panel.querySelectorAll(`input[data-cat="${category}"]`).forEach(cb => {
+      const st = map[cb.value];
+      cb.checked = st === 'checked';
+      cb.indeterminate = st === 'indeterminate';
+    });
+  };
+  apply('eventTypes');
+  apply('additionalKeywords');
+}
+
+/** Short human label for the current selection's refinement status, or null when empty. */
+function _rpStatusLabel(selState) {
+  switch (selState.status) {
+    case 'default': return 'Default';
+    case 'none':     return 'No Tags';
+    case 'refined': {
+      const tags = [...(selState.sampleOverride?.eventTypes || []), ...(selState.sampleOverride?.additionalKeywords || [])];
+      return tags.length ? `Refined: ${tags.join(', ')}` : 'Refined';
+    }
+    case 'mixed': return 'Mixed';
+    default: return null; // 'empty'
+  }
+}
+
+// Tracks whether the operator has intentionally changed the desired tag combination
+// (toggled a chip) since the current selection was last (re)computed. Only relevant
+// for a MIXED selection — a uniform selection's checkboxes already represent real,
+// applicable state, so Apply stays available immediately as before. Reset to false
+// on every full panel render and every selection change (_syncRefinementSelectedCount)
+// — merely selecting mixed files must never leave Apply already enabled.
+let _rpDirty = false;
+
+/** Whether "Apply to Selected" should be disabled: no selection, or a mixed selection
+ * the operator hasn't intentionally touched yet (checkboxes would otherwise read as
+ * unchecked-by-default and silently collapse the heterogeneous selection). */
+function _rpApplyBlocked(selCount, selState) {
+  return selCount === 0 || (selState.status === 'mixed' && !_rpDirty);
+}
+
+function renderRefinementPanel(groupId) {
+  const panel = document.getElementById('groupPanel');
+  if (!panel) return;
+
+  const group = GroupManager.getGroups().find(g => g.id === groupId);
+  if (!group) { TagRefinementManager.exit(); renderGroupPanel(); return; }
+
+  const comp = EventCreator.getEventComps().find(c => c.folderName === group.subEventId);
+  if (!TagRefinementManager.isEligible(comp)) {
+    TagRefinementManager.exit();
+    renderCurrentView();
+    renderGroupPanel();
+    return;
+  }
+
+  const eventTypeLabels = (comp.eventTypes || [])
+    .map(t => (typeof t === 'object' ? (t.label || '') : String(t)))
+    .filter(Boolean);
+  const additionalKeywordLabels = (comp.additionalKeywords || [])
+    .map(k => (k && typeof k.label === 'string') ? k.label : '')
+    .filter(Boolean);
+
+  const groupFilePaths = [...group.files];
+  const summary = TagRefinementManager.getSummary(groupId, groupFilePaths);
+  const selPaths = [...selectedFiles].filter(p => group.files.has(p));
+  const selCount = selPaths.length;
+  const selState = TagRefinementManager.getSelectionState(groupId, selPaths, eventTypeLabels, additionalKeywordLabels);
+  const statusLabel = _rpStatusLabel(selState);
+  const groupIdx = GroupManager.getGroupIndex(groupId);
+  const groupColor = GroupManager.getGroupColor(groupIdx);
+
+  // Fresh selection/render → no intentional edit has happened yet.
+  _rpDirty = false;
+  const applyBlocked = _rpApplyBlocked(selCount, selState);
+  const showMixedHint = selCount > 0 && selState.status === 'mixed' && !_rpDirty;
+
+  panel.innerHTML = `
+    <div class="gp-header">Refining Tags · ${_esc(group.label)}</div>
+    <div class="rp-context" style="--group-color:${groupColor}">
+      <div class="rp-group-label">${_esc(group.label)}</div>
+      <div class="rp-component-label">Component: ${_esc(group.subEventId || '—')}</div>
+      <div class="rp-file-count">${groupFilePaths.length} file${groupFilePaths.length === 1 ? '' : 's'}</div>
+    </div>
+    ${eventTypeLabels.length ? `
+      <div class="rp-section">
+        <div class="rp-section-title">Event Types</div>
+        <div class="rp-chip-list">${eventTypeLabels.map(l => _rpChipHtml('eventTypes', l)).join('')}</div>
+      </div>` : ''}
+    ${additionalKeywordLabels.length ? `
+      <div class="rp-section">
+        <div class="rp-section-title">Additional Keywords</div>
+        <div class="rp-chip-list">${additionalKeywordLabels.map(l => _rpChipHtml('additionalKeywords', l)).join('')}</div>
+      </div>` : ''}
+    <div class="rp-selected-count" id="rpSelectedCount">Selected: ${selCount} file${selCount === 1 ? '' : 's'}${statusLabel ? ` <span class="rp-status rp-status-${selState.status}" id="rpSelectionStatus">${_esc(statusLabel)}</span>` : ''}</div>
+    <div class="rp-actions">
+      <button id="rpApplyBtn" class="rp-btn rp-btn-primary" type="button" ${applyBlocked ? 'disabled' : ''}>Apply to Selected</button>
+      <div class="rp-mixed-hint" id="rpMixedHint" ${showMixedHint ? '' : 'hidden'}>Choose tags to apply to this mixed selection</div>
+      <button id="rpAllBtn"   class="rp-btn" type="button" ${selCount === 0 ? 'disabled' : ''}>Use All Component Tags</button>
+      <button id="rpNoneBtn"  class="rp-btn" type="button" ${selCount === 0 ? 'disabled' : ''}>Use No Refinable Tags</button>
+      <button id="rpResetBtn" class="rp-btn" type="button" ${selCount === 0 ? 'disabled' : ''}>Reset Selected to Defaults</button>
+    </div>
+    <div class="rp-summary">
+      <span>${summary.total} file${summary.total === 1 ? '' : 's'}</span>
+      <span>${summary.default} default</span>
+      <span>${summary.refined} refined</span>
+      <span>${summary.noTags} no tags</span>
+    </div>
+    <button id="rpDoneBtn" class="rp-done-btn" type="button">Done Refining</button>`;
+
+  _applyChipStates(panel, selState);
+
+  // Only an explicit operator interaction with a chip establishes intent — this never
+  // fires from _applyChipStates() above (that sets .checked/.indeterminate directly,
+  // which does not dispatch 'change'), only from a real click/keyboard toggle.
+  //
+  // Selection count is recomputed fresh here rather than closing over `selCount` —
+  // this listener is attached once per full render, but the selection (and therefore
+  // the true current count) keeps changing afterward via the lightweight
+  // _syncRefinementSelectedCount() path, which never re-renders the panel. A stale
+  // captured selCount (frequently 0, from the moment refinement mode was entered
+  // before anything was selected) would silently block this handler forever.
+  panel.addEventListener('change', e => {
+    if (!e.target.matches('input[data-cat]') || _rpDirty) return;
+    const currentSelCount = [...selectedFiles].filter(p => group.files.has(p)).length;
+    if (currentSelCount === 0) return;
+    _rpDirty = true;
+    const applyBtn = document.getElementById('rpApplyBtn');
+    if (applyBtn) applyBtn.disabled = false;
+    const hint = document.getElementById('rpMixedHint');
+    if (hint) hint.hidden = true;
+  });
+
+  const _selectedInGroup = () => [...selectedFiles].filter(p => group.files.has(p));
+
+  const _applyAndRerender = (overrideFn) => {
+    const sel = _selectedInGroup();
+    if (sel.length === 0) return;
+    overrideFn(sel);
+    syncAllRefinementBadges();
+    renderRefinementPanel(groupId);
+  };
+
+  panel.querySelector('#rpApplyBtn')?.addEventListener('click', () => {
+    _applyAndRerender(sel => {
+      const checkedIn = (cat) => [...panel.querySelectorAll(`input[data-cat="${cat}"]:checked`)].map(cb => cb.value);
+      TagRefinementManager.setOverride(groupId, sel, {
+        eventTypes: checkedIn('eventTypes'),
+        additionalKeywords: checkedIn('additionalKeywords'),
+      });
+    });
+  });
+
+  panel.querySelector('#rpAllBtn')?.addEventListener('click', () => {
+    _applyAndRerender(sel => {
+      TagRefinementManager.setOverride(groupId, sel, {
+        eventTypes: [...eventTypeLabels],
+        additionalKeywords: [...additionalKeywordLabels],
+      });
+    });
+  });
+
+  panel.querySelector('#rpNoneBtn')?.addEventListener('click', () => {
+    _applyAndRerender(sel => {
+      TagRefinementManager.setOverride(groupId, sel, { eventTypes: [], additionalKeywords: [] });
+    });
+  });
+
+  panel.querySelector('#rpResetBtn')?.addEventListener('click', () => {
+    _applyAndRerender(sel => {
+      TagRefinementManager.resetToDefault(groupId, sel);
+    });
+  });
+
+  panel.querySelector('#rpDoneBtn')?.addEventListener('click', () => {
+    _exitRefinementMode();
+  });
 }
 
 // ── Context menu (right-click on tile) ────────────────────────────────────
@@ -12764,6 +13272,10 @@ function _showCtxMenu(x, y, anchorPath) {
   menu.querySelectorAll('.ctx-item[data-action]').forEach(item => {
     item.addEventListener('click', () => {
       const paths = [...selectedFiles];
+      // A file moving between groups (or out of a group entirely) leaves behind any
+      // per-file refinement — it belonged to the old component's tag vocabulary. No-op
+      // for files that had none.
+      TagRefinementManager.clearFiles(paths);
       if (item.dataset.action === 'assign') {
         GroupManager.assignFiles(paths, Number(item.dataset.gid));
       } else if (item.dataset.action === 'new') {
@@ -12773,6 +13285,7 @@ function _showCtxMenu(x, y, anchorPath) {
         GroupManager.unassignFiles(paths);
       }
       syncAllGroupBadges();
+      syncAllRefinementBadges();
       renderGroupPanel();
       _hideCtxMenu();
     });
@@ -12856,12 +13369,14 @@ document.addEventListener('keydown', e => {
 
   const existing = GroupManager.getGroups().find(g => g.id === n);
   const gid      = existing ? existing.id : GroupManager.createGroup();
+  TagRefinementManager.clearFiles([...selectedFiles]);
   GroupManager.assignFiles([...selectedFiles], gid);
 
   // Auto-deselect — no renderFileArea(), just tile class sync
   selectedFiles.clear();
   syncAllTiles();
   syncAllGroupBadges();
+  syncAllRefinementBadges();
   renderGroupPanel();
 
   _showChordToast(`Assigned to G${gid}`, 'success');
@@ -12904,8 +13419,10 @@ document.addEventListener('keydown', e => {
 
     const card = e.target.closest('.group-card[data-gid]');
     if (card) {
+      TagRefinementManager.clearFiles(paths);
       GroupManager.assignFiles(paths, Number(card.dataset.gid));
       syncAllGroupBadges();
+      syncAllRefinementBadges();
       renderGroupPanel();
     }
   });

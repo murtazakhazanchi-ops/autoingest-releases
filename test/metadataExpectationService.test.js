@@ -126,5 +126,115 @@ t('multi-component event, single-tag split, ambiguous 0/2+ tag counts suppress t
   assert.deepEqual(r.keywords, ['Majlis', 'Ziyafat', 'London', 'UK']);
 });
 
+// ── Per-Photo Tag Refinement ────────────────────────────────────────────────
+
+t('default (no refinement) resolution includes all component Additional Keywords', () => {
+  const evidence = {
+    filePath: '/archive/Event/Comp-A/photo.jpg',
+    groups: [{ id: 'g1', subEventId: 'Comp-A', files: ['/archive/Event/Comp-A/photo.jpg'] }],
+    diskComponents: [
+      { folderName: 'Comp-A', location: '', city: 'London', country: 'UK', types: ['Waaz', 'Majlis'],
+        additionalKeywords: [{ label: 'Children', keywordId: 'k1' }, { label: 'Outdoor', keywordId: 'k2' }] },
+      { folderName: 'Comp-B', location: '', city: 'London', country: 'UK', types: ['Ziyafat'] },
+    ],
+  };
+  const r = resolveExpectedMetadata(evidence);
+  assert.deepEqual(r.keywords, ['Waaz', 'Majlis', 'Children', 'Outdoor', 'London', 'UK']);
+});
+
+t('refined file receives only its selected Event Types + Additional Keywords', () => {
+  const evidence = {
+    filePath: '/archive/Event/Comp-A/photo.jpg',
+    groups: [{
+      id: 'g1', subEventId: 'Comp-A', files: ['/archive/Event/Comp-A/photo.jpg'],
+      fileTagRefinements: {
+        [require('path').normalize('/archive/Event/Comp-A/photo.jpg')]: { eventTypes: ['Waaz'], additionalKeywords: ['Children'] },
+      },
+    }],
+    diskComponents: [
+      { folderName: 'Comp-A', location: '', city: 'London', country: 'UK', types: ['Waaz', 'Majlis', 'Ziyafat'],
+        additionalKeywords: [{ label: 'Children' }, { label: 'Outdoor' }, { label: 'Procession' }] },
+    ],
+  };
+  const r = resolveExpectedMetadata(evidence);
+  assert.deepEqual(r.keywords, ['Waaz', 'Children', 'London', 'UK']);
+  assert.ok(r.evidenceSource.includes('tagRefinements:explicit-override'));
+});
+
+t('explicit-empty refinement produces no refinable tags but keeps contextual metadata', () => {
+  const evidence = {
+    filePath: '/archive/Event/Comp-A/photo.jpg',
+    photographer: 'John',
+    hijriDate: '1448-01-16',
+    groups: [{
+      id: 'g1', subEventId: 'Comp-A', files: ['/archive/Event/Comp-A/photo.jpg'],
+      fileTagRefinements: { '/archive/Event/Comp-A/photo.jpg': { eventTypes: [], additionalKeywords: [] } },
+    }],
+    diskComponents: [
+      { folderName: 'Comp-A', location: 'Hall A', city: 'London', country: 'UK', types: ['Waaz', 'Majlis'],
+        additionalKeywords: [{ label: 'Children' }] },
+    ],
+  };
+  const r = resolveExpectedMetadata(evidence);
+  assert.deepEqual(r.keywords, ['Hall A', 'London', 'UK']);
+  assert.equal(r.photographer, 'John');
+  assert.equal(r.hijriDate, '1448-01-16');
+  assert.equal(r.copyright, '© Aljamea-tus-Saifiyah');
+});
+
+t('no fileTagRefinements entry for a file falls through to full component defaults (reset-to-default equivalent)', () => {
+  const diskComponents = [
+    { folderName: 'Comp-A', location: '', city: 'London', country: 'UK', types: ['Waaz', 'Majlis'],
+      additionalKeywords: [{ label: 'Children' }] },
+    { folderName: 'Comp-B', location: '', city: 'London', country: 'UK', types: ['Ziyafat'] },
+  ];
+  const withOverride = resolveExpectedMetadata({
+    filePath: '/archive/Event/Comp-A/a.jpg',
+    groups: [{
+      id: 'g1', subEventId: 'Comp-A', files: ['/archive/Event/Comp-A/a.jpg', '/archive/Event/Comp-A/b.jpg'],
+      fileTagRefinements: { '/archive/Event/Comp-A/a.jpg': { eventTypes: ['Waaz'], additionalKeywords: [] } },
+    }],
+    diskComponents,
+  });
+  const withoutOverride = resolveExpectedMetadata({
+    filePath: '/archive/Event/Comp-A/b.jpg', // no entry in fileTagRefinements — inherits
+    groups: [{
+      id: 'g1', subEventId: 'Comp-A', files: ['/archive/Event/Comp-A/a.jpg', '/archive/Event/Comp-A/b.jpg'],
+      fileTagRefinements: { '/archive/Event/Comp-A/a.jpg': { eventTypes: ['Waaz'], additionalKeywords: [] } },
+    }],
+    diskComponents,
+  });
+  assert.deepEqual(withOverride.keywords, ['Waaz', 'London', 'UK']);
+  assert.deepEqual(withoutOverride.keywords, ['Waaz', 'Majlis', 'Children', 'London', 'UK']);
+});
+
+t('Additional Keywords useInFolderName/folderPlacement never affect resolved keywords (metadata-only)', () => {
+  const evidence = {
+    filePath: '/archive/Event/Comp-A/photo.jpg',
+    groups: [{ id: 'g1', subEventId: 'Comp-A', files: ['/archive/Event/Comp-A/photo.jpg'] }],
+    diskComponents: [
+      { folderName: 'Comp-A', location: '', city: 'London', country: 'UK', types: ['Waaz'],
+        additionalKeywords: [{ label: 'Children', keywordId: 'k1', useInFolderName: true, folderPlacement: { order: 0 } }] },
+    ],
+  };
+  const r = resolveExpectedMetadata(evidence);
+  assert.deepEqual(r.keywords, ['Waaz', 'Children', 'London', 'UK']);
+  // folderName on the resolved component is untouched by additionalKeywords/useInFolderName.
+  assert.equal(r.component.folderName, 'Comp-A');
+});
+
+t('legacy metadataGroups override (single-component) still includes Additional Keywords by default, Event Type override unchanged', () => {
+  const evidence = {
+    filePath: '/archive/Event/photo.jpg',
+    groups: [{ id: 'g1', subEventId: null, files: ['/archive/Event/photo.jpg'], metadataTags: ['Custom Tag'] }],
+    diskComponents: [{ location: '', city: 'London', country: 'UK', types: ['Majlis', 'Ziyafat'],
+      additionalKeywords: [{ label: 'Outdoor' }] }],
+  };
+  const r = resolveExpectedMetadata(evidence);
+  // Event Type resolution is still fully governed by the legacy explicit override (unchanged
+  // behavior); Additional Keywords are a separate category and still apply by default.
+  assert.deepEqual(r.keywords, ['Custom Tag', 'Outdoor', 'London', 'UK']);
+});
+
 console.log(`${passed} passed`);
 if (process.exitCode) console.log('SOME TESTS FAILED');

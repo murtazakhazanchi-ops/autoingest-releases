@@ -2554,6 +2554,26 @@
       background: color-mix(in srgb, var(--group-color, var(--accent)) 28%, transparent);
     }
 
+    /* Tag Refinement — lightweight per-file state indicator, next to the group badge.
+       rb-refined = explicit subset applied; rb-none = explicitly no refinable tags.
+       No badge at all = default/inherited (the common, unrefined case). */
+    .file-refine-badge {
+      position: static;
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 16px; height: 16px; margin-left: 4px; flex-shrink: 0;
+      font-size: 10px; font-weight: 700; line-height: 1;
+      border-radius: 50%; pointer-events: none;
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    }
+    .file-refine-badge.rb-refined {
+      background: var(--green-dim); color: var(--green);
+      border: 1px solid color-mix(in srgb, var(--green) 40%, transparent);
+    }
+    .file-refine-badge.rb-none {
+      background: color-mix(in srgb, var(--subtext) 16%, transparent); color: var(--subtext);
+      border: 1px solid var(--border);
+    }
+
     /* P1 — Thumbnail */
     .file-thumb {
       width: 100%; aspect-ratio: 1;
@@ -5244,6 +5264,131 @@
     .gc-status.ok   { background: var(--green-dim); color: var(--green); }
     .gc-status.warn { background: color-mix(in srgb, var(--yellow) 10%, transparent); color: var(--yellow); }
 
+    /* ── Tag Refinement — "Refine Tags" trigger + summary counts on a group card ── */
+    .gc-refine-area {
+      padding: 5px 12px 4px 16px;
+      display: flex; flex-direction: column; gap: 3px;
+      border-bottom: 1px solid var(--border-subtle, var(--border));
+    }
+    .gc-refine-trigger {
+      width: 100%; padding: 4px 8px;
+      background: var(--glass-bg-3); border: 1px solid var(--glass-border, var(--border-subtle));
+      border-radius: 6px; color: var(--subtext); font-size: 0.72rem;
+      font-family: inherit; cursor: pointer; outline: none; text-align: left;
+      transition: border-color 0.12s, color 0.12s, background 0.12s;
+    }
+    .gc-refine-trigger:hover {
+      border-color: var(--accent); color: var(--text);
+    }
+    .gc-refine-counts {
+      font-size: 0.64rem; color: var(--subtext); opacity: 0.8;
+    }
+
+    /* ── Tag Refinement panel — replaces the normal Group Panel while active ─── */
+    .rp-context {
+      padding: 8px 12px 6px 16px;
+      display: flex; flex-direction: column; gap: 2px;
+      border-bottom: 1px solid var(--border-subtle, var(--border));
+    }
+    .rp-group-label {
+      font-size: 0.76rem; font-weight: 700; color: var(--text);
+    }
+    .rp-group-label::before {
+      content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+      background: var(--group-color, var(--accent)); margin-right: 6px;
+    }
+    .rp-component-label { font-size: 0.68rem; color: var(--subtext); }
+    .rp-file-count { font-size: 0.64rem; color: var(--subtext); opacity: 0.75; }
+    .rp-section { padding: 8px 12px 4px 16px; }
+    .rp-section-title {
+      font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+      color: var(--subtext); opacity: 0.75; margin-bottom: 5px;
+    }
+    .rp-chip-list { display: flex; flex-wrap: wrap; gap: 5px; }
+    .rp-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 8px; border-radius: 999px;
+      background: var(--glass-bg-3); border: 1px solid var(--glass-border, var(--border-subtle));
+      font-size: 0.7rem; color: var(--text); cursor: pointer; user-select: none;
+      transition: border-color 0.12s, background 0.12s;
+    }
+    .rp-chip:has(input:checked) {
+      border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+      background: color-mix(in srgb, var(--accent) 14%, transparent);
+    }
+    .rp-chip input { accent-color: var(--accent); margin: 0; }
+    .rp-selected-count {
+      padding: 8px 12px 2px 16px; font-size: 0.68rem; color: var(--subtext);
+    }
+    .rp-actions {
+      padding: 6px 12px; display: flex; flex-direction: column; gap: 6px;
+    }
+    .rp-btn {
+      width: 100%; padding: 6px 10px;
+      background: transparent; border: 1.5px solid var(--border);
+      border-radius: 7px; color: var(--subtext);
+      font-size: 0.72rem; font-family: inherit; cursor: pointer;
+      transition: border-color 0.12s, color 0.12s, background 0.12s;
+    }
+    .rp-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
+    .rp-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .rp-btn-primary {
+      background: color-mix(in srgb, var(--accent) 14%, transparent);
+      border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+      color: var(--text);
+    }
+    .rp-mixed-hint {
+      margin-top: -2px; font-size: 0.62rem; color: var(--subtext); opacity: 0.75;
+      text-align: center;
+    }
+    .rp-summary {
+      padding: 4px 12px 8px 16px; display: flex; flex-wrap: wrap; gap: 8px;
+      font-size: 0.64rem; color: var(--subtext); opacity: 0.85;
+    }
+    .rp-done-btn {
+      display: block; width: calc(100% - 24px); margin: 4px 12px 12px;
+      padding: 7px; background: transparent; border: 1.5px solid var(--border);
+      border-radius: 8px; color: var(--subtext); font-size: 0.75rem; font-weight: 600;
+      font-family: inherit; cursor: pointer;
+      transition: border-color 0.12s, color 0.12s;
+    }
+    .rp-done-btn:hover { border-color: var(--green); color: var(--green); }
+
+    /* Mixed-selection safety — status suffix next to "Selected: N files", and the
+       indeterminate (mixed) tri-state on chip checkboxes. Never implies uniformity
+       when the selection isn't uniform. */
+    .rp-status {
+      display: inline-block; padding: 1px 7px; border-radius: 999px;
+      font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+      vertical-align: middle; margin-left: 2px;
+    }
+    .rp-status-default  { background: var(--glass-bg-3); color: var(--subtext); }
+    .rp-status-refined  { background: var(--green-dim); color: var(--green); }
+    .rp-status-none     { background: color-mix(in srgb, var(--subtext) 16%, transparent); color: var(--subtext); }
+    .rp-status-mixed    { background: color-mix(in srgb, var(--yellow) 16%, transparent); color: var(--yellow); }
+    .rp-chip:has(input:indeterminate) {
+      border-color: color-mix(in srgb, var(--yellow) 45%, transparent);
+      background: color-mix(in srgb, var(--yellow) 12%, transparent);
+    }
+    .rp-chip input:indeterminate { accent-color: var(--yellow); }
+
+    /* ── Tag Refinement — persistent filter-mode banner above the grid ─────── */
+    /* Shown/hidden via style.display directly in JS (matches #folderBackBar's own
+       pattern just above it in the DOM) — not a CSS class, so there is no inline-
+       style-vs-stylesheet specificity fight over the hidden default. */
+    #refinementBanner {
+      padding: 7px 14px; align-items: center; gap: 8px;
+      border-bottom: 1px solid var(--border-subtle, var(--border));
+      background: color-mix(in srgb, var(--group-color, var(--accent)) 10%, var(--surface));
+      font-size: 0.75rem; color: var(--text); flex-shrink: 0;
+    }
+    #refinementBannerDot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+      background: var(--group-color, var(--accent));
+    }
+    #refinementBannerText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #refinementBannerText strong { font-weight: 700; }
+
     /* ── PORTAL DROPDOWN ─────────────────────────────────────────── */
     @keyframes gc-dropdown-appear {
       from { opacity: 0; transform: translateY(-6px) scale(0.98); }
@@ -5398,6 +5543,21 @@
       flex-shrink: 0;
     }
 
+    /* Tag Refinement — list-view counterpart of .file-refine-badge. */
+    .rb-badge-list {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 15px; height: 15px; border-radius: 50%;
+      font-size: 9.5px; font-weight: 700; margin-left: 5px; vertical-align: middle;
+    }
+    .rb-badge-list.rb-refined {
+      background: var(--green-dim); color: var(--green);
+      border: 1px solid color-mix(in srgb, var(--green) 40%, transparent);
+    }
+    .rb-badge-list.rb-none {
+      background: color-mix(in srgb, var(--subtext) 16%, transparent); color: var(--subtext);
+      border: 1px solid var(--border);
+    }
+
     /* ── CONTEXT MENU ─────────────────────────────────────────── */
     #groupCtxMenu {
       position: fixed; z-index: 9999; display: none;
@@ -5474,14 +5634,15 @@
     .gpm-cancel:hover { border-color: var(--blue); color: var(--blue); }
 
     /* ── G4: missing sub-event / unassigned / dup-sub-event modals ─────────── */
-    #missingSubEventOverlay, #unassignedOverlay, #dupSubEventOverlay {
+    #missingSubEventOverlay, #unassignedOverlay, #dupSubEventOverlay, #clearRefinementsOverlay {
       display: none; position: fixed; inset: 0;
       background: rgba(0,0,0,.65); z-index: 200;
       align-items: center; justify-content: center;
     }
     #missingSubEventOverlay.visible,
     #unassignedOverlay.visible,
-    #dupSubEventOverlay.visible { display: flex; }
+    #dupSubEventOverlay.visible,
+    #clearRefinementsOverlay.visible { display: flex; }
     .dupWarningModal {
       background: var(--surface); border-radius: 14px; padding: 28px 28px 24px;
       width: min(480px, 90vw); box-shadow: 0 12px 48px rgba(0,0,0,.5);
@@ -5520,10 +5681,15 @@
     .ei-required { color: var(--red); }
     #eiMappingSection { margin-bottom: 16px; }
     .ei-map-row {
-      display: flex; align-items: center; gap: 8px;
+      display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
       padding: 7px 10px; border-radius: 9px;
       background: var(--glass-bg-1); border: 1px solid var(--border-subtle);
       margin-bottom: 6px; font-size: 0.78rem;
+    }
+    /* Refined/default/no-tags summary — own line under the group→sub-event row when present. */
+    .ei-map-refine {
+      flex: 1 0 100%; font-size: 0.68rem; color: var(--subtext); opacity: 0.85;
+      padding-left: calc(9px + 8px); /* align under .ei-map-sub, past the group chip */
     }
     .ei-map-group {
       padding: 2px 9px; border-radius: 6px; font-weight: 700; font-size: 0.72rem;
@@ -7573,6 +7739,12 @@
           <button class="sel-btn" id="folderBackBtn" title="Back to folder list">← All Folders</button>
           <span id="folderBackPath" style="font-size:0.78rem;opacity:0.7;"></span>
         </div>
+        <!-- Tag Refinement: persistent filter-mode indicator, shown above the grid (not
+             inside its scroll container) so it stays visible while the grid scrolls. -->
+        <div id="refinementBanner" style="display:none;">
+          <span id="refinementBannerDot"></span>
+          <span id="refinementBannerText"></span>
+        </div>
         <!-- File area — JS writes grouped sections here -->
         <div id="fileGrid">
           <div class="panel-state">
@@ -7922,6 +8094,21 @@
     </div>
   </div>
 
+  <!-- Tag Refinement: warn before a component remap clears existing per-file refinements -->
+  <div id="clearRefinementsOverlay">
+    <div id="clearRefinementsModal" class="dupWarningModal">
+      <div class="dup-icon">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
+      <h3>Change Component Mapping?</h3>
+      <p class="dup-subtitle">Changing this group's component will clear tag refinements for <strong id="clearRefinementsCount">0</strong> file(s).</p>
+      <div class="dup-actions">
+        <button id="clearRefinementsConfirmBtn" class="dup-btn dup-btn-primary">Change &amp; Clear</button>
+        <button id="clearRefinementsCancelBtn" class="dup-btn dup-btn-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <!-- G5: Event import confirmation -->
   <div id="quickImportOverlay">
     <div id="quickImportModal">
@@ -8254,6 +8441,7 @@
   <script src="eventCreator.js"></script>
   <script src="eventMgmt.js"></script>
   <script src="groupManager.js"></script>
+  <script src="tagRefinementManager.js"></script>
   <script src="importRouter.js"></script>
   <!-- ── ARCHIVE LOCATIONS MODAL ──────────────────────────────────────── -->
   <div id="archiveLocationsModal" class="emm-overlay" role="dialog" aria-modal="true" aria-labelledby="alocTitle">
