@@ -35,6 +35,7 @@ const { SYSTEM_PROMPT } = require('./systemPrompt');
 const { buildToolDefinitions } = require('./toolDefinitions');
 const { validateFinalAnswer, containProtocolArtifacts } = require('./answerValidator');
 const { pruneHistoryToFit } = require('./historyPruning');
+const { estimateTokens } = require('./contextBudget');
 const { OrchestratorError, mapUnknownError } = require('./errors');
 
 // runtime is required lazily inside methods that need it (not at module
@@ -234,7 +235,28 @@ class OrchestratorSession {
     if (!this._allIssuedHandles) this._allIssuedHandles = new Set();
 
     try {
-      let outcome = await this._promptOnce(userText, { signal, timeoutMs });
+      await this._ensureBudgetBeforeTurn(userText);
+      let outcome;
+      try {
+        outcome = await this._promptOnce(userText, { signal, timeoutMs });
+      } catch (err) {
+        // Stage 4.1 real-model qualification (Section 14) evidence: even
+        // with the proactive pre-turn check above, a single turn whose OWN
+        // combined prompt (existing history + this user message) overflows
+        // can still surface CONTEXT_LIMIT from node-llama-cpp's own default
+        // context-shift strategy mid-prompt, before _ensureBudgetBeforeTurn
+        // could have known. One deterministic fresh-context retry, exactly
+        // the same recovery _maybePrune() already uses post-turn, rather
+        // than letting the raw error (and an unusable session) reach the
+        // caller.
+        if (err.code === 'CONTEXT_LIMIT') {
+          this.diagnostics.freshContextCount += 1;
+          await getRuntime().resetSession({ sessionId: this.sessionId, toolSchemas: this._toolSchemas, systemInstruction: SYSTEM_PROMPT });
+          outcome = await this._promptOnce(userText, { signal, timeoutMs });
+        } else {
+          throw err;
+        }
+      }
       // Section 23 defense-in-depth: node-llama-cpp's own responseText is
       // already the library's defined "plain visible text" (thought
       // segments and function-call structure excluded per its own
@@ -276,6 +298,33 @@ class OrchestratorSession {
       };
     } finally {
       this.busy = false;
+    }
+  }
+
+  // Stage 4.1, Section 14 (real-model qualification finding): _maybePrune()
+  // below only runs AFTER a turn completes, so it cannot help when the
+  // history handed INTO a turn is already over budget -- real-model
+  // qualification demonstrated this concretely: a history exceeding
+  // AVAILABLE_FOR_HISTORY, injected through the real orchestrator/runtime
+  // path, produced a raw CONTEXT_LIMIT from node-llama-cpp's own default
+  // context-shift strategy on the very next sendMessage(), and the session
+  // stayed unusable afterward because nothing had ever pruned it. This
+  // mirrors _maybePrune()'s own pruning hierarchy, just run BEFORE the
+  // prompt instead of after, so the common case (history grows over budget
+  // for any reason other than this stage's own post-turn pruning, e.g. a
+  // future caller injecting/restoring history) is caught deterministically
+  // rather than relying on node-llama-cpp's own internal recovery.
+  async _ensureBudgetBeforeTurn(userText) {
+    const runtime = getRuntime();
+    const history = await runtime.getSessionHistory(this.sessionId);
+    const result = pruneHistoryToFit(history, estimateTokens(userText));
+    if (result.needsFreshContext) {
+      this.diagnostics.freshContextCount += 1;
+      await runtime.resetSession({ sessionId: this.sessionId, toolSchemas: this._toolSchemas, systemInstruction: SYSTEM_PROMPT });
+      return;
+    }
+    if (result.pruned) {
+      await runtime.setSessionHistory(this.sessionId, result.history);
     }
   }
 

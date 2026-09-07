@@ -58,11 +58,11 @@ function baseBehavior(scenario) {
     if (msg.type === 'load') setTimeout(() => child.emit('message', { type: 'loaded' }), 1);
     else if (msg.type === 'createContext') setTimeout(() => child.emit('message', { type: 'context-created', contextSize: 24576 }), 1);
     else if (msg.type === 'createSession') setTimeout(() => child.emit('message', { type: 'session-created', sessionId: msg.sessionId }), 1);
-    else if (msg.type === 'resetSession') { scenario.resetCalls.push(msg.sessionId); setTimeout(() => child.emit('message', { type: 'session-reset', sessionId: msg.sessionId }), 1); }
+    else if (msg.type === 'resetSession') { scenario.resetCalls.push(msg.sessionId); scenario.history = []; if (scenario.callOrder) scenario.callOrder.push('resetSession'); setTimeout(() => child.emit('message', { type: 'session-reset', sessionId: msg.sessionId }), 1); }
     else if (msg.type === 'disposeSession') setTimeout(() => child.emit('message', { type: 'session-disposed', sessionId: msg.sessionId }), 1);
     else if (msg.type === 'getSessionHistory') setTimeout(() => child.emit('message', { type: 'session-history-result', sessionId: msg.sessionId, requestId: msg.requestId, history: scenario.history || [] }), 1);
-    else if (msg.type === 'setSessionHistory') { scenario.setHistoryCalls.push(msg.history); setTimeout(() => child.emit('message', { type: 'session-history-set', sessionId: msg.sessionId, requestId: msg.requestId }), 1); }
-    else if (msg.type === 'promptSession') scenario.onPromptSession(msg, child);
+    else if (msg.type === 'setSessionHistory') { scenario.setHistoryCalls.push(msg.history); scenario.history = msg.history; if (scenario.callOrder) scenario.callOrder.push('setSessionHistory'); setTimeout(() => child.emit('message', { type: 'session-history-set', sessionId: msg.sessionId, requestId: msg.requestId }), 1); }
+    else if (msg.type === 'promptSession') { if (scenario.callOrder) scenario.callOrder.push('promptSession'); scenario.onPromptSession(msg, child); }
     else if (msg.type === 'tool-result') scenario.onToolResult(msg);
   };
 }
@@ -323,6 +323,75 @@ async function main() {
         await session.sendMessage('a question');
         assert.equal(session.diagnostics.freshContextCount, 1);
         assert.ok(scenario.resetCalls.length >= 1, 'an unfittable history must trigger a resetSession call on the child');
+        await session.dispose();
+      });
+    } finally {
+      await runtime.terminate();
+      runtime._setSpawnFnForTesting(null);
+    }
+  });
+
+  // Stage 4.1, Section 14 real-model qualification finding: injecting an
+  // over-budget history through the real orchestrator/runtime path and
+  // then calling sendMessage() surfaced a raw CONTEXT_LIMIT from
+  // node-llama-cpp's own default context-shift strategy, and left the
+  // session unusable on the very next turn too, because nothing had ever
+  // pruned it -- _maybePrune() only runs AFTER a turn. Fixed with a new
+  // proactive _ensureBudgetBeforeTurn() pre-turn check plus a reactive
+  // one-shot fresh-context retry as defense-in-depth. These two tests
+  // cover both halves of that fix.
+  await t('Stage 4.1 Section 14: an over-budget history already present before sendMessage() is pruned BEFORE the prompt, not left to native context-shift', async () => {
+    const scenario = makeScenario([{ calls: [], text: 'ok' }]);
+    scenario.callOrder = [];
+    scenario.history = [{ type: 'system', text: 'sys' }];
+    for (let i = 0; i < 50; i++) {
+      scenario.history.push({ type: 'user', text: `question number ${i} `.repeat(100) });
+      scenario.history.push({ type: 'model', response: [{ type: 'functionCall', name: 'search_autoingest', params: { query: `q${i}` }, result: {} }, `answer number ${i} `.repeat(100)] });
+    }
+    runtime._setSpawnFnForTesting(() => makeFakeChild(baseBehavior(scenario)));
+    try {
+      await withVerifiedModel(async (dir) => {
+        await runtime.load(null, { overrideDir: dir });
+        const session = new OrchestratorSession({ sessionId: uniqueSessionId(), knowledgeContext });
+        await session.create();
+        await session.sendMessage('a question');
+        assert.ok(scenario.setHistoryCalls.length >= 1, 'the over-budget history must be pruned at least once');
+        const firstSetHistoryIdx = scenario.callOrder.indexOf('setSessionHistory');
+        const firstPromptIdx = scenario.callOrder.indexOf('promptSession');
+        assert.ok(firstSetHistoryIdx >= 0 && firstSetHistoryIdx < firstPromptIdx, 'pruning must happen BEFORE the prompt is sent, not only after');
+        await session.dispose();
+      });
+    } finally {
+      await runtime.terminate();
+      runtime._setSpawnFnForTesting(null);
+    }
+  });
+
+  await t('Stage 4.1 Section 14: a CONTEXT_LIMIT error from promptSession is recovered with one fresh-context retry, not surfaced raw', async () => {
+    let promptAttempts = 0;
+    const scenario = {
+      resetCalls: [], setHistoryCalls: [], history: [{ type: 'system', text: 'sys' }],
+      onToolResult() {},
+      onPromptSession(msg, child) {
+        promptAttempts += 1;
+        if (promptAttempts === 1) {
+          setTimeout(() => child.emit('message', { type: 'session-error', sessionId: msg.sessionId, requestId: msg.requestId, message: 'The default context shift strategy did not return a history that fits the context size.' }), 1);
+        } else {
+          setTimeout(() => child.emit('message', { type: 'session-result', sessionId: msg.sessionId, requestId: msg.requestId, text: 'recovered answer', toolCalls: [], stopReason: 'eogToken' }), 1);
+        }
+      },
+    };
+    runtime._setSpawnFnForTesting(() => makeFakeChild(baseBehavior(scenario)));
+    try {
+      await withVerifiedModel(async (dir) => {
+        await runtime.load(null, { overrideDir: dir });
+        const session = new OrchestratorSession({ sessionId: uniqueSessionId(), knowledgeContext });
+        await session.create();
+        const outcome = await session.sendMessage('a question');
+        assert.equal(outcome.text, 'recovered answer', 'the turn must succeed via the fresh-context retry rather than throwing CONTEXT_LIMIT to the caller');
+        assert.equal(promptAttempts, 2, 'exactly one retry after the reset');
+        assert.ok(session.diagnostics.freshContextCount >= 1, 'the reactive recovery must be recorded as a fresh-context event');
+        assert.ok(scenario.resetCalls.length >= 1, 'a resetSession call must have been made before the retry');
         await session.dispose();
       });
     } finally {
