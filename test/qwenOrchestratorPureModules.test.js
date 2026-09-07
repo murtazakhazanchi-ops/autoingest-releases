@@ -257,10 +257,47 @@ async function main() {
     assert.ok(result.findings.some((f) => f.code === 'ungrounded-capability-claim'));
   });
 
+  // Stage 4.2 real-model finding (Finding A, cap-platform-1): the model
+  // confidently claimed Linux support with ZERO grounding tool ever
+  // called, but the answer's phrasing ("runs natively on X", "fully
+  // supported platform") evaded the original CAPABILITY_CLAIM_RE, so
+  // checkCapabilityGrounding never even ran. See DEC-026's Stage 4.2
+  // Postscript.
+  await t('validateFinalAnswer: flags an ungrounded capability claim phrased as "runs natively on X" (real Linux-claim regression)', () => {
+    const result = validateFinalAnswer({ finalText: "AutoIngest runs natively on Linux. It's designed to work across major operating systems including Windows, macOS, and Linux, with Linux being a fully supported platform for all its core features and workflows.", toolCalls: [], sessionToolLog: [] });
+    assert.ok(result.findings.some((f) => f.code === 'ungrounded-capability-claim'), JSON.stringify(result.findings));
+  });
+
+  await t('validateFinalAnswer: flags an ungrounded capability claim phrased as "works with/is compatible with X"', () => {
+    const result = validateFinalAnswer({ finalText: 'AutoIngest works with any third-party cloud provider out of the box.', toolCalls: [], sessionToolLog: [] });
+    assert.ok(result.findings.some((f) => f.code === 'ungrounded-capability-claim'), JSON.stringify(result.findings));
+  });
+
   await t('validateFinalAnswer: does NOT flag a capability claim when a grounding tool was called this conversation', () => {
     const sessionToolLog = [{ tool: 'capability_status', args: { handle: 'H1' }, result: { status: 'AVAILABLE' } }];
     const result = validateFinalAnswer({ finalText: 'AutoIngest supports that feature.', toolCalls: [], sessionToolLog });
     assert.ok(!result.findings.some((f) => f.code === 'ungrounded-capability-claim'));
+  });
+
+  // Stage 4.2 real-model finding (Finding B root cause): a bolded
+  // bullet-point LABEL using ordinary English (e.g. "**File dates**") is
+  // not an identity claim, but used to false-positive as
+  // 'ungrounded-identity-claim' whenever it reduced to exactly one
+  // distinctive word after generic-term filtering AND that word's exact
+  // inflection didn't literally appear in the retrieved text even though
+  // its singular/plural counterpart did -- reproduced via the real
+  // long-context-0 conversation's "What is QMZ?" turn (see DEC-026's
+  // Stage 4.2 Postscript). This is the regression test for that fix.
+  await t('validateFinalAnswer: does NOT flag a bolded label whose singular/plural form appears in retrieved evidence (regression for the real QMZ false-positive)', () => {
+    const sessionToolLog = [{ tool: 'read_autoingest', args: { handle: 'H17' }, result: { dimensions: { behavior: 'QMZ reads each media file\'s original embedded capture date rather than the file\'s copy date on disk.' } } }];
+    const result = validateFinalAnswer({ finalText: '**File dates** are read from the original embedded capture date, not the copy date on disk.', toolCalls: [], sessionToolLog });
+    assert.ok(!result.findings.some((f) => f.code === 'ungrounded-identity-claim'), JSON.stringify(result.findings));
+  });
+
+  await t('validateFinalAnswer: STILL flags a genuinely fabricated multi-word bolded term with no grounding at all', () => {
+    const sessionToolLog = [{ tool: 'read_autoingest', args: { handle: 'H1' }, result: { dimensions: { behavior: 'Files are copied from the source to the destination archive folder.' } } }];
+    const result = validateFinalAnswer({ finalText: 'This is handled by the **Quantum Sync Bridge**, an internal AutoIngest subsystem.', toolCalls: [], sessionToolLog });
+    assert.ok(result.findings.some((f) => f.code === 'ungrounded-identity-claim'), JSON.stringify(result.findings));
   });
 
   await t('validateFinalAnswer: flags an answer asserting a relationship the conversation itself found CONTRADICTED', () => {

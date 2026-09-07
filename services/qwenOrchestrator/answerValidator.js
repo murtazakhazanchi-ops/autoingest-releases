@@ -133,7 +133,21 @@ function checkResidualCodeSpanLeak({ finalText }) {
 
 // --- checkCapabilityGrounding: a capability/support claim must trace to
 // a real knowledge-tool call this conversation --------------------------
-const CAPABILITY_CLAIM_RE = /\bAutoIngest\s+(?:can(?:not|'t)?|does(?:n'?t| not)?|supports?|is (?:able|not able|available|planned|not supported|not available)|has(?:n'?t| not)?\s+(?:the|a)\s+(?:capability|feature))\b|\b(?:is|are|was)\s+(?:not\s+)?(?:currently\s+)?(?:supported|available|planned|implemented)\s+(?:by|in|with)\s+AutoIngest\b/i;
+//
+// Stage 4.2 real-model finding: "AutoIngest runs natively on Linux ... with
+// Linux being a fully supported platform for all its core features and
+// workflows" is a clear, confident capability claim -- made with ZERO
+// grounding tool ever called (search_autoingest returned no relevant
+// candidate, and no capability_status/read_autoingest/roadmap_status
+// followed) -- but the original pattern only recognized "AutoIngest
+// supports/does/can/is available" and "supported/available/planned/
+// implemented by/in/with AutoIngest" phrasings, missing "runs (natively)
+// on", "works with/on", "is compatible with", and a standalone "fully/
+// natively supported platform/feature/capability" claim not immediately
+// adjacent to the word "AutoIngest". Widened to close that real, general
+// gap (see DEC-026's Stage 4.2 Postscript) -- still a general phrasing
+// pattern, not a per-topic answer generator.
+const CAPABILITY_CLAIM_RE = /\bAutoIngest\s+(?:can(?:not|'t)?|does(?:n'?t| not)?|supports?|runs?(?:\s+natively)?\s+on|works?\s+(?:with|on)|is\s+compatible\s+with|is (?:able|not able|available|planned|not supported|not available)|has(?:n'?t| not)?\s+(?:the|a)\s+(?:capability|feature))\b|\b(?:is|are|was)\s+(?:not\s+)?(?:currently\s+)?(?:fully\s+)?(?:supported|available|planned|implemented)\s+(?:by|in|with|as|on)\s+AutoIngest\b|\b(?:fully|natively)\s+supported\s+(?:platform|feature|capability)\b/i;
 
 // Any of the three knowledge-bearing tools counts as provenance for a
 // capability claim -- all three read from the same trusted Knowledge
@@ -200,9 +214,22 @@ function checkUngroundedIdentityClaim({ finalText, toolCalls, sessionToolLog }) 
     // distinctive (4+ char, non-generic) words appear in the retrieved
     // text, treat it as grounded -- avoids false-positiving on the
     // model's own natural paraphrasing of a real, retrieved phrase.
+    //
+    // Stage 4.2 real-model finding: a short bolded bullet-point LABEL
+    // (ordinary English used for readability, e.g. "**File dates** are
+    // read from...") is not an identity claim at all, but used to be
+    // rejected whenever it reduced to exactly one distinctive word after
+    // filtering generic terms (`words.length >= 2` gave a 1-word phrase no
+    // partial-credit path) AND that one word's exact inflection ("dates")
+    // didn't literally appear in retrieved text even though its singular
+    // form ("date") did. Lowering the gate to 1+ word and stemming a
+    // trailing "s" before the substring check closes both gaps without
+    // weakening detection of a genuinely fabricated multi-word term (which
+    // still needs at least half its own distinctive words to match).
     const words = norm.split(' ').filter((w) => w.length >= 4 && !GENERIC_MATCH_WORDS.has(w));
-    if (words.length >= 2) {
-      const matchedWords = words.filter((w) => retrievedText.includes(w));
+    if (words.length >= 1) {
+      const stem = (w) => (w.endsWith('s') && w.length > 4 ? w.slice(0, -1) : w);
+      const matchedWords = words.filter((w) => retrievedText.includes(w) || retrievedText.includes(stem(w)));
       if (matchedWords.length >= Math.ceil(words.length / 2)) continue;
     }
 
