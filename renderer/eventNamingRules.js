@@ -70,11 +70,12 @@
 
   // shouldAppendCityToSubfolders(comps) — SUB-FOLDER NAME rule, ONE decision
   // for the whole event (apply the same result to every component's own
-  // folder name). False only when every component shares exactly one city;
-  // true the moment there is any city diversity at all.
+  // folder name). Do not show city if all components are of the same city
+  // -- a single component is trivially "all one city", so it suppresses
+  // too, exactly like the original pre-fix `comps.length <= 1 || every(...)`
+  // formula did. True the moment there is any city diversity at all.
   function shouldAppendCityToSubfolders(comps) {
     if (!Array.isArray(comps) || comps.length === 0) return false;
-    if (comps.length === 1) return true; // a single component always shows its own city
     const firstCity = cityLabel(comps[0]);
     const allSameCity = comps.every((c) => cityLabel(c) === firstCity);
     return !allSameCity;

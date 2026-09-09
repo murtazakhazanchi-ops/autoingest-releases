@@ -237,9 +237,13 @@ function buildNameForTest(comps) {
 
 (function test10d() {
   try {
-    // Single component always shows its own city.
-    assert.equal(shouldAppendCityToSubfolders([comp('A', 'Surat')]), true);
-    ok('sub-folder rule: single component -> true');
+    // A single component is trivially "all components are the same city" --
+    // matches the original pre-fix `comps.length <= 1 || every(...)`
+    // formula exactly, and real archive evidence for single-component
+    // events is itself mixed/inconsistent, so the explicit rule (not
+    // archive archaeology) is authoritative here: suppress.
+    assert.equal(shouldAppendCityToSubfolders([comp('A', 'Surat')]), false);
+    ok('sub-folder rule: single component -> false (trivially all-same-city, suppressed)');
   } catch (e) { fail('sub-folder rule: single component', e); }
 })();
 
@@ -262,6 +266,33 @@ function buildNameForTest(comps) {
     assert.equal(shouldAppendCityToSubfolders(comps), true, 'sub-folder rule: every component gets its own city, no run collapsing');
     ok('overall-name rule and sub-folder rule genuinely differ for the same mixed-city input');
   } catch (e) { fail('overall-name vs sub-folder rule difference', e); }
+})();
+
+// ── 10g. Exact mathematical equivalence to the pre-regression stable/0.9
+// formula at commit 9ae32ac (`comps.length <= 1 || comps.every(c =>
+// c.city?.label === comps[0].city?.label)`, with cityPart shown only when
+// !allSameCity) -- proves this correction restores the ORIGINAL sub-folder
+// behavior exactly, not merely something similar to it. ─────────────────
+(function test10g() {
+  function originalAllSameCityFormula(comps) {
+    return comps.length <= 1 || comps.every((c) => c.city?.label === comps[0].city?.label);
+  }
+  const cases = [
+    [comp('A', 'Surat')],
+    [comp('A', 'Surat'), comp('B', 'Surat')],
+    [comp('A', 'Surat'), comp('B', 'Surat'), comp('C', 'Surat')],
+    [comp('A', 'Mandvi'), comp('B', 'Mundra'), comp('C', 'Mundra'), comp('D', 'Mundra')],
+    [comp('A', 'Surat'), comp('B', 'Mumbai')],
+    [comp('A', 'Surat'), comp('B', 'Mumbai'), comp('C', 'Surat')],
+  ];
+  try {
+    for (const comps of cases) {
+      const original = !originalAllSameCityFormula(comps); // original cityPart condition: !allSameCity
+      const current = shouldAppendCityToSubfolders(comps);
+      assert.equal(current, original, `mismatch for ${JSON.stringify(comps.map((c) => c.city?.label))}: original=${original}, current=${current}`);
+    }
+    ok('shouldAppendCityToSubfolders is EXACTLY equivalent to the pre-regression 9ae32ac formula for every tested case');
+  } catch (e) { fail('exact equivalence to pre-regression formula', e); }
 })();
 
 // ── 11. Existing single-component behavior unchanged ────────────────────────
