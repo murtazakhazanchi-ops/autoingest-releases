@@ -2459,6 +2459,7 @@ ${unparseable.map(ev => `
         _showEventBanner('Internal error: component structure is invalid. Cannot save.', 'error');
         return;
       }
+      const _noRenameAppendCity = window.EventNamingRules.shouldAppendCityToSubfolders(_eventComps);
       const noRenameCompsForDisk = JSON.parse(JSON.stringify(_eventComps)).map((c, idx) => ({
         id:                 c.id,
         types:              c.eventTypes.map(et => et.label),
@@ -2467,7 +2468,7 @@ ${unparseable.map(ev => `
         country:            c.country         || null,
         additionalKeywords: Array.isArray(c.additionalKeywords) && c.additionalKeywords.length ? c.additionalKeywords : undefined,
         isUnresolved:       false,
-        folderName:         c.folderName ?? buildFolderName(c, idx, window.EventNamingRules.shouldAppendCity(_eventComps, idx)),
+        folderName:         c.folderName ?? buildFolderName(c, idx, _noRenameAppendCity),
       }));
       const _noRenameEffPath = _effectiveCollPath() || activeMaster?.path;
       if (_noRenameEffPath) {
@@ -2596,6 +2597,7 @@ ${unparseable.map(ev => `
     );
 
     // Update the scanned events cache so the list reflects the change.
+    const _renameAppendCity = window.EventNamingRules.shouldAppendCityToSubfolders(compsWithIds);
     const compsForDisk = compsWithIds.map((c, idx) => ({
       id:                 c.id,
       types:              c.eventTypes.map(et => et.label),
@@ -2605,7 +2607,7 @@ ${unparseable.map(ev => `
       additionalKeywords: Array.isArray(c.additionalKeywords) && c.additionalKeywords.length ? c.additionalKeywords : undefined,
       isUnresolved:       false,
       // Preserve existing folderName (set once at creation — never recompute).
-      folderName:         c.folderName ?? buildFolderName(c, idx, window.EventNamingRules.shouldAppendCity(compsWithIds, idx)),
+      folderName:         c.folderName ?? buildFolderName(c, idx, _renameAppendCity),
     }));
     if (!compsForDisk.every(c => typeof c.id === 'number')) {
       throw new Error('Invalid component structure: missing id');
@@ -3178,7 +3180,7 @@ ${unparseable.map(ev => `
     if (!rowsEl) return;
 
     const compIdx  = _eventComps.findIndex(c => c.id === comp.id);
-    const folderName = buildFolderName(comp, compIdx >= 0 ? compIdx : 0, window.EventNamingRules.shouldAppendCity(_eventComps, compIdx >= 0 ? compIdx : 0));
+    const folderName = buildFolderName(comp, compIdx >= 0 ? compIdx : 0, window.EventNamingRules.shouldAppendCityToSubfolders(_eventComps));
     if (prevEl) prevEl.innerHTML = `<span class="ec-kw-adv-prev-label">Preview</span><code class="ec-kw-adv-prev-code">${esc(folderName)}</code>`;
     const kwInFolder = (comp.additionalKeywords || []).some(k => k.useInFolderName);
     if (warnEl) warnEl.hidden = !(kwInFolder && folderName.length > 160);
@@ -4231,6 +4233,7 @@ ${unparseable.map(ev => `
       // Component order here is the same order they appear in _eventComps (setEventState
       // always assigns ids 1…n in array order, so cleanComps is already position-ordered).
       // folderName is computed once at creation from this order and never recomputed.
+      const _createAppendCity = window.EventNamingRules.shouldAppendCityToSubfolders(cleanComps);
       const compsForDisk = cleanComps.map((c, idx) => ({
         types:              c.eventTypes.map(et => et.label),
         location:           c.location?.label || null,
@@ -4238,7 +4241,7 @@ ${unparseable.map(ev => `
         country:            c.country         || null,
         additionalKeywords: Array.isArray(c.additionalKeywords) && c.additionalKeywords.length ? c.additionalKeywords : undefined,
         isUnresolved:       false,
-        folderName:         buildFolderName(c, idx, window.EventNamingRules.shouldAppendCity(cleanComps, idx)),
+        folderName:         buildFolderName(c, idx, _createAppendCity),
       }));
 
       const collectionCode = document.getElementById('evCollectionCode')?.value?.trim() || _collectionCode || null;
@@ -4766,13 +4769,14 @@ ${unparseable.map(ev => `
   function _buildSubEventFolderNames(components) {
     // Prefer the persisted folderName (written at event creation, stable thereafter).
     // Fallback: compute from current metadata for legacy events that predate this field,
-    // using the same consecutive-city-run rule creation now uses (window.EventNamingRules).
+    // using the same event-wide sub-folder rule creation now uses (window.EventNamingRules).
     // Note: for a legacy event created under an older naming implementation, this fallback
     // may still differ from whatever that event's own folder names actually are — no folder
     // scanning or matching is attempted; this is display-only and never renames anything.
+    const appendCity = window.EventNamingRules.shouldAppendCityToSubfolders(components);
     return components.map((comp, idx) => {
       if (comp.folderName != null) return comp.folderName;
-      return buildFolderName(comp, idx, window.EventNamingRules.shouldAppendCity(components, idx));
+      return buildFolderName(comp, idx, appendCity);
     });
   }
 

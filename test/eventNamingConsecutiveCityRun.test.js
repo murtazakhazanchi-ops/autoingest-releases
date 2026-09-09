@@ -2,29 +2,42 @@
 
 // Regression test for the consecutive-city-run naming bug (reported against
 // the real event 1448-03-27 _03-... on stable/0.9 at merge commit 9ae32ac):
-// a multi-component event whose consecutive components share a city was
-// getting that city appended once PER COMPONENT instead of once per
-// consecutive run, e.g. "...QMZ-Mundra-Ziyarat-...-Mundra-Muaina-...-Mundra"
-// instead of "...QMZ-Ziyarat-...-Muaina-...-Mundra".
+// a multi-component event whose OVERALL EVENT NAME had consecutive
+// same-city components getting that city appended once PER COMPONENT
+// instead of once per consecutive run, e.g.
+// "...QMZ-Mundra-Ziyarat-...-Mundra-Muaina-...-Mundra" instead of
+// "...QMZ-Ziyarat-...-Muaina-...-Mundra".
 //
-// Root cause: renderer/eventCreator.js's _buildCompString() and
-// buildFolderName() each independently computed a single GLOBAL
-// "allSameCity" boolean ("do ALL components share one city?") rather than
-// asking, per component, "does the city change here?" — correct only when
-// every component shared one city, or when no two consecutive components
-// ever shared a city.
+// Root cause: renderer/eventCreator.js's _buildCompString() computed a
+// single GLOBAL "allSameCity" boolean ("do ALL components share one
+// city?") rather than asking, per component, "does the city change here?"
+// — correct only when every component shared one city, or when no two
+// consecutive components ever shared a city.
 //
-// Fixed by extracting the actual rule into a small, pure, directly-testable
-// helper (renderer/eventNamingRules.js, dual-exported the same way
+// Fixed by extracting the rule into shouldAppendCity() in
+// renderer/eventNamingRules.js (dual-exported the same way
 // renderer/pathUtils.js already solves this for other small cross-cutting
 // renderer helpers — see test/l6SeqPrefixDeduplication.test.js for the
-// identical precedent) and having both eventCreator.js functions call it
-// per component index instead of maintaining their own allSameCity logic.
+// identical precedent).
+//
+// IMPORTANT CORRECTION: a first pass of this fix mistakenly applied that
+// SAME consecutive-run rule to buildFolderName() (component SUB-FOLDER
+// names) too. That was wrong -- a sub-folder is a standalone directory
+// entry that must be self-describing on its own; collapsing its city
+// because a sibling shares it makes an individual folder (e.g. "02-QMZ")
+// impossible to identify by city without inspecting neighbors. The
+// original, pre-fix `allSameCity` GLOBAL check was actually already
+// correct for sub-folders (verified directly: the real historical event's
+// own persisted sub-folder names already matched it) -- it was only ever
+// wrong for the overall event name. shouldAppendCityToSubfolders()
+// restores that original event-wide rule for sub-folders specifically,
+// while shouldAppendCity() keeps the consecutive-run fix for the overall
+// name. The two rules are DIFFERENT and deliberately not interchangeable.
 //
 // Run: node test/eventNamingConsecutiveCityRun.test.js
 
 const assert = require('node:assert/strict');
-const { shouldAppendCity } = require('../renderer/eventNamingRules.js');
+const { shouldAppendCity, shouldAppendCityToSubfolders } = require('../renderer/eventNamingRules.js');
 
 let passed = 0;
 function ok(name) { passed++; console.log(`  ok — ${name}`); }
@@ -178,21 +191,108 @@ function buildNameForTest(comps) {
   } catch (e) { fail('location text containing city-like text', e); }
 })();
 
-// ── 10. Component/sub-folder naming uses the identical city-run semantics as the overall event name ──
-(function test10() {
-  // Both eventCreator.js's buildFolderName() and _buildCompString() now call
-  // shouldAppendCity(comps, idx) with the SAME comps array and SAME idx for
-  // a given component -- proven directly here: the decision for a given
-  // component/index pair is identical regardless of which caller asks.
-  const comps = [comp('Ziyarat', 'Mandvi'), comp('QMZ', 'Mundra'), comp('Muaina', 'Mundra')];
+// ── 10. Sub-folder naming rule is DIFFERENT from the overall-name rule ──────
+// shouldAppendCityToSubfolders(comps) is ONE decision for the whole event
+// (apply to every component's own folder name) -- true whenever there is
+// ANY city diversity, false only when every component shares one city.
+(function test10a() {
   try {
-    for (let i = 0; i < comps.length; i++) {
-      const decision1 = shouldAppendCity(comps, i);
-      const decision2 = shouldAppendCity(comps, i); // simulates the second (independent) call site
-      assert.equal(decision1, decision2, `component ${i}: overall-name and sub-folder-name call sites must agree`);
+    // All-same-city: no sub-folder shows a city.
+    assert.equal(shouldAppendCityToSubfolders([comp('A', 'Surat'), comp('B', 'Surat'), comp('C', 'Surat')]), false);
+    ok('sub-folder rule: all-same-city event -> false (no city on any sub-folder)');
+  } catch (e) { fail('sub-folder rule: all-same-city', e); }
+})();
+
+(function test10b() {
+  try {
+    // The real reported case (Mandvi/Mundra/Mundra/Mundra): every sub-folder
+    // shows its own city, including the three consecutive Mundra ones --
+    // deliberately NOT collapsed, unlike the overall event name.
+    const comps = [comp('Ziyarat', 'Mandvi', 'Mazar e Noorani'), comp('QMZ', 'Mundra'), comp('Ziyarat', 'Mundra', 'Rani Behensaheba (Mundra)'), comp('Muaina', 'Mundra', 'Haveli')];
+    assert.equal(shouldAppendCityToSubfolders(comps), true);
+    ok('sub-folder rule: mixed-city event -> true (every sub-folder shows its own city, no consecutive-run collapsing)');
+  } catch (e) { fail('sub-folder rule: mixed-city event', e); }
+})();
+
+(function test10c() {
+  try {
+    // Real historical event's own persisted sub-folder names, verified
+    // directly against disk before any fix existed, already matched this
+    // exact rule -- confirming the pre-fix `allSameCity` behavior was
+    // correct for sub-folders all along and only ever wrong for the
+    // overall event name.
+    const realComps = [comp('Ziyarat', 'Mandvi'), comp('QMZ', 'Mundra'), comp('Ziyarat', 'Mundra'), comp('Muaina', 'Mundra')];
+    const expectedFolderNames = ['01-Ziyarat-Mandvi', '02-QMZ-Mundra', '03-Ziyarat-Mundra', '04-Muaina-Mundra'];
+    const appendCity = shouldAppendCityToSubfolders(realComps);
+    const actual = realComps.map((c, idx) => {
+      const indexPart = String(idx + 1).padStart(2, '0');
+      const types = c.eventTypes.map((t) => t.label).join('-');
+      const cityPart = appendCity && c.city?.label ? `-${c.city.label}` : '';
+      return `${indexPart}-${types}${cityPart}`;
+    });
+    assert.deepEqual(actual, expectedFolderNames, 'reconstructed sub-folder names must match the real historical event\'s own pre-existing, already-correct folder names');
+    ok('sub-folder rule: matches the real historical event\'s own already-correct persisted folder names');
+  } catch (e) { fail('sub-folder rule: matches real historical event', e); }
+})();
+
+(function test10d() {
+  try {
+    // A single component is trivially "all components are the same city" --
+    // matches the original pre-fix `comps.length <= 1 || every(...)`
+    // formula exactly, and real archive evidence for single-component
+    // events is itself mixed/inconsistent, so the explicit rule (not
+    // archive archaeology) is authoritative here: suppress.
+    assert.equal(shouldAppendCityToSubfolders([comp('A', 'Surat')]), false);
+    ok('sub-folder rule: single component -> false (trivially all-same-city, suppressed)');
+  } catch (e) { fail('sub-folder rule: single component', e); }
+})();
+
+(function test10e() {
+  try {
+    assert.equal(shouldAppendCityToSubfolders([]), false);
+    assert.equal(shouldAppendCityToSubfolders(null), false);
+    ok('sub-folder rule: edge cases (empty/invalid input) handled without throwing');
+  } catch (e) { fail('sub-folder rule: edge cases', e); }
+})();
+
+// ── 10f. Overall-name rule and sub-folder rule are genuinely DIFFERENT for
+// the same mixed-city input (this is the whole point of the correction) ──
+(function test10f() {
+  try {
+    const comps = [comp('A', 'Mandvi'), comp('B', 'Mundra'), comp('C', 'Mundra')];
+    // Overall name: component 2 (mid-run) does NOT get its own city.
+    assert.equal(shouldAppendCity(comps, 1), false, 'overall-name rule: mid-run component does not repeat the city');
+    // Sub-folder: EVERY component (including component 2) DOES get its own city.
+    assert.equal(shouldAppendCityToSubfolders(comps), true, 'sub-folder rule: every component gets its own city, no run collapsing');
+    ok('overall-name rule and sub-folder rule genuinely differ for the same mixed-city input');
+  } catch (e) { fail('overall-name vs sub-folder rule difference', e); }
+})();
+
+// ── 10g. Exact mathematical equivalence to the pre-regression stable/0.9
+// formula at commit 9ae32ac (`comps.length <= 1 || comps.every(c =>
+// c.city?.label === comps[0].city?.label)`, with cityPart shown only when
+// !allSameCity) -- proves this correction restores the ORIGINAL sub-folder
+// behavior exactly, not merely something similar to it. ─────────────────
+(function test10g() {
+  function originalAllSameCityFormula(comps) {
+    return comps.length <= 1 || comps.every((c) => c.city?.label === comps[0].city?.label);
+  }
+  const cases = [
+    [comp('A', 'Surat')],
+    [comp('A', 'Surat'), comp('B', 'Surat')],
+    [comp('A', 'Surat'), comp('B', 'Surat'), comp('C', 'Surat')],
+    [comp('A', 'Mandvi'), comp('B', 'Mundra'), comp('C', 'Mundra'), comp('D', 'Mundra')],
+    [comp('A', 'Surat'), comp('B', 'Mumbai')],
+    [comp('A', 'Surat'), comp('B', 'Mumbai'), comp('C', 'Surat')],
+  ];
+  try {
+    for (const comps of cases) {
+      const original = !originalAllSameCityFormula(comps); // original cityPart condition: !allSameCity
+      const current = shouldAppendCityToSubfolders(comps);
+      assert.equal(current, original, `mismatch for ${JSON.stringify(comps.map((c) => c.city?.label))}: original=${original}, current=${current}`);
     }
-    ok('component/sub-folder naming follows the same city-run semantics as the overall event name');
-  } catch (e) { fail('component/sub-folder naming agreement', e); }
+    ok('shouldAppendCityToSubfolders is EXACTLY equivalent to the pre-regression 9ae32ac formula for every tested case');
+  } catch (e) { fail('exact equivalence to pre-regression formula', e); }
 })();
 
 // ── 11. Existing single-component behavior unchanged ────────────────────────

@@ -264,9 +264,15 @@ async function seedRegistry(window, { types, cities }) {
         check(comps.length === 4, 'Scenario 1: event.json has 4 components');
         check(comps[0]?.city === 'Mandvi' && comps[1]?.city === 'Mundra' && comps[2]?.city === 'Mundra' && comps[3]?.city === 'Mundra',
           'Scenario 1: component city values are Mandvi, Mundra, Mundra, Mundra as entered');
+        // Sub-folder rule is DIFFERENT from the overall-name rule: this is a
+        // mixed-city event (Mandvi + Mundra), so shouldAppendCityToSubfolders
+        // is true and EVERY component's own sub-folder shows its own city,
+        // with NO consecutive-run collapsing -- component 1 shows Mandvi,
+        // components 2-4 (all Mundra) EACH individually show Mundra too.
         const subFolderMundraCounts = comps.map((c) => (c.folderName.match(/Mundra/g) || []).length);
-        check(subFolderMundraCounts[0] === 0 && subFolderMundraCounts[1] === 0 && subFolderMundraCounts[2] === 0 && subFolderMundraCounts[3] === 1,
-          `Scenario 1: sub-folder names only carry the city on the LAST component of the run (got city-mention-counts ${JSON.stringify(subFolderMundraCounts)} for comps 1-4)`);
+        check(subFolderMundraCounts[0] === 0 && subFolderMundraCounts[1] === 1 && subFolderMundraCounts[2] === 1 && subFolderMundraCounts[3] === 1,
+          `Scenario 1: sub-folder names show their OWN city unconditionally in a mixed-city event, no consecutive-run collapsing (got city-mention-counts ${JSON.stringify(subFolderMundraCounts)} for comps 1-4)`);
+        check(comps[0]?.folderName?.includes('Mandvi'), 'Scenario 1: component 1 sub-folder shows its own city (Mandvi)');
         log('SCENARIO 1 component folderNames:', JSON.stringify(comps.map((c) => c.folderName)));
       }
     }
@@ -337,9 +343,11 @@ async function seedRegistry(window, { types, cities }) {
       const scenario2Json = JSON.parse(await fsp.readFile(jsonPath, 'utf8').catch(() => 'null'));
       if (scenario2Json) {
         const comps = scenario2Json.components || [];
+        // All-same-city event: shouldAppendCityToSubfolders is false, so NO
+        // sub-folder shows the city at all (it's redundant/obvious from context).
         const subFolderCityCounts = comps.map((c) => (c.folderName.match(/Surat/g) || []).length);
-        check(subFolderCityCounts[0] === 0 && subFolderCityCounts[1] === 0 && subFolderCityCounts[2] === 1,
-          `Scenario 2: sub-folder city only on the last component (got ${JSON.stringify(subFolderCityCounts)})`);
+        check(subFolderCityCounts[0] === 0 && subFolderCityCounts[1] === 0 && subFolderCityCounts[2] === 0,
+          `Scenario 2: all-same-city event shows city on NO sub-folder (got ${JSON.stringify(subFolderCityCounts)})`);
       }
     }
   }
