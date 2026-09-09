@@ -98,14 +98,18 @@ const EventCreator = (() => {
       .trim();
   }
 
-  // Sourced from renderer/folderNameHelper.js — tested independently there.
-  // City included only when allSameCity is false. Index must not change after first write.
+  // City appended only when appendCity is true — the caller computes this
+  // per component index via the shared consecutive-city-run rule
+  // (window.EventNamingRules.shouldAppendCity), never a global "all
+  // components share one city" flag (see BUG-### / fix commit: that
+  // approach duplicated the city on every run of 2+ consecutive
+  // same-city components). Index must not change after first write.
   // Folder-name keywords are interleaved within the event-tag section per folderPlacement.
-  function buildFolderName(comp, idx, allSameCity) {
+  function buildFolderName(comp, idx, appendCity) {
     const indexPart  = String(idx + 1).padStart(2, '0');
     const eventTypes = comp.eventTypes || [];
     const locationPart = comp.location?.label ? '-' + sanitizeForFolder(comp.location.label) : '';
-    const cityPart     = (!allSameCity && comp.city?.label) ? '-' + sanitizeForFolder(comp.city.label) : '';
+    const cityPart     = (appendCity && comp.city?.label) ? '-' + sanitizeForFolder(comp.city.label) : '';
 
     const kwToFolder = (comp.additionalKeywords || []).filter(k => k && k.useInFolderName);
 
@@ -2455,8 +2459,6 @@ ${unparseable.map(ev => `
         _showEventBanner('Internal error: component structure is invalid. Cannot save.', 'error');
         return;
       }
-      const _noRenameAllSameCity = _eventComps.length <= 1 ||
-        _eventComps.every(c => c.city?.label === _eventComps[0].city?.label);
       const noRenameCompsForDisk = JSON.parse(JSON.stringify(_eventComps)).map((c, idx) => ({
         id:                 c.id,
         types:              c.eventTypes.map(et => et.label),
@@ -2465,7 +2467,7 @@ ${unparseable.map(ev => `
         country:            c.country         || null,
         additionalKeywords: Array.isArray(c.additionalKeywords) && c.additionalKeywords.length ? c.additionalKeywords : undefined,
         isUnresolved:       false,
-        folderName:         c.folderName ?? buildFolderName(c, idx, _noRenameAllSameCity),
+        folderName:         c.folderName ?? buildFolderName(c, idx, window.EventNamingRules.shouldAppendCity(_eventComps, idx)),
       }));
       const _noRenameEffPath = _effectiveCollPath() || activeMaster?.path;
       if (_noRenameEffPath) {
@@ -2594,8 +2596,6 @@ ${unparseable.map(ev => `
     );
 
     // Update the scanned events cache so the list reflects the change.
-    const _renameAllSameCity = compsWithIds.length <= 1 ||
-      compsWithIds.every(c => c.city?.label === compsWithIds[0].city?.label);
     const compsForDisk = compsWithIds.map((c, idx) => ({
       id:                 c.id,
       types:              c.eventTypes.map(et => et.label),
@@ -2605,7 +2605,7 @@ ${unparseable.map(ev => `
       additionalKeywords: Array.isArray(c.additionalKeywords) && c.additionalKeywords.length ? c.additionalKeywords : undefined,
       isUnresolved:       false,
       // Preserve existing folderName (set once at creation — never recompute).
-      folderName:         c.folderName ?? buildFolderName(c, idx, _renameAllSameCity),
+      folderName:         c.folderName ?? buildFolderName(c, idx, window.EventNamingRules.shouldAppendCity(compsWithIds, idx)),
     }));
     if (!compsForDisk.every(c => typeof c.id === 'number')) {
       throw new Error('Invalid component structure: missing id');
@@ -3177,10 +3177,8 @@ ${unparseable.map(ev => `
     const warnEl = document.getElementById(`ecKwAdvWarn-${comp.id}`);
     if (!rowsEl) return;
 
-    const allSameCity = _eventComps.length <= 1 ||
-      _eventComps.every(c => c.city?.label === _eventComps[0].city?.label);
     const compIdx  = _eventComps.findIndex(c => c.id === comp.id);
-    const folderName = buildFolderName(comp, compIdx >= 0 ? compIdx : 0, allSameCity);
+    const folderName = buildFolderName(comp, compIdx >= 0 ? compIdx : 0, window.EventNamingRules.shouldAppendCity(_eventComps, compIdx >= 0 ? compIdx : 0));
     if (prevEl) prevEl.innerHTML = `<span class="ec-kw-adv-prev-label">Preview</span><code class="ec-kw-adv-prev-code">${esc(folderName)}</code>`;
     const kwInFolder = (comp.additionalKeywords || []).some(k => k.useInFolderName);
     if (warnEl) warnEl.hidden = !(kwInFolder && folderName.length > 160);
@@ -4038,8 +4036,14 @@ ${unparseable.map(ev => `
   function _buildCompString(comps) {
     if (!Array.isArray(comps) || comps.length === 0) return '';
 
-    const firstCity   = comps[0]?.city?.label || '';
-    const allSameCity = comps.every(c => (c.city?.label || '') === firstCity);
+    // Consecutive-city-run rule (see renderer/eventNamingRules.js) — replaces
+    // the previous global "all components share one city" flag, which
+    // duplicated the city on every run of 2+ consecutive same-city
+    // components. shouldAppendCity(comps, idx) naturally covers the
+    // all-same-city case too (the last component is always where its own
+    // run — the whole event, in that case — ends), so no separate
+    // trailing-append special case is needed.
+    const { shouldAppendCity } = window.EventNamingRules;
 
     const byMode = (k, mode, ai) => {
       const fp = k.folderPlacement;
@@ -4049,7 +4053,7 @@ ${unparseable.map(ev => `
     const byOrder = (a, b) => (a.folderPlacement?.order || 0) - (b.folderPlacement?.order || 0);
 
     const parts = [];
-    comps.forEach(comp => {
+    comps.forEach((comp, idx) => {
       const kwToFolder = (comp.additionalKeywords || []).filter(k => k && k.useInFolderName);
       const eventTypes = comp.eventTypes || [];
 
@@ -4066,9 +4070,8 @@ ${unparseable.map(ev => `
       }
 
       if (comp.location?.label) parts.push(comp.location.label);
-      if (!allSameCity && comp.city?.label) parts.push(comp.city.label);
+      if (shouldAppendCity(comps, idx) && comp.city?.label) parts.push(comp.city.label);
     });
-    if (allSameCity && firstCity) parts.push(firstCity);
 
     return sanitizeEventName(parts.join('-'));
   }
@@ -4228,8 +4231,6 @@ ${unparseable.map(ev => `
       // Component order here is the same order they appear in _eventComps (setEventState
       // always assigns ids 1…n in array order, so cleanComps is already position-ordered).
       // folderName is computed once at creation from this order and never recomputed.
-      const allSameCity = cleanComps.length <= 1 ||
-        cleanComps.every(c => c.city?.label === cleanComps[0].city?.label);
       const compsForDisk = cleanComps.map((c, idx) => ({
         types:              c.eventTypes.map(et => et.label),
         location:           c.location?.label || null,
@@ -4237,7 +4238,7 @@ ${unparseable.map(ev => `
         country:            c.country         || null,
         additionalKeywords: Array.isArray(c.additionalKeywords) && c.additionalKeywords.length ? c.additionalKeywords : undefined,
         isUnresolved:       false,
-        folderName:         buildFolderName(c, idx, allSameCity),
+        folderName:         buildFolderName(c, idx, window.EventNamingRules.shouldAppendCity(cleanComps, idx)),
       }));
 
       const collectionCode = document.getElementById('evCollectionCode')?.value?.trim() || _collectionCode || null;
@@ -4764,15 +4765,14 @@ ${unparseable.map(ev => `
 
   function _buildSubEventFolderNames(components) {
     // Prefer the persisted folderName (written at event creation, stable thereafter).
-    // Fallback: compute from current metadata for legacy events that predate this field.
-    // Note: the fallback always includes city, which may differ from the naming logic used
-    // at creation (which conditionally omits city when all components share one). This is
-    // acceptable for legacy events — no folder scanning or matching is attempted.
-    const allSameCity = components.length <= 1 ||
-      components.every(c => c.city?.label === components[0].city?.label);
+    // Fallback: compute from current metadata for legacy events that predate this field,
+    // using the same consecutive-city-run rule creation now uses (window.EventNamingRules).
+    // Note: for a legacy event created under an older naming implementation, this fallback
+    // may still differ from whatever that event's own folder names actually are — no folder
+    // scanning or matching is attempted; this is display-only and never renames anything.
     return components.map((comp, idx) => {
       if (comp.folderName != null) return comp.folderName;
-      return buildFolderName(comp, idx, allSameCity);
+      return buildFolderName(comp, idx, window.EventNamingRules.shouldAppendCity(components, idx));
     });
   }
 
