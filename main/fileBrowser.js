@@ -372,6 +372,73 @@ async function getShallowFolderTree(dirPath, maxDepth = 4, depth = 0, _state = {
   return node;
 }
 
+// CARD-mode tree depth: generous enough to comfortably cover real camera
+// layouts (DCIM/<numbered-folder>/<file> is 2 levels; even an unusually
+// nested Sony PRIVATE/M4ROOT/CLIP-style path is 3) while staying well
+// inside scanMediaRecursive's own MAX_SCAN_DEPTH (12) so no file that
+// scanMediaRecursive finds can end up without a matching directory node
+// to attach to.
+const CARD_TREE_MAX_DEPTH = 6;
+
+/**
+ * Attaches a flat media-file list (as returned by scanMediaRecursive) onto
+ * an existing directory-skeleton tree (as returned by getShallowFolderTree),
+ * by inserting each file into the child whose path is the file's own
+ * dirname. Mutates and returns `root`.
+ *
+ * Directory structure and media membership are two independent datasets —
+ * this is the one place they are combined, so that a directory's presence
+ * in the tree never depends on whether it (or any sibling) contains media.
+ * A file whose parent directory isn't present in the skeleton (possible
+ * only if the skeleton's own depth/node cap was hit — SKIP_DIRS and the
+ * hidden-dot-prefix rule are identical between the two scanners, so that is
+ * the only real source of divergence) is attached to the root rather than
+ * silently dropped, so no discovered file ever disappears.
+ */
+function attachFilesToTree(root, files) {
+  const nodesByPath = new Map();
+  (function index(node) {
+    nodesByPath.set(node.path, node);
+    for (const child of node.children || []) index(child);
+  })(root);
+
+  for (const file of files) {
+    const parentPath = path.dirname(file.path);
+    const node = nodesByPath.get(parentPath) || root;
+    node.files.push(file);
+  }
+
+  return root;
+}
+
+/**
+ * Builds the real CARD-mode folder tree: directory structure comes from
+ * getShallowFolderTree() (so every real, readable directory appears
+ * regardless of whether it or its descendants contain any media — the
+ * defect this function fixes: a prior implementation derived structure
+ * solely from scanMediaRecursive's own file-path list, so any directory
+ * with zero media anywhere beneath it, including the whole card when it
+ * had no media at all, was invisible), and media membership comes from
+ * scanMediaRecursive(). The two are independent datasets, combined once
+ * here via attachFilesToTree() -- never inferred from each other.
+ *
+ * Runs both scans in parallel: getShallowFolderTree does no file stat
+ * calls and is extremely fast; scanMediaRecursive is the slower, thorough
+ * pass and is the one that still drives progressive onBatch updates.
+ *
+ * @param {string} startDir
+ * @param {Function|null} onBatch  Forwarded to scanMediaRecursive unchanged.
+ * @returns {Promise<{tree: object, files: Array}>}
+ */
+async function buildCardFolderTree(startDir, onBatch = null) {
+  const [tree, files] = await Promise.all([
+    getShallowFolderTree(startDir, CARD_TREE_MAX_DEPTH),
+    scanMediaRecursive(startDir, onBatch),
+  ]);
+  attachFilesToTree(tree, files);
+  return { tree, files };
+}
+
 /**
  * Scans known Sony PRIVATE folder video paths.
  * Only checks two specific subdirectories — never recurses the full PRIVATE tree.
@@ -415,4 +482,4 @@ async function scanPrivateFolder(privatePath) {
   return results;
 }
 
-module.exports = { readDirectory, getDCIMPath, scanPrivateFolder, safeExists, scanMediaRecursive, buildFolderTree, getShallowFolderTree };
+module.exports = { readDirectory, getDCIMPath, scanPrivateFolder, safeExists, scanMediaRecursive, buildFolderTree, getShallowFolderTree, attachFilesToTree, buildCardFolderTree };
