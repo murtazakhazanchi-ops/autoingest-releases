@@ -5,7 +5,7 @@ const fs   = require('fs');
 const fsp  = require('fs').promises;
 const { execFile } = require('child_process');
 const { detectMemoryCards, listAllDrives } = require('./driveDetector');
-const { scanMediaRecursive, buildFolderTree, getShallowFolderTree, readDirectory } = require('./fileBrowser');
+const { scanMediaRecursive, getShallowFolderTree, readDirectory, buildCardFolderTree } = require('./fileBrowser');
 const { copyFiles, copyFileJobs, setPaused, getFileHash, abortCopy } = require('./fileManager');
 const { getThumbnail, shutdownWorkers } = require('../services/thumbnailer');
 const listManager  = require('./listManager');
@@ -418,7 +418,14 @@ ipcMain.handle('files:get', async (event, { drivePath, folderPath, requestId }) 
   // renderer has a stable non-null root. Folders list is empty in Commits 3-5.
   const dcimPathForUI = drivePath;
 
-  const files = await scanMediaRecursive(targetPath, (batch) => {
+  // Bugfix (2026-09): folder tree now comes from real directory enumeration
+  // (getShallowFolderTree, via buildCardFolderTree), not from the media-file
+  // list alone — a directory with zero media anywhere beneath it (including
+  // the whole card, on a freshly formatted or already-imported card) must
+  // still appear and be navigable. Media membership is still driven
+  // entirely by scanMediaRecursive; the two datasets are only combined,
+  // never inferred from each other.
+  const { tree: folderTree, files } = await buildCardFolderTree(targetPath, (batch) => {
     if (activeFileRequests.get(senderId) !== requestId) return; // Patch 22: superseded
     if (event.sender.isDestroyed()) return;
     event.sender.send('files:batch', {
@@ -440,8 +447,6 @@ ipcMain.handle('files:get', async (event, { drivePath, folderPath, requestId }) 
     return { dcimPath: dcimPathForUI, folderPath: targetPath, folders: [], files: [] };
   }
 
-  // Commit 6: build folder tree once from the complete file list and ship it.
-  const folderTree = buildFolderTree(files);
   return { dcimPath: dcimPathForUI, folderPath: targetPath, folders: folderTree, files };
 });
 
