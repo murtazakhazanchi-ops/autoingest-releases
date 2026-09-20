@@ -1790,13 +1790,40 @@
         "scripts/product-docs/knowledge-portal/index.html",
         "scripts/product-docs/test/knowledgeRelationshipVisibility.test.js",
         "scripts/product-docs/test/knowledgeNeighborhoodAdmission.test.js",
-        "scripts/product-docs/test/knowledgeHistoricalContext.test.js"
+        "scripts/product-docs/test/knowledgeHistoricalContext.test.js",
+        "scripts/product-docs/lib/askRetrieval/queryNormalization.js",
+        "scripts/product-docs/lib/askRetrieval/bm25Index.js",
+        "scripts/product-docs/lib/askRetrieval/canonicalAliases.js",
+        "scripts/product-docs/lib/askRetrieval/fusion.js",
+        "scripts/product-docs/lib/askRetrieval/retrieval.js",
+        "scripts/product-docs/test/askRetrieval/*.test.js",
+        "scripts/product-docs/bench/orchestrator/retrievalStage1Performance.js",
+        "scripts/product-docs/bench/results/retrieval-stage1-performance.json",
+        "scripts/product-docs/lib/askKnowledge/handles.js",
+        "scripts/product-docs/lib/askKnowledge/leakBoundary.js",
+        "scripts/product-docs/lib/askKnowledge/relationships.js",
+        "scripts/product-docs/lib/askKnowledge/decisionFacts.js",
+        "scripts/product-docs/lib/askKnowledge/sourcePrecedence.js",
+        "scripts/product-docs/lib/askKnowledge/capabilityStatus.js",
+        "scripts/product-docs/lib/askKnowledge/roadmapStatus.js",
+        "scripts/product-docs/lib/askKnowledge/search.js",
+        "scripts/product-docs/lib/askKnowledge/read.js",
+        "scripts/product-docs/lib/askKnowledge/validators.js",
+        "scripts/product-docs/lib/askKnowledge/index.js",
+        "scripts/product-docs/test/askKnowledge/*.test.js",
+        "scripts/product-docs/bench/orchestrator/stage2CorpusAudit.js",
+        "scripts/product-docs/bench/results/stage2-corpus-audit.json"
       ],
       "confidenceLevel": "explicit",
       "directBugs": [],
       "directDecisions": [
         "DEC-019",
-        "DEC-020"
+        "DEC-020",
+        "DEC-022",
+        "DEC-023",
+        "DEC-024",
+        "DEC-025",
+        "DEC-026"
       ],
       "directPostmortems": [],
       "evidenceNote": "Derived directly from features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md's header table and Lifecycle Metadata section.",
@@ -1806,7 +1833,12 @@
       "relatedBugs": [],
       "relatedDecisions": [
         "DEC-019",
-        "DEC-020"
+        "DEC-020",
+        "DEC-022",
+        "DEC-023",
+        "DEC-024",
+        "DEC-025",
+        "DEC-026"
       ],
       "relatedPostmortems": [],
       "roadmapIds": [

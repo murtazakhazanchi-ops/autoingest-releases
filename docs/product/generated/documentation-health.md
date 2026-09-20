@@ -2,7 +2,7 @@
 
 > Generated artifact. Implements the 13 rules specified in [14_VALIDATION_SPECIFICATION.md](../14_VALIDATION_SPECIFICATION.md) plus Part 4 tooling-integrity checks. Regenerate with `node scripts/product-docs/cli.js validate`.
 
-Generated against source commit `bba7925a6df25f9f7b1592f3c769e4bd621086a2`.
+Generated against source commit `823c9652ed3919a497737f8b43364cfcf1b32e3d`.
 
 ## Summary
 
@@ -44,9 +44,9 @@ None.
 
 | Rule | Message | File | Note |
 |---|---|---|---|
-| architecture-coverage | 40/58 features placed in the architectural-evolution relationship map | 11_ARCHITECTURAL_EVOLUTION.md | Unplaced: AI-FEAT-002, AI-FEAT-003, AI-FEAT-005, AI-FEAT-007, AI-FEAT-008, AI-FEAT-010, AI-FEAT-012, AI-FEAT-013, AI-FEAT-014, AI-FEAT-015, AI-FEAT-016, AI-FEAT-017, AI-FEAT-023, AI-FEAT-026, AI-FEAT-034, AI-FEAT-035, AI-FEAT-048, AI-FEAT-058 |
+| architecture-coverage | 41/58 features placed in the architectural-evolution relationship map | 11_ARCHITECTURAL_EVOLUTION.md | Unplaced: AI-FEAT-002, AI-FEAT-003, AI-FEAT-005, AI-FEAT-007, AI-FEAT-008, AI-FEAT-010, AI-FEAT-012, AI-FEAT-013, AI-FEAT-014, AI-FEAT-015, AI-FEAT-016, AI-FEAT-017, AI-FEAT-023, AI-FEAT-026, AI-FEAT-034, AI-FEAT-035, AI-FEAT-048 |
 | overlapping-active-decisions | 2 Accepted decisions (DEC-006, DEC-007) all govern the exact same feature/milestone set (AI-FEAT-029) — worth a human check that they don't contradict each other | DEC-006 | — |
-| overlapping-active-decisions | 2 Accepted decisions (DEC-019, DEC-020) all govern the exact same feature/milestone set (AI-FEAT-058) — worth a human check that they don't contradict each other | DEC-019 | — |
+| overlapping-active-decisions | 7 Accepted decisions (DEC-019, DEC-020, DEC-022, DEC-023, DEC-024, DEC-025, DEC-026) all govern the exact same feature/milestone set (AI-FEAT-058) — worth a human check that they don't contradict each other | DEC-019 | — |
 | shared-code-path | main/main.js is explicitly owned by 6 features (shared, not exclusive) | main/main.js | AI-FEAT-001, AI-FEAT-021, AI-FEAT-024, AI-FEAT-025, AI-FEAT-036, AI-FEAT-057 |
 | shared-code-path | main/preload.js is explicitly owned by 2 features (shared, not exclusive) | main/preload.js | AI-FEAT-001, AI-FEAT-057 |
 | shared-code-path | renderer/theme-init.js is explicitly owned by 2 features (shared, not exclusive) | renderer/theme-init.js | AI-FEAT-001, AI-FEAT-003 |

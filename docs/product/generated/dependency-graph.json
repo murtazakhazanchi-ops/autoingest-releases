@@ -3420,6 +3420,22 @@
     {
       "evidence_status": "explicit",
       "note": null,
+      "provenance_path": "bugs/BUG-019_ORCHESTRATOR_CAPABILITY_CLAIM_REGEX_MISSED_CONFIDENT_UNGROUNDED_ASSERTIONS.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-058",
+      "target": "BUG-019"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-020_ORCHESTRATOR_IDENTITY_CLAIM_VALIDATOR_FALSE_POSITIVE_ON_PLURAL_LABEL.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-058",
+      "target": "BUG-020"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
       "provenance_path": "features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md#lifecycle-metadata:Related-decisions",
       "relationship": "governed_by",
       "source": "AI-FEAT-058",
@@ -3448,6 +3464,86 @@
       "relationship": "governed_by",
       "source": "AI-FEAT-058",
       "target": "DEC-020"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-058",
+      "target": "DEC-022"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-022_ASK_AUTOINGEST_STAGE_1_DETERMINISTIC_RETRIEVAL_PRODUCTIONIZATION.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-058",
+      "target": "DEC-022"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-058",
+      "target": "DEC-023"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-023_ASK_AUTOINGEST_STAGE_2_DECISION_BACKED_KNOWLEDGE_AND_RELATIONSHIP_CONFLICT_POLICY.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-058",
+      "target": "DEC-023"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-058",
+      "target": "DEC-024"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-024_STAGE_2_1_CANONICAL_KNOWLEDGE_RELATIONSHIP_CORRECTIONS.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-058",
+      "target": "DEC-024"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-058",
+      "target": "DEC-025"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-025_ASK_AUTOINGEST_STAGE_3_QWEN_RUNTIME_FOUNDATION.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-058",
+      "target": "DEC-025"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-058",
+      "target": "DEC-026"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-026_ASK_AUTOINGEST_STAGE_4_ONE_BRAIN_ORCHESTRATOR_ARCHITECTURE.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-058",
+      "target": "DEC-026"
     },
     {
       "evidence_status": "explicit",
@@ -3792,6 +3888,46 @@
       "relationship": "governed_by",
       "source": "AI-RM-011",
       "target": "DEC-020"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-022_ASK_AUTOINGEST_STAGE_1_DETERMINISTIC_RETRIEVAL_PRODUCTIONIZATION.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-RM-011",
+      "target": "DEC-022"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-023_ASK_AUTOINGEST_STAGE_2_DECISION_BACKED_KNOWLEDGE_AND_RELATIONSHIP_CONFLICT_POLICY.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-RM-011",
+      "target": "DEC-023"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-024_STAGE_2_1_CANONICAL_KNOWLEDGE_RELATIONSHIP_CORRECTIONS.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-RM-011",
+      "target": "DEC-024"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-025_ASK_AUTOINGEST_STAGE_3_QWEN_RUNTIME_FOUNDATION.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-RM-011",
+      "target": "DEC-025"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-026_ASK_AUTOINGEST_STAGE_4_ONE_BRAIN_ORCHESTRATOR_ARCHITECTURE.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-RM-011",
+      "target": "DEC-026"
     },
     {
       "evidence_status": "explicit",
@@ -4435,6 +4571,38 @@
     },
     {
       "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-019_ORCHESTRATOR_CAPABILITY_CLAIM_REGEX_MISSED_CONFIDENT_UNGROUNDED_ASSERTIONS.md#related",
+      "relationship": "related_to",
+      "source": "BUG-019",
+      "target": "BUG-020"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-019_ORCHESTRATOR_CAPABILITY_CLAIM_REGEX_MISSED_CONFIDENT_UNGROUNDED_ASSERTIONS.md#related",
+      "relationship": "shaped_by_decision",
+      "source": "BUG-019",
+      "target": "DEC-026"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-020_ORCHESTRATOR_IDENTITY_CLAIM_VALIDATOR_FALSE_POSITIVE_ON_PLURAL_LABEL.md#related",
+      "relationship": "related_to",
+      "source": "BUG-020",
+      "target": "BUG-019"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-020_ORCHESTRATOR_IDENTITY_CLAIM_VALIDATOR_FALSE_POSITIVE_ON_PLURAL_LABEL.md#related",
+      "relationship": "shaped_by_decision",
+      "source": "BUG-020",
+      "target": "DEC-026"
+    },
+    {
+      "evidence_status": "explicit",
       "note": "decision-to-decision body reference",
       "provenance_path": "decisions/DEC-003_LOCAL_FIRST_ON_PREMISES_ARCHITECTURE.md#body",
       "relationship": "related_to",
@@ -4568,6 +4736,54 @@
       "relationship": "related_to",
       "source": "DEC-020",
       "target": "DEC-021"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "decision-to-decision body reference",
+      "provenance_path": "decisions/DEC-022_ASK_AUTOINGEST_STAGE_1_DETERMINISTIC_RETRIEVAL_PRODUCTIONIZATION.md#body",
+      "relationship": "related_to",
+      "source": "DEC-022",
+      "target": "DEC-019"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "decision-to-decision body reference",
+      "provenance_path": "decisions/DEC-023_ASK_AUTOINGEST_STAGE_2_DECISION_BACKED_KNOWLEDGE_AND_RELATIONSHIP_CONFLICT_POLICY.md#body",
+      "relationship": "related_to",
+      "source": "DEC-023",
+      "target": "DEC-022"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "decision-to-decision body reference",
+      "provenance_path": "decisions/DEC-024_STAGE_2_1_CANONICAL_KNOWLEDGE_RELATIONSHIP_CORRECTIONS.md#body",
+      "relationship": "related_to",
+      "source": "DEC-024",
+      "target": "DEC-011"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "decision-to-decision body reference",
+      "provenance_path": "decisions/DEC-024_STAGE_2_1_CANONICAL_KNOWLEDGE_RELATIONSHIP_CORRECTIONS.md#body",
+      "relationship": "related_to",
+      "source": "DEC-024",
+      "target": "DEC-023"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "decision-to-decision body reference",
+      "provenance_path": "decisions/DEC-026_ASK_AUTOINGEST_STAGE_4_ONE_BRAIN_ORCHESTRATOR_ARCHITECTURE.md#body",
+      "relationship": "related_to",
+      "source": "DEC-026",
+      "target": "DEC-024"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "decision-to-decision body reference",
+      "provenance_path": "decisions/DEC-026_ASK_AUTOINGEST_STAGE_4_ONE_BRAIN_ORCHESTRATOR_ARCHITECTURE.md#body",
+      "relationship": "related_to",
+      "source": "DEC-026",
+      "target": "DEC-025"
     },
     {
       "evidence_status": "explicit",
@@ -5406,6 +5622,12 @@
       "type": "architecture_section"
     },
     {
+      "doc_path": "11_ARCHITECTURAL_EVOLUTION.md#knowledge-onboarding-ask-autoingest",
+      "id": "ARCH-knowledge-onboarding-ask-autoingest",
+      "label": "Knowledge & Onboarding — Ask AutoIngest",
+      "type": "architecture_section"
+    },
+    {
       "doc_path": "11_ARCHITECTURAL_EVOLUTION.md#multi-channel-release-architecture",
       "id": "ARCH-multi-channel-release-architecture",
       "label": "Multi-Channel Release Architecture",
@@ -5517,6 +5739,18 @@
       "doc_path": "bugs/BUG-018_TELEMETRY_IMPORT_FAILURE_REPORT_INCLUDES_ARCHIVE_DESTINATION_PATH.md",
       "id": "BUG-018",
       "label": "Telemetry Import-Failure Report Includes the Real Archive Destination Path",
+      "type": "bug"
+    },
+    {
+      "doc_path": "bugs/BUG-019_ORCHESTRATOR_CAPABILITY_CLAIM_REGEX_MISSED_CONFIDENT_UNGROUNDED_ASSERTIONS.md",
+      "id": "BUG-019",
+      "label": "Orchestrator capability-claim regex missed confident, ungrounded assertions",
+      "type": "bug"
+    },
+    {
+      "doc_path": "bugs/BUG-020_ORCHESTRATOR_IDENTITY_CLAIM_VALIDATOR_FALSE_POSITIVE_ON_PLURAL_LABEL.md",
+      "id": "BUG-020",
+      "label": "Orchestrator identity-claim validator false-positived on a plural bolded label, causing a reproducible long-conversation fallback cluster",
       "type": "bug"
     },
     {
@@ -5643,6 +5877,36 @@
       "doc_path": "decisions/DEC-021_TRANSFER_EXPORT_PROCESS_LOCAL_LOCK_ACCEPTED_FOR_PRESENT_OPERATIONAL_MODEL.md",
       "id": "DEC-021",
       "label": "Transfer Export Process-Local Lock Accepted for Present Operational Model",
+      "type": "decision"
+    },
+    {
+      "doc_path": "decisions/DEC-022_ASK_AUTOINGEST_STAGE_1_DETERMINISTIC_RETRIEVAL_PRODUCTIONIZATION.md",
+      "id": "DEC-022",
+      "label": "Ask AutoIngest Stage 1: Deterministic Retrieval Foundation Productionized, Decision-Text Enrichment Kept Opt-In",
+      "type": "decision"
+    },
+    {
+      "doc_path": "decisions/DEC-023_ASK_AUTOINGEST_STAGE_2_DECISION_BACKED_KNOWLEDGE_AND_RELATIONSHIP_CONFLICT_POLICY.md",
+      "id": "DEC-023",
+      "label": "Ask AutoIngest Stage 2: Decision-Backed Knowledge Policy Resolved (Reads Yes, Retrieval-Surface No), Relationship CONFLICT State Corrected Against Real Data",
+      "type": "decision"
+    },
+    {
+      "doc_path": "decisions/DEC-024_STAGE_2_1_CANONICAL_KNOWLEDGE_RELATIONSHIP_CORRECTIONS.md",
+      "id": "DEC-024",
+      "label": "Stage 2.1: Canonical Knowledge Relationship Corrections (Transfer Export/Import, QMZ, event.json Contract)",
+      "type": "decision"
+    },
+    {
+      "doc_path": "decisions/DEC-025_ASK_AUTOINGEST_STAGE_3_QWEN_RUNTIME_FOUNDATION.md",
+      "id": "DEC-025",
+      "label": "Ask AutoIngest Stage 3: Qwen Runtime Isolation Boundary, Cancellation Strategy, and Honest Acquisition State",
+      "type": "decision"
+    },
+    {
+      "doc_path": "decisions/DEC-026_ASK_AUTOINGEST_STAGE_4_ONE_BRAIN_ORCHESTRATOR_ARCHITECTURE.md",
+      "id": "DEC-026",
+      "label": "Ask AutoIngest Stage 4: One-Brain Orchestrator Architecture",
       "type": "decision"
     },
     {
