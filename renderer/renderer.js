@@ -1225,18 +1225,21 @@ function _ecPanelOpen() {
 }
 
 function showEventCreator() {
-  // Entering event creator invalidates any existing group→sub-event mappings
+  // Entering event creator from the landing screen invalidates any existing group→sub-event
+  // mappings (there is no open Import workspace to return to) — a true session boundary.
   _clearHeroLastImportArea();
-  GroupManager.reset();
+  ImportSession.reset();
   renderGroupPanel();
   _ecPanelOpen();
   EventCreator.start();
 }
 
 function showEventCreatorResume() {
-  // Re-entering to change the event also invalidates existing group mappings
+  // Changing the event from the LANDING screen also invalidates existing group mappings.
+  // (From inside an open Import workspace use openEventPickerFromWorkspace(), which keeps
+  // every event's assignments — see importSessionUI.js.)
   _clearHeroLastImportArea();
-  GroupManager.reset();
+  ImportSession.reset();
   renderGroupPanel();
   _ecPanelOpen();
   EventCreator.resetToList();
@@ -1260,7 +1263,7 @@ function showLanding() {
 function resetWorkspaceState() {
   activeSource = null;
   activeDrive  = null;
-  GroupManager.reset();
+  ImportSession.reset();   // source session over — every event's assignments go with it
   setRailMode('card');
 }
 
@@ -3065,7 +3068,10 @@ async function selectLocalFolder() {
 }
 
 document.getElementById('ecBackBtn')?.addEventListener('click', () => {
-  if (!EventCreator.navigateBack()) showLanding();
+  if (!EventCreator.navigateBack()) {
+    if (_ecReturnsToWorkspace()) _returnToWorkspaceFromPicker(true);
+    else showLanding();
+  }
 });
 document.getElementById('emmBackBtn')?.addEventListener('click', () => EventMgmt.handleBack());
 document.getElementById('emmContinueBtn')?.addEventListener('click', async () => {
@@ -3147,14 +3153,24 @@ document.addEventListener('eventcreator:listDeselect', () => {
   const seq = document.getElementById('emmSeqFoldersBtn');
   if (seq) seq.style.display = 'none';
 });
-document.addEventListener('eventmgmt:requestClose', showLanding);
+document.addEventListener('eventmgmt:requestClose', () => {
+  // Picker opened from the Import workspace → dismissing it returns to that same workspace.
+  if (_ecReturnsToWorkspace()) { _returnToWorkspaceFromPicker(true); return; }
+  showLanding();
+});
 document.addEventListener('eventcreator:openArchiveLocations', () => _alocOpen());
 document.addEventListener('eventcreator:done', () => {
   if (EventCreator.consumeMetaOutdated()) {
     const _savedEventPath = EventCreator.getActiveEventData()?.eventPath || null;
     if (_savedEventPath) _metaOutdatedPath = _savedEventPath;
   }
-  GroupManager.reset();
+  if (_ecReturnsToWorkspace()) {
+    // Opened from the Import workspace: keep every event's assignments, switch the Current
+    // Event, and return to the SAME source workspace (no landing screen, no rescan).
+    _returnToWorkspaceFromPicker(false).then(() => _renderMetaTitleIndicator());
+    return;
+  }
+  ImportSession.reset();
   renderGroupPanel();
   showLanding();
   _renderMetaTitleIndicator();
@@ -5640,6 +5656,7 @@ function renderDrives(cards) {
     const stillPresent = cards.some(c => c.mountpoint === activeDrive.mountpoint);
     if (!stillPresent) {
       window.api.abortCopy();
+      _multiImportAbort = true;   // a multi-event run must not start its next event
       importRunning = false;
       document.getElementById('progressOverlay').classList.remove('visible');
       showMessage('Card disconnected. Import cancelled.');
@@ -5820,7 +5837,7 @@ async function selectSource({ type, path, label = null, driveObj = null }) {
   currentFolderContext = { path: null, files: [], isRoot: true, isLeaf: false };
   selectedFiles.clear(); currentFiles = []; lastClickedPath = null; _selectionAnchor = null; _prevFocusPath = null; tileMap = new Map();
   resetViewCache();
-  GroupManager.reset();
+  ImportSession.reset();   // new/changed source → previous source's assignments must not carry over
   renderGroupPanel();
 
   // ── External Drive / Local Folder: instant workspace, scan only on folder selection ──
@@ -5947,7 +5964,7 @@ function resetAppState({ preserveEvent = false } = {}) {
   currentFiles = [];
   destFileCache = new Map();
   resetViewCache();
-  GroupManager.reset();
+  ImportSession.reset();   // eject / disconnect / reset — the source session ends here
   renderGroupPanel();
 
   // Clear tileMap and disconnect observer
@@ -6795,6 +6812,7 @@ function buildSectionHtml({ key, label, icon, files }) {
 }
 
 function buildIconTilesHtml(files, enablePairing = false) {
+  const _evCtx = _eventBadgeCtx();
   return files.map((file, i) => {
     const checked  = selectedFiles.has(file.path);
     const imported = isAlreadyImported(file);
@@ -6813,6 +6831,7 @@ function buildIconTilesHtml(files, enablePairing = false) {
     const grpBadge      = grp
       ? `<div class="file-group-badge" style="--group-color:${GroupManager.getGroupColor(GroupManager.getGroupIndex(grp.id))}">${grp.label}</div>`
       : '';
+    const evBadge   = _eventBadgeHtmlIcon(file.path, _evCtx);
 
     return `<div class="${tileCls}" data-path="${escapeHtml(file.path)}" data-size="${file.size}" data-base="${escapeHtml(base)}" draggable="true">
       <input type="checkbox" ${checked ? 'checked' : ''} data-path="${escapeHtml(file.path)}" />
@@ -6828,7 +6847,7 @@ function buildIconTilesHtml(files, enablePairing = false) {
             </div>
             <div class="file-date">${formatDate(file.modifiedAt)}</div>
           </div>
-          <div class="file-meta-right">${grpBadge}</div>
+          <div class="file-meta-right">${evBadge}${grpBadge}</div>
         </div>
       </div>
     </div>`;
@@ -6836,6 +6855,7 @@ function buildIconTilesHtml(files, enablePairing = false) {
 }
 
 function buildListRowsHtml(files, enablePairing = false) {
+  const _evCtx = _eventBadgeCtx();
   return files.map((file, i) => {
     const checked  = selectedFiles.has(file.path);
     const imported = isAlreadyImported(file);
@@ -6854,11 +6874,12 @@ function buildListRowsHtml(files, enablePairing = false) {
     const grpLabel = grpR
       ? `<span class="grp-badge-list" style="--group-color:${GroupManager.getGroupColor(GroupManager.getGroupIndex(grpR.id))}">${grpR.label}</span>`
       : '';
+    const evLabel  = _eventBadgeHtmlList(file.path, _evCtx);
 
     return `<tr class="${rowCls}" data-path="${escapeHtml(file.path)}" data-size="${file.size}" data-base="${escapeHtml(base)}" draggable="true">
       <td class="lt-check"><input type="checkbox" ${checked ? 'checked' : ''} data-path="${escapeHtml(file.path)}" /></td>
       <td class="lt-thumb"><div class="list-thumb">${thumbHtml(file)}</div></td>
-      <td class="lt-name"><span class="file-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</span>${dupLabel}${grpLabel}</td>
+      <td class="lt-name"><span class="file-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</span>${dupLabel}${evLabel}${grpLabel}</td>
       <td class="lt-type"><span class="file-ext-badge ${badgeCls}">${extUp}</span></td>
       <td class="lt-size">${formatSize(file.size)}</td>
       <td class="lt-date">${formatDate(file.modifiedAt)}</td>
@@ -7390,6 +7411,8 @@ function updateSelectionBar() {
   importBtn.innerHTML = hasGroupedFiles
     ? `${SVG.download} Import Groups`
     : `${SVG.download} Import Selected`;
+
+  _syncSessionSelectionUI();   // Assign/Unassign buttons, session strip, "Import N Assigned Files"
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -7912,6 +7935,11 @@ function showProgress() {
     if (_pa) _pa.style.display = '';
   }
   document.getElementById('progressOverlay').classList.add('visible');
+  const _pel = document.getElementById('progressEventLabel');
+  if (_pel) _pel.style.display = 'none';   // only multi-event runs show "Event 2 of 3"
+  // Per-event artefacts of a previous multi-event run must never leak into the next import's modal.
+  document.querySelectorAll('#progressSummary .sess-run-list, #progressSummary .sess-run-note, #progressModal [id^="qmzSortBtn-"]')
+    .forEach(el => el.remove());
   document.getElementById('progressSummary').classList.remove('visible');
   document.getElementById('progressDoneBtn').classList.remove('visible');
   document.getElementById('progressFill').style.width = '0%';
@@ -8085,7 +8113,7 @@ function _pollProgressSummaryMetadataState(eventFolderPath, attemptsLeft = 10) {
   }).catch(() => {});
 }
 
-function showProgressSummary({ copied, skipped, errors, skippedReasons, failedFiles, duration, integrity, copiedFiles }, importCleanupRoot = null, eventFolderPath = null) {
+function showProgressSummary({ copied, skipped, errors, skippedReasons, failedFiles, duration, integrity, copiedFiles }, importCleanupRoot = null, eventFolderPath = null, opts = {}) {
   // "Imports This Session": count files actually copied in this import run. This is the only
   // place the session counter grows — Transfer Export/Import never reach here.
   _importsThisSession += (Number(copied) || 0);
@@ -8192,8 +8220,19 @@ function showProgressSummary({ copied, skipped, errors, skippedReasons, failedFi
   }
 
   // ── Sort QMZ Photos button — only when the active event has a QMZ component ─
-  if (actLeft && !modal.querySelector('#qmzSortBtn') && copiedFiles && copiedFiles.length > 0) {
-    const eData      = (typeof EventCreator !== 'undefined') ? EventCreator.getActiveEventData() : null;
+  // Multi-event runs pass opts.skipQmz and add one button PER EVENT via _appendQmzSortButton,
+  // because the active event is not necessarily the event a file was imported into.
+  if (!opts.skipQmz) {
+    _appendQmzSortButton(actLeft, modal, (typeof EventCreator !== 'undefined') ? EventCreator.getActiveEventData() : null, copiedFiles, 'qmzSortBtn', 'Sort QMZ Photos');
+  }
+}
+
+/**
+ * Adds a "Sort QMZ Photos" button to the import summary for the event `eData` when it has a QMZ
+ * component. `eData` is passed explicitly (unlike the old inline block, which read the ACTIVE event).
+ */
+function _appendQmzSortButton(actLeft, modal, eData, copiedFiles, btnId, label) {
+  if (actLeft && modal && !modal.querySelector('#' + btnId) && copiedFiles && copiedFiles.length > 0) {
     const components = eData?.event?.components || [];
     const qmzComp    = components.find(c => c.eventTypes?.some(t => t.label === 'QMZ'));
     if (qmzComp) {
@@ -8223,9 +8262,9 @@ function showProgressSummary({ copied, skipped, errors, skippedReasons, failedFi
         componentTitle: (components.length > 1 && qmzComp.folderName) ? qmzComp.folderName : null,
       };
       const qmzBtn = document.createElement('button');
-      qmzBtn.id          = 'qmzSortBtn';
+      qmzBtn.id          = btnId;
       qmzBtn.className   = 'im-btn-secondary';
-      qmzBtn.textContent = 'Sort QMZ Photos';
+      qmzBtn.textContent = label;
       qmzBtn.addEventListener('click', () => openQMZManager(derivedRoot, evtCtx));
       actLeft.appendChild(qmzBtn);
     }
@@ -8258,13 +8297,24 @@ let _alLastImportEntries     = [];   // cached on each AL render; used for error
 let _metaBatchGroupsSnapshot = null; // [{label, metadataTags, fileCount}] captured at batch_start for AL breakdown
 let _metaDurableRun          = null; // lastMetadataRun loaded from event.json {status,processed,failed,skipped,timestamp,metadataSummary}
 let _metaDurableRunPath      = null; // event path that _metaDurableRun was loaded for
-let _pendingLfSyncManifest   = null; // { batchId, importId, photographer, fileCount, localEventPath, eventName, collectionName, importedAt } — set after Local First import; cleared on batch_complete/batch_error
+// Per-batch metadata bookkeeping. A multi-event import runs one metadata batch PER EVENT and they
+// overlap, so anything batch-specific (which event a batch belongs to, its pending Local First
+// sync manifest) is keyed by batchId here rather than held in single slots. The scalar `_metaBatch*`
+// globals above remain a mirror of the most recently STARTED batch, which every existing status
+// consumer already scopes by `_metaBatchEventPath`.
+const _metaTracker = MetadataBatchTracker.create();
 
-async function _writeLocalFirstManifest(metadataStatus) {
-  const pending = _pendingLfSyncManifest;
+/** Register a Local First sync manifest for its own batch; written when THAT batch finishes. */
+function _lfRegisterManifest(manifest) {
+  const { writeNow } = _metaTracker.registerManifest(manifest);
+  // Metadata for this batch already finished before the import reply was processed: write now
+  // instead of silently dropping the manifest.
+  if (writeNow) _writeLocalFirstManifest(manifest.batchId, writeNow.status, manifest);
+}
+
+async function _writeLocalFirstManifest(batchId, metadataStatus, preTaken = null) {
+  const pending = preTaken || _metaTracker.takeManifest(batchId);
   if (!pending) return;
-  if (_metaBatchId !== pending.batchId) return;
-  _pendingLfSyncManifest = null;
   // Files are always ready for archive copy after a local import, regardless of metadata
   // result. needsAttention flags the metadata issue separately so the operator is informed
   // but is not blocked from syncing files to the archive.
@@ -8304,22 +8354,25 @@ window.api.onMetadataProgress((progress) => {
     _metaBatchErrors    = [];
     _metaBatchTimestamp = null; // clear until batch_complete
     _mtiShowingCompleted = false;
-    _metaBatchEventPath  = EventCreator.getActiveEventData()?.eventPath || null;
-    // Snapshot groups for AL breakdown before GroupManager state can change.
-    _metaBatchGroupsSnapshot = (isMetadataGroupingMode() && GroupManager.hasGroups())
-      ? GroupManager.getGroups().map(g => ({
-          label:        g.label,
-          metadataTags: g.metadataTags,
-          fileCount:    g.files.size,
-        }))
-      : null;
+    // The batch's OWN event: the payload carries it for multi-event imports (main echoes the identity
+    // the renderer supplied); only when absent (single-event import, retry/reapply) does this fall back
+    // to the active event, exactly as before. Never infer it from Current Event UI state otherwise.
+    const _startedRec = _metaTracker.start(progress, EventCreator.getActiveEventData()?.eventPath || null);
+    _metaBatchEventPath  = _startedRec.eventPath;
+    // Snapshot groups for AL breakdown before group state can change — from THIS batch's event.
+    _metaBatchGroupsSnapshot = _metaGroupsSnapshotFor(progress.eventPath);
     _renderMetadataBadge();
     _renderMetaTitleIndicator();
     _refreshMetadataSyncCard();
     return;
   }
 
-  if (progress.batchId !== _metaBatchId) return;
+  const _applied = _metaTracker.apply(progress);
+  if (!_applied) return;                       // unknown batch — ignored, as before
+  if (progress.batchId !== _metaBatchId) {     // an earlier batch (another event) still finishing
+    _onBackgroundMetadataBatch(progress, _applied);
+    return;
+  }
 
   if (progress.event === 'file_done') {
     _metaBatchDone    = progress.done    || 0;
@@ -8366,7 +8419,7 @@ window.api.onMetadataProgress((progress) => {
       _metaRetryPending = false;
       showMessage('Retry completed — all files tagged', 6000);
     }
-    _pendingLfSyncManifest && _writeLocalFirstManifest('complete');
+    _writeLocalFirstManifest(progress.batchId, 'complete');
     return;
   }
 
@@ -8387,9 +8440,50 @@ window.api.onMetadataProgress((progress) => {
     _msRefreshStripAutoIngestValue();
     _refreshMetadataSyncCard();
     _refreshAlErrorsPanel();
-    _pendingLfSyncManifest && _writeLocalFirstManifest('failed');
+    _writeLocalFirstManifest(progress.batchId, 'failed');
   }
 });
+
+/**
+ * AL breakdown snapshot for a starting batch. With an eventPath in the payload (multi-event) it is
+ * taken from THAT event's isolated workspace; otherwise from the current event, as before.
+ */
+function _metaGroupsSnapshotFor(eventPath) {
+  const ws = eventPath ? ImportSession.listWorkspaces().find(w => w.eventData?.eventPath === eventPath) : null;
+  // A payload that names its event but whose workspace is gone (session reset mid-run) must not fall back to the
+  // CURRENT event's groups — that would attribute another event's breakdown to this batch.
+  if (eventPath && !ws) return null;
+  const groups = ws ? ws.groups : GroupManager;
+  const metaMode = ws
+    ? importMode === 'event' && ImportSession.metaGroupingTags(ws.eventData?.event?.components).length > 1
+    : isMetadataGroupingMode();
+  return (metaMode && groups.hasGroups())
+    ? groups.getGroups().map(g => ({ label: g.label, metadataTags: g.metadataTags, fileCount: g.files.size }))
+    : null;
+}
+
+/**
+ * A batch other than the most recently started one reached a terminal state (event A's metadata
+ * finishing while event B is importing). Its own Local First manifest is written, and its event's
+ * durable state is refreshed if that event is the one on screen. Badge/toast/counters keep following
+ * the latest batch, as before.
+ */
+function _onBackgroundMetadataBatch(progress, applied) {
+  if (!applied.terminal) return;
+  if (applied.firstTerminal) {
+    _writeLocalFirstManifest(progress.batchId, progress.event === 'batch_complete' ? 'complete' : 'failed');
+  }
+  const path = applied.rec.eventPath;
+  const active = EventCreator.getActiveEventData()?.eventPath || null;
+  if (path && (path === active || path === _alCurrentEventPath)) {
+    _loadDurableMetaRun(path).then(() => {
+      _refreshAlMetadataPanel();
+      _refreshMsApplyStatusPanel();
+      _msRefreshStripAutoIngestValue();
+      _refreshMetadataSyncCard();
+    });
+  }
+}
 
 function _renderMetadataBadge() {
   const badge = document.getElementById('metadataProgressBadge');
@@ -10222,6 +10316,13 @@ document.addEventListener('keydown', e => {
 document.getElementById('importBtn').addEventListener('click', async () => {
   if (importRunning) return;
 
+  // Multi-event session (files assigned to events beyond / other than the Current Event's own
+  // groups): one plan, one runner (importSessionUI.js). Whenever the session is just a one-event,
+  // groups-only workflow, the proven single-event path below runs UNCHANGED — a deliberate,
+  // transitional regression-safety decision; the intended end state is one runner fed a one-event plan.
+  if (importMode === 'event' && !ImportSession.isLegacyEligible()) { await runSessionImport(); return; }
+  _importWasSession = false;
+
   const eventData = EventCreator.getActiveEventData();
   const mode = importMode;
 
@@ -10493,7 +10594,7 @@ document.getElementById('importBtn').addEventListener('click', async () => {
 
         if (summary.metadataBatchId) {
           // Metadata running — write manifest job after batch_complete / batch_error
-          _pendingLfSyncManifest = {
+          _lfRegisterManifest({
             batchId:        summary.metadataBatchId,
             importId:       _lfImportId,
             photographer:   photographer || '',
@@ -10503,7 +10604,7 @@ document.getElementById('importBtn').addEventListener('click', async () => {
             eventName:      eventData.event?.name || '',
             collectionName: _lfCollName,
             importedAt:     _lfImportedAt,
-          };
+          });
         } else {
           // Auto-metadata disabled — write manifest job immediately
           window.api.appendSyncJob(_txEventPath, {
@@ -11195,7 +11296,10 @@ function _continueImporting() {
   _selectionAnchor = null;
   _prevFocusPath   = null;
 
-  GroupManager.reset();
+  // Single-event import: dissolve the current event's groups (unchanged behaviour). After a
+  // multi-event session run, completed events were already cleared and failed / not-started
+  // ones must stay assigned for retry — so nothing is reset in that case.
+  if (!_importWasSession) GroupManager.reset();
   renderGroupPanel();
 
   _closeProgressModal(); // closes overlay, syncs badges, updates selection bar
@@ -11217,7 +11321,7 @@ function _exitToHome() {
   _selectionAnchor = null; _prevFocusPath = null; tileMap = new Map();
   resetViewCache();
 
-  GroupManager.reset();
+  ImportSession.reset();   // leaving to the home screen ends the source session
   renderGroupPanel();
 
   document.getElementById('workspace').classList.remove('visible');
@@ -12263,6 +12367,8 @@ function syncGroupBadge(path) {
 
 function syncAllGroupBadges() {
   for (const [path] of tileMap) syncGroupBadge(path);
+  syncAllEventBadges();   // event ownership badges follow every group/ownership change
+  _renderSessionStrip();
 }
 
 // ── Portal dropdown (sub-event assignment) ────────────────────────────────
@@ -12570,6 +12676,7 @@ function _updateMetaGroupHint() {
 }
 
 function renderGroupPanel() {
+  _renderSessionStrip();   // ownership may have changed wherever the panel is re-rendered
   Dropdown.close();        // close sub-event picker
   MetaPicker.closeQuiet(); // close keyword picker without triggering re-render
 
@@ -12856,7 +12963,9 @@ document.addEventListener('keydown', e => {
 
   const existing = GroupManager.getGroups().find(g => g.id === n);
   const gid      = existing ? existing.id : GroupManager.createGroup();
+  ImportSession.takeLastClaim();   // flush any stale claim info before this assignment
   GroupManager.assignFiles([...selectedFiles], gid);
+  const _claimInfo = ImportSession.takeLastClaim();
 
   // Auto-deselect — no renderFileArea(), just tile class sync
   selectedFiles.clear();
@@ -12864,7 +12973,8 @@ document.addEventListener('keydown', e => {
   syncAllGroupBadges();
   renderGroupPanel();
 
-  _showChordToast(`Assigned to G${gid}`, 'success');
+  _showChordToast(`Assigned to G${gid}` + (_claimInfo && _claimInfo.reassigned > 0
+    ? ` (${_claimInfo.reassigned} moved from ${_claimInfo.fromOrdinals.map(o => 'E' + o).join(', ')})` : ''), 'success');
   _hideChordToast(1200);
 });
 
