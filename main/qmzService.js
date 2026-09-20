@@ -9,6 +9,16 @@ const config = require('../config/app.config');
 const STATE_FILE  = 'qmz-sequences.json';
 const UNSEQUENCED = '_Unsequenced';
 const SEQ_RE      = /^\d{2}[QMZ]$/;
+// Mirrors services/photographerSequenceService.js's PC_PREFIX_RE — duplicated
+// locally rather than imported, matching this file's existing convention of
+// staying decoupled from other main-process modules (see mediaType/isJunkFile
+// above). Used only to recognize the malformed-but-unambiguous
+// "PCxx-_Unsequenced" shape a pre-fix photographer-sequencing run can have
+// left behind (bug: qmz-nested-unsequenced) — never to rename anything.
+const PC_PREFIX_RE = /^PC(\d{2,3})-/;
+function _stripPcPrefix(name) {
+  return (name || '').replace(PC_PREFIX_RE, '');
+}
 const LETTER_TYPE = { Q: 'Qadam', M: 'Majlis', Z: 'Ziyafat' };
 const LETTER_MAX  = { Q: 50, M: 51, Z: 52 };
 const MEDIA_EXT   = new Set([...config.PHOTO_EXTENSIONS, ...config.VIDEO_EXTENSIONS]);
@@ -41,6 +51,16 @@ const VIDEO_EXTS  = new Set(config.VIDEO_EXTENSIONS);
 // below. Never writes anything — read-only, exactly like readFileTags itself.
 const EXIF_DATE_TIMEOUT_MS     = 500; // exifr — fast in-process parse
 const RAW_EXIF_TIMEOUT_MS      = 800; // ExifTool — persistent process + possible NAS round-trip
+// Bug 2 perf fix: listMediaFiles() used to read each RAW file's capture date
+// one at a time (`for (...) await readCaptureDate(...)`), serializing every
+// ExifTool round-trip — measured at 100-400ms+ each even against tiny
+// placeholder files, so a single ~1200-RAW photographer folder over SMB
+// stalled the entire QMZ workspace open for minutes. Bounded to match
+// main/exifService.js's own ExifTool pool size (`maxProcs: 4`) so this
+// actually exploits the pool's real parallel capacity instead of leaving
+// most of it idle, without over-saturating a pool shared with other
+// in-flight metadata work (import, repair).
+const CAPTURE_DATE_CONCURRENCY = 4;
 // Cache avoids re-reading EXIF on every _qmzRefresh() rescan for files that
 // haven't changed. Keyed like the thumbnail cache (path+size+mtime) so a
 // moved/renamed file (new path after sequence assignment) or a genuinely
@@ -131,6 +151,28 @@ function letterToType(letter) {
   return LETTER_TYPE[String(letter ?? '').toUpperCase()] ?? null;
 }
 
+// Runs `worker` over `items` with at most `limit` concurrent in flight at
+// once, preserving input order in the returned array regardless of which
+// worker finishes first (each worker writes to its own fixed index). No new
+// dependency for a small, well-understood pattern — used by
+// listMediaFiles() to bound its ExifTool/stat round-trips (see
+// CAPTURE_DATE_CONCURRENCY) instead of a raw Promise.all (unbounded — would
+// fire hundreds/thousands of concurrent ExifTool calls at once) or a
+// sequential for-loop (the one-at-a-time stall this was written to fix).
+async function _mapWithConcurrency(items, limit, worker) {
+  const results = new Array(items.length);
+  let next = 0;
+  async function runOne() {
+    while (next < items.length) {
+      const idx = next++;
+      results[idx] = await worker(items[idx], idx);
+    }
+  }
+  const workerCount = Math.max(1, Math.min(limit, items.length));
+  await Promise.all(Array.from({ length: workerCount }, runOne));
+  return results;
+}
+
 // ── Filesystem helpers ────────────────────────────────────────────────────────
 
 async function resolveConflict(filePath) {
@@ -193,39 +235,191 @@ async function removeIfEmptyIgnoringJunk(dir) {
   } catch { /* best-effort — never throw */ }
 }
 
+// Filesystem hardening (mirrors main/main.js's BUG-011 fix for master:scanEvents):
+// Dirent.isDirectory()/isFile() can misreport on some network shares — a
+// documented class of Node/libuv behavior, not specific to any one code path.
+// main.js's event scanner already recovers from this by falling back to a real
+// stat() when the Dirent disagrees; qmzService.js's own directory listing was
+// written independently and never got the same protection, so a QMZ component
+// whose _Unsequenced/photographer folders hit this on a real Windows/NAS
+// archive could silently report zero photographers/media even though the
+// folders and files are genuinely present on disk (bug: qmz-nested-unsequenced,
+// "already opened by old workspace" follow-up). Only adds a stat() call on the
+// rare disagreement path — the common case (Dirent and stat agree) is
+// unaffected.
+async function _directoryHardened(parentDir, entry) {
+  if (entry.isDirectory()) return true;
+  try {
+    const st = await fsp.stat(path.join(parentDir, entry.name));
+    if (st.isDirectory()) {
+      log(`[qmz] DIRENT/STAT MISMATCH name=${JSON.stringify(entry.name)} parent=${JSON.stringify(parentDir)} `
+        + `dirent.isDirectory()=false stat.isDirectory()=true — accepting stat() result, treating as a directory`);
+      return true;
+    }
+  } catch { /* stat failed too — genuinely not a directory (or gone) */ }
+  return false;
+}
+
+async function _fileHardened(parentDir, entry) {
+  if (entry.isFile()) return true;
+  try {
+    const st = await fsp.stat(path.join(parentDir, entry.name));
+    if (st.isFile()) {
+      log(`[qmz] DIRENT/STAT MISMATCH name=${JSON.stringify(entry.name)} parent=${JSON.stringify(parentDir)} `
+        + `dirent.isFile()=false stat.isFile()=true — accepting stat() result, treating as a file`);
+      return true;
+    }
+  } catch { /* stat failed too — genuinely not a file (or gone) */ }
+  return false;
+}
+
 async function listChildDirs(dir) {
   try {
     const entries = await fsp.readdir(dir, { withFileTypes: true });
-    return entries.filter(e => e.isDirectory()).map(e => e.name);
+    const result  = [];
+    for (const e of entries) {
+      if (await _directoryHardened(dir, e)) result.push(e.name);
+    }
+    return result;
   } catch { return []; }
 }
 
+// Bug 2 perf fix, round 2: real Windows/SMB measurement showed the bounded
+// concurrency from the first perf fix (round 1, matching maxProcs: 4) was
+// working exactly as designed (~4x wall-clock reduction vs sequential) but
+// was nowhere near enough — real per-file ExifTool round trips measured
+// ~300-500ms average on the tester's actual NAS (vs ~100-400ms against tiny
+// local placeholder files), so a several-hundred-file photographer folder
+// still took tens of seconds to minutes, and QMZ opens ALWAYS pay this twice
+// (see initRoot's own comment below) with only the second pass warmed by
+// _exifDateCache — explaining the observed "some scans become instant"
+// pattern precisely.
+//
+// Root architectural question (per the forensic investigation): is
+// authoritative EXIF capture date actually required before the QMZ
+// workspace can become usable? Traced every consumer — renderer/renderer.js
+// uses file.capturedAt in exactly three places, all display/ordering
+// concerns (default 'date' sort comparator, the date label under each tile,
+// and Timeline grouping) — never for photographer/folder discovery, RAW/XMP
+// pairing, or any move/assign/sequence operation. None of those require an
+// authoritative date to make the workspace interactive.
+//
+// listMediaFiles() therefore no longer blocks on readCaptureDate() at all —
+// every file gets an immediate capturedAt of its filesystem modifiedAt (already
+// available from the mandatory stat() below, at negligible cost) plus
+// capturedAtPending:true for RAW/photo types, so the workspace, file cards,
+// and default date-sort become available in the time it takes to stat the
+// directory, not to run ExifTool across it. Real EXIF dates are then
+// resolved by a separate, explicitly-triggered resolveCaptureDates() call —
+// see that function below — which the renderer fires in the background
+// immediately after the fast scan renders, and applies in place once ready
+// (re-sorting/re-labeling without blocking anything, including selection,
+// thumbnails, or sequence assignment in the meantime).
 async function listMediaFiles(dir) {
+  // Perf diagnostics — aggregate counts/timings only, logged once per
+  // directory, never per-file.
+  const _t0 = Date.now();
+  let _rawEntryCount = 0, _readdirMs = 0;
+  let _direntSaysFile = 0, _direntNotFile = 0;
+  let _statFallbackCount = 0, _statFallbackTotalMs = 0, _statFallbackMaxMs = 0;
+  let _mandatoryStatTotalMs = 0, _mandatoryStatMaxMs = 0;
+  let _mediaFound = 0, _ignoredByExt = 0;
   try {
+    const _rd0 = Date.now();
     const entries = await fsp.readdir(dir, { withFileTypes: true });
-    const files   = [];
-    for (const e of entries) {
-      if (!e.isFile() || isJunkFile(e.name) || !MEDIA_EXT.has(path.extname(e.name).toLowerCase())) continue;
+    _readdirMs = Date.now() - _rd0;
+    _rawEntryCount = entries.length;
+
+    const candidates = entries.filter(e => {
+      if (isJunkFile(e.name) || !MEDIA_EXT.has(path.extname(e.name).toLowerCase())) { _ignoredByExt++; return false; }
+      return true;
+    });
+
+    // Bounded-concurrency classification + stat (NOT capture-date — see the
+    // function-level comment above). Still bounded, still hardened against
+    // Windows/SMB Dirent misreports (BUG-011-class) exactly as round 1 left
+    // it — only the capture-date work moved out of this synchronous path.
+    const results = await _mapWithConcurrency(candidates, CAPTURE_DATE_CONCURRENCY, async (e) => {
+      if (e.isFile()) {
+        _direntSaysFile++;
+      } else {
+        _direntNotFile++;
+        const _sf0 = Date.now();
+        const hardened = await _fileHardened(dir, e);
+        const _sfMs = Date.now() - _sf0;
+        _statFallbackCount++;
+        _statFallbackTotalMs += _sfMs;
+        if (_sfMs > _statFallbackMaxMs) _statFallbackMaxMs = _sfMs;
+        if (!hardened) return null;
+      }
+      _mediaFound++;
       const p    = path.join(dir, e.name);
       const type = mediaType(e.name);
       let size = 0;
       let modifiedAt = null;
-      let capturedAt = null;
       try {
+        const _st0 = Date.now();
         const stat = await fsp.stat(p);
+        const _stMs = Date.now() - _st0;
+        _mandatoryStatTotalMs += _stMs;
+        if (_stMs > _mandatoryStatMaxMs) _mandatoryStatMaxMs = _stMs;
         size       = stat.size;
         modifiedAt = stat.mtime.toISOString();
-        // Preferred: original capture date, read per-type (see note above).
-        // Fallback only: filesystem modified time — used below when this is
-        // null, i.e. no embedded capture date could be read at all.
-        if (type === 'photo' || type === 'raw') {
-          capturedAt = await readCaptureDate(p, stat.size, stat.mtimeMs, type);
-        }
       } catch {}
-      files.push({ name: e.name, path: p, size, type, modifiedAt, capturedAt: capturedAt || modifiedAt });
-    }
+      const needsCaptureDate = type === 'photo' || type === 'raw';
+      return {
+        name: e.name, path: p, size, type, modifiedAt,
+        // Provisional — filesystem mtime, not the camera's own capture
+        // timestamp. Corrected in place by resolveCaptureDates() once the
+        // real EXIF/embedded date is read, without blocking initial render.
+        capturedAt: modifiedAt,
+        capturedAtPending: needsCaptureDate,
+      };
+    });
+    const files = results.filter(Boolean);
+
+    log(`[qmz-perf] listMediaFiles dir=${JSON.stringify(dir)} totalMs=${Date.now() - _t0} readdirMs=${_readdirMs} `
+      + `rawEntries=${_rawEntryCount} ignoredByExt=${_ignoredByExt} direntSaysFile=${_direntSaysFile} direntNotFile=${_direntNotFile} `
+      + `statFallback: count=${_statFallbackCount} totalMs=${_statFallbackTotalMs} maxMs=${_statFallbackMaxMs} `
+      + `mandatoryStat: totalMs=${_mandatoryStatTotalMs} maxMs=${_mandatoryStatMaxMs} `
+      + `mediaFound=${_mediaFound} concurrency=${CAPTURE_DATE_CONCURRENCY}`);
     return files;
-  } catch { return []; }
+  } catch (err) {
+    log(`[qmz-perf] listMediaFiles dir=${JSON.stringify(dir)} FAILED after ${Date.now() - _t0}ms: ${err.message}`);
+    return [];
+  }
+}
+
+/**
+ * Resolves authoritative EXIF/embedded capture dates for a batch of files
+ * already discovered by scanRoot() (i.e. carrying capturedAtPending:true).
+ * Explicitly separate from listMediaFiles() so the initial scan never blocks
+ * on it — see that function's header comment for the full rationale.
+ *
+ * Reuses the SAME bounded-concurrency mechanism and cache (_exifDateCache,
+ * keyed path|size|mtimeMs) as before, so results are identical to what the
+ * old synchronous path would have produced — this only changes WHEN the
+ * work happens, not what it computes.
+ *
+ * @param {Array<{path:string, size:number, modifiedAt:string, type:string}>} files
+ * @returns {Promise<{ [path]: string|null }>} capturedAt per input path
+ *   (only for photo/raw entries — non-applicable entries are simply absent
+ *   from the result, callers should leave their existing capturedAt as-is).
+ */
+async function resolveCaptureDates(files) {
+  const _t0 = Date.now();
+  const candidates = (files || []).filter(f => f && f.path && (f.type === 'photo' || f.type === 'raw'));
+  const result = {};
+  await _mapWithConcurrency(candidates, CAPTURE_DATE_CONCURRENCY, async (f) => {
+    try {
+      const mtimeMs = f.modifiedAt ? new Date(f.modifiedAt).getTime() : null;
+      result[f.path] = await readCaptureDate(f.path, f.size, mtimeMs, f.type);
+    } catch {
+      result[f.path] = null;
+    }
+  });
+  log(`[qmz-perf] resolveCaptureDates count=${candidates.length} totalMs=${Date.now() - _t0} concurrency=${CAPTURE_DATE_CONCURRENCY}`);
+  return result;
 }
 
 // True if `code`'s sequence folder has any photographer subfolder containing
@@ -267,6 +461,33 @@ async function saveState(qmzRoot, state) {
 // ── Scan ─────────────────────────────────────────────────────────────────────
 
 /**
+ * Bug 2 perf fix, round 2: cheap top-level-only classification — readdir +
+ * Dirent-hardened directory check, nothing else. Used by initRoot(), which
+ * only ever needs the "other" (adoption-candidate) list; it never reads
+ * scan.unsequenced or scan.sequences. Before this fix, initRoot() called the
+ * FULL scanRoot() — which for every _Unsequenced/sequence child runs
+ * listMediaFiles() (a per-file stat, formerly also an ExifTool round trip) —
+ * purely to throw almost all of that expensive result away and use only
+ * `.other`. Every QMZ open therefore paid the full per-photographer
+ * discovery cost TWICE: once here (wasted), once more via the renderer's own
+ * explicit scanRoot() call in _qmzRefresh() (the one whose result is
+ * actually used) — this is the exact duplicate-scan mechanism behind the
+ * "some scans become instant" observation from the real Windows/SMB
+ * diagnostics: the second pass was fast only because _exifDateCache was
+ * already warmed by the first, wasted one.
+ */
+async function _classifyOtherFolders(qmzRoot) {
+  const childDirs = await listChildDirs(qmzRoot);
+  const other = [];
+  for (const dir of childDirs) {
+    if (dir === UNSEQUENCED) continue;
+    if (SEQ_RE.test(dir)) continue;
+    other.push(dir);
+  }
+  return other;
+}
+
+/**
  * Scan qmzRoot and return its current structure.
  *   sequences   — sorted array of { code, type, photographers: { name: { count, files[] } } }
  *   unsequenced — { photographerName: { count, files[] } }
@@ -275,15 +496,46 @@ async function saveState(qmzRoot, state) {
  */
 async function scanRoot(qmzRoot) {
   const [childDirs, state] = await Promise.all([listChildDirs(qmzRoot), readState(qmzRoot)]);
+  log(`[qmz-diag] scanRoot hardened childDirs=${JSON.stringify(childDirs)}`);
   const sequences   = [];
   const unsequenced = {};
   const other       = [];
 
   for (const dir of childDirs) {
     if (dir === UNSEQUENCED) {
+      const unseqPath = path.join(qmzRoot, UNSEQUENCED);
+      let _rawUnseqEntries = null;
+      try { _rawUnseqEntries = (await fsp.readdir(unseqPath, { withFileTypes: true })).map(e => `${e.name}${e.isDirectory() ? '/' : ''}`); }
+      catch (err) { _rawUnseqEntries = [`<readdir THREW: ${err.code || err.message}>`]; }
+      log(`[qmz-diag] scanRoot _Unsequenced chosenPath=${JSON.stringify(unseqPath)} rawReaddir=${JSON.stringify(_rawUnseqEntries)}`);
       const pgDirs = await listChildDirs(path.join(qmzRoot, UNSEQUENCED));
+      log(`[qmz-diag] scanRoot _Unsequenced hardened children (classified as directories)=${JSON.stringify(pgDirs)}`);
       for (const pg of pgDirs) {
-        const files = await listMediaFiles(path.join(qmzRoot, UNSEQUENCED, pg));
+        const pgPath = path.join(qmzRoot, UNSEQUENCED, pg);
+        // Recovery for archives affected by the (now-fixed) bug where running
+        // photographer sequencing against a QMZ root renamed "_Unsequenced"
+        // itself into "PCxx-_Unsequenced", which initRoot then nested INSIDE
+        // _Unsequenced/ as a plain adoption candidate — leaving real media two
+        // levels deeper than this scan expects (0 files reported). Recognize
+        // that malformed-but-unambiguous shape — a child of _Unsequenced whose
+        // canonical name (PCxx- prefix stripped) is itself "_Unsequenced" —
+        // and read straight through it to the real nested photographer
+        // folders. Read-only: no filesystem move is performed here.
+        if (_stripPcPrefix(pg) === UNSEQUENCED) {
+          log(`[qmz-diag] scanRoot child=${JSON.stringify(pg)} classified=ALIAS(_Unsequenced) — reading through to nested photographers`);
+          const nestedPgDirs = await listChildDirs(pgPath);
+          for (const nestedPg of nestedPgDirs) {
+            const files = await listMediaFiles(path.join(pgPath, nestedPg));
+            log(`[qmz-diag] scanRoot   nested photographer=${JSON.stringify(nestedPg)} canonical=${JSON.stringify(_stripPcPrefix(nestedPg))} mediaCount=${files.length}`);
+            const existing = unsequenced[nestedPg];
+            unsequenced[nestedPg] = existing
+              ? { count: existing.count + files.length, files: [...existing.files, ...files] }
+              : { count: files.length, files };
+          }
+          continue;
+        }
+        const files = await listMediaFiles(pgPath);
+        log(`[qmz-diag] scanRoot child=${JSON.stringify(pg)} classified=PHOTOGRAPHER canonical=${JSON.stringify(_stripPcPrefix(pg))} mediaCount=${files.length}`);
         unsequenced[pg] = { count: files.length, files };
       }
     } else if (SEQ_RE.test(dir)) {
@@ -301,43 +553,91 @@ async function scanRoot(qmzRoot) {
   }
 
   sequences.sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0));
+  log(`[qmz-diag] scanRoot RESULT root=${JSON.stringify(qmzRoot)} `
+    + `unsequenced=${JSON.stringify(Object.entries(unsequenced).map(([k, v]) => `${k}:${v.count}`))} `
+    + `sequences=${JSON.stringify(sequences.map(s => s.code))} other=${JSON.stringify(other)}`);
   return { sequences, unsequenced, other, state };
 }
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 
+// Moves every FILE (not subdirectory) directly inside srcDir into destDir via
+// the same no-overwrite-safe safeMoveFile used everywhere else, then removes
+// srcDir if it ended up empty. Shared by the standard adoption-collision merge
+// and the "_Unsequenced" alias recovery merge below — both need the identical
+// safe, file-by-file behavior, just at a different nesting depth.
+async function _mergeDirFilesInto(srcDir, destDir, errors, label) {
+  let entries;
+  try { entries = await fsp.readdir(srcDir, { withFileTypes: true }); }
+  catch (err) { errors.push({ dir: label, error: err.message }); return; }
+
+  for (const e of entries) {
+    if (!(await _fileHardened(srcDir, e))) continue;
+    const r = await safeMoveFile(path.join(srcDir, e.name), path.join(destDir, e.name));
+    if (!r.ok) errors.push({ dir: label, file: e.name, error: r.reason });
+  }
+  try {
+    const rem = await fsp.readdir(srcDir);
+    if (rem.length === 0) await fsp.rmdir(srcDir);
+  } catch {}
+}
+
 /**
  * Adopt plain photographer folders (not sequence dirs, not _Unsequenced) into _Unsequenced/.
  * Uses atomic rename where possible; merges file-by-file when _Unsequenced/<dir> already exists.
+ *
+ * Recovery/prevention (bug: qmz-nested-unsequenced): a folder whose canonical
+ * name (PCxx- prefix stripped) is itself "_Unsequenced" is "_Unsequenced"
+ * mistakenly renamed by a (now-fixed) photographer-sequencing run against a
+ * QMZ root — it is NOT a real photographer folder. Adopting it as a single
+ * unit under _Unsequenced/ would create exactly the double-nesting this bug
+ * report is about (real media ending up two levels deeper than the scanner
+ * expects). Instead, its children — the real photographer folders — are
+ * merged directly into _Unsequenced/, one level flattened, using the same
+ * safe per-file move as every other adoption path here.
  */
 async function initRoot(qmzRoot) {
-  const scan    = await scanRoot(qmzRoot);
+  log(`[qmz-diag] initRoot ENTER root=${JSON.stringify(qmzRoot)}`);
+  const other   = await _classifyOtherFolders(qmzRoot);
   const adopted = [];
   const errors  = [];
 
-  await fsp.mkdir(path.join(qmzRoot, UNSEQUENCED), { recursive: true });
+  const unsequencedDir = path.join(qmzRoot, UNSEQUENCED);
+  await fsp.mkdir(unsequencedDir, { recursive: true });
 
-  for (const dirName of scan.other) {
+  for (const dirName of other) {
+    if (_stripPcPrefix(dirName) === UNSEQUENCED) {
+      const aliasDir = path.join(qmzRoot, dirName);
+      let children;
+      try { children = await fsp.readdir(aliasDir, { withFileTypes: true }); }
+      catch (err) { errors.push({ dir: dirName, error: err.message }); continue; }
+
+      for (const child of children) {
+        if (!(await _directoryHardened(aliasDir, child))) continue; // stray files directly under the alias — leave in place, never guessed at
+        const childSrc  = path.join(aliasDir, child.name);
+        const childDest = path.join(unsequencedDir, child.name);
+        try {
+          await fsp.rename(childSrc, childDest);
+        } catch {
+          await _mergeDirFilesInto(childSrc, childDest, errors, `${dirName}/${child.name}`);
+        }
+      }
+      try {
+        const rem = await fsp.readdir(aliasDir);
+        if (rem.length === 0) await fsp.rmdir(aliasDir);
+      } catch {}
+      adopted.push(dirName);
+      continue;
+    }
+
     const srcDir  = path.join(qmzRoot, dirName);
-    const destDir = path.join(qmzRoot, UNSEQUENCED, dirName);
+    const destDir = path.join(unsequencedDir, dirName);
     try {
       await fsp.rename(srcDir, destDir);
       adopted.push(dirName);
     } catch {
       // _Unsequenced/<dirName> already exists — merge file by file
-      let srcEntries;
-      try { srcEntries = await fsp.readdir(srcDir, { withFileTypes: true }); }
-      catch (err) { errors.push({ dir: dirName, error: err.message }); continue; }
-
-      for (const e of srcEntries) {
-        if (!e.isFile()) continue;
-        const r = await safeMoveFile(path.join(srcDir, e.name), path.join(destDir, e.name));
-        if (!r.ok) errors.push({ dir: dirName, file: e.name, error: r.reason });
-      }
-      try {
-        const rem = await fsp.readdir(srcDir);
-        if (rem.length === 0) await fsp.rmdir(srcDir);
-      } catch {}
+      await _mergeDirFilesInto(srcDir, destDir, errors, dirName);
       adopted.push(dirName);
     }
   }
@@ -519,4 +819,13 @@ module.exports = {
   removeSequence,
   moveFilesToSequence,
   moveFilesToUnsequenced,
+  resolveCaptureDates,
+  // Test-only: exposes the Dirent/stat hardening helpers so
+  // test/qmzDirentMismatchRegression.test.js can exercise them directly
+  // against a real fs.stat() with a faked Dirent, mirroring
+  // test/bug011DirentMismatchRegression.test.js's established technique. Not
+  // part of the module's real public API — no other caller should use these
+  // directly; listChildDirs/listMediaFiles already apply them internally.
+  _directoryHardened,
+  _fileHardened,
 };

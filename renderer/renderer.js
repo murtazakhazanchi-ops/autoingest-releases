@@ -8801,6 +8801,23 @@ async function openQMZManager(qmzRoot, eventContext) {
   document.getElementById('qmzOverlay').classList.remove('hidden');
   _qmzSetStatus('Loading…');
 
+  // UI safety (Bug 2 forensic investigation): _qmzData is normally cleared by
+  // _closeQMZManager(), but openQMZManager() itself never cleared it — so if
+  // it's ever called again before a close (e.g. switching directly between
+  // two QMZ sessions), the sidebar/grid could keep showing a PREVIOUS event's
+  // photographers/media as real, clickable content while a slow scan (large
+  // photographer folders over SMB can take many seconds — see
+  // main/qmzService.js's listMediaFiles) is still in flight for the new one.
+  // Clearing here, plus an explicit loading placeholder, guarantees stale
+  // data can never be interacted with instead of a genuine "no media" state.
+  _qmzData = null;
+  const pgListEl = document.getElementById('qmzPhotographerList');
+  if (pgListEl) pgListEl.innerHTML = '<div class="qmz-empty">Loading…</div>';
+  const titleEl = document.getElementById('qmzCenterTitle');
+  if (titleEl) titleEl.textContent = 'Loading…';
+  const gridEl = document.getElementById('qmzFileGrid');
+  if (gridEl) gridEl.innerHTML = '<div class="qmz-empty">Loading…</div>';
+
   await window.api.qmzInitRoot({ qmzRoot });
   await _qmzRefresh();
   _qmzSetStatus('');
@@ -8834,10 +8851,83 @@ function _closeQMZManager() {
 async function _qmzRefresh() {
   if (!_qmzRoot) return;
   _qmzData = await window.api.qmzScanRoot({ qmzRoot: _qmzRoot });
+  // Defensive: if the previously-active photographer no longer resolves in
+  // the freshly-scanned data (e.g. a QMZ recovery adoption ran between opens
+  // and changed the underlying keys, or the last operation emptied/renamed
+  // it), clear the stale selection instead of leaving the sidebar (fresh
+  // data), header (stale _qmzActivePg name), and grid (empty lookup against
+  // the stale name) each showing a different, inconsistent photographer —
+  // exactly the "sidebar shows X, header shows Y, grid says no media"
+  // symptom this guards against. Never fabricates a fallback selection —
+  // just returns to the neutral "select a photographer" state, matching
+  // openQMZManager's own initial reset shape.
+  if (_qmzActivePg) {
+    const stillValid = _qmzViewScope === 'sequence'
+      ? !!(_qmzData.sequences.find(s => s.code === _qmzActiveLocation)?.photographers?.[_qmzActivePg])
+      : !!_qmzData.unsequenced[_qmzActivePg];
+    if (!stillValid) {
+      _qmzActivePg        = null;
+      _qmzSelectedFiles    = new Set();
+      _qmzSelectionAnchor  = null;
+      _qmzLastClickedPath  = null;
+      _qmzPrevFocusPath    = null;
+    }
+  }
   _renderQMZPhotographerList();
   _renderQMZCenter();
   _renderQMZRight();
   _qmzUpdateActions();
+
+  // Bug 2 perf fix, round 2: real EXIF capture dates are resolved in the
+  // background, AFTER the workspace above has already rendered with each
+  // file's filesystem modifiedAt as a provisional capturedAt (see
+  // qmzService.js's listMediaFiles()) — never awaited here, so a
+  // several-hundred/thousand-file photographer folder over SMB no longer
+  // blocks the operator from seeing and using the workspace. Fire-and-forget
+  // is intentional; _qmzEnrichCaptureDatesInBackground() re-renders in place
+  // once real dates arrive.
+  _qmzEnrichCaptureDatesInBackground();
+}
+
+// Resolves real EXIF capture dates for every file the just-completed scan
+// marked capturedAtPending, then corrects them in place and re-renders —
+// without blocking selection, thumbnails, or sequence assignment, which
+// never depended on capturedAt (moves/assigns operate on file paths only).
+// Captures its own target (_qmzData/_qmzRoot) at call time and discards the
+// result if either changed by the time it resolves (QMZ closed, switched to
+// a different event, or a newer scan already replaced this data) — never
+// mutates or re-renders stale state.
+function _qmzEnrichCaptureDatesInBackground() {
+  if (!_qmzData) return;
+  const targetData = _qmzData;
+  const targetRoot = _qmzRoot;
+
+  const pending = [];
+  for (const pg of Object.values(targetData.unsequenced)) {
+    for (const f of pg.files) if (f.capturedAtPending) pending.push(f);
+  }
+  for (const seq of targetData.sequences) {
+    for (const pg of Object.values(seq.photographers)) {
+      for (const f of pg.files) if (f.capturedAtPending) pending.push(f);
+    }
+  }
+  if (!pending.length) return;
+
+  window.api.qmzResolveCaptureDates({
+    files: pending.map(f => ({ path: f.path, size: f.size, modifiedAt: f.modifiedAt, type: f.type })),
+  }).then(result => {
+    if (_qmzData !== targetData || _qmzRoot !== targetRoot) return; // stale — QMZ moved on, discard silently
+    let changed = false;
+    for (const f of pending) {
+      f.capturedAtPending = false;
+      const resolved = result[f.path];
+      if (resolved) { f.capturedAt = resolved; changed = true; }
+    }
+    if (changed) {
+      _renderQMZCenter();
+      _renderQMZRight();
+    }
+  }).catch(() => { /* best-effort background enrichment — files remain fully usable with their provisional date */ });
 }
 
 function _renderQMZPhotographerList() {

@@ -59,11 +59,19 @@ jobs:
         # below. An operator's normal `git tag -a vX.Y.Z -m "AutoIngest
         # vX.Y.Z"` (this repo's existing convention) has no such line and
         # is correctly NOT treated as an override.
+        #
+        # The trailer is OPTIONAL, so "no matching line" must succeed with an
+        # empty reason. GitHub runs this shell as `bash -e -o pipefail`, and
+        # grep exits 1 when nothing matches, which would abort the job before
+        # the gate ever ran (v0.9.12's first Stable tag hit exactly this). Only
+        # grep's no-match status (1) is tolerated; a real grep error (2+) still
+        # fails the step. An empty/whitespace-only trailer also yields an empty
+        # reason, so it selects the normal gate and can never become an override.
         id: override
         shell: bash
         run: |
           MSG=$(git tag -l --format='%(contents)' "${GITHUB_REF_NAME}")
-          REASON=$(printf '%s\n' "$MSG" | grep -m1 '^Override-Drift-Check:' | sed 's/^Override-Drift-Check:[[:space:]]*//')
+          REASON=$(printf '%s\n' "$MSG" | { grep -m1 '^Override-Drift-Check:' || [ $? -eq 1 ]; } | sed 's/^Override-Drift-Check:[[:space:]]*//')
           {
             echo "reason<<EOF_OVERRIDE_REASON"
             echo "$REASON"
