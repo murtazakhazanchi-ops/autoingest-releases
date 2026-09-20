@@ -1,7 +1,17 @@
 // renderer/groupManager.js
 // ── GroupManager — module singleton ─────────────────────────────────────────
 // Manages temporary file-to-group assignments for the import grouping workflow.
-// Groups are reset on drive change / eject / event change (caller invokes reset()).
+//
+// Per-event isolation: createGroupManager() builds an independent instance. The
+// exported `GroupManager` is a thin facade bound to ONE instance at a time (the
+// Current Event's — see importSession.js). Group ids are positional (1..N) and
+// only meaningful inside one event, so every participating event owns its own
+// instance; group/component state can never leak across events because no two
+// events ever share one. Unbound, the facade behaves exactly like the original
+// singleton (one implicit instance).
+//
+// reset() clears the bound instance only. Session-level teardown (source change,
+// eject, …) is ImportSession.reset()'s job.
 //
 // Group shape:
 //   { id: number, label: string,
@@ -10,23 +20,29 @@
 //   }
 'use strict';
 
-const GroupManager = (() => {
+// 10 pastel group colours keyed by --group-N CSS custom properties.
+// Index is stable while a group exists; colour is derived at render time from
+// the group's position in _groups, so no drift after deletions.
+const GROUP_COLORS = [
+  'var(--group-1)',
+  'var(--group-2)',
+  'var(--group-3)',
+  'var(--group-4)',
+  'var(--group-5)',
+  'var(--group-6)',
+  'var(--group-7)',
+  'var(--group-8)',
+  'var(--group-9)',
+  'var(--group-10)',
+];
 
-  // 10 pastel group colours keyed by --group-N CSS custom properties.
-  // Index is stable while a group exists; colour is derived at render time from
-  // the group's position in _groups, so no drift after deletions.
-  const GROUP_COLORS = [
-    'var(--group-1)',
-    'var(--group-2)',
-    'var(--group-3)',
-    'var(--group-4)',
-    'var(--group-5)',
-    'var(--group-6)',
-    'var(--group-7)',
-    'var(--group-8)',
-    'var(--group-9)',
-    'var(--group-10)',
-  ];
+/**
+ * @param {{ onClaim?: (paths: string[]) => void }} [hooks]
+ *   onClaim — invoked at the top of assignFiles(), before any mutation, with the
+ *   paths about to be owned by this instance. ImportSession uses it to enforce
+ *   file→event exclusivity at the model level (release from every other event).
+ */
+function createGroupManager(hooks = {}) {
 
   let _groups       = [];          // Group[]
   let _fileGroupMap = new Map();   // filePath → groupId
@@ -65,6 +81,7 @@ const GroupManager = (() => {
   function assignFiles(paths, groupId) {
     const g = _groups.find(x => x.id === groupId);
     if (!g) return;
+    if (typeof hooks.onClaim === 'function') hooks.onClaim([...paths]);
     // Collect emptied source groups as object refs — defer removal until after the
     // full loop so mid-loop renumbering can't corrupt subsequent _fileGroupMap writes.
     const toRemove = [];
@@ -191,4 +208,21 @@ const GroupManager = (() => {
     getDuplicateSubEvents,
   };
 
+}
+
+// ── Facade — the bound-instance singleton the rest of the renderer uses ───────
+const GroupManager = (() => {
+  let _bound = createGroupManager();
+  const facade = {};
+  for (const key of Object.keys(_bound)) {
+    facade[key] = (...args) => _bound[key](...args);
+  }
+  /** Point the facade at another instance (the Current Event's). */
+  facade.bind     = (instance) => { _bound = instance; };
+  facade.getBound = () => _bound;
+  facade.create   = createGroupManager;
+  return facade;
 })();
+
+// Node.js / test compatibility — no effect in the browser.
+if (typeof module !== 'undefined') module.exports = GroupManager;
