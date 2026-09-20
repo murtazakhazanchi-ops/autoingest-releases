@@ -55,6 +55,7 @@ event.json → logic → filesystem → UI
 - Groups only exist if they contain files
 - subEventId must always be valid
 - Files must belong to exactly one group
+- Group/component state is scoped to ONE event and must never leak across events (isolated per-event GroupManager instances; a source file is owned by at most one event in an import session)
 
 ### MUST NOT
 
@@ -73,6 +74,7 @@ event.json → logic → filesystem → UI
 - Conflict → rename (_1, _2)
 - Operations must be idempotent
 - All selected files must be processed (copied, skipped, or errored)
+- Multi-event import: each event is one independent transaction; only explicitly assigned files import; source-cleanup eligibility never exceeds the files transactions reported as copied
 
 ### Source Cleanup (deleteFromSource) Validation Order
 
@@ -246,6 +248,11 @@ MUST NOT
 - Renderer-driven event.json mutations
 - Independent writes for logs, lastImport, or status
 - Divergence between imports[] and lastImport
+
+Multi-event clarification
+
+- The atomic transaction boundary is **per event.json**. A multi-event source import is an orchestration of independent event transactions and is not filesystem-atomic; a partially completed session (some events committed, some failed) is a valid outcome, and retry is safe because of the no-overwrite / same-size-skip rules.
+- Batch-scoped state (metadata progress attribution, Local First sync manifests) must be keyed by the batch/event identity carried in the payload, never by Current-Event UI state.
 
 Enforcement
 
