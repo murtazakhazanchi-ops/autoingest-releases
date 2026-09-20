@@ -56,6 +56,7 @@ const metadataAuditExport   = require('../services/metadataAuditExport');
 const metadataRepairService = require('./metadataRepairService');
 const metadataSyncService = require('./metadataSyncService');
 const { resolvePhotographerFromPath } = require('../services/eventEvidenceReconstruction');
+const eventMetadataIntent = require('../services/eventMetadataIntent');
 const realtimeOps              = require('../services/realtimeOperationsService');
 const offlineCollectionRegistry    = require('../services/offlineCollectionRegistryService');
 const photographerSeqService       = require('../services/photographerSequenceService');
@@ -1220,53 +1221,13 @@ ipcMain.handle('import:commitTransaction', async (event, {
 
     result.auditLogs = logs;
 
-    // Build metadataGroups for reapply: map dest-relative paths → metadataTags.
-    // Only populated when at least one group carries an explicit metadataTags array.
-    let metadataGroupsForDisk = null;
-    if (Array.isArray(groups) && groups.some(g => Array.isArray(g.metadataTags)) && result.copiedFiles?.length > 0) {
-      const srcToTags = new Map();
-      for (const g of groups) {
-        if (!Array.isArray(g.metadataTags)) continue;
-        for (const src of (g.files || [])) srcToTags.set(path.normalize(src), g.metadataTags);
-      }
-      const buckets = new Map(); // JSON(tags) → { metadataTags, relPaths }
-      for (const cf of result.copiedFiles) {
-        const tags = srcToTags.get(path.normalize(cf.src));
-        if (!Array.isArray(tags)) continue;
-        const key = JSON.stringify(tags);
-        if (!buckets.has(key)) buckets.set(key, { metadataTags: tags, relPaths: [] });
-        if (eventJsonPath) buckets.get(key).relPaths.push(path.relative(eventJsonPath, cf.dest));
-      }
-      if (buckets.size > 0) metadataGroupsForDisk = Array.from(buckets.values());
-    }
-
-    // Build tagRefinements for durability/audit (Per-Photo Tag Refinement feature):
-    // map dest-relative paths → per-file Event Type / Additional Keyword override,
-    // bucketed by identical combination. Independent of metadataGroupsForDisk above —
-    // that mechanism is single-component group-level keyword picking; this one is
-    // multi-component per-file refinement. Only populated when at least one group
-    // carries an explicit fileTagRefinements map.
-    let tagRefinementsForDisk = null;
-    if (Array.isArray(groups) && groups.some(g => g.fileTagRefinements && Object.keys(g.fileTagRefinements).length > 0) && result.copiedFiles?.length > 0) {
-      const srcToOverride = new Map();
-      for (const g of groups) {
-        if (!g.fileTagRefinements) continue;
-        for (const [src, override] of Object.entries(g.fileTagRefinements)) {
-          srcToOverride.set(path.normalize(src), override);
-        }
-      }
-      const refineBuckets = new Map(); // JSON([eventTypes,additionalKeywords]) → { eventTypes, additionalKeywords, relPaths }
-      for (const cf of result.copiedFiles) {
-        const override = srcToOverride.get(path.normalize(cf.src));
-        if (!override) continue;
-        const eventTypes = Array.isArray(override.eventTypes) ? override.eventTypes : [];
-        const additionalKeywords = Array.isArray(override.additionalKeywords) ? override.additionalKeywords : [];
-        const key = JSON.stringify([eventTypes, additionalKeywords]);
-        if (!refineBuckets.has(key)) refineBuckets.set(key, { eventTypes, additionalKeywords, relPaths: [] });
-        if (eventJsonPath) refineBuckets.get(key).relPaths.push(path.relative(eventJsonPath, cf.dest));
-      }
-      if (refineBuckets.size > 0) tagRefinementsForDisk = Array.from(refineBuckets.values());
-    }
+    // Durable metadata intent (Tier 0 tagRefinements + Tier 1 metadataGroups): what THIS import decided,
+    // per destination-relative key, for every file it copied OR same-size-skipped. It is MERGED into the
+    // existing event.json records inside the atomic update below — a later import must never replace an
+    // earlier import's records (services/eventMetadataIntent.js owns the schema, keys and merge rules).
+    const intentDelta = eventJsonPath
+      ? eventMetadataIntent.buildImportIntentDelta({ eventFolderPath: eventJsonPath, groups, copiedFiles: result.copiedFiles, skippedFiles: result.skippedFiles })
+      : null;
 
     if (eventJsonPath) {
       // Single serialized read/merge/write: merge audit logs + set lastImport + set
@@ -1302,8 +1263,15 @@ ipcMain.handle('import:commitTransaction', async (event, {
             };
           }
 
-          if (metadataGroupsForDisk) changes.metadataGroups = metadataGroupsForDisk;
-          if (tagRefinementsForDisk) changes.tagRefinements = tagRefinementsForDisk;
+          // Per-key merge against the freshest on-disk records (this mutator receives them). `value`
+          // undefined + changed drops the key ("absent when none"); unchanged fields are left untouched.
+          if (intentDelta) {
+            const tr = eventMetadataIntent.mergeTagRefinements(doc.tagRefinements, intentDelta.refinements);
+            if (tr.changed) changes.tagRefinements = tr.value;
+            const mg = eventMetadataIntent.mergeMetadataGroups(doc.metadataGroups, intentDelta.metaTags);
+            if (mg.changed) changes.metadataGroups = mg.value;
+            if (tr.skipped || mg.skipped) log(`[import:commitTransaction] intent merge skipped an unparseable field (tagRefinements: ${tr.skipped || 'ok'}, metadataGroups: ${mg.skipped || 'ok'}) — left untouched`);
+          }
           return changes;
         });
         hidePathBestEffort(jsonPath).catch(() => {});
