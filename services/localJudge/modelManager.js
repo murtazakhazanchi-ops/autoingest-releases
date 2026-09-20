@@ -83,12 +83,50 @@ function getFor(url) {
   return url.startsWith('http://') ? http : https;
 }
 
-const MODEL_ID = 'phi-4-mini-instruct-Q4_K_M';
-const MODEL_FILENAME = 'phi-4-mini-instruct-Q4_K_M.gguf';
-const EXPECTED_SIZE_BYTES = 2491874688;
-const EXPECTED_SHA256 = '01999f17c39cc3074afae5e9c539bc82d45f2dd7faa3917c66cbef76fce8c0c2';
-const DOWNLOAD_URL = 'https://huggingface.co/unsloth/Phi-4-mini-instruct-GGUF/resolve/main/Phi-4-mini-instruct-Q4_K_M.gguf';
-const MODEL_LICENSE = 'MIT (Microsoft Phi-4-mini-instruct base model, verified via huggingface.co/microsoft/Phi-4-mini-instruct cardData.license)';
+// Production-transfer validation checkpoint (2026-08-27, Product Owner
+// Phase 3): pinned model identity swapped from Phi-4-mini-instruct to
+// Gemma-4-E4B-it, per the Product Owner's explicit instruction to change
+// ONLY the model/runtime configuration required to run the real
+// production pipeline with the model every A/B/C architecture measurement
+// was actually taken on -- no other change in this file. This is the one,
+// deliberate, explicit model-identity decision point this module's own
+// header comment describes ("Model identity is pinned explicitly ...
+// Product Owner decision"); nothing about the download/verify/getStatus
+// state machine, the file layout, or the pinning discipline itself
+// changes.
+//
+// EXPECTED_SIZE_BYTES/EXPECTED_SHA256 below are independently computed
+// (streaming SHA-256 + stat) against the exact real gemma-4-E4B-it-Q4_K_M.gguf
+// artifact already used, unchanged, throughout every A/B/C benchmark run
+// in this investigation -- not copied from any external source.
+//
+// MODEL_LICENSE is disclosed honestly, not with the same from-source
+// re-verification rigor the prior Phi entry's own comment documents: this
+// checkpoint did not independently re-confirm Gemma's license text against
+// its model card. Gemma models are distributed by Google under Google's
+// own Gemma Terms of Use (not a standard OSI license) -- a prior
+// checkpoint's own bake-off comment characterized this as "Apache
+// 2.0-compatible," which this checkpoint does NOT re-assert without
+// independent verification. Re-confirming and, if needed, correcting this
+// license line is flagged as a required follow-up before any release
+// build ships with this model, not resolved here.
+//
+// DOWNLOAD_URL is deliberately left unresolved rather than guessed: unlike
+// the prior Phi entry (whose comment documents an actual, independently
+// checked public source and its known 416-byte mismatch), this checkpoint
+// has no independently-verified public download source for this exact
+// artifact to cite. Left blank on purpose -- download() is already gated
+// off entirely by main/askAutoIngest.js's own PRODUCTION_DOWNLOAD_SOURCE_APPROVED
+// flag (unchanged, still false), so no code path can act on this being
+// unresolved; resolving a real, byte-verified source is a required
+// follow-up before that flag is ever flipped for this model, not
+// something to fabricate here.
+const MODEL_ID = 'gemma-4-E4B-it-Q4_K_M';
+const MODEL_FILENAME = 'gemma-4-E4B-it-Q4_K_M.gguf';
+const EXPECTED_SIZE_BYTES = 4977171584;
+const EXPECTED_SHA256 = '85a896a047553e842f25297ee5b031d64ff30147d9c4af17b1e4b394cd1fab87';
+const DOWNLOAD_URL = '';
+const MODEL_LICENSE = 'Gemma Terms of Use (Google) -- NOT independently re-verified against the model card this checkpoint; see comment above.';
 
 const STATUS = Object.freeze({
   NOT_DOWNLOADED: 'NOT_DOWNLOADED',

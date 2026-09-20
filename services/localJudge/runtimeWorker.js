@@ -72,6 +72,30 @@
 
 let llama = null;
 let model = null;
+let _loadedModelPath = null;
+
+// Production-transfer validation checkpoint (2026-08-27, Product Owner
+// Phase 3) addition: node-llama-cpp auto-detects a chat template from the
+// loaded GGUF's own metadata when no explicit chatWrapper is passed to
+// LlamaChatSession -- exactly what this file did before this checkpoint,
+// and still does for every model family except the one case documented
+// here. Every prior benchmark in this investigation (the original model
+// bake-off through the corrected Candidate C run) independently found and
+// disclosed the same fact: Gemma's chat-template family defaults to an
+// internal "thinking"/reasoning mode that, under a short maxTokens budget
+// (this production path's schema-constrained generation uses budgets far
+// smaller than an open-ended chat reply), consumes the entire budget on
+// invisible reasoning content and leaves an empty visible answer. This is
+// a model-family runtime-configuration fact, not a prompt or schema
+// change, and not specific to any one request -- disabled uniformly for
+// every request against a Gemma artifact, exactly mirroring the disclosed
+// convention every A/B/C harness already used. No other model family is
+// affected: this file's own default (`chatWrapper` left unset, so
+// node-llama-cpp auto-detects) is completely unchanged for Phi or any
+// other future model whose filename doesn't match this pattern.
+function chatWrapperOptionsFor(modelPath) {
+  return /gemma/i.test(modelPath || '') ? { family: 'gemma' } : null;
+}
 
 // node-llama-cpp is ESM-only (confirmed directly: a plain require() throws
 // "require() of ES Module ... not supported" under Electron's utilityProcess,
@@ -88,12 +112,13 @@ async function handleLoad(modelPath) {
   const t0 = performance.now();
   llama = await getLlama();
   model = await llama.loadModel({ modelPath });
+  _loadedModelPath = modelPath;
   const loadMs = performance.now() - t0;
   process.parentPort.postMessage({ type: 'loaded', loadMs, gpu: llama.gpu });
 }
 
 async function handleInfer({ requestId, system, user, schema, maxTokens = 200, repeatPenalty }) {
-  const { LlamaChatSession } = await nllc();
+  const { LlamaChatSession, Gemma4ChatWrapper } = await nllc();
   if (!model) {
     process.parentPort.postMessage({ type: 'infer-error', requestId, message: 'model not loaded' });
     return;
@@ -102,7 +127,9 @@ async function handleInfer({ requestId, system, user, schema, maxTokens = 200, r
   try {
     const grammar = await llama.createGrammarForJsonSchema(schema);
     context = await model.createContext({ sequences: 1 });
-    const session = new LlamaChatSession({ contextSequence: context.getSequence(), systemPrompt: system });
+    const wrapperOptions = chatWrapperOptionsFor(_loadedModelPath);
+    const chatWrapper = wrapperOptions && wrapperOptions.family === 'gemma' ? new Gemma4ChatWrapper({ reasoning: false }) : undefined;
+    const session = new LlamaChatSession({ contextSequence: context.getSequence(), systemPrompt: system, ...(chatWrapper ? { chatWrapper } : {}) });
 
     let firstTokenMs = null;
     const t0 = performance.now();

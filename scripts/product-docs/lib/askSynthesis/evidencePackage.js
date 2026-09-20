@@ -23,6 +23,45 @@ const {
   explainNormalization,
 } = require('../knowledgeEngine');
 
+// Integration-readiness checkpoint (Phase 5, 2026-08-27) -- Knowledge
+// Model evidence-shaping integration. Mirrors main/askAutoIngest.js's own
+// PRODUCTION_DOWNLOAD_SOURCE_APPROVED precedent exactly: a single boolean
+// gate, not a configuration system. OFF (the default, and this file's own
+// exact behavior before this checkpoint) reproduces buildEvidenceAtoms()'s
+// output byte-for-byte -- the Knowledge Model module is never required,
+// never consulted, never on the hot path. ON tries the Knowledge Model
+// FIRST for whatever feature/boundary/roadmap subject the (unmodified)
+// deterministic authority layer already resolved; on a miss, or on ANY
+// error (require failure, malformed record, anything), it falls back to
+// the exact same existing atom extraction, unconditionally logged, never
+// silently. The Knowledge Model can never make Ask AutoIngest unavailable.
+//
+// Deliberately reads `answer.classification` (already computed by
+// knowledgeEngine.js's own answerQuestion(), already returned on the
+// `answer` object this file already threads through everywhere) rather
+// than importing lib/questionClassifier.js directly -- this file's own
+// long-standing Phase A directive (see header comment above) is that it
+// never touches questionClassifier.js; reusing the already-computed
+// classification honors that unmodified while still giving the Knowledge
+// Model's dimension selection exactly the same question-type signal.
+const KNOWLEDGE_MODEL_EVIDENCE_ENABLED = true;
+
+function knowledgeModelAtomsFor(answer, question) {
+  if (!KNOWLEDGE_MODEL_EVIDENCE_ENABLED) return null;
+  try {
+    const { resolveKnowledgeEvidenceAtoms } = require('../knowledgeModel/retrieval');
+    const result = resolveKnowledgeEvidenceAtoms({ answer, questionType: answer.classification, userText: question });
+    if (!result) return null;
+    // eslint-disable-next-line no-console
+    console.log(`[evidencePackage] Knowledge Model evidence used: ${result.kmRecordId} (${result.extractionTier}) dims=${result.dimensionsUsed.join(',')}`);
+    return result;
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[evidencePackage] Knowledge Model evidence lookup failed -- falling back to deterministic atom extraction:', err && err.message);
+    return null;
+  }
+}
+
 // A human-readable display name for any canonical ID this system knows about
 // — Feature, Workflow, Decision, Bug, Postmortem, Memory, or Architecture
 // section — resolved from the SAME already-built searchIndexById map every
@@ -422,7 +461,7 @@ function buildEvidencePackage(question, ctx) {
     primary && primary.entityType === 'workflow' ? primary.id : (answer.sources.find((s) => /^AI-WF-/.test(s.id)) || {}).id,
     ctx,
   );
-  const evidenceAtoms = buildEvidenceAtoms({
+  const deterministicAtoms = buildEvidenceAtoms({
     directAnswerCapability,
     directAnswerProvenanceBlob: directAnswerProvenance,
     guidance: sanitizedGuidance,
@@ -430,6 +469,21 @@ function buildEvidencePackage(question, ctx) {
     limitations: sanitizedLimitations,
     primaryId: primary && primary.id,
   });
+  // Knowledge Model evidence, tried first (Phase 5 integration -- see
+  // KNOWLEDGE_MODEL_EVIDENCE_ENABLED above). Only ever replaces WHAT FACTS
+  // ARE OFFERED to synthesis -- every other field below (primary,
+  // capabilityStatus, matchQuality, retrievalDiagnostics,
+  // admittedNeighborhood, historical, relatedCapabilities, sources,
+  // deterministicFallback, legitimateSourceIds) is computed exactly as it
+  // always was, from the unmodified deterministic answer, regardless of
+  // whether the Knowledge Model covers this subject. On no coverage or any
+  // error, `kmResult` is null and `evidenceAtoms` is byte-identical to
+  // this file's own pre-Phase-5 behavior.
+  const kmResult = knowledgeModelAtomsFor(answer, question);
+  const evidenceAtoms = kmResult ? kmResult.atoms : deterministicAtoms;
+  const knowledgeModelSource = kmResult
+    ? { used: true, kmRecordId: kmResult.kmRecordId, extractionTier: kmResult.extractionTier, dimensionsUsed: kmResult.dimensionsUsed }
+    : { used: false, kmRecordId: null, extractionTier: null, dimensionsUsed: null };
 
   return {
     // ---- 1. User question + classification ----
@@ -518,6 +572,15 @@ function buildEvidencePackage(question, ctx) {
     // ---- 14. Sources — id, displayName, path, role, evidenceQualification
     // ----
     sources: describeSources(answer.sources, ctx),
+
+    // ---- Diagnostic-only (Phase 5 integration), same discipline as
+    // `synthesis`/`authority` diagnostics elsewhere in this codebase --
+    // never affects capabilityStatus/directAnswer/steps/limitations above,
+    // which are already final by the time this runs. Lets a caller (e.g.
+    // the production-transfer validation harness) see, per turn, whether
+    // this answer's evidenceAtoms came from the Knowledge Model or the
+    // pre-existing deterministic extraction ----
+    knowledgeModelSource,
 
     // ---- 15. Deterministic fallback — a structured, operator-safe
     // projection of the exact answer the CLI/portal would show today. C8

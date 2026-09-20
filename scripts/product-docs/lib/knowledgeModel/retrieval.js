@@ -241,20 +241,9 @@ function buildEvidenceBlock(records, dimensionKeys, { includeTechnical, capabili
 // called).
 function conceptualRetrieve({ answer, questionType, userText }) {
   const allRecords = resolveKnowledgeRecords(answer);
-  if (!allRecords.length) return null;
-
-  const includeTechnical = isTechnicalQuestion(userText);
-  const includeRecovery = isRecoveryQuestion(userText);
-  // Multi-record relevance filter (follow-up checkpoint fix) -- applied
-  // BEFORE dimension selection, so a 'scoped' companion record (e.g. a
-  // troubleshooting record) that isn't relevant to this question's own
-  // type/intent never gets the chance to contribute any dimension at all,
-  // not even by accident through a shared featureId.
-  const records = filterRecordsByRelevance(allRecords, questionType, includeRecovery, includeTechnical);
-  if (!records.length) return null; // every matching record was scoped-out for this question shape -- caller falls back, same as "no coverage"
-
-  let dimensionKeys = DIMENSIONS_BY_TYPE[questionType] || DIMENSIONS_BY_TYPE.UNKNOWN;
-  if (includeRecovery) dimensionKeys = [...new Set([...dimensionKeys, 'recovery'])];
+  const resolved = _resolveRelevantRecordsAndDimensions({ answer, questionType, userText });
+  if (!resolved) return null;
+  const { records, dimensionKeys, includeTechnical, includeRecovery } = resolved;
   const evidenceBlock = buildEvidenceBlock(records, dimensionKeys, { includeTechnical, capabilityStatus: answer.capabilityStatus });
 
   return {
@@ -268,4 +257,117 @@ function conceptualRetrieve({ answer, questionType, userText }) {
   };
 }
 
-module.exports = { conceptualRetrieve, resolveKnowledgeRecords, filterRecordsByRelevance, isTechnicalQuestion, isRecoveryQuestion, DIMENSIONS_BY_TYPE };
+// Integration-readiness checkpoint (Phase 5) addition: production's real
+// synthesis pipeline does not consume a pre-formatted evidence-block
+// STRING the way the A/B/C experimental harnesses did -- it consumes an
+// array of role-typed ATOMS ({role, text, sourceId, sourceField}, the
+// exact shape evidencePackage.js's own buildEvidenceAtoms() already
+// produces), which promptTemplates.js/safetyValidation.js are already
+// built around. This function resolves the same relevant records and
+// dimensions conceptualRetrieve() does (factored out below so the two
+// never drift apart), but returns that structured atom shape instead of a
+// formatted string, so evidencePackage.js can splice it in alongside (or
+// instead of) its own existing atom construction without needing a second
+// prompt-building code path.
+//
+// `sourceId` on every returned atom is deliberately the REAL, resolved
+// AI-FEAT-###/boundary/roadmap id from the C8 authority layer's own
+// `answer` (never the internal KM-* record id) -- this is what keeps
+// safetyValidation.js's existing legitimateSourceIds check working
+// unmodified: that id is already guaranteed present there by
+// evidencePackage.js's own existing code, so no new "unknown id" failure
+// mode is introduced by adding these atoms.
+//
+// role mapping (deliberately mirrors buildEvidenceAtoms()'s own existing
+// role vocabulary, not a new one): purpose/behavior/recovery/relationships
+// -> FACT; operatorWorkflow/actions -> ACTION; limitations -> LIMITATION;
+// technicalDetail -> TECHNICAL. TECHNICAL atoms are included in the full
+// returned array (so safetyValidation.js's leak-comparison logic sees them,
+// exactly as it already does for every other record's TECHNICAL atoms) but
+// this function does NOT decide whether they reach synthesis -- that is
+// selectEvidenceAtomsForClassification()'s own long-standing, unmodified
+// policy in evidencePackage.js, deliberately left untouched by this
+// integration (see the integration-validation report's own disclosed
+// limitation on technical-question support).
+function _resolveRelevantRecordsAndDimensions({ answer, questionType, userText }) {
+  const allRecords = resolveKnowledgeRecords(answer);
+  if (!allRecords.length) return null;
+  const includeTechnical = isTechnicalQuestion(userText);
+  const includeRecovery = isRecoveryQuestion(userText);
+  const records = filterRecordsByRelevance(allRecords, questionType, includeRecovery, includeTechnical);
+  if (!records.length) return null;
+  let dimensionKeys = DIMENSIONS_BY_TYPE[questionType] || DIMENSIONS_BY_TYPE.UNKNOWN;
+  if (includeRecovery) dimensionKeys = [...new Set([...dimensionKeys, 'recovery'])];
+  return { records, dimensionKeys, includeTechnical, includeRecovery };
+}
+
+// Mirrors evidencePackage.js's own (non-exported) RATIONALE_ELIGIBLE_CLASSIFICATIONS
+// exactly -- duplicated rather than imported, matching this codebase's own
+// established convention for small, stable cross-file constants (see e.g.
+// STATUS/EXTRACTION_TIERS's own independent-but-consistent duplication
+// pattern elsewhere) rather than reaching into evidencePackage.js's private
+// internals from this module. Kept in sync deliberately, not accidentally:
+// change one, change both.
+const RATIONALE_ELIGIBLE_CLASSIFICATIONS = new Set(['EXPLANATION', 'UNKNOWN', 'KNOWN_RECORD_BROWSE']);
+
+function resolveKnowledgeEvidenceAtoms({ answer, questionType, userText }) {
+  const resolved = _resolveRelevantRecordsAndDimensions({ answer, questionType, userText });
+  if (!resolved) return null;
+  const { records, dimensionKeys, includeTechnical, includeRecovery } = resolved;
+  const keys = includeTechnical ? [...new Set([...dimensionKeys, 'technicalDetail'])] : dimensionKeys;
+  const sourceId = (answer.matchedCapabilities && answer.matchedCapabilities[0] && answer.matchedCapabilities[0].id)
+    || (answer.sources && answer.sources[0] && answer.sources[0].id)
+    || null;
+
+  const atoms = [];
+  const push = (role, text, sourceField) => { if (text) atoms.push({ role, text, sourceId, sourceField }); };
+
+  for (const key of keys) {
+    if (key === 'purpose') {
+      const text = dedupJoin(records.map((r) => r.purpose), '\n');
+      push('FACT', text, 'km:purpose');
+      // A KnowledgeRecord's own `purpose` dimension already IS the "why
+      // this exists" content the deterministic path's RATIONALE atom
+      // carries (there split out of directAnswer's own "Why this exists"
+      // narrative) -- offered as RATIONALE too, gated to the exact same
+      // classifications the deterministic path already restricts it to,
+      // so promptTemplates.js's whyThisExists payload gets populated from
+      // Knowledge Model content the same way it already does from
+      // deterministic content. Never a NEW leakage surface: KM's purpose
+      // text went through the same authoring contract every other
+      // operator-facing dimension did (Section 10 of the integration
+      // readiness report) -- it never carries the documentation/audit-
+      // trail-commentary style text a PROVENANCE atom exists to flag,
+      // which is exactly why no equivalent PROVENANCE atom is emitted
+      // anywhere in this function: there is nothing of that kind to flag
+      // in Knowledge Model content by construction, not an oversight.
+      if (RATIONALE_ELIGIBLE_CLASSIFICATIONS.has(questionType)) push('RATIONALE', text, 'km:purpose:rationale');
+    }
+    if (key === 'behavior') push('FACT', dedupJoin(records.map((r) => r.behavior), '\n'), 'km:behavior');
+    if (key === 'preconditions') records.flatMap((r) => r.preconditions).forEach((p, i) => push('FACT', p, `km:preconditions[${i}]`));
+    if (key === 'operatorWorkflow') records.flatMap((r) => r.operatorWorkflow).forEach((s, i) => push('ACTION', s, `km:operatorWorkflow[${i}]`));
+    if (key === 'actions') records.flatMap((r) => r.actions).forEach((a, i) => push('ACTION', `${a.label}: ${a.description}`, `km:actions[${i}]`));
+    if (key === 'relationships') records.flatMap((r) => r.relationships).forEach((rel, i) => push('FACT', `${rel.note}`, `km:relationships[${i}]`));
+    if (key === 'limitations') records.flatMap((r) => r.limitations).forEach((l, i) => push('LIMITATION', l, `km:limitations[${i}]`));
+    if (key === 'recovery') {
+      const text = dedupJoin(records.map((r) => r.recovery), '\n');
+      push('FACT', text || 'No AutoIngest evidence establishes resume/recovery behavior for this specific feature -- this is not established, not something to guess at.', 'km:recovery');
+    }
+    if (key === 'technicalDetail') {
+      const text = dedupJoin(records.map((r) => r.technicalDetail), '\n');
+      push('TECHNICAL', text, 'km:technicalDetail'); // intentionally NEVER offered to synthesis -- see header comment
+    }
+  }
+
+  if (!atoms.length) return null;
+  return {
+    atoms,
+    dimensionsUsed: keys,
+    kmRecordId: records.map((r) => r.id).join('+'),
+    extractionTier: records.every((r) => r.extractionTier === 'forensic-verified') ? 'forensic-verified' : (records.some((r) => r.extractionTier === 'forensic-verified') ? 'mixed' : 'registry-reshaped'),
+    technicalGateOpen: includeTechnical,
+    recoveryGateOpen: includeRecovery,
+  };
+}
+
+module.exports = { conceptualRetrieve, resolveKnowledgeEvidenceAtoms, resolveKnowledgeRecords, filterRecordsByRelevance, isTechnicalQuestion, isRecoveryQuestion, DIMENSIONS_BY_TYPE };
