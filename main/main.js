@@ -94,6 +94,7 @@ async function _emitDeviceHealth() {
 // ── Last imported file pairs for optional checksum verification ───────────────
 // Populated after each import; holds { src, dest } for every copied file.
 let lastImportedFiles = [];
+let lastImportedSessionId = null; // multi-event import: id of the source-import session lastImportedFiles accumulates for
 
 // ── Global Import Index ───────────────────────────────────────────────────────
 // Persists { lowercaseFilename: { size, addedAt } } across sessions.
@@ -1038,6 +1039,11 @@ ipcMain.handle('import:commitTransaction', async (event, {
   source,
   importedBy,
   importMode,   // 'direct-nas' | 'local-first' | undefined
+  // Multi-event import (additive, both optional — absent for every single-event import):
+  progressEventPath = null,   // identity the renderer uses for this event; echoed on metadata:progress so
+                              // progress is attributed to THIS batch's event, not whichever event is current
+  importSessionId = null,     // shared by every event transaction of ONE multi-event source import: Deep Verify
+                              // then covers the whole session instead of only the last event's files
 }) => {
   let originalEventJson = null;
 
@@ -1140,9 +1146,16 @@ ipcMain.handle('import:commitTransaction', async (event, {
       });
     };
 
+    // Same importSessionId as the previous transaction → accumulate (importFileJobs itself
+    // replaces lastImportedFiles on every call). Different/absent id → its replace stands, so
+    // a stale earlier import can never leak into a later one's Deep Verify.
+    const _accumulateFrom = (typeof importSessionId === 'string' && importSessionId && importSessionId === lastImportedSessionId)
+      ? lastImportedFiles : null;
     let result;
     try {
       result = await importFileJobs(event, fileJobs, _teamImportProgress);
+      if (_accumulateFrom) lastImportedFiles = _accumulateFrom.concat(result.copiedFiles || []);
+      lastImportedSessionId = (typeof importSessionId === 'string' && importSessionId) ? importSessionId : null;
     } catch (err) {
       // Copy failed — no archive writes completed; release locks immediately.
       _releaseDirectNasLocks(_directNasLocks);
@@ -1314,7 +1327,10 @@ ipcMain.handle('import:commitTransaction', async (event, {
         eventJsonPath:    eventJsonPath ? path.join(eventJsonPath, 'event.json') : null,
       };
       const baseEmit = win
-        ? (p) => { if (!win.isDestroyed()) win.webContents.send('metadata:progress', p); }
+        ? (p) => {
+            if (win.isDestroyed()) return;
+            win.webContents.send('metadata:progress', progressEventPath ? { ...p, eventPath: progressEventPath } : p);
+          }
         : null;
 
       // emitFn is non-null when a window is open OR when locks need deferred release.
