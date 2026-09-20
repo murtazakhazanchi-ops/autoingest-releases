@@ -336,6 +336,12 @@ function prefixRemapper(pairs) {
   return k => { for (const [f, t] of list) if (k.startsWith(f)) return t + k.slice(f.length); return undefined; };
 }
 
+/** applyRenames' {from,to,scopeRel} folder renames → {fromPrefix,toPrefix} event-relative directory pairs. */
+function prefixPairsFromRenames(renames) {
+  const join = (scopeRel, name) => (scopeRel ? `${scopeRel}/${name}` : name);
+  return (renames || []).map(r => ({ fromPrefix: join(r.scopeRel, r.from), toPrefix: join(r.scopeRel, r.to) }));
+}
+
 // ── Local First scoped merge ──────────────────────────────────────────────────────────
 
 /**
@@ -371,7 +377,7 @@ module.exports = {
   getIntent, integrityErrorFor,
   mergeTagRefinements, mergeMetadataGroups,
   buildImportIntentDelta,
-  remapTagRefinements, remapMetadataGroups, exactPairRemapper, prefixRemapper,
+  remapTagRefinements, remapMetadataGroups, exactPairRemapper, prefixRemapper, prefixPairsFromRenames,
   syncMergeIntent,
   // exposed for tests
   _parseTagRefinements: raw => parseBuckets(raw, TR_SPEC),

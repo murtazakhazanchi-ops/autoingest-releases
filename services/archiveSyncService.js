@@ -14,6 +14,8 @@
 const fsp    = require('fs').promises;
 const fs     = require('fs');
 const path   = require('path');
+const eventMetadataIntent = require('./eventMetadataIntent');
+const { updateEventJsonAtomic } = require('../main/eventJsonStore');
 const crypto = require('crypto');
 
 const {
@@ -71,6 +73,17 @@ async function _safeRenamedPath(destPath) {
       throw e;
     }
   }
+}
+
+/**
+ * Remember which local file landed at which archive path (the ACTUAL final destination — after any
+ * conflict rename or photographer-folder remap). Durable metadata intent is keyed by event-relative
+ * destination path, so the event.json merge needs this mapping. Non-enumerable: never serialized into
+ * persisted sync results.
+ */
+function _recordCopy(result, localPath, finalDest) {
+  if (!result._copiedPairs) Object.defineProperty(result, '_copiedPairs', { value: [], enumerable: false });
+  result._copiedPairs.push({ from: localPath, to: finalDest });
 }
 
 /**
@@ -162,7 +175,8 @@ async function _syncDir(localDir, archiveDir, result, depth = 0, abortSignal = n
     if (destStat === null) {
       // Destination does not exist — copy
       try {
-        const { wasRenamed } = await _copyFile(localPath, archivePath);
+        const { finalDest, wasRenamed } = await _copyFile(localPath, archivePath);
+        _recordCopy(result, localPath, finalDest);
         if (_isSidecar(entry.name)) result.sidecarsCopied++;
         else result.copiedToArchive++;
         if (wasRenamed) result.renamedConflicts++;
@@ -191,7 +205,8 @@ async function _syncDir(localDir, archiveDir, result, depth = 0, abortSignal = n
       } else {
         try {
           const safeDest = await _safeRenamedPath(archivePath);
-          await _copyFile(localPath, safeDest);
+          const { finalDest: renamedTo } = await _copyFile(localPath, safeDest);
+          _recordCopy(result, localPath, renamedTo);
           result.renamedConflicts++;
           result.copiedToArchive++;
           onFileProgress?.(entry.name, 'copied');
@@ -217,7 +232,8 @@ async function _syncDir(localDir, archiveDir, result, depth = 0, abortSignal = n
         onFileProgress?.(entry.name, 'skipped');
       } else {
         const safeDest = await _safeRenamedPath(archivePath);
-        await _copyFile(localPath, safeDest);
+        const { finalDest: renamedTo } = await _copyFile(localPath, safeDest);
+        _recordCopy(result, localPath, renamedTo);
         result.renamedConflicts++;
         result.copiedToArchive++;
         onFileProgress?.(entry.name, 'copied');
@@ -251,7 +267,8 @@ async function _syncOneFile(localPath, archivePath, filename, result, abortSigna
 
   if (destStat === null) {
     try {
-      const { wasRenamed } = await _copyFile(localPath, archivePath);
+      const { finalDest, wasRenamed } = await _copyFile(localPath, archivePath);
+      _recordCopy(result, localPath, finalDest);
       if (_isSidecar(filename)) result.sidecarsCopied++;
       else result.copiedToArchive++;
       if (wasRenamed) result.renamedConflicts++;
@@ -279,7 +296,8 @@ async function _syncOneFile(localPath, archivePath, filename, result, abortSigna
     } else {
       try {
         const safeDest = await _safeRenamedPath(archivePath);
-        await _copyFile(localPath, safeDest);
+        const { finalDest: renamedTo } = await _copyFile(localPath, safeDest);
+        _recordCopy(result, localPath, renamedTo);
         result.renamedConflicts++;
         result.copiedToArchive++;
         onFileProgress?.(filename, 'copied');
@@ -304,7 +322,8 @@ async function _syncOneFile(localPath, archivePath, filename, result, abortSigna
       onFileProgress?.(filename, 'skipped');
     } else {
       const safeDest = await _safeRenamedPath(archivePath);
-      await _copyFile(localPath, safeDest);
+      const { finalDest: renamedTo } = await _copyFile(localPath, safeDest);
+      _recordCopy(result, localPath, renamedTo);
       result.renamedConflicts++;
       result.copiedToArchive++;
       onFileProgress?.(filename, 'copied');
@@ -421,14 +440,23 @@ async function _buildArchiveOverrides(relPaths, archiveEventPath) {
  * Sync event.json from the staging event folder to the archive event folder.
  * Called at every successful sync exit point.
  *
- * Case A — archive event.json absent: copy staging version wholesale.
- * Case B — archive event.json present: merge new imports[] entries only.
- *   Only imports, lastImport, status, updatedAt are updated; all other archive
- *   fields (components, hijriDate, metadata) remain authoritative in the archive.
+ * Case A — archive event.json absent: copy staging version wholesale (staging is authoritative).
+ * Case B — archive event.json present: the archive stays authoritative for components, hijriDate,
+ *   metadata state etc. Only these change:
+ *     • imports / lastImport / status / updatedAt — new import entries merged by id (unchanged rule)
+ *     • durable metadata intent (tagRefinements + metadataGroups) — SCOPED to the files this sync
+ *       job actually copied (`copiedPairs`, the real local→archive paths incl. conflict renames and
+ *       photographer-folder remaps): staging is authoritative for exactly those files (its record,
+ *       or its absence = Default), and the archive is authoritative for everything else — so a
+ *       routine sync can never erase archive-side intent, and skipped duplicates / other devices'
+ *       files are never touched. See eventMetadataIntent.syncMergeIntent.
+ *   The write goes through updateEventJsonAtomic (in-process serialization with every other
+ *   event.json writer). NOTE: that protects a single AutoIngest process only — two machines
+ *   writing the same NAS event.json can still race (a separate, pre-existing limitation).
  *
  * Non-fatal: logs a warning and continues on any error.
  */
-async function _copyEventJsonIfNeeded(localEventPath, archiveEventPath) {
+async function _copyEventJsonIfNeeded(localEventPath, archiveEventPath, copiedPairs = []) {
   const localJsonPath   = path.join(localEventPath,  'event.json');
   const archiveJsonPath = path.join(archiveEventPath, 'event.json');
 
@@ -463,36 +491,49 @@ async function _copyEventJsonIfNeeded(localEventPath, archiveEventPath) {
     return;
   }
 
-  // Case B: archive already has event.json — merge imports by id-deduplication
-  const localImports   = Array.isArray(localDoc.imports)   ? localDoc.imports   : [];
-  const archiveImports = Array.isArray(archiveDoc.imports) ? archiveDoc.imports : [];
+  // Case B: staging-relative → archive-relative keys for exactly the files this job copied.
+  const pairs = [];
+  for (const cp of copiedPairs || []) {
+    const fromRel = eventMetadataIntent.fileRelKey(localEventPath, cp.from);
+    const toRel   = eventMetadataIntent.fileRelKey(archiveEventPath, cp.to);
+    if (fromRel !== null && toRel !== null) pairs.push({ fromRel, toRel });
+  }
 
-  if (localImports.length === 0) return; // nothing to merge
-
-  const mergedMap = new Map();
-  [...archiveImports, ...localImports].forEach(entry => {
-    if (entry && typeof entry.id === 'string') mergedMap.set(entry.id, entry);
-  });
-  const merged = Array.from(mergedMap.values());
-
-  if (merged.length === archiveImports.length) return; // no new entries added
-
-  const updated = {
-    ...archiveDoc,
-    imports:    merged,
-    lastImport: localDoc.lastImport ?? archiveDoc.lastImport,
-    status:     localDoc.status     ?? archiveDoc.status,
-    updatedAt:  localDoc.updatedAt  ?? archiveDoc.updatedAt,
+  // Pure function of the freshest archive document — evaluated once up front to skip a needless
+  // rewrite (as before), and again inside the atomic update against the truly-latest document.
+  const computeChanges = (doc) => {
+    const changes = {};
+    const localImports   = Array.isArray(localDoc.imports) ? localDoc.imports : [];
+    const archiveImports = Array.isArray(doc.imports)      ? doc.imports      : [];
+    if (localImports.length > 0) {
+      const mergedMap = new Map();
+      [...archiveImports, ...localImports].forEach(entry => {
+        if (entry && typeof entry.id === 'string') mergedMap.set(entry.id, entry);
+      });
+      const merged = Array.from(mergedMap.values());
+      if (merged.length !== archiveImports.length) {                       // new entries added
+        changes.imports    = merged;
+        changes.lastImport = localDoc.lastImport ?? doc.lastImport;
+        changes.status     = localDoc.status     ?? doc.status;
+        changes.updatedAt  = localDoc.updatedAt  ?? doc.updatedAt;
+      }
+    }
+    if (pairs.length > 0) {
+      const m = eventMetadataIntent.syncMergeIntent(doc, localDoc, pairs);
+      if (m.tagRefinements.changed) changes.tagRefinements = m.tagRefinements.value;   // undefined drops the key
+      if (m.metadataGroups.changed) changes.metadataGroups = m.metadataGroups.value;
+      for (const note of m.notes) console.warn('[syncJob] intent merge:', note);
+    }
+    return changes;
   };
 
-  const tmpPath = archiveJsonPath + '.tmp';
+  if (Object.keys(computeChanges(archiveDoc)).length === 0) return;        // nothing to merge
+
   try {
-    await fsp.writeFile(tmpPath, JSON.stringify(updated, null, 2), 'utf8');
-    await fsp.rename(tmpPath, archiveJsonPath);
+    await updateEventJsonAtomic(archiveJsonPath, computeChanges);
     hidePathBestEffort(archiveJsonPath).catch(() => {});
   } catch (err) {
-    try { await fsp.unlink(tmpPath); } catch {}
-    console.warn('[syncJob] event.json import merge to archive failed:', err.message);
+    console.warn('[syncJob] event.json merge to archive failed:', err.message);
   }
 }
 
@@ -868,7 +909,7 @@ async function syncJob(job, { nasRoot, stagingRoot }, { progressCallback, pauseS
     return result;
   }
 
-  await _copyEventJsonIfNeeded(localEventPath, archiveEventPath);
+  await _copyEventJsonIfNeeded(localEventPath, archiveEventPath, result._copiedPairs || []);
 
   if (result.sidecarConflicts > 0) {
     result.ok      = true;
@@ -1048,4 +1089,8 @@ async function verifyJobChecksum(job, { nasRoot, stagingRoot, progressCallback }
   return result;
 }
 
-module.exports = { syncJob, verifyJobChecksum };
+module.exports = {
+  syncJob, verifyJobChecksum,
+  // Test-only: exposes the event.json merge so the scoped intent-merge rules can be verified directly.
+  _copyEventJsonIfNeeded,
+};

@@ -5259,6 +5259,26 @@ ipcMain.handle('event:getPhotographerFolders', async (_event, { localEventPath }
   }
 });
 
+/**
+ * Remap event.json's durable intent records (tagRefinements + metadataGroups) after AutoIngest renamed
+ * photographer folders. `renames` are applyRenames' {from,to,scopeRel} pairs.
+ */
+async function _remapEventIntentForRenames(eventFolderPath, renames) {
+  const remap = eventMetadataIntent.prefixRemapper(eventMetadataIntent.prefixPairsFromRenames(renames));
+  try {
+    await updateEventJsonAtomic(path.join(eventFolderPath, 'event.json'), (doc) => {
+      const changes = {};
+      const tr = eventMetadataIntent.remapTagRefinements(doc.tagRefinements, remap);
+      if (tr.changed) changes.tagRefinements = tr.value;
+      const mg = eventMetadataIntent.remapMetadataGroups(doc.metadataGroups, remap);
+      if (mg.changed) changes.metadataGroups = mg.value;
+      return changes;
+    });
+  } catch (err) {
+    log('warn', `[seq] intent key remap failed for ${eventFolderPath}: ${err.message}`);
+  }
+}
+
 ipcMain.handle('event:applyPhotographerSequence', async (_event, { localEventPath, scopedOrdered } = {}) => {
   if (!localEventPath || typeof localEventPath !== 'string') {
     return { ok: false, reason: 'localEventPath required' };
@@ -5350,6 +5370,12 @@ ipcMain.handle('event:applyPhotographerSequence', async (_event, { localEventPat
 
   // Apply filesystem renames (component-aware two-phase)
   const renameResult = await photographerSeqService.applyRenames(realEvent, fullScopedOrdered);
+  // Durable metadata intent is keyed by event-relative path, so a folder rename must move its keys —
+  // from the actual rename pairs (never fuzzy matching), for exactly the renames in effect on disk,
+  // even when a later scope failed.
+  if (renameResult.renames && renameResult.renames.length > 0) {
+    await _remapEventIntentForRenames(realEvent, renameResult.renames);
+  }
   if (!renameResult.ok) {
     log('warn', `[seq] Rename failed: ${renameResult.error}`);
     return { ok: false, reason: renameResult.error };
