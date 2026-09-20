@@ -179,6 +179,18 @@ function resolveExpectedMetadata(evidence) {
       };
     }
 
+    // Fail closed: a group whose persisted intent record (tagRefinements / metadataGroups) is
+    // malformed or conflicting must never be silently reinterpreted as Default — destructive
+    // workflows (Repair, Reapply) would otherwise restore removed tags. Set only by
+    // eventEvidenceReconstruction; the renderer's import payload never carries it.
+    if (group && typeof group.intentIntegrityError === 'string' && group.intentIntegrityError) {
+      return {
+        status: 'ambiguous', ambiguityReason: group.intentIntegrityError,
+        ..._emptyFields(), metadataContractVersion: METADATA_CONTRACT_VERSION, resolverVersion: RESOLVER_VERSION,
+        evidenceSource: [...evidenceSource, 'intent:integrity-error'],
+      };
+    }
+
     // Tier 0 — per-file Tag Refinement override. Lives on the already-resolved group
     // (group.fileTagRefinements, keyed by normalized absolute source path) rather than
     // as a separate evidence field — it is a finer-grained layer on top of the same

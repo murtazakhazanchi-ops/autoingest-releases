@@ -303,5 +303,29 @@ t('legacy metadataGroups override (single-component) still includes Additional K
   });
 }
 
+// ── Fail-closed hook (durable-intent reconstruction, D3) ───────────────────────────────
+{
+  const F = '/arc/Ev/Jane Doe/x.cr2';
+  const comp = { location: 'Hall', city: 'Surat', country: 'India', types: ['Ziyarat'], folderName: null, additionalKeywords: [{ label: 'Quran Tilawat' }] };
+  const ev = (groupExtra = {}) => ({ filePath: F, groups: [{ id: 'root', subEventId: null, files: [F], ...groupExtra }], diskComponents: [comp] });
+
+  t('group.intentIntegrityError ⇒ ambiguous with that reason, NO keywords (nothing for Repair/Reapply to write)', () => {
+    const r = resolveExpectedMetadata(ev({ intentIntegrityError: 'tag-refinement-record-conflict' }));
+    assert.equal(r.status, 'ambiguous'); assert.equal(r.ambiguityReason, 'tag-refinement-record-conflict');
+    assert.deepEqual(r.keywords, []); assert.ok(r.evidenceSource.includes('intent:integrity-error'));
+  });
+  t('the hook is inert when absent / empty — existing evidence resolves exactly as before, including explicit-empty overrides', () => {
+    assert.equal(resolveExpectedMetadata(ev()).status, 'resolved');
+    assert.equal(resolveExpectedMetadata(ev({ intentIntegrityError: '' })).status, 'resolved');
+    assert.equal(resolveExpectedMetadata(ev({ intentIntegrityError: null })).status, 'resolved');
+    const r = resolveExpectedMetadata(ev({ fileTagRefinements: { [F]: { eventTypes: [], additionalKeywords: [] } } }));
+    assert.deepEqual(r.keywords, ['Hall', 'Surat', 'India']);
+  });
+  t('metadataTags [] (explicit legacy state) suppresses the Event Type; absent metadataTags keeps the default', () => {
+    assert.deepEqual(resolveExpectedMetadata(ev({ metadataTags: [] })).keywords, ['Quran Tilawat', 'Hall', 'Surat', 'India']);
+    assert.deepEqual(resolveExpectedMetadata(ev()).keywords, ['Ziyarat', 'Quran Tilawat', 'Hall', 'Surat', 'India']);
+  });
+}
+
 console.log(`${passed} passed`);
 if (process.exitCode) console.log('SOME TESTS FAILED');
