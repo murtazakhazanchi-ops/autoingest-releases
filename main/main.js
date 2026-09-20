@@ -55,7 +55,7 @@ const metadataAuditService  = require('../services/metadataAuditService');
 const metadataAuditExport   = require('../services/metadataAuditExport');
 const metadataRepairService = require('./metadataRepairService');
 const metadataSyncService = require('./metadataSyncService');
-const { resolvePhotographerFromPath } = require('../services/eventEvidenceReconstruction');
+const { buildEventEvidenceContext } = require('../services/eventEvidenceReconstruction');
 const eventMetadataIntent = require('../services/eventMetadataIntent');
 const realtimeOps              = require('../services/realtimeOperationsService');
 const offlineCollectionRegistry    = require('../services/offlineCollectionRegistryService');
@@ -948,47 +948,9 @@ async function _verifyAndReconcile(eventJsonFilePath, files, context) {
  * already has to solve this same problem.
  */
 function _buildTransferVerificationContext(eventFolderPath, eventJson, filesForEvent) {
-  const components = Array.isArray(eventJson?.components) ? eventJson.components : [];
-  const isMulti = components.length > 1;
-  const imports = Array.isArray(eventJson?.imports) ? eventJson.imports : [];
-  const fallbackPhotographer = imports.length > 0 ? (imports[imports.length - 1].photographer || '') : '';
-
-  const resolvePhotographer = (filePath, baseDir) => resolvePhotographerFromPath(filePath, baseDir, fallbackPhotographer);
-
-  const groups = [];
-  const filesWithPhotographer = [];
-
-  if (!isMulti) {
-    groups.push({ id: 'root', subEventId: null, files: filesForEvent.map(f => f.dest) });
-    for (const f of filesForEvent) {
-      filesWithPhotographer.push({ ...f, photographer: resolvePhotographer(f.dest, eventFolderPath) });
-    }
-  } else {
-    const matched = new Set();
-    for (const comp of components) {
-      if (!comp.folderName) continue;
-      const compDir  = path.join(eventFolderPath, comp.folderName) + path.sep;
-      const compFiles = filesForEvent.filter(f => f.dest.startsWith(compDir));
-      if (compFiles.length === 0) continue;
-      groups.push({ id: comp.folderName, subEventId: comp.folderName, files: compFiles.map(f => f.dest) });
-      for (const f of compFiles) {
-        filesWithPhotographer.push({ ...f, photographer: resolvePhotographer(f.dest, path.join(eventFolderPath, comp.folderName)) });
-        matched.add(f.dest);
-      }
-    }
-    for (const f of filesForEvent) {
-      if (!matched.has(f.dest)) filesWithPhotographer.push({ ...f, photographer: fallbackPhotographer || null });
-    }
-  }
-
-  return {
-    context: {
-      photographer: fallbackPhotographer, hijriDate: eventJson?.hijriDate || null,
-      eventDescription: eventJson?.eventName || null, groups, diskComponents: components,
-      eventJsonPath: path.join(eventFolderPath, 'event.json'),
-    },
-    files: filesWithPhotographer,
-  };
+  // Same durable-intent reconstruction as Audit/Repair/resume/Reapply — a correctly refined or MetaPicker
+  // file must verify as complete, not be flagged incomplete and re-queued for rewrite.
+  return buildEventEvidenceContext(eventFolderPath, eventJson, filesForEvent);
 }
 
 /**
@@ -3782,15 +3744,9 @@ ipcMain.handle('metadata:reapplyEvent', async (_event, eventFolderPath) => {
   }
 
   const components      = Array.isArray(eventJson?.components) ? eventJson.components : [];
-  const hijriDate       = eventJson?.hijriDate || null;
-  const imports         = Array.isArray(eventJson?.imports) ? eventJson.imports : [];
-  // Fallback photographer used when path derivation yields an empty segment.
-  const fallbackPhotographer = imports.length > 0 ? (imports[imports.length - 1].photographer || '') : '';
   const eventName       = path.basename(eventFolderPath);
   const collName        = path.basename(path.dirname(eventFolderPath));
   const isMulti         = components.length > 1;
-  // Persisted metadata grouping: relPath → metadataTags[], built from last grouping import.
-  const savedMetaGroups = Array.isArray(eventJson?.metadataGroups) ? eventJson.metadataGroups : null;
 
   const cfg        = require('../config/app.config');
   const MEDIA_EXTS = new Set([...cfg.PHOTO_EXTENSIONS, ...cfg.VIDEO_EXTENSIONS]);
@@ -3813,69 +3769,23 @@ ipcMain.handle('metadata:reapplyEvent', async (_event, eventFolderPath) => {
     return files;
   }
 
-  // Resolve photographer from archive folder structure.
-  // Single-component:  eventFolder/<photographer>/[VIDEO/]filename
-  // Multi-component:   eventFolder/<comp>/<photographer>/[VIDEO/]filename
-  // In both cases the photographer segment is always parts[0] relative to baseDir.
-  function resolvePhotographer(filePath, baseDir) {
-    return resolvePhotographerFromPath(filePath, baseDir, fallbackPhotographer);
-  }
-
-  const groups      = [];
-  const copiedFiles = [];
-
+  // Scan (unchanged): single-component → the whole event folder; multi-component → each component's own
+  // folder (a component with no folderName is never scanned).
+  const scanned = [];
   if (!isMulti) {
-    const rawFiles = await scanMediaDir(eventFolderPath, 0);
-
-    if (savedMetaGroups) {
-      // Reconstruct per-tag groups from the persisted mapping so reapply writes
-      // the same keyword assignments that were chosen during the original import.
-      const relToTags = new Map();
-      for (const mg of savedMetaGroups) {
-        if (!Array.isArray(mg.metadataTags)) continue;
-        for (const relPath of (mg.relPaths || [])) {
-          relToTags.set(path.normalize(relPath), mg.metadataTags);
-        }
-      }
-      const buckets  = new Map(); // JSON(tags) → files[]
-      const noTagFiles = [];
-      for (const f of rawFiles) {
-        const rel  = path.normalize(path.relative(eventFolderPath, f));
-        const tags = relToTags.get(rel);
-        if (Array.isArray(tags)) {
-          const key = JSON.stringify(tags);
-          if (!buckets.has(key)) buckets.set(key, { tags, files: [] });
-          buckets.get(key).files.push(f);
-        } else {
-          noTagFiles.push(f);
-        }
-      }
-      let gid = 1;
-      for (const [, { tags, files }] of buckets) {
-        groups.push({ id: `meta-${gid++}`, subEventId: null, files, metadataTags: tags });
-      }
-      if (noTagFiles.length > 0) {
-        groups.push({ id: 'meta-untagged', subEventId: null, files: noTagFiles, metadataTags: null });
-      }
-    } else {
-      groups.push({ id: 'root', subEventId: null, files: rawFiles });
-    }
-
-    for (const f of rawFiles) {
-      copiedFiles.push({ src: f, dest: f, photographer: resolvePhotographer(f, eventFolderPath) });
-    }
+    scanned.push(...await scanMediaDir(eventFolderPath, 0));
   } else {
     for (const comp of components) {
       if (!comp.folderName) continue;
-      const compDir  = path.join(eventFolderPath, comp.folderName);
-      const rawFiles = await scanMediaDir(compDir, 0);
-      if (rawFiles.length === 0) continue;
-      groups.push({ id: comp.folderName, subEventId: comp.folderName, files: rawFiles });
-      for (const f of rawFiles) {
-        copiedFiles.push({ src: f, dest: f, photographer: resolvePhotographer(f, compDir) });
-      }
+      scanned.push(...await scanMediaDir(path.join(eventFolderPath, comp.folderName), 0));
     }
   }
+
+  // Expected metadata comes from the ONE common reconstruction path (durable Tier 0 tagRefinements +
+  // Tier 1 metadataGroups from event.json, then the component default) — Reapply carries no precedence or
+  // refinement logic of its own, and needs neither the original source/card nor any renderer state.
+  const { context: reapplyBase, files: copiedFiles } = buildEventEvidenceContext(
+    eventFolderPath, eventJson, scanned.map(f => ({ src: f, dest: f })));
 
   if (copiedFiles.length === 0) {
     return { ok: false, error: 'No eligible media files found in event folder' };
@@ -3884,16 +3794,7 @@ ipcMain.handle('metadata:reapplyEvent', async (_event, eventFolderPath) => {
   const batchId = `reapply-${Date.now().toString(36)}`;
   const win     = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
   const reapplyEventJsonPath = path.join(eventFolderPath, 'event.json');
-  const reapplyContext = {
-    photographer:     fallbackPhotographer,
-    eventName,
-    collName,
-    hijriDate,
-    eventDescription: eventJson?.eventName || null,
-    groups,
-    diskComponents:   components,
-    eventJsonPath:    reapplyEventJsonPath,
-  };
+  const reapplyContext = { ...reapplyBase, eventName, collName, eventJsonPath: reapplyEventJsonPath };
   const baseEmit = win
     ? (p) => { if (!win.isDestroyed()) win.webContents.send('metadata:progress', p); }
     : null;
