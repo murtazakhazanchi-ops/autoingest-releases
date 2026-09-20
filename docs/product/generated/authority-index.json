@@ -1276,6 +1276,37 @@
         "AI-RM-010"
       ],
       "topic": "Multi-Channel Release & Update System"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-058_MULTI_EVENT_IMPORT.md",
+      "canonicalTechnicalDocs": [
+        "docs/multi-event-import.md",
+        "docs/group-manager.md",
+        "docs/ingestion-flow.md",
+        "docs/system-contracts.md",
+        "docs/ui-system.md",
+        "docs/features.md #16"
+      ],
+      "codeAreas": [
+        "renderer/importSession.js",
+        "renderer/groupManager.js",
+        "main/main.js",
+        "docs/multi-event-import.md",
+        "test/importSession.test.js"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-058_MULTI_EVENT_IMPORT.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-058",
+      "relatedBugs": [],
+      "relatedDecisions": [
+        "DEC-019"
+      ],
+      "relatedPostmortems": [],
+      "roadmapIds": [
+        "AI-RM-011"
+      ],
+      "topic": "Multi-Event Import"
     }
   ]
 }

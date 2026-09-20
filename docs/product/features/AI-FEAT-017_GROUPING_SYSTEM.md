@@ -47,6 +47,7 @@ Introduced as part of the v0.7.x "Core System Architecture" milestone (`docs/his
 ## Evolution / Implementation Journal
 
 - **v0.7.x** — grouping system introduced.
+- **2026-09-20 — superseded statement (Multi-Event Import).** The Summary's "reset on event change" describes the original design: GroupManager was a singleton reset whenever the event changed. **Superseded** on branch `feature/multi-event-import` (AI-FEAT-058, [DEC-019](../decisions/DEC-019_MULTI_EVENT_IMPORT_ARCHITECTURE.md)): `renderer/groupManager.js` now exports a facade plus `createGroupManager()`, each participating event owns an isolated instance, and the invariant is "group/component state must never leak across events". The rules above (groups never empty, one group → one sub-event, one group per file) are unchanged and apply per instance. Not yet merged/released.
 
 ## Engineering Evolution
 

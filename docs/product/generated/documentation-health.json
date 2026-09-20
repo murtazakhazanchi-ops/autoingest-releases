@@ -4,8 +4,8 @@
     {
       "file": "11_ARCHITECTURAL_EVOLUTION.md",
       "level": "information",
-      "message": "40/57 features placed in the architectural-evolution relationship map",
-      "note": "Unplaced: AI-FEAT-002, AI-FEAT-003, AI-FEAT-005, AI-FEAT-007, AI-FEAT-008, AI-FEAT-010, AI-FEAT-012, AI-FEAT-013, AI-FEAT-014, AI-FEAT-015, AI-FEAT-016, AI-FEAT-017, AI-FEAT-023, AI-FEAT-026, AI-FEAT-034, AI-FEAT-035, AI-FEAT-048",
+      "message": "42/58 features placed in the architectural-evolution relationship map",
+      "note": "Unplaced: AI-FEAT-002, AI-FEAT-003, AI-FEAT-005, AI-FEAT-007, AI-FEAT-008, AI-FEAT-010, AI-FEAT-012, AI-FEAT-013, AI-FEAT-014, AI-FEAT-015, AI-FEAT-016, AI-FEAT-023, AI-FEAT-026, AI-FEAT-034, AI-FEAT-035, AI-FEAT-048",
       "rule": "architecture-coverage"
     },
     {
@@ -401,6 +401,13 @@
       "rule": "documentation-completeness"
     },
     {
+      "file": "features/AI-FEAT-058_MULTI_EVENT_IMPORT.md",
+      "level": "evidence_gap",
+      "message": "AI-FEAT-058 has 1 evidence-pending marker(s)",
+      "note": null,
+      "rule": "documentation-completeness"
+    },
+    {
       "file": "features/AI-FEAT-005_APPLICATION_SETTINGS_CONFIGURATION_STORE.md",
       "level": "warning",
       "message": "AI-FEAT-005 is Implemented but cites no Related technical docs",
@@ -501,8 +508,8 @@
     {
       "file": "main/main.js",
       "level": "information",
-      "message": "main/main.js is explicitly owned by 6 features (shared, not exclusive)",
-      "note": "AI-FEAT-001, AI-FEAT-021, AI-FEAT-024, AI-FEAT-025, AI-FEAT-036, AI-FEAT-057",
+      "message": "main/main.js is explicitly owned by 7 features (shared, not exclusive)",
+      "note": "AI-FEAT-001, AI-FEAT-021, AI-FEAT-024, AI-FEAT-025, AI-FEAT-036, AI-FEAT-057, AI-FEAT-058",
       "rule": "shared-code-path"
     },
     {
@@ -562,6 +569,13 @@
       "rule": "shared-code-path"
     },
     {
+      "file": "renderer/groupManager.js",
+      "level": "information",
+      "message": "renderer/groupManager.js is explicitly owned by 2 features (shared, not exclusive)",
+      "note": "AI-FEAT-017, AI-FEAT-058",
+      "rule": "shared-code-path"
+    },
+    {
       "file": "main/fileManager.js",
       "level": "information",
       "message": "main/fileManager.js is explicitly owned by 2 features (shared, not exclusive)",
@@ -598,11 +612,11 @@
     }
   ],
   "schema_version": "1.2.0",
-  "source_commit": "fed471d5c7e2ac60b950460a52b6054fa0f092c1",
+  "source_commit": "9638a256f25f5f12b4d03898cc0f344d57ebb04b",
   "summary": {
     "error": 0,
-    "evidence_gap": 56,
-    "information": 14,
+    "evidence_gap": 57,
+    "information": 15,
     "warning": 15
   }
 }

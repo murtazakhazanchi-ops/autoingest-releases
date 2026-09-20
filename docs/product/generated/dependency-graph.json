@@ -427,6 +427,14 @@
     },
     {
       "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-011:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-009",
+      "target": "AI-RM-011"
+    },
+    {
+      "evidence_status": "explicit",
       "note": null,
       "provenance_path": "features/AI-FEAT-009_EVENT_CREATION.md#lifecycle-metadata:Related-architectural-evolution-sections",
       "relationship": "documented_by",
@@ -496,6 +504,14 @@
       "relationship": "depends_on",
       "source": "AI-FEAT-010",
       "target": "AI-FEAT-009"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-011:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-010",
+      "target": "AI-RM-011"
     },
     {
       "evidence_status": "explicit",
@@ -667,6 +683,22 @@
     },
     {
       "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-011:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-017",
+      "target": "AI-RM-011"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-019_MULTI_EVENT_IMPORT_ARCHITECTURE.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-017",
+      "target": "DEC-019"
+    },
+    {
+      "evidence_status": "explicit",
       "note": null,
       "provenance_path": "features/AI-FEAT-018_EVENT_COMPONENT_IMPORT_ROUTING.md#header-table:Dependencies",
       "relationship": "depends_on",
@@ -795,6 +827,14 @@
     },
     {
       "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-011:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-019",
+      "target": "AI-RM-011"
+    },
+    {
+      "evidence_status": "explicit",
       "note": null,
       "provenance_path": "features/AI-FEAT-019_IMPORT_PIPELINE_COPY_ENGINE.md#lifecycle-metadata:Related-architectural-evolution-sections",
       "relationship": "documented_by",
@@ -876,6 +916,14 @@
     {
       "evidence_status": "explicit",
       "note": null,
+      "provenance_path": "decisions/DEC-019_MULTI_EVENT_IMPORT_ARCHITECTURE.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-019",
+      "target": "DEC-019"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
       "provenance_path": "features/AI-FEAT-020_DUPLICATE_DETECTION.md#header-table:Dependencies",
       "relationship": "depends_on",
       "source": "AI-FEAT-020",
@@ -947,6 +995,14 @@
     },
     {
       "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-011:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-021",
+      "target": "AI-RM-011"
+    },
+    {
+      "evidence_status": "explicit",
       "note": null,
       "provenance_path": "features/AI-FEAT-021_ATOMIC_IMPORT_TRANSACTION.md#lifecycle-metadata:Related-architectural-evolution-sections",
       "relationship": "documented_by",
@@ -960,6 +1016,14 @@
       "relationship": "documented_by",
       "source": "AI-FEAT-021",
       "target": "ARCH-d-archive-integrity-and-transaction-safety"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-019_MULTI_EVENT_IMPORT_ARCHITECTURE.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-021",
+      "target": "DEC-019"
     },
     {
       "evidence_status": "explicit",
@@ -1091,6 +1155,14 @@
     },
     {
       "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-011:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-024",
+      "target": "AI-RM-011"
+    },
+    {
+      "evidence_status": "explicit",
       "note": null,
       "provenance_path": "features/AI-FEAT-024_SOURCE_CLEANUP.md#lifecycle-metadata:Related-architectural-evolution-sections",
       "relationship": "documented_by",
@@ -1136,6 +1208,14 @@
       "relationship": "governed_by",
       "source": "AI-FEAT-024",
       "target": "DEC-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-019_MULTI_EVENT_IMPORT_ARCHITECTURE.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-024",
+      "target": "DEC-019"
     },
     {
       "evidence_status": "explicit",
@@ -1187,6 +1267,14 @@
     },
     {
       "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-011:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-025",
+      "target": "AI-RM-011"
+    },
+    {
+      "evidence_status": "explicit",
       "note": null,
       "provenance_path": "features/AI-FEAT-025_CHECKSUM_BASED_FILE_VERIFICATION.md#lifecycle-metadata:Related-architectural-evolution-sections",
       "relationship": "documented_by",
@@ -1216,6 +1304,14 @@
       "relationship": "governed_by",
       "source": "AI-FEAT-025",
       "target": "DEC-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-019_MULTI_EVENT_IMPORT_ARCHITECTURE.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-025",
+      "target": "DEC-019"
     },
     {
       "evidence_status": "explicit",
@@ -2595,6 +2691,14 @@
     },
     {
       "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-011:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-044",
+      "target": "AI-RM-011"
+    },
+    {
+      "evidence_status": "explicit",
       "note": null,
       "provenance_path": "features/AI-FEAT-044_LOCAL_FIRST_BACKGROUND_ARCHIVE_SYNC.md#lifecycle-metadata:Related-architectural-evolution-sections",
       "relationship": "documented_by",
@@ -2640,6 +2744,14 @@
       "relationship": "governed_by",
       "source": "AI-FEAT-044",
       "target": "DEC-003"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-019_MULTI_EVENT_IMPORT_ARCHITECTURE.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-044",
+      "target": "DEC-019"
     },
     {
       "evidence_status": "explicit",
@@ -3316,6 +3428,134 @@
     {
       "evidence_status": "explicit",
       "note": null,
+      "provenance_path": "features/AI-FEAT-058_MULTI_EVENT_IMPORT.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-058",
+      "target": "AI-FEAT-009"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-058_MULTI_EVENT_IMPORT.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-058",
+      "target": "AI-FEAT-010"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-058_MULTI_EVENT_IMPORT.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-058",
+      "target": "AI-FEAT-012"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-058_MULTI_EVENT_IMPORT.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-058",
+      "target": "AI-FEAT-017"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-058_MULTI_EVENT_IMPORT.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-058",
+      "target": "AI-FEAT-018"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-058_MULTI_EVENT_IMPORT.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-058",
+      "target": "AI-FEAT-019"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-058_MULTI_EVENT_IMPORT.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-058",
+      "target": "AI-FEAT-020"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-058_MULTI_EVENT_IMPORT.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-058",
+      "target": "AI-FEAT-021"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-058_MULTI_EVENT_IMPORT.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-058",
+      "target": "AI-FEAT-024"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-058_MULTI_EVENT_IMPORT.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-058",
+      "target": "AI-FEAT-025"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-058_MULTI_EVENT_IMPORT.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-058",
+      "target": "AI-FEAT-028"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-058_MULTI_EVENT_IMPORT.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-058",
+      "target": "AI-FEAT-029"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-058_MULTI_EVENT_IMPORT.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-058",
+      "target": "AI-FEAT-044"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-058_MULTI_EVENT_IMPORT.md#header-table:Related-roadmap-milestone",
+      "relationship": "planned_in",
+      "source": "AI-FEAT-058",
+      "target": "AI-RM-011"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-058_MULTI_EVENT_IMPORT.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-058",
+      "target": "DEC-019"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-019_MULTI_EVENT_IMPORT_ARCHITECTURE.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-058",
+      "target": "DEC-019"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
       "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-001:Included-AI-FEAT-IDs",
       "relationship": "implements",
       "source": "AI-RM-001",
@@ -3616,6 +3856,30 @@
       "relationship": "governed_by",
       "source": "AI-RM-010",
       "target": "DEC-018"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-011:Included-AI-FEAT-IDs",
+      "relationship": "implements",
+      "source": "AI-RM-011",
+      "target": "AI-FEAT-058"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-011:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-RM-011",
+      "target": "AI-RM-010"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-019_MULTI_EVENT_IMPORT_ARCHITECTURE.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-RM-011",
+      "target": "DEC-019"
     },
     {
       "evidence_status": "explicit",
@@ -4634,6 +4898,12 @@
       "type": "feature"
     },
     {
+      "doc_path": "features/AI-FEAT-058_MULTI_EVENT_IMPORT.md",
+      "id": "AI-FEAT-058",
+      "label": "Multi-Event Import",
+      "type": "feature"
+    },
+    {
       "doc_path": "memory/AI-MEM-0001_METADATA_MANAGEMENT_MODAL_AUDIT_REPAIR_EVOLUTION.md",
       "id": "AI-MEM-0001",
       "label": "Metadata Management Modal Consolidation and Audit & Repair Tab Evolution",
@@ -4712,6 +4982,12 @@
       "type": "milestone"
     },
     {
+      "doc_path": "02_MASTER_ROADMAP.md",
+      "id": "AI-RM-011",
+      "label": "Multi-Event Import",
+      "type": "milestone"
+    },
+    {
       "doc_path": "11_ARCHITECTURAL_EVOLUTION.md#a-established-adobe-bridge-workflow-pre-autoingest",
       "id": "ARCH-a-established-adobe-bridge-workflow-pre-autoingest",
       "label": "A. Established Adobe Bridge Workflow (pre-AutoIngest)",
@@ -4769,6 +5045,12 @@
       "doc_path": "11_ARCHITECTURAL_EVOLUTION.md#multi-channel-release-architecture",
       "id": "ARCH-multi-channel-release-architecture",
       "label": "Multi-Channel Release Architecture",
+      "type": "architecture_section"
+    },
+    {
+      "doc_path": "11_ARCHITECTURAL_EVOLUTION.md#multi-event-import-architecture",
+      "id": "ARCH-multi-event-import-architecture",
+      "label": "Multi-Event Import Architecture",
       "type": "architecture_section"
     },
     {
@@ -4973,6 +5255,12 @@
       "doc_path": "decisions/DEC-018_PART_9_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM_DESIGN_AND_IMPLEMENTATION.md",
       "id": "DEC-018",
       "label": "Part 9 — Multi-Channel Release & Update System: design and implementation",
+      "type": "decision"
+    },
+    {
+      "doc_path": "decisions/DEC-019_MULTI_EVENT_IMPORT_ARCHITECTURE.md",
+      "id": "DEC-019",
+      "label": "Multi-Event Import Architecture",
       "type": "decision"
     },
     {

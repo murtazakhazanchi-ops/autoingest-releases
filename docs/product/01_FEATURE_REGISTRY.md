@@ -74,6 +74,7 @@ IDs are assigned once and never reused or renumbered, even if a feature is later
 | AI-FEAT-026 | Audit Integrity Verification (Count-Based) | Implemented | Operational | — | — | [features/AI-FEAT-026_AUDIT_INTEGRITY_VERIFICATION.md](features/AI-FEAT-026_AUDIT_INTEGRITY_VERIFICATION.md) |
 | AI-FEAT-027 | Activity Log | Implemented | Stable | — | — | [features/AI-FEAT-027_ACTIVITY_LOG.md](features/AI-FEAT-027_ACTIVITY_LOG.md) |
 | AI-FEAT-028 | Import Source Attribution | Implemented | Stable | — | — | [features/AI-FEAT-028_IMPORT_SOURCE_ATTRIBUTION.md](features/AI-FEAT-028_IMPORT_SOURCE_ATTRIBUTION.md) |
+| AI-FEAT-058 | Multi-Event Import | In active development | Experimental | — | AI-RM-011 | [features/AI-FEAT-058_MULTI_EVENT_IMPORT.md](features/AI-FEAT-058_MULTI_EVENT_IMPORT.md) |
 
 ## Metadata
 
@@ -152,9 +153,10 @@ IDs are assigned once and never reused or renumbered, even if a feature is later
 
 ## Totals
 
-- **57 features registered**: 49 Implemented-family (45 plain "Implemented", including AI-FEAT-057 + 4 "Implemented — evolving"), 0 "Partially implemented", 0 "In active development", 8 "Planned" (0% implementation confirmed for all 8).
+- **58 features registered**: 49 Implemented-family (45 plain "Implemented", including AI-FEAT-057 + 4 "Implemented — evolving"), 0 "Partially implemented", 1 "In active development" (AI-FEAT-058), 8 "Planned" (0% implementation confirmed for all 8).
 - Planned: 8 (all mapped 1:1 to AI-RM-002 through AI-RM-009, except AI-RM-001 which has no dedicated "planned" row because it is already complete — see AI-FEAT-033)
 - AI-FEAT-057 maps to AI-RM-010, a parallel release-infrastructure track outside the AI-RM-001…009 archive-capability sequence — see 02_MASTER_ROADMAP.md.
+- AI-FEAT-058 maps to AI-RM-011, a parallel ingestion-workflow track outside that sequence — see 02_MASTER_ROADMAP.md.
 
 ## Cross-Cutting Patterns (documented, not given their own AI-FEAT ID)
 

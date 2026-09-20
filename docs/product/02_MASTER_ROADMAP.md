@@ -8,6 +8,8 @@ Canonical, ordered implementation roadmap. Do not reorder unless the project own
 
 **AI-RM-010** (Multi-Channel Release & Update System) is a separate, parallel release-infrastructure track, not a continuation of the sequence above — see its own entry below. Status: **Completed** (logic-level; live pilot deferred).
 
+**AI-RM-011** (Multi-Event Import) is likewise a separate track, not a continuation of the AI-RM-001…009 archive-capability sequence: an ingestion-workflow enhancement. Status: **In progress** — implemented and verified on branch `feature/multi-event-import`; merge and release pending. See its own entry below.
+
 ---
 
 ## AI-RM-001 — Metadata Audit & Repair
@@ -177,3 +179,21 @@ Canonical, ordered implementation roadmap. Do not reorder unless the project own
 | Planned estimate | Single implementation session (2026-08-12) |
 | Current risks | The live pilot has not been run — real-world CI behavior (GitHub API rate limits, actual tag-creation race conditions between the two RC platform jobs, real signing-free artifact acceptance by target OSes) is unverified beyond the logic-level model. |
 | Next action | Awaiting explicit authorization to run the live pilot (an actual `rc-build` `workflow_dispatch` run) — see the Part 9 final report. |
+
+---
+
+## AI-RM-011 — Multi-Event Import
+
+| Field | Value |
+|---|---|
+| Status | **In progress** (implemented and verified on `feature/multi-event-import`; not yet merged to `stable/0.9` or released) |
+| Objective | Let an operator open one import source (card, drive, USB, local folder — source-agnostic), assign its files to several events, and import them in ONE pass, with every file routed and tagged by its own event, without weakening any copy-safety, naming, metadata or transaction rule. |
+| Included AI-FEAT IDs | AI-FEAT-058 |
+| Existing features extended | AI-FEAT-017 (Grouping System — per-event instances), AI-FEAT-019 (Import Pipeline & Copy Engine), AI-FEAT-021 (Atomic Import Transaction — orchestrated per event), AI-FEAT-009 / AI-FEAT-010 (event picker/creator reused), AI-FEAT-024 (Source Cleanup — eligibility unchanged), AI-FEAT-025 (Deep Verify accumulation), AI-FEAT-044 (Local First sync manifests per event) |
+| Dependencies | None — a parallel ingestion-workflow track (deliberately not written as a range of milestone IDs, per the note on AI-RM-010). |
+| Deliverables | `renderer/importSession.js`, `renderer/importSessionRunner.js`, `renderer/importSessionUI.js`, `renderer/metadataBatchTracker.js`; `createGroupManager()` factory + facade; EventCreator snapshot/capture/guard APIs; two additive `main/main.js` changes; `docs/multi-event-import.md`; 7 test files (unit + live). |
+| Acceptance criteria | Live verification with synthetic fixtures: camera-card-style and plain-folder sources; A→B→C→A switching without rescanning; one combined review and one import; exact per-event routing and per-event metadata isolation (real ExifTool); event-local failure continues and retries; source removal resets the session; exact cleanup list; new-event creation from inside the workspace; multi-event Local First; the original single-event path unchanged; no Tag Refinement code reintroduced. |
+| Planned estimate | Single implementation session (2026-09-20) |
+| Current risks | Merge and release verification not yet performed. Two import code paths coexist (transitional). Known limitations in `docs/multi-event-import.md` §11. Per-Photo Tag Refinement is held out of Stable and is not part of this milestone. |
+| Next action | Owner review of the final report; commit breakdown approval; merge decision. |
+

@@ -27,6 +27,22 @@
         "AI-FEAT-037"
       ]
     },
+    "docs/multi-event-import.md": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-019",
+        "AI-FEAT-020",
+        "AI-FEAT-021",
+        "AI-FEAT-022",
+        "AI-FEAT-023",
+        "AI-FEAT-024",
+        "AI-FEAT-025",
+        "AI-FEAT-026",
+        "AI-FEAT-027",
+        "AI-FEAT-028",
+        "AI-FEAT-058"
+      ]
+    },
     "main/driveDetector.js": {
       "confidence": "explicit",
       "features": [
@@ -63,7 +79,8 @@
         "AI-FEAT-035",
         "AI-FEAT-036",
         "AI-FEAT-037",
-        "AI-FEAT-057"
+        "AI-FEAT-057",
+        "AI-FEAT-058"
       ]
     },
     "main/exifService.js": {
@@ -103,7 +120,8 @@
         "AI-FEAT-025",
         "AI-FEAT-026",
         "AI-FEAT-027",
-        "AI-FEAT-028"
+        "AI-FEAT-028",
+        "AI-FEAT-058"
       ]
     },
     "main/main.js": {
@@ -135,7 +153,8 @@
         "AI-FEAT-035",
         "AI-FEAT-036",
         "AI-FEAT-037",
-        "AI-FEAT-057"
+        "AI-FEAT-057",
+        "AI-FEAT-058"
       ]
     },
     "main/metadataQueueRecovery.js": {
@@ -303,7 +322,18 @@
       "confidence": "explicit",
       "features": [
         "AI-FEAT-017",
-        "AI-FEAT-018"
+        "AI-FEAT-018",
+        "AI-FEAT-019",
+        "AI-FEAT-020",
+        "AI-FEAT-021",
+        "AI-FEAT-022",
+        "AI-FEAT-023",
+        "AI-FEAT-024",
+        "AI-FEAT-025",
+        "AI-FEAT-026",
+        "AI-FEAT-027",
+        "AI-FEAT-028",
+        "AI-FEAT-058"
       ]
     },
     "renderer/importRouter.js": {
@@ -311,6 +341,22 @@
       "features": [
         "AI-FEAT-017",
         "AI-FEAT-018"
+      ]
+    },
+    "renderer/importSession.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-019",
+        "AI-FEAT-020",
+        "AI-FEAT-021",
+        "AI-FEAT-022",
+        "AI-FEAT-023",
+        "AI-FEAT-024",
+        "AI-FEAT-025",
+        "AI-FEAT-026",
+        "AI-FEAT-027",
+        "AI-FEAT-028",
+        "AI-FEAT-058"
       ]
     },
     "renderer/index.html": {
@@ -376,7 +422,8 @@
         "AI-FEAT-036",
         "AI-FEAT-037",
         "AI-FEAT-047",
-        "AI-FEAT-057"
+        "AI-FEAT-057",
+        "AI-FEAT-058"
       ]
     },
     "renderer/splash.html": {
@@ -619,7 +666,8 @@
         "AI-FEAT-025",
         "AI-FEAT-026",
         "AI-FEAT-027",
-        "AI-FEAT-028"
+        "AI-FEAT-028",
+        "AI-FEAT-058"
       ]
     },
     "services/realtimeOperationsService.js": {
@@ -718,6 +766,22 @@
         "AI-FEAT-035",
         "AI-FEAT-036",
         "AI-FEAT-037"
+      ]
+    },
+    "test/importSession.test.js": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-019",
+        "AI-FEAT-020",
+        "AI-FEAT-021",
+        "AI-FEAT-022",
+        "AI-FEAT-023",
+        "AI-FEAT-024",
+        "AI-FEAT-025",
+        "AI-FEAT-026",
+        "AI-FEAT-027",
+        "AI-FEAT-028",
+        "AI-FEAT-058"
       ]
     },
     "test/metadataManagementModalUI.test.js": {
@@ -947,6 +1011,13 @@
       "scripts/product-docs/lib/updateChannelModel.js",
       "services/autoUpdater.js",
       "services/settings.js"
+    ],
+    "AI-FEAT-058": [
+      "docs/multi-event-import.md",
+      "main/main.js",
+      "renderer/groupManager.js",
+      "renderer/importSession.js",
+      "test/importSession.test.js"
     ]
   },
   "feature_to_tests": {
@@ -1051,7 +1122,16 @@
     "AI-FEAT-054": [],
     "AI-FEAT-055": [],
     "AI-FEAT-056": [],
-    "AI-FEAT-057": []
+    "AI-FEAT-057": [],
+    "AI-FEAT-058": [
+      "test/importSession.test.js",
+      "test/importSessionRunner.test.js",
+      "test/metadataBatchTracker.test.js",
+      "test/multiEventImportLive.test.js",
+      "test/multiEventImportUiLive.test.js",
+      "test/multiEventLocalFirstUiLive.test.js",
+      "test/multiEventNewEventUiLive.test.js"
+    ]
   },
   "ipc_to_features": {
     "SUBSYS-application-platform": {
@@ -1079,7 +1159,8 @@
         "AI-FEAT-025",
         "AI-FEAT-026",
         "AI-FEAT-027",
-        "AI-FEAT-028"
+        "AI-FEAT-028",
+        "AI-FEAT-058"
       ]
     },
     "SUBSYS-media-browsing": {
@@ -1163,7 +1244,8 @@
         "AI-FEAT-025",
         "AI-FEAT-026",
         "AI-FEAT-027",
-        "AI-FEAT-028"
+        "AI-FEAT-028",
+        "AI-FEAT-058"
       ]
     },
     "SUBSYS-media-browsing": {
@@ -1242,7 +1324,8 @@
       "AI-FEAT-025",
       "AI-FEAT-026",
       "AI-FEAT-027",
-      "AI-FEAT-028"
+      "AI-FEAT-028",
+      "AI-FEAT-058"
     ],
     "SUBSYS-media-browsing": [
       "AI-FEAT-013",
@@ -1306,6 +1389,12 @@
       "AI-FEAT-030",
       "AI-FEAT-033"
     ],
+    "test/importSession.test.js": [
+      "AI-FEAT-058"
+    ],
+    "test/importSessionRunner.test.js": [
+      "AI-FEAT-058"
+    ],
     "test/metadataAuditExport.test.js": [
       "AI-FEAT-029",
       "AI-FEAT-033"
@@ -1313,6 +1402,9 @@
     "test/metadataAuditService.test.js": [
       "AI-FEAT-029",
       "AI-FEAT-033"
+    ],
+    "test/metadataBatchTracker.test.js": [
+      "AI-FEAT-058"
     ],
     "test/metadataExpectationService.test.js": [
       "AI-FEAT-029"
@@ -1342,6 +1434,18 @@
     "test/metadataVerificationService.test.js": [
       "AI-FEAT-029",
       "AI-FEAT-032"
+    ],
+    "test/multiEventImportLive.test.js": [
+      "AI-FEAT-058"
+    ],
+    "test/multiEventImportUiLive.test.js": [
+      "AI-FEAT-058"
+    ],
+    "test/multiEventLocalFirstUiLive.test.js": [
+      "AI-FEAT-058"
+    ],
+    "test/multiEventNewEventUiLive.test.js": [
+      "AI-FEAT-058"
     ],
     "test/qmzLiveE2E.test.js": [
       "AI-FEAT-047"

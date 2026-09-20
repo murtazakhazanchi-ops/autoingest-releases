@@ -6,6 +6,17 @@ Append newest first. Never edit or delete a prior entry — if something was wro
 
 ---
 
+## 2026-09-20 — Multi-Event Import documented (AI-FEAT-058 / AI-RM-011 / DEC-019)
+
+- **Task type**: new feature, architecture (documentation of work implemented and verified on branch `feature/multi-event-import`; not yet merged or released). New records: [AI-FEAT-058](features/AI-FEAT-058_MULTI_EVENT_IMPORT.md), [AI-RM-011](02_MASTER_ROADMAP.md) (a parallel ingestion-workflow track), [DEC-019](decisions/DEC-019_MULTI_EVENT_IMPORT_ARCHITECTURE.md). New technical authority: `docs/multi-event-import.md`.
+- **What it documents**: one opened, source-agnostic import source → multiple event assignments → one final import. UI selection vs persistent assignment; Current Event vs Assigned Event; per-event GroupManager instances behind a facade; exclusive file→event ownership; one existing transaction per event (an orchestration — not filesystem-atomic); event-local failures continue, source-wide fatals stop; completed events clear while failed/not-started events stay assigned; per-batch metadata attribution and Local First manifests; Deep Verify aggregation; exact cleanup eligibility.
+- **Reconciled statement**: `docs/group-manager.md`'s "must reset on event change" is superseded by "group/component state must never leak across events" (guaranteed by isolated per-event instances) — recorded in DEC-019's Reconciliation Note; `docs/system-contracts.md`, `docs/ingestion-flow.md`, `docs/ui-system.md`, `docs/features.md` and `docs/CLAUDE.md` routing were updated; [AI-FEAT-017](features/AI-FEAT-017_GROUPING_SYSTEM.md) and [AI-FEAT-021](features/AI-FEAT-021_ATOMIC_IMPORT_TRANSACTION.md) received appended, marked notes (nothing deleted).
+- **Base**: built on `61eba47`, then re-cut onto `stable/0.9` `7f72e51` after `ac75466` intentionally held Per-Photo Tag Refinement out of v0.9.12. **Per-Photo Tag Refinement is not part of this feature and is not shipped by it**; the event workspace is documented as the future extension point.
+- **Review**: an independent code review found no CRITICAL/HIGH issues; valid findings were fixed and are journaled in AI-FEAT-058. One earlier claim (retry is idempotent by same-size skip) was superseded and is recorded as such.
+- **Evidence confidence**: verified from current code and tests (unit suites plus live Electron runs against synthetic fixtures only). Merge and release evidence is pending and marked as such.
+
+---
+
 ## 2026-08-13 — Fixed Product Documentation Validation CI failure (BUG-016)
 
 - **Task type**: small, targeted CI/tooling fix (systematic-debugging process: reproduced deterministically pre- and post-fix in a `node_modules`-less `git worktree` matching the real CI condition, not guessed).

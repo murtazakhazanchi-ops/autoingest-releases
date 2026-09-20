@@ -61,4 +61,5 @@
 | Archive Analytics | archive analytics | AI-FEAT-055 | AI-RM-008 | [features/AI-FEAT-055_ARCHIVE_ANALYTICS.md](../features/AI-FEAT-055_ARCHIVE_ANALYTICS.md) | — | explicit |
 | AI Archive Intelligence | ai archive intelligence | AI-FEAT-056 | AI-RM-009 | [features/AI-FEAT-056_AI_ARCHIVE_INTELLIGENCE.md](../features/AI-FEAT-056_AI_ARCHIVE_INTELLIGENCE.md) | — | explicit |
 | Multi-Channel Release & Update System | — | AI-FEAT-057 | AI-RM-010 | [features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md](../features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md) | .github/workflows/release.yml, scripts/product-docs/README.md | explicit |
+| Multi-Event Import | — | AI-FEAT-058 | AI-RM-011 | [features/AI-FEAT-058_MULTI_EVENT_IMPORT.md](../features/AI-FEAT-058_MULTI_EVENT_IMPORT.md) | docs/multi-event-import.md, docs/group-manager.md, docs/ingestion-flow.md, docs/system-contracts.md, docs/ui-system.md, docs/features.md #16 | explicit |
 

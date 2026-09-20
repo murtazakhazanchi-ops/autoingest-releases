@@ -152,22 +152,28 @@
 ## Import and Archive Writing (`SUBSYS-import-and-archive-writing`)
 
 **Aliases**: import pipeline, copy engine, duplicate detection, atomic import, photographer folder, quick import, source cleanup, checksum verification, audit integrity, activity log
-**Primary features**: AI-FEAT-019, AI-FEAT-020, AI-FEAT-021, AI-FEAT-022, AI-FEAT-023, AI-FEAT-024, AI-FEAT-025, AI-FEAT-026, AI-FEAT-027, AI-FEAT-028
-**Canonical technical docs**: CLAUDE.md § Transactional Ingest Layer, docs/data-model.md § Import Entry Schema, docs/failure-patterns.md #12, docs/failure-patterns.md #16, docs/features.md #10, docs/features.md #11, docs/features.md #5, docs/features.md #6, docs/features.md #8, docs/features.md #9, docs/ingestion-flow.md, docs/ingestion-flow.md § Duplicate Handling, docs/metadata-system.md § Non-Goals, docs/system-contracts.md §13, docs/system-contracts.md §4, docs/system-contracts.md §4-5
+**Primary features**: AI-FEAT-019, AI-FEAT-020, AI-FEAT-021, AI-FEAT-022, AI-FEAT-023, AI-FEAT-024, AI-FEAT-025, AI-FEAT-026, AI-FEAT-027, AI-FEAT-028, AI-FEAT-058
+**Canonical technical docs**: CLAUDE.md § Transactional Ingest Layer, docs/data-model.md § Import Entry Schema, docs/failure-patterns.md #12, docs/failure-patterns.md #16, docs/features.md #10, docs/features.md #11, docs/features.md #16, docs/features.md #5, docs/features.md #6, docs/features.md #8, docs/features.md #9, docs/group-manager.md, docs/ingestion-flow.md, docs/ingestion-flow.md § Duplicate Handling, docs/metadata-system.md § Non-Goals, docs/multi-event-import.md, docs/system-contracts.md, docs/system-contracts.md §13, docs/system-contracts.md §4, docs/system-contracts.md §4-5, docs/ui-system.md
 **Related bugs**: None recorded
 **Related decisions**: None recorded
 
 **Source directories**:
+- `docs`
 - `main`
 - `renderer`
 - `services`
+- `test`
 
 **Source files**:
+- `docs/multi-event-import.md`
 - `main/eventJsonStore.js`
 - `main/fileManager.js`
 - `main/main.js`
+- `renderer/groupManager.js`
+- `renderer/importSession.js`
 - `renderer/renderer.js`
 - `services/photographerSequenceService.js`
+- `test/importSession.test.js`
 
 **Change-impact checklist**:
 - Re-read the Related Files section of every primary feature listed above before changing shared source files.

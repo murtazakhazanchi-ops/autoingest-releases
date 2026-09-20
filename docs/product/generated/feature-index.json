@@ -474,7 +474,8 @@
       ],
       "dependents": [
         "AI-FEAT-010",
-        "AI-FEAT-018"
+        "AI-FEAT-018",
+        "AI-FEAT-058"
       ],
       "documentation_completeness": {
         "evidence_gap_count": 2,
@@ -530,7 +531,8 @@
       ],
       "dependents": [
         "AI-FEAT-027",
-        "AI-FEAT-050"
+        "AI-FEAT-050",
+        "AI-FEAT-058"
       ],
       "documentation_completeness": {
         "evidence_gap_count": 6,
@@ -643,7 +645,8 @@
       ],
       "dependents": [
         "AI-FEAT-024",
-        "AI-FEAT-028"
+        "AI-FEAT-028",
+        "AI-FEAT-058"
       ],
       "documentation_completeness": {
         "evidence_gap_count": 7,
@@ -890,7 +893,8 @@
       ],
       "dependents": [
         "AI-FEAT-013",
-        "AI-FEAT-018"
+        "AI-FEAT-018",
+        "AI-FEAT-058"
       ],
       "documentation_completeness": {
         "evidence_gap_count": 3,
@@ -907,7 +911,12 @@
         "Not yet covered in 11_ARCHITECTURAL_EVOLUTION.md's relationship map"
       ],
       "related_bugs": [],
-      "related_changelog_entries": [],
+      "related_changelog_entries": [
+        {
+          "date": "2026-09-20",
+          "excerpt": "**Reconciled statement**: `docs/group-manager.md`'s \"must reset on event change\" is superseded by \"group/component state must never leak across events\" (guaranteed by isolated per-event instances) — r"
+        }
+      ],
       "related_code_paths": [
         "renderer/groupManager.js"
       ],
@@ -942,7 +951,8 @@
       "dependents": [
         "AI-FEAT-009",
         "AI-FEAT-019",
-        "AI-FEAT-022"
+        "AI-FEAT-022",
+        "AI-FEAT-058"
       ],
       "documentation_completeness": {
         "evidence_gap_count": 3,
@@ -1001,7 +1011,8 @@
         "AI-FEAT-021",
         "AI-FEAT-024",
         "AI-FEAT-025",
-        "AI-FEAT-044"
+        "AI-FEAT-044",
+        "AI-FEAT-058"
       ],
       "documentation_completeness": {
         "evidence_gap_count": 4,
@@ -1116,7 +1127,8 @@
         "AI-FEAT-019"
       ],
       "dependents": [
-        "AI-FEAT-028"
+        "AI-FEAT-028",
+        "AI-FEAT-058"
       ],
       "documentation_completeness": {
         "evidence_gap_count": 3,
@@ -1133,7 +1145,12 @@
         "[§3D — D. Archive Integrity and Transaction Safety](../11_ARCHITECTURAL_EVOLUTION.md#d-archive-integrity-and-transaction-safety)"
       ],
       "related_bugs": [],
-      "related_changelog_entries": [],
+      "related_changelog_entries": [
+        {
+          "date": "2026-09-20",
+          "excerpt": "**Reconciled statement**: `docs/group-manager.md`'s \"must reset on event change\" is superseded by \"group/component state must never leak across events\" (guaranteed by isolated per-event instances) — r"
+        }
+      ],
       "related_code_paths": [
         "main/eventJsonStore.js",
         "main/main.js"
@@ -3294,6 +3311,99 @@
       "subfeatures": [],
       "summary": "Formalizes AutoIngest's release process into three isolated channels — Development (internal engineering builds, never published), RC/Preview (real tester acceptance before Stable, opt-in only), and Stable (the existing production release path, unchanged) — so a tester-facing build can exist without ever risking exposure to Stable users, and so a verified RC has an auditable, gated path to becoming the Stable release built from its exact source.",
       "timeline_path": "generated/feature-timelines/AI-FEAT-057_TIMELINE.md"
+    },
+    {
+      "aliases": [],
+      "canonical_document": "features/AI-FEAT-058_MULTI_EVENT_IMPORT.md",
+      "category": "Import and Archive Writing",
+      "dependencies": [
+        "AI-FEAT-009",
+        "AI-FEAT-010",
+        "AI-FEAT-012",
+        "AI-FEAT-017",
+        "AI-FEAT-018",
+        "AI-FEAT-019",
+        "AI-FEAT-021"
+      ],
+      "dependents": [],
+      "documentation_completeness": {
+        "evidence_gap_count": 1,
+        "narrative": "Complete for the implemented scope; merge/release evidence is pending (see fields above)"
+      },
+      "evidence_status": "Verified from current code (branch `feature/multi-event-import`, uncommitted at the time of writing), tests, and live synthetic runs. Not yet merged to `stable/0.9` or released — see Status.",
+      "feature_id": "AI-FEAT-058",
+      "introduced_version": "2026-09-20 (branch created from `stable/0.9`; implementation and verification the same session)",
+      "last_modified_version": "2026-09-20",
+      "maturity": "Experimental",
+      "name": "Multi-Event Import",
+      "parent_feature": [],
+      "related_architecture_sections": [
+        "[11_ARCHITECTURAL_EVOLUTION.md](../11_ARCHITECTURAL_EVOLUTION.md) — \"Multi-Event Import Architecture\""
+      ],
+      "related_bugs": [],
+      "related_changelog_entries": [
+        {
+          "date": "2026-09-20",
+          "excerpt": "## 2026-09-20 — Multi-Event Import documented (AI-FEAT-058 / AI-RM-011 / DEC-019)"
+        },
+        {
+          "date": "2026-09-20",
+          "excerpt": "**Task type**: new feature, architecture (documentation of work implemented and verified on branch `feature/multi-event-import`; not yet merged or released). New records: [AI-FEAT-058](features/AI-FEA"
+        },
+        {
+          "date": "2026-09-20",
+          "excerpt": "**Review**: an independent code review found no CRITICAL/HIGH issues; valid findings were fixed and are journaled in AI-FEAT-058. One earlier claim (retry is idempotent by same-size skip) was supersed"
+        }
+      ],
+      "related_code_paths": [
+        "renderer/importSession.js",
+        "renderer/groupManager.js",
+        "main/main.js",
+        "docs/multi-event-import.md",
+        "test/importSession.test.js"
+      ],
+      "related_decisions": [
+        "DEC-019"
+      ],
+      "related_features": [
+        "AI-FEAT-020",
+        "AI-FEAT-024",
+        "AI-FEAT-025",
+        "AI-FEAT-028",
+        "AI-FEAT-029",
+        "AI-FEAT-044"
+      ],
+      "related_postmortems": [],
+      "related_technical_docs": [
+        "docs/multi-event-import.md",
+        "docs/group-manager.md",
+        "docs/ingestion-flow.md",
+        "docs/system-contracts.md",
+        "docs/ui-system.md",
+        "docs/features.md #16"
+      ],
+      "related_tests": [
+        "test/importSession.test.js",
+        "test/importSessionRunner.test.js",
+        "test/metadataBatchTracker.test.js",
+        "test/multiEventImportLive.test.js",
+        "test/multiEventImportUiLive.test.js",
+        "test/multiEventLocalFirstUiLive.test.js",
+        "test/multiEventNewEventUiLive.test.js"
+      ],
+      "roadmap_ids": [
+        "AI-RM-011"
+      ],
+      "search_keywords": [
+        "event",
+        "import",
+        "import and archive writing",
+        "multi"
+      ],
+      "status": "In active development",
+      "subfeatures": [],
+      "summary": "Imports **one opened source into several events with one final Import**: one opened import source → multiple event assignments → one final import. The source can be any source the normal workflow supports (camera card, drive, USB, local folder); the model is deliberately source-agnostic. Files are assigned to events through persistent, exclusive file→event ownership; the operator switches the Current Event from inside the Import workspace (reusing the existing picker/creator, returning to the same un-rescanned workspace); one combined review validates every participating event; one Import runs one existing transaction per event.",
+      "timeline_path": "generated/feature-timelines/AI-FEAT-058_TIMELINE.md"
     }
   ],
   "schema_version": "1.2.0"
