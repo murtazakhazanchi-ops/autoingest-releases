@@ -1240,34 +1240,6 @@ ipcMain.handle('import:commitTransaction', async (event, {
       if (buckets.size > 0) metadataGroupsForDisk = Array.from(buckets.values());
     }
 
-    // Build tagRefinements for durability/audit (Per-Photo Tag Refinement feature):
-    // map dest-relative paths → per-file Event Type / Additional Keyword override,
-    // bucketed by identical combination. Independent of metadataGroupsForDisk above —
-    // that mechanism is single-component group-level keyword picking; this one is
-    // multi-component per-file refinement. Only populated when at least one group
-    // carries an explicit fileTagRefinements map.
-    let tagRefinementsForDisk = null;
-    if (Array.isArray(groups) && groups.some(g => g.fileTagRefinements && Object.keys(g.fileTagRefinements).length > 0) && result.copiedFiles?.length > 0) {
-      const srcToOverride = new Map();
-      for (const g of groups) {
-        if (!g.fileTagRefinements) continue;
-        for (const [src, override] of Object.entries(g.fileTagRefinements)) {
-          srcToOverride.set(path.normalize(src), override);
-        }
-      }
-      const refineBuckets = new Map(); // JSON([eventTypes,additionalKeywords]) → { eventTypes, additionalKeywords, relPaths }
-      for (const cf of result.copiedFiles) {
-        const override = srcToOverride.get(path.normalize(cf.src));
-        if (!override) continue;
-        const eventTypes = Array.isArray(override.eventTypes) ? override.eventTypes : [];
-        const additionalKeywords = Array.isArray(override.additionalKeywords) ? override.additionalKeywords : [];
-        const key = JSON.stringify([eventTypes, additionalKeywords]);
-        if (!refineBuckets.has(key)) refineBuckets.set(key, { eventTypes, additionalKeywords, relPaths: [] });
-        if (eventJsonPath) refineBuckets.get(key).relPaths.push(path.relative(eventJsonPath, cf.dest));
-      }
-      if (refineBuckets.size > 0) tagRefinementsForDisk = Array.from(refineBuckets.values());
-    }
-
     if (eventJsonPath) {
       // Single serialized read/merge/write: merge audit logs + set lastImport + set
       // status:'complete'. Routed through updateEventJsonAtomic (not a hand-rolled
@@ -1303,7 +1275,6 @@ ipcMain.handle('import:commitTransaction', async (event, {
           }
 
           if (metadataGroupsForDisk) changes.metadataGroups = metadataGroupsForDisk;
-          if (tagRefinementsForDisk) changes.tagRefinements = tagRefinementsForDisk;
           return changes;
         });
         hidePathBestEffort(jsonPath).catch(() => {});
