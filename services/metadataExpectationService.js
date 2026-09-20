@@ -11,9 +11,12 @@
  * Evidence hierarchy (strongest wins; a tie/contradiction between equally-strong
  * sources returns status:'ambiguous', never an inferred guess):
  *   0. Explicit per-file Tag Refinement override (group.fileTagRefinements, keyed by
- *      normalized absolute source path) — a multi-component-only, per-file override of
- *      the Event Type / Additional Keyword categories, layered on top of an already-
- *      resolved component. Independent of, and checked ahead of, tier 1.
+ *      normalized absolute source path) — a per-file override of the Event Type /
+ *      Additional Keyword categories, layered on top of an already-resolved component.
+ *      Applies to multi-component groups AND to the single import payload group
+ *      (id:0) a single-component event builds. Independent of, and checked ahead of,
+ *      tier 1. No entry = "inherit the pipeline default" (tiers 1/3), NOT "all tags":
+ *      a single-component event with 2+ Event Types deliberately defaults to none.
  *   1. Explicit per-file metadataGroups assignment ("metadata grouping mode").
  *   2. Explicit QMZ context (qmzComponent) — a directly-known, already-resolved
  *      component for the file being processed right now.
@@ -27,6 +30,7 @@
  */
 
 const path = require('path');
+const { defaultEventTypeTokens } = require('../renderer/refinableTags');
 
 const METADATA_CONTRACT_VERSION = 1;
 const RESOLVER_VERSION = 1;
@@ -79,20 +83,15 @@ function _buildKeywords({ component, isMulti, explicitTags, eventTypeOverride, a
     const country  = (typeof component.country  === 'string' ? component.country  : '') || '';
 
     // Event Type tags — Tag Refinement override wins over the legacy metadataGroups
-    // override, which wins over the derived type-split default.
+    // override, which wins over the derived type-split default. The default/legacy
+    // branches live in renderer/refinableTags.js (defaultEventTypeTokens) so the Tag
+    // Refinement panel's notion of "what an untouched file inherits" is the very same
+    // function that decides what is written here — including the deliberate rule that a
+    // single-component event with 0 or 2+ split tags suppresses Event Types as ambiguous.
     if (Array.isArray(eventTypeOverride)) {
       kw.push(...eventTypeOverride);
-    } else if (Array.isArray(explicitTags)) {
-      kw.push(...explicitTags);
     } else {
-      const typeArr = Array.isArray(component.types) ? component.types : [];
-      const allTags = typeArr.join(',').split(',').map(t => t.trim()).filter(Boolean);
-      if (isMulti) {
-        kw.push(...allTags);
-      } else if (allTags.length === 1) {
-        kw.push(allTags[0]);
-      }
-      // 0 or 2+ split tags on a single-component event → ambiguous, suppressed.
+      kw.push(...defaultEventTypeTokens({ typeLabels: component.types, isMulti, explicitTags }));
     }
 
     // Additional Keyword tags — a separate refinable category, independent of the
@@ -183,8 +182,8 @@ function resolveExpectedMetadata(evidence) {
     // Tier 0 — per-file Tag Refinement override. Lives on the already-resolved group
     // (group.fileTagRefinements, keyed by normalized absolute source path) rather than
     // as a separate evidence field — it is a finer-grained layer on top of the same
-    // group→component match, not an independent evidence source. Populated only for
-    // eligible multi-component groups; absent (or no entry for this file) means inherit.
+    // group→component match, not an independent evidence source. Absent (or no entry
+    // for this file) means inherit the pipeline default.
     const fileOverride = (group && group.fileTagRefinements && typeof group.fileTagRefinements === 'object')
       ? group.fileTagRefinements[path.normalize(filePath)]
       : undefined;

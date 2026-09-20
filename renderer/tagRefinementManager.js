@@ -5,17 +5,29 @@
 // GroupManager's group→component mapping. GroupManager owns which component a
 // group physically routes to; this module owns an optional, finer-grained
 // override of that component's Event Types / Additional Keywords for individual
-// files already inside a group. A group still maps to exactly one component —
-// this module never creates or implies sub-groups.
+// files. It never creates or implies sub-groups.
 //
-// Override shape (per group, per file path):
+// Scopes. Overrides live under a scope id, which is either
+//   • a GroupManager group id (number) — multi-component events, where the group's
+//     mapped component is the refinable component; or
+//   • EVENT_SCOPE (the reserved string 'event') — single-component events, where the
+//     one component is already the destination, so no group is needed or created.
+// A string can never collide with a numeric group id. Every function below takes the
+// scope id in the position formerly called groupId; the two scopes share one engine.
+//
+// Override shape (per scope, per file path):
 //   { eventTypes: string[], additionalKeywords: string[] }
 //
 // Tri-state semantics (critical — see spec):
-//   no entry for a file       → inherit all of the mapped component's Event Types
-//                                 + Additional Keywords (the default).
+//   no entry for a file       → inherit whatever the metadata pipeline would normally
+//                                 resolve for that file (the "effective default"). This
+//                                 is NOT always "every component tag": a single-component
+//                                 event with 2+ Event Types deliberately inherits none.
+//                                 See renderer/refinableTags.js effectiveDefaults().
 //   entry with both arrays [] → explicitly no refinable tags for this file.
 //   entry with populated arrays → exactly that explicit subset.
+// Default and explicit-none are distinct STATES even when they resolve to the same
+// output today — default stays dynamic (tracks the pipeline), explicit-none is fixed.
 // resetToDefault() REMOVES the entry (reverts to inheritance) — it never sets
 // empty arrays, which would instead mean "explicitly no tags".
 //
@@ -25,18 +37,32 @@
 // file moves/unassigns out of the group it was refined in — callers are
 // responsible for invoking the corresponding clear*/reset methods at those
 // points (see renderer.js call sites next to GroupManager.reset()/setSubEvent()/
-// assignFiles()/unassignFiles()).
+// assignFiles()/unassignFiles()). EVENT_SCOPE overrides are cleared by reset() at
+// exactly the same points, so they cannot leak across events/sources/workspaces.
 'use strict';
+
+// Shared refinable-tag model (eligibility input + effective defaults). Browser: the
+// renderer loads refinableTags.js first via <script>; Node tests: plain require.
+const _RefinableTags = (typeof module === 'object' && module.exports)
+  ? require('./refinableTags')
+  : window.RefinableTags;
 
 const TagRefinementManager = (() => {
 
-  // groupId -> Map<filePath, {eventTypes:string[], additionalKeywords:string[]}>
+  /** Reserved scope id for single-component events (no groups). Never a number. */
+  const EVENT_SCOPE = 'event';
+
+  // scopeId -> Map<filePath, {eventTypes:string[], additionalKeywords:string[]}>
   let _overrides = new Map();
 
-  // Refinement-mode UI state: which group (if any) is currently being refined.
-  // Purely a view concern (which group's files are shown filtered in the grid /
-  // which panel is rendered) — kept here so renderer.js has one source of truth
-  // for both the override data and the mode flag.
+  // Monotonic mutation counter — lets the UI memoize O(n) summaries and skip rescans
+  // on selection changes that did not touch any override.
+  let _rev = 0;
+
+  // Refinement-mode UI state: which scope (group id or EVENT_SCOPE), if any, is
+  // currently being refined. Purely a view concern (which files are shown filtered in
+  // the grid / which panel is rendered) — kept here so renderer.js has one source of
+  // truth for both the override data and the mode flag.
   let _activeGroupId = null;
 
   function _groupMap(groupId, create) {
@@ -51,16 +77,17 @@ const TagRefinementManager = (() => {
   // ── Eligibility ────────────────────────────────────────────────────────────
 
   /**
-   * A component is eligible for Tag Refinement when it has more than one total
-   * refinable tag (Event Types + Additional Keywords combined) — not merely
-   * multiple Event Types. `component` is the UI-format shape returned by
-   * EventCreator.getEventComps() ({ eventTypes:[{label}], additionalKeywords:[{label}] }).
+   * THE authoritative eligibility rule — every "should Refine Tags be offered / stay
+   * open" decision (group card, single-component footer button, panel render guard,
+   * mode-validity guard) must call this, never re-derive it.
+   *
+   * A component is eligible when it offers at least ONE refinable tag (an Event Type or
+   * an Additional Keyword): even a lone Event Type is eligible, so the operator can drop
+   * it from individual photographs. Only a component with nothing to refine is not.
+   * `component` may be UI-format (EventCreator.getEventComps()) or disk-format.
    */
   function isEligible(component) {
-    if (!component) return false;
-    const etCount = Array.isArray(component.eventTypes) ? component.eventTypes.length : 0;
-    const akCount = Array.isArray(component.additionalKeywords) ? component.additionalKeywords.length : 0;
-    return (etCount + akCount) > 1;
+    return _RefinableTags.countRefinable(component) >= 1;
   }
 
   // ── Overrides ──────────────────────────────────────────────────────────────
@@ -80,6 +107,7 @@ const TagRefinementManager = (() => {
     const et = Array.isArray(eventTypes) ? [...eventTypes] : [];
     const ak = Array.isArray(additionalKeywords) ? [...additionalKeywords] : [];
     for (const p of filePaths) m.set(p, { eventTypes: [...et], additionalKeywords: [...ak] });
+    _rev++;
   }
 
   /**
@@ -93,11 +121,13 @@ const TagRefinementManager = (() => {
     if (!m) return;
     for (const p of filePaths) m.delete(p);
     if (m.size === 0) _overrides.delete(groupId);
+    _rev++;
   }
 
   /** Clears every override in a group — used when the group's component mapping changes. */
   function clearGroup(groupId) {
     _overrides.delete(groupId);
+    _rev++;
   }
 
   /**
@@ -111,6 +141,7 @@ const TagRefinementManager = (() => {
       for (const p of filePaths) m.delete(p);
       if (m.size === 0) _overrides.delete(gid);
     }
+    _rev++;
   }
 
   /** Number of files in a group carrying an explicit override (refined or explicit-none). */
@@ -139,19 +170,29 @@ const TagRefinementManager = (() => {
   }
 
   /**
-   * Effective per-tag checkbox state and an overall status for a batch of files,
-   * given the mapped component's full Event Type / Additional Keyword lists. A file
-   * with no override inherits ALL of `allEventTypes`/`allAdditionalKeywords` — so a
-   * default file has every tag "checked" for effective-membership purposes, same as
-   * an explicit all-tags override, but the two stay distinguishable via `status`.
+   * Effective per-tag checkbox state and an overall status for a batch of files.
+   *
+   * `allEventTypes` / `allAdditionalKeywords` are the AVAILABLE tags (what the panel
+   * offers as chips). `defaults` is what a file with NO override actually inherits from
+   * the metadata pipeline — a separate concept, because available ≠ inherited (a
+   * single-component event with 2+ Event Types offers all of them but inherits none).
+   * `defaults` may be:
+   *   • omitted            → legacy behavior: an untouched file inherits every available tag
+   *   • { eventTypes, additionalKeywords } → the same defaults for every file
+   *   • (filePath) => { eventTypes, additionalKeywords } → per-file defaults (e.g. files in
+   *     different legacy metadata groups inherit different Event Types)
+   * A default file's checkbox state is derived from its defaults, and stays
+   * distinguishable from an explicit override via `status` even when the two would
+   * resolve to identical output.
    *
    * Read-only: never mutates any override. Callers use this purely to decide what to
    * render — selecting files, mixed or not, never changes stored state on its own.
    *
-   * @param {number|string} groupId
-   * @param {string[]} filePaths — the current selection, already scoped to this group
+   * @param {number|string} groupId — scope id (group id or EVENT_SCOPE)
+   * @param {string[]} filePaths — the current selection, already scoped to this scope
    * @param {string[]} allEventTypes
    * @param {string[]} allAdditionalKeywords
+   * @param {object|Function} [defaults]
    * @returns {{
    *   status: 'empty'|'default'|'refined'|'none'|'mixed',
    *   sampleOverride: {eventTypes:string[], additionalKeywords:string[]}|null,
@@ -159,10 +200,14 @@ const TagRefinementManager = (() => {
    *   additionalKeywords: Object<string,'checked'|'unchecked'|'indeterminate'>,
    * }}
    */
-  function getSelectionState(groupId, filePaths, allEventTypes, allAdditionalKeywords) {
+  function getSelectionState(groupId, filePaths, allEventTypes, allAdditionalKeywords, defaults) {
     if (!filePaths || filePaths.length === 0) {
       return { status: 'empty', sampleOverride: null, eventTypes: {}, additionalKeywords: {} };
     }
+
+    const defaultsFor = typeof defaults === 'function'
+      ? defaults
+      : () => defaults || { eventTypes: allEventTypes, additionalKeywords: allAdditionalKeywords };
 
     const overrides = filePaths.map(p => getOverride(groupId, p));
     const _key = o => o ? JSON.stringify({ e: [...o.eventTypes].sort(), a: [...o.additionalKeywords].sort() }) : null;
@@ -175,12 +220,17 @@ const TagRefinementManager = (() => {
     else if (overrides[0].eventTypes.length === 0 && overrides[0].additionalKeywords.length === 0) status = 'none';
     else status = 'refined';
 
-    const tagState = (allTags, pick) => {
+    // Resolve each no-override file's inherited defaults ONCE (n calls), not once per
+    // tag — the per-tag loops below then only do small-array membership checks.
+    const inherited = overrides.map((o, i) => (o ? null : (defaultsFor(filePaths[i]) || {})));
+
+    const tagState = (allTags, category) => {
       const out = {};
       for (const tag of allTags) {
         let count = 0;
-        for (const o of overrides) {
-          const effective = o ? pick(o) : allTags; // no override → inherits every tag
+        for (let i = 0; i < overrides.length; i++) {
+          const o = overrides[i];
+          const effective = o ? o[category] : (inherited[i][category] || []);
           if (effective.includes(tag)) count++;
         }
         out[tag] = count === 0 ? 'unchecked' : (count === overrides.length ? 'checked' : 'indeterminate');
@@ -191,8 +241,8 @@ const TagRefinementManager = (() => {
     return {
       status,
       sampleOverride: uniform ? overrides[0] : null,
-      eventTypes: tagState(allEventTypes, o => o.eventTypes),
-      additionalKeywords: tagState(allAdditionalKeywords, o => o.additionalKeywords),
+      eventTypes: tagState(allEventTypes, 'eventTypes'),
+      additionalKeywords: tagState(allAdditionalKeywords, 'additionalKeywords'),
     };
   }
 
@@ -202,18 +252,34 @@ const TagRefinementManager = (() => {
   // clone IPC boundary alongside the group payload built for import:commitTransaction.
   // Returns null (not {}) when there is nothing to serialize, so callers can
   // cheaply skip persistence work.
-  function serializeGroupForImport(groupId) {
+  //
+  // `filePaths` (optional) restricts the output to those files — used for EVENT_SCOPE,
+  // where the scope spans the whole loaded source but a given import payload group only
+  // owns the files actually being imported. Omitted for group scopes, where the scope's
+  // own file set is already the payload group's.
+  function serializeGroupForImport(groupId, filePaths) {
     const m = _groupMap(groupId, false);
     if (!m || m.size === 0) return null;
     const out = {};
-    for (const [p, o] of m) out[p] = { eventTypes: [...o.eventTypes], additionalKeywords: [...o.additionalKeywords] };
-    return out;
+    let any = false;
+    const emit = (p, o) => { out[p] = { eventTypes: [...o.eventTypes], additionalKeywords: [...o.additionalKeywords] }; any = true; };
+    if (Array.isArray(filePaths)) {
+      for (const p of filePaths) { const o = m.get(p); if (o) emit(p, o); }
+    } else {
+      for (const [p, o] of m) emit(p, o);
+    }
+    return any ? out : null;
   }
 
   // ── Refinement mode ────────────────────────────────────────────────────────
 
   function isActive()         { return _activeGroupId !== null; }
   function getActiveGroupId() { return _activeGroupId; }
+  /** True when the active refinement session is the single-component (no-groups) one. */
+  function isEventScopeActive() { return _activeGroupId === EVENT_SCOPE; }
+  function isEventScope(scopeId) { return scopeId === EVENT_SCOPE; }
+  /** Bumps on every override mutation; stable across pure reads. */
+  function getRevision()      { return _rev; }
   function enter(groupId)     { _activeGroupId = groupId; }
   function exit()             { _activeGroupId = null; }
 
@@ -225,11 +291,16 @@ const TagRefinementManager = (() => {
   function reset() {
     _overrides = new Map();
     _activeGroupId = null;
+    _rev++;
   }
 
   // ── Public API ─────────────────────────────────────────────────────────────
 
   return {
+    EVENT_SCOPE,
+    isEventScope,
+    isEventScopeActive,
+    getRevision,
     isEligible,
     getOverride,
     setOverride,

@@ -2721,6 +2721,29 @@
     #importBtn:hover   { background: #b9f0b4; }
     #importBtn:disabled { opacity: 0.45; cursor: not-allowed; }
 
+    /* Tag Refinement entry for single-component events — secondary to Import (outlined,
+       not filled), sits directly to its left. Compact summary appears only once overrides
+       exist, so the unrefined common case stays quiet. */
+    #refineTagsArea {
+      display: none; align-items: center; gap: 10px; margin-right: 12px; min-width: 0;
+    }
+    #refineTagsArea.visible { display: flex; }
+    #refineTagsSummary {
+      font-size: 0.68rem; color: var(--subtext); white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    #refineTagsSummary:empty { display: none; }
+    #refineTagsBtn {
+      padding: 8px 14px; font-size: 0.8rem; font-weight: 600; font-family: inherit;
+      background: transparent; color: var(--subtext);
+      border: 1.5px solid var(--border); border-radius: 8px; cursor: pointer;
+      white-space: nowrap; flex-shrink: 0;
+      transition: border-color 0.12s, color 0.12s, opacity 0.15s;
+    }
+    #refineTagsBtn:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
+    #refineTagsBtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    #refineTagsBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+
     /* ── PROGRESS OVERLAY ──────────────────────── */
     #progressOverlay {
       display: none; position: fixed; inset: 0;
@@ -5300,6 +5323,7 @@
     .rp-component-label { font-size: 0.68rem; color: var(--subtext); }
     .rp-file-count { font-size: 0.64rem; color: var(--subtext); opacity: 0.75; }
     .rp-section { padding: 8px 12px 4px 16px; }
+    .rp-note { margin-top: 6px; font-size: 0.62rem; line-height: 1.4; color: var(--subtext); opacity: 0.8; }
     .rp-section-title {
       font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
       color: var(--subtext); opacity: 0.75; margin-bottom: 5px;
@@ -5680,6 +5704,7 @@
     }
     .ei-required { color: var(--red); }
     #eiMappingSection { margin-bottom: 16px; }
+    #eiRefineSummary { margin-bottom: 16px; font-size: 0.72rem; color: var(--subtext); }
     .ei-map-row {
       display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
       padding: 7px 10px; border-radius: 9px;
@@ -7769,6 +7794,13 @@
     </div>
     <!-- Import footer -->
     <div id="importFooter">
+      <!-- Tag Refinement entry for SINGLE-component events (no groups exist to host the
+           per-group button). Shown only when the event's one component has at least one
+           refinable tag; refinement prepares the import, it never replaces Import. -->
+      <div id="refineTagsArea">
+        <span id="refineTagsSummary" aria-live="polite"></span>
+        <button id="refineTagsBtn" type="button">Refine Tags</button>
+      </div>
       <button id="importBtn">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
         Import Selected
@@ -8144,6 +8176,7 @@
         <div class="ei-label">Group assignments</div>
         <div id="eiMappingTable"></div>
       </div>
+      <div id="eiRefineSummary" style="display:none;"></div>
 
       <div id="eiImportMethod">
         <div class="ei-label">Import Method</div>
@@ -8442,6 +8475,7 @@
   <script src="eventCreator.js"></script>
   <script src="eventMgmt.js"></script>
   <script src="groupManager.js"></script>
+  <script src="refinableTags.js"></script>
   <script src="tagRefinementManager.js"></script>
   <script src="importRouter.js"></script>
   <!-- ── ARCHIVE LOCATIONS MODAL ──────────────────────────────────────── -->

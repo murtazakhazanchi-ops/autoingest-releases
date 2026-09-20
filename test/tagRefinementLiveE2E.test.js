@@ -85,12 +85,19 @@ async function rawFile(p) {
     hasIsEligible: typeof TagRefinementManager?.isEligible === 'function',
     isActiveInitially: TagRefinementManager?.isActive?.(),
     eligibleTrue: TagRefinementManager?.isEligible?.({ eventTypes: [{ label: 'Waaz' }], additionalKeywords: [{ label: 'Children' }] }),
-    eligibleFalse: TagRefinementManager?.isEligible?.({ eventTypes: [{ label: 'Waaz' }], additionalKeywords: [] }),
+    // Eligibility rule CHANGED from ">1 total refinable tag" to ">= 1": a lone Event Type is
+    // now eligible (the operator can drop it from individual photos); only a component with
+    // nothing to refine is not.
+    eligibleSingleType: TagRefinementManager?.isEligible?.({ eventTypes: [{ label: 'Waaz' }], additionalKeywords: [] }),
+    eligibleFalse: TagRefinementManager?.isEligible?.({ eventTypes: [], additionalKeywords: [] }),
+    sharedModelLoaded: typeof RefinableTags?.effectiveDefaults === 'function',
   }));
   log('TagRefinementManager renderer check:', JSON.stringify(trmCheck));
   check(trmCheck.exists && trmCheck.hasIsEligible, 'TagRefinementManager loaded in the real renderer (script tag wired correctly)');
+  check(trmCheck.sharedModelLoaded, 'shared RefinableTags model loaded in the real renderer (script order correct)');
   check(trmCheck.isActiveInitially === false, 'refinement mode inactive by default');
-  check(trmCheck.eligibleTrue === true && trmCheck.eligibleFalse === false, 'isEligible reflects the real >1-total-refinable-tag rule live in the app');
+  check(trmCheck.eligibleTrue === true && trmCheck.eligibleSingleType === true && trmCheck.eligibleFalse === false,
+    'isEligible reflects the real >=1-refinable-tag rule live in the app (lone Event Type eligible; zero tags not)');
 
   // ── Configure Main Archive Root via the real IPC (bypasses folder-picker dialog) ──
   await window.evaluate(async (root) => window.api.setMainArchiveRoot(root), archiveRoot);
@@ -98,8 +105,9 @@ async function rawFile(p) {
 
   // =============================================================================
   // Multi-component event: Component 1 (Waaz+Majlis+Ziyafat, 2 Additional Keywords)
-  // is refinement-eligible; Component 2 (Ziyarat only) is not. One file in
-  // Component 1's group carries an explicit per-file refinement override.
+  // and Component 2 (Ziyarat only — now eligible too under the >=1 rule, but left
+  // unrefined here to prove an untouched eligible component imports exactly as before).
+  // One file in Component 1's group carries an explicit per-file refinement override.
   // =============================================================================
   const evDir = path.join(archiveRoot, 'CollTagRefineE2E', '1448-01-01 _01-Waaz-Ziyarat');
   const comp1Folder = 'Waaz-Hall A';
@@ -195,12 +203,12 @@ async function rawFile(p) {
       'refined file does NOT receive component tags outside its explicit selection'
     );
 
-    const tagsZ1 = await et.read(sidecar(destZ1)); // Component 2 — untouched by the feature (not eligible)
+    const tagsZ1 = await et.read(sidecar(destZ1)); // Component 2 — eligible but left unrefined
     const kwZ1 = asArr(tagsZ1.Subject).sort();
-    log('z1 (Component 2, ineligible) Subject:', JSON.stringify(kwZ1));
+    log('z1 (Component 2, unrefined) Subject:', JSON.stringify(kwZ1));
     check(
       kwZ1.includes('Ziyarat') && kwZ1.includes('Hall B') && kwZ1.includes('Mumbai') && kwZ1.includes('India'),
-      'Component 2 (single Event Type, no Additional Keywords — not refinement-eligible) imports normally, untouched'
+      'Component 2 (single Event Type, no Additional Keywords), left unrefined, imports normally with its inherited Event Type'
     );
   } finally {
     await et.end().catch(() => {});

@@ -236,5 +236,72 @@ t('legacy metadataGroups override (single-component) still includes Additional K
   assert.deepEqual(r.keywords, ['Custom Tag', 'Outdoor', 'London', 'UK']);
 });
 
+// ── Per-Photo Tag Refinement on a SINGLE-component event (Mode B) ──────────────────────
+// The renderer builds ONE payload group { id:0, subEventId:null, files } for a single-
+// component import (never registered in GroupManager) and attaches fileTagRefinements to
+// it. These pin the tri-state semantics and — critically — that the resolver's deliberate
+// single-component ambiguity rule is untouched by refinement.
+{
+  const F = '/src/photo.jpg';
+  const single = (types, aks, groupExtra = {}) => ({
+    filePath: F,
+    groups: [{ id: 0, subEventId: null, files: [F], ...groupExtra }],
+    diskComponents: [{ location: 'Hall', city: 'Surat', country: 'India', types, folderName: null,
+      additionalKeywords: aks.map(label => ({ label })) }],
+  });
+  const refine = (eventTypes, additionalKeywords) => ({ fileTagRefinements: { [F]: { eventTypes, additionalKeywords } } });
+  const ctx = ['Hall', 'Surat', 'India'];
+
+  t('single-component, ONE Event Type: no override inherits it; explicit-empty removes it but keeps City/Location/Country', () => {
+    assert.deepEqual(resolveExpectedMetadata(single(['Ziyarat'], [])).keywords, ['Ziyarat', ...ctx]);
+    assert.deepEqual(resolveExpectedMetadata(single(['Ziyarat'], [], refine([], []))).keywords, ctx);
+  });
+
+  t('single-component, ONE Event Type: Reset (no fileTagRefinements entry) restores inheritance', () => {
+    const withOverride = resolveExpectedMetadata(single(['Ziyarat'], [], refine([], [])));
+    const afterReset   = resolveExpectedMetadata(single(['Ziyarat'], [], { fileTagRefinements: null }));
+    assert.notDeepEqual(afterReset.keywords, withOverride.keywords);
+    assert.deepEqual(afterReset.keywords, ['Ziyarat', ...ctx]);
+  });
+
+  t('single-component, 2+ Event Types: untouched file follows the EXISTING ambiguity rule (no Event Type)', () => {
+    assert.deepEqual(resolveExpectedMetadata(single(['Ziyarat', 'Waaz'], [])).keywords, ctx);
+  });
+
+  t('single-component, 2+ Event Types: explicit Ziyarat / Waaz / both / neither each produce exactly that', () => {
+    const run = ets => resolveExpectedMetadata(single(['Ziyarat', 'Waaz'], [], refine(ets, []))).keywords;
+    assert.deepEqual(run(['Ziyarat']), ['Ziyarat', ...ctx]);
+    assert.deepEqual(run(['Waaz']), ['Waaz', ...ctx]);
+    assert.deepEqual(run(['Ziyarat', 'Waaz']), ['Ziyarat', 'Waaz', ...ctx]);
+    assert.deepEqual(run([]), ctx);
+  });
+
+  t('single-component, 2+ Event Types: Reset restores the ambiguous/default resolver behavior', () => {
+    const r = resolveExpectedMetadata(single(['Ziyarat', 'Waaz'], [], { fileTagRefinements: {} }));
+    assert.deepEqual(r.keywords, ctx);
+    assert.ok(!r.evidenceSource.includes('tagRefinements:explicit-override'));
+  });
+
+  t('single-component: Additional Keywords keep their existing default (inherit all) and are independently refinable', () => {
+    const aks = ['Quran Tilawat', 'Children'];
+    assert.deepEqual(resolveExpectedMetadata(single(['Ziyarat', 'Waaz'], aks)).keywords, [...aks, ...ctx]);
+    assert.deepEqual(resolveExpectedMetadata(single(['Ziyarat'], aks, refine(['Ziyarat'], ['Children']))).keywords,
+      ['Ziyarat', 'Children', ...ctx]);
+    assert.deepEqual(resolveExpectedMetadata(single(['Ziyarat'], aks, refine([], []))).keywords, ctx);
+  });
+
+  t('precedence: per-photo refinement > legacy group.metadataTags > component default (Event Types); AKs independent of metadataTags', () => {
+    const comp = single(['Ziyarat', 'Waaz'], ['Children']);
+    const withTags = (extra) => ({ ...comp, groups: [{ id: 7, subEventId: null, files: [F], metadataTags: ['Waaz'], ...extra }] });
+    // 3. component default only → ambiguous, suppressed
+    assert.deepEqual(resolveExpectedMetadata(comp).keywords, ['Children', ...ctx]);
+    // 2. legacy metadataTags beats component default
+    assert.deepEqual(resolveExpectedMetadata(withTags({})).keywords, ['Waaz', 'Children', ...ctx]);
+    // 1. refinement beats legacy metadataTags — for Event Types AND it may narrow AKs
+    assert.deepEqual(resolveExpectedMetadata(withTags(refine(['Ziyarat'], []))).keywords, ['Ziyarat', ...ctx]);
+    assert.deepEqual(resolveExpectedMetadata(withTags(refine([], []))).keywords, ctx);
+  });
+}
+
 console.log(`${passed} passed`);
 if (process.exitCode) console.log('SOME TESTS FAILED');
