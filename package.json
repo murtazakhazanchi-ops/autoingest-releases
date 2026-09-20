@@ -1,6 +1,6 @@
 {
   "name": "auto-ingest",
-  "version": "0.9.11",
+  "version": "0.9.12",
   "description": "AutoIngest — AJS Photo Archive Ingest System",
   "main": "main/main.js",
   "scripts": {
