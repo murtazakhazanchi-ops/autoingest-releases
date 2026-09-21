@@ -12676,7 +12676,9 @@ function _updateMetaGroupHint() {
 }
 
 function renderGroupPanel() {
-  _renderSessionStrip();   // ownership may have changed wherever the panel is re-rendered
+  // Ownership may have changed wherever the panel is re-rendered (⌘G, drag-drop, Remove group, event switch):
+  // refresh the session strip AND the primary "Import N Assigned Files" action together, not only on selection changes.
+  _syncSessionSelectionUI();
   Dropdown.close();        // close sub-event picker
   MetaPicker.closeQuiet(); // close keyword picker without triggering re-render
 
