@@ -6853,7 +6853,7 @@ function _refinementBadgeState(filePath) {
   // (single-component, where files are not necessarily in any group). Two O(1) Map
   // lookups — never a DOM read.
   const g = GroupManager.getGroupForFile(filePath);
-  const override = (g && TagRefinementManager.getOverride(g.id, filePath))
+  const override = (g && TagRefinementManager.getOverride(g.uid, filePath))
     || TagRefinementManager.getOverride(TagRefinementManager.EVENT_SCOPE, filePath);
   if (!override) return null;
   return (override.eventTypes.length === 0 && override.additionalKeywords.length === 0) ? 'none' : 'refined';
@@ -10618,12 +10618,14 @@ document.getElementById('importBtn').addEventListener('click', async () => {
         // Per-file Tag Refinement overrides for this group, keyed by absolute source
         // path (same identity as `files` above) — null when the group carries none.
         // Structured-clone-safe: a plain object, not a Map.
-        //   multi-component  → this group's own scope
+        //   multi-component  → this group's own scope, looked up by its STABLE uid (never
+        //     the mutable, renumbered `id` — see groupManager.js) so a group that survived
+        //     removal of an earlier-numbered sibling still finds its own refinements here.
         //   single-component → the event scope, restricted to the files this payload group
         //     actually imports. The payload group (id 0 / metadata groups) is import-time
         //     only — the refinement itself never created or depended on any group.
         fileTagRefinements: isMulti
-          ? TagRefinementManager.serializeGroupForImport(group.id)
+          ? TagRefinementManager.serializeGroupForImport(group.uid)
           : TagRefinementManager.serializeGroupForImport(TagRefinementManager.EVENT_SCOPE, [...group.files]),
       })),
       source: _buildImportSourceMeta(),
@@ -11073,10 +11075,10 @@ async function showEventImportConfirmModal(groups, eventData) {
       mappingTable.innerHTML = groups.map((g, idx) => {
         const color = GroupManager.getGroupColor(idx);
         const count = g.files.size;
-        const refCount = TagRefinementManager.groupRefinementCount(g.id);
+        const refCount = TagRefinementManager.groupRefinementCount(g.uid);
         let refineHtml = '';
         if (refCount > 0) {
-          const s = TagRefinementManager.getSummary(g.id, [...g.files]);
+          const s = TagRefinementManager.getSummary(g.uid, [...g.files]);
           refineHtml = `<span class="ei-map-refine">${s.default} default · ${s.refined} refined · ${s.noTags} no tags</span>`;
         }
         return `<div class="ei-map-row">
@@ -12751,13 +12753,15 @@ document.addEventListener('click', e => {
     groupColor,
     onSelect(value) {
       const newSubEventId = (value === '' || value == null) ? null : String(value);
-      const refCount = TagRefinementManager.groupRefinementCount(gid);
+      const refCount = TagRefinementManager.groupRefinementCount(thisGroup.uid);
       if (refCount > 0 && newSubEventId !== thisGroup.subEventId) {
         // Changing the component invalidates any per-file refinements made against
-        // the old component's tag vocabulary — never carry them across silently.
+        // the old component's tag vocabulary — never carry them across silently. The
+        // group's uid (its identity) is untouched by a remap — only its refinement
+        // CONTENTS are cleared.
         showClearRefinementsOnRemapModal(refCount).then(proceed => {
           if (!proceed) return;
-          TagRefinementManager.clearGroup(gid);
+          TagRefinementManager.clearGroup(thisGroup.uid);
           GroupManager.setSubEvent(gid, value);
           syncAllRefinementBadges();
           renderGroupPanel();
@@ -12939,7 +12943,7 @@ function renderGroupPanel() {
       if (mapped) {
         const comp = EventCreator.getEventComps().find(c => c.folderName === g.subEventId);
         if (TagRefinementManager.isEligible(comp)) {
-          const summary  = TagRefinementManager.getSummary(g.id, [...g.files]);
+          const summary  = TagRefinementManager.getSummary(g.uid, [...g.files]);
           const hasWork  = summary.refined > 0 || summary.noTags > 0;
           const label    = hasWork ? 'Review / Refine Tags' : 'Refine Tags';
           const counts   = hasWork
@@ -13015,11 +13019,13 @@ function renderGroupPanel() {
       ${groups.map((g, idx) => _buildCardHtml(g, idx)).join('')}
     </div>`;
 
-  // Remove buttons
+  // Remove buttons. Refinement cleanup for the removed group happens via GroupManager's
+  // onGroupRemoved hook (wired once, below) rather than here — it fires for every removal
+  // route (this button AND auto-removal of an emptied group elsewhere), so there is one
+  // place that can forget it, not several.
   panel.querySelectorAll('.gc-remove-btn[data-gid]').forEach(btn => {
     btn.addEventListener('click', () => {
       const gid = Number(btn.dataset.gid);
-      TagRefinementManager.clearGroup(gid);
       GroupManager.removeGroup(gid);
       syncAllGroupBadges();
       syncAllRefinementBadges();
@@ -13028,6 +13034,13 @@ function renderGroupPanel() {
   });
 
 }
+
+// One-time lifecycle wiring: whenever GroupManager actually removes a logical group —
+// via the explicit Remove button OR auto-removal when a source group empties out from
+// assignFiles/unassignFiles (context menu, drag-and-drop, Cmd+G, moving all of a group's
+// files elsewhere) — clear its Tag Refinement state, keyed by its stable uid. One central
+// hook instead of every removal call site remembering to do this itself (see Follow-up B).
+GroupManager.onGroupRemoved(uid => TagRefinementManager.clearGroup(uid));
 
 // ── Tag Refinement mode ─────────────────────────────────────────────────────
 // Conceptually: current media → scope → edit per-file metadata overrides. Reuses the
@@ -13041,11 +13054,17 @@ function renderGroupPanel() {
 // Either way, refinement decides only which refinable keywords a file receives — it never
 // touches routing, folder naming, or the import action itself.
 
-// Delegated handler for .gc-refine-trigger clicks (enter group-scope refinement)
+// Delegated handler for .gc-refine-trigger clicks (enter group-scope refinement). The
+// button's data-gid is the group's DISPLAY id (for the DOM/lookup only) — refinement mode
+// itself is entered and tracked by the group's STABLE uid, so it can never be retargeted
+// by a later renumbering while active.
 document.addEventListener('click', e => {
   const trigger = e.target.closest('.gc-refine-trigger[data-gid]');
   if (!trigger) return;
-  _enterRefinementMode(Number(trigger.dataset.gid));
+  const gid = Number(trigger.dataset.gid);
+  const group = GroupManager.getGroups().find(g => g.id === gid);
+  if (!group) return;
+  _enterRefinementMode(group.uid);
 });
 
 // Footer "Refine Tags" (enter event-scope refinement — single-component events)
@@ -13105,7 +13124,11 @@ function _refinementScope() {
     };
   }
 
-  const group = GroupManager.getGroups().find(g => g.id === scopeId);
+  // scopeId is the group's STABLE uid (see _enterRefinementMode) — looking it up this
+  // way, rather than by the mutable display `id`, is what makes this resolve to null
+  // (not some unrelated survivor) once the refined group is actually gone: uids are
+  // never reused, so a stale scopeId can never accidentally match a live group.
+  const group = GroupManager.getGroups().find(g => g.uid === scopeId);
   if (!group) return null;
   const comps = EventCreator.getEventComps();
   return {
@@ -13114,7 +13137,7 @@ function _refinementScope() {
     isMulti: comps.length > 1,
     label: group.label,
     componentLabel: group.subEventId || '—',
-    color: GroupManager.getGroupColor(GroupManager.getGroupIndex(scopeId)),
+    color: GroupManager.getGroupColor(GroupManager.getGroupIndex(group.id)),
     has: p => group.files.has(p),
     paths: () => [...group.files],
   };

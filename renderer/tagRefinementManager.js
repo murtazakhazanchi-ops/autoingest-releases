@@ -8,12 +8,21 @@
 // files. It never creates or implies sub-groups.
 //
 // Scopes. Overrides live under a scope id, which is either
-//   • a GroupManager group id (number) — multi-component events, where the group's
-//     mapped component is the refinable component; or
+//   • a GroupManager group's STABLE `uid` (string, e.g. "group-3") — multi-component
+//     events, where the group's mapped component is the refinable component. This is
+//     deliberately the group's `uid`, NOT its mutable, renumbered `id` — GroupManager
+//     renumbers surviving groups' `id`s whenever one is removed, and keying refinement
+//     state by that mutable id let a survivor's overrides go orphaned under its old
+//     number while a stranger's could appear to live under its new one (Follow-up B). A
+//     group's `uid` is assigned once at creation and never changes or gets reused, so
+//     scope identity here is stable across any amount of removal/renumbering churn; or
 //   • EVENT_SCOPE (the reserved string 'event') — single-component events, where the
 //     one component is already the destination, so no group is needed or created.
-// A string can never collide with a numeric group id. Every function below takes the
-// scope id in the position formerly called groupId; the two scopes share one engine.
+// EVENT_SCOPE can never collide with a group uid — see groupManager.js's `group-N` uid
+// format. Every function below takes the scope id in the position formerly called
+// groupId; the two scopes share one engine. This module has no idea what a "uid" is —
+// it just holds a Map keyed by whatever scope id the caller passes; the STABILITY
+// guarantee lives entirely in what the caller (renderer.js) passes as that key.
 //
 // Override shape (per scope, per file path):
 //   { eventTypes: string[], additionalKeywords: string[] }

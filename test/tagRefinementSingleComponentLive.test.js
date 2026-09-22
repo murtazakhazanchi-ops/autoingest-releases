@@ -463,8 +463,13 @@ async function writeRaws(dir, count) {
   ps = await panelState();
   check(same(ps.chips.map(c => c.value), ['Ziyarat']) && ps.status === 'Default' && chipOf(ps, 'eventTypes', 'Ziyarat').checked, 'S3: one-tag group shows Ziyarat, default-inherited');
   await clickChip('eventTypes', 'Ziyarat'); await window.click('#rpApplyBtn');
-  const oG = await window.evaluate(({ gid, ps }) => ps.map(p => ({
-    grp: TagRefinementManager.getOverride(gid, p), evt: TagRefinementManager.getOverride(TagRefinementManager.EVENT_SCOPE, p) })), { gid: g.g1, ps: [1, 2].map(P3) });
+  // Refinement state is keyed by the group's STABLE uid, not its display id (Follow-up B
+  // fix) — resolve it the same way renderer.js does before probing TagRefinementManager.
+  const oG = await window.evaluate(({ gid, ps }) => {
+    const uid = GroupManager.getGroups().find(x => x.id === gid).uid;
+    return ps.map(p => ({
+      grp: TagRefinementManager.getOverride(uid, p), evt: TagRefinementManager.getOverride(TagRefinementManager.EVENT_SCOPE, p) }));
+  }, { gid: g.g1, ps: [1, 2].map(P3) });
   check(oG.every(x => same(x.grp, { eventTypes: [], additionalKeywords: [] }) && x.evt === null),
     'S3: explicit-empty override stored in the GROUP scope only — nothing leaks into event scope');
   await window.click('#rpDoneBtn');
