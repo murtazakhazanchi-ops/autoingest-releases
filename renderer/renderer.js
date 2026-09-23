@@ -11495,10 +11495,11 @@ function _continueImporting() {
   _selectionAnchor = null;
   _prevFocusPath   = null;
 
-  // Single-event import: dissolve the current event's groups (unchanged behaviour). After a
-  // multi-event session run, completed events were already cleared and failed / not-started
-  // ones must stay assigned for retry — so nothing is reset in that case.
-  if (!_importWasSession) GroupManager.reset();
+  // Single-event import: dissolve the current event's groups AND its refinement state
+  // (unchanged behaviour). After a multi-event session run, completed events already had
+  // their workspace (groups + refinements) replaced by ImportSession.completeEvents(), and
+  // failed / not-started ones must stay assigned for retry — so nothing is reset in that case.
+  if (!_importWasSession) { GroupManager.reset(); TagRefinementManager.reset(); }
   renderGroupPanel();
 
   _closeProgressModal(); // closes overlay, syncs badges, updates selection bar
@@ -13658,6 +13659,10 @@ function _showCtxMenu(x, y, anchorPath) {
   menu.querySelectorAll('.ctx-item[data-action]').forEach(item => {
     item.addEventListener('click', () => {
       const paths = [...selectedFiles];
+      // A file moving between groups (or out of a group entirely) leaves behind any
+      // per-file refinement — it belonged to the old component's tag vocabulary. No-op
+      // for files that had none.
+      TagRefinementManager.clearFiles(paths);
       if (item.dataset.action === 'assign') {
         GroupManager.assignFiles(paths, Number(item.dataset.gid));
       } else if (item.dataset.action === 'new') {
@@ -13667,6 +13672,7 @@ function _showCtxMenu(x, y, anchorPath) {
         GroupManager.unassignFiles(paths);
       }
       syncAllGroupBadges();
+      syncAllRefinementBadges();
       renderGroupPanel();
       _hideCtxMenu();
     });
@@ -13750,6 +13756,7 @@ document.addEventListener('keydown', e => {
 
   const existing = GroupManager.getGroups().find(g => g.id === n);
   const gid      = existing ? existing.id : GroupManager.createGroup();
+  TagRefinementManager.clearFiles([...selectedFiles]);
   ImportSession.takeLastClaim();   // flush any stale claim info before this assignment
   GroupManager.assignFiles([...selectedFiles], gid);
   const _claimInfo = ImportSession.takeLastClaim();
@@ -13758,6 +13765,7 @@ document.addEventListener('keydown', e => {
   selectedFiles.clear();
   syncAllTiles();
   syncAllGroupBadges();
+  syncAllRefinementBadges();
   renderGroupPanel();
 
   _showChordToast(`Assigned to G${gid}` + (_claimInfo && _claimInfo.reassigned > 0
@@ -13801,8 +13809,10 @@ document.addEventListener('keydown', e => {
 
     const card = e.target.closest('.group-card[data-gid]');
     if (card) {
+      TagRefinementManager.clearFiles(paths);
       GroupManager.assignFiles(paths, Number(card.dataset.gid));
       syncAllGroupBadges();
+      syncAllRefinementBadges();
       renderGroupPanel();
     }
   });
