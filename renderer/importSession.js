@@ -26,20 +26,22 @@
 // The GroupManager facade stays bound to the CURRENT workspace's instance, so all existing
 // group-panel / badge UI code is unchanged.
 //
-// EXTENSION POINT — additional event-scoped state (e.g. per-photo tag refinement, should it
-// return): add it to the workspace next to `groups` / `directFiles` (see _makeWorkspace), then
-// (1) release it for the moved paths in _claim() and release(), (2) rebind/reset it in
-// _bindTo() / switchTo() alongside the GroupManager facade, and (3) include it in each plan
-// item in buildPlan(). Nothing else in the session model needs to change.
+// Per-photo Tag Refinement is event-scoped state exactly like `groups`: each workspace owns
+// its own TagRefinementManager instance next to its GroupManager instance (see
+// _newInstances/_makeWorkspace), (1) has it released for moved/claimed paths in _claim() and
+// release(), (2) has it rebound/reset in _bindTo()/switchTo()/reset() alongside the
+// GroupManager facade, and (3) is read from THAT workspace's own instance (never the facade)
+// when building each plan item in buildPlan() — the facades only reflect the Current Event.
 //
 // buildPlan() freezes a deterministic per-event import plan — routing (via ImportRouter,
-// not re-implemented here) and metadata context are resolved from each file's OWN event
-// workspace, never from mutable Current Event state.
+// not re-implemented here) and metadata context (including tagRefinements) are resolved from
+// each file's OWN event workspace, never from mutable Current Event / facade state.
 'use strict';
 
 const ImportSession = (() => {
 
   const _GM     = (typeof GroupManager          !== 'undefined') ? GroupManager          : require('./groupManager');
+  const _TRM    = (typeof TagRefinementManager   !== 'undefined') ? TagRefinementManager   : require('./tagRefinementManager');
   const _Router = (typeof ImportRouter          !== 'undefined') ? ImportRouter          : require('./importRouter');
 
   /** Router validation codes that legacy Event Import already enforces (G4-1 / G4-3). */
@@ -61,13 +63,27 @@ const ImportSession = (() => {
     return String(eventPath || '').replace(/\\/g, '/').replace(/\/+$/, '');
   }
 
+  /**
+   * One event workspace's concrete manager pair, wired together at creation. The
+   * group-removal → refinement-cleanup hook (Follow-up B) is attached HERE, between the
+   * two CONCRETE instances, once per workspace — never on the global facade. Fixes the
+   * listener-lifecycle bug a facade-level hook would have: a callback registered once on
+   * whichever instance happened to be bound at renderer-load time would be orphaned the
+   * first time the facade rebinds to a different event's instance. Wiring it at instance
+   * creation means every workspace has permanent, correct cleanup regardless of which
+   * event is ever the Current Event.
+   */
   function _newInstances() {
     const hooks = {};
-    return { hooks, groups: _GM.create(hooks) };
+    const groups = _GM.create(hooks);
+    const refinements = _TRM.create();
+    groups.onGroupRemoved(uid => refinements.clearGroup(uid));
+    return { hooks, groups, refinements };
   }
 
   function _bindTo(inst) {
     _GM.bind(inst.groups);
+    _TRM.bind(inst.refinements);
   }
 
   function _ownedCount(ws) {
@@ -76,6 +92,20 @@ const ImportSession = (() => {
 
   function _owns(ws, path) {
     return ws.groups.getFileGroupMap().has(path) || ws.directFiles.has(path);
+  }
+
+  /**
+   * True when a non-current, unowned workspace is safe to discard entirely. Owning zero
+   * files is not enough by itself: a single-component (groupless) event can carry real
+   * EVENT_SCOPE Tag Refinement state before the operator ever explicitly assigns any file
+   * to it (group-scoped refinement can't hit this — a file must already be IN a group,
+   * which is itself ownership). Losing that refinement merely because the operator looked
+   * at another event next would be exactly the cross-event data loss this whole per-
+   * workspace architecture exists to prevent — so a workspace holding refinement state is
+   * never disposable, regardless of file ownership.
+   */
+  function _isDisposable(ws) {
+    return _ownedCount(ws) === 0 && !ws.refinements.hasAnyOverrides();
   }
 
   function _ensureOrdinal(ws) {
@@ -98,6 +128,7 @@ const ImportSession = (() => {
       eventData,
       ordinal: _ordinals.get(key) ?? null,
       groups: inst.groups,
+      refinements: inst.refinements,
       directFiles: new Set(),
       _hooks: inst.hooks,
     };
@@ -109,6 +140,14 @@ const ImportSession = (() => {
    * Model-level exclusivity. Called (via the onClaim hook) BEFORE `claimer` takes `paths`:
    * every other workspace releases them — groups and direct files — and the
    * claimer's own direct set drops them (they are about to live in one of its groups).
+   *
+   * LOCKED semantic (file moves between events): a file's per-photo refinement is
+   * relative to the event/component it was refined against — Event B can offer entirely
+   * different Event Types / Additional Keywords. So a released file's refinement is
+   * cleared from the LOSING workspace's TagRefinementManager instance here, exactly
+   * where its group membership is released — it never carries into whichever event
+   * claims the file next; the claiming event always starts that file at Default unless
+   * the operator explicitly refines it there.
    */
   function _claim(claimer, paths) {
     _ensureOrdinal(claimer);
@@ -124,6 +163,7 @@ const ImportSession = (() => {
       reassigned += owned.length;
       if (ws.ordinal != null) fromOrdinals.add(ws.ordinal);
       ws.groups.unassignFiles(owned);      // also removes emptied groups + renumbers
+      ws.refinements.clearFiles(owned);    // never let a stale override follow the file
       for (const p of owned) ws.directFiles.delete(p);
     }
     _lastClaim = { reassigned, fromOrdinals: [...fromOrdinals].sort((a, b) => a - b) };
@@ -131,12 +171,12 @@ const ImportSession = (() => {
   }
 
   /**
-   * Drop non-current workspaces that own nothing — they hold no state worth keeping.
-   * `keep` (the claimer, which owns nothing until its claim completes) is never pruned.
+   * Drop non-current, disposable workspaces — see _isDisposable(). `keep` (the claimer,
+   * which owns nothing until its claim completes) is never pruned.
    */
   function _pruneEmpty(keep = null) {
     for (const [key, ws] of _workspaces) {
-      if (ws !== keep && key !== _currentKey && _ownedCount(ws) === 0) _workspaces.delete(key);
+      if (ws !== keep && key !== _currentKey && _isDisposable(ws)) _workspaces.delete(key);
     }
   }
 
@@ -159,11 +199,11 @@ const ImportSession = (() => {
 
   /**
    * Make `eventData` the Current Event: create its workspace if needed and bind the
-   * GroupManager facade to it. SYNCHRONOUS — callers must resolve
-   * every async input (disk reads, modals) BEFORE calling, so the swap is atomic.
+   * GroupManager AND TagRefinementManager facades to it. SYNCHRONOUS — callers must
+   * resolve every async input (disk reads, modals) BEFORE calling, so the swap is atomic.
    *
    * The first workspace adopts the detached instances the facades were already bound to,
-   * so any grouping done before the session "started" is not lost.
+   * so any grouping OR refinement done before the session "started" is not lost.
    *
    * @param {{ eventPath:string, collectionPath?:string, coll?:object, event?:object, idx?:number }} eventData
    * @returns the workspace
@@ -173,7 +213,7 @@ const ImportSession = (() => {
     const key = keyOf(eventData.eventPath);
     const prev = _currentKey != null ? _workspaces.get(_currentKey) : null;
 
-    if (prev && prev.key !== key && _ownedCount(prev) === 0) _workspaces.delete(prev.key);
+    if (prev && prev.key !== key && _isDisposable(prev)) _workspaces.delete(prev.key);
 
     let ws = _workspaces.get(key);
     if (!ws) {
@@ -273,13 +313,16 @@ const ImportSession = (() => {
     return { assigned: toAdd.length, reassigned };
   }
 
-  /** Release files from whichever event owns them (groups and direct files). */
+  /** Release files from whichever event owns them (groups and direct files). Same
+   *  refinement-clearing rule as _claim() — a released file starts at Default wherever
+   *  (if anywhere) it is owned next. */
   function release(paths) {
     const list = [...new Set(paths)];
     for (const ws of _workspaces.values()) {
       const owned = list.filter(p => _owns(ws, p));
       if (owned.length === 0) continue;
       ws.groups.unassignFiles(owned);
+      ws.refinements.clearFiles(owned);
       for (const p of owned) ws.directFiles.delete(p);
     }
     _pruneEmpty();
@@ -369,6 +412,7 @@ const ImportSession = (() => {
     const groupMap = ws.groups.getFileGroupMap();
     const asRouterGroup = (g) => ({
       id: g.id,
+      uid: g.uid,   // stable identity — carried through to buildPlan() for refinement lookup
       label: g.label,
       subEventId: g.subEventId,
       metadataTags: g.metadataTags ?? null,
@@ -383,7 +427,7 @@ const ImportSession = (() => {
       // Mirrors legacy Event Import: ungrouped files in metadata-grouping mode import with
       // an explicit empty keyword set (deterministic "no component keyword").
       if (ungrouped.length > 0) {
-        groups.push({ id: -1, label: '', subEventId: null, metadataTags: [], files: new Set(ungrouped) });
+        groups.push({ id: -1, uid: null, label: '', subEventId: null, metadataTags: [], files: new Set(ungrouped) });
       }
       return groups;
     }
@@ -392,7 +436,7 @@ const ImportSession = (() => {
     // Union of both stores so an owned file can never be silently dropped.
     const all = new Set(ws.directFiles);
     for (const p of groupMap.keys()) all.add(p);
-    return [{ id: 0, label: '', subEventId: null, metadataTags: null, files: all }];
+    return [{ id: 0, uid: null, label: '', subEventId: null, metadataTags: null, files: all }];
   }
 
   /**
@@ -497,9 +541,21 @@ const ImportSession = (() => {
         importMode: importMode || null,
         fileCount: _ownedCount(ws),
         routingEventData,
+        // Per-file Tag Refinement overrides, looked up from THIS WORKSPACE's OWN
+        // TagRefinementManager instance (ws.refinements) — never the facade, which only
+        // ever reflects whichever event happens to be the Current Event right now. This is
+        // the correctness boundary that keeps a multi-event plan's per-event refinement
+        // intent from bleeding across events: each item below is built entirely from its
+        // own event's captured state, exactly like routing already was.
+        //   multi-component  → that group's own scope, by its STABLE uid.
+        //   single-component (with or without legacy metadata grouping) → the event scope,
+        //     restricted to the files THIS router group actually owns.
         groups: routerGroups.map(g => ({
           id: g.id, label: g.label, subEventId: g.subEventId, metadataTags: g.metadataTags,
           files: [...g.files],
+          fileTagRefinements: isMulti
+            ? ws.refinements.serializeGroupForImport(g.uid)
+            : ws.refinements.serializeGroupForImport(ws.refinements.EVENT_SCOPE, [...g.files]),
         })),
         fileJobs,
         skippedSrcs,

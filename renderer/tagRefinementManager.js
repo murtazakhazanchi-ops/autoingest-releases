@@ -1,5 +1,5 @@
 // renderer/tagRefinementManager.js
-// ── TagRefinementManager — module singleton ─────────────────────────────────
+// ── TagRefinementManager — instantiable manager + bound facade ───────────────
 // Per-file metadata override state for the "Per-Photo Tag Refinement" feature.
 // Strictly metadata-only: never touches archive routing, folder naming, or
 // GroupManager's group→component mapping. GroupManager owns which component a
@@ -7,7 +7,22 @@
 // override of that component's Event Types / Additional Keywords for individual
 // files. It never creates or implies sub-groups.
 //
-// Scopes. Overrides live under a scope id, which is either
+// Per-event isolation (mirrors groupManager.js): createTagRefinementManager()
+// builds an independent instance — its own `_overrides` Map, its own active-scope
+// state, its own revision counter. The exported `TagRefinementManager` is a thin
+// facade bound to ONE instance at a time (the Current Event's — see
+// importSession.js). Multi-Event Import gives each event workspace its OWN
+// TagRefinementManager instance, created and bound alongside its GroupManager
+// instance, so refinement state can never leak or collide across events even
+// though every event's groups independently start their `uid` numbering at
+// "group-1" — the isolation comes from being different manager INSTANCES
+// entirely, not from the scope-id strings being distinguishable. Unbound (no
+// ImportSession involved), the facade behaves exactly like the original
+// module-global singleton.
+//
+// reset() clears the bound instance only — same convention as GroupManager.
+//
+// Scopes. Inside ONE instance, overrides live under a scope id, which is either
 //   • a GroupManager group's STABLE `uid` (string, e.g. "group-3") — multi-component
 //     events, where the group's mapped component is the refinable component. This is
 //     deliberately the group's `uid`, NOT its mutable, renumbered `id` — GroupManager
@@ -18,11 +33,13 @@
 //     scope identity here is stable across any amount of removal/renumbering churn; or
 //   • EVENT_SCOPE (the reserved string 'event') — single-component events, where the
 //     one component is already the destination, so no group is needed or created.
-// EVENT_SCOPE can never collide with a group uid — see groupManager.js's `group-N` uid
-// format. Every function below takes the scope id in the position formerly called
-// groupId; the two scopes share one engine. This module has no idea what a "uid" is —
+// EVENT_SCOPE is a single module-level constant shared by every instance (it never needs
+// to vary per instance — cross-event isolation already comes from separate instances) and
+// can never collide with a group uid — see groupManager.js's `group-N` uid format. Every
+// function below takes the scope id in the position formerly called groupId; the two
+// scopes share one engine within an instance. This module has no idea what a "uid" is —
 // it just holds a Map keyed by whatever scope id the caller passes; the STABILITY
-// guarantee lives entirely in what the caller (renderer.js) passes as that key.
+// guarantee lives entirely in what the caller (renderer.js / importSession.js) passes.
 //
 // Override shape (per scope, per file path):
 //   { eventTypes: string[], additionalKeywords: string[] }
@@ -46,8 +63,9 @@
 // file moves/unassigns out of the group it was refined in — callers are
 // responsible for invoking the corresponding clear*/reset methods at those
 // points (see renderer.js call sites next to GroupManager.reset()/setSubEvent()/
-// assignFiles()/unassignFiles()). EVENT_SCOPE overrides are cleared by reset() at
-// exactly the same points, so they cannot leak across events/sources/workspaces.
+// assignFiles()/unassignFiles(), and importSession.js's _claim()/release(), which
+// clear a moved/released file's override from its OLD event's instance so it never
+// carries into whichever event claims the file next — see LOCKED semantics there).
 'use strict';
 
 // Shared refinable-tag model (eligibility input + effective defaults). Browser: the
@@ -56,10 +74,12 @@ const _RefinableTags = (typeof module === 'object' && module.exports)
   ? require('./refinableTags')
   : window.RefinableTags;
 
-const TagRefinementManager = (() => {
+/** Reserved scope id for single-component events (no groups). Never a number. Module-level
+ *  (not per-instance) — every instance uses the exact same reserved string; cross-event
+ *  isolation comes from separate instances, not from this string varying. */
+const EVENT_SCOPE = 'event';
 
-  /** Reserved scope id for single-component events (no groups). Never a number. */
-  const EVENT_SCOPE = 'event';
+function createTagRefinementManager() {
 
   // scopeId -> Map<filePath, {eventTypes:string[], additionalKeywords:string[]}>
   let _overrides = new Map();
@@ -157,6 +177,18 @@ const TagRefinementManager = (() => {
   function groupRefinementCount(groupId) {
     const m = _groupMap(groupId, false);
     return m ? m.size : 0;
+  }
+
+  /**
+   * True when this instance holds ANY override, in any scope (group or EVENT_SCOPE).
+   * Used by importSession.js to decide whether a workspace with zero OWNED files still
+   * holds operator work worth keeping — e.g. EVENT_SCOPE refinement done on a
+   * single-component (groupless) event before the operator ever explicitly assigned
+   * those files to it. Without this, an ownerless-but-refined workspace looks identical
+   * to a genuinely empty one and would be silently discarded on switching away.
+   */
+  function hasAnyOverrides() {
+    return _overrides.size > 0;
   }
 
   /**
@@ -304,6 +336,10 @@ const TagRefinementManager = (() => {
   }
 
   // ── Public API ─────────────────────────────────────────────────────────────
+  // EVENT_SCOPE is included here (a plain string, not a function) so every concrete
+  // instance — not just the bound facade — can be used directly by callers that hold an
+  // instance reference themselves (importSession.js's per-workspace `ws.refinements`,
+  // never the facade, when building a multi-event import plan — see buildPlan()).
 
   return {
     EVENT_SCOPE,
@@ -317,6 +353,7 @@ const TagRefinementManager = (() => {
     clearGroup,
     clearFiles,
     groupRefinementCount,
+    hasAnyOverrides,
     getSummary,
     getSelectionState,
     serializeGroupForImport,
@@ -327,6 +364,26 @@ const TagRefinementManager = (() => {
     reset,
   };
 
+}
+
+// ── Facade — the bound-instance singleton the rest of the renderer uses ───────
+// Mirrors groupManager.js's facade exactly, with one adjustment: EVENT_SCOPE (above) is a
+// plain string, not a function, so it is skipped by the generic per-key proxy loop (which
+// would otherwise try to make it callable) and aliased directly instead — its value is
+// identical on every instance, so aliasing once is equivalent to proxying it per-call.
+const TagRefinementManager = (() => {
+  let _bound = createTagRefinementManager();
+  const facade = {};
+  for (const key of Object.keys(_bound)) {
+    if (typeof _bound[key] !== 'function') continue;
+    facade[key] = (...args) => _bound[key](...args);
+  }
+  facade.EVENT_SCOPE = EVENT_SCOPE;
+  /** Point the facade at another instance (the Current Event's). */
+  facade.bind     = (instance) => { _bound = instance; };
+  facade.getBound = () => _bound;
+  facade.create   = createTagRefinementManager;
+  return facade;
 })();
 
 // Node.js / test compatibility — no effect in the browser.
