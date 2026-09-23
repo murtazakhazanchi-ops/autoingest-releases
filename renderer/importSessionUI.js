@@ -810,9 +810,12 @@ async function _runSessionImportInner() {
           photographer: choice.photographer,
           subEventNames: subEventNamesFor(item),
           liveComps: item.routingEventData.event.components,
+          // fileTagRefinements: computed by ImportSession.buildPlan() from THIS event's own
+          // TagRefinementManager instance (never the facade) — carried through verbatim so
+          // main.js's durable-intent merge sees exactly what the operator set for this event.
           groups: item.groups.map(g => ({
             id: g.id, subEventId: g.subEventId, metadataTags: g.metadataTags ?? null,
-            files: [...g.files],
+            files: [...g.files], fileTagRefinements: g.fileTagRefinements ?? null,
           })),
           source: sourceMeta,
           importedBy,
