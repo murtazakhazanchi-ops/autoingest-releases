@@ -345,6 +345,49 @@ async function runAuditAndWait(archiveRoot) {
     assert.ok(!active.includes(batchId), 'the repair-shaped batch must be compacted after recovery, like any other batch');
   });
 
+  await t('runMetadataRepair: a GROUP-SCOPE tag-refinement record (persisted event.json.tagRefinements) is honored — the refined file gets its override, an unrefined sibling in the same group/component still gets the component Default (v0.9.13 stabilization, closes the previously-identified group-scope Repair coverage gap)', async () => {
+    const archiveRoot = await fsp.mkdtemp(path.join(os.tmpdir(), 'ai-repair-archive-'));
+    const comp1Folder = 'Waaz-Hall A-Mumbai';
+    const comp2Folder = 'Ziyafat-Hall B-Mumbai';
+    const refinedRelPath = `${comp1Folder}/Jane Doe/IMG_refined.cr2`;
+    const eventDir = await mkEvent(archiveRoot, 'Coll', 'EventGroupScope', {
+      version: 1, hijriDate: '1448-01-01', eventName: 'Waaz',
+      components: [
+        { folderName: comp1Folder, location: 'Hall A', city: 'Mumbai', country: 'India', types: ['Waaz'] },
+        { folderName: comp2Folder, location: 'Hall B', city: 'Mumbai', country: 'India', types: ['Ziyafat'] },
+      ],
+      // One file in comp1's group carries an explicit-No-Tags group-scope refinement
+      // (empty eventTypes/additionalKeywords — the same on-disk shape a real import
+      // writes for TagRefinementManager.getOverride() explicit overrides); its sibling
+      // in the SAME group/component carries no record at all (Default).
+      tagRefinements: [{ eventTypes: [], additionalKeywords: [], relPaths: [refinedRelPath] }],
+    });
+    const fRefined = path.join(eventDir, comp1Folder, 'Jane Doe', 'IMG_refined.cr2');
+    const fDefault = path.join(eventDir, comp1Folder, 'Jane Doe', 'IMG_default.cr2');
+    await fsp.mkdir(path.dirname(fRefined), { recursive: true });
+    await fsp.writeFile(fRefined, Buffer.from('not-a-real-raw-file'));
+    await fsp.writeFile(fDefault, Buffer.from('not-a-real-raw-file'));
+
+    const jobId = await runAuditAndWait(archiveRoot);
+    const preview = await repair.previewMetadataRepair(jobId);
+    assert.equal(preview.items.length, 2, 'sanity: both group-A files need repair');
+
+    const result = await repair.runMetadataRepair(jobId);
+    assert.ok(result.ok);
+    assert.equal(result.result.complete, 2);
+
+    const sidecarRefined = fRefined.slice(0, -path.extname(fRefined).length) + '.xmp';
+    const sidecarDefault = fDefault.slice(0, -path.extname(fDefault).length) + '.xmp';
+    const tagsRefined = await readFileTags(sidecarRefined);
+    const tagsDefault = await readFileTags(sidecarDefault);
+    const subjRefined = [].concat(tagsRefined.Subject || []).map(String);
+    const subjDefault = [].concat(tagsDefault.Subject || []).map(String);
+
+    assert.ok(!subjRefined.includes('Waaz'), `group-scope explicit No Tags must be honored by Repair — event-type keyword must NOT be written (${JSON.stringify(subjRefined)})`);
+    assert.ok(subjRefined.includes('Hall A') && subjRefined.includes('Mumbai'), `explicit No Tags only suppresses the event-type token, not location/city (${JSON.stringify(subjRefined)})`);
+    assert.ok(subjDefault.includes('Waaz'), `the unrefined sibling in the SAME group/component must still get the component Default (${JSON.stringify(subjDefault)})`);
+  });
+
   console.log(`${passed} passed`);
   await shutdown().catch(() => {});
   process.exit(process.exitCode || 0);
