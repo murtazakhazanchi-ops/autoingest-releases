@@ -5715,14 +5715,15 @@
     .gpm-cancel:hover { border-color: var(--blue); color: var(--blue); }
 
     /* ── G4: missing sub-event / unassigned / dup-sub-event modals ─────────── */
-    #missingSubEventOverlay, #unassignedOverlay, #dupSubEventOverlay {
+    #missingSubEventOverlay, #unassignedOverlay, #dupSubEventOverlay, #clearRefinementsOverlay {
       display: none; position: fixed; inset: 0;
       background: rgba(0,0,0,.65); z-index: 200;
       align-items: center; justify-content: center;
     }
     #missingSubEventOverlay.visible,
     #unassignedOverlay.visible,
-    #dupSubEventOverlay.visible { display: flex; }
+    #dupSubEventOverlay.visible,
+    #clearRefinementsOverlay.visible { display: flex; }
     .dupWarningModal {
       background: var(--surface); border-radius: 14px; padding: 28px 28px 24px;
       width: min(480px, 90vw); box-shadow: 0 12px 48px rgba(0,0,0,.5);
