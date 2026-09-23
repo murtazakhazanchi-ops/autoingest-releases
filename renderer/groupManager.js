@@ -14,10 +14,24 @@
 // eject, …) is ImportSession.reset()'s job.
 //
 // Group shape:
-//   { id: number, label: string,
+//   { uid: string,              ← STABLE logical identity — assigned once at creation,
+//                                  never reused within a session, never changes for the
+//                                  life of the group (survives removeGroup() renumbering
+//                                  every OTHER group's `id`). This is what TagRefinementManager
+//                                  keys its per-group override state by — see uid note below.
+//     id: number, label: string, ← MUTABLE display/order identity. Renumbered sequentially
+//                                  from 1 whenever a group is removed, purely for "G1"/"G2"/…
+//                                  labels and panel ordering. Never use `id` as a durable key.
 //     files: Set<string>,        ← file paths (unique identifiers in this app)
 //     subEventId: string | null  ← id from EventCreator.getSubEventNames()
 //   }
+//
+// Why a separate uid: removeGroup() renumbers surviving groups' `id`s to keep them
+// sequential (G1/G2/G3 after removing the old G2). A consumer that keyed state by `id`
+// (TagRefinementManager did, historically — see Follow-up B) would silently have a
+// survivor's state orphaned under its old numeric key and picked up a stranger's state
+// under its new one. `uid` never changes and is never reused, so keying by it is safe
+// across any amount of removal/renumbering churn.
 'use strict';
 
 // 10 pastel group colours keyed by --group-N CSS custom properties.
@@ -48,11 +62,29 @@ function createGroupManager(hooks = {}) {
   let _fileGroupMap = new Map();   // filePath → groupId
   let _activeTabId  = null;
 
+  // Monotonic source for `uid`. Session-local (resets with the rest of GroupManager's
+  // state in reset() — every caller resets TagRefinementManager in lockstep, so there is
+  // never live refinement state that could collide with a post-reset counter restart).
+  // Never depends on _groups.length, so a deleted group's uid is never reissued even if
+  // the live group count returns to the same number.
+  let _uidCounter = 0;
+  function _nextUid() { return `group-${++_uidCounter}`; }
+
+  // Subscribers notified with a removed group's stable `uid`, once per actual removal —
+  // the single lifecycle hook other modules (TagRefinementManager) hang cleanup off of,
+  // instead of every UI call site remembering to clear state manually. Fires for EVERY
+  // removal route (explicit Remove button, and auto-removal of an emptied source group
+  // from assignFiles/unassignFiles), because they all funnel through removeGroup().
+  let _removalListeners = [];
+  function onGroupRemoved(cb) { _removalListeners.push(cb); }
+  function _notifyRemoved(uid) { for (const cb of _removalListeners) cb(uid); }
+
   // ── CRUD ───────────────────────────────────────────────────────────────────
 
   function createGroup() {
     const id = _groups.length + 1;
-    _groups.push({ id, label: `G${id}`, files: new Set(), subEventId: null, metadataTags: null });
+    const uid = _nextUid();
+    _groups.push({ uid, id, label: `G${id}`, files: new Set(), subEventId: null, metadataTags: null });
     _activeTabId = id;
     return id;
   }
@@ -63,7 +95,8 @@ function createGroupManager(hooks = {}) {
     for (const p of g.files) _fileGroupMap.delete(p);
     _groups = _groups.filter(x => x.id !== id);
 
-    // Renumber remaining groups sequentially from 1
+    // Renumber remaining groups' DISPLAY id/label sequentially from 1. `uid` is never
+    // touched here — it is the whole point of the field.
     _groups.forEach((group, idx) => {
       const newId = idx + 1;
       if (group.id !== newId) {
@@ -76,6 +109,8 @@ function createGroupManager(hooks = {}) {
 
     if (_activeTabId === id)
       _activeTabId = _groups.length ? _groups[_groups.length - 1].id : null;
+
+    _notifyRemoved(g.uid);
   }
 
   function assignFiles(paths, groupId) {
@@ -181,7 +216,11 @@ function createGroupManager(hooks = {}) {
   // ── Reset ──────────────────────────────────────────────────────────────────
 
   function reset() {
-    _groups = []; _fileGroupMap = new Map(); _activeTabId = null;
+    // _uidCounter resets too: every reset() call site resets TagRefinementManager in the
+    // same breath (source/event/workspace change), so no refinement state keyed by an
+    // old uid survives to collide with a post-reset "group-1". _removalListeners is NOT
+    // cleared — that is one-time module wiring (see onGroupRemoved), not per-session state.
+    _groups = []; _fileGroupMap = new Map(); _activeTabId = null; _uidCounter = 0;
   }
 
   // ── Public API ─────────────────────────────────────────────────────────────
@@ -189,6 +228,7 @@ function createGroupManager(hooks = {}) {
   return {
     createGroup,
     removeGroup,
+    onGroupRemoved,
     assignFiles,
     unassignFiles,
     getGroupForFile,

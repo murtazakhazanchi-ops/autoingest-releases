@@ -142,7 +142,11 @@ async function scanPhotographerFolders(localEventPath, components) {
  *   scopeKey: string,
  *   ordered:  Array<{ canonical: string, sequence: number, folderName: string }>
  * }>} scopedOrdered
- * @returns {Promise<{ ok: boolean, renames: Array<{from:string,to:string}>, error?: string }>}
+ * @returns {Promise<{ ok: boolean, renames: Array<{from:string,to:string,scopeRel:string}>, error?: string }>}
+ *   `renames` are the renames that are actually in effect on disk — on failure, the failing scope was
+ *   rolled back, so only EARLIER scopes' renames are reported. `scopeRel` is the event-relative
+ *   directory the rename happened in ('' for the event root), so callers can remap durable records
+ *   keyed by event-relative path (event.json tagRefinements / metadataGroups) from the real pairs.
  */
 async function applyRenames(localEventPath, scopedOrdered) {
   const allRenames = [];
@@ -153,8 +157,9 @@ async function applyRenames(localEventPath, scopedOrdered) {
       : path.join(localEventPath, scope.scopeKey);
 
     const result = await _applyRenamesInDir(baseDir, scope.ordered);
-    if (!result.ok) return result;
-    allRenames.push(...result.renames);
+    if (!result.ok) return { ...result, renames: allRenames };
+    const scopeRel = scope.scopeKey === EVENT_ROOT_KEY ? '' : scope.scopeKey;
+    allRenames.push(...result.renames.map(r => ({ ...r, scopeRel })));
   }
 
   return { ok: true, renames: allRenames };
