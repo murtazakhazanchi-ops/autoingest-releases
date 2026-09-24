@@ -59,19 +59,34 @@ function _streamChecksum(filePath) {
 }
 
 /**
+ * Build the n-th suffixed candidate for destPath: A.CR2 with n=1 → A_1.CR2, etc.
+ * n=0 returns destPath itself, unchanged — shared by the single-file and pair-aware
+ * suffix searches so there is exactly one suffix-naming convention in this module.
+ */
+function _suffixed(destPath, n) {
+  if (n === 0) return destPath;
+  const ext  = path.extname(destPath);
+  const base = destPath.slice(0, destPath.length - ext.length);
+  return `${base}_${n}${ext}`;
+}
+
+async function _pathExists(p) {
+  try {
+    await fsp.access(p);
+    return true;
+  } catch (e) {
+    if (e.code === 'ENOENT') return false;
+    throw e;
+  }
+}
+
+/**
  * Find a free path by appending _1, _2, … before the extension.
  */
 async function _safeRenamedPath(destPath) {
-  const ext  = path.extname(destPath);
-  const base = destPath.slice(0, destPath.length - ext.length);
   for (let n = 1; ; n++) {
-    const candidate = `${base}_${n}${ext}`;
-    try {
-      await fsp.access(candidate);
-    } catch (e) {
-      if (e.code === 'ENOENT') return candidate;
-      throw e;
-    }
+    const candidate = _suffixed(destPath, n);
+    if (!(await _pathExists(candidate))) return candidate;
   }
 }
 
@@ -124,6 +139,114 @@ async function _copyFile(srcPath, destPath) {
   return { finalDest, wasRenamed };
 }
 
+// ── RAW/XMP pair-aware destination resolution ───────────────────────────────────────
+//
+// PAIR INVARIANT: a RAW's companion XMP destination is resolved as part of the RAW's
+// own basename decision, before either file is copied. Never derive it later from the
+// original source basename, and never resolve it independently of the RAW — otherwise a
+// conflict-renamed RAW can end up detached from, or mis-associated with, its sidecar
+// (D1: an incoming XMP silently attaching to an unrelated pre-existing RAW).
+
+/**
+ * Resolve the archive destination for a RAW file that may have a companion XMP, choosing
+ * a basename that is simultaneously safe for BOTH halves of the pair.
+ *
+ * True-duplicate short-circuit: if the archive's bare (unsuffixed) basename already holds
+ * a byte-identical RAW, the RAW keeps that existing identity — no rename, matching the
+ * existing single-file skip semantics exactly. The caller is expected to then run the
+ * companion XMP through the ordinary single-file sidecar rules against that same
+ * untouched basename (this function does not touch the XMP in that case).
+ *
+ * Otherwise, walks n = 0, 1, 2, … and returns the smallest n where BOTH the RAW candidate
+ * and (if hasXmp) the XMP candidate are simultaneously free. A suffix is never chosen for
+ * one half of the pair while leaving the other on a mismatched or already-occupied
+ * basename — so the final RAW and XMP always share one basename.
+ *
+ * Performs only existence/size/checksum checks; the actual copy happens elsewhere.
+ *
+ * @returns {Promise<{ duplicate: boolean, rawDest: string, xmpDest: string|null }>}
+ */
+async function _resolvePairDestination(localRawPath, archiveRawPath, hasXmp, archiveXmpBase) {
+  if (await _pathExists(archiveRawPath)) {
+    const [srcStat, destStat] = await Promise.all([fsp.stat(localRawPath), fsp.stat(archiveRawPath)]);
+    if (srcStat.size === destStat.size) {
+      const [srcHash, destHash] = await Promise.all([
+        _streamChecksum(localRawPath),
+        _streamChecksum(archiveRawPath),
+      ]);
+      if (srcHash === destHash) {
+        return { duplicate: true, rawDest: archiveRawPath, xmpDest: hasXmp ? archiveXmpBase : null };
+      }
+    }
+  }
+
+  for (let n = 0; ; n++) {
+    const rawCandidate = _suffixed(archiveRawPath, n);
+    if (await _pathExists(rawCandidate)) continue;
+    if (!hasXmp) return { duplicate: false, rawDest: rawCandidate, xmpDest: null };
+    const xmpCandidate = _suffixed(archiveXmpBase, n);
+    if (await _pathExists(xmpCandidate)) continue;
+    return { duplicate: false, rawDest: rawCandidate, xmpDest: xmpCandidate };
+  }
+}
+
+/**
+ * Sync a RAW file together with its companion XMP (if the source has one) as a single
+ * naming pair. Falls through to the ordinary single-file _syncOneFile path when there is
+ * no companion XMP at all (an unpaired RAW behaves exactly as before) or when the RAW
+ * turns out to be a true duplicate at its existing bare basename (its XMP then follows
+ * the existing, unchanged single-file sidecar rules against that same untouched
+ * basename — never overwritten, never guessed at a different name).
+ */
+async function _syncRawWithCompanion(
+  localRawPath, archiveRawPath, rawFilename,
+  localXmpPath, archiveXmpPath, xmpFilename,
+  hasXmp, result, abortSignal = null, onFileProgress = null,
+) {
+  if (!hasXmp) {
+    await _syncOneFile(localRawPath, archiveRawPath, rawFilename, result, abortSignal, onFileProgress);
+    return;
+  }
+
+  let resolved;
+  try {
+    resolved = await _resolvePairDestination(localRawPath, archiveRawPath, true, archiveXmpPath);
+  } catch (err) {
+    result.errors.push(`Pair resolution failed ${rawFilename}: ${err.message}`);
+    onFileProgress?.(rawFilename, 'failed');
+    return;
+  }
+
+  if (resolved.duplicate) {
+    await _syncOneFile(localRawPath, archiveRawPath, rawFilename, result, abortSignal, onFileProgress);
+    await _syncOneFile(localXmpPath, archiveXmpPath, xmpFilename, result, abortSignal, onFileProgress);
+    return;
+  }
+
+  const wasRenamed = resolved.rawDest !== archiveRawPath;
+  try {
+    const { finalDest } = await _copyFile(localRawPath, resolved.rawDest);
+    _recordCopy(result, localRawPath, finalDest);
+    result.copiedToArchive++;
+    if (wasRenamed) result.renamedConflicts++;
+    onFileProgress?.(rawFilename, 'copied');
+  } catch (err) {
+    result.errors.push(`Copy failed ${rawFilename}: ${err.message}`);
+    onFileProgress?.(rawFilename, 'failed');
+    return; // RAW failed — do not attempt its XMP against a destination we can no longer trust.
+  }
+
+  try {
+    const { finalDest: xmpFinal } = await _copyFile(localXmpPath, resolved.xmpDest);
+    _recordCopy(result, localXmpPath, xmpFinal);
+    result.sidecarsCopied++;
+    onFileProgress?.(xmpFilename, 'copied');
+  } catch (err) {
+    result.errors.push(`Copy failed ${xmpFilename}: ${err.message}`);
+    onFileProgress?.(xmpFilename, 'failed');
+  }
+}
+
 /**
  * Sync all files in localDir into archiveDir.
  * depth=0  → photographer folder (files + recurse into subdirs with depth=1)
@@ -147,6 +270,22 @@ async function _syncDir(localDir, archiveDir, result, depth = 0, abortSignal = n
     return;
   }
 
+  // RAW files with a same-folder companion .xmp are synced as a pair (see the PAIR
+  // INVARIANT comment above _resolvePairDestination) — pre-scan so the main loop below
+  // can route paired RAWs through _syncRawWithCompanion and skip their claimed .xmp
+  // entry rather than syncing it a second time as an unrelated generic file. Orphan
+  // .xmp files (no sibling RAW here) fall through to the existing generic behavior.
+  const localFileNames = new Set(entries.filter(e => e.isFile()).map(e => e.name));
+  const claimedXmpNames = new Set();
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    const ext = path.extname(entry.name).toLowerCase();
+    if (!_RAW_EXTS.has(ext)) continue;
+    const base = entry.name.slice(0, entry.name.length - ext.length);
+    const xmpName = base + '.xmp';
+    if (localFileNames.has(xmpName)) claimedXmpNames.add(xmpName);
+  }
+
   for (const entry of entries) {
     if (abortSignal?.aborted) return;
     if (pauseSignal?.paused)  return;
@@ -161,6 +300,22 @@ async function _syncDir(localDir, archiveDir, result, depth = 0, abortSignal = n
     }
 
     if (!entry.isFile()) continue;
+
+    if (claimedXmpNames.has(entry.name)) continue; // handled by its RAW's pairing below
+
+    const ext = path.extname(entry.name).toLowerCase();
+    if (_RAW_EXTS.has(ext)) {
+      const base        = entry.name.slice(0, entry.name.length - ext.length);
+      const xmpFilename = base + '.xmp';
+      if (claimedXmpNames.has(xmpFilename)) {
+        await _syncRawWithCompanion(
+          localPath, archivePath, entry.name,
+          path.join(localDir, xmpFilename), path.join(archiveDir, xmpFilename), xmpFilename,
+          true, result, abortSignal, onFileProgress,
+        );
+        continue;
+      }
+    }
 
     let destStat = null;
     try {
@@ -362,22 +517,24 @@ async function _syncFileList(relPaths, localEventPath, archiveEventPath, result,
     const archivePath = path.join(archiveEventPath, ...archiveRel.split('/').filter(Boolean));
     const filename    = segments[segments.length - 1] || '';
 
-    await _syncOneFile(localPath, archivePath, filename, result, abortSignal, onFileProgress);
-
-    // Companion XMP expansion: for RAW files, attempt to sync a same-folder .xmp sidecar.
+    // RAW files: resolve together with their companion .xmp (if the source has one) as
+    // a single naming pair — see the PAIR INVARIANT comment above _resolvePairDestination.
     const ext = path.extname(filename).toLowerCase();
     if (_RAW_EXTS.has(ext)) {
       const base        = filename.slice(0, filename.length - ext.length);
       const xmpFilename = base + '.xmp';
       const xmpLocal    = path.join(path.dirname(localPath),   xmpFilename);
       const xmpArchive  = path.join(path.dirname(archivePath), xmpFilename);
-      try {
-        await fsp.access(xmpLocal);
-        await _syncOneFile(xmpLocal, xmpArchive, xmpFilename, result, abortSignal, onFileProgress);
-      } catch {
-        // XMP absent or inaccessible — non-fatal, skip silently
-      }
+      const hasXmp      = await _pathExists(xmpLocal);
+      await _syncRawWithCompanion(
+        localPath, archivePath, filename,
+        xmpLocal, xmpArchive, xmpFilename,
+        hasXmp, result, abortSignal, onFileProgress,
+      );
+      continue;
     }
+
+    await _syncOneFile(localPath, archivePath, filename, result, abortSignal, onFileProgress);
   }
 }
 
@@ -932,6 +1089,15 @@ async function syncJob(job, { nasRoot, stagingRoot }, { progressCallback, pauseS
  * Includes companion XMP sidecar expansion (same logic as _syncFileList).
  *
  * Does not re-copy files. Reports only. Safe to run at any time after sync.
+ *
+ * KNOWN LIMITATION (not fixed as part of D1 — recorded, not fixed): this function
+ * reconstructs each file's expected archive path directly from job.files' relPaths and
+ * has no access to the sync's actual conflict-rename decisions (_copiedPairs is
+ * deliberately non-enumerable and never persisted — see _recordCopy). It already
+ * mis-locates a RAW that was itself conflict-renamed during sync, independent of the
+ * RAW/XMP pairing fix below; the same gap applies to its own companion-XMP expansion.
+ * Correctly fixing this needs the sync's actual pair-destination mapping to be threaded
+ * through durably (a real API/persistence change), which is out of scope here.
  *
  * @param {{ progressCallback?: Function }} [opts]
  * @returns {Promise<{
