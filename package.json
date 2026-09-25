@@ -90,11 +90,10 @@
       ],
       "icon": "assets/mac.icns",
       "category": "public.app-category.photography",
-      "identity": null,
-      "hardenedRuntime": false,
-      "gatekeeperAssess": false
+      "hardenedRuntime": true
     },
     "dmg": {
+      "sign": true,
       "title": "${productName} ${version}",
       "window": {
         "width": 540,

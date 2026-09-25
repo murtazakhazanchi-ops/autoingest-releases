@@ -133,10 +133,89 @@ jobs:
         run: |
           echo "$SERVICE_ACCOUNT_KEY" > config/service-account-key.json
 
+      # D3 — macOS release signing/notarization. See scripts/verify-mac-signing.sh for the
+      # verification-gate rationale. @electron/notarize's API-key route (electron-builder's
+      # preferred/documented mechanism) expects APPLE_API_KEY to be a
+      # FILE PATH to the downloaded AuthKey_XXXXXXXXXX.p8 — never its raw content — so the
+      # raw key is held in its own secret (APPLE_API_KEY_P8) and written to a runner-local
+      # temp file here, exactly like this workflow's existing SERVICE_ACCOUNT_KEY pattern.
+      - name: Prepare Apple API key file (if configured)
+        if: ${{ secrets.APPLE_API_KEY_P8 != '' }}
+        shell: bash
+        env:
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+        run: |
+          KEY_PATH="$RUNNER_TEMP/apple-notarization-key.p8"
+          echo "$APPLE_API_KEY_P8" > "$KEY_PATH"
+          echo "APPLE_API_KEY=$KEY_PATH" >> "$GITHUB_ENV"
+
+      # Presence-only preflight — never echoes a secret value. electron-builder's own
+      # default behavior, confirmed from the installed app-builder-lib@26.8.1 source, is to
+      # WARN and silently fall back to ad-hoc signing (or skip notarization entirely) when
+      # credentials are missing, not to fail — so a real gate must exist above that default.
+      - name: Verify macOS signing/notarization credentials are configured
+        shell: bash
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          missing=()
+          [ -z "${CSC_LINK:-}" ] && missing+=("CSC_LINK")
+          [ -z "${CSC_KEY_PASSWORD:-}" ] && missing+=("CSC_KEY_PASSWORD")
+          has_api_key=1
+          [ -z "${APPLE_API_KEY:-}" ] && has_api_key=0
+          [ -z "${APPLE_API_KEY_ID:-}" ] && has_api_key=0
+          [ -z "${APPLE_API_ISSUER:-}" ] && has_api_key=0
+          has_apple_id=1
+          [ -z "${APPLE_ID:-}" ] && has_apple_id=0
+          [ -z "${APPLE_APP_SPECIFIC_PASSWORD:-}" ] && has_apple_id=0
+          [ -z "${APPLE_TEAM_ID:-}" ] && has_apple_id=0
+          if [ "$has_api_key" -eq 0 ] && [ "$has_apple_id" -eq 0 ]; then
+            missing+=("a complete notarization credential set: either (APPLE_API_KEY_P8, APPLE_API_KEY_ID, APPLE_API_ISSUER) or (APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID)")
+          fi
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::macOS release signing credentials are not configured. Missing: ${missing[*]}"
+            exit 1
+          fi
+          echo "macOS signing/notarization credentials are present (values not shown)."
+
       - name: Build and publish Mac
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: npm run dist:mac -- -p always
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        # -c.mac.forceCodeSigning=true is a release-build-only override (kept out of
+        # package.json's static config) so `npm run dist:mac`/`build:mac` still packages
+        # normally for a local developer with no Apple credentials — only the CI release
+        # jobs must refuse to silently ship an ad-hoc/unsigned artifact.
+        run: npm run dist:mac -- -p always -c.mac.forceCodeSigning=true
+
+      # Independently verifies what electron-builder actually produced — never trusts a
+      # clean exit code alone. Runs against BOTH architectures' raw appOutDir bundle
+      # (before dmg/zip wrapping, catching a failure at the earliest point) plus the final
+      # DMG containers. Fails the job — never uploads/publishes a silently-unsigned artifact.
+      - name: Verify macOS release signing & notarization
+        shell: bash
+        run: |
+          set -e
+          bash scripts/verify-mac-signing.sh "dist/mac/AutoIngest.app"
+          bash scripts/verify-mac-signing.sh "dist/mac-arm64/AutoIngest.app"
+          for dmg in dist/AutoIngest-*.dmg; do
+            echo "=== DMG: $dmg ==="
+            codesign -dv --verbose=4 "$dmg" 2>&1 | tee /tmp/dmg-codesign.log
+            grep -q "Signature=adhoc" /tmp/dmg-codesign.log && { echo "::error::$dmg is ad-hoc signed"; exit 1; }
+            spctl --assess --type open --context context:primary-signature --verbose=4 "$dmg"
+          done
 
   build-windows:
     needs: create-release
@@ -400,8 +479,72 @@ jobs:
           RC_TAG: ${{ needs.rc-tag.outputs.rc_tag }}
         run: node scripts/product-docs/cli.js release gate --tag "$RC_TAG" --channel rc
 
+      # D3 — macOS release signing/notarization. Identical mechanism/rationale as build-mac
+      # (kept in sync — see that job's comments). RC and Stable must never diverge here:
+      # Preview exists partly to validate the real release pipeline.
+      - name: Prepare Apple API key file (if configured)
+        if: ${{ secrets.APPLE_API_KEY_P8 != '' }}
+        shell: bash
+        env:
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+        run: |
+          KEY_PATH="$RUNNER_TEMP/apple-notarization-key.p8"
+          echo "$APPLE_API_KEY_P8" > "$KEY_PATH"
+          echo "APPLE_API_KEY=$KEY_PATH" >> "$GITHUB_ENV"
+
+      - name: Verify macOS signing/notarization credentials are configured
+        shell: bash
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          missing=()
+          [ -z "${CSC_LINK:-}" ] && missing+=("CSC_LINK")
+          [ -z "${CSC_KEY_PASSWORD:-}" ] && missing+=("CSC_KEY_PASSWORD")
+          has_api_key=1
+          [ -z "${APPLE_API_KEY:-}" ] && has_api_key=0
+          [ -z "${APPLE_API_KEY_ID:-}" ] && has_api_key=0
+          [ -z "${APPLE_API_ISSUER:-}" ] && has_api_key=0
+          has_apple_id=1
+          [ -z "${APPLE_ID:-}" ] && has_apple_id=0
+          [ -z "${APPLE_APP_SPECIFIC_PASSWORD:-}" ] && has_apple_id=0
+          [ -z "${APPLE_TEAM_ID:-}" ] && has_apple_id=0
+          if [ "$has_api_key" -eq 0 ] && [ "$has_apple_id" -eq 0 ]; then
+            missing+=("a complete notarization credential set: either (APPLE_API_KEY_P8, APPLE_API_KEY_ID, APPLE_API_ISSUER) or (APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID)")
+          fi
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::macOS release signing credentials are not configured. Missing: ${missing[*]}"
+            exit 1
+          fi
+          echo "macOS signing/notarization credentials are present (values not shown)."
+
       - name: Build and publish Mac RC
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: npm run dist:mac -- -p always -c.publish.channel=rc -c.publish.releaseType=prerelease
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: npm run dist:mac -- -p always -c.publish.channel=rc -c.publish.releaseType=prerelease -c.mac.forceCodeSigning=true
+
+      - name: Verify macOS release signing & notarization
+        shell: bash
+        run: |
+          set -e
+          bash scripts/verify-mac-signing.sh "dist/mac/AutoIngest.app"
+          bash scripts/verify-mac-signing.sh "dist/mac-arm64/AutoIngest.app"
+          for dmg in dist/AutoIngest-*.dmg; do
+            echo "=== DMG: $dmg ==="
+            codesign -dv --verbose=4 "$dmg" 2>&1 | tee /tmp/dmg-codesign.log
+            grep -q "Signature=adhoc" /tmp/dmg-codesign.log && { echo "::error::$dmg is ad-hoc signed"; exit 1; }
+            spctl --assess --type open --context context:primary-signature --verbose=4 "$dmg"
+          done
