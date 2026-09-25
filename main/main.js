@@ -4254,19 +4254,10 @@ function _regActiveInCategory(category) {
   );
 }
 
-// Legacy listManager labels not present in the registry for this category — kept
-// selectable (read-only fallback) so nothing the user relied on silently disappears.
-function _regLegacyFallbackLabels(name, registryLabels) {
-  const have = new Set(registryLabels.map(l => String(l).toLowerCase()));
-  let legacy = [];
-  try {
-    const lm = listManager.getList(name) || [];
-    legacy = lm.map(n => (typeof n === 'string' ? n : n.label))
-               .filter(l => l && !have.has(String(l).toLowerCase()));
-  } catch {}
-  const seen = new Set();
-  return legacy.filter(l => { const k = l.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
-}
+// D2: leaf-safe legacy fallback — only true selectable leaves may become committed
+// keyword/Event-Type/Location values; a node with children (at any depth) is structural/
+// navigation context only. See services/legacyKeywordFallback.js for the full rationale.
+const { collectLegacyLeaves, pruneLegacyTree } = require('../services/legacyKeywordFallback');
 
 // Build TreeAutocomplete-shaped data for a registry-backed list name.
 function _registryListData(name) {
@@ -4275,7 +4266,8 @@ function _registryListData(name) {
 
   if (name === 'cities') {
     const labels = kws.map(k => k.label);
-    const legacy = _regLegacyFallbackLabels(name, labels);
+    const have   = new Set(labels.map(l => l.toLowerCase()));
+    const legacy = collectLegacyLeaves(listManager.getList(name) || [], have); // flat list — every entry is already a leaf
     const seen = new Set();
     return [...labels, ...legacy].filter(l => { const k = l.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
   }
@@ -4297,12 +4289,28 @@ function _registryListData(name) {
   });
   const tree = toArr(root);
 
-  // Read-only fallback for legacy listManager terms not in the registry, grouped clearly.
+  // Read-only fallback for legacy listManager terms not in the registry — preserves the
+  // real category/leaf shape (rather than flattening it) so the existing browse renderer's
+  // own parent-is-navigation-only / leaf-is-selectable distinction applies unchanged.
   const registryLabels = [];
   (function collect(nodes) { for (const n of nodes) { registryLabels.push(n.label); if (n.children) collect(n.children); } })(tree);
-  const legacy = _regLegacyFallbackLabels(name, registryLabels);
-  if (legacy.length) {
-    tree.push({ label: 'Other (legacy — read-only)', children: legacy.map(l => ({ label: l })) });
+  const have = new Set(registryLabels.map(l => l.toLowerCase()));
+  const prunedLegacy = pruneLegacyTree(listManager.getList(name) || [], have);
+  if (prunedLegacy.length) {
+    if (name === 'locations') {
+      // _renderLocationsTree has no "pure category" concept at the top level — any
+      // children-bearing top-level entry also offers ITS OWN label as a selectable
+      // "(general)" leaf (exactly like "Jamrat"/"Kaaba" already do). Wrapping the whole
+      // legacy subtree under one synthetic node would make that wrapper's own label
+      // ("Other (legacy — read-only)") selectable, which must never happen — so its
+      // pruned top-level entries are spliced in directly instead, exactly like every
+      // other top-level location entry already is.
+      tree.push(...prunedLegacy);
+    } else {
+      // _renderEventsTree treats every top-level entry as a pure, non-selectable
+      // category header — safe to group under one clearly-labeled wrapper.
+      tree.push({ label: 'Other (legacy — read-only)', children: prunedLegacy });
+    }
   }
   return tree;
 }
@@ -4330,9 +4338,10 @@ function _registryMatch(name, input) {
     else if (Array.isArray(k.aliases) && k.aliases.some(a => String(a).toLowerCase().includes(q)))
                                      push(k.label, 'alias', 40);
   }
-  // Legacy fallback terms participate in search too (read-only).
-  const registryLabels = kws.map(k => k.label);
-  for (const label of _regLegacyFallbackLabels(name, registryLabels)) {
+  // Legacy fallback LEAVES participate in search too (read-only) — never a structural/
+  // parent node, regardless of nesting depth or how closely its own label matches `q`.
+  const have = new Set(kws.map(k => k.label.toLowerCase()));
+  for (const label of collectLegacyLeaves(listManager.getList(name) || [], have)) {
     const lo = label.toLowerCase();
     if (lo === q)              push(label, 'exact', 100);
     else if (lo.startsWith(q)) push(label, 'startsWith', 70);
