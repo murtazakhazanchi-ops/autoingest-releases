@@ -214,6 +214,13 @@ console.log('macReleaseSigningConfig (D3 — repository-side foundation, no cred
     }
   });
 
+  t('no literal empty ${{ }} expression exists anywhere, including inside comments — GitHub templates run: blocks BEFORE bash ever sees them, so even a comment\'s illustrative "${{ }}" is parsed as a real (invalid) expression and rejects the whole workflow at dispatch time (caught live: "An expression was expected")', () => {
+    assert.doesNotMatch(workflow, /\$\{\{\s*\}\}/);
+    const opens = (workflow.match(/\$\{\{/g) || []).length;
+    const closes = (workflow.match(/\}\}/g) || []).length;
+    assert.equal(opens, closes, `unbalanced \${{ / }} — ${opens} opens vs ${closes} closes`);
+  });
+
   t('no step-level `if:` condition references the `secrets` context (GitHub Actions rejects the ENTIRE workflow file at dispatch time if any does — caught live: a prior draft of this exact workflow failed `gh workflow run` with "Unrecognized named-value: \'secrets\'" on two such lines)', () => {
     const ifLines = workflow.split('\n').filter(l => /^\s*if:/.test(l));
     for (const line of ifLines) {

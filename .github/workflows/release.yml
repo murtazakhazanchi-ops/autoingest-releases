@@ -571,8 +571,8 @@ jobs:
         run: |
           if [ "$MAC_SIGNING_MODE" = "unsigned" ]; then
             echo "::warning::Building macOS RC with forceCodeSigning=false — D3 unsigned exception active."
-            # A GitHub secret that does not exist evaluates to an EMPTY STRING in ${{ }},
-            # never "unset" — and electron-builder's own credential resolution (confirmed
+            # A GitHub secret that does not exist evaluates to an EMPTY STRING when
+            # interpolated, never "unset" — and electron-builder's own credential resolution (confirmed
             # live: real CI failure "/…/autoingest-releases not a file") treats an empty
             # CSC_LINK as a real (if malformed) certificate path rather than "absent",
             # trying to import the working directory itself. Truly unsetting these here
