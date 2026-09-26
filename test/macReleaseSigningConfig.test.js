@@ -206,6 +206,13 @@ console.log('macReleaseSigningConfig (D3 — repository-side foundation, no cred
     }
   });
 
+  t('no step-level `if:` condition references the `secrets` context (GitHub Actions rejects the ENTIRE workflow file at dispatch time if any does — caught live: a prior draft of this exact workflow failed `gh workflow run` with "Unrecognized named-value: \'secrets\'" on two such lines)', () => {
+    const ifLines = workflow.split('\n').filter(l => /^\s*if:/.test(l));
+    for (const line of ifLines) {
+      assert.doesNotMatch(line, /secrets\./, `step-level if: must never reference secrets — found: ${line.trim()}`);
+    }
+  });
+
   console.log(`${passed} passed`);
   process.exit(process.exitCode || 0);
 })();

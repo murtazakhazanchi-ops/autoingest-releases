@@ -144,15 +144,20 @@ jobs:
       # FILE PATH to the downloaded AuthKey_XXXXXXXXXX.p8 — never its raw content — so the
       # raw key is held in its own secret (APPLE_API_KEY_P8) and written to a runner-local
       # temp file here, exactly like this workflow's existing SERVICE_ACCOUNT_KEY pattern.
+      # The `secrets` context cannot be used in a step-level `if:` (GitHub Actions rejects
+      # the whole workflow file at parse time if it is — caught live when dispatching this
+      # workflow) — so the presence check moves inside the script instead; the step always
+      # runs and is a fast no-op when the secret is empty.
       - name: Prepare Apple API key file (if configured)
-        if: ${{ secrets.APPLE_API_KEY_P8 != '' }}
         shell: bash
         env:
           APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
         run: |
-          KEY_PATH="$RUNNER_TEMP/apple-notarization-key.p8"
-          echo "$APPLE_API_KEY_P8" > "$KEY_PATH"
-          echo "APPLE_API_KEY=$KEY_PATH" >> "$GITHUB_ENV"
+          if [ -n "$APPLE_API_KEY_P8" ]; then
+            KEY_PATH="$RUNNER_TEMP/apple-notarization-key.p8"
+            echo "$APPLE_API_KEY_P8" > "$KEY_PATH"
+            echo "APPLE_API_KEY=$KEY_PATH" >> "$GITHUB_ENV"
+          fi
 
       # Presence-only preflight — never echoes a secret value. electron-builder's own
       # default behavior, confirmed from the installed app-builder-lib@26.8.1 source, is to
@@ -507,15 +512,17 @@ jobs:
             echo "mode=signed" >> "$GITHUB_OUTPUT"
           fi
 
+      # See build-mac's identical step for why this has no step-level `if:`.
       - name: Prepare Apple API key file (if configured)
-        if: ${{ secrets.APPLE_API_KEY_P8 != '' }}
         shell: bash
         env:
           APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
         run: |
-          KEY_PATH="$RUNNER_TEMP/apple-notarization-key.p8"
-          echo "$APPLE_API_KEY_P8" > "$KEY_PATH"
-          echo "APPLE_API_KEY=$KEY_PATH" >> "$GITHUB_ENV"
+          if [ -n "$APPLE_API_KEY_P8" ]; then
+            KEY_PATH="$RUNNER_TEMP/apple-notarization-key.p8"
+            echo "$APPLE_API_KEY_P8" > "$KEY_PATH"
+            echo "APPLE_API_KEY=$KEY_PATH" >> "$GITHUB_ENV"
+          fi
 
       - name: Verify macOS signing/notarization credentials are configured
         if: steps.mac_signing_mode.outputs.mode == 'signed'
