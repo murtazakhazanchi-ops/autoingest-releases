@@ -132,6 +132,14 @@ console.log('macReleaseSigningConfig (D3 — repository-side foundation, no cred
     assert.match(inputBlock, /type:\s*boolean/);
   });
 
+  t('the unsigned build path truly unsets (not just leaves empty) every CSC/Apple env var before invoking electron-builder — a real CI failure showed electron-builder treats an empty CSC_LINK as a present (if malformed) cert path, not as absent', () => {
+    const block = jobBlocks['rc-build-mac'];
+    const buildStepIdx = block.indexOf('- name: Build and publish Mac RC');
+    const nextStepStart = block.indexOf('\n      - name:', buildStepIdx + 1);
+    const buildStep = block.slice(buildStepIdx, nextStepStart);
+    assert.match(buildStep, /unset CSC_LINK CSC_KEY_PASSWORD APPLE_API_KEY APPLE_API_KEY_ID APPLE_API_ISSUER APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID/);
+  });
+
   t('the credential preflight and strict verification gate are both skipped in unsigned mode — never run-then-ignored', () => {
     const block = jobBlocks['rc-build-mac'];
     const preflightStepStart = block.indexOf('- name: Verify macOS signing/notarization credentials are configured');
