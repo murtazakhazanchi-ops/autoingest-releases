@@ -18,6 +18,11 @@ on:
         description: 'RC version, shaped X.Y.Z-rc.N (e.g. 0.9.12-rc.1) — required when build_type is rc'
         required: false
         type: string
+      allow_unsigned_mac:
+        description: 'D3 TEMPORARY EXCEPTION — publish this RC''s macOS build UNSIGNED because Apple Developer credentials are not yet provisioned. Never the default; must be explicitly set true per-run. Has no effect on the Stable (build-mac) path, which always requires real signing — see rc-build-mac''s "Determine macOS signing mode" step.'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
 
@@ -480,8 +485,28 @@ jobs:
         run: node scripts/product-docs/cli.js release gate --tag "$RC_TAG" --channel rc
 
       # D3 — macOS release signing/notarization. Identical mechanism/rationale as build-mac
-      # (kept in sync — see that job's comments). RC and Stable must never diverge here:
-      # Preview exists partly to validate the real release pipeline.
+      # (kept in sync — see that job's comments). RC and Stable must never diverge here
+      # EXCEPT for the one explicit, temporary exception below: while D3's Apple Developer
+      # credentials remain unprovisioned, a human can pass allow_unsigned_mac=true on this
+      # workflow_dispatch run to publish this RC's macOS build unsigned rather than block
+      # the whole RC on signing. This bypass has no effect on build-mac (Stable), which has
+      # no such input and always requires real signing — deliberately: Stable is not the
+      # temporary-exception path. Never triggered by secret absence alone; only by this
+      # explicit per-run operator choice.
+      - name: Determine macOS signing mode
+        id: mac_signing_mode
+        shell: bash
+        env:
+          ALLOW_UNSIGNED_MAC: ${{ github.event.inputs.allow_unsigned_mac }}
+        run: |
+          if [ "$ALLOW_UNSIGNED_MAC" = "true" ]; then
+            echo "::warning::D3 UNSIGNED macOS EXCEPTION explicitly authorized for this run (allow_unsigned_mac=true). This RC's macOS build will be published UNSIGNED / NOT NOTARIZED. This is a deliberate, temporary, per-run exception because Apple Developer credentials are not yet provisioned (D3 deferred) — never a silent fallback from missing secrets. The signed path remains the default and will be enforced again once credentials exist."
+            echo "mode=unsigned" >> "$GITHUB_OUTPUT"
+          else
+            echo "macOS signing mode: signed (default — pass allow_unsigned_mac=true explicitly to bypass, only while D3 credentials remain unprovisioned)."
+            echo "mode=signed" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Prepare Apple API key file (if configured)
         if: ${{ secrets.APPLE_API_KEY_P8 != '' }}
         shell: bash
@@ -493,6 +518,7 @@ jobs:
           echo "APPLE_API_KEY=$KEY_PATH" >> "$GITHUB_ENV"
 
       - name: Verify macOS signing/notarization credentials are configured
+        if: steps.mac_signing_mode.outputs.mode == 'signed'
         shell: bash
         env:
           CSC_LINK: ${{ secrets.CSC_LINK }}
@@ -534,9 +560,17 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: npm run dist:mac -- -p always -c.publish.channel=rc -c.publish.releaseType=prerelease -c.mac.forceCodeSigning=true
+          MAC_SIGNING_MODE: ${{ steps.mac_signing_mode.outputs.mode }}
+        run: |
+          if [ "$MAC_SIGNING_MODE" = "unsigned" ]; then
+            echo "::warning::Building macOS RC with forceCodeSigning=false — D3 unsigned exception active."
+            npm run dist:mac -- -p always -c.publish.channel=rc -c.publish.releaseType=prerelease -c.mac.forceCodeSigning=false
+          else
+            npm run dist:mac -- -p always -c.publish.channel=rc -c.publish.releaseType=prerelease -c.mac.forceCodeSigning=true
+          fi
 
       - name: Verify macOS release signing & notarization
+        if: steps.mac_signing_mode.outputs.mode == 'signed'
         shell: bash
         run: |
           set -e
@@ -548,3 +582,23 @@ jobs:
             grep -q "Signature=adhoc" /tmp/dmg-codesign.log && { echo "::error::$dmg is ad-hoc signed"; exit 1; }
             spctl --assess --type open --context context:primary-signature --verbose=4 "$dmg"
           done
+
+      # The unsigned-exception path deliberately does NOT run verify-mac-signing.sh's strict
+      # pass/fail gate — that gate is designed to correctly FAIL an unsigned build, and Phase
+      # 6 of this authorization explicitly forbids "running signed verification gates and
+      # ignoring failures." Instead: confirm the artifacts actually exist (a real build
+      # happened, not a silently-empty one) and log non-fatal diagnostics for the record.
+      - name: Confirm unsigned macOS artifacts (D3 deferred — no strict signing gate run)
+        if: steps.mac_signing_mode.outputs.mode == 'unsigned'
+        shell: bash
+        run: |
+          set -e
+          for app in dist/mac/AutoIngest.app dist/mac-arm64/AutoIngest.app; do
+            if [ ! -d "$app" ]; then
+              echo "::error::expected app bundle missing: $app"
+              exit 1
+            fi
+            echo "=== $app (diagnostic only — not a pass/fail gate) ==="
+            codesign -dv --verbose=4 "$app" 2>&1 || true
+          done
+          echo "::warning::UNSIGNED / NOT NOTARIZED — D3 DEFERRED. This macOS build was explicitly published unsigned because Apple Developer credentials are not yet provisioned. Gatekeeper will reject it; a manual Privacy & Security -> Open Anyway (or equivalent) approval is required to run it after download. This is an accepted, temporary, per-run exception authorized via allow_unsigned_mac=true — not a silent fallback and not a claim that signing succeeded."

@@ -99,13 +99,67 @@ console.log('macReleaseSigningConfig (D3 — repository-side foundation, no cred
     });
   }
 
-  t('the two mac release jobs use the identical credential/preflight/gate mechanism (Preview/Stable parity — no "RC unsigned, Stable signed" split)', () => {
+  t('build-mac (Stable) carries exactly the original signing mechanism, with no unsigned-exception mechanism at all', () => {
     const extractStepNames = (block) => [...block.matchAll(/- name: ([^\n]+)/g)].map(m => m[1].trim())
       .filter(n => /Apple|signing|notarization|macOS release/.test(n));
     const buildMacSteps = extractStepNames(jobBlocks['build-mac']);
+    assert.deepEqual(buildMacSteps, [
+      'Prepare Apple API key file (if configured)',
+      'Verify macOS signing/notarization credentials are configured',
+      'Verify macOS release signing & notarization',
+    ]);
+    assert.doesNotMatch(jobBlocks['build-mac'], /allow_unsigned_mac|mac_signing_mode|UNSIGNED \/ NOT NOTARIZED/,
+      'Stable must have no unsigned-exception mechanism — signing stays unconditionally required there');
+  });
+
+  t('rc-build-mac carries the same base mechanism PLUS the explicit, opt-in unsigned exception (D3 deferred)', () => {
+    const extractStepNames = (block) => [...block.matchAll(/- name: ([^\n]+)/g)].map(m => m[1].trim())
+      .filter(n => /Apple|signing|notarization|macOS release/.test(n));
     const rcBuildMacSteps = extractStepNames(jobBlocks['rc-build-mac']);
-    assert.deepEqual(buildMacSteps, rcBuildMacSteps);
-    assert.ok(buildMacSteps.length >= 3, 'expected at least the credential-prep, preflight, and verification-gate steps');
+    assert.deepEqual(rcBuildMacSteps, [
+      'Determine macOS signing mode',
+      'Prepare Apple API key file (if configured)',
+      'Verify macOS signing/notarization credentials are configured',
+      'Verify macOS release signing & notarization',
+      'Confirm unsigned macOS artifacts (D3 deferred — no strict signing gate run)',
+    ]);
+  });
+
+  t('allow_unsigned_mac workflow_dispatch input exists, defaults false, and is boolean-typed', () => {
+    assert.match(workflow, /allow_unsigned_mac:/);
+    const inputBlock = workflow.slice(workflow.indexOf('allow_unsigned_mac:'), workflow.indexOf('allow_unsigned_mac:') + 700);
+    assert.match(inputBlock, /default:\s*false/);
+    assert.match(inputBlock, /type:\s*boolean/);
+  });
+
+  t('the credential preflight and strict verification gate are both skipped in unsigned mode — never run-then-ignored', () => {
+    const block = jobBlocks['rc-build-mac'];
+    const preflightStepStart = block.indexOf('- name: Verify macOS signing/notarization credentials are configured');
+    assert.match(block.slice(preflightStepStart, preflightStepStart + 150), /if: steps\.mac_signing_mode\.outputs\.mode == 'signed'/);
+
+    const gateStepStart = block.indexOf('- name: Verify macOS release signing & notarization');
+    assert.match(block.slice(gateStepStart, gateStepStart + 150), /if: steps\.mac_signing_mode\.outputs\.mode == 'signed'/);
+  });
+
+  t('the unsigned path never invokes scripts/verify-mac-signing.sh (which is designed to correctly fail an unsigned build)', () => {
+    const block = jobBlocks['rc-build-mac'];
+    const unsignedStepIdx = block.indexOf('Confirm unsigned macOS artifacts');
+    const unsignedStepStart = block.lastIndexOf('- name:', unsignedStepIdx);
+    const nextStepStart = block.indexOf('\n      - name:', unsignedStepStart + 1);
+    const unsignedStep = block.slice(unsignedStepStart, nextStepStart === -1 ? undefined : nextStepStart);
+    assert.doesNotMatch(unsignedStep, /verify-mac-signing\.sh/);
+    assert.match(unsignedStep, /UNSIGNED \/ NOT NOTARIZED — D3 DEFERRED/, 'the exact required declaration string must appear in CI logs');
+    assert.match(unsignedStep, /if: steps\.mac_signing_mode\.outputs\.mode == 'unsigned'/);
+  });
+
+  t('the build step passes forceCodeSigning=false (explicit) in unsigned mode and =true (default) in signed mode — never omitted', () => {
+    const block = jobBlocks['rc-build-mac'];
+    const buildStepIdx = block.indexOf('- name: Build and publish Mac RC');
+    const nextStepStart = block.indexOf('\n      - name:', buildStepIdx + 1);
+    const buildStep = block.slice(buildStepIdx, nextStepStart);
+    assert.match(buildStep, /-c\.mac\.forceCodeSigning=false/);
+    assert.match(buildStep, /-c\.mac\.forceCodeSigning=true/);
+    assert.match(buildStep, /MAC_SIGNING_MODE/);
   });
 
   t('Windows signing is untouched by this change (out of scope for D3)', () => {
