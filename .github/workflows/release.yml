@@ -716,6 +716,21 @@ jobs:
           echo "existing assets:"
           gh release view "$TARGET_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name'
 
+      # The earlier checkout replaced the entire working tree with target_tag's content —
+      # correct, since packaged application source must be exactly that commit — but that
+      # commit predates this recovery job's own verification script, which exists only on
+      # this release-engineering branch. Restoring just that one file does not affect what
+      # gets packaged: it is tooling invoked AFTER electron-builder has already produced its
+      # output, never part of the built app bundle. actions/checkout only fetches the ref it
+      # was given, so this branch must be fetched explicitly before it can be read.
+      - name: Restore this recovery job's own verification script from its own branch
+        shell: bash
+        run: |
+          git fetch --depth 1 origin "${{ github.ref_name }}"
+          git show FETCH_HEAD:scripts/verify-mac-unsigned-recovery.sh > scripts/verify-mac-unsigned-recovery.sh
+          chmod +x scripts/verify-mac-unsigned-recovery.sh
+          test -s scripts/verify-mac-unsigned-recovery.sh
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:

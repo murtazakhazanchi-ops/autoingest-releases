@@ -318,6 +318,17 @@ console.log('macReleaseSigningConfig (D3 — repository-side foundation, no cred
     assert.doesNotMatch(recoveryBlock, /-c\.mac\.forceCodeSigning=true/);
   });
 
+  t('recovery restores its own verification script from its own branch (via git fetch + git show) after checking out target_tag, and this runs before the build step', () => {
+    const restoreIdx = recoveryBlock.indexOf('Restore this recovery job\'s own verification script');
+    assert.ok(restoreIdx >= 0, 'expected a step that restores the verification script after the target_tag checkout');
+    const buildIdx = recoveryBlock.indexOf('Build macOS (unsigned');
+    assert.ok(restoreIdx < buildIdx, 'the script restore must happen before the build step uses it');
+    const restoreStep = recoveryBlock.slice(restoreIdx, buildIdx);
+    assert.match(restoreStep, /git fetch --depth 1 origin/);
+    assert.match(restoreStep, /git show FETCH_HEAD:scripts\/verify-mac-unsigned-recovery\.sh/);
+    assert.match(restoreStep, /chmod \+x scripts\/verify-mac-unsigned-recovery\.sh/);
+  });
+
   t('recovery runs the dedicated unsigned verification script (never invokes the strict signed-only gate as a command) against both architectures', () => {
     assert.match(recoveryBlock, /verify-mac-unsigned-recovery\.sh.*dist\/mac\/AutoIngest\.app/);
     assert.match(recoveryBlock, /verify-mac-unsigned-recovery\.sh.*dist\/mac-arm64\/AutoIngest\.app/);
