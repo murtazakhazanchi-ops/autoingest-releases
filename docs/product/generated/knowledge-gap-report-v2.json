@@ -574,7 +574,7 @@
         "step-by-step instructions",
         "UI navigation"
       ],
-      "note": "Zero match — the question uses \"importing\" (gerund) rather than \"import\"; lib/query.js performs no stemming (a pre-existing, structural, shared-ranker characteristic — see DEC-019's \"reuse lib/query.js unchanged\" — not something this stage changes). Safe (no invented claim) but misses surfacing the already-evidenced fact that import/sync do not block on relay unavailability (see R03/R14, which use \"import\"/\"internet\" verbatim and do surface a weak, hedged, on-topic answer).",
+      "note": "Zero match — the question uses \"importing\" (gerund) rather than \"import\"; lib/query.js performs no stemming (a pre-existing, structural, shared-ranker characteristic — see DEC-021's \"reuse lib/query.js unchanged\" — not something this stage changes). Safe (no invented claim) but misses surfacing the already-evidenced fact that import/sync do not block on relay unavailability (see R03/R14, which use \"import\"/\"internet\" verbatim and do surface a weak, hedged, on-topic answer).",
       "pass": true,
       "query": "Does going offline stop me from importing?",
       "relatedFeature": null
@@ -802,7 +802,7 @@
         "step-by-step instructions",
         "UI navigation"
       ],
-      "note": "No evidence either way on running without an archive root configured; matches the already-disclosed generic \"archive\" bare-token retrieval-precision gap (see AI-FEAT-058 Stage 2 Future Enhancements) rather than being a new, distinct defect.",
+      "note": "No evidence either way on running without an archive root configured; matches the already-disclosed generic \"archive\" bare-token retrieval-precision gap (see AI-FEAT-059 Stage 2 Future Enhancements) rather than being a new, distinct defect.",
       "pass": false,
       "query": "Can I use AutoIngest without an archive root configured?",
       "relatedFeature": "AI-FEAT-042(200)"
@@ -882,7 +882,7 @@
       "relatedFeature": "AI-FEAT-013(100)"
     }
   ],
-  "generated_at": "2026-08-14T03:09:24.316Z",
+  "generated_at": "2026-09-28T11:43:16.763Z",
   "known_miss_count": 15,
   "pass_count": 84,
   "schema_version": "1.0.0",
