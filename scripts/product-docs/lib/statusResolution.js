@@ -1,7 +1,7 @@
 'use strict';
 
 // Stage 1 Knowledge Engine — deterministic capability-status resolution.
-// See docs/product/features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md
+// See docs/product/features/AI-FEAT-059_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md
 // for the full design rationale. Status is always read off evidence already
 // present on a canonical record (feature Status field, linked bug status,
 // an explicitly-curated boundary citation) — never inferred from a title,
@@ -126,7 +126,7 @@ const KNOWN_BOUNDARIES = Object.freeze([
   // sentence ("Online Registry"). The raw-override rule was designed as a
   // safety valve for a hypothetical stale boundary; testing never found a
   // real case where overriding was CORRECT, only cases where it caused a
-  // false AVAILABLE for an explicitly-excluded topic. See AI-FEAT-058
+  // false AVAILABLE for an explicitly-excluded topic. See AI-FEAT-059
   // Stage 2 Phase 24 evolution entry.
   // Stage 2 — four Online Registry authority/scope boundaries, added after
   // Phase 20's expanded eval corpus surfaced several boundary questions

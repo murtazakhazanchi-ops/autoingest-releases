@@ -6,7 +6,7 @@
 // the real defects found and fixed while testing 36 newly-invented
 // questions (none reused from knowledgeTestCorpus.js or
 // knowledgeTestCorpusV2.js — verified distinct at authoring time) against
-// the real engine. See AI-FEAT-058's Phase 24 evolution entry for the full
+// the real engine. See AI-FEAT-059's Phase 24 evolution entry for the full
 // account of each defect's root cause.
 
 const assert = require('node:assert/strict');

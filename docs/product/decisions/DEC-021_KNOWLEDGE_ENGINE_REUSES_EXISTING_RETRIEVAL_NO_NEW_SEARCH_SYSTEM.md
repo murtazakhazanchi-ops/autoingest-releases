@@ -1,8 +1,8 @@
-# DEC-019 — Knowledge Engine Reuses Existing Retrieval; No New Search System, No Hosted Backend
+# DEC-021 — Knowledge Engine Reuses Existing Retrieval; No New Search System, No Hosted Backend
 
 | Field | Value |
 |---|---|
-| Related feature(s) / roadmap milestone | AI-FEAT-058 / AI-RM-011 |
+| Related feature(s) / roadmap milestone | AI-FEAT-059 / AI-RM-012 |
 | Status | Accepted |
 | Date | 2026-08-13 |
 | Evidence status | Verified from code (`scripts/product-docs/lib/query.js`, `knowledgeEngine.js`, `knowledge-portal/server.js`) and this feature's own eval run (18/20 corpus questions passed as expected, 2/20 documented known misses, 0 unexplained) |
@@ -16,7 +16,7 @@ The Phase 1 Knowledge & Onboarding Portal audit concluded that `scripts/product-
 **1. Retrieval — reuse `lib/query.js` unchanged vs. build a second matching implementation vs. add embeddings.**
 - Reusing `lib/query.js` unchanged means `query`/`impact`/`context`/`knowledge` all share one ranking implementation, and a future improvement to it benefits every consumer at once.
 - Building a second, knowledge-engine-specific matcher was rejected outright — the Stage 1 brief explicitly prohibits it ("Do not create a parallel search engine unless existing architecture demonstrably cannot support the requirement"), and nothing found during implementation demonstrated that.
-- Embeddings were rejected for Stage 1: the eval corpus (18/20 exact passes, the 2 misses both root-caused to specific, fixable retrieval-precision gaps rather than a fundamental inability to match natural language) did not demonstrate that lexical/keyword matching fails outright — it demonstrated real but scoped precision limitations (see AI-FEAT-058's Future Enhancements), which is a materially different and much cheaper problem to solve.
+- Embeddings were rejected for Stage 1: the eval corpus (18/20 exact passes, the 2 misses both root-caused to specific, fixable retrieval-precision gaps rather than a fundamental inability to match natural language) did not demonstrate that lexical/keyword matching fails outright — it demonstrated real but scoped precision limitations (see AI-FEAT-059's Future Enhancements), which is a materially different and much cheaper problem to solve.
 
 **2. Confident vs. weak matches — trust every match the ranker returns vs. add a local confidence tier.**
 - Trusting every match above a bare floor score was the initial implementation and was found, during this feature's own adversarial testing, to risk presenting a low-relevance record as a confident answer (e.g. "Can I delete an event?" tying on the single generic token "event").

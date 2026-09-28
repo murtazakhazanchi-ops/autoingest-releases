@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Related feature(s) / roadmap milestone | AI-FEAT-058 / AI-RM-011 |
+| Related feature(s) / roadmap milestone | AI-FEAT-059 / AI-RM-012 |
 | Status | Accepted |
 | Date | 2026-08-13 |
 | Evidence status | Verified from code (`scripts/product-docs/lib/knowledgeEngine.js`, `intentConcepts.js`, `parseProductDocs.js`) and Stage 2's own eval-corpus/regression testing |
@@ -16,7 +16,7 @@ Stage 1's own audit (approved before Stage 2 implementation began) proposed thre
 **1. Workflow record storage — full Markdown parser/validator family (matching bugs/decisions) vs. structured JSON authored directly vs. Markdown reusing generic section-extraction.**
 - A full bespoke Markdown family (its own ID allocator, concurrency-safe locking, etc., matching `recordAllocator.js`'s bug/decision/postmortem machinery) was rejected as disproportionate to Stage 2's scope — that machinery exists for high-volume, concurrently-authored record families; Workflow authoring is deliberate and low-volume.
 - Structured JSON authored directly was rejected — Workflow content is fundamentally prose (steps, navigation descriptions, limitations) that benefits from Markdown's readability and this repository's existing review conventions, and JSON invites exactly the kind of un-reviewable data-only PRs the evidence-discipline culture here works against.
-- **Chosen: Markdown files under `docs/product/workflows/AI-WF-###_NAME.md`, parsed by a new `parseWorkflowFile` that reuses `lib/markdown.js`'s existing generic `extractSection`/`extractHeaderTable` helpers (the same pattern `parseFeatureFile` already uses) — no new parsing primitives, only a new section-name mapping.** ID allocation is manual/sequential (same pattern used for `AI-FEAT-058`/`AI-RM-011`/`DEC-019` in Stage 1), not routed through `recordAllocator.js`'s concurrency-safe lock (that mechanism solves a problem — concurrent sessions racing on the same ID — that doesn't apply to a single deliberate authoring pass).
+- **Chosen: Markdown files under `docs/product/workflows/AI-WF-###_NAME.md`, parsed by a new `parseWorkflowFile` that reuses `lib/markdown.js`'s existing generic `extractSection`/`extractHeaderTable` helpers (the same pattern `parseFeatureFile` already uses) — no new parsing primitives, only a new section-name mapping.** ID allocation is manual/sequential (same pattern used for `AI-FEAT-059`/`AI-RM-012`/`DEC-021` in Stage 1), not routed through `recordAllocator.js`'s concurrency-safe lock (that mechanism solves a problem — concurrent sessions racing on the same ID — that doesn't apply to a single deliberate authoring pass).
 
 **2. Concept/synonym retrieval layer — embeddings vs. a large per-question lookup table vs. a small curated concept-cluster map.**
 - Embeddings were rejected per the Stage 2 brief's own explicit instruction and Stage 1's own finding that the eval corpus's failures were scoped, fixable retrieval-precision gaps, not a fundamental inability to match natural language.
@@ -34,13 +34,13 @@ Workflow records: Markdown under `docs/product/workflows/`, parsed via the exist
 ## Consequences
 
 - Workflow authoring remains a deliberate, reviewed, low-volume activity — Stage 2 shipped 8 records covering the highest-value operator paths identified in the Phase 1-3 audit, not exhaustive coverage of the ~50 identified intents (recorded as a knowledge gap in `docs/product/workflows/README.md`, not silently absent).
-- The concept layer is a real, ongoing maintenance surface: each cluster's `hints` must be verified against real keyword overlap with their intended target records (two clusters — `import-video`, `transfer-resume` — were found mis-aimed during Stage 2's own testing and corrected or deliberately left unboosted; see `AI-FEAT-058`'s Stage 2 Evolution Journal).
+- The concept layer is a real, ongoing maintenance surface: each cluster's `hints` must be verified against real keyword overlap with their intended target records (two clusters — `import-video`, `transfer-resume` — were found mis-aimed during Stage 2's own testing and corrected or deliberately left unboosted; see `AI-FEAT-059`'s Stage 2 Evolution Journal).
 - A byproduct of investigating the boundary-override regression: `lib/searchIndex.js`'s `keywordsFrom()` previously had no stopword filtering (only a length>2 filter), which a short Capability summary rarely exposed but a much richer Workflow record's prose did — a real, separate, confirmed defect (`AI-WF-006` won "How do I switch between Stable and Preview versions?" confidently on the words "how"/"between"/"and" alone) fixed by adding a small curated stopword list, benefiting every future record in this family, not just Workflow.
 - The raw-vs-hint distinction adds a second parallel candidate-scoring pass (`bestRawByRecord` alongside `bestByRecord`) inside `searchCandidates()` — a small, bounded cost, not a second ranking implementation (still one call to `lib/query.js`'s `runQuery` per candidate query, just tracked separately for the raw one).
 
 ## Reconciliation Note
 
-None recorded — consistent with `scripts/product-docs/README.md`'s existing non-goals (no embeddings, no external AI, no network) and with DEC-019's own architecture, which this extends rather than supersedes.
+None recorded — consistent with `scripts/product-docs/README.md`'s existing non-goals (no embeddings, no external AI, no network) and with DEC-021's own architecture, which this extends rather than supersedes.
 
 ## Post-Decision Evolution (2026-08-14)
 
@@ -49,4 +49,4 @@ The raw-vs-hint boundary precedence rule described above (§ Decision) was itsel
 - **Phase 20/24**: a strong match earned by the raw question itself (not a hint) could still override a boundary — the rule as written correctly blocked hint-inflated overrides, but a genuinely strong raw match on an unrelated real feature (e.g. "Online Registry" strongly title-matching its own parent feature `AI-FEAT-048`) could still suppress a narrower, correctly-matched boundary about that same feature's documented scope. Testing never found a case where this override was CORRECT (i.e., rescued a stale boundary) — only cases where it produced a false `AVAILABLE` for an explicitly-excluded topic.
 - **Fix**: an opt-in `hardOverride: true` flag (`lib/statusResolution.js`), applied first to the five Registry-scope boundaries (Phase 20), then extended to all eleven boundaries including the original six Stage 1 exclusions (Phase 24 adversarial review, then confirmed necessary again during the pre-merge acceptance pass) — a boundary carrying this flag is never overridden by any raw match, however strong, because such a boundary makes a narrower scope claim about a real feature rather than "this doesn't exist," and a strong match on the parent feature is not competing evidence against that narrower claim.
 
-This does not supersede the original Decision — the raw-vs-hint distinction itself remains exactly as decided (a hint may never override a boundary); `hardOverride` is an additional, narrower precedence rule layered on top for boundaries where even a raw match must not override. See [AI-FEAT-058](../features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md)'s Phase 20 and Phase 24 evolution entries, and [AI-MEM-0004](../memory/AI-MEM-0004_KNOWLEDGE_PORTAL_STAGE_2_OPERATOR_KNOWLEDGE_ARCHITECTURE.md) for the full narrative.
+This does not supersede the original Decision — the raw-vs-hint distinction itself remains exactly as decided (a hint may never override a boundary); `hardOverride` is an additional, narrower precedence rule layered on top for boundaries where even a raw match must not override. See [AI-FEAT-059](../features/AI-FEAT-059_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md)'s Phase 20 and Phase 24 evolution entries, and [AI-MEM-0004](../memory/AI-MEM-0004_KNOWLEDGE_PORTAL_STAGE_2_OPERATOR_KNOWLEDGE_ARCHITECTURE.md) for the full narrative.

@@ -45,7 +45,7 @@ const CORPUS = [
     id: 'Q03', domain: 'Import',
     question: 'My photographer information is missing after import.',
     expectedStatus: 'AVAILABLE', expectedMatchQuality: 'weak', instructionsShouldExist: false, shouldAcknowledgeGap: true,
-    knownLimitation: 'AI-FEAT-022 (Photographer-Folder Resolution) still ties at score 100 with several other features sharing only "import"/"photographer" as isolated tokens; no concept cluster currently targets this exact troubleshooting phrasing (a real, scoped Stage 3 candidate — see AI-FEAT-058 Stage 2 Future Enhancements), and no Workflow record covers this specific symptom yet.',
+    knownLimitation: 'AI-FEAT-022 (Photographer-Folder Resolution) still ties at score 100 with several other features sharing only "import"/"photographer" as isolated tokens; no concept cluster currently targets this exact troubleshooting phrasing (a real, scoped Stage 3 candidate — see AI-FEAT-059 Stage 2 Future Enhancements), and no Workflow record covers this specific symptom yet.',
   },
   {
     id: 'Q04', domain: 'Events',
@@ -87,7 +87,7 @@ const CORPUS = [
     id: 'Q10', domain: 'Transfer',
     question: 'My transfer stopped halfway — what happens now?',
     expectedStatus: 'AVAILABLE', expectedMatchQuality: 'strong', instructionsShouldExist: true, shouldAcknowledgeGap: false,
-    knownLimitation: 'FIXED in Stage 2 — Stage 1 gave a generic, on-topic-but-not-specific answer (AI-FEAT-038). The "transfer-resume" concept cluster now surfaces AI-WF-005 (Export or Update a Transfer Drive), which discusses this exact scenario including BUG-005\'s resume-state history. Also the case that found and fixed the Stage 2 TROUBLESHOOTING/HOW_TO workflow-preference gap — see AI-FEAT-058 Stage 2 Evolution Journal.',
+    knownLimitation: 'FIXED in Stage 2 — Stage 1 gave a generic, on-topic-but-not-specific answer (AI-FEAT-038). The "transfer-resume" concept cluster now surfaces AI-WF-005 (Export or Update a Transfer Drive), which discusses this exact scenario including BUG-005\'s resume-state history. Also the case that found and fixed the Stage 2 TROUBLESHOOTING/HOW_TO workflow-preference gap — see AI-FEAT-059 Stage 2 Evolution Journal.',
   },
   {
     id: 'Q11', domain: 'Unsupported',
@@ -142,7 +142,7 @@ const CORPUS = [
     id: 'Q20', domain: 'Settings',
     question: 'Can I have multiple people log in with different roles?',
     expectedStatus: 'NOT_SUPPORTED', expectedMatchQuality: 'boundary', instructionsShouldExist: false, shouldAcknowledgeGap: false,
-    knownLimitation: 'FIXED in Stage 2 — Stage 1 could not resolve this because the boundary table\'s keyword phrasing was too narrow ("multiple users log in", not "multiple people log in with different roles"). A boundary-widening concept cluster (intentConcepts.js BOUNDARY_CONCEPT_CLUSTERS, "team-multi-role") now recognizes "different roles" as a paraphrase of the SAME already-evidenced multi-user-roles exclusion — same citation, wider recall, never a new unevidenced claim. This same fix ALSO caught and required repairing a genuine regression: a "team-collaboration" concept hint aimed at a different, legitimate paraphrase family ("several users... simultaneously") was, before a fix, strong enough to override this correctly-detected boundary — see AI-FEAT-058 Stage 2 Evolution Journal for the full account of why hint-boosted scores must never override a boundary, only raw-question scores may.',
+    knownLimitation: 'FIXED in Stage 2 — Stage 1 could not resolve this because the boundary table\'s keyword phrasing was too narrow ("multiple users log in", not "multiple people log in with different roles"). A boundary-widening concept cluster (intentConcepts.js BOUNDARY_CONCEPT_CLUSTERS, "team-multi-role") now recognizes "different roles" as a paraphrase of the SAME already-evidenced multi-user-roles exclusion — same citation, wider recall, never a new unevidenced claim. This same fix ALSO caught and required repairing a genuine regression: a "team-collaboration" concept hint aimed at a different, legitimate paraphrase family ("several users... simultaneously") was, before a fix, strong enough to override this correctly-detected boundary — see AI-FEAT-059 Stage 2 Evolution Journal for the full account of why hint-boosted scores must never override a boundary, only raw-question scores may.',
   },
 ];
 

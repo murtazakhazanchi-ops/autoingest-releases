@@ -13,7 +13,7 @@
 // features or roadmap milestones (potentially one record per significant
 // session, over years). See docs/product/16_ENGINEERING_MEMORY_POLICY.md §
 // ID Model and docs/product/18_ENGINEERING_CONVERSATION_POLICY.md § ID Model.
-// AI-WF-### (Stage 2, Workflow knowledge — see docs/product/features/AI-FEAT-058_*.md
+// AI-WF-### (Stage 2, Workflow knowledge — see docs/product/features/AI-FEAT-059_*.md
 // § Stage 2) is 3 digits, same width as feature/roadmap/bug/decision/postmortem —
 // authored deliberately, one at a time, not expected to accumulate at memory/
 // conversation volume.

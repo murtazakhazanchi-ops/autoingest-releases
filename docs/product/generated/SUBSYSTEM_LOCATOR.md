@@ -391,7 +391,7 @@
 
 ## Knowledge & Onboarding (`SUBSYS-knowledge-onboarding`)
 
-**Primary features**: AI-FEAT-058
+**Primary features**: AI-FEAT-059
 **Canonical technical docs**: None cited
 **Related bugs**: None recorded
 **Related decisions**: None recorded

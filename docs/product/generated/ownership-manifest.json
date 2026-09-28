@@ -30,43 +30,43 @@
     "docs/product/19_WORKFLOW_TEMPLATE.md": {
       "confidence": "explicit",
       "features": [
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ]
     },
     "docs/product/decisions/DEC-020_STAGE_2_KNOWLEDGE_ARCHITECTURE_WORKFLOW_RECORDS_AND_CONCEPT_LAYER.md": {
       "confidence": "explicit",
       "features": [
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ]
     },
     "docs/product/generated/knowledge-gap-report-v2.json": {
       "confidence": "explicit",
       "features": [
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ]
     },
     "docs/product/generated/knowledge-gap-report.json": {
       "confidence": "explicit",
       "features": [
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ]
     },
     "docs/product/generated/knowledge-index.json": {
       "confidence": "explicit",
       "features": [
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ]
     },
     "docs/product/generated/workflow-index.json": {
       "confidence": "explicit",
       "features": [
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ]
     },
     "docs/product/workflows/README.md": {
       "confidence": "explicit",
       "features": [
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ]
     },
     "main/driveDetector.js": {
@@ -478,103 +478,103 @@
         "AI-FEAT-006",
         "AI-FEAT-007",
         "AI-FEAT-057",
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ]
     },
     "scripts/product-docs/knowledge-portal/index.html": {
       "confidence": "explicit",
       "features": [
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ]
     },
     "scripts/product-docs/knowledge-portal/server.js": {
       "confidence": "explicit",
       "features": [
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ]
     },
     "scripts/product-docs/lib/build.js": {
       "confidence": "explicit",
       "features": [
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ]
     },
     "scripts/product-docs/lib/ids.js": {
       "confidence": "explicit",
       "features": [
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ]
     },
     "scripts/product-docs/lib/intentConcepts.js": {
       "confidence": "explicit",
       "features": [
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ]
     },
     "scripts/product-docs/lib/knowledgeCli.js": {
       "confidence": "explicit",
       "features": [
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ]
     },
     "scripts/product-docs/lib/knowledgeEngine.js": {
       "confidence": "explicit",
       "features": [
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ]
     },
     "scripts/product-docs/lib/knowledgeEval.js": {
       "confidence": "explicit",
       "features": [
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ]
     },
     "scripts/product-docs/lib/knowledgeIndex.js": {
       "confidence": "explicit",
       "features": [
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ]
     },
     "scripts/product-docs/lib/knowledgeTestCorpus.js": {
       "confidence": "explicit",
       "features": [
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ]
     },
     "scripts/product-docs/lib/knowledgeTestCorpusV2.js": {
       "confidence": "explicit",
       "features": [
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ]
     },
     "scripts/product-docs/lib/markdown.js": {
       "confidence": "explicit",
       "features": [
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ]
     },
     "scripts/product-docs/lib/parseProductDocs.js": {
       "confidence": "explicit",
       "features": [
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ]
     },
     "scripts/product-docs/lib/questionClassifier.js": {
       "confidence": "explicit",
       "features": [
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ]
     },
     "scripts/product-docs/lib/searchIndex.js": {
       "confidence": "explicit",
       "features": [
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ]
     },
     "scripts/product-docs/lib/statusResolution.js": {
       "confidence": "explicit",
       "features": [
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ]
     },
     "scripts/product-docs/lib/updateChannelModel.js": {
@@ -593,43 +593,43 @@
     "scripts/product-docs/lib/validators.js": {
       "confidence": "explicit",
       "features": [
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ]
     },
     "scripts/product-docs/lib/version.js": {
       "confidence": "explicit",
       "features": [
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ]
     },
     "scripts/product-docs/lib/workflowIndex.js": {
       "confidence": "explicit",
       "features": [
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ]
     },
     "scripts/product-docs/test/knowledge.test.js": {
       "confidence": "explicit",
       "features": [
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ]
     },
     "scripts/product-docs/test/knowledgeAdversarialPhase24.test.js": {
       "confidence": "explicit",
       "features": [
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ]
     },
     "scripts/product-docs/test/knowledgeHallucinationV2.test.js": {
       "confidence": "explicit",
       "features": [
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ]
     },
     "scripts/product-docs/test/knowledgeMergeReadiness.test.js": {
       "confidence": "explicit",
       "features": [
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ]
     },
     "services/adoptionDryRunService.js": {
@@ -1129,7 +1129,7 @@
       "services/autoUpdater.js",
       "services/settings.js"
     ],
-    "AI-FEAT-058": [
+    "AI-FEAT-059": [
       "docs/product/19_WORKFLOW_TEMPLATE.md",
       "docs/product/decisions/DEC-020_STAGE_2_KNOWLEDGE_ARCHITECTURE_WORKFLOW_RECORDS_AND_CONCEPT_LAYER.md",
       "docs/product/generated/knowledge-gap-report-v2.json",
@@ -1282,7 +1282,7 @@
     "AI-FEAT-055": [],
     "AI-FEAT-056": [],
     "AI-FEAT-057": [],
-    "AI-FEAT-058": []
+    "AI-FEAT-059": []
   },
   "ipc_to_features": {
     "SUBSYS-application-platform": {
@@ -1476,7 +1476,7 @@
       "AI-FEAT-028"
     ],
     "SUBSYS-knowledge-onboarding": [
-      "AI-FEAT-058"
+      "AI-FEAT-059"
     ],
     "SUBSYS-media-browsing": [
       "AI-FEAT-013",

@@ -4,7 +4,7 @@
 // (knowledgeTestCorpus.js) against the real engine, reports expected vs.
 // actual honestly (including known misses — see the corpus file's own
 // `knownLimitation` notes), and emits a knowledge-gap report (Phase 11 of
-// AI-FEAT-058's brief). This is a prototype evaluation artifact, not part
+// AI-FEAT-059's brief). This is a prototype evaluation artifact, not part
 // of the deterministic `build`/`validate` freshness-diff contract — it
 // depends on the fixed test corpus, not on canonical docs/product/
 // Markdown, so it is written directly here rather than folded into

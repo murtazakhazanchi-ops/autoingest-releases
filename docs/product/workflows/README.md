@@ -1,6 +1,6 @@
 # Workflows — Operator Task Knowledge
 
-Each file here is a `AI-WF-###_NAME.md` Workflow record, following [../19_WORKFLOW_TEMPLATE.md](../19_WORKFLOW_TEMPLATE.md). A Workflow answers **"how do I accomplish this task"** — distinct from a `features/AI-FEAT-###` record, which answers "what capability exists." See [docs/product/features/AI-FEAT-058_*.md](../features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md) § Stage 2 for the full architecture this supports.
+Each file here is a `AI-WF-###_NAME.md` Workflow record, following [../19_WORKFLOW_TEMPLATE.md](../19_WORKFLOW_TEMPLATE.md). A Workflow answers **"how do I accomplish this task"** — distinct from a `features/AI-FEAT-###` record, which answers "what capability exists." See [docs/product/features/AI-FEAT-059_*.md](../features/AI-FEAT-059_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md) § Stage 2 for the full architecture this supports.
 
 This is a deliberately bounded, non-exhaustive set (Stage 2) covering the highest-value operator paths identified in the Stage 2 operator intent audit — not every intent in that audit has a Workflow yet. Every field either cites verified evidence or is marked `Not verified in this pass` / `Not located in this pass` — never invented.
 
@@ -19,4 +19,4 @@ This is a deliberately bounded, non-exhaustive set (Stage 2) covering the highes
 
 ## Not yet covered
 
-Events (editing/finding an existing event), Application/Settings, Roadmap/Status routing (handled separately — see AI-FEAT-058 § Stage 2 roadmap routing, not a Workflow record), and most of the ~50 intents identified in the Stage 2 audit that didn't make this bounded set. Recorded as a knowledge gap, not silently absent — see AI-FEAT-058's Stage 2 section for the full list.
+Events (editing/finding an existing event), Application/Settings, Roadmap/Status routing (handled separately — see AI-FEAT-059 § Stage 2 roadmap routing, not a Workflow record), and most of the ~50 intents identified in the Stage 2 audit that didn't make this bounded set. Recorded as a knowledge gap, not silently absent — see AI-FEAT-059's Stage 2 section for the full list.

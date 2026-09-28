@@ -1,6 +1,6 @@
 'use strict';
 
-// Stage 1 Knowledge Engine — minimal local static+API server (AI-FEAT-058
+// Stage 1 Knowledge Engine — minimal local static+API server (AI-FEAT-059
 // Phase 9). Node core `http`/`url`/`fs` modules only — no framework, no new
 // npm dependency, matching this tool's existing "no npm dependencies added"
 // convention (see scripts/product-docs/README.md). Binds to 127.0.0.1 only

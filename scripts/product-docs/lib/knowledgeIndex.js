@@ -13,7 +13,7 @@
 //
 // Field list is deliberately the minimum needed to answer an operator
 // question without inventing anything (see
-// docs/product/features/AI-FEAT-058_*.md § Knowledge Record Schema for the
+// docs/product/features/AI-FEAT-059_*.md § Knowledge Record Schema for the
 // full rationale of each field, and for the fields considered and rejected
 // as unnecessary for Stage 1 — entry-point/navigation and screenshot
 // fields, since no canonical source for either exists yet).

@@ -1,6 +1,6 @@
 # Workflow Record Template
 
-Copy this structure for every `docs/product/workflows/AI-WF-###_NAME.md` file. A Workflow record answers **"how do I accomplish this task?"** — the question a `features/AI-FEAT-###` record structurally cannot answer, since a feature record's job is "what capability exists," not "what do I click." See [docs/product/features/AI-FEAT-058_*.md](features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md) § Stage 2 for the full rationale, and [DEC-020](decisions/) (Stage 2) for why Workflow is a separate record family rather than new fields bolted onto Capability.
+Copy this structure for every `docs/product/workflows/AI-WF-###_NAME.md` file. A Workflow record answers **"how do I accomplish this task?"** — the question a `features/AI-FEAT-###` record structurally cannot answer, since a feature record's job is "what capability exists," not "what do I click." See [docs/product/features/AI-FEAT-059_*.md](features/AI-FEAT-059_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md) § Stage 2 for the full rationale, and [DEC-020](decisions/) (Stage 2) for why Workflow is a separate record family rather than new fields bolted onto Capability.
 
 **The single non-negotiable rule for this record family**: every field either cites verified evidence (real code, real UI text, a real canonical document) or is filled with the literal phrase `Not verified in this pass` / `Evidence pending`. Never invent a menu label, button text, keyboard shortcut, field name, folder name, or step order. If canonical docs and the actual runtime UI disagree, STOP and record the discrepancy in the Evidence status field — do not silently pick one.
 
@@ -12,7 +12,7 @@ Copy this structure for every `docs/product/workflows/AI-WF-###_NAME.md` file. A
 | Field | Value |
 |---|---|
 | Workflow ID | AI-WF-### |
-| Domain | <one of the operator-intent domains — see docs/product/features/AI-FEAT-058_*.md § Stage 2 Intent Map> |
+| Domain | <one of the operator-intent domains — see docs/product/features/AI-FEAT-059_*.md § Stage 2 Intent Map> |
 | Related capabilities | AI-FEAT-###, AI-FEAT-### |
 | Related roadmap milestone | AI-RM-### or None |
 | Navigation verified | Yes / Partial / Not verified in this pass |

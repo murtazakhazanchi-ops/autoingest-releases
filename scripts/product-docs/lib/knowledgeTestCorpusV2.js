@@ -16,7 +16,7 @@
 // No entry here was authored by guessing plausible answers: every one was
 // run against the real engine during construction, and several real defects
 // this pass surfaced were FIXED (not documented around) — see
-// docs/product/features/AI-FEAT-058_*.md's Phase 20 evolution entry and
+// docs/product/features/AI-FEAT-059_*.md's Phase 20 evolution entry and
 // lib/statusResolution.js's five new Stage 2 Registry-scope boundaries
 // (registry-media-storage, registry-not-source-of-truth,
 // registry-conflict-detection, registry-activity-scope,
@@ -60,7 +60,7 @@ const CORPUS_V2 = [
     id: 'P04a', domain: 'Events', family: 'Q04',
     question: 'What\'s the way to start a new event?',
     expectedStatus: 'AVAILABLE', expectedMatchQuality: 'strong',
-    knownLimitation: 'IMPROVED during Phase 24 — this question classifies EXPLANATION (not HOW_TO), so it fell through to feature-only matching until the workflow-preference gate was broadened to include EXPLANATION (see AI-FEAT-058 Phase 24 evolution entry). Now correctly, strongly matches AI-WF-002.',
+    knownLimitation: 'IMPROVED during Phase 24 — this question classifies EXPLANATION (not HOW_TO), so it fell through to feature-only matching until the workflow-preference gate was broadened to include EXPLANATION (see AI-FEAT-059 Phase 24 evolution entry). Now correctly, strongly matches AI-WF-002.',
   },
   {
     id: 'P04b', domain: 'Events', family: 'Q04',
@@ -357,7 +357,7 @@ const CORPUS_V2 = [
     id: 'R24', domain: 'Online Registry',
     question: 'Does going offline stop me from importing?',
     expectedStatus: 'UNKNOWN', expectedMatchQuality: 'none',
-    knownLimitation: 'Zero match — the question uses "importing" (gerund) rather than "import"; lib/query.js performs no stemming (a pre-existing, structural, shared-ranker characteristic — see DEC-019\'s "reuse lib/query.js unchanged" — not something this stage changes). Safe (no invented claim) but misses surfacing the already-evidenced fact that import/sync do not block on relay unavailability (see R03/R14, which use "import"/"internet" verbatim and do surface a weak, hedged, on-topic answer).',
+    knownLimitation: 'Zero match — the question uses "importing" (gerund) rather than "import"; lib/query.js performs no stemming (a pre-existing, structural, shared-ranker characteristic — see DEC-021\'s "reuse lib/query.js unchanged" — not something this stage changes). Safe (no invented claim) but misses surfacing the already-evidenced fact that import/sync do not block on relay unavailability (see R03/R14, which use "import"/"internet" verbatim and do surface a weak, hedged, on-topic answer).',
   },
   {
     id: 'W01', domain: 'Import',
@@ -511,7 +511,7 @@ const CORPUS_V2 = [
     id: 'X04', domain: 'Adversarial',
     question: 'Can I use AutoIngest without an archive root configured?',
     expectedStatus: 'UNKNOWN', expectedMatchQuality: 'strong',
-    knownLimitation: 'No evidence either way on running without an archive root configured; matches the already-disclosed generic "archive" bare-token retrieval-precision gap (see AI-FEAT-058 Stage 2 Future Enhancements) rather than being a new, distinct defect.',
+    knownLimitation: 'No evidence either way on running without an archive root configured; matches the already-disclosed generic "archive" bare-token retrieval-precision gap (see AI-FEAT-059 Stage 2 Future Enhancements) rather than being a new, distinct defect.',
   },
   {
     id: 'X05', domain: 'Adversarial',

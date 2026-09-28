@@ -1279,7 +1279,7 @@
     },
     {
       "aliases": [],
-      "canonicalProductDoc": "features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md",
+      "canonicalProductDoc": "features/AI-FEAT-059_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md",
       "canonicalTechnicalDocs": [],
       "codeAreas": [
         "scripts/product-docs/lib/knowledgeIndex.js",
@@ -1331,15 +1331,15 @@
         "scripts/product-docs/knowledge-portal/index.html"
       ],
       "confidenceLevel": "explicit",
-      "evidenceNote": "Derived directly from features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md's header table and Lifecycle Metadata section.",
-      "featureId": "AI-FEAT-058",
+      "evidenceNote": "Derived directly from features/AI-FEAT-059_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-059",
       "relatedBugs": [],
       "relatedDecisions": [
-        "DEC-019"
+        "DEC-021"
       ],
       "relatedPostmortems": [],
       "roadmapIds": [
-        "AI-RM-011"
+        "AI-RM-012"
       ],
       "topic": "Knowledge Engine (Stage 1 Prototype → Stage 2 Operator Knowledge Architecture)"
     }

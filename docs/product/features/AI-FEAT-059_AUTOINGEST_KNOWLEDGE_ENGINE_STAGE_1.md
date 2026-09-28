@@ -1,15 +1,15 @@
-# AI-FEAT-058 — Knowledge Engine (Stage 1 Prototype → Stage 2 Operator Knowledge Architecture)
+# AI-FEAT-059 — Knowledge Engine (Stage 1 Prototype → Stage 2 Operator Knowledge Architecture)
 
 | Field | Value |
 |---|---|
-| Feature ID | AI-FEAT-058 |
+| Feature ID | AI-FEAT-059 |
 | Category | Knowledge & Onboarding |
 | Status | Implemented — evolving |
 | Maturity | Experimental |
 | Parent feature | None |
 | Subfeatures | None |
 | Dependencies | None — reads the existing feature registry generically (all 58 `AI-FEAT` records) via `docs/product/generated/feature-index.json`, not a functional dependency on any single feature |
-| Related roadmap milestone | AI-RM-011 |
+| Related roadmap milestone | AI-RM-012 |
 | Related technical docs | None — this feature's own documentation home is `scripts/product-docs/README.md`, not the `docs/` technical-doc tier |
 | Evidence status | Stage 1: verified from current code and `scripts/product-docs/test/knowledge.test.js`, plus an independent forensic PR review (2026-08-13) that found and fixed one defect (see Evolution Journal). Stage 2 (2026-08-13 to 2026-08-14): verified from current code (`lib/intentConcepts.js`, `questionClassifier.js`, `workflowIndex.js`, extended `knowledgeEngine.js`), `docs/product/workflows/AI-WF-001..008_*.md` (each individually evidence-cited against real onboarding text or `renderer/` UI labels), the Online Registry architecture trace (`realtime-server/`, `services/realtimeOperationsService.js`, `main/main.js` emitter call sites), a dedicated merge-readiness pass re-verifying every test/corpus/security check from the actual merged `main` state in an independent worktree, and 354 total passing assertions across 35 test files at merge time. See [AI-MEM-0004](../memory/AI-MEM-0004_KNOWLEDGE_PORTAL_STAGE_2_OPERATOR_KNOWLEDGE_ARCHITECTURE.md) for the full engagement narrative. |
 | First-known implementation | 2026-08-13 |
@@ -22,7 +22,7 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 | Field | Value |
 |---|---|
 | Related features | None beyond the generic feature-registry dependency already noted above |
-| Related decisions | [DEC-019](../decisions/DEC-019_KNOWLEDGE_ENGINE_REUSES_EXISTING_RETRIEVAL_NO_NEW_SEARCH_SYSTEM.md) |
+| Related decisions | [DEC-021](../decisions/DEC-021_KNOWLEDGE_ENGINE_REUSES_EXISTING_RETRIEVAL_NO_NEW_SEARCH_SYSTEM.md) |
 | Related bugs | None recorded — no `BUG-###` record was warranted; the defects found during this feature's own build (see Evolution below) were caught and fixed before commit, with no user-facing incident |
 | Related postmortems | None |
 | Related architectural evolution sections | Not yet covered in 11_ARCHITECTURAL_EVOLUTION.md's relationship map |
@@ -40,7 +40,7 @@ A Stage 1 prototype proving that AutoIngest's existing `docs/product/` documenta
 
 **Status resolution** (`lib/statusResolution.js`): deterministically maps each feature's canonical `Status` field (plus linked-bug evidence) to one of `AVAILABLE` / `PARTIALLY_AVAILABLE` / `PLANNED`. A small, explicitly-curated, evidence-cited table (`KNOWN_BOUNDARIES`, 6 entries — face recognition, AI auto-tagging, photo editing, cloud storage, Linux, multi-user roles) is the only mechanism that can elevate an answer to `NOT_SUPPORTED`; a query with no confident match and no boundary citation is always `UNKNOWN`, never silently upgraded. Status is never inferred from a record's title or category.
 
-**Answer engine** (`lib/knowledgeEngine.js`): reuses `lib/query.js`'s existing deterministic ranker completely unchanged (no second search implementation — see DEC-019). Classifies a match's confidence into `strong` / `weak` / `boundary` / `none` and hedges the answer language whenever the top match is a bare single-keyword-overlap or a multi-way tie, rather than presenting a low-relevance match as a confident answer (see Evolution below — this was added specifically because of a defect found during this feature's own testing). Every answer is a structured object: `query`, `classification`, `directAnswer`, `capabilityStatus`, `matchQuality`, `matchedCapabilities`, `guidance`, `limitations`, `relatedCapabilities`, `sources`, `confidence`. Guidance is either `null` or the one fixed sentence "AutoIngest supports this capability, but detailed operator instructions are not yet documented." — Stage 1 never invents step-by-step instructions, since no Workflow/Navigation record type exists yet.
+**Answer engine** (`lib/knowledgeEngine.js`): reuses `lib/query.js`'s existing deterministic ranker completely unchanged (no second search implementation — see DEC-021). Classifies a match's confidence into `strong` / `weak` / `boundary` / `none` and hedges the answer language whenever the top match is a bare single-keyword-overlap or a multi-way tie, rather than presenting a low-relevance match as a confident answer (see Evolution below — this was added specifically because of a defect found during this feature's own testing). Every answer is a structured object: `query`, `classification`, `directAnswer`, `capabilityStatus`, `matchQuality`, `matchedCapabilities`, `guidance`, `limitations`, `relatedCapabilities`, `sources`, `confidence`. Guidance is either `null` or the one fixed sentence "AutoIngest supports this capability, but detailed operator instructions are not yet documented." — Stage 1 never invents step-by-step instructions, since no Workflow/Navigation record type exists yet.
 
 **CLI** (`lib/knowledgeCli.js`, wired into `cli.js` as `knowledge <sub>`): `knowledge ask "<question>" [--json]`, `knowledge eval [--out <path>]` (runs the 20-question corpus, writes `docs/product/generated/knowledge-gap-report.json`), `knowledge serve [--port 5177]`.
 
@@ -67,7 +67,7 @@ This section classifies this feature's already-evidenced history by milestone ty
 
 **Initial implementation**: 2026-08-13, in one session, directly following the completed Phase 1 Knowledge & Onboarding Portal audit.
 
-**Architectural / workflow decisions**: [DEC-019](../decisions/DEC-019_KNOWLEDGE_ENGINE_REUSES_EXISTING_RETRIEVAL_NO_NEW_SEARCH_SYSTEM.md) — reuse `lib/query.js` unchanged, add a local match-quality/hedge layer rather than trust every match, check the curated boundary table before a weak match is allowed to stand, and serve the minimal portal from a local Node-core HTTP server rather than a hosted service or a duplicated browser-side ranking implementation.
+**Architectural / workflow decisions**: [DEC-021](../decisions/DEC-021_KNOWLEDGE_ENGINE_REUSES_EXISTING_RETRIEVAL_NO_NEW_SEARCH_SYSTEM.md) — reuse `lib/query.js` unchanged, add a local match-quality/hedge layer rather than trust every match, check the curated boundary table before a weak match is allowed to stand, and serve the minimal portal from a local Node-core HTTP server rather than a hosted service or a duplicated browser-side ranking implementation.
 
 **Reliability / correctness fixes**: all three found and fixed pre-commit during this feature's own construction and testing (no `BUG-###` record — see Known Bugs below): the bug-status prefix-match fix, the weak-match hedging mechanism, and the boundary-table-precedence fix. Full detail in Evolution / Implementation Journal above.
 
@@ -176,7 +176,7 @@ None recorded as canonical `BUG-###` entries — every defect found during this 
 
 ## Decisions
 
-- [DEC-019](../decisions/DEC-019_KNOWLEDGE_ENGINE_REUSES_EXISTING_RETRIEVAL_NO_NEW_SEARCH_SYSTEM.md) — Stage 1: reuse `lib/query.js` unchanged, add a local Node-core HTTP server rather than duplicate ranking logic in browser JavaScript or add a hosted backend, use a small curated boundary table rather than infer `NOT_SUPPORTED` from zero search results.
+- [DEC-021](../decisions/DEC-021_KNOWLEDGE_ENGINE_REUSES_EXISTING_RETRIEVAL_NO_NEW_SEARCH_SYSTEM.md) — Stage 1: reuse `lib/query.js` unchanged, add a local Node-core HTTP server rather than duplicate ranking logic in browser JavaScript or add a hosted backend, use a small curated boundary table rather than infer `NOT_SUPPORTED` from zero search results.
 - [DEC-020](../decisions/DEC-020_STAGE_2_KNOWLEDGE_ARCHITECTURE_WORKFLOW_RECORDS_AND_CONCEPT_LAYER.md) — Stage 2: Workflow records as Markdown reusing the existing generic section-extraction pattern (not a bespoke record family, not JSON); the Intent/concept layer as a small curated trigger-phrase-to-hint map run through the same unchanged ranker (not embeddings, not a giant lookup table); a hint-boosted score may never override a curated `NOT_SUPPORTED` boundary — only the raw, un-hinted question's own score may.
 
 ## Future Enhancements

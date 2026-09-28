@@ -20,12 +20,12 @@
 
 | Field | Value |
 |---|---|
-| Primary feature IDs | AI-FEAT-058 |
+| Primary feature IDs | AI-FEAT-059 |
 | Secondary feature IDs | AI-FEAT-048 (Online Registry — referenced extensively, not modified), AI-FEAT-045 (Archive-level locking — referenced, not modified) |
-| Roadmap milestone IDs | AI-RM-011 |
+| Roadmap milestone IDs | AI-RM-012 |
 | Subsystems | Knowledge & Onboarding (product-docs tooling) |
-| Related bugs | None — every defect found during this engagement was caught and fixed pre-commit, recorded in AI-FEAT-058's own Evolution log per this system's established convention for that situation, not as standalone BUG-### records |
-| Related decisions | DEC-019, DEC-020 |
+| Related bugs | None — every defect found during this engagement was caught and fixed pre-commit, recorded in AI-FEAT-059's own Evolution log per this system's established convention for that situation, not as standalone BUG-### records |
+| Related decisions | DEC-021, DEC-020 |
 | Related postmortems | None |
 | Related releases | None — no AutoIngest application release was published as part of this work |
 | Related technical docs | scripts/product-docs/README.md |
@@ -47,7 +47,7 @@
 ## Initial Plan
 
 - **Proposed architecture**: Concept/intent layer (`lib/intentConcepts.js`) and question classifier (`lib/questionClassifier.js`), both routed through the existing `lib/query.js` ranker; a new Workflow record type distinct from Capability; roadmap/status routing; curated boundary table extension for Registry-specific facts.
-- **Proposed files**: See AI-FEAT-058's own Related Files sections (Stage 2, Phase 20/21, Phase 22/23, Phase 24, and Pre-Merge Acceptance Pass subsections) — not repeated here to avoid duplicating the canonical record.
+- **Proposed files**: See AI-FEAT-059's own Related Files sections (Stage 2, Phase 20/21, Phase 22/23, Phase 24, and Pre-Merge Acceptance Pass subsections) — not repeated here to avoid duplicating the canonical record.
 - **Proposed tests**: An expanded eval corpus (100+ questions), a dedicated hallucination/grounding suite, a dedicated adversarial-review suite.
 - **Proposed workflow**: Phases 4-19 (architecture) → Phase 20-21 (corpus + hallucination tests) → Phase 22-23 (portal UX + directory mode) → Phase 24 (adversarial review) → Phase 25 (documentation integration) → Phase 26-27 (mandatory report sections) → user review → merge-readiness pass → merge → historical closure.
 - **Original acceptance criteria**: Zero unexplained corpus deviations, zero fabricated IDs, zero invented navigation, `conflict:warning` never presented as active, full regression suite green, `validate` clean.
@@ -111,7 +111,7 @@
 ## Investigation Journal
 
 - **Symptoms**: See Revisions 2-4 above for the specific defect-finding investigations; not restated here.
-- **Files inspected**: `realtime-server/server.js`, `services/realtimeOperationsService.js`, `main/main.js` (emitter call sites — read-only architecture trace, never modified), `lib/query.js` (read to confirm reuse, never modified), every file listed in AI-FEAT-058's own Related Files sections.
+- **Files inspected**: `realtime-server/server.js`, `services/realtimeOperationsService.js`, `main/main.js` (emitter call sites — read-only architecture trace, never modified), `lib/query.js` (read to confirm reuse, never modified), every file listed in AI-FEAT-059's own Related Files sections.
 - **Commands run**: `node cli.js build`/`validate`, the full product-docs test suite (standalone + automation), direct HTTP acceptance scripts against a live local portal server instance, `git diff`/`git log`/`git merge-base` for branch/divergence verification.
 - **Evidence**: Every defect finding in this capsule traces to a specific, reproducible question run against the real engine, not inference.
 - **Root cause**: See the per-revision entries above; no unresolved root cause remains at capsule-compile time.
@@ -137,8 +137,8 @@
 ## Implementation Chronicle
 
 - **Implementation stages**: Phases 4-19 (architecture) → 20-21 (corpus + hallucination) → 22-23 (portal + directory) → 24 (adversarial) → 25 (documentation) → 26-27 (mandatory reports, presented as artifacts) → user review → merge-readiness pass (browser-substitute testing, Node 18, Workflow-gap classification) → merge → this closure pass.
-- **Files/modules changed**: See AI-FEAT-058's own Related Files sections in full — not duplicated here.
-- **Important design choices**: The `hardOverride` boundary-precedence mechanism (see DEC-020 and AI-FEAT-058's Phase 20/24 evolution entries) is the single most consequential design decision to emerge from this engagement — it was not part of the original plan, was discovered necessary only through the engagement's own adversarial testing discipline, and directly protects the highest-stakes explicit user constraint (`conflict:warning` dormancy).
+- **Files/modules changed**: See AI-FEAT-059's own Related Files sections in full — not duplicated here.
+- **Important design choices**: The `hardOverride` boundary-precedence mechanism (see DEC-020 and AI-FEAT-059's Phase 20/24 evolution entries) is the single most consequential design decision to emerge from this engagement — it was not part of the original plan, was discovered necessary only through the engagement's own adversarial testing discipline, and directly protects the highest-stakes explicit user constraint (`conflict:warning` dormancy).
 - **Unexpected discoveries**: That testing "as an operator" (merge-readiness pass) found a real gap ("Team Live" terminology) that testing "as the documentation's own vocabulary" (all prior phases, including the 119-question corpus and the 36-question adversarial review) had missed entirely — a genuine methodological lesson, not just a bug.
 - **Corrections**: See Evolution Timeline; none required rewriting prior work, all were additive fixes.
 - **Deviations from plan**: None material — Phases 4-27 were completed largely as originally scoped, with the merge-readiness pass added as a user-directed final gate not present in the original Stage 2 brief's own phase numbering.
@@ -168,7 +168,7 @@
 
 ## Visual Evidence
 
-None recorded — no screenshots were captured (interactive browser access was unavailable in this session's environment for the entire engagement; see AI-FEAT-058's Pre-Merge Acceptance Pass section for the disclosed substitute-verification approach used instead).
+None recorded — no screenshots were captured (interactive browser access was unavailable in this session's environment for the entire engagement; see AI-FEAT-059's Pre-Merge Acceptance Pass section for the disclosed substitute-verification approach used instead).
 
 ## Testing and Verification
 
@@ -177,15 +177,15 @@ None recorded — no screenshots were captured (interactive browser access was u
 - **Manual verification**: Direct HTTP requests against a live local portal server instance (multiple ports across the engagement as the server was restarted after each fix); a 26-check operator-simulation script; a 13-question live Registry-acceptance script; a 15-question event-coordination acceptance script (all 15 user-supplied examples); `git diff --check`; two-consecutive-build determinism hash comparison.
 - **Screenshots**: None.
 - **Performance measurements**: Not applicable — this is a documentation/retrieval tool, not a performance-sensitive system.
-- **Unresolved gaps**: True rendered-browser visual/interactive verification was never performed in this engagement (environment constraint) — disclosed at every relevant checkpoint (Stage 2 final report, Merge Readiness Report, AI-FEAT-058) rather than silently assumed complete.
+- **Unresolved gaps**: True rendered-browser visual/interactive verification was never performed in this engagement (environment constraint) — disclosed at every relevant checkpoint (Stage 2 final report, Merge Readiness Report, AI-FEAT-059) rather than silently assumed complete.
 
 ## Final Outcome
 
 - **What shipped**: A deterministic, local, citation-grounded Knowledge Engine — concept/intent retrieval layer, question classifier, 8 authored Workflow records (one, `AI-WF-006`, substantially expanded mid-closure to document distributed event coordination as a fifth first-class Registry concept), roadmap/status routing, 11 curated boundaries (6 general + 5 Registry-scope, all with `hardOverride`), a 119-question evaluation corpus, four dedicated regression suites (hallucination, adversarial, merge-readiness, event-coordination), and a 9-tab local portal with directory/onboarding browsing mode. Merged to `main` at commit `765e9b8`; event-coordination reconciliation committed as a direct follow-up commit on `main` in the same closure pass.
 - **What did not**: No LLM, no embeddings, no live Registry dashboard integration, no production Electron integration, no new AutoIngest release, no Stage 3 work.
-- **Final architecture**: See AI-FEAT-058's own Stage 2 sections in full — this capsule does not restate the technical architecture, only the narrative of how it came to be.
+- **Final architecture**: See AI-FEAT-059's own Stage 2 sections in full — this capsule does not restate the technical architecture, only the narrative of how it came to be.
 - **Final user workflow**: `node scripts/product-docs/cli.js knowledge ask "<question>"`, `knowledge eval`/`eval-v2`, `knowledge serve` (local portal at `127.0.0.1`).
-- **Known limitations**: See AI-FEAT-058's Pre-Merge Acceptance Pass § Remaining Limitations and this capsule's Follow-up work below.
+- **Known limitations**: See AI-FEAT-059's Pre-Merge Acceptance Pass § Remaining Limitations and this capsule's Follow-up work below.
 - **Follow-up work**: True rendered-browser verification; remaining Workflow-record coverage (Class A: event editing/finding); a production-integration decision (standalone vs. AutoIngest-integrated); a decision on whether semantic/AI-assisted retrieval is actually needed given observed deterministic-retrieval quality; a live-Registry-integration decision (explicitly separate from this documentation portal); UX polish from real operator use; a maintenance process to keep new capabilities/workflows automatically discoverable; and — newly identified in Revision 6 — a full evidence review of `AI-FEAT-048`'s own canonical record, which this pass found to understate its actual implemented scope but deliberately did not rewrite (out of this investigation's mandate).
 
 ## Lessons

@@ -14,7 +14,7 @@
 // relationship types (conversation_about_feature and siblings), and a new
 // manifest.json entity_counts key (engineering_conversations). Additive
 // only — no existing field was renamed or removed — a minor bump, not major.
-// 1.3.0 — Stage 1 Knowledge Engine (AI-FEAT-058) adds a new generated
+// 1.3.0 — Stage 1 Knowledge Engine (AI-FEAT-059) adds a new generated
 // artifact (knowledge-index.json, a portal-oriented projection of
 // feature-index.json + roadmap-dashboard.json) and a new manifest.json
 // entity_counts key (knowledge_records). Additive only — no existing field

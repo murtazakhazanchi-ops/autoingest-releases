@@ -2,7 +2,7 @@
 'use strict';
 
 // Run with: node scripts/product-docs/test/knowledge.test.js
-// Stage 1 Knowledge Engine (AI-FEAT-058) regression suite — Phase 12 of its
+// Stage 1 Knowledge Engine (AI-FEAT-059) regression suite — Phase 12 of its
 // brief. Reads the real docs/product/ tree read-only, same convention as
 // integration.test.js. Section 2 below is Phase 8's mandatory negative/
 // hallucination testing.
@@ -46,7 +46,7 @@ function resolveSourcePath(p) {
 // related_technical_docs field, and rewriting the 57 feature records is
 // explicitly out of Stage 1's scope. Documented as a known exception,
 // exactly like the corpus's knownLimitation notes, rather than silently
-// loosened for everything. See AI-FEAT-058 Architectural Review — the
+// loosened for everything. See AI-FEAT-059 Architectural Review — the
 // existing `checkRelatedTechnicalDocs` validator only checks for an EMPTY
 // field, never whether a cited path resolves; this is a genuine, newly
 // found gap in docs/product/'s own existing validation coverage.

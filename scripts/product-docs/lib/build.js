@@ -53,7 +53,7 @@ function assemble() {
 
   const ownershipManifest = buildOwnershipManifest(parsed, { featureIndex, subsystems, sourceIndex });
   const unimplementedRequirements = buildUnimplementedRequirements(parsed, conversationIndex);
-  // Stage 1 Knowledge Engine (AI-FEAT-058) — a portal-oriented projection of
+  // Stage 1 Knowledge Engine (AI-FEAT-059) — a portal-oriented projection of
   // featureIndex + dashboard. Derives from already-parsed structures only;
   // adds no new Markdown-parsing logic. See lib/knowledgeIndex.js.
   const knowledgeIndex = buildKnowledgeIndex(parsed, { featureIndex, dashboard });
@@ -135,7 +135,7 @@ function assemble() {
   }));
   files.set('UNIMPLEMENTED_CONVERSATION_REQUIREMENTS.md', renderUnimplementedRequirementsMd(unimplementedRequirements, version.DOCSYS_VERSION));
 
-  // Stage 1 Knowledge Engine (AI-FEAT-058) — a locator/projection layer,
+  // Stage 1 Knowledge Engine (AI-FEAT-059) — a locator/projection layer,
   // same authority rule as every other file in this directory: never
   // authoritative, regenerated from canonical Markdown, never hand-edited.
   files.set('knowledge-index.json', stableStringify({

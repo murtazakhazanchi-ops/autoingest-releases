@@ -205,7 +205,7 @@ New generated artifacts: `generated/conversation-index.{json,jsonl}`, `generated
 
 ## Part 9 — Knowledge Engine (Deterministic Operator Q&A, Stage 1 + Stage 2)
 
-A grounded, citation-honest, natural-language answer engine for AutoIngest operator questions — reusing this tool's own existing offline ranker (`lib/query.js`) unchanged, with **no LLM, no embeddings, no vector DB, and no network call**. Full architecture, evolution, and evidence: [docs/product/features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md](../../docs/product/features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md) (canonical — this section is a pointer, not a duplicate).
+A grounded, citation-honest, natural-language answer engine for AutoIngest operator questions — reusing this tool's own existing offline ranker (`lib/query.js`) unchanged, with **no LLM, no embeddings, no vector DB, and no network call**. Full architecture, evolution, and evidence: [docs/product/features/AI-FEAT-059_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md](../../docs/product/features/AI-FEAT-059_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md) (canonical — this section is a pointer, not a duplicate).
 
 ```bash
 node scripts/product-docs/cli.js knowledge ask "<question>" [--json]

@@ -1,6 +1,6 @@
 'use strict';
 
-// Stage 2 — the concept/synonym canonicalization layer (AI-FEAT-058's
+// Stage 2 — the concept/synonym canonicalization layer (AI-FEAT-059's
 // Phase 3-approved "Intent" record type). Deliberately small, curated,
 // inspectable, and tested — NOT a giant per-question lookup table, and NOT
 // embeddings. Each cluster maps a family of real paraphrases to one or more

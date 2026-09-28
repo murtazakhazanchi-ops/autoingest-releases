@@ -140,15 +140,15 @@
       "date_completed": "2026-08-14",
       "date_started": "2026-08-13",
       "decision_ids": [
-        "DEC-019",
-        "DEC-020"
+        "DEC-020",
+        "DEC-021"
       ],
       "evidence_classification": "Full session capture — this capsule was compiled directly from the session's own conversation record, not reconstructed after the fact from repository artifacts alone",
       "evidence_pending_summary": "Source session ID(s) (this repository's session-ID convention was not applied to this engagement); the exact date/time boundaries between phases (recorded only as \"2026-08-13\"/\"2026-08-14\" — the engagement spanned parts of both dates without more precise timestamps captured contemporaneously).",
       "feature_ids": [
         "AI-FEAT-045",
         "AI-FEAT-048",
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ],
       "keywords": [
         "knowledge",
@@ -171,7 +171,7 @@
       ],
       "revision_count": 6,
       "roadmap_ids": [
-        "AI-RM-011"
+        "AI-RM-012"
       ],
       "source_types": "Claude Code (background session), reconstructed from this session's own direct conversation record — not an imported external-tool packet",
       "status": "Compiled",

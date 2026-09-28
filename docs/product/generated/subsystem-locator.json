@@ -651,7 +651,7 @@
       "id": "SUBSYS-knowledge-onboarding",
       "name": "Knowledge & Onboarding",
       "primaryFeatures": [
-        "AI-FEAT-058"
+        "AI-FEAT-059"
       ],
       "relatedBugs": [],
       "relatedDecisions": [],

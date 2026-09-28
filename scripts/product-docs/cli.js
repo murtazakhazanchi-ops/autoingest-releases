@@ -40,7 +40,7 @@ Commands:
   release <sub>             Part 7D release intelligence (drafts only, never publishes) — see "release --help"
   context <sub>             Part 7E universal repository context assistant — see "context --help"
   conversation <sub>        Part 8 multi-AI engineering conversation integration — see "conversation --help"
-  knowledge <sub>           Stage 1 AutoIngest Knowledge Engine prototype (AI-FEAT-058) — see "knowledge --help"
+  knowledge <sub>           Stage 1 AutoIngest Knowledge Engine prototype (AI-FEAT-059) — see "knowledge --help"
 
 Run any command with --help for command-specific usage.
 `;

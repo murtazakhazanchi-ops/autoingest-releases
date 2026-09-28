@@ -3316,34 +3316,34 @@
     {
       "evidence_status": "explicit",
       "note": null,
-      "provenance_path": "features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md#header-table:Related-roadmap-milestone",
+      "provenance_path": "features/AI-FEAT-059_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md#header-table:Related-roadmap-milestone",
       "relationship": "planned_in",
-      "source": "AI-FEAT-058",
-      "target": "AI-RM-011"
-    },
-    {
-      "evidence_status": "explicit",
-      "note": null,
-      "provenance_path": "features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md#lifecycle-metadata:Related-decisions",
-      "relationship": "governed_by",
-      "source": "AI-FEAT-058",
-      "target": "DEC-019"
-    },
-    {
-      "evidence_status": "explicit",
-      "note": null,
-      "provenance_path": "decisions/DEC-019_KNOWLEDGE_ENGINE_REUSES_EXISTING_RETRIEVAL_NO_NEW_SEARCH_SYSTEM.md#header-table:Related-feature(s)-/-roadmap-milestone",
-      "relationship": "governed_by",
-      "source": "AI-FEAT-058",
-      "target": "DEC-019"
+      "source": "AI-FEAT-059",
+      "target": "AI-RM-012"
     },
     {
       "evidence_status": "explicit",
       "note": null,
       "provenance_path": "decisions/DEC-020_STAGE_2_KNOWLEDGE_ARCHITECTURE_WORKFLOW_RECORDS_AND_CONCEPT_LAYER.md#header-table:Related-feature(s)-/-roadmap-milestone",
       "relationship": "governed_by",
-      "source": "AI-FEAT-058",
+      "source": "AI-FEAT-059",
       "target": "DEC-020"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-059_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-059",
+      "target": "DEC-021"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-021_KNOWLEDGE_ENGINE_REUSES_EXISTING_RETRIEVAL_NO_NEW_SEARCH_SYSTEM.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-059",
+      "target": "DEC-021"
     },
     {
       "evidence_status": "explicit",
@@ -3652,42 +3652,42 @@
     {
       "evidence_status": "explicit",
       "note": null,
-      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-011:Included-AI-FEAT-IDs",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-012:Included-AI-FEAT-IDs",
       "relationship": "implements",
-      "source": "AI-RM-011",
-      "target": "AI-FEAT-058"
+      "source": "AI-RM-012",
+      "target": "AI-FEAT-059"
     },
     {
       "evidence_status": "explicit",
       "note": null,
-      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-011:Dependencies",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-012:Dependencies",
       "relationship": "depends_on",
-      "source": "AI-RM-011",
+      "source": "AI-RM-012",
       "target": "AI-RM-001"
     },
     {
       "evidence_status": "explicit",
       "note": null,
-      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-011:Dependencies",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-012:Dependencies",
       "relationship": "depends_on",
-      "source": "AI-RM-011",
+      "source": "AI-RM-012",
       "target": "AI-RM-010"
-    },
-    {
-      "evidence_status": "explicit",
-      "note": null,
-      "provenance_path": "decisions/DEC-019_KNOWLEDGE_ENGINE_REUSES_EXISTING_RETRIEVAL_NO_NEW_SEARCH_SYSTEM.md#header-table:Related-feature(s)-/-roadmap-milestone",
-      "relationship": "governed_by",
-      "source": "AI-RM-011",
-      "target": "DEC-019"
     },
     {
       "evidence_status": "explicit",
       "note": null,
       "provenance_path": "decisions/DEC-020_STAGE_2_KNOWLEDGE_ARCHITECTURE_WORKFLOW_RECORDS_AND_CONCEPT_LAYER.md#header-table:Related-feature(s)-/-roadmap-milestone",
       "relationship": "governed_by",
-      "source": "AI-RM-011",
+      "source": "AI-RM-012",
       "target": "DEC-020"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-021_KNOWLEDGE_ENGINE_REUSES_EXISTING_RETRIEVAL_NO_NEW_SEARCH_SYSTEM.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-RM-012",
+      "target": "DEC-021"
     },
     {
       "evidence_status": "explicit",
@@ -4079,7 +4079,7 @@
       "provenance_path": "decisions/DEC-020_STAGE_2_KNOWLEDGE_ARCHITECTURE_WORKFLOW_RECORDS_AND_CONCEPT_LAYER.md#body",
       "relationship": "related_to",
       "source": "DEC-020",
-      "target": "DEC-019"
+      "target": "DEC-021"
     },
     {
       "evidence_status": "explicit",
@@ -4714,8 +4714,8 @@
       "type": "feature"
     },
     {
-      "doc_path": "features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md",
-      "id": "AI-FEAT-058",
+      "doc_path": "features/AI-FEAT-059_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md",
+      "id": "AI-FEAT-059",
       "label": "Knowledge Engine (Stage 1 Prototype → Stage 2 Operator Knowledge Architecture)",
       "type": "feature"
     },
@@ -4805,7 +4805,7 @@
     },
     {
       "doc_path": "02_MASTER_ROADMAP.md",
-      "id": "AI-RM-011",
+      "id": "AI-RM-012",
       "label": "AutoIngest Knowledge & Onboarding Portal (Stage 1 + Stage 2)",
       "type": "milestone"
     },
@@ -5074,15 +5074,15 @@
       "type": "decision"
     },
     {
-      "doc_path": "decisions/DEC-019_KNOWLEDGE_ENGINE_REUSES_EXISTING_RETRIEVAL_NO_NEW_SEARCH_SYSTEM.md",
-      "id": "DEC-019",
-      "label": "Knowledge Engine Reuses Existing Retrieval; No New Search System, No Hosted Backend",
-      "type": "decision"
-    },
-    {
       "doc_path": "decisions/DEC-020_STAGE_2_KNOWLEDGE_ARCHITECTURE_WORKFLOW_RECORDS_AND_CONCEPT_LAYER.md",
       "id": "DEC-020",
       "label": "Stage 2 Knowledge Architecture: Workflow Records, Concept Layer, and Hint-vs-Raw Boundary Precedence",
+      "type": "decision"
+    },
+    {
+      "doc_path": "decisions/DEC-021_KNOWLEDGE_ENGINE_REUSES_EXISTING_RETRIEVAL_NO_NEW_SEARCH_SYSTEM.md",
+      "id": "DEC-021",
+      "label": "Knowledge Engine Reuses Existing Retrieval; No New Search System, No Hosted Backend",
       "type": "decision"
     },
     {

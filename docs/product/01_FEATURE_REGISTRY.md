@@ -152,16 +152,16 @@ IDs are assigned once and never reused or renumbered, even if a feature is later
 
 | ID | Name | Status | Maturity | Parent | Roadmap | Doc |
 |---|---|---|---|---|---|---|
-| AI-FEAT-058 | Knowledge Engine (Stage 1 Prototype → Stage 2 Operator Knowledge Architecture) | Implemented — evolving | Experimental | — | AI-RM-011 | [features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md](features/AI-FEAT-058_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md) |
+| AI-FEAT-059 | Knowledge Engine (Stage 1 Prototype → Stage 2 Operator Knowledge Architecture) | Implemented — evolving | Experimental | — | AI-RM-012 | [features/AI-FEAT-059_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md](features/AI-FEAT-059_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md) |
 
 ---
 
 ## Totals
 
-- **58 features registered**: 50 Implemented-family (45 plain "Implemented", including AI-FEAT-057 + 5 "Implemented — evolving", including AI-FEAT-058), 0 "Partially implemented", 0 "In active development", 8 "Planned" (0% implementation confirmed for all 8).
+- **58 features registered**: 50 Implemented-family (45 plain "Implemented", including AI-FEAT-057 + 5 "Implemented — evolving", including AI-FEAT-059), 0 "Partially implemented", 0 "In active development", 8 "Planned" (0% implementation confirmed for all 8).
 - Planned: 8 (all mapped 1:1 to AI-RM-002 through AI-RM-009, except AI-RM-001 which has no dedicated "planned" row because it is already complete — see AI-FEAT-033)
 - AI-FEAT-057 maps to AI-RM-010, a parallel release-infrastructure track outside the AI-RM-001…009 archive-capability sequence — see 02_MASTER_ROADMAP.md.
-- AI-FEAT-058 maps to AI-RM-011, a parallel documentation/tooling track (Knowledge & Onboarding Portal, Stage 1 + Stage 2 Phases 4-24) outside both the AI-RM-001…009 sequence and the AI-RM-010 release-infrastructure track — see 02_MASTER_ROADMAP.md.
+- AI-FEAT-059 maps to AI-RM-012, a parallel documentation/tooling track (Knowledge & Onboarding Portal, Stage 1 + Stage 2 Phases 4-24) outside both the AI-RM-001…009 sequence and the AI-RM-010 release-infrastructure track — see 02_MASTER_ROADMAP.md.
 
 ## Cross-Cutting Patterns (documented, not given their own AI-FEAT ID)
 

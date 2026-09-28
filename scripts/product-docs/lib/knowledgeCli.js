@@ -10,7 +10,7 @@ const build = require('./build');
 const { answerQuestion, buildEngineContext } = require('./knowledgeEngine');
 const { runEval, runEvalV2 } = require('./knowledgeEval');
 
-const HELP = `knowledge — AutoIngest Knowledge Engine (AI-FEAT-058, Stage 1 + Stage 2)
+const HELP = `knowledge — AutoIngest Knowledge Engine (AI-FEAT-059, Stage 1 + Stage 2)
 
 Usage: node scripts/product-docs/cli.js knowledge <sub> [args]
 

@@ -7,7 +7,7 @@
 // curated concept/synonym layer, Workflow-record-aware "how to" answers,
 // and roadmap routing — all still deterministic, still no embeddings, still
 // this one module as the ONLY place that turns retrieval + evidence into
-// operator-facing text (see docs/product/features/AI-FEAT-058_*.md §
+// operator-facing text (see docs/product/features/AI-FEAT-059_*.md §
 // Architectural Review, and docs/product/decisions/DEC-020_*.md for why
 // this stays one module rather than forking a v2).
 //

@@ -31,7 +31,7 @@
 
 ## 2026-08-13 — AI-MEM-0004 — Knowledge Portal Stage 2: Operator Knowledge Architecture, Online Registry Coverage, and Merge
 
-- **Feature(s)**: AI-FEAT-045, AI-FEAT-048, AI-FEAT-058
+- **Feature(s)**: AI-FEAT-045, AI-FEAT-048, AI-FEAT-059
 - **Accepted approach**: Evidence pending
 - **Rejected alternative(s)**: Accepted or rejected**: Rejected, per explicit user constraint, at every phase — never seriously reconsidered.; Accepted or rejected**: Rejected.
 - **Related commit(s)**: 765e9b83fba64593d07422f390f8b3a41046dc8b (merge commit); knowledge-portal-stage2 tip d89440bbd1576e4c2530fa76b4b791c9fe226997
