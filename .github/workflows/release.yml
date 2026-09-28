@@ -754,6 +754,20 @@ jobs:
       # partially-verified recovery artifact publicly visible — see stable-mac-recovery's
       # own report for the explicit later step that republishes once verified. --mac only:
       # this job never touches Windows and never runs electron-builder's --win target.
+      #
+      # -c.mac.identity=- is REQUIRED, not merely forceCodeSigning=false. Confirmed directly
+      # from the installed app-builder-lib@26.8.1 source (macPackager.js `sign()`): its
+      # implicit ad-hoc fallback is `fallBackToAdhoc = (arch === Arch.arm64 || arch ===
+      # Arch.universal) && !forceCodeSigning` — hardcoded to arm64/universal ONLY. An x64
+      # build with forceCodeSigning=false and no identity found takes a DIFFERENT branch
+      # (`noIdentity` without `fallBackToAdhoc`) and skips signing entirely — no CodeDirectory
+      # at all, failing `codesign --verify --deep --strict` (live v0.9.13 Stable recovery,
+      # 2026-09-28: arm64 got a valid ad-hoc seal, x64 got none, from the identical build
+      # command). Explicitly passing identity="-" hits a DIFFERENT, arch-independent branch
+      # (`qualifier === "-"` at macPackager.js:246) that assigns the ad-hoc identity
+      # unconditionally — verified structurally correct for both architectures, including
+      # every nested helper/framework, against a real local x64+arm64 build from this exact
+      # mechanism.
       - name: Build macOS (unsigned — D3 deferred, explicitly authorized above)
         shell: bash
         env:
@@ -762,7 +776,7 @@ jobs:
         run: |
           echo "::warning::macOS signing/notarization intentionally deferred for $TARGET_TAG recovery — D3 UNSIGNED EXCEPTION explicitly authorized for this run (allow_unsigned_mac=true)."
           unset CSC_LINK CSC_KEY_PASSWORD APPLE_API_KEY APPLE_API_KEY_ID APPLE_API_ISSUER APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID
-          npm run dist:mac -- -p always -c.mac.forceCodeSigning=false -c.publish.releaseType=draft
+          npm run dist:mac -- -p always -c.mac.forceCodeSigning=false -c.mac.identity=- -c.publish.releaseType=draft
 
       # Ad-hoc sealing must still be internally valid — the same known-good unsigned state
       # RC.4 already passed full manual acceptance against. This is a distinct, purpose-built

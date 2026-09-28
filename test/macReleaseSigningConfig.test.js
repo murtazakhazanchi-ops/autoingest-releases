@@ -313,9 +313,38 @@ console.log('macReleaseSigningConfig (D3 — repository-side foundation, no cred
     assert.match(buildStep, /unset CSC_LINK CSC_KEY_PASSWORD APPLE_API_KEY APPLE_API_KEY_ID APPLE_API_ISSUER APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID/);
   });
 
+  // ── explicit cross-architecture ad-hoc mechanism (-c.mac.identity=-) — fixes a real,
+  //    source-confirmed x64 defect: app-builder-lib@26.8.1's implicit ad-hoc fallback
+  //    (`fallBackToAdhoc` in macPackager.js) is hardcoded to arm64/universal only, so an x64
+  //    build with forceCodeSigning=false alone skips signing entirely rather than falling
+  //    back to ad-hoc (reproduced live during v0.9.13 Stable recovery, 2026-09-28: arm64 got
+  //    a valid ad-hoc seal from the same build, x64 got none). Passing identity="-"
+  //    explicitly hits a different, arch-independent branch in the same source. ──
+  t('recovery requests the explicit cross-architecture ad-hoc identity ("-"), not just forceCodeSigning=false, so x64 does not silently skip signing', () => {
+    const buildIdx = recoveryBlock.indexOf('Build macOS (unsigned');
+    const nextStepIdx = recoveryBlock.indexOf('\n      - name:', buildIdx + 1);
+    const buildStep = recoveryBlock.slice(buildIdx, nextStepIdx);
+    assert.match(buildStep, /-c\.mac\.identity=-/);
+  });
+
+  t('the explicit ad-hoc identity mechanism is documented with its source-level root cause (fallBackToAdhoc is arch-restricted) directly above the build step, not asserted without evidence', () => {
+    const buildIdx = recoveryBlock.indexOf('Build macOS (unsigned');
+    const commentStart = recoveryBlock.lastIndexOf('# D3 remains deferred', buildIdx);
+    assert.ok(commentStart >= 0 && commentStart < buildIdx, 'expected an explanatory comment immediately above the build step');
+    const comment = recoveryBlock.slice(commentStart, buildIdx);
+    assert.match(comment, /fallBackToAdhoc/);
+    assert.match(comment, /arm64.*universal/);
+    assert.match(comment, /skips signing entirely|skip signing entirely/);
+  });
+
   t('recovery has no signed-mode branch at all (unlike rc-build-mac) — it exists only for the explicitly-authorized unsigned path', () => {
     assert.doesNotMatch(recoveryBlock, /mac_signing_mode/);
     assert.doesNotMatch(recoveryBlock, /-c\.mac\.forceCodeSigning=true/);
+  });
+
+  t('the signed/credentialed paths (build-mac and rc-build-mac\'s signed branch) never pass an explicit ad-hoc identity — that override is exclusive to the D3-deferred unsigned recovery path', () => {
+    assert.doesNotMatch(jobBlocks['build-mac'], /-c\.mac\.identity=-/);
+    assert.doesNotMatch(jobBlocks['rc-build-mac'], /-c\.mac\.identity=-/);
   });
 
   t('recovery restores its own verification script from its own branch (via git fetch + git show) after checking out target_tag, and this runs before the build step', () => {
