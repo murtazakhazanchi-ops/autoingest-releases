@@ -8648,6 +8648,11 @@
   </div>
 
   <script src="renderer.js" defer></script>
+  <!-- Internal command registry for future external controllers (MX Creative
+       Console, etc.) — see docs/commandLayer.md. Must load after renderer.js:
+       it only calls window.__autoIngestRendererBridge, defined at the end of
+       renderer.js. -->
+  <script src="commandManager.js" defer></script>
 
   <!-- ── STARTUP LOGIN SPLASH ───────────────────────────────────────────── -->
   <div id="loginSplash" role="dialog" aria-modal="true" aria-label="Operator sign-in" style="display:none">

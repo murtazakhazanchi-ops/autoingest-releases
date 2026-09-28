@@ -7370,10 +7370,28 @@ function _getNormalVisibleFiles() {
 
 // ════════════════════════════════════════════════════════════════
 // GLOBAL SELECT ALL / CLEAR
+// _selectAllVisible()/_clearSelection() are the shared, context-aware
+// (QMZ vs normal screen) primitives — reused by the button handlers below,
+// the Cmd/Ctrl+A / Cmd/Ctrl+D shortcuts, and renderer/commandManager.js's
+// selection.selectAll / selection.clear commands. See the "ACTIVE-FILE
+// RESOLUTION + COMMAND-LAYER PRIMITIVES" section (near navigatePreview) for
+// the sibling navigation/preview/toggle primitives.
 // ════════════════════════════════════════════════════════════════
-document.getElementById('selectAllBtn').addEventListener('click', () => {
-  const visible      = getVisibleFiles();
-  const visiblePaths = visible.map(f => f.path);
+
+/** Selects (or, if already all selected, deselects) every visible file.
+ * Mirrors the Select All button / Cmd/Ctrl+A for whichever screen is
+ * active. Always returns true — callers gate on button-disabled state. */
+function _selectAllVisible() {
+  if (_qmzOpen) {
+    const order = _qmzGetRenderedPathOrder();
+    const allSelected = order.length > 0 && order.every(p => _qmzSelectedFiles.has(p));
+    if (allSelected) order.forEach(p => _qmzSelectedFiles.delete(p));
+    else             order.forEach(p => _qmzSelectedFiles.add(p));
+    _qmzSyncAllTiles();
+    _qmzUpdateActions();
+    return true;
+  }
+  const visiblePaths = getVisibleFiles().map(f => f.path);
   const allVisibleSelected = visiblePaths.length > 0 &&
     visiblePaths.every(p => selectedFiles.has(p));
   if (allVisibleSelected) {
@@ -7386,14 +7404,32 @@ document.getElementById('selectAllBtn').addEventListener('click', () => {
   syncAllTiles();
   updateSelectionBar();
   updateSteps();
-});
+  return true;
+}
 
-document.getElementById('clearSelBtn').addEventListener('click', () => {
+/** Clears the current selection. Mirrors the Clear button / Cmd/Ctrl+D for
+ * whichever screen is active. Always returns true. */
+function _clearSelection() {
+  if (_qmzOpen) {
+    _qmzSelectedFiles.clear();
+    _qmzSyncAllTiles();
+    _qmzUpdateActions();
+    return true;
+  }
   selectedFiles.clear();
   _selectionAnchor = null;
   syncAllTiles();
   updateSelectionBar();
   updateSteps();
+  return true;
+}
+
+document.getElementById('selectAllBtn').addEventListener('click', () => {
+  _selectAllVisible();
+});
+
+document.getElementById('clearSelBtn').addEventListener('click', () => {
+  _clearSelection();
 });
 
 // ════════════════════════════════════════════════════════════════
@@ -7401,38 +7437,20 @@ document.getElementById('clearSelBtn').addEventListener('click', () => {
 // ════════════════════════════════════════════════════════════════
 document.addEventListener('keydown', e => {
   if (!(e.metaKey || e.ctrlKey) || e.key !== 'a') return;
+  const tag = document.activeElement.tagName;
   if (_qmzOpen) {
     // QMZ's own Select-All — operates only on _qmzSelectedFiles, never on
     // the hidden import screen's selectedFiles.
-    const tag = document.activeElement.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-    const order = _qmzGetRenderedPathOrder();
-    if (!order.length) return;
+    if (!_qmzGetRenderedPathOrder().length) return;
     e.preventDefault();
-    const allSelected = order.every(p => _qmzSelectedFiles.has(p));
-    if (allSelected) order.forEach(p => _qmzSelectedFiles.delete(p));
-    else             order.forEach(p => _qmzSelectedFiles.add(p));
-    _qmzSyncAllTiles();
-    _qmzUpdateActions();
+    _selectAllVisible();
     return;
   }
-  const tag = document.activeElement.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-  const visible = getVisibleFiles();
-  if (!visible.length) return;
+  if (!getVisibleFiles().length) return;
   e.preventDefault();
-  const visiblePaths = visible.map(f => f.path);
-  const allVisibleSelected = visiblePaths.every(p => selectedFiles.has(p));
-  if (allVisibleSelected) {
-    visiblePaths.forEach(p => selectedFiles.delete(p));
-    _selectionAnchor = null;
-  } else {
-    visiblePaths.forEach(p => selectedFiles.add(p));
-    requestThumbsForPaths(visiblePaths);
-  }
-  syncAllTiles();
-  updateSelectionBar();
-  updateSteps();
+  _selectAllVisible();
 });
 
 // ════════════════════════════════════════════════════════════════
@@ -7440,26 +7458,19 @@ document.addEventListener('keydown', e => {
 // ════════════════════════════════════════════════════════════════
 document.addEventListener('keydown', e => {
   if (!(e.metaKey || e.ctrlKey) || e.key !== 'd') return;
+  const tag = document.activeElement.tagName;
   if (_qmzOpen) {
     // QMZ's own Clear — operates only on _qmzSelectedFiles.
-    const tag = document.activeElement.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
     if (!_qmzSelectedFiles.size) return;
     e.preventDefault();
-    _qmzSelectedFiles.clear();
-    _qmzSyncAllTiles();
-    _qmzUpdateActions();
+    _clearSelection();
     return;
   }
-  const tag = document.activeElement.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA') return;
   if (!getVisibleFiles().length) return;
   e.preventDefault();
-  selectedFiles.clear();
-  _selectionAnchor = null;
-  syncAllTiles();
-  updateSelectionBar();
-  updateSteps();
+  _clearSelection();
 });
 
 // ════════════════════════════════════════════════════════════════
@@ -10337,25 +10348,25 @@ function closePreview() {
 }
 
 async function navigatePreview(dir) {
-  if (!_previewOpen || !_previewPath || !_previewOrder.length) return;
+  if (!_previewOpen || !_previewPath || !_previewOrder.length) return false;
 
   // Ref.2 — close gracefully if current path is no longer in the snapshot
   // (e.g. Source Cleanup removed the file, or folder changed mid-preview)
-  if (!_previewOrder.includes(_previewPath)) { closePreview(); return; }
+  if (!_previewOrder.includes(_previewPath)) { closePreview(); return false; }
 
   const idx = _previewOrder.indexOf(_previewPath);
-  if (idx === -1) return;
+  if (idx === -1) return false;
   const next = idx + dir;
-  if (next < 0 || next >= _previewOrder.length) return;
+  if (next < 0 || next >= _previewOrder.length) return false;
   const nextPath = _previewOrder[next];
 
   // Ref.7 — skip redundant load on rapid key presses
-  if (nextPath === _previewPath) return;
+  if (nextPath === _previewPath) return false;
 
   const nextFile = _qmzOpen
     ? _qmzGetActiveFiles().find(f => f.path === nextPath)
     : currentFiles.find(f => f.path === nextPath);
-  if (!nextFile) return;
+  if (!nextFile) return false;
 
   // Stop current video before switching (Ref.5)
   const vid = document.getElementById('pvVideo');
@@ -10373,6 +10384,86 @@ async function navigatePreview(dir) {
 
   await _pvLoadContent(nextFile);
   _pvUpdateNav();
+  return true;
+}
+
+// ════════════════════════════════════════════════════════════════
+// ACTIVE-FILE RESOLUTION + COMMAND-LAYER PRIMITIVES (AI-FEAT MX Console Phase 1A)
+// Small, reusable functions shared by the existing keyboard/mouse handlers
+// below AND renderer/commandManager.js's command registry — neither
+// duplicates the other's logic. Each mirrors an existing, already-shipped
+// interaction exactly; see the call sites replaced by each one for the
+// original inline behavior. Every one is context-aware (_qmzOpen) so a
+// caller never needs to know which screen is active.
+// ════════════════════════════════════════════════════════════════
+
+/**
+ * Resolves the file a navigation/preview/selection command should act on
+ * right now: the currently focused/clicked tile, else the first selected
+ * file, else the first file in view. Mirrors the existing Space-bar preview
+ * fallback chain (Ref.1) for both the QMZ and normal screens.
+ */
+function _resolveActiveFilePath() {
+  return _qmzOpen
+    ? (_qmzLastClickedPath || [..._qmzSelectedFiles][0] || _qmzGetRenderedPathOrder()[0] || null)
+    : (lastClickedPath || [...selectedFiles][0] || currentFiles[0]?.path || null);
+}
+
+/**
+ * Opens/closes the preview overlay for the active file. Mirrors the
+ * existing Space-bar behavior for both the QMZ and normal screens.
+ * Returns false only when there was nothing to preview.
+ */
+function _togglePreviewForActiveFile() {
+  if (_previewOpen) { closePreview(); return true; }
+  const fp = _resolveActiveFilePath();
+  if (!fp) return false;
+  openPreview(fp); // async, fire-and-forget — matches the existing Space-bar handler
+  return true;
+}
+
+/**
+ * Toggles import-selection for the active file. Mirrors the existing
+ * Cmd/Ctrl-click behavior on the normal screen (handleTileClick's ctrlKey
+ * branch) and plain-click toggle behavior in QMZ (_qmzHandleTileClick,
+ * which always toggles — QMZ has no separate "preview focus only" click).
+ */
+function _toggleSelectionForActiveFile() {
+  const fp = _resolveActiveFilePath();
+  if (!fp) return false;
+  if (_qmzOpen) { _qmzHandleTileClick(fp, false); return true; }
+  handleTileClick(fp, false, true);
+  return true;
+}
+
+/**
+ * Moves focus (or, when the preview overlay is open, the previewed file)
+ * one step forward (dir > 0) or backward (dir < 0) through the current
+ * rendered order. Mirrors the existing ArrowLeft/ArrowRight keyboard
+ * behavior exactly, including the asymmetry where only the non-QMZ path
+ * checks _isAnyBlockingOverlayOpen() (QMZ is itself the blocking overlay).
+ * Returns false at a boundary or when there is nothing to navigate.
+ */
+async function _navigateActiveFile(dir) {
+  const key = dir > 0 ? 'ArrowRight' : 'ArrowLeft';
+  if (_previewOpen) return navigatePreview(dir);
+  if (_qmzOpen) {
+    const order = _qmzGetRenderedPathOrder();
+    if (!order.length) return false;
+    const next = _qmzArrowFocusTarget(key, order);
+    if (!next) return false;
+    _qmzSetPreviewFocus(next);
+    _qmzTileMap.get(next)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    return true;
+  }
+  if (_isAnyBlockingOverlayOpen()) return false;
+  const order = getRenderedPathOrder();
+  if (!order.length) return false;
+  const next = _arrowFocusTarget(key, order);
+  if (!next) return false;
+  _setPreviewFocus(next);
+  tileMap.get(next)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  return true;
 }
 
 // ── Preview keyboard handler ───────────────────────────────────────────────
@@ -10385,14 +10476,20 @@ document.addEventListener('keydown', e => {
   // than reusing the import branches below with a few tweaked lookups.
   if (_qmzOpen) {
     if (e.key === ' ') {
-      if (_previewOpen) { e.preventDefault(); e.stopPropagation(); closePreview(); return; }
-      const fp = _qmzLastClickedPath || [..._qmzSelectedFiles][0] || _qmzGetRenderedPathOrder()[0];
-      if (fp) { e.preventDefault(); e.stopPropagation(); openPreview(fp); }
+      if (_previewOpen || _resolveActiveFilePath()) {
+        e.preventDefault(); e.stopPropagation();
+        _togglePreviewForActiveFile();
+      }
+      return;
+    }
+    if (!_previewOpen && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      e.preventDefault();
+      e.stopPropagation();
+      _navigateActiveFile(e.key === 'ArrowRight' ? 1 : -1);
       return;
     }
     if (!_previewOpen &&
-        (e.key === 'ArrowRight' || e.key === 'ArrowLeft' ||
-         e.key === 'ArrowDown'  || e.key === 'ArrowUp')) {
+        (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
       const order = _qmzGetRenderedPathOrder();
       if (!order.length) return;
       e.preventDefault();
@@ -10412,17 +10509,21 @@ document.addEventListener('keydown', e => {
   }
 
   if (e.key === ' ') {
-    if (_previewOpen) { e.preventDefault(); e.stopPropagation(); closePreview(); return; }
-    // Ref.1 — fallback: lastClick → first selected → first file in view
-    const fp = lastClickedPath || [...selectedFiles][0] || currentFiles[0]?.path;
-    if (fp) { e.preventDefault(); e.stopPropagation(); openPreview(fp); }
+    if (_previewOpen || _resolveActiveFilePath()) {
+      e.preventDefault(); e.stopPropagation();
+      _togglePreviewForActiveFile();
+    }
     return;
   }
 
   // ── Grid focus navigation (preview closed) ───────────────────────
-  if (!_previewOpen &&
-      (e.key === 'ArrowRight' || e.key === 'ArrowLeft' ||
-       e.key === 'ArrowDown'  || e.key === 'ArrowUp')) {
+  if (!_previewOpen && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+    e.preventDefault();
+    e.stopPropagation();
+    _navigateActiveFile(e.key === 'ArrowRight' ? 1 : -1);
+    return;
+  }
+  if (!_previewOpen && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
     if (_isAnyBlockingOverlayOpen()) return;
     const order = getRenderedPathOrder();
     if (!order.length) return;
@@ -13658,25 +13759,73 @@ function _showCtxMenu(x, y, anchorPath) {
 
   menu.querySelectorAll('.ctx-item[data-action]').forEach(item => {
     item.addEventListener('click', () => {
-      const paths = [...selectedFiles];
-      // A file moving between groups (or out of a group entirely) leaves behind any
-      // per-file refinement — it belonged to the old component's tag vocabulary. No-op
-      // for files that had none.
-      TagRefinementManager.clearFiles(paths);
       if (item.dataset.action === 'assign') {
-        GroupManager.assignFiles(paths, Number(item.dataset.gid));
+        _assignSelectionToGroup(Number(item.dataset.gid));
       } else if (item.dataset.action === 'new') {
-        const gid = GroupManager.createGroup();
-        GroupManager.assignFiles(paths, gid);
+        _assignSelectionToGroup(null);
       } else if (item.dataset.action === 'unassign') {
-        GroupManager.unassignFiles(paths);
+        _unassignSelectionFromGroup();
       }
-      syncAllGroupBadges();
-      syncAllRefinementBadges();
-      renderGroupPanel();
       _hideCtxMenu();
     });
   });
+}
+
+// ── Group assignment primitives — shared by the context menu above, the
+// Cmd+G digit chord below, and renderer/commandManager.js's group.assign /
+// group.unassign commands. All three operate on the import screen's
+// `selectedFiles` (GroupManager assignment is import-screen-only; QMZ has
+// no grouping concept) and always perform the same production side effects
+// every existing call site already did identically before this extraction:
+// clearing per-file Tag Refinement for the moved files (a file moving
+// between groups, or out, belonged to its old component's tag vocabulary —
+// see the comment on TagRefinementManager.clearFiles' call below), the
+// GroupManager mutation itself, and the group + refinement badge/panel
+// re-sync. Neither clears the selection nor shows a toast — those remain
+// caller-specific UX choices (see the Cmd+G chord handler below, which also
+// layers its own Multi-Event Import claim-tracking around the call).
+// ──────────────────────────────────────────────────────────────────────────
+
+/**
+ * Assigns the current selection to a group.
+ * @param {number|null} groupId  Existing group's id, or null/omitted to
+ *   always create a new group. If groupId is given but no such group
+ *   currently exists, a new group is created instead — mirrors the
+ *   existing Cmd+G digit-chord behavior (GroupManager.createGroup() always
+ *   allocates the next sequential id, which may not equal groupId).
+ * @returns {number|null} the id files were assigned to, or null if there
+ *   was no selection to assign.
+ */
+function _assignSelectionToGroup(groupId) {
+  if (selectedFiles.size === 0) return null;
+  const paths = [...selectedFiles];
+  // A file moving between groups (or out of a group entirely) leaves behind any
+  // per-file refinement — it belonged to the old component's tag vocabulary. No-op
+  // for files that had none. (Cross-event reassignment's own refinement clear —
+  // for the LOSING event's workspace — happens separately, inside GroupManager
+  // .assignFiles' onClaim hook -> ImportSession's _claim(); this clears the
+  // CURRENT/claiming event's own local refinement state for a same-event move.)
+  TagRefinementManager.clearFiles(paths);
+  const existing = groupId != null ? GroupManager.getGroups().find(x => x.id === groupId) : null;
+  const gid = existing ? existing.id : GroupManager.createGroup();
+  GroupManager.assignFiles(paths, gid);
+  syncAllGroupBadges();
+  syncAllRefinementBadges();
+  renderGroupPanel();
+  return gid;
+}
+
+/** Removes the current selection from whatever group(s) it belongs to.
+ * @returns {boolean} false if there was no selection to unassign. */
+function _unassignSelectionFromGroup() {
+  if (selectedFiles.size === 0) return false;
+  const paths = [...selectedFiles];
+  TagRefinementManager.clearFiles(paths);
+  GroupManager.unassignFiles(paths);
+  syncAllGroupBadges();
+  syncAllRefinementBadges();
+  renderGroupPanel();
+  return true;
 }
 
 // Dismiss context menu on click outside
@@ -13754,19 +13903,18 @@ document.addEventListener('keydown', e => {
 
   if (selectedFiles.size === 0) { _hideChordToast(0); return; }
 
-  const existing = GroupManager.getGroups().find(g => g.id === n);
-  const gid      = existing ? existing.id : GroupManager.createGroup();
-  TagRefinementManager.clearFiles([...selectedFiles]);
-  ImportSession.takeLastClaim();   // flush any stale claim info before this assignment
-  GroupManager.assignFiles([...selectedFiles], gid);
+  // Multi-Event Import claim tracking is caller-side, layered around the shared
+  // primitive (not inside it — the context menu never reads/surfaces claim info,
+  // see the primitive's own comment above). Flush any stale claim info left by
+  // an earlier operation before this one, so this toast never reports a reassignment
+  // that didn't happen as part of THIS assignment.
+  ImportSession.takeLastClaim();
+  const gid = _assignSelectionToGroup(n);
   const _claimInfo = ImportSession.takeLastClaim();
 
   // Auto-deselect — no renderFileArea(), just tile class sync
   selectedFiles.clear();
   syncAllTiles();
-  syncAllGroupBadges();
-  syncAllRefinementBadges();
-  renderGroupPanel();
 
   _showChordToast(`Assigned to G${gid}` + (_claimInfo && _claimInfo.reassigned > 0
     ? ` (${_claimInfo.reassigned} moved from ${_claimInfo.fromOrdinals.map(o => 'E' + o).join(', ')})` : ''), 'success');
@@ -17914,3 +18062,54 @@ const _transferMonitor = (() => {
     }
   });
 })();
+
+// ════════════════════════════════════════════════════════════════
+// COMMAND LAYER BRIDGE (AI-FEAT MX Console Phase 1A)
+// Explicit extension point for renderer/commandManager.js — the ONLY
+// renderer.js surface it is allowed to touch. Everything listed here is an
+// already-authoritative function/state accessor reused as-is (see the
+// "ACTIVE-FILE RESOLUTION + COMMAND-LAYER PRIMITIVES" section near
+// navigatePreview, and the group-assignment primitives near the group
+// context menu) — this object adds no new business logic of its own.
+//
+// This is NOT a public API for arbitrary external code: adapters (the
+// future Logitech Actions SDK plugin, keyboard shortcuts, or any other MX
+// Creative Console client) must go through AutoIngestCommands.execute()/
+// canExecute() in commandManager.js, never call into this bridge directly.
+// See docs/commandLayer.md.
+// ════════════════════════════════════════════════════════════════
+window.__autoIngestRendererBridge = {
+  // context
+  isQmzOpen:                () => _qmzOpen,
+  isPreviewOpen:             () => _previewOpen,
+  isAnyBlockingOverlayOpen:  () => _isAnyBlockingOverlayOpen(),
+  getActiveFilePath:         () => _resolveActiveFilePath(),
+  getVisibleFileCount:       () => getVisibleFiles().length,
+  getSelectionSize:          () => (_qmzOpen ? _qmzSelectedFiles.size : selectedFiles.size),
+  // navigation
+  navigateActiveFile:        (dir) => _navigateActiveFile(dir),
+  // selection
+  toggleSelectionForActiveFile: () => _toggleSelectionForActiveFile(),
+  selectAllVisible:          () => _selectAllVisible(),
+  clearSelection:            () => _clearSelection(),
+  // preview
+  togglePreviewForActiveFile: () => _togglePreviewForActiveFile(),
+  // grouping (import screen only — GroupManager has no QMZ concept)
+  //
+  // assignSelectionToGroup wraps the shared primitive with the same
+  // Multi-Event Import claim-tracking flush/capture the Cmd+G digit chord
+  // already does around it (see that handler's own comment) — a
+  // command-driven assignment is, like the chord, a discrete "assign
+  // selection to group N" action a caller may want feedback from, unlike
+  // the context menu's click-a-specific-item interaction, which still
+  // never reads claim info (unchanged). Returns { groupId, claim } instead
+  // of a bare id so a future MX console page can surface the same
+  // "N moved from E<ordinal>" information the chord's toast already shows.
+  assignSelectionToGroup: (groupId) => {
+    ImportSession.takeLastClaim(); // flush stale claim info, mirrors the Cmd+G chord
+    const assignedGroupId = _assignSelectionToGroup(groupId);
+    const claim = ImportSession.takeLastClaim();
+    return { groupId: assignedGroupId, claim };
+  },
+  unassignSelectionFromGroup: () => _unassignSelectionFromGroup(),
+};
