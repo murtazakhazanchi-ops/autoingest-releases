@@ -102,6 +102,11 @@ Import / copy / duplicate / routing
 → docs/system-contracts.md  
 → docs/data-model.md
 
+Multi-event import (one source → several events → one import) / event workspace / Change Event from Import / per-event group state  
+→ docs/multi-event-import.md  
+→ docs/group-manager.md  
+→ docs/ingestion-flow.md
+
 event.json / persistence / validation  
 → docs/data-model.md  
 → docs/event-system.md  
@@ -117,7 +122,8 @@ Metadata / EXIF / IPTC / XMP / sidecars / tagging
 Group mapping / sub-event assignment  
 → docs/group-manager.md  
 → docs/event-system.md  
-→ docs/ingestion-flow.md
+→ docs/ingestion-flow.md  
+→ docs/multi-event-import.md (per-event instances)
 
 Debugging / stabilization  
 → docs/debug-playbook.md  

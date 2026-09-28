@@ -2,11 +2,11 @@
 
 > Generated artifact — locator only. Regenerate with `node scripts/product-docs/cli.js build`. Full machine-readable graph: `dependency-graph.json`. Views below are deliberately bounded (one subsystem or milestone chain per diagram) rather than one unreadable graph of every node.
 
-Total: 125 nodes, 546 edges.
+Total: 130 nodes, 586 edges.
 
 ### Roadmap milestone relationships
 
-11 node(s), 10 edge(s) in this view.
+12 node(s), 11 edge(s) in this view.
 
 ```mermaid
 flowchart LR
@@ -21,6 +21,7 @@ flowchart LR
   AI_RM_008(("AI-RM-008: Archive Analytics"))
   AI_RM_009(("AI-RM-009: AI Archive Intelligence"))
   AI_RM_010(("AI-RM-010: Multi-Channel Release & Update System"))
+  AI_RM_011(("AI-RM-011: Multi-Event Import"))
   AI_RM_012(("AI-RM-012: AutoIngest Knowledge & Onboarding Portal (Stage 1 + Stage 2)"))
   AI_RM_002 -->|depends_on| AI_RM_001
   AI_RM_003 -->|depends_on| AI_RM_002
@@ -30,13 +31,14 @@ flowchart LR
   AI_RM_007 -->|depends_on| AI_RM_006
   AI_RM_008 -->|depends_on| AI_RM_007
   AI_RM_009 -->|depends_on| AI_RM_008
+  AI_RM_011 -->|depends_on| AI_RM_010
   AI_RM_012 -->|depends_on| AI_RM_001
   AI_RM_012 -->|depends_on| AI_RM_010
 ```
 
 ### Feature dependency overview (features with a depends_on/extended_by edge)
 
-54 node(s), 148 edge(s) in this view.
+55 node(s), 161 edge(s) in this view.
 
 ```mermaid
 flowchart LR
@@ -95,6 +97,7 @@ flowchart LR
   AI_FEAT_055["AI-FEAT-055: Archive Analytics"]
   AI_FEAT_056["AI-FEAT-056: AI Archive Intelligence"]
   AI_FEAT_057["AI-FEAT-057: Multi-Channel Release & Update System"]
+  AI_FEAT_058["AI-FEAT-058: Multi-Event Import"]
   AI_FEAT_002 -->|depends_on| AI_FEAT_005
   AI_FEAT_002 -->|related_to| AI_FEAT_022
   AI_FEAT_002 -->|related_to| AI_FEAT_027
@@ -243,6 +246,19 @@ flowchart LR
   AI_FEAT_057 -->|related_to| AI_FEAT_005
   AI_FEAT_057 -->|depends_on| AI_FEAT_006
   AI_FEAT_057 -->|related_to| AI_FEAT_006
+  AI_FEAT_058 -->|depends_on| AI_FEAT_009
+  AI_FEAT_058 -->|depends_on| AI_FEAT_010
+  AI_FEAT_058 -->|depends_on| AI_FEAT_012
+  AI_FEAT_058 -->|depends_on| AI_FEAT_017
+  AI_FEAT_058 -->|depends_on| AI_FEAT_018
+  AI_FEAT_058 -->|depends_on| AI_FEAT_019
+  AI_FEAT_058 -->|related_to| AI_FEAT_020
+  AI_FEAT_058 -->|depends_on| AI_FEAT_021
+  AI_FEAT_058 -->|related_to| AI_FEAT_024
+  AI_FEAT_058 -->|related_to| AI_FEAT_025
+  AI_FEAT_058 -->|related_to| AI_FEAT_028
+  AI_FEAT_058 -->|related_to| AI_FEAT_029
+  AI_FEAT_058 -->|related_to| AI_FEAT_044
 ```
 
 ### Metadata subsystem
@@ -294,7 +310,7 @@ flowchart LR
 
 ### Import and Archive Writing subsystem
 
-10 node(s), 14 edge(s) in this view.
+11 node(s), 20 edge(s) in this view.
 
 ```mermaid
 flowchart LR
@@ -309,6 +325,7 @@ flowchart LR
   AI_FEAT_026["AI-FEAT-026: Audit Integrity Verification (Count-Based)"]
   AI_FEAT_027["AI-FEAT-027: Activity Log"]
   AI_FEAT_028["AI-FEAT-028: Import Source Attribution"]
+  AI_FEAT_058["AI-FEAT-058: Multi-Event Import"]
   AI_FEAT_019 -->|extended_by| AI_FEAT_020
   AI_FEAT_019 -->|extended_by| AI_FEAT_020
   AI_FEAT_020 -->|depends_on| AI_FEAT_019
@@ -323,6 +340,12 @@ flowchart LR
   AI_FEAT_028 -->|depends_on| AI_FEAT_021
   AI_FEAT_028 -->|related_to| AI_FEAT_022
   AI_FEAT_028 -->|related_to| AI_FEAT_027
+  AI_FEAT_058 -->|depends_on| AI_FEAT_019
+  AI_FEAT_058 -->|related_to| AI_FEAT_020
+  AI_FEAT_058 -->|depends_on| AI_FEAT_021
+  AI_FEAT_058 -->|related_to| AI_FEAT_024
+  AI_FEAT_058 -->|related_to| AI_FEAT_025
+  AI_FEAT_058 -->|related_to| AI_FEAT_028
 ```
 
 ### Transfer and Backup subsystem
@@ -379,7 +402,7 @@ flowchart LR
 
 ### Planned archive-management direction
 
-18 node(s), 27 edge(s) in this view.
+19 node(s), 28 edge(s) in this view.
 
 ```mermaid
 flowchart LR
@@ -401,6 +424,7 @@ flowchart LR
   AI_RM_008(("AI-RM-008: Archive Analytics"))
   AI_RM_009(("AI-RM-009: AI Archive Intelligence"))
   AI_RM_010(("AI-RM-010: Multi-Channel Release & Update System"))
+  AI_RM_011(("AI-RM-011: Multi-Event Import"))
   AI_RM_012(("AI-RM-012: AutoIngest Knowledge & Onboarding Portal (Stage 1 + Stage 2)"))
   AI_FEAT_049 -->|planned_in| AI_RM_002
   AI_FEAT_050 -->|planned_in| AI_RM_003
@@ -428,6 +452,7 @@ flowchart LR
   AI_RM_008 -->|depends_on| AI_RM_007
   AI_RM_009 -->|implements| AI_FEAT_056
   AI_RM_009 -->|depends_on| AI_RM_008
+  AI_RM_011 -->|depends_on| AI_RM_010
   AI_RM_012 -->|depends_on| AI_RM_010
 ```
 

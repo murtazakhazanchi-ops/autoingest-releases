@@ -270,16 +270,21 @@
         "docs/failure-patterns.md #16",
         "docs/features.md #10",
         "docs/features.md #11",
+        "docs/features.md #16",
         "docs/features.md #5",
         "docs/features.md #6",
         "docs/features.md #8",
         "docs/features.md #9",
+        "docs/group-manager.md",
         "docs/ingestion-flow.md",
         "docs/ingestion-flow.md § Duplicate Handling",
         "docs/metadata-system.md § Non-Goals",
+        "docs/multi-event-import.md",
+        "docs/system-contracts.md",
         "docs/system-contracts.md §13",
         "docs/system-contracts.md §4",
-        "docs/system-contracts.md §4-5"
+        "docs/system-contracts.md §4-5",
+        "docs/ui-system.md"
       ],
       "changeImpactChecklist": [
         "Re-read the Related Files section of every primary feature listed above before changing shared source files.",
@@ -298,21 +303,28 @@
         "AI-FEAT-025",
         "AI-FEAT-026",
         "AI-FEAT-027",
-        "AI-FEAT-028"
+        "AI-FEAT-028",
+        "AI-FEAT-058"
       ],
       "relatedBugs": [],
       "relatedDecisions": [],
       "sourceDirectories": [
+        "docs",
         "main",
         "renderer",
-        "services"
+        "services",
+        "test"
       ],
       "sourceFiles": [
+        "docs/multi-event-import.md",
         "main/eventJsonStore.js",
         "main/fileManager.js",
         "main/main.js",
+        "renderer/groupManager.js",
+        "renderer/importSession.js",
         "renderer/renderer.js",
-        "services/photographerSequenceService.js"
+        "services/photographerSequenceService.js",
+        "test/importSession.test.js"
       ]
     },
     {

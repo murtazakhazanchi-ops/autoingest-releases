@@ -55,7 +55,8 @@ const metadataAuditService  = require('../services/metadataAuditService');
 const metadataAuditExport   = require('../services/metadataAuditExport');
 const metadataRepairService = require('./metadataRepairService');
 const metadataSyncService = require('./metadataSyncService');
-const { resolvePhotographerFromPath } = require('../services/eventEvidenceReconstruction');
+const { buildEventEvidenceContext } = require('../services/eventEvidenceReconstruction');
+const eventMetadataIntent = require('../services/eventMetadataIntent');
 const realtimeOps              = require('../services/realtimeOperationsService');
 const offlineCollectionRegistry    = require('../services/offlineCollectionRegistryService');
 const photographerSeqService       = require('../services/photographerSequenceService');
@@ -94,6 +95,7 @@ async function _emitDeviceHealth() {
 // ── Last imported file pairs for optional checksum verification ───────────────
 // Populated after each import; holds { src, dest } for every copied file.
 let lastImportedFiles = [];
+let lastImportedSessionId = null; // multi-event import: id of the source-import session lastImportedFiles accumulates for
 
 // ── Global Import Index ───────────────────────────────────────────────────────
 // Persists { lowercaseFilename: { size, addedAt } } across sessions.
@@ -947,47 +949,9 @@ async function _verifyAndReconcile(eventJsonFilePath, files, context) {
  * already has to solve this same problem.
  */
 function _buildTransferVerificationContext(eventFolderPath, eventJson, filesForEvent) {
-  const components = Array.isArray(eventJson?.components) ? eventJson.components : [];
-  const isMulti = components.length > 1;
-  const imports = Array.isArray(eventJson?.imports) ? eventJson.imports : [];
-  const fallbackPhotographer = imports.length > 0 ? (imports[imports.length - 1].photographer || '') : '';
-
-  const resolvePhotographer = (filePath, baseDir) => resolvePhotographerFromPath(filePath, baseDir, fallbackPhotographer);
-
-  const groups = [];
-  const filesWithPhotographer = [];
-
-  if (!isMulti) {
-    groups.push({ id: 'root', subEventId: null, files: filesForEvent.map(f => f.dest) });
-    for (const f of filesForEvent) {
-      filesWithPhotographer.push({ ...f, photographer: resolvePhotographer(f.dest, eventFolderPath) });
-    }
-  } else {
-    const matched = new Set();
-    for (const comp of components) {
-      if (!comp.folderName) continue;
-      const compDir  = path.join(eventFolderPath, comp.folderName) + path.sep;
-      const compFiles = filesForEvent.filter(f => f.dest.startsWith(compDir));
-      if (compFiles.length === 0) continue;
-      groups.push({ id: comp.folderName, subEventId: comp.folderName, files: compFiles.map(f => f.dest) });
-      for (const f of compFiles) {
-        filesWithPhotographer.push({ ...f, photographer: resolvePhotographer(f.dest, path.join(eventFolderPath, comp.folderName)) });
-        matched.add(f.dest);
-      }
-    }
-    for (const f of filesForEvent) {
-      if (!matched.has(f.dest)) filesWithPhotographer.push({ ...f, photographer: fallbackPhotographer || null });
-    }
-  }
-
-  return {
-    context: {
-      photographer: fallbackPhotographer, hijriDate: eventJson?.hijriDate || null,
-      eventDescription: eventJson?.eventName || null, groups, diskComponents: components,
-      eventJsonPath: path.join(eventFolderPath, 'event.json'),
-    },
-    files: filesWithPhotographer,
-  };
+  // Same durable-intent reconstruction as Audit/Repair/resume/Reapply — a correctly refined or MetaPicker
+  // file must verify as complete, not be flagged incomplete and re-queued for rewrite.
+  return buildEventEvidenceContext(eventFolderPath, eventJson, filesForEvent);
 }
 
 /**
@@ -1038,6 +1002,11 @@ ipcMain.handle('import:commitTransaction', async (event, {
   source,
   importedBy,
   importMode,   // 'direct-nas' | 'local-first' | undefined
+  // Multi-event import (additive, both optional — absent for every single-event import):
+  progressEventPath = null,   // identity the renderer uses for this event; echoed on metadata:progress so
+                              // progress is attributed to THIS batch's event, not whichever event is current
+  importSessionId = null,     // shared by every event transaction of ONE multi-event source import: Deep Verify
+                              // then covers the whole session instead of only the last event's files
 }) => {
   let originalEventJson = null;
 
@@ -1140,9 +1109,16 @@ ipcMain.handle('import:commitTransaction', async (event, {
       });
     };
 
+    // Same importSessionId as the previous transaction → accumulate (importFileJobs itself
+    // replaces lastImportedFiles on every call). Different/absent id → its replace stands, so
+    // a stale earlier import can never leak into a later one's Deep Verify.
+    const _accumulateFrom = (typeof importSessionId === 'string' && importSessionId && importSessionId === lastImportedSessionId)
+      ? lastImportedFiles : null;
     let result;
     try {
       result = await importFileJobs(event, fileJobs, _teamImportProgress);
+      if (_accumulateFrom) lastImportedFiles = _accumulateFrom.concat(result.copiedFiles || []);
+      lastImportedSessionId = (typeof importSessionId === 'string' && importSessionId) ? importSessionId : null;
     } catch (err) {
       // Copy failed — no archive writes completed; release locks immediately.
       _releaseDirectNasLocks(_directNasLocks);
@@ -1220,25 +1196,16 @@ ipcMain.handle('import:commitTransaction', async (event, {
 
     result.auditLogs = logs;
 
-    // Build metadataGroups for reapply: map dest-relative paths → metadataTags.
-    // Only populated when at least one group carries an explicit metadataTags array.
-    let metadataGroupsForDisk = null;
-    if (Array.isArray(groups) && groups.some(g => Array.isArray(g.metadataTags)) && result.copiedFiles?.length > 0) {
-      const srcToTags = new Map();
-      for (const g of groups) {
-        if (!Array.isArray(g.metadataTags)) continue;
-        for (const src of (g.files || [])) srcToTags.set(path.normalize(src), g.metadataTags);
-      }
-      const buckets = new Map(); // JSON(tags) → { metadataTags, relPaths }
-      for (const cf of result.copiedFiles) {
-        const tags = srcToTags.get(path.normalize(cf.src));
-        if (!Array.isArray(tags)) continue;
-        const key = JSON.stringify(tags);
-        if (!buckets.has(key)) buckets.set(key, { metadataTags: tags, relPaths: [] });
-        if (eventJsonPath) buckets.get(key).relPaths.push(path.relative(eventJsonPath, cf.dest));
-      }
-      if (buckets.size > 0) metadataGroupsForDisk = Array.from(buckets.values());
-    }
+    // Durable metadata intent (Tier 0 tagRefinements + Tier 1 metadataGroups): what THIS import decided,
+    // per destination-relative key, for every file it copied OR same-size-skipped. It is MERGED into the
+    // existing event.json records inside the atomic update below — a later import must never replace an
+    // earlier import's records (services/eventMetadataIntent.js owns the schema, keys and merge rules).
+    // Supersedes the RC.1-era metadataGroupsForDisk-only block (blind replace, no tagRefinements support)
+    // — RC.1 never touched this logic independently (identical to the pre-refinement baseline), so this
+    // is a straight upgrade, not a feature loss.
+    const intentDelta = eventJsonPath
+      ? eventMetadataIntent.buildImportIntentDelta({ eventFolderPath: eventJsonPath, groups, copiedFiles: result.copiedFiles, skippedFiles: result.skippedFiles })
+      : null;
 
     if (eventJsonPath) {
       // Single serialized read/merge/write: merge audit logs + set lastImport + set
@@ -1274,7 +1241,15 @@ ipcMain.handle('import:commitTransaction', async (event, {
             };
           }
 
-          if (metadataGroupsForDisk) changes.metadataGroups = metadataGroupsForDisk;
+          // Per-key merge against the freshest on-disk records (this mutator receives them). `value`
+          // undefined + changed drops the key ("absent when none"); unchanged fields are left untouched.
+          if (intentDelta) {
+            const tr = eventMetadataIntent.mergeTagRefinements(doc.tagRefinements, intentDelta.refinements);
+            if (tr.changed) changes.tagRefinements = tr.value;
+            const mg = eventMetadataIntent.mergeMetadataGroups(doc.metadataGroups, intentDelta.metaTags);
+            if (mg.changed) changes.metadataGroups = mg.value;
+            if (tr.skipped || mg.skipped) log(`[import:commitTransaction] intent merge skipped an unparseable field (tagRefinements: ${tr.skipped || 'ok'}, metadataGroups: ${mg.skipped || 'ok'}) — left untouched`);
+          }
           return changes;
         });
         hidePathBestEffort(jsonPath).catch(() => {});
@@ -1314,7 +1289,10 @@ ipcMain.handle('import:commitTransaction', async (event, {
         eventJsonPath:    eventJsonPath ? path.join(eventJsonPath, 'event.json') : null,
       };
       const baseEmit = win
-        ? (p) => { if (!win.isDestroyed()) win.webContents.send('metadata:progress', p); }
+        ? (p) => {
+            if (win.isDestroyed()) return;
+            win.webContents.send('metadata:progress', progressEventPath ? { ...p, eventPath: progressEventPath } : p);
+          }
         : null;
 
       // emitFn is non-null when a window is open OR when locks need deferred release.
@@ -3785,15 +3763,9 @@ ipcMain.handle('metadata:reapplyEvent', async (_event, eventFolderPath) => {
   }
 
   const components      = Array.isArray(eventJson?.components) ? eventJson.components : [];
-  const hijriDate       = eventJson?.hijriDate || null;
-  const imports         = Array.isArray(eventJson?.imports) ? eventJson.imports : [];
-  // Fallback photographer used when path derivation yields an empty segment.
-  const fallbackPhotographer = imports.length > 0 ? (imports[imports.length - 1].photographer || '') : '';
   const eventName       = path.basename(eventFolderPath);
   const collName        = path.basename(path.dirname(eventFolderPath));
   const isMulti         = components.length > 1;
-  // Persisted metadata grouping: relPath → metadataTags[], built from last grouping import.
-  const savedMetaGroups = Array.isArray(eventJson?.metadataGroups) ? eventJson.metadataGroups : null;
 
   const cfg        = require('../config/app.config');
   const MEDIA_EXTS = new Set([...cfg.PHOTO_EXTENSIONS, ...cfg.VIDEO_EXTENSIONS]);
@@ -3816,69 +3788,23 @@ ipcMain.handle('metadata:reapplyEvent', async (_event, eventFolderPath) => {
     return files;
   }
 
-  // Resolve photographer from archive folder structure.
-  // Single-component:  eventFolder/<photographer>/[VIDEO/]filename
-  // Multi-component:   eventFolder/<comp>/<photographer>/[VIDEO/]filename
-  // In both cases the photographer segment is always parts[0] relative to baseDir.
-  function resolvePhotographer(filePath, baseDir) {
-    return resolvePhotographerFromPath(filePath, baseDir, fallbackPhotographer);
-  }
-
-  const groups      = [];
-  const copiedFiles = [];
-
+  // Scan (unchanged): single-component → the whole event folder; multi-component → each component's own
+  // folder (a component with no folderName is never scanned).
+  const scanned = [];
   if (!isMulti) {
-    const rawFiles = await scanMediaDir(eventFolderPath, 0);
-
-    if (savedMetaGroups) {
-      // Reconstruct per-tag groups from the persisted mapping so reapply writes
-      // the same keyword assignments that were chosen during the original import.
-      const relToTags = new Map();
-      for (const mg of savedMetaGroups) {
-        if (!Array.isArray(mg.metadataTags)) continue;
-        for (const relPath of (mg.relPaths || [])) {
-          relToTags.set(path.normalize(relPath), mg.metadataTags);
-        }
-      }
-      const buckets  = new Map(); // JSON(tags) → files[]
-      const noTagFiles = [];
-      for (const f of rawFiles) {
-        const rel  = path.normalize(path.relative(eventFolderPath, f));
-        const tags = relToTags.get(rel);
-        if (Array.isArray(tags)) {
-          const key = JSON.stringify(tags);
-          if (!buckets.has(key)) buckets.set(key, { tags, files: [] });
-          buckets.get(key).files.push(f);
-        } else {
-          noTagFiles.push(f);
-        }
-      }
-      let gid = 1;
-      for (const [, { tags, files }] of buckets) {
-        groups.push({ id: `meta-${gid++}`, subEventId: null, files, metadataTags: tags });
-      }
-      if (noTagFiles.length > 0) {
-        groups.push({ id: 'meta-untagged', subEventId: null, files: noTagFiles, metadataTags: null });
-      }
-    } else {
-      groups.push({ id: 'root', subEventId: null, files: rawFiles });
-    }
-
-    for (const f of rawFiles) {
-      copiedFiles.push({ src: f, dest: f, photographer: resolvePhotographer(f, eventFolderPath) });
-    }
+    scanned.push(...await scanMediaDir(eventFolderPath, 0));
   } else {
     for (const comp of components) {
       if (!comp.folderName) continue;
-      const compDir  = path.join(eventFolderPath, comp.folderName);
-      const rawFiles = await scanMediaDir(compDir, 0);
-      if (rawFiles.length === 0) continue;
-      groups.push({ id: comp.folderName, subEventId: comp.folderName, files: rawFiles });
-      for (const f of rawFiles) {
-        copiedFiles.push({ src: f, dest: f, photographer: resolvePhotographer(f, compDir) });
-      }
+      scanned.push(...await scanMediaDir(path.join(eventFolderPath, comp.folderName), 0));
     }
   }
+
+  // Expected metadata comes from the ONE common reconstruction path (durable Tier 0 tagRefinements +
+  // Tier 1 metadataGroups from event.json, then the component default) — Reapply carries no precedence or
+  // refinement logic of its own, and needs neither the original source/card nor any renderer state.
+  const { context: reapplyBase, files: copiedFiles } = buildEventEvidenceContext(
+    eventFolderPath, eventJson, scanned.map(f => ({ src: f, dest: f })));
 
   if (copiedFiles.length === 0) {
     return { ok: false, error: 'No eligible media files found in event folder' };
@@ -3887,16 +3813,7 @@ ipcMain.handle('metadata:reapplyEvent', async (_event, eventFolderPath) => {
   const batchId = `reapply-${Date.now().toString(36)}`;
   const win     = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
   const reapplyEventJsonPath = path.join(eventFolderPath, 'event.json');
-  const reapplyContext = {
-    photographer:     fallbackPhotographer,
-    eventName,
-    collName,
-    hijriDate,
-    eventDescription: eventJson?.eventName || null,
-    groups,
-    diskComponents:   components,
-    eventJsonPath:    reapplyEventJsonPath,
-  };
+  const reapplyContext = { ...reapplyBase, eventName, collName, eventJsonPath: reapplyEventJsonPath };
   const baseEmit = win
     ? (p) => { if (!win.isDestroyed()) win.webContents.send('metadata:progress', p); }
     : null;
@@ -4337,19 +4254,10 @@ function _regActiveInCategory(category) {
   );
 }
 
-// Legacy listManager labels not present in the registry for this category — kept
-// selectable (read-only fallback) so nothing the user relied on silently disappears.
-function _regLegacyFallbackLabels(name, registryLabels) {
-  const have = new Set(registryLabels.map(l => String(l).toLowerCase()));
-  let legacy = [];
-  try {
-    const lm = listManager.getList(name) || [];
-    legacy = lm.map(n => (typeof n === 'string' ? n : n.label))
-               .filter(l => l && !have.has(String(l).toLowerCase()));
-  } catch {}
-  const seen = new Set();
-  return legacy.filter(l => { const k = l.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
-}
+// D2: leaf-safe legacy fallback — only true selectable leaves may become committed
+// keyword/Event-Type/Location values; a node with children (at any depth) is structural/
+// navigation context only. See services/legacyKeywordFallback.js for the full rationale.
+const { collectLegacyLeaves, pruneLegacyTree } = require('../services/legacyKeywordFallback');
 
 // Build TreeAutocomplete-shaped data for a registry-backed list name.
 function _registryListData(name) {
@@ -4358,7 +4266,8 @@ function _registryListData(name) {
 
   if (name === 'cities') {
     const labels = kws.map(k => k.label);
-    const legacy = _regLegacyFallbackLabels(name, labels);
+    const have   = new Set(labels.map(l => l.toLowerCase()));
+    const legacy = collectLegacyLeaves(listManager.getList(name) || [], have); // flat list — every entry is already a leaf
     const seen = new Set();
     return [...labels, ...legacy].filter(l => { const k = l.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
   }
@@ -4380,12 +4289,28 @@ function _registryListData(name) {
   });
   const tree = toArr(root);
 
-  // Read-only fallback for legacy listManager terms not in the registry, grouped clearly.
+  // Read-only fallback for legacy listManager terms not in the registry — preserves the
+  // real category/leaf shape (rather than flattening it) so the existing browse renderer's
+  // own parent-is-navigation-only / leaf-is-selectable distinction applies unchanged.
   const registryLabels = [];
   (function collect(nodes) { for (const n of nodes) { registryLabels.push(n.label); if (n.children) collect(n.children); } })(tree);
-  const legacy = _regLegacyFallbackLabels(name, registryLabels);
-  if (legacy.length) {
-    tree.push({ label: 'Other (legacy — read-only)', children: legacy.map(l => ({ label: l })) });
+  const have = new Set(registryLabels.map(l => l.toLowerCase()));
+  const prunedLegacy = pruneLegacyTree(listManager.getList(name) || [], have);
+  if (prunedLegacy.length) {
+    if (name === 'locations') {
+      // _renderLocationsTree has no "pure category" concept at the top level — any
+      // children-bearing top-level entry also offers ITS OWN label as a selectable
+      // "(general)" leaf (exactly like "Jamrat"/"Kaaba" already do). Wrapping the whole
+      // legacy subtree under one synthetic node would make that wrapper's own label
+      // ("Other (legacy — read-only)") selectable, which must never happen — so its
+      // pruned top-level entries are spliced in directly instead, exactly like every
+      // other top-level location entry already is.
+      tree.push(...prunedLegacy);
+    } else {
+      // _renderEventsTree treats every top-level entry as a pure, non-selectable
+      // category header — safe to group under one clearly-labeled wrapper.
+      tree.push({ label: 'Other (legacy — read-only)', children: prunedLegacy });
+    }
   }
   return tree;
 }
@@ -4413,9 +4338,10 @@ function _registryMatch(name, input) {
     else if (Array.isArray(k.aliases) && k.aliases.some(a => String(a).toLowerCase().includes(q)))
                                      push(k.label, 'alias', 40);
   }
-  // Legacy fallback terms participate in search too (read-only).
-  const registryLabels = kws.map(k => k.label);
-  for (const label of _regLegacyFallbackLabels(name, registryLabels)) {
+  // Legacy fallback LEAVES participate in search too (read-only) — never a structural/
+  // parent node, regardless of nesting depth or how closely its own label matches `q`.
+  const have = new Set(kws.map(k => k.label.toLowerCase()));
+  for (const label of collectLegacyLeaves(listManager.getList(name) || [], have)) {
     const lo = label.toLowerCase();
     if (lo === q)              push(label, 'exact', 100);
     else if (lo.startsWith(q)) push(label, 'startsWith', 70);
@@ -5361,6 +5287,26 @@ ipcMain.handle('event:getPhotographerFolders', async (_event, { localEventPath }
   }
 });
 
+/**
+ * Remap event.json's durable intent records (tagRefinements + metadataGroups) after AutoIngest renamed
+ * photographer folders. `renames` are applyRenames' {from,to,scopeRel} pairs.
+ */
+async function _remapEventIntentForRenames(eventFolderPath, renames) {
+  const remap = eventMetadataIntent.prefixRemapper(eventMetadataIntent.prefixPairsFromRenames(renames));
+  try {
+    await updateEventJsonAtomic(path.join(eventFolderPath, 'event.json'), (doc) => {
+      const changes = {};
+      const tr = eventMetadataIntent.remapTagRefinements(doc.tagRefinements, remap);
+      if (tr.changed) changes.tagRefinements = tr.value;
+      const mg = eventMetadataIntent.remapMetadataGroups(doc.metadataGroups, remap);
+      if (mg.changed) changes.metadataGroups = mg.value;
+      return changes;
+    });
+  } catch (err) {
+    log('warn', `[seq] intent key remap failed for ${eventFolderPath}: ${err.message}`);
+  }
+}
+
 ipcMain.handle('event:applyPhotographerSequence', async (_event, { localEventPath, scopedOrdered } = {}) => {
   if (!localEventPath || typeof localEventPath !== 'string') {
     return { ok: false, reason: 'localEventPath required' };
@@ -5452,6 +5398,12 @@ ipcMain.handle('event:applyPhotographerSequence', async (_event, { localEventPat
 
   // Apply filesystem renames (component-aware two-phase)
   const renameResult = await photographerSeqService.applyRenames(realEvent, fullScopedOrdered);
+  // Durable metadata intent is keyed by event-relative path, so a folder rename must move its keys —
+  // from the actual rename pairs (never fuzzy matching), for exactly the renames in effect on disk,
+  // even when a later scope failed.
+  if (renameResult.renames && renameResult.renames.length > 0) {
+    await _remapEventIntentForRenames(realEvent, renameResult.renames);
+  }
   if (!renameResult.ok) {
     log('warn', `[seq] Rename failed: ${renameResult.error}`);
     return { ok: false, reason: renameResult.error };

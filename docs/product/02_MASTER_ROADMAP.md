@@ -10,6 +10,8 @@ Canonical, ordered implementation roadmap. Do not reorder unless the project own
 
 **AI-RM-012** (AutoIngest Knowledge & Onboarding Portal — Stage 1) is also a separate, parallel track — a documentation/tooling initiative, not a continuation of the AI-RM-001…009 archive-capability sequence. Status: **In Progress** — Stage 1 (prototype) complete, Stage 2 not started (see AI-FEAT-059; the full multi-stage portal is not scheduled here as a single milestone, see that milestone's own entry for why).
 
+**AI-RM-011** (Multi-Event Import) is likewise a separate track, not a continuation of the AI-RM-001…009 archive-capability sequence: an ingestion-workflow enhancement. Status: **In progress** — implemented and verified on branch `feature/multi-event-import`; merge and release pending. See its own entry below.
+
 ---
 
 ## AI-RM-001 — Metadata Audit & Repair
@@ -179,6 +181,23 @@ Canonical, ordered implementation roadmap. Do not reorder unless the project own
 | Planned estimate | Single implementation session (2026-08-12), plus a three-part live-pilot verification arc (2026-08-13) |
 | Current risks | None blocking. Two CI-only bugs were found and fixed during the pilot ([BUG-015](bugs/BUG-015_WINDOWS_RUNNER_DEFAULT_POWERSHELL_SHELL_MANGLES_ELECTRON_BUILDER_DOT_NOTATION_CLI_OVERRIDES.md), [BUG-016](bugs/BUG-016_UNDECLARED_NPM_DEPENDENCY_IN_PRODUCT_DOCS_TOOLING_MASKED_BY_LOCALLY_HOISTED_NODE_MODULES.md)) — both closed. One accepted (non-blocking) structural note: `rc-build-windows`/`rc-build-mac` have no atomic dual-platform publish gate (see AI-FEAT-057's Decisions section). One non-blocking UX candidate identified (exact running version, including prerelease suffix, not confidently visible to a tester in-app — see AI-FEAT-057's Future Enhancements). |
 | Next action | None — complete. A future real Stable release (whenever separately authorized) will automatically carry the Update Channel selector to the entire existing Stable install base as an ordinary update; no further migration work is required for that transition. |
+
+---
+
+## AI-RM-011 — Multi-Event Import
+
+| Field | Value |
+|---|---|
+| Status | **In progress** (implemented and verified on `feature/multi-event-import`; not yet merged to `stable/0.9` or released) |
+| Objective | Let an operator open one import source (card, drive, USB, local folder — source-agnostic), assign its files to several events, and import them in ONE pass, with every file routed and tagged by its own event, without weakening any copy-safety, naming, metadata or transaction rule. |
+| Included AI-FEAT IDs | AI-FEAT-058 |
+| Existing features extended | AI-FEAT-017 (Grouping System — per-event instances), AI-FEAT-019 (Import Pipeline & Copy Engine), AI-FEAT-021 (Atomic Import Transaction — orchestrated per event), AI-FEAT-009 / AI-FEAT-010 (event picker/creator reused), AI-FEAT-024 (Source Cleanup — eligibility unchanged), AI-FEAT-025 (Deep Verify accumulation), AI-FEAT-044 (Local First sync manifests per event) |
+| Dependencies | None — a parallel ingestion-workflow track (deliberately not written as a range of milestone IDs, per the note on AI-RM-010). |
+| Deliverables | `renderer/importSession.js`, `renderer/importSessionRunner.js`, `renderer/importSessionUI.js`, `renderer/metadataBatchTracker.js`; `createGroupManager()` factory + facade; EventCreator snapshot/capture/guard APIs; two additive `main/main.js` changes; `docs/multi-event-import.md`; 7 test files (unit + live). |
+| Acceptance criteria | Live verification with synthetic fixtures: camera-card-style and plain-folder sources; A→B→C→A switching without rescanning; one combined review and one import; exact per-event routing and per-event metadata isolation (real ExifTool); event-local failure continues and retries; source removal resets the session; exact cleanup list; new-event creation from inside the workspace; multi-event Local First; the original single-event path unchanged; no Tag Refinement code reintroduced. |
+| Planned estimate | Single implementation session (2026-09-20) |
+| Current risks | Merge and release verification not yet performed. Two import code paths coexist (transitional). Known limitations in `docs/multi-event-import.md` §11. Per-Photo Tag Refinement is held out of Stable and is not part of this milestone. |
+| Next action | Owner review of the final report; commit breakdown approval; merge decision. |
 
 ---
 

@@ -236,6 +236,27 @@ Use this as a reference before implementing or modifying any feature.
 
 ---
 
+### 16. Multi-Event Import
+
+**Description**
+- One opened import source (card, drive, USB, local folder — source-agnostic) is assigned to several events and imported in ONE pass: persistent file→event ownership (exclusive, stable `E1/E2/…` ordinals), isolated per-event GroupManager instances, explicit **Assign to <event>** for single-component events, **Change Event** from inside the Import workspace (reusing the existing picker/creator and returning to the same, un-rescanned workspace), one combined review, one final Import
+- Executes as one existing, unchanged `import:commitTransaction` per event: event-local failures continue, source-wide fatals (abort/disconnect) stop the run; completed events clear from the session, failed/not-started events stay assigned for retry (an event with per-file errors keeps only its failed files)
+- Per-batch metadata attribution, per-event Local First sync manifests, session-wide Deep Verify, exact source-cleanup eligibility
+- See `docs/multi-event-import.md`
+
+**System Impact**
+- INGEST
+- UI
+- GROUP
+- STATE
+
+**Notes**
+- Transaction atomicity remains per event; a multi-event import is an orchestration, not one filesystem-atomic operation
+- Only explicitly assigned files import; the "unassigned" count covers files loaded in the current view only
+- Per-Photo Tag Refinement is held out of Stable and is not part of this feature; the per-event workspace is its future extension point
+
+---
+
 ## Planned Features
 
 ### 1. NAS Sync

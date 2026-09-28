@@ -137,4 +137,93 @@ async function appendJob(localEventPath, job) {
   return { ok: true, path: filePath };
 }
 
-module.exports = { writeManifest, readManifest, appendJob };
+// ── D4: durable destination reservations ────────────────────────────────────────────
+//
+// Records, per job/import, the resolved archive destination for a source file that
+// needed a conflict rename — so a retry of the SAME job/import recognizes an
+// already-reserved (or already-copied) destination instead of allocating another `_N`
+// suffix each time. A reservation is written BEFORE the copy it describes (see
+// archiveSyncService.js's PAIR/RETRY INVARIANT comments): it means "this source owns
+// this destination", not "the copy definitely completed" — every consumer must verify
+// the mapped destination against live disk state before trusting it.
+//
+// Scope: per-import (`jobs[]` entry, keyed by importId) for the modern manifest shape;
+// per-event (the manifest's own top level) for the legacy flat shape that predates
+// jobs[] — this matches how every other field on a legacy manifest is already scoped,
+// and keeps a genuinely new later import (a new importId) fully independent of an
+// older one's reservations. relPath keys are canonical, forward-slash, event-relative —
+// never an absolute machine path — so a manifest remains meaningful regardless of where
+// the staging root is mounted.
+
+/** Find the record (job entry, or the manifest itself for legacy) that owns reservations for `importId`. */
+function _findScope(manifest, importId) {
+  if (importId) {
+    const jobs = Array.isArray(manifest?.jobs) ? manifest.jobs : [];
+    return jobs.find(j => j.importId === importId) || null;
+  }
+  return manifest || null;
+}
+
+/**
+ * Read a single reserved-destination record, if one exists.
+ * @returns {Promise<{relPath:string, finalRelPath:string, size:number, checksum:string}|null>}
+ */
+async function getResolvedFile(localEventPath, importId, relPath) {
+  const manifest = await readManifest(localEventPath);
+  const scope = _findScope(manifest, importId);
+  const list = Array.isArray(scope?.resolvedFiles) ? scope.resolvedFiles : [];
+  return list.find(f => f.relPath === relPath) || null;
+}
+
+/**
+ * Atomically upsert one or more resolved-destination reservations (by relPath) into the
+ * scope for `importId` (a RAW+XMP pair passes both entries in one call so they land in a
+ * single atomic write — never two independent suffix decisions). Preserves every other
+ * field and every other job entry untouched. No-op (returns ok:false) if the target
+ * scope (job entry) does not exist yet — reservations are only ever added to a job/event
+ * that is already known to the manifest.
+ *
+ * @param {string} localEventPath
+ * @param {string|null} importId  null selects the legacy (event-level) scope.
+ * @param {{relPath:string, finalRelPath:string, size:number, checksum:string}[]} entries
+ * @returns {Promise<{ ok: boolean, path?: string }>}
+ */
+async function reserveResolvedFiles(localEventPath, importId, entries) {
+  if (!Array.isArray(entries) || entries.length === 0) return { ok: false };
+
+  const dir      = path.join(localEventPath, AUTOINGEST_DIR);
+  const filePath = path.join(dir, MANIFEST_FILE);
+  const tmp      = filePath + '.tmp';
+
+  const existing = await readManifest(localEventPath);
+  if (!existing) return { ok: false };
+
+  const mergeInto = (scope) => {
+    const list = Array.isArray(scope.resolvedFiles) ? scope.resolvedFiles.slice() : [];
+    for (const entry of entries) {
+      const idx = list.findIndex(f => f.relPath === entry.relPath);
+      const record = { relPath: entry.relPath, finalRelPath: entry.finalRelPath, size: entry.size, checksum: entry.checksum };
+      if (idx >= 0) list[idx] = record; else list.push(record);
+    }
+    return { ...scope, resolvedFiles: list };
+  };
+
+  let updated;
+  if (importId) {
+    const jobs = Array.isArray(existing.jobs) ? existing.jobs : [];
+    const idx  = jobs.findIndex(j => j.importId === importId);
+    if (idx === -1) return { ok: false }; // unknown import — nothing to attach the reservation to
+    const newJobs = jobs.slice();
+    newJobs[idx]  = mergeInto(jobs[idx]);
+    updated = { ...existing, jobs: newJobs, updatedAt: Date.now() };
+  } else {
+    updated = { ...mergeInto(existing), updatedAt: Date.now() };
+  }
+
+  await fsp.mkdir(dir, { recursive: true });
+  await fsp.writeFile(tmp, JSON.stringify(updated, null, 2), 'utf8');
+  await fsp.rename(tmp, filePath);
+  return { ok: true, path: filePath };
+}
+
+module.exports = { writeManifest, readManifest, appendJob, getResolvedFile, reserveResolvedFiles };

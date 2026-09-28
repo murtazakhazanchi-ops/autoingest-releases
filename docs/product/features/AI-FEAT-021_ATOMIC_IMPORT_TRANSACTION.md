@@ -45,6 +45,7 @@ Evidence pending beyond what `docs/history.md`'s v0.7.4-dev entry documents.
 ## Evolution / Implementation Journal
 
 - **v0.7.4-dev** — `import:commitTransaction` introduced, replacing multi-step `event.json` writes; dead code removed (`markEventImportComplete`, standalone `appendImports`).
+- **2026-09-20 — clarification (Multi-Event Import).** The transaction boundary is unchanged: it is **per event.json**. AI-FEAT-058 ([DEC-019](../decisions/DEC-019_MULTI_EVENT_IMPORT_ARCHITECTURE.md)) orchestrates several independent `import:commitTransaction` calls for one source import; that orchestration is not filesystem-atomic and can partially complete (successfully copied events are never rolled back). `import:commitTransaction` gained two optional, additive inputs — `progressEventPath` (echoed on `metadata:progress`) and `importSessionId` (Deep Verify accumulation). Not yet merged/released.
 
 ## Engineering Evolution
 

@@ -367,6 +367,10 @@ const EventCreator = (() => {
   let _legacyModalOpen         = false; // prevents double-modal on fast double-click of Continue
   let _navScreen           = 'masterStep'; // 'masterStep' | 'eventList' | 'eventForm' | 'previewStep'
   let _selectedListFolder  = null;         // Phase 2: folder name highlighted in SELECT mode
+  // Multi-event import: optional guard consulted before an existing event is opened for
+  // editing/renaming. fn(eventPath, folderName) → true to allow, false to block; the guard owns any
+  // user-facing message. null = no guard (default behaviour).
+  let _editGuard = null;
   let _listenersAttached   = false;        // Guard: delegated panel listeners registered only once
   let _saveInProgress          = false;        // Guard: prevent concurrent save executions
   let _lastSaveWasMetaOutdated = false;        // Consumed once by renderer via consumeMetaOutdated()
@@ -2140,6 +2144,10 @@ ${unparseable.map(ev => `
       console.error('[openEventForEdit] Missing event path');
       return;
     }
+
+    // Blocked (e.g. the event has files assigned in the current import session): stay in
+    // the list, change nothing. `false` lets callers restore their mode.
+    if (_editGuard && !_editGuard(eventPath, entry.folderName)) return false;
 
     let components = await loadEventFromDisk(eventPath);
 
@@ -5515,6 +5523,70 @@ ${unparseable.map(ev => `
       _activeEventIdx = idx;
     },
 
+    /**
+     * Read one event's components (+ sub-event ids) straight from disk WITHOUT touching any
+     * EventCreator state — unlike reloadForImport(), which locks _eventComps for the ACTIVE
+     * event. Used to validate/route every participating event of a multi-event import.
+     * Returns { components, subEventIds } (UI-format components) or null if unreadable.
+     */
+    async loadEventSnapshot(eventPath) {
+      const components = await loadEventFromDisk(eventPath);
+      if (!components || components.length === 0) return null;
+      const subEventIds = components.length > 1 ? _buildSubEventFolderNames(components) : [];
+      return { components, subEventIds };
+    },
+
+    /**
+     * Snapshot of which event is active. Picking a collection in the event picker mutates
+     * this state immediately (before any event is adopted), so a caller that opens the
+     * picker with the intent to return to the SAME event on cancel must capture first.
+     */
+    captureActiveSelection() {
+      return {
+        selectedCollection,
+        activeMaster:       activeMaster ? { ...activeMaster } : null,
+        activeEventIdx:     _activeEventIdx,
+        viewingExisting:    _viewingExisting ? { ..._viewingExisting } : null,
+        selectedListFolder: _selectedListFolder,
+      };
+    },
+
+    /** Restore a captureActiveSelection() snapshot (picker cancelled). Forces a fresh scan next open. */
+    restoreActiveSelection(snap) {
+      if (!snap) return;
+      selectedCollection  = snap.selectedCollection;
+      activeMaster        = snap.activeMaster ? { ...snap.activeMaster } : null;
+      _activeEventIdx     = snap.activeEventIdx;
+      _viewingExisting    = snap.viewingExisting ? { ...snap.viewingExisting } : null;
+      _selectedListFolder = snap.selectedListFolder;
+      _editMode           = false;
+      _repairMode         = false;
+      _repairFolderName   = null;
+      _newEventDate       = null;
+      _scannedEvents      = null;
+    },
+
+    /**
+     * Point the event picker at an already-adopted event (by collection + folder name) so the
+     * next resetToList() opens with it highlighted. Mirrors what selecting a collection does.
+     * Returns false if the collection is not known this session.
+     */
+    preselectEvent(collectionName, eventFolderName) {
+      const coll = sessionCollections.find(c => c.name === collectionName);
+      if (!coll || !coll._masterPath) return false;
+      selectedCollection = collectionName;
+      activeMaster = {
+        name: collectionName,
+        path: (_offlineStagingMode && sessionArchiveRoot) ? (sessionArchiveRoot + '/' + collectionName) : coll._masterPath,
+      };
+      _selectedListFolder = eventFolderName || null;
+      _scannedEvents = null;
+      return true;
+    },
+
+    /** Install/clear the edit guard — fn(eventPath, folderName) → boolean (allow). See _editGuard. */
+    setEditGuard(fn) { _editGuard = (typeof fn === 'function') ? fn : null; },
+
     buildFolderPreviewHTML(coll, event) {
       return _buildFolderTreeHTML(coll, event);
     },
@@ -5816,8 +5888,8 @@ ${unparseable.map(ev => `
     async editSelectedEvent() {
       if (!_selectedListFolder) return false;
       const entry = (_scannedEvents || []).find(e => e.folderName === _selectedListFolder) || { folderName: _selectedListFolder };
-      await openEventForEdit(entry);
-      return true;
+      const opened = await openEventForEdit(entry);
+      return opened !== false;
     },
 
     /**

@@ -99,3 +99,19 @@ Violations map to:
 - ROUTING → incorrect path generation
 - VALIDATION → invalid grouping or mappings
 - DATA → incorrect event.json state
+
+---
+
+## Multi-Event Import
+
+One opened source can be assigned to several events and imported in one pass. Ingestion rules are unchanged; only orchestration is new:
+
+- The plan is built per event by the existing `ImportRouter` from that event's own groups and event data (Collection/Event/[SubEvent/]Photographer/[VIDEO/]) — never from Current-Event state.
+- Each event runs through one existing `import:commitTransaction`. **Transaction atomicity remains per event.** A multi-event import is an orchestration of independent event transactions and is **not** filesystem-atomic; event-local failures may leave a partially completed session. Successfully copied files are never rolled back.
+- Event-local failures continue to the next event; source-wide fatal conditions (abort, source disconnect) stop the run. Retries never overwrite (same-name+size skip / different-size rename / never-overwrite). An event that committed with per-file errors keeps only its failed files assigned — already-copied files are released, because metadata tagging rewrites JPEG/PNG/TIFF destinations in place and a same-size check would no longer recognise them.
+- Completed events are cleared from the session; failed and not-started events stay assigned for retry (a completed-with-errors event keeps only its failed files).
+- Source-cleanup eligibility is the union of `copiedFiles` from events whose transaction returned a summary — never broader.
+- Only explicitly assigned files import; unassigned, unloaded files are never touched.
+
+See [multi-event-import.md](multi-event-import.md).
+

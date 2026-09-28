@@ -427,7 +427,8 @@
         "AI-FEAT-004",
         "AI-FEAT-008",
         "AI-FEAT-010",
-        "AI-FEAT-018"
+        "AI-FEAT-018",
+        "AI-FEAT-058"
       ],
       "roadmapRelationship": [],
       "searchTerms": [
@@ -484,7 +485,8 @@
         "AI-FEAT-004",
         "AI-FEAT-009",
         "AI-FEAT-027",
-        "AI-FEAT-050"
+        "AI-FEAT-050",
+        "AI-FEAT-058"
       ],
       "roadmapRelationship": [],
       "searchTerms": [
@@ -583,7 +585,8 @@
       "relatedFeatures": [
         "AI-FEAT-011",
         "AI-FEAT-024",
-        "AI-FEAT-028"
+        "AI-FEAT-028",
+        "AI-FEAT-058"
       ],
       "roadmapRelationship": [],
       "searchTerms": [
@@ -809,7 +812,8 @@
       "relatedFeatures": [
         "AI-FEAT-004",
         "AI-FEAT-013",
-        "AI-FEAT-018"
+        "AI-FEAT-018",
+        "AI-FEAT-058"
       ],
       "roadmapRelationship": [],
       "searchTerms": [
@@ -861,7 +865,8 @@
         "AI-FEAT-009",
         "AI-FEAT-017",
         "AI-FEAT-019",
-        "AI-FEAT-022"
+        "AI-FEAT-022",
+        "AI-FEAT-058"
       ],
       "roadmapRelationship": [],
       "searchTerms": [
@@ -919,7 +924,8 @@
         "AI-FEAT-025",
         "AI-FEAT-038",
         "AI-FEAT-039",
-        "AI-FEAT-044"
+        "AI-FEAT-044",
+        "AI-FEAT-058"
       ],
       "roadmapRelationship": [],
       "searchTerms": [
@@ -1010,7 +1016,8 @@
       "relatedFeatures": [
         "AI-FEAT-004",
         "AI-FEAT-019",
-        "AI-FEAT-028"
+        "AI-FEAT-028",
+        "AI-FEAT-058"
       ],
       "roadmapRelationship": [],
       "searchTerms": [
@@ -2906,6 +2913,74 @@
       "summary": "Formalizes AutoIngest's release process into three isolated channels — Development (internal engineering builds, never published), RC/Preview (real tester acceptance before Stable, opt-in only), and Stable (the existing production release path, unchanged) — so a tester-facing build can exist without ever risking exposure to Stable users, and so a verified RC has an auditable, gated path to becoming the Stable release built from its exact source.",
       "title": "Multi-Channel Release & Update System",
       "whatItDoes": "Formalizes AutoIngest's release process into three isolated channels — Development (internal engineering builds, never published), RC/Preview (real tester acceptance before Stable, opt-in only), and Stable (the existing production release path, unchanged) — so a tester-facing build can exist without ever risking exposure to Stable users, and so a verified RC has an auditable, gated path to becoming the Stable release built from its exact source."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"In active development\""
+        ],
+        "operatorStatus": "PARTIALLY_AVAILABLE",
+        "reason": "Implemented, but the record's own status marks it evolving or partial."
+      },
+      "canonicalDocument": "features/AI-FEAT-058_MULTI_EVENT_IMPORT.md",
+      "category": "Import and Archive Writing",
+      "id": "AI-FEAT-058",
+      "knownLimitations": {
+        "evidenceGapCount": 1,
+        "futureEnhancements": "- Per-event photographer (UI only — plan items already carry a photographer per event).\n- Retire the retained single-event handler once the runner has proven itself in production, converging on one runner fed a one-event plan.\n- Re-introduce event-scoped refinement state through the documented workspace extension point **if and when** Per-Photo Tag Refinement is released.\n- Exact unassigned counts for tree-mode sources, if a background scan is ever justified.",
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Verified from current code (branch `feature/multi-event-import`, uncommitted at the time of writing), tests, and live synthetic runs. Not yet merged to `stable/0.9` or released — see Status.",
+        "introducedVersion": "2026-09-20 (branch created from `stable/0.9`; implementation and verification the same session)",
+        "lastModifiedVersion": "2026-09-20"
+      },
+      "operatorStatus": "PARTIALLY_AVAILABLE",
+      "relatedFeatures": [
+        "AI-FEAT-009",
+        "AI-FEAT-010",
+        "AI-FEAT-012",
+        "AI-FEAT-017",
+        "AI-FEAT-018",
+        "AI-FEAT-019",
+        "AI-FEAT-020",
+        "AI-FEAT-021",
+        "AI-FEAT-024",
+        "AI-FEAT-025",
+        "AI-FEAT-028",
+        "AI-FEAT-029",
+        "AI-FEAT-044"
+      ],
+      "roadmapRelationship": [
+        {
+          "roadmapId": "AI-RM-011",
+          "status": "**In progress** (implemented and verified on `feature/multi-event-import`; not yet merged to `stable/0.9` or released)"
+        }
+      ],
+      "searchTerms": [
+        "event",
+        "import",
+        "import and archive writing",
+        "multi"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "docs/features.md #16",
+        "docs/group-manager.md",
+        "docs/ingestion-flow.md",
+        "docs/multi-event-import.md",
+        "docs/system-contracts.md",
+        "docs/ui-system.md",
+        "features/AI-FEAT-058_MULTI_EVENT_IMPORT.md",
+        "main/main.js",
+        "renderer/groupManager.js",
+        "renderer/importSession.js",
+        "test/importSession.test.js"
+      ],
+      "status": "In active development",
+      "summary": "Imports **one opened source into several events with one final Import**: one opened import source → multiple event assignments → one final import. The source can be any source the normal workflow supports (camera card, drive, USB, local folder); the model is deliberately source-agnostic. Files are assigned to events through persistent, exclusive file→event ownership; the operator switches the Current Event from inside the Import workspace (reusing the existing picker/creator, returning to the same un-rescanned workspace); one combined review validates every participating event; one Import runs one existing transaction per event.",
+      "title": "Multi-Event Import",
+      "whatItDoes": "Imports **one opened source into several events with one final Import**: one opened import source → multiple event assignments → one final import. The source can be any source the normal workflow supports (camera card, drive, USB, local folder); the model is deliberately source-agnostic. Files are assigned to events through persistent, exclusive file→event ownership; the operator switches the Current Event from inside the Import workspace (reusing the existing picker/creator, returning to the same un-rescanned workspace); one combined review validates every participating event; one Import runs one existing transaction per event."
     },
     {
       "availability": {

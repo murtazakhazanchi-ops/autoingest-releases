@@ -1,6 +1,6 @@
 {
   "name": "auto-ingest",
-  "version": "0.9.12",
+  "version": "0.9.13",
   "description": "AutoIngest — AJS Photo Archive Ingest System",
   "main": "main/main.js",
   "scripts": {
@@ -90,11 +90,10 @@
       ],
       "icon": "assets/mac.icns",
       "category": "public.app-category.photography",
-      "identity": null,
-      "hardenedRuntime": false,
-      "gatekeeperAssess": false
+      "hardenedRuntime": true
     },
     "dmg": {
+      "sign": true,
       "title": "${productName} ${version}",
       "window": {
         "width": 540,

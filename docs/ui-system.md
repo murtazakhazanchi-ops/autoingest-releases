@@ -66,6 +66,8 @@ Two separate concepts — must never be conflated:
 
 - Import selection state must not affect system logic directly
 
+**Persistent event assignment (Multi-Event Import)** is a third, separate concept: it is owned by `ImportSession`, survives selection changes, and is only changed by explicit assignment (group placement, or **Assign to <event>** for single-component events). Selecting files never assigns them, Change Event never claims selected files, and Import never auto-assigns. Event ownership is shown by `E1/E2/…` badges (a squared mauve pill, distinct from the round-dot group badge), updated through `tileMap` without a grid rebuild; the context bar carries **Change Event** and the Import Session strip. See [multi-event-import.md](multi-event-import.md).
+
 ---
 
 ## Dashboard

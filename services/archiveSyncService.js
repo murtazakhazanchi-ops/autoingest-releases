@@ -14,6 +14,9 @@
 const fsp    = require('fs').promises;
 const fs     = require('fs');
 const path   = require('path');
+const eventMetadataIntent = require('./eventMetadataIntent');
+const { updateEventJsonAtomic } = require('../main/eventJsonStore');
+const localSyncManifest = require('./localSyncManifest');
 const crypto = require('crypto');
 
 const {
@@ -57,20 +60,46 @@ function _streamChecksum(filePath) {
 }
 
 /**
+ * Build the n-th suffixed candidate for destPath: A.CR2 with n=1 → A_1.CR2, etc.
+ * n=0 returns destPath itself, unchanged — shared by the single-file and pair-aware
+ * suffix searches so there is exactly one suffix-naming convention in this module.
+ */
+function _suffixed(destPath, n) {
+  if (n === 0) return destPath;
+  const ext  = path.extname(destPath);
+  const base = destPath.slice(0, destPath.length - ext.length);
+  return `${base}_${n}${ext}`;
+}
+
+async function _pathExists(p) {
+  try {
+    await fsp.access(p);
+    return true;
+  } catch (e) {
+    if (e.code === 'ENOENT') return false;
+    throw e;
+  }
+}
+
+/**
  * Find a free path by appending _1, _2, … before the extension.
  */
 async function _safeRenamedPath(destPath) {
-  const ext  = path.extname(destPath);
-  const base = destPath.slice(0, destPath.length - ext.length);
   for (let n = 1; ; n++) {
-    const candidate = `${base}_${n}${ext}`;
-    try {
-      await fsp.access(candidate);
-    } catch (e) {
-      if (e.code === 'ENOENT') return candidate;
-      throw e;
-    }
+    const candidate = _suffixed(destPath, n);
+    if (!(await _pathExists(candidate))) return candidate;
   }
+}
+
+/**
+ * Remember which local file landed at which archive path (the ACTUAL final destination — after any
+ * conflict rename or photographer-folder remap). Durable metadata intent is keyed by event-relative
+ * destination path, so the event.json merge needs this mapping. Non-enumerable: never serialized into
+ * persisted sync results.
+ */
+function _recordCopy(result, localPath, finalDest) {
+  if (!result._copiedPairs) Object.defineProperty(result, '_copiedPairs', { value: [], enumerable: false });
+  result._copiedPairs.push({ from: localPath, to: finalDest });
 }
 
 /**
@@ -111,6 +140,247 @@ async function _copyFile(srcPath, destPath) {
   return { finalDest, wasRenamed };
 }
 
+// ── RAW/XMP pair-aware destination resolution ───────────────────────────────────────
+//
+// PAIR INVARIANT: a RAW's companion XMP destination is resolved as part of the RAW's
+// own basename decision, before either file is copied. Never derive it later from the
+// original source basename, and never resolve it independently of the RAW — otherwise a
+// conflict-renamed RAW can end up detached from, or mis-associated with, its sidecar
+// (D1: an incoming XMP silently attaching to an unrelated pre-existing RAW).
+
+/**
+ * Resolve the archive destination for a RAW file that may have a companion XMP, choosing
+ * a basename that is simultaneously safe for BOTH halves of the pair.
+ *
+ * True-duplicate short-circuit: if the archive's bare (unsuffixed) basename already holds
+ * a byte-identical RAW, the RAW keeps that existing identity — no rename, matching the
+ * existing single-file skip semantics exactly. The caller is expected to then run the
+ * companion XMP through the ordinary single-file sidecar rules against that same
+ * untouched basename (this function does not touch the XMP in that case).
+ *
+ * Otherwise, walks n = 0, 1, 2, … and returns the smallest n where BOTH the RAW candidate
+ * and (if hasXmp) the XMP candidate are simultaneously free. A suffix is never chosen for
+ * one half of the pair while leaving the other on a mismatched or already-occupied
+ * basename — so the final RAW and XMP always share one basename.
+ *
+ * Performs only existence/size/checksum checks; the actual copy happens elsewhere.
+ *
+ * @returns {Promise<{ duplicate: boolean, rawDest: string, xmpDest: string|null }>}
+ */
+async function _resolvePairDestination(localRawPath, archiveRawPath, hasXmp, archiveXmpBase) {
+  if (await _pathExists(archiveRawPath)) {
+    const [srcStat, destStat] = await Promise.all([fsp.stat(localRawPath), fsp.stat(archiveRawPath)]);
+    if (srcStat.size === destStat.size) {
+      const [srcHash, destHash] = await Promise.all([
+        _streamChecksum(localRawPath),
+        _streamChecksum(archiveRawPath),
+      ]);
+      if (srcHash === destHash) {
+        return { duplicate: true, rawDest: archiveRawPath, xmpDest: hasXmp ? archiveXmpBase : null };
+      }
+    }
+  }
+
+  for (let n = 0; ; n++) {
+    const rawCandidate = _suffixed(archiveRawPath, n);
+    if (await _pathExists(rawCandidate)) continue;
+    if (!hasXmp) return { duplicate: false, rawDest: rawCandidate, xmpDest: null };
+    const xmpCandidate = _suffixed(archiveXmpBase, n);
+    if (await _pathExists(xmpCandidate)) continue;
+    return { duplicate: false, rawDest: rawCandidate, xmpDest: xmpCandidate };
+  }
+}
+
+// ── D4: destination reservations (retry idempotency) ────────────────────────────────
+//
+// RETRY INVARIANT: a persisted reservation means "this source file, from this job/
+// import, owns this destination" — it does NOT mean the copy completed. Every
+// consumer of a reservation MUST verify it against live disk state (source evidence
+// AND destination content) before trusting it; nothing ever skips a copy on the
+// manifest's word alone. Reservations are written for conflict-renamed destinations
+// only — a fresh, no-conflict, or genuinely-duplicate copy is already idempotent via
+// the existing size/checksum skip logic and never needs one.
+
+/**
+ * @typedef {{ localEventPath: string, archiveEventPath: string, importId: string|null }} ManifestCtx
+ */
+
+/** Canonical, forward-slash, event-relative key for a path — shared with event.json intent. */
+function _relKey(eventFolderPath, filePath) {
+  return eventMetadataIntent.fileRelKey(eventFolderPath, filePath);
+}
+
+/**
+ * Check a persisted reservation against live state.
+ * @returns {Promise<{ sourceChanged: boolean, destMismatch: boolean, verified: boolean, absoluteDest: string }>}
+ *   Exactly one of sourceChanged / destMismatch / verified is true, OR all three are
+ *   false meaning "destination absent — safe to (re)copy at absoluteDest, no new suffix".
+ */
+async function _verifyReservation(manifestCtx, localPath, resv) {
+  const absoluteDest = path.join(manifestCtx.archiveEventPath, ...resv.finalRelPath.split('/').filter(Boolean));
+
+  const srcStat = await fsp.stat(localPath);
+  if (srcStat.size !== resv.size) return { sourceChanged: true, destMismatch: false, verified: false, absoluteDest };
+  const srcHash = await _streamChecksum(localPath);
+  if (srcHash !== resv.checksum) return { sourceChanged: true, destMismatch: false, verified: false, absoluteDest };
+
+  if (!(await _pathExists(absoluteDest))) {
+    return { sourceChanged: false, destMismatch: false, verified: false, absoluteDest }; // reserved but not yet copied — reuse
+  }
+  const destStat = await fsp.stat(absoluteDest);
+  if (destStat.size !== resv.size) return { sourceChanged: false, destMismatch: true, verified: false, absoluteDest };
+  const destHash = await _streamChecksum(absoluteDest);
+  if (destHash !== resv.checksum) return { sourceChanged: false, destMismatch: true, verified: false, absoluteDest };
+  return { sourceChanged: false, destMismatch: false, verified: true, absoluteDest };
+}
+
+/**
+ * Apply an already-verified reservation for one file: record the reconciliation pair
+ * and either skip (already correct) or copy (reserved but not yet, or no longer,
+ * present) — never allocating a new suffix. Returns false (and reports the file as
+ * failed) when the reservation cannot be trusted (source or destination drifted).
+ */
+async function _applyVerifiedReservation(localPath, filename, resv, check, result, onFileProgress, counterName) {
+  if (check.sourceChanged) {
+    result.errors.push(`Source changed since it was reserved for ${filename} (expected size ${resv.size}) — needs attention, not treated as the same sync item`);
+    onFileProgress?.(filename, 'failed');
+    return false;
+  }
+  if (check.destMismatch) {
+    result.errors.push(`Reserved destination ${resv.finalRelPath} exists but its contents differ from the reservation for ${filename} — needs attention, not overwritten or re-suffixed`);
+    onFileProgress?.(filename, 'failed');
+    return false;
+  }
+  if (check.verified) {
+    _recordCopy(result, localPath, check.absoluteDest);
+    result.skippedDuplicates++; // already completed for this job — same semantic bucket as an ordinary duplicate skip
+    onFileProgress?.(filename, 'skipped');
+    return true;
+  }
+  // Reserved, destination currently absent (never copied, or vanished) — reuse the
+  // exact reserved path; _copyFile's own no-overwrite guard is a last-instant safety
+  // net, not the primary mechanism (the reservation already claimed this basename).
+  try {
+    const { finalDest } = await _copyFile(localPath, check.absoluteDest);
+    _recordCopy(result, localPath, finalDest);
+    result[counterName]++;
+    onFileProgress?.(filename, 'copied');
+    return true;
+  } catch (err) {
+    result.errors.push(`Copy failed ${filename}: ${err.message}`);
+    onFileProgress?.(filename, 'failed');
+    return false;
+  }
+}
+
+/**
+ * Sync a RAW file together with its companion XMP (if the source has one) as a single
+ * naming pair. Falls through to the ordinary single-file _syncOneFile path when there is
+ * no companion XMP at all (an unpaired RAW behaves exactly as before) or when the RAW
+ * turns out to be a true duplicate at its existing bare basename (its XMP then follows
+ * the existing, unchanged single-file sidecar rules against that same untouched
+ * basename — never overwritten, never guessed at a different name).
+ *
+ * manifestCtx/rawRelPath/xmpRelPath (all optional): when supplied, enables D4 retry
+ * idempotency — a prior conflict-renamed reservation for this exact pair is recognized
+ * and reused/verified instead of resolving (and reserving) a fresh suffix.
+ */
+async function _syncRawWithCompanion(
+  localRawPath, archiveRawPath, rawFilename,
+  localXmpPath, archiveXmpPath, xmpFilename,
+  hasXmp, result, abortSignal = null, onFileProgress = null,
+  manifestCtx = null, rawRelPath = null, xmpRelPath = null,
+) {
+  if (!hasXmp) {
+    await _syncOneFile(localRawPath, archiveRawPath, rawFilename, result, abortSignal, onFileProgress, manifestCtx, rawRelPath);
+    return;
+  }
+
+  const canReserve = !!(manifestCtx && rawRelPath && xmpRelPath);
+
+  if (canReserve) {
+    const rawResv = await localSyncManifest.getResolvedFile(manifestCtx.localEventPath, manifestCtx.importId, rawRelPath);
+    if (rawResv) {
+      const rawCheck = await _verifyReservation(manifestCtx, localRawPath, rawResv);
+      const rawOk = await _applyVerifiedReservation(localRawPath, rawFilename, rawResv, rawCheck, result, onFileProgress, 'copiedToArchive');
+      if (!rawOk) return; // RAW failed/needs-attention — do not touch its XMP either.
+
+      const xmpResv = await localSyncManifest.getResolvedFile(manifestCtx.localEventPath, manifestCtx.importId, xmpRelPath);
+      if (xmpResv) {
+        // Both halves were reserved together (the ordinary case) — verify/reuse the XMP too.
+        const xmpCheck = await _verifyReservation(manifestCtx, localXmpPath, xmpResv);
+        await _applyVerifiedReservation(localXmpPath, xmpFilename, xmpResv, xmpCheck, result, onFileProgress, 'sidecarsCopied');
+      } else {
+        // The RAW was reserved WITHOUT its XMP (it was synced alone, via the single-file
+        // path, before this companion existed in staging — e.g. metadata/XMP finishing
+        // after the RAW copy). Its basename is now verified/settled at rawCheck.absoluteDest;
+        // the XMP has never been attempted before, so it runs through the ordinary,
+        // unchanged single-file sidecar rules at that same ACTUAL basename (never the
+        // stale pre-resolution xmpFilename) — matching D1's own true-duplicate branch,
+        // never independently guessed or reserved for itself.
+        const rawExt = path.extname(rawCheck.absoluteDest);
+        const rawActualBase = path.basename(rawCheck.absoluteDest, rawExt);
+        const actualXmpFilename = rawActualBase + '.xmp';
+        const xmpArchivePath = path.join(path.dirname(rawCheck.absoluteDest), actualXmpFilename);
+        await _syncOneFile(localXmpPath, xmpArchivePath, actualXmpFilename, result, abortSignal, onFileProgress);
+      }
+      return;
+    }
+  }
+
+  let resolved;
+  try {
+    resolved = await _resolvePairDestination(localRawPath, archiveRawPath, true, archiveXmpPath);
+  } catch (err) {
+    result.errors.push(`Pair resolution failed ${rawFilename}: ${err.message}`);
+    onFileProgress?.(rawFilename, 'failed');
+    return;
+  }
+
+  if (resolved.duplicate) {
+    // True duplicate at the bare basename: no rename, no D4 exposure, no reservation.
+    await _syncOneFile(localRawPath, archiveRawPath, rawFilename, result, abortSignal, onFileProgress);
+    await _syncOneFile(localXmpPath, archiveXmpPath, xmpFilename, result, abortSignal, onFileProgress);
+    return;
+  }
+
+  const wasRenamed = resolved.rawDest !== archiveRawPath;
+
+  if (wasRenamed && canReserve) {
+    // D4: reserve BOTH destinations atomically, BEFORE copying either.
+    const [rawStat, rawChecksum, xmpStat, xmpChecksum] = await Promise.all([
+      fsp.stat(localRawPath), _streamChecksum(localRawPath),
+      fsp.stat(localXmpPath), _streamChecksum(localXmpPath),
+    ]);
+    await localSyncManifest.reserveResolvedFiles(manifestCtx.localEventPath, manifestCtx.importId, [
+      { relPath: rawRelPath, finalRelPath: _relKey(manifestCtx.archiveEventPath, resolved.rawDest), size: rawStat.size, checksum: rawChecksum },
+      { relPath: xmpRelPath, finalRelPath: _relKey(manifestCtx.archiveEventPath, resolved.xmpDest), size: xmpStat.size, checksum: xmpChecksum },
+    ]);
+  }
+
+  try {
+    const { finalDest } = await _copyFile(localRawPath, resolved.rawDest);
+    _recordCopy(result, localRawPath, finalDest);
+    result.copiedToArchive++;
+    if (wasRenamed) result.renamedConflicts++;
+    onFileProgress?.(rawFilename, 'copied');
+  } catch (err) {
+    result.errors.push(`Copy failed ${rawFilename}: ${err.message}`);
+    onFileProgress?.(rawFilename, 'failed');
+    return; // RAW failed — do not attempt its XMP against a destination we can no longer trust.
+  }
+
+  try {
+    const { finalDest: xmpFinal } = await _copyFile(localXmpPath, resolved.xmpDest);
+    _recordCopy(result, localXmpPath, xmpFinal);
+    result.sidecarsCopied++;
+    onFileProgress?.(xmpFilename, 'copied');
+  } catch (err) {
+    result.errors.push(`Copy failed ${xmpFilename}: ${err.message}`);
+    onFileProgress?.(xmpFilename, 'failed');
+  }
+}
+
 /**
  * Sync all files in localDir into archiveDir.
  * depth=0  → photographer folder (files + recurse into subdirs with depth=1)
@@ -121,8 +391,11 @@ async function _copyFile(srcPath, destPath) {
  * pauseSignal  — optional { paused: boolean }
  *                Checked before each entry; exits loop cleanly so the job can resume later.
  * onFileProgress — optional (filename: string, action: 'copied'|'skipped'|'failed') => void
+ * manifestCtx (optional): enables D4 retry idempotency (see the RETRY INVARIANT comment
+ * above _verifyReservation); its localEventPath/archiveEventPath stay fixed across the
+ * recursive depth=1 call so relPath keys remain canonical regardless of subdir depth.
  */
-async function _syncDir(localDir, archiveDir, result, depth = 0, abortSignal = null, pauseSignal = null, onFileProgress = null) {
+async function _syncDir(localDir, archiveDir, result, depth = 0, abortSignal = null, pauseSignal = null, onFileProgress = null, manifestCtx = null) {
   if (abortSignal?.aborted) return;
   if (pauseSignal?.paused)  return;
 
@@ -134,6 +407,22 @@ async function _syncDir(localDir, archiveDir, result, depth = 0, abortSignal = n
     return;
   }
 
+  // RAW files with a same-folder companion .xmp are synced as a pair (see the PAIR
+  // INVARIANT comment above _resolvePairDestination) — pre-scan so the main loop below
+  // can route paired RAWs through _syncRawWithCompanion and skip their claimed .xmp
+  // entry rather than syncing it a second time as an unrelated generic file. Orphan
+  // .xmp files (no sibling RAW here) fall through to the existing generic behavior.
+  const localFileNames = new Set(entries.filter(e => e.isFile()).map(e => e.name));
+  const claimedXmpNames = new Set();
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    const ext = path.extname(entry.name).toLowerCase();
+    if (!_RAW_EXTS.has(ext)) continue;
+    const base = entry.name.slice(0, entry.name.length - ext.length);
+    const xmpName = base + '.xmp';
+    if (localFileNames.has(xmpName)) claimedXmpNames.add(xmpName);
+  }
+
   for (const entry of entries) {
     if (abortSignal?.aborted) return;
     if (pauseSignal?.paused)  return;
@@ -143,89 +432,37 @@ async function _syncDir(localDir, archiveDir, result, depth = 0, abortSignal = n
 
     if (entry.isDirectory()) {
       if (_skipDir(entry.name)) continue;
-      if (depth < 1) await _syncDir(localPath, archivePath, result, depth + 1, abortSignal, pauseSignal, onFileProgress);
+      if (depth < 1) await _syncDir(localPath, archivePath, result, depth + 1, abortSignal, pauseSignal, onFileProgress, manifestCtx);
       continue;
     }
 
     if (!entry.isFile()) continue;
 
-    let destStat = null;
-    try {
-      destStat = await fsp.stat(archivePath);
-    } catch (e) {
-      if (e.code !== 'ENOENT') {
-        result.errors.push(`Stat failed ${archivePath}: ${e.message}`);
+    if (claimedXmpNames.has(entry.name)) continue; // handled by its RAW's pairing below
+
+    const ext = path.extname(entry.name).toLowerCase();
+    if (_RAW_EXTS.has(ext)) {
+      const base        = entry.name.slice(0, entry.name.length - ext.length);
+      const xmpFilename = base + '.xmp';
+      if (claimedXmpNames.has(xmpFilename)) {
+        const xmpLocalPath = path.join(localDir, xmpFilename);
+        const relPath    = manifestCtx ? _relKey(manifestCtx.localEventPath, localPath) : null;
+        const xmpRelPath = manifestCtx ? _relKey(manifestCtx.localEventPath, xmpLocalPath) : null;
+        await _syncRawWithCompanion(
+          localPath, archivePath, entry.name,
+          xmpLocalPath, path.join(archiveDir, xmpFilename), xmpFilename,
+          true, result, abortSignal, onFileProgress,
+          manifestCtx, relPath, xmpRelPath,
+        );
         continue;
       }
     }
 
-    if (destStat === null) {
-      // Destination does not exist — copy
-      try {
-        const { wasRenamed } = await _copyFile(localPath, archivePath);
-        if (_isSidecar(entry.name)) result.sidecarsCopied++;
-        else result.copiedToArchive++;
-        if (wasRenamed) result.renamedConflicts++;
-        onFileProgress?.(entry.name, 'copied');
-      } catch (err) {
-        result.errors.push(`Copy failed ${entry.name}: ${err.message}`);
-        onFileProgress?.(entry.name, 'failed');
-      }
-      continue;
-    }
-
-    // Destination exists — compare sizes
-    let srcStat;
-    try {
-      srcStat = await fsp.stat(localPath);
-    } catch (err) {
-      result.errors.push(`Stat failed ${localPath}: ${err.message}`);
-      onFileProgress?.(entry.name, 'failed');
-      continue;
-    }
-
-    if (srcStat.size !== destStat.size) {
-      if (_isSidecar(entry.name)) {
-        result.sidecarConflicts++;
-        onFileProgress?.(entry.name, 'skipped');
-      } else {
-        try {
-          const safeDest = await _safeRenamedPath(archivePath);
-          await _copyFile(localPath, safeDest);
-          result.renamedConflicts++;
-          result.copiedToArchive++;
-          onFileProgress?.(entry.name, 'copied');
-        } catch (err) {
-          result.errors.push(`Conflict-rename failed ${entry.name}: ${err.message}`);
-          onFileProgress?.(entry.name, 'failed');
-        }
-      }
-      continue;
-    }
-
-    // Same size — full checksum to confirm identity
-    try {
-      const [srcHash, destHash] = await Promise.all([
-        _streamChecksum(localPath),
-        _streamChecksum(archivePath),
-      ]);
-      if (srcHash === destHash) {
-        result.skippedDuplicates++;
-        onFileProgress?.(entry.name, 'skipped');
-      } else if (_isSidecar(entry.name)) {
-        result.sidecarConflicts++;
-        onFileProgress?.(entry.name, 'skipped');
-      } else {
-        const safeDest = await _safeRenamedPath(archivePath);
-        await _copyFile(localPath, safeDest);
-        result.renamedConflicts++;
-        result.copiedToArchive++;
-        onFileProgress?.(entry.name, 'copied');
-      }
-    } catch (err) {
-      result.errors.push(`Checksum/copy failed ${entry.name}: ${err.message}`);
-      onFileProgress?.(entry.name, 'failed');
-    }
+    // Every other file (JPG, video, orphan XMP, RAW-without-companion) shares the exact
+    // no-overwrite / checksum / sidecar-conflict / D4-reservation rules with Strategy A —
+    // no second copy of that algorithm here.
+    const relPath = manifestCtx ? _relKey(manifestCtx.localEventPath, localPath) : null;
+    await _syncOneFile(localPath, archivePath, entry.name, result, abortSignal, onFileProgress, manifestCtx, relPath);
   }
 }
 
@@ -235,9 +472,21 @@ async function _syncDir(localDir, archiveDir, result, depth = 0, abortSignal = n
  * Lock acquisition is the caller's responsibility.
  *
  * onFileProgress — optional (filename: string, action: 'copied'|'skipped'|'failed') => void
+ * manifestCtx/relPath (optional): enables D4 retry idempotency — see the RETRY INVARIANT
+ * comment above _verifyReservation. A prior conflict-renamed reservation for this exact
+ * source is recognized and reused/verified instead of resolving a fresh suffix.
  */
-async function _syncOneFile(localPath, archivePath, filename, result, abortSignal = null, onFileProgress = null) {
+async function _syncOneFile(localPath, archivePath, filename, result, abortSignal = null, onFileProgress = null, manifestCtx = null, relPath = null) {
   if (abortSignal?.aborted) return;
+
+  if (manifestCtx && relPath) {
+    const resv = await localSyncManifest.getResolvedFile(manifestCtx.localEventPath, manifestCtx.importId, relPath);
+    if (resv) {
+      const check = await _verifyReservation(manifestCtx, localPath, resv);
+      await _applyVerifiedReservation(localPath, filename, resv, check, result, onFileProgress, _isSidecar(filename) ? 'sidecarsCopied' : 'copiedToArchive');
+      return;
+    }
+  }
 
   let destStat = null;
   try {
@@ -251,7 +500,8 @@ async function _syncOneFile(localPath, archivePath, filename, result, abortSigna
 
   if (destStat === null) {
     try {
-      const { wasRenamed } = await _copyFile(localPath, archivePath);
+      const { finalDest, wasRenamed } = await _copyFile(localPath, archivePath);
+      _recordCopy(result, localPath, finalDest);
       if (_isSidecar(filename)) result.sidecarsCopied++;
       else result.copiedToArchive++;
       if (wasRenamed) result.renamedConflicts++;
@@ -279,7 +529,13 @@ async function _syncOneFile(localPath, archivePath, filename, result, abortSigna
     } else {
       try {
         const safeDest = await _safeRenamedPath(archivePath);
-        await _copyFile(localPath, safeDest);
+        if (manifestCtx && relPath) {
+          const checksum = await _streamChecksum(localPath);
+          await localSyncManifest.reserveResolvedFiles(manifestCtx.localEventPath, manifestCtx.importId,
+            [{ relPath, finalRelPath: _relKey(manifestCtx.archiveEventPath, safeDest), size: srcStat.size, checksum }]);
+        }
+        const { finalDest: renamedTo } = await _copyFile(localPath, safeDest);
+        _recordCopy(result, localPath, renamedTo);
         result.renamedConflicts++;
         result.copiedToArchive++;
         onFileProgress?.(filename, 'copied');
@@ -304,7 +560,12 @@ async function _syncOneFile(localPath, archivePath, filename, result, abortSigna
       onFileProgress?.(filename, 'skipped');
     } else {
       const safeDest = await _safeRenamedPath(archivePath);
-      await _copyFile(localPath, safeDest);
+      if (manifestCtx && relPath) {
+        await localSyncManifest.reserveResolvedFiles(manifestCtx.localEventPath, manifestCtx.importId,
+          [{ relPath, finalRelPath: _relKey(manifestCtx.archiveEventPath, safeDest), size: srcStat.size, checksum: srcHash }]);
+      }
+      const { finalDest: renamedTo } = await _copyFile(localPath, safeDest);
+      _recordCopy(result, localPath, renamedTo);
       result.renamedConflicts++;
       result.copiedToArchive++;
       onFileProgress?.(filename, 'copied');
@@ -327,8 +588,10 @@ async function _syncOneFile(localPath, archivePath, filename, result, abortSigna
  * onFileProgress — optional (filename, action) => void
  *
  * @param {string[]} relPaths  Paths relative to localEventPath, using '/' separator.
+ * @param {ManifestCtx|null} manifestCtx  Optional — enables D4 retry idempotency (see
+ *   the RETRY INVARIANT comment above _verifyReservation).
  */
-async function _syncFileList(relPaths, localEventPath, archiveEventPath, result, abortSignal = null, pauseSignal = null, onFileProgress = null, archivePathOverrides = null) {
+async function _syncFileList(relPaths, localEventPath, archiveEventPath, result, abortSignal = null, pauseSignal = null, onFileProgress = null, archivePathOverrides = null, manifestCtx = null) {
   for (const relPath of relPaths) {
     if (abortSignal?.aborted) return;
     if (pauseSignal?.paused)  return;
@@ -343,22 +606,26 @@ async function _syncFileList(relPaths, localEventPath, archiveEventPath, result,
     const archivePath = path.join(archiveEventPath, ...archiveRel.split('/').filter(Boolean));
     const filename    = segments[segments.length - 1] || '';
 
-    await _syncOneFile(localPath, archivePath, filename, result, abortSignal, onFileProgress);
-
-    // Companion XMP expansion: for RAW files, attempt to sync a same-folder .xmp sidecar.
+    // RAW files: resolve together with their companion .xmp (if the source has one) as
+    // a single naming pair — see the PAIR INVARIANT comment above _resolvePairDestination.
     const ext = path.extname(filename).toLowerCase();
     if (_RAW_EXTS.has(ext)) {
       const base        = filename.slice(0, filename.length - ext.length);
       const xmpFilename = base + '.xmp';
       const xmpLocal    = path.join(path.dirname(localPath),   xmpFilename);
       const xmpArchive  = path.join(path.dirname(archivePath), xmpFilename);
-      try {
-        await fsp.access(xmpLocal);
-        await _syncOneFile(xmpLocal, xmpArchive, xmpFilename, result, abortSignal, onFileProgress);
-      } catch {
-        // XMP absent or inaccessible — non-fatal, skip silently
-      }
+      const hasXmp      = await _pathExists(xmpLocal);
+      const xmpRelPath  = [...segments.slice(0, -1), xmpFilename].join('/');
+      await _syncRawWithCompanion(
+        localPath, archivePath, filename,
+        xmpLocal, xmpArchive, xmpFilename,
+        hasXmp, result, abortSignal, onFileProgress,
+        manifestCtx, relPath, xmpRelPath,
+      );
+      continue;
     }
+
+    await _syncOneFile(localPath, archivePath, filename, result, abortSignal, onFileProgress, manifestCtx, relPath);
   }
 }
 
@@ -421,14 +688,23 @@ async function _buildArchiveOverrides(relPaths, archiveEventPath) {
  * Sync event.json from the staging event folder to the archive event folder.
  * Called at every successful sync exit point.
  *
- * Case A — archive event.json absent: copy staging version wholesale.
- * Case B — archive event.json present: merge new imports[] entries only.
- *   Only imports, lastImport, status, updatedAt are updated; all other archive
- *   fields (components, hijriDate, metadata) remain authoritative in the archive.
+ * Case A — archive event.json absent: copy staging version wholesale (staging is authoritative).
+ * Case B — archive event.json present: the archive stays authoritative for components, hijriDate,
+ *   metadata state etc. Only these change:
+ *     • imports / lastImport / status / updatedAt — new import entries merged by id (unchanged rule)
+ *     • durable metadata intent (tagRefinements + metadataGroups) — SCOPED to the files this sync
+ *       job actually copied (`copiedPairs`, the real local→archive paths incl. conflict renames and
+ *       photographer-folder remaps): staging is authoritative for exactly those files (its record,
+ *       or its absence = Default), and the archive is authoritative for everything else — so a
+ *       routine sync can never erase archive-side intent, and skipped duplicates / other devices'
+ *       files are never touched. See eventMetadataIntent.syncMergeIntent.
+ *   The write goes through updateEventJsonAtomic (in-process serialization with every other
+ *   event.json writer). NOTE: that protects a single AutoIngest process only — two machines
+ *   writing the same NAS event.json can still race (a separate, pre-existing limitation).
  *
  * Non-fatal: logs a warning and continues on any error.
  */
-async function _copyEventJsonIfNeeded(localEventPath, archiveEventPath) {
+async function _copyEventJsonIfNeeded(localEventPath, archiveEventPath, copiedPairs = []) {
   const localJsonPath   = path.join(localEventPath,  'event.json');
   const archiveJsonPath = path.join(archiveEventPath, 'event.json');
 
@@ -463,36 +739,49 @@ async function _copyEventJsonIfNeeded(localEventPath, archiveEventPath) {
     return;
   }
 
-  // Case B: archive already has event.json — merge imports by id-deduplication
-  const localImports   = Array.isArray(localDoc.imports)   ? localDoc.imports   : [];
-  const archiveImports = Array.isArray(archiveDoc.imports) ? archiveDoc.imports : [];
+  // Case B: staging-relative → archive-relative keys for exactly the files this job copied.
+  const pairs = [];
+  for (const cp of copiedPairs || []) {
+    const fromRel = eventMetadataIntent.fileRelKey(localEventPath, cp.from);
+    const toRel   = eventMetadataIntent.fileRelKey(archiveEventPath, cp.to);
+    if (fromRel !== null && toRel !== null) pairs.push({ fromRel, toRel });
+  }
 
-  if (localImports.length === 0) return; // nothing to merge
-
-  const mergedMap = new Map();
-  [...archiveImports, ...localImports].forEach(entry => {
-    if (entry && typeof entry.id === 'string') mergedMap.set(entry.id, entry);
-  });
-  const merged = Array.from(mergedMap.values());
-
-  if (merged.length === archiveImports.length) return; // no new entries added
-
-  const updated = {
-    ...archiveDoc,
-    imports:    merged,
-    lastImport: localDoc.lastImport ?? archiveDoc.lastImport,
-    status:     localDoc.status     ?? archiveDoc.status,
-    updatedAt:  localDoc.updatedAt  ?? archiveDoc.updatedAt,
+  // Pure function of the freshest archive document — evaluated once up front to skip a needless
+  // rewrite (as before), and again inside the atomic update against the truly-latest document.
+  const computeChanges = (doc) => {
+    const changes = {};
+    const localImports   = Array.isArray(localDoc.imports) ? localDoc.imports : [];
+    const archiveImports = Array.isArray(doc.imports)      ? doc.imports      : [];
+    if (localImports.length > 0) {
+      const mergedMap = new Map();
+      [...archiveImports, ...localImports].forEach(entry => {
+        if (entry && typeof entry.id === 'string') mergedMap.set(entry.id, entry);
+      });
+      const merged = Array.from(mergedMap.values());
+      if (merged.length !== archiveImports.length) {                       // new entries added
+        changes.imports    = merged;
+        changes.lastImport = localDoc.lastImport ?? doc.lastImport;
+        changes.status     = localDoc.status     ?? doc.status;
+        changes.updatedAt  = localDoc.updatedAt  ?? doc.updatedAt;
+      }
+    }
+    if (pairs.length > 0) {
+      const m = eventMetadataIntent.syncMergeIntent(doc, localDoc, pairs);
+      if (m.tagRefinements.changed) changes.tagRefinements = m.tagRefinements.value;   // undefined drops the key
+      if (m.metadataGroups.changed) changes.metadataGroups = m.metadataGroups.value;
+      for (const note of m.notes) console.warn('[syncJob] intent merge:', note);
+    }
+    return changes;
   };
 
-  const tmpPath = archiveJsonPath + '.tmp';
+  if (Object.keys(computeChanges(archiveDoc)).length === 0) return;        // nothing to merge
+
   try {
-    await fsp.writeFile(tmpPath, JSON.stringify(updated, null, 2), 'utf8');
-    await fsp.rename(tmpPath, archiveJsonPath);
+    await updateEventJsonAtomic(archiveJsonPath, computeChanges);
     hidePathBestEffort(archiveJsonPath).catch(() => {});
   } catch (err) {
-    try { await fsp.unlink(tmpPath); } catch {}
-    console.warn('[syncJob] event.json import merge to archive failed:', err.message);
+    console.warn('[syncJob] event.json merge to archive failed:', err.message);
   }
 }
 
@@ -807,6 +1096,11 @@ async function syncJob(job, { nasRoot, stagingRoot }, { progressCallback, pauseS
     }, LOCK_HEARTBEAT_INTERVAL_MS);
 
     try {
+      // D4: reservations are scoped by import (job.importId when Strategy A's manifest
+      // job-card identity is known) or, for legacy jobs with no importId, by the whole
+      // staging event — see localSyncManifest's "D4: durable destination reservations".
+      const manifestCtx = { localEventPath, archiveEventPath, importId: job.importId ?? null };
+
       if (filesByPhotographer) {
         // Strategy A: sync only the exact files listed for this photographer/component.
         // For multi-component paths (comp/photographer/file), build an archive-path
@@ -822,10 +1116,11 @@ async function syncJob(job, { nasRoot, stagingRoot }, { progressCallback, pauseS
           externalPauseSignal,
           onFileProgress,
           _archiveOverrides,
+          manifestCtx,
         );
       } else {
         // Strategy B or C: sync entire photographer folder
-        await _syncDir(localPhPath, archivePhPath, result, 0, abortSignal, externalPauseSignal, onFileProgress);
+        await _syncDir(localPhPath, archivePhPath, result, 0, abortSignal, externalPauseSignal, onFileProgress, manifestCtx);
       }
     } finally {
       clearInterval(heartbeatTimer);
@@ -868,7 +1163,7 @@ async function syncJob(job, { nasRoot, stagingRoot }, { progressCallback, pauseS
     return result;
   }
 
-  await _copyEventJsonIfNeeded(localEventPath, archiveEventPath);
+  await _copyEventJsonIfNeeded(localEventPath, archiveEventPath, result._copiedPairs || []);
 
   if (result.sidecarConflicts > 0) {
     result.ok      = true;
@@ -891,6 +1186,14 @@ async function syncJob(job, { nasRoot, stagingRoot }, { progressCallback, pauseS
  * Includes companion XMP sidecar expansion (same logic as _syncFileList).
  *
  * Does not re-copy files. Reports only. Safe to run at any time after sync.
+ *
+ * D4: for each relPath, consults the same durable destination-reservation mapping sync
+ * itself writes (services/localSyncManifest.js) — when a reservation exists, verification
+ * checks the RESERVED finalRelPath, not the original pre-rename basename, so a
+ * conflict-renamed file is located correctly instead of being reported missing/mismatched
+ * against an unrelated file at the original name. When no reservation exists (older jobs,
+ * or a file that never needed a rename), legacy behavior is unchanged — this requires no
+ * manifest migration and never fails merely because a mapping is absent.
  *
  * @param {{ progressCallback?: Function }} [opts]
  * @returns {Promise<{
@@ -953,13 +1256,22 @@ async function verifyJobChecksum(job, { nasRoot, stagingRoot, progressCallback }
   // Build file pairs: Strategy A (files[]) or Strategy B (photographer folder scan)
   let filePairs = [];
 
+  const importId = job.importId ?? null;
+  /** Resolve the real archive path for a relPath: the reserved finalRelPath if a
+   *  durable mapping exists, otherwise the plain (pre-rename-agnostic) join. */
+  const _resolveArchivePath = async (relPath, fallback) => {
+    const resv = await localSyncManifest.getResolvedFile(localEventPath, importId, relPath);
+    if (!resv) return fallback;
+    return path.join(archiveEventPath, ...resv.finalRelPath.split('/').filter(Boolean));
+  };
+
   if (Array.isArray(job.files) && job.files.length > 0) {
     // Strategy A: exact file list + XMP sidecar expansion (matches _syncFileList logic)
     for (const relPath of job.files) {
       if (typeof relPath !== 'string' || !relPath) continue;
       const segments    = relPath.split('/').filter(Boolean);
       const localPath   = path.join(localEventPath,   ...segments);
-      const archivePath = path.join(archiveEventPath, ...segments);
+      const archivePath = await _resolveArchivePath(relPath, path.join(archiveEventPath, ...segments));
       const filename    = segments[segments.length - 1] || '';
       filePairs.push({ localPath, archivePath, filename });
 
@@ -968,7 +1280,8 @@ async function verifyJobChecksum(job, { nasRoot, stagingRoot, progressCallback }
         const base        = filename.slice(0, filename.length - ext.length);
         const xmpFilename = base + '.xmp';
         const xmpLocal    = path.join(path.dirname(localPath),   xmpFilename);
-        const xmpArchive  = path.join(path.dirname(archivePath), xmpFilename);
+        const xmpRelPath  = [...segments.slice(0, -1), xmpFilename].join('/');
+        const xmpArchive  = await _resolveArchivePath(xmpRelPath, path.join(path.dirname(archivePath), xmpFilename));
         try {
           await fsp.access(xmpLocal);
           filePairs.push({ localPath: xmpLocal, archivePath: xmpArchive, filename: xmpFilename });
@@ -1048,4 +1361,8 @@ async function verifyJobChecksum(job, { nasRoot, stagingRoot, progressCallback }
   return result;
 }
 
-module.exports = { syncJob, verifyJobChecksum };
+module.exports = {
+  syncJob, verifyJobChecksum,
+  // Test-only: exposes the event.json merge so the scoped intent-merge rules can be verified directly.
+  _copyEventJsonIfNeeded,
+};

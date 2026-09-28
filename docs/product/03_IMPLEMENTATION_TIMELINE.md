@@ -131,3 +131,20 @@ No dates are invented in this document. Where a date is not verifiable from Git 
 | Actual duration | Not applicable |
 | Reason for deviation | Not applicable |
 | Evidence source | Confirmed zero implementation via exhaustive code/git search (see AI-FEAT-056) |
+
+---
+
+## AI-RM-011 — Multi-Event Import
+
+| Field | Value |
+|---|---|
+| Original estimate | Single implementation session |
+| Revised estimate | None |
+| Planned start | 2026-09-20 |
+| Actual start | 2026-09-20 (branch `feature/multi-event-import` created from `stable/0.9`) |
+| Planned completion | Evidence pending — not yet documented as fact. |
+| Actual completion | Not yet — implemented and verified on the branch; merge/release pending |
+| Actual duration | Evidence pending — not yet documented as fact. |
+| Reason for deviation | The branch base was re-cut from `61eba47` onto `7f72e51` after `stable/0.9` intentionally held Per-Photo Tag Refinement out of v0.9.12 (`ac75466`); refinement-dependent parts were removed. |
+| Evidence source | Git history (`61eba47`, `ac75466`, `7f72e51`), the feature record AI-FEAT-058, and the test files it cites |
+

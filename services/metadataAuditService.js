@@ -162,6 +162,8 @@ async function classifyOneFile(eventFolderPath, eventJson, filePath) {
     return {
       ...base, status: 'ambiguous', photographer: null, component: null, fields: null, keywords: null,
       error: null, ambiguityReason: expectation.ambiguityReason, evidenceSource: expectation.evidenceSource || null,
+      // Advisory (never affects status): e.g. tagRefinements:label-not-in-component.
+      intentDiagnostics: evidence.intentDiagnostics || null,
     };
   }
 
@@ -187,6 +189,7 @@ async function classifyOneFile(eventFolderPath, eventJson, filePath) {
         // A read-error is on the SIDECAR read, not the expectation resolve — repair can
         // still retry writing this file's already-resolved frozen expectation.
         expectation, verifyPath, snapshot,
+        intentDiagnostics: evidence.intentDiagnostics || null,
       };
     }
   }
@@ -210,6 +213,8 @@ async function classifyOneFile(eventFolderPath, eventJson, filePath) {
     fields, keywords, error: null, ambiguityReason: null, evidenceSource: expectation.evidenceSource || null,
     // Repair (Phase F) consumes exactly this frozen expectation — never re-resolved.
     expectation, verifyPath, snapshot,
+    // Advisory (never affects status): e.g. tagRefinements:label-not-in-component.
+    intentDiagnostics: evidence.intentDiagnostics || null,
   };
 }
 
