@@ -14,15 +14,24 @@ on:
         options:
           - development
           - rc
+          - stable-mac-recovery
       rc_version:
         description: 'RC version, shaped X.Y.Z-rc.N (e.g. 0.9.12-rc.1) — required when build_type is rc'
         required: false
         type: string
       allow_unsigned_mac:
-        description: 'D3 TEMPORARY EXCEPTION — publish this RC''s macOS build UNSIGNED because Apple Developer credentials are not yet provisioned. Never the default; must be explicitly set true per-run. Has no effect on the Stable (build-mac) path, which always requires real signing — see rc-build-mac''s "Determine macOS signing mode" step.'
+        description: 'D3 TEMPORARY EXCEPTION — publish this RC''s (or, with build_type=stable-mac-recovery, this Stable recovery''s) macOS build UNSIGNED because Apple Developer credentials are not yet provisioned. Never the default; must be explicitly set true per-run. Has no effect on the Stable tag-push (build-mac) path, which always requires real signing regardless of this input — see rc-build-mac''s "Determine macOS signing mode" step and stable-mac-recovery''s "Validate recovery inputs" step.'
         required: false
         default: false
         type: boolean
+      target_tag:
+        description: 'Existing Stable tag (shaped vX.Y.Z) to recover — required when build_type is stable-mac-recovery. Must already have a published GitHub Release; this job uploads to it and never creates a new one.'
+        required: false
+        type: string
+      confirm_target_tag:
+        description: 'Re-type target_tag exactly, as an explicit double-confirmation — required when build_type is stable-mac-recovery.'
+        required: false
+        type: string
 
 jobs:
 
@@ -617,3 +626,148 @@ jobs:
             codesign -dv --verbose=4 "$app" 2>&1 || true
           done
           echo "::warning::UNSIGNED / NOT NOTARIZED — D3 DEFERRED. This macOS build was explicitly published unsigned because Apple Developer credentials are not yet provisioned. Gatekeeper will reject it; a manual Privacy & Security -> Open Anyway (or equivalent) approval is required to run it after download. This is an accepted, temporary, per-run exception authorized via allow_unsigned_mac=true — not a silent fallback and not a claim that signing succeeded."
+
+  # ── Stable macOS Recovery (manual only, narrow-scope) ────────────────────────
+  # Handles exactly one situation: a Stable tag-push run (create-release/build-mac/
+  # build-windows above) already published a real, non-draft GitHub Release for a Stable
+  # tag, but build-mac failed before producing any macOS artifact (e.g. Apple credentials
+  # still unprovisioned) — see AI-FEAT-057 recovery notes. This job never creates a
+  # release, never moves/retags anything, never touches Windows, and only runs on an
+  # explicit workflow_dispatch with build_type=stable-mac-recovery — the push-triggered
+  # build-mac job above is byte-for-byte unchanged and still always requires real
+  # Developer ID signing; this job does not weaken that default.
+  #
+  # Packaging source is the EXACT target_tag commit (checked out explicitly below and then
+  # proven), never this workflow-definition branch's own HEAD — the workflow YAML may live
+  # on a short-lived release-engineering branch, but what gets built and uploaded must be
+  # provably identical to what the target Stable tag already points at.
+  stable-mac-recovery:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'stable-mac-recovery'
+    runs-on: macos-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Validate recovery inputs
+        shell: bash
+        env:
+          TARGET_TAG: ${{ github.event.inputs.target_tag }}
+          CONFIRM_TARGET_TAG: ${{ github.event.inputs.confirm_target_tag }}
+          ALLOW_UNSIGNED_MAC: ${{ github.event.inputs.allow_unsigned_mac }}
+        run: |
+          if [ -z "$TARGET_TAG" ]; then
+            echo "::error::target_tag is required for build_type=stable-mac-recovery"
+            exit 1
+          fi
+          if [[ ! "$TARGET_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::target_tag must be shaped vX.Y.Z (a Stable tag, not an RC tag), got: '$TARGET_TAG'"
+            exit 1
+          fi
+          if [ "$TARGET_TAG" != "$CONFIRM_TARGET_TAG" ]; then
+            echo "::error::confirm_target_tag ('$CONFIRM_TARGET_TAG') must exactly match target_tag ('$TARGET_TAG') — explicit double-confirmation required before packaging a Stable recovery."
+            exit 1
+          fi
+          # Never inferred from missing secrets alone — this job has no signed-mode branch
+          # at all; it exists only to (re)produce the already-accepted, explicitly-authorized
+          # UNSIGNED / NOT NOTARIZED — D3 DEFERRED state for an existing partial release.
+          if [ "$ALLOW_UNSIGNED_MAC" != "true" ]; then
+            echo "::error::allow_unsigned_mac must be explicitly 'true' to run this recovery job. This is never inferred from missing secrets alone."
+            exit 1
+          fi
+          echo "recovery inputs validated for $TARGET_TAG"
+
+      - name: Checkout the EXACT target tag (never this workflow branch's HEAD)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.target_tag }}
+          fetch-depth: 0
+
+      - name: Prove packaging source matches target_tag exactly
+        shell: bash
+        env:
+          TARGET_TAG: ${{ github.event.inputs.target_tag }}
+        run: |
+          ACTUAL="$(git rev-parse HEAD)"
+          EXPECTED="$(git rev-parse "refs/tags/$TARGET_TAG^{commit}")"
+          echo "checked out commit:  $ACTUAL"
+          echo "$TARGET_TAG^{commit}: $EXPECTED"
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::checked-out HEAD ($ACTUAL) does not match ${TARGET_TAG}^{commit} ($EXPECTED) — refusing to package a recovery from the wrong source."
+            exit 1
+          fi
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          EXPECTED_VERSION="${TARGET_TAG#v}"
+          if [ "$PKG_VERSION" != "$EXPECTED_VERSION" ]; then
+            echo "::error::package.json version ($PKG_VERSION) does not match target_tag ($TARGET_TAG) — refusing to package a version mismatch onto an existing Stable release."
+            exit 1
+          fi
+          echo "confirmed: packaging source is ${TARGET_TAG}^{commit}, version $PKG_VERSION"
+
+      - name: Verify a GitHub Release already exists for target_tag (never create one here)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          TARGET_TAG: ${{ github.event.inputs.target_tag }}
+        run: |
+          if ! gh release view "$TARGET_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::no existing GitHub Release found for $TARGET_TAG — this recovery job only uploads to an ALREADY-EXISTING release and never creates one. Run the normal Stable tag-push path first."
+            exit 1
+          fi
+          echo "confirmed: a GitHub Release already exists for $TARGET_TAG"
+          echo "existing assets:"
+          gh release view "$TARGET_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Create service account key
+        shell: bash
+        env:
+          SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
+        run: |
+          echo "$SERVICE_ACCOUNT_KEY" > config/service-account-key.json
+
+      # D3 remains deferred; this job exists specifically to (re)produce that already-accepted
+      # UNSIGNED / NOT NOTARIZED state for an existing partial Stable release. -p always
+      # publishes to whatever release electron-builder finds matching this tag's version
+      # (already confirmed above to exist); -c.publish.releaseType=draft keeps that release
+      # in draft regardless of its current state, so this job can never itself make a
+      # partially-verified recovery artifact publicly visible — see stable-mac-recovery's
+      # own report for the explicit later step that republishes once verified. --mac only:
+      # this job never touches Windows and never runs electron-builder's --win target.
+      - name: Build macOS (unsigned — D3 deferred, explicitly authorized above)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          TARGET_TAG: ${{ github.event.inputs.target_tag }}
+        run: |
+          echo "::warning::macOS signing/notarization intentionally deferred for $TARGET_TAG recovery — D3 UNSIGNED EXCEPTION explicitly authorized for this run (allow_unsigned_mac=true)."
+          unset CSC_LINK CSC_KEY_PASSWORD APPLE_API_KEY APPLE_API_KEY_ID APPLE_API_ISSUER APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID
+          npm run dist:mac -- -p always -c.mac.forceCodeSigning=false -c.publish.releaseType=draft
+
+      # Ad-hoc sealing must still be internally valid — the same known-good unsigned state
+      # RC.4 already passed full manual acceptance against. This is a distinct, purpose-built
+      # check (scripts/verify-mac-unsigned-recovery.sh), never the strict signed-only gate
+      # (scripts/verify-mac-signing.sh), which is designed to correctly FAIL an unsigned
+      # build — Phase 6 of this recovery's authorization forbids running that strict gate and
+      # ignoring its failure.
+      - name: Verify unsigned macOS artifacts (D3 deferred — ad-hoc sealing must still be internally valid)
+        shell: bash
+        run: |
+          set -e
+          bash scripts/verify-mac-unsigned-recovery.sh "dist/mac/AutoIngest.app"
+          bash scripts/verify-mac-unsigned-recovery.sh "dist/mac-arm64/AutoIngest.app"
+
+      - name: Confirm uploaded macOS assets and declare deferred-signing state
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          TARGET_TAG: ${{ github.event.inputs.target_tag }}
+        run: |
+          echo "assets now attached to $TARGET_TAG (still draft — not yet publicly visible):"
+          gh release view "$TARGET_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name'
+          echo "::warning::UNSIGNED / NOT NOTARIZED — D3 DEFERRED. macOS assets for $TARGET_TAG were explicitly published unsigned because Apple Developer credentials are not yet provisioned. The release remains DRAFT; a separate, explicit step is required to republish it once verification and smoke testing are complete."

@@ -56,7 +56,7 @@ console.log('macReleaseSigningConfig (D3 — repository-side foundation, no cred
   // ── release.yml: both mac release jobs carry identical signing enforcement ──
   const jobBlocks = {
     'build-mac': workflow.slice(workflow.indexOf('\n  build-mac:'), workflow.indexOf('\n  build-windows:')),
-    'rc-build-mac': workflow.slice(workflow.indexOf('\n  rc-build-mac:')),
+    'rc-build-mac': workflow.slice(workflow.indexOf('\n  rc-build-mac:'), workflow.indexOf('\n  stable-mac-recovery:')),
   };
   assert.ok(jobBlocks['build-mac'].length > 200, 'build-mac job block located');
   assert.ok(jobBlocks['rc-build-mac'].length > 200, 'rc-build-mac job block located');
@@ -225,6 +225,128 @@ console.log('macReleaseSigningConfig (D3 — repository-side foundation, no cred
     const ifLines = workflow.split('\n').filter(l => /^\s*if:/.test(l));
     for (const line of ifLines) {
       assert.doesNotMatch(line, /secrets\./, `step-level if: must never reference secrets — found: ${line.trim()}`);
+    }
+  });
+
+  // ── stable-mac-recovery: narrow-scope manual recovery job for a partially-published
+  //    Stable release (build-mac failed, Windows/release already live) ──
+  const recoveryBlock = workflow.slice(workflow.indexOf('\n  stable-mac-recovery:'));
+  assert.ok(recoveryBlock.length > 200, 'stable-mac-recovery job block located');
+
+  t('stable-mac-recovery only runs on workflow_dispatch with build_type=stable-mac-recovery (never on tag-push)', () => {
+    const jobStart = workflow.indexOf('\n  stable-mac-recovery:');
+    const ifLine = workflow.slice(jobStart, jobStart + 400).match(/^\s*if:.*$/m);
+    assert.ok(ifLine, 'expected an if: guard on the job');
+    assert.match(ifLine[0], /workflow_dispatch/);
+    assert.match(ifLine[0], /build_type == 'stable-mac-recovery'/);
+  });
+
+  t('build_type input offers stable-mac-recovery as a real choice option, alongside development/rc', () => {
+    const inputBlock = workflow.slice(workflow.indexOf('build_type:'), workflow.indexOf('rc_version:'));
+    assert.match(inputBlock, /- development/);
+    assert.match(inputBlock, /- rc/);
+    assert.match(inputBlock, /- stable-mac-recovery/);
+  });
+
+  t('target_tag and confirm_target_tag inputs exist as strings', () => {
+    for (const name of ['target_tag', 'confirm_target_tag']) {
+      assert.match(workflow, new RegExp(`${name}:`));
+      const inputBlock = workflow.slice(workflow.indexOf(`${name}:`), workflow.indexOf(`${name}:`) + 400);
+      assert.match(inputBlock, /type:\s*string/);
+    }
+  });
+
+  t('recovery requires explicit unsigned authorization (allow_unsigned_mac must be exactly "true", never inferred)', () => {
+    assert.match(recoveryBlock, /"\$ALLOW_UNSIGNED_MAC" != "true"/);
+    assert.match(recoveryBlock, /never inferred from missing secrets alone/);
+  });
+
+  t('recovery requires target_tag, shaped as a Stable tag (vX.Y.Z), and rejects an unconfirmed tag', () => {
+    assert.match(recoveryBlock, /target_tag is required/);
+    assert.match(recoveryBlock, /\^v\[0-9\]\+\\\.\[0-9\]\+\\\.\[0-9\]\+\$/);
+    assert.match(recoveryBlock, /CONFIRM_TARGET_TAG.*must exactly match target_tag/);
+  });
+
+  t('recovery checks out the exact target_tag ref, then proves HEAD == target_tag^{commit} and package.json version matches, before doing anything else', () => {
+    const checkoutIdx = recoveryBlock.indexOf('uses: actions/checkout@v4');
+    const checkoutBlock = recoveryBlock.slice(checkoutIdx, checkoutIdx + 200);
+    assert.match(checkoutBlock, /ref: \$\{\{ github\.event\.inputs\.target_tag \}\}/);
+
+    const proveIdx = recoveryBlock.indexOf('Prove packaging source matches target_tag exactly');
+    assert.ok(proveIdx > checkoutIdx, 'the source-provenance check must run after checkout');
+    const proveBlock = recoveryBlock.slice(proveIdx, proveIdx + 1200);
+    assert.match(proveBlock, /git rev-parse HEAD/);
+    assert.match(proveBlock, /refs\/tags\/\$TARGET_TAG\^\{commit\}/);
+    assert.match(proveBlock, /does not match/);
+    assert.match(proveBlock, /package\.json version/);
+  });
+
+  t('recovery never creates or moves a tag or a release — only "gh release view" (read-only) appears, never "git tag", "git push", or a create-release action', () => {
+    assert.doesNotMatch(recoveryBlock, /git tag/);
+    assert.doesNotMatch(recoveryBlock, /git push/);
+    assert.doesNotMatch(recoveryBlock, /softprops\/action-gh-release/);
+    assert.match(recoveryBlock, /gh release view/);
+  });
+
+  t('recovery verifies a GitHub Release already exists for target_tag before building anything, and fails if it does not', () => {
+    const verifyIdx = recoveryBlock.indexOf('Verify a GitHub Release already exists for target_tag');
+    assert.ok(verifyIdx >= 0);
+    const buildIdx = recoveryBlock.indexOf('Build macOS (unsigned');
+    assert.ok(verifyIdx < buildIdx, 'the existing-release check must run before the build step');
+    const verifyBlock = recoveryBlock.slice(verifyIdx, buildIdx);
+    assert.match(verifyBlock, /no existing GitHub Release found/);
+    assert.match(verifyBlock, /this recovery job only uploads to an ALREADY-EXISTING release and never creates one/);
+  });
+
+  t('recovery never invokes Windows packaging (no npm run dist:win / electron-builder --win command anywhere in the job)', () => {
+    assert.doesNotMatch(recoveryBlock, /dist:win/);
+    assert.doesNotMatch(recoveryBlock, /run:[\s\S]{0,400}?--win\b/, 'a run: block must never actually invoke --win — prose mentioning "--win" in a comment is fine');
+  });
+
+  t('recovery builds --mac only, forces unsigned explicitly, and keeps the release in draft so it cannot self-publish', () => {
+    const buildIdx = recoveryBlock.indexOf('Build macOS (unsigned');
+    const nextStepIdx = recoveryBlock.indexOf('\n      - name:', buildIdx + 1);
+    const buildStep = recoveryBlock.slice(buildIdx, nextStepIdx);
+    assert.match(buildStep, /npm run dist:mac/);
+    assert.match(buildStep, /-c\.mac\.forceCodeSigning=false/);
+    assert.match(buildStep, /-c\.publish\.releaseType=draft/);
+    assert.match(buildStep, /unset CSC_LINK CSC_KEY_PASSWORD APPLE_API_KEY APPLE_API_KEY_ID APPLE_API_ISSUER APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID/);
+  });
+
+  t('recovery has no signed-mode branch at all (unlike rc-build-mac) — it exists only for the explicitly-authorized unsigned path', () => {
+    assert.doesNotMatch(recoveryBlock, /mac_signing_mode/);
+    assert.doesNotMatch(recoveryBlock, /-c\.mac\.forceCodeSigning=true/);
+  });
+
+  t('recovery runs the dedicated unsigned verification script (never invokes the strict signed-only gate as a command) against both architectures', () => {
+    assert.match(recoveryBlock, /verify-mac-unsigned-recovery\.sh.*dist\/mac\/AutoIngest\.app/);
+    assert.match(recoveryBlock, /verify-mac-unsigned-recovery\.sh.*dist\/mac-arm64\/AutoIngest\.app/);
+    // verify-mac-signing.sh may still be named in an explanatory comment (contrasting it with
+    // the dedicated unsigned script) — it must never actually be invoked with `bash`/`sh`.
+    assert.doesNotMatch(recoveryBlock, /\b(bash|sh)\s+scripts\/verify-mac-signing\.sh/);
+    assert.match(recoveryBlock, /set -e/);
+  });
+
+  t('recovery does not appear inside the Stable tag-push jobs\' text (build-mac remains byte-for-byte unaffected)', () => {
+    assert.doesNotMatch(jobBlocks['build-mac'], /stable-mac-recovery|target_tag/);
+  });
+
+  t('scripts/verify-mac-unsigned-recovery.sh exists, is executable, and asserts the required structural signals (strict codesign, bundle identity, resource sealing) plus logs the accepted spctl/stapler limitation — never silently', () => {
+    const p = path.join(ROOT, 'scripts/verify-mac-unsigned-recovery.sh');
+    assert.ok(fs.existsSync(p));
+    const mode = fs.statSync(p).mode;
+    assert.ok(mode & 0o111, 'script must be executable');
+    const src = fs.readFileSync(p, 'utf8');
+    for (const needle of [
+      'codesign --verify --deep --strict',
+      'CFBundleIdentifier',
+      '_CodeSignature/CodeResources',
+      'spctl --assess',
+      'stapler validate',
+      'UNSIGNED / NOT NOTARIZED — D3 DEFERRED',
+      'set -o pipefail',
+    ]) {
+      assert.ok(src.includes(needle), `expected script to check for "${needle}"`);
     }
   });
 
