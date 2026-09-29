@@ -1,0 +1,20 @@
+type: plugin4
+name: AutoingestMx
+version: 0.1.0
+displayName: AutoIngest
+description: Phase 3A smoke-test plugin connecting the MX Creative Console to AutoIngest's local control transport (navigation, selection, preview only — no groups/QMZ/import/archive yet)
+minimumLoupedeckVersion: 6.1
+
+pluginType: remote
+pluginRuntime: nodejs
+entryPoint: index.mjs
+
+# Application-linked profiles (so the AutoIngest MX profile activates
+# automatically when AutoIngest is the foreground app) are configured
+# through Logi Options+'s own "Applications" UI using the app's real macOS
+# bundle identifier (com.autoingest.app, from package.json's
+# build.appId) — NOT declared here. The current toolkit (0.1.1) ships no
+# documented schema/example for declaring this in pluginCapabilities; see
+# docs/mxLogitechPlugin.md "Application profile" for the manual setup
+# steps used for Phase 3A instead.
+pluginCapabilities:
