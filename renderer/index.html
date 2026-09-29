@@ -8653,6 +8653,10 @@
        it only calls window.__autoIngestRendererBridge, defined at the end of
        renderer.js. -->
   <script src="commandManager.js" defer></script>
+  <!-- MX Console control transport glue (Phase 2) — see
+       docs/mxControlTransport.md. Must load after commandManager.js: it only
+       calls window.AutoIngestCommands and window.api. -->
+  <script src="mxControlAdapter.js" defer></script>
 
   <!-- ── STARTUP LOGIN SPLASH ───────────────────────────────────────────── -->
   <div id="loginSplash" role="dialog" aria-modal="true" aria-label="Operator sign-in" style="display:none">

@@ -18,6 +18,7 @@ const crashReporter = require('../services/crashReporter');
 const perf          = require('../services/performanceMonitor');
 const autoUpdater   = require('../services/autoUpdater');
 const settings        = require('../services/settings');
+const mxControlService = require('../services/mxControlService');
 // Canonical Representation Audit, L1 (2026-08-11): the ONE path-containment
 // implementation for this whole codebase — already proven correct under
 // BUG-013 for the renderer's own UNC/case-sensitivity handling. Dual-exported
@@ -259,6 +260,11 @@ function startDrivePolling() {
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 let pollHandle = null;
 let _splashWin = null;
+// Tracked so mxControlService can reach the current renderer for forwarded
+// commands, and so it can fail closed (never invent state/results) when no
+// renderer exists yet — e.g. during the splash screen, or after the main
+// window has been closed. See services/mxControlService.js.
+let _mxMainWin = null;
 
 app.whenReady().then(() => {
   if (!isMac) Menu.setApplicationMenu(null);
@@ -302,10 +308,22 @@ app.whenReady().then(() => {
   perf.init();
   autoUpdater.init();
   _splashWin = createSplashWindow();
+  // Local-only control transport for a future MX Creative Console adapter
+  // (AI-FEAT MX Console Phase 2). Starts as soon as AutoIngest is running,
+  // independent of whether a main window exists yet — see
+  // services/mxControlService.js for the fail-closed behavior while no
+  // renderer is available. Never blocks/crashes startup if it fails.
+  mxControlService.init({ getMainWindow: () => _mxMainWin })
+    .catch((err) => log(`[main] mxControlService failed to start: ${err.message}`));
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       _splashWin = createSplashWindow();
     }
+    // window-all-closed shuts the control service down alongside the other
+    // per-window services below; re-arm it on reactivation so a reopened app
+    // (common on macOS) still serves a future MX Console client.
+    mxControlService.init({ getMainWindow: () => _mxMainWin })
+      .catch((err) => log(`[main] mxControlService failed to restart: ${err.message}`));
   });
 });
 
@@ -316,8 +334,28 @@ app.on('window-all-closed', () => {
   shutdownWorkers();
   exifService.shutdown().catch(() => {});
   realtimeOps.shutdown();
+  mxControlService.shutdown().catch(() => {});
   if (pollHandle) clearInterval(pollHandle);
   if (process.platform !== 'darwin') app.quit();
+});
+
+// mxControlService's shutdown (closing the WS server, deleting the discovery
+// descriptor) is genuinely async, and window-all-closed's fire-and-forget
+// call above races the process actually exiting — a stale descriptor left
+// on disk is tolerable (its pid lets a future client detect it's dead, see
+// services/mxControlService.js), but a real quit is cheap to make clean, so
+// this guard blocks the FIRST before-quit just long enough to let it finish,
+// then re-issues quit() so app exit proceeds normally.
+let _mxControlShutdownDone = false;
+app.on('before-quit', (event) => {
+  if (_mxControlShutdownDone) return;
+  event.preventDefault();
+  mxControlService.shutdown()
+    .catch((err) => log(`[main] mxControlService shutdown error: ${err.message}`))
+    .finally(() => {
+      _mxControlShutdownDone = true;
+      app.quit();
+    });
 });
 
 // Catch unhandled rejections so they go to the log and never crash the process.
@@ -335,6 +373,8 @@ const activeFileRequests = new Map();
 ipcMain.handle('splash:complete', () => {
   const mainWin = createMainWindow();
   crashReporter.init(mainWin);
+  _mxMainWin = mainWin;
+  mainWin.on('closed', () => { if (_mxMainWin === mainWin) _mxMainWin = null; });
   if (pollHandle) clearInterval(pollHandle);
   pollHandle = startDrivePolling();
   // Start invisible so we can fade in after the splash closes

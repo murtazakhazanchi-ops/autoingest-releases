@@ -198,6 +198,22 @@ const AutoIngestCommands = (() => {
 
   // ── Registry API ─────────────────────────────────────────────────────────
 
+  /**
+   * Safe registry lookup — COMMANDS is a plain object literal, so a naive
+   * COMMANDS[commandId] resolves inherited Object.prototype members for
+   * commandId values like "__proto__", "toString", "constructor", etc.,
+   * returning a truthy non-command object instead of undefined and letting
+   * an attacker-controlled commandId slip past the "!def -> unknown-command"
+   * check. Found live via test/mxControlTransportLive.test.js (Phase 2)
+   * sending commandId:"__proto__" over the WS transport — exactly the kind
+   * of untrusted string this registry must reject outright, not partially
+   * execute against. hasOwnProperty restricts the lookup to COMMANDS' own
+   * registered entries only.
+   */
+  function _lookupCommand(commandId) {
+    return Object.prototype.hasOwnProperty.call(COMMANDS, commandId) ? COMMANDS[commandId] : undefined;
+  }
+
   function getCommands() {
     return Object.keys(COMMANDS);
   }
@@ -281,7 +297,7 @@ const AutoIngestCommands = (() => {
    *   attempted (unknown id, malformed payload, or check() failed).
    */
   function canExecute(commandId, payload) {
-    const def = COMMANDS[commandId];
+    const def = _lookupCommand(commandId);
     if (!def) return { ok: false, commandId, reason: 'unknown-command' };
     if (def.isValid && !def.isValid(payload)) {
       return { ok: false, commandId, reason: 'invalid-payload' };
@@ -325,7 +341,7 @@ const AutoIngestCommands = (() => {
     const gate = canExecute(commandId, payload);
     if (!gate.ok) return gate;
 
-    const def    = COMMANDS[commandId];
+    const def    = _lookupCommand(commandId);
     const bridge = _bridge();
     try {
       // run() may be sync or async, and may return a plain boolean ("did

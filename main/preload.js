@@ -428,4 +428,14 @@ contextBridge.exposeInMainWorld('api', {
   onRealtimeStatus:         (cb)        => _register('realtime:statusChanged', (_e, s) => cb(s)),
   onRealtimeEvent:          (cb)        => _register('realtime:event',         (_e, ev) => cb(ev)),
 
+  // ── MX Console control transport (AI-FEAT MX Console Phase 2) ──
+  // Narrow, explicit channels ONLY — no generic invoke(channel, args) surface
+  // for this feature. See docs/mxControlTransport.md and
+  // services/mxControlService.js. The renderer never talks to the WebSocket
+  // clients directly; it only reports its own state and answers command
+  // requests the main process forwards to it.
+  mxControlNotifyState:       (state)               => ipcRenderer.send('mx-control:state-changed', state),
+  onMxControlExecuteCommand:  (cb)                   => _register('mx-control:execute-command', (_e, msg) => cb(msg)),
+  mxControlSendCommandResult: (requestId, result)    => ipcRenderer.send('mx-control:command-result', { requestId, result }),
+
 });
