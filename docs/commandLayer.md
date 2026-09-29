@@ -1,4 +1,4 @@
-# Command Layer (AI-FEAT MX Console — Phase 1A)
+# Command Layer (AI-FEAT MX Console — Phase 1A + 1B)
 
 Internal abstraction so external controllers (the future Logitech MX
 Creative Console plugin, keyboard shortcuts, or any other hardware
@@ -15,6 +15,13 @@ durable metadata intent). The original Phase 1A commit, `f217891` on
 this design validated against the pre-reconciliation `main` line — it
 predates Multi-Event Import/Tag Refinement's presence in the group-assignment
 code path (see "Group assignment" below) and should not be built on directly.
+
+**Phase 1B**, on the same `feature/mx-creative-console-v2` branch, adds the
+observability surface a future external adapter needs before any transport
+exists: `getContext()`/`getState()`/`getAvailableCommands()`, a minimal
+`subscribe()` mechanism, and one new command, `qmz.assignToSequence`. It adds
+no transport, no new IPC channel, and no Logitech-specific code — see
+"State & discovery API" and "QMZ — qmz.assignToSequence" below.
 
 ```
 (future) MX Creative Console
@@ -51,9 +58,15 @@ globals directly, no DOM inspection) — always through
 ## API
 
 ```js
-AutoIngestCommands.getCommands()               // -> string[] of registered command ids
+AutoIngestCommands.getCommands()               // -> string[] of ALL registered command ids
 AutoIngestCommands.canExecute(commandId, payload)  // -> { ok, commandId, reason? }  (sync)
 AutoIngestCommands.execute(commandId, payload)     // -> Promise<{ ok, commandId, executed?, detail?, reason? }>
+
+// Phase 1B — observability, no transport:
+AutoIngestCommands.getContext()                // -> 'browse' | 'qmz' | 'import' | null
+AutoIngestCommands.getAvailableCommands()      // -> string[] of ids currently eligible (see below)
+AutoIngestCommands.getState()                  // -> compact state snapshot (see "State schema")
+AutoIngestCommands.subscribe(listener)         // -> unsubscribe: () => void
 ```
 
 `execute()` always returns a Promise (some underlying operations, e.g.
@@ -150,22 +163,16 @@ itself (not duplicated per caller):
 
 ### Deferred commands, and why
 
-- **QMZ (`qmz.assignQ`/`assignM`/`assignZ`, `qmz.nextSequence`/`previousSequence`).**
-  Inspected `_qmzAssignToSequence(sequenceCode)`, `_qmzHandleAssignByNumber()`
-  and `_qmzShowTypeChooser()` (`renderer.js`) before deciding this. QMZ
-  assignment requires a **specific, existing or to-be-created sequence
-  code** (e.g. `"Q05"`), resolved today via a numeric input plus, on
-  ambiguity, a type-chooser UI flow (multiple sequences sharing a number,
-  or none existing yet). There is no authoritative "assign to type Q, pick
-  whatever sequence" primitive — inventing a default (next available? the
-  currently viewed sequence?) would be new behavior, not a reuse of
-  existing behavior, which the architecture explicitly rules out. A
-  `qmz.assignToSequence({ sequenceCode })` command reusing
-  `_qmzAssignToSequence` directly (no invented defaulting) is a reasonable
-  Phase 1B candidate once QMZ has a concrete console-page design; `nextSequence`/
-  `previousSequence` have the same issue (there is no single "current
-  sequence" state to step through — QMZ is scoped by photographer/view,
-  not one active sequence).
+- **QMZ explicit-sequence assignment** was deferred in Phase 1A for the
+  reason recorded here at the time: no authoritative "assign to type Q, pick
+  whatever sequence" primitive exists, and inventing a default would be new
+  behavior. Phase 1B implements exactly the non-defaulting form this note
+  anticipated — `qmz.assignToSequence({ sequenceCode })`, requiring an
+  **exact, already-existing** code, never a type/number pair to resolve
+  ambiguously. See "QMZ — `qmz.assignToSequence`" below.
+- **QMZ `nextSequence`/`previousSequence`.** Still deferred — there is no
+  single "current sequence" state to step through (QMZ is scoped by
+  photographer/view, not one active sequence). Unchanged from Phase 1A.
 - **Import (start/confirm an import).** Explicitly out of scope for this
   slice per the architecture brief — the existing confirmation/validation
   path needs its own review before any command can invoke it without
@@ -176,17 +183,212 @@ itself (not duplicated per caller):
 
 ---
 
+## State & discovery API (Phase 1B)
+
+```js
+AutoIngestCommands.getContext()            // -> 'browse' | 'qmz' | 'import' | null
+AutoIngestCommands.getAvailableCommands()  // -> string[]
+AutoIngestCommands.getState()              // -> state snapshot, see schema below
+```
+
+All three read live renderer state through the bridge on every call —
+nothing is cached, nothing is derived independently of the same state
+`canExecute()`/`execute()` already read. `getState()` returns `null` (and
+`getContext()` returns `null`, `getAvailableCommands()` returns `[]`) only
+if the bridge itself isn't wired up yet (`renderer.js` hasn't finished
+loading) — this mirrors `execute()`'s own `renderer-not-ready` case.
+
+### Context values
+
+Only three values exist, because only three are genuinely distinct,
+authoritative modes in this codebase today:
+
+- `'browse'` — the normal import screen (file grid, selection, grouping,
+  preview). This is the default/fallback.
+- `'qmz'` — the QMZ Sequence Manager overlay is open (`_qmzOpen`).
+- `'import'` — an import is actively running (`importRunning`), tied to the
+  same flag that drives `showProgress()`/the progress modal. Cheap,
+  authoritative, and already read by other code — worth exposing even
+  though Phase 1B adds no commands that run *during* an import.
+
+**There is deliberately no `'group'` context.** Grouping is an *activity*
+available within `'browse'`, not a distinct mode the UI itself switches
+into — `isMetadataGroupingMode()` is a capability flag (whether grouping UI
+affordances are shown), not evidence of a separate screen. Fabricating a
+`'group'` context here would invent a UI concept that doesn't exist rather
+than reflect one that does; if grouping ever becomes a real distinct screen,
+add its context value then; do not add it speculatively now.
+
+### State schema
+
+```ts
+{
+  context: 'browse' | 'qmz' | 'import',
+  activeFile: string | null,     // _resolveActiveFilePath() — same resolution execute() uses
+  selectedCount: number,
+  hasSelection: boolean,         // selectedCount > 0
+  previewOpen: boolean,
+  availableCommands: string[],   // see "Availability semantics" below
+
+  // Exactly one of these two is present, never both, based on `context`:
+  groups?: [{ id, label, fileCount, subEventId, colorIndex }],   // absent when context === 'qmz'
+  sequences?: [{ code, count }],                                  // present only when context === 'qmz'
+}
+```
+
+- `groups` (browse/import) mirrors `GroupManager.getGroups()` read-only —
+  `id`, `label`, `fileCount` (`files.size`, never the raw `Set`),
+  `subEventId`, and `colorIndex` (`GroupManager.getGroupIndex`/color-coding
+  position). No new mutation API is added beyond the existing
+  `group.assign`/`group.unassign` commands.
+- `sequences` (qmz only) mirrors the live `_qmzData.sequences` list —
+  `code` and `count` (total files across all photographers in that
+  sequence). Read-only; the only way to change it is
+  `qmz.assignToSequence` (assign into an existing one) or the pre-existing
+  UI (create/remove a sequence) — the command layer adds no sequence
+  create/remove/edit command in Phase 1B.
+- `activeFile` while the preview overlay is open resolves to the
+  previewed file (`_previewPath`), not whatever was focused/selected
+  before opening it — `_resolveActiveFilePath()` was made preview-aware for
+  this (previously only call sites that already short-circuited on
+  `_previewOpen` needed it; `getState()` is the first caller that needs the
+  resolution itself to be preview-aware).
+
+### Availability semantics
+
+`getAvailableCommands()` filters `getCommands()` down to the ids whose
+`check(undefined, bridge)` currently returns true — **the exact same
+`check()` every command already declares for `canExecute()`/`execute()`**,
+not a second table. A command with no `check()` is always considered
+available (matches `canExecute()`'s own "no check ⇒ always eligible" rule).
+
+For a parameterized command (`group.assign`, `qmz.assignToSequence`),
+`getAvailableCommands()` reflects only the **context/selection**
+eligibility (`check()`), never a specific payload — it answers "is this
+command worth offering right now", not "would this exact payload succeed".
+A caller (future adapter) must still call
+`canExecute(commandId, realPayload)` before actually executing, exactly as
+already documented above for `canExecute()`/`execute()`. For example,
+`qmz.assignToSequence` appears in `availableCommands` as soon as the QMZ
+overlay is open with a non-empty selection, regardless of which sequence
+code will eventually be passed — a specific nonexistent or malformed code
+is still rejected at `canExecute()`/`execute()` time (see below).
+
+---
+
+## Subscription (Phase 1B)
+
+```js
+const unsubscribe = AutoIngestCommands.subscribe(listener);
+// listener(state) is called with the same shape getState() returns,
+// every time AutoIngest's own state actually changes.
+unsubscribe(); // stop receiving further notifications
+```
+
+- **Event-driven, not polled.** `commandManager.js` wires
+  `window.__autoIngestRendererBridge.notifyStateChange` to its internal
+  `_notify()` the first time the bridge is observed — lazily, inside the
+  shared `_bridge()` helper every one of `getAvailableCommands()`,
+  `getState()`, `canExecute()`, and `execute()` already calls, so it's wired
+  before `subscribe()`'s listener could ever matter in practice (call any
+  one of those four, or just `execute()` a command, before relying on a
+  subscription). `renderer.js` calls `_notifyCommandLayer()`
+  (a thin wrapper around that same hook) from the small set of
+  already-shared low-level functions every UI and command-driven mutation
+  path already funnels through: `_setPreviewFocus`, `syncOneTile`,
+  `syncAllTiles`, `syncAllGroupBadges`, `openPreview`, `closePreview`,
+  `navigatePreview`, the QMZ equivalents (`_qmzSetPreviewFocus`,
+  `_qmzSyncOneTile`, `_qmzSyncAllTiles`, `_qmzRefresh`,
+  `_closeQMZManager`), and every `importRunning` assignment site. This was
+  the deliberate alternative to sprinkling a notify call into every
+  individual UI event handler — no new state-change source was added, only
+  a hook onto the ones that already exist and that every path already
+  passes through. There is no `MutationObserver`, no polling interval, no
+  timer of any kind.
+- **A throwing listener never breaks another listener.** Each listener runs
+  in its own `try/catch` inside `_notify()`; a thrown error is logged
+  (`console.error`) and the remaining listeners still run.
+- **No dedicated "unsubscribe all" / listener-count API** — not needed for
+  a single future adapter's lifecycle; add one only if a real second
+  consumer needs it.
+
+---
+
+## QMZ — `qmz.assignToSequence` (Phase 1B)
+
+| Command | Payload | Applicable when | Calls |
+|---|---|---|---|
+| `qmz.assignToSequence` | `{ sequenceCode: string }` | QMZ is open, selection is non-empty | `_qmzAssignSelectionToSequenceCode(sequenceCode)` |
+
+**Payload format.** `sequenceCode` must match `main/qmzService.js`'s own
+`SEQ_RE`: exactly two digits followed by one of `Q`/`M`/`Z` — e.g. `"01Q"`,
+`"12M"`, `"52Z"`. **Before writing this command's validation, `SEQ_RE`,
+`parseCode()`, `formatCode()`, and every other QMZ code-format reference in
+`main/qmzService.js` were checked exhaustively: no lowercase-suffix variant
+(e.g. `"05aQ"`, `"05bM"`) exists anywhere in the current QMZ implementation.**
+Such codes are rejected by `isValid()` as malformed, the same as any other
+string that doesn't match `SEQ_RE` — this command does not invent grammar
+the rest of QMZ doesn't already accept.
+
+**Authoritative primitive.** `_qmzAssignSelectionToSequenceCode(sequenceCode)`
+(`renderer.js`) is the shared primitive reused by both `qmz.assignToSequence`
+and the pre-existing `_qmzHandleAssignByNumber()`'s single-match branch —
+genuinely one implementation, not two. It never creates a sequence and
+never guesses a type: it checks the code against the live
+`_qmzData.sequences` list and, only if a real match exists, delegates to
+`_qmzAssignToSequence(sequenceCode)` — the same real-move-on-disk primitive
+every existing QMZ assignment path (numeric-input assign, type-chooser
+assign) already uses (`window.api.qmzMoveToSequence`, then
+`_qmzAutoQueueMetadata`). Selection is cleared and QMZ state is refreshed
+exactly as it is for every other QMZ assignment path — no separate
+behavior for the command-layer caller.
+
+**Validation and result semantics:**
+
+- Missing payload, a non-string `sequenceCode`, a blank string, or a string
+  not matching `SEQ_RE` (including a lowercase-suffix code) → rejected by
+  `isValid()`: `{ ok: false, reason: 'invalid-payload' }`. Nothing is
+  touched.
+- Outside QMZ mode, or with an empty selection → rejected by `check()`:
+  `{ ok: false, reason: 'not-applicable' }`. Nothing is touched.
+- A **well-formed but nonexistent** code (e.g. `"02M"` when no such
+  sequence has been created) is **not** rejected by `canExecute()` — code
+  existence is a payload-dependent fact, not context eligibility, and
+  `check()` deliberately never inspects the payload (consistent with every
+  other command here). It genuinely runs, finds no match, and resolves to
+  `{ ok: true, executed: false }` — the normal "ran, nothing to do" outcome,
+  the same category as navigating past the last file. The sequence is never
+  auto-created and no type is ever guessed.
+- A well-formed, existing code with a non-empty selection →
+  `{ ok: true, executed: true }`; `computeExecuted(result)` is required
+  here for the same reason as `group.assign`: the underlying primitive
+  resolves to a plain boolean (`true`/`false`), and `false != null` would
+  otherwise make the generic fallback report `executed: true` even when
+  nothing happened (see `commandManager.js`'s `computeExecuted` comment on
+  this command — this exact bug was caught by the Phase 1B live test before
+  being fixed, not assumed benign).
+
+**QMZ state (`state.sequences`) is read-only.** Phase 1B adds no
+create/remove/edit-sequence command; `qmz.assignToSequence` is the only new
+QMZ mutation.
+
+---
+
 ## Context / mode
 
 Every command's `check(payload, bridge)` reads live renderer state through
 the bridge (`isQmzOpen()`, `isPreviewOpen()`, `getSelectionSize()`,
-`getActiveFilePath()`, `getVisibleFileCount()`) — nothing is cached. This
-is deliberately minimal: there is no formal "console page" mode system
-yet (Browse / Group / QMZ / Import / Audit / Archive). Adding one later —
-so a specific console page can ask "is this command relevant to what I'm
-showing" — only means adding more bridge accessors and `check()`
-conditions; it does not require changing the registry shape, `execute()`,
-or any existing command.
+`getActiveFilePath()`, `getVisibleFileCount()`) — nothing is cached.
+`AutoIngestCommands.getContext()`/`getState().context` (Phase 1B, see
+above) expose the coarse-grained summary of that same state as one of
+`'browse'` / `'qmz'` / `'import'` — see "Context values" above for exactly
+what exists and, just as importantly, what was deliberately **not** added
+(no `'group'` context — grouping is an activity within `'browse'`, not a
+distinct mode). Adding a genuinely new mode later — so a specific console
+page can ask "is this command relevant to what I'm showing" — only means
+adding more bridge accessors, `check()` conditions, and a new
+`_getCommandContext()` branch; it does not require changing the registry
+shape, `execute()`, or any existing command.
 
 ---
 
@@ -203,9 +405,19 @@ or any existing command.
    touch.
 3. Add an entry to `COMMANDS` in `commandManager.js`: `run()` (required),
    `check()` (when the command isn't always applicable), `isValid()` (when
-   it takes a payload that could be malformed).
-4. Add a live test case to `test/mxCommandLayerLive.test.js` exercising it
-   against real fixture data, following the existing cases' pattern.
+   it takes a payload that could be malformed), and — **before assuming the
+   generic `executed` fallback is fine** — check whether `run()`'s resolved
+   value is ever a non-null "no effect" result (an object, or `false`); if
+   so, add `computeExecuted(result)` too. This was missed once for
+   `qmz.assignToSequence` in Phase 1B and caught only by its own live test
+   (see the QMZ section above) — treat it as a required checklist item for
+   every new command, not an occasional fix.
+4. Add a live test case exercising it against real fixture data, following
+   the existing cases' pattern — either in `test/mxCommandLayerLive.test.js`
+   (Phase 1A's registry/navigation/selection/preview/grouping coverage) or
+   `test/mxCommandLayerPhase1BLive.test.js` (state/discovery/subscription/QMZ
+   coverage), whichever the new command's area matches; split into a further
+   new file if either grows unwieldy, following the same pattern.
 
 **Adapters must never manipulate AutoIngest state independently.** Every
 effect a controller (Logitech plugin, keyboard shortcut, anything else)
@@ -214,6 +426,39 @@ produces must go through `AutoIngestCommands.execute()`. Nothing outside
 `window.__autoIngestRendererBridge` directly, read/write `selectedFiles`/
 `GroupManager`/etc. directly, or simulate clicks on command-layer-covered
 UI.
+
+---
+
+## What an external adapter may / may not do (as of Phase 1B)
+
+A future adapter (Logitech plugin or otherwise) may, once a transport
+exists:
+
+- Call `getContext()`/`getState()`/`getAvailableCommands()` to render its
+  own UI (e.g. relabeling MX Console dial/button actions per context).
+- Call `subscribe()` to keep that UI in sync without polling.
+- Call `canExecute()`/`execute()` for any of the nine registered commands,
+  including `qmz.assignToSequence` with a real, existing sequence code.
+
+It may **not**, and nothing in Phase 1B adds a way to:
+
+- Read or write any AutoIngest state by a path other than
+  `AutoIngestCommands` (no direct `window.__autoIngestRendererBridge`
+  access, no DOM inspection/simulation, no reaching into `GroupManager`/
+  `selectedFiles`/QMZ state directly).
+- Create, remove, or edit a QMZ sequence (only assignment into an
+  *existing* one is exposed).
+- Start, confirm, or otherwise drive an import (`import.start` and
+  everything import-execution-related remains unexposed).
+- Touch Archive Maintenance, Event Maintenance, or the Archive Browser
+  (unimplemented in the command layer — no authoritative primitive exists
+  yet to reuse).
+- Reach the renderer over a network port, WebSocket, or HTTP server — no
+  such transport exists in this codebase; Phase 1B is transport-free by
+  design, same as Phase 1A.
+- Bypass `isValid()`/`check()` validation for any command, including
+  guessing/accepting a QMZ code format (such as a lowercase-suffix code)
+  that `main/qmzService.js` itself doesn't support.
 
 ---
 

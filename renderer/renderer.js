@@ -5660,6 +5660,7 @@ function renderDrives(cards) {
       window.api.abortCopy();
       _multiImportAbort = true;   // a multi-event run must not start its next event
       importRunning = false;
+      _notifyCommandLayer();
       document.getElementById('progressOverlay').classList.remove('visible');
       showMessage('Card disconnected. Import cancelled.');
       resetAppState({ preserveEvent: true });
@@ -5959,6 +5960,7 @@ function resetAppState({ preserveEvent = false } = {}) {
   _selectionAnchor = null;
   _prevFocusPath   = null;
   importRunning    = false;
+  _notifyCommandLayer();
   isShuttingDown   = false;  // cleared last — safe to accept a new card
   expandedFolders.clear(); dcimChildrenCache = []; cachedDcimPath = null;
 
@@ -7154,6 +7156,7 @@ function _setPreviewFocus(path) {
   if (path) tileMap.get(path)?.classList.add('pv-focused');
   _prevFocusPath  = path;
   lastClickedPath = path;
+  _notifyCommandLayer();
 }
 
 /**
@@ -7293,6 +7296,7 @@ function syncOneTile(filePath) {
   const cb = tile.querySelector('input[type="checkbox"]');
   if (cb) cb.checked = checked;
   syncPairLinks();
+  _notifyCommandLayer();
 }
 
 /**
@@ -7309,6 +7313,7 @@ function syncAllTiles() {
   }
   _prevFocusPath = lastClickedPath;
   syncPairLinks();
+  _notifyCommandLayer();
 }
 
 /**
@@ -9081,6 +9086,7 @@ function _closeQMZManager() {
     document.getElementById('eventMgmtModal')?.classList.add('open');
     _qmzHiddenEventMgmt = false;
   }
+  _notifyCommandLayer(); // context transition: qmz -> browse
 }
 
 async function _qmzRefresh() {
@@ -9120,8 +9126,10 @@ async function _qmzRefresh() {
   // several-hundred/thousand-file photographer folder over SMB no longer
   // blocks the operator from seeing and using the workspace. Fire-and-forget
   // is intentional; _qmzEnrichCaptureDatesInBackground() re-renders in place
-  // once real dates arrive.
+  // once real dates arrive (capturedAt isn't part of the compact command-layer
+  // state schema, so that later correction doesn't need its own notify).
   _qmzEnrichCaptureDatesInBackground();
+  _notifyCommandLayer(); // covers both the qmz context transition on open and every sequence-data change
 }
 
 // Resolves real EXIF capture dates for every file the just-completed scan
@@ -9603,6 +9611,7 @@ function _qmzSyncOneTile(filePath) {
   tile.classList.toggle('selected', checked);
   const cb = tile.querySelector('input[type="checkbox"]');
   if (cb) cb.checked = checked;
+  _notifyCommandLayer();
 }
 
 function _qmzSyncAllTiles() {
@@ -9614,6 +9623,7 @@ function _qmzSyncAllTiles() {
     if (cb) cb.checked = checked;
   }
   _qmzPrevFocusPath = _qmzLastClickedPath;
+  _notifyCommandLayer();
 }
 
 // ── QMZ preview-focus + arrow-key grid navigation ───────────────────────────
@@ -9626,6 +9636,7 @@ function _qmzSetPreviewFocus(path) {
   if (path) _qmzTileMap.get(path)?.classList.add('pv-focused');
   _qmzPrevFocusPath   = path;
   _qmzLastClickedPath = path;
+  _notifyCommandLayer();
 }
 
 function _qmzArrowFocusTarget(key, order) {
@@ -9889,7 +9900,7 @@ function _qmzGroupPathsByPhotographer(paths) {
 }
 
 async function _qmzAssignToSequence(sequenceCode) {
-  if (!_qmzRoot || !_qmzSelectedFiles.size) return;
+  if (!_qmzRoot || !_qmzSelectedFiles.size) return false;
   const filesToMove = [..._qmzSelectedFiles];
   const byPg = _qmzGroupPathsByPhotographer(filesToMove);
   _qmzSetStatus(`Moving ${filesToMove.length} file(s) to ${sequenceCode}…`);
@@ -9916,6 +9927,29 @@ async function _qmzAssignToSequence(sequenceCode) {
   );
   _qmzSelectedFiles = new Set();
   await _qmzRefresh();
+  return true;
+}
+
+/**
+ * Assigns the current QMZ selection to an EXISTING sequence identified by
+ * its exact code (e.g. "01Q") — never creates one, never guesses a type.
+ * Shared by _qmzHandleAssignByNumber's single-match branch (below) and
+ * commandManager.js's qmz.assignToSequence command: both call this, not two
+ * separate implementations. The real move (_qmzAssignToSequence) is already
+ * the single primitive every existing QMZ path used; the only thing this
+ * adds is the existence check against the live _qmzData.sequences list —
+ * moveFilesToSequence's own main-process handler would otherwise silently
+ * mkdir a destination for ANY syntactically valid code, existing or not
+ * (see main/qmzService.js), which is exactly the silent-substitution/
+ * auto-creation this primitive exists to prevent at the renderer boundary.
+ * @returns {Promise<boolean>} true if assignment was attempted (a real,
+ *   existing sequence and a non-empty selection); false otherwise.
+ */
+async function _qmzAssignSelectionToSequenceCode(sequenceCode) {
+  if (!_qmzRoot || !_qmzSelectedFiles.size) return false;
+  const exists = (_qmzData?.sequences || []).some(s => s.code === sequenceCode);
+  if (!exists) return false;
+  return _qmzAssignToSequence(sequenceCode);
 }
 
 async function _qmzHandleMoveToUnsequenced() {
@@ -10005,7 +10039,7 @@ async function _qmzHandleAssignByNumber() {
   const matches = (_qmzData?.sequences || []).filter(s => s.number === num);
   if (matches.length === 1) {
     document.getElementById('qmzAssignInput').value = '';
-    await _qmzAssignToSequence(matches[0].code);
+    await _qmzAssignSelectionToSequenceCode(matches[0].code);
   } else if (matches.length > 1) {
     // Multiple sequences share this number — let user pick which to assign to
     _qmzShowTypeChooser(
@@ -10227,6 +10261,7 @@ async function openPreview(filePath) {
   _previewPath  = filePath;
   _previewOrder = _qmzOpen ? _qmzGetRenderedPathOrder() : getRenderedPathOrder();
   _previewOpen  = true;
+  _notifyCommandLayer();
 
   const overlay    = document.getElementById('previewOverlay');
   const pvContent  = document.getElementById('pvContent');
@@ -10345,6 +10380,7 @@ function closePreview() {
 
   const overlay = document.getElementById('previewOverlay');
   if (overlay) overlay.classList.add('hidden');
+  _notifyCommandLayer();
 }
 
 async function navigatePreview(dir) {
@@ -10373,6 +10409,7 @@ async function navigatePreview(dir) {
   if (vid) { vid.pause(); vid.currentTime = 0; vid.removeAttribute('src'); vid.load(); }
 
   _previewPath = nextPath;
+  _notifyCommandLayer(); // activeFile resolves to _previewPath while preview is open — see _resolveActiveFilePath
 
   const pvContent  = document.getElementById('pvContent');
   const pvFilename = document.getElementById('pvFilename');
@@ -10399,11 +10436,21 @@ async function navigatePreview(dir) {
 
 /**
  * Resolves the file a navigation/preview/selection command should act on
- * right now: the currently focused/clicked tile, else the first selected
- * file, else the first file in view. Mirrors the existing Space-bar preview
- * fallback chain (Ref.1) for both the QMZ and normal screens.
+ * right now. While the preview overlay is open, that is unambiguously
+ * whichever file is currently being previewed (_previewPath) — arrow-key
+ * navigation inside an open preview (navigatePreview) moves _previewPath
+ * without touching lastClickedPath/_qmzLastClickedPath (by design: the grid
+ * focus underneath is deliberately left where the operator opened preview
+ * from), so falling through to the pre-preview fallback chain here would
+ * make `activeFile` visibly stale for a caller watching state while
+ * browsing inside preview (AI-FEAT MX Console Phase 1B). When preview is
+ * closed, mirrors the existing Space-bar fallback chain (Ref.1): the
+ * currently focused/clicked tile, else the first selected file, else the
+ * first file in view — unchanged from Phase 1A, for both the QMZ and
+ * normal screens.
  */
 function _resolveActiveFilePath() {
+  if (_previewOpen) return _previewPath || null;
   return _qmzOpen
     ? (_qmzLastClickedPath || [..._qmzSelectedFiles][0] || _qmzGetRenderedPathOrder()[0] || null)
     : (lastClickedPath || [...selectedFiles][0] || currentFiles[0]?.path || null);
@@ -10464,6 +10511,82 @@ async function _navigateActiveFile(dir) {
   _setPreviewFocus(next);
   tileMap.get(next)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   return true;
+}
+
+// ════════════════════════════════════════════════════════════════
+// COMPACT STATE DERIVATION (AI-FEAT MX Console Phase 1B)
+// Every value here is read directly from already-authoritative renderer
+// state — nothing is cached or independently maintained. See
+// docs/commandLayer.md "Context detection" for why `context` has exactly
+// three values (no fabricated "group"/"audit"/"archive" modes) and why
+// `import` is included (importRunning is a real, cheap, authoritative flag
+// — see where it's set around showProgress()).
+// ════════════════════════════════════════════════════════════════
+
+/** "qmz" | "import" | "browse" — the screen currently occupying the
+ * renderer, in priority order (QMZ and import are both full-overlay
+ * screens; browse is the default underneath either). There is no separate
+ * "group" context: grouping is an activity available WITHIN browse
+ * (context menu / Cmd+G chord), never its own screen — isMetadataGroupingMode()
+ * is a capability flag about the active event's tag shape, not a mode the
+ * operator navigates into/out of. See getGroupsCompact() for group state
+ * exposed alongside the browse context instead. */
+function _getCommandContext() {
+  if (_qmzOpen) return 'qmz';
+  if (importRunning) return 'import';
+  return 'browse';
+}
+
+/** Compact, JSON-safe group list — never the raw Set<string> files, never
+ * a DOM node. colorIndex is the group's position in GroupManager.getGroups()
+ * (what GroupManager.getGroupColor(idx) itself takes) — cheap, already
+ * computed by the existing panel-rendering code, safe to expose for a
+ * future console page's own color coding. */
+function _getGroupsCompact() {
+  return GroupManager.getGroups().map((g, idx) => ({
+    id: g.id,
+    label: g.label,
+    fileCount: g.files.size,
+    subEventId: g.subEventId,
+    colorIndex: idx,
+  }));
+}
+
+/** Compact QMZ sequence list — only when QMZ is open (empty otherwise).
+ * `count` mirrors exactly what the QMZ sidebar itself already computes per
+ * sequence chip (see _renderQMZRight) — summed across photographers, no new
+ * aggregation invented for this. Never the per-file lists inside
+ * sequence.photographers. */
+function _getQmzSequencesCompact() {
+  if (!_qmzOpen || !_qmzData?.sequences) return [];
+  return _qmzData.sequences.map(s => ({
+    code: s.code,
+    count: Object.values(s.photographers || {}).reduce((sum, pg) => sum + (pg.count || 0), 0),
+  }));
+}
+
+/**
+ * Notifies renderer/commandManager.js's subscribers that command-visible
+ * state may have changed. A thin pass-through to whatever the command layer
+ * installed on the bridge (a no-op until commandManager.js loads and wires
+ * itself in) — renderer.js never holds a listener list of its own; that
+ * stays entirely inside commandManager.js, per docs/commandLayer.md's
+ * ownership rule.
+ *
+ * Called from the small set of ALREADY-SHARED low-level sync/refresh
+ * functions every selection/focus/preview/group/QMZ-mutating path — UI or
+ * command-driven — already funnels through (syncAllTiles/syncOneTile,
+ * _setPreviewFocus, openPreview/closePreview, syncAllGroupBadges,
+ * _qmzSyncAllTiles/_qmzSyncOneTile, _qmzSetPreviewFocus, _qmzRefresh,
+ * _closeQMZManager), plus the two import-start/import-end points
+ * (importRunning has no shared sync function of its own). This is
+ * deliberately NOT sprinkled across every individual UI event handler —
+ * see docs/commandLayer.md "State-change subscription" for why hooking
+ * these dozen already-shared chokepoints is enough for full coverage
+ * without a wide renderer refactor.
+ */
+function _notifyCommandLayer() {
+  window.__autoIngestRendererBridge?.notifyStateChange?.();
 }
 
 // ── Preview keyboard handler ───────────────────────────────────────────────
@@ -10783,6 +10906,7 @@ document.getElementById('importBtn').addEventListener('click', async () => {
     }
 
     importRunning = true;
+    _notifyCommandLayer();
     updateSelectionBar();
     // Reset cleanup eligibility for the new import session — per-import state,
     // owned here (import start) not in _closeProgressModal.
@@ -10899,6 +11023,7 @@ document.getElementById('importBtn').addEventListener('click', async () => {
       }
     } finally {
       importRunning = false;
+      _notifyCommandLayer();
     }
     return;
   }
@@ -10929,6 +11054,7 @@ document.getElementById('importBtn').addEventListener('click', async () => {
   await window.api.ensureDir(finalDest);
 
   importRunning = true;
+  _notifyCommandLayer();
   setStatusBarMessage('selection', null);
   setStatusBarMessage('import', 'Importing…', 3);
   updateSelectionBar();
@@ -10954,6 +11080,7 @@ document.getElementById('importBtn').addEventListener('click', async () => {
     document.getElementById('progressDoneBtn').classList.add('visible');
   } finally {
     importRunning = false;
+    _notifyCommandLayer();
     setStatusBarMessage('import', null);
   }
 });
@@ -11511,6 +11638,7 @@ function _closeProgressModal() {
   document.getElementById('progressOverlay').classList.remove('visible');
   importRunning        = false;
   _postImportSucceeded = false;
+  _notifyCommandLayer();
 
   // Remove per-import dynamic elements so the next import gets a clean modal.
   // Cleanup eligibility (_csqEligibleFiles / _csqSourceRoot) is NOT cleared here —
@@ -12670,6 +12798,7 @@ function syncAllGroupBadges() {
   for (const [path] of tileMap) syncGroupBadge(path);
   syncAllEventBadges();   // event ownership badges follow every group/ownership change
   _renderSessionStrip();
+  _notifyCommandLayer();
 }
 
 /**
@@ -18064,13 +18193,15 @@ const _transferMonitor = (() => {
 })();
 
 // ════════════════════════════════════════════════════════════════
-// COMMAND LAYER BRIDGE (AI-FEAT MX Console Phase 1A)
+// COMMAND LAYER BRIDGE (AI-FEAT MX Console Phase 1A + 1B)
 // Explicit extension point for renderer/commandManager.js — the ONLY
 // renderer.js surface it is allowed to touch. Everything listed here is an
 // already-authoritative function/state accessor reused as-is (see the
-// "ACTIVE-FILE RESOLUTION + COMMAND-LAYER PRIMITIVES" section near
-// navigatePreview, and the group-assignment primitives near the group
-// context menu) — this object adds no new business logic of its own.
+// "ACTIVE-FILE RESOLUTION + COMMAND-LAYER PRIMITIVES" and "COMPACT STATE
+// DERIVATION" sections near navigatePreview, the group-assignment
+// primitives near the group context menu, and _qmzAssignSelectionToSequenceCode
+// near the QMZ assign-by-number handler) — this object adds no new business
+// logic of its own, Phase 1B included.
 //
 // This is NOT a public API for arbitrary external code: adapters (the
 // future Logitech Actions SDK plugin, keyboard shortcuts, or any other MX
@@ -18112,4 +18243,20 @@ window.__autoIngestRendererBridge = {
     return { groupId: assignedGroupId, claim };
   },
   unassignSelectionFromGroup: () => _unassignSelectionFromGroup(),
+
+  // ── Phase 1B: compact state, and QMZ's explicit-sequence command ──────────
+  getContext:          () => _getCommandContext(),
+  isImportRunning:     () => importRunning,
+  getGroupsCompact:    () => _getGroupsCompact(),
+  getQmzSequencesCompact: () => _getQmzSequencesCompact(),
+  // Assigns to an EXISTING QMZ sequence only — see _qmzAssignSelectionToSequenceCode's
+  // own comment for why it never creates/guesses one.
+  qmzAssignSelectionToSequence: (sequenceCode) => _qmzAssignSelectionToSequenceCode(sequenceCode),
+  // State-change notifications: commandManager.js overwrites this with its
+  // own listener-fanout function at load time (see its "Wire into the
+  // bridge" section) — this no-op default means a hook point calling
+  // notifyStateChange() before commandManager.js has loaded is always safe.
+  // renderer.js never holds a listener list itself; see docs/commandLayer.md
+  // "State-change subscription" for the ownership boundary.
+  notifyStateChange: () => {},
 };

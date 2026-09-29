@@ -134,6 +134,7 @@ async function writeMedia(root, relFile) {
       'selection.toggleCurrent', 'selection.selectAll', 'selection.clear',
       'preview.toggle',
       'group.assign', 'group.unassign',
+      'qmz.assignToSequence', // added in Phase 1B — see test/mxCommandLayerPhase1BLive.test.js
     ];
     check(expected.every((id) => commands.includes(id)), 'registry contains every expected initial command');
     check(commands.length === expected.length, 'registry contains no unexpected extra commands');

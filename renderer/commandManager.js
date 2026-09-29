@@ -1,11 +1,17 @@
 // renderer/commandManager.js
-// ── AutoIngestCommands — internal command registry (Phase 1A) ──────────────
+// ── AutoIngestCommands — internal command registry (Phase 1A + 1B) ─────────
 //
 // A small, explicit abstraction so external controllers (the future
 // Logitech MX Creative Console plugin, keyboard shortcuts, or any other
 // hardware controller) can invoke existing AutoIngest behavior WITHOUT
 // simulating DOM clicks, depending on CSS selectors, duplicating business
-// logic, or bypassing GroupManager/selection/import safety.
+// logic, or bypassing GroupManager/QMZ/ImportSession/selection/import safety.
+//
+// Phase 1B adds observability on top of Phase 1A's execute()/canExecute():
+// getContext()/getState()/getAvailableCommands() so a future adapter can
+// read compact, authoritative state instead of guessing, and subscribe()
+// so it can react to changes instead of polling. Still no transport, no
+// Logitech code — see docs/commandLayer.md.
 //
 // Architecture:
 //   (future) MX Creative Console
@@ -28,10 +34,63 @@
 
 const AutoIngestCommands = (() => {
 
+  // ── State-change subscription (Phase 1B) ────────────────────────────────
+  // Owned entirely here, not in renderer.js: renderer.js's small set of
+  // already-shared sync/refresh functions (syncAllTiles, _setPreviewFocus,
+  // openPreview/closePreview, syncAllGroupBadges, the QMZ equivalents,
+  // _qmzRefresh, _closeQMZManager, and the import-start/end points — see
+  // "COMPACT STATE DERIVATION" in renderer.js) each call
+  // bridge.notifyStateChange() after the state they own changes. That
+  // function is a no-op until _bridge() below overwrites it with _notify
+  // the first time this module talks to the bridge — no polling, no
+  // MutationObserver, no dependency on WHEN renderer.js finishes loading
+  // relative to this file (which is guaranteed anyway — see load order
+  // above — this is just defensive).
+  const _listeners = new Set();
+  let _bridgeWired = false;
+
   /** Returns the live bridge, or null if renderer.js hasn't finished
-   * loading yet (e.g. a command fired during startup). Never throws. */
+   * loading yet (e.g. a command fired during startup). Never throws.
+   * Also wires this module's _notify into the bridge's notification slot,
+   * exactly once, the first time the bridge is genuinely available. */
   function _bridge() {
-    return (typeof window !== 'undefined' && window.__autoIngestRendererBridge) || null;
+    const bridge = (typeof window !== 'undefined' && window.__autoIngestRendererBridge) || null;
+    if (bridge && !_bridgeWired) {
+      bridge.notifyStateChange = _notify;
+      _bridgeWired = true;
+    }
+    return bridge;
+  }
+
+  /**
+   * Subscribes to compact state-change notifications (see getState() for
+   * the shape). Fires after any command-visible state change — from a
+   * command, a keyboard shortcut, or a plain mouse click; see the ownership
+   * note above.
+   * @param {(state: object) => void} listener
+   * @returns {() => void} an unsubscribe function.
+   */
+  function subscribe(listener) {
+    if (typeof listener !== 'function') {
+      throw new TypeError('AutoIngestCommands.subscribe: listener must be a function');
+    }
+    _listeners.add(listener);
+    return () => { _listeners.delete(listener); };
+  }
+
+  /** Fans the current state out to every subscriber. Iterates a snapshot so
+   * a listener unsubscribing itself (or another listener) mid-notify never
+   * skips/double-calls anyone; one listener throwing never stops the rest. */
+  function _notify() {
+    const state = getState();
+    for (const fn of [..._listeners]) {
+      try {
+        fn(state);
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('[AutoIngestCommands] a state-change listener threw:', err);
+      }
+    }
   }
 
   // ── Command definitions ─────────────────────────────────────────────────
@@ -108,15 +167,109 @@ const AutoIngestCommands = (() => {
       check: (_p, b) => !b.isQmzOpen() && b.getSelectionSize() > 0,
       run: (_p, b) => b.unassignSelectionFromGroup(),
     },
+
+    // payload: { sequenceCode: string }, e.g. "01Q", "12M", "52Z" — exactly
+    // main/qmzService.js's own SEQ_RE format (2 digits + Q/M/Z; there is no
+    // lowercase-suffix variant anywhere in the current QMZ implementation —
+    // see docs/commandLayer.md "QMZ — qmz.assignToSequence" for the
+    // Phase 1B investigation that confirmed this before writing this regex).
+    // Never creates the sequence and never guesses a type: the code must
+    // already exist in the live QMZ workspace (bridge.qmzAssignSelectionToSequence
+    // -> _qmzAssignSelectionToSequenceCode's own existence check).
+    'qmz.assignToSequence': {
+      isValid: (p) => !!p && typeof p === 'object' &&
+        typeof p.sequenceCode === 'string' && /^\d{2}[QMZ]$/.test(p.sequenceCode),
+      check: (_p, b) => b.isQmzOpen() && b.getSelectionSize() > 0,
+      run: (p, b) => b.qmzAssignSelectionToSequence(p.sequenceCode),
+      // Same lesson as group.assign: run() resolves to a plain boolean here
+      // (true only if a real, existing sequence code was matched and the
+      // move was attempted), but `false` is still != null, so the generic
+      // `result != null` fallback would wrongly report executed:true for a
+      // well-formed payload naming a sequence that doesn't exist. A
+      // nonexistent code is a normal "ran, nothing to do" outcome (check()
+      // deliberately does not inspect the payload to pre-reject it — see
+      // the comment above isValid — so this must resolve here instead).
+      computeExecuted: (result) => result === true,
+    },
   };
 
-  // QMZ and Import commands are deferred for Phase 1A — see
+  // Import commands (import.start/confirm) are deferred for Phase 1B — see
   // docs/commandLayer.md "Deferred commands" for exactly why.
 
   // ── Registry API ─────────────────────────────────────────────────────────
 
   function getCommands() {
     return Object.keys(COMMANDS);
+  }
+
+  /**
+   * Command ids currently eligible to attempt, given live renderer state —
+   * the SAME check(payload, bridge) predicate canExecute() itself calls for
+   * each command (not a second eligibility table). Evaluated with an
+   * undefined payload: every command's check() in this registry only reads
+   * bridge/context state, never the payload (payload-shape validity is
+   * isValid()'s job, evaluated separately inside canExecute()) — so a
+   * parameterized command like group.assign or qmz.assignToSequence still
+   * appears here whenever its general context is valid (selection present,
+   * right screen open), even with no specific groupId/sequenceCode chosen
+   * yet. A caller must still call canExecute(commandId, payload) with the
+   * REAL payload before executing — this list is a discovery aid, not a
+   * pre-validated payload-free execute() shortcut.
+   * @returns {string[]}
+   */
+  function getAvailableCommands() {
+    const bridge = _bridge();
+    if (!bridge) return [];
+    return Object.entries(COMMANDS)
+      .filter(([, def]) => {
+        if (!def.check) return true;
+        try {
+          return !!def.check(undefined, bridge);
+        } catch {
+          return false;
+        }
+      })
+      .map(([id]) => id);
+  }
+
+  /** "browse" | "import" | "qmz" — see renderer.js's _getCommandContext for
+   * exactly which state each is derived from and why there is no separate
+   * "group" context. Returns null if the renderer isn't ready yet. */
+  function getContext() {
+    return _bridge()?.getContext() ?? null;
+  }
+
+  /**
+   * Compact, read-only, JSON-safe snapshot of everything a future console
+   * page needs: never a Set, DOM node, or large file array. See
+   * docs/commandLayer.md "State schema" for the authoritative field list —
+   * every field is read fresh from the bridge on each call (or each
+   * subscribe() notification), nothing here is cached.
+   * @returns {object|null} null if the renderer isn't ready yet.
+   */
+  function getState() {
+    const bridge = _bridge();
+    if (!bridge) return null;
+    const context = bridge.getContext();
+    const selectedCount = bridge.getSelectionSize();
+    const state = {
+      context,
+      activeFile: bridge.getActiveFilePath(),
+      selectedCount,
+      hasSelection: selectedCount > 0,
+      previewOpen: bridge.isPreviewOpen(),
+      availableCommands: getAvailableCommands(),
+    };
+    // Group state and QMZ sequence state are mutually exclusive by
+    // construction (GroupManager has no QMZ concept, QMZ has no groups) —
+    // exposed only for the context where each is meaningful, matching
+    // the compactness requirement rather than always sending both.
+    if (context === 'qmz') {
+      state.sequences = bridge.getQmzSequencesCompact();
+    } else {
+      state.groups = bridge.getGroupsCompact();
+    }
+    return state;
   }
 
   /**
@@ -194,7 +347,15 @@ const AutoIngestCommands = (() => {
     }
   }
 
-  return { execute, canExecute, getCommands };
+  return {
+    execute,
+    canExecute,
+    getCommands,
+    getAvailableCommands,
+    getContext,
+    getState,
+    subscribe,
+  };
 })();
 
 if (typeof window !== 'undefined') {
