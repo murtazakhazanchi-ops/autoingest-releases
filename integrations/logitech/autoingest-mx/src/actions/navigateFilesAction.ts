@@ -19,6 +19,12 @@ export class NavigateFilesAction extends AdjustmentAction {
   name = 'navigate_files';
   displayName = 'Navigate Files';
   description = 'Moves the active file forward or backward in AutoIngest';
+  // Phase 3B investigated AdjustmentAction's hasReset/resetCommandName as a
+  // possible dial-press mechanism (real, public, JSDoc'd SDK API — see
+  // docs/mxLogitechPlugin.md "Dial-press experiment"), but the physical MX
+  // Creative Console's main dial has no press/click mechanism at all
+  // (confirmed on real hardware) — moot regardless of SDK support. SELECT
+  // stays on the keypad, per the task brief's own explicit fallback.
   hasReset = false;
 
   async execute(event: AdjustmentActionExecuteEvent): Promise<void> {

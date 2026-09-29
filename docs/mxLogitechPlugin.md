@@ -1,12 +1,12 @@
-# MX Logitech Plugin (AI-FEAT MX Console — Phase 3A)
+# MX Logitech Plugin (AI-FEAT MX Console — Phase 3A + 3B)
 
-The first real Logitech MX Creative Console plugin — an integration/smoke-test
-milestone proving physical end-to-end control, not the final console UX. It
+The real Logitech MX Creative Console plugin. Phase 3A proved physical
+end-to-end control as an integration smoke test (three actions). Phase 3B
+turns it into the first practical Browse/Select operator surface — nine
+keypad actions plus the dial, still no Group/QMZ multi-page system. It
 connects to AutoIngest's existing Phase 2 control transport
 (`services/mxControlService.js` — see
-[mxControlTransport.md](mxControlTransport.md)) and exposes three of
-`AutoIngestCommands`' commands on real hardware: the main dial and one LCD
-key (two, optionally).
+[mxControlTransport.md](mxControlTransport.md)).
 
 ---
 
@@ -19,19 +19,31 @@ integrations/
                              logically separate from the AutoIngest app
       index.ts               entry point — registers actions, connects
       src/
-        descriptor.ts         cross-platform descriptor discovery/validation
+        descriptor.ts          cross-platform descriptor discovery/validation
         autoIngestClient.ts    connection manager (the AutoIngestClient)
         sharedClient.ts        the one shared AutoIngestClient instance
+        groupSlotHelper.ts     Phase 3B: G1/G2/G3 label resolution + assign
         actions/
-          toggleSelectionAction.ts
-          navigateFilesAction.ts
-          previewAction.ts
+          toggleSelectionAction.ts    Select (Phase 3A, displayName updated)
+          navigateFilesAction.ts      Navigate Files (dial, unchanged)
+          previewAction.ts            Preview (Phase 3A, now a standing key)
+          selectAllAction.ts          Select All (Phase 3B)
+          clearSelectionAction.ts     Clear (Phase 3B)
+          unassignGroupAction.ts      Unassign (Phase 3B)
+          assignG1Action.ts           G1 (Phase 3B)
+          assignG2Action.ts           G2 (Phase 3B)
+          assignG3Action.ts           G3 (Phase 3B)
+          groupsPagePlaceholderAction.ts   Groups › (Phase 3B, intentional placeholder)
       test/
-        descriptor.test.ts               unit tests
-        autoIngestClient.integration.test.ts   integration tests (real transport)
+        testHarness.ts                          shared real-AutoIngest launch helpers
+        descriptor.test.ts                      unit tests
+        groupSlotHelper.test.ts                 unit tests (Phase 3B)
+        browseActions.unit.test.ts              unit tests, mocked client (Phase 3B)
+        autoIngestClient.integration.test.ts    integration tests (real transport)
+        browsePageActions.integration.test.ts   integration tests (real transport, Phase 3B)
       package/                Logitech plugin metadata + icons
         metadata/LoupedeckPackage.yaml
-        actionicons/*.svg
+        actionicons/*.svg   (10 actions — see "Button icon design" below)
         actionsymbols/*.svg
 ```
 
@@ -201,23 +213,122 @@ physical session — see "Physical test results"):
 
 ## Logitech actions implemented
 
-| Action | SDK type | Display name | Commands | Hardware (Phase 3A) |
+### Browse page layout (Phase 3B)
+
+```
+┌──────────────┬──────────────┬──────────────┐
+│    SELECT    │  SELECT ALL  │    CLEAR     │
+├──────────────┼──────────────┼──────────────┤
+│   PREVIEW    │      G1      │      G2      │
+├──────────────┼──────────────┼──────────────┤
+│      G3      │   UNASSIGN   │   GROUPS ›   │
+└──────────────┴──────────────┴──────────────┘
+Main dial: clockwise -> next file, counter-clockwise -> previous file
+```
+
+| Action `name` | SDK type | Display name | Commands | Hardware |
 |---|---|---|---|---|
-| `toggle_selection` | `CommandAction` | Toggle Selection | `selection.toggleCurrent` | One LCD key |
-| `navigate_files` | `AdjustmentAction` | Navigate Files | `navigation.nextFile` (tick>0) / `navigation.previousFile` (tick<0) | Main dial |
-| `preview_toggle` | `CommandAction` | Preview | `preview.toggle` | Optional second LCD key |
+| `toggle_selection` | `CommandAction` | Select | `selection.toggleCurrent` | LCD key |
+| `select_all` | `CommandAction` | Select All | `selection.selectAll` | LCD key |
+| `clear_selection` | `CommandAction` | Clear | `selection.clear` | LCD key |
+| `preview_toggle` | `CommandAction` | Preview | `preview.toggle` | LCD key |
+| `assign_g1` | `CommandAction` | G1 | `group.assign` (resolved id) | LCD key |
+| `assign_g2` | `CommandAction` | G2 | `group.assign` (resolved id) | LCD key |
+| `assign_g3` | `CommandAction` | G3 | `group.assign` (resolved id) | LCD key |
+| `unassign_group` | `CommandAction` | Unassign | `group.unassign` | LCD key |
+| `groups_page_placeholder` | `CommandAction` | Groups | none — intentionally inert | LCD key |
+| `navigate_files` | `AdjustmentAction` | Navigate Files | `navigation.nextFile`/`previousFile` | Main dial |
 
-Per the SDK's own Command-vs-Adjustment distinction: the two discrete button
-actions are `CommandAction`s, the dial is a real `AdjustmentAction` — never
-a fake keyboard-shortcut simulation. `navigate_files` holds **no numeric
-"current file" state**; it reads only `event.tick`'s sign (ignoring
-magnitude, so multi-tick SDK events never batch several moves), issues
-exactly one command per detent, and lets AutoIngest's own result
-(`executed:true/false`) be the sole authority on whether anything moved —
-confirmed live: rotating past the first/last of 5 fixture files left
-AutoIngest stable with no corruption (Test C).
+Per the SDK's own Command-vs-Adjustment distinction: every discrete button
+action is a `CommandAction`, the dial is a real `AdjustmentAction` — never a
+fake keyboard-shortcut simulation. `navigate_files` still holds **no
+numeric "current file" state**; it reads only `event.tick`'s sign (ignoring
+magnitude), issues exactly one command per detent, and lets AutoIngest's
+own result (`executed:true/false`) be the sole authority on whether
+anything moved.
 
-No group/QMZ/import/archive actions exist yet — explicitly out of scope.
+`toggle_selection`'s `name` deliberately stayed `toggle_selection` (Phase
+3A's original identity, so any existing hardware assignment survives);
+only its `displayName` changed, from "Toggle Selection" to "Select", to fit
+the compact keypad label. `preview_toggle` is unchanged in every respect —
+Phase 3A introduced it as an optional second key; Phase 3B's layout simply
+makes it a standing one.
+
+**Command availability gating.** `select_all`, `clear_selection`,
+`preview_toggle`, `unassign_group`, and `assign_g{1,2,3}` all consult
+`autoIngestClient.getLatestState()?.availableCommands` before calling
+`executeCommand()`, skipping (and logging why) when the target command
+isn't currently in that list. This is a **UX convenience only** — it never
+reproduces `canExecute()`'s business rules locally, and if `getLatestState()`
+returns `null` (renderer not ready yet) every gate falls through and lets
+AutoIngest itself decide, rather than blocking on stale/missing local data.
+
+**Context gating.** `unassign_group` and `assign_g{1,2,3}` additionally skip
+when `state.context !== 'browse'` (so they fail safely — no request sent at
+all — while QMZ or import is active), matching the Phase 3B brief's "know
+the current context, log/ignore Browse-only actions when inappropriate."
+`select_all`/`clear_selection`/`preview_toggle` are **not** context-gated —
+they remain meaningful outside pure browse too, and `AutoIngestCommands`'
+own `check()` already governs their real eligibility either way. No second
+mode/context state was invented in the plugin — every gate reads AutoIngest's
+own pushed `context` field directly.
+
+No QMZ/import/archive actions exist yet — explicitly out of scope for
+Phase 3B too.
+
+---
+
+## Group mapping strategy (Phase 3B)
+
+`src/groupSlotHelper.ts` resolves a keypad "G1"/"G2"/"G3" press to
+AutoIngest's real group id and issues `group.assign` through it — shared by
+the three thin `AssignG{1,2,3}Action` classes (see "SDK capability matrix"
+below for why three classes exist instead of one configurable action).
+
+**Why label resolution, not a hardcoded id.** `renderer/groupManager.js`'s
+own header comment documents `id` as a MUTABLE display/order identity,
+renumbered sequentially on every `removeGroup()` — but that same function,
+and `createGroup()`, always keep `label` in lockstep as `` `G${id}` ``
+(verified by reading the module directly, and re-confirmed live: a group
+recreated after a full unassign came back as `{id:1, label:'G1'}`, matching
+a fresh session exactly). So "the group currently labeled G1" and "the
+group whose id is 1" are always the same group at any given moment — but
+the plugin still resolves by **label from AutoIngest's own pushed state**
+(`state.groups`), never by assuming id 1 means G1, because that is what
+AutoIngest actually reports and costs nothing extra to read correctly.
+
+**No new AutoIngest command was needed.** Before writing any plugin code,
+`renderer.js`'s `_assignSelectionToGroup(groupId)` — the real primitive the
+existing `group.assign` command, the context menu, and the Cmd+G digit-chord
+all already share — was read directly:
+
+```js
+const existing = groupId != null ? GroupManager.getGroups().find(x => x.id === groupId) : null;
+const gid = existing ? existing.id : GroupManager.createGroup();
+```
+
+If `groupId` doesn't match an existing group, this **always** falls through
+to `GroupManager.createGroup()`, which **ignores the requested id** and
+creates the next sequential group. This is confirmed, existing, shipped
+behavior — the Cmd+G chord's own toast (`` `Assigned to G${gid}` ``) reports
+whatever `gid` actually came back, not the digit the operator pressed. So
+`group.assign` already safely expresses exactly what Phase 3B needed
+("assign to this existing group, or create-and-assign the next sequential
+one") with zero new AutoIngest surface. `assignToGroupSlot()` replicates
+this faithfully: if label resolution fails, it passes the slot number
+itself as `groupId` — behaviorally identical to passing `null`, since both
+fall through to the same `createGroup()` call.
+
+**Known, inherited quirk — not a plugin defect.** If slots are assigned out
+of order (e.g. pressing G3 before any group exists), the group that gets
+created is labeled by whatever's next sequentially (G1 in that example),
+**not** G3 — exactly matching what the keyboard chord has always done.
+Verified live and in the integration test suite (creating G1 fresh after a
+full unassign correctly came back as `{id:1, label:'G1'}`, never
+misnumbered). Documented here rather than "fixed," because fixing it would
+mean inventing new AutoIngest grouping semantics the task explicitly
+forbade doing speculatively. In real photographer workflows (G1 used
+before G2 before G3) this never surfaces.
 
 ---
 
@@ -252,17 +363,38 @@ further.
 
 ---
 
-## Assets
+## Button icon design
 
-Three pairs of minimal, hand-authored SVG icons (`package/actionicons/` +
+Ten pairs of minimal, hand-authored SVG icons (`package/actionicons/` +
 `package/actionsymbols/`, one pair per action, named to match each action's
 `name` field — confirmed as the real convention by inspecting the toolkit's
-generated example): a checkmark-in-square (Toggle Selection), double
-chevrons (Navigate Files), and a simple eye (Preview). 24×24, stroke-only,
-neutral gray (`#e3e3e3`), matching the generated example's style. Not
-derived from any copyrighted Logitech asset — simple geometric primitives
-authored for this plugin specifically. Final icon design is explicitly
-deferred past Phase 3A.
+generated example). All 24×24, no embedded text except the three intentional
+number badges, and no Logitech branding — simple geometric primitives
+authored for this plugin specifically, not derived from any copyrighted
+asset.
+
+Two deliberate style tiers, chosen for legibility at the MX Creative
+Console's small LCD size (an explicit Phase 3B requirement) over abstract
+uniformity:
+
+- **Stroke-only** (`stroke="#e3e3e3"`, `stroke-width="2"`, round caps/joins,
+  `fill="none"`), matching Phase 3A's original style — checkmark-in-square
+  (Select), a second checkmark with a smaller reflected square behind it
+  (Select All), an X-in-square (Clear), double chevrons (Navigate Files), a
+  simple eye (Preview), a broken-bracket-with-slash (Unassign — "removed
+  from its container"), and two small squares plus a forward chevron
+  (Groups — "more pages," honest about being a placeholder rather than
+  showing a real page).
+- **Solid badge** — for G1/G2/G3 only: a filled circle (`fill="#e3e3e3"`)
+  with a bold dark digit centered on top. A stroked/outlined digit at LCD
+  key size is measurably harder to read than a solid numbered badge (the
+  conventional treatment for numbered UI badges generally); the Phase 3B
+  brief explicitly permits this ("a clear group badge/number treatment is
+  acceptable"), so these three intentionally break from the stroke-only
+  style rather than sacrifice legibility for consistency.
+
+Final icon/branding design remains explicitly deferred past Phase 3B — this
+is functional visual design only, per the brief's own instruction.
 
 ---
 
@@ -291,12 +423,28 @@ and command-outcome events are logged).
 
 ## Automated tests (no hardware required)
 
-`npm test` — 30 checks total, all passing:
+`npm test` (compiles via real `tsc` first, then runs unit then integration —
+see "Known limitations" for why not `tsx`) — **69 checks total, all
+passing**:
 
 - **`test/descriptor.test.ts`** (17 checks, plain temp-dir I/O, no
   AutoIngest process needed): valid/invalid/missing descriptor parsing,
   every `DescriptorError` code, dev-vs-packaged candidate-path resolution,
   end-to-end `discoverDescriptor()` against a synthetic isolated home.
+- **`test/groupSlotHelper.test.ts`** (7 checks, Phase 3B, pure function, no
+  client/process needed): `resolveGroupIdByLabel()` against existing/
+  missing/empty/undefined `groups`, and a null state — "group label →
+  actual group id resolution" and "group missing behavior" from the Phase
+  3B test requirements.
+- **`test/browseActions.unit.test.ts`** (25 checks, Phase 3B, the shared
+  `autoIngestClient` singleton's public methods temporarily mocked and
+  restored per test — no AutoIngest process): command mapping for all 10
+  actions, `availableCommands` gating (each gated action verified to send
+  **zero** commands when its target is unavailable), context gating (browse
+  vs qmz vs import), rejection propagation (a mocked `ok:false` result never
+  throws), and no-plugin-local-state-mutation (the same action instance
+  called twice with different mocked states behaves purely per-state, never
+  per-call-count; `navigate_files` provably holds no numeric position).
 - **`test/autoIngestClient.integration.test.ts`** (13 checks, launches the
   **real** AutoIngest app via `playwright-core`'s `_electron`, exactly like
   the AutoIngest repo's own `test/mxControlTransportLive.test.js` — reuses
@@ -311,18 +459,54 @@ and command-outcome events are logged).
   tiny local `ws` server sending the one real message shape
   `{type:'ready',protocolVersion:999}`, since the real server can never
   itself produce a mismatch against its own version — the descriptor and
-  discovery layer feeding it are still 100% real).
+  discovery layer feeding it are still 100% real). Unchanged from Phase 3A
+  except now importing its launch helpers from the shared `testHarness.ts`.
+- **`test/browsePageActions.integration.test.ts`** (7 checks, Phase 3B, same
+  real-transport approach): the real mechanism `assignToGroupSlot()`
+  depends on, proven end to end — a nonexistent "G1" creates a real group
+  labeled G1; `resolveGroupIdByLabel()` then finds its real id from live
+  pushed state; reassigning to that resolved id targets the *same* group,
+  not a new one; a real `group.unassign` round-trip empties and
+  auto-removes it (the same unchanged command whose Tag Refinement
+  cleanup/badge sync Phase 1A/1B's own tests already cover exhaustively);
+  and a fresh group created afterward is correctly re-labeled G1 from a
+  clean slate. Architectural note: the *action classes* themselves import
+  the shared singleton directly (not dependency-injected — matching the
+  SDK's own generated-example simplicity), which always uses real discovery
+  and so cannot safely be pointed at an isolated synthetic AutoIngest
+  instance without either touching real settings or a larger refactor; this
+  file therefore drives a fresh `AutoIngestClient` plus the real, exported
+  `resolveGroupIdByLabel()` — the same mechanism the actions use — while the
+  thin action-class glue itself is already fully covered by
+  `browseActions.unit.test.ts`'s mocked-client tests.
+- A genuine bug was found and fixed *while writing these tests*: two places
+  called `selection.selectAll` a second time assuming it would (re)select
+  everything — but `renderer.js`'s real `_selectAllVisible()` is a
+  **toggle** (if every visible file is already selected, it deselects them
+  instead), confirmed by reading the source directly. Not a plugin or
+  transport defect — the tests were wrong to assume idempotence; fixed by
+  explicitly clearing selection before each intentional re-select.
+- A second, unrelated race was found the same way Phase 2/3A's own tests
+  found one: `executeCommand()`'s resolution only guarantees the
+  `commandResult` reply arrived, not the *separate* `state` push its side
+  effects trigger — reading `getLatestState()` immediately afterward without
+  waiting could observe stale data. Fixed by waiting for the specific state
+  change (e.g. `selectedCount`) before depending on it, the same pattern
+  already documented in `mxControlTransportLive.test.js`.
 
 ---
 
 ## Physical test procedure
 
 1. `cd integrations/logitech/autoingest-mx && npm run build && npm run link`
-2. Start Logi Plugin Service if not already running.
+2. Start Logi Plugin Service if not already running (or restart it after
+   linking, to pick up newly-added actions — see "Reload does not
+   guarantee..." above).
 3. Open Logi Options+ → the MX Creative Console's device configuration
-   screen → confirm **AutoIngest**'s three actions appear under "All
-   Actions" → assign Navigate Files to the main dial, Toggle Selection (and
-   optionally Preview) to LCD keys.
+   screen → confirm **AutoIngest**'s ten actions appear under "All Actions"
+   → assign per the Browse page layout (see "Logitech actions implemented"):
+   Navigate Files to the main dial, and the nine `CommandAction`s to the
+   nine LCD keys.
 4. Launch AutoIngest, select a synthetic memory-card fixture as the source
    (never a real card/archive).
 5. Work through the checklist below on the real device while watching
@@ -331,7 +515,7 @@ and command-outcome events are logged).
 
 ---
 
-## Physical test results (real MX Creative Console, this session)
+## Physical test results — Phase 3A (real MX Creative Console)
 
 All items tested on the actual hardware, cross-checked against live
 `app.log` `[mx-control]` activity in real time.
@@ -381,18 +565,103 @@ trying to hold the connection.
 
 ---
 
-## Known Node SDK / tooling limitations encountered
+## Physical test results — Phase 3B (real MX Creative Console)
+
+All items tested live, cross-checked against `app.log`'s real-time
+`[mx-control]` activity (command requested/result pairs).
+
+| # | Test | Result |
+|---|---|---|
+| 1 | SELECT toggles current file | **Pass** — real `selection.toggleCurrent`, `ok:true` × 2 (select, deselect) |
+| 2 | SELECT ALL selects all visible files | **Pass** — real `selection.selectAll`, `ok:true` |
+| 3 | CLEAR clears them | **Pass** — real `selection.clear`, `ok:true` |
+| 4 | PREVIEW opens/closes | **Pass** — real `preview.toggle`, `ok:true` × 2 |
+| 5 | G1 assigns current selection | **Pass** — real `selection.selectAll` → `group.assign`, both `ok:true` |
+| 6 | G2 reassigns correctly | **Pass** — real `group.assign`, `ok:true` |
+| 7 | G3 works | **Pass after a real-world key-mapping fix** — see below |
+| 8 | UNASSIGN removes selection from group | **Pass** — real `group.unassign`, `ok:true` |
+| 9 | Tag Refinement cleanup still occurs | **Pass by inheritance** — `group.unassign` routes through the same unchanged `_unassignSelectionFromGroup()` primitive Phase 1A/1B's own tests already verify calls `TagRefinementManager.clearFiles()`; this session's own `browsePageActions.integration.test.ts` additionally proved the real round-trip end to end |
+| 10 | Multi-Event claim behavior intact | **Pass by inheritance** — same unchanged command/primitive; Phase 1A/1B's own live tests cover this exhaustively, unaffected by Phase 3B |
+| 11 | Dial navigation remains responsive | **Pass** — dozens of rapid, correctly-ordered `nextFile`/`previousFile` commands at varied speeds, every one `ok:true`, no gaps or errors, even with the expanded 10-action plugin |
+| 12 | Selection remains correct while dialing | **Pass** — user-confirmed across slow/medium/fast rotation |
+| 13 | Context change to QMZ fails Browse actions safely | **Deferred** — not exercised this session; the underlying mechanism (context-gating in the action classes, plus `AutoIngestCommands`' own `check()`) is fully covered by `browseActions.unit.test.ts`'s mocked qmz-context tests, but not re-confirmed on physical hardware |
+| 14 | AutoIngest restart doesn't require reassigning device actions | **Pass** — killed and relaunched AutoIngest; plugin reconnected in ~200ms on a new port; user confirmed commands worked immediately with zero Options+ changes |
+| 15 | Plugin Service reload doesn't corrupt active AutoIngest state | **Pass** — restarted Plugin Service while AutoIngest kept running; fresh plugin process reconnected in ~6s; user confirmed selection/state was untouched and a command still worked afterward |
+
+### A real-world key-mapping issue (not a code bug)
+
+During Test 7, the user reported "G2 is getting tagged by the G3 button."
+Before assuming a code defect, the underlying logic was re-traced: with G1
+and G2 already created in order, a fresh G3 assignment resolves
+`resolveGroupIdByLabel(state, 'G3')` → `null` (no such label yet) → falls
+back to `groupId: 3` → AutoIngest's `GroupManager.createGroup()` creates
+`id = _groups.length + 1 = 3` — sequentially correct, no skipped-slot
+ambiguity in this scenario. The transport's own logs never include command
+*payloads* (by design, to avoid leaking state into logs), so the exact
+`groupId` sent couldn't be read back directly. Asked the user to check
+Options+'s device configuration screen for which **action** was actually
+bound to that physical key — it was a manual assignment mix-up (the G2
+action was on the key intended for G3), not a plugin defect. Corrected in
+Options+, retested, passed cleanly. Documented here as a reminder that
+manually assigning nine similar-looking numbered actions is genuinely
+error-prone for an operator, not a reason to doubt the code without first
+verifying the actual binding.
+
+### Dial-press experiment result
+
+See "Dial-press experiment" under the SDK capability matrix below: tested
+live, found to be moot — the physical dial has no press mechanism at all.
+
+---
+
+## SDK capability matrix (Phase 3B investigation)
+
+Investigated by reading `@logitech/plugin-sdk@0.1.1`'s full public `.d.ts`
+**and** its compiled runtime (`dist/index.js`, 978 lines — the actual wire
+protocol/message-handler implementations, not just the documented surface),
+before writing any Phase 3B code. "Present" below means found in the
+runtime/protocol; "functional" means it actually does something beyond
+being wired up.
+
+| Capability | Status | Evidence |
+|---|---|---|
+| Folders/pages (device-side) | **Unsupported** | Only `Action.groupName` exists — a flat label for organizing entries in Options+'s own Action Picker UI (its own JSDoc: "The logical group or folder this action will appear in the UI"), not something that changes what the physical LCD shows at runtime. No page/folder message type exists in the protocol. |
+| Configurable action parameters | **Unsupported** | Full message-type registry (`InitConnection`, `GetActionsList`, `GetActionText`, `GetActionImage`, `ExecuteCommand`, `ExecuteAdjustment`, `StopPlugin`) has no parameter-schema concept; `ActionData`'s fields are fixed (`name`, `actionType`, `displayName`, `description`, `groupName`). This is why G1/G2/G3 are three thin classes, not one configurable one. |
+| Dynamic action images | **Present, non-functional** | `GetActionImageRequestHandler.getDataFromEvent()` unconditionally `return null;` — the request/response machinery exists but is a stub in this SDK version. |
+| Dynamic text | **Present, non-functional as an override point** | `GetActionTextRequestHandler.getDataFromEvent(action)` always returns `{ text: action.displayName }` — the static field, with no hook for a subclass to override it per-instance. |
+| Action-state change notifications (server→plugin) | **Unsupported** | The message-type registry above is the complete set; no `ActionStateChanged`-style event exists. |
+| Dial press | **Moot — hardware does not support it** | `AdjustmentAction.hasReset`/`resetCommandName` are real, JSDoc'd public SDK API, tested live (built, linked, loaded a paired CommandAction named to match), but the physical MX Creative Console's main dial has no press/click mechanism at all — confirmed directly on the real device. **SELECT stays on the keypad**; see "Dial-press experiment" below for the full test. |
+| Roller | **Not investigated at the protocol level beyond confirming no distinct API** | Zero matches for "roller" anywhere in the SDK. Presumably usable as another `AdjustmentAction` bound via Options+'s own UI, same mechanism as the dial — left unassigned per the Phase 3B brief regardless. |
+
+### Dial-press experiment
+
+Tested live: `NavigateFilesAction.hasReset` was temporarily set to `true`
+and a paired `CommandAction` named exactly `navigate_files_RESET` (matching
+`resetCommandName`'s computed value) was registered, built, linked, and
+loaded into a fresh Plugin Service process — the SDK side worked without
+error, and the action appeared registered.
+
+**Result: moot at the hardware level.** The physical MX Creative Console's
+main dial **has no press/click mechanism at all** — confirmed directly on
+the real device, independent of anything the SDK does or doesn't support.
+The experiment was reverted (`hasReset` back to `false`,
+`dialPressExperimentAction.ts` deleted) rather than kept as dead code.
+**SELECT remains on the keypad**, per the task brief's own explicit
+fallback — this is now a confirmed hardware constraint, not merely an SDK
+uncertainty.
+
+---
+
+## Tooling / Plugin Service limitations encountered
+
+Distinct from the plugin-sdk capability matrix above — these are about the
+surrounding toolkit and Logi Plugin Service process, found across both
+phases:
 
 - **`pluginCapabilities` has no documented schema in toolkit 0.1.1** for
   declaring an application-linked profile — see "Profile / application
   linking" above. Confirmed by inspecting the toolkit's own template source,
   not assumed from missing docs alone.
-- **No dynamic key/LCD text or icon update API** in `@logitech/plugin-sdk@0.1.1`'s
-  type definitions (`Action`/`CommandAction`/`AdjustmentAction` — no
-  `setTitle`/`setIcon`/similar method exists). Per the task brief's own
-  fallback, a dedicated connection-status action/button was **not** built;
-  connection state is surfaced through plugin logs only (see "Logging").
-  Revisit if a future SDK version adds this.
 - **`tsx`/esbuild cannot run tests that call Playwright's `page.evaluate()`
   with inline arrow functions.** esbuild (which `tsx` uses) wraps
   transpiled functions with a `__name(fn, "name")` helper for name
@@ -402,11 +671,12 @@ trying to hold the connection.
   `ReferenceError: __name is not defined`. Root-caused directly (confirmed
   the real, unpackaged `tsc` output has zero `__name` occurrences, while the
   `tsx`-transpiled version does) rather than worked around superficially.
-  **Fix**: `test:integration` compiles via real `tsc`
-  (`tsconfig.test.json` → `dist-test/`, gitignored) and runs the plain
-  `node` output instead of running through `tsx` directly. This is a
-  general Playwright+esbuild interaction, not specific to the Logitech SDK,
-  but worth recording here since it blocked this plugin's own tests.
+  **Fix**: `test:compile` (used by both `test:unit` and `test:integration`)
+  compiles via real `tsc` (`tsconfig.test.json` → `dist-test/`, gitignored)
+  and runs plain `node` output instead of running through `tsx` directly.
+  This is a general Playwright+esbuild interaction, not specific to the
+  Logitech SDK, but worth recording here since it blocked this plugin's own
+  tests.
 - **Plugin Service does not auto-load a freshly-linked plugin on its own
   startup** — confirmed empirically (started the service, waited, no new
   log/process activity for the linked plugin) — discovery happens lazily,
@@ -414,14 +684,14 @@ trying to hold the connection.
   the toolkit's own README wording: "should now be visible... in the device
   configuration screen").
 - **Reload does not guarantee the previous plugin process is terminated
-  first** — see "A real bug found and fixed" above.
+  first** — see Phase 3A's "A real bug found and fixed" in the physical
+  test results below.
 
 ---
 
-## What Phase 3A explicitly does NOT do
+## What Phase 3A/3B explicitly do NOT do
 
-Full keypad pages, dynamic-folder navigation beyond what was needed to load/
-test, G1–G9 group buttons, `group.assign` UI, QMZ sequence-selection UI,
-import controls, Archive Maintenance, the Actions Ring, Marketplace
-packaging/publishing, a final `.lplug4` release, or any merge to `main`/
-`stable/0.9`.
+Full multi-page G1–G9 keypad, QMZ sequence-selection UI, import controls,
+dynamic import progress, Archive Maintenance, Event Maintenance, the
+Actions Ring, a final installer, Marketplace packaging/publishing, or any
+merge to `main`/`stable/0.9`.
