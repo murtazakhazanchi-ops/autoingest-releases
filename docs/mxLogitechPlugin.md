@@ -1,10 +1,13 @@
-# MX Logitech Plugin (AI-FEAT MX Console — Phase 3A + 3B)
+# MX Logitech Plugin (AI-FEAT MX Console — Phase 3A + 3B + 3C)
 
 The real Logitech MX Creative Console plugin. Phase 3A proved physical
 end-to-end control as an integration smoke test (three actions). Phase 3B
 turns it into the first practical Browse/Select operator surface — nine
-keypad actions plus the dial, still no Group/QMZ multi-page system. It
-connects to AutoIngest's existing Phase 2 control transport
+keypad actions plus the dial, still no Group/QMZ multi-page system. Phase 3C
+adds no plugin code at all — it gives that Browse surface its own dedicated,
+auto-switching Logi Options+ application profile, so AutoIngest's mappings
+no longer have to live permanently on the operator's default/global console
+layout. It connects to AutoIngest's existing Phase 2 control transport
 (`services/mxControlService.js` — see
 [mxControlTransport.md](mxControlTransport.md)).
 
@@ -334,32 +337,20 @@ before G2 before G3) this never surfaces.
 
 ## Profile / application linking
 
-**Investigated, not implemented in the plugin manifest.** Logi Options+'s
-own runtime represents an app-linked profile via a
-`processOrBundleName` field on a `SupportedApplicationInfo` record (found by
-inspecting an existing installed profile's `ApplicationInfo.json` under
-`~/Library/Application Support/Logi/LogiPluginService/Applications/`) — this
-is **configured through Options+'s own "Applications" UI** (Settings →
-Applications → Add Application → select the app), using the OS's real
-bundle/process identity, **not** something a plugin declares in its own
-manifest.
+**Resolved in Phase 3C — see the full "Phase 3C" section below for the
+complete investigation and physical verification.** Short version: Logi
+Options+ (not the plugin) owns application-specific profile switching
+entirely, via a `processOrBundleName` field on a `SupportedApplicationInfo`
+record under
+`~/Library/Application Support/Logi/LogiPluginService/Applications/<deviceType>/<key>/ApplicationInfo.json`.
+This is created through Options+'s own application-picker UI, matched
+against the OS's real bundle identifier, and **is not and cannot be**
+something the plugin declares in its own manifest — confirmed below that
+`@logitech/plugin-toolkit@0.1.1`'s `LoupedeckPackage.yaml` has no schema for
+it at all.
 
 AutoIngest's real macOS identity for this purpose: `com.autoingest.app`
 (from `package.json`'s `build.appId`).
-
-`@logitech/plugin-toolkit@0.1.1`'s generated `LoupedeckPackage.yaml` has an
-empty `pluginCapabilities:` field with no bundled schema or example for
-declaring app-linking there — confirmed by inspecting the toolkit's own
-template source, which contains no reference to `pluginCapabilities`,
-`linkedApplication`, `bundleIdentifier`, or similar keys anywhere. This is a
-genuine, documented current-toolkit limitation, not an oversight — see
-below.
-
-**For Phase 3A**, the AutoIngest MX profile was assigned manually in Options+
-(the "manually assignable development profile" the task brief anticipated).
-Automatic foreground-app activation is Phase 3B+ scope, pending either newer
-toolkit support or reverse-engineering the `ApplicationInfo.json` format
-further.
 
 ---
 
@@ -689,9 +680,203 @@ phases:
 
 ---
 
-## What Phase 3A/3B explicitly do NOT do
+## Phase 3C — AutoIngest-specific Logitech application profile
+
+**No plugin or AutoIngest product code changed in this phase.** Phase 3C is
+Options+ configuration, application-identity verification, and physical
+testing only — exactly as the brief required ("prefer minimal/zero
+AutoIngest product-code changes... only change plugin/app code if a genuine
+profile-integration bug is discovered"). None was.
+
+### Goal
+
+AutoIngest's nine Browse-layout actions (Phase 3B) should live on their own
+Logi Options+ profile that activates automatically when AutoIngest is the
+foreground app, and yields back to the default/global profile the moment
+focus moves elsewhere — never permanently occupying the operator's
+general-purpose console layout.
+
+### Application identity verification
+
+| Context | Bundle/process identity | Verified how |
+|---|---|---|
+| Packaged macOS build | `com.autoingest.app` | Built a real local unpacked app (`npx electron-builder --mac --dir --arm64`), read `Info.plist` via `PlistBuddy`: `CFBundleIdentifier=com.autoingest.app`, `CFBundleName=AutoIngest`, `CFBundleExecutable=AutoIngest`. Ad-hoc codesigned (`codesign -dv` → `Signature=adhoc`), sufficient for local Gatekeeper/testing. |
+| Dev-mode (`electron .` / `npm start`) macOS | `com.github.Electron` | Read `node_modules/electron/dist/Electron.app/Contents/Info.plist` directly: generic Electron identity, `CFBundleName=Electron`. **Confirmed indistinguishable from any other dev Electron app on the machine** — Options+ cannot tell AutoIngest's dev mode apart from an unrelated Electron project also running `electron .`. |
+| Windows | `com.autoingest.app` (inferred) | `package.json`'s `build.win` has no `appId` override and no explicit `AppUserModelId`; electron-builder defaults `AppUserModelId` to `build.appId` when unset. **Not independently verified on real Windows hardware this session** — macOS-only development machine. Executable would be `AutoIngest.exe`. |
+
+**Corrected a Phase 3A assumption**: `app.getName()` resolves from
+`package.json`'s `"name"` field (`"auto-ingest"`, lowercase) in **both** dev
+and packaged modes, because `app.setName()` is never called anywhere in the
+codebase — confirmed by launching the real packaged build and finding its
+helper process still used
+`--user-data-dir=.../Application Support/auto-ingest` (lowercase), and by a
+full directory listing of `~/Library/Application Support/` showing no
+`AutoIngest` entry at all, packaged or not. **The userData-folder name is
+not a dev-vs-packaged signal.** The only axis that actually matters for
+Options+'s foreground-app matching is the OS-level bundle identifier
+(`com.github.Electron` vs `com.autoingest.app`), which is completely
+separate from Electron's internal userData path naming.
+
+**Consequence for the final product**: the dedicated Options+ profile must
+target `com.autoingest.app` — the packaged identity — not the generic dev
+Electron identity. A separate, temporary profile against dev-mode Electron
+is fine for ongoing development testing but must never be confused with, or
+used as, the shipped deliverable.
+
+### How Options+ actually represents an application-linked profile
+
+Read-only inspection of
+`~/Library/Application Support/Logi/LogiPluginService/` (never mutated
+directly — all mutation went through the Options+ UI):
+
+- Every linked application is one folder under
+  `Applications/<deviceType>/<key>/`, containing `ApplicationInfo.json`
+  (identity + metadata) and a `Profiles/<GUID>/` subfolder holding the real
+  button-layout data (`ProfileInfo.json`).
+- Two device-type folders exist on this machine: `Loupedeck70` (the
+  stable/base definitions — Logitech's own shipped native-plugin
+  applications `@_defaultmac`, `@_lightroom`, `@_photoshop` all live here,
+  and this is also where the **manually-added** AutoIngest entry landed)
+  and `Loupedeck71` (a live per-connected-device-instance overlay —
+  `@_defaultmac`, plus two bundle-id-keyed entries, `com.apple.preview` and
+  `com.canon.eos-utility-3`, that already existed from prior,
+  unrelated use on this machine).
+- `ApplicationInfo.json`'s key field is `processOrBundleName`. For
+  Logitech's own native-plugin apps (`@_defaultmac`, `@_lightroom`,
+  `@_photoshop`) this is **`null`** — those are matched by their own native
+  C# plugin's internal foreground-detection, not by generic bundle-ID
+  matching. For every generically-linked app (`com.apple.preview`,
+  `com.canon.eos-utility-3`, and now `com.autoingest.app`), this field holds
+  the **real OS bundle identifier verbatim**, `hasNativePlugin:false`,
+  `nativePluginName:null`. This is the confirmed, generic mechanism any
+  third-party app — including a Node-SDK plugin like AutoingestMx — rides
+  on, entirely independent of the plugin's own SDK capabilities.
+- **Important negative finding**: foregrounding AutoIngest alone, with no
+  prior Options+ action, created **no** new entry — tested directly
+  (launched the real packaged app, confirmed frontmost via
+  `osascript`/System Events for 10+ seconds, re-checked the directory: no
+  change). Linking an application is a **manual, explicit step in the
+  Options+ UI** (its application-picker / "add application" flow),
+  not a passive background auto-detection. Once created, however, the
+  resulting `processOrBundleName` entry is what drives genuinely automatic
+  switching from then on (see physical test results below).
+- `LoupedeckSettings.ini`'s `CurrentApplication/Loupedeck7x=` key looked like
+  the obvious live indicator of "which profile is active right now," but
+  **it did not reliably update** during live profile switching in this
+  session's testing (stayed on `@_defaultmac` through multiple confirmed
+  real switches) — **do not trust this file as a live signal**; the
+  physical device itself is the only reliable ground truth, which is
+  exactly what the physical test matrix below relies on.
+
+### How the AutoIngest profile was actually created
+
+Entirely through the Options+ GUI (user-performed, per the brief's "creation
+is UI-driven, I can't interact with native macOS apps directly"
+constraint):
+
+1. Opened Logi Options+ → its application list for the MX Creative Console.
+2. Used its "add application" control, pointed at the real packaged
+   `dist/mac-arm64/AutoIngest.app` build (not dev-mode `electron .`).
+3. Enabled **"Adapt to App"** for the new AutoIngest entry.
+4. Assigned the Phase 3B Browse layout to its nine keys exactly as
+   specified — **not** the tenth "Groups" action:
+
+```
+┌──────────────┬──────────────┬──────────────┐
+│    SELECT    │  SELECT ALL  │    CLEAR     │
+├──────────────┼──────────────┼──────────────┤
+│   PREVIEW    │      G1      │      G2      │
+├──────────────┼──────────────┼──────────────┤
+│      G3      │   UNASSIGN   │  (reserved)  │
+└──────────────┴──────────────┴──────────────┘
+Main dial: Navigate Files (unchanged)
+```
+
+The ninth key is deliberately left **unassigned** — not mapped to "Groups"
+— per the brief: since device-side pages are unsupported (see the SDK
+capability matrix above), presenting a dead page-navigation concept would
+be worse than an honest blank key.
+
+This created
+`Applications/Loupedeck70/com.autoingest.app/ApplicationInfo.json`
+(`processOrBundleName: "com.autoingest.app"`, `displayName: "AutoIngest"`,
+`hasNativePlugin: false`) plus one `Profiles/<GUID>/ProfileInfo.json` for
+the layout above — the identical shape as the Preview/Canon entries,
+confirming AutoIngest rides the same generic mechanism.
+
+### Physical test results — Phase 3C (real MX Creative Console)
+
+All items driven live: AutoIngest and Logi Options+ both running, the real
+device physically connected, foreground switches triggered via
+`osascript`/System Events and cross-checked by the user watching the
+physical keypad.
+
+| # | Test | Result |
+|---|---|---|
+| A | Finder foreground → default profile | **Pass** — default/global keys shown |
+| B | AutoIngest foreground → AutoIngest profile auto-activates | **Pass** — keypad changed immediately on focus switch |
+| C | Verify 8-key mapping | **Pass** — all 8 assigned keys (Select/Select All/Clear/Preview/G1/G2/G3/Unassign) visible; 9th key correctly blank, not "Groups" |
+| D | Verify dial | **Pass** — Navigate Files worked under the AutoIngest profile |
+| E | Switch to another app (Safari) → AutoIngest mappings disappear | **Pass** |
+| F | Return to AutoIngest → mappings restore automatically | **Pass** — no manual reassignment |
+| G | AutoIngest running in background (not foreground) → its profile does **not** stay active | **Pass** — confirmed after a 15s background hold, default/Finder keys still showing |
+| H | Quit AutoIngest while its profile is active → Options+ safely falls back | **Pass** — no crash/hang; default keys appeared immediately after the process was terminated |
+| I | Relaunch and foreground AutoIngest → same profile returns, no reassignment needed | **Pass** — layout and live command execution (dial + a key press) both confirmed working immediately |
+| J | Restart Logi Options+ / Plugin Service → profile association survives | **Pass** — user restarted via the Options+ UI itself; AutoIngest profile and auto-activation both still worked afterward |
+| K | Restart the Mac → association persists | **Skipped** — optional per the brief ("only if safe/convenient"); user chose to skip |
+
+**Plugin/connection independence, verified alongside the above**: exactly
+one `AutoingestMx` plugin Node process and exactly one `AutoIngest.app`
+process were confirmed via `pgrep` before and after every profile switch,
+and again after the Test I relaunch — no duplicate processes, no stale
+connection slots. The plugin's WebSocket connection to AutoIngest is
+entirely decoupled from which console profile happens to be visually
+active; profile switching never touched the transport layer, and the known
+stale-plugin-process characteristic from Phase 3A (a *reload*, not a
+*profile switch*, spawning a second process) did not recur here because no
+relink/reload happened during this phase.
+
+### Default/global profile cleanup
+
+Phase 3A/3B physical testing (before this dedicated profile existed) had
+left AutoIngest's actions assigned directly on the operator's default/global
+MX Creative Console profile. After the dedicated profile was confirmed
+working, the user removed those AutoIngest-specific key assignments from
+the default profile via the Options+ UI, leaving any of their own unrelated
+mappings untouched. Verified at the file level: `grep -i autoingest` against
+the default profile's `ProfileInfo.json`
+(`Applications/Loupedeck70/@_defaultmac/Profiles/.../ProfileInfo.json`)
+returns **zero** matches post-cleanup.
+
+### Export / import and `.lp5` findings
+
+- **No `.lp5` file exists anywhere** in the installed
+  `LogiPluginService` directory tree on this machine (checked recursively).
+  This installed Options+ version does not appear to use that format for
+  the application-profile data investigated here.
+- **No user-facing export/import feature was found** for an
+  application-linked profile. `Applications.Backups/*.zip` exist, but these
+  are **automatic, timestamped local backups Options+ maintains for itself**
+  (observed growing over this session's testing), not something a user
+  triggers to share a profile — inspected read-only, never mutated.
+  `Snapshots/*.st4` are opaque binary snapshot files; left entirely
+  uninspected beyond confirming their existence and extension, per the
+  brief's "inspection allowed, unsupported mutation/reverse-engineering is
+  not."
+- **Conclusion**: a working AutoIngest profile is, for now, a **local,
+  manually-recreated configuration** — not something that can be packaged
+  and distributed alongside the plugin yet. If this becomes a real
+  deliverable need, the officially-documented path (per
+  `@logitech/plugin-toolkit`'s own docs) is C# tooling, not the Node SDK —
+  **not pursued this phase**, per the brief's explicit "if Node SDK cannot
+  package it, do not migrate to C# yet — just document the limitation."
+
+---
+
+## What Phase 3A/3B/3C explicitly do NOT do
 
 Full multi-page G1–G9 keypad, QMZ sequence-selection UI, import controls,
 dynamic import progress, Archive Maintenance, Event Maintenance, the
-Actions Ring, a final installer, Marketplace packaging/publishing, or any
-merge to `main`/`stable/0.9`.
+Actions Ring, a final installer, Marketplace packaging/publishing, a C#
+toolkit migration, virtual plugin pages, programmatic/undocumented Options+
+database mutation, or any merge to `main`/`stable/0.9`.
