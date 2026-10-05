@@ -10566,20 +10566,27 @@ function _getQmzSequencesCompact() {
 }
 
 /**
- * Compact Tag Refinement state (AI-FEAT MX Console Phase 3D) — null when
- * refinement isn't active, same "only where meaningful" convention as groups/
- * sequences above. Deliberately omits an `available` boolean: whether
- * `tagRefinement.open` would succeed right now is already exactly what
- * `availableCommands` encodes (`'tagRefinement.open' in availableCommands`)
- * — a second copy of that same answer here would be exactly the kind of
- * redundant eligibility table getAvailableCommands()'s own doc comment
- * already warns against. Also deliberately omits a per-tag checkbox-state
- * array (the brief's own example `tags: [...]` field): nothing this phase
- * exposes on hardware ever needs to pick an individual tag, so shipping that
- * array would be unused weight with no consumer, which is the one thing
- * Phase 1B's "cheap to derive, actually needed" compactness rule exists to
- * prevent. `scopeLabel`/`componentLabel`/`status` mirror exactly what the
- * refinement banner and panel already show — no new derivation.
+ * Compact Tag Refinement state (AI-FEAT MX Console Phase 3D, `tags[]` added
+ * in Phase 3E) — null when refinement isn't active, same "only where
+ * meaningful" convention as groups/sequences above. Deliberately omits an
+ * `available`/`canApply` boolean: whether `tagRefinement.open`/
+ * `applyToSelected` would succeed right now is already exactly what
+ * `availableCommands` encodes — a second copy of that same answer here
+ * would be the redundant eligibility table `getAvailableCommands()`'s own
+ * doc comment already warns against. `scopeLabel`/`componentLabel`/`status`
+ * mirror exactly what the refinement banner and panel already show — no new
+ * derivation.
+ *
+ * `tags[]` (Phase 3E): one entry per real, currently-offered tag (never a
+ * fixed/padded size — the brief's own "do not assume a fixed maximum").
+ * `id` is the composite canonical identity (`"<category>:<label>"` — see
+ * `_setRefinementTagStateFromId`), since the real system has no separate
+ * tag ID; `state` is draft-aware (`_refinementTagDisplayState`) — it
+ * reflects a pending `tagRefinement.setTagState` press immediately, exactly
+ * as the brief's desired workflow requires, before Apply commits anything
+ * to the real TagRefinementManager. Bounded by (available tags × selected
+ * files in scope) — never scans the archive; see "Performance" in
+ * docs/commandLayer.md.
  */
 function _getTagRefinementCompact() {
   const scope = _refinementScope();
@@ -10587,12 +10594,19 @@ function _getTagRefinementCompact() {
   const selPaths = [...selectedFiles].filter(p => scope.has(p));
   const { eventTypes: etLabels, additionalKeywords: akLabels } = RefinableTags.availableTags(scope.comp);
   const selState = TagRefinementManager.getSelectionState(scope.scopeId, selPaths, etLabels, akLabels, _makeDefaultsResolver(scope));
+  const tagEntry = (category, label) => ({
+    id: `${category}:${label}`,
+    category,
+    label,
+    state: _refinementTagDisplayState(selState, category, label),
+  });
   return {
     active: true,
     scopeLabel: scope.label,
     componentLabel: scope.componentLabel,
     selectedCount: selPaths.length,
     status: selState.status, // 'empty' | 'default' | 'refined' | 'none' | 'mixed'
+    tags: [...etLabels.map((l) => tagEntry('eventTypes', l)), ...akLabels.map((l) => tagEntry('additionalKeywords', l))],
   };
 }
 
@@ -13863,6 +13877,139 @@ function _rpApplyBlocked(selCount, selState) {
   return selCount === 0 || (selState.status === 'mixed' && !_rpDirty);
 }
 
+// ── Hardware-addressable draft (AI-FEAT MX Console Phase 3E) ────────────────
+// Promotes the panel's draft from "implicit, held only in the DOM checkboxes'
+// native .checked state, read at Apply-click time via a DOM query" into an
+// explicit object both the real chip's own `change` handler AND
+// tagRefinement.setTagState write to — the same primitive, not two. See
+// docs/commandLayer.md "Tag Refinement — dynamic tag state (Phase 3E)".
+//
+// null = clean (mirrors !_rpDirty exactly — no explicit per-tag choice made
+// since the last full render/reset). Once dirty, holds the FULL per-category
+// checked Set, lazily seeded from the current computed baseline the first
+// time any tag is touched, so changing one tag never silently resets the
+// others — the same behavior an untouched checkbox already has for free.
+let _rpDraft = null;
+
+/** The baseline checked-label Set for one category BEFORE any explicit draft
+ * edit — exactly what _applyChipStates would paint on a fresh render: every
+ * tag whose computed state is 'checked' (never 'indeterminate' — an
+ * untouched mixed tag defaults to unchecked, same as a checkbox that was
+ * never ticked). */
+function _refinementBaselineChecked(selState, category) {
+  const map = selState[category] || {};
+  return new Set(Object.keys(map).filter((label) => map[label] === 'checked'));
+}
+
+/** The EFFECTIVE checked-label Set for one category right now — the draft's
+ * set once dirty, else the live computed baseline. This is what BOTH the
+ * real Apply button and tagRefinement.applyToSelected commit, and what
+ * getTagRefinementCompact() reports per tag — one function, two callers. */
+function _refinementEffectiveChecked(selState, category) {
+  if (_rpDraft) return _rpDraft[category];
+  return _refinementBaselineChecked(selState, category);
+}
+
+/** Draft-aware per-tag display state — 'checked'/'unchecked' from the draft
+ * once dirty (never 'indeterminate' once touched: a native checkbox always
+ * resolves indeterminate to a definite value on click, never cycles through
+ * "mixed" as a settable state), else the live computed selState value
+ * (which MAY be 'indeterminate' for an untouched mixed tag). */
+function _refinementTagDisplayState(selState, category, label) {
+  if (_rpDraft) return _rpDraft[category].has(label) ? 'checked' : 'unchecked';
+  return (selState[category] && selState[category][label]) || 'unchecked';
+}
+
+/**
+ * Sets one tag's desired state in the draft — the shared primitive BOTH the
+ * real chip's `change` handler and `tagRefinement.setTagState` call.
+ * Validates the tag against the CURRENT scope's real available tags fresh
+ * on every call (never trusts a previously-sent list) — rejects an
+ * arbitrary/stale/wrong-category tag without mutating anything, satisfying
+ * "no arbitrary metadata keywords, no stale tag IDs" without a second
+ * allow-list anywhere.
+ * @returns {boolean} true if applied, false if rejected (unknown/stale tag,
+ *   no active refinement session, or no selection in scope).
+ */
+function _setRefinementDraftTag(category, label, checked) {
+  if (category !== 'eventTypes' && category !== 'additionalKeywords') return false;
+  const scope = _refinementScope();
+  if (!scope) return false;
+  const selPaths = [...selectedFiles].filter((p) => scope.has(p));
+  if (selPaths.length === 0) return false;
+  const { eventTypes: etLabels, additionalKeywords: akLabels } = RefinableTags.availableTags(scope.comp);
+  const validLabels = category === 'eventTypes' ? etLabels : akLabels;
+  if (!validLabels.includes(label)) return false; // unknown/stale/wrong-category — rejected, nothing mutated
+
+  if (!_rpDraft) {
+    const selState = TagRefinementManager.getSelectionState(scope.scopeId, selPaths, etLabels, akLabels, _makeDefaultsResolver(scope));
+    _rpDraft = {
+      eventTypes: _refinementBaselineChecked(selState, 'eventTypes'),
+      additionalKeywords: _refinementBaselineChecked(selState, 'additionalKeywords'),
+    };
+  }
+  if (checked) _rpDraft[category].add(label); else _rpDraft[category].delete(label);
+  _rpDirty = true;
+
+  // Keep an open panel visually in sync too — a hardware press should be
+  // immediately visible if the operator also has the panel open. Matches
+  // by .value rather than a CSS attribute-selector to avoid any escaping
+  // concern with the label string.
+  const panel = document.getElementById('groupPanel');
+  if (panel) {
+    const cb = [...panel.querySelectorAll(`input[data-cat="${category}"]`)].find((el) => el.value === label);
+    if (cb) { cb.checked = checked; cb.indeterminate = false; }
+  }
+  const applyBtn = document.getElementById('rpApplyBtn');
+  if (applyBtn) applyBtn.disabled = false;
+  const hint = document.getElementById('rpMixedHint');
+  if (hint) hint.hidden = true;
+
+  _notifyCommandLayer();
+  return true;
+}
+
+/** Parses a composite tagId ("eventTypes:Waaz") into {category,label} and
+ * applies via _setRefinementDraftTag — the one place this format is parsed.
+ * A malformed id (no ':' separator, or not a string) is rejected the same
+ * way an unknown label is: no mutation, false returned. */
+function _setRefinementTagStateFromId(tagId, checked) {
+  if (typeof tagId !== 'string') return false;
+  const sep = tagId.indexOf(':');
+  if (sep <= 0) return false;
+  return _setRefinementDraftTag(tagId.slice(0, sep), tagId.slice(sep + 1), checked);
+}
+
+/** tagRefinement.applyToSelected's run(): commits the EFFECTIVE (draft-aware)
+ * tag state to the real TagRefinementManager — exactly what the panel's own
+ * Apply button does (see its refactored click handler below), now shared so
+ * a mouse click and a command-driven call use the identical commit path. */
+function _applyEffectiveRefinementToSelection() {
+  const scope = _refinementScope();
+  if (!scope) return 0;
+  const selPaths = [...selectedFiles].filter((p) => scope.has(p));
+  if (selPaths.length === 0) return 0;
+  const { eventTypes: etLabels, additionalKeywords: akLabels } = RefinableTags.availableTags(scope.comp);
+  const selState = TagRefinementManager.getSelectionState(scope.scopeId, selPaths, etLabels, akLabels, _makeDefaultsResolver(scope));
+  const eventTypes = [..._refinementEffectiveChecked(selState, 'eventTypes')];
+  const additionalKeywords = [..._refinementEffectiveChecked(selState, 'additionalKeywords')];
+  return _applyRefinementOverride((sel, sc) => {
+    TagRefinementManager.setOverride(sc.scopeId, sel, { eventTypes, additionalKeywords });
+  });
+}
+
+/** `tagRefinement.applyToSelected`'s check(): mirrors the real Apply
+ * button's own disabled-state rule EXACTLY (`_rpApplyBlocked`) — not a
+ * second approximation of it. */
+function _isRefinementApplyBlocked() {
+  const scope = _refinementScope();
+  if (!scope) return true;
+  const selPaths = [...selectedFiles].filter((p) => scope.has(p));
+  const { eventTypes: etLabels, additionalKeywords: akLabels } = RefinableTags.availableTags(scope.comp);
+  const selState = TagRefinementManager.getSelectionState(scope.scopeId, selPaths, etLabels, akLabels, _makeDefaultsResolver(scope));
+  return _rpApplyBlocked(selPaths.length, selState);
+}
+
 function renderRefinementPanel() {
   const panel = document.getElementById('groupPanel');
   if (!panel) return;
@@ -13890,6 +14037,7 @@ function renderRefinementPanel() {
 
   // Fresh selection/render → no intentional edit has happened yet.
   _rpDirty = false;
+  _rpDraft = null; // discard any pending hardware/mouse draft — this render IS the new baseline
   const applyBlocked = _rpApplyBlocked(selCount, selState);
   const showMixedHint = selCount > 0 && selState.status === 'mixed' && !_rpDirty;
 
@@ -13942,14 +14090,14 @@ function renderRefinementPanel() {
   // same function the command layer's tagRefinement.useAllTags/clearSelected reuse, so a
   // mouse click and a command-driven call are never two separate implementations.
 
+  // Phase 3E: delegates to _applyEffectiveRefinementToSelection() — the
+  // SAME effective (draft-aware) tag state tagRefinement.applyToSelected
+  // commits, rather than this handler owning its own separate DOM-checkbox
+  // read. A mouse click and a command-driven call are now identical from
+  // here on, including when the "effective" state came from a hardware
+  // tagRefinement.setTagState press rather than a chip click.
   panel.querySelector('#rpApplyBtn')?.addEventListener('click', () => {
-    _applyRefinementOverride((sel, sc) => {
-      const checkedIn = (cat) => [...panel.querySelectorAll(`input[data-cat="${cat}"]:checked`)].map(cb => cb.value);
-      TagRefinementManager.setOverride(sc.scopeId, sel, {
-        eventTypes: checkedIn('eventTypes'),
-        additionalKeywords: checkedIn('additionalKeywords'),
-      });
-    });
+    _applyEffectiveRefinementToSelection();
   });
 
   panel.querySelector('#rpAllBtn')?.addEventListener('click', () => {
@@ -13987,17 +14135,14 @@ function renderRefinementPanel() {
 // The previous per-render registration stacked one extra listener per render; and a count
 // captured at render time (frequently 0, from the moment refinement mode was entered
 // before anything was selected) would silently block this handler forever.
+//
+// Phase 3E: delegates entirely to _setRefinementDraftTag() — the SAME
+// primitive tagRefinement.setTagState calls — rather than owning its own
+// separate "enable Apply / hide hint" logic. A mouse click and a
+// command-driven press now write to the identical draft object.
 document.getElementById('groupPanel')?.addEventListener('change', e => {
-  if (!e.target.matches('input[data-cat]') || _rpDirty) return;
-  const scope = _refinementScope();
-  if (!scope) return;
-  const currentSelCount = [...selectedFiles].filter(p => scope.has(p)).length;
-  if (currentSelCount === 0) return;
-  _rpDirty = true;
-  const applyBtn = document.getElementById('rpApplyBtn');
-  if (applyBtn) applyBtn.disabled = false;
-  const hint = document.getElementById('rpMixedHint');
-  if (hint) hint.hidden = true;
+  if (!e.target.matches('input[data-cat]')) return;
+  _setRefinementDraftTag(e.target.dataset.cat, e.target.value, e.target.checked);
 });
 
 // ── Context menu (right-click on tile) ────────────────────────────────────
@@ -18440,6 +18585,11 @@ window.__autoIngestRendererBridge = {
   applyAllTagsToRefinementSelection: () => _applyAllTagsToRefinementSelection(),
   resetRefinementSelectionToDefault: () => _resetRefinementSelectionToDefault(),
   getTagRefinementCompact:     () => _getTagRefinementCompact(),
+  // Phase 3E: dynamic per-tag draft + commit — see _setRefinementDraftTag's
+  // own comment for the validation/rejection rules.
+  setRefinementTagState:       (tagId, checked) => _setRefinementTagStateFromId(tagId, checked),
+  isRefinementApplyBlocked:    () => _isRefinementApplyBlocked(),
+  applyEffectiveRefinementToSelection: () => _applyEffectiveRefinementToSelection(),
   // openEventPickerFromWorkspace() already no-ops safely (importRunning/
   // _sessionRunBusy/no-active-event) and now reports that outcome as a
   // boolean — see its own updated comment in importSessionUI.js. Opens the

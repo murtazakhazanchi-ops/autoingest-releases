@@ -452,6 +452,192 @@ source this phase introduces.
 
 ---
 
+## Tag Refinement — dynamic tag state (Phase 3E)
+
+**AutoIngest-side foundation for a future dynamic hardware keypad — no
+hardware/plugin work in this phase.** Builds on Phase 3D's `tagRefinement.*`
+commands to let an external controller participate in the real
+select→refine→Apply flow per tag, not just at the whole-session granularity
+Phase 3D stopped at.
+
+### The existing model, traced first (before any edits)
+
+- **No separate tag ID exists anywhere.** A tag's only identity in the real
+  system is `{category: 'eventTypes'|'additionalKeywords', label: string}` —
+  labels are used directly as chip `value`s and directly as override array
+  members. The canonical identity exposed to commands is the composite
+  string `` `${category}:${label}` `` (e.g. `"eventTypes:Waaz"`) — not an
+  invented numeric ID, and not just the bare label (which could collide
+  across the two categories).
+- **The real tri-state enum is `checked`/`unchecked`/`indeterminate`**
+  (`TagRefinementManager.getSelectionState()`'s own values) — used verbatim
+  here, not the placeholder `on`/`off`/`mixed` names an earlier draft of
+  this feature used informally.
+- **Chip interaction was draft-only, held ONLY in the DOM** before this
+  phase: the panel's `change` listener touched nothing but a `_rpDirty` flag
+  and the Apply button's `disabled` attribute — the checkbox's own native
+  `.checked` was the only record of "what will be applied." **Apply to
+  Selected is a real, distinct commit step** (`#rpApplyBtn`'s click handler
+  read `:checked` from the DOM and called `TagRefinementManager.setOverride`)
+  — chip changes never touched `TagRefinementManager` on their own.
+- **Promoted to an explicit, renderer-owned draft** (`_rpDraft` in
+  `renderer.js`) so a headless command-layer caller can participate in the
+  identical draft a mouse click would — the real chip `change` handler and
+  `tagRefinement.setTagState` now both call the same
+  `_setRefinementDraftTag()` primitive; `#rpApplyBtn`'s click handler and
+  `tagRefinement.applyToSelected` both call the same
+  `_applyEffectiveRefinementToSelection()`. Neither path duplicates the
+  other's logic.
+- **Selection changes while refinement is active do not re-render the
+  panel** (a DOM-render-cost optimization, not a business rule — only the
+  selected-count label updates). `getState()`'s `tagRefinement.tags[]` is
+  computed **live** against the current selection on every call instead,
+  consistent with every other `getState()` field — not replicated staleness.
+
+### Commands
+
+| Command | Payload | Applicable when | Calls |
+|---|---|---|---|
+| `tagRefinement.setTagState` | `{ tagId: string, checked: boolean }` | active, selection-within-scope non-empty | `_setRefinementDraftTag()` |
+| `tagRefinement.applyToSelected` | — | active, Apply not blocked (see below) | `_applyEffectiveRefinementToSelection()` |
+
+**Why `setTagState`, not `toggleTag`.** The real underlying primitive (a
+checkbox) is a desired-boolean-state setter, not a toggle: a DOM `change`
+event always reports the checkbox's new, definite value directly, never "please
+flip whatever it currently is." An explicit `{tagId, checked}` avoids the
+command layer (or the plugin) ever having to track/guess a prior state to
+know what to toggle to — the brief's own escape hatch ("if the UI actually
+sets a desired tri-state rather than simply toggling, expose the appropriate
+operation instead") is exactly this case.
+
+**Validation — the tag must exist in the CURRENT scope's real tag set,
+checked fresh on every call, never a cached/trusted list:**
+`_setRefinementDraftTag()` reads `RefinableTags.availableTags(scope.comp)`
+directly each time. An arbitrary tag, a real label under the WRONG category,
+a malformed `tagId` (no `:` separator), or a stale `tagId` left over from a
+previous event/component are all rejected identically — **not** by
+`isValid()`/`check()` (existence is payload-dependent, not context
+eligibility — same established rule as `qmz.assignToSequence`'s nonexistent-
+code case), but by `run()` itself returning `false`, resolving to
+`{ ok: true, executed: false }`. Nothing is ever mutated by a rejected
+attempt. `isValid()` only rejects shape errors (missing/non-string `tagId`,
+missing/non-boolean `checked`) before anything is attempted.
+
+**`tagRefinement.applyToSelected`'s `check()` mirrors the real Apply
+button's own disabled-state rule EXACTLY**
+(`isRefinementApplyBlocked()` → the real, unchanged `_rpApplyBlocked()`),
+not an approximation: blocked when there is no selection in scope, or when
+the selection is `'mixed'` and the operator hasn't explicitly touched any
+tag yet (`_rpDirty`) — exactly the same rule that disables the real button.
+`applyToSelected` is implemented now (Phase 3D explicitly did NOT implement
+it verbatim, because the real Apply button committed whichever tags were
+checked in the DOM — an arbitrary, unspecifiable-by-hardware state. The
+draft model this phase adds is the missing piece: `setTagState` lets a
+caller build that same explicit state first, so `applyToSelected` can
+commit it through the identical primitive the mouse uses).
+
+### State schema (Phase 3E addition)
+
+```ts
+tagRefinement?: {
+  active: boolean,
+  scopeLabel: string | null,
+  componentLabel: string | null,
+  selectedCount: number,
+  status: 'empty'|'default'|'refined'|'none'|'mixed',
+  tags: Array<{
+    id: string,                                   // "<category>:<label>"
+    category: 'eventTypes' | 'additionalKeywords',
+    label: string,
+    state: 'checked' | 'unchecked' | 'indeterminate', // draft-aware — see below
+  }>,
+}
+```
+
+- `tags[]` has one entry per real, currently-offered tag for the active
+  scope's component — **never a fixed/padded size**, and never includes a
+  tag that isn't genuinely available right now.
+- `state` is **draft-aware**: once the operator (mouse or hardware) has
+  touched any tag since the last full render/reset, every tag's `state`
+  reflects the pending draft (`checked`/`unchecked` only — a native
+  checkbox always resolves `indeterminate` to a definite value on
+  interaction, never cycles through "mixed" as a settable state) rather than
+  the live `getSelectionState()` computation. This is required for the
+  brief's own desired workflow ("each key press... the console will show the
+  current tri-state") — a `setTagState` press must be visible in the very
+  next pushed state, before Apply commits anything to the real
+  `TagRefinementManager`.
+- **No `canApply` boolean** — same reasoning as Phase 3D's `available`
+  omission: `'tagRefinement.applyToSelected' in availableCommands` already
+  encodes exactly that answer; a second copy would be the redundant
+  eligibility table `getAvailableCommands()`'s own doc comment warns against.
+- **No per-photo tag maps, ever** — `tags[]` is scoped to the whole current
+  selection, computed from `getSelectionState()`, never a per-file
+  breakdown.
+
+### Live state updates (subscription coverage)
+
+Every one of the brief's required redraw triggers was checked against the
+existing notify-hook chain:
+
+| Trigger | Already notifies? | How |
+|---|---|---|
+| Refinement mode opens/closes | **Fixed this phase** (see Phase 3D's own "a real gap found and fixed") | explicit `_notifyCommandLayer()` in `_enterRefinementMode`/`_exitRefinementMode` |
+| Selection changes | Yes, pre-existing | `syncAllTiles()` (every selection-mutating path already calls it) |
+| A tag/chip state changes | **New this phase** | `_setRefinementDraftTag()` calls `_notifyCommandLayer()` directly |
+| Use All Tags / Clear Selected / Apply run | Yes (Phase 3D) | `_applyRefinementOverride()` already notifies |
+| Refinement scope changes | Yes | covered by open/close above (a scope change is always an exit+re-entry) |
+| Active group changes | Yes, pre-existing | `syncAllGroupBadges()` |
+
+No polling anywhere; no new notification source beyond the one genuine gap
+(tag/chip state) this phase had to add.
+
+### Performance
+
+`tags[]`'s cost is bounded by **(available tags for the active component) ×
+(selected files within scope)** — never the archive or card size, since it
+is computed from `RefinableTags.availableTags()` (fixed, small, per-event)
+and `TagRefinementManager.getSelectionState()` (iterates only the files
+passed in, never all files on disk). Verified with a synthetic 150-file
+selection in `test/mxCommandLayerPhase3ELive.test.js` — `getState()`
+completed in single-digit milliseconds. No caching/memoization was added
+speculatively; none was needed.
+
+### UI ↔ command equivalence (proven, not assumed)
+
+`test/mxCommandLayerPhase3ELive.test.js` performs the SAME refinement
+operation twice on two fresh files — once via real DOM events (an actual
+chip checkbox click + an actual `#rpApplyBtn`/`#rpAllBtn`/`#rpResetBtn`
+click) and once via `AutoIngestCommands` only — and asserts the resulting
+`TagRefinementManager.getOverride()` is identical, for: a single tag turned
+ON, Use All Tags, and Clear/Reset. This is possible, and meaningful, only
+because both paths were refactored onto the exact same shared primitives
+above — not because the two implementations happen to agree today.
+
+### Security / validation tests
+
+Also in `test/mxCommandLayerPhase3ELive.test.js`: an arbitrary tag not in
+the current scope, a real label under the wrong category, a `tagId` with no
+category prefix, a stale `tagId` from a previously-active different
+component (switched via a real Change Event), and every malformed-payload
+shape (`isValid()`'s job) — each resolves safely (`ok:true,executed:false`
+or `ok:false,reason:'invalid-payload'`, never a throw) and a before/after
+snapshot confirms **zero** of them mutated the real
+`TagRefinementManager` override.
+
+### Transport test (Phase 2, real WebSocket client)
+
+`test/mxCommandLayerPhase3ELive.test.js` also drives the real authenticated
+WS transport end to end (the same `ws`-package client role
+`test/mxControlTransportLive.test.js` established): receives the real tag
+list with real tri-state values in the initial/subsequent state pushes,
+executes `tagRefinement.setTagState` and observes the draft reflected in the
+very next push, executes `tagRefinement.applyToSelected`, and confirms the
+real `TagRefinementManager` override on the other side — all over one
+ordinary authenticated connection, no Logitech SDK involved.
+
+---
+
 ## Change Event — `event.openChooser` (Phase 3D)
 
 | Command | Payload | Applicable when | Calls |
@@ -496,6 +682,10 @@ than that to be useful on its own, and nothing this phase adds needs to
 
 ## State schema (Phase 3D additions)
 
+**`tagRefinement` gained a `tags[]` field in Phase 3E** — see "Tag
+Refinement — dynamic tag state (Phase 3E)" above for its full shape. The
+original Phase 3D fields below are unchanged.
+
 ```ts
 {
   ...                              // unchanged Phase 1B fields, see above
@@ -505,6 +695,7 @@ than that to be useful on its own, and nothing this phase adds needs to
     componentLabel: string | null,  // the mapped component's folder/display name
     selectedCount: number,          // selection within the active scope only
     status: 'empty'|'default'|'refined'|'none'|'mixed',
+    tags: Array<{...}>,             // Phase 3E — see the dedicated section above
   },
   event?: {
     activeEventName: string | null,

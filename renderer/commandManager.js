@@ -195,9 +195,13 @@ const AutoIngestCommands = (() => {
     // ── Tag Refinement (Phase 3D) ────────────────────────────────────────
     // See docs/commandLayer.md "Tag Refinement commands" for the full
     // investigation this grouping is built from (renderer/tagRefinementManager.js
-    // + the "Tag Refinement mode" section of renderer.js) and for why
-    // `applyToSelected`/`toggleTag` (the original brief candidates) are
-    // deliberately NOT present here.
+    // + the "Tag Refinement mode" section of renderer.js). Phase 3D rejected
+    // `applyToSelected`/`toggleTag` verbatim (the real Apply button commits
+    // whichever tags are checked in the DOM — nothing a hardware payload
+    // could specify yet); Phase 3E adds the missing piece — an explicit,
+    // renderer-owned draft (`setTagState`) — then implements `applyToSelected`
+    // properly on top of it. See "Tag Refinement — dynamic tag state
+    // (Phase 3E)" in commandLayer.md.
     'tagRefinement.open': {
       // isRefinementTargetAvailable() mirrors _resolveRefinementTargetScope()
       // != null — the exact same resolution run() uses, evaluated for
@@ -223,6 +227,32 @@ const AutoIngestCommands = (() => {
       check: (_p, b) => b.isTagRefinementActive() && b.getTagRefinementSelectedCount() > 0,
       run: (_p, b) => b.resetRefinementSelectionToDefault(),
       computeExecuted: (result) => result > 0,
+    },
+    // Sets one tag's desired draft state — the dynamic-keypad primitive
+    // (Phase 3E). payload.tagId is the composite canonical identity
+    // ("<category>:<label>", e.g. "eventTypes:Waaz" — the real system has
+    // no separate tag ID; see state.tagRefinement.tags[].id). A well-formed
+    // but unknown/stale/wrong-category tagId is NOT rejected by check() —
+    // existence is a payload-dependent fact, not context eligibility, same
+    // established rule as qmz.assignToSequence's nonexistent-code case — it
+    // genuinely runs, is rejected internally, and resolves to
+    // { ok: true, executed: false }, never mutating anything.
+    'tagRefinement.setTagState': {
+      isValid: (p) => !!p && typeof p === 'object' && typeof p.tagId === 'string' && p.tagId.length > 0 && typeof p.checked === 'boolean',
+      check: (_p, b) => b.isTagRefinementActive() && b.getTagRefinementSelectedCount() > 0,
+      run: (p, b) => b.setRefinementTagState(p.tagId, p.checked),
+      // run() already resolves to a real boolean (true = applied, false =
+      // rejected) — the generic fallback handles it correctly as-is.
+    },
+    // Commits the EFFECTIVE (draft-aware) tag state to the real
+    // TagRefinementManager — exactly what the panel's own Apply button does.
+    // check() mirrors that button's own disabled-state rule EXACTLY
+    // (isRefinementApplyBlocked -> the real _rpApplyBlocked), not an
+    // approximation of it — see commandLayer.md.
+    'tagRefinement.applyToSelected': {
+      check: (_p, b) => b.isTagRefinementActive() && !b.isRefinementApplyBlocked(),
+      run: (_p, b) => b.applyEffectiveRefinementToSelection(),
+      computeExecuted: (result) => result > 0, // a file count, same lesson as useAllTags/clearSelected above
     },
 
     // ── Change Event (Phase 3D) ──────────────────────────────────────────

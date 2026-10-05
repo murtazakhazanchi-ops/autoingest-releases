@@ -1,4 +1,4 @@
-# MX Logitech Plugin (AI-FEAT MX Console — Phase 3A + 3B + 3C + 3D)
+# MX Logitech Plugin (AI-FEAT MX Console — Phase 3A + 3B + 3C + 3D + 3E)
 
 The real Logitech MX Creative Console plugin. Phase 3A proved physical
 end-to-end control as an integration smoke test (three actions). Phase 3B
@@ -1020,13 +1020,87 @@ regression re-run (see "Automated tests" above):
 
 ---
 
-## What Phase 3A/3B/3C/3D explicitly do NOT do
+## Phase 3E — AutoIngest-side foundation for a dynamic Tag Refinement keypad
+
+**No Logitech SDK work in this phase — no plugin code touched at all.**
+This phase builds only the AutoIngest-side command/state foundation a
+future dynamic hardware keypad would need; see `docs/commandLayer.md` "Tag
+Refinement — dynamic tag state (Phase 3E)" for the full technical
+write-up (canonical tag identity, draft model, validation rules, and the
+UI↔command equivalence/security/transport/performance tests). This section
+gives the plugin-facing summary and the intended future workflow.
+
+### What exists now (AutoIngest side only)
+
+- `tagRefinement.setTagState({ tagId, checked })` — sets one tag's desired
+  state in a renderer-owned draft, shared with the real UI's own chips
+  (same primitive, not two). `tagId` is the composite canonical identity
+  `"<category>:<label>"` — there is no separate tag ID anywhere in the real
+  system, and none was invented here.
+- `tagRefinement.applyToSelected` — commits that draft through the exact
+  same path the real "Apply to Selected" button uses.
+- `state.tagRefinement.tags[]` — one entry per real, currently-offered tag
+  (`{id, category, label, state}`), `state` being draft-aware so a pending
+  hardware press is visible in the very next pushed state, before anything
+  is committed.
+- Both commands ride the existing Phase 2 transport completely unchanged —
+  see `docs/mxControlTransport.md` "Phase 3E — dynamic Tag Refinement rode
+  the transport unchanged."
+
+### Intended future workflow (NOT YET IMPLEMENTED)
+
+The eventual hardware experience this foundation targets:
+
+1. Operator navigates/selects photographs normally on the MX Creative
+   Console (unchanged Browse layout).
+2. Presses **Refine Tags** (the Phase 3D `refine_tags` action, still
+   registered-but-unassigned — see "Reserved ninth key evaluation" above).
+3. The console's dynamic keys/display would populate with the REAL
+   refinable tags for the current selection (`state.tagRefinement.tags[]`),
+   each key showing that tag's real tri-state.
+4. Pressing a key sends `tagRefinement.setTagState` for that exact tag;
+   the console's own key redraws from the next pushed state.
+5. A dedicated Apply key (or gesture) sends `tagRefinement.applyToSelected`,
+   committing exactly what the real "Apply to Selected" button would.
+
+**This requires dynamic per-key content (text and/or icon) the device can
+be told to show at runtime — confirmed unsupported in `@logitech/plugin-sdk
+0.1.1`'s Node SDK** (see the SDK capability matrix above:
+`GetActionImageRequestHandler`/`GetActionTextRequestHandler` are present in
+the protocol but non-functional stubs). Per the brief's own framing, the
+only currently-documented path to genuine dynamic keypad content in the
+Loupedeck/Logitech plugin ecosystem is the **C# toolkit, not the Node
+SDK** — and **that migration is explicitly NOT part of this phase, or
+authorized by it.** This document records the intended workflow so a
+future phase has a traceable target; it is not a commitment to build it a
+particular way, and nothing here should be read as C# migration having
+begun.
+
+### Readiness assessment
+
+The AutoIngest side (commands, state, validation, subscription,
+performance, the real Phase 2 transport) is now genuinely ready to serve a
+dynamic hardware keypad the moment one exists — every piece a future
+C#/dynamic-folder plugin would need to call is implemented, tested (UI↔
+command equivalence proven, not assumed; security/validation covered;
+transport proven end to end with a real authenticated client), and
+documented. **What does not yet exist is the hardware side**: no
+`PluginDynamicFolder`, no C# project, no dynamic icon/text rendering, no
+physical device test of any of this — all explicitly out of scope for this
+phase and not started.
+
+---
+
+## What Phase 3A/3B/3C/3D/3E explicitly do NOT do
 
 Full multi-page G1–G9 keypad, QMZ sequence-selection UI, import start/
 controls, dynamic import progress, Archive Maintenance, Event Maintenance,
 the Actions Ring, a final installer, Marketplace packaging/publishing, a C#
-toolkit migration, virtual plugin pages, programmatic/undocumented Options+
-database mutation, an Ask AutoIngest mapping (no renderer entry point
-exists), a resume command (every real instance is either internal-only or
-belongs to an out-of-scope screen), a permanent ninth-key assignment
-(pending physical comparison), or any merge to `main`/`stable/0.9`.
+toolkit migration (Phase 3E built only the AutoIngest-side foundation a
+future C# migration would consume — the migration itself has not begun),
+virtual plugin pages, `PluginDynamicFolder`, dynamic icon rendering,
+programmatic/undocumented Options+ database mutation, an Ask AutoIngest
+mapping (no renderer entry point exists), a resume command (every real
+instance is either internal-only or belongs to an out-of-scope screen), a
+permanent ninth-key assignment (pending physical comparison), or any merge
+to `main`/`stable/0.9`.

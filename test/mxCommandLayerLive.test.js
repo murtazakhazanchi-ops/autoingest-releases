@@ -138,6 +138,8 @@ async function writeMedia(root, relFile) {
       // added in Phase 3D — see test/mxCommandLayerPhase3DLive.test.js
       'tagRefinement.open', 'tagRefinement.close', 'tagRefinement.useAllTags', 'tagRefinement.clearSelected',
       'event.openChooser',
+      // added in Phase 3E — see test/mxCommandLayerPhase3ELive.test.js
+      'tagRefinement.setTagState', 'tagRefinement.applyToSelected',
     ];
     check(expected.every((id) => commands.includes(id)), 'registry contains every expected initial command');
     check(commands.length === expected.length, 'registry contains no unexpected extra commands');

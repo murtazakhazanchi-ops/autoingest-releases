@@ -206,6 +206,26 @@ to bypass, and nothing resembling `eval` anywhere in this path.
 
 ---
 
+## Phase 3E — dynamic Tag Refinement rode the transport unchanged
+
+`tagRefinement.setTagState`/`applyToSelected` (see `docs/commandLayer.md`
+"Tag Refinement — dynamic tag state") and the new `tagRefinement.tags[]`/
+`event` state fields required **zero changes to this file's code**
+(`services/mxControlService.js`). This is the direct, intended consequence
+of "Command allowlist" and "State flow" above already being fully generic:
+`executeCommand` already forwards any `commandId`/payload opaquely, and
+`_broadcastStateIfChanged()` already pushes whatever `getState()` returns,
+whatever shape that happens to be, deduplicated the same way regardless of
+size. A larger `tags[]` array is just a larger JSON object to diff/send —
+nothing about it is special-cased, and nothing needed to be. Verified
+end-to-end with a real authenticated WebSocket client in
+`test/mxCommandLayerPhase3ELive.test.js` (receives the real tag list/tri-
+state values, executes the tag operation, receives the resulting pushed
+state, executes Apply, receives the final state — all over one ordinary
+connection).
+
+---
+
 ## State flow
 
 ```
