@@ -10566,6 +10566,58 @@ function _getQmzSequencesCompact() {
 }
 
 /**
+ * Compact Tag Refinement state (AI-FEAT MX Console Phase 3D) — null when
+ * refinement isn't active, same "only where meaningful" convention as groups/
+ * sequences above. Deliberately omits an `available` boolean: whether
+ * `tagRefinement.open` would succeed right now is already exactly what
+ * `availableCommands` encodes (`'tagRefinement.open' in availableCommands`)
+ * — a second copy of that same answer here would be exactly the kind of
+ * redundant eligibility table getAvailableCommands()'s own doc comment
+ * already warns against. Also deliberately omits a per-tag checkbox-state
+ * array (the brief's own example `tags: [...]` field): nothing this phase
+ * exposes on hardware ever needs to pick an individual tag, so shipping that
+ * array would be unused weight with no consumer, which is the one thing
+ * Phase 1B's "cheap to derive, actually needed" compactness rule exists to
+ * prevent. `scopeLabel`/`componentLabel`/`status` mirror exactly what the
+ * refinement banner and panel already show — no new derivation.
+ */
+function _getTagRefinementCompact() {
+  const scope = _refinementScope();
+  if (!scope) return null;
+  const selPaths = [...selectedFiles].filter(p => scope.has(p));
+  const { eventTypes: etLabels, additionalKeywords: akLabels } = RefinableTags.availableTags(scope.comp);
+  const selState = TagRefinementManager.getSelectionState(scope.scopeId, selPaths, etLabels, akLabels, _makeDefaultsResolver(scope));
+  return {
+    active: true,
+    scopeLabel: scope.label,
+    componentLabel: scope.componentLabel,
+    selectedCount: selPaths.length,
+    status: selState.status, // 'empty' | 'default' | 'refined' | 'none' | 'mixed'
+  };
+}
+
+/**
+ * Compact active-event state (AI-FEAT MX Console Phase 3D) — null when no
+ * event is active (quick-import mode, or nothing loaded yet), same
+ * "only where meaningful" convention as the other compact accessors.
+ * Deliberately just two scalars: `activeEventName` and `participatingCount`
+ * (ImportSession.participatingCount() — already computed/used by
+ * _eventBadgeCtx() elsewhere, not a new aggregation). No event id, no full
+ * event list, no event.json fields — "Change Event" on MX is `event.openChooser`
+ * only (opens the real chooser; the operator still picks from the real list
+ * on screen), so nothing here needs to let a caller target a specific event
+ * without going through that chooser.
+ */
+function _getEventStateCompact() {
+  const ed = EventCreator.getActiveEventData();
+  if (!ed) return null;
+  return {
+    activeEventName: ed.event?.displayName || ed.event?.name || null,
+    participatingCount: ImportSession.participatingCount(),
+  };
+}
+
+/**
  * Notifies renderer/commandManager.js's subscribers that command-visible
  * state may have changed. A thin pass-through to whatever the command layer
  * installed on the bridge (a no-op until commandManager.js loads and wires
@@ -13538,6 +13590,13 @@ function _enterRefinementMode(scopeId) {
   renderCurrentView();
   syncAllRefinementBadges();
   renderGroupPanel();
+  // None of the calls above are in the existing notify-hook chain (they're
+  // view/badge rendering, not one of the shared sync functions already wired
+  // — see docs/commandLayer.md "State-change subscription") — added here so
+  // a command-layer subscriber (AI-FEAT MX Console Phase 3D) actually learns
+  // when tagRefinement state changes, matching every other mutation path's
+  // behavior.
+  _notifyCommandLayer();
 }
 
 function _exitRefinementMode() {
@@ -13554,6 +13613,7 @@ function _exitRefinementMode() {
   renderCurrentView();
   renderGroupPanel();
   updateSelectionBar();
+  _notifyCommandLayer(); // see the matching comment in _enterRefinementMode above
 }
 
 // Summary text memo — recomputed only when an override changed or the file array was replaced.
@@ -13617,6 +13677,132 @@ function _updateRefinementBanner() {
     textEl.innerHTML = `Refining Tags · <strong>${_esc(scope.label)}</strong>${componentPart} · ${fileCount} file${fileCount === 1 ? '' : 's'}`;
   }
   banner.style.display = 'flex';
+}
+
+// ── Command-layer primitives (AI-FEAT MX Console Phase 3D) ──────────────────
+// Thin compositions over the primitives already defined above — no new
+// eligibility/business rules, only "resolve the current selection/context
+// into the same target a mouse click already resolves it to, then call the
+// existing mutating function." See docs/commandLayer.md "Tag Refinement
+// commands" for why `tagRefinement.applyToSelected` (the brief's original
+// candidate) was deliberately NOT implemented verbatim: the real "Apply to
+// Selected" button applies whichever tags are currently CHECKED in the
+// panel's own checkboxes — an arbitrary, UI-held tag combination the console
+// has no way to specify without inventing a tag-picking mechanism (exactly
+// what "do NOT let the plugin construct its own tag sets" forbids). "Use All
+// Component Tags" / "Reset Selected to Defaults" are the real, existing,
+// parameter-free buttons that DO map cleanly — this is what
+// `tagRefinement.useAllTags` / `tagRefinement.clearSelected` reuse.
+
+/** Number of currently-selected files that fall inside the active refinement
+ * scope — 0 when refinement isn't active. Shared by the command layer's
+ * `check()`s and by `getTagRefinementCompact()` below, so both read the exact
+ * same derivation, never two copies of it. */
+function _refinementSelectedCount() {
+  const scope = _refinementScope();
+  return scope ? [...selectedFiles].filter(p => scope.has(p)).length : 0;
+}
+
+/**
+ * Read-only: which scope `tagRefinement.open` would enter right now, or null
+ * if none applies — mirrors `_enterRefinementMode`'s own two real entry
+ * points (the footer single-component button, and a specific group's own
+ * refine-trigger) without duplicating their eligibility rules a second time:
+ *   - Already active → null ("open" never switches scopes out from under an
+ *     in-progress session; close it first).
+ *   - Single-component event, eligible → EVENT_SCOPE, same as the footer
+ *     button — no selection required to ENTER (matches the footer button,
+ *     which has no selection precondition either).
+ *   - Multi-component: every currently selected file must resolve (via
+ *     `GroupManager.getGroupForFile`, the same lookup `_makeDefaultsResolver`
+ *     already uses) to the SAME group, and that group's mapped component
+ *     must itself be refinement-eligible — exactly the group whose own
+ *     `.gc-refine-trigger` the operator would otherwise have to click.
+ *   - Empty selection, a selection spanning more than one group, a file with
+ *     no group, or a group mapped to a non-eligible component → null.
+ */
+function _resolveRefinementTargetScope() {
+  if (TagRefinementManager.isActive()) return null;
+  if (_isEventRefineAvailable()) return TagRefinementManager.EVENT_SCOPE;
+  if (selectedFiles.size === 0) return null;
+  const comps = EventCreator.getEventComps();
+  if (comps.length <= 1) return null; // single/no-component events are event-scope only
+  let targetGroup = undefined; // undefined = not yet seen; null = conflict/missing
+  for (const p of selectedFiles) {
+    const g = GroupManager.getGroupForFile(p);
+    if (!g) { targetGroup = null; break; }
+    if (targetGroup === undefined) targetGroup = g;
+    else if (targetGroup.uid !== g.uid) { targetGroup = null; break; }
+  }
+  if (!targetGroup) return null;
+  const comp = comps.find(c => c.folderName === targetGroup.subEventId);
+  if (!comp || !TagRefinementManager.isEligible(comp)) return null;
+  return targetGroup.uid;
+}
+
+/** `tagRefinement.open`'s run(): enters the scope `_resolveRefinementTargetScope()`
+ * resolves, exactly as if the operator had clicked the matching "Refine Tags"
+ * button. Returns false (a normal no-op, not an error) when nothing resolves. */
+function _openTagRefinementForSelection() {
+  const target = _resolveRefinementTargetScope();
+  if (target == null) return false;
+  _enterRefinementMode(target);
+  return true;
+}
+
+/** `tagRefinement.close`'s run(): the exact effect of the panel's own "Done
+ * Refining" button. Returns false (normal no-op) when refinement isn't active. */
+function _closeTagRefinement() {
+  if (!TagRefinementManager.isActive()) return false;
+  _exitRefinementMode();
+  return true;
+}
+
+/**
+ * Applies a mutation to the selection within the active refinement scope, then
+ * performs the exact same post-mutation sync the panel's own buttons already
+ * do (targeted badge sync, event-signature bookkeeping, panel re-render if
+ * still open). `renderRefinementPanel()`'s own Apply/Use All/Use None/Reset
+ * button handlers call this too (see below) — a mouse click and a
+ * command-driven call go through byte-identical code from here on, never two
+ * parallel implementations.
+ * @param {(sel: string[], scope: object) => void} mutateFn
+ * @returns {number} files touched — 0 is a normal no-op (not active, or
+ *   nothing selected within the active scope), never an error.
+ */
+function _applyRefinementOverride(mutateFn) {
+  const scope = _refinementScope();
+  if (!scope) return 0;
+  const sel = [...selectedFiles].filter(p => scope.has(p));
+  if (sel.length === 0) return 0;
+  mutateFn(sel, scope);
+  if (scope.isEvent) _evRefineSig = _eventCompSignature(scope.comp);
+  for (const p of sel) syncRefinementBadge(p);
+  if (TagRefinementManager.isActive()) renderRefinementPanel();
+  _notifyCommandLayer(); // tagRefinement.status may have changed — see _enterRefinementMode's comment
+  return sel.length;
+}
+
+/** `tagRefinement.useAllTags`'s run(): the exact effect of "Use All Component
+ * Tags" (`#rpAllBtn`) — every available Event Type/Additional Keyword applied
+ * to the current selection-within-scope. */
+function _applyAllTagsToRefinementSelection() {
+  const scope = _refinementScope();
+  if (!scope) return 0;
+  const { eventTypes, additionalKeywords } = RefinableTags.availableTags(scope.comp);
+  return _applyRefinementOverride((sel, sc) => {
+    TagRefinementManager.setOverride(sc.scopeId, sel, { eventTypes, additionalKeywords });
+  });
+}
+
+/** `tagRefinement.clearSelected`'s run(): the exact effect of "Reset Selected
+ * to Defaults" (`#rpResetBtn`) — reverts to inheriting the mapped component's
+ * defaults (NOT the same as applying every tag — see tagRefinementManager.js's
+ * own tri-state-semantics comment). */
+function _resetRefinementSelectionToDefault() {
+  return _applyRefinementOverride((sel, sc) => {
+    TagRefinementManager.resetToDefault(sc.scopeId, sel);
+  });
 }
 
 /** Builds one selectable tag chip for the refinement panel. */
@@ -13752,24 +13938,12 @@ function renderRefinementPanel() {
   // Handlers resolve the scope FRESH each time rather than closing over this render's
   // scope: the selection (and even the file set) keeps changing after this render via the
   // lightweight _syncRefinementSelectedCount() path, which never re-renders the panel.
-  const _selectedInScope = () => {
-    const sc = _refinementScope();
-    return sc ? [...selectedFiles].filter(p => sc.has(p)) : [];
-  };
-
-  const _applyAndRerender = (overrideFn) => {
-    const sel = _selectedInScope();
-    if (sel.length === 0) return;
-    const sc = _refinementScope();
-    overrideFn(sel, sc);
-    if (sc && sc.isEvent) _evRefineSig = _eventCompSignature(sc.comp);
-    // Only the tiles whose override just changed — O(selected) via tileMap, never a rescan.
-    for (const p of sel) syncRefinementBadge(p);
-    renderRefinementPanel();
-  };
+  // All four delegate to the module-level _applyRefinementOverride() (see above) — the
+  // same function the command layer's tagRefinement.useAllTags/clearSelected reuse, so a
+  // mouse click and a command-driven call are never two separate implementations.
 
   panel.querySelector('#rpApplyBtn')?.addEventListener('click', () => {
-    _applyAndRerender((sel, sc) => {
+    _applyRefinementOverride((sel, sc) => {
       const checkedIn = (cat) => [...panel.querySelectorAll(`input[data-cat="${cat}"]:checked`)].map(cb => cb.value);
       TagRefinementManager.setOverride(sc.scopeId, sel, {
         eventTypes: checkedIn('eventTypes'),
@@ -13779,7 +13953,7 @@ function renderRefinementPanel() {
   });
 
   panel.querySelector('#rpAllBtn')?.addEventListener('click', () => {
-    _applyAndRerender((sel, sc) => {
+    _applyRefinementOverride((sel, sc) => {
       TagRefinementManager.setOverride(sc.scopeId, sel, {
         eventTypes: [...eventTypeLabels],
         additionalKeywords: [...additionalKeywordLabels],
@@ -13788,13 +13962,13 @@ function renderRefinementPanel() {
   });
 
   panel.querySelector('#rpNoneBtn')?.addEventListener('click', () => {
-    _applyAndRerender((sel, sc) => {
+    _applyRefinementOverride((sel, sc) => {
       TagRefinementManager.setOverride(sc.scopeId, sel, { eventTypes: [], additionalKeywords: [] });
     });
   });
 
   panel.querySelector('#rpResetBtn')?.addEventListener('click', () => {
-    _applyAndRerender((sel, sc) => {
+    _applyRefinementOverride((sel, sc) => {
       TagRefinementManager.resetToDefault(sc.scopeId, sel);
     });
   });
@@ -18252,6 +18426,28 @@ window.__autoIngestRendererBridge = {
   // Assigns to an EXISTING QMZ sequence only — see _qmzAssignSelectionToSequenceCode's
   // own comment for why it never creates/guesses one.
   qmzAssignSelectionToSequence: (sequenceCode) => _qmzAssignSelectionToSequenceCode(sequenceCode),
+
+  // ── Phase 3D: Tag Refinement + Change Event ────────────────────────────────
+  // Every accessor here is a thin read or a thin call into the Phase 3D
+  // primitives added above (_resolveRefinementTargetScope, _enterRefinementMode/
+  // _exitRefinementMode, _applyRefinementOverride, openEventPickerFromWorkspace)
+  // — no eligibility rule is duplicated a second time anywhere in this object.
+  isTagRefinementActive:      () => TagRefinementManager.isActive(),
+  isRefinementTargetAvailable: () => _resolveRefinementTargetScope() != null,
+  getTagRefinementSelectedCount: () => _refinementSelectedCount(),
+  openTagRefinementForSelection: () => _openTagRefinementForSelection(),
+  closeTagRefinement:          () => _closeTagRefinement(),
+  applyAllTagsToRefinementSelection: () => _applyAllTagsToRefinementSelection(),
+  resetRefinementSelectionToDefault: () => _resetRefinementSelectionToDefault(),
+  getTagRefinementCompact:     () => _getTagRefinementCompact(),
+  // openEventPickerFromWorkspace() already no-ops safely (importRunning/
+  // _sessionRunBusy/no-active-event) and now reports that outcome as a
+  // boolean — see its own updated comment in importSessionUI.js. Opens the
+  // real chooser only; it never picks a target event itself (see
+  // docs/commandLayer.md "Change Event — event.openChooser").
+  openEventChooser:           () => openEventPickerFromWorkspace(),
+  getEventStateCompact:        () => _getEventStateCompact(),
+
   // State-change notifications: commandManager.js overwrites this with its
   // own listener-fanout function at load time (see its "Wire into the
   // bridge" section) — this no-op default means a hook point calling

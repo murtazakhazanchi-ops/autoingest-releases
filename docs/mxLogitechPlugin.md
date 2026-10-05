@@ -1,4 +1,4 @@
-# MX Logitech Plugin (AI-FEAT MX Console — Phase 3A + 3B + 3C)
+# MX Logitech Plugin (AI-FEAT MX Console — Phase 3A + 3B + 3C + 3D)
 
 The real Logitech MX Creative Console plugin. Phase 3A proved physical
 end-to-end control as an integration smoke test (three actions). Phase 3B
@@ -241,6 +241,14 @@ Main dial: clockwise -> next file, counter-clockwise -> previous file
 | `unassign_group` | `CommandAction` | Unassign | `group.unassign` | LCD key |
 | `groups_page_placeholder` | `CommandAction` | Groups | none — intentionally inert | LCD key |
 | `navigate_files` | `AdjustmentAction` | Navigate Files | `navigation.nextFile`/`previousFile` | Main dial |
+| `refine_tags` | `CommandAction` | Refine Tags | `tagRefinement.open` | Registered, unassigned (Phase 3D) |
+| `change_event` | `CommandAction` | Change Event | `event.openChooser` | Registered, unassigned (Phase 3D) |
+
+`refine_tags`/`change_event` (Phase 3D) are registered so both are
+available in the Options+ Action Picker for temporary ninth-key physical
+testing — see "Phase 3D" below. Neither is assigned to the Browse layout's
+ninth key by this change; the eight working keys and the dial above are
+unchanged.
 
 Per the SDK's own Command-vs-Adjustment distinction: every discrete button
 action is a `CommandAction`, the dial is a real `AdjustmentAction` — never a
@@ -276,8 +284,14 @@ own `check()` already governs their real eligibility either way. No second
 mode/context state was invented in the plugin — every gate reads AutoIngest's
 own pushed `context` field directly.
 
+`refine_tags`/`change_event` (Phase 3D) follow the exact same two gating
+patterns: both consult `availableCommands` (`tagRefinement.open`/
+`event.openChooser` respectively) before calling `executeCommand()`, and
+both additionally skip when `state.context !== 'browse'` — same reasoning
+as `unassign_group`/`assign_g{1,2,3}` above.
+
 No QMZ/import/archive actions exist yet — explicitly out of scope for
-Phase 3B too.
+Phase 3B (and 3D) too.
 
 ---
 
@@ -415,7 +429,7 @@ and command-outcome events are logged).
 ## Automated tests (no hardware required)
 
 `npm test` (compiles via real `tsc` first, then runs unit then integration —
-see "Known limitations" for why not `tsx`) — **69 checks total, all
+see "Known limitations" for why not `tsx`) — **80 checks total, all
 passing**:
 
 - **`test/descriptor.test.ts`** (17 checks, plain temp-dir I/O, no
@@ -427,15 +441,17 @@ passing**:
   missing/empty/undefined `groups`, and a null state — "group label →
   actual group id resolution" and "group missing behavior" from the Phase
   3B test requirements.
-- **`test/browseActions.unit.test.ts`** (25 checks, Phase 3B, the shared
+- **`test/browseActions.unit.test.ts`** (36 checks — 25 from Phase 3B, 11
+  added in Phase 3D for `refine_tags`/`change_event` — the shared
   `autoIngestClient` singleton's public methods temporarily mocked and
-  restored per test — no AutoIngest process): command mapping for all 10
+  restored per test — no AutoIngest process): command mapping for all 12
   actions, `availableCommands` gating (each gated action verified to send
   **zero** commands when its target is unavailable), context gating (browse
   vs qmz vs import), rejection propagation (a mocked `ok:false` result never
   throws), and no-plugin-local-state-mutation (the same action instance
   called twice with different mocked states behaves purely per-state, never
-  per-call-count; `navigate_files` provably holds no numeric position).
+  per-call-count; `navigate_files` provably holds no numeric position;
+  `refine_tags` likewise).
 - **`test/autoIngestClient.integration.test.ts`** (13 checks, launches the
   **real** AutoIngest app via `playwright-core`'s `_electron`, exactly like
   the AutoIngest repo's own `test/mxControlTransportLive.test.js` — reuses
@@ -484,6 +500,19 @@ passing**:
   waiting could observe stale data. Fixed by waiting for the specific state
   change (e.g. `selectedCount`) before depending on it, the same pattern
   already documented in `mxControlTransportLive.test.js`.
+
+**AutoIngest-side coverage (Phase 3D, in the main repo's own `test/`, not
+this plugin's).** `test/mxCommandLayerPhase3DLive.test.js` (41 checks, real
+Electron renderer, real `event.json` fixtures, real multi-component groups)
+proves `tagRefinement.open`'s scope resolution, `useAllTags`/`clearSelected`
+against the real `TagRefinementManager`, `event.openChooser`'s real event
+switch, and the subscription gap fix above — end to end, against the real
+command layer this plugin's two new actions call into. See
+`docs/commandLayer.md` "Tag Refinement commands"/"Change Event" for the
+full write-up. The full existing regression suite (Phase 1A/1B command
+layer, every Tag Refinement suite, every Multi-Event Import suite, QMZ,
+`importSession`/`importSessionRunner`) was re-run after these changes — all
+passing, no regression.
 
 ---
 
@@ -873,10 +902,131 @@ returns **zero** matches post-cleanup.
 
 ---
 
-## What Phase 3A/3B/3C explicitly do NOT do
+## Phase 3D — Tag Refinement + Event / Workflow controls
 
-Full multi-page G1–G9 keypad, QMZ sequence-selection UI, import controls,
-dynamic import progress, Archive Maintenance, Event Maintenance, the
-Actions Ring, a final installer, Marketplace packaging/publishing, a C#
+**Goal.** Expose and validate high-value operator commands that support
+Per-Photo Tag Refinement and the Multi-Event "Change Event" workflow —
+decide which one deserves the reserved ninth physical key, without yet
+building virtual Logitech pages or redesigning the working Browse profile.
+See `docs/commandLayer.md` "Tag Refinement commands" / "Change Event —
+`event.openChooser`" / "Resume — investigated, not exposed" / "Ask
+AutoIngest — no command layer entry point exists" for the full
+investigation each command (or non-command) is built from.
+
+### Authoritative workflows inspected
+
+- **Per-Photo Tag Refinement** (`renderer/tagRefinementManager.js` +
+  renderer.js's "Tag Refinement mode" section) — real eligibility rule
+  (`isEligible`), real tri-state override semantics, the two real entry
+  points (event-scope footer button, group-scope trigger), and exactly
+  which panel buttons are parameter-free vs. arbitrary-tag-dependent.
+- **Multi-Event / Change Event** (`renderer/importSessionUI.js`) — the
+  landing-screen "Change Event" (destructive, session-boundary, unreachable
+  from Browse) vs. the real in-workspace `openEventPickerFromWorkspace()`
+  (opens the real chooser only; the event switch itself happens later, once
+  the operator picks from the real list).
+- **Resume** — every `resume`-named function/IPC handler in the codebase,
+  individually traced; see commandLayer.md for the full breakdown.
+- **Ask AutoIngest** (`AI-FEAT-059`, `scripts/product-docs/knowledge-portal/`)
+  — see below.
+
+### Ask AutoIngest — investigated, rejected
+
+**"Ask AutoIngest" is not a renderer feature.** It is a separate, standalone
+local-only Node `http` server (`scripts/product-docs/knowledge-portal/server.js`,
+bound to `127.0.0.1`) serving its own static page — part of
+`scripts/product-docs/`, the developer documentation/engineering-knowledge
+tooling, architecturally unrelated to the Electron app's renderer process
+this plugin controls. Status per its own feature record
+(`docs/product/features/AI-FEAT-059_...md`): "Implemented — evolving",
+Maturity "Experimental", explicitly "not the final operator-facing portal."
+It is reached via a browser, the `knowledge` CLI, or its own page — never
+through `renderer.js`, `window.__autoIngestRendererBridge`, or
+`AutoIngestCommands`.
+
+**No `askAutoIngest.open`/`toggle` command was added, and no plugin action
+exists for it.** There is no "authoritative renderer function" to delegate
+to — not a scope judgment call, an architectural fact. Making AutoIngest's
+MX plugin launch this portal would mean inventing an entirely new
+mechanism (spawning a browser pointed at a local dev-tool server) with no
+corresponding existing in-app operator behavior — exactly what "map cleanly
+to existing application behavior" forbids. This also means the reserved
+ninth key's candidate set narrows from three to two (see below).
+
+### Reserved ninth key evaluation
+
+| Candidate | Status | Notes |
+|---|---|---|
+| A. Refine Tags (`refine_tags` → `tagRefinement.open`) | Implemented, registered, unassigned | High-value when applicable; genuinely unavailable in some real sessions (non-refinable component, single-component event with nothing to refine, ambiguous/empty selection in a multi-component event) — see test matrix below. |
+| B. Change Event (`change_event` → `event.openChooser`) | Implemented, registered, unassigned | Always applicable in any live Browse session with an active event (not QMZ, not importing) — broader availability than A, but a lower-frequency action per session (an operator changes event far less often than refining tags). |
+| C. Ask AutoIngest | **Not implementable this phase** | No renderer entry point exists at all — removed from consideration, not merely deferred. See above. |
+
+Per the brief's own criteria (expected usage frequency, UI steps saved,
+context clarity, accidental-trigger risk, usefulness across most Browse
+sessions) — not implementation convenience: **Change Event is the
+candidate with broader, more predictable availability** (it never depends
+on the active event's component shape or the current selection), while
+**Refine Tags is the higher-value action when it IS available** (it saves
+more real UI steps — selecting a specific group's trigger vs. one key
+press). Neither dominates outright. **This document does not pick a
+winner** — the brief requires comparing both via physical testing before
+permanently assigning the key (see below); that comparison has not yet
+been run on the real device as of this phase's close. The ninth key
+remains reserved/blank in the working Browse profile until that physical
+comparison happens.
+
+### Physical test guidance (not yet run — temporary assignment only)
+
+The eight working keys (`SELECT`/`SELECT ALL`/`CLEAR`/`PREVIEW`/`G1`/`G2`/
+`G3`/`UNASSIGN`) and the dial are **unchanged** — per the brief, nothing
+here displaces a proven mapping. To compare the two candidates physically:
+
+1. In Logi Options+, temporarily assign **Refine Tags** to the reserved
+   ninth key of the dedicated AutoIngest profile (Phase 3C) and test:
+   - Select photos in a refinable group/single-component event → press →
+     the real refinement panel opens (same path as clicking "Refine Tags").
+   - A non-refinable selection/component → press → no-op, no panel, no
+     error.
+   - No selection in a multi-component event → press → no-op (ambiguous,
+     never guesses a group).
+   - A selection spanning two groups → press → no-op (ambiguous).
+2. Reassign the same key to **Change Event** and test:
+   - Press → the real event chooser opens.
+   - Pick a different event from the real on-screen list → the switch
+     completes exactly as clicking `#ctxChangeEventBtn` would.
+   - Press while QMZ is open → no-op (unavailable).
+3. Record which felt more useful across a realistic session before
+   permanently assigning the key — this is a judgment call the brief
+   explicitly reserves for after physical comparison, not something to
+   decide from the command-layer investigation alone.
+
+### What changed in the AutoIngest app (not just the plugin)
+
+Minimal, all additive/behavior-preserving, all covered by the full
+regression re-run (see "Automated tests" above):
+
+- `renderer/commandManager.js` — 5 new commands
+  (`tagRefinement.open`/`close`/`useAllTags`/`clearSelected`,
+  `event.openChooser`), 2 new `getState()` fields (`tagRefinement`, `event`).
+- `renderer/renderer.js` — new thin composition functions built entirely
+  from existing primitives (no new business rules); `renderRefinementPanel()`'s
+  inline button-handler closure refactored into a shared module-level
+  function so the mouse and the command layer use byte-identical code; a
+  real pre-existing gap fixed (refinement mode entry/exit never notified
+  `subscribe()`rs — now it does).
+- `renderer/importSessionUI.js` — `openEventPickerFromWorkspace()` now
+  returns a boolean reporting whether it actually opened the chooser
+  (every existing caller already ignored the return value).
+
+---
+
+## What Phase 3A/3B/3C/3D explicitly do NOT do
+
+Full multi-page G1–G9 keypad, QMZ sequence-selection UI, import start/
+controls, dynamic import progress, Archive Maintenance, Event Maintenance,
+the Actions Ring, a final installer, Marketplace packaging/publishing, a C#
 toolkit migration, virtual plugin pages, programmatic/undocumented Options+
-database mutation, or any merge to `main`/`stable/0.9`.
+database mutation, an Ask AutoIngest mapping (no renderer entry point
+exists), a resume command (every real instance is either internal-only or
+belongs to an out-of-scope screen), a permanent ninth-key assignment
+(pending physical comparison), or any merge to `main`/`stable/0.9`.

@@ -191,6 +191,53 @@ const AutoIngestCommands = (() => {
       // the comment above isValid — so this must resolve here instead).
       computeExecuted: (result) => result === true,
     },
+
+    // ── Tag Refinement (Phase 3D) ────────────────────────────────────────
+    // See docs/commandLayer.md "Tag Refinement commands" for the full
+    // investigation this grouping is built from (renderer/tagRefinementManager.js
+    // + the "Tag Refinement mode" section of renderer.js) and for why
+    // `applyToSelected`/`toggleTag` (the original brief candidates) are
+    // deliberately NOT present here.
+    'tagRefinement.open': {
+      // isRefinementTargetAvailable() mirrors _resolveRefinementTargetScope()
+      // != null — the exact same resolution run() uses, evaluated for
+      // availability rather than effect. Not a second eligibility table.
+      check: (_p, b) => b.isRefinementTargetAvailable(),
+      run: (_p, b) => b.openTagRefinementForSelection(),
+    },
+    'tagRefinement.close': {
+      check: (_p, b) => b.isTagRefinementActive(),
+      run: (_p, b) => b.closeTagRefinement(),
+    },
+    // The real, parameter-free replacement for the brief's rejected
+    // `applyToSelected` candidate — see commandLayer.md for why "whatever
+    // tags happen to be checked in the panel" cannot be a hardware command.
+    'tagRefinement.useAllTags': {
+      check: (_p, b) => b.isTagRefinementActive() && b.getTagRefinementSelectedCount() > 0,
+      run: (_p, b) => b.applyAllTagsToRefinementSelection(),
+      // run() resolves to a file count (0 is a normal no-op), not a boolean —
+      // same lesson as group.assign/qmz.assignToSequence above.
+      computeExecuted: (result) => result > 0,
+    },
+    'tagRefinement.clearSelected': {
+      check: (_p, b) => b.isTagRefinementActive() && b.getTagRefinementSelectedCount() > 0,
+      run: (_p, b) => b.resetRefinementSelectionToDefault(),
+      computeExecuted: (result) => result > 0,
+    },
+
+    // ── Change Event (Phase 3D) ──────────────────────────────────────────
+    // Opens the real event chooser/creator (openEventPickerFromWorkspace) —
+    // the operator still picks the target event from the real on-screen
+    // list. See docs/commandLayer.md "Change Event — event.openChooser" for
+    // why no command encodes a specific target event.
+    'event.openChooser': {
+      // Mirrors group.assign/group.unassign's own "!isQmzOpen()" gate — QMZ
+      // is a separate full-screen overlay the context bar (and this button)
+      // is already unreachable from, same established pattern, not a new
+      // rule invented for this command.
+      check: (_p, b) => !b.isQmzOpen() && !b.isImportRunning(),
+      run: (_p, b) => b.openEventChooser(),
+    },
   };
 
   // Import commands (import.start/confirm) are deferred for Phase 1B — see
@@ -284,6 +331,19 @@ const AutoIngestCommands = (() => {
       state.sequences = bridge.getQmzSequencesCompact();
     } else {
       state.groups = bridge.getGroupsCompact();
+    }
+    // Tag Refinement and the active event are both browse-only concepts in
+    // the current codebase (refinement mode can only be entered from browse;
+    // "Change Event" from the workspace is unreachable from qmz/import) — see
+    // docs/commandLayer.md "State schema (Phase 3D additions)". Present only
+    // when meaningful, same convention as groups/sequences above, and each
+    // omitted entirely (not `null`) rather than always present-but-null, to
+    // match getState()'s existing compactness convention.
+    if (context === 'browse') {
+      const tr = bridge.getTagRefinementCompact();
+      if (tr) state.tagRefinement = tr;
+      const ev = bridge.getEventStateCompact();
+      if (ev) state.event = ev;
     }
     return state;
   }

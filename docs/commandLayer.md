@@ -374,6 +374,215 @@ QMZ mutation.
 
 ---
 
+## Tag Refinement commands (Phase 3D)
+
+| Command | Payload | Applicable when | Calls |
+|---|---|---|---|
+| `tagRefinement.open` | — | not already active, AND a scope resolves (see below) | `_openTagRefinementForSelection()` |
+| `tagRefinement.close` | — | refinement is active | `_closeTagRefinement()` |
+| `tagRefinement.useAllTags` | — | active, selection-within-scope non-empty | `_applyAllTagsToRefinementSelection()` |
+| `tagRefinement.clearSelected` | — | active, selection-within-scope non-empty | `_resetRefinementSelectionToDefault()` |
+
+**Investigated before writing any command** (`renderer/tagRefinementManager.js`
++ the "Tag Refinement mode" section of `renderer.js`): refinement has exactly
+two real entry points — the footer "Refine Tags" button (single-component
+events, `EVENT_SCOPE`, no selection precondition to enter) and a specific
+group's own `.gc-refine-trigger` (multi-component events, that group's
+stable `uid`). There is no existing "resolve refinement scope from the
+current selection" primitive — `_resolveRefinementTargetScope()` is a new,
+genuinely new composition, but built **entirely** from already-existing
+accessors (`_isEventRefineAvailable()`, `GroupManager.getGroupForFile()`,
+`EventCreator.getEventComps()`, `TagRefinementManager.isEligible()`), the
+same way `_assignSelectionToGroup`/`group.assign` already compose existing
+primitives rather than add a business rule. It resolves to:
+
+- `TagRefinementManager.EVENT_SCOPE` when the single-component event's
+  footer control would itself be available (selection not required).
+- A specific group's `uid` when **every** currently selected file resolves
+  (via `GroupManager.getGroupForFile`) to the **same** group, and that
+  group's mapped component is itself refinement-eligible
+  (`TagRefinementManager.isEligible`).
+- `null` — refinement already active, an empty selection in a multi-component
+  event, a selection spanning more than one group, a file with no group at
+  all, or a group mapped to a non-eligible component. `tagRefinement.open`'s
+  `check()` is exactly `_resolveRefinementTargetScope() != null` — since it
+  fully pre-validates, `canExecute()` rejects an inapplicable attempt
+  (`{ok:false, reason:'not-applicable'}`) **before** `run()` is ever called,
+  the same established pattern as `selection.clear` on an empty selection —
+  never AutoIngest's own `ok:true, executed:false` "ran, nothing to do" shape
+  for these four commands specifically (all four pre-validate fully; only
+  commands whose `check()` is `() => true`, like navigation at a boundary,
+  use that shape).
+
+**Why `tagRefinement.applyToSelected`/`toggleTag` (the original candidates)
+are NOT implemented.** The real "Apply to Selected" button (`#rpApplyBtn`)
+applies whichever Event Type/Additional Keyword checkboxes are currently
+**checked in the panel's own DOM** — an arbitrary, UI-held tag combination
+with no server-side representation outside that render. A hardware command
+cannot specify that without either hardcoding tag names (brittle — tags
+differ per event/component) or building a tag-picking/list mechanism on the
+console (no dynamic text/list affordance exists — see the SDK capability
+matrix in `docs/mxLogitechPlugin.md`) — and either path is exactly what "do
+NOT let the plugin construct its own tag sets" forbids. `toggleTag({tag})`
+has the identical problem one level down (naming one specific tag). The two
+real, existing, **parameter-free** buttons that DO map cleanly —
+"Use All Component Tags" (`#rpAllBtn`) and "Reset Selected to Defaults"
+(`#rpResetBtn`) — are what `tagRefinement.useAllTags`/`clearSelected` reuse
+instead; `clearSelected`'s real name was literally reusable as-is.
+`useAllTags` is the closest honest replacement for what `applyToSelected`
+was trying to express.
+
+**No logic duplicated between the mouse and the command layer.**
+`renderRefinementPanel()`'s own Apply/Use All/Use None/Reset button handlers
+were refactored to call the same module-level `_applyRefinementOverride()`
+the command layer's `useAllTags`/`clearSelected` call — previously an inline
+closure re-created on every panel render, now one shared function. A click
+and a command-driven call are byte-identical from that point on, never two
+parallel implementations.
+
+**A real gap found and fixed while building this.** Entering/exiting
+refinement mode (`_enterRefinementMode`/`_exitRefinementMode`) called none
+of the existing notify-hook functions (`syncAllTiles`, `syncAllGroupBadges`,
+etc. — see "State-change subscription" above) — a `subscribe()`r would never
+have learned that `tagRefinement` state changed. Fixed by adding an explicit
+`_notifyCommandLayer()` call at the end of `_enterRefinementMode`,
+`_exitRefinementMode`, and `_applyRefinementOverride` — not a new polling
+path, just completing the existing hook coverage for a genuinely new state
+source this phase introduces.
+
+---
+
+## Change Event — `event.openChooser` (Phase 3D)
+
+| Command | Payload | Applicable when | Calls |
+|---|---|---|---|
+| `event.openChooser` | — | not in QMZ, not importing | `openEventPickerFromWorkspace()` |
+
+**Investigated before deciding the name.** "Change Event" from the LANDING
+screen (`showEventCreatorResume`) resets the whole workspace (groups, QMZ,
+import session) — a true session boundary, and not reachable from the
+`'browse'` context this console operates in anyway. The REAL in-workspace
+"Change Event" is `openEventPickerFromWorkspace()`
+(`renderer/importSessionUI.js`, bound to `#ctxChangeEventBtn`): it **only
+opens** the real event chooser/creator modal and returns; the actual switch
+happens asynchronously, later, once the operator picks a specific event
+from the real on-screen list (`_returnToWorkspaceFromPicker`). There is no
+authoritative way to target a *specific* event without that list — exactly
+the brief's own anticipated fallback: "the safest first command may simply
+be `event.openChooser`." No command encodes a target event; the hardware is
+a launcher for the real chooser, same principle as Ask AutoIngest's "console
+is only the launcher, not a replacement text-input mechanism" (see
+`docs/mxLogitechPlugin.md` for why Ask AutoIngest itself has no command at
+all).
+
+**`check()` mirrors `group.assign`/`group.unassign`'s own `!isQmzOpen()`
+gate** — not a new rule, the same established "QMZ is a separate full-screen
+overlay this is already unreachable from" pattern — plus `!isImportRunning()`
+(the same pre-existing `importRunning` flag every other import-aware check
+already reads). `openEventPickerFromWorkspace()` additionally no-ops safely
+on its own remaining guard (`_sessionRunBusy`, no active event) and now
+*reports* that outcome as a boolean return value (a purely additive change —
+every pre-existing caller already ignored the return value).
+
+**State: `state.event`.** `{ activeEventName, participatingCount }` —
+present only when an event is actually active (omitted entirely otherwise,
+same "only where meaningful" convention as `groups`/`sequences`/
+`tagRefinement`). Deliberately just two scalars: no event id, no event list,
+no `event.json` fields. Exposing the active event's name needs nothing more
+than that to be useful on its own, and nothing this phase adds needs to
+*target* a specific event without going through the real chooser.
+
+---
+
+## State schema (Phase 3D additions)
+
+```ts
+{
+  ...                              // unchanged Phase 1B fields, see above
+  tagRefinement?: {
+    active: boolean,
+    scopeLabel: string | null,      // e.g. "Current Event" or a group's label
+    componentLabel: string | null,  // the mapped component's folder/display name
+    selectedCount: number,          // selection within the active scope only
+    status: 'empty'|'default'|'refined'|'none'|'mixed',
+  },
+  event?: {
+    activeEventName: string | null,
+    participatingCount: number,     // ImportSession.participatingCount()
+  },
+}
+```
+
+Both fields are **omitted entirely** (not present-but-`null`) outside
+`context === 'browse'` — refinement can only be active, and "Change Event"
+is only reachable, from browse in the current codebase. Both are
+deliberately minimal:
+
+- `tagRefinement` has **no `available` boolean** — whether `tagRefinement.open`
+  would succeed is already exactly what `availableCommands` encodes
+  (`'tagRefinement.open' in availableCommands`); a second copy of that same
+  answer would be the redundant eligibility table `getAvailableCommands()`'s
+  own doc comment already warns against.
+- `tagRefinement` has **no per-tag checkbox-state array** (the task brief's
+  own example `tags: [...]` field). Nothing this phase exposes on hardware
+  ever needs to pick an individual tag, so shipping that array would be
+  unused weight with no consumer — the one thing the "cheap to derive,
+  actually needed" compactness rule exists to prevent.
+- `event` has **no event id, no full event list, no `event.json` fields** —
+  see "Change Event — `event.openChooser`" above for why nothing needs to
+  target a specific event without the real chooser.
+
+---
+
+## Resume — investigated, not exposed (Phase 3D)
+
+No genuinely Browse-context, operator-facing "resume" command was added.
+Every `resume`-named thing in the codebase was traced individually:
+
+- **Genuinely internal automatic recovery, never operator-facing**:
+  `main/metadataQueueStore.js`/`main/main.js`'s metadata-batch resume
+  (`resumeInterruptedBatches`, run once at startup), `main/exifService.js`'s
+  `resumeFrozenFile` (an internal retry primitive), and
+  `main/metadataAuditService.js`'s audit resume (`resumeMetadataAudit`,
+  called from the Archive Maintenance screen's own retry UI, not Browse).
+- **`EventCreator.resume()`** (`renderer/eventCreator.js`) is an internal
+  wizard-step-navigation helper ("resume at step 3"), not reachable from
+  Browse and not a standalone operator concept.
+- **Real, operator-facing resume buttons DO exist**, but each belongs to a
+  screen/pipeline explicitly out of this phase's (and the current roadmap's)
+  scope, not to "internal-only" automatic recovery: the active-import
+  pause/resume control (`#progressResumeBtn`, `copy:resume` IPC) belongs to
+  the import-progress screen — import start/confirm/control remains
+  deferred per this document's own existing "Deferred commands" section;
+  the Archive Sync Queue's "Resume Sync" button (`.sq-resume-btn`) belongs to
+  Archive Maintenance — not started, per the same section.
+
+Per the brief's own instruction ("If resume is only internal automatic
+recovery: do NOT expose it on MX"), extended to cover the second case found
+here too: a real operator action that exists but belongs to an
+out-of-current-scope screen is reported as such, not quietly treated as
+equivalent to "doesn't exist." Nothing is hardware-mapped this phase.
+
+---
+
+## Ask AutoIngest — no command layer entry point exists (Phase 3D)
+
+Investigated and found to be architecturally outside this file's scope
+entirely, not merely deferred: "Ask AutoIngest" (`AI-FEAT-059`, the Knowledge
+Engine) lives **entirely** under `scripts/product-docs/knowledge-portal/` —
+a separate, standalone Node `http` server (`server.js`, bound to
+`127.0.0.1`) serving its own static page, with **no connection whatsoever**
+to `renderer.js`, `window.__autoIngestRendererBridge`, or
+`AutoIngestCommands`. It is reached via a browser, the `knowledge` CLI
+(`knowledge ask`/`knowledge serve`), or its own portal page — never through
+the Electron app's renderer at all. There is therefore no "authoritative
+renderer function" this command layer could ever delegate to for it, by
+construction, not by choice. See `docs/mxLogitechPlugin.md` "Ask AutoIngest
+— investigated, rejected" for the full finding and its effect on the
+reserved-ninth-key evaluation.
+
+---
+
 ## Context / mode
 
 Every command's `check(payload, bridge)` reads live renderer state through

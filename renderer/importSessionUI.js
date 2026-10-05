@@ -265,16 +265,28 @@ function _refreshEventWorkspaceUI() {
   _renderMetaTitleIndicator();
 }
 
+/**
+ * Opens the real event chooser/creator, returning to THIS workspace afterward
+ * (see the module comment above) instead of landing on the home screen.
+ * @returns {boolean} true once the chooser was actually opened, false on
+ *   every no-op path (import running, a run already in flight, or no active
+ *   event to change from) — added for AI-FEAT MX Console Phase 3D's
+ *   `event.openChooser` command, which reports this as `executed`. Every
+ *   pre-existing caller (the #ctxChangeEventBtn click handler, and the
+ *   preselect call site below) already ignored the return value, so this is
+ *   purely additive — no existing behavior changed.
+ */
 function openEventPickerFromWorkspace(opts = {}) {
-  if (importRunning || _sessionRunBusy) return;
+  if (importRunning || _sessionRunBusy) return false;
   const cur = _captureEventData();
-  if (!cur) { showMessage('No active event to change.'); return; }
+  if (!cur) { showMessage('No active event to change.'); return false; }
   ImportSession.switchTo(cur);   // make sure the current event's workspace exists and is bound
   _ecReturnTarget = 'workspace';
   _ecReturnSnapshot = EventCreator.captureActiveSelection();
   if (opts.preselect) EventCreator.preselectEvent(opts.preselect.collectionName, opts.preselect.eventFolderName);
   _ecPanelOpen();                // rail → event mode, open EventMgmt, hide context bar
   EventCreator.resetToList();
+  return true;
 }
 
 /**

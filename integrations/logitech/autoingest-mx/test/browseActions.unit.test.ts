@@ -28,6 +28,8 @@ import { UnassignGroupAction } from '../src/actions/unassignGroupAction.js';
 import { AssignG1Action } from '../src/actions/assignG1Action.js';
 import { AssignG2Action } from '../src/actions/assignG2Action.js';
 import { NavigateFilesAction } from '../src/actions/navigateFilesAction.js';
+import { RefineTagsAction } from '../src/actions/refineTagsAction.js';
+import { ChangeEventAction } from '../src/actions/changeEventAction.js';
 
 let passed = 0;
 let failed = 0;
@@ -274,6 +276,64 @@ console.log('Browse page actions (mocked client)');
           assert.ok(calls.every((c) => c.commandId === 'navigation.nextFile'));
         });
     }));
+
+  // ── Phase 3D: Refine Tags / Change Event ────────────────────────────────
+  await t('refine_tags: sends tagRefinement.open when available', () =>
+    withMock(browseState({ availableCommands: ['tagRefinement.open'] }), (calls) =>
+      new RefineTagsAction().onKeyDown().then(() => {
+        assert.deepEqual(calls, [{ commandId: 'tagRefinement.open', payload: undefined }]);
+      })));
+
+  await t('refine_tags: skipped, no command sent, when tagRefinement.open is not in availableCommands', () =>
+    withMock(browseState({ availableCommands: [] }), (calls) =>
+      new RefineTagsAction().onKeyDown().then(() => { assert.deepEqual(calls, []); })));
+
+  await t('refine_tags: skipped when context is "qmz", not "browse"', () =>
+    withMock(browseState({ context: 'qmz', availableCommands: ['tagRefinement.open'] }), (calls) =>
+      new RefineTagsAction().onKeyDown().then(() => { assert.deepEqual(calls, []); })));
+
+  await t('refine_tags: skipped when context is "import"', () =>
+    withMock(browseState({ context: 'import', availableCommands: ['tagRefinement.open'] }), (calls) =>
+      new RefineTagsAction().onKeyDown().then(() => { assert.deepEqual(calls, []); })));
+
+  await t('refine_tags: gating never blocks when latestState is null (renderer not ready yet)', () =>
+    withMock(null, (calls) =>
+      new RefineTagsAction().onKeyDown().then(() => {
+        assert.deepEqual(calls, [{ commandId: 'tagRefinement.open', payload: undefined }]);
+      })));
+
+  await t('refine_tags: a rejected command (ok:false) never throws', () =>
+    withMock(browseState({ availableCommands: ['tagRefinement.open'] }), async () => {
+      await assert.doesNotReject(() => new RefineTagsAction().onKeyDown());
+    }, { ok: false, reason: 'not-applicable' }));
+
+  await t('change_event: sends event.openChooser when available', () =>
+    withMock(browseState({ availableCommands: ['event.openChooser'] }), (calls) =>
+      new ChangeEventAction().onKeyDown().then(() => {
+        assert.deepEqual(calls, [{ commandId: 'event.openChooser', payload: undefined }]);
+      })));
+
+  await t('change_event: skipped, no command sent, when event.openChooser is not in availableCommands', () =>
+    withMock(browseState({ availableCommands: [] }), (calls) =>
+      new ChangeEventAction().onKeyDown().then(() => { assert.deepEqual(calls, []); })));
+
+  await t('change_event: skipped when context is "qmz", not "browse"', () =>
+    withMock(browseState({ context: 'qmz', availableCommands: ['event.openChooser'] }), (calls) =>
+      new ChangeEventAction().onKeyDown().then(() => { assert.deepEqual(calls, []); })));
+
+  await t('change_event: gating never blocks when latestState is null (renderer not ready yet)', () =>
+    withMock(null, (calls) =>
+      new ChangeEventAction().onKeyDown().then(() => {
+        assert.deepEqual(calls, [{ commandId: 'event.openChooser', payload: undefined }]);
+      })));
+
+  await t('no plugin-local state: refine_tags called twice with different mocked states behaves purely per-state', async () => {
+    const action = new RefineTagsAction();
+    await withMock(browseState({ availableCommands: [] }), (calls) =>
+      action.onKeyDown().then(() => assert.deepEqual(calls, [])));
+    await withMock(browseState({ availableCommands: ['tagRefinement.open'] }), (calls) =>
+      action.onKeyDown().then(() => assert.deepEqual(calls, [{ commandId: 'tagRefinement.open', payload: undefined }])));
+  });
 
   console.log(`${passed} passed, ${failed} failed`);
   if (failed > 0) process.exitCode = 1;

@@ -135,6 +135,9 @@ async function writeMedia(root, relFile) {
       'preview.toggle',
       'group.assign', 'group.unassign',
       'qmz.assignToSequence', // added in Phase 1B — see test/mxCommandLayerPhase1BLive.test.js
+      // added in Phase 3D — see test/mxCommandLayerPhase3DLive.test.js
+      'tagRefinement.open', 'tagRefinement.close', 'tagRefinement.useAllTags', 'tagRefinement.clearSelected',
+      'event.openChooser',
     ];
     check(expected.every((id) => commands.includes(id)), 'registry contains every expected initial command');
     check(commands.length === expected.length, 'registry contains no unexpected extra commands');

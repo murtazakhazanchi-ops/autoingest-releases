@@ -38,6 +38,16 @@ export interface AutoIngestState {
   availableCommands: string[];
   groups?: Array<{ id: number; label: string; fileCount: number; subEventId: unknown; colorIndex: number }>;
   sequences?: Array<{ code: string; count: number }>;
+  // Phase 3D additions — both browse-only, present only when meaningful; see
+  // docs/commandLayer.md "State schema (Phase 3D additions)".
+  tagRefinement?: {
+    active: boolean;
+    scopeLabel: string | null;
+    componentLabel: string | null;
+    selectedCount: number;
+    status: 'empty' | 'default' | 'refined' | 'none' | 'mixed';
+  };
+  event?: { activeEventName: string | null; participatingCount: number };
 }
 
 export interface ClientSnapshot {

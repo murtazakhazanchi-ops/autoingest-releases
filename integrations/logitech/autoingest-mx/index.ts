@@ -10,6 +10,8 @@ import { AssignG1Action } from './src/actions/assignG1Action.js';
 import { AssignG2Action } from './src/actions/assignG2Action.js';
 import { AssignG3Action } from './src/actions/assignG3Action.js';
 import { GroupsPagePlaceholderAction } from './src/actions/groupsPagePlaceholderAction.js';
+import { RefineTagsAction } from './src/actions/refineTagsAction.js';
+import { ChangeEventAction } from './src/actions/changeEventAction.js';
 
 console.log('[autoingest-mx] plugin loaded');
 
@@ -40,6 +42,13 @@ pluginSDK.registerAction(new AssignG3Action());
 pluginSDK.registerAction(new UnassignGroupAction());
 pluginSDK.registerAction(new GroupsPagePlaceholderAction());
 pluginSDK.registerAction(new NavigateFilesAction());
+
+// Phase 3D: registered so both are available in the Options+ Action Picker
+// for temporary ninth-key physical testing — neither is assigned to any key
+// by this change, and the working Browse layout above is otherwise
+// untouched (see docs/mxLogitechPlugin.md "Reserved ninth key evaluation").
+pluginSDK.registerAction(new RefineTagsAction());
+pluginSDK.registerAction(new ChangeEventAction());
 
 await pluginSDK.connect();
 
