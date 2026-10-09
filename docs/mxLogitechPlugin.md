@@ -16,12 +16,20 @@ proven reference implementation and current fallback.** Phase 4A
 (see [mxLogitechCSharp.md](mxLogitechCSharp.md)) built a separate C#
 plugin (`integrations/logitech/autoingest-mx-csharp/`) as a **parity
 candidate** — same actions, same transport, verified end to end against
-the real transport and by 32 automated tests — but it has not yet
-completed physical-console parity testing or an Options+ Action Picker
-pass, and dynamic Tag Refinement (Phase 4B, the actual reason the C#
-migration exists) has **not** been implemented anywhere yet. This Node
-plugin keeps working exactly as documented below regardless of how Phase
-4A/4B eventually conclude.
+the real transport and by 32 automated tests. A follow-up physical
+parity test then exercised it on the real MX Creative Console against a
+real packaged AutoIngest build: all 9 static actions, the dial, the
+Options+ application-profile switch, connection/restart recovery, and
+offline/error behavior all passed with real server-side log evidence —
+see [mxLogitechCSharp.md](mxLogitechCSharp.md)'s "Physical console parity
+test" section for the full results. Two scenarios remain deliberately
+deferred (a multi-file Tag Refinement press, a deep Multi-Event-ownership
+regression), and dynamic Tag Refinement (Phase 4B, the actual reason the
+C# migration exists) has **not** been implemented anywhere yet. This Node
+plugin was confirmed still fully intact as a fallback during that same
+test (its source files were never edited or deleted) and keeps working
+exactly as documented below regardless of how Phase 4B eventually
+concludes.
 
 ---
 

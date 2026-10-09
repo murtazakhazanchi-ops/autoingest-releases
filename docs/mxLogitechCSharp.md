@@ -473,17 +473,172 @@ alone.
 
 ---
 
-## Current status (end of Phase 4A)
+## Physical console parity test (post-Phase 4A)
+
+Run against the real MX Creative Console, the real Logi Options+ "AutoIngest"
+profile (Phase 3C), and a packaged (not dev-mode) AutoIngest build — dev-mode
+reports as `com.github.Electron` to macOS, so Options+'s Adapt-to-App never
+activated the AutoIngest profile for it; this was the root cause of an
+initial "profile not switching" report, not a C# defect.
+
+**Pre-existing packaging bugs found and fixed** (electron-builder's
+dependency walker, not the C# migration): the packaged build's main
+process crashed before creating any window with a cascading
+`Cannot find module` chain (`bindings` → `file-uri-to-path` →
+`graceful-fs` → `builder-util-runtime` → the rest of `electron-updater`'s
+transitive tree — 18 packages total), because `build.files` never included
+a general `node_modules` glob and electron-builder's own native-module
+walker only reliably caught `drivelist` itself, not its pure-JS
+dependents. Separately, `sharp`'s actual native binary
+(`@img/sharp-darwin-arm64` / `@img/sharp-libvips-darwin-arm64`, both
+`optionalDependencies` of a scoped sub-package) never made it into the
+asar at all, causing `Could not load the "sharp" module` and indefinitely
+stalled thumbnails. Fixed both by adding each missing package as an
+explicit direct dependency in root `package.json` (plus `asarUnpack` for
+the two native-binary chains), matching how `drivelist` itself was already
+declared. Zero AutoIngest *logic* changed — this is packaging
+configuration only, pre-dating all MX console phases (confirmed via git
+history).
+
+**New diagnostic logging added** (by explicit request, not a bug fix):
+`services/mxControlService.js`'s existing command-result log line now
+also prints the resolved `groupId` when a `group.assign` result carries
+one (`result.detail.groupId`, per `commandManager.js`'s own
+`computeExecuted`/`detail` shape) — e.g.
+`command result: group.assign ok=true groupId=2`. This reads a field the
+renderer's result object already provided; the "payload forwarded
+opaquely" request-side rule is untouched. Verified: G1/G2/G3 pressed
+separately now log three genuinely distinct group IDs (1, 2, 3), not just
+three `ok=true` lines.
+
+**Single-client arbitration** — proven repeatedly, in both directions,
+with zero code changes: when Node held the connection, every C# retry was
+rejected (`already-connected`) and logged as such on *both* sides; when
+C# held it, every Node respawn was rejected the same way. Node's own
+Plugin-Service-level auto-respawn (near-instantaneous, faster than C#'s
+15s backoff) made it necessary to temporarily move the Node plugin's
+`index.mjs` aside during C#-focused test windows (reversible — restored
+and re-verified working, see below — never deleted, never edited).
+
+**Command parity (A–J)** — all 9 static actions plus the dial confirmed
+with real server-side evidence (`app.log` `command requested`/`command
+result` pairs, not just console-side appearance): SELECT
+(`selection.toggleCurrent`), SELECT ALL (`selection.selectAll`), CLEAR
+(`selection.clear`), PREVIEW (`preview.toggle`), G1/G2/G3
+(`group.assign`, now with distinct logged `groupId`s), UNASSIGN
+(`group.unassign`), REFINE TAGS (`tagRefinement.open`), CHANGE EVENT
+(`event.openChooser`). Dial (`navigation.previousFile`/`nextFile`)
+confirmed at slow and rapid rotation (a ~40ms-apart burst occurred
+naturally) and at both boundaries (stops safely at the first/last file,
+no wraparound, no error).
+
+**Tag Refinement regression** — two console observations traced to exact,
+pre-existing `renderer.js` code paths rather than defects:
+- REFINE TAGS opened with **zero files selected** — this is the existing
+  footer "Refine Tags" button's own event-scope behavior
+  (`_isEventRefineAvailable()` is checked *before* `selectedFiles.size`
+  in `_resolveRefinementTargetScope()`, for single-component events) —
+  the C# command reproduces this faithfully, it did not invent it.
+- Pressing REFINE TAGS again while **already open** is a no-op — the same
+  function's first line (`if (TagRefinementManager.isActive()) return
+  null;`) gates it off, identical to a second click on the real button.
+  (`ok` stays `true` either way — `ok` means "ran without error," not
+  "did something"; `executed` is the separate field that would read
+  `false` here, consistent with the design `commandManager.js`'s own
+  comments describe.)
+
+  Both results are good UI↔command-equivalence evidence per se, not gaps.
+  **Deferred, not yet run**: a true multi-file/mixed-selection REFINE
+  TAGS press (tri-state display across files with different tag states).
+
+**Connection/restart tests** — all passed: two independent AutoIngest
+quit/relaunch cycles each produced a new port/token and a clean C#
+reconnect in ~4s; a Logi Plugin Service restart produced a clean C#
+reconnect in ~3s with no duplicate host processes (one benign
+`Cannot load plugin ... already loaded` log line appeared from the
+freshly-spawned host losing an internal reload race to the surviving
+in-process instance, but the live connection itself never actually broke).
+
+**Application profile test** — confirmed: the console's control layout
+switches correctly on every app-focus change (AutoIngest → other app →
+back), independent of WebSocket connectivity, exactly as Phase 3C
+predicted.
+
+**Offline/error behavior** — passed cleanly: quitting AutoIngest removes
+the matching bundle identity, so Options+ itself falls back away from the
+AutoIngest profile — there is no way to even attempt a stale command
+against a dead target, let alone hang or crash. Relaunching restored a
+working connection (C#, ~11s) and a working console within the same
+session.
+
+**Node fallback — confirmed intact** (connection level, by explicit
+instruction, not re-run as a full physical command matrix — that was
+already proven in Phase 3C): with `index.mjs` restored, a fresh
+AutoIngest relaunch let Node win the connection race outright, authenticate
+cleanly, and have its own log show a clean `authenticated` line with zero
+contention once it held the slot. Node's plugin source files were at no
+point deleted, edited, or migrated — only its live process was
+temporarily stopped and its entry file briefly relocated (both reversed).
+
+**One test-setup mismatch, not a bug**: with Node holding the connection,
+pressing the physical SELECT key (still mapped to the *C#* `SelectCommand`
+from Step 3's profile swap) produced no visible effect. Root cause: C#'s
+own command path requires C# itself to be the connected client; since
+Node held the slot, C# was rejected (`already-connected`) and the key
+press could not reach AutoIngest at all — `app.log` shows zero
+`command requested` lines for that press. This is a direct, expected
+consequence of swapping the physical profile to C#'s actions while
+testing Node's connection fallback with the *same* profile still active —
+not a Node defect and not an AutoIngest transport regression. Confirmed
+resolved by re-swapping to C# as the sole client: the identical key press
+immediately produced `command result: ... ok=true` again.
+
+**Separate pre-existing issue, out of scope**: `IMG_0004.jpg` and
+`IMG_0005.jpg` (two of the six synthetic test fixtures, byte-identical in
+size to the four that work) consistently stall thumbnail generation
+(`[perf] Thumbnail stalled ... never resolved`) on every run, before and
+after the `sharp` packaging fix — unrelated to that fix, since it affects
+only these two specific files, not thumbnails generally, and the same
+`[perf] Thumbnail stalled` pattern appears routinely in AutoIngest's real
+production logs going back months across unrelated RAW formats (CR2,
+ARW, CR3, DNG, 3FR). Not investigated further per instruction, since
+nothing ties it specifically to the C# migration.
+
+**Node vs C# comparison**: reconnect speed (~3–4s both), stability
+(both single-client-arbitrated correctly, no crashes), Action Picker
+visibility (both fully visible), profile-switch behavior (identical,
+since both are governed by the same Options+ bundle-ID mechanism, not
+plugin language), logging (both avoid leaking the auth token). Resource
+usage was *not* cleanly comparable: Node gets its own dedicated OS
+process (~44MB RSS observed) exclusively for this plugin, while C# runs
+in-process inside Logi Plugin Service alongside every other loaded
+plugin (Lightroom, Photoshop, etc.), so LogiPluginService's total
+footprint (~271MB observed) cannot be attributed to the AutoIngest plugin
+alone. One asymmetry worth noting: Node's Plugin-Service-level respawn is
+near-instantaneous (sub-second) on process death, while C#'s own
+reconnect backoff starts at ~2–4s and grows — not a defect in either, just
+a architectural difference between a separately-spawned child process and
+an in-process-hosted plugin.
+
+---
+
+## Current status (end of Phase 4A physical parity test)
 
 - Builds cleanly: **0 warnings, 0 errors** (main plugin project).
 - Loads into Logi Plugin Service successfully, in-process, confirmed via
   its own dedicated log file.
 - Connects and authenticates against the real, unmodified Phase 2
-  transport — confirmed on both sides of the connection.
+  transport — confirmed on both sides of the connection, including after
+  two independent app restarts and one Plugin Service restart.
 - 32/32 automated tests passing, covering descriptor discovery, connection
   lifecycle, command execution, resilience, and security.
-- **Not yet done this phase** (all explicitly out of scope per the brief):
-  Options+ Action Picker visual confirmation, the full physical-console
-  parity test matrix, the Node-vs-C# perceived-latency comparison, and any
-  `PluginDynamicFolder`/dynamic-content work (Phase 4B). See the Phase 4A
-  final report for the precise breakdown of what remains and why.
+- **Physical console parity test now complete**: all 9 static actions,
+  the dial (including boundaries), the application-profile switch, and
+  offline/error behavior all confirmed on the real MX Creative Console
+  against a real packaged AutoIngest build, with real server-side log
+  evidence for every result. Node plugin confirmed intact as fallback.
+- **Still deferred** (not a defect, just not yet exercised): a
+  multi-file/mixed-selection Tag Refinement press, and a deep
+  Multi-Event-ownership/claim-reassignment group side-effect scenario.
+- **Not yet done** (unchanged, explicitly Phase 4B's scope):
+  `PluginDynamicFolder`/dynamic Tag Refinement content.

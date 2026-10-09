@@ -316,7 +316,15 @@ function _handleExecuteCommand(ws, msg) {
 
   _pendingCommands.set(requestId, {
     resolve: (result) => {
-      log(`[mx-control] command result: ${msg.commandId} ok=${!!(result && result.ok)}`);
+      // group.assign's own result carries { detail: { groupId, claim } } (see
+      // commandManager.js's computeExecuted for 'group.assign') — surface which
+      // group a hardware assign actually landed on, for console-side diagnosis.
+      // Still logging the result object the renderer already returned, not the
+      // request payload — the "payload forwarded opaquely" rule above is unchanged.
+      const groupSuffix = (result && result.detail && typeof result.detail.groupId === 'number')
+        ? ` groupId=${result.detail.groupId}`
+        : '';
+      log(`[mx-control] command result: ${msg.commandId} ok=${!!(result && result.ok)}${groupSuffix}`);
       _send(ws, { type: 'commandResult', requestId, result });
     },
     timer,
