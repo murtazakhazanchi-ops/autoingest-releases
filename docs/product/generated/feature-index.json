@@ -207,7 +207,12 @@
         "BUG-003",
         "BUG-006"
       ],
-      "related_changelog_entries": [],
+      "related_changelog_entries": [
+        {
+          "date": "2026-10-13",
+          "excerpt": "## 2026-10-13 — BUG-017: event-creation sub-folder path divergence (AI-FEAT-004)"
+        }
+      ],
       "related_code_paths": [
         "main/eventJsonStore.js"
       ],
@@ -3373,6 +3378,10 @@
       "related_bugs": [],
       "related_changelog_entries": [
         {
+          "date": "2026-10-13",
+          "excerpt": "**Registry-ID note, resolved by this merge**: this entry's bug record was written against `main`, which at the time still had the pre-`DEC-022` numbering (`AI-FEAT-058` = Knowledge Engine). Merging th"
+        },
+        {
           "date": "2026-09-20",
           "excerpt": "## 2026-09-20 — Multi-Event Import documented (AI-FEAT-058 / AI-RM-011 / DEC-019)"
         },
@@ -3461,6 +3470,10 @@
       ],
       "related_bugs": [],
       "related_changelog_entries": [
+        {
+          "date": "2026-10-13",
+          "excerpt": "**Registry-ID note, resolved by this merge**: this entry's bug record was written against `main`, which at the time still had the pre-`DEC-022` numbering (`AI-FEAT-058` = Knowledge Engine). Merging th"
+        },
         {
           "date": "2026-09-28",
           "excerpt": "**What happened**: `main`'s Ask AutoIngest Knowledge Engine work and `stable/0.9`'s Multi-Event Import work (entry directly above) had independently allocated the identical IDs — `AI-FEAT-058`, `DEC-0"

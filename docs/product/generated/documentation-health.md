@@ -2,14 +2,14 @@
 
 > Generated artifact. Implements the 13 rules specified in [14_VALIDATION_SPECIFICATION.md](../14_VALIDATION_SPECIFICATION.md) plus Part 4 tooling-integrity checks. Regenerate with `node scripts/product-docs/cli.js validate`.
 
-Generated against source commit `495416f1fc4c84490b6f3ebf21ca511d3b7dd506`.
+Generated against source commit `56051e970359f5e0e95a38ebf86f35f1c9ac6684`.
 
 ## Summary
 
 | Level | Count | Exit policy |
 |---|---|---|
 | Error | 0 | Fails the build (non-zero exit) |
-| Warning | 17 | Reported, does not fail the build |
+| Warning | 16 | Reported, does not fail the build |
 | Information | 27 | Reported, does not fail the build |
 | Evidence gap | 58 | Reported, does not fail the build — visibility only, per 14_VALIDATION_SPECIFICATION.md Rule 13 |
 
@@ -19,7 +19,7 @@ Generated against source commit `495416f1fc4c84490b6f3ebf21ca511d3b7dd506`.
 
 None.
 
-## Warning (17)
+## Warning (16)
 
 | Rule | Message | File | Note |
 |---|---|---|---|
@@ -27,7 +27,6 @@ None.
 | cyclic-dependency | Undocumented dependency cycle: AI-FEAT-009 -> AI-FEAT-018 -> AI-FEAT-009 | generated/dependency-graph.json | — |
 | cyclic-dependency | Undocumented dependency cycle: AI-FEAT-032 -> AI-FEAT-039 -> AI-FEAT-032 | generated/dependency-graph.json | — |
 | decision-draft-missing-evidence | DEC-016 is Status: Draft but its Evidence status does not cite the originating session or detected signals | decisions/DEC-016_WINDOWS_NAS_EVENT_MANAGEMENT_RELIABILITY_INVESTIGATION_BUG_011_014_CHATGPT_SIDE_.md | — |
-| generated-source-commit-mismatch | manifest.json's source_commit (4610fa193cfae78beb4b48beb7ee6956b38349e1) does not match current HEAD (495416f1fc4c84490b6f3ebf21ca511d3b7dd506) — expected if docs/product/ has uncommitted changes since the last build | generated/manifest.json | — |
 | missing-related-technical-docs | AI-FEAT-005 is Implemented but cites no Related technical docs | features/AI-FEAT-005_APPLICATION_SETTINGS_CONFIGURATION_STORE.md | — |
 | missing-related-technical-docs | AI-FEAT-006 is Implemented but cites no Related technical docs | features/AI-FEAT-006_APPLICATION_AUTO_UPDATE.md | — |
 | missing-related-technical-docs | AI-FEAT-007 is Implemented but cites no Related technical docs | features/AI-FEAT-007_TELEMETRY_PIPELINE.md | — |

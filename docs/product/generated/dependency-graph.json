@@ -172,6 +172,14 @@
     {
       "evidence_status": "explicit",
       "note": null,
+      "provenance_path": "bugs/BUG-017_EVENT_CREATE_SUBFOLDER_PATH_DIVERGES_FROM_EVENT_JSON_WRITE_PATH_AFTER_OFFLINE_EPISODE.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-004",
+      "target": "BUG-017"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
       "provenance_path": "features/AI-FEAT-004_EVENT_JSON_DATA_MODEL_PERSISTENCE_CONTRACT.md#lifecycle-metadata:Related-decisions",
       "relationship": "governed_by",
       "source": "AI-FEAT-004",
@@ -3540,6 +3548,14 @@
     {
       "evidence_status": "explicit",
       "note": null,
+      "provenance_path": "bugs/BUG-017_EVENT_CREATE_SUBFOLDER_PATH_DIVERGES_FROM_EVENT_JSON_WRITE_PATH_AFTER_OFFLINE_EPISODE.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-058",
+      "target": "BUG-017"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
       "provenance_path": "features/AI-FEAT-058_MULTI_EVENT_IMPORT.md#lifecycle-metadata:Related-decisions",
       "relationship": "governed_by",
       "source": "AI-FEAT-058",
@@ -4320,6 +4336,30 @@
       "relationship": "related_to",
       "source": "BUG-016",
       "target": "BUG-015"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-017_EVENT_CREATE_SUBFOLDER_PATH_DIVERGES_FROM_EVENT_JSON_WRITE_PATH_AFTER_OFFLINE_EPISODE.md#related",
+      "relationship": "related_to",
+      "source": "BUG-017",
+      "target": "BUG-003"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-017_EVENT_CREATE_SUBFOLDER_PATH_DIVERGES_FROM_EVENT_JSON_WRITE_PATH_AFTER_OFFLINE_EPISODE.md#related",
+      "relationship": "related_to",
+      "source": "BUG-017",
+      "target": "BUG-006"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-017_EVENT_CREATE_SUBFOLDER_PATH_DIVERGES_FROM_EVENT_JSON_WRITE_PATH_AFTER_OFFLINE_EPISODE.md#related",
+      "relationship": "related_to",
+      "source": "BUG-017",
+      "target": "BUG-012"
     },
     {
       "evidence_status": "explicit",
@@ -5301,6 +5341,12 @@
       "doc_path": "bugs/BUG-016_UNDECLARED_NPM_DEPENDENCY_IN_PRODUCT_DOCS_TOOLING_MASKED_BY_LOCALLY_HOISTED_NODE_MODULES.md",
       "id": "BUG-016",
       "label": "Undeclared npm Dependency in product-docs Tooling Masked by Locally-Hoisted node_modules",
+      "type": "bug"
+    },
+    {
+      "doc_path": "bugs/BUG-017_EVENT_CREATE_SUBFOLDER_PATH_DIVERGES_FROM_EVENT_JSON_WRITE_PATH_AFTER_OFFLINE_EPISODE.md",
+      "id": "BUG-017",
+      "label": "Event-Creation Sub-Folder Path Diverges From event.json Write Path After an Offline Episode",
       "type": "bug"
     },
     {
