@@ -143,7 +143,15 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin.Tests
                 {
                     var requestId = root.GetProperty("requestId").GetString();
                     var commandId = root.GetProperty("commandId").GetString();
-                    var payload = root.TryGetProperty("payload", out var p) ? p : default;
+                    // .Clone() is required: `p` is a view into `doc`, which this
+                    // method's `using` disposes on return. Previously-passing
+                    // tests never inspected a stored Payload's contents after
+                    // the fact (only CommandId/RequestId), so this went
+                    // unnoticed until a test needed to read payload fields
+                    // post-hoc (Phase 4B's tagRefinement.setTagState payload
+                    // assertions) — found live via that test's own
+                    // ObjectDisposedException, not assumed.
+                    var payload = root.TryGetProperty("payload", out var p) ? p.Clone() : default;
                     lock (this._sync) this.ReceivedCommands.Add((requestId, commandId, payload));
                     if (this.SuppressReplyFor.Contains(commandId)) return; // deliberately silent — exercises the client's own timeout path
                     var reply = this.ReplyBuilder?.Invoke(commandId) ?? new { ok = true, commandId, executed = true };

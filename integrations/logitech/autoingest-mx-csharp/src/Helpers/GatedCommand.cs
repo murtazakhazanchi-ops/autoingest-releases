@@ -22,7 +22,12 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin
         /// unassign_group/assign_G{n}/change_event/refine_tags's own
         /// context-gating in the Node plugin). Null means "not context-gated"
         /// (select_all/clear_selection/preview_toggle's own behavior).</param>
-        public static async Task RunAsync(string commandId, string actionNameForLog, string requiredContext = null)
+        /// <param name="payload">Optional command payload (Phase 4B:
+        /// tagRefinement.setTagState's {tagId, checked}). Forwarded to
+        /// ExecuteCommandAsync completely opaquely — this helper never
+        /// inspects or validates payload shape itself, same "opaque payload"
+        /// rule the Node/renderer transport already follows.</param>
+        public static async Task RunAsync(string commandId, string actionNameForLog, string requiredContext = null, object payload = null)
         {
             var state = SharedClient.Instance.GetLatestState();
             if (state != null && requiredContext != null && state.Context != requiredContext)
@@ -35,7 +40,7 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin
                 PluginLog.Verbose($"[autoingest-mx-cs] {actionNameForLog}: skipped — currently unavailable");
                 return;
             }
-            var result = await SharedClient.Instance.ExecuteCommandAsync(commandId).ConfigureAwait(false);
+            var result = await SharedClient.Instance.ExecuteCommandAsync(commandId, payload).ConfigureAwait(false);
             if (!result.Ok)
             {
                 PluginLog.Verbose($"[autoingest-mx-cs] {actionNameForLog}: not executed ({result.Reason ?? "unknown"})");

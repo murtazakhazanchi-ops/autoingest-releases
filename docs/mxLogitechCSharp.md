@@ -695,5 +695,220 @@ an in-process-hosted plugin.
   cross-event Tag Refinement cleanup) both passed. The latter incidentally
   surfaced and led to fixing an unrelated, pre-existing defect
   (BUG-017 — see docs/product/bugs/), merged into this branch.
-- **Not yet done** (unchanged, explicitly Phase 4B's scope):
-  `PluginDynamicFolder`/dynamic Tag Refinement content.
+- **Phase 4B (dynamic Tag Refinement workspace) — software complete,
+  physical device testing pending.** See the dedicated section below.
+
+---
+
+## Phase 4B — Dynamic Tag Refinement workspace
+
+The real dynamic workspace: pressing REFINE TAGS enters a live `PluginDynamicFolder`
+showing AutoIngest's actual refinable tags for the current selection, with
+real tri-state rendering and direct hardware editing — mirroring the real
+panel's draft/Apply semantics exactly, never a second model.
+
+### Architecture — three layers, deliberately separated
+
+1. **`RefinementWorkspaceModel.cs`** (`Helpers/`) — pure, Logitech-free logic.
+   Every state/identity/transition decision lives here: `BuildButtonSpecs`
+   (state → ordered button list), `ComputeNextChecked` (the press→target-
+   state rule), `ResolveTag` (fresh re-validation against the latest state),
+   `IsControlAction`, `TruncateForDisplay`. No `BitmapBuilder`, no SDK type,
+   anywhere in this file — fully unit-testable without a Logitech host.
+2. **`RefinementButtonImageRenderer.cs`** (`Helpers/`) — the ONLY file that
+   touches `BitmapBuilder`/`BitmapColor`. Renders one `RefinementButtonSpec`
+   into a `BitmapImage`. Nothing else in this layer makes a decision; it just
+   draws what it's told.
+3. **`RefineTagsFolder.cs`** (`Actions/`) — the actual `PluginDynamicFolder`
+   subclass. A thin shell: SDK lifecycle wiring + the `AutoIngestClient`
+   subscription, calling into the two layers above for everything else.
+
+This mirrors Phase 4A's own command/model/render separation and directly
+satisfies the brief's "testable model separate from Logitech rendering"
+requirement (§23) — `RefinementWorkspaceModelTests.cs` exercises layer 1
+with zero SDK dependency at all.
+
+### Tag identity — no custom encoding introduced
+
+AutoIngest's own `tagRefinement.tags[].id` (`"<category>:<label>"`, e.g.
+`"eventTypes:Waaz"` — `renderer.js`'s `_getTagRefinementCompact()`) is
+already a plain string and already collision-free (every real id starts
+with `eventTypes:` or `additionalKeywords:`, the only two categories
+`commandManager.js` validates). It is used completely unmodified as the
+Loupedeck `actionParameter`. The three control buttons use fixed sentinel
+strings (`__apply__`, `__allTags__`, `__resetTags__`) that can never collide
+with a real tag id for the same reason. **No encoding/decoding step exists
+anywhere in this code** — introducing one on top of an already-canonical
+string would be the mistake, not the fix.
+
+### Lifecycle
+
+- **`Load()`/`Unload()`**: no-ops (`return true`) — nothing plugin-lifetime
+  to prepare; everything meaningful happens per-entry.
+- **`Activate()`**: subscribes to `SharedClient.Instance` state changes,
+  then (fire-and-forget, never blocking the SDK's synchronous callback)
+  checks whether `tagRefinement.Active` is already true; if not, executes
+  `tagRefinement.open` and waits (4s timeout) for the resulting state push
+  before populating the button list. If refinement never becomes available
+  (no refinable selection), logs the reason and calls `Close()` rather than
+  showing a fabricated empty editor.
+- **`Deactivate()`**: disposes the subscription, clears the local button-
+  spec cache. **Does not call `tagRefinement.close`** — leaving the
+  hardware workspace is not the same action as the real panel's own "Done
+  Refining" button; the operator's draft and AutoIngest's own refinement
+  session are untouched, resumable from the real on-screen panel or by
+  re-entering the folder.
+
+### Press semantics — confirmed from the real UI, not assumed
+
+Traced `renderer.js`'s `_refinementTagDisplayState`/`_setRefinementDraftTag`
+before writing any transition logic. `tagRefinement.setTagState` **sets** an
+explicit target `checked: boolean` — it is not a cycle. The real
+transition table (verified, not guessed):
+
+| Current display state | Press result |
+|---|---|
+| `unchecked` | → `checked` |
+| `indeterminate` | → `checked` (same as any native checkbox: a click always resolves to a definite value; an untouched indeterminate tag's underlying `.checked` is already `false`) |
+| `checked` | → `unchecked` |
+
+`RefinementWorkspaceModel.ComputeNextChecked(currentState)` implements
+exactly this, nothing else.
+
+### Draft state — no optimistic redraw
+
+A tag press sends `tagRefinement.setTagState` and stops. The redraw happens
+only when the next state push arrives (`OnStateChanged`, subscribed once per
+`Activate()`), driven by AutoIngest's own authoritative draft — never a
+locally-guessed value. This is the same "wait for confirmation, never
+optimistic" rule Phase 4A's own command actions already follow.
+
+### Apply / All Tags / Reset Tags
+
+- **Apply** (`tagRefinement.applyToSelected`) — commits the draft via the
+  real `TagRefinementManager`. The folder **stays open** afterward (per the
+  brief's explicit instruction); the next state push shows the newly
+  committed state, and the operator can keep refining the same selection.
+- **All Tags** (`tagRefinement.useAllTags`) — "Use All Component Tags"
+  (`#rpAllBtn`'s real effect): every available tag applied to the draft.
+- **Reset Tags** (`tagRefinement.clearSelected`) — **verified against the
+  real implementation before labeling it** (`_resetRefinementSelectionToDefault`,
+  the real panel's `#rpResetBtn` "Reset Selected to Defaults"): reverts to
+  **inheriting the component's defaults**, which may still leave tags
+  checked. It is explicitly **not** "no tags"/"clear all" — an earlier draft
+  of this feature mislabeled it "Clear Tags" before this was checked against
+  source, caught during implementation, and corrected. Labeled "Reset Tags"
+  on the hardware.
+
+All three control buttons appear only when `availableCommands` actually
+contains their real command id right now — the same availableCommands-
+gating every other action in this plugin already uses, never a separately
+re-derived eligibility rule. (AutoIngest deliberately omits a `canApply`
+state field for exactly this reason — see `_getTagRefinementCompact()`'s own
+doc comment.)
+
+### Visual rendering
+
+Label is the dominant element (the brief: "the tag value/name is the most
+important information") — centered, wrapping `DrawText`, truncated only
+when a label is long enough to need it (never replaced with a placeholder
+like "Tag 1"). A small, high-contrast state badge sits in the top-right
+corner, shape-coded (not color-only, per the brief's explicit rule):
+filled checkmark (checked), outlined ring (unchecked), filled dash (mixed/
+indeterminate). Control buttons (Apply/All Tags/Reset Tags) use a distinct
+background tint from plain tag buttons, label only, no state badge.
+
+### List refresh vs. single-image refresh
+
+`RefineTagsFolder` diffs the new button-spec set against the previous one
+on every state push:
+- **Action set changed** (a tag appeared/disappeared, availability of a
+  control button changed) → `ButtonActionNamesChanged()` (full refresh).
+- **Same buttons, only states differ** → `CommandImageChanged(actionName)`
+  per changed button only — never the heavier full refresh for a single
+  checkmark update.
+
+### Pagination
+
+No fixed tag limit anywhere in this code. `GetButtonPressActionNames`
+returns the real, unbounded tag list every time; Logitech's own
+`PluginDynamicFolder` is documented to paginate automatically when content
+exceeds one page. **Not yet physically verified** how many usable slots the
+real MX Creative Keypad gives per page, or how Apply/All Tags/Reset Tags lay
+out once pagination kicks in — see "Physical testing — pending" below.
+
+### Back / navigation
+
+`GetNavigationArea` returns `PluginDynamicFolderNavigation.ButtonArea` —
+Logitech supplies the Back button automatically on touch pages, the brief's
+preferred first implementation. (An earlier draft set the `Navigation`
+property directly in the constructor; the compiler flagged it as obsolete
+in this SDK version — `GetNavigationArea` is the supported mechanism, fixed
+before this was committed.) Back is never wired to `tagRefinement.close` —
+leaving the folder and closing AutoIngest's own refinement session are
+different actions (see Lifecycle above).
+
+### Selection/scope changes while the folder is open
+
+Every state push rebuilds the button list from scratch — there is no
+"stale tag" state to accidentally preserve. A tag press always re-resolves
+against `SharedClient.Instance.GetLatestState()` fresh (`RunCommand` never
+consults the cached button-spec dictionary for validation, only for
+display) — an id from a scope that no longer exists resolves to `null` and
+is silently ignored (logged, never mutated). If `tagRefinement.Active`
+becomes `false` on any push (selection cleared, Change Event, scope no
+longer refinable), the folder closes itself rather than showing a stale or
+empty editor.
+
+### Offline / disconnect behavior
+
+If a state push ever reports `ConnectionState != Connected` or a `null`
+state while the folder is open, it closes itself immediately — no crash,
+no pretending an edit is valid, no replay queue (presses are fire-and-forget
+per-press; there is nothing buffered to replay on reconnect by
+construction). Re-entering the folder after reconnect re-reads fresh state
+from scratch.
+
+### Testing
+
+- **`RefinementWorkspaceModelTests.cs`** (25 tests): state→button-list
+  mapping, tag-order stability, identity passthrough/non-collision,
+  duplicate labels across categories, all three display states preserved
+  verbatim, the confirmed transition table, stale/unknown tag rejection,
+  full tag-set replacement on a new state, per-command availableCommands
+  gating (Apply/All Tags/Reset Tags), the corrected "Reset Tags" wording
+  pinned against regression, button ordering, null-safety, truncation
+  (including the "never replace with a placeholder" rule), and
+  `System.Text.Json`'s default tolerance of unknown future fields.
+- **`RefinementTransportIntegrationTests.cs`** (1 comprehensive test): the
+  real `AutoIngestClient` against `MockAutoIngestServer`'s real WebSocket/
+  JSON path — open → real mixed-state tag list arrives → press an
+  indeterminate tag → verify the server received the exact real payload
+  shape (`{tagId, checked}`) → draft state pushed and redrawn from the
+  server's own authoritative value (never the locally-sent guess) → Apply
+  → committed `status: "refined"` pushed and observed. Found and fixed one
+  real latent bug in the shared test harness while writing this
+  (`MockAutoIngestServer` stored a `JsonElement` view into a `JsonDocument`
+  it then disposed — any test that inspected payload contents *after* the
+  handler returned would throw `ObjectDisposedException`; no prior test had
+  done so. Fixed with `.Clone()`).
+- Full suite: **58/58 passing** (32 from Phase 4A + 26 new).
+
+### Physical testing — pending (brief §25-27, requires the real console)
+
+Not yet run: the full on-device walkthrough (real tag labels, real
+checked/unchecked/indeterminate rendering, press transitions, Apply/All
+Tags/Reset Tags, Back), pagination behavior with varying tag counts (1, 2,
+3-5, overflow, many), and state-change behavior while the folder is open
+(selection/group/Change Event changes, AutoIngest restart, Plugin Service
+restart). **Requires re-mapping the physical REFINE TAGS key in Options+**
+from the Phase 4A static `RefineTagsCommand` action to this folder's own
+entry action — a manual profile edit, not yet done, since the brief's §1
+explicitly said not to change the normal profile until this point.
+
+### Code changes outside the C# plugin
+
+None. `GatedCommand.cs` gained one optional `payload` parameter (backward-
+compatible, used only by `setTagState`) — an extension of this plugin's own
+internal helper, not an AutoIngest API change. Zero renderer/main/transport
+changes, per the brief's §33 preference.
