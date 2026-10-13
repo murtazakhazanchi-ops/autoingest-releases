@@ -548,8 +548,59 @@ pre-existing `renderer.js` code paths rather than defects:
   comments describe.)
 
   Both results are good UI↔command-equivalence evidence per se, not gaps.
-  **Deferred, not yet run**: a true multi-file/mixed-selection REFINE
-  TAGS press (tri-state display across files with different tag states).
+
+**Scenario A closure — multi-file/mixed-selection Tag Refinement** (originally
+deferred, later completed): using a disposable two-component synthetic event
+(`Fajr Namaz`/`Majlis` on component 1), two synthetic files were grouped
+together (G1) and given deliberately conflicting per-file overrides via the
+real panel (file 1: `Fajr Namaz` only; file 2: `Majlis` only — the panel's
+chips are real `<input type="checkbox">` elements, confirmed keyboard-
+operable without a trackpad, though not needed once a trackpad became
+available). Selecting both files *within the refinement workspace itself*
+(entering refinement mode clears the outer grid selection by design —
+`_enterRefinementMode()`'s `selectedFiles.clear()` — so the operator
+re-selects inside that view, not before entering it) and pressing REFINE TAGS
+again produced **both tags showing mixed/indeterminate**, confirmed both via
+your visual report and via `app.log` (two `selection.toggleCurrent ok=true`
+calls inside the refinement workspace). This is exactly Phase 3E's documented
+tri-state semantics, driven end to end by the C# console action.
+
+**Scenario B closure — deep Multi-Event claim regression** (originally
+deferred, later completed): built a second disposable synthetic event
+(Event B, 2 components) alongside Event A from Scenario A, via AutoIngest's
+real "Change Event → create new event" workspace flow. This incidentally
+surfaced a genuine, pre-existing, unrelated defect
+([BUG-017](product/bugs/BUG-017_EVENT_CREATE_SUBFOLDER_PATH_DIVERGES_FROM_EVENT_JSON_WRITE_PATH_AFTER_OFFLINE_EPISODE.md)):
+`event.json` and an event's sub-component folders could land in two
+different physical locations after an offline/`invalid-nas` episode,
+leaving a folder structure with no readable `event.json` ("legacy event").
+Root-caused, fixed, tested, and merged into this branch (`fix/event-json-
+path-divergence` → `feature/mx-creative-console-v2`, commit `24db767`)
+before continuing — zero MX-console/C# code involved; the C# work here was
+purely the trigger context that happened to expose it. Re-ran the exact
+"Change Event → create new event" repro against the fixed build: `event.json`
+and both sub-component folders now land in the same folder, confirmed by
+direct filesystem read.
+
+With Event B created, files assigned to it via console G-presses
+(`group.assign ok=true groupId=1`, logged), the actual claim-reassignment
+test: with Event B current, selected both of Event A's files (owned by
+Event A's G1) and pressed **G2** on the console — AutoIngest's real UI
+showed the documented "moved from E1" toast, and `app.log` confirmed
+`group.assign ok=true groupId=2`. Verified: Event A's now-empty workspace
+was pruned from the session strip entirely (not just its group); the
+"Import N Assigned Files" count stayed correct (no duplicate
+claims — each file attributed to exactly one event); and re-opening REFINE
+TAGS on the reassigned files inside Event B's newly-mapped group showed a
+**clean default state for Event B's own tag vocabulary, with no leftover
+trace of Event A's per-file overrides** — confirming `GroupManager
+.assignFiles()`'s `onClaim` hook correctly clears the losing event's
+refinement state on cross-event reassignment, exactly as
+`docs/multi-event-import.md` and `refinableTags.js`'s own comments describe.
+All of this exercised through the same proven console actions (G1/G2/G3,
+SELECT, REFINE TAGS) — no new C# behavior, no AutoIngest code changes
+required for the claim-reassignment mechanics themselves (only the
+incidentally-discovered, unrelated path-divergence bug above needed one).
 
 **Connection/restart tests** — all passed: two independent AutoIngest
 quit/relaunch cycles each produced a new port/token and a clean C#
@@ -637,8 +688,12 @@ an in-process-hosted plugin.
   offline/error behavior all confirmed on the real MX Creative Console
   against a real packaged AutoIngest build, with real server-side log
   evidence for every result. Node plugin confirmed intact as fallback.
-- **Still deferred** (not a defect, just not yet exercised): a
-  multi-file/mixed-selection Tag Refinement press, and a deep
-  Multi-Event-ownership/claim-reassignment group side-effect scenario.
+- **Both previously-deferred scenarios now closed**: a multi-file/mixed-
+  selection Tag Refinement press (correct mixed/indeterminate tri-state)
+  and a deep Multi-Event-ownership/claim-reassignment scenario (correct
+  claim transfer, workspace pruning, no duplicate claims, correct
+  cross-event Tag Refinement cleanup) both passed. The latter incidentally
+  surfaced and led to fixing an unrelated, pre-existing defect
+  (BUG-017 — see docs/product/bugs/), merged into this branch.
 - **Not yet done** (unchanged, explicitly Phase 4B's scope):
   `PluginDynamicFolder`/dynamic Tag Refinement content.
