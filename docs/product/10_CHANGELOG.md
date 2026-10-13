@@ -6,6 +6,19 @@ Append newest first. Never edit or delete a prior entry — if something was wro
 
 ---
 
+## 2026-10-13 — BUG-017: event-creation sub-folder path divergence (AI-FEAT-004)
+
+- **Task type**: bug record for a real fix, on a dedicated branch off `main` (`fix/event-json-path-divergence`, commit `f09890f`), discovered incidentally during unrelated MX Creative Console physical-parity test fixture setup.
+- **What happened**: `renderer/eventCreator.js`'s `_tryCreateEvent()` wrote `event.json` via `activeMaster.path` but created sub-component folders via a separately re-derived `coll._masterPath || activeMaster.path`, which diverges after an offline/`invalid-nas` episode and is never resynced — splitting an event's `event.json` and its sub-folders across two physical locations and causing Event Management to list it as a "legacy event" with no readable `event.json`. `_tryRepairEvent()` had the same divergence plus an independent unawaited-write defect that silently failed to repair it either.
+- **Fix**: routed all three divergent call sites (`_tryCreateEvent()`, `_tryRepairEvent()`, `getActiveEventData()`) through the existing `_effectiveCollPath()` resolver; awaited and surfaced the repair flow's write result instead of a fire-and-forget `.catch(console.error)`.
+- **Verified**: temporarily applied the identical patch to `feature/mx-creative-console-v2` (confirmed via `git diff` that the three touched functions are untouched by that branch, so this is a faithful test) and ran `test/multiEventNewEventUiLive.test.js` and `test/multiEventLocalFirstUiLive.test.js` — both passed cleanly. Patch reverted from that branch afterward; nothing from it is part of this fix's commit. `validate` 0 errors after rebuild.
+- **New record**: [BUG-017](bugs/BUG-017_EVENT_CREATE_SUBFOLDER_PATH_DIVERGES_FROM_EVENT_JSON_WRITE_PATH_AFTER_OFFLINE_EPISODE.md).
+- **Also flagged, not fixed here** (independent hardening, out of scope for this minimal fix): `main.js`'s `event:write` IPC handler creates the event folder before validating `eventData`, and can report a false write failure if a best-effort post-write notification throws after the write already succeeded.
+- **Noted, not resolved**: a registry-ID collision — `AI-FEAT-058` names "Knowledge Engine" on `main` but "Multi-Event Import" on `feature/mx-creative-console-v2` — surfaced while sourcing this record's `Related feature(s)` field; left as evidence-pending for whoever next reconciles those branches' registries, not addressed here.
+- **Evidence confidence**: root cause traced by a `contract-debugger` subagent investigation (file/line citations), independently cross-checked by direct filesystem inspection (confirmed the repro archive's missing `.autoingest/root/archive-root.json` marker) before the fix was authorized.
+
+---
+
 ## 2026-08-14 — Knowledge Portal Stage 2 merged to `main`; event-coordination reconciliation (AI-FEAT-058 / AI-RM-011 / DEC-020)
 
 - **Task type**: merge + post-merge historical/documentation closure, plus a mid-closure product-owner clarification reconciled in the same pass.

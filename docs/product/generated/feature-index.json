@@ -207,7 +207,12 @@
         "BUG-003",
         "BUG-006"
       ],
-      "related_changelog_entries": [],
+      "related_changelog_entries": [
+        {
+          "date": "2026-10-13",
+          "excerpt": "## 2026-10-13 — BUG-017: event-creation sub-folder path divergence (AI-FEAT-004)"
+        }
+      ],
       "related_code_paths": [
         "main/eventJsonStore.js"
       ],
@@ -3347,6 +3352,10 @@
       ],
       "related_bugs": [],
       "related_changelog_entries": [
+        {
+          "date": "2026-10-13",
+          "excerpt": "**Noted, not resolved**: a registry-ID collision — `AI-FEAT-058` names \"Knowledge Engine\" on `main` but \"Multi-Event Import\" on `feature/mx-creative-console-v2` — surfaced while sourcing this record's"
+        },
         {
           "date": "2026-08-14",
           "excerpt": "## 2026-08-14 — Knowledge Portal Stage 2 merged to `main`; event-coordination reconciliation (AI-FEAT-058 / AI-RM-011 / DEC-020)"
