@@ -4282,7 +4282,16 @@ ${unparseable.map(ev => `
 
       // Await write so a NAS failure can be detected and routed to local staging.
       const _writeResult = await window.api.writeEventJson(eventFolderPath, eventJsonPayload);
+      // The ONE physical folder event.json actually landed in — set on whichever
+      // success branch below actually succeeds. Subfolder creation below must use
+      // THIS, never re-derive coll._masterPath/activeMaster.path independently:
+      // coll._masterPath can diverge from activeMaster.path after an offline
+      // episode and is never resynced once the archive becomes reachable again,
+      // which used to split event.json and its subfolders across two different
+      // physical folders (see fix/event-json-path-divergence).
+      let _actualEventFolderPath = null;
       if (_writeResult?.ok) {
+        _actualEventFolderPath = eventFolderPath;
         if (_writeResult.alreadyExisted) {
           console.log('[EventCreator] event.json already existed; kept existing record:', name);
         }
@@ -4313,6 +4322,7 @@ ${unparseable.map(ev => `
             const _stagingWrite    = await window.api.writeEventJson(_stagingEvPath, eventJsonPayload);
             if (_stagingWrite?.ok) {
               coll._masterPath = _stagingCollPath;
+              _actualEventFolderPath = _stagingEvPath;
               // Mark new offline event so hero shows the local-staging badge.
               _viewingExisting = {
                 folderName:         safe,
@@ -4339,10 +4349,11 @@ ${unparseable.map(ev => `
 
       // Create one subfolder per component — only for multi-component events.
       // Single-component events route files directly into the event folder.
-      if (compsForDisk.length > 1) {
+      if (compsForDisk.length > 1 && _actualEventFolderPath) {
         try {
-          // Use effective working collection path — staging when offline, archive when online.
-          const basePath = (coll._masterPath || activeMaster.path) + '/' + safe;
+          // Same physical folder event.json was just confirmed to land in — see
+          // the comment on _actualEventFolderPath above.
+          const basePath = _actualEventFolderPath;
 
           // folderName was already computed and persisted into compsForDisk above.
           // Use those names directly so disk folders match event.json exactly.
@@ -4418,19 +4429,56 @@ ${unparseable.map(ev => `
     const newName     = `${_newEventDate} _${seq}-${parts}`;
     const safeNewName = sanitizeForPath(newName);
 
-    const result = await window.api.renameEvent(activeMaster.path, oldName, safeNewName);
+    // Same resolved location _scanAndRenderEventList() used to discover and list
+    // this legacy entry in the first place — never activeMaster.path alone, which
+    // can diverge from the real on-disk collection path after an offline episode
+    // (see the matching fix in _tryCreateEvent() above for the full mechanism).
+    const _repairCollPath = _effectiveCollPath() || activeMaster.path;
+
+    const result = await window.api.renameEvent(_repairCollPath, oldName, safeNewName);
     if (!result.ok) {
       _showEventBanner(result.reason || 'Rename failed.', 'error');
       return;
     }
 
-    // Replace unparseable entry with a fully resolved one in the scan cache.
     const repairCompsForDisk = cleanComps.map(c => ({
       types:        c.eventTypes.map(et => et.label),
       location:     c.location?.label || null,
       city:         c.city?.label     || '',
       isUnresolved: false,
     }));
+
+    // Write event.json for the newly repaired event folder — awaited and checked,
+    // never fire-and-forget: a legacy folder with no event.json is exactly the
+    // failure this repair flow exists to fix, so a failed write here must be
+    // surfaced to the operator, not silently logged while the UI proceeds as if
+    // the repair succeeded.
+    if (_repairCollPath) {
+      const newEventPath = _repairCollPath + '/' + safeNewName;
+      const _repairWriteResult = await window.api.writeEventJson(newEventPath, {
+        version:       1,
+        hijriDate:     _newEventDate,
+        sequence:      parseInt(seq, 10),
+        eventName:     newName,
+        safeEventName: safeNewName,
+        components:    repairCompsForDisk,
+        globalCity:    repairCompsForDisk[0]?.city || '',
+        status:        'created',
+        createdAt:     Date.now(),
+        updatedAt:     Date.now(),
+      }).catch(err => {
+        console.error('[EventCreator] writeEventJson (repair) failed:', err);
+        return { ok: false, reason: err?.message || 'writeEventJson threw' };
+      });
+      if (!_repairWriteResult?.ok) {
+        _showEventBanner(_repairWriteResult?.reason || 'Repair renamed the folder but event.json was not written.', 'error');
+        return;
+      }
+    }
+
+    // Replace unparseable entry with a fully resolved one in the scan cache — only
+    // after the write above is confirmed, so the cache/UI never shows a "repaired"
+    // event that doesn't actually have an event.json on disk.
     if (_scannedEvents) {
       const idx = _scannedEvents.findIndex(e => e.folderName === oldName && !e.isParseable);
       if (idx >= 0) {
@@ -4444,23 +4492,6 @@ ${unparseable.map(ev => `
           _eventJson:   { eventName: newName, safeEventName: safeNewName },
         });
       }
-    }
-
-    // Write event.json for the newly repaired event folder.
-    if (activeMaster?.path) {
-      const newEventPath = activeMaster.path + '/' + safeNewName;
-      window.api.writeEventJson(newEventPath, {
-        version:       1,
-        hijriDate:     _newEventDate,
-        sequence:      parseInt(seq, 10),
-        eventName:     newName,
-        safeEventName: safeNewName,
-        components:    repairCompsForDisk,
-        globalCity:    repairCompsForDisk[0]?.city || '',
-        status:        'created',
-        createdAt:     Date.now(),
-        updatedAt:     Date.now(),
-      }).catch(err => console.error('[EventCreator] writeEventJson (repair) failed:', err));
     }
 
     // Preselect the repaired event on return to list (use safe name for list lookup).
@@ -5370,9 +5401,13 @@ ${unparseable.map(ev => `
       if (!event) return null;
       // For pending-local events, route imports to Local Staging (not archive) so
       // files land in the correct staging folder that will be synced later.
+      // Otherwise resolve through _effectiveCollPath() — the same single source
+      // of truth _tryCreateEvent()/_tryRepairEvent() now write through — never
+      // coll._masterPath alone, which can be stale after an offline episode
+      // (see fix/event-json-path-divergence).
       const collPath = (_viewingExisting?.isPendingSync && _viewingExisting?._stagingCollPath)
         ? _viewingExisting._stagingCollPath
-        : (coll._masterPath || null);
+        : (_effectiveCollPath() || null);
       return {
         coll,
         event,
