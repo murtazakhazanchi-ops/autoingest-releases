@@ -292,6 +292,32 @@ const AutoIngestCommands = (() => {
       check: (_p, b) => !b.isQmzOpen() && !b.isImportRunning(),
       run: (_p, b) => b.openEventChooser(),
     },
+
+    // ── Import (Phase 4C revised) ───────────────────────────────────────
+    // Opens the real Import review/confirmation flow — never executes the
+    // final copy. Traced the authoritative #importBtn click handler first
+    // (renderer.js): it runs AutoIngest's own real validation (missing
+    // sub-event mappings, unassigned files, duplicate sub-event mappings,
+    // photographer requirement) and stops at the real
+    // showEventImportConfirmModal()/runSessionImport() confirmation UI,
+    // which requires an explicit operator action on the COMPUTER before any
+    // file copy begins. openImportConfirmation() dispatches a REAL click on
+    // the real #importBtn element — not a re-implementation of its logic —
+    // so every one of those checks and the confirmation step are reused
+    // exactly, never duplicated here. A disabled or hidden button (browser
+    // behavior: .click() does not fire on a disabled element) naturally
+    // means the attempt is a no-op, same "AutoIngest remains final
+    // authority" rule check() below only coarsely gates.
+    'import.openConfirmation': {
+      check: (_p, b) => !b.isQmzOpen() && !b.isImportRunning(),
+      run: (_p, b) => b.openImportConfirmation(),
+      // run() resolves to whether the real button's click was genuinely
+      // dispatched (true) or the button itself was hidden/disabled at that
+      // moment (false) — NOT whether an import later completed. Same
+      // "entering a flow, not finishing it" convention tagRefinement.open's
+      // own executed flag already uses.
+      computeExecuted: (result) => result === true,
+    },
   };
 
   // Import commands (import.start/confirm) are deferred for Phase 1B — see

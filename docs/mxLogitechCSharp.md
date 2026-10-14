@@ -1172,3 +1172,99 @@ component list, Back without changing anything, and pagination if the
 event has enough components. Requires deciding, with the operator, which
 physical key temporarily hosts this workspace's entry action for testing
 (see "Physical key placement" above).
+
+---
+
+## Phase 4C (revised) — permanent operator profile
+
+Expands Phase 4C from a single command into the target permanent
+AutoIngest MX layout, after Phase 4B closure's own recommendation to add
+the missing group→sub-event capability before any further work. Target
+hardware model:
+
+```
+DIALPAD
+  SELECT · SELECT ALL · CLEAR · PREVIEW   (4 assignable buttons)
+  Main dial (roller)  = Navigate Files (unchanged since Phase 3A/3B)
+  Dial accessory's OWN secondary roller = left intentionally unassigned
+                                           (same "don't fill a slot just
+                                           because it exists" principle as
+                                           the reserved ninth Keypad key)
+
+KEYPAD (3×3)
+  G1          | G2         | G3
+  GROUPS      | MAP GROUP  | REFINE TAGS
+  CHANGE EVENT| IMPORT     | [reserved]
+```
+
+### Dialpad capability — confirmed on real hardware, not assumed
+
+Before moving anything, the operator confirmed directly in Options+ that
+the Dial accessory exposes **4 assignable command buttons plus its own
+roller**, separate from the main dial (which already drives Navigate
+Files and has no press mechanism at all — a real hardware fact already on
+record from Phase 3B). All four buttons accepted AutoIngest MX's existing
+`SelectCommand`/`SelectAllCommand`/`ClearCommand`/`PreviewCommand`
+actions — the exact same actions already used on the Keypad, zero new
+code. Physically tested: select, select-again (toggle), select all, clear,
+preview open/close, and the main dial's navigate-next/previous all
+confirmed working after the move.
+
+### GROUPS workspace
+
+`GroupsWorkspaceModel` / `GroupsButtonImageRenderer` / `GroupsFolder` —
+same three-layer split, same physical-closure lessons applied from the
+start (never calls `Close()`, `Unavailable` is a retry lever, only a real
+list-membership change redraws, every mutating press re-resolves fresh
+state). Lists every group with id > 3 (G1/G2/G3 keep their own fixed
+keys), each showing its real label and file count, plus a "+ New Group"
+entry whenever fewer than the real authoritative max (9, read from the
+existing Cmd+G chord's own digit guard) currently exist. Pressing an
+existing group or "+ New Group" both dispatch the exact same
+`group.assign` primitive G1/G2/G3 already use — no new grouping command,
+no plugin-local numbering, never creates an empty group just by being
+listed (the model is pure/side-effect-free; only a press mutates
+anything).
+
+**Decision (brief §8, stay-open vs. auto-return)**: stays open after a
+successful assignment. Reactively calling `Close()` is the exact
+zombie-session risk Phase 4B physical testing confirmed; never repeated
+here. Whether staying open "feels right" for a quick, repeated-assignment
+workflow is for physical testing (§28) to confirm or revisit — the
+operator can already exit via the real hardware Back button either way.
+
+### Import — `ImportCommand.cs`
+
+A thin `PluginDynamicCommand` (not a dynamic folder — there is nothing to
+browse) wrapping `GatedCommand.RunAsync("import.openConfirmation", ...,
+requiredContext: "browse")`. See `docs/commandLayer.md`'s own "Import —
+`import.openConfirmation`" section for the full command-layer trace
+(reuses the real `#importBtn` click verbatim, never reimplements its
+validation).
+
+### Testing
+
+- **`GroupsWorkspaceModelTests.cs`** (9 tests): unavailable fallback,
+  G1-G3 deliberately never duplicated, real existing-group listing with
+  real file counts, the authoritative max-9 cap, stale-group replacement,
+  and the "never creates an empty group" pin.
+- **`GroupsTransportIntegrationTests.cs`** (2 tests): a real existing-G4
+  press sends the real `group.assign` payload and reflects the pushed
+  resulting state; a "+ New Group" press sends `group.assign` with no
+  payload at all, never inventing its own numbering.
+- **`mxCommandLayerImportLive.test.js`**: see `docs/commandLayer.md`'s own
+  Import test summary.
+- Full C# suite: **93/93 passing** (81 prior + 12 new: 9 GROUPS model + 2
+  GROUPS transport + 1 shared helper exercised across both).
+
+### Physical Keypad/profile migration and testing — pending
+
+Dialpad migration is physically confirmed (above). The Keypad
+reconfiguration (G1/G2/G3 | GROUPS/MAP GROUP/REFINE TAGS | CHANGE
+EVENT/IMPORT/reserved) and the full physical test matrix (brief §28-32:
+GROUPS overflow + pagination, MAP GROUP → immediate Refine Tags
+eligibility with no restart, Change Event refreshing stale
+component/group state, Import opening the real review flow and
+respecting real validation, and profile-switch/quit/relaunch/Plugin
+Service restart regression) have not yet been run — next step once the
+Keypad is physically remapped.

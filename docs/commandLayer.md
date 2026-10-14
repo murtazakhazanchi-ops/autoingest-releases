@@ -857,6 +857,72 @@ structural guarantee from both paths calling the exact same
 
 ---
 
+## GROUPS workspace — G4+ (Phase 4C revised)
+
+No new command. The console's GROUPS dynamic workspace (beyond the fixed
+G1/G2/G3 keys) reuses **`group.assign`** exactly as documented above —
+pressing an existing group assigns to it by real id; pressing "+ New
+Group" calls `group.assign` with no `groupId` at all, the same "create the
+next sequential group" fallback G1/G2/G3's own `GroupSlotHelper` already
+relies on. No new grouping business logic, no plugin-local group model.
+Max group count (9) is read from the real authoritative limit (the
+existing Cmd+G digit chord's own `n < 1 || n > 9` guard in `renderer.js`),
+not invented — see `docs/mxLogitechCSharp.md`'s own "GROUPS workspace"
+section for the C# dynamic-folder design.
+
+---
+
+## Import — `import.openConfirmation` (Phase 4C revised)
+
+Opens AutoIngest's real Import review/confirmation flow — **never**
+executes the final file copy. Traced the authoritative `#importBtn` click
+handler first (`renderer.js`): it runs AutoIngest's own real validation
+(missing sub-event mappings, unassigned files, duplicate sub-event
+mappings, photographer requirement) and stops at the real
+`showEventImportConfirmModal()`/`runSessionImport()` confirmation UI,
+which requires an explicit operator action on the computer before any
+transactional copy begins.
+
+```js
+'import.openConfirmation': {
+  check: (_p, b) => !b.isQmzOpen() && !b.isImportRunning(),
+  run: (_p, b) => b.openImportConfirmation(),
+  computeExecuted: (result) => result === true,
+}
+```
+
+`openImportConfirmation()` (the bridge function) dispatches a **real
+click** on the real `#importBtn` DOM element — not a re-implementation of
+its ~300-line handler. This is the single safest way to guarantee zero
+validation/confirmation logic is duplicated or accidentally weakened:
+every one of the button's own existing guards
+(`TagRefinementManager.isEventScopeActive()`, `importRunning`, the real
+`canImport` computation) applies automatically, and a disabled or hidden
+button naturally means the click never fires at all (standard browser
+behavior — `.click()` is a no-op on a `disabled` element), so `check()`
+above only needs the same coarse `!isQmzOpen() && !isImportRunning()` gate
+`event.openChooser` already uses; AutoIngest's own click-time logic remains
+final authority, exactly as the brief requires.
+
+`executed: true` means the real click was genuinely dispatched and the
+flow was entered — **not** that an import completed. Same "entering a
+flow, not finishing it" convention `tagRefinement.open`'s own `executed`
+flag already uses. There is no `import.startNow`/direct-copy command
+anywhere in this plugin; the operator retains final confirmation authority
+on the real modal.
+
+### Tests
+
+`mxCommandLayerImportLive.test.js` (JS, real Electron renderer): opens the
+real `#eventImportOverlay` for a ready single-component event, confirms
+event status is unchanged by merely opening it, confirms Cancel closes it
+with still no status change (no copy ever began), confirms a
+missing-sub-event-mapping group correctly blocks the confirmation modal
+from opening at all (real validation reused, not bypassed), and confirms
+unavailability while QMZ is open.
+
+---
+
 ## Resume — investigated, not exposed (Phase 3D)
 
 No genuinely Browse-context, operator-facing "resume" command was added.

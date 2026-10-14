@@ -1130,3 +1130,26 @@ mapping (no renderer entry point exists), a resume command (every real
 instance is either internal-only or belongs to an out-of-scope screen), a
 permanent ninth-key assignment (pending physical comparison), or any merge
 to `main`/`stable/0.9`.
+
+---
+
+## Migration superseded this document (AI-FEAT MX Console Phase 4A+)
+
+C# was confirmed the primary MX Creative Console implementation at the
+close of Phase 4B (Dynamic Tag Refinement), after the Node SDK was found
+unable to render it (see `docs/mxLogitechCSharp.md`'s own "Why C#
+migration exists"). This Node plugin remains intact as reference/fallback
+— untouched since before Phase 4A began — and is not being brought to
+feature parity for capabilities the Node SDK cannot support
+(`PluginDynamicFolder`-based workspaces: Dynamic Tag Refinement, Group →
+Sub-Event Mapping, the GROUPS overflow workspace) or where parity isn't
+explicitly useful.
+
+All further hardware/profile work — the physical Dialpad migration
+(SELECT/SELECT ALL/CLEAR/PREVIEW moved off the Keypad onto the Dial
+accessory's 4 assignable buttons, confirmed on real hardware), the target
+permanent Keypad layout (G1/G2/G3 · GROUPS/MAP GROUP/REFINE TAGS · CHANGE
+EVENT/IMPORT/reserved), and every command/workspace built since — is
+documented going forward in `docs/mxLogitechCSharp.md` only. This file is
+retained as the historical record of the Node plugin's own Phase 1A-3E
+development and is not updated further.

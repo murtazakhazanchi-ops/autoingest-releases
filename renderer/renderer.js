@@ -18688,6 +18688,19 @@ window.__autoIngestRendererBridge = {
   // docs/commandLayer.md "Change Event — event.openChooser").
   openEventChooser:           () => openEventPickerFromWorkspace(),
   getEventStateCompact:        () => _getEventStateCompact(),
+  // Phase 4C (revised) — dispatches a REAL click on the real #importBtn
+  // element, never a re-implementation of its handler. Returns whether the
+  // click was genuinely dispatched (the button existed, was visible, and
+  // was not disabled) — browsers never fire a click event on a disabled
+  // element, so this naturally inherits every one of the button's own
+  // existing guards (TagRefinementManager.isEventScopeActive(), importRunning,
+  // canImport, etc.) without duplicating any of them here.
+  openImportConfirmation: () => {
+    const btn = document.getElementById('importBtn');
+    if (!btn || btn.disabled || !btn.classList.contains('visible')) return false;
+    btn.click();
+    return true;
+  },
 
   // State-change notifications: commandManager.js overwrites this with its
   // own listener-fanout function at load time (see its "Wire into the
