@@ -818,15 +818,34 @@ filled checkmark (checked), outlined ring (unchecked), filled dash (mixed/
 indeterminate). Control buttons (Apply/All Tags/Reset Tags) use a distinct
 background tint from plain tag buttons, label only, no state badge.
 
-### List refresh vs. single-image refresh
+### List refresh vs. single-image refresh — revised after physical testing
 
-`RefineTagsFolder` diffs the new button-spec set against the previous one
-on every state push:
-- **Action set changed** (a tag appeared/disappeared, availability of a
-  control button changed) → `ButtonActionNamesChanged()` (full refresh).
-- **Same buttons, only states differ** → `CommandImageChanged(actionName)`
-  per changed button only — never the heavier full refresh for a single
-  checkmark update.
+Original design (above the line): diff the button-spec set on every push,
+use `ButtonActionNamesChanged()` for a list-membership change and
+`CommandImageChanged(actionName)` per-button for a same-list state-only
+change (e.g. a tag's checkmark flipping). **Physical testing found this
+does not work as designed, and the eventual fix is a behavior change, not
+a rendering detail:**
+
+- `CommandImageChanged()` does not cause any `GetCommandImage` requery at
+  all in this installed SDK (v6.4.2.3414) — confirmed across three separate
+  attempts with diagnostic logging, both the `CreateCommandName()`-wrapped
+  and raw-`actionParameter` forms, from multiple execution contexts.
+- An interim fix forced a state-only change to "really" change the list
+  twice (drop to empty, notify, restore the real list, notify again) so
+  every button looked "new" to `ButtonActionNamesChanged()`'s own working
+  mechanism. This visually updated ticks, inconsistently — **and pagination
+  testing (brief §13) found it had a 100%-reproducible, far worse cost: any
+  tag press on page 2+ of a multi-page scope snapped the device back to
+  page 1**, making multi-page refinement practically unusable.
+- **Final, shipped behavior**: a same-list, state-only change is now a
+  genuine no-op. Only a real list-membership change calls
+  `ButtonActionNamesChanged()`. Tag ticks are correct on every fresh
+  `Activate()` or list-changing redraw; they do not flip live in place
+  while the same button list stays on screen (e.g. after a same-session
+  selection change). Confirmed as the deliberate, user-accepted trade-off:
+  never fight pagination to chase a redraw mechanism this SDK build does
+  not reliably support.
 
 ### Pagination
 
@@ -855,30 +874,76 @@ Every state push rebuilds the button list from scratch — there is no
 against `SharedClient.Instance.GetLatestState()` fresh (`RunCommand` never
 consults the cached button-spec dictionary for validation, only for
 display) — an id from a scope that no longer exists resolves to `null` and
-is silently ignored (logged, never mutated). If `tagRefinement.Active`
-becomes `false` on any push (selection cleared, Change Event, scope no
-longer refinable), the folder closes itself rather than showing a stale or
-empty editor.
+is silently ignored (logged, never mutated).
+
+**Revised after physical testing**: the folder no longer closes itself when
+`tagRefinement.Active` becomes `false` — see "`Close()` removed" below for
+why. `BuildButtonSpecs` renders a single informational `Unavailable` button
+instead, and pressing it retries the open attempt (see "Stuck-state retry"
+below).
+
+Confirmed group-change-while-open (brief §16) is **blocked by AutoIngest's
+own pre-existing architecture**, not something this folder needs to defend
+against: `getVisibleFiles()` filters the entire grid to the active
+refinement scope while refinement is active, so another group's files are
+never reachable to re-map in the first place. Change-Event-while-open
+(brief §17) IS allowed by AutoIngest and does **not** auto-close an active
+refinement session — confirmed as a genuine, pre-existing condition in
+`renderer.js`'s `_resolveRefinementTargetScope()`/`event.openChooser`, not
+a Phase 4B defect. See "Physical closure findings" below for the full,
+initially-confusing repro and its real root cause (a missing
+group→sub-event console command, not Dynamic Tag Refinement).
+
+### `Close()` removed — a core architectural pivot from physical testing
+
+`RefineTagsFolder` never calls `this.Close()`, on itself or reactively.
+An earlier revision did call it from `OnStateChanged` whenever refinement
+became unavailable. Physically, this produced a zombie-session bug:
+repeated, apparently-ineffective `Close()` calls while the device kept
+routing presses to the same stale instance, and the physical REFINE TAGS
+key then appeared to open nothing on the next press. Removed entirely;
+`BuildButtonSpecs` shows an informational `Unavailable` button instead, and
+the operator exits via the real hardware Back button.
 
 ### Offline / disconnect behavior
 
-If a state push ever reports `ConnectionState != Connected` or a `null`
-state while the folder is open, it closes itself immediately — no crash,
-no pretending an edit is valid, no replay queue (presses are fire-and-forget
-per-press; there is nothing buffered to replay on reconnect by
-construction). Re-entering the folder after reconnect re-reads fresh state
-from scratch.
+**Revised after physical testing** — the folder does not close itself on
+disconnect (see "`Close()` removed" above); a disconnected/null state
+pushes through `BuildButtonSpecs` to the same `Unavailable` rendering.
+Confirmed via the real AutoIngest-quit-while-folder-open scenario (brief
+§18): the console correctly fell back to its normal (non-AutoIngest)
+profile with no crash, and relaunching AutoIngest reconnected cleanly.
+
+### Stuck-state retry — the Unavailable button is a retry lever
+
+Confirmed via plugin-log evidence (not guessed) that this SDK build does
+not reliably call `Activate()` again on a later re-entry to the same
+dynamic-folder instance — in one observed session it fired exactly once for
+the whole session, including across a full AutoIngest quit/relaunch cycle.
+Without a fix, a press that landed on `Unavailable` for a reason that had
+since resolved (a file now selected, AutoIngest reconnected) was a dead
+end — the only recovery was restarting the Logi Plugin Service. Pressing
+the `Unavailable` button itself now retries `EnsureOpenAndPopulateAsync`
+directly, giving the operator an in-band recovery path.
+
+Separately, a full Logi Plugin Service restart (killing its processes; the
+service auto-respawns) was confirmed, as its own deliberate test, to always
+cleanly recover the plugin and reconnect — a legitimate fallback recovery
+step for an operator, not something to rely on for routine use.
 
 ### Testing
 
-- **`RefinementWorkspaceModelTests.cs`** (25 tests): state→button-list
+- **`RefinementWorkspaceModelTests.cs`** (28+ tests): state→button-list
   mapping, tag-order stability, identity passthrough/non-collision,
   duplicate labels across categories, all three display states preserved
   verbatim, the confirmed transition table, stale/unknown tag rejection,
   full tag-set replacement on a new state, per-command availableCommands
-  gating (Apply/All Tags/Reset Tags), the corrected "Reset Tags" wording
-  pinned against regression, button ordering, null-safety, truncation
-  (including the "never replace with a placeholder" rule), and
+  gating (Apply/All Tags/Reset Tags/Select/Clear), the corrected "Reset
+  Tags" wording pinned against regression, button ordering (Select/Clear
+  first, then tags, then All Tags/Reset Tags/Apply), the single-entry
+  `Unavailable` fallback, null-safety, the corrected word-boundary-aware
+  truncation (both the "has a wrap point" and "no wrap point" cases pinned
+  against the real physical overflow this replaced), and
   `System.Text.Json`'s default tolerance of unknown future fields.
 - **`RefinementTransportIntegrationTests.cs`** (1 comprehensive test): the
   real `AutoIngestClient` against `MockAutoIngestServer`'s real WebSocket/
@@ -892,19 +957,79 @@ from scratch.
   it then disposed — any test that inspected payload contents *after* the
   handler returned would throw `ObjectDisposedException`; no prior test had
   done so. Fixed with `.Clone()`).
-- Full suite: **58/58 passing** (32 from Phase 4A + 26 new).
+- Full suite: **63/63 passing** (32 from Phase 4A + 26 Phase 4B software +
+  5 physical-closure regression tests).
 
-### Physical testing — pending (brief §25-27, requires the real console)
+### Physical closure findings (Phase 4B closure session)
 
-Not yet run: the full on-device walkthrough (real tag labels, real
-checked/unchecked/indeterminate rendering, press transitions, Apply/All
-Tags/Reset Tags, Back), pagination behavior with varying tag counts (1, 2,
-3-5, overflow, many), and state-change behavior while the folder is open
-(selection/group/Change Event changes, AutoIngest restart, Plugin Service
-restart). **Requires re-mapping the physical REFINE TAGS key in Options+**
-from the Phase 4A static `RefineTagsCommand` action to this folder's own
-entry action — a manual profile edit, not yet done, since the brief's §1
-explicitly said not to change the normal profile until this point.
+Full on-device walkthrough completed — real tag labels, real
+checked/unchecked/indeterminate rendering, press transitions, pagination
+with a 15+ tag scope, long-label truncation, Apply/All Tags/Reset Tags,
+Select/Clear, Back, AutoIngest quit/relaunch, and a Logi Plugin Service
+restart. Six real, confirmed issues found and fixed (see each one's own
+section above for detail):
+
+1. **Zombie-subscription spam** after leaving the folder — fixed with the
+   `_isActive` guard (set in `Activate()`, cleared first in `Deactivate()`).
+2. **`Close()` unreliable from a background thread** — removed entirely;
+   see "`Close()` removed" above. The single biggest architectural pivot
+   from physical testing.
+3. **Selection unreachable inside the workspace** — entering refinement
+   mode has always cleared the outer file-grid selection
+   (`_enterRefinementMode()`, pre-existing, unrelated to Phase 4B); the
+   dynamic folder replacing the whole Keypad grid removed the operator's
+   only way back to the real SELECT key. Fixed by adding `Select`/`Clear`
+   buttons mapped to the existing `selection.toggleCurrent`/`selection.clear`
+   commands, placed first in the button order.
+4. **Live tick redraw vs. pagination** — see "List refresh vs.
+   single-image refresh — revised after physical testing" above. The
+   state-only redraw trick was removed after it was found to snap the
+   device back to page 1 on every tag press on a multi-page scope.
+5. **Stuck `Unavailable` with no re-entry path** — see "Stuck-state retry"
+   above.
+6. **Long-label overflow** — `TruncateForDisplay`'s original budget assumed
+   ~7px/char across two lines unconditionally. Physical testing with a
+   hyphenated (no-space) long keyword overflowed the LCD key badly.
+   Rendered the real font via a `SkiaSharp.MeasureText` reflection probe
+   against the installed `PluginApi.dll` (same discipline as the rest of
+   this document — measured, not guessed): ~9.3px/char at this button's
+   fontSize. `BitmapBuilder.DrawText` only wraps at whitespace — confirmed
+   by rendering "Test Tag One" (wraps correctly) vs. the hyphenated label
+   (renders as one unbroken, clipped line). Fixed: a label with no wrap
+   point gets one line's worth of budget; a label with a real wrap point
+   still gets the original two-line budget. Known residual limitation
+   (not fixed, out of smallest-fix scope): an individual word inside a
+   multi-word label that is itself longer than one line's budget can still
+   overflow that wrapped line — not observed with this product's real
+   (short) tag labels.
+
+Two additional real findings that are **not** Phase 4B defects, confirmed
+by checking real behavior before concluding anything:
+
+- **Apply can cause AutoIngest's own on-screen refinement panel to exit.**
+  Initially suspected as a console-side bug; the user confirmed the
+  computer's own panel closed too. Accurate mirroring of real behavior, not
+  a defect — this supersedes the original brief's own assumption that Apply
+  should never auto-close.
+- **A multi-component event's "no console command to assign a group to a
+  sub-event" gap** blocked REFINE TAGS after Change Event in a way that
+  initially looked like a stale-state bug. Traced conclusively: Change
+  Event itself works fine on the console; `tagRefinement.open`'s real
+  eligibility check (`_resolveRefinementTargetScope()`) correctly requires
+  the selected file's group to already have a `subEventId` mapping to one
+  of the event's components, and `group.assign` (the only console group
+  command that exists) only assigns a file to a group — it does not assign
+  a group to a sub-event. That mapping currently only exists via the Group
+  Manager UI on the computer. Confirmed as the true root cause by assigning
+  the sub-event via the computer, then immediately re-trying REFINE TAGS on
+  the console for that file — it opened. This is a real, legitimate gap,
+  but in the group-management command surface (Phase 1A/3), not in Dynamic
+  Tag Refinement — recommended as a future console command
+  (`group.assignSubEvent` or similar), not built in this session.
+
+The physical REFINE TAGS key is remapped in Options+ to this folder's own
+entry action (done during this closure session); the Phase 4A static
+`RefineTagsCommand` action remains intact, unmapped, as reference/fallback.
 
 ### Code changes outside the C# plugin
 
@@ -912,3 +1037,19 @@ None. `GatedCommand.cs` gained one optional `payload` parameter (backward-
 compatible, used only by `setTagState`) — an extension of this plugin's own
 internal helper, not an AutoIngest API change. Zero renderer/main/transport
 changes, per the brief's §33 preference.
+
+### Phase 4B closure verdict
+
+**Dynamic Tag Refinement is production-usable**, with one accepted,
+documented limitation: tag ticks do not live-redraw in place while the
+folder stays open on a same-list state change (deliberate trade-off vs.
+breaking pagination — see "List refresh vs. single-image refresh" above).
+All six real defects found during physical closure were fixed, covered by
+automated regression tests, and re-verified live. Two additional findings
+(Apply exits the real panel; no console command to assign a group's
+sub-event) are confirmed accurate/out-of-scope, not defects. **C# is
+confirmed the primary MX Creative Console implementation** — the Node
+plugin remains intact as reference/fallback, unchanged, not deleted.
+Recommended next phase: continue with QMZ/Import console work, or a
+dedicated session to add the missing group→sub-event console command,
+per the user's own prioritization — not started automatically.

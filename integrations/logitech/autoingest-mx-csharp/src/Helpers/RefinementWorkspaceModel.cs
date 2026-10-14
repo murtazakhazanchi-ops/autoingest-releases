@@ -10,7 +10,10 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin
         Tag,
         ApplyToSelected,
         UseAllTags,
-        ClearSelected,
+        ClearSelected,      // tagRefinement.clearSelected — "Reset Tags" (see its own doc comment below)
+        SelectCurrent,      // selection.toggleCurrent — added after physical testing, see BuildButtonSpecs' doc comment
+        ClearFileSelection, // selection.clear — same
+        Unavailable,        // informational only, maps to no command — see BuildButtonSpecs' doc comment
     }
 
     /// <summary>
@@ -57,18 +60,54 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin
         public const string ApplyActionParameter = "__apply__";
         public const string AllTagsActionParameter = "__allTags__";
         public const string ResetTagsActionParameter = "__resetTags__"; // tagRefinement.clearSelected — see below
+        public const string SelectActionParameter = "__select__";
+        public const string ClearSelectionActionParameter = "__clearSelection__";
+        public const string UnavailableActionParameter = "__unavailable__";
 
         /// <summary>
-        /// Builds the full, ordered button list for the current state — tags
-        /// first (in AutoIngest's own array order — never resorted, so tag
-        /// order stays stable across redraws), then Apply/All Tags/Clear Tags
-        /// at the end (brief §15's own stated order), each included only when
-        /// `availableCommands` actually allows it right now — the same
-        /// availableCommands-gating rule every other action in this plugin
-        /// already uses (GatedCommand), never a locally-reinvented eligibility
-        /// rule. Returns an empty list (not null) when refinement isn't
-        /// active or there is nothing to show — callers decide what an empty
-        /// list means (brief §5: show unavailable, or close safely).
+        /// Builds the full, ordered button list for the current state.
+        ///
+        /// SELECT/CLEAR SELECTION come FIRST (added after physical testing
+        /// found a real gap, not anticipated in the original design): entering
+        /// refinement mode always clears the outer file-grid selection — this
+        /// is pre-existing, documented AutoIngest behavior
+        /// (_enterRefinementMode()'s own selectedFiles.clear(), unrelated to
+        /// Phase 4B) — and the dynamic folder REPLACES the entire Keypad
+        /// button grid, including the normal profile's own SELECT key.
+        /// Phase 4A's own proven workflow (select files from WITHIN the
+        /// refinement view, via dial+SELECT) depended on SELECT staying
+        /// reachable because REFINE TAGS was a flat action back then, never
+        /// taking over the Keypad. Once it became a dynamic folder, that
+        /// path silently disappeared: the operator could see tags but had no
+        /// way to attach them to any file. Exposing selection.toggleCurrent/
+        /// selection.clear as workspace buttons restores exactly that same
+        /// proven workflow — zero new AutoIngest commands, reusing the exact
+        /// ones the static SelectCommand/ClearCommand actions already call.
+        ///
+        /// Then tags (AutoIngest's own array order — never resorted, so tag
+        /// order stays stable across redraws), then Apply/All Tags/Reset Tags
+        /// at the end (brief §15's own stated order for those three). Every
+        /// button is included only when `availableCommands` actually allows
+        /// it right now — the same availableCommands-gating rule every other
+        /// action in this plugin already uses (GatedCommand), never a
+        /// locally-reinvented eligibility rule. Returns an empty list (not
+        /// null) when refinement isn't active or there is nothing to show —
+        /// callers decide what an empty list means (brief §5: show
+        /// unavailable, or close safely).
+        ///
+        /// Changed after physical testing (not the original design): when
+        /// refinement isn't active, this returns a single informational
+        /// "Unavailable" entry rather than an empty list. The original design
+        /// had RefineTagsFolder call Close() reactively from a background
+        /// state-push callback in this situation; physically, that produced a
+        /// zombie-session bug (repeated, ineffective Close() calls while the
+        /// device kept routing presses to the same stale instance, and the
+        /// physical REFINE TAGS key then appeared not to open anything on the
+        /// next press) — see RefineTagsFolder.cs's own doc comment. Showing a
+        /// clear, inert "Unavailable" button and letting the operator use the
+        /// real hardware Back button to exit is both simpler and avoids
+        /// depending on a self-close mechanism that turned out not to behave
+        /// as assumed from a background thread.
         /// </summary>
         public static IReadOnlyList<RefinementButtonSpec> BuildButtonSpecs(
             TagRefinementInfo tagRefinement,
@@ -76,10 +115,19 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin
         {
             if (tagRefinement == null || !tagRefinement.Active || tagRefinement.Tags == null)
             {
-                return System.Array.Empty<RefinementButtonSpec>();
+                return new[] { new RefinementButtonSpec(UnavailableActionParameter, RefinementButtonKind.Unavailable, "Unavailable") };
             }
 
-            var specs = new List<RefinementButtonSpec>(tagRefinement.Tags.Count + 3);
+            var commands = availableCommands ?? System.Array.Empty<string>();
+            var specs = new List<RefinementButtonSpec>(tagRefinement.Tags.Count + 5);
+            if (commands.Contains("selection.toggleCurrent"))
+            {
+                specs.Add(new RefinementButtonSpec(SelectActionParameter, RefinementButtonKind.SelectCurrent, "Select"));
+            }
+            if (commands.Contains("selection.clear"))
+            {
+                specs.Add(new RefinementButtonSpec(ClearSelectionActionParameter, RefinementButtonKind.ClearFileSelection, "Clear"));
+            }
             foreach (var tag in tagRefinement.Tags)
             {
                 specs.Add(new RefinementButtonSpec(
@@ -90,7 +138,6 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin
                     State: tag.State));
             }
 
-            var commands = availableCommands ?? System.Array.Empty<string>();
             if (commands.Contains("tagRefinement.useAllTags"))
             {
                 specs.Add(new RefinementButtonSpec(AllTagsActionParameter, RefinementButtonKind.UseAllTags, "All Tags"));
@@ -145,31 +192,58 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin
             return null;
         }
 
-        /// <summary>True for the three fixed control actions, false for anything
-        /// else (including a real tag id) — the one place that distinguishes
-        /// "this press is a control button" from "this press claims to be a
-        /// tag", so RunCommand never has to string-match sentinels twice.</summary>
+        /// <summary>True for every fixed control action (Select/Clear/All
+        /// Tags/Reset Tags/Apply), false for anything else (including a real
+        /// tag id) — the one place that distinguishes "this press is a
+        /// control button" from "this press claims to be a tag", so
+        /// RunCommand never has to string-match sentinels twice.</summary>
         public static bool IsControlAction(string actionParameter) =>
             actionParameter == ApplyActionParameter
             || actionParameter == AllTagsActionParameter
-            || actionParameter == ResetTagsActionParameter;
+            || actionParameter == ResetTagsActionParameter
+            || actionParameter == SelectActionParameter
+            || actionParameter == ClearSelectionActionParameter
+            || actionParameter == UnavailableActionParameter;
 
         /// <summary>Simple, deterministic truncation for a small LCD key — the
         /// brief explicitly forbids replacing a real tag name with a
         /// placeholder, so this only ever shortens the REAL label (never
         /// substitutes it), and only when it is long enough that it would
-        /// otherwise not fit at all. Rough character budget tied to canvas
-        /// width, generous enough that normal-length labels pass through
-        /// unmodified. Pure/testable — no Logitech type involved.</summary>
+        /// otherwise not fit at all. Pure/testable — no Logitech type
+        /// involved.
+        ///
+        /// Corrected after physical long-label testing (brief §14) found the
+        /// original version broken: it assumed ~7px/char AND that
+        /// BitmapBuilder.DrawText always wraps across two lines regardless of
+        /// word boundaries. Neither held up. Measured the real font via a
+        /// SkiaSharp.MeasureText probe against the actually-installed
+        /// PluginApi.dll (same discipline as the rest of this project — never
+        /// guess at SDK behavior): ~9.3px/char at this button's fontSize (16).
+        /// More importantly, DrawText only wraps at whitespace — a label with
+        /// no spaces (e.g. a hyphenated keyword) renders as a single
+        /// unbroken, massively overflowing line that gets clipped at both
+        /// edges, confirmed by rendering it and visually inspecting the
+        /// output. So a label with a real wrap point (contains a space) is
+        /// still trusted for up to two lines' worth of budget (DrawText does
+        /// the wrapping correctly, confirmed the same way), but a label with
+        /// none only ever gets ONE line's worth before truncating — the exact
+        /// case that physically overflowed.
+        ///
+        /// Known residual limitation, not fixed here (smallest-fix scope):
+        /// a multi-word label containing one individual word longer than a
+        /// single line's budget can still overflow that one wrapped line,
+        /// since this only measures total length, not per-word width. Real
+        /// tag labels in this product are short English/transliterated
+        /// words, so this has not been observed; documented rather than
+        /// guessed at with unverified additional logic.</summary>
         public static string TruncateForDisplay(string label, int canvasWidthPixels)
         {
             if (string.IsNullOrEmpty(label)) { return label; }
-            // ~1 readable character per 7px at the chosen font size, times two
-            // wrapped lines worth of budget before truncating — generous on
-            // purpose; real tag labels in this product are short English/
-            // transliterated words, not sentences.
-            var budget = System.Math.Max(8, (canvasWidthPixels / 7) * 2);
-            return label.Length <= budget ? label : label.Substring(0, budget - 1) + "…";
+            const double PixelsPerChar = 9.3;
+            var perLineBudget = System.Math.Max(4, (int)(canvasWidthPixels / PixelsPerChar));
+            var hasWrapPoint = label.Contains(' ');
+            var budget = hasWrapPoint ? perLineBudget * 2 : perLineBudget;
+            return label.Length <= budget ? label : label.Substring(0, System.Math.Max(1, budget - 1)) + "…";
         }
     }
 }

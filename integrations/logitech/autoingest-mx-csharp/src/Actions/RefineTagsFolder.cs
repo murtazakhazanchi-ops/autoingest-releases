@@ -20,14 +20,26 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin
     /// brief. Only the physical REFINE TAGS key's Options+ mapping changes
     /// (a manual profile edit, done once physical testing begins), pointing
     /// the key at THIS folder's own entry action instead.
+    ///
+    /// Never calls Close() on itself. An earlier revision did, reactively,
+    /// from the background state-subscription callback whenever refinement
+    /// became unavailable — physical testing found this produced a real
+    /// zombie-session bug: repeated, apparently-ineffective Close() calls
+    /// while the device kept routing presses to the same stale instance,
+    /// and the physical REFINE TAGS key then appeared not to open anything
+    /// on the next press. See RefinementWorkspaceModel.BuildButtonSpecs'
+    /// own doc comment: when refinement isn't active, it now returns a
+    /// single informational "Unavailable" button instead of an empty list,
+    /// and the operator exits via the real hardware Back button.
     /// </summary>
     public class RefineTagsFolder : PluginDynamicFolder
     {
-        // How long Activate() waits for AutoIngest's own tagRefinement.open
-        // push before giving up and closing safely (brief §5's "do not
-        // fabricate an empty editor" case) — generous for a local WS round
-        // trip, short enough the operator never wonders if the key did
-        // anything.
+        // How long Activate()'s own open attempt waits for AutoIngest's
+        // tagRefinement.open push before giving up — generous for a local WS
+        // round trip. On timeout, this simply stays on the "Unavailable"
+        // rendering (see RefinementWorkspaceModel.BuildButtonSpecs) rather
+        // than attempting to self-close — see that method's own doc comment
+        // for why a reactive Close() was removed after physical testing.
         private static readonly TimeSpan OpenWaitTimeout = TimeSpan.FromSeconds(4);
 
         private IDisposable _stateSubscription;
@@ -37,6 +49,13 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin
         // consulted for validation — RunCommand always re-resolves against
         // SharedClient.Instance.GetLatestState() fresh, never this cache.
         private Dictionary<string, RefinementButtonSpec> _lastSpecsByParam = new();
+
+        // Found during physical testing: a background state-subscription
+        // callback (OnStateChanged) must never act — especially never call
+        // back into the SDK — once this instance no longer believes itself
+        // to be the active, on-device folder. Set true only inside
+        // Activate(), set false as the very first thing Deactivate() does.
+        private volatile bool _isActive;
 
         public RefineTagsFolder()
         {
@@ -63,6 +82,7 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin
 
         public override bool Activate()
         {
+            this._isActive = true;
             this.SubscribeToStateChanges();
             ActionRunner.FireAndForget(this.EnsureOpenAndPopulateAsync, "refine_tags_folder_activate");
             return true;
@@ -70,6 +90,7 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin
 
         public override bool Deactivate()
         {
+            this._isActive = false; // first — see the field's own doc comment
             this._stateSubscription?.Dispose();
             this._stateSubscription = null;
             this._lastSpecsByParam = new Dictionary<string, RefinementButtonSpec>();
@@ -98,13 +119,19 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin
                 // before populating anything — never assume stale cached state.
                 await GatedCommand.RunAsync("tagRefinement.open", "refine_tags_folder_open").ConfigureAwait(false);
                 var opened = await this.WaitForRefinementActiveAsync(OpenWaitTimeout).ConfigureAwait(false);
+                if (!this._isActive) { return; } // Deactivate() already fired while we were waiting — do nothing
                 if (!opened)
                 {
-                    PluginLog.Info("[autoingest-mx-cs] refine_tags_folder: no refinable selection — closing");
-                    this.Close();
-                    return;
+                    // No refinable selection within the timeout — leave the
+                    // "Unavailable" rendering in place (RefreshButtonList
+                    // below already shows it; nothing further to do). Does
+                    // NOT call Close() — see RefinementWorkspaceModel
+                    // .BuildButtonSpecs' doc comment for why a reactive
+                    // self-close was removed after physical testing.
+                    PluginLog.Info("[autoingest-mx-cs] refine_tags_folder: no refinable selection — showing unavailable");
                 }
             }
+            if (!this._isActive) { return; }
             this.RefreshButtonList();
         }
 
@@ -140,64 +167,83 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin
 
         private void OnStateChanged(ClientSnapshot snapshot)
         {
-            if (snapshot.ConnectionState != ConnectionState.Connected || snapshot.State == null)
+            if (!this._isActive)
             {
-                // Brief §20: AutoIngest offline/disconnected while the folder is
-                // open — never pretend edits are valid, never crash. Closing is
-                // the simplest safe behavior; on reconnect the operator can
-                // re-enter and the folder re-reads fresh state from scratch.
-                PluginLog.Info("[autoingest-mx-cs] refine_tags_folder: AutoIngest unavailable — closing");
-                this.Close();
+                // See the field's own doc comment — a stray callback that
+                // outlives (or precedes) this instance's real active window
+                // must be a pure no-op, never call back into the SDK.
                 return;
             }
 
-            var tagRefinement = snapshot.State.TagRefinement;
-            if (tagRefinement?.Active != true)
-            {
-                // Brief §18: selection/scope changed underneath the open
-                // folder and refinement is no longer active at all (e.g. the
-                // operator cleared selection, or Change Event moved things).
-                // Close rather than show a stale/empty editor.
-                PluginLog.Info("[autoingest-mx-cs] refine_tags_folder: refinement no longer active — closing");
-                this.Close();
-                return;
-            }
+            // Brief §18/§20: offline/disconnected, or refinement no longer
+            // active (selection/scope changed underneath the open folder,
+            // Change Event, AutoIngest unavailable) — in every case,
+            // RefreshButtonList below renders the "Unavailable" state
+            // (RefinementWorkspaceModel.BuildButtonSpecs returns it for a
+            // null/inactive tagRefinement) rather than self-closing. See
+            // that method's own doc comment: a reactive Close() from this
+            // background callback produced a real zombie-session bug during
+            // physical testing (repeated ineffective Close() calls while the
+            // device kept routing presses to the same stale instance) — the
+            // operator uses the real hardware Back button to exit instead.
+            var state = snapshot.ConnectionState == ConnectionState.Connected ? snapshot.State : null;
 
-            this.RefreshButtonList(snapshot.State);
+            // AutoIngestClient.Subscribe()'s callback runs SYNCHRONOUSLY,
+            // inline, on whatever thread the WebSocket receive loop is on —
+            // a different execution context than EnsureOpenAndPopulateAsync's
+            // Task.Run (via ActionRunner.FireAndForget), which is the only
+            // path confirmed by physical testing to make the SDK's own
+            // ButtonActionNamesChanged() notification actually take visible
+            // effect. Dispatching through the exact same proven path here
+            // too, rather than calling back into the SDK directly from the
+            // WS thread — found live: tag ticks never updated on a same-
+            // session selection change (this method's own direct call) until
+            // routed through this same mechanism.
+            ActionRunner.FireAndForget(() => { this.RefreshButtonListFrom(state); return Task.CompletedTask; }, "refine_tags_folder_state_changed");
         }
 
-        private void RefreshButtonList(AutoIngestState state = null)
+        /// <summary>Fetches the latest state itself — for the call site that
+        /// has no snapshot already in hand (EnsureOpenAndPopulateAsync).</summary>
+        private void RefreshButtonList() => this.RefreshButtonListFrom(SharedClient.Instance.GetLatestState());
+
+        /// <summary>Uses EXACTLY the given state, including a genuine `null`
+        /// (disconnected) — never falls back to GetLatestState(), so a caller
+        /// that already resolved "disconnected" can't have that signal
+        /// silently overwritten by a possibly-stale re-fetch.</summary>
+        private void RefreshButtonListFrom(AutoIngestState state)
         {
-            state ??= SharedClient.Instance.GetLatestState();
             var specs = RefinementWorkspaceModel.BuildButtonSpecs(state?.TagRefinement, state?.AvailableCommands);
             var newByParam = specs.ToDictionary(s => s.ActionParameter);
             var oldByParam = this._lastSpecsByParam;
 
             var listChanged = oldByParam.Count != newByParam.Count || !oldByParam.Keys.All(newByParam.ContainsKey);
 
+            // Confirmed from physical diagnostic logging across three
+            // separate attempts: CommandImageChanged() does not cause ANY
+            // GetCommandImage requery in this installed SDK (v6.4.2.3414).
+            // An earlier revision worked around this for a same-list,
+            // state-only change (e.g. a tag's checked state flipping) by
+            // forcing the list to "change" twice via ButtonActionNamesChanged()
+            // (drop to empty, notify, restore, notify again) so every name
+            // looked "new" and got a real image requery. Physical pagination
+            // testing (brief §13) found that trick has a confirmed, 100%-
+            // reproducible cost worse than the problem it solved: ANY tag
+            // press on page 2+ of a multi-page scope snapped the device back
+            // to page 1, making multi-page refinement unusable — while the
+            // live-redraw benefit it bought was already only inconsistent/
+            // racy (see the RefinementButtonImageRenderer/GetCommandImage
+            // diagnostic history). Confirmed with the user as the deliberate
+            // trade-off (brief §24): never fight pagination to chase a
+            // partially-working redraw. So a state-only change is now a
+            // genuine no-op here — only a real list-membership change
+            // (listChanged) ever calls ButtonActionNamesChanged(). The
+            // operator sees a tag's current state correctly on every fresh
+            // Activate()/list-changing redraw; it just does not flip live
+            // in place while the same list stays on screen.
+            if (!listChanged) { return; }
+
             this._lastSpecsByParam = newByParam;
-
-            if (listChanged)
-            {
-                // Brief §16: the action list itself changed (tags
-                // appeared/disappeared/changed identity) — full refresh.
-                this.ButtonActionNamesChanged();
-                return;
-            }
-
-            // Brief §17: same buttons, only some states changed — redraw only
-            // the ones whose rendered content actually differs, never the
-            // whole list. Compared against the PRE-replacement snapshot
-            // (captured above as oldByParam) — comparing against the already-
-            // updated dictionary would trivially find no differences.
-            foreach (var spec in specs)
-            {
-                if (oldByParam.TryGetValue(spec.ActionParameter, out var previous) && previous.State == spec.State)
-                {
-                    continue; // unchanged — no redraw needed for this button
-                }
-                this.CommandImageChanged(this.CreateCommandName(spec.ActionParameter));
-            }
+            this.ButtonActionNamesChanged();
         }
 
         // ── Folder content (brief §6/§15) ───────────────────────────────────
@@ -211,10 +257,11 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin
         public override string GetCommandDisplayName(string actionParameter, PluginImageSize imageSize) =>
             this._lastSpecsByParam.TryGetValue(actionParameter, out var spec) ? spec.Label : actionParameter;
 
-        public override BitmapImage GetCommandImage(string actionParameter, PluginImageSize imageSize) =>
-            this._lastSpecsByParam.TryGetValue(actionParameter, out var spec)
-                ? RefinementButtonImageRenderer.Render(spec, imageSize)
-                : null;
+        public override BitmapImage GetCommandImage(string actionParameter, PluginImageSize imageSize)
+        {
+            var found = this._lastSpecsByParam.TryGetValue(actionParameter, out var spec);
+            return found ? RefinementButtonImageRenderer.Render(spec, imageSize) : null;
+        }
 
         // ── Press handling (brief §9/§10/§11/§12/§13) ──────────────────────
 
@@ -223,6 +270,22 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin
 
         private Task HandlePressAsync(string actionParameter)
         {
+            if (actionParameter == RefinementWorkspaceModel.UnavailableActionParameter)
+            {
+                // Found during physical closure testing (brief §18/§22):
+                // Activate() is not reliably called again by this SDK build
+                // on a later re-entry to the same folder instance — confirmed
+                // via diagnostic logging to fire exactly once for an entire
+                // session, including across an AutoIngest quit/relaunch
+                // cycle. Without this, a press that lands on "Unavailable"
+                // for a reason that has since resolved (a file is now
+                // selected, AutoIngest has reconnected) was a dead end — the
+                // only recovery was restarting the Logi Plugin Service. This
+                // lets the operator retry the open attempt in-band instead.
+                ActionRunner.FireAndForget(this.EnsureOpenAndPopulateAsync, "refine_tags_folder_retry_from_unavailable");
+                return Task.CompletedTask;
+            }
+
             if (RefinementWorkspaceModel.IsControlAction(actionParameter))
             {
                 var commandId = actionParameter switch
@@ -230,6 +293,12 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin
                     RefinementWorkspaceModel.ApplyActionParameter => "tagRefinement.applyToSelected",
                     RefinementWorkspaceModel.AllTagsActionParameter => "tagRefinement.useAllTags",
                     RefinementWorkspaceModel.ResetTagsActionParameter => "tagRefinement.clearSelected",
+                    // Added after physical testing — see BuildButtonSpecs' own
+                    // doc comment on why these two exist at all: the exact
+                    // same commands the static SelectCommand/ClearCommand
+                    // actions already call, reused unmodified.
+                    RefinementWorkspaceModel.SelectActionParameter => "selection.toggleCurrent",
+                    RefinementWorkspaceModel.ClearSelectionActionParameter => "selection.clear",
                     _ => null,
                 };
                 return commandId == null

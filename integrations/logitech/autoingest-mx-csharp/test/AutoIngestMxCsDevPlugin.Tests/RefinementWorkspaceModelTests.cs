@@ -46,10 +46,22 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin.Tests
         }
 
         [Fact]
-        public void BuildButtonSpecs_InactiveOrNullRefinement_ReturnsEmpty()
+        public void BuildButtonSpecs_InactiveOrNullRefinement_ReturnsSingleUnavailableEntry()
         {
-            Assert.Empty(RefinementWorkspaceModel.BuildButtonSpecs(null, System.Array.Empty<string>()));
-            Assert.Empty(RefinementWorkspaceModel.BuildButtonSpecs(new TagRefinementInfo { Active = false }, System.Array.Empty<string>()));
+            // Changed after physical testing: a reactive Close() from
+            // RefineTagsFolder's background state-subscription callback
+            // produced a real zombie-session bug (see that class's own doc
+            // comment) — an empty list isn't returned anymore; a single
+            // informational, inert "Unavailable" entry is, so the operator
+            // sees a clear state and exits via the real hardware Back button.
+            foreach (var tagRefinement in new[] { null, new TagRefinementInfo { Active = false } })
+            {
+                var specs = RefinementWorkspaceModel.BuildButtonSpecs(tagRefinement, System.Array.Empty<string>());
+                var spec = Assert.Single(specs);
+                Assert.Equal(RefinementButtonKind.Unavailable, spec.Kind);
+                Assert.Equal(RefinementWorkspaceModel.UnavailableActionParameter, spec.ActionParameter);
+                Assert.True(RefinementWorkspaceModel.IsControlAction(spec.ActionParameter));
+            }
         }
 
         // ── Canonical tag identity — passthrough, never array position ─────
@@ -73,6 +85,29 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin.Tests
             Assert.True(RefinementWorkspaceModel.IsControlAction(RefinementWorkspaceModel.ApplyActionParameter));
             Assert.True(RefinementWorkspaceModel.IsControlAction(RefinementWorkspaceModel.AllTagsActionParameter));
             Assert.True(RefinementWorkspaceModel.IsControlAction(RefinementWorkspaceModel.ResetTagsActionParameter));
+            Assert.True(RefinementWorkspaceModel.IsControlAction(RefinementWorkspaceModel.SelectActionParameter));
+            Assert.True(RefinementWorkspaceModel.IsControlAction(RefinementWorkspaceModel.ClearSelectionActionParameter));
+        }
+
+        [Fact]
+        public void SelectAndClearButtons_RestoreTheProvenInWorkspaceSelectionWorkflow()
+        {
+            // Regression test for the real physical-testing finding: entering
+            // refinement mode clears the outer selection (pre-existing
+            // AutoIngest behavior), and the dynamic folder replaces the whole
+            // Keypad grid including the normal SELECT key — so without these
+            // two buttons there was no way to attach any file to the
+            // refinement scope at all once inside the folder.
+            var info = Info(Tag("eventTypes", "Waaz", "checked"));
+            var specs = RefinementWorkspaceModel.BuildButtonSpecs(info, new[] { "selection.toggleCurrent", "selection.clear" });
+
+            var select = Assert.Single(specs, s => s.Kind == RefinementButtonKind.SelectCurrent);
+            Assert.Equal(RefinementWorkspaceModel.SelectActionParameter, select.ActionParameter);
+            Assert.Equal("Select", select.Label);
+
+            var clear = Assert.Single(specs, s => s.Kind == RefinementButtonKind.ClearFileSelection);
+            Assert.Equal(RefinementWorkspaceModel.ClearSelectionActionParameter, clear.ActionParameter);
+            Assert.Equal("Clear", clear.Label);
         }
 
         [Fact]
@@ -160,6 +195,8 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin.Tests
         [InlineData("tagRefinement.applyToSelected", RefinementButtonKind.ApplyToSelected, "Apply")]
         [InlineData("tagRefinement.useAllTags", RefinementButtonKind.UseAllTags, "All Tags")]
         [InlineData("tagRefinement.clearSelected", RefinementButtonKind.ClearSelected, "Reset Tags")]
+        [InlineData("selection.toggleCurrent", RefinementButtonKind.SelectCurrent, "Select")]
+        [InlineData("selection.clear", RefinementButtonKind.ClearFileSelection, "Clear")]
         public void ControlButton_OnlyAppearsWhenItsCommandIsAvailable(string commandId, RefinementButtonKind kind, string expectedLabel)
         {
             var info = Info(Tag("eventTypes", "Waaz", "checked"));
@@ -190,14 +227,23 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin.Tests
         }
 
         [Fact]
-        public void ButtonOrder_TagsFirstThenAllTagsThenResetThenApply()
+        public void ButtonOrder_SelectClearFirstThenTagsThenAllTagsThenResetThenApply()
         {
             var info = Info(Tag("eventTypes", "Waaz", "checked"));
-            var commands = new[] { "tagRefinement.useAllTags", "tagRefinement.clearSelected", "tagRefinement.applyToSelected" };
+            var commands = new[]
+            {
+                "selection.toggleCurrent", "selection.clear",
+                "tagRefinement.useAllTags", "tagRefinement.clearSelected", "tagRefinement.applyToSelected",
+            };
             var specs = RefinementWorkspaceModel.BuildButtonSpecs(info, commands);
 
             Assert.Equal(
-                new[] { RefinementButtonKind.Tag, RefinementButtonKind.UseAllTags, RefinementButtonKind.ClearSelected, RefinementButtonKind.ApplyToSelected },
+                new[]
+                {
+                    RefinementButtonKind.SelectCurrent, RefinementButtonKind.ClearFileSelection,
+                    RefinementButtonKind.Tag,
+                    RefinementButtonKind.UseAllTags, RefinementButtonKind.ClearSelected, RefinementButtonKind.ApplyToSelected,
+                },
                 specs.Select(s => s.Kind));
         }
 
@@ -236,6 +282,41 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin.Tests
         {
             Assert.Null(RefinementWorkspaceModel.TruncateForDisplay(null, 90));
             Assert.Equal(string.Empty, RefinementWorkspaceModel.TruncateForDisplay(string.Empty, 90));
+        }
+
+        // Pins the real physical-closure finding (brief §14): a label with no
+        // whitespace gets no wrap point from BitmapBuilder.DrawText, so it
+        // must be truncated to ONE line's worth of budget, not two — found by
+        // physically overflowing the LCD key with a synthetic hyphenated
+        // label, confirmed by rendering and visually inspecting the clipped
+        // output (see RefinementWorkspaceModel.TruncateForDisplay's own doc
+        // comment for the measured constants). 80px is this SDK's real
+        // Width90 button canvas width (confirmed via reflection — NOT the
+        // nominal "90").
+        [Fact]
+        public void TruncateForDisplay_LongLabelWithNoWrapPoint_TruncatesToOneLineBudget()
+        {
+            var longUnbrokenLabel = "TestTag01-ThisIsADeliberatelyVeryLongAdditionalKeywordLabel";
+            var result = RefinementWorkspaceModel.TruncateForDisplay(longUnbrokenLabel, canvasWidthPixels: 80);
+
+            Assert.True(result.Length < longUnbrokenLabel.Length);
+            // One line's worth at 80px / ~9.3px-per-char is ~8 chars — must
+            // stay far short of the old (broken) 2-line budget of ~22 chars,
+            // which is what physically overflowed on the real device.
+            Assert.True(result.Length <= 10, $"expected a single-line-budget truncation, got \"{result}\" ({result.Length} chars)");
+            Assert.StartsWith("TestTag", result);
+            Assert.EndsWith("…", result);
+        }
+
+        // A label WITH a real wrap point must still get the full two-line
+        // budget — DrawText wraps it correctly (confirmed by rendering), so
+        // truncating it as aggressively as an unbroken label would needlessly
+        // shorten text that actually fits fine.
+        [Fact]
+        public void TruncateForDisplay_LabelWithWrapPoint_StillGetsTwoLineBudget()
+        {
+            var result = RefinementWorkspaceModel.TruncateForDisplay("Test Tag One", canvasWidthPixels: 80);
+            Assert.Equal("Test Tag One", result); // fits within the 2-line budget — passes through unmodified
         }
 
         // ── Unknown future state fields (System.Text.Json default-ignore) ──
