@@ -1053,3 +1053,122 @@ plugin remains intact as reference/fallback, unchanged, not deleted.
 Recommended next phase: continue with QMZ/Import console work, or a
 dedicated session to add the missing group→sub-event console command,
 per the user's own prioritization — not started automatically.
+
+---
+
+## Phase 4C — Group → Sub-Event Mapping workspace
+
+Closes the gap Phase 4B closure found: the console could assign files to
+G1/G2/G3 but had no way to map a group to one of a multi-component event's
+real components, so Tag Refinement correctly stayed unavailable until the
+operator used the computer. See `docs/commandLayer.md`'s own "Group →
+Sub-Event Mapping — `group.setSubEvent` (Phase 4C)" section for the full
+command-layer design (authoritative UI path traced first, side effects
+preserved exactly, target-group resolution, state schema) — this section
+covers the C# dynamic workspace built on top of it.
+
+### Architecture — same three-layer split Phase 4B established
+
+- **`GroupMappingWorkspaceModel.cs`**: pure, Logitech-free logic. Builds
+  the button list from `availableSubEvents`/`targetGroupIdForMapping`/
+  `groups` (all already resolved authoritatively by the renderer — no
+  business-rule duplication here), marks the current mapping and any
+  component already taken by a different group. Fully unit-tested, zero
+  SDK dependency.
+- **`GroupMappingButtonImageRenderer.cs`**: the only file touching
+  `BitmapBuilder`/`BitmapColor` for this feature — a green check badge for
+  the current mapping, a red "x" badge for a component taken by another
+  group, reusing `RefinementWorkspaceModel.TruncateForDisplay` for the
+  label (brief §9's "never color-only" rule, same visual language Phase
+  4B's tag badges already established).
+- **`GroupMappingFolder.cs`**: the actual `PluginDynamicFolder` — SDK
+  lifecycle + `AutoIngestClient` subscription wiring only.
+
+### Every Phase 4B physical-closure lesson applied from the start
+
+Rather than rediscover these live again, `GroupMappingFolder` is built with
+every confirmed finding already in place:
+- **Never calls `Close()`** — same zombie-session risk `RefineTagsFolder`
+  found; an informational `Unavailable` button instead, exited via the
+  real hardware Back button.
+- **The `Unavailable` button is a retry lever**, not a dead end — this SDK
+  build does not reliably call `Activate()` again on a later re-entry to
+  the same folder instance; pressing it forces `RefreshButtonList()`
+  directly.
+- **Only a real list-membership change calls `ButtonActionNamesChanged()`**
+  — a same-list `IsCurrent`/`IsTakenByOtherGroup` flip is not live-
+  redrawn in place (visible on the next real redraw instead), the same
+  pagination-safety trade-off `RefineTagsFolder`'s own "List refresh" doc
+  comment explains in full.
+- **Every mutating press re-resolves fresh** against
+  `SharedClient.Instance.GetLatestState()` — both `targetGroupIdForMapping`
+  and the pressed component id, never a cached value.
+- **Threaded through `ActionRunner.FireAndForget`**, not called directly
+  from the WS receive-loop thread, matching the fix `ButtonActionNamesChanged()`
+  needed to reliably take effect in `RefineTagsFolder`.
+
+### Component mapping UX
+
+No "open" step is needed (unlike `tagRefinement.open`) — the workspace only
+ever reads already-authoritative state, so `Activate()` populates
+immediately from the latest snapshot. One button per real available
+component, in `EventCreator`'s own order (never resorted). Pressing a
+component sends `group.setSubEvent({ groupId: <resolved fresh>, subEventId:
+<the pressed component's real id> })`; pressing an already-current or
+already-taken component is rejected safely by the real renderer-side
+validation (defense in depth — the same "never trust a stale cache for a
+mutating action" rule every other press in this plugin already follows).
+
+### Single-component events
+
+`availableSubEvents` is `[]` for a single-component event (the underlying
+`EventCreator.getSubEventNames()` already returns `[]` — no behavior to
+preserve or invent here); `BuildButtonSpecs` renders the same informational
+`Unavailable` entry it would for "no target group" — there is nothing
+console-specific to add, since the real UI itself has no sub-event dropdown
+for this case either.
+
+### Tag Refinement integration — confirmed end-to-end
+
+`GroupMappingTransportIntegrationTests.cs`'s
+`FullMappingFlow_UnmappedToMapped_UnlocksTagRefinementEligibility` proves
+the exact chain brief §10 asked to verify, over the real transport: an
+unmapped group's workspace shows no current mapping and
+`tagRefinement.open` is absent from `availableCommands` → `group.setSubEvent`
+→ the pushed state shows the real mapping AND `tagRefinement.open` becomes
+available — no restart, no reload.
+
+### Physical key placement — reported, not forced (brief §18)
+
+The Browse profile's 3×3 layout is already fully occupied (SELECT / SELECT
+ALL / CLEAR / PREVIEW / G1 / G2 / G3 / UNASSIGN / REFINE TAGS — all nine
+slots). No clean permanent entry point exists for a tenth action without
+displacing an existing one. Per the brief's own instruction, this is
+reported rather than forced: the software (command, state, dynamic
+workspace, all automated tests) is complete and ready to physically test,
+but which physical key (if any) the operator is willing to temporarily
+reassign for testing — and permanently, if they choose — is their call, not
+assumed here.
+
+### Testing
+
+- **`GroupMappingWorkspaceModelTests.cs`**: 16 tests — see
+  `docs/commandLayer.md`'s own test summary for the full list.
+- **`GroupMappingTransportIntegrationTests.cs`**: 2 tests — the full
+  unmapped→mapped→Tag-Refinement-unlocked flow over the real transport,
+  plus a dedicated duplicate-rejection transport test.
+- **`mxCommandLayerPhase4CLive.test.js`**: the full command-layer test
+  battery (brief §14) against the real Electron renderer.
+- Full C# suite: **81/81 passing** (63 Phase 4B closure + 18 new).
+
+### Physical device testing — pending
+
+Not yet run: the real on-device walkthrough (brief §17) — real component
+names on the real Keypad, pressing a component and confirming the real
+AutoIngest mapping updates, re-opening the workspace to confirm the current
+mapping is visibly marked, remapping and confirming Tag Refinement's
+available tag set changes accordingly, Change Event replacing a stale
+component list, Back without changing anything, and pagination if the
+event has enough components. Requires deciding, with the operator, which
+physical key temporarily hosts this workspace's entry action for testing
+(see "Physical key placement" above).

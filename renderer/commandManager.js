@@ -168,6 +168,30 @@ const AutoIngestCommands = (() => {
       run: (_p, b) => b.unassignSelectionFromGroup(),
     },
 
+    // Maps an existing group to one of the active event's real sub-events/
+    // components — the console-driven equivalent of the Group Panel's own
+    // sub-event dropdown (AI-FEAT MX Console Phase 4C). Only meaningful for
+    // multi-component events (getAvailableSubEvents() is [] otherwise, same
+    // "command unavailable where the concept doesn't exist" convention the
+    // Tag Refinement commands already use). groupId is an explicit payload
+    // field, same shape as group.assign — the CALLER (the C# dynamic
+    // workspace) resolves which group via resolveTargetGroupForMapping()
+    // before sending, never this command itself.
+    'group.setSubEvent': {
+      isValid: (p) => !!p && typeof p === 'object'
+        && Number.isInteger(p.groupId)
+        && typeof p.subEventId === 'string' && p.subEventId.length > 0,
+      check: (_p, b) => !b.isQmzOpen() && b.getAvailableSubEvents().length > 0,
+      run: (p, b) => b.setGroupSubEvent(p.groupId, p.subEventId),
+      // run() resolves to a real boolean (true = applied, false = rejected:
+      // unknown group, stale/unknown subEventId, duplicate already taken by
+      // another group, or the operator cancelled the real "clear
+      // refinements?" confirmation) — a well-formed-but-rejected payload is
+      // NOT a check() failure, same established lesson as
+      // tagRefinement.setTagState/qmz.assignToSequence above.
+      computeExecuted: (result) => result === true,
+    },
+
     // payload: { sequenceCode: string }, e.g. "01Q", "12M", "52Z" — exactly
     // main/qmzService.js's own SEQ_RE format (2 digits + Q/M/Z; there is no
     // lowercase-suffix variant anywhere in the current QMZ implementation —
@@ -361,6 +385,19 @@ const AutoIngestCommands = (() => {
       state.sequences = bridge.getQmzSequencesCompact();
     } else {
       state.groups = bridge.getGroupsCompact();
+      // Phase 4C: only present for a multi-component event (the only
+      // context group.setSubEvent is ever meaningful in) — omitted
+      // entirely, not sent as [], matching getState()'s existing
+      // compactness convention (see tagRefinement/event below).
+      const subEvents = bridge.getAvailableSubEvents();
+      if (subEvents.length > 0) {
+        state.availableSubEvents = subEvents;
+        // Only meaningful alongside availableSubEvents itself — resolved
+        // authoritatively here (same rule tagRefinement.open's own
+        // group-scope resolution uses), so the C# dynamic workspace never
+        // has to re-derive "which group does this selection target" itself.
+        state.targetGroupIdForMapping = bridge.resolveTargetGroupForMapping();
+      }
     }
     // Tag Refinement and the active event are both browse-only concepts in
     // the current codebase (refinement mode can only be entered from browse;

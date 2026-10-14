@@ -725,6 +725,138 @@ deliberately minimal:
 
 ---
 
+## Group → Sub-Event Mapping — `group.setSubEvent` (Phase 4C)
+
+Added after Phase 4B physical closure found a real workflow gap: the
+console could assign files to G1/G2/G3 (`group.assign`) but had no way to
+map a group to one of a multi-component event's real sub-events/
+components, so `tagRefinement.open` correctly stayed unavailable until the
+operator used the computer. Traced the authoritative UI path first (the
+Group Panel's own sub-event dropdown, `renderer.js`'s delegated
+`.gc-sub-trigger` click handler) before adding anything — the new command
+reuses that exact primitive, extracted into `_setGroupSubEvent(groupId,
+subEventId)`, rather than duplicating its logic.
+
+### Commands
+
+```js
+'group.setSubEvent': {
+  isValid: (p) => !!p && typeof p === 'object'
+    && Number.isInteger(p.groupId)
+    && typeof p.subEventId === 'string' && p.subEventId.length > 0,
+  check: (_p, b) => !b.isQmzOpen() && b.getAvailableSubEvents().length > 0,
+  run: (p, b) => b.setGroupSubEvent(p.groupId, p.subEventId),
+  computeExecuted: (result) => result === true,
+}
+```
+
+`groupId` is an explicit payload field (same shape as `group.assign`) — the
+**caller** (the C# dynamic workspace) resolves which group via the new
+`targetGroupIdForMapping` state field below, never this command itself.
+`check()` only validates general applicability (a multi-component event
+exists); `run()` does the real per-payload validation and resolves to
+`false` — not an `ok:false` check failure — for any rejection: unknown
+group, stale/unknown `subEventId`, or a duplicate already taken by another
+group. Same established lesson `tagRefinement.setTagState`/
+`qmz.assignToSequence` already document: existence/validity of a specific
+payload value is a payload-dependent fact, not a context-eligibility one.
+
+### Target-group resolution
+
+Evaluated the brief's three options (map the selection's group; map the
+most-recently-active group; a first dynamic level that asks which group)
+and chose **"map the group the current selection unambiguously belongs
+to,"** reusing — not reinventing — the exact rule `tagRefinement.open`'s
+own group-scope resolution already established
+(`_resolveRefinementTargetScope()`'s "every selected file must resolve to
+the SAME group" check). `_resolveTargetGroupForMapping()` is the same
+pattern applied to this command: null for an empty, ambiguous (spans two
+groups), or ungrouped selection — never a guess.
+
+### Side effects preserved exactly (brief §2/§11)
+
+`_setGroupSubEvent` reproduces the real dropdown's own side effects, not an
+approximation:
+- A duplicate `subEventId` (already taken by a *different* group) is
+  rejected — the real dropdown has never allowed reaching this value
+  either (a `disabled` item is unclickable); the console enforces the same
+  rule programmatically, since it has no "disabled" affordance of its own.
+  **Current AutoIngest policy blocks duplicates at the UI level** (not a
+  later import-time-only warning), so the console blocks them too, per the
+  brief's own "do not impose stricter or looser C# behavior" instruction.
+- Remapping a group that already has per-file Tag Refinement overrides to
+  a **different** component shows the real "clear refinements?"
+  confirmation (`showClearRefinementsOnRemapModal`) on the **computer
+  screen** and awaits it — console-triggered or not. Only on confirmation
+  does it clear the group's refinement contents (never its `uid`/identity)
+  and apply the remap. A console press that triggers this blocks on a
+  human answering the computer, exactly as a mouse click already does —
+  not a new condition this command introduces.
+- Mapping a group to a component changes **only** that group's
+  `subEventId`. It never touches file→group membership, ImportSession
+  claims/ownership, or file paths — verified with a dedicated regression
+  test (`mxCommandLayerPhase4CLive.test.js`, section 3).
+
+### State schema (Phase 4C additions)
+
+```ts
+{
+  ...
+  groups?: Array<{ id, label, fileCount, subEventId, colorIndex }>, // subEventId unchanged, already existed
+  availableSubEvents?: Array<{ id: string, name: string }>, // NEW — EventCreator.getSubEventNames()'s own real shape, verbatim
+  targetGroupIdForMapping?: number | null,                  // NEW — see "Target-group resolution" above
+}
+```
+
+Both new fields are **omitted entirely** (not present-but-`[]`/`null`)
+outside a multi-component event — `getAvailableSubEvents()` returning `[]`
+is itself the single source of truth for "this concept doesn't apply here"
+(single-component events, no active event), same compactness convention
+`tagRefinement`/`event` already use. `id === name` — both are the real
+component folder name `EventCreator.getSubEventNames()` already computes;
+nothing is rebuilt from event types/city/location here (brief §4/§8).
+
+### Live state updates (subscription coverage)
+
+`_setGroupSubEvent` now calls `_notifyCommandLayer()` on a real change — a
+genuine pre-existing gap found while building this: the mouse-only dropdown
+never needed to (nothing was watching before the command layer existed).
+Covered by `mxCommandLayerPhase4CLive.test.js`'s own subscription check.
+
+### UI ↔ command equivalence (proven, not assumed)
+
+`mxCommandLayerPhase4CLive.test.js` section 7 drives an equivalent remap
+through BOTH the real `.gc-sub-trigger` dropdown click path and
+`group.setSubEvent`, and asserts the resulting `GroupManager` state is
+identical — not "should be the same because the code looks similar," a
+structural guarantee from both paths calling the exact same
+`_setGroupSubEvent` primitive, proven end-to-end.
+
+### Tests
+
+- **`GroupMappingWorkspaceModelTests.cs`** (16 tests, C#, pure model):
+  Unavailable fallback (no components / no target group), real component
+  list mapping with the real display name passed through unmodified,
+  current-mapping rendering, taken-by-another-group rendering (and that a
+  group's own existing mapping is never confused with "taken by another"),
+  stale-state replacement, `ResolveSubEventId`'s `JsonElement` handling,
+  long names never truncated at the model layer.
+- **`GroupMappingTransportIntegrationTests.cs`** (2 tests, C#, real
+  transport): the real `AutoIngestClient` against `MockAutoIngestServer`'s
+  real WebSocket/JSON path — an unmapped group's workspace (Tag Refinement
+  correctly unavailable) → `group.setSubEvent` → the pushed state reflects
+  the real mapping AND `tagRefinement.open` becomes available, no
+  restart/reload — plus a dedicated duplicate-rejection transport test.
+- **`mxCommandLayerPhase4CLive.test.js`** (JS, real Electron renderer):
+  single-component unavailability, the full state schema, malformed/
+  invalid/stale payload rejection, a valid mapping and its state update,
+  subscription coverage, group-membership/ImportSession-ownership
+  invariance across a remap, duplicate-mapping rejection, ambiguous-
+  selection resolution, a stale `subEventId` after Change Event, and the
+  UI↔command equivalence test above.
+
+---
+
 ## Resume — investigated, not exposed (Phase 3D)
 
 No genuinely Browse-context, operator-facing "resume" command was added.

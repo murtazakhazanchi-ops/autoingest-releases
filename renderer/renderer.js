@@ -10552,6 +10552,19 @@ function _getGroupsCompact() {
   }));
 }
 
+/**
+ * Compact sub-event/component list for the active event (AI-FEAT MX Console
+ * Phase 4C — group.setSubEvent). Exactly EventCreator.getSubEventNames()'s
+ * own real {id, name} shape — id is the real folder name, name is the real
+ * display name AutoIngest itself already computed; nothing is rebuilt from
+ * event types/city/location here (brief §8: "use AutoIngest-provided
+ * display names"). [] for single-component events or no active event, same
+ * as the underlying function — callers decide what an empty list means.
+ */
+function _getAvailableSubEventsCompact() {
+  return EventCreator.getSubEventNames();
+}
+
 /** Compact QMZ sequence list — only when QMZ is open (empty otherwise).
  * `count` mirrors exactly what the QMZ sidebar itself already computes per
  * sequence chip (see _renderQMZRight) — summed across photographers, no new
@@ -13114,6 +13127,91 @@ function _updateMetaTriggerInPlace(gid, newTags) {
     : `${SVG.warn} Not assigned`;
 }
 
+/**
+ * The ONE authoritative group→sub-event remap primitive (AI-FEAT MX Console
+ * Phase 4C) — both the mouse-driven dropdown below and the console's
+ * `group.setSubEvent` command call this exact function, never two parallel
+ * copies of the same logic. Validates, then reproduces the real dropdown's
+ * own side effects exactly:
+ *   - a duplicate subEventId (already taken by a DIFFERENT group) is
+ *     rejected — the dropdown has never allowed reaching this value either
+ *     (a `disabled` item is unclickable, see the Dropdown click handler
+ *     above), so this is the same rule enforced programmatically for a
+ *     caller that has no "disabled" affordance of its own.
+ *   - remapping a group that already has per-file tag refinements to a
+ *     DIFFERENT component shows the real "clear refinements?" confirmation
+ *     (`showClearRefinementsOnRemapModal`) on the computer screen and waits
+ *     for it — exactly as a mouse click would, console-triggered or not.
+ *     Only on confirmation does it clear the group's refinement contents
+ *     (never its `uid`/identity) and apply the remap.
+ * Returns true if the mapping was actually applied, false for any rejection
+ * (unknown group, stale/unknown subEventId, duplicate, or the operator
+ * cancelled the confirmation) — never throws.
+ *
+ * Calls _notifyCommandLayer() on a real change — the mouse-only dropdown
+ * never needed to (nothing was watching), but the command layer's own
+ * `groups`/`availableSubEvents` state must reflect a remap immediately
+ * (brief §5: "ensure state updates are emitted when a group's sub-event
+ * mapping changes"), same as every other state-mutating bridge primitive.
+ * @param {number} groupId
+ * @param {string|null} subEventId - a real id from EventCreator.getSubEventNames(), or '' /null to unmap.
+ * @returns {Promise<boolean>}
+ */
+async function _setGroupSubEvent(groupId, subEventId) {
+  const groups    = GroupManager.getGroups();
+  const thisGroup = groups.find(g => g.id === groupId);
+  if (!thisGroup) return false;
+
+  const newSubEventId = (subEventId === '' || subEventId == null) ? null : String(subEventId);
+  if (newSubEventId !== null) {
+    const subNames = EventCreator.getSubEventNames();
+    if (!subNames.some(s => s.id === newSubEventId)) return false; // stale/unknown id — never guessed at
+    const takenByOther = groups.some(g => g.id !== groupId && g.subEventId === newSubEventId);
+    if (takenByOther) return false; // same rule the dropdown's own `disabled` already enforces
+  }
+
+  const refCount = TagRefinementManager.groupRefinementCount(thisGroup.uid);
+  if (refCount > 0 && newSubEventId !== thisGroup.subEventId) {
+    // Changing the component invalidates any per-file refinements made against
+    // the old component's tag vocabulary — never carry them across silently. The
+    // group's uid (its identity) is untouched by a remap — only its refinement
+    // CONTENTS are cleared.
+    const proceed = await showClearRefinementsOnRemapModal(refCount);
+    if (!proceed) return false;
+    TagRefinementManager.clearGroup(thisGroup.uid);
+    GroupManager.setSubEvent(groupId, newSubEventId);
+    syncAllRefinementBadges();
+    renderGroupPanel();
+    _notifyCommandLayer();
+    return true;
+  }
+  GroupManager.setSubEvent(groupId, newSubEventId);
+  renderGroupPanel();
+  _notifyCommandLayer();
+  return true;
+}
+
+/**
+ * Resolves which single group the console's `group.setSubEvent` command
+ * should target, mirroring `_resolveRefinementTargetScope()`'s own already-
+ * established "every selected file must resolve to the SAME group" rule
+ * (brief §7, Option A) rather than inventing a second eligibility table.
+ * Returns null — never a guess — when selection is empty, spans more than
+ * one group, or includes an ungrouped file.
+ * @returns {number|null}
+ */
+function _resolveTargetGroupForMapping() {
+  if (selectedFiles.size === 0) return null;
+  let targetGroup = undefined; // undefined = not yet seen; null = conflict/missing
+  for (const p of selectedFiles) {
+    const g = GroupManager.getGroupForFile(p);
+    if (!g) { targetGroup = null; break; }
+    if (targetGroup === undefined) targetGroup = g;
+    else if (targetGroup.id !== g.id) { targetGroup = null; break; }
+  }
+  return targetGroup ? targetGroup.id : null;
+}
+
 // Delegated handler for all .gc-sub-trigger clicks (survives innerHTML rebuilds)
 document.addEventListener('click', e => {
   const trigger = e.target.closest('.gc-sub-trigger[data-gid]');
@@ -13147,24 +13245,7 @@ document.addEventListener('click', e => {
     items,
     groupColor,
     onSelect(value) {
-      const newSubEventId = (value === '' || value == null) ? null : String(value);
-      const refCount = TagRefinementManager.groupRefinementCount(thisGroup.uid);
-      if (refCount > 0 && newSubEventId !== thisGroup.subEventId) {
-        // Changing the component invalidates any per-file refinements made against
-        // the old component's tag vocabulary — never carry them across silently. The
-        // group's uid (its identity) is untouched by a remap — only its refinement
-        // CONTENTS are cleared.
-        showClearRefinementsOnRemapModal(refCount).then(proceed => {
-          if (!proceed) return;
-          TagRefinementManager.clearGroup(thisGroup.uid);
-          GroupManager.setSubEvent(gid, value);
-          syncAllRefinementBadges();
-          renderGroupPanel();
-        });
-        return;
-      }
-      GroupManager.setSubEvent(gid, value);
-      renderGroupPanel();
+      _setGroupSubEvent(gid, value);
     },
   });
 });
@@ -18562,11 +18643,21 @@ window.__autoIngestRendererBridge = {
     return { groupId: assignedGroupId, claim };
   },
   unassignSelectionFromGroup: () => _unassignSelectionFromGroup(),
+  // Maps an existing group to one of the active event's real components —
+  // the exact same primitive the Group Panel's own sub-event dropdown uses
+  // (AI-FEAT MX Console Phase 4C, see _setGroupSubEvent's own doc comment).
+  // Async: may await the real "clear refinements?" on-screen confirmation.
+  setGroupSubEvent: (groupId, subEventId) => _setGroupSubEvent(groupId, subEventId),
+  // "Which group does the current console selection target?" — selection
+  // must resolve to exactly one group (brief §7, Option A); null for empty/
+  // ambiguous/ungrouped selection, never a guess.
+  resolveTargetGroupForMapping: () => _resolveTargetGroupForMapping(),
 
   // ── Phase 1B: compact state, and QMZ's explicit-sequence command ──────────
   getContext:          () => _getCommandContext(),
   isImportRunning:     () => importRunning,
   getGroupsCompact:    () => _getGroupsCompact(),
+  getAvailableSubEvents: () => _getAvailableSubEventsCompact(),
   getQmzSequencesCompact: () => _getQmzSequencesCompact(),
   // Assigns to an EXISTING QMZ sequence only — see _qmzAssignSelectionToSequenceCode's
   // own comment for why it never creates/guesses one.

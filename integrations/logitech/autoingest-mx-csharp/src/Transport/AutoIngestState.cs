@@ -55,6 +55,17 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin.Transport
         [JsonPropertyName("participatingCount")] public int ParticipatingCount { get; set; }
     }
 
+    // AI-FEAT MX Console Phase 4C — group.setSubEvent. Mirrors
+    // EventCreator.getSubEventNames()'s own real {id, name} shape exactly;
+    // id is the real folder name AutoIngest itself uses as the sub-event
+    // identity (see docs/commandLayer.md), never rebuilt from event
+    // types/city/location here.
+    public sealed class SubEventInfo
+    {
+        [JsonPropertyName("id")] public string Id { get; set; }
+        [JsonPropertyName("name")] public string Name { get; set; }
+    }
+
     public sealed class AutoIngestState
     {
         [JsonPropertyName("context")] public string Context { get; set; } // "browse" | "qmz" | "import"
@@ -67,6 +78,18 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin.Transport
         [JsonPropertyName("sequences")] public List<SequenceInfo> Sequences { get; set; }
         [JsonPropertyName("tagRefinement")] public TagRefinementInfo TagRefinement { get; set; }
         [JsonPropertyName("event")] public EventInfo Event { get; set; }
+        // Phase 4C — only present for a multi-component event (the only
+        // context group.setSubEvent is ever meaningful in), same "omitted
+        // rather than empty" convention as tagRefinement/event above.
+        [JsonPropertyName("availableSubEvents")] public List<SubEventInfo> AvailableSubEvents { get; set; }
+        // Which group the CURRENT selection unambiguously targets for
+        // mapping — resolved authoritatively by the renderer
+        // (_resolveTargetGroupForMapping, the same "every selected file
+        // must resolve to the SAME group" rule tagRefinement.open's own
+        // group-scope resolution already uses), never re-derived in C#
+        // (brief §15: "No C# business-rule duplication"). null for
+        // empty/ambiguous/ungrouped selection.
+        [JsonPropertyName("targetGroupIdForMapping")] public int? TargetGroupIdForMapping { get; set; }
     }
 
     public enum ConnectionState
