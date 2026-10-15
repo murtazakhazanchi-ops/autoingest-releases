@@ -6,6 +6,19 @@ Append newest first. Never edit or delete a prior entry — if something was wro
 
 ---
 
+
+## 2026-10-15 — MX Creative Console: Unified Contextual Keypad migration
+
+- **Task type**: architecture — Migrated the AutoIngest MX Creative Console Logitech C# plugin's Groups/Map Group/Refine Tags workspaces off PluginDynamicFolder rendering onto a native 9-slot PluginMultistateDynamicCommand architecture (ContextSlotA1-A9), after confirming the folder-rendering mechanism (ButtonActionNamesChanged/CommandImageChanged) was fundamentally unreliable under physical testing (pagination resets, cross-button color contamination, phantom colors). Physically verified end-to-end on the real MX Creative Keypad.
+- **Affected feature(s)**: AI-FEAT-060
+- **Affected roadmap milestone(s)**: AI-RM-013
+- **Commits**: cb4a2d489015e6fc3411d156b0edece5b7d77fec
+- **Tests**: dotnet test (AutoIngestMxCsDevPlugin.Tests, full suite, 116/116 passing after this session's changes), ContextualKeypadModelTests.cs (Browse/Groups/Map Group/Refine Tags pagination, slot-layout, CLOSE-vs-BACK-in-Refine-mode, truncation-adjacent layout coverage)
+- **Unresolved gaps**: Phase 1A/3A-D/4A history for this same MX Creative Console C# plugin predates this session and is not independently re-verified here — evidence pending for that earlier timeline beyond what this plugin's own docs/mxLogitechCSharp.md and docs/mxLogitechPlugin.md already record.
+- **Evidence confidence**: strong (session `sess-2026-10-15T12-14-59-369Z-d5ac2a`)
+
+---
+
 ## 2026-10-13 — BUG-017: event-creation sub-folder path divergence (AI-FEAT-004)
 
 - **Task type**: bug record for a real fix, on a dedicated branch off `main` (`fix/event-json-path-divergence`, commit `f09890f`), discovered incidentally during unrelated MX Creative Console physical-parity test fixture setup.

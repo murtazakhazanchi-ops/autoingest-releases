@@ -2,16 +2,16 @@
 
 > Generated artifact — cross-checked against 01_FEATURE_REGISTRY.md, 02_MASTER_ROADMAP.md, 03_IMPLEMENTATION_TIMELINE.md, and 04_PROJECT_DASHBOARD.md at generation time; generation fails with a diagnostic instead of silently picking a side if those sources disagree. Regenerate with `node scripts/product-docs/cli.js build`.
 
-**Progress**: 3/12 milestones complete (25%)
+**Progress**: 3/13 milestones complete (23.1%)
 **Current milestone**: AI-RM-002
 **Following milestone**: AI-RM-003
-**Total features**: 59
+**Total features**: 60
 
 ## Feature status counts (overall)
 
 | Status | Count |
 |---|---|
-| Implemented — evolving | 5 |
+| Implemented — evolving | 6 |
 | Implemented | 45 |
 | In active development | 1 |
 | Planned | 8 |
@@ -32,6 +32,7 @@
 | AI-RM-010 | Multi-Channel Release & Update System | **Completed** — verified on real Windows hardware (2026-08-13) | AI-FEAT-057 | — | Single implementation session (2026-08-12), plus a three-part live-pilot verification arc (2026-08-13) | None — complete. A future real Stable release (whenever separately authorized) will automatically carry the Update Channel selector to the entire existing Stable install base as an ordinary update; no further migration work is required for that transition. |
 | AI-RM-011 | Multi-Event Import | **In progress** (implemented and verified on `feature/multi-event-import`; not yet merged to `stable/0.9` or released) | AI-FEAT-058 | AI-RM-010 | Single implementation session (2026-09-20) | Owner review of the final report; commit breakdown approval; merge decision. |
 | AI-RM-012 | AutoIngest Knowledge & Onboarding Portal (Stage 1 + Stage 2) | **Completed — Stage 1 + Stage 2 merged to `main`** (merge commit `765e9b8`, 2026-08-14). Stage 1 (prototype) and Stage 2 Phases 4–27 (concept/intent retrieval layer, Workflow record type, roadmap routing, Online Registry/teamwork coverage, 119-question eval corpus, hallucination/grounding + adversarial suites, 9-tab portal UX + directory/onboarding mode, mandatory final-report sections, and a pre-merge acceptance pass) all complete and verified from the actual merged `main` state. Stage 3 has not begun and requires separate approval. | AI-FEAT-059 | AI-RM-001, AI-RM-010 | Stage 1: single implementation session (2026-08-13). Stage 2: single extended implementation session spanning 2026-08-13 to 2026-08-14 (Phases 1-27 plus a user-directed pre-merge acceptance pass and merge). | None for this milestone — complete and merged. Deferred future-work items (true rendered-browser verification, remaining Workflow-record coverage, a production-integration decision, a semantic/AI-assisted-retrieval necessity review, a separate live-Registry-integration architecture decision, UX polish from real operator use, and an automatic-discoverability maintenance process) are recorded, not scheduled — see AI-FEAT-059's Future Enhancements. Any Stage 3 work requires separate review and authorization. |
+| AI-RM-013 | MX Creative Console Hardware Integration (Unified Contextual Keypad) | **In progress** (implemented and physically verified on `feature/mx-creative-console-v2`; not yet merged to `main` or `stable/0.9`) | AI-FEAT-060 | AI-RM-001, AI-RM-010 | Evidence pending for phases predating this session (Phase 1A/3A-D/4A/4B — see AI-FEAT-060's Original Plan / Intent). This session's own Unified Contextual Keypad migration (native multistate spike → contextual keypad spike → production migration → three physical bug fixes) ran in a single extended session (2026-10-15). | Owner decision on whether/when to merge `feature/mx-creative-console-v2`; optionally, a follow-up session to remove the retired `PluginDynamicFolder` source now that it is superseded. |
 
 ## Blockers and risks
 

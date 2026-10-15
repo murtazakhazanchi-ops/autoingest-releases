@@ -1373,6 +1373,44 @@
         "AI-RM-012"
       ],
       "topic": "Knowledge Engine (Stage 1 Prototype → Stage 2 Operator Knowledge Architecture)"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-060_MX_CREATIVE_CONSOLE_LOGITECH_HARDWARE_CONTROL_SURFACE.md",
+      "canonicalTechnicalDocs": [
+        "integrations/logitech/autoingest-mx-csharp/docs/mxLogitechCSharp.md",
+        "integrations/logitech/autoingest-mx-csharp/docs/mxLogitechPlugin.md",
+        "[docs/commandLayer.md]"
+      ],
+      "codeAreas": [
+        "integrations/logitech/autoingest-mx-csharp/src/Helpers/ContextualKeypadController.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Helpers/ContextualKeypadModel.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Helpers/ContextSlotBinding.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Helpers/ContextSlotImageRenderer.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Helpers/ImageSizeHelper.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Helpers/RefinementWorkspaceModel.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Helpers/RefinementButtonImageRenderer.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Helpers/GroupsWorkspaceModel.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Helpers/GroupMappingWorkspaceModel.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Actions/ContextSlotA1.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Actions/RefineTagsFolder.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Actions/GroupsFolder.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Actions/GroupMappingFolder.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Actions/NavigateFilesAdjustment.cs",
+        "integrations/logitech/autoingest-mx-csharp/test/AutoIngestMxCsDevPlugin.Tests/ContextualKeypadModelTests.cs",
+        "integrations/logitech/autoingest-mx-csharp/docs/mxLogitechCSharp.md",
+        "integrations/logitech/autoingest-mx-csharp/docs/mxLogitechPlugin.md"
+      ],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-060_MX_CREATIVE_CONSOLE_LOGITECH_HARDWARE_CONTROL_SURFACE.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-060",
+      "relatedBugs": [],
+      "relatedDecisions": [],
+      "relatedPostmortems": [],
+      "roadmapIds": [
+        "AI-RM-013"
+      ],
+      "topic": "MX Creative Console — Logitech Hardware Control Surface"
     }
   ]
 }

@@ -85,6 +85,108 @@
         "AI-FEAT-059"
       ]
     },
+    "integrations/logitech/autoingest-mx-csharp/docs/mxLogitechCSharp.md": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-060"
+      ]
+    },
+    "integrations/logitech/autoingest-mx-csharp/docs/mxLogitechPlugin.md": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-060"
+      ]
+    },
+    "integrations/logitech/autoingest-mx-csharp/src/Actions/ContextSlotA1.cs": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-060"
+      ]
+    },
+    "integrations/logitech/autoingest-mx-csharp/src/Actions/GroupMappingFolder.cs": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-060"
+      ]
+    },
+    "integrations/logitech/autoingest-mx-csharp/src/Actions/GroupsFolder.cs": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-060"
+      ]
+    },
+    "integrations/logitech/autoingest-mx-csharp/src/Actions/NavigateFilesAdjustment.cs": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-060"
+      ]
+    },
+    "integrations/logitech/autoingest-mx-csharp/src/Actions/RefineTagsFolder.cs": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-060"
+      ]
+    },
+    "integrations/logitech/autoingest-mx-csharp/src/Helpers/ContextSlotBinding.cs": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-060"
+      ]
+    },
+    "integrations/logitech/autoingest-mx-csharp/src/Helpers/ContextSlotImageRenderer.cs": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-060"
+      ]
+    },
+    "integrations/logitech/autoingest-mx-csharp/src/Helpers/ContextualKeypadController.cs": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-060"
+      ]
+    },
+    "integrations/logitech/autoingest-mx-csharp/src/Helpers/ContextualKeypadModel.cs": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-060"
+      ]
+    },
+    "integrations/logitech/autoingest-mx-csharp/src/Helpers/GroupMappingWorkspaceModel.cs": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-060"
+      ]
+    },
+    "integrations/logitech/autoingest-mx-csharp/src/Helpers/GroupsWorkspaceModel.cs": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-060"
+      ]
+    },
+    "integrations/logitech/autoingest-mx-csharp/src/Helpers/ImageSizeHelper.cs": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-060"
+      ]
+    },
+    "integrations/logitech/autoingest-mx-csharp/src/Helpers/RefinementButtonImageRenderer.cs": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-060"
+      ]
+    },
+    "integrations/logitech/autoingest-mx-csharp/src/Helpers/RefinementWorkspaceModel.cs": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-060"
+      ]
+    },
+    "integrations/logitech/autoingest-mx-csharp/test/AutoIngestMxCsDevPlugin.Tests/ContextualKeypadModelTests.cs": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-060"
+      ]
+    },
     "main/driveDetector.js": {
       "confidence": "explicit",
       "features": [
@@ -1248,6 +1350,25 @@
       "scripts/product-docs/test/knowledgeAdversarialPhase24.test.js",
       "scripts/product-docs/test/knowledgeHallucinationV2.test.js",
       "scripts/product-docs/test/knowledgeMergeReadiness.test.js"
+    ],
+    "AI-FEAT-060": [
+      "integrations/logitech/autoingest-mx-csharp/docs/mxLogitechCSharp.md",
+      "integrations/logitech/autoingest-mx-csharp/docs/mxLogitechPlugin.md",
+      "integrations/logitech/autoingest-mx-csharp/src/Actions/ContextSlotA1.cs",
+      "integrations/logitech/autoingest-mx-csharp/src/Actions/GroupMappingFolder.cs",
+      "integrations/logitech/autoingest-mx-csharp/src/Actions/GroupsFolder.cs",
+      "integrations/logitech/autoingest-mx-csharp/src/Actions/NavigateFilesAdjustment.cs",
+      "integrations/logitech/autoingest-mx-csharp/src/Actions/RefineTagsFolder.cs",
+      "integrations/logitech/autoingest-mx-csharp/src/Helpers/ContextSlotBinding.cs",
+      "integrations/logitech/autoingest-mx-csharp/src/Helpers/ContextSlotImageRenderer.cs",
+      "integrations/logitech/autoingest-mx-csharp/src/Helpers/ContextualKeypadController.cs",
+      "integrations/logitech/autoingest-mx-csharp/src/Helpers/ContextualKeypadModel.cs",
+      "integrations/logitech/autoingest-mx-csharp/src/Helpers/GroupMappingWorkspaceModel.cs",
+      "integrations/logitech/autoingest-mx-csharp/src/Helpers/GroupsWorkspaceModel.cs",
+      "integrations/logitech/autoingest-mx-csharp/src/Helpers/ImageSizeHelper.cs",
+      "integrations/logitech/autoingest-mx-csharp/src/Helpers/RefinementButtonImageRenderer.cs",
+      "integrations/logitech/autoingest-mx-csharp/src/Helpers/RefinementWorkspaceModel.cs",
+      "integrations/logitech/autoingest-mx-csharp/test/AutoIngestMxCsDevPlugin.Tests/ContextualKeypadModelTests.cs"
     ]
   },
   "feature_to_tests": {
@@ -1362,7 +1483,8 @@
       "test/multiEventLocalFirstUiLive.test.js",
       "test/multiEventNewEventUiLive.test.js"
     ],
-    "AI-FEAT-059": []
+    "AI-FEAT-059": [],
+    "AI-FEAT-060": []
   },
   "ipc_to_features": {
     "SUBSYS-application-platform": {
@@ -1544,6 +1666,9 @@
     "SUBSYS-grouping-and-routing": [
       "AI-FEAT-017",
       "AI-FEAT-018"
+    ],
+    "SUBSYS-hardware-peripheral-integration": [
+      "AI-FEAT-060"
     ],
     "SUBSYS-import-and-archive-writing": [
       "AI-FEAT-019",

@@ -37,3 +37,12 @@
 - **Related commit(s)**: 765e9b83fba64593d07422f390f8b3a41046dc8b (merge commit); knowledge-portal-stage2 tip d89440bbd1576e4c2530fa76b4b791c9fe226997
 - **Unresolved follow-up**: True rendered-browser verification; remaining Workflow-record coverage (Class A: event editing/finding); a production-integration decision (standalone vs. AutoIngest-integrated); a decision on whether semantic/AI-assisted retrieval is actually needed given observed deterministic-retrieval quality; a live-Registry-integration decision (explicitly separate from this documentation portal); UX polish from real operator use; a maintenance process to keep new capabilities/workflows automatically discoverable; and — newly identified in Revision 6 — a full evidence review of `AI-FEAT-048`'s own canonical record, which this pass found to understate its actual implemented scope but deliberately did not rewrite (out of this investigation's mandate).
 - **Capsule**: [AI-MEM-0004](../memory/AI-MEM-0004_KNOWLEDGE_PORTAL_STAGE_2_OPERATOR_KNOWLEDGE_ARCHITECTURE.md)
+
+## 2026-10-15T12:14:59.410Z — AI-MEM-0005 — MX Creative Console: Unified Contextual Keypad migration
+
+- **Feature(s)**: AI-FEAT-060
+- **Accepted approach**: Evidence pending
+- **Rejected alternative(s)**: None recorded
+- **Related commit(s)**: cb4a2d4
+- **Unresolved follow-up**: None recorded.
+- **Capsule**: [AI-MEM-0005](../memory/AI-MEM-0005_MX_CREATIVE_CONSOLE_UNIFIED_CONTEXTUAL_KEYPAD_MIGRATION.md)

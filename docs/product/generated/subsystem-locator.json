@@ -530,6 +530,58 @@
       ]
     },
     {
+      "aliases": [],
+      "canonicalProductDoc": "docs/product/01_FEATURE_REGISTRY.md",
+      "canonicalTechnicalDocs": [
+        "[docs/commandLayer.md]",
+        "integrations/logitech/autoingest-mx-csharp/docs/mxLogitechCSharp.md",
+        "integrations/logitech/autoingest-mx-csharp/docs/mxLogitechPlugin.md"
+      ],
+      "changeImpactChecklist": [
+        "Re-read the Related Files section of every primary feature listed above before changing shared source files.",
+        "Check relatedBugs/relatedDecisions for constraints before altering resolver or write-path behavior.",
+        "Run: node scripts/product-docs/cli.js impact <changed-file-path> to confirm ownership before editing."
+      ],
+      "id": "SUBSYS-hardware-peripheral-integration",
+      "name": "Hardware & Peripheral Integration",
+      "primaryFeatures": [
+        "AI-FEAT-060"
+      ],
+      "relatedBugs": [
+        "BUG-018",
+        "BUG-019",
+        "BUG-020"
+      ],
+      "relatedDecisions": [
+        "DEC-023"
+      ],
+      "sourceDirectories": [
+        "integrations/logitech/autoingest-mx-csharp/docs",
+        "integrations/logitech/autoingest-mx-csharp/src/Actions",
+        "integrations/logitech/autoingest-mx-csharp/src/Helpers",
+        "integrations/logitech/autoingest-mx-csharp/test/AutoIngestMxCsDevPlugin.Tests"
+      ],
+      "sourceFiles": [
+        "integrations/logitech/autoingest-mx-csharp/docs/mxLogitechCSharp.md",
+        "integrations/logitech/autoingest-mx-csharp/docs/mxLogitechPlugin.md",
+        "integrations/logitech/autoingest-mx-csharp/src/Actions/ContextSlotA1.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Actions/GroupMappingFolder.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Actions/GroupsFolder.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Actions/NavigateFilesAdjustment.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Actions/RefineTagsFolder.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Helpers/ContextSlotBinding.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Helpers/ContextSlotImageRenderer.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Helpers/ContextualKeypadController.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Helpers/ContextualKeypadModel.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Helpers/GroupMappingWorkspaceModel.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Helpers/GroupsWorkspaceModel.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Helpers/ImageSizeHelper.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Helpers/RefinementButtonImageRenderer.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Helpers/RefinementWorkspaceModel.cs",
+        "integrations/logitech/autoingest-mx-csharp/test/AutoIngestMxCsDevPlugin.Tests/ContextualKeypadModelTests.cs"
+      ]
+    },
+    {
       "aliases": [
         "realtime presence",
         "team presence",

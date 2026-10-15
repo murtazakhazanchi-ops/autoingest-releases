@@ -297,6 +297,43 @@
 - Check relatedBugs/relatedDecisions for constraints before altering resolver or write-path behavior.
 - Run: node scripts/product-docs/cli.js impact <changed-file-path> to confirm ownership before editing.
 
+## Hardware & Peripheral Integration (`SUBSYS-hardware-peripheral-integration`)
+
+**Primary features**: AI-FEAT-060
+**Canonical technical docs**: [docs/commandLayer.md], integrations/logitech/autoingest-mx-csharp/docs/mxLogitechCSharp.md, integrations/logitech/autoingest-mx-csharp/docs/mxLogitechPlugin.md
+**Related bugs**: BUG-018, BUG-019, BUG-020
+**Related decisions**: DEC-023
+
+**Source directories**:
+- `integrations/logitech/autoingest-mx-csharp/docs`
+- `integrations/logitech/autoingest-mx-csharp/src/Actions`
+- `integrations/logitech/autoingest-mx-csharp/src/Helpers`
+- `integrations/logitech/autoingest-mx-csharp/test/AutoIngestMxCsDevPlugin.Tests`
+
+**Source files**:
+- `integrations/logitech/autoingest-mx-csharp/docs/mxLogitechCSharp.md`
+- `integrations/logitech/autoingest-mx-csharp/docs/mxLogitechPlugin.md`
+- `integrations/logitech/autoingest-mx-csharp/src/Actions/ContextSlotA1.cs`
+- `integrations/logitech/autoingest-mx-csharp/src/Actions/GroupMappingFolder.cs`
+- `integrations/logitech/autoingest-mx-csharp/src/Actions/GroupsFolder.cs`
+- `integrations/logitech/autoingest-mx-csharp/src/Actions/NavigateFilesAdjustment.cs`
+- `integrations/logitech/autoingest-mx-csharp/src/Actions/RefineTagsFolder.cs`
+- `integrations/logitech/autoingest-mx-csharp/src/Helpers/ContextSlotBinding.cs`
+- `integrations/logitech/autoingest-mx-csharp/src/Helpers/ContextSlotImageRenderer.cs`
+- `integrations/logitech/autoingest-mx-csharp/src/Helpers/ContextualKeypadController.cs`
+- `integrations/logitech/autoingest-mx-csharp/src/Helpers/ContextualKeypadModel.cs`
+- `integrations/logitech/autoingest-mx-csharp/src/Helpers/GroupMappingWorkspaceModel.cs`
+- `integrations/logitech/autoingest-mx-csharp/src/Helpers/GroupsWorkspaceModel.cs`
+- `integrations/logitech/autoingest-mx-csharp/src/Helpers/ImageSizeHelper.cs`
+- `integrations/logitech/autoingest-mx-csharp/src/Helpers/RefinementButtonImageRenderer.cs`
+- `integrations/logitech/autoingest-mx-csharp/src/Helpers/RefinementWorkspaceModel.cs`
+- `integrations/logitech/autoingest-mx-csharp/test/AutoIngestMxCsDevPlugin.Tests/ContextualKeypadModelTests.cs`
+
+**Change-impact checklist**:
+- Re-read the Related Files section of every primary feature listed above before changing shared source files.
+- Check relatedBugs/relatedDecisions for constraints before altering resolver or write-path behavior.
+- Run: node scripts/product-docs/cli.js impact <changed-file-path> to confirm ownership before editing.
+
 ## Collaboration and Realtime Coordination (`SUBSYS-collaboration-and-realtime-coordination`)
 
 **Aliases**: realtime presence, team presence, online registry

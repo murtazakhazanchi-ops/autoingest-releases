@@ -2,16 +2,16 @@
 
 > Generated artifact. Implements the 13 rules specified in [14_VALIDATION_SPECIFICATION.md](../14_VALIDATION_SPECIFICATION.md) plus Part 4 tooling-integrity checks. Regenerate with `node scripts/product-docs/cli.js validate`.
 
-Generated against source commit `56051e970359f5e0e95a38ebf86f35f1c9ac6684`.
+Generated against source commit `cb4a2d489015e6fc3411d156b0edece5b7d77fec`.
 
 ## Summary
 
 | Level | Count | Exit policy |
 |---|---|---|
 | Error | 0 | Fails the build (non-zero exit) |
-| Warning | 16 | Reported, does not fail the build |
+| Warning | 18 | Reported, does not fail the build |
 | Information | 27 | Reported, does not fail the build |
-| Evidence gap | 58 | Reported, does not fail the build — visibility only, per 14_VALIDATION_SPECIFICATION.md Rule 13 |
+| Evidence gap | 59 | Reported, does not fail the build — visibility only, per 14_VALIDATION_SPECIFICATION.md Rule 13 |
 
 **Result**: PASS
 
@@ -19,7 +19,7 @@ Generated against source commit `56051e970359f5e0e95a38ebf86f35f1c9ac6684`.
 
 None.
 
-## Warning (16)
+## Warning (18)
 
 | Rule | Message | File | Note |
 |---|---|---|---|
@@ -27,6 +27,8 @@ None.
 | cyclic-dependency | Undocumented dependency cycle: AI-FEAT-009 -> AI-FEAT-018 -> AI-FEAT-009 | generated/dependency-graph.json | — |
 | cyclic-dependency | Undocumented dependency cycle: AI-FEAT-032 -> AI-FEAT-039 -> AI-FEAT-032 | generated/dependency-graph.json | — |
 | decision-draft-missing-evidence | DEC-016 is Status: Draft but its Evidence status does not cite the originating session or detected signals | decisions/DEC-016_WINDOWS_NAS_EVENT_MANAGEMENT_RELIABILITY_INVESTIGATION_BUG_011_014_CHATGPT_SIDE_.md | — |
+| missing-engineering-evolution | AI-FEAT-060 has no Engineering Evolution section | features/AI-FEAT-060_MX_CREATIVE_CONSOLE_LOGITECH_HARDWARE_CONTROL_SURFACE.md | — |
+| missing-lifecycle-metadata | AI-FEAT-060 has no Lifecycle Metadata section | features/AI-FEAT-060_MX_CREATIVE_CONSOLE_LOGITECH_HARDWARE_CONTROL_SURFACE.md | — |
 | missing-related-technical-docs | AI-FEAT-005 is Implemented but cites no Related technical docs | features/AI-FEAT-005_APPLICATION_SETTINGS_CONFIGURATION_STORE.md | — |
 | missing-related-technical-docs | AI-FEAT-006 is Implemented but cites no Related technical docs | features/AI-FEAT-006_APPLICATION_AUTO_UPDATE.md | — |
 | missing-related-technical-docs | AI-FEAT-007 is Implemented but cites no Related technical docs | features/AI-FEAT-007_TELEMETRY_PIPELINE.md | — |
@@ -44,7 +46,7 @@ None.
 
 | Rule | Message | File | Note |
 |---|---|---|---|
-| architecture-coverage | 42/59 features placed in the architectural-evolution relationship map | 11_ARCHITECTURAL_EVOLUTION.md | Unplaced: AI-FEAT-002, AI-FEAT-003, AI-FEAT-005, AI-FEAT-007, AI-FEAT-008, AI-FEAT-010, AI-FEAT-012, AI-FEAT-013, AI-FEAT-014, AI-FEAT-015, AI-FEAT-016, AI-FEAT-023, AI-FEAT-026, AI-FEAT-034, AI-FEAT-035, AI-FEAT-048, AI-FEAT-059 |
+| architecture-coverage | 42/60 features placed in the architectural-evolution relationship map | 11_ARCHITECTURAL_EVOLUTION.md | Unplaced: AI-FEAT-002, AI-FEAT-003, AI-FEAT-005, AI-FEAT-007, AI-FEAT-008, AI-FEAT-010, AI-FEAT-012, AI-FEAT-013, AI-FEAT-014, AI-FEAT-015, AI-FEAT-016, AI-FEAT-023, AI-FEAT-026, AI-FEAT-034, AI-FEAT-035, AI-FEAT-048, AI-FEAT-059, AI-FEAT-060 |
 | overlapping-active-decisions | 2 Accepted decisions (DEC-006, DEC-007) all govern the exact same feature/milestone set (AI-FEAT-029) — worth a human check that they don't contradict each other | DEC-006 | — |
 | overlapping-active-decisions | 2 Accepted decisions (DEC-020, DEC-021) all govern the exact same feature/milestone set (AI-FEAT-059) — worth a human check that they don't contradict each other | DEC-020 | — |
 | shared-code-path | main/main.js is explicitly owned by 7 features (shared, not exclusive) | main/main.js | AI-FEAT-001, AI-FEAT-021, AI-FEAT-024, AI-FEAT-025, AI-FEAT-036, AI-FEAT-057, AI-FEAT-058 |
@@ -72,7 +74,7 @@ None.
 | shared-code-path | scripts/product-docs/lib/questionClassifier.js is explicitly owned by 3 features (shared, not exclusive) | scripts/product-docs/lib/questionClassifier.js | AI-FEAT-059, AI-FEAT-059, AI-FEAT-059 |
 | shared-code-path | scripts/product-docs/lib/knowledgeTestCorpusV2.js is explicitly owned by 2 features (shared, not exclusive) | scripts/product-docs/lib/knowledgeTestCorpusV2.js | AI-FEAT-059, AI-FEAT-059 |
 
-## Evidence gap (58)
+## Evidence gap (59)
 
 | Rule | Message | File | Note |
 |---|---|---|---|
@@ -134,4 +136,5 @@ None.
 | documentation-completeness | AI-FEAT-056 has 4 evidence-pending marker(s) | features/AI-FEAT-056_AI_ARCHIVE_INTELLIGENCE.md | — |
 | documentation-completeness | AI-FEAT-058 has 1 evidence-pending marker(s) | features/AI-FEAT-058_MULTI_EVENT_IMPORT.md | — |
 | documentation-completeness | AI-FEAT-059 has 2 evidence-pending marker(s) | features/AI-FEAT-059_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md | — |
+| documentation-completeness | AI-FEAT-060 has 5 evidence-pending marker(s) | features/AI-FEAT-060_MX_CREATIVE_CONSOLE_LOGITECH_HARDWARE_CONTROL_SURFACE.md | — |
 

@@ -115,6 +115,12 @@ IDs are assigned once and never reused or renumbered, even if a feature is later
 |---|---|---|---|---|---|---|
 | AI-FEAT-047 | QMZ Sequencing Workspace | Implemented | Stable | — | — | [features/AI-FEAT-047_QMZ_SEQUENCING_WORKSPACE.md](features/AI-FEAT-047_QMZ_SEQUENCING_WORKSPACE.md) |
 
+## Hardware & Peripheral Integration
+
+| ID | Name | Status | Maturity | Parent | Roadmap | Doc |
+|---|---|---|---|---|---|---|
+| AI-FEAT-060 | MX Creative Console — Logitech Hardware Control Surface | Implemented — evolving | Evolving | — | AI-RM-013 | [features/AI-FEAT-060_MX_CREATIVE_CONSOLE_LOGITECH_HARDWARE_CONTROL_SURFACE.md](features/AI-FEAT-060_MX_CREATIVE_CONSOLE_LOGITECH_HARDWARE_CONTROL_SURFACE.md) |
+
 ## Collaboration and Realtime Coordination
 
 | ID | Name | Status | Maturity | Parent | Roadmap | Doc |
@@ -159,11 +165,12 @@ IDs are assigned once and never reused or renumbered, even if a feature is later
 
 ## Totals
 
-- **59 features registered**: 50 Implemented-family (45 plain "Implemented", including AI-FEAT-057 + 5 "Implemented — evolving", including AI-FEAT-059), 0 "Partially implemented", 1 "In active development" (AI-FEAT-058), 8 "Planned" (0% implementation confirmed for all 8).
+- **60 features registered**: 51 Implemented-family (45 plain "Implemented", including AI-FEAT-057 + 6 "Implemented — evolving", including AI-FEAT-059/AI-FEAT-060), 0 "Partially implemented", 1 "In active development" (AI-FEAT-058), 8 "Planned" (0% implementation confirmed for all 8).
 - Planned: 8 (all mapped 1:1 to AI-RM-002 through AI-RM-009, except AI-RM-001 which has no dedicated "planned" row because it is already complete — see AI-FEAT-033)
 - AI-FEAT-057 maps to AI-RM-010, a parallel release-infrastructure track outside the AI-RM-001…009 archive-capability sequence — see 02_MASTER_ROADMAP.md.
 - AI-FEAT-058 maps to AI-RM-011, a parallel ingestion-workflow track outside that sequence — see 02_MASTER_ROADMAP.md.
 - AI-FEAT-059 maps to AI-RM-012, a parallel documentation/tooling track (Knowledge & Onboarding Portal, Stage 1 + Stage 2 Phases 4-24) outside both the AI-RM-001…009 sequence and the AI-RM-010 release-infrastructure track — see 02_MASTER_ROADMAP.md.
+- AI-FEAT-060 maps to AI-RM-013, a parallel hardware-integration track (the MX Creative Console Logitech plugin, developed entirely on `feature/mx-creative-console-v2`, not yet merged) outside all three tracks above — see 02_MASTER_ROADMAP.md.
 
 ## Cross-Cutting Patterns (documented, not given their own AI-FEAT ID)
 

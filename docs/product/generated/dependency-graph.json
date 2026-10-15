@@ -3620,6 +3620,46 @@
     {
       "evidence_status": "explicit",
       "note": null,
+      "provenance_path": "features/AI-FEAT-060_MX_CREATIVE_CONSOLE_LOGITECH_HARDWARE_CONTROL_SURFACE.md#header-table:Related-roadmap-milestone",
+      "relationship": "planned_in",
+      "source": "AI-FEAT-060",
+      "target": "AI-RM-013"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-018_PLUGINDYNAMICFOLDER_REDRAW_MECHANISM_BUTTONACTIONNAMESCHANGED_COMMANDIMAGECHANGE.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-060",
+      "target": "BUG-018"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-019_OPTIONS_PROFILE_MAPPING_GAP_PHYSICAL_NINTH_KEYPAD_KEY_HAD_PRESSACTION_NULL.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-060",
+      "target": "BUG-019"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "bugs/BUG-020_LABEL_TRUNCATION_SILENTLY_DROPPED_WHEN_GETCOMMANDDISPLAYNAME_MIGRATED_OFF_PLUGIN.md#header-table:Related-feature(s)",
+      "relationship": "affected_by_bug",
+      "source": "AI-FEAT-060",
+      "target": "BUG-020"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-023_MX_CREATIVE_CONSOLE_UNIFIED_CONTEXTUAL_KEYPAD_MIGRATION.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-060",
+      "target": "DEC-023"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
       "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-001:Included-AI-FEAT-IDs",
       "relationship": "implements",
       "source": "AI-RM-001",
@@ -4000,6 +4040,38 @@
       "relationship": "governed_by",
       "source": "AI-RM-012",
       "target": "DEC-022"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-013:Included-AI-FEAT-IDs",
+      "relationship": "implements",
+      "source": "AI-RM-013",
+      "target": "AI-FEAT-060"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-013:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-RM-013",
+      "target": "AI-RM-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-013:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-RM-013",
+      "target": "AI-RM-010"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-023_MX_CREATIVE_CONSOLE_UNIFIED_CONTEXTUAL_KEYPAD_MIGRATION.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-RM-013",
+      "target": "DEC-023"
     },
     {
       "evidence_status": "explicit",
@@ -5086,6 +5158,12 @@
       "type": "feature"
     },
     {
+      "doc_path": "features/AI-FEAT-060_MX_CREATIVE_CONSOLE_LOGITECH_HARDWARE_CONTROL_SURFACE.md",
+      "id": "AI-FEAT-060",
+      "label": "MX Creative Console — Logitech Hardware Control Surface",
+      "type": "feature"
+    },
+    {
       "doc_path": "memory/AI-MEM-0001_METADATA_MANAGEMENT_MODAL_AUDIT_REPAIR_EVOLUTION.md",
       "id": "AI-MEM-0001",
       "label": "Metadata Management Modal Consolidation and Audit & Repair Tab Evolution",
@@ -5107,6 +5185,12 @@
       "doc_path": "memory/AI-MEM-0004_KNOWLEDGE_PORTAL_STAGE_2_OPERATOR_KNOWLEDGE_ARCHITECTURE.md",
       "id": "AI-MEM-0004",
       "label": "Knowledge Portal Stage 2: Operator Knowledge Architecture, Online Registry Coverage, and Merge",
+      "type": "memory_capsule"
+    },
+    {
+      "doc_path": "memory/AI-MEM-0005_MX_CREATIVE_CONSOLE_UNIFIED_CONTEXTUAL_KEYPAD_MIGRATION.md",
+      "id": "AI-MEM-0005",
+      "label": "MX Creative Console: Unified Contextual Keypad migration",
       "type": "memory_capsule"
     },
     {
@@ -5179,6 +5263,12 @@
       "doc_path": "02_MASTER_ROADMAP.md",
       "id": "AI-RM-012",
       "label": "AutoIngest Knowledge & Onboarding Portal (Stage 1 + Stage 2)",
+      "type": "milestone"
+    },
+    {
+      "doc_path": "02_MASTER_ROADMAP.md",
+      "id": "AI-RM-013",
+      "label": "MX Creative Console Hardware Integration (Unified Contextual Keypad)",
       "type": "milestone"
     },
     {
@@ -5350,6 +5440,24 @@
       "type": "bug"
     },
     {
+      "doc_path": "bugs/BUG-018_PLUGINDYNAMICFOLDER_REDRAW_MECHANISM_BUTTONACTIONNAMESCHANGED_COMMANDIMAGECHANGE.md",
+      "id": "BUG-018",
+      "label": "PluginDynamicFolder redraw mechanism (ButtonActionNamesChanged/CommandImageChanged) unreliable on the installed SDK",
+      "type": "bug"
+    },
+    {
+      "doc_path": "bugs/BUG-019_OPTIONS_PROFILE_MAPPING_GAP_PHYSICAL_NINTH_KEYPAD_KEY_HAD_PRESSACTION_NULL.md",
+      "id": "BUG-019",
+      "label": "Options+ profile mapping gap — physical ninth Keypad key had pressAction: null",
+      "type": "bug"
+    },
+    {
+      "doc_path": "bugs/BUG-020_LABEL_TRUNCATION_SILENTLY_DROPPED_WHEN_GETCOMMANDDISPLAYNAME_MIGRATED_OFF_PLUGIN.md",
+      "id": "BUG-020",
+      "label": "Label truncation silently dropped when GetCommandDisplayName migrated off PluginDynamicFolder to the ContextSlot architecture",
+      "type": "bug"
+    },
+    {
       "doc_path": "decisions/DEC-001_EVENT_DATA_AS_DURABLE_ARCHIVE_TRUTH.md",
       "id": "DEC-001",
       "label": "Event Data as Durable Archive Truth",
@@ -5479,6 +5587,12 @@
       "doc_path": "decisions/DEC-022_MAIN_STABLE_RECONCILIATION_CANONICAL_ID_COLLISION_RESOLUTION.md",
       "id": "DEC-022",
       "label": "Main/Stable Reconciliation Canonical-ID Collision Resolution",
+      "type": "decision"
+    },
+    {
+      "doc_path": "decisions/DEC-023_MX_CREATIVE_CONSOLE_UNIFIED_CONTEXTUAL_KEYPAD_MIGRATION.md",
+      "id": "DEC-023",
+      "label": "MX Creative Console: Unified Contextual Keypad migration",
       "type": "decision"
     },
     {

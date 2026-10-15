@@ -2,11 +2,11 @@
 
 > Generated artifact — locator only. Regenerate with `node scripts/product-docs/cli.js build`. Full machine-readable graph: `dependency-graph.json`. Views below are deliberately bounded (one subsystem or milestone chain per diagram) rather than one unreadable graph of every node.
 
-Total: 131 nodes, 591 edges.
+Total: 138 nodes, 600 edges.
 
 ### Roadmap milestone relationships
 
-12 node(s), 11 edge(s) in this view.
+13 node(s), 13 edge(s) in this view.
 
 ```mermaid
 flowchart LR
@@ -23,6 +23,7 @@ flowchart LR
   AI_RM_010(("AI-RM-010: Multi-Channel Release & Update System"))
   AI_RM_011(("AI-RM-011: Multi-Event Import"))
   AI_RM_012(("AI-RM-012: AutoIngest Knowledge & Onboarding Portal (Stage 1 + Stage 2)"))
+  AI_RM_013(("AI-RM-013: MX Creative Console Hardware Integration (Unified Contextual Keypad)"))
   AI_RM_002 -->|depends_on| AI_RM_001
   AI_RM_003 -->|depends_on| AI_RM_002
   AI_RM_004 -->|depends_on| AI_RM_003
@@ -34,6 +35,8 @@ flowchart LR
   AI_RM_011 -->|depends_on| AI_RM_010
   AI_RM_012 -->|depends_on| AI_RM_001
   AI_RM_012 -->|depends_on| AI_RM_010
+  AI_RM_013 -->|depends_on| AI_RM_001
+  AI_RM_013 -->|depends_on| AI_RM_010
 ```
 
 ### Feature dependency overview (features with a depends_on/extended_by edge)
@@ -402,7 +405,7 @@ flowchart LR
 
 ### Planned archive-management direction
 
-19 node(s), 28 edge(s) in this view.
+20 node(s), 29 edge(s) in this view.
 
 ```mermaid
 flowchart LR
@@ -426,6 +429,7 @@ flowchart LR
   AI_RM_010(("AI-RM-010: Multi-Channel Release & Update System"))
   AI_RM_011(("AI-RM-011: Multi-Event Import"))
   AI_RM_012(("AI-RM-012: AutoIngest Knowledge & Onboarding Portal (Stage 1 + Stage 2)"))
+  AI_RM_013(("AI-RM-013: MX Creative Console Hardware Integration (Unified Contextual Keypad)"))
   AI_FEAT_049 -->|planned_in| AI_RM_002
   AI_FEAT_050 -->|planned_in| AI_RM_003
   AI_FEAT_051 -->|planned_in| AI_RM_004
@@ -454,5 +458,6 @@ flowchart LR
   AI_RM_009 -->|depends_on| AI_RM_008
   AI_RM_011 -->|depends_on| AI_RM_010
   AI_RM_012 -->|depends_on| AI_RM_010
+  AI_RM_013 -->|depends_on| AI_RM_010
 ```
 

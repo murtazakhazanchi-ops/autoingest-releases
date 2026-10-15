@@ -3579,6 +3579,76 @@
       "subfeatures": [],
       "summary": "A Stage 1 prototype proving that AutoIngest's existing `docs/product/` documentation system — the feature registry, roadmap, and the deterministic offline search engine already built in `scripts/product-docs/lib/query.js` — can power a grounded, citation-honest, natural-language \"Ask AutoIngest\" answer engine **without** an LLM, embeddings, or any hosted service. This is explicitly **not** the final operator-facing portal (see the Phase 1 Knowledge & Onboarding Portal audit): no Workflow/Navigation/Tutorial content exists yet, no visual design work was done, and no conversational multi-turn layer was built. It is the smallest working slice that validates the two claims the larger portal initiative depends on: that the existing generated-index layer is sufficient retrieval infrastructure, and that a citation-honest answer contract is achievable on top of it.",
       "timeline_path": "generated/feature-timelines/AI-FEAT-059_TIMELINE.md"
+    },
+    {
+      "aliases": [],
+      "canonical_document": "features/AI-FEAT-060_MX_CREATIVE_CONSOLE_LOGITECH_HARDWARE_CONTROL_SURFACE.md",
+      "category": "Hardware & Peripheral Integration",
+      "dependencies": [],
+      "dependents": [],
+      "documentation_completeness": {
+        "evidence_gap_count": 5,
+        "narrative": "Evidence pending"
+      },
+      "evidence_status": "Verified from current code, tests, and a live physical hardware session (2026-10-15); earlier phases (1A/3A-D/4A/4B) are \"Known from project history; repository evidence pending\" beyond what this plugin's own `docs/mxLogitechCSharp.md`/`mxLogitechPlugin.md` already record.",
+      "feature_id": "AI-FEAT-060",
+      "introduced_version": "Evidence pending — not yet documented as fact (Phase 1A predates this record; earliest commit touching `integrations/logitech/autoingest-mx-csharp/` on `feature/mx-creative-console-v2` not yet dated here).",
+      "last_modified_version": "2026-10-15 — Unified Contextual Keypad migration (this record's own Evolution entry below).",
+      "maturity": "Evolving",
+      "name": "MX Creative Console — Logitech Hardware Control Surface",
+      "parent_feature": [],
+      "related_architecture_sections": [],
+      "related_bugs": [],
+      "related_changelog_entries": [
+        {
+          "date": "2026-10-15",
+          "excerpt": "**Affected feature(s)**: AI-FEAT-060"
+        }
+      ],
+      "related_code_paths": [
+        "integrations/logitech/autoingest-mx-csharp/src/Helpers/ContextualKeypadController.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Helpers/ContextualKeypadModel.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Helpers/ContextSlotBinding.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Helpers/ContextSlotImageRenderer.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Helpers/ImageSizeHelper.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Helpers/RefinementWorkspaceModel.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Helpers/RefinementButtonImageRenderer.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Helpers/GroupsWorkspaceModel.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Helpers/GroupMappingWorkspaceModel.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Actions/ContextSlotA1.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Actions/RefineTagsFolder.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Actions/GroupsFolder.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Actions/GroupMappingFolder.cs",
+        "integrations/logitech/autoingest-mx-csharp/src/Actions/NavigateFilesAdjustment.cs",
+        "integrations/logitech/autoingest-mx-csharp/test/AutoIngestMxCsDevPlugin.Tests/ContextualKeypadModelTests.cs",
+        "integrations/logitech/autoingest-mx-csharp/docs/mxLogitechCSharp.md",
+        "integrations/logitech/autoingest-mx-csharp/docs/mxLogitechPlugin.md"
+      ],
+      "related_decisions": [],
+      "related_features": [],
+      "related_postmortems": [],
+      "related_technical_docs": [
+        "integrations/logitech/autoingest-mx-csharp/docs/mxLogitechCSharp.md",
+        "integrations/logitech/autoingest-mx-csharp/docs/mxLogitechPlugin.md",
+        "[docs/commandLayer.md]"
+      ],
+      "related_tests": [],
+      "roadmap_ids": [
+        "AI-RM-013"
+      ],
+      "search_keywords": [
+        "console",
+        "control",
+        "creative",
+        "hardware",
+        "hardware & peripheral integration",
+        "logitech",
+        "surface"
+      ],
+      "status": "Implemented — evolving",
+      "subfeatures": [],
+      "summary": "A separate C# plugin for the Logitech MX Creative Console (Keypad + dial) that lets an operator drive AutoIngest's Browse/Groups/Map Group/Refine Tags workflows directly from physical hardware, talking to the running AutoIngest Electron app over its existing local WebSocket command layer ([docs/commandLayer.md](../../commandLayer.md)) rather than through the on-screen UI. It exists under `integrations/logitech/autoingest-mx-csharp/`, outside the Electron app's own source tree, and is developed entirely on `feature/mx-creative-console-v2` (not yet merged to `main` or `stable/0.9`).",
+      "timeline_path": "generated/feature-timelines/AI-FEAT-060_TIMELINE.md"
     }
   ],
   "schema_version": "1.3.0"
