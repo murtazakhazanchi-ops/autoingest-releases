@@ -29,26 +29,27 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin
     /// press/click mechanism at all, independent of SDK support (see
     /// docs/mxLogitechPlugin.md "Dial-press experiment"). Not re-tested here
     /// since it is a hardware fact, not an SDK-specific one.
+    ///
+    /// Unified Contextual Keypad (brief §9): the dial's meaning is now
+    /// context-sensitive — delegates entirely to
+    /// ContextualKeypadController.DialRotate(), which itself routes to real
+    /// file navigation in Browse mode, or controller-managed page
+    /// forward/back in Groups/MapGroup/RefineTags mode. This file no longer
+    /// decides that routing itself, so file navigation vs. page navigation
+    /// can never drift out of sync with whatever the nine Keypad slots are
+    /// currently showing.
     /// </summary>
     public class NavigateFilesAdjustment : PluginDynamicAdjustment
     {
         public NavigateFilesAdjustment()
-            : base(displayName: "Navigate Files", description: "Moves the active file forward or backward in AutoIngest", groupName: "Browse", hasReset: false)
+            : base(displayName: "Navigate Files", description: "Moves the active file forward or backward in AutoIngest (or pages, while a contextual Keypad mode is active)", groupName: "Browse", hasReset: false)
         {
         }
 
         protected override void ApplyAdjustment(String actionParameter, Int32 diff)
         {
             if (diff == 0) return;
-            var commandId = diff > 0 ? "navigation.nextFile" : "navigation.previousFile";
-            ActionRunner.FireAndForget(async () =>
-            {
-                var result = await SharedClient.Instance.ExecuteCommandAsync(commandId).ConfigureAwait(false);
-                if (!result.Ok)
-                {
-                    PluginLog.Verbose($"[autoingest-mx-cs] navigate_files: {commandId} not executed ({result.Reason ?? "unknown"})");
-                }
-            }, "navigate_files");
+            ContextualKeypadController.DialRotate(diff > 0 ? 1 : -1);
         }
 
         protected override String GetAdjustmentValue(String actionParameter) => String.Empty;

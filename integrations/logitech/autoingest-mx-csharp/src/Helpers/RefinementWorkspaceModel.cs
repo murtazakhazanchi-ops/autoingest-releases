@@ -229,20 +229,46 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin
         /// none only ever gets ONE line's worth before truncating — the exact
         /// case that physically overflowed.
         ///
-        /// Known residual limitation, not fixed here (smallest-fix scope):
-        /// a multi-word label containing one individual word longer than a
-        /// single line's budget can still overflow that one wrapped line,
-        /// since this only measures total length, not per-word width. Real
-        /// tag labels in this product are short English/transliterated
-        /// words, so this has not been observed; documented rather than
-        /// guessed at with unverified additional logic.</summary>
+        /// Second round, found during Phase 4C (revised) physical testing of
+        /// GroupMappingButtonImageRenderer's real component/folder-name
+        /// labels (e.g. "01-Ziyarat-Mawkib-Mazar e Saifee"): the first
+        /// fix's "has a wrap point → grant a 2-line budget" check looked
+        /// only at whether the label contained a space ANYWHERE, not
+        /// whether that space survived the actual truncation cut. That
+        /// label's first (and only reachable) space sits at index 23 — past
+        /// the 15-character cutoff the granted budget produced — so the
+        /// truncated result ("01-Ziyarat-Mawk…") had no space in it at all,
+        /// landing right back in the original unbroken-overflow bug.
+        /// Confirmed by rendering the actual truncated output and visually
+        /// inspecting it, not guessed. Fixed: the wrap point only counts as
+        /// usable when it occurs AT OR BEFORE the single-line budget — i.e.
+        /// DrawText's own real first wrapped line (everything up to that
+        /// space) must itself fit in one line, or granting a larger overall
+        /// budget is meaningless. A label whose first word alone exceeds one
+        /// line's budget now correctly falls back to the single-line
+        /// budget, same as a label with no space at all.</summary>
         public static string TruncateForDisplay(string label, int canvasWidthPixels)
         {
             if (string.IsNullOrEmpty(label)) { return label; }
-            const double PixelsPerChar = 9.3;
+            // Third round, found during the same Phase 4C (revised) physical
+            // round: 9.3px/char was measured against a mixed-case sample,
+            // but a real capital-letter-heavy word ("Mubarak…") measures
+            // ~9.8px/char — at 9.3 the resulting truncated line
+            // ("Mubarak…", 78.2px) left only 1.8px of margin inside an 80px
+            // canvas, which overflowed in practice (anti-aliasing/glyph
+            // bounds are not pixel-exact to MeasureText's own advance
+            // width). Measured several realistic component-name words
+            // (SkiaSharp.MeasureText against this exact installed font) and
+            // confirmed 10.5px/char keeps every wrapped line comfortably
+            // under budget (~15-19px margin) without over-truncating
+            // shorter labels — not guessed, verified by re-rendering both
+            // real failing component names and checking their actual
+            // per-line measured width before raising this constant.
+            const double PixelsPerChar = 10.5;
             var perLineBudget = System.Math.Max(4, (int)(canvasWidthPixels / PixelsPerChar));
-            var hasWrapPoint = label.Contains(' ');
-            var budget = hasWrapPoint ? perLineBudget * 2 : perLineBudget;
+            var spaceIndex = label.IndexOf(' ');
+            var hasUsableWrapPoint = spaceIndex >= 0 && spaceIndex <= perLineBudget;
+            var budget = hasUsableWrapPoint ? perLineBudget * 2 : perLineBudget;
             return label.Length <= budget ? label : label.Substring(0, System.Math.Max(1, budget - 1)) + "…";
         }
     }

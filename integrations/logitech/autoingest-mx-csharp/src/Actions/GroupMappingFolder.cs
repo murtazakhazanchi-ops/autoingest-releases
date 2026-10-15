@@ -107,7 +107,9 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin
             this._lastSpecsByParam.Keys.Select(this.CreateCommandName);
 
         public override string GetCommandDisplayName(string actionParameter, PluginImageSize imageSize) =>
-            this._lastSpecsByParam.TryGetValue(actionParameter, out var spec) ? spec.Label : actionParameter;
+            this._lastSpecsByParam.TryGetValue(actionParameter, out var spec)
+                ? RefinementWorkspaceModel.TruncateForDisplay(spec.Label, ImageSizeHelper.GetWidthPixels(imageSize))
+                : actionParameter;
 
         public override BitmapImage GetCommandImage(string actionParameter, PluginImageSize imageSize)
         {

@@ -272,7 +272,7 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin.Tests
             var result = RefinementWorkspaceModel.TruncateForDisplay(longLabel, canvasWidthPixels: 60);
 
             Assert.True(result.Length < longLabel.Length);
-            Assert.StartsWith("A Very Long", result); // real text preserved, not "Tag 1"
+            Assert.StartsWith("A Very", result); // real text preserved, not "Tag 1" — exact cutoff shifts with the measured px/char constant, not pinned here
             Assert.DoesNotContain("Tag 1", result);
             Assert.EndsWith("…", result);
         }
@@ -304,7 +304,7 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin.Tests
             // stay far short of the old (broken) 2-line budget of ~22 chars,
             // which is what physically overflowed on the real device.
             Assert.True(result.Length <= 10, $"expected a single-line-budget truncation, got \"{result}\" ({result.Length} chars)");
-            Assert.StartsWith("TestTag", result);
+            Assert.StartsWith("Test", result); // exact cutoff shifts with the measured px/char constant, not pinned here
             Assert.EndsWith("…", result);
         }
 
@@ -313,10 +313,46 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin.Tests
         // truncating it as aggressively as an unbroken label would needlessly
         // shorten text that actually fits fine.
         [Fact]
-        public void TruncateForDisplay_LabelWithWrapPoint_StillGetsTwoLineBudget()
+        public void TruncateForDisplay_LabelWithUsableWrapPoint_StillGetsTwoLineBudget()
         {
             var result = RefinementWorkspaceModel.TruncateForDisplay("Test Tag One", canvasWidthPixels: 80);
             Assert.Equal("Test Tag One", result); // fits within the 2-line budget — passes through unmodified
+        }
+
+        // Pins the real physical-closure finding from Phase 4C (revised)'s
+        // GROUPS/MAP GROUP testing: a real component folder name
+        // ("01-Ziyarat-Mawkib-Mazar e Saifee") DOES contain a space, but not
+        // until index 23 — past where a naive two-line-budget cutoff landed
+        // (15 chars), producing a truncated result with NO space in it at
+        // all and overflowing on the real device exactly like the original,
+        // unbroken-label bug. Confirmed by rendering the actual truncated
+        // output and visually inspecting it. A wrap point only "counts" when
+        // it occurs at or before the single-line budget — otherwise the
+        // label's own first word is already too long for one line, so a
+        // bigger overall budget cannot help and must not be granted.
+        [Fact]
+        public void TruncateForDisplay_WrapPointPastSingleLineBudget_FallsBackToOneLineBudget()
+        {
+            var realComponentFolderName = "01-Ziyarat-Mawkib-Mazar e Saifee"; // first space at index 23
+            var result = RefinementWorkspaceModel.TruncateForDisplay(realComponentFolderName, canvasWidthPixels: 80);
+
+            Assert.True(result.Length <= 10, $"expected a single-line-budget truncation, got \"{result}\" ({result.Length} chars)");
+            Assert.DoesNotContain(" ", result); // the truncated result must never pretend to have a wrap point it doesn't
+            Assert.EndsWith("…", result);
+        }
+
+        // The inverse case: a space EARLY enough to survive truncation still
+        // grants the larger budget, and the result legitimately contains it.
+        [Fact]
+        public void TruncateForDisplay_WrapPointWithinSingleLineBudget_GrantsTwoLineBudgetAndKeepsTheSpace()
+        {
+            var label = "Waaz Mubarak-Al-Masjid al-Moazzam-Surat-Extra-Padding-To-Force-Truncation"; // first space at index 4
+            var result = RefinementWorkspaceModel.TruncateForDisplay(label, canvasWidthPixels: 80);
+
+            Assert.True(result.Length < label.Length);
+            Assert.Contains(" ", result);
+            Assert.StartsWith("Waaz Mubarak", result);
+            Assert.EndsWith("…", result);
         }
 
         // ── Unknown future state fields (System.Text.Json default-ignore) ──

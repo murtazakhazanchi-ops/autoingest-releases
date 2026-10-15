@@ -50,6 +50,24 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin
         // SharedClient.Instance.GetLatestState() fresh, never this cache.
         private Dictionary<string, RefinementButtonSpec> _lastSpecsByParam = new();
 
+        // Found during Phase 4C (revised) physical testing of the reinstated
+        // live-redraw trick: a single real tag press triggers the renderer
+        // to call AutoIngest's own several already-shared sync chokepoints
+        // in succession (syncAllTiles/syncAllRefinementBadges/renderRefinementPanel
+        // etc. — see docs/commandLayer.md "State-change subscription"), each
+        // independently notifying the command layer — so this instance can
+        // receive several closely-spaced, overlapping state pushes for what
+        // is logically ONE change. RefreshButtonListFrom's "drop to empty,
+        // restore" redraw was not safe against overlapping/interleaved
+        // calls: two overlapping executions could race on the shared
+        // _lastSpecsByParam field, each momentarily showing the OTHER call's
+        // intermediate (dropped-empty or stale) snapshot — this is the
+        // confirmed cause of "pressing one tag visibly recolors a different
+        // tag too." Serialized with a plain lock (no I/O inside the locked
+        // region, so this can never deadlock or block the WS thread for
+        // longer than a redraw itself takes).
+        private readonly object _refreshLock = new();
+
         // Found during physical testing: a background state-subscription
         // callback (OnStateChanged) must never act — especially never call
         // back into the SDK — once this instance no longer believes itself
@@ -212,35 +230,55 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin
         /// silently overwritten by a possibly-stale re-fetch.</summary>
         private void RefreshButtonListFrom(AutoIngestState state)
         {
+            lock (this._refreshLock)
+            {
+                this.RefreshButtonListFromLocked(state);
+            }
+        }
+
+        private void RefreshButtonListFromLocked(AutoIngestState state)
+        {
             var specs = RefinementWorkspaceModel.BuildButtonSpecs(state?.TagRefinement, state?.AvailableCommands);
             var newByParam = specs.ToDictionary(s => s.ActionParameter);
             var oldByParam = this._lastSpecsByParam;
 
             var listChanged = oldByParam.Count != newByParam.Count || !oldByParam.Keys.All(newByParam.ContainsKey);
+            var stateOnlyChanged = !listChanged
+                && specs.Any(s => oldByParam.TryGetValue(s.ActionParameter, out var previous) && previous.State != s.State);
 
-            // Confirmed from physical diagnostic logging across three
-            // separate attempts: CommandImageChanged() does not cause ANY
-            // GetCommandImage requery in this installed SDK (v6.4.2.3414).
-            // An earlier revision worked around this for a same-list,
-            // state-only change (e.g. a tag's checked state flipping) by
-            // forcing the list to "change" twice via ButtonActionNamesChanged()
-            // (drop to empty, notify, restore, notify again) so every name
-            // looked "new" and got a real image requery. Physical pagination
-            // testing (brief §13) found that trick has a confirmed, 100%-
-            // reproducible cost worse than the problem it solved: ANY tag
-            // press on page 2+ of a multi-page scope snapped the device back
-            // to page 1, making multi-page refinement unusable — while the
-            // live-redraw benefit it bought was already only inconsistent/
-            // racy (see the RefinementButtonImageRenderer/GetCommandImage
-            // diagnostic history). Confirmed with the user as the deliberate
-            // trade-off (brief §24): never fight pagination to chase a
-            // partially-working redraw. So a state-only change is now a
-            // genuine no-op here — only a real list-membership change
-            // (listChanged) ever calls ButtonActionNamesChanged(). The
-            // operator sees a tag's current state correctly on every fresh
-            // Activate()/list-changing redraw; it just does not flip live
-            // in place while the same list stays on screen.
-            if (!listChanged) { return; }
+            if (!listChanged && !stateOnlyChanged) { return; }
+
+            // Reinstated during Phase 4C (revised) physical testing — history:
+            // CommandImageChanged() is confirmed to never cause a
+            // GetCommandImage requery in this installed SDK (v6.4.2.3414,
+            // three separate attempts). The only confirmed-working mechanism
+            // is forcing the list to "change" twice via
+            // ButtonActionNamesChanged() (drop to empty, notify, restore,
+            // notify again) so every name looks "new" and gets a real
+            // requery. Phase 4B closure's own pagination testing found this
+            // resets the device to page 1 on every state-only change, and
+            // the decision then was to accept stale state instead (brief
+            // §24) rather than fight pagination.
+            //
+            // That trade-off is reversed here: once tag state became the
+            // button's own BACKGROUND COLOR (an explicit operator design
+            // request, replacing the earlier small-badge rendering), a
+            // stale color after a press is a real correctness bug, not a
+            // minor cosmetic staleness — confirmed live ("I press again to
+            // remove it, the green doesn't reset, it stays on"). A wrong-
+            // colored button is worse than losing page position on a
+            // same-list press. Real Tag Refinement scopes are typically
+            // small enough to rarely paginate at all (the brief's own "short
+            // English/transliterated words" tag-count expectation), so this
+            // is judged the right default now — confirmed with the operator
+            // this is specifically scoped to Refine Tags; Map Group/Groups
+            // keep the listChanged-only behavior until/unless the same
+            // problem is confirmed there too.
+            if (stateOnlyChanged)
+            {
+                this._lastSpecsByParam = new Dictionary<string, RefinementButtonSpec>();
+                this.ButtonActionNamesChanged();
+            }
 
             this._lastSpecsByParam = newByParam;
             this.ButtonActionNamesChanged();
@@ -255,7 +293,9 @@ namespace Loupedeck.AutoIngestMxCsDevPlugin
             this._lastSpecsByParam.Keys.Select(this.CreateCommandName);
 
         public override string GetCommandDisplayName(string actionParameter, PluginImageSize imageSize) =>
-            this._lastSpecsByParam.TryGetValue(actionParameter, out var spec) ? spec.Label : actionParameter;
+            this._lastSpecsByParam.TryGetValue(actionParameter, out var spec)
+                ? RefinementWorkspaceModel.TruncateForDisplay(spec.Label, ImageSizeHelper.GetWidthPixels(imageSize))
+                : actionParameter;
 
         public override BitmapImage GetCommandImage(string actionParameter, PluginImageSize imageSize)
         {
