@@ -8,7 +8,20 @@ const config = require('../config/app.config');
 
 const STATE_FILE  = 'qmz-sequences.json';
 const UNSEQUENCED = '_Unsequenced';
-const SEQ_RE      = /^\d{2}[QMZ]$/;
+// Sequence code shape: 2 zero-padded digits, an optional single lowercase
+// alphabetic suffix (a slot split across multiple honorees — e.g. a single
+// numbered appointment subdivided into "5a"/"5b"), then the QMZ type letter —
+// Q/M/Z as before, or the combined type "MZ" (PDF-Assisted QMZ Workspace
+// Folder Generation feature; real reference programs carry entries like
+// "5a MZ"/"5b MZ" for a single appointment split between two honorees).
+// Capturing groups are used directly by parseCode() below — a capturing
+// group does not change .test()'s boolean result, so the SAME regex is also
+// used everywhere else here purely as a membership test (scanRoot,
+// _classifyOtherFolders). The suffix, if present, is always part of the
+// sequence's identity (two different suffixes are two different, independent
+// sequences — see createSequence's duplicate check, which compares the full
+// code string unchanged).
+const SEQ_RE      = /^(\d{2})([a-z]?)(MZ|Q|M|Z)$/;
 // Mirrors services/photographerSequenceService.js's PC_PREFIX_RE — duplicated
 // locally rather than imported, matching this file's existing convention of
 // staying decoupled from other main-process modules (see mediaType/isJunkFile
@@ -19,8 +32,19 @@ const PC_PREFIX_RE = /^PC(\d{2,3})-/;
 function _stripPcPrefix(name) {
   return (name || '').replace(PC_PREFIX_RE, '');
 }
-const LETTER_TYPE = { Q: 'Qadam', M: 'Majlis', Z: 'Ziyafat' };
+const LETTER_TYPE = { Q: 'Qadam', M: 'Majlis', Z: 'Ziyafat', MZ: 'Majlis + Ziyafat' };
+// Q/M/Z's specific ceilings (50/51/52) predate this feature and have no
+// discoverable rationale anywhere in the codebase, commit history or product
+// docs (git blame → commit b56f6ba, "feat(qmz): add QMZ Sequence Manager",
+// introduces them with no explanation; DEC-011 confirms "type-specific
+// maximums" is an intentional product concept but gives no numbers) — left
+// completely untouched, per instruction, rather than reverse-engineered.
+// MZ deliberately has NO entry here: there is no product rationale to invent
+// one. createSequence() falls back to MAX_SEQUENCE_NUMBER for any letter
+// without its own configured ceiling — the sequence-code FORMAT's own
+// structural limit (two zero-padded digits), not a business rule.
 const LETTER_MAX  = { Q: 50, M: 51, Z: 52 };
+const MAX_SEQUENCE_NUMBER = 99;
 const MEDIA_EXT   = new Set([...config.PHOTO_EXTENSIONS, ...config.VIDEO_EXTENSIONS]);
 const RAW_EXTS    = new Set(config.RAW_EXTENSIONS);
 const PHOTO_EXTS  = new Set(config.PHOTO_EXTENSIONS);
@@ -135,16 +159,27 @@ function isJunkFile(filename) {
 
 // ── Pure helpers ──────────────────────────────────────────────────────────────
 
-function formatCode(number, letter) {
-  return String(number).padStart(2, '0') + String(letter).toUpperCase();
+// `suffix` is optional and backward-compatible: every existing call site omits
+// it, producing byte-identical output to before (e.g. formatCode(1, 'Q') is
+// still exactly "01Q"). Always lower-cased on the way out, regardless of how
+// it was cased on the way in, per the sequence-folder naming convention
+// (number, then lowercase suffix if any, then uppercase type — no separator).
+function formatCode(number, letter, suffix = '') {
+  return String(number).padStart(2, '0') + String(suffix || '').toLowerCase() + String(letter).toUpperCase();
 }
 
+// Returns { number, suffix, letter, type, code, folderName } or null for
+// anything SEQ_RE doesn't recognize. `suffix` is '' (never undefined) for a
+// plain code like "01Q" — existing callers reading only .number/.letter/
+// .type/.code/.folderName are completely unaffected by its addition.
 function parseCode(code) {
-  if (typeof code !== 'string' || !SEQ_RE.test(code)) return null;
-  const letter = code[2];
-  const number = parseInt(code, 10);
-  if (!LETTER_TYPE[letter]) return null;
-  return { number, letter, type: LETTER_TYPE[letter], code, folderName: code };
+  if (typeof code !== 'string') return null;
+  const m = SEQ_RE.exec(code);
+  if (!m) return null;
+  const [, numStr, suffix, letter] = m;
+  const number = parseInt(numStr, 10);
+  if (!LETTER_TYPE[letter]) return null; // defensive — SEQ_RE's own alternation already guarantees this
+  return { number, suffix, letter, type: LETTER_TYPE[letter], code, folderName: code };
 }
 
 function letterToType(letter) {
@@ -648,21 +683,31 @@ async function initRoot(qmzRoot) {
 
 // ── Create sequences ─────────────────────────────────────────────────────────
 
-async function createSequence(qmzRoot, number, letter) {
+// `suffix` is optional and backward-compatible — every existing caller omits
+// it, so `letter`-only validation and the Q/M/Z ceilings in LETTER_MAX are
+// completely untouched. MZ (and any future letter with no entry in
+// LETTER_MAX) falls back to MAX_SEQUENCE_NUMBER — see that constant's own
+// comment for why no MZ-specific ceiling is invented here.
+async function createSequence(qmzRoot, number, letter, suffix = '') {
   letter = String(letter ?? '').toUpperCase();
   if (!LETTER_TYPE[letter]) return { ok: false, error: `Invalid letter: ${letter}` };
-  const max = LETTER_MAX[letter];
+  suffix = String(suffix ?? '').toLowerCase();
+  if (suffix && !/^[a-z]$/.test(suffix)) return { ok: false, error: `Invalid sequence suffix: ${suffix}` };
+  const max = LETTER_MAX[letter] ?? MAX_SEQUENCE_NUMBER;
   if (!Number.isInteger(number) || number < 1 || number > max)
     return { ok: false, error: `Number out of range for ${letter}: ${number} (1–${max})` };
 
-  const code = formatCode(number, letter);
+  const code = formatCode(number, letter, suffix);
   try { await fsp.mkdir(path.join(qmzRoot, code), { recursive: true }); }
   catch (err) { return { ok: false, error: err.message }; }
 
   const state   = await readState(qmzRoot);
+  // Exact-string comparison on the full code (including suffix) — "05aMZ"
+  // and "05bMZ" are different codes, so this already distinguishes different
+  // suffixes of the same base number/type without any extra logic.
   const already = state.sequences.some(s => s.code === code);
   if (!already) {
-    state.sequences.push({ code, number, letter, type: LETTER_TYPE[letter] });
+    state.sequences.push({ code, number, letter, suffix, type: LETTER_TYPE[letter] });
     state.sequences.sort((a, b) => (a.code < b.code ? -1 : 1));
     const r = await saveState(qmzRoot, state);
     if (!r.ok) return { ok: false, error: r.error };
@@ -674,10 +719,10 @@ async function createSequence(qmzRoot, number, letter) {
 async function bulkCreateSequences(qmzRoot, items) {
   const created = [];
   const errors  = [];
-  for (const { number, letter } of items) {
-    const r = await createSequence(qmzRoot, number, letter);
+  for (const { number, letter, suffix } of items) {
+    const r = await createSequence(qmzRoot, number, letter, suffix);
     if (r.ok) created.push(r.code);
-    else errors.push({ number, letter, error: r.error });
+    else errors.push({ number, letter, suffix, error: r.error });
   }
   return { ok: errors.length === 0, created, errors };
 }
@@ -699,7 +744,12 @@ async function editSequenceType(qmzRoot, code, newLetter) {
     return { ok: false, error: 'Move files out of this sequence before changing its type.' };
   }
 
-  const newCode = formatCode(parsed.number, newLetter);
+  // The existing sequence's suffix (if any) is carried through unchanged —
+  // editSequenceType changes only the TYPE, never the number or suffix (there
+  // is no caller/UI need for that yet, and silently discarding a suffix on a
+  // type edit would be exactly the "silently discard suffixes" this
+  // extension must not do).
+  const newCode = formatCode(parsed.number, newLetter, parsed.suffix);
   const state   = await readState(qmzRoot);
   if (state.sequences.some(s => s.code === newCode)) {
     return { ok: false, error: `Sequence ${newCode} already exists.` };
@@ -713,7 +763,7 @@ async function editSequenceType(qmzRoot, code, newLetter) {
   catch (err) { return { ok: false, error: err.message }; }
 
   state.sequences = state.sequences.map(s => s.code === code
-    ? { code: newCode, number: parsed.number, letter: newLetter, type: LETTER_TYPE[newLetter] }
+    ? { code: newCode, number: parsed.number, letter: newLetter, suffix: parsed.suffix, type: LETTER_TYPE[newLetter] }
     : s);
   state.sequences.sort((a, b) => (a.code < b.code ? -1 : 1));
   const r = await saveState(qmzRoot, state);
