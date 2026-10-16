@@ -13,11 +13,11 @@
 | Related technical docs | `docs/mxLogitechCSharp.md`, `docs/mxLogitechPlugin.md`, `docs/commandLayer.md` |
 | Evidence status | Verified from current code, tests, and a live physical hardware session (2026-10-15); earlier phases (1A/3A-D/4A/4B) are "Known from project history; repository evidence pending" beyond what this plugin's own `docs/mxLogitechCSharp.md`/`mxLogitechPlugin.md` already record. |
 | First-known implementation | Evidence pending — not yet documented as fact (Phase 1A predates this record; earliest commit touching `integrations/logitech/autoingest-mx-csharp/` on `feature/mx-creative-console-v2` not yet dated here). |
-| Latest major update | 2026-10-15 — Unified Contextual Keypad migration (this record's own Evolution entry below). |
+| Latest major update | 2026-10-16 — Released in AutoIngest v0.9.14 Stable (commit `093c721`, tag `v0.9.14`); see this record's own Evolution entry below. |
 
 ## Summary
 
-A separate C# plugin for the Logitech MX Creative Console (Keypad + dial) that lets an operator drive AutoIngest's Browse/Groups/Map Group/Refine Tags workflows directly from physical hardware, talking to the running AutoIngest Electron app over its existing local WebSocket command layer (`docs/commandLayer.md`) rather than through the on-screen UI. It exists under `integrations/logitech/autoingest-mx-csharp/`, outside the Electron app's own source tree, and is developed entirely on `feature/mx-creative-console-v2` (not yet merged to `main` or `stable/0.9`).
+A separate C# plugin for the Logitech MX Creative Console (Keypad + dial) that lets an operator drive AutoIngest's Browse/Groups/Map Group/Refine Tags workflows directly from physical hardware, talking to the running AutoIngest Electron app over its existing local WebSocket command layer (`docs/commandLayer.md`) rather than through the on-screen UI. It exists under `integrations/logitech/autoingest-mx-csharp/`, outside the Electron app's own source tree, and was developed on `feature/mx-creative-console-v2` before being promoted through `integration/main-stable-reconcile` into `main`/`stable/0.9` and released in AutoIngest v0.9.14 Stable (commit `093c721`, tag `v0.9.14`, 2026-10-16).
 
 ## Current Behavior
 
@@ -44,6 +44,7 @@ Evidence pending for the full original scope of Phase 1A/3A-D/4A/4B beyond what 
 - **2026-10-15 — Three physical bugs found and fixed during the migrated build's own hardware verification** (each has its own BUG record, linked below): an Options+ profile mapping gap on the physical ninth key; label truncation silently dropped during the `ContextSlotN` migration; and — following a design request, not a bug — the ninth key's role in Refine Tags mode specifically changed from BACK to CLOSE (`tagRefinement.close`), since that mode is the only one with an AutoIngest-side session to end.
 - **2026-10-15 — User-confirmed physical verification**: "i have done all the tests alls working fine" — Groups, Map Group, and Refine Tags modes, plus the remaining physical test matrix items from the migration brief (dial paging, remapping via press, cross-mode switching, label truncation, the CLOSE-vs-BACK layout), all confirmed working on the real device.
 - **2026-10-15** — Migrated the AutoIngest MX Creative Console Logitech C# plugin's Groups/Map Group/Refine Tags workspaces off PluginDynamicFolder rendering onto a native 9-slot PluginMultistateDynamicCommand architecture (ContextSlotA1-A9), after confirming the folder-rendering mechanism (ButtonActionNamesChanged/CommandImageChanged) was fundamentally unreliable under physical testing (pagination resets, cross-button color contamination, phantom colors). Physically verified end-to-end on the real MX Creative Keypad. (evidence: cb4a2d489015e6fc3411d156b0edece5b7d77fec)
+- **2026-10-16 — Promoted to Stable (v0.9.14)**: `feature/mx-creative-console-v2` was promoted through `integration/main-stable-reconcile` (commit `65d39bf`) into `stable/0.9` and `main`, then released as AutoIngest v0.9.14 Stable (version-bump commit `093c721`, tag `v0.9.14`). Re-verified on the actual published Stable macOS package (not rc.2, not a dev build) across the full physical smoke test (install/version/bundle ID, Options+ recognition, profile activation, C# connection with Node fallback silent, Browse/Dialpad/main dial, Refine Tags state+color update, Map Group real component list, Import review flow with no auto-copy from a hardware press alone, quit/relaunch reconnect, foreground-app-switch profile-switching correctness) — all clean, no divergence from rc.2. macOS distribution is ad-hoc signed, not notarized (Apple Developer signing credentials not available) — Gatekeeper rejects it by default, same disclosed limitation as v0.9.13; Windows installer built and published via CI normally.
 
 ## Known Bugs / Troubleshooting
 
@@ -59,7 +60,7 @@ Evidence pending for the full original scope of Phase 1A/3A-D/4A/4B beyond what 
 
 - Remove the retired `PluginDynamicFolder`-based `RefineTagsFolder.cs`/`GroupsFolder.cs`/`GroupMappingFolder.cs` source now that the native replacement is physically proven (currently kept as source/reference only, per the migration brief's own "do not delete first" instruction).
 - A native parameterized-action mechanism (`PluginDynamicAction.AddParameter`/`RemoveParameter`/`GetParameters`/`ParametersChanged`/`UpdateParameters`) was found via reflection during this session but deliberately not pursued — noted for a future architecture review, since it contradicts this codebase's earlier assumption that the C# SDK has no parameterized-action mechanism.
-- Merge/release decision for `feature/mx-creative-console-v2` into `main`/`stable/0.9` — not yet made.
+- Merge/release decision for `feature/mx-creative-console-v2` into `main`/`stable/0.9` — **resolved 2026-10-16**: merged and released in AutoIngest v0.9.14 Stable (see this record's own Evolution entry above). Left here, not deleted, per this system's Append-Never-Erase rule.
 
 ## Related Files
 
