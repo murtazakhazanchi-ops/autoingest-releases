@@ -3073,20 +3073,20 @@
       "id": "AI-FEAT-060",
       "knownLimitations": {
         "evidenceGapCount": 5,
-        "futureEnhancements": "- Remove the retired `PluginDynamicFolder`-based `RefineTagsFolder.cs`/`GroupsFolder.cs`/`GroupMappingFolder.cs` source now that the native replacement is physically proven (currently kept as source/reference only, per the migration brief's own \"do not delete first\" instruction).\n- A native parameterized-action mechanism (`PluginDynamicAction.AddParameter`/`RemoveParameter`/`GetParameters`/`ParametersChanged`/`UpdateParameters`) was found via reflection during this session but deliberately not pursued — noted for a future architecture review, since it contradicts this codebase's earlier assumption that the C# SDK has no parameterized-action mechanism.\n- Merge/release decision for `feature/mx-creative-console-v2` into `main`/`stable/0.9` — not yet made.",
+        "futureEnhancements": "- Remove the retired `PluginDynamicFolder`-based `RefineTagsFolder.cs`/`GroupsFolder.cs`/`GroupMappingFolder.cs` source now that the native replacement is physically proven (currently kept as source/reference only, per the migration brief's own \"do not delete first\" instruction).\n- A native parameterized-action mechanism (`PluginDynamicAction.AddParameter`/`RemoveParameter`/`GetParameters`/`ParametersChanged`/`UpdateParameters`) was found via reflection during this session but deliberately not pursued — noted for a future architecture review, since it contradicts this codebase's earlier assumption that the C# SDK has no parameterized-action mechanism.\n- Merge/release decision for `feature/mx-creative-console-v2` into `main`/`stable/0.9` — **resolved 2026-10-16**: merged and released in AutoIngest v0.9.14 Stable (see this record's own Evolution entry above). Left here, not deleted, per this system's Append-Never-Erase rule.",
         "openBugs": []
       },
       "lastUpdated": {
         "evidenceStatus": "Verified from current code, tests, and a live physical hardware session (2026-10-15); earlier phases (1A/3A-D/4A/4B) are \"Known from project history; repository evidence pending\" beyond what this plugin's own `docs/mxLogitechCSharp.md`/`mxLogitechPlugin.md` already record.",
         "introducedVersion": "Evidence pending — not yet documented as fact (Phase 1A predates this record; earliest commit touching `integrations/logitech/autoingest-mx-csharp/` on `feature/mx-creative-console-v2` not yet dated here).",
-        "lastModifiedVersion": "2026-10-15 — Unified Contextual Keypad migration (this record's own Evolution entry below)."
+        "lastModifiedVersion": "2026-10-16 — Released in AutoIngest v0.9.14 Stable (commit `093c721`, tag `v0.9.14`); see this record's own Evolution entry below."
       },
       "operatorStatus": "PARTIALLY_AVAILABLE",
       "relatedFeatures": [],
       "roadmapRelationship": [
         {
           "roadmapId": "AI-RM-013",
-          "status": "**In progress** (implemented and physically verified on `feature/mx-creative-console-v2`; not yet merged to `main` or `stable/0.9`)"
+          "status": "**Completed** — released in AutoIngest v0.9.14 Stable (commit `093c721`, tag `v0.9.14`, 2026-10-16)"
         }
       ],
       "searchTerms": [
@@ -3121,9 +3121,9 @@
         "integrations/logitech/autoingest-mx-csharp/test/AutoIngestMxCsDevPlugin.Tests/ContextualKeypadModelTests.cs"
       ],
       "status": "Implemented — evolving",
-      "summary": "A separate C# plugin for the Logitech MX Creative Console (Keypad + dial) that lets an operator drive AutoIngest's Browse/Groups/Map Group/Refine Tags workflows directly from physical hardware, talking to the running AutoIngest Electron app over its existing local WebSocket command layer (`docs/commandLayer.md`) rather than through the on-screen UI. It exists under `integrations/logitech/autoingest-mx-csharp/`, outside the Electron app's own source tree, and is developed entirely on `feature/mx-creative-console-v2` (not yet merged to `main` or `stable/0.9`).",
+      "summary": "A separate C# plugin for the Logitech MX Creative Console (Keypad + dial) that lets an operator drive AutoIngest's Browse/Groups/Map Group/Refine Tags workflows directly from physical hardware, talking to the running AutoIngest Electron app over its existing local WebSocket command layer (`docs/commandLayer.md`) rather than through the on-screen UI. It exists under `integrations/logitech/autoingest-mx-csharp/`, outside the Electron app's own source tree, and was developed on `feature/mx-creative-console-v2` before being promoted through `integration/main-stable-reconcile` into `main`/`stable/0.9` and released in AutoIngest v0.9.14 Stable (commit `093c721`, tag `v0.9.14`, 2026-10-16).",
       "title": "MX Creative Console — Logitech Hardware Control Surface",
-      "whatItDoes": "A separate C# plugin for the Logitech MX Creative Console (Keypad + dial) that lets an operator drive AutoIngest's Browse/Groups/Map Group/Refine Tags workflows directly from physical hardware, talking to the running AutoIngest Electron app over its existing local WebSocket command layer (`docs/commandLayer.md`) rather than through the on-screen UI. It exists under `integrations/logitech/autoingest-mx-csharp/`, outside the Electron app's own source tree, and is developed entirely on `feature/mx-creative-console-v2` (not yet merged to `main` or `stable/0.9`)."
+      "whatItDoes": "A separate C# plugin for the Logitech MX Creative Console (Keypad + dial) that lets an operator drive AutoIngest's Browse/Groups/Map Group/Refine Tags workflows directly from physical hardware, talking to the running AutoIngest Electron app over its existing local WebSocket command layer (`docs/commandLayer.md`) rather than through the on-screen UI. It exists under `integrations/logitech/autoingest-mx-csharp/`, outside the Electron app's own source tree, and was developed on `feature/mx-creative-console-v2` before being promoted through `integration/main-stable-reconcile` into `main`/`stable/0.9` and released in AutoIngest v0.9.14 Stable (commit `093c721`, tag `v0.9.14`, 2026-10-16)."
     }
   ],
   "docsys_version": "1.3.0",

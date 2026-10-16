@@ -16,7 +16,7 @@ Live project status. Update alongside meaningful feature work — see [05_DOCUME
 | In active development | 1 (AI-FEAT-058 Multi-Event Import — implemented and verified on branch `feature/multi-event-import`; merge and release pending; AI-RM-011, a parallel ingestion-workflow track outside the AI-RM-001…009 sequence) |
 | Planned features | 8 (AI-FEAT-049 through AI-FEAT-056, mapped 1:1 to AI-RM-002 through AI-RM-009) |
 | Overall roadmap progress | 1/9 milestones complete |
-| Completed roadmap milestones | AI-RM-001 (Metadata Audit & Repair); AI-RM-010 (Multi-Channel Release & Update System — a parallel infrastructure track, not part of the AI-RM-001…009 archive-capability sequence this dashboard otherwise tracks); AI-RM-012 (AutoIngest Knowledge & Onboarding Portal — a parallel documentation/tooling track, merged to `main` 2026-08-14) |
+| Completed roadmap milestones | AI-RM-001 (Metadata Audit & Repair); AI-RM-010 (Multi-Channel Release & Update System — a parallel infrastructure track, not part of the AI-RM-001…009 archive-capability sequence this dashboard otherwise tracks); AI-RM-012 (AutoIngest Knowledge & Onboarding Portal — a parallel documentation/tooling track, merged to `main` 2026-08-14); AI-RM-013 (MX Creative Console Hardware Integration — a parallel hardware-integration track, released in AutoIngest v0.9.14 Stable 2026-10-16) |
 | Current roadmap milestone | AI-RM-002 (Archive Maintenance) — not started |
 | Active implementation task | None — not started (confirmed via exhaustive code/git search, see AI-FEAT-049) |
 | Next milestone | AI-RM-002 (Archive Maintenance) |

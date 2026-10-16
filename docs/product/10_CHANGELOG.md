@@ -7,6 +7,21 @@ Append newest first. Never edit or delete a prior entry — if something was wro
 ---
 
 
+## 2026-10-16 — AutoIngest v0.9.14 Stable released (AI-FEAT-060 / AI-RM-013)
+
+- **Task type**: release-status documentation update, following the real Stable promotion and packaged smoke test (not new implementation work).
+- **What happened**: `feature/mx-creative-console-v2` (Logitech MX Creative Console hardware integration, Unified Contextual Keypad) was promoted through `integration/main-stable-reconcile` (commit `65d39bf`) into `stable/0.9` and `main`, then released as AutoIngest v0.9.14 Stable. The release required one additional version-bump commit (`093c721` — `npm version 0.9.14`, since the Stable release gate validates the already-committed `package.json`/`package-lock.json` version against the tag directly, unlike the RC `workflow_dispatch` path which bumps the version only ephemerally in CI) — the gate correctly blocked the first `v0.9.14` tag attempt on exactly this mismatch, citing the historical v0.9.11 incident ([PM-002](postmortems/PM-002_V0_9_11_FIRST_PUBLICATION_ATTEMPT_PRODUCED_AN_EMPTY_GITHUB_RELEASE.md)) by name. `main` and `stable/0.9` both now resolve to `093c721`; `v0.9.14` resolves to the same commit.
+- **Smoke test**: re-verified end-to-end on the actual published Stable macOS package (not rc.2, not a dev build) — install/version/bundle ID, Options+ recognition, profile activation, C# connection with Node fallback silent, Browse/Dialpad/main dial, Refine Tags state+color update with no phantom recoloring, Map Group real component list, Import review flow with no auto-copy from a hardware press alone, quit/relaunch reconnect, foreground-app-switch profile-switching correctness. All clean, no divergence from rc.2.
+- **Known, disclosed limitation (unchanged from v0.9.13)**: `build-mac`'s Stable CI path has no Apple Developer signing credentials configured and fails every time, as it did for v0.9.13; the macOS DMG/ZIP artifacts were built and ad-hoc-signed locally, verified byte-for-byte via checksum after upload, and attached to the GitHub release manually. Gatekeeper rejects the ad-hoc signature by default — the same disclosed limitation as v0.9.13, not a new gap.
+- **Affected feature(s)**: AI-FEAT-060 (status unchanged, "Implemented — evolving"; Latest major update and Evolution journal updated to record the release)
+- **Affected roadmap milestone(s)**: AI-RM-013 (**Completed** — was "In progress... not yet merged")
+- **Updated records**: [AI-FEAT-060](features/AI-FEAT-060_MX_CREATIVE_CONSOLE_LOGITECH_HARDWARE_CONTROL_SURFACE.md) (Summary, Latest major update, Evolution entry, Future Enhancements correction), [AI-RM-013](02_MASTER_ROADMAP.md) (Status, Current risks, Next action), `04_PROJECT_DASHBOARD.md` (`Completed roadmap milestones` field). BUG-018/019/020 (already `Fixed`) and DEC-023 (already `Accepted`) needed no status change — their existing resolved/accepted semantics already matched the shipped reality.
+- **Not created**: `docs/release-notes-v0.9.14.md` — consistent with v0.9.13, which also has no corresponding file under `docs/release-notes-*.md` (user-facing release notes for both versions live only in their GitHub Release bodies).
+- **Commits**: `093c721` (version bump), `65d39bf` (packaging fix, tip of the validated integration line)
+- **Evidence confidence**: strong — verified directly from git (`git rev-parse`, `git merge-base --is-ancestor`, `git log 65d39bf..093c721`), the real `stable-release-gate` CI failure/success transcripts, a byte-for-byte checksum match on the uploaded macOS DMG, and a real physical hardware smoke test on the published package.
+
+---
+
 ## 2026-10-15 — MX Creative Console: Unified Contextual Keypad migration
 
 - **Task type**: architecture — Migrated the AutoIngest MX Creative Console Logitech C# plugin's Groups/Map Group/Refine Tags workspaces off PluginDynamicFolder rendering onto a native 9-slot PluginMultistateDynamicCommand architecture (ContextSlotA1-A9), after confirming the folder-rendering mechanism (ButtonActionNamesChanged/CommandImageChanged) was fundamentally unreliable under physical testing (pagination resets, cross-button color contamination, phantom colors). Physically verified end-to-end on the real MX Creative Keypad.
