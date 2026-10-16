@@ -8,16 +8,16 @@
 | Maturity | Evolving |
 | Parent feature | None |
 | Subfeatures | None |
-| Dependencies | None recorded — talks to AutoIngest over the existing local WebSocket command layer ([docs/commandLayer.md](../../commandLayer.md)), not a dependency on any specific `AI-FEAT-###`'s internal code. |
+| Dependencies | None recorded — talks to AutoIngest over the existing local WebSocket command layer (`docs/commandLayer.md`), not a dependency on any specific `AI-FEAT-###`'s internal code. |
 | Related roadmap milestone | AI-RM-013 |
-| Related technical docs | `integrations/logitech/autoingest-mx-csharp/docs/mxLogitechCSharp.md`, `integrations/logitech/autoingest-mx-csharp/docs/mxLogitechPlugin.md`, [docs/commandLayer.md](../../commandLayer.md) |
+| Related technical docs | `docs/mxLogitechCSharp.md`, `docs/mxLogitechPlugin.md`, `docs/commandLayer.md` |
 | Evidence status | Verified from current code, tests, and a live physical hardware session (2026-10-15); earlier phases (1A/3A-D/4A/4B) are "Known from project history; repository evidence pending" beyond what this plugin's own `docs/mxLogitechCSharp.md`/`mxLogitechPlugin.md` already record. |
 | First-known implementation | Evidence pending — not yet documented as fact (Phase 1A predates this record; earliest commit touching `integrations/logitech/autoingest-mx-csharp/` on `feature/mx-creative-console-v2` not yet dated here). |
 | Latest major update | 2026-10-15 — Unified Contextual Keypad migration (this record's own Evolution entry below). |
 
 ## Summary
 
-A separate C# plugin for the Logitech MX Creative Console (Keypad + dial) that lets an operator drive AutoIngest's Browse/Groups/Map Group/Refine Tags workflows directly from physical hardware, talking to the running AutoIngest Electron app over its existing local WebSocket command layer ([docs/commandLayer.md](../../commandLayer.md)) rather than through the on-screen UI. It exists under `integrations/logitech/autoingest-mx-csharp/`, outside the Electron app's own source tree, and is developed entirely on `feature/mx-creative-console-v2` (not yet merged to `main` or `stable/0.9`).
+A separate C# plugin for the Logitech MX Creative Console (Keypad + dial) that lets an operator drive AutoIngest's Browse/Groups/Map Group/Refine Tags workflows directly from physical hardware, talking to the running AutoIngest Electron app over its existing local WebSocket command layer (`docs/commandLayer.md`) rather than through the on-screen UI. It exists under `integrations/logitech/autoingest-mx-csharp/`, outside the Electron app's own source tree, and is developed entirely on `feature/mx-creative-console-v2` (not yet merged to `main` or `stable/0.9`).
 
 ## Current Behavior
 
@@ -32,7 +32,7 @@ As of this record (2026-10-15), the plugin's nine physical Keypad keys are perma
 
 ## Original Plan / Intent
 
-Evidence pending for the full original scope of Phase 1A/3A-D/4A/4B beyond what `integrations/logitech/autoingest-mx-csharp/docs/mxLogitechCSharp.md` and `mxLogitechPlugin.md` already record from those phases directly. What is verified from this session: the user requested fixing real physical bugs in the then-current Dynamic Tag Refinement workspace, then a visual redesign (plain tag label, whole-button color per state), then — once the folder-rendering redraw mechanism proved physically unreliable — two deliberately scoped architecture spikes (native multistate action state, then a contextual native keypad) before any production migration, each required to pass physical hardware testing before the next step was authorized.
+Evidence pending for the full original scope of Phase 1A/3A-D/4A/4B beyond what `docs/mxLogitechCSharp.md` and `mxLogitechPlugin.md` already record from those phases directly. What is verified from this session: the user requested fixing real physical bugs in the then-current Dynamic Tag Refinement workspace, then a visual redesign (plain tag label, whole-button color per state), then — once the folder-rendering redraw mechanism proved physically unreliable — two deliberately scoped architecture spikes (native multistate action state, then a contextual native keypad) before any production migration, each required to pass physical hardware testing before the next step was authorized.
 
 ## Evolution / Implementation Journal
 
@@ -78,5 +78,5 @@ Evidence pending for the full original scope of Phase 1A/3A-D/4A/4B beyond what 
 - `integrations/logitech/autoingest-mx-csharp/src/Actions/GroupMappingFolder.cs` (retired from active mapping, retained as source)
 - `integrations/logitech/autoingest-mx-csharp/src/Actions/NavigateFilesAdjustment.cs`
 - `integrations/logitech/autoingest-mx-csharp/test/AutoIngestMxCsDevPlugin.Tests/ContextualKeypadModelTests.cs`
-- `integrations/logitech/autoingest-mx-csharp/docs/mxLogitechCSharp.md`
-- `integrations/logitech/autoingest-mx-csharp/docs/mxLogitechPlugin.md`
+- `docs/mxLogitechCSharp.md`
+- `docs/mxLogitechPlugin.md`

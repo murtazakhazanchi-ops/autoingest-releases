@@ -3621,16 +3621,16 @@
         "integrations/logitech/autoingest-mx-csharp/src/Actions/GroupMappingFolder.cs",
         "integrations/logitech/autoingest-mx-csharp/src/Actions/NavigateFilesAdjustment.cs",
         "integrations/logitech/autoingest-mx-csharp/test/AutoIngestMxCsDevPlugin.Tests/ContextualKeypadModelTests.cs",
-        "integrations/logitech/autoingest-mx-csharp/docs/mxLogitechCSharp.md",
-        "integrations/logitech/autoingest-mx-csharp/docs/mxLogitechPlugin.md"
+        "docs/mxLogitechCSharp.md",
+        "docs/mxLogitechPlugin.md"
       ],
       "related_decisions": [],
       "related_features": [],
       "related_postmortems": [],
       "related_technical_docs": [
-        "integrations/logitech/autoingest-mx-csharp/docs/mxLogitechCSharp.md",
-        "integrations/logitech/autoingest-mx-csharp/docs/mxLogitechPlugin.md",
-        "[docs/commandLayer.md]"
+        "docs/mxLogitechCSharp.md",
+        "docs/mxLogitechPlugin.md",
+        "docs/commandLayer.md"
       ],
       "related_tests": [],
       "roadmap_ids": [
@@ -3647,7 +3647,7 @@
       ],
       "status": "Implemented — evolving",
       "subfeatures": [],
-      "summary": "A separate C# plugin for the Logitech MX Creative Console (Keypad + dial) that lets an operator drive AutoIngest's Browse/Groups/Map Group/Refine Tags workflows directly from physical hardware, talking to the running AutoIngest Electron app over its existing local WebSocket command layer ([docs/commandLayer.md](../../commandLayer.md)) rather than through the on-screen UI. It exists under `integrations/logitech/autoingest-mx-csharp/`, outside the Electron app's own source tree, and is developed entirely on `feature/mx-creative-console-v2` (not yet merged to `main` or `stable/0.9`).",
+      "summary": "A separate C# plugin for the Logitech MX Creative Console (Keypad + dial) that lets an operator drive AutoIngest's Browse/Groups/Map Group/Refine Tags workflows directly from physical hardware, talking to the running AutoIngest Electron app over its existing local WebSocket command layer (`docs/commandLayer.md`) rather than through the on-screen UI. It exists under `integrations/logitech/autoingest-mx-csharp/`, outside the Electron app's own source tree, and is developed entirely on `feature/mx-creative-console-v2` (not yet merged to `main` or `stable/0.9`).",
       "timeline_path": "generated/feature-timelines/AI-FEAT-060_TIMELINE.md"
     }
   ],

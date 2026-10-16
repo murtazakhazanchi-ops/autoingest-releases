@@ -3100,10 +3100,10 @@
       ],
       "sourceAuthority": "canonical",
       "sourceFiles": [
-        "[docs/commandLayer.md]",
+        "docs/commandLayer.md",
+        "docs/mxLogitechCSharp.md",
+        "docs/mxLogitechPlugin.md",
         "features/AI-FEAT-060_MX_CREATIVE_CONSOLE_LOGITECH_HARDWARE_CONTROL_SURFACE.md",
-        "integrations/logitech/autoingest-mx-csharp/docs/mxLogitechCSharp.md",
-        "integrations/logitech/autoingest-mx-csharp/docs/mxLogitechPlugin.md",
         "integrations/logitech/autoingest-mx-csharp/src/Actions/ContextSlotA1.cs",
         "integrations/logitech/autoingest-mx-csharp/src/Actions/GroupMappingFolder.cs",
         "integrations/logitech/autoingest-mx-csharp/src/Actions/GroupsFolder.cs",
@@ -3121,9 +3121,9 @@
         "integrations/logitech/autoingest-mx-csharp/test/AutoIngestMxCsDevPlugin.Tests/ContextualKeypadModelTests.cs"
       ],
       "status": "Implemented — evolving",
-      "summary": "A separate C# plugin for the Logitech MX Creative Console (Keypad + dial) that lets an operator drive AutoIngest's Browse/Groups/Map Group/Refine Tags workflows directly from physical hardware, talking to the running AutoIngest Electron app over its existing local WebSocket command layer ([docs/commandLayer.md](../../commandLayer.md)) rather than through the on-screen UI. It exists under `integrations/logitech/autoingest-mx-csharp/`, outside the Electron app's own source tree, and is developed entirely on `feature/mx-creative-console-v2` (not yet merged to `main` or `stable/0.9`).",
+      "summary": "A separate C# plugin for the Logitech MX Creative Console (Keypad + dial) that lets an operator drive AutoIngest's Browse/Groups/Map Group/Refine Tags workflows directly from physical hardware, talking to the running AutoIngest Electron app over its existing local WebSocket command layer (`docs/commandLayer.md`) rather than through the on-screen UI. It exists under `integrations/logitech/autoingest-mx-csharp/`, outside the Electron app's own source tree, and is developed entirely on `feature/mx-creative-console-v2` (not yet merged to `main` or `stable/0.9`).",
       "title": "MX Creative Console — Logitech Hardware Control Surface",
-      "whatItDoes": "A separate C# plugin for the Logitech MX Creative Console (Keypad + dial) that lets an operator drive AutoIngest's Browse/Groups/Map Group/Refine Tags workflows directly from physical hardware, talking to the running AutoIngest Electron app over its existing local WebSocket command layer ([docs/commandLayer.md](../../commandLayer.md)) rather than through the on-screen UI. It exists under `integrations/logitech/autoingest-mx-csharp/`, outside the Electron app's own source tree, and is developed entirely on `feature/mx-creative-console-v2` (not yet merged to `main` or `stable/0.9`)."
+      "whatItDoes": "A separate C# plugin for the Logitech MX Creative Console (Keypad + dial) that lets an operator drive AutoIngest's Browse/Groups/Map Group/Refine Tags workflows directly from physical hardware, talking to the running AutoIngest Electron app over its existing local WebSocket command layer (`docs/commandLayer.md`) rather than through the on-screen UI. It exists under `integrations/logitech/autoingest-mx-csharp/`, outside the Electron app's own source tree, and is developed entirely on `feature/mx-creative-console-v2` (not yet merged to `main` or `stable/0.9`)."
     }
   ],
   "docsys_version": "1.3.0",

@@ -140,6 +140,12 @@ async function writeMedia(root, relFile) {
       'event.openChooser',
       // added in Phase 3E — see test/mxCommandLayerPhase3ELive.test.js
       'tagRefinement.setTagState', 'tagRefinement.applyToSelected',
+      // added by the Map Group feature (group → sub-event mapping, commit
+      // e22a172) — see mxLogitechCSharp.md
+      'group.setSubEvent',
+      // added alongside the GROUPS overflow workspace (safe Import review
+      // entry point, commit 7fc2978) — see mxLogitechCSharp.md
+      'import.openConfirmation',
     ];
     check(expected.every((id) => commands.includes(id)), 'registry contains every expected initial command');
     check(commands.length === expected.length, 'registry contains no unexpected extra commands');

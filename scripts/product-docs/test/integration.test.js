@@ -20,17 +20,17 @@ async function main() {
 
   const { parsed, built, files, manifest } = build.assemble();
 
-  await t('all 59 AI-FEAT records are present', () => {
-    assert.equal(parsed.features.size, 59);
+  await t('all 60 AI-FEAT records are present', () => {
+    assert.equal(parsed.features.size, 60);
   });
 
-  await t('all 12 AI-RM roadmap milestones are present', () => {
-    assert.equal(parsed.roadmap.size, 12);
+  await t('all 13 AI-RM roadmap milestones are present', () => {
+    assert.equal(parsed.roadmap.size, 13);
   });
 
-  await t('bug/decision/postmortem counts match the current repository (BUG-001..016, DEC-001..022, PM-001..002)', () => {
-    assert.equal(parsed.bugs.size, 16);
-    assert.equal(parsed.decisions.size, 22);
+  await t('bug/decision/postmortem counts match the current repository (BUG-001..020, DEC-001..023, PM-001..002)', () => {
+    assert.equal(parsed.bugs.size, 20);
+    assert.equal(parsed.decisions.size, 23);
     assert.equal(parsed.postmortems.size, 2);
   });
 
@@ -96,9 +96,9 @@ async function main() {
     }
   });
 
-  await t('the roadmap dashboard matches the canonical current-position statement (AI-RM-001 + AI-RM-010 + AI-RM-012 complete, AI-RM-002 next, 3/12)', () => {
+  await t('the roadmap dashboard matches the canonical current-position statement (AI-RM-001 + AI-RM-010 + AI-RM-012 complete, AI-RM-002 next, 3/13)', () => {
     assert.equal(built.dashboard.completed_count, 3);
-    assert.equal(built.dashboard.total_milestones, 12);
+    assert.equal(built.dashboard.total_milestones, 13);
     assert.equal(built.dashboard.current_milestone_id, 'AI-RM-002');
   });
 
@@ -112,7 +112,7 @@ async function main() {
     assert.ok(manifest.schema_version);
     assert.ok(manifest.source_commit);
     assert.ok(manifest.generation_command);
-    assert.equal(manifest.entity_counts.features, 59);
+    assert.equal(manifest.entity_counts.features, 60);
   });
 
   summarize('integration.test.js');

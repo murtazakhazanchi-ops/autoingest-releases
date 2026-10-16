@@ -43,6 +43,18 @@
         "AI-FEAT-058"
       ]
     },
+    "docs/mxLogitechCSharp.md": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-060"
+      ]
+    },
+    "docs/mxLogitechPlugin.md": {
+      "confidence": "explicit",
+      "features": [
+        "AI-FEAT-060"
+      ]
+    },
     "docs/product/19_WORKFLOW_TEMPLATE.md": {
       "confidence": "explicit",
       "features": [
@@ -83,18 +95,6 @@
       "confidence": "explicit",
       "features": [
         "AI-FEAT-059"
-      ]
-    },
-    "integrations/logitech/autoingest-mx-csharp/docs/mxLogitechCSharp.md": {
-      "confidence": "explicit",
-      "features": [
-        "AI-FEAT-060"
-      ]
-    },
-    "integrations/logitech/autoingest-mx-csharp/docs/mxLogitechPlugin.md": {
-      "confidence": "explicit",
-      "features": [
-        "AI-FEAT-060"
       ]
     },
     "integrations/logitech/autoingest-mx-csharp/src/Actions/ContextSlotA1.cs": {
@@ -1352,8 +1352,8 @@
       "scripts/product-docs/test/knowledgeMergeReadiness.test.js"
     ],
     "AI-FEAT-060": [
-      "integrations/logitech/autoingest-mx-csharp/docs/mxLogitechCSharp.md",
-      "integrations/logitech/autoingest-mx-csharp/docs/mxLogitechPlugin.md",
+      "docs/mxLogitechCSharp.md",
+      "docs/mxLogitechPlugin.md",
       "integrations/logitech/autoingest-mx-csharp/src/Actions/ContextSlotA1.cs",
       "integrations/logitech/autoingest-mx-csharp/src/Actions/GroupMappingFolder.cs",
       "integrations/logitech/autoingest-mx-csharp/src/Actions/GroupsFolder.cs",

@@ -533,9 +533,9 @@
       "aliases": [],
       "canonicalProductDoc": "docs/product/01_FEATURE_REGISTRY.md",
       "canonicalTechnicalDocs": [
-        "[docs/commandLayer.md]",
-        "integrations/logitech/autoingest-mx-csharp/docs/mxLogitechCSharp.md",
-        "integrations/logitech/autoingest-mx-csharp/docs/mxLogitechPlugin.md"
+        "docs/commandLayer.md",
+        "docs/mxLogitechCSharp.md",
+        "docs/mxLogitechPlugin.md"
       ],
       "changeImpactChecklist": [
         "Re-read the Related Files section of every primary feature listed above before changing shared source files.",
@@ -556,14 +556,14 @@
         "DEC-023"
       ],
       "sourceDirectories": [
-        "integrations/logitech/autoingest-mx-csharp/docs",
+        "docs",
         "integrations/logitech/autoingest-mx-csharp/src/Actions",
         "integrations/logitech/autoingest-mx-csharp/src/Helpers",
         "integrations/logitech/autoingest-mx-csharp/test/AutoIngestMxCsDevPlugin.Tests"
       ],
       "sourceFiles": [
-        "integrations/logitech/autoingest-mx-csharp/docs/mxLogitechCSharp.md",
-        "integrations/logitech/autoingest-mx-csharp/docs/mxLogitechPlugin.md",
+        "docs/mxLogitechCSharp.md",
+        "docs/mxLogitechPlugin.md",
         "integrations/logitech/autoingest-mx-csharp/src/Actions/ContextSlotA1.cs",
         "integrations/logitech/autoingest-mx-csharp/src/Actions/GroupMappingFolder.cs",
         "integrations/logitech/autoingest-mx-csharp/src/Actions/GroupsFolder.cs",

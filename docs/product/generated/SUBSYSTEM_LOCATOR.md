@@ -300,19 +300,19 @@
 ## Hardware & Peripheral Integration (`SUBSYS-hardware-peripheral-integration`)
 
 **Primary features**: AI-FEAT-060
-**Canonical technical docs**: [docs/commandLayer.md], integrations/logitech/autoingest-mx-csharp/docs/mxLogitechCSharp.md, integrations/logitech/autoingest-mx-csharp/docs/mxLogitechPlugin.md
+**Canonical technical docs**: docs/commandLayer.md, docs/mxLogitechCSharp.md, docs/mxLogitechPlugin.md
 **Related bugs**: BUG-018, BUG-019, BUG-020
 **Related decisions**: DEC-023
 
 **Source directories**:
-- `integrations/logitech/autoingest-mx-csharp/docs`
+- `docs`
 - `integrations/logitech/autoingest-mx-csharp/src/Actions`
 - `integrations/logitech/autoingest-mx-csharp/src/Helpers`
 - `integrations/logitech/autoingest-mx-csharp/test/AutoIngestMxCsDevPlugin.Tests`
 
 **Source files**:
-- `integrations/logitech/autoingest-mx-csharp/docs/mxLogitechCSharp.md`
-- `integrations/logitech/autoingest-mx-csharp/docs/mxLogitechPlugin.md`
+- `docs/mxLogitechCSharp.md`
+- `docs/mxLogitechPlugin.md`
 - `integrations/logitech/autoingest-mx-csharp/src/Actions/ContextSlotA1.cs`
 - `integrations/logitech/autoingest-mx-csharp/src/Actions/GroupMappingFolder.cs`
 - `integrations/logitech/autoingest-mx-csharp/src/Actions/GroupsFolder.cs`
