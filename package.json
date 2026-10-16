@@ -16,8 +16,6 @@
     "realtime:start": "cd realtime-server && node server.js"
   },
   "dependencies": {
-    "@img/sharp-darwin-arm64": "0.34.5",
-    "@img/sharp-libvips-darwin-arm64": "1.2.4",
     "argparse": "^2.0.1",
     "bindings": "^1.5.0",
     "builder-util-runtime": "^9.5.1",
@@ -44,6 +42,10 @@
     "sharp": "^0.34.5",
     "socket.io-client": "^4.7.5",
     "ws": "^8.20.1"
+  },
+  "optionalDependencies": {
+    "@img/sharp-darwin-arm64": "0.34.5",
+    "@img/sharp-libvips-darwin-arm64": "1.2.4"
   },
   "devDependencies": {
     "electron": "^30.0.0",
