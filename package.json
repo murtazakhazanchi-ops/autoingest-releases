@@ -39,13 +39,15 @@
     "exiftool-vendored": "^28.8.0",
     "googleapis": "^144.0.0",
     "lucide": "^1.11.0",
+    "pdfjs-dist": "5.4.624",
     "sharp": "^0.34.5",
     "socket.io-client": "^4.7.5",
     "ws": "^8.20.1"
   },
   "optionalDependencies": {
     "@img/sharp-darwin-arm64": "0.34.5",
-    "@img/sharp-libvips-darwin-arm64": "1.2.4"
+    "@img/sharp-libvips-darwin-arm64": "1.2.4",
+    "@napi-rs/canvas-darwin-arm64": "0.1.100"
   },
   "devDependencies": {
     "electron": "^30.0.0",
@@ -86,6 +88,9 @@
       "node_modules/bindings/**/*",
       "node_modules/@img/sharp-darwin-arm64/**/*",
       "node_modules/@img/sharp-libvips-darwin-arm64/**/*",
+      "node_modules/pdfjs-dist/**/*",
+      "node_modules/@napi-rs/canvas/**/*",
+      "node_modules/@napi-rs/canvas-darwin-arm64/**/*",
       "!**/node_modules/.cache/**",
       "!dist/**",
       "!**/*.md",
@@ -98,7 +103,9 @@
       "node_modules/bindings/**/*",
       "node_modules/file-uri-to-path/**/*",
       "node_modules/@img/sharp-darwin-arm64/**/*",
-      "node_modules/@img/sharp-libvips-darwin-arm64/**/*"
+      "node_modules/@img/sharp-libvips-darwin-arm64/**/*",
+      "node_modules/@napi-rs/canvas/**/*",
+      "node_modules/@napi-rs/canvas-darwin-arm64/**/*"
     ],
     "mac": {
       "target": [
