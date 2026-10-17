@@ -192,17 +192,18 @@ const AutoIngestCommands = (() => {
       computeExecuted: (result) => result === true,
     },
 
-    // payload: { sequenceCode: string }, e.g. "01Q", "12M", "52Z" — exactly
-    // main/qmzService.js's own SEQ_RE format (2 digits + Q/M/Z; there is no
-    // lowercase-suffix variant anywhere in the current QMZ implementation —
-    // see docs/commandLayer.md "QMZ — qmz.assignToSequence" for the
-    // Phase 1B investigation that confirmed this before writing this regex).
+    // payload: { sequenceCode: string }, e.g. "01Q", "12M", "52Z", "05aMZ", "06MZ" — the
+    // exact shape of main/qmzService.js's own authoritative SEQ_RE, via the shared
+    // renderer/qmzSequenceFormat.js (Stage 5 fix — this validator previously carried its own
+    // independent copy, /^\d{2}[QMZ]$/, which predated "PDF-Assisted QMZ Workspace Folder
+    // Generation" Stage 1's lowercase-suffix/combined-MZ support and had silently drifted out
+    // of sync with it, rejecting every suffixed or MZ sequence code from the MX Console).
     // Never creates the sequence and never guesses a type: the code must
     // already exist in the live QMZ workspace (bridge.qmzAssignSelectionToSequence
     // -> _qmzAssignSelectionToSequenceCode's own existence check).
     'qmz.assignToSequence': {
       isValid: (p) => !!p && typeof p === 'object' &&
-        typeof p.sequenceCode === 'string' && /^\d{2}[QMZ]$/.test(p.sequenceCode),
+        window.QmzSequenceFormat.isValidSequenceCode(p.sequenceCode),
       check: (_p, b) => b.isQmzOpen() && b.getSelectionSize() > 0,
       run: (p, b) => b.qmzAssignSelectionToSequence(p.sequenceCode),
       // Same lesson as group.assign: run() resolves to a plain boolean here

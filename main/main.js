@@ -5509,8 +5509,15 @@ ipcMain.handle('qmz:resolveCaptureDates', async (_e, { files }) => {
   return qmzService.resolveCaptureDates(files);
 });
 
-ipcMain.handle('qmz:createSequence', async (_e, { qmzRoot, number, letter }) => {
-  return qmzService.createSequence(qmzRoot, number, letter);
+// Stage 5 fix: `suffix` was previously dropped by this handler entirely — any caller
+// attempting to create a suffixed sequence (e.g. "05aMZ") through this specific IPC channel
+// silently got the wrong, unsuffixed folder ("05MZ") with no error. The manual "Add
+// Specific" UI never surfaces a suffix input (so no operator-visible regression existed), and
+// Stage 4's PDF-driven creation (createReviewedSequences) calls qmzService.createSequence()
+// directly in the main process, bypassing this handler entirely — but the IPC boundary itself
+// must still forward every parameter qmzService.createSequence() actually accepts.
+ipcMain.handle('qmz:createSequence', async (_e, { qmzRoot, number, letter, suffix }) => {
+  return qmzService.createSequence(qmzRoot, number, letter, suffix);
 });
 
 ipcMain.handle('qmz:bulkCreate', async (_e, { qmzRoot, items }) => {

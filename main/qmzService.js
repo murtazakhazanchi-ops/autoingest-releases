@@ -11,6 +11,11 @@ const config = require('../config/app.config');
 // header comment for exactly why a naive `x.startsWith(root)` is unsafe (it would wrongly
 // treat "/archive/QMZ-Other" as contained in "/archive/QMZ").
 const PathUtils = require('../renderer/pathUtils.js');
+// The ONE definition of the QMZ sequence-code shape, shared with renderer/commandManager.js's
+// MX Creative Console command validation (see qmzSequenceFormat.js's own header comment for
+// why this extraction exists — a real drift between this file's SEQ_RE and commandManager.js's
+// own independent copy was found and fixed in Stage 5's review).
+const { SEQ_RE } = require('../renderer/qmzSequenceFormat.js');
 
 const STATE_FILE  = 'qmz-sequences.json';
 const UNSEQUENCED = '_Unsequenced';
@@ -22,20 +27,12 @@ const UNSEQUENCED = '_Unsequenced';
 // ensureEnroute()'s own comment for why an existing folder with different casing is treated as
 // a conflict rather than silently reused.
 const ENROUTE_DIR = 'Enroute';
-// Sequence code shape: 2 zero-padded digits, an optional single lowercase
-// alphabetic suffix (a slot split across multiple honorees — e.g. a single
-// numbered appointment subdivided into "5a"/"5b"), then the QMZ type letter —
-// Q/M/Z as before, or the combined type "MZ" (PDF-Assisted QMZ Workspace
-// Folder Generation feature; real reference programs carry entries like
-// "5a MZ"/"5b MZ" for a single appointment split between two honorees).
-// Capturing groups are used directly by parseCode() below — a capturing
-// group does not change .test()'s boolean result, so the SAME regex is also
-// used everywhere else here purely as a membership test (scanRoot,
-// _classifyOtherFolders). The suffix, if present, is always part of the
-// sequence's identity (two different suffixes are two different, independent
-// sequences — see createSequence's duplicate check, which compares the full
-// code string unchanged).
-const SEQ_RE      = /^(\d{2})([a-z]?)(MZ|Q|M|Z)$/;
+// SEQ_RE itself now lives in renderer/qmzSequenceFormat.js (required above) — capturing
+// groups are used directly by parseCode() below (a capturing group does not change .test()'s
+// boolean result, so the SAME regex is also used everywhere else here purely as a membership
+// test: scanRoot, _classifyOtherFolders). The suffix, if present, is always part of the
+// sequence's identity (two different suffixes are two different, independent sequences — see
+// createSequence's duplicate check, which compares the full code string unchanged).
 // Mirrors services/photographerSequenceService.js's PC_PREFIX_RE — duplicated
 // locally rather than imported, matching this file's existing convention of
 // staying decoupled from other main-process modules (see mediaType/isJunkFile
