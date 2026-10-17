@@ -6861,6 +6861,112 @@
   }
   #qmzOverlay .qmz-bulk-create-btn { width: 100%; }
 
+  /* ── QMZ PDF Program Review — Stage 3 ─────────────────────────────────── */
+  /* z-index 300: above #qmzOverlay (200) — this review modal opens FROM WITHIN an
+     already-open QMZ workspace and must render on top of it, matching the project's
+     existing "nested modal sits one layer higher" convention (see e.g. .ec-modal-overlay). */
+  #qmzPdfReviewOverlay {
+    position: fixed; inset: 0; z-index: 300;
+    background: var(--scrim);
+    display: flex; align-items: center; justify-content: center;
+  }
+  #qmzPdfReviewOverlay.hidden { display: none; }
+  .qpr-modal {
+    background: var(--card-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 18px;
+    width: min(760px, calc(100vw - 32px));
+    max-height: 86vh;
+    display: flex; flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+    overflow: hidden;
+  }
+  .qpr-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 20px 14px; flex-shrink: 0; border-bottom: 1px solid var(--border-subtle);
+  }
+  .qpr-title { font-size: 1rem; font-weight: 700; color: var(--text); margin: 0; }
+  .qpr-close-btn {
+    width: 28px; height: 28px; border-radius: 8px; border: none; background: transparent;
+    color: var(--subtext); cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: background 0.12s, color 0.12s;
+  }
+  .qpr-close-btn:hover { background: var(--card-hover); color: var(--text); }
+  .qpr-body { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; }
+  .qpr-pdf-info {
+    font-size: 0.78rem; color: var(--subtext); line-height: 1.7;
+    background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 10px;
+    padding: 10px 12px;
+  }
+  .qpr-pdf-info strong { color: var(--text); }
+  .qpr-workspace-banner {
+    font-size: 0.78rem; border-radius: 10px; padding: 9px 12px; line-height: 1.6;
+    display: none; /* shown via JS only once a section is selected */
+  }
+  .qpr-workspace-banner.match {
+    display: block; background: var(--green-dim, rgba(52,199,89,0.12)); color: var(--green); border: 1px solid var(--green);
+  }
+  .qpr-workspace-banner.mismatch {
+    display: block; background: var(--yellow-dim, rgba(255,204,0,0.12)); color: var(--yellow); border: 1px solid var(--yellow);
+  }
+  .qpr-workspace-banner.unknown {
+    display: block; background: var(--bg-secondary); color: var(--subtext); border: 1px solid var(--border-subtle);
+  }
+  .qpr-section-row { display: flex; align-items: center; gap: 10px; font-size: 0.8rem; flex-wrap: wrap; }
+  .qpr-section-row label { color: var(--subtext); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .qpr-section-select {
+    height: 32px; padding: 0 10px; border-radius: 8px;
+    border: 1px solid var(--border-subtle); background: var(--bg-secondary); color: var(--text);
+    font-size: 0.82rem; cursor: pointer;
+  }
+  .qpr-section-suggested-tag {
+    font-size: 0.68rem; font-weight: 700; color: var(--green);
+    border: 1px solid var(--green); border-radius: 6px; padding: 2px 7px;
+  }
+  .qpr-warnings { display: flex; flex-direction: column; gap: 6px; }
+  .qpr-warning-row {
+    font-size: 0.76rem; line-height: 1.55; border-radius: 8px; padding: 7px 10px;
+    background: var(--yellow-dim, rgba(255,204,0,0.1)); color: var(--text); border: 1px solid var(--border-subtle);
+  }
+  .qpr-table-toolbar { display: flex; align-items: center; gap: 8px; padding-top: 4px; }
+  .qpr-sel-count { flex: 1; text-align: right; font-size: 0.76rem; color: var(--subtext); }
+  .qpr-entry-list {
+    border: 1px solid var(--border-subtle); border-radius: 10px; background: var(--bg-secondary);
+    max-height: 320px; overflow-y: auto;
+  }
+  .qpr-entry-row {
+    display: grid; grid-template-columns: 24px 110px 110px 1fr 90px; align-items: center; gap: 10px;
+    padding: 7px 10px; font-size: 0.78rem; color: var(--text); border-bottom: 1px solid var(--border-subtle);
+  }
+  .qpr-entry-row:last-child { border-bottom: none; }
+  .qpr-entry-row.invalid { opacity: 0.75; }
+  .qpr-entry-row input[type="checkbox"] { cursor: pointer; accent-color: var(--blue); }
+  .qpr-entry-row input[type="checkbox"]:disabled { cursor: default; }
+  .qpr-seq-field, .qpr-type-field {
+    height: 26px; padding: 0 6px; border-radius: 6px; font-size: 0.76rem;
+    border: 1px solid var(--border-subtle); background: var(--card-bg); color: var(--text);
+    font-family: monospace;
+  }
+  .qpr-seq-field { width: 48px; }
+  .qpr-type-field { width: 64px; }
+  .qpr-seq-field.edited, .qpr-type-field.edited { border-color: var(--blue); }
+  .qpr-folder-name { font-family: monospace; font-weight: 700; }
+  .qpr-folder-name .orig { font-weight: 400; color: var(--subtext); text-decoration: line-through; margin-right: 6px; font-family: monospace; }
+  .qpr-status-pill { font-size: 0.68rem; font-weight: 700; border-radius: 6px; padding: 2px 7px; text-align: center; }
+  .qpr-status-pill.valid      { background: var(--green-dim, rgba(52,199,89,0.12)); color: var(--green); }
+  .qpr-status-pill.invalid    { background: var(--red-dim, rgba(255,59,48,0.12)); color: var(--red); }
+  .qpr-status-pill.duplicate  { background: var(--yellow-dim, rgba(255,204,0,0.12)); color: var(--yellow); }
+  .qpr-empty-state { padding: 24px 12px; font-size: 0.8rem; color: var(--subtext); text-align: center; line-height: 1.7; }
+  .qpr-actions {
+    display: flex; align-items: center; gap: 10px; padding: 14px 20px; flex-shrink: 0;
+    border-top: 1px solid var(--border-subtle); background: var(--surface2);
+  }
+  .qpr-status { flex: 1; font-size: 0.76rem; color: var(--subtext); }
+  .qpr-btn-create {
+    height: 36px; padding: 0 18px; border-radius: 10px; font-size: 0.82rem; font-weight: 700;
+    background: var(--border-subtle); color: var(--subtext); border: none; cursor: not-allowed;
+  }
+
   /* ── Startup Splash Overlay ──────────────────────────────────────────── */
   #loginSplash {
     position: fixed; inset: 0; z-index: 9999;
@@ -8520,6 +8626,14 @@
             <button id="qmzBulkCreateBtn" class="qmz-add-btn qmz-bulk-create-btn">Create All</button>
           </div>
 
+          <!-- PDF-Assisted QMZ Workspace Folder Generation — Stage 3: import + review only,
+               no folder creation. See docs/multi-event-import.md-style module header in
+               main/qmzProgramPdfParser.js for the read-only extraction contract this drives. -->
+          <div class="qmz-section-header">Import from PDF</div>
+          <div class="qmz-right-block">
+            <button id="qmzImportPdfBtn" class="qmz-add-btn qmz-bulk-create-btn">Import QMZ Program PDF</button>
+          </div>
+
           <!-- Actions -->
           <div class="qmz-right-actions">
             <button id="qmzMoveUnsequencedBtn" class="qmz-action-btn" disabled>↩ Unsequenced</button>
@@ -8530,6 +8644,49 @@
       <div class="qmz-footer">
         <span id="qmzStatus" class="qmz-status"></span>
         <button id="qmzDoneBtn" class="qmz-btn-done">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── QMZ PDF PROGRAM REVIEW — Stage 3: import, city selection, sequence review and
+       correction. Entirely read-only with respect to the archive: no code path in this
+       overlay ever calls qmz:createSequence / qmz:bulkCreate. Folder creation is Stage 4. ── -->
+  <div id="qmzPdfReviewOverlay" class="hidden" role="dialog" aria-modal="true" aria-labelledby="qprTitle">
+    <div class="qpr-modal">
+      <div class="qpr-header">
+        <p class="qpr-title" id="qprTitle">QMZ Program — Review Sequences</p>
+        <button class="qpr-close-btn" id="qprCloseBtn" aria-label="Close review">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="1" y1="1" x2="13" y2="13"/><line x1="13" y1="1" x2="1" y2="13"/></svg>
+        </button>
+      </div>
+
+      <div id="qprBody" class="qpr-body">
+        <!-- A. PDF information -->
+        <div id="qprPdfInfo" class="qpr-pdf-info"></div>
+
+        <!-- C. Active workspace vs. selected-section city -->
+        <div id="qprWorkspaceBanner" class="qpr-workspace-banner"></div>
+
+        <!-- B. City / section selector -->
+        <div id="qprSectionRow" class="qpr-section-row"></div>
+
+        <!-- Document/section-level warnings -->
+        <div id="qprWarnings" class="qpr-warnings"></div>
+
+        <!-- E. Sequence review table -->
+        <div class="qpr-table-toolbar">
+          <button id="qprSelectAllBtn" class="qmz-action-btn">Select All</button>
+          <button id="qprClearAllBtn" class="qmz-action-btn">Clear All</button>
+          <span id="qprSelCount" class="qpr-sel-count"></span>
+        </div>
+        <div id="qprEntryList" class="qpr-entry-list"></div>
+      </div>
+
+      <div class="qpr-actions">
+        <span id="qprStatus" class="qpr-status"></span>
+        <button id="qprCancelBtn" class="sc-btn-cancel">Cancel</button>
+        <button id="qprCreateBtn" class="qpr-btn-create" disabled title="Folder creation is implemented in a later stage">Create Selected Folders</button>
+        <button id="qprDoneBtn" class="sc-btn-done">Done</button>
       </div>
     </div>
   </div>

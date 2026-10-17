@@ -399,6 +399,11 @@ contextBridge.exposeInMainWorld('api', {
   qmzMoveToUnsequenced: (params) => ipcRenderer.invoke('qmz:moveToUnsequenced', params),
   qmzQueueMetadata:     (params) => ipcRenderer.invoke('qmz:queueMetadata',     params),
   onQmzMetadataProgress: (cb)    => _register('qmz:metadata:progress', (_e, data) => cb(data)),
+  // PDF-Assisted QMZ Workspace Folder Generation, Stage 3 — qmzImportProgramPdf takes no
+  // arguments: the native file picker and the PDF path itself are entirely main-process-owned
+  // (see main.js's own comment on this channel), never supplied by the renderer.
+  qmzImportProgramPdf:      ()       => ipcRenderer.invoke('qmz:importProgramPdf'),
+  qmzValidateSequenceInput: (params) => ipcRenderer.invoke('qmz:validateSequenceInput', params),
 
   // ── Online Registry (advisory — prepare local shells from remote registry entries) ──
   registryGetAll:                ()       => ipcRenderer.invoke('registry:getAll'),

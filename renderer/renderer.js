@@ -360,6 +360,22 @@ let _qmzPrevFocusPath   = null; // previously focused path — for O(1) pv-focus
 let _qmzViewScope       = 'unsequenced'; // 'unsequenced' | 'sequence' — see _qmzGetActiveFiles()
 let _qmzHiddenEventMgmt = false; // true if openQMZManager() visually hid an open Event Creator modal
 let _qmzLastNonTimelineViewMode = 'icon'; // 'icon' | 'list' — restored when the Timeline toggle turns off
+
+// ── QMZ PDF Program Review — Stage 3 of "PDF-Assisted QMZ Workspace Folder Generation" ────
+// Entirely ephemeral, read-only review state — never written to qmz-sequences.json, never
+// touches the archive. Reset on every close (Cancel/Done/X) and whenever the QMZ workspace
+// itself closes (_closeQMZManager), so no review state can ever outlive the workspace it was
+// prepared against or leak into a different one. See qmzProgramPdfParser.js's own header
+// comment for the parser's exact output contract this state is built from.
+let _qprOpen         = false;
+let _qprGeneration    = 0;     // incremented on every import click — guards stale IPC responses
+let _qprParsed        = null;  // the raw parser result: { source, sections, warnings, fatal }
+let _qprActiveSectionId = null;
+let _qprSuggestedSectionId = null; // the one confidently city-matched section, if any
+// Per-section, keyed by section.id — switching sections never merges or clears these.
+let _qprSelections   = new Map(); // sectionId -> Set<entryKey>  ("p{page}:r{row}")
+let _qprCorrections  = new Map(); // sectionId -> Map<entryKey, {number, letter, suffix, code, error}>
+let _qprWorkspaceCityAtOpen = null; // _qmzEventContext.component.city, captured at import time
 let _previewOpen      = false;      // true while preview overlay is visible
 let _previewPath      = null;       // path of currently previewed file
 let _previewOrder     = [];         // snapshot of getRenderedPathOrder() at open time
@@ -9005,6 +9021,7 @@ function _closeSourceCleanup() {
 // ── QMZ Sequence Manager ──────────────────────────────────────────────────────
 
 async function openQMZManager(qmzRoot, eventContext) {
+  _qprCloseReview(); // defensive — a new workspace session must never inherit a prior one's PDF review state
   _qmzRoot          = qmzRoot;
   _qmzEventContext  = eventContext;
   _qmzActivePg      = null;
@@ -9066,6 +9083,7 @@ async function openQMZManager(qmzRoot, eventContext) {
 window.openQMZManager = openQMZManager;
 
 function _closeQMZManager() {
+  _qprCloseReview(); // the whole workspace is closing — no review state may outlive it
   _qmzOpen           = false;
   _qmzRoot           = null;
   _qmzData           = null;
@@ -10111,6 +10129,387 @@ async function _qmzHandleRetryTagging() {
   _qmzSetStatus(`Metadata queued for ${dests.length} file(s)`, 'ok');
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// QMZ PDF Program Review — Stage 3 of "PDF-Assisted QMZ Workspace Folder Generation"
+//
+// Entirely read-only with respect to the archive: nothing here ever calls
+// window.api.qmzCreateSequence / qmzBulkCreate / qmzMoveToSequence / qmzMoveToUnsequenced, or
+// writes qmz-sequences.json, event.json, or any archive file. "Create Selected Folders" is
+// rendered permanently disabled — folder creation is Stage 4. The only two IPC channels this
+// section calls are qmzImportProgramPdf (opens a native, PDF-restricted file picker and runs
+// the Stage 2 parser — the renderer never sees or supplies a filesystem path) and
+// qmzValidateSequenceInput (a pure, read-only validation echo of qmzService.js's own
+// createSequence() rules, so a manual correction is checked by the exact same authoritative
+// logic rather than a second, independently-maintained copy of it in the renderer).
+// ════════════════════════════════════════════════════════════════════════════
+
+function _qprEntryKey(entry) { return `p${entry.sourcePage}:r${entry.sourceRow}`; }
+function _qprNormalizeCityLabel(s) { return String(s ?? '').trim().toLowerCase(); }
+
+/** Splits a typed sequence string like "5a" into {number, suffix} for the validation IPC call.
+ *  Purely a string-shaping step, not a validation rule — an unparsed/malformed string is still
+ *  sent through (as NaN/empty), and the server-side qmzService.validateSequenceInput() is what
+ *  actually accepts or rejects it, exactly as the instruction requires ("use the existing QMZ
+ *  service's validation behavior as the authoritative rule"). */
+function _qprSplitSequenceInput(raw) {
+  const m = /^\s*(\d{1,3})([a-zA-Z]?)\s*$/.exec(String(raw ?? ''));
+  return m ? { number: parseInt(m[1], 10), suffix: m[2] || '' } : { number: NaN, suffix: '' };
+}
+
+function _qprActiveSection() {
+  if (!_qprParsed || !_qprActiveSectionId) return null;
+  return _qprParsed.sections.find(s => s.id === _qprActiveSectionId) || null;
+}
+
+/** Effective (corrected-or-original) values for one entry in the given section. */
+function _qprEffective(section, entry) {
+  const key  = _qprEntryKey(entry);
+  const corr = _qprCorrections.get(section.id)?.get(key);
+  if (!corr) return { number: entry.number, letter: entry.letter, suffix: entry.suffix, code: entry.folderName, edited: false, invalid: false, error: null };
+  if (corr.error) return { number: corr.number, letter: corr.letter, suffix: corr.suffix, code: null, edited: true, invalid: true, error: corr.error };
+  return { number: corr.number, letter: corr.letter, suffix: corr.suffix, code: corr.code, edited: corr.code !== entry.folderName, invalid: false, error: null };
+}
+
+/** Folder-name -> occurrence count, using each entry's EFFECTIVE (corrected) code — recomputed
+ *  on every render so an edit that creates or resolves a collision is reflected immediately
+ *  (Phase 7's "recompute duplicate status when the operator edits a sequence or type"). Never
+ *  mutates the parser's own original `section.duplicates` (that remains the as-extracted record). */
+function _qprEffectiveDuplicates(section) {
+  const counts = new Map();
+  for (const entry of section.entries) {
+    const eff = _qprEffective(section, entry);
+    if (eff.invalid || !eff.code) continue;
+    counts.set(eff.code, (counts.get(eff.code) || 0) + 1);
+  }
+  return counts;
+}
+
+// ── City suggestion (Phase 5D) — conservative, exact-normalized match only ─────────────────
+function _qprComputeSuggestion(sections, workspaceCity) {
+  if (!workspaceCity) return null;
+  const want = _qprNormalizeCityLabel(workspaceCity);
+  const matches = sections.filter(s => s.cityLabel && _qprNormalizeCityLabel(s.cityLabel) === want);
+  return matches.length === 1 ? matches[0].id : null; // zero or ambiguous (>1) -> no suggestion
+}
+
+// ── Import entry point ──────────────────────────────────────────────────────────────────────
+async function _qprStartImport() {
+  if (!_qmzRoot) return; // the button only exists inside an open QMZ workspace, but stay defensive
+  const btn = document.getElementById('qmzImportPdfBtn');
+  const myGen = ++_qprGeneration; // any import click (or workspace close) started after this one invalidates it
+  if (btn) { btn.disabled = true; btn.textContent = 'Importing…'; }
+  _qmzSetStatus('Opening PDF…');
+
+  let response;
+  try {
+    response = await window.api.qmzImportProgramPdf();
+  } catch (err) {
+    // qmz:importProgramPdf itself is designed to never reject — this is a last-resort guard
+    // against an unexpected IPC-layer failure, so the UI never silently does nothing.
+    if (btn) { btn.disabled = false; btn.textContent = 'Import QMZ Program PDF'; }
+    if (myGen === _qprGeneration) _qmzSetStatus('PDF import failed unexpectedly', 'err');
+    return;
+  }
+  if (btn) { btn.disabled = false; btn.textContent = 'Import QMZ Program PDF'; }
+
+  if (myGen !== _qprGeneration) return; // a newer import (or a workspace close) superseded this one
+  if (response.canceled) { _qmzSetStatus(''); return; }
+
+  _qprOpenReview(response.result);
+}
+
+function _qprOpenReview(parsed) {
+  _qprParsed       = parsed;
+  _qprSelections   = new Map();
+  _qprCorrections  = new Map();
+  _qprWorkspaceCityAtOpen = _qmzEventContext?.component?.city || null;
+  _qprSuggestedSectionId  = parsed.fatal ? null : _qprComputeSuggestion(parsed.sections, _qprWorkspaceCityAtOpen);
+
+  if (parsed.fatal) {
+    _qprActiveSectionId = null;
+  } else if (parsed.sections.length === 1) {
+    _qprActiveSectionId = parsed.sections[0].id; // single-section PDFs are auto-selected (Phase 5B: "selector may be simplified")
+  } else {
+    _qprActiveSectionId = _qprSuggestedSectionId; // null when no confident/unambiguous match — operator must choose explicitly
+  }
+
+  if (_qprActiveSectionId) _qprSelectDefaultsForSection(_qprActiveSectionId);
+
+  _qprOpen = true;
+  document.getElementById('qmzPdfReviewOverlay')?.classList.remove('hidden');
+  _qprRender();
+}
+
+/** Pre-checks every valid entry — ONLY ever called for the section the suggestion algorithm
+ *  actually confirmed (or the sole section of a single-section PDF), never for a section the
+ *  operator merely navigated to manually. A manually-chosen section (including the
+ *  non-suggested side of a city mismatch) starts fully unchecked, requiring an explicit
+ *  Select All or per-row action — consistent with this whole feature's "assignment is always
+ *  explicit, never a side effect of navigation" rule (see main/qmzProgramPdfParser.js and the
+ *  Stage 1 model for the same principle applied to parsing/normalization). */
+function _qprSelectDefaultsForSection(sectionId) {
+  const section = _qprParsed.sections.find(s => s.id === sectionId);
+  if (!section) return;
+  _qprSelections.set(sectionId, new Set(section.entries.map(_qprEntryKey)));
+}
+
+function _qprCloseReview() {
+  if (!_qprOpen && !_qprParsed) return; // nothing to do — avoids redundant DOM churn on every QMZ open/close
+  _qprGeneration++; // invalidate any in-flight import for the session that's ending
+  _qprOpen = false;
+  _qprParsed = null;
+  _qprActiveSectionId = null;
+  _qprSuggestedSectionId = null;
+  _qprSelections = new Map();
+  _qprCorrections = new Map();
+  _qprWorkspaceCityAtOpen = null;
+  document.getElementById('qmzPdfReviewOverlay')?.classList.add('hidden');
+}
+
+// ── Rendering ────────────────────────────────────────────────────────────────────────────
+
+function _qprRender() {
+  if (!_qprOpen) return;
+  _qprRenderPdfInfo();
+  _qprRenderWorkspaceBanner();
+  _qprRenderSectionSelector();
+  _qprRenderWarnings();
+  _qprRenderEntryTable();
+}
+
+function _qprRenderPdfInfo() {
+  const el = document.getElementById('qprPdfInfo');
+  if (!el || !_qprParsed) return;
+  const { source, fatal, sections } = _qprParsed;
+  if (fatal) {
+    el.innerHTML = `<strong>${_qprEsc(source.fileName)}</strong> — could not be read<br>${_qprEsc(_qprFatalMessage(fatal))}`;
+    return;
+  }
+  const totalValid = sections.reduce((n, s) => n + s.entries.length, 0);
+  el.innerHTML = `<strong>${_qprEsc(source.fileName)}</strong> &nbsp;·&nbsp; `
+    + `${source.pageCount} page${source.pageCount === 1 ? '' : 's'} &nbsp;·&nbsp; `
+    + `${sections.length} section${sections.length === 1 ? '' : 's'} detected &nbsp;·&nbsp; `
+    + `${totalValid} valid sequence${totalValid === 1 ? '' : 's'}`;
+}
+
+// Understandable, non-technical messages for every fatal code the parser can return — Phase 10:
+// "Do not show raw stack traces to operators."
+function _qprFatalMessage(fatal) {
+  const known = {
+    'unreadable-file':     'The file could not be opened.',
+    'empty-file':          'The selected file is empty.',
+    'invalid-pdf':         'This does not appear to be a valid PDF file.',
+    'password-protected':  'This PDF is password-protected and cannot be read.',
+    'no-extractable-text': 'No text could be found in this PDF — it may be a scanned/image-only document, which is not supported.',
+    'unexpected-error':    'An unexpected error occurred while reading this PDF.',
+  };
+  return known[fatal.code] || fatal.message || 'This PDF could not be processed.';
+}
+
+function _qprRenderWorkspaceBanner() {
+  const el = document.getElementById('qprWorkspaceBanner');
+  if (!el) return;
+  el.className = 'qpr-workspace-banner';
+  if (!_qprParsed || _qprParsed.fatal || !_qprActiveSectionId) { el.innerHTML = ''; return; }
+  const section = _qprActiveSection();
+  if (!section) { el.innerHTML = ''; return; }
+
+  const workspaceLabel = _qprWorkspaceCityAtOpen || '(unknown)';
+  const sectionLabel   = section.cityLabel || '(unlabeled section)';
+  if (!_qprWorkspaceCityAtOpen || !section.cityLabel) {
+    el.classList.add('unknown');
+    el.innerHTML = `Active QMZ Workspace: <strong>${_qprEsc(workspaceLabel)}</strong> &nbsp;·&nbsp; Selected PDF Section: <strong>${_qprEsc(sectionLabel)}</strong>`;
+    return;
+  }
+  const matches = _qprNormalizeCityLabel(workspaceLabel) === _qprNormalizeCityLabel(sectionLabel);
+  el.classList.add(matches ? 'match' : 'mismatch');
+  el.innerHTML = matches
+    ? `✓ Active QMZ Workspace: <strong>${_qprEsc(workspaceLabel)}</strong> matches the selected PDF section.`
+    : `⚠ The selected PDF section is for <strong>${_qprEsc(sectionLabel)}</strong>, but the active QMZ workspace is <strong>${_qprEsc(workspaceLabel)}</strong>.`;
+}
+
+function _qprRenderSectionSelector() {
+  const el = document.getElementById('qprSectionRow');
+  if (!el || !_qprParsed) return;
+  if (_qprParsed.fatal) { el.innerHTML = ''; return; }
+  const { sections } = _qprParsed;
+
+  if (sections.length === 0) {
+    el.innerHTML = `<span style="color:var(--subtext)">No sections detected.</span>`;
+    return;
+  }
+  if (sections.length === 1) {
+    // Phase 5B: "If the PDF contains only one section, the selector may be simplified."
+    el.innerHTML = `<label>Section</label><strong>${_qprEsc(sections[0].cityLabel || '(unlabeled)')}</strong>`;
+    return;
+  }
+  const options = sections.map(s => {
+    const label = s.cityLabel || `(unlabeled — ${s.id})`;
+    const sel = s.id === _qprActiveSectionId ? ' selected' : '';
+    return `<option value="${_qprEsc(s.id)}"${sel}>${_qprEsc(label)} — ${s.entries.length} sequence${s.entries.length === 1 ? '' : 's'}</option>`;
+  }).join('');
+  const suggestedTag = _qprSuggestedSectionId ? `<span class="qpr-section-suggested-tag">Suggested: ${_qprEsc(sections.find(s => s.id === _qprSuggestedSectionId)?.cityLabel || '')}</span>` : '';
+  el.innerHTML = `<label>Detected Sections</label><select id="qprSectionSelect" class="qpr-section-select">${options}</select>${suggestedTag}`;
+  document.getElementById('qprSectionSelect')?.addEventListener('change', (e) => {
+    _qprActiveSectionId = e.target.value;
+    if (!_qprSelections.has(_qprActiveSectionId)) _qprSelections.set(_qprActiveSectionId, new Set());
+    // Only the originally-suggested section gets pre-checked defaults — switching TO it (even
+    // manually) is still that same confident match, so restore its defaults the first time it's
+    // viewed if nothing has been touched yet; a section the operator reaches that was NEVER the
+    // suggestion keeps its already-initialized (empty, unless since edited) selection untouched.
+    if (_qprActiveSectionId === _qprSuggestedSectionId && !_qprSelections.get(_qprActiveSectionId).size && !_qprCorrections.has(_qprActiveSectionId)) {
+      _qprSelectDefaultsForSection(_qprActiveSectionId);
+    }
+    _qprRender();
+  });
+}
+
+function _qprRenderWarnings() {
+  const el = document.getElementById('qprWarnings');
+  if (!el || !_qprParsed) return;
+  const docWarnings = _qprParsed.fatal ? [] : _qprParsed.warnings;
+  const section = _qprActiveSection();
+  const sectionWarnings = section ? section.warnings : [];
+  const all = [...docWarnings, ...sectionWarnings];
+  if (!all.length) { el.innerHTML = ''; return; }
+  el.innerHTML = all.map(w => `<div class="qpr-warning-row">⚠ ${_qprEsc(_qprWarningMessage(w))}</div>`).join('');
+}
+
+function _qprWarningMessage(w) {
+  const known = {
+    'sharaf-column-not-found': 'No "Sharaf" column was found — nothing could be extracted from this PDF.',
+    'no-valid-qmz-entries':    'No numbered rows with a recognized QMZ type (Q/M/Z/MZ) were found.',
+    'city-undetermined':       'This section\'s city could not be determined — please verify or correct it manually.',
+    'mixed-code-prefixes':     'This section contains rows with more than one city code prefix — please review carefully.',
+  };
+  return w.message || known[w.reason] || 'This PDF has an uncertain or unsupported structure in one area.';
+}
+
+function _qprRenderEntryTable() {
+  const listEl = document.getElementById('qprEntryList');
+  const selCountEl = document.getElementById('qprSelCount');
+  if (!listEl) return;
+
+  const section = _qprActiveSection();
+  if (!section) {
+    listEl.innerHTML = `<div class="qpr-empty-state">${_qprParsed?.fatal ? _qprEsc(_qprFatalMessage(_qprParsed.fatal)) : 'Select a section above to review its sequences.'}</div>`;
+    if (selCountEl) selCountEl.textContent = '';
+    return;
+  }
+  if (!section.entries.length) {
+    listEl.innerHTML = `<div class="qpr-empty-state">No valid sequences were detected in this section.</div>`;
+    if (selCountEl) selCountEl.textContent = 'Selected: 0 of 0';
+    return;
+  }
+
+  const duplicateCounts = _qprEffectiveDuplicates(section);
+  const selected = _qprSelections.get(section.id) || new Set();
+  // Phase 5E-11/12: preserve original PDF sequence order — never reordered by selection or correction.
+  const rows = section.entries.map(entry => {
+    const key = _qprEntryKey(entry);
+    const eff = _qprEffective(section, entry);
+    const isDuplicate = !eff.invalid && eff.code && (duplicateCounts.get(eff.code) || 0) > 1;
+    const checked = selected.has(key) && !eff.invalid;
+    const statusHtml = eff.invalid
+      ? `<span class="qpr-status-pill invalid" title="${_qprEsc(eff.error || 'Invalid')}">Invalid</span>`
+      : isDuplicate
+        ? `<span class="qpr-status-pill duplicate" title="Duplicate folder name within this section">Duplicate</span>`
+        : `<span class="qpr-status-pill valid">Valid</span>`;
+    const folderHtml = eff.invalid
+      ? `<span class="qpr-folder-name">—</span>`
+      : `<span class="qpr-folder-name">${eff.edited ? `<span class="orig">${_qprEsc(entry.folderName)}</span>` : ''}${_qprEsc(eff.code)}</span>`;
+    return `
+      <div class="qpr-entry-row${eff.invalid ? ' invalid' : ''}" data-key="${_qprEsc(key)}">
+        <input type="checkbox" class="qpr-entry-check" data-key="${_qprEsc(key)}" ${checked ? 'checked' : ''} ${eff.invalid ? 'disabled' : ''} aria-label="Select ${_qprEsc(eff.code || entry.folderName)}">
+        <input type="text" class="qpr-seq-field${eff.edited ? ' edited' : ''}" data-key="${_qprEsc(key)}" data-field="seq" value="${_qprEsc(eff.suffix ? `${eff.number}${eff.suffix}` : String(eff.number))}" maxlength="4" aria-label="Sequence number">
+        <select class="qpr-type-field${eff.edited ? ' edited' : ''}" data-key="${_qprEsc(key)}" data-field="type" aria-label="QMZ type">
+          ${['Q', 'M', 'Z', 'MZ'].map(t => `<option value="${t}"${t === eff.letter ? ' selected' : ''}>${t}</option>`).join('')}
+        </select>
+        ${folderHtml}
+        ${statusHtml}
+      </div>`;
+  }).join('');
+  listEl.innerHTML = rows;
+
+  const eligibleCount = section.entries.filter(e => !_qprEffective(section, e).invalid).length;
+  const selectedCount = [...selected].filter(k => {
+    const entry = section.entries.find(e => _qprEntryKey(e) === k);
+    return entry && !_qprEffective(section, entry).invalid;
+  }).length;
+  if (selCountEl) selCountEl.textContent = `Selected: ${selectedCount} of ${eligibleCount}`;
+}
+
+function _qprEsc(s) {
+  const d = document.createElement('div');
+  d.textContent = String(s ?? '');
+  return d.innerHTML;
+}
+
+// ── Entry-list interaction (event delegation on the list container) ────────────────────────
+function _qprHandleEntryListChange(e) {
+  const section = _qprActiveSection();
+  if (!section) return;
+
+  if (e.target.matches('.qpr-entry-check')) {
+    const key = e.target.dataset.key;
+    const set = _qprSelections.get(section.id) || new Set();
+    if (e.target.checked) set.add(key); else set.delete(key);
+    _qprSelections.set(section.id, set);
+    _qprRenderEntryTable(); // only the count/row state needs refreshing, not the whole modal
+    return;
+  }
+
+  if (e.target.matches('.qpr-seq-field, .qpr-type-field')) {
+    _qprHandleEntryCorrection(section, e.target);
+  }
+}
+
+async function _qprHandleEntryCorrection(section, fieldEl) {
+  const key = fieldEl.dataset.key;
+  const entry = section.entries.find(x => _qprEntryKey(x) === key);
+  if (!entry) return;
+
+  const row = fieldEl.closest('.qpr-entry-row');
+  const seqRaw  = row.querySelector('.qpr-seq-field')?.value ?? '';
+  const typeRaw = row.querySelector('.qpr-type-field')?.value ?? entry.letter;
+  const { number, suffix } = _qprSplitSequenceInput(seqRaw);
+
+  const myGen = _qprGeneration; // guard: don't apply a validation response after the review itself was closed/replaced
+  const res = await window.api.qmzValidateSequenceInput({ number, letter: typeRaw, suffix });
+  if (myGen !== _qprGeneration) return;
+
+  const bucket = _qprCorrections.get(section.id) || new Map();
+  if (res.ok) {
+    bucket.set(key, { number: res.number, letter: res.letter, suffix: res.suffix, code: res.code, error: null });
+  } else {
+    // Preserve exactly what the operator typed rather than reverting it — Phase 6: "Do not
+    // silently truncate or reinterpret invalid input" — and mark the row invalid/unselectable.
+    bucket.set(key, { number, letter: typeRaw, suffix, code: null, error: res.error });
+    const sel = _qprSelections.get(section.id);
+    if (sel) sel.delete(key); // an entry that just became invalid can never be "ready" — Phase 7-5/10
+  }
+  _qprCorrections.set(section.id, bucket);
+  _qprRenderEntryTable();
+}
+
+// ── Select All / Clear All (Phase 5E-5/6 — operate on the ACTIVE section's eligible entries only) ──
+function _qprSelectAll() {
+  const section = _qprActiveSection();
+  if (!section) return;
+  const set = new Set();
+  for (const entry of section.entries) {
+    if (!_qprEffective(section, entry).invalid) set.add(_qprEntryKey(entry));
+  }
+  _qprSelections.set(section.id, set);
+  _qprRenderEntryTable();
+}
+function _qprClearAll() {
+  const section = _qprActiveSection();
+  if (!section) return;
+  _qprSelections.set(section.id, new Set());
+  _qprRenderEntryTable();
+}
+
 // Wire QMZ overlay event listeners — runs once at page load.
 (function _initQMZListeners() {
   document.getElementById('qmzCloseBtn')?.addEventListener('click', _closeQMZManager);
@@ -10211,9 +10610,27 @@ async function _qmzHandleRetryTagging() {
   // Escape closes the overlay — but not while QMZ's own preview is open on top
   // of it; the preview keyboard handler owns Escape in that case (closes the
   // preview first, matching import's Escape-closes-preview-first behavior).
+  // The PDF review modal sits above both, so it claims Escape first — closing
+  // it must restore normal QMZ workspace interaction, never bubble through to
+  // close the whole workspace in the same keystroke (Phase 11).
   document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && _qprOpen) { e.preventDefault(); _qprCloseReview(); return; }
     if (e.key === 'Escape' && _qmzOpen && !_previewOpen) { e.preventDefault(); _closeQMZManager(); }
   });
+
+  // ── QMZ PDF Program Review — Stage 3 listener wiring ──────────────────────────────────
+  document.getElementById('qmzImportPdfBtn')?.addEventListener('click', _qprStartImport);
+  document.getElementById('qprCloseBtn')?.addEventListener('click', _qprCloseReview);
+  document.getElementById('qprCancelBtn')?.addEventListener('click', _qprCloseReview);
+  document.getElementById('qprDoneBtn')?.addEventListener('click', _qprCloseReview);
+  document.getElementById('qprSelectAllBtn')?.addEventListener('click', _qprSelectAll);
+  document.getElementById('qprClearAllBtn')?.addEventListener('click', _qprClearAll);
+  // Delegated listeners on the entry list container — rows are re-rendered on every state
+  // change, so binding per-row listeners would leak; delegation also means the DOM doesn't
+  // need to be re-queried after _qprRenderEntryTable() replaces its innerHTML.
+  document.getElementById('qprEntryList')?.addEventListener('change', _qprHandleEntryListChange);
+  // Note: #qprCreateBtn intentionally has NO click handler — it is rendered permanently
+  // `disabled` (see renderer/index.html) and must stay inert for the whole of Stage 3.
 })();
 
 // ── Space-bar Media Preview ────────────────────────────────────────────────

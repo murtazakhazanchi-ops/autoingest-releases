@@ -62,6 +62,7 @@ const realtimeOps              = require('../services/realtimeOperationsService'
 const offlineCollectionRegistry    = require('../services/offlineCollectionRegistryService');
 const photographerSeqService       = require('../services/photographerSequenceService');
 const qmzService                   = require('./qmzService');
+const { parseProgramPdf }          = require('./qmzProgramPdfParser');
 
 // ── Platform ─────────────────────────────────────────────────────────────────
 const isMac = process.platform === 'darwin';
@@ -5514,6 +5515,44 @@ ipcMain.handle('qmz:createSequence', async (_e, { qmzRoot, number, letter }) => 
 
 ipcMain.handle('qmz:bulkCreate', async (_e, { qmzRoot, items }) => {
   return qmzService.bulkCreateSequences(qmzRoot, items);
+});
+
+// PDF-Assisted QMZ Workspace Folder Generation, Stage 3 — pure, read-only validation (no
+// qmzRoot, no filesystem access) for the PDF-review correction fields, so the renderer never
+// re-implements qmzService.js's own sequence-code rules. See that function's own comment:
+// createSequence() itself calls this first, so this is the exact same authoritative check.
+ipcMain.handle('qmz:validateSequenceInput', async (_e, { number, letter, suffix }) => {
+  return qmzService.validateSequenceInput(number, letter, suffix);
+});
+
+// PDF-Assisted QMZ Workspace Folder Generation, Stage 3 — one controlled operation that opens
+// a native, PDF-restricted file picker and hands the selected file straight to the Stage 2
+// parser, entirely inside the main process. The renderer never supplies or sees a filesystem
+// path for this — it only ever receives the parser's own structured result (see
+// qmzProgramPdfParser.js's own header comment for that contract). Never creates, renames,
+// moves, or deletes anything — parseProgramPdf() is read-only by construction (Stage 2).
+ipcMain.handle('qmz:importProgramPdf', async (_e) => {
+  const win = BrowserWindow.getFocusedWindow();
+  const result = await dialog.showOpenDialog(win, {
+    title:      'Select QMZ Program PDF',
+    properties: ['openFile'],
+    filters:    [{ name: 'PDF Documents', extensions: ['pdf'] }],
+  });
+  if (result.canceled || !result.filePaths[0]) return { canceled: true };
+
+  try {
+    const parsed = await parseProgramPdf(result.filePaths[0]);
+    // Log only the filename and counts — never anything the parser extracted from the PDF's
+    // own content (qmzProgramPdfParser.js's own log() call already follows this same rule).
+    log(`[main] qmz:importProgramPdf: ${parsed.fatal ? `fatal:${parsed.fatal.code}` : `${parsed.sections.length} section(s)`}`);
+    return { canceled: false, result: parsed };
+  } catch (err) {
+    // parseProgramPdf() is designed to always resolve with a `fatal`-shaped result rather than
+    // throw — this catch exists only as a last-resort guard against a genuinely unexpected
+    // failure (e.g. disk I/O), so the renderer never receives a raw, unhandled IPC rejection.
+    log(`[main] qmz:importProgramPdf: unexpected error: ${err.message}`);
+    return { canceled: false, result: { source: { fileName: path.basename(result.filePaths[0]), pageCount: 0 }, sections: [], warnings: [], fatal: { code: 'unexpected-error', message: 'An unexpected error occurred while reading this PDF.' } } };
+  }
 });
 
 ipcMain.handle('qmz:editSequence', async (_e, { qmzRoot, code, newLetter }) => {

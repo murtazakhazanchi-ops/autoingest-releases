@@ -683,12 +683,15 @@ async function initRoot(qmzRoot) {
 
 // ── Create sequences ─────────────────────────────────────────────────────────
 
-// `suffix` is optional and backward-compatible — every existing caller omits
-// it, so `letter`-only validation and the Q/M/Z ceilings in LETTER_MAX are
-// completely untouched. MZ (and any future letter with no entry in
-// LETTER_MAX) falls back to MAX_SEQUENCE_NUMBER — see that constant's own
-// comment for why no MZ-specific ceiling is invented here.
-async function createSequence(qmzRoot, number, letter, suffix = '') {
+// Pure, synchronous, read-only validation — no filesystem access, no qmzRoot. Extracted
+// verbatim from createSequence() (Stage 3 of "PDF-Assisted QMZ Workspace Folder Generation")
+// so a caller needing to validate a (number, letter, suffix) triple WITHOUT creating anything
+// — e.g. a renderer-side PDF-review correction field — uses the exact same authoritative rules
+// createSequence() itself enforces, rather than a second, independently-maintained copy of
+// them. createSequence() now calls this first; this is a pure refactor, not a behavior change
+// — see test/qmzSuffixedCombinedTypeRegression.test.js's Group A/B, re-run unchanged after
+// this extraction, for the regression coverage proving that.
+function validateSequenceInput(number, letter, suffix = '') {
   letter = String(letter ?? '').toUpperCase();
   if (!LETTER_TYPE[letter]) return { ok: false, error: `Invalid letter: ${letter}` };
   suffix = String(suffix ?? '').toLowerCase();
@@ -696,8 +699,20 @@ async function createSequence(qmzRoot, number, letter, suffix = '') {
   const max = LETTER_MAX[letter] ?? MAX_SEQUENCE_NUMBER;
   if (!Number.isInteger(number) || number < 1 || number > max)
     return { ok: false, error: `Number out of range for ${letter}: ${number} (1–${max})` };
-
   const code = formatCode(number, letter, suffix);
+  return { ok: true, code, number, letter, suffix, type: LETTER_TYPE[letter] };
+}
+
+// `suffix` is optional and backward-compatible — every existing caller omits
+// it, so `letter`-only validation and the Q/M/Z ceilings in LETTER_MAX are
+// completely untouched. MZ (and any future letter with no entry in
+// LETTER_MAX) falls back to MAX_SEQUENCE_NUMBER — see that constant's own
+// comment for why no MZ-specific ceiling is invented here.
+async function createSequence(qmzRoot, number, letter, suffix = '') {
+  const v = validateSequenceInput(number, letter, suffix);
+  if (!v.ok) return v;
+  ({ number, letter, suffix } = v);
+  const code = v.code;
   try { await fsp.mkdir(path.join(qmzRoot, code), { recursive: true }); }
   catch (err) { return { ok: false, error: err.message }; }
 
@@ -859,6 +874,7 @@ module.exports = {
   formatCode,
   parseCode,
   letterToType,
+  validateSequenceInput,
   readState,
   saveState,
   scanRoot,
