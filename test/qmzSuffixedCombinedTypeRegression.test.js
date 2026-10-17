@@ -208,8 +208,13 @@ async function mkQmzRoot() { return fsp.mkdtemp(path.join(os.tmpdir(), 'ai-qmz-s
   await t('B10: moveFilesToSequence works against a suffixed/combined-type code exactly like a plain one', async () => {
     const root = await mkQmzRoot();
     await createSequence(root, 5, 'MZ', 'a');
-    const srcDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'ai-qmz-suffix-src-'));
-    const srcFile = path.join(srcDir, 'IMG_0001.CR2');
+    // Source lives under qmzRoot/_Unsequenced, matching how the real app always discovers a
+    // move source (listMediaFiles() only ever scans inside qmzRoot) — a later security-
+    // hardening follow-up made moveFilesToSequence() reject any source outside the authorized
+    // workspace, which a source in a wholly separate temp directory (this fixture's original
+    // form) legitimately now is.
+    const srcFile = path.join(root, '_Unsequenced', 'Alihusain Jamali', 'IMG_0001.CR2');
+    await fsp.mkdir(path.dirname(srcFile), { recursive: true });
     await fsp.writeFile(srcFile, Buffer.from('not-a-real-raw-file'));
     const r = await moveFilesToSequence(root, [srcFile], '05aMZ', 'Alihusain Jamali');
     assert.equal(r.ok, true);

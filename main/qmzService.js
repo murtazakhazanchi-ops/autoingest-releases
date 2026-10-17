@@ -5,6 +5,12 @@ const fsp    = require('fs').promises;
 const exifr  = require('exifr');
 const { log } = require('../services/logger');
 const config = require('../config/app.config');
+// Security hardening (post-Stage-4) — the SAME Windows/UNC-safe containment check already
+// used throughout main/main.js (archive-root/staging-root boundary checks). Reused here
+// rather than a second, independently-written containment helper — see isPathUnderRoot's own
+// header comment for exactly why a naive `x.startsWith(root)` is unsafe (it would wrongly
+// treat "/archive/QMZ-Other" as contained in "/archive/QMZ").
+const PathUtils = require('../renderer/pathUtils.js');
 
 const STATE_FILE  = 'qmz-sequences.json';
 const UNSEQUENCED = '_Unsequenced';
@@ -801,27 +807,12 @@ async function ensureEnroute(qmzRoot) {
   let st;
   try { st = await fsp.lstat(dir); } catch { st = null; }
 
+  // Security hardening (post-Stage-4): delegates the symlink/non-directory safety decision to
+  // the same shared _assertSafeDirLevel() every other QMZ destination now uses, rather than a
+  // second, independently-maintained copy of this exact logic.
   if (st) {
-    if (st.isSymbolicLink()) {
-      let real;
-      try { real = await fsp.realpath(dir); }
-      catch { return { ok: false, folderName: ENROUTE_DIR, status: 'conflict', error: 'Enroute exists as a broken symlink.' }; }
-      let rootReal;
-      try { rootReal = await fsp.realpath(qmzRoot); } catch { rootReal = qmzRoot; }
-      const insideRoot = real === rootReal || real.startsWith(rootReal + path.sep);
-      if (!insideRoot) {
-        return { ok: false, folderName: ENROUTE_DIR, status: 'conflict', error: 'Enroute exists as a symlink pointing outside the QMZ workspace — refusing to use it.' };
-      }
-      let targetStat;
-      try { targetStat = await fsp.stat(dir); } catch { targetStat = null; }
-      if (!targetStat || !targetStat.isDirectory()) {
-        return { ok: false, folderName: ENROUTE_DIR, status: 'conflict', error: 'Enroute exists but does not resolve to a directory.' };
-      }
-      return { ok: true, folderName: ENROUTE_DIR, status: 'already-exists' };
-    }
-    if (!st.isDirectory()) {
-      return { ok: false, folderName: ENROUTE_DIR, status: 'conflict', error: 'Enroute exists but is not a directory.' };
-    }
+    const safety = await _assertSafeDirLevel(qmzRoot, dir);
+    if (!safety.ok) return { ok: false, folderName: ENROUTE_DIR, status: 'conflict', error: safety.error };
     return { ok: true, folderName: ENROUTE_DIR, status: 'already-exists' };
   }
 
@@ -832,10 +823,9 @@ async function ensureEnroute(qmzRoot) {
     // confirm racing) winning first is not an error — re-check what is actually there now
     // rather than reporting a failure for a folder that in fact exists correctly.
     if (err.code === 'EEXIST') {
-      let recheck;
-      try { recheck = await fsp.stat(dir); } catch { recheck = null; }
-      if (recheck && recheck.isDirectory()) return { ok: true, folderName: ENROUTE_DIR, status: 'already-exists' };
-      return { ok: false, folderName: ENROUTE_DIR, status: 'conflict', error: 'Enroute exists but is not a directory.' };
+      const safety = await _assertSafeDirLevel(qmzRoot, dir);
+      if (!safety.ok) return { ok: false, folderName: ENROUTE_DIR, status: 'conflict', error: safety.error };
+      return { ok: true, folderName: ENROUTE_DIR, status: 'already-exists' };
     }
     return { ok: false, folderName: ENROUTE_DIR, status: 'error', error: err.message };
   }
@@ -1002,16 +992,201 @@ async function removeSequence(qmzRoot, code) {
   return { ok: true, code };
 }
 
+// ── Shared path-safety validation (security hardening, post-Stage-4) ──────────────────────
+//
+// Root cause of the vulnerability this section closes: moveFilesToSequence()/
+// moveFilesToUnsequenced()/moveFilesToEnroute() built their destination directory as
+// `path.join(qmzRoot, <category>, photographerName)` and trusted `photographerName` as a
+// single directory-name component with NO validation at the service/IPC boundary — only the
+// renderer's own conventions (deriving it from an already-scanned folder name, or from an
+// already-selected file's own parent path) ever constrained what that string actually was. A
+// crafted `photographerName` such as "../../Outside" is accepted by path.join() exactly like
+// any other string and collapses the traversal, moving files to a directory OUTSIDE qmzRoot
+// (reproduced directly against isolated synthetic fixtures — never against a real archive —
+// see test/qmzEnrouteSecurityRegression.test.js). The renderer never actually supplies such a
+// value today, but the service must not depend on that remaining true forever: the trusted
+// main-process boundary is supposed to be the service layer itself, not caller discipline.
+//
+// The fix below is intentionally the SAME shared mechanism for all three destinations: a
+// photographer name is validated as exactly one path segment before any path is built from
+// it, every directory LEVEL between qmzRoot and the destination is checked for an unsafe
+// symlink before any write, and every source file is independently confirmed to already live
+// inside qmzRoot (lexically, and — where it exists — after resolving symlinks) before it is
+// ever handed to safeMoveFile(). None of this changes safeMoveFile()'s own collision policy,
+// moveWithSidecar()'s sidecar co-move, or any result-reporting shape callers already depend
+// on (validated-and-rejected files are reported via the exact same {src, error} shape the
+// existing 'source-missing' case already used).
+
+const UNSAFE_PATH_CHARS_RE = /[\\/\0]/; // backslash, forward slash, NUL — unconditionally, never platform-gated
+const DRIVE_LETTER_RE      = /^[a-zA-Z]:$/; // a bare "C:" with no separator still changes path resolution on Windows
+
+/**
+ * A photographer name must represent exactly one directory component, never a path.
+ * Deliberately does NOT use path.basename() to "fix up" an unsafe value into a different,
+ * silently-substituted photographer identity — an unsafe name is rejected outright and the
+ * whole move call fails fast, exactly like an invalid sequence code already does via
+ * parseCode(). Ordinary names (spaces, hyphens, underscores, parentheses, …) are untouched;
+ * this is strictly a path-separator/identity check, not a character-set whitelist.
+ */
+function validatePhotographerName(name) {
+  if (typeof name !== 'string' || name.length === 0) {
+    return { ok: false, error: 'Photographer name cannot be empty.' };
+  }
+  if (name === '.' || name === '..') {
+    return { ok: false, error: `Invalid photographer name: ${JSON.stringify(name)}` };
+  }
+  if (UNSAFE_PATH_CHARS_RE.test(name)) {
+    return { ok: false, error: `Photographer name cannot contain a path separator: ${JSON.stringify(name)}` };
+  }
+  if (DRIVE_LETTER_RE.test(name)) {
+    return { ok: false, error: `Invalid photographer name: ${JSON.stringify(name)}` };
+  }
+  return { ok: true, name };
+}
+
+/**
+ * Checks ONE existing filesystem entry for safety as a directory level a move operation is
+ * about to read through or create inside: absent is fine (will be created fresh by the
+ * caller's own mkdir); a real directory is fine; a symlink is fine ONLY if it resolves to a
+ * real directory still inside qmzRoot; anything else (a plain file, a symlink escaping the
+ * workspace, a symlink to a non-directory, a broken symlink) is rejected. Mirrors
+ * ensureEnroute()'s own original Stage 4 symlink-safety logic, generalized into the one
+ * shared helper every destination level now goes through — see _assertSafeDestinationPath.
+ */
+async function _assertSafeDirLevel(qmzRoot, dirPath) {
+  let st;
+  try { st = await fsp.lstat(dirPath); } catch { return { ok: true }; } // nothing here yet — safe
+
+  if (st.isSymbolicLink()) {
+    let real;
+    try { real = await fsp.realpath(dirPath); }
+    catch { return { ok: false, error: `Path exists as a broken symlink: ${path.basename(dirPath)}` }; }
+    let rootReal;
+    try { rootReal = await fsp.realpath(qmzRoot); } catch { rootReal = path.resolve(qmzRoot); }
+    if (!PathUtils.isPathUnderOrEqualToRoot(real, rootReal)) {
+      return { ok: false, error: `Path exists as a symlink pointing outside the authorized QMZ workspace: ${path.basename(dirPath)}` };
+    }
+    let targetStat;
+    try { targetStat = await fsp.stat(dirPath); } catch { targetStat = null; }
+    if (!targetStat || !targetStat.isDirectory()) {
+      return { ok: false, error: `Path exists but does not resolve to a directory: ${path.basename(dirPath)}` };
+    }
+    return { ok: true };
+  }
+  if (!st.isDirectory()) {
+    return { ok: false, error: `Path exists but is not a directory: ${path.basename(dirPath)}` };
+  }
+  return { ok: true };
+}
+
+/**
+ * Validates an entire destination directory path (e.g. `<qmzRoot>/Enroute/Abbas Bhai`) before
+ * any mkdir happens: the path must be lexically contained in qmzRoot (Windows/UNC-safe, no
+ * naive string-prefix match — see PathUtils.isPathUnderRoot), and EVERY directory level
+ * between qmzRoot and the destination (not just the leaf) is checked via
+ * _assertSafeDirLevel — a hijacked symlink at the CATEGORY level (e.g. "01Q" itself replaced
+ * by a symlink) is just as dangerous as one at the photographer leaf, and recursive mkdir
+ * would otherwise walk straight through it.
+ *
+ * Known limitation (documented, not silently claimed away): this check and the later mkdir/
+ * move are not atomic. A sufficiently well-timed concurrent filesystem change between this
+ * validation and the actual write (e.g. a symlink swapped in immediately after this check
+ * passes) is not fully excluded by this fix — Node's fs API offers no O_NOFOLLOW-equivalent
+ * for mkdir/recursive directory creation to close that TOCTOU window completely. This mirrors
+ * the same residual race already inherent to every other filesystem-safety check in this
+ * codebase (see e.g. main.js's own realpath-then-act patterns) and is not a regression
+ * introduced here.
+ */
+async function _assertSafeDestinationPath(qmzRoot, destDir) {
+  const rootResolved = path.resolve(qmzRoot);
+  const destResolved = path.resolve(destDir);
+  if (!PathUtils.isPathUnderRoot(destResolved, rootResolved)) {
+    return { ok: false, error: 'Destination path is outside the authorized QMZ workspace.' };
+  }
+  const relParts = path.relative(rootResolved, destResolved).split(path.sep).filter(Boolean);
+  let current = rootResolved;
+  for (const part of relParts) {
+    current = path.join(current, part);
+    const r = await _assertSafeDirLevel(qmzRoot, current);
+    if (!r.ok) return r;
+  }
+  return { ok: true };
+}
+
+/**
+ * Validates one source file before it is ever handed to safeMoveFile(): must already be
+ * lexically contained inside qmzRoot, must not be the workspace root itself, must not be the
+ * internal qmz-sequences.json state file, must not be a directory, and — if it (or any
+ * directory in its path back up to qmzRoot) is a symlink — must resolve to something still
+ * inside qmzRoot. Returns the SAME {ok, reason} shape safeMoveFile() already uses for its own
+ * 'source-missing' case, so existing per-file error reporting is completely unchanged for
+ * every caller that only ever saw legitimate input.
+ */
+async function _validateSourceFile(qmzRoot, src) {
+  if (typeof src !== 'string' || !src) return { ok: false, reason: 'invalid-source-path' };
+
+  const rootResolved = path.resolve(qmzRoot);
+  const srcResolved  = path.resolve(src);
+
+  // Checked BEFORE the general containment test below: isPathUnderRoot() requires strictly
+  // `startsWith(root + '/')`, so qmzRoot resolved against ITSELF would otherwise fall through
+  // as a generic "outside the workspace" rejection — correct in effect (both paths reject the
+  // operation) but less specific than the brief's own named case for this exact input.
+  if (srcResolved === rootResolved) {
+    return { ok: false, reason: 'source-is-workspace-root' };
+  }
+  if (!PathUtils.isPathUnderRoot(srcResolved, rootResolved)) {
+    return { ok: false, reason: 'source-outside-workspace' };
+  }
+  if (path.dirname(srcResolved) === rootResolved && path.basename(srcResolved) === STATE_FILE) {
+    return { ok: false, reason: 'source-is-internal-state-file' };
+  }
+
+  let st;
+  try { st = await fsp.lstat(srcResolved); }
+  catch { return { ok: false, reason: 'source-missing' }; } // preserves safeMoveFile's own existing wording for this case
+
+  if (st.isSymbolicLink()) {
+    let real;
+    try { real = await fsp.realpath(srcResolved); }
+    catch { return { ok: false, reason: 'source-missing' }; } // broken symlink — same user-facing outcome as a missing file
+    let rootReal;
+    try { rootReal = await fsp.realpath(rootResolved); } catch { rootReal = rootResolved; }
+    if (!PathUtils.isPathUnderOrEqualToRoot(real, rootReal)) {
+      return { ok: false, reason: 'source-symlink-escape' };
+    }
+    const targetStat = await fsp.stat(srcResolved).catch(() => null);
+    if (targetStat && targetStat.isDirectory()) return { ok: false, reason: 'source-is-directory' };
+    return { ok: true };
+  }
+  if (st.isDirectory()) {
+    return { ok: false, reason: 'source-is-directory' };
+  }
+  // A regular (non-symlink) file still needs its own parent chain checked for an intermediate
+  // symlink that redirects elsewhere (e.g. _Unsequenced/Abbas Bhai itself being a symlink
+  // pointing outside qmzRoot) — reuses the exact same directory-level walk destinations use.
+  const parentCheck = await _assertSafeDestinationPath(qmzRoot, path.dirname(srcResolved));
+  if (!parentCheck.ok) return { ok: false, reason: 'source-symlink-escape' };
+
+  return { ok: true };
+}
+
 // ── Move files ────────────────────────────────────────────────────────────────
 
 async function moveFilesToSequence(qmzRoot, filePaths, sequenceCode, photographerName) {
   if (!parseCode(sequenceCode)) return { ok: false, error: `Invalid sequence code: ${sequenceCode}` };
+  const pgCheck = validatePhotographerName(photographerName);
+  if (!pgCheck.ok) return pgCheck;
   const destDir = path.join(qmzRoot, sequenceCode, photographerName);
+  const destCheck = await _assertSafeDestinationPath(qmzRoot, destDir);
+  if (!destCheck.ok) return destCheck;
   try { await fsp.mkdir(destDir, { recursive: true }); } catch {}
 
   const moved  = [];
   const errors = [];
   for (const src of filePaths) {
+    const v = await _validateSourceFile(qmzRoot, src);
+    if (!v.ok) { errors.push({ src, error: v.reason }); continue; }
     const r = await moveWithSidecar(src, destDir);
     if (r.ok) moved.push({ src, dest: r.dest, action: r.action });
     else errors.push({ src, error: r.reason });
@@ -1022,12 +1197,18 @@ async function moveFilesToSequence(qmzRoot, filePaths, sequenceCode, photographe
 }
 
 async function moveFilesToUnsequenced(qmzRoot, filePaths, photographerName) {
+  const pgCheck = validatePhotographerName(photographerName);
+  if (!pgCheck.ok) return pgCheck;
   const destDir = path.join(qmzRoot, UNSEQUENCED, photographerName);
+  const destCheck = await _assertSafeDestinationPath(qmzRoot, destDir);
+  if (!destCheck.ok) return destCheck;
   try { await fsp.mkdir(destDir, { recursive: true }); } catch {}
 
   const moved  = [];
   const errors = [];
   for (const src of filePaths) {
+    const v = await _validateSourceFile(qmzRoot, src);
+    if (!v.ok) { errors.push({ src, error: v.reason }); continue; }
     const r = await moveWithSidecar(src, destDir);
     if (r.ok) moved.push({ src, dest: r.dest, action: r.action });
     else errors.push({ src, error: r.reason });
@@ -1054,12 +1235,18 @@ async function moveFilesToUnsequenced(qmzRoot, filePaths, photographerName) {
 // Enroute is not a QMZ type, so there is no type tag to write (see the renderer's own comment
 // on why _qmzAutoQueueMetadata is never called for an Enroute move, mirroring Unsequenced).
 async function moveFilesToEnroute(qmzRoot, filePaths, photographerName) {
+  const pgCheck = validatePhotographerName(photographerName);
+  if (!pgCheck.ok) return pgCheck;
   const destDir = path.join(qmzRoot, ENROUTE_DIR, photographerName);
+  const destCheck = await _assertSafeDestinationPath(qmzRoot, destDir);
+  if (!destCheck.ok) return destCheck;
   try { await fsp.mkdir(destDir, { recursive: true }); } catch {}
 
   const moved  = [];
   const errors = [];
   for (const src of filePaths) {
+    const v = await _validateSourceFile(qmzRoot, src);
+    if (!v.ok) { errors.push({ src, error: v.reason }); continue; }
     const r = await moveWithSidecar(src, destDir);
     if (r.ok) moved.push({ src, dest: r.dest, action: r.action });
     else errors.push({ src, error: r.reason });
@@ -1095,6 +1282,15 @@ module.exports = {
   moveFilesToUnsequenced,
   moveFilesToEnroute,
   resolveCaptureDates,
+  // Security hardening (post-Stage-4) — validatePhotographerName() is part of the real public
+  // API (moveFilesToSequence/moveFilesToUnsequenced/moveFilesToEnroute now call it internally,
+  // but a caller may also want to pre-check a name before attempting a move). The remaining
+  // three are test-only internals exposed so the security regression suite can exercise each
+  // layer directly rather than only through a full move call.
+  validatePhotographerName,
+  _assertSafeDestinationPath,
+  _assertSafeDirLevel,
+  _validateSourceFile,
   // Test-only: exposes the Dirent/stat hardening helpers so
   // test/qmzDirentMismatchRegression.test.js can exercise them directly
   // against a real fs.stat() with a faked Dirent, mirroring
