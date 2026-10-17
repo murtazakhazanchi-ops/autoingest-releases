@@ -47,7 +47,8 @@
   "optionalDependencies": {
     "@img/sharp-darwin-arm64": "0.34.5",
     "@img/sharp-libvips-darwin-arm64": "1.2.4",
-    "@napi-rs/canvas-darwin-arm64": "0.1.100"
+    "@napi-rs/canvas-darwin-arm64": "0.1.100",
+    "@napi-rs/canvas-win32-x64-msvc": "0.1.100"
   },
   "devDependencies": {
     "electron": "^30.0.0",
@@ -91,6 +92,7 @@
       "node_modules/pdfjs-dist/**/*",
       "node_modules/@napi-rs/canvas/**/*",
       "node_modules/@napi-rs/canvas-darwin-arm64/**/*",
+      "node_modules/@napi-rs/canvas-win32-x64-msvc/**/*",
       "!**/node_modules/.cache/**",
       "!dist/**",
       "!**/*.md",
@@ -105,7 +107,8 @@
       "node_modules/@img/sharp-darwin-arm64/**/*",
       "node_modules/@img/sharp-libvips-darwin-arm64/**/*",
       "node_modules/@napi-rs/canvas/**/*",
-      "node_modules/@napi-rs/canvas-darwin-arm64/**/*"
+      "node_modules/@napi-rs/canvas-darwin-arm64/**/*",
+      "node_modules/@napi-rs/canvas-win32-x64-msvc/**/*"
     ],
     "mac": {
       "target": [
