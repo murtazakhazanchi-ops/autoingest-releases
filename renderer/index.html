@@ -6860,6 +6860,13 @@
     font-size: 0.68rem; color: var(--blue); min-height: 14px; line-height: 1.5; word-break: break-all;
   }
   #qmzOverlay .qmz-bulk-create-btn { width: 100%; }
+  /* Stage 4 — Enroute manual-creation status line, right panel */
+  #qmzOverlay .qmz-enroute-status { font-size: 0.7rem; color: var(--subtext); line-height: 1.5; min-height: 14px; }
+  #qmzOverlay .qmz-enroute-status.ok { color: var(--green); }
+  /* Enroute chip in the sequence list — reuses .qmz-seq-chip's base layout/hover/active
+     styles, with its own accent (no Q/M/Z/MZ type color applies, since it isn't one) and no
+     edit/remove actions (the renderer simply never renders those buttons for this chip). */
+  #qmzOverlay .qmz-enroute-chip { border-left: 3px solid var(--subtext); }
 
   /* ── QMZ PDF Program Review — Stage 3 ─────────────────────────────────── */
   /* z-index 300: above #qmzOverlay (200) — this review modal opens FROM WITHIN an
@@ -6964,8 +6971,66 @@
   .qpr-status { flex: 1; font-size: 0.76rem; color: var(--subtext); }
   .qpr-btn-create {
     height: 36px; padding: 0 18px; border-radius: 10px; font-size: 0.82rem; font-weight: 700;
-    background: var(--border-subtle); color: var(--subtext); border: none; cursor: not-allowed;
+    background: var(--blue); color: #fff; border: none; cursor: pointer; transition: opacity 0.12s;
   }
+  .qpr-btn-create:hover:not(:disabled) { opacity: 0.85; }
+  .qpr-btn-create:disabled {
+    background: var(--border-subtle); color: var(--subtext); cursor: not-allowed; opacity: 1;
+  }
+
+  /* Stage 4 — "Additional Sorting Folders" (Enroute checkbox), part of the Stage 3 review modal */
+  .qpr-enroute-row {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    font-size: 0.8rem; padding: 2px 0;
+  }
+  .qpr-enroute-label { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text); cursor: pointer; }
+  .qpr-enroute-label input[type="checkbox"] { cursor: pointer; accent-color: var(--blue); }
+  .qpr-enroute-desc { font-size: 0.74rem; color: var(--subtext); }
+  .qpr-enroute-status { font-size: 0.72rem; color: var(--subtext); margin-left: auto; }
+
+  /* Stage 4 — these toggle visibility via classList, matching this modal's existing
+     #qmzPdfReviewOverlay.hidden convention (there is no unscoped global `.hidden` rule). */
+  #qprBackToReviewBtn.hidden,
+  #qprConfirmCreateBtn.hidden,
+  #qprCancelBtn.hidden,
+  #qprCreateBtn.hidden,
+  .qpr-create-preview.hidden,
+  .qpr-create-results.hidden { display: none; }
+
+  /* Stage 4 — folder-creation preview panel */
+  .qpr-create-preview {
+    border: 1px solid var(--border-subtle); border-radius: 10px; background: var(--bg-secondary);
+    padding: 12px 14px; display: flex; flex-direction: column; gap: 10px;
+  }
+  .qpr-preview-header { font-size: 0.86rem; font-weight: 700; color: var(--text); }
+  .qpr-preview-rows { display: flex; flex-direction: column; gap: 3px; }
+  .qpr-preview-row { font-size: 0.78rem; display: flex; gap: 8px; }
+  .qpr-preview-label { color: var(--subtext); min-width: 140px; }
+  .qpr-preview-mismatch {
+    font-size: 0.76rem; line-height: 1.6; border-radius: 8px; padding: 8px 10px;
+    background: var(--yellow-dim, rgba(255,204,0,0.12)); border: 1px solid var(--yellow); color: var(--text);
+  }
+  .qpr-preview-mismatch label { display: flex; align-items: flex-start; gap: 7px; cursor: pointer; }
+  .qpr-preview-mismatch input[type="checkbox"] { margin-top: 2px; cursor: pointer; accent-color: var(--yellow); }
+  .qpr-preview-cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .qpr-preview-col h4 { margin: 0 0 4px; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--subtext); }
+  .qpr-preview-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; }
+  .qpr-preview-list li {
+    font-size: 0.76rem; font-family: monospace; border-radius: 6px; padding: 3px 7px;
+    background: var(--card-bg); border: 1px solid var(--border-subtle);
+  }
+  .qpr-preview-list li.blocked { color: var(--red); border-color: var(--red); }
+  .qpr-preview-list .qpr-preview-empty { font-family: inherit; color: var(--subtext); background: transparent; border: none; padding: 0; }
+  .qpr-preview-totals { font-size: 0.76rem; color: var(--subtext); border-top: 1px solid var(--border-subtle); padding-top: 8px; }
+
+  /* Stage 4 — per-folder creation results panel */
+  .qpr-create-results {
+    border: 1px solid var(--border-subtle); border-radius: 10px; background: var(--bg-secondary);
+    padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; font-size: 0.78rem;
+  }
+  .qpr-create-results .qpr-result-row { display: flex; gap: 8px; font-family: monospace; }
+  .qpr-create-results .qpr-result-row.ok   { color: var(--green); }
+  .qpr-create-results .qpr-result-row.fail { color: var(--red); }
 
   /* ── Startup Splash Overlay ──────────────────────────────────────────── */
   #loginSplash {
@@ -8634,9 +8699,19 @@
             <button id="qmzImportPdfBtn" class="qmz-add-btn qmz-bulk-create-btn">Import QMZ Program PDF</button>
           </div>
 
+          <!-- Stage 4 — Enroute is a permanent sorting destination, fully independent of any
+               PDF import: an operator can create and use it with no numbered sequences and no
+               PDF at all. See main/qmzService.js's ensureEnroute() for the safety contract. -->
+          <div class="qmz-section-header">Enroute</div>
+          <div class="qmz-right-block">
+            <button id="qmzCreateEnrouteBtn" class="qmz-add-btn qmz-bulk-create-btn">Create Enroute Folder</button>
+            <div id="qmzEnrouteStatus" class="qmz-enroute-status"></div>
+          </div>
+
           <!-- Actions -->
           <div class="qmz-right-actions">
             <button id="qmzMoveUnsequencedBtn" class="qmz-action-btn" disabled>↩ Unsequenced</button>
+            <button id="qmzMoveEnrouteBtn" class="qmz-action-btn" disabled>→ Enroute</button>
             <button id="qmzQueueMetaBtn" class="qmz-action-btn" disabled>Retry Tagging</button>
           </div>
         </div>
@@ -8680,12 +8755,60 @@
           <span id="qprSelCount" class="qpr-sel-count"></span>
         </div>
         <div id="qprEntryList" class="qpr-entry-list"></div>
+
+        <!-- Stage 4 — Enroute is independent of PDF section data: not extracted from the PDF,
+             not a numbered sequence, tied to the ACTIVE QMZ workspace (not any city label). -->
+        <div class="qpr-section-header">Additional Sorting Folders</div>
+        <div class="qpr-enroute-row">
+          <label class="qpr-enroute-label">
+            <input type="checkbox" id="qprEnrouteCheckbox" checked />
+            Create Enroute Folder
+          </label>
+          <span class="qpr-enroute-desc">Photographs not associated with a numbered QMZ sequence.</span>
+          <span id="qprEnrouteStatus" class="qpr-enroute-status"></span>
+        </div>
+
+        <!-- Stage 4 — folder-creation preview, shown only after "Create Selected Folders" is
+             clicked, before any filesystem write. Nothing here creates anything by itself. -->
+        <div id="qprCreatePreview" class="qpr-create-preview hidden">
+          <div class="qpr-preview-header">QMZ Folder Creation Review</div>
+          <div class="qpr-preview-rows">
+            <div class="qpr-preview-row"><span class="qpr-preview-label">Active Workspace</span><span id="qprPreviewWorkspace"></span></div>
+            <div class="qpr-preview-row"><span class="qpr-preview-label">Selected PDF Section</span><span id="qprPreviewSection"></span></div>
+          </div>
+          <div id="qprPreviewMismatchAck" class="qpr-preview-mismatch hidden">
+            <label>
+              <input type="checkbox" id="qprMismatchAckCheckbox" />
+              I understand these folders will be created in the ACTIVE workspace shown above, not the PDF section's city.
+            </label>
+          </div>
+          <div class="qpr-preview-cols">
+            <div class="qpr-preview-col">
+              <h4>To Create</h4>
+              <ul id="qprPreviewToCreate" class="qpr-preview-list"></ul>
+            </div>
+            <div class="qpr-preview-col">
+              <h4>Already Exists</h4>
+              <ul id="qprPreviewExists" class="qpr-preview-list"></ul>
+            </div>
+            <div class="qpr-preview-col">
+              <h4>Needs Attention</h4>
+              <ul id="qprPreviewBlocked" class="qpr-preview-list"></ul>
+            </div>
+          </div>
+          <div id="qprPreviewTotals" class="qpr-preview-totals"></div>
+        </div>
+
+        <!-- Stage 4 — per-folder creation results, shown only after a confirmed creation. -->
+        <div id="qprCreateResults" class="qpr-create-results hidden"></div>
       </div>
 
       <div class="qpr-actions">
         <span id="qprStatus" class="qpr-status"></span>
         <button id="qprCancelBtn" class="sc-btn-cancel">Cancel</button>
-        <button id="qprCreateBtn" class="qpr-btn-create" disabled title="Folder creation is implemented in a later stage">Create Selected Folders</button>
+        <button id="qprBackToReviewBtn" class="sc-btn-cancel hidden">Back to Review</button>
+        <button id="qprCreateBtn" class="qpr-btn-create" disabled>Create Selected Folders</button>
+        <button id="qprConfirmCreateBtn" class="qpr-btn-create hidden" disabled>Confirm &amp; Create</button>
         <button id="qprDoneBtn" class="sc-btn-done">Done</button>
       </div>
     </div>

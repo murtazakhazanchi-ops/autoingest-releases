@@ -371,14 +371,25 @@ function buildTwoCityPdf(cityA, rowsA, cityB, rowsB) {
 
   // ═══════════════ GROUP E — safety ═══════════════
   log('=== GROUP E: safety ===');
-  const createBtnDisabled = await window.evaluate(() => document.getElementById('qprCreateBtn')?.disabled);
-  check(createBtnDisabled === true, 'E1: "Create Selected Folders" is rendered permanently disabled');
+  // Stage 4 ("validated folder creation") intentionally changes this exact button's behavior:
+  // it is no longer permanently disabled — it is disabled only when nothing creatable is
+  // selected, and clicking it now opens a creation PREVIEW, never creates anything by itself.
+  // The real safety boundary moved to an explicit, separate "Confirm & Create" step — see
+  // test/qmzEnrouteLiveE2E.test.js for that full flow. This only re-confirms that nothing in
+  // the Stage 3 review surface itself (selection, correction, section switching) ever creates
+  // a folder, which remains true after Stage 4 exactly as it was before it.
+  const createBtnEnabled = await window.evaluate(() => document.getElementById('qprCreateBtn')?.disabled === false);
+  check(createBtnEnabled === true, 'E1: "Create Selected Folders" is enabled once a valid entry is selected (Stage 4 behavior)');
   const foldersBeforeClick = await listedFolders();
-  await domClick('#qprCreateBtn'); // should be a no-op even if somehow dispatched
+  await domClick('#qprCreateBtn'); // Stage 4: now opens the preview panel, not a no-op click
   await window.waitForTimeout(300);
+  const previewShown = await isHidden('qprCreatePreview') === false;
+  check(previewShown === true, 'E2: clicking "Create Selected Folders" opens the creation preview panel');
   const foldersAfterClick = await listedFolders();
-  check(JSON.stringify(foldersBeforeClick) === JSON.stringify(foldersAfterClick), 'E2: clicking the disabled Create button creates zero folders on disk');
-  check(foldersAfterClick.length === 0, 'E3: no QMZ sequence folders exist anywhere under qmzRoot after the entire review session so far');
+  check(JSON.stringify(foldersBeforeClick) === JSON.stringify(foldersAfterClick), 'E2b: opening the preview alone creates zero folders on disk');
+  check(foldersAfterClick.length === 0, 'E3: no QMZ sequence folders exist anywhere under qmzRoot after reviewing/previewing (before any explicit confirmation)');
+  await domClick('#qprBackToReviewBtn'); // back to normal review state for the rest of Group E
+  await window.waitForTimeout(200);
 
   // Escape must close the review modal first, leaving the underlying QMZ workspace open.
   await window.keyboard.press('Escape');

@@ -5571,6 +5571,28 @@ ipcMain.handle('qmz:moveToUnsequenced', async (_e, { qmzRoot, filePaths, photogr
   return qmzService.moveFilesToUnsequenced(qmzRoot, filePaths, photographerName);
 });
 
+// Stage 4 of "PDF-Assisted QMZ Workspace Folder Generation" — Enroute is a permanent,
+// first-class sorting destination, independent of any PDF import (manual "Create Enroute
+// Folder" button) and optionally offered during PDF review. See qmzService.js's own comment
+// on ensureEnroute() for its safety guarantees (idempotent, conflict-safe, no path traversal
+// surface since "Enroute" is a fixed literal never supplied by the renderer).
+ipcMain.handle('qmz:ensureEnroute', async (_e, { qmzRoot }) => {
+  return qmzService.ensureEnroute(qmzRoot);
+});
+
+ipcMain.handle('qmz:moveToEnroute', async (_e, { qmzRoot, filePaths, photographerName }) => {
+  return qmzService.moveFilesToEnroute(qmzRoot, filePaths, photographerName);
+});
+
+// Stage 4 — the operator-confirmed PDF folder-creation step. Revalidates every entry
+// server-side (qmzService.createReviewedSequences never trusts the renderer's own Stage 3
+// validation alone) and optionally ensures Enroute exists in the same combined, reported
+// operation. Never called as a side effect of parsing, section selection, or any checkbox
+// change — only an explicit operator confirmation in the review UI reaches this handler.
+ipcMain.handle('qmz:createReviewedSequences', async (_e, { qmzRoot, entries, includeEnroute }) => {
+  return qmzService.createReviewedSequences(qmzRoot, entries, { includeEnroute: !!includeEnroute });
+});
+
 ipcMain.handle('qmz:queueMetadata', async (event, { batchId, files, context }) => {
   const sender = event.sender;
   const eventJsonFilePath = context?.eventJsonPath || null;

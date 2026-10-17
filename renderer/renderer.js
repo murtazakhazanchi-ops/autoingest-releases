@@ -376,6 +376,14 @@ let _qprSuggestedSectionId = null; // the one confidently city-matched section, 
 let _qprSelections   = new Map(); // sectionId -> Set<entryKey>  ("p{page}:r{row}")
 let _qprCorrections  = new Map(); // sectionId -> Map<entryKey, {number, letter, suffix, code, error}>
 let _qprWorkspaceCityAtOpen = null; // _qmzEventContext.component.city, captured at import time
+// Stage 4 ("PDF-Assisted QMZ Workspace Folder Generation") — the Enroute checkbox is
+// deliberately GLOBAL, not per-section: Phase 6's own instruction is explicit that it
+// represents creation in the ACTIVE QMZ WORKSPACE, never tied to any one PDF city section, so
+// switching sections must never change it and must never create more than one Enroute.
+let _qprEnrouteChecked   = true;  // defaults to checked for a new import
+let _qprPreviewOpen      = false; // true while the creation-preview panel is shown in place of the Create/Cancel buttons
+let _qprMismatchAck      = false; // operator's explicit acknowledgment of a city mismatch, required before confirming
+let _qprCreating         = false; // true only for the duration of the real qmz:createReviewedSequences IPC call
 let _previewOpen      = false;      // true while preview overlay is visible
 let _previewPath      = null;       // path of currently previewed file
 let _previewOrder     = [];         // snapshot of getRenderedPathOrder() at open time
@@ -9123,6 +9131,11 @@ async function _qmzRefresh() {
   if (_qmzActivePg) {
     const stillValid = _qmzViewScope === 'sequence'
       ? !!(_qmzData.sequences.find(s => s.code === _qmzActiveLocation)?.photographers?.[_qmzActivePg])
+      // Stage 4 — Enroute checked separately from Unsequenced; without this branch a stale
+      // refresh while viewing Enroute would incorrectly look up _qmzData.unsequenced instead
+      // and always find nothing, resetting a perfectly valid Enroute selection on every scan.
+      : _qmzViewScope === 'enroute'
+      ? !!_qmzData.enroute?.photographers?.[_qmzActivePg]
       : !!_qmzData.unsequenced[_qmzActivePg];
     if (!stillValid) {
       _qmzActivePg        = null;
@@ -9135,6 +9148,7 @@ async function _qmzRefresh() {
   _renderQMZPhotographerList();
   _renderQMZCenter();
   _renderQMZRight();
+  _qmzRenderEnrouteStatus();
   _qmzUpdateActions();
 
   // Bug 2 perf fix, round 2: real EXIF capture dates are resolved in the
@@ -9195,7 +9209,7 @@ function _renderQMZPhotographerList() {
   const el = document.getElementById('qmzPhotographerList');
   if (!el || !_qmzData) return;
 
-  const { unsequenced, sequences } = _qmzData;
+  const { unsequenced, sequences, enroute } = _qmzData;
   const rows = [];
 
   // Unsequenced photographers
@@ -9239,6 +9253,22 @@ function _renderQMZPhotographerList() {
     }
   }
 
+  // Enroute photographers (Stage 4) — a third group, parallel to Unsequenced/Sequenced.
+  // Independent of any numbered sequence or PDF import; shown only once Enroute actually
+  // has a photographer with files (an empty/not-yet-created Enroute has nothing to list
+  // here — it's still reachable via the right panel's Enroute chip or the manual button).
+  const ePgs = enroute ? Object.keys(enroute.photographers).sort() : [];
+  if (ePgs.length) {
+    rows.push('<div class="qmz-pg-group-label">Enroute</div>');
+    for (const pg of ePgs) {
+      const isActive = _qmzActivePg === pg && _qmzViewScope === 'enroute';
+      rows.push(`<div class="qmz-pg-row${isActive ? ' active' : ''}" data-pg="${escapeHtml(pg)}" data-loc="enroute">
+        <span class="qmz-pg-name">${escapeHtml(pg)}</span>
+        <span class="qmz-pg-count">${enroute.photographers[pg].count}</span>
+      </div>`);
+    }
+  }
+
   if (!rows.length) {
     el.innerHTML = '<div class="qmz-empty">No photographer folders found.</div>';
     return;
@@ -9249,7 +9279,8 @@ function _renderQMZPhotographerList() {
     row.addEventListener('click', () => {
       _qmzActivePg       = row.dataset.pg;
       _qmzActiveLocation = row.dataset.loc || 'unsequenced';
-      _qmzViewScope       = _qmzActiveLocation === 'unsequenced' ? 'unsequenced' : 'sequence';
+      _qmzViewScope       = _qmzActiveLocation === 'unsequenced' ? 'unsequenced'
+        : _qmzActiveLocation === 'enroute' ? 'enroute' : 'sequence';
       _qmzSelectedFiles  = new Set();
       _qmzSelectionAnchor = null;
       _qmzLastClickedPath = null;
@@ -9279,6 +9310,13 @@ function _qmzGetActiveFiles() {
     // sequence combined (the new "review this sequence" MVP view).
     if (_qmzActivePg) return seq.photographers[_qmzActivePg]?.files || [];
     return Object.values(seq.photographers).flatMap(p => p.files);
+  }
+  if (_qmzViewScope === 'enroute') {
+    // Mirrors the sequence branch above — Enroute behaves like a destination with its own
+    // photographer subfolders, not like Unsequenced's single-photographer-only view.
+    const photographers = _qmzData.enroute?.photographers || {};
+    if (_qmzActivePg) return photographers[_qmzActivePg]?.files || [];
+    return Object.values(photographers).flatMap(p => p.files);
   }
   if (!_qmzActivePg) return [];
   return _qmzData.unsequenced[_qmzActivePg]?.files || [];
@@ -9513,6 +9551,8 @@ function _renderQMZCenter() {
       const seq   = _qmzData.sequences.find(s => s.code === _qmzActiveLocation);
       const label = seq ? `${seq.code} — ${seq.type}` : _qmzActiveLocation;
       titleEl.textContent = _qmzActivePg ? `${label} — ${_qmzActivePg}` : `${label} — All Photographers`;
+    } else if (_qmzViewScope === 'enroute') {
+      titleEl.textContent = _qmzActivePg ? `Enroute — ${_qmzActivePg}` : 'Enroute — All Photographers';
     } else {
       titleEl.textContent = `${_qmzActivePg} — Unsequenced`;
     }
@@ -9743,13 +9783,30 @@ function _renderQMZRight() {
   const el = document.getElementById('qmzSequenceList');
   if (!el || !_qmzData) return;
 
-  const { sequences } = _qmzData;
-  if (!sequences.length) {
+  const { sequences, enroute } = _qmzData;
+
+  // Enroute chip — Stage 4: always shown once Enroute exists on disk (created either via the
+  // manual "Create Enroute Folder" button or a confirmed PDF-review import), parallel to the
+  // numbered sequence chips but visually distinct and with no edit/remove actions (there is no
+  // number/type to edit, and removal isn't part of this feature — see ensureEnroute()'s own
+  // "never deleted automatically" guarantee in main/qmzService.js).
+  let enrouteChipHtml = '';
+  if (enroute?.exists) {
+    const total    = Object.values(enroute.photographers).reduce((s, p) => s + p.count, 0);
+    const isActive = _qmzViewScope === 'enroute';
+    enrouteChipHtml = `<div class="qmz-seq-chip qmz-enroute-chip${isActive ? ' active' : ''}" data-enroute="1" role="button" tabindex="0" title="Review files in Enroute">
+      <span class="qmz-seq-chip-code">Enroute</span>
+      <span class="qmz-seq-chip-type">Not associated with a numbered sequence</span>
+      <span class="qmz-seq-chip-count">${total}</span>
+    </div>`;
+  }
+
+  if (!sequences.length && !enrouteChipHtml) {
     el.innerHTML = '<div class="qmz-empty">No sequences yet.<br>Add one below.</div>';
     return;
   }
 
-  el.innerHTML = sequences.map(seq => {
+  el.innerHTML = enrouteChipHtml + sequences.map(seq => {
     const total    = Object.values(seq.photographers).reduce((s, p) => s + p.count, 0);
     const isActive = _qmzViewScope === 'sequence' && _qmzActiveLocation === seq.code;
     return `<div class="qmz-seq-chip ${seq.letter.toLowerCase()}${isActive ? ' active' : ''}" data-code="${escapeHtml(seq.code)}" role="button" tabindex="0" title="Review files in ${escapeHtml(seq.code)}">
@@ -9769,11 +9826,13 @@ function _renderQMZRight() {
 
   // Clicking a chip reviews that sequence's files (Fix 3) — assignment happens
   // via the dedicated "Assign Selected" number input + Enter (_qmzHandleAssignByNumber),
-  // which already fully covers the assign workflow without this ambiguity.
+  // which already fully covers the assign workflow without this ambiguity. The Enroute
+  // chip (data-enroute="1", no data-code) routes to _qmzViewEnroute() instead.
   el.querySelectorAll('.qmz-seq-chip').forEach(chip => {
-    chip.addEventListener('click', () => _qmzViewSequence(chip.dataset.code));
+    const viewFn = chip.dataset.enroute ? _qmzViewEnroute : () => _qmzViewSequence(chip.dataset.code);
+    chip.addEventListener('click', viewFn);
     chip.addEventListener('keydown', e => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); _qmzViewSequence(chip.dataset.code); }
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); viewFn(); }
     });
   });
   el.querySelectorAll('.qmz-seq-chip-action[data-action="edit"]').forEach(btn => {
@@ -9841,11 +9900,29 @@ function _qmzViewSequence(code) {
   _qmzUpdateActions();
 }
 
+// Stage 4 — mirrors _qmzViewSequence() exactly, for the Enroute destination.
+function _qmzViewEnroute() {
+  _qmzViewScope        = 'enroute';
+  _qmzActiveLocation   = 'enroute';
+  _qmzActivePg         = null;
+  _qmzSelectedFiles    = new Set();
+  _qmzSelectionAnchor  = null;
+  _qmzLastClickedPath  = null;
+  _qmzPrevFocusPath    = null;
+  _renderQMZPhotographerList();
+  _renderQMZCenter();
+  _renderQMZRight();
+  _qmzUpdateActions();
+}
+
 function _qmzUpdateActions() {
   const hasSel     = _qmzSelectedFiles.size > 0;
   const notUseq    = _qmzViewScope !== 'unsequenced';
-  const hasContext = _qmzActivePg || _qmzViewScope === 'sequence'; // sequence view can be "all photographers" (no active pg)
+  const notEnroute = _qmzViewScope !== 'enroute';
+  const hasContext = _qmzActivePg || _qmzViewScope === 'sequence' || _qmzViewScope === 'enroute'; // sequence/enroute views can be "all photographers" (no active pg)
   document.getElementById('qmzMoveUnsequencedBtn').disabled = !(hasSel && notUseq);
+  const moveEnrouteBtn = document.getElementById('qmzMoveEnrouteBtn');
+  if (moveEnrouteBtn) moveEnrouteBtn.disabled = !(hasSel && notEnroute);
   document.getElementById('qmzQueueMetaBtn').disabled       = !hasSel;
   document.getElementById('qmzSelectAllBtn').disabled       = !hasContext;
   const clearBtn = document.getElementById('qmzClearSelBtn');
@@ -10000,6 +10077,69 @@ async function _qmzHandleMoveToUnsequenced() {
   await _qmzRefresh();
 }
 
+// Stage 4 — mirrors _qmzHandleMoveToUnsequenced() exactly, for the Enroute destination. Note
+// what this deliberately does NOT do: unlike _qmzAssignToSequence(), it never calls
+// _qmzAutoQueueMetadata() — Enroute is not a Q/M/Z/MZ type, so there is no type-tag metadata
+// write for it, exactly mirroring _qmzHandleMoveToUnsequenced's own existing behavior (that
+// function has never auto-queued metadata either).
+async function _qmzHandleMoveToEnroute() {
+  if (!_qmzRoot || !_qmzSelectedFiles.size) return;
+  const wasSinglePgSequenceView = _qmzViewScope === 'sequence' && !!_qmzActivePg;
+  const byPg = _qmzGroupPathsByPhotographer([..._qmzSelectedFiles]);
+  _qmzSetStatus(`Moving ${_qmzSelectedFiles.size} file(s) to Enroute…`);
+  let movedTotal = 0, errorTotal = 0;
+  for (const [pg, paths] of byPg) {
+    const result = await window.api.qmzMoveToEnroute({
+      qmzRoot: _qmzRoot,
+      filePaths: paths,
+      photographerName: pg,
+    });
+    if (result.ok) movedTotal += result.moved.length;
+    else errorTotal += result.errors.length;
+  }
+  _qmzSetStatus(
+    errorTotal ? `Moved ${movedTotal}, ${errorTotal} error(s)` : `Moved ${movedTotal} file(s) to Enroute`,
+    errorTotal ? 'err' : 'ok'
+  );
+  _qmzSelectedFiles = new Set();
+  if (wasSinglePgSequenceView) {
+    _qmzViewScope      = 'unsequenced';
+    _qmzActiveLocation = 'unsequenced';
+  }
+  await _qmzRefresh();
+}
+
+// Stage 4 — manual "Create Enroute Folder" button. Fully independent of any PDF import: works
+// with zero numbered sequences and no PDF at all. ensureEnroute() itself is idempotent, so a
+// second click when Enroute already exists is a safe no-op that reports "already exists"
+// rather than attempting (and silently no-op'ing) a duplicate creation.
+async function _qmzHandleCreateEnroute() {
+  if (!_qmzRoot) return;
+  const btn = document.getElementById('qmzCreateEnrouteBtn');
+  if (btn) btn.disabled = true;
+  _qmzSetStatus('Creating Enroute folder…');
+  const r = await window.api.qmzEnsureEnroute({ qmzRoot: _qmzRoot });
+  if (btn) btn.disabled = false;
+  if (r.ok) {
+    _qmzSetStatus(r.status === 'created' ? 'Enroute folder created' : 'Enroute folder already exists', 'ok');
+    await _qmzRefresh();
+  } else {
+    _qmzSetStatus(r.error || 'Could not create Enroute folder', 'err');
+  }
+}
+
+// Updates the manual-creation button/status line to reflect whether Enroute already exists —
+// called from _qmzRefresh() alongside the other right-panel renders, never a standalone scan.
+function _qmzRenderEnrouteStatus() {
+  const btn    = document.getElementById('qmzCreateEnrouteBtn');
+  const status = document.getElementById('qmzEnrouteStatus');
+  if (!btn || !status || !_qmzData) return;
+  const exists = !!_qmzData.enroute?.exists;
+  btn.textContent = exists ? 'Enroute Available' : 'Create Enroute Folder';
+  status.textContent = exists ? 'Enroute folder already exists.' : '';
+  status.classList.toggle('ok', exists);
+}
+
 // Quick Add Next: next number = global max across ALL sequences + 1 (not per-letter).
 async function _qmzHandleAddNext() {
   if (!_qmzRoot) return;
@@ -10119,7 +10259,9 @@ async function _qmzHandleBulkCreate() {
 // Manual retry: re-tag currently selected files (e.g. after a metadata failure).
 async function _qmzHandleRetryTagging() {
   if (!_qmzRoot || !_qmzSelectedFiles.size) return;
-  if (_qmzViewScope === 'unsequenced') { _qmzSetStatus('Select sequenced files to tag', 'err'); return; }
+  // Enroute, like Unsequenced, is not a Q/M/Z/MZ type — there is no type-tag metadata to
+  // (re)queue for it, so it is guarded here exactly the same way Unsequenced always has been.
+  if (_qmzViewScope === 'unsequenced' || _qmzViewScope === 'enroute') { _qmzSetStatus('Select sequenced files to tag', 'err'); return; }
   const dests = [..._qmzSelectedFiles];
   const byPg  = _qmzGroupPathsByPhotographer(dests);
   _qmzSetStatus(`Queuing metadata for ${dests.length} file(s)…`);
@@ -10224,6 +10366,13 @@ function _qprOpenReview(parsed) {
   _qprCorrections  = new Map();
   _qprWorkspaceCityAtOpen = _qmzEventContext?.component?.city || null;
   _qprSuggestedSectionId  = parsed.fatal ? null : _qprComputeSuggestion(parsed.sections, _qprWorkspaceCityAtOpen);
+  // Stage 4 — every new import starts a fresh, clean creation flow: default-checked Enroute,
+  // no stale preview/acknowledgment/in-progress state carried over from a prior import.
+  _qprEnrouteChecked = true;
+  _qprPreviewOpen    = false;
+  _qprMismatchAck    = false;
+  _qprCreating       = false;
+  _qprHidePreviewAndResultsDom();
 
   if (parsed.fatal) {
     _qprActiveSectionId = null;
@@ -10255,7 +10404,7 @@ function _qprSelectDefaultsForSection(sectionId) {
 
 function _qprCloseReview() {
   if (!_qprOpen && !_qprParsed) return; // nothing to do — avoids redundant DOM churn on every QMZ open/close
-  _qprGeneration++; // invalidate any in-flight import for the session that's ending
+  _qprGeneration++; // invalidate any in-flight import OR in-flight creation request for the session that's ending
   _qprOpen = false;
   _qprParsed = null;
   _qprActiveSectionId = null;
@@ -10263,7 +10412,28 @@ function _qprCloseReview() {
   _qprSelections = new Map();
   _qprCorrections = new Map();
   _qprWorkspaceCityAtOpen = null;
+  _qprEnrouteChecked = true;
+  _qprPreviewOpen    = false;
+  _qprMismatchAck    = false;
+  _qprCreating       = false;
   document.getElementById('qmzPdfReviewOverlay')?.classList.add('hidden');
+  _qprHidePreviewAndResultsDom();
+}
+
+// Restores the modal to its normal review state — hides the preview/results panels and the
+// Confirm/Back buttons, re-shows Cancel/Create. Shared by both _qprOpenReview() (a fresh
+// import must never show a stale preview from a previous one) and _qprCloseReview().
+function _qprHidePreviewAndResultsDom() {
+  document.getElementById('qprCreatePreview')?.classList.add('hidden');
+  document.getElementById('qprCreateResults')?.classList.add('hidden');
+  document.getElementById('qprBackToReviewBtn')?.classList.add('hidden');
+  document.getElementById('qprConfirmCreateBtn')?.classList.add('hidden');
+  document.getElementById('qprCancelBtn')?.classList.remove('hidden');
+  document.getElementById('qprCreateBtn')?.classList.remove('hidden');
+  const entryList = document.getElementById('qprEntryList');
+  if (entryList) entryList.style.display = '';
+  const enrouteRow = document.querySelector('.qpr-enroute-row');
+  if (enrouteRow) enrouteRow.style.display = '';
 }
 
 // ── Rendering ────────────────────────────────────────────────────────────────────────────
@@ -10275,6 +10445,8 @@ function _qprRender() {
   _qprRenderSectionSelector();
   _qprRenderWarnings();
   _qprRenderEntryTable();
+  _qprRenderEnrouteSection();
+  _qprUpdateCreateButtonState();
 }
 
 function _qprRenderPdfInfo() {
@@ -10510,6 +10682,256 @@ function _qprClearAll() {
   _qprRenderEntryTable();
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// Stage 4 of "PDF-Assisted QMZ Workspace Folder Generation" — validated folder creation.
+//
+// Everything above this point (Stage 3) remains strictly read-only. Everything below is the
+// ONLY code in this file that may ever call window.api.qmzCreateReviewedSequences — and it is
+// reached exclusively via an explicit operator click on #qprConfirmCreateBtn, never as a side
+// effect of parsing, section switching, a checkbox change, or opening the preview. The preview
+// step (_qprShowPreview/_qprBuildPreview) computes everything client-side for display only and
+// never writes anything; the actual creation (_qprConfirmCreate) always revalidates against
+// the live workspace one more time via the main-process service, which itself never trusts
+// this preview's numbers either (see qmzService.createReviewedSequences's own comment).
+// ════════════════════════════════════════════════════════════════════════════
+
+function _qprRenderEnrouteSection() {
+  const checkbox = document.getElementById('qprEnrouteCheckbox');
+  const status   = document.getElementById('qprEnrouteStatus');
+  if (checkbox) checkbox.checked = _qprEnrouteChecked;
+  if (status) {
+    // Reflects the ALREADY-OPEN QMZ workspace's own live scan — no extra IPC round-trip needed,
+    // and importantly this is the ACTIVE workspace's Enroute, never the PDF section's city.
+    status.textContent = _qmzData?.enroute?.exists ? 'Enroute folder already exists in this workspace.' : '';
+  }
+}
+
+/** Entries eligible for creation in the active section: selected (checked) AND currently valid
+ *  (an entry that became invalid via a correction can never be "selected" — see
+ *  _qprHandleEntryCorrection, which already removes it from the selection set on that
+ *  transition) — mapped to the plain {number, letter, suffix} shape the IPC/service layer
+ *  expects, using each entry's EFFECTIVE (corrected-or-original) values. */
+function _qprSelectedCreatableEntries() {
+  const section = _qprActiveSection();
+  if (!section) return [];
+  const selected = _qprSelections.get(section.id) || new Set();
+  const out = [];
+  for (const entry of section.entries) {
+    const key = _qprEntryKey(entry);
+    if (!selected.has(key)) continue;
+    const eff = _qprEffective(section, entry);
+    if (eff.invalid) continue; // defensive — should already be unselected, never trust that alone
+    out.push({ number: eff.number, letter: eff.letter, suffix: eff.suffix, code: eff.code });
+  }
+  return out;
+}
+
+function _qprUpdateCreateButtonState() {
+  const btn = document.getElementById('qprCreateBtn');
+  if (!btn) return;
+  const hasNumbered = _qprSelectedCreatableEntries().length > 0;
+  btn.disabled = !(hasNumbered || _qprEnrouteChecked);
+}
+
+// ── Creation preview (Phase 7) — pure, read-only computation for display only ──────────────
+function _qprBuildPreview() {
+  const entries = _qprSelectedCreatableEntries();
+  const codeCounts = new Map();
+  for (const e of entries) codeCounts.set(e.code, (codeCounts.get(e.code) || 0) + 1);
+
+  const toCreate = [];
+  const exists   = [];
+  const blocked  = [];
+  const seen     = new Set();
+  for (const e of entries) {
+    if (codeCounts.get(e.code) > 1) {
+      if (!seen.has(e.code)) { blocked.push({ code: e.code, reason: 'duplicate selection' }); seen.add(e.code); }
+      continue;
+    }
+    // _qmzData is the ALREADY-open workspace's own live scan — reused here rather than a fresh
+    // IPC round-trip purely for the PREVIEW's display; the real creation step re-checks disk
+    // state itself server-side regardless of what this preview shows.
+    const onDiskAlready = (_qmzData?.sequences || []).some(s => s.code === e.code);
+    (onDiskAlready ? exists : toCreate).push(e.code);
+  }
+
+  const workspaceCity = _qmzEventContext?.component?.city || null;
+  const section       = _qprActiveSection();
+  const sectionCity   = section?.cityLabel || null;
+  const mismatch      = !!(workspaceCity && sectionCity && _qprNormalizeCityLabel(workspaceCity) !== _qprNormalizeCityLabel(sectionCity));
+
+  let enroutePreview = null;
+  if (_qprEnrouteChecked) {
+    enroutePreview = { label: 'Enroute', alreadyExists: !!_qmzData?.enroute?.exists };
+  }
+
+  return { toCreate, exists, blocked, mismatch, workspaceCity, sectionCity, enroutePreview };
+}
+
+function _qprRenderPreview(preview) {
+  const wsEl  = document.getElementById('qprPreviewWorkspace');
+  const secEl = document.getElementById('qprPreviewSection');
+  if (wsEl)  wsEl.textContent  = preview.workspaceCity || '(unknown)';
+  if (secEl) secEl.textContent = preview.sectionCity   || '(unlabeled section)';
+
+  const mismatchEl = document.getElementById('qprPreviewMismatchAck');
+  if (mismatchEl) mismatchEl.classList.toggle('hidden', !preview.mismatch);
+  const mismatchCheckbox = document.getElementById('qprMismatchAckCheckbox');
+  if (mismatchCheckbox) mismatchCheckbox.checked = _qprMismatchAck;
+
+  const toCreateList = [...preview.toCreate];
+  const existsList   = [...preview.exists];
+  if (preview.enroutePreview) {
+    (preview.enroutePreview.alreadyExists ? existsList : toCreateList).push('Enroute');
+  }
+
+  const listHtml = (items, emptyLabel, cls = '') => items.length
+    ? items.map(c => `<li class="${cls}">${_qprEsc(c)}</li>`).join('')
+    : `<li class="qpr-preview-empty">${_qprEsc(emptyLabel)}</li>`;
+
+  const toCreateEl = document.getElementById('qprPreviewToCreate');
+  const existsEl    = document.getElementById('qprPreviewExists');
+  const blockedEl   = document.getElementById('qprPreviewBlocked');
+  if (toCreateEl) toCreateEl.innerHTML = listHtml(toCreateList, 'Nothing to create', '');
+  if (existsEl)    existsEl.innerHTML   = listHtml(existsList, 'None', '');
+  if (blockedEl)   blockedEl.innerHTML  = listHtml(preview.blocked.map(b => `${b.code} — ${b.reason}`), 'None', 'blocked');
+
+  const totalsEl = document.getElementById('qprPreviewTotals');
+  if (totalsEl) {
+    totalsEl.textContent = `${toCreateList.length} new · ${existsList.length} already exist · ${preview.blocked.length} blocked`;
+  }
+}
+
+function _qprShowPreview() {
+  if (document.getElementById('qprCreateBtn')?.disabled) return;
+  _qprMismatchAck = false;
+  const preview = _qprBuildPreview();
+  _qprRenderPreview(preview);
+  _qprPreviewOpen = true;
+
+  document.getElementById('qprCreatePreview')?.classList.remove('hidden');
+  document.getElementById('qprCancelBtn')?.classList.add('hidden');
+  document.getElementById('qprCreateBtn')?.classList.add('hidden');
+  document.getElementById('qprBackToReviewBtn')?.classList.remove('hidden');
+  const confirmBtn = document.getElementById('qprConfirmCreateBtn');
+  if (confirmBtn) { confirmBtn.classList.remove('hidden'); confirmBtn.disabled = preview.mismatch; }
+  // Hide the entry-editing surface while the preview is open — prevents an edit mid-preview
+  // from silently invalidating a preview the operator is about to confirm against.
+  const entryList = document.getElementById('qprEntryList');
+  if (entryList) entryList.style.display = 'none';
+  const enrouteRow = document.querySelector('.qpr-enroute-row');
+  if (enrouteRow) enrouteRow.style.display = 'none';
+}
+
+function _qprBackToReview() {
+  _qprPreviewOpen = false;
+  _qprHidePreviewAndResultsDom();
+  _qprRender();
+}
+
+function _qprHandleMismatchAckChange(e) {
+  _qprMismatchAck = !!e.target.checked;
+  const confirmBtn = document.getElementById('qprConfirmCreateBtn');
+  if (confirmBtn) confirmBtn.disabled = !_qprMismatchAck;
+}
+
+/** The ONLY function in this entire feature that may create a folder. Reached exclusively via
+ *  an explicit click on #qprConfirmCreateBtn, itself only ever shown after an explicit click on
+ *  #qprCreateBtn. Revalidates the live workspace immediately before calling the IPC — never
+ *  trusts the preview's own numbers, and bails out entirely if the review (or the whole QMZ
+ *  workspace) was closed or superseded by a newer import while the preview sat open. */
+async function _qprConfirmCreate() {
+  if (_qprCreating) return; // guards against a double-click/duplicate submission
+  if (!_qprPreviewOpen) return; // the preview must have been shown first — no shortcut into creation
+  const section = _qprActiveSection();
+  const entries = _qprSelectedCreatableEntries();
+  if (!entries.length && !_qprEnrouteChecked) return; // nothing to do — button should already be disabled for this
+
+  // Defense in depth (Phase 8): re-check the mismatch-acknowledgment requirement HERE, in the
+  // handler itself, rather than trusting the button's `disabled` attribute alone — a
+  // programmatically dispatched click can reach a listener even on a disabled control in some
+  // engines, so the real gate must not live in the DOM state by itself.
+  const preview = _qprBuildPreview();
+  if (preview.mismatch && !_qprMismatchAck) {
+    _qprSetCreateStatus('Please acknowledge the workspace/section mismatch before confirming.', 'err');
+    return;
+  }
+
+  const myGen = _qprGeneration;
+  if (!_qmzRoot || !_qmzOpen) { _qprSetCreateStatus('The QMZ workspace is no longer open.', 'err'); return; }
+
+  _qprCreating = true;
+  const confirmBtn = document.getElementById('qprConfirmCreateBtn');
+  const backBtn    = document.getElementById('qprBackToReviewBtn');
+  if (confirmBtn) confirmBtn.disabled = true;
+  if (backBtn) backBtn.disabled = true;
+  _qprSetCreateStatus('Creating folders…');
+
+  let resp;
+  try {
+    resp = await window.api.qmzCreateReviewedSequences({
+      qmzRoot: _qmzRoot, // read fresh at call time, not captured when the PDF was imported
+      entries: entries.map(e => ({ number: e.number, letter: e.letter, suffix: e.suffix })),
+      includeEnroute: _qprEnrouteChecked,
+    });
+  } catch (err) {
+    if (myGen === _qprGeneration) {
+      _qprCreating = false;
+      if (confirmBtn) confirmBtn.disabled = false;
+      if (backBtn) backBtn.disabled = false;
+      _qprSetCreateStatus('Folder creation failed unexpectedly.', 'err');
+    }
+    return;
+  }
+  if (myGen !== _qprGeneration) return; // review closed/superseded while this was in flight
+
+  _qprCreating    = false;
+  _qprPreviewOpen = false; // creation is complete — the preview is no longer "awaiting confirmation"
+  _qprRenderCreateResults(resp, section);
+  await _qmzRefresh(); // reflect newly-created folders in the live workspace immediately
+}
+
+function _qprSetCreateStatus(msg, cls) {
+  const el = document.getElementById('qprStatus');
+  if (!el) return;
+  el.textContent = msg;
+  el.className   = cls ? `qpr-status ${cls}` : 'qpr-status';
+}
+
+function _qprRenderCreateResults(resp, section) {
+  const el = document.getElementById('qprCreateResults');
+  if (!el) return;
+
+  const STATUS_LABEL = {
+    'created':              'Created',
+    'already-exists':       'Already exists',
+    'invalid':              'Invalid',
+    'duplicate-in-request': 'Duplicate selection',
+    'error':                'Failed',
+    'conflict':             'Conflict',
+  };
+  const isOkStatus = s => s === 'created' || s === 'already-exists';
+
+  const rows = resp.results.map(r => {
+    const label = STATUS_LABEL[r.status] || r.status;
+    const code  = r.code || `${r.number}${r.letter}`;
+    return `<div class="qpr-result-row ${isOkStatus(r.status) ? 'ok' : 'fail'}">${_qprEsc(code)} — ${_qprEsc(label)}${r.error ? `: ${_qprEsc(r.error)}` : ''}</div>`;
+  });
+  if (resp.enroute) {
+    const label = STATUS_LABEL[resp.enroute.status] || resp.enroute.status;
+    rows.push(`<div class="qpr-result-row ${isOkStatus(resp.enroute.status) ? 'ok' : 'fail'}">Enroute — ${_qprEsc(label)}${resp.enroute.error ? `: ${_qprEsc(resp.enroute.error)}` : ''}</div>`);
+  }
+  el.innerHTML = rows.length ? rows.join('') : '<div class="qpr-result-row">Nothing was selected to create.</div>';
+  el.classList.remove('hidden');
+
+  document.getElementById('qprCreatePreview')?.classList.add('hidden');
+  document.getElementById('qprBackToReviewBtn')?.classList.add('hidden');
+  document.getElementById('qprConfirmCreateBtn')?.classList.add('hidden');
+
+  const failed = resp.results.filter(r => !isOkStatus(r.status)).length + (resp.enroute && !isOkStatus(resp.enroute.status) ? 1 : 0);
+  _qprSetCreateStatus(resp.ok ? 'Folder creation complete.' : `Folder creation finished with ${failed} issue(s).`, resp.ok ? 'ok' : 'err');
+}
+
 // Wire QMZ overlay event listeners — runs once at page load.
 (function _initQMZListeners() {
   document.getElementById('qmzCloseBtn')?.addEventListener('click', _closeQMZManager);
@@ -10605,7 +11027,11 @@ function _qprClearAll() {
 
   // Bottom actions
   document.getElementById('qmzMoveUnsequencedBtn')?.addEventListener('click', _qmzHandleMoveToUnsequenced);
+  document.getElementById('qmzMoveEnrouteBtn')?.addEventListener('click', _qmzHandleMoveToEnroute);
   document.getElementById('qmzQueueMetaBtn')?.addEventListener('click', _qmzHandleRetryTagging);
+
+  // Stage 4 — manual Enroute creation, independent of PDF import.
+  document.getElementById('qmzCreateEnrouteBtn')?.addEventListener('click', _qmzHandleCreateEnroute);
 
   // Escape closes the overlay — but not while QMZ's own preview is open on top
   // of it; the preview keyboard handler owns Escape in that case (closes the
@@ -10629,8 +11055,18 @@ function _qprClearAll() {
   // change, so binding per-row listeners would leak; delegation also means the DOM doesn't
   // need to be re-queried after _qprRenderEntryTable() replaces its innerHTML.
   document.getElementById('qprEntryList')?.addEventListener('change', _qprHandleEntryListChange);
-  // Note: #qprCreateBtn intentionally has NO click handler — it is rendered permanently
-  // `disabled` (see renderer/index.html) and must stay inert for the whole of Stage 3.
+
+  // ── QMZ PDF Program Review — Stage 4 listener wiring (validated folder creation) ───────
+  document.getElementById('qprEnrouteCheckbox')?.addEventListener('change', (e) => {
+    _qprEnrouteChecked = !!e.target.checked;
+    _qprUpdateCreateButtonState();
+  });
+  // #qprCreateBtn now opens the creation PREVIEW only — it never creates anything by itself.
+  // The only path that ever calls qmz:createReviewedSequences is #qprConfirmCreateBtn, below.
+  document.getElementById('qprCreateBtn')?.addEventListener('click', _qprShowPreview);
+  document.getElementById('qprBackToReviewBtn')?.addEventListener('click', _qprBackToReview);
+  document.getElementById('qprConfirmCreateBtn')?.addEventListener('click', _qprConfirmCreate);
+  document.getElementById('qprMismatchAckCheckbox')?.addEventListener('change', _qprHandleMismatchAckChange);
 })();
 
 // ── Space-bar Media Preview ────────────────────────────────────────────────

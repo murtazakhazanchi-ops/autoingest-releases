@@ -404,6 +404,10 @@ contextBridge.exposeInMainWorld('api', {
   // (see main.js's own comment on this channel), never supplied by the renderer.
   qmzImportProgramPdf:      ()       => ipcRenderer.invoke('qmz:importProgramPdf'),
   qmzValidateSequenceInput: (params) => ipcRenderer.invoke('qmz:validateSequenceInput', params),
+  // Stage 4 — Enroute (independent of PDF import) and the PDF-review-confirmed batch creation.
+  qmzEnsureEnroute:         (params) => ipcRenderer.invoke('qmz:ensureEnroute',          params),
+  qmzMoveToEnroute:         (params) => ipcRenderer.invoke('qmz:moveToEnroute',          params),
+  qmzCreateReviewedSequences: (params) => ipcRenderer.invoke('qmz:createReviewedSequences', params),
 
   // ── Online Registry (advisory — prepare local shells from remote registry entries) ──
   registryGetAll:                ()       => ipcRenderer.invoke('registry:getAll'),

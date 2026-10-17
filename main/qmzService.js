@@ -8,6 +8,14 @@ const config = require('../config/app.config');
 
 const STATE_FILE  = 'qmz-sequences.json';
 const UNSEQUENCED = '_Unsequenced';
+// Stage 4 of "PDF-Assisted QMZ Workspace Folder Generation" — Enroute is a permanent,
+// first-class sorting destination for photographs that do not belong to any numbered QMZ
+// sequence. Deliberately NOT a sequence code: it has no number, no Q/M/Z/MZ type, and does
+// not match SEQ_RE — it is recognized by exact literal name, the same way UNSEQUENCED already
+// is, never by pattern. Capitalization is fixed ("Enroute", not "enroute"/"ENROUTE") — see
+// ensureEnroute()'s own comment for why an existing folder with different casing is treated as
+// a conflict rather than silently reused.
+const ENROUTE_DIR = 'Enroute';
 // Sequence code shape: 2 zero-padded digits, an optional single lowercase
 // alphabetic suffix (a slot split across multiple honorees — e.g. a single
 // numbered appointment subdivided into "5a"/"5b"), then the QMZ type letter —
@@ -516,6 +524,7 @@ async function _classifyOtherFolders(qmzRoot) {
   const other = [];
   for (const dir of childDirs) {
     if (dir === UNSEQUENCED) continue;
+    if (dir === ENROUTE_DIR) continue; // Stage 4 — Enroute is a known destination, never an adoption candidate
     if (SEQ_RE.test(dir)) continue;
     other.push(dir);
   }
@@ -526,7 +535,10 @@ async function _classifyOtherFolders(qmzRoot) {
  * Scan qmzRoot and return its current structure.
  *   sequences   — sorted array of { code, type, photographers: { name: { count, files[] } } }
  *   unsequenced — { photographerName: { count, files[] } }
- *   other       — plain dirs that are neither sequences nor _Unsequenced (adoption candidates)
+ *   enroute     — { exists: boolean, photographers: { name: { count, files[] } } } (Stage 4 —
+ *                  see ENROUTE_DIR's own comment; exists:false with photographers:{} when the
+ *                  Enroute folder has not been created in this workspace yet)
+ *   other       — plain dirs that are neither sequences, _Unsequenced, nor Enroute (adoption candidates)
  *   state       — parsed qmz-sequences.json (or default)
  */
 async function scanRoot(qmzRoot) {
@@ -534,10 +546,18 @@ async function scanRoot(qmzRoot) {
   log(`[qmz-diag] scanRoot hardened childDirs=${JSON.stringify(childDirs)}`);
   const sequences   = [];
   const unsequenced = {};
+  const enroute     = { exists: false, photographers: {} };
   const other       = [];
 
   for (const dir of childDirs) {
-    if (dir === UNSEQUENCED) {
+    if (dir === ENROUTE_DIR) {
+      enroute.exists = true;
+      const pgDirs = await listChildDirs(path.join(qmzRoot, ENROUTE_DIR));
+      for (const pg of pgDirs) {
+        const files = await listMediaFiles(path.join(qmzRoot, ENROUTE_DIR, pg));
+        enroute.photographers[pg] = { count: files.length, files };
+      }
+    } else if (dir === UNSEQUENCED) {
       const unseqPath = path.join(qmzRoot, UNSEQUENCED);
       let _rawUnseqEntries = null;
       try { _rawUnseqEntries = (await fsp.readdir(unseqPath, { withFileTypes: true })).map(e => `${e.name}${e.isDirectory() ? '/' : ''}`); }
@@ -590,8 +610,10 @@ async function scanRoot(qmzRoot) {
   sequences.sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0));
   log(`[qmz-diag] scanRoot RESULT root=${JSON.stringify(qmzRoot)} `
     + `unsequenced=${JSON.stringify(Object.entries(unsequenced).map(([k, v]) => `${k}:${v.count}`))} `
-    + `sequences=${JSON.stringify(sequences.map(s => s.code))} other=${JSON.stringify(other)}`);
-  return { sequences, unsequenced, other, state };
+    + `sequences=${JSON.stringify(sequences.map(s => s.code))} `
+    + `enroute=${enroute.exists ? JSON.stringify(Object.entries(enroute.photographers).map(([k, v]) => `${k}:${v.count}`)) : '(not created)'} `
+    + `other=${JSON.stringify(other)}`);
+  return { sequences, unsequenced, enroute, other, state };
 }
 
 // ── Init ─────────────────────────────────────────────────────────────────────
@@ -713,7 +735,16 @@ async function createSequence(qmzRoot, number, letter, suffix = '') {
   if (!v.ok) return v;
   ({ number, letter, suffix } = v);
   const code = v.code;
-  try { await fsp.mkdir(path.join(qmzRoot, code), { recursive: true }); }
+  const dir  = path.join(qmzRoot, code);
+
+  // Stage 4 ("PDF-Assisted QMZ Workspace Folder Generation") needs to tell an operator
+  // whether this call actually created a new folder or found one already there (Phase 9's
+  // per-folder creation report: "01Q — Created" vs "01Q — Already exists") — checked BEFORE
+  // the idempotent mkdir below so a pre-existing folder is never misreported as newly created.
+  let existedBefore = false;
+  try { existedBefore = (await fsp.stat(dir)).isDirectory(); } catch { /* absent — will be created */ }
+
+  try { await fsp.mkdir(dir, { recursive: true }); }
   catch (err) { return { ok: false, error: err.message }; }
 
   const state   = await readState(qmzRoot);
@@ -728,7 +759,9 @@ async function createSequence(qmzRoot, number, letter, suffix = '') {
     if (!r.ok) return { ok: false, error: r.error };
   }
 
-  return { ok: true, code };
+  // `status` is additive — every pre-Stage-4 caller reads only `.ok`/`.code`/`.error` and is
+  // unaffected; see test/qmzSuffixedCombinedTypeRegression.test.js, re-run unchanged.
+  return { ok: true, code, status: existedBefore ? 'already-exists' : 'created' };
 }
 
 async function bulkCreateSequences(qmzRoot, items) {
@@ -740,6 +773,151 @@ async function bulkCreateSequences(qmzRoot, items) {
     else errors.push({ number, letter, suffix, error: r.error });
   }
   return { ok: errors.length === 0, created, errors };
+}
+
+// ── Enroute (Stage 4 of "PDF-Assisted QMZ Workspace Folder Generation") ────────
+// A permanent, intentional sorting destination for photographs that do not belong to any
+// numbered QMZ sequence. NOT a sequence number, NOT a Q/M/Z/MZ type, NOT a replacement for
+// _Unsequenced, NOT a temporary recovery directory. See ENROUTE_DIR's own comment for the
+// recognition rules and module's scanRoot()/_classifyOtherFolders() for how it is kept out of
+// adoption/"other" classification.
+//
+// Idempotent, safe creation of the Enroute folder directly beneath qmzRoot. Mirrors
+// createSequence()'s own existence-then-mkdir shape so the two destinations behave
+// consistently, but has no code/number/letter to validate — "Enroute" is a fixed literal,
+// never operator- or renderer-supplied, so there is no folder-name injection surface to guard
+// against here; what this DOES guard against is an unsafe pre-existing filesystem object at
+// that exact path (a file, a dangling symlink, or a symlink that escapes qmzRoot) silently
+// being treated as a usable Enroute folder.
+async function ensureEnroute(qmzRoot) {
+  let rootStat;
+  try { rootStat = await fsp.stat(qmzRoot); }
+  catch { return { ok: false, folderName: ENROUTE_DIR, status: 'error', error: 'QMZ workspace root is not accessible.' }; }
+  if (!rootStat.isDirectory()) {
+    return { ok: false, folderName: ENROUTE_DIR, status: 'error', error: 'QMZ workspace root is not a directory.' };
+  }
+
+  const dir = path.join(qmzRoot, ENROUTE_DIR);
+  let st;
+  try { st = await fsp.lstat(dir); } catch { st = null; }
+
+  if (st) {
+    if (st.isSymbolicLink()) {
+      let real;
+      try { real = await fsp.realpath(dir); }
+      catch { return { ok: false, folderName: ENROUTE_DIR, status: 'conflict', error: 'Enroute exists as a broken symlink.' }; }
+      let rootReal;
+      try { rootReal = await fsp.realpath(qmzRoot); } catch { rootReal = qmzRoot; }
+      const insideRoot = real === rootReal || real.startsWith(rootReal + path.sep);
+      if (!insideRoot) {
+        return { ok: false, folderName: ENROUTE_DIR, status: 'conflict', error: 'Enroute exists as a symlink pointing outside the QMZ workspace — refusing to use it.' };
+      }
+      let targetStat;
+      try { targetStat = await fsp.stat(dir); } catch { targetStat = null; }
+      if (!targetStat || !targetStat.isDirectory()) {
+        return { ok: false, folderName: ENROUTE_DIR, status: 'conflict', error: 'Enroute exists but does not resolve to a directory.' };
+      }
+      return { ok: true, folderName: ENROUTE_DIR, status: 'already-exists' };
+    }
+    if (!st.isDirectory()) {
+      return { ok: false, folderName: ENROUTE_DIR, status: 'conflict', error: 'Enroute exists but is not a directory.' };
+    }
+    return { ok: true, folderName: ENROUTE_DIR, status: 'already-exists' };
+  }
+
+  try {
+    await fsp.mkdir(dir);
+  } catch (err) {
+    // A concurrent creator (e.g. a second confirm click, or the manual button and a PDF-review
+    // confirm racing) winning first is not an error — re-check what is actually there now
+    // rather than reporting a failure for a folder that in fact exists correctly.
+    if (err.code === 'EEXIST') {
+      let recheck;
+      try { recheck = await fsp.stat(dir); } catch { recheck = null; }
+      if (recheck && recheck.isDirectory()) return { ok: true, folderName: ENROUTE_DIR, status: 'already-exists' };
+      return { ok: false, folderName: ENROUTE_DIR, status: 'conflict', error: 'Enroute exists but is not a directory.' };
+    }
+    return { ok: false, folderName: ENROUTE_DIR, status: 'error', error: err.message };
+  }
+  log(`[qmz] ensureEnroute: created Enroute at ${dir}`);
+  return { ok: true, folderName: ENROUTE_DIR, status: 'created' };
+}
+
+/**
+ * Creates a batch of QMZ sequence folders from an operator-reviewed list (PDF-Assisted QMZ
+ * Workspace Folder Generation, Stage 4), plus, optionally, the Enroute folder in the SAME
+ * workspace in one combined, reported operation. Reuses createSequence()/ensureEnroute() —
+ * the exact same engine the manual "Add Specific"/"Bulk Create"/"Create Enroute Folder"
+ * controls already use — rather than a second, independent creation path.
+ *
+ * Every entry is revalidated here via validateSequenceInput(), regardless of what the
+ * renderer already checked (never trust renderer validation alone) — a stale or tampered IPC
+ * payload can never bypass the authoritative rule.
+ *
+ * Duplicate detection is scoped to THIS REQUEST ONLY: two entries in the same batch that
+ * resolve to the identical code are both reported as 'duplicate-in-request' and NEITHER is
+ * created — picking a winner between two operator-indistinguishable selections would be an
+ * unannounced, silent decision, which this feature avoids everywhere else (see Stage 2/3's own
+ * duplicate handling). An entry that merely matches a folder already on disk is not a
+ * duplicate of anything — see 'already-exists', which createSequence() itself distinguishes.
+ *
+ * @param {string} qmzRoot
+ * @param {Array<{number:number, letter:string, suffix?:string}>} entries
+ * @param {{ includeEnroute?: boolean }} [options]
+ * @returns {Promise<{
+ *   ok: boolean,
+ *   results: Array<{ number, letter, suffix, code: string|null,
+ *     status: 'created'|'already-exists'|'invalid'|'duplicate-in-request'|'error', error?: string }>,
+ *   enroute: null | { folderName: string, status: string, error?: string },
+ * }>}
+ */
+async function createReviewedSequences(qmzRoot, entries, { includeEnroute = false } = {}) {
+  const prepared = (entries || []).map((e) => {
+    const v = validateSequenceInput(e.number, e.letter, e.suffix);
+    return { input: e, valid: v.ok, code: v.ok ? v.code : null, v };
+  });
+
+  const codeCounts = new Map();
+  for (const p of prepared) {
+    if (!p.valid) continue;
+    codeCounts.set(p.code, (codeCounts.get(p.code) || 0) + 1);
+  }
+
+  const results = [];
+  for (const p of prepared) {
+    const { number, letter, suffix } = p.input;
+    if (!p.valid) {
+      results.push({ number, letter, suffix, code: null, status: 'invalid', error: p.v.error });
+      continue;
+    }
+    if (codeCounts.get(p.code) > 1) {
+      results.push({ number, letter, suffix, code: p.code, status: 'duplicate-in-request' });
+      continue;
+    }
+    const r = await createSequence(qmzRoot, p.v.number, p.v.letter, p.v.suffix);
+    if (r.ok) {
+      results.push({ number: p.v.number, letter: p.v.letter, suffix: p.v.suffix, code: r.code, status: r.status });
+    } else {
+      results.push({ number: p.v.number, letter: p.v.letter, suffix: p.v.suffix, code: p.code, status: 'error', error: r.error });
+    }
+  }
+
+  let enroute = null;
+  if (includeEnroute) {
+    enroute = await ensureEnroute(qmzRoot);
+  }
+
+  const ok = results.every(r => r.status === 'created' || r.status === 'already-exists')
+    && (!enroute || enroute.status === 'created' || enroute.status === 'already-exists');
+
+  log(`[qmz] createReviewedSequences: ${results.filter(r => r.status === 'created').length} created, `
+    + `${results.filter(r => r.status === 'already-exists').length} already-existed, `
+    + `${results.filter(r => r.status === 'invalid').length} invalid, `
+    + `${results.filter(r => r.status === 'duplicate-in-request').length} duplicate-in-request, `
+    + `${results.filter(r => r.status === 'error').length} error`
+    + (enroute ? `, enroute=${enroute.status}` : ''));
+
+  return { ok, results, enroute };
 }
 
 // ── Edit / remove sequences ──────────────────────────────────────────────────
@@ -868,6 +1046,34 @@ async function moveFilesToUnsequenced(qmzRoot, filePaths, photographerName) {
   return { ok: errors.length === 0, moved, errors };
 }
 
+// Stage 4 — moves files into Enroute exactly the way moveFilesToUnsequenced() moves files into
+// _Unsequenced: same shared engine (moveWithSidecar/safeMoveFile/removeIfEmptyIgnoringJunk), no
+// second file-movement implementation, no numbered-sequence validation (Enroute is not a
+// sequence code and must never be forced through parseCode()/SEQ_RE to be usable as a move
+// destination). Like moveFilesToUnsequenced, this never auto-queues Q/M/Z/MZ type metadata —
+// Enroute is not a QMZ type, so there is no type tag to write (see the renderer's own comment
+// on why _qmzAutoQueueMetadata is never called for an Enroute move, mirroring Unsequenced).
+async function moveFilesToEnroute(qmzRoot, filePaths, photographerName) {
+  const destDir = path.join(qmzRoot, ENROUTE_DIR, photographerName);
+  try { await fsp.mkdir(destDir, { recursive: true }); } catch {}
+
+  const moved  = [];
+  const errors = [];
+  for (const src of filePaths) {
+    const r = await moveWithSidecar(src, destDir);
+    if (r.ok) moved.push({ src, dest: r.dest, action: r.action });
+    else errors.push({ src, error: r.reason });
+  }
+
+  const sourceDirs = new Set(moved.map(m => path.dirname(m.src)));
+  for (const dir of sourceDirs) {
+    await removeIfEmptyIgnoringJunk(dir);
+  }
+
+  log(`[qmz] moveToEnroute ${photographerName}: ${moved.length} moved, ${errors.length} errors`);
+  return { ok: errors.length === 0, moved, errors };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -881,10 +1087,13 @@ module.exports = {
   initRoot,
   createSequence,
   bulkCreateSequences,
+  ensureEnroute,
+  createReviewedSequences,
   editSequenceType,
   removeSequence,
   moveFilesToSequence,
   moveFilesToUnsequenced,
+  moveFilesToEnroute,
   resolveCaptureDates,
   // Test-only: exposes the Dirent/stat hardening helpers so
   // test/qmzDirentMismatchRegression.test.js can exercise them directly
