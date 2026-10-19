@@ -9853,7 +9853,9 @@ function _renderQMZRight() {
 // compact "pick the new type" picker; MVP-blocked (backend-enforced) when the
 // sequence has any files.
 async function _qmzHandleEditSequence(code, currentLetter) {
-  const otherLetters = ['Q', 'M', 'Z'].filter(l => l !== currentLetter);
+  // "QMZ Sequence Enhancements" extends the edit-type chooser to all six QMZ types (was
+  // Q/M/Z only — MZ/O/AQ are equally valid edit targets, same as everywhere else).
+  const otherLetters = ['Q', 'M', 'Z', 'MZ', 'O', 'AQ'].filter(l => l !== currentLetter);
   _qmzShowTypeChooser(
     `Change ${code}'s type to:`,
     async (letter) => {
@@ -10141,13 +10143,21 @@ function _qmzRenderEnrouteStatus() {
 }
 
 // Quick Add Next: next number = global max across ALL sequences + 1 (not per-letter).
+// letterMax/MAX_SEQUENCE_NUMBER now come from the SAME shared renderer/qmzSequenceFormat.js
+// module main/qmzService.js's own authoritative ceilings live in — see that file's own
+// comment for why these must never be a second, independently-maintained copy (the pre-
+// extension version of this function hardcoded {Q:50,M:51,Z:52} with a "?? 50" fallback,
+// which would have under-counted MZ/O/AQ's real ceiling of 99).
+function _qmzLetterMax(letter) {
+  const fmt = window.QmzSequenceFormat;
+  return (fmt?.LETTER_MAX?.[letter]) ?? fmt?.MAX_SEQUENCE_NUMBER ?? 99;
+}
 async function _qmzHandleAddNext() {
   if (!_qmzRoot) return;
   const letter    = document.getElementById('qmzLetterSelect')?.value || 'Q';
-  const letterMax = { Q: 50, M: 51, Z: 52 };
   const allNums   = (_qmzData?.sequences || []).map(s => s.number);
   const next      = allNums.length ? Math.max(...allNums) + 1 : 1;
-  if (next > (letterMax[letter] ?? 50)) { _qmzSetStatus(`Max number reached`, 'err'); return; }
+  if (next > _qmzLetterMax(letter)) { _qmzSetStatus(`Max number reached`, 'err'); return; }
   const result = await window.api.qmzCreateSequence({ qmzRoot: _qmzRoot, number: next, letter });
   _qmzSetStatus(result.ok ? `Created ${result.code}` : (result.error || 'Create failed'), result.ok ? 'ok' : 'err');
   if (result.ok) await _qmzRefresh();
@@ -10158,7 +10168,8 @@ async function _qmzHandleAddSpecific() {
   if (!_qmzRoot) return;
   const number = parseInt(document.getElementById('qmzSeqNumInput')?.value || '', 10);
   const letter = (document.getElementById('qmzSeqLetterSelect')?.value || 'Q').toUpperCase();
-  if (!number || number < 1 || number > 52) { _qmzSetStatus('Enter a valid number (1–52)', 'err'); return; }
+  const max    = _qmzLetterMax(letter);
+  if (!number || number < 1 || number > max) { _qmzSetStatus(`Enter a valid number (1–${max})`, 'err'); return; }
   const result = await window.api.qmzCreateSequence({ qmzRoot: _qmzRoot, number, letter });
   _qmzSetStatus(result.ok ? `Created ${result.code}` : (result.error || 'Create failed'), result.ok ? 'ok' : 'err');
   if (result.ok) {
@@ -10186,8 +10197,13 @@ function _qmzShowTypeChooser(label, onPick, availableLetters) {
 async function _qmzHandleAssignByNumber() {
   const raw = (document.getElementById('qmzAssignInput')?.value || '').trim();
   const num = parseInt(raw, 10);
-  if (!raw || isNaN(num) || num < 1 || num > 52) {
-    _qmzSetStatus('Enter a sequence number (1–52)', 'err');
+  // Type-agnostic at this point (the chooser below resolves which type, if any, to use) — the
+  // broadest possible ceiling (MAX_SEQUENCE_NUMBER) is the right pre-check here, same reasoning
+  // as _qmzLetterMax's fallback. Was hardcoded to 52 (Q/M/Z's own ceilings), which would have
+  // wrongly rejected a valid MZ/O/AQ number above 52 even before this extension.
+  const maxNum = window.QmzSequenceFormat?.MAX_SEQUENCE_NUMBER ?? 99;
+  if (!raw || isNaN(num) || num < 1 || num > maxNum) {
+    _qmzSetStatus(`Enter a sequence number (1–${maxNum})`, 'err');
     return;
   }
   if (!_qmzSelectedFiles.size) {
@@ -10224,9 +10240,12 @@ async function _qmzHandleAssignByNumber() {
 }
 
 // Bulk Create — parse space-separated letters, preview, then create all.
+// "QMZ Sequence Enhancements" extends the accepted token set from Q/M/Z to all six QMZ
+// types (MZ/O/AQ included) — same whitelist, same whitespace-split parsing, no other change.
+const QMZ_BULK_LETTERS = ['Q', 'M', 'Z', 'MZ', 'O', 'AQ'];
 function _qmzUpdateBulkPreview() {
   const raw     = (document.getElementById('qmzBulkInput')?.value || '').toUpperCase().trim();
-  const letters = raw.split(/\s+/).filter(l => ['Q', 'M', 'Z'].includes(l));
+  const letters = raw.split(/\s+/).filter(l => QMZ_BULK_LETTERS.includes(l));
   const preview = document.getElementById('qmzBulkPreview');
   if (!preview) return;
   if (!letters.length) { preview.textContent = ''; return; }
@@ -10239,7 +10258,7 @@ function _qmzUpdateBulkPreview() {
 async function _qmzHandleBulkCreate() {
   if (!_qmzRoot) return;
   const raw     = (document.getElementById('qmzBulkInput')?.value || '').toUpperCase().trim();
-  const letters = raw.split(/\s+/).filter(l => ['Q', 'M', 'Z'].includes(l));
+  const letters = raw.split(/\s+/).filter(l => QMZ_BULK_LETTERS.includes(l));
   if (!letters.length) { _qmzSetStatus('Enter letters: e.g. Q M Z Q Q', 'err'); return; }
   const allNums = (_qmzData?.sequences || []).map(s => s.number);
   const start   = allNums.length ? Math.max(...allNums) + 1 : 1;
@@ -10595,7 +10614,10 @@ function _qprRenderEntryTable() {
         <input type="checkbox" class="qpr-entry-check" data-key="${_qprEsc(key)}" ${checked ? 'checked' : ''} ${eff.invalid ? 'disabled' : ''} aria-label="Select ${_qprEsc(eff.code || entry.folderName)}">
         <input type="text" class="qpr-seq-field${eff.edited ? ' edited' : ''}" data-key="${_qprEsc(key)}" data-field="seq" value="${_qprEsc(eff.suffix ? `${eff.number}${eff.suffix}` : String(eff.number))}" maxlength="4" aria-label="Sequence number">
         <select class="qpr-type-field${eff.edited ? ' edited' : ''}" data-key="${_qprEsc(key)}" data-field="type" aria-label="QMZ type">
-          ${['Q', 'M', 'Z', 'MZ'].map(t => `<option value="${t}"${t === eff.letter ? ' selected' : ''}>${t}</option>`).join('')}
+          ${/* "QMZ Sequence Enhancements" — O/AQ added alongside Q/M/Z/MZ so a PDF-detected
+               O/AQ entry has a matching <option> to select, and so a manual correction can
+               choose either new type too, same as any existing one. */ ''}
+          ${['Q', 'M', 'Z', 'MZ', 'O', 'AQ'].map(t => `<option value="${t}"${t === eff.letter ? ' selected' : ''}>${t}</option>`).join('')}
         </select>
         ${folderHtml}
         ${statusHtml}

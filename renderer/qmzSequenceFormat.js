@@ -19,16 +19,34 @@
 (function () {
   // Sequence code shape: 2 zero-padded digits, an optional single lowercase alphabetic suffix
   // (a slot split across multiple honorees — e.g. a single numbered appointment subdivided
-  // into "5a"/"5b"), then the QMZ type letter — Q/M/Z, or the combined type "MZ". See
-  // qmzService.js's own SEQ_RE comment (its former definition site, before this extraction)
-  // for the full rationale.
-  const SEQ_RE = /^(\d{2})([a-z]?)(MZ|Q|M|Z)$/;
+  // into "5a"/"5b"), then the QMZ type letter — Q/M/Z/O, or a combined/two-letter type
+  // (MZ/AQ). See qmzService.js's own SEQ_RE comment (its former definition site, before this
+  // extraction) for the full rationale. "QMZ Sequence Enhancements" added O (Olda) and AQ
+  // (Aqeeqa) to the original Q/M/Z/MZ set — the two-letter alternatives are listed first
+  // purely for readability (matching the existing MZ convention); neither ordering nor
+  // alternative shares a leading character that would make the other prefix-match first, so
+  // this is not a correctness concern.
+  const SEQ_RE = /^(\d{2})([a-z]?)(MZ|AQ|Q|M|Z|O)$/;
 
   function isValidSequenceCode(code) {
     return typeof code === 'string' && SEQ_RE.test(code);
   }
 
-  const exportsObj = { SEQ_RE, isValidSequenceCode };
+  // The SINGLE source of truth for per-letter numeric ceilings, shared by
+  // main/qmzService.js (via require) and renderer/renderer.js (via window.QmzSequenceFormat)
+  // so the renderer's own pre-flight range checks can never drift from the authoritative
+  // server-side rule the way three now-fixed hardcoded "52" literals in renderer.js
+  // previously did. Q/M/Z's specific ceilings (50/51/52) predate this feature and have no
+  // discoverable rationale (see qmzService.js's own comment on this same constant) — left
+  // completely untouched. MZ, O, and AQ deliberately have NO entry here: there is no product
+  // rationale to invent one for any of them, so all three fall back to MAX_SEQUENCE_NUMBER —
+  // exactly the precedent already established for MZ in Stage 1 of "PDF-Assisted QMZ
+  // Workspace Folder Generation" (confirmed via AskUserQuestion at the time). O/AQ are a
+  // direct continuation of that same decision, not a new ambiguity.
+  const LETTER_MAX = { Q: 50, M: 51, Z: 52 };
+  const MAX_SEQUENCE_NUMBER = 99;
+
+  const exportsObj = { SEQ_RE, isValidSequenceCode, LETTER_MAX, MAX_SEQUENCE_NUMBER };
 
   if (typeof module === 'object' && module.exports) {
     module.exports = exportsObj;

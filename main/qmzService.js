@@ -15,7 +15,7 @@ const PathUtils = require('../renderer/pathUtils.js');
 // MX Creative Console command validation (see qmzSequenceFormat.js's own header comment for
 // why this extraction exists — a real drift between this file's SEQ_RE and commandManager.js's
 // own independent copy was found and fixed in Stage 5's review).
-const { SEQ_RE } = require('../renderer/qmzSequenceFormat.js');
+const { SEQ_RE, LETTER_MAX, MAX_SEQUENCE_NUMBER } = require('../renderer/qmzSequenceFormat.js');
 // QMZ workspace maintenance — reuses the SAME centralised hidden/protected-file mechanism
 // already applied to event.json/event.metadata.json throughout main.js/metadataSyncService.js,
 // rather than inventing a QMZ-specific one. See readState()/saveState()'s own comments for why
@@ -49,19 +49,23 @@ const PC_PREFIX_RE = /^PC(\d{2,3})-/;
 function _stripPcPrefix(name) {
   return (name || '').replace(PC_PREFIX_RE, '');
 }
-const LETTER_TYPE = { Q: 'Qadam', M: 'Majlis', Z: 'Ziyafat', MZ: 'Majlis + Ziyafat' };
+// "QMZ Sequence Enhancements" adds O (Olda) and AQ (Aqeeqa); MZ's label changes from the
+// original "Majlis + Ziyafat" to "Majmui Ziyafat" (MZ itself is NOT a new code — only its
+// display label changes; see docs/DEC-011-style precedent this task continues).
+const LETTER_TYPE = { Q: 'Qadam', M: 'Majlis', Z: 'Ziyafat', MZ: 'Majmui Ziyafat', O: 'Olda', AQ: 'Aqeeqa' };
 // Q/M/Z's specific ceilings (50/51/52) predate this feature and have no
 // discoverable rationale anywhere in the codebase, commit history or product
 // docs (git blame → commit b56f6ba, "feat(qmz): add QMZ Sequence Manager",
 // introduces them with no explanation; DEC-011 confirms "type-specific
 // maximums" is an intentional product concept but gives no numbers) — left
 // completely untouched, per instruction, rather than reverse-engineered.
-// MZ deliberately has NO entry here: there is no product rationale to invent
-// one. createSequence() falls back to MAX_SEQUENCE_NUMBER for any letter
-// without its own configured ceiling — the sequence-code FORMAT's own
-// structural limit (two zero-padded digits), not a business rule.
-const LETTER_MAX  = { Q: 50, M: 51, Z: 52 };
-const MAX_SEQUENCE_NUMBER = 99;
+// MZ, O, and AQ deliberately have NO entry here: there is no product rationale to invent
+// one for any of them. createSequence() falls back to MAX_SEQUENCE_NUMBER for any letter
+// without its own configured ceiling — the sequence-code FORMAT's own structural limit (two
+// zero-padded digits), not a business rule. O/AQ follow the exact same precedent already
+// established for MZ (confirmed via AskUserQuestion in Stage 1), not a new ambiguity.
+// Both constants now live in renderer/qmzSequenceFormat.js — the single source of truth also
+// read by renderer.js's own pre-flight range checks (see that file's own comment for why).
 const MEDIA_EXT   = new Set([...config.PHOTO_EXTENSIONS, ...config.VIDEO_EXTENSIONS]);
 const RAW_EXTS    = new Set(config.RAW_EXTENSIONS);
 const PHOTO_EXTS  = new Set(config.PHOTO_EXTENSIONS);

@@ -124,7 +124,9 @@ async function mkQmzRoot() { return fsp.mkdtemp(path.join(os.tmpdir(), 'ai-qmz-s
   await t('B2: parseCode — 05aMZ / 05bMZ round-trip, including the "MZ" 2-character type', () => {
     const a = parseCode('05aMZ');
     assert.ok(a);
-    assert.deepStrictEqual(a, { number: 5, suffix: 'a', letter: 'MZ', type: 'Majlis + Ziyafat', code: '05aMZ', folderName: '05aMZ' });
+    // "QMZ Sequence Enhancements" relabeled MZ's display type from "Majlis + Ziyafat" to
+    // "Majmui Ziyafat" — MZ itself is unchanged, only this string.
+    assert.deepStrictEqual(a, { number: 5, suffix: 'a', letter: 'MZ', type: 'Majmui Ziyafat', code: '05aMZ', folderName: '05aMZ' });
     const b = parseCode('05bMZ');
     assert.ok(b);
     assert.equal(b.suffix, 'b');
@@ -153,7 +155,7 @@ async function mkQmzRoot() { return fsp.mkdtemp(path.join(os.tmpdir(), 'ai-qmz-s
     const byCode = Object.fromEntries(state.sequences.map(s => [s.code, s]));
     assert.equal(byCode['05aMZ'].suffix, 'a');
     assert.equal(byCode['05bMZ'].suffix, 'b');
-    assert.equal(byCode['05aMZ'].type, 'Majlis + Ziyafat');
+    assert.equal(byCode['05aMZ'].type, 'Majmui Ziyafat');
   });
 
   await t('B5: MZ is NOT interpreted as two independent sequence folders — exactly one folder per created code', async () => {

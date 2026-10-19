@@ -3,7 +3,7 @@
 /**
  * qmzProgramPdfParser.js — PDF-Assisted QMZ Workspace Folder Generation, Stage 2.
  *
- * Reads a QMZ "program" PDF (a numbered list of Q/M/Z/MZ appointments, usually produced
+ * Reads a QMZ "program" PDF (a numbered list of Q/M/Z/MZ/O/AQ appointments, usually produced
  * from a spreadsheet, one or more cities per document) and returns structured, validated
  * sequence data. Completely independent of the UI and of any filesystem operation — this
  * module NEVER creates, renames, moves, or deletes a QMZ folder, and never touches
@@ -77,11 +77,16 @@ const path = require('path');
 const { log } = require('../services/logger');
 const { formatCode, parseCode, letterToType } = require('./qmzService');
 
-// Supported QMZ types for this feature — confirmed product decision (Phase 5). "N" is an
-// explicit, recognized "not a QMZ row" marker in the real reference PDFs (e.g. an escort or
+// Supported QMZ types for this feature — confirmed product decision (Phase 5), extended by
+// "QMZ Sequence Enhancements" to add O (Olda) and AQ (Aqeeqa) alongside the original Q/M/Z/MZ.
+// Each value is the literal abbreviation the Sharaf column cell already contains — this is
+// an exact-string match against an explicit field the program's own authors fill in, never a
+// free-text keyword/NLP match against a full word like "Olda" or "Aqeeqa", exactly the same
+// mechanism already used for Q/M/Z/MZ (no guessing is introduced by this extension). "N" is
+// an explicit, recognized "not a QMZ row" marker in the real reference PDFs (e.g. an escort or
 // additional family member listed without a sequence of their own) — it is recognized and
 // silently excluded, never flagged as an unrecognized value.
-const SHARAF_TYPES = new Set(['Q', 'M', 'Z', 'MZ']);
+const SHARAF_TYPES = new Set(['Q', 'M', 'Z', 'MZ', 'O', 'AQ']);
 const SHARAF_NOT_APPLICABLE = 'N';
 
 // Row-clustering tolerance: sub-baseline fragments of one logical PDF row differ by well
@@ -499,7 +504,7 @@ async function parseProgramPdf(input) {
 
   result.sections = _detectSections(rowRecords);
   if (result.sections.every(s => s.entries.length === 0)) {
-    result.warnings.push({ reason: 'no-valid-qmz-entries', message: 'No numbered rows with a recognized QMZ type (Q/M/Z/MZ) were found.' });
+    result.warnings.push({ reason: 'no-valid-qmz-entries', message: 'No numbered rows with a recognized QMZ type (Q/M/Z/MZ/O/AQ) were found.' });
   }
 
   log(`[qmz-pdf-parser] ${fileName}: ${result.sections.length} section(s), ${result.sections.reduce((n, s) => n + s.entries.length, 0)} entrie(s)`);

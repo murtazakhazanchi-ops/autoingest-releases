@@ -220,7 +220,9 @@ let _parse;
     });
     await t('B5: 05aMZ extracted correctly — number 5, suffix "a", combined type MZ', () => {
       const e = r.sections[0].entries.find(x => x.folderName === '05aMZ');
-      assert.ok(e); assert.equal(e.number, 5); assert.equal(e.suffix, 'a'); assert.equal(e.letter, 'MZ'); assert.equal(e.type, 'Majlis + Ziyafat');
+      // "QMZ Sequence Enhancements" relabeled MZ's display type from "Majlis + Ziyafat" to
+      // "Majmui Ziyafat" — MZ itself is unchanged, only this string.
+      assert.ok(e); assert.equal(e.number, 5); assert.equal(e.suffix, 'a'); assert.equal(e.letter, 'MZ'); assert.equal(e.type, 'Majmui Ziyafat');
     });
     await t('B6: 05bMZ extracted correctly', () => {
       const e = r.sections[0].entries.find(x => x.folderName === '05bMZ');
