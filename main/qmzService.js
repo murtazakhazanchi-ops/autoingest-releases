@@ -688,7 +688,21 @@ async function initRoot(qmzRoot) {
   const errors  = [];
 
   const unsequencedDir = path.join(qmzRoot, UNSEQUENCED);
-  await fsp.mkdir(unsequencedDir, { recursive: true });
+  // Workspace maintenance — previously created _Unsequenced unconditionally on every
+  // initRoot() call (i.e. every QMZ workspace open), which is the exact reason a fully-sorted
+  // workspace's empty _Unsequenced folder never actually disappeared: reopening the workspace
+  // silently recreated it immediately. _Unsequenced is only genuinely needed here as an
+  // adoption DESTINATION, so only create it when there is something to adopt into it — when
+  // `other` is empty, this entire loop below is a no-op anyway, so there would be nothing to
+  // put in a freshly-created directory. If _Unsequenced already exists for a real reason
+  // (content moved back into it, or the operator's own files already there), this mkdir
+  // branch is simply never reached and the existing directory is left completely untouched —
+  // scanRoot() already handles an absent _Unsequenced correctly (it just doesn't appear in the
+  // scan), and moveFilesToUnsequenced()/moveFilesToEnroute() each still recreate it on demand
+  // via their own recursive mkdir whenever a file actually needs to land there again.
+  if (other.length > 0) {
+    await fsp.mkdir(unsequencedDir, { recursive: true });
+  }
 
   for (const dirName of other) {
     if (_stripPcPrefix(dirName) === UNSEQUENCED) {
@@ -1195,6 +1209,25 @@ async function _validateSourceFile(qmzRoot, src) {
 
 // ── Move files ────────────────────────────────────────────────────────────────
 
+// Workspace maintenance — shared by all three move functions below so "an empty source
+// photographer folder is removed, and an empty _Unsequenced root disappears with it" has
+// exactly ONE implementation, never three independently-drifting copies. Reuses
+// removeIfEmptyIgnoringJunk() unchanged (never recursive, never touches anything containing a
+// real file, subdirectory, XMP sidecar, hidden file other than macOS junk, or symlink — see
+// that function's own guarantees) for both the leaf photographer folder AND the _Unsequenced
+// root itself. Checking _Unsequenced unconditionally (not only when the move's source was
+// literally inside it) is intentional and harmless: if it is already empty for an unrelated
+// reason, removing it is still correct per the same "never leave an empty _Unsequenced
+// lingering" rule; if it still has real content, removeIfEmptyIgnoringJunk's own check leaves
+// it completely untouched.
+async function _cleanupEmptySourceDirsAndUnsequencedRoot(qmzRoot, moved) {
+  const sourceDirs = new Set(moved.map(m => path.dirname(m.src)));
+  for (const dir of sourceDirs) {
+    await removeIfEmptyIgnoringJunk(dir);
+  }
+  await removeIfEmptyIgnoringJunk(path.join(qmzRoot, UNSEQUENCED));
+}
+
 async function moveFilesToSequence(qmzRoot, filePaths, sequenceCode, photographerName) {
   if (!parseCode(sequenceCode)) return { ok: false, error: `Invalid sequence code: ${sequenceCode}` };
   const pgCheck = validatePhotographerName(photographerName);
@@ -1213,6 +1246,14 @@ async function moveFilesToSequence(qmzRoot, filePaths, sequenceCode, photographe
     if (r.ok) moved.push({ src, dest: r.dest, action: r.action });
     else errors.push({ src, error: r.reason });
   }
+
+  // Workspace maintenance — cleans up an emptied source photographer folder (e.g.
+  // _Unsequenced/Abbas Bhai, or an Enroute/Enroute-to-sequence move) and, if that leaves
+  // _Unsequenced itself empty, removes it too. Previously MISSING from this function
+  // entirely — _Unsequenced -> numbered-sequence assignment is one of this app's two most
+  // common sorting actions, so its absence here was the main reason a fully-sorted workspace
+  // never actually lost its empty _Unsequenced folder.
+  await _cleanupEmptySourceDirsAndUnsequencedRoot(qmzRoot, moved);
 
   log(`[qmz] moveToSequence ${sequenceCode}/${photographerName}: ${moved.length} moved, ${errors.length} errors`);
   return { ok: errors.length === 0, moved, errors };
@@ -1236,10 +1277,10 @@ async function moveFilesToUnsequenced(qmzRoot, filePaths, photographerName) {
     else errors.push({ src, error: r.reason });
   }
 
-  // Clean up any sequence photographer folder left empty by this move (real
-  // files or unmoved leftovers block removal — see removeIfEmptyIgnoringJunk).
-  // Only the leaf photographer folder is ever touched here, never the
-  // sequence folder itself — that stays until the user explicitly removes it.
+  // Clean up any sequence/Enroute photographer folder left empty by this move (real files or
+  // unmoved leftovers block removal — see removeIfEmptyIgnoringJunk). This move's own
+  // DESTINATION is _Unsequenced itself, so there is nothing to remove there — only the
+  // (now possibly empty) SOURCE folder this move just emptied out.
   const sourceDirs = new Set(moved.map(m => path.dirname(m.src)));
   for (const dir of sourceDirs) {
     await removeIfEmptyIgnoringJunk(dir);
@@ -1274,10 +1315,11 @@ async function moveFilesToEnroute(qmzRoot, filePaths, photographerName) {
     else errors.push({ src, error: r.reason });
   }
 
-  const sourceDirs = new Set(moved.map(m => path.dirname(m.src)));
-  for (const dir of sourceDirs) {
-    await removeIfEmptyIgnoringJunk(dir);
-  }
+  // Workspace maintenance — this move's source is very often _Unsequenced/<photographer>, so
+  // this also removes _Unsequenced itself once empty (see
+  // _cleanupEmptySourceDirsAndUnsequencedRoot's own comment for why checking it
+  // unconditionally is safe even when the source genuinely wasn't _Unsequenced this time).
+  await _cleanupEmptySourceDirsAndUnsequencedRoot(qmzRoot, moved);
 
   log(`[qmz] moveToEnroute ${photographerName}: ${moved.length} moved, ${errors.length} errors`);
   return { ok: errors.length === 0, moved, errors };
