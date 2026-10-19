@@ -26,6 +26,7 @@ const INTERNAL_FILE_NAMES = new Set([
   'event.json',
   'event.metadata.json',
   'event.sync.json',
+  'qmz-sequences.json',
 ]);
 
 const INTERNAL_DIR_NAMES = new Set([

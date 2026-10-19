@@ -16,6 +16,12 @@ const PathUtils = require('../renderer/pathUtils.js');
 // why this extraction exists — a real drift between this file's SEQ_RE and commandManager.js's
 // own independent copy was found and fixed in Stage 5's review).
 const { SEQ_RE } = require('../renderer/qmzSequenceFormat.js');
+// QMZ workspace maintenance — reuses the SAME centralised hidden/protected-file mechanism
+// already applied to event.json/event.metadata.json throughout main.js/metadataSyncService.js,
+// rather than inventing a QMZ-specific one. See readState()/saveState()'s own comments for why
+// this file is kept at its existing plain name (qmz-sequences.json) rather than renamed to a
+// dot-prefixed one.
+const { hidePathBestEffort } = require('../services/internalFileProtection');
 
 const STATE_FILE  = 'qmz-sequences.json';
 const UNSEQUENCED = '_Unsequenced';
@@ -481,10 +487,28 @@ async function _sequenceHasFiles(qmzRoot, code) {
 }
 
 // ── State I/O ────────────────────────────────────────────────────────────────
+//
+// Workspace maintenance — qmz-sequences.json is hidden from normal Finder/Explorer browsing
+// via hidePathBestEffort() (macOS chflags hidden / Windows attrib +H / Linux .hidden
+// registry), the exact same centralised mechanism already used for event.json throughout the
+// rest of the app — NOT by renaming the file to a dot-prefixed name. Investigated the
+// alternative (".qmz-sequences.json") first: a dot-prefix is NOT honored as hidden by Windows
+// Explorer at all, whereas chflags/attrib genuinely are on both platforms, and renaming would
+// require a migration step (old name vs new name, conflicting-file reconciliation, etc.) that
+// a pure attribute change does not — the on-disk filename, schema, and every existing sequence
+// record stay completely untouched. hidePathBestEffort() is applied in readState() too (not
+// only saveState()) so that simply OPENING a pre-existing/legacy workspace retroactively hides
+// its already-created file — no explicit migration step is needed, every workspace becomes
+// correctly hidden the next time it is either opened or saved to, whichever comes first.
+// Best-effort and non-fatal by design (see that function's own header comment) — a failure to
+// apply the attribute (e.g. a read-only NAS mount) never blocks reading or writing the actual
+// sequence data.
 
 async function readState(qmzRoot) {
+  const dest = path.join(qmzRoot, STATE_FILE);
   try {
-    const raw = await fsp.readFile(path.join(qmzRoot, STATE_FILE), 'utf8');
+    const raw = await fsp.readFile(dest, 'utf8');
+    hidePathBestEffort(dest).catch(() => {});
     return JSON.parse(raw);
   } catch {
     return { version: 1, qmzRoot, sequences: [] };
@@ -497,6 +521,7 @@ async function saveState(qmzRoot, state) {
   try {
     await fsp.writeFile(tmp, JSON.stringify(state, null, 2), 'utf8');
     await fsp.rename(tmp, dest);
+    hidePathBestEffort(dest).catch(() => {});
     return { ok: true };
   } catch (err) {
     log(`[qmz] saveState failed: ${err.message}`);
