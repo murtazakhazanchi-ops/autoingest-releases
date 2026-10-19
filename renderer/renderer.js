@@ -9996,12 +9996,34 @@ function _qmzGroupPathsByPhotographer(paths) {
   return byPg;
 }
 
+// "QMZ Sorting Workflow Optimization" — reusable scroll-reset for the file-grid scroll
+// container, used ONLY after a fully successful assignment (see this function's own call
+// site below). #qmzFileGrid's own innerHTML is rebuilt on every _qmzRefresh() (via
+// _renderQMZCenter()) but that never touches its scrollTop — the same DOM node persists
+// across refreshes, so its scroll position is retained by ordinary DOM behavior, not by any
+// intentional preservation logic. This is the actual root cause of "the workspace stays
+// scrolled where it was" — confirmed by reading _renderQMZCenter() directly, not assumed.
+function _qmzScrollFileGridToTop() {
+  const grid = document.getElementById('qmzFileGrid');
+  if (grid) grid.scrollTop = 0;
+}
+
+// The ONE shared QMZ assignment engine — called by every existing entry point
+// (_qmzHandleAssignByNumber's single-match/ambiguous-match/create-then-assign branches via
+// _qmzAssignSelectionToSequenceCode, and commandManager.js's qmz.assignToSequence command via
+// the same wrapper) and now also by Quick Assign. Returns a result object (not a bare
+// boolean) so callers can distinguish complete success / partial failure / complete failure
+// — _qmzAssignSelectionToSequenceCode's own boolean contract (consumed by the MX Console
+// bridge via `=== true`) is preserved unchanged; it is a thin wrapper around this function,
+// not this function itself.
 async function _qmzAssignToSequence(sequenceCode) {
-  if (!_qmzRoot || !_qmzSelectedFiles.size) return false;
+  if (!_qmzRoot || !_qmzSelectedFiles.size) return { attempted: false, movedTotal: 0, errorTotal: 0, totalRequested: 0 };
   const filesToMove = [..._qmzSelectedFiles];
+  const totalRequested = filesToMove.length;
   const byPg = _qmzGroupPathsByPhotographer(filesToMove);
   _qmzSetStatus(`Moving ${filesToMove.length} file(s) to ${sequenceCode}…`);
   let movedTotal = 0, errorTotal = 0;
+  const movedPaths = [];
   for (const [pg, paths] of byPg) {
     const result = await window.api.qmzMoveToSequence({
       qmzRoot: _qmzRoot,
@@ -10009,22 +10031,39 @@ async function _qmzAssignToSequence(sequenceCode) {
       sequenceCode,
       photographerName: pg,
     });
+    // A batch result's `moved` array can be non-empty even when `result.ok` is false — a
+    // photographer batch with ONE failing file still reports every file that DID move
+    // alongside the errors (see main/qmzService.js's moveFilesToSequence: `ok` is
+    // `errors.length === 0`, not "nothing moved"). Counting/removing-from-selection only
+    // inside the `result.ok` branch silently under-counted movedTotal and left a file that
+    // had ALREADY physically moved still marked "selected" in the UI on any partial batch
+    // failure — fixed here so both entry points report and track selection accurately.
+    if (result.moved?.length) {
+      movedTotal += result.moved.length;
+      for (const m of result.moved) movedPaths.push(m.src);
+    }
+    if (!result.ok) errorTotal += result.errors.length;
     if (result.ok) {
       // Auto-queue metadata with the type keyword for the moved files' new paths
       const movedDests = result.moved.map(m => m.dest);
       await _qmzAutoQueueMetadata(sequenceCode, movedDests, pg);
-      movedTotal += result.moved.length;
-    } else {
-      errorTotal += result.errors.length;
     }
   }
   _qmzSetStatus(
     errorTotal ? `Moved ${movedTotal}, ${errorTotal} error(s) moving to ${sequenceCode}` : `Moved ${movedTotal} to ${sequenceCode} — metadata queued`,
     errorTotal ? 'err' : 'ok'
   );
-  _qmzSelectedFiles = new Set();
+  // Only files that actually moved leave the selection — a file that failed to move stays
+  // selected so the operator can inspect or retry it, rather than silently losing track of
+  // it (previously this unconditionally cleared the ENTIRE selection regardless of outcome).
+  for (const p of movedPaths) _qmzSelectedFiles.delete(p);
   await _qmzRefresh();
-  return true;
+  // Scroll-to-top only on a COMPLETE success (zero errors, at least one file moved) — shared
+  // by every caller of this function, so the sidebar's own "Assign Selected" gets it too,
+  // not just Quick Assign. A cancelled/invalid/failed/partial attempt never reaches here with
+  // errorTotal === 0, so scroll position is naturally preserved in every other case.
+  if (errorTotal === 0 && movedTotal > 0) _qmzScrollFileGridToTop();
+  return { attempted: true, movedTotal, errorTotal, totalRequested };
 }
 
 /**
@@ -10040,13 +10079,20 @@ async function _qmzAssignToSequence(sequenceCode) {
  * (see main/qmzService.js), which is exactly the silent-substitution/
  * auto-creation this primitive exists to prevent at the renderer boundary.
  * @returns {Promise<boolean>} true if assignment was attempted (a real,
- *   existing sequence and a non-empty selection); false otherwise.
+ *   existing sequence and a non-empty selection); false otherwise. This
+ *   boolean contract is unchanged by "QMZ Sorting Workflow Optimization" —
+ *   commandManager.js's qmz.assignToSequence command checks it via
+ *   `result === true` (strict equality), so _qmzAssignToSequence's own
+ *   richer { attempted, movedTotal, errorTotal, totalRequested } result is
+ *   deliberately translated back down to a plain boolean here rather than
+ *   passed through, to avoid breaking that MX Console bridge contract.
  */
 async function _qmzAssignSelectionToSequenceCode(sequenceCode) {
   if (!_qmzRoot || !_qmzSelectedFiles.size) return false;
   const exists = (_qmzData?.sequences || []).some(s => s.code === sequenceCode);
   if (!exists) return false;
-  return _qmzAssignToSequence(sequenceCode);
+  const result = await _qmzAssignToSequence(sequenceCode);
+  return !!result.attempted;
 }
 
 async function _qmzHandleMoveToUnsequenced() {

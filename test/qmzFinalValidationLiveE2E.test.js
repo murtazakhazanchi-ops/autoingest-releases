@@ -187,8 +187,15 @@ function buildSingleCityPdf(cityLabel, rows) {
     });
     await window.waitForTimeout(200);
   }
+  // "QMZ Sorting Workflow Optimization" changed _qmzAssignToSequence's return value from a
+  // bare boolean to a richer { attempted, movedTotal, errorTotal, totalRequested } result
+  // (so Quick Assign/the sidebar can distinguish complete/partial/failed outcomes) — this
+  // helper reduces that back to the simple boolean this file's own checks expect
+  // ("did assignment complete with zero errors"), rather than every call site comparing
+  // against a result shape that intentionally changed.
   async function assignSelectionTo(code) {
-    return window.evaluate((c) => _qmzAssignToSequence(c), code);
+    const r = await window.evaluate((c) => _qmzAssignToSequence(c), code);
+    return !!(r && r.attempted && r.errorTotal === 0 && r.movedTotal > 0);
   }
   const shot = async (name) => { if (SHOTS) await window.screenshot({ path: path.join(SHOTS, name + '.png') }); };
   async function sequenceState() { return window.evaluate(() => JSON.parse(JSON.stringify(_qmzData.sequences))); }
