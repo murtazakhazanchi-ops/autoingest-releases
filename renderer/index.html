@@ -6744,7 +6744,18 @@
   /* File grid — reuses shared .icon-grid/.file-tile/.list-table/.section-header
      visuals verbatim (defined once, unscoped, elsewhere) for pixel parity with
      the import screen. No new tile CSS is added here. */
-  #qmzOverlay .qmz-file-grid { flex: 1; overflow-y: auto; padding: 8px; }
+  /* Top padding deliberately omitted (was "padding: 8px" on all sides) — the shared,
+     unscoped .section-header class (defined once, reused verbatim here — see this
+     block's own header comment) is `position: sticky; top: 0`, which locks relative to
+     this scroll container's OWN padding edge. A nonzero top padding here left an 8px
+     band between the sticky header's locked position and this container's visual top
+     (flush against .qmz-toolbar above it) through which scrolling thumbnails remained
+     visible — the main (non-QMZ) file browser's #fileGrid avoids this exact issue the
+     same way, with `padding: 0`, relying entirely on the nested .icon-grid's own
+     `padding: 12px 14px` for tile spacing. Left/right/bottom padding is preserved
+     unchanged here (QMZ's own existing inset, independent of .icon-grid's) — only the
+     top component, which is what actually causes a sticky-coverage gap, is removed. */
+  #qmzOverlay .qmz-file-grid { flex: 1; overflow-y: auto; padding: 0 8px 8px; }
   #qmzOverlay .qmz-file-grid.qmz-view-list { padding: 0; }
   #qmzOverlay .qmz-empty { padding: 24px 16px; font-size: 0.8rem; color: var(--subtext); text-align: center; line-height: 1.7; }
   /* Right panel */
