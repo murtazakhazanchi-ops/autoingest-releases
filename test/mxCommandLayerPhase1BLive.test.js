@@ -322,17 +322,32 @@ async function writeRaw(p) {
     check(rejMalformed2.ok === false && rejMalformed2.reason === 'invalid-payload', 'a malformed code with the letter first ("Q01") is rejected');
     const rejLetter = await window.evaluate(() => window.AutoIngestCommands.execute('qmz.assignToSequence', { sequenceCode: '01X' }));
     check(rejLetter.ok === false && rejLetter.reason === 'invalid-payload', 'a code with an invalid type letter ("01X", not Q/M/Z) is rejected');
-    // The task brief's own examples ("05aQ", "05bM") describe a lowercase-
-    // suffix sequence-code format. Verified against main/qmzService.js's own
-    // SEQ_RE (/^\d{2}[QMZ]$/) and parseCode(): no such format exists anywhere
-    // in the current QMZ implementation — inventing acceptance for it here
-    // would be exactly the "invent QMZ behavior" this project's standing
-    // rule forbids. These are correctly rejected as malformed, not accepted.
-    const rejLowercaseSuffix1 = await window.evaluate(() => window.AutoIngestCommands.execute('qmz.assignToSequence', { sequenceCode: '05aQ' }));
-    check(rejLowercaseSuffix1.ok === false && rejLowercaseSuffix1.reason === 'invalid-payload',
-      '"05aQ" (lowercase-suffix format from the task brief\'s own examples) is rejected — no such format exists in main/qmzService.js\'s SEQ_RE');
-    const rejLowercaseSuffix2 = await window.evaluate(() => window.AutoIngestCommands.execute('qmz.assignToSequence', { sequenceCode: '05bM' }));
-    check(rejLowercaseSuffix2.ok === false && rejLowercaseSuffix2.reason === 'invalid-payload', '"05bM" is likewise rejected for the same reason');
+    // CORRECTED (QMZ Final Validation / Preview RC.3): this block previously asserted that
+    // "05aQ"/"05bM" — the task brief's own lowercase-suffix examples — were rejected as
+    // malformed, citing an SEQ_RE (/^\d{2}[QMZ]$/) that predates "PDF-Assisted QMZ Workspace
+    // Folder Generation" Stage 1 — verified via `git show a856fb9:renderer/qmzSequenceFormat.js`
+    // that the suffix-supporting regex was ALREADY in place before this entire session's work
+    // even began, so this assertion was stale well before "QMZ Sequence Enhancements" (which
+    // only widened the TYPE alternation further, to add O/AQ). A suffixed code's real,
+    // current-and-correct behavior is identical to any other well-formed-but-nonexistent code
+    // (see the "02M" case immediately below): it passes isValid(), is NOT auto-created, and
+    // simply has no effect (ok:true, executed:false) because no sequence named "05aQ"/"05bM"
+    // was ever created in this fixture.
+    const acceptedLowercaseSuffix1 = await window.evaluate(() => window.AutoIngestCommands.execute('qmz.assignToSequence', { sequenceCode: '05aQ' }));
+    check(acceptedLowercaseSuffix1.ok === true && acceptedLowercaseSuffix1.executed === false,
+      '"05aQ" (lowercase-suffix format) is a syntactically VALID payload — it runs and safely no-ops because no such sequence exists yet, exactly like "02M" below, never rejected as malformed');
+    const acceptedLowercaseSuffix2 = await window.evaluate(() => window.AutoIngestCommands.execute('qmz.assignToSequence', { sequenceCode: '05bM' }));
+    check(acceptedLowercaseSuffix2.ok === true && acceptedLowercaseSuffix2.executed === false, '"05bM" is likewise accepted as valid-but-nonexistent');
+
+    // Genuinely invalid shapes under the CURRENT (suffix + 6-type) SEQ_RE — replaces the
+    // negative-coverage lost by correcting the two checks above, so this file still exercises
+    // real malformed-input rejection, not just previously-valid input that was wrongly rejected.
+    const rejMultiCharSuffix = await window.evaluate(() => window.AutoIngestCommands.execute('qmz.assignToSequence', { sequenceCode: '05abQ' }));
+    check(rejMultiCharSuffix.ok === false && rejMultiCharSuffix.reason === 'invalid-payload', 'a multi-character suffix ("05abQ") is still rejected — suffix must be a single lowercase letter');
+    const rejNumericSuffix = await window.evaluate(() => window.AutoIngestCommands.execute('qmz.assignToSequence', { sequenceCode: '051Q' }));
+    check(rejNumericSuffix.ok === false && rejNumericSuffix.reason === 'invalid-payload', 'a numeric "suffix" ("051Q") is still rejected — suffix must be alphabetic');
+    const rejUnknownType = await window.evaluate(() => window.AutoIngestCommands.execute('qmz.assignToSequence', { sequenceCode: '05aY' }));
+    check(rejUnknownType.ok === false && rejUnknownType.reason === 'invalid-payload', 'a suffixed code with an unrecognized type letter ("05aY", not one of Q/M/Z/MZ/O/AQ) is still rejected');
 
     // check() deliberately never inspects the payload (consistent with every
     // other command in this registry — see commandManager.js) — sequence
@@ -348,6 +363,19 @@ async function writeRaw(p) {
     check(afterRejectSeqState === beforeSeqState, 'no sequence was created/mutated by any of the rejected payloads (never auto-creates, never guesses)');
     const stillSelected = await window.evaluate(() => _qmzSelectedFiles.size);
     check(stillSelected === 2, 'the QMZ selection itself is untouched by every rejected attempt');
+
+    // Real POSITIVE coverage: a genuinely-created suffixed sequence is a real, executable
+    // target for this command — probed via canExecute() (not a full execute()) so this check
+    // adds real coverage without consuming the 2-file selection the capstone "5b" assignment
+    // below still needs, preserving that check's original intent/fixture untouched. Placed
+    // AFTER the "zero side effects from rejected payloads" checks above so this intentional,
+    // real state mutation is never mistaken for one of them.
+    const suffixedCreate = await window.evaluate((root) => window.api.qmzCreateSequence({ qmzRoot: root, number: 5, letter: 'Q', suffix: 'a' }), qmzRoot);
+    check(suffixedCreate.ok === true && suffixedCreate.code === '05aQ', 'setup: a real suffixed sequence "05aQ" is created via window.api.qmzCreateSequence');
+    await window.evaluate(() => _qmzRefresh());
+    await window.waitForTimeout(300);
+    const suffixedCanExecute = await window.evaluate(() => window.AutoIngestCommands.canExecute('qmz.assignToSequence', { sequenceCode: '05aQ' }));
+    check(suffixedCanExecute.ok === true, 'once "05aQ" genuinely exists, it is a real, executable assignment target — proves the suffix format works end-to-end through the command layer, not just at the isValid() gate');
 
     const rejOutsideQmz = await window.evaluate(() => {
       const wasOpen = _qmzOpen;
