@@ -8689,6 +8689,14 @@
                  number is currently typed, independent of which type is selected — per the
                  feature's own requirement that suffix allocation is type-independent — but the
                  operator may freely overwrite it (manual override is always available). -->
+            <!-- Split across two rows (was one 5-control row) — the combined width of the two
+                 fixed-width inputs, the "+Suffix" button, the type select (which, with no
+                 explicit width, grows to fit its widest option — "MZ"/"AQ" — once those two
+                 types were added), and the Create button exceeded the 240px right panel's
+                 ~224px usable content width, pushing Create off the right edge. Row 1 holds
+                 the number/suffix entry controls; row 2 holds the type select (now given an
+                 explicit width so it never resizes as the selected type changes length) and
+                 Create, which is flex:1 so it always has the remaining row to itself. -->
             <div class="qmz-seq-create-row">
               <input id="qmzSeqNumInput" class="qmz-seq-input" type="number" min="1" max="99"
                 placeholder="#" autocomplete="off" aria-label="Sequence number to create"
@@ -8699,7 +8707,10 @@
                 style="width:56px;flex-shrink:0" />
               <button id="qmzSeqSuggestSuffixBtn" class="qmz-add-btn" type="button"
                 title="Suggest next available suffix for this number">+Suffix</button>
-              <select id="qmzSeqLetterSelect" class="qmz-select" aria-label="Sequence type">
+            </div>
+            <div class="qmz-seq-create-row">
+              <select id="qmzSeqLetterSelect" class="qmz-select" aria-label="Sequence type"
+                style="width:64px;flex-shrink:0">
                 <option value="Q">Q</option>
                 <option value="M">M</option>
                 <option value="Z">Z</option>
