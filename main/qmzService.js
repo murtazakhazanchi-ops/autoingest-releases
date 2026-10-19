@@ -783,6 +783,25 @@ async function createSequence(qmzRoot, number, letter, suffix = '') {
   const code = v.code;
   const dir  = path.join(qmzRoot, code);
 
+  // "QMZ Sequence Enhancements" — insertion-position conflict check. A manually-inserted
+  // additional sequence's identity, for duplicate-prevention purposes, is (number, suffix) —
+  // NOT the full code string — because the lowercase suffix represents a POSITION slot
+  // ("first additional sequence after 3"), independent of which event type eventually
+  // occupies it. Two different types sharing the same base number + suffix (e.g. "03aAQ" and
+  // "03aO") must conflict; "03aAQ" and "03bO" (different suffix) and "03Q"/"03aQ" (one has no
+  // suffix at all) must not. Only suffixed codes are checked here — an empty suffix has
+  // always allowed multiple types at the same bare number (pre-existing behavior, left
+  // untouched; this task only adds a NEW constraint for the suffix/insertion-position case).
+  // Checked BEFORE the mkdir below so a rejected request never creates an orphan folder for a
+  // position that is already taken under a different type.
+  const state = await readState(qmzRoot);
+  if (suffix) {
+    const conflict = state.sequences.find(s => s.number === number && s.suffix === suffix && s.code !== code);
+    if (conflict) {
+      return { ok: false, error: `Insertion position ${number}${suffix} is already used by ${conflict.code}.` };
+    }
+  }
+
   // Stage 4 ("PDF-Assisted QMZ Workspace Folder Generation") needs to tell an operator
   // whether this call actually created a new folder or found one already there (Phase 9's
   // per-folder creation report: "01Q — Created" vs "01Q — Already exists") — checked BEFORE
@@ -793,7 +812,6 @@ async function createSequence(qmzRoot, number, letter, suffix = '') {
   try { await fsp.mkdir(dir, { recursive: true }); }
   catch (err) { return { ok: false, error: err.message }; }
 
-  const state   = await readState(qmzRoot);
   // Exact-string comparison on the full code (including suffix) — "05aMZ"
   // and "05bMZ" are different codes, so this already distinguishes different
   // suffixes of the same base number/type without any extra logic.
@@ -912,6 +930,22 @@ async function createReviewedSequences(qmzRoot, entries, { includeEnroute = fals
     if (!p.valid) continue;
     codeCounts.set(p.code, (codeCounts.get(p.code) || 0) + 1);
   }
+  // "QMZ Sequence Enhancements" — the same (number, suffix) insertion-position conflict rule
+  // createSequence() now enforces against LIVE state (see its own comment) must also be
+  // caught WITHIN this batch: two reviewed entries with different codes but the same
+  // suffixed position (e.g. "03aAQ" and "03aO", both from manual PDF-review corrections)
+  // would otherwise race createSequence() sequentially — the first would succeed and the
+  // second would be rejected by createSequence()'s live-state check, silently picking a
+  // winner by processing order. Pre-flagging both as 'duplicate-in-request', exactly like the
+  // existing exact-code dedupe above, avoids that unannounced decision. Only suffixed entries
+  // are keyed here — an empty suffix has always allowed multiple types at the same bare
+  // number (unchanged, pre-existing behavior).
+  const positionCounts = new Map();
+  for (const p of prepared) {
+    if (!p.valid || !p.v.suffix) continue;
+    const posKey = `${p.v.number}|${p.v.suffix}`;
+    positionCounts.set(posKey, (positionCounts.get(posKey) || 0) + 1);
+  }
 
   const results = [];
   for (const p of prepared) {
@@ -921,6 +955,10 @@ async function createReviewedSequences(qmzRoot, entries, { includeEnroute = fals
       continue;
     }
     if (codeCounts.get(p.code) > 1) {
+      results.push({ number, letter, suffix, code: p.code, status: 'duplicate-in-request' });
+      continue;
+    }
+    if (p.v.suffix && positionCounts.get(`${p.v.number}|${p.v.suffix}`) > 1) {
       results.push({ number, letter, suffix, code: p.code, status: 'duplicate-in-request' });
       continue;
     }
@@ -976,6 +1014,17 @@ async function editSequenceType(qmzRoot, code, newLetter) {
   const state   = await readState(qmzRoot);
   if (state.sequences.some(s => s.code === newCode)) {
     return { ok: false, error: `Sequence ${newCode} already exists.` };
+  }
+  // Same insertion-position conflict rule as createSequence() (see its own comment):
+  // changing a suffixed sequence's type must not be allowed to collide with a DIFFERENT
+  // existing sequence that already occupies the same (number, suffix) position — e.g.
+  // editing "03aQ" to type AQ must be rejected if "03aO" already exists, exactly as creating
+  // "03aAQ" fresh would be. An empty suffix is unaffected (pre-existing behavior unchanged).
+  if (parsed.suffix) {
+    const conflict = state.sequences.find(s => s.number === parsed.number && s.suffix === parsed.suffix && s.code !== code);
+    if (conflict) {
+      return { ok: false, error: `Insertion position ${parsed.number}${parsed.suffix} is already used by ${conflict.code}.` };
+    }
   }
 
   const srcDir  = path.join(qmzRoot, code);

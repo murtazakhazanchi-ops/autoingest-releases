@@ -46,7 +46,28 @@
   const LETTER_MAX = { Q: 50, M: 51, Z: 52 };
   const MAX_SEQUENCE_NUMBER = 99;
 
-  const exportsObj = { SEQ_RE, isValidSequenceCode, LETTER_MAX, MAX_SEQUENCE_NUMBER };
+  // Pure, synchronous suggestion helper for the "Additional Sequence" UI: given the full list
+  // of existing sequences (any shape with .number/.suffix — e.g. qmzService.js's
+  // state.sequences or the renderer's own _qmzData.sequences) and a base sequence number,
+  // returns the next unused lowercase suffix letter for THAT number — independent of event
+  // type, per the feature's own requirement ("if 03aAQ exists, the next suggested suffix is
+  // 03b regardless of what type is chosen next"). Returns null once a-z are exhausted. A pure
+  // suggestion only, never enforced — the operator may always type a different,
+  // non-contiguous suffix instead (manual override requirement).
+  function nextAvailableSuffix(sequences, number) {
+    const used = new Set(
+      (sequences || [])
+        .filter(s => s && s.number === number && s.suffix)
+        .map(s => String(s.suffix).toLowerCase())
+    );
+    for (let c = 97; c <= 122; c++) { // 'a'..'z'
+      const letter = String.fromCharCode(c);
+      if (!used.has(letter)) return letter;
+    }
+    return null;
+  }
+
+  const exportsObj = { SEQ_RE, isValidSequenceCode, LETTER_MAX, MAX_SEQUENCE_NUMBER, nextAvailableSuffix };
 
   if (typeof module === 'object' && module.exports) {
     module.exports = exportsObj;

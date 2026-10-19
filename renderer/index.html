@@ -6855,6 +6855,11 @@
     border: 1px solid var(--border-subtle); background: transparent; color: var(--subtext); cursor: pointer;
   }
   #qmzOverlay .qmz-chooser-cancel:hover { color: var(--text); }
+  /* "QMZ Sequence Enhancements" — live code preview for the Add Specific row (number +
+     optional suffix + type -> resulting code), styled identically to .qmz-bulk-preview. */
+  #qmzOverlay .qmz-seq-code-preview {
+    font-size: 0.68rem; color: var(--blue); min-height: 14px; line-height: 1.5; word-break: break-all;
+  }
   /* Bulk create */
   #qmzOverlay .qmz-bulk-preview {
     font-size: 0.68rem; color: var(--blue); min-height: 14px; line-height: 1.5; word-break: break-all;
@@ -8675,10 +8680,25 @@
                 <option value="AQ">AQ Aqeeqa</option>
               </select>
             </div>
+            <!-- "QMZ Sequence Enhancements" — a manually-inserted ADDITIONAL sequence is just a
+                 specific-number creation with a non-empty suffix; there is no separate mode
+                 toggle because the existing number+type+Create flow already does everything an
+                 additional sequence needs once a suffix field is present. The suffix is always
+                 optional (blank = a regular, non-inserted sequence, byte-identical to before
+                 this field existed). "Suggest" fills the next unused suffix letter for whatever
+                 number is currently typed, independent of which type is selected — per the
+                 feature's own requirement that suffix allocation is type-independent — but the
+                 operator may freely overwrite it (manual override is always available). -->
             <div class="qmz-seq-create-row">
               <input id="qmzSeqNumInput" class="qmz-seq-input" type="number" min="1" max="99"
                 placeholder="#" autocomplete="off" aria-label="Sequence number to create"
                 style="width:46px;flex-shrink:0" />
+              <input id="qmzSeqSuffixInput" class="qmz-seq-input" type="text" maxlength="1"
+                placeholder="suffix" autocomplete="off"
+                aria-label="Optional insertion-position suffix for an additional sequence"
+                style="width:56px;flex-shrink:0" />
+              <button id="qmzSeqSuggestSuffixBtn" class="qmz-add-btn" type="button"
+                title="Suggest next available suffix for this number">+Suffix</button>
               <select id="qmzSeqLetterSelect" class="qmz-select" aria-label="Sequence type">
                 <option value="Q">Q</option>
                 <option value="M">M</option>
@@ -8689,6 +8709,7 @@
               </select>
               <button id="qmzAddSpecificBtn" class="qmz-add-btn">Create</button>
             </div>
+            <div id="qmzSeqCodePreview" class="qmz-seq-code-preview"></div>
           </div>
 
           <!-- Bulk Create — paste pattern, preview, create all -->

@@ -10163,18 +10163,51 @@ async function _qmzHandleAddNext() {
   if (result.ok) await _qmzRefresh();
 }
 
-// Add Specific: reads separate number + letter fields — creation only, no assign.
+// "QMZ Sequence Enhancements" — suggests the next unused suffix letter for whatever number
+// is currently typed, independent of the type dropdown's current selection (per the feature's
+// own requirement). A pure suggestion only: the operator can still type over it freely.
+function _qmzHandleSuggestSuffix() {
+  const numEl = document.getElementById('qmzSeqNumInput');
+  const sfxEl = document.getElementById('qmzSeqSuffixInput');
+  const number = parseInt(numEl?.value || '', 10);
+  if (!sfxEl || !number) return;
+  const suggestion = window.QmzSequenceFormat?.nextAvailableSuffix(_qmzData?.sequences || [], number);
+  if (suggestion) sfxEl.value = suggestion;
+  _qmzUpdateSeqCodePreview();
+}
+
+// Live preview of the resulting code as the operator types — purely cosmetic, uses the same
+// formatCode shape the backend itself enforces (2-digit number + lowercase suffix + type).
+function _qmzUpdateSeqCodePreview() {
+  const previewEl = document.getElementById('qmzSeqCodePreview');
+  if (!previewEl) return;
+  const number = parseInt(document.getElementById('qmzSeqNumInput')?.value || '', 10);
+  const suffix = (document.getElementById('qmzSeqSuffixInput')?.value || '').toLowerCase();
+  const letter = (document.getElementById('qmzSeqLetterSelect')?.value || 'Q').toUpperCase();
+  if (!number) { previewEl.textContent = ''; return; }
+  previewEl.textContent = `${String(number).padStart(2, '0')}${suffix}${letter}`;
+}
+
+// Add Specific: reads number + optional suffix + letter fields — creation only, no assign.
+// The suffix field is what makes this the same flow a manually-inserted ADDITIONAL sequence
+// uses (see index.html's own comment on the Add Sequence block) — a blank suffix is byte-
+// identical to this function's pre-extension behavior.
 async function _qmzHandleAddSpecific() {
   if (!_qmzRoot) return;
   const number = parseInt(document.getElementById('qmzSeqNumInput')?.value || '', 10);
+  const suffix = (document.getElementById('qmzSeqSuffixInput')?.value || '').toLowerCase();
   const letter = (document.getElementById('qmzSeqLetterSelect')?.value || 'Q').toUpperCase();
   const max    = _qmzLetterMax(letter);
   if (!number || number < 1 || number > max) { _qmzSetStatus(`Enter a valid number (1–${max})`, 'err'); return; }
-  const result = await window.api.qmzCreateSequence({ qmzRoot: _qmzRoot, number, letter });
+  if (suffix && !/^[a-z]$/.test(suffix)) { _qmzSetStatus('Suffix must be a single letter', 'err'); return; }
+  const result = await window.api.qmzCreateSequence({ qmzRoot: _qmzRoot, number, letter, suffix });
   _qmzSetStatus(result.ok ? `Created ${result.code}` : (result.error || 'Create failed'), result.ok ? 'ok' : 'err');
   if (result.ok) {
     const numEl = document.getElementById('qmzSeqNumInput');
+    const sfxEl = document.getElementById('qmzSeqSuffixInput');
     if (numEl) numEl.value = '';
+    if (sfxEl) sfxEl.value = '';
+    _qmzUpdateSeqCodePreview();
     await _qmzRefresh();
   }
 }
@@ -11040,6 +11073,14 @@ function _qprRenderCreateResults(resp, section) {
   document.getElementById('qmzAddNextBtn')?.addEventListener('click', _qmzHandleAddNext);
   document.getElementById('qmzAddSpecificBtn')?.addEventListener('click', _qmzHandleAddSpecific);
   document.getElementById('qmzSeqNumInput')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') _qmzHandleAddSpecific();
+  });
+  // "QMZ Sequence Enhancements" — suffix field + suggest button + live code preview.
+  document.getElementById('qmzSeqSuggestSuffixBtn')?.addEventListener('click', _qmzHandleSuggestSuffix);
+  document.getElementById('qmzSeqNumInput')?.addEventListener('input', _qmzUpdateSeqCodePreview);
+  document.getElementById('qmzSeqSuffixInput')?.addEventListener('input', _qmzUpdateSeqCodePreview);
+  document.getElementById('qmzSeqLetterSelect')?.addEventListener('change', _qmzUpdateSeqCodePreview);
+  document.getElementById('qmzSeqSuffixInput')?.addEventListener('keydown', e => {
     if (e.key === 'Enter') _qmzHandleAddSpecific();
   });
 
