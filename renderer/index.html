@@ -6669,7 +6669,9 @@
   }
   #qmzOverlay .qmz-panel { display: flex; flex-direction: column; overflow: hidden; }
   #qmzOverlay .qmz-panel-left  { width: 220px; min-width: 220px; border-right: 1px solid var(--border-subtle); flex-shrink: 0; background: var(--bg-secondary); }
-  #qmzOverlay .qmz-panel-center { flex: 1; }
+  /* position: relative so the Quick Assign popup below can anchor (position: absolute)
+     within THIS panel specifically, not the whole overlay or the right-hand sidebar. */
+  #qmzOverlay .qmz-panel-center { flex: 1; position: relative; }
   #qmzOverlay .qmz-panel-right { width: 240px; border-left: 1px solid var(--border-subtle); flex-shrink: 0; }
   #qmzOverlay .qmz-panel-header {
     padding: 10px 14px 8px;
@@ -6757,6 +6759,56 @@
      top component, which is what actually causes a sticky-coverage gap, is removed. */
   #qmzOverlay .qmz-file-grid { flex: 1; overflow-y: auto; padding: 0 8px 8px; }
   #qmzOverlay .qmz-file-grid.qmz-view-list { padding: 0; }
+  /* "QMZ Sorting Workflow Optimization" — Quick Assign popup. Scoped to .qmz-panel-center
+     (position:absolute within it, see that rule's own comment) — deliberately NOT a
+     full-window scrim like .qpr-modal's #qmzPdfReviewOverlay (`position:fixed; inset:0`):
+     the backdrop below only covers the center photograph panel, and is a light tint rather
+     than the heavier var(--scrim) used for that larger modal, per this feature's own
+     "compact popup, not a heavy backdrop" requirement. Visual language (border-radius,
+     shadow, surface tokens) is otherwise the same family as .qpr-modal for consistency. */
+  #qmzOverlay .qmz-qa-overlay {
+    position: absolute; inset: 0; z-index: 50;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0, 0, 0, 0.12);
+  }
+  #qmzOverlay .qmz-qa-overlay.hidden { display: none; }
+  #qmzOverlay .qmz-qa-popup {
+    background: var(--card-bg); border: 1px solid var(--glass-border); border-radius: 16px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
+    width: min(300px, calc(100% - 32px)); box-sizing: border-box;
+    padding: 20px; display: flex; flex-direction: column; gap: 9px; align-items: stretch;
+  }
+  #qmzOverlay .qmz-qa-title {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--subtext); text-align: center;
+  }
+  #qmzOverlay .qmz-qa-count { font-size: 0.85rem; font-weight: 600; color: var(--text); text-align: center; }
+  #qmzOverlay .qmz-qa-label { font-size: 0.68rem; color: var(--subtext); margin-top: 4px; }
+  #qmzOverlay .qmz-qa-input {
+    box-sizing: border-box; width: 100%; height: 42px; padding: 0 12px; border-radius: 10px;
+    font-size: 1.15rem; font-family: monospace; text-align: center; text-transform: uppercase;
+    border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text); outline: none;
+    transition: border-color 0.12s;
+  }
+  #qmzOverlay .qmz-qa-input:focus { border-color: var(--blue); }
+  #qmzOverlay .qmz-qa-input.qmz-qa-input-error { border-color: var(--red); }
+  #qmzOverlay .qmz-qa-preview { font-size: 0.82rem; font-weight: 600; color: var(--blue); min-height: 18px; text-align: center; }
+  #qmzOverlay .qmz-qa-preview.qmz-qa-error-text { color: var(--red); font-weight: 500; }
+  #qmzOverlay .qmz-qa-matches {
+    display: flex; flex-direction: column; gap: 4px; max-height: 140px; overflow-y: auto;
+  }
+  #qmzOverlay .qmz-qa-matches.hidden { display: none; }
+  #qmzOverlay .qmz-qa-match {
+    padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border-subtle);
+    font-size: 0.8rem; font-weight: 600; color: var(--text); cursor: pointer; text-align: left;
+    display: flex; justify-content: space-between; gap: 8px;
+  }
+  #qmzOverlay .qmz-qa-match:hover,
+  #qmzOverlay .qmz-qa-match.qmz-active { border-color: var(--blue); background: var(--blue-dim); color: var(--blue); }
+  #qmzOverlay .qmz-qa-match-type { font-weight: 400; color: var(--subtext); }
+  #qmzOverlay .qmz-qa-match.qmz-active .qmz-qa-match-type { color: inherit; opacity: 0.8; }
+  #qmzOverlay .qmz-qa-hint { font-size: 0.66rem; color: var(--subtext); opacity: 0.6; text-align: center; margin-top: 2px; }
+  #qmzOverlay .qmz-qa-popup.qmz-qa-busy .qmz-qa-input { opacity: 0.6; }
   #qmzOverlay .qmz-empty { padding: 24px 16px; font-size: 0.8rem; color: var(--subtext); text-align: center; line-height: 1.7; }
   /* Right panel */
   #qmzOverlay .qmz-sequence-list { flex: 1; overflow-y: auto; padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; }
@@ -8651,6 +8703,23 @@
             </div>
           </div>
           <div id="qmzFileGrid" class="qmz-file-grid"></div>
+          <!-- "QMZ Sorting Workflow Optimization" — Quick Assign: a compact popup, positioned
+               centrally within THIS panel (.qmz-panel-center, not the right sidebar and not a
+               full Electron-window-covering modal), opened via the bare "A" keyboard shortcut.
+               Hidden by default; shown/hidden purely via the .hidden class, same convention as
+               every other QMZ overlay element. -->
+          <div id="qmzQuickAssignOverlay" class="qmz-qa-overlay hidden">
+            <div class="qmz-qa-popup" role="dialog" aria-modal="true" aria-labelledby="qmzQaTitle">
+              <div class="qmz-qa-title" id="qmzQaTitle">Quick Assign</div>
+              <div class="qmz-qa-count" id="qmzQaCount">0 photographs selected</div>
+              <label class="qmz-qa-label" for="qmzQaInput">Assign to sequence</label>
+              <input id="qmzQaInput" class="qmz-qa-input" type="text" autocomplete="off"
+                aria-label="Sequence number or code" />
+              <div id="qmzQaPreview" class="qmz-qa-preview" aria-live="polite"></div>
+              <div id="qmzQaMatches" class="qmz-qa-matches hidden" role="listbox"></div>
+              <div class="qmz-qa-hint">Enter to Assign · Esc to Cancel</div>
+            </div>
+          </div>
         </div>
         <!-- Right: Sequence chips + creation -->
         <div class="qmz-panel qmz-panel-right">

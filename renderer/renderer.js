@@ -10095,6 +10095,284 @@ async function _qmzAssignSelectionToSequenceCode(sequenceCode) {
   return !!result.attempted;
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// "QMZ Sorting Workflow Optimization" — Quick Assign (Phase 2-6)
+//
+// A keyboard-driven popup that lets the operator type a sequence number (or full code)
+// and press Enter to assign the current selection — without reaching for the mouse or the
+// right-hand sidebar's "Assign Selected" field. Resolution and the actual move both reuse
+// the EXACT same primitives the sidebar already uses (_qmzData.sequences as the
+// authoritative destination list, _qmzAssignToSequence as the one move engine) — this is
+// a second ENTRY POINT, never a second assignment engine.
+// ════════════════════════════════════════════════════════════════════════════
+
+let _qmzQaOpen            = false;
+let _qmzAssignInFlight     = false; // shared busy flag — also guards re-opening while a move is running
+let _qmzQaMatches          = [];    // ambiguous-destination candidates, when the typed input matches >1 sequence
+let _qmzQaActiveMatchIndex = 0;
+let _qmzQaFocusReturnEl    = null;
+
+// Recognized type letters, longest-first — see _qmzQaParseInput's own comment for exactly
+// why the 2-letter alternatives (MZ/AQ) MUST be tried before the 1-letter ones (Q/M/Z/O).
+const QMZ_QA_TWO_LETTER_TYPES = ['MZ', 'AQ'];
+const QMZ_QA_ONE_LETTER_TYPES = ['Q', 'M', 'Z', 'O'];
+
+/**
+ * Parses a raw Quick Assign input string into { number, suffix, type } — purely a string-
+ * shaping step (mirrors the established _qprSplitSequenceInput precedent elsewhere in this
+ * file: syntax parsing only, never the authoritative accept/reject decision). `type` is null
+ * when the operator typed a number (optionally with a suffix) but no type letter at all —
+ * that is resolved against the live sequence list by _qmzQaResolve, never guessed here.
+ *
+ * The 2-letter type alternatives are checked BEFORE the 1-letter ones specifically to avoid
+ * a real ambiguity: a naive "take one trailing letter as an optional suffix, then whatever's
+ * left as the type" parse would misread "06AQ" as suffix="a"+type="Q" (wrong — "06AQ" has NO
+ * suffix, type is "AQ") the moment a 1-letter type alternative is tried first and happens to
+ * match the tail. Checking the 2-letter alternatives first and taking the first one that
+ * matches the string's actual tail resolves this correctly for every case traced through
+ * ("06AQ", "05MZ", "03aAQ", "12aM", "25Z", "03a", "04", ...).
+ */
+function _qmzQaParseInput(raw) {
+  const s = String(raw ?? '').trim();
+  if (!s) return null;
+  const upper = s.toUpperCase();
+  let type = null, rest = s;
+  for (const t of QMZ_QA_TWO_LETTER_TYPES) {
+    if (upper.length > 2 && upper.endsWith(t) && /^[A-Za-z]{2}$/.test(s.slice(-2))) { type = t; rest = s.slice(0, -2); break; }
+  }
+  if (!type) {
+    for (const t of QMZ_QA_ONE_LETTER_TYPES) {
+      if (upper.endsWith(t) && /^[A-Za-z]$/.test(s.slice(-1))) { type = t; rest = s.slice(0, -1); break; }
+    }
+  }
+  const m = /^(\d{1,2})([A-Za-z]?)$/.exec(rest);
+  if (!m) return null;
+  const number = parseInt(m[1], 10);
+  const suffix = (m[2] || '').toLowerCase();
+  return { number, suffix, type };
+}
+
+/**
+ * Resolves a parsed { number, suffix, type } against the live, authoritative
+ * _qmzData.sequences list (the SAME source of truth the sidebar's chip list and
+ * _qmzHandleAssignByNumber's own chooser already use — never a separate/cached copy).
+ * Suffix matching is independent of type (4E): filtering by (number, suffix) alone, before
+ * ever looking at type, is what makes "03a" resolve to whichever single type occupies that
+ * exact insertion position, regardless of which type that happens to be. Multiple matches
+ * can only occur when suffix is empty (a bare number may host more than one type — e.g.
+ * "03Q" and "03M" coexisting — the insertion-position duplicate-prevention feature already
+ * guarantees a non-empty suffix position can never have more than one occupant).
+ * @returns {{kind:'invalid'}|{kind:'notfound'}|{kind:'exact',code,seq}|{kind:'ambiguous',matches}}
+ */
+function _qmzQaResolve(raw) {
+  const parsed = _qmzQaParseInput(raw);
+  if (!parsed) return { kind: 'invalid' };
+  const sequences = _qmzData?.sequences || [];
+  const bySuffix = sequences.filter(s => s.number === parsed.number && s.suffix === parsed.suffix);
+  if (parsed.type) {
+    const exact = bySuffix.find(s => s.letter === parsed.type);
+    return exact ? { kind: 'exact', code: exact.code, seq: exact } : { kind: 'notfound' };
+  }
+  if (bySuffix.length === 0) return { kind: 'notfound' };
+  if (bySuffix.length === 1) return { kind: 'exact', code: bySuffix[0].code, seq: bySuffix[0] };
+  return { kind: 'ambiguous', matches: bySuffix };
+}
+
+function _qmzQaSelectedCount() { return _qmzSelectedFiles.size; }
+
+// 2A — activation conditions. Mirrors the existing QMZ-scoped "S" shortcut's own guard
+// shape (same keydown handler, same early-return-when-editable convention) plus the
+// feature-specific checks this brief requires (selection non-empty, no nested modal open,
+// no move already in flight).
+function _qmzCanOpenQuickAssign() {
+  if (!_qmzOpen) return false;
+  if (_qmzQaOpen || _qmzAssignInFlight) return false;
+  if (_qprOpen || _previewOpen) return false;
+  if (_isAnyBlockingOverlayOpen()) return false;
+  if (!_qmzSelectedFiles.size) return false;
+  if (_isEditableTarget(document.activeElement)) return false;
+  return true;
+}
+
+function _qmzOpenQuickAssign() {
+  if (!_qmzCanOpenQuickAssign()) return;
+  _qmzQaFocusReturnEl = document.activeElement;
+  _qmzQaMatches = [];
+  _qmzQaActiveMatchIndex = 0;
+  const overlay = document.getElementById('qmzQuickAssignOverlay');
+  const input   = document.getElementById('qmzQaInput');
+  const count   = document.getElementById('qmzQaCount');
+  if (!overlay || !input) return;
+  const n = _qmzQaSelectedCount();
+  if (count) count.textContent = `${n} photograph${n === 1 ? '' : 's'} selected`;
+  input.value = '';
+  input.classList.remove('qmz-qa-input-error');
+  _qmzQaRenderPreview({ kind: 'invalid' }, '');
+  overlay.classList.remove('hidden');
+  _qmzQaOpen = true;
+  // Focus synchronously; a 0ms timeout guarantees focus lands after the overlay's own
+  // `hidden` class removal has been applied (display:none -> flex), matching the pattern
+  // already used elsewhere in this file for focusing an element in a just-shown container.
+  input.focus();
+  setTimeout(() => input.focus(), 0);
+}
+
+function _qmzCloseQuickAssign() {
+  const overlay = document.getElementById('qmzQuickAssignOverlay');
+  if (overlay) overlay.classList.add('hidden');
+  _qmzQaOpen = false;
+  _qmzQaMatches = [];
+  _qmzQaActiveMatchIndex = 0;
+  // Restore focus to wherever it was before Quick Assign opened (5B/Phase 8 — focus must
+  // never stay trapped inside a now-hidden popup); fall back to the file grid itself if the
+  // original element is gone (e.g. a re-render replaced it).
+  const fallback = document.getElementById('qmzFileGrid');
+  const target = (_qmzQaFocusReturnEl && document.contains(_qmzQaFocusReturnEl)) ? _qmzQaFocusReturnEl : fallback;
+  _qmzQaFocusReturnEl = null;
+  target?.focus?.();
+}
+
+function _qmzQaRenderMatches() {
+  const el = document.getElementById('qmzQaMatches');
+  if (!el) return;
+  if (!_qmzQaMatches.length) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+  el.classList.remove('hidden');
+  el.innerHTML = _qmzQaMatches.map((s, i) => `
+    <div class="qmz-qa-match${i === _qmzQaActiveMatchIndex ? ' qmz-active' : ''}" data-qa-index="${i}" role="option" aria-selected="${i === _qmzQaActiveMatchIndex}">
+      <span>${escapeHtml(s.code)}</span><span class="qmz-qa-match-type">${escapeHtml(s.type)}</span>
+    </div>`).join('');
+}
+
+// Live preview — re-resolves on every keystroke so the operator always sees the TRUE
+// current state (3B/4F: never a stale/cached count or destination), including an inline
+// "not found" message before Enter is ever pressed.
+function _qmzQaRenderPreview(resolution, raw) {
+  const previewEl = document.getElementById('qmzQaPreview');
+  const inputEl   = document.getElementById('qmzQaInput');
+  if (!previewEl) return;
+  inputEl?.classList.remove('qmz-qa-input-error');
+  previewEl.classList.remove('qmz-qa-error-text');
+  if (!raw) { previewEl.textContent = ''; _qmzQaMatches = []; _qmzQaRenderMatches(); return; }
+  switch (resolution.kind) {
+    case 'exact':
+      previewEl.textContent = `${resolution.code} — ${resolution.seq.type}`;
+      _qmzQaMatches = [];
+      _qmzQaRenderMatches();
+      break;
+    case 'ambiguous':
+      previewEl.textContent = 'Multiple matches — choose one';
+      _qmzQaMatches = resolution.matches;
+      _qmzQaActiveMatchIndex = 0;
+      _qmzQaRenderMatches();
+      break;
+    case 'notfound': {
+      const parsed = _qmzQaParseInput(raw);
+      const shown = parsed ? `${String(parsed.number).padStart(2, '0')}${parsed.suffix}` : raw;
+      previewEl.textContent = `Sequence ${shown} not found.`;
+      previewEl.classList.add('qmz-qa-error-text');
+      inputEl?.classList.add('qmz-qa-input-error');
+      _qmzQaMatches = [];
+      _qmzQaRenderMatches();
+      break;
+    }
+    default:
+      previewEl.textContent = 'Invalid sequence format.';
+      previewEl.classList.add('qmz-qa-error-text');
+      inputEl?.classList.add('qmz-qa-input-error');
+      _qmzQaMatches = [];
+      _qmzQaRenderMatches();
+  }
+}
+
+function _qmzQaHandleInput() {
+  const raw = document.getElementById('qmzQaInput')?.value || '';
+  _qmzQaRenderPreview(_qmzQaResolve(raw), raw);
+}
+
+function _qmzQaSetBusy(busy) {
+  const popup = document.querySelector('#qmzQuickAssignOverlay .qmz-qa-popup');
+  const input = document.getElementById('qmzQaInput');
+  popup?.classList.toggle('qmz-qa-busy', busy);
+  if (input) input.disabled = busy;
+}
+
+// 5A/6A-6C — Enter submission. Resolves the destination fresh (never trusts a result cached
+// from an earlier keystroke), revalidates it still exists immediately before assigning
+// (4F — a sequence could in principle have been removed between resolution and submission),
+// invokes the one shared engine, and WAITS for its real result before deciding what to do —
+// never treats dispatching the IPC call itself as success.
+async function _qmzQaHandleSubmit() {
+  if (_qmzAssignInFlight) return; // 5C — no duplicate/overlapping submissions
+  const raw = document.getElementById('qmzQaInput')?.value || '';
+  const resolution = _qmzQaResolve(raw);
+
+  let code = null;
+  if (resolution.kind === 'exact') {
+    code = resolution.code;
+  } else if (resolution.kind === 'ambiguous') {
+    const chosen = _qmzQaMatches[_qmzQaActiveMatchIndex];
+    if (chosen) code = chosen.code;
+  }
+  if (!code) { _qmzQaRenderPreview(resolution, raw); return; } // 4C/4D — never guess; keep popup open
+
+  if (!_qmzSelectedFiles.size) { _qmzCloseQuickAssign(); return; } // defensive — selection vanished underneath the popup
+
+  // Revalidate immediately before assigning (4F) — the destination must still exist in the
+  // live, current scan, not just at the moment it was first resolved.
+  const stillExists = (_qmzData?.sequences || []).some(s => s.code === code);
+  if (!stillExists) { _qmzQaRenderPreview({ kind: 'notfound' }, raw); return; }
+
+  _qmzAssignInFlight = true;
+  _qmzQaSetBusy(true);
+  try {
+    const result = await _qmzAssignToSequence(code);
+    if (result.attempted && result.errorTotal === 0 && result.movedTotal > 0) {
+      _qmzCloseQuickAssign(); // 6A — complete success only
+    } else {
+      // 6B/6C — complete or partial failure: report accurately, keep the popup open and
+      // usable for correction/retry, never claim success. _qmzAssignToSequence's own
+      // _qmzSetStatus call already reported the authoritative moved/error counts; Quick
+      // Assign's own preview mirrors that outcome inline too.
+      const previewEl = document.getElementById('qmzQaPreview');
+      if (previewEl) {
+        previewEl.textContent = result.movedTotal > 0
+          ? `Moved ${result.movedTotal}, ${result.errorTotal} failed — selection kept for retry`
+          : `Assignment failed (${result.errorTotal} error${result.errorTotal === 1 ? '' : 's'})`;
+        previewEl.classList.add('qmz-qa-error-text');
+      }
+      // The selected-count display must reflect the CURRENT selection (failed files remain
+      // selected — see _qmzAssignToSequence's own comment), not the count at popup-open time.
+      const countEl = document.getElementById('qmzQaCount');
+      if (countEl) { const n = _qmzQaSelectedCount(); countEl.textContent = `${n} photograph${n === 1 ? '' : 's'} selected`; }
+    }
+  } finally {
+    _qmzAssignInFlight = false;
+    _qmzQaSetBusy(false);
+  }
+}
+
+function _qmzQaHandleKeydown(e) {
+  // stopPropagation on Escape specifically — without it, this element's own 'keydown' fires
+  // first (capture/target phase), but the event then bubbles to document's OWN Escape
+  // handler (which closes the whole QMZ workspace whenever `_qmzOpen && !_previewOpen`),
+  // closing the entire workspace in the same keystroke instead of just this popup (5B:
+  // "Escape must not accidentally close the entire QMZ workspace").
+  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); _qmzCloseQuickAssign(); return; }
+  if (e.key === 'ArrowDown' && _qmzQaMatches.length) {
+    e.preventDefault();
+    _qmzQaActiveMatchIndex = Math.min(_qmzQaActiveMatchIndex + 1, _qmzQaMatches.length - 1);
+    _qmzQaRenderMatches();
+    return;
+  }
+  if (e.key === 'ArrowUp' && _qmzQaMatches.length) {
+    e.preventDefault();
+    _qmzQaActiveMatchIndex = Math.max(_qmzQaActiveMatchIndex - 1, 0);
+    _qmzQaRenderMatches();
+    return;
+  }
+  if (e.key === 'Enter') { e.preventDefault(); _qmzQaHandleSubmit(); return; }
+}
+
 async function _qmzHandleMoveToUnsequenced() {
   if (!_qmzRoot || !_qmzSelectedFiles.size) return;
   const wasSinglePgSequenceView = _qmzViewScope === 'sequence' && !!_qmzActivePg;
@@ -11141,6 +11419,28 @@ function _qprRenderCreateResults(resp, section) {
 
   // Stage 4 — manual Enroute creation, independent of PDF import.
   document.getElementById('qmzCreateEnrouteBtn')?.addEventListener('click', _qmzHandleCreateEnroute);
+
+  // "QMZ Sorting Workflow Optimization" — Quick Assign popup wiring.
+  document.getElementById('qmzQaInput')?.addEventListener('input', _qmzQaHandleInput);
+  document.getElementById('qmzQaInput')?.addEventListener('keydown', _qmzQaHandleKeydown);
+  // Clicking a candidate in the ambiguous-match list selects AND immediately submits it —
+  // the operator doesn't need to click once to highlight, then press Enter separately.
+  document.getElementById('qmzQaMatches')?.addEventListener('click', (e) => {
+    const row = e.target.closest('.qmz-qa-match');
+    if (!row) return;
+    const idx = parseInt(row.dataset.qaIndex, 10);
+    if (Number.isInteger(idx) && _qmzQaMatches[idx]) {
+      _qmzQaActiveMatchIndex = idx;
+      _qmzQaHandleSubmit();
+    }
+  });
+  // Clicking the backdrop (not the popup itself) cancels, same as Escape — standard
+  // click-outside-to-dismiss, never triggered by a click inside the popup bubbling up
+  // (the popup's own click handler below stops that propagation).
+  document.getElementById('qmzQuickAssignOverlay')?.addEventListener('click', (e) => {
+    if (e.target.id === 'qmzQuickAssignOverlay') _qmzCloseQuickAssign();
+  });
+  document.querySelector('#qmzQuickAssignOverlay .qmz-qa-popup')?.addEventListener('click', (e) => e.stopPropagation());
 
   // Escape closes the overlay — but not while QMZ's own preview is open on top
   // of it; the preview keyboard handler owns Escape in that case (closes the
@@ -15361,11 +15661,22 @@ document.addEventListener('keydown', e => {
   const tag = document.activeElement?.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
-  // QMZ mode: S focuses the assign input; Cmd+G is blocked.
+  // QMZ mode: S focuses the assign input; A opens Quick Assign (2A/2B — "QMZ Sorting
+  // Workflow Optimization"); Cmd+G is blocked.
   if (_qmzOpen) {
     if (e.key === 's' && !(e.metaKey || e.ctrlKey || e.altKey)) {
       e.preventDefault();
       document.getElementById('qmzAssignInput')?.focus();
+    }
+    // The tag-only check above (line ~15634) already excludes INPUT/TEXTAREA/SELECT focus
+    // (including Quick Assign's own input while open, preventing re-triggering mid-typing —
+    // "Repeatedly pressing A must not open multiple popup instances"); _isEditableTarget()
+    // additionally excludes contenteditable, which that tag-only check does not cover.
+    // _qmzOpenQuickAssign() itself re-checks every other 2A activation condition (selection
+    // non-empty, no nested PDF-review/preview modal, no move in flight) before doing anything.
+    if (e.key === 'a' && !(e.metaKey || e.ctrlKey || e.altKey) && !_isEditableTarget(document.activeElement)) {
+      e.preventDefault();
+      _qmzOpenQuickAssign();
     }
     if ((e.metaKey || e.ctrlKey) && e.key === 'g') e.preventDefault();
     return;
