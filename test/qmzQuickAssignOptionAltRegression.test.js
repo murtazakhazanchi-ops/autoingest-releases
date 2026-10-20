@@ -216,6 +216,34 @@ async function mkTmp(prefix) { return fsp.mkdtemp(path.join(os.tmpdir(), prefix)
   check(!(await qaIsOpen()), '13. Option/Alt+A does not open Quick Assign while a real text field is focused');
   await window.evaluate(() => { const el = document.getElementById('qmzAssignInput'); if (el) el.value = ''; el?.blur(); });
 
+  // ═══════════════ 7B. Stale focus from an EARLIER unrelated text field, released by a TILE
+  // click (not the checkbox) — the actual real-operator failure found after shipping the
+  // checkbox-focus and Option/Alt+A fixes. Clicking a photo TILE is the larger, more natural
+  // selection target, but unlike the checkbox it never moved focus — so any stale focus left
+  // in ANY earlier text field (sequence number, search, anything) silently blocked the
+  // shortcut even though the file was genuinely selected. ═══════════════
+  log('=== Stale focus from an unrelated field, released by clicking a photo tile ===');
+  await window.evaluate(() => { _qmzSelectedFiles.clear(); _qmzSyncAllTiles(); });
+  await window.waitForTimeout(100);
+  await window.click('#qmzSeqNumInput');
+  await window.waitForTimeout(100);
+  // Click the TILE BODY, not the checkbox — dispatched directly on the tile element itself
+  // so the click genuinely lands outside the checkbox, exactly like a real operator clicking
+  // anywhere on the photo rather than precisely on its small checkbox corner.
+  await window.evaluate(() => {
+    const tile = document.querySelector('#qmzFileGrid .file-tile[data-path]');
+    tile?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  });
+  await window.waitForTimeout(150);
+  const selAfterTileClick = await window.evaluate(() => _qmzSelectedFiles.size);
+  check(selAfterTileClick === 1, `setup: clicking the tile body genuinely selects the file (got ${selAfterTileClick})`);
+  const activeAfterTileClick = await window.evaluate(() => document.activeElement?.tagName);
+  check(activeAfterTileClick !== 'INPUT', `14. clicking a tile releases stale focus from an earlier text field (activeElement is now ${activeAfterTileClick})`);
+  await pressOptAltA();
+  check(await qaIsOpen(), '15. Option/Alt+A opens Quick Assign after selecting via a tile click, even though an unrelated field was focused beforehand');
+  await qaClose();
+  await window.evaluate(() => { const el = document.getElementById('qmzSeqNumInput'); if (el) el.value = ''; });
+
   // ═══════════════ 8. Duplicate-popup / existing-shortcut safety ═══════════════
   log('=== Duplicate popup + existing shortcuts unaffected ===');
   // Clear any leftover selection from earlier steps first — clicking an already-checked
@@ -229,7 +257,7 @@ async function mkTmp(prefix) { return fsp.mkdtemp(path.join(os.tmpdir(), prefix)
   check(await qaIsOpen(), 'setup: popup open for duplicate-instance check');
   await pressOptAltA();
   const stillOneOverlay = await window.evaluate(() => document.querySelectorAll('#qmzQuickAssignOverlay').length);
-  check(stillOneOverlay === 1 && (await qaIsOpen()), '14. repeated Option/Alt+A does not create duplicate popup instances');
+  check(stillOneOverlay === 1 && (await qaIsOpen()), '16. repeated Option/Alt+A does not create duplicate popup instances');
   await qaClose();
 
   // Existing "S" shortcut (focus sidebar assign input) must still work bare, unaffected.
@@ -237,10 +265,10 @@ async function mkTmp(prefix) { return fsp.mkdtemp(path.join(os.tmpdir(), prefix)
   await window.keyboard.press('s');
   await window.waitForTimeout(200);
   const assignFocused = await window.evaluate(() => document.activeElement?.id === 'qmzAssignInput');
-  check(assignFocused, '15. existing bare "S" shortcut (focus sidebar assign input) still works, unaffected by this change');
+  check(assignFocused, '17. existing bare "S" shortcut (focus sidebar assign input) still works, unaffected by this change');
   await window.evaluate(() => document.getElementById('qmzAssignInput')?.blur());
 
-  check(consoleErrors.length === 0, `16. no console/page errors occurred (found: ${JSON.stringify(consoleErrors)})`);
+  check(consoleErrors.length === 0, `18. no console/page errors occurred (found: ${JSON.stringify(consoleErrors)})`);
 
   log(failures === 0 ? 'ALL CHECKS PASSED' : `${failures} CHECK(S) FAILED`);
   await electronApp.close();

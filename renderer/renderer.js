@@ -11388,6 +11388,18 @@ function _qprRenderCreateResults(resp, section) {
     if (e.target.type === 'checkbox') return;  // handled by the change listener below
     const tile = e.target.closest('.file-tile');
     if (!tile || !tile.dataset.path) return;
+    // "AutoIngest — Fix Quick Assign Shortcut (Option/Alt + A)" follow-up: unlike clicking the
+    // checkbox (which naturally takes focus), clicking the TILE BODY — the much larger, more
+    // natural click target covering the whole photo — never moves document.activeElement at
+    // all. In a real operator session, focus can be anywhere from an earlier interaction (the
+    // sequence-number field, a search box, anything), and tile clicks left it there
+    // indefinitely, silently blocking the editable-target guard for EVERY keyboard shortcut
+    // afterward even though selection itself was working correctly — confirmed live: selecting
+    // via tile click while #qmzSeqNumInput was previously focused left activeElement on that
+    // input, and Option/Alt+A did nothing. Blurring any stale editable focus here, exactly
+    // like a real click on real content should, fixes this independently of which element the
+    // operator actually clicks to select a file.
+    if (_isEditableTarget(document.activeElement)) document.activeElement.blur();
     _qmzHandleTileClick(tile.dataset.path, e.shiftKey);
   });
   document.getElementById('qmzFileGrid')?.addEventListener('change', e => {
