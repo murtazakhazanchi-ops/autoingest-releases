@@ -407,6 +407,138 @@ let _parse;
     assert.ok(!serialized.includes('Secret Person Name'), 'the Name column\'s free text must never appear anywhere in the parser output');
   });
 
+  // ═══════════════════ GROUP G — real operator report: "AutoIngest — QMZ PDF Import Missing
+  // Sequences". Root-caused against a real QMZ program PDF (not committed — contains real
+  // names/phone numbers/ITS IDs; verified live, uncommitted, during development, same
+  // discipline as the two original reference PDFs this file's own header describes): a
+  // left-margin grouping label spanning several consecutive rows (shared accommodation, e.g.
+  // "Fakhri Heights"/"Same Building") can carry its own text item positioned LEFT of the
+  // table's sequence-number column. Its Y-coordinate clustered with one specific data row,
+  // became that row's leftmost item, and corrupted sequence extraction — silently losing a
+  // real, numbered entry. These fixtures reproduce the exact STRUCTURAL shape with synthetic
+  // names only. ═══════════════════
+  console.log('=== GROUP G: left-margin label collision (real operator report) ===');
+  await t('G1: a left-margin label sharing a row\'s Y-coordinate does not lose that row\'s sequence', async () => {
+    const y = HEADER_Y - ROW_H * 3;
+    const pdf = makeSyntheticPdf([
+      ...headerRow(HEADER_Y),
+      ...dataRow(HEADER_Y - ROW_H * 1, '1', 'Person One', 'Q', 'TCA-0001'),
+      ...dataRow(HEADER_Y - ROW_H * 2, '2', 'Person Two', 'Q', 'TCA-0002'),
+      { text: 'Fakhri Heights', x: COL.no - 15, y }, // the intruding margin label — same Y as row 3
+      ...dataRow(y, '3', 'Person Three', 'Q', 'TCA-0003'),
+      ...dataRow(HEADER_Y - ROW_H * 4, '4', 'Person Four', 'Q', 'TCA-0004'),
+    ]);
+    const r = await _parse(pdf);
+    assert.deepStrictEqual(r.sections[0].entries.map(e => e.folderName), ['01Q', '02Q', '03Q', '04Q'],
+      'the label-collided row (03Q) must not be lost');
+  });
+  await t('G2: a margin label spanning MULTIPLE consecutive rows loses none of them', async () => {
+    // Matches the real document exactly: one label ("Fakhri Heights") visually spans rows
+    // 11-14 but its own text anchor only actually collided with row 14; a second label ("Same
+    // Building") spans rows 29-31 but only actually collided with row 30. Reproduced here as
+    // two separate labels, each colliding with a different row in a short run.
+    const rows = [1, 2, 3, 4, 5].map(n => HEADER_Y - ROW_H * n);
+    const pdf = makeSyntheticPdf([
+      ...headerRow(HEADER_Y),
+      ...dataRow(rows[0], '1', 'Person One', 'Q', 'TCA-0001'),
+      { text: 'Group Label A', x: COL.no - 15, y: rows[1] },
+      ...dataRow(rows[1], '2', 'Person Two', 'Q', 'TCA-0002'),
+      ...dataRow(rows[2], '3', 'Person Three', 'Q', 'TCA-0003'),
+      { text: 'Group Label B', x: COL.no - 15, y: rows[3] },
+      ...dataRow(rows[3], '4', 'Person Four', 'M', 'TCA-0004'),
+      ...dataRow(rows[4], '5', 'Person Five', 'Q', 'TCA-0005'),
+    ]);
+    const r = await _parse(pdf);
+    assert.deepStrictEqual(r.sections[0].entries.map(e => e.folderName), ['01Q', '02Q', '03Q', '04M', '05Q']);
+  });
+  await t('G3: the FINAL numbered row, immediately followed by an unnumbered trailing note, is retained', async () => {
+    // Matches the real document exactly: the last numbered row (31M) sits directly above an
+    // unnumbered closing note ("Haveli (Madrasa program)") with no number of its own.
+    const pdf = buildTable([
+      y => dataRow(y, '1', 'Person One', 'Q', 'TCA-0001'),
+      y => dataRow(y, '2', 'Person Two', 'M', 'TCA-0002'),
+      y => bannerRow(y, 'Closing Note (Unnumbered)'),
+    ]);
+    const r = await _parse(pdf);
+    assert.deepStrictEqual(r.sections[0].entries.map(e => e.folderName), ['01Q', '02M'],
+      'the final numbered row (02M) must survive even with a trailing unnumbered note directly beneath it');
+  });
+  await t('G4: a numeric-looking token elsewhere on an UNNUMBERED row is never misread as a sequence number', () => {
+    // The exact false-positive this module's own dual geometry+content check exists to avoid:
+    // a travel-time-shaped cell ("1 min") sitting in a LATER column, on a row with no real
+    // leading sequence number, must not be picked up as "sequence 1".
+    const y = HEADER_Y - ROW_H;
+    const row = [
+      { text: 'Closing Note', x: COL.no + 60, y },
+      { text: '1 min', x: COL.code + 40, y }, // far right of the table — not near the sequence column
+    ];
+    const pdf = makeSyntheticPdf([...headerRow(HEADER_Y), ...row]);
+    return _parse(pdf).then(r => {
+      assert.equal(r.sections.length === 0 ? 0 : r.sections[0].entries.length, 0,
+        'no entry must be fabricated from an unrelated numeric-looking cell');
+    });
+  });
+  await t('G5: a genuinely ambiguous row (looks like it might be lost data) is reported, not silently dropped', async () => {
+    // A row containing both a number-shaped token AND a recognized Sharaf-type token as
+    // separate words, but that still does not resolve to a real data row through normal
+    // classification — flagged as excludedRows reason 'ambiguous-banner' rather than being
+    // absorbed as an ordinary section label or vanishing with no trace at all.
+    const y = HEADER_Y - ROW_H;
+    const pdf = makeSyntheticPdf([...headerRow(HEADER_Y), { text: 'Unclear 14 Q Entry', x: COL.no + 60, y }]);
+    const r = await _parse(pdf);
+    assert.ok(r.sections[0].excludedRows.some(x => x.reason === 'ambiguous-banner'),
+      'an ambiguous row containing both a number and a type token must be reported, not silently absorbed');
+  });
+  await t('G6: numbering gaps within a section are detected and reported for operator review', async () => {
+    const pdf = buildTable([
+      y => dataRow(y, '1', 'Person One', 'Q', 'TCA-0001'),
+      y => dataRow(y, '2', 'Person Two', 'Q', 'TCA-0002'),
+      y => dataRow(y, '5', 'Person Five', 'M', 'TCA-0005'), // 3 and 4 missing
+    ]);
+    const r = await _parse(pdf);
+    assert.deepStrictEqual(r.sections[0].numberingGaps, [3, 4]);
+    assert.ok(r.sections[0].warnings.some(w => w.reason === 'numbering-gap' && JSON.stringify(w.missingNumbers) === JSON.stringify([3, 4])));
+  });
+  await t('G7: no numbering-gap warning when the section is genuinely contiguous', async () => {
+    const pdf = buildTable([
+      y => dataRow(y, '1', 'Person One', 'Q', 'TCA-0001'),
+      y => dataRow(y, '2', 'Person Two', 'Q', 'TCA-0002'),
+      y => dataRow(y, '3', 'Person Three', 'M', 'TCA-0003'),
+    ]);
+    const r = await _parse(pdf);
+    assert.deepStrictEqual(r.sections[0].numberingGaps, []);
+    assert.ok(!r.sections[0].warnings.some(w => w.reason === 'numbering-gap'));
+  });
+  await t('G8: a suffixed entry (e.g. "3a") shares its base number with "3" and is never itself a gap', async () => {
+    const pdf = buildTable([
+      y => dataRow(y, '1', 'Person One', 'Q', 'TCA-0001'),
+      y => dataRow(y, '2', 'Person Two', 'Q', 'TCA-0002'),
+      y => dataRow(y, '3', 'Person Three', 'Q', 'TCA-0003'),
+      y => dataRow(y, '3a', 'Person Three A', 'MZ', 'TCA-0004'),
+      y => dataRow(y, '4', 'Person Four', 'M', 'TCA-0005'),
+    ]);
+    const r = await _parse(pdf);
+    assert.deepStrictEqual(r.sections[0].numberingGaps, []);
+  });
+  await t('G9: a wrapped/multi-line name (its own text lands in a separate Y-cluster) never loses the row\'s sequence', async () => {
+    // A real reference PDF can render a long Name across two slightly different Y baselines
+    // within the same logical row — confirmed directly against the real document. The
+    // sequence number and Sharaf type, on the row's own primary baseline, must still resolve
+    // correctly regardless of where the wrapped name fragment landed.
+    const y = HEADER_Y - ROW_H;
+    const pdf = makeSyntheticPdf([
+      ...headerRow(HEADER_Y),
+      { text: '1', x: COL.no, y },
+      { text: 'Q', x: COL.sharaf, y },
+      { text: 'TCA-0001', x: COL.code, y },
+      { text: 'Wrapped Second Line Of Name', x: COL.name, y: y - 4.9 }, // within a DIFFERENT row's cluster
+      ...dataRow(y - ROW_H, '2', 'Person Two', 'Q', 'TCA-0002'),
+    ]);
+    const r = await _parse(pdf);
+    assert.ok(r.sections[0].entries.some(e => e.folderName === '01Q'), 'sequence 1 must survive a wrapped name fragment');
+    assert.ok(r.sections[0].entries.some(e => e.folderName === '02Q'), 'the following row must also be unaffected');
+  });
+
   console.log(`\n${passed} check(s) passed.`);
   if (process.exitCode) console.log('SOME CHECKS FAILED');
   process.exit(process.exitCode || 0);

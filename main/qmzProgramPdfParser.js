@@ -205,24 +205,61 @@ function _bucketRow(row, columns) {
  *   { kind: 'banner', text }
  *   { kind: 'continuation' }
  */
-// The sequence-number value is extracted directly from the ROW's own leading (leftmost) raw
-// text item, not from a bucketed "sequence column" cell — verified necessary against the real
-// reference PDF: its Name column is visually CENTER-aligned, so a longer name can start
-// further left than a shorter one, in some rows sitting closer to the sequence-number column's
-// own header position than to "Name"'s (no column-boundary geometry, however derived, can
-// cleanly separate a center-aligned column from its neighbor on both sides at once). The
-// sequence number, however, is reliably always the FIRST thing on the row — merged with
-// trailing name text in that same item or not — so this takes the leading
-// digit(s)+optional-letter token off the row's own first item and ignores everything after it
-// (the rest is always irrelevant Name content, the confirmed product decision).
-function _extractLeadingSequence(row) {
-  if (!row.items.length) return null;
-  const m = /^(\d{1,2}[a-zA-Z]?)\b/.exec(row.items[0].str.trim());
-  return m ? m[1] : null;
+// The sequence-number value is extracted from whichever of the ROW's own items geometrically
+// belongs to the sequence-number column (nearest-neighbor by X against every column header,
+// the same rule _bucketRow already uses) AND whose text itself starts with a sequence-number
+// shape — never from a bucketed cell's already-joined text, and never from row.items[0] alone.
+// Two real-world failure modes, both confirmed directly against real QMZ program PDFs, forced
+// this dual (geometry AND content) rule rather than either signal alone:
+//
+//  1. Geometry alone is not enough: a real PDF's Name column is visually CENTER-aligned, so a
+//     longer name can start further left than a shorter one, in some rows sitting closer to
+//     the sequence column's own header X than to "Name"'s — a pure column-bucket lookup can
+//     pick up a half-name "cell" that isn't usefully a sequence number, so this still only
+//     reads a LEADING digit/letter token off whichever matching item it settles on and ignores
+//     the rest (the trailing Name content), exactly like the original design already did.
+//  2. Content alone is not enough either: a real PDF's left-margin grouping label (e.g.
+//     "Fakhri Heights" or "Same Building", spanning several consecutive rows by shared
+//     accommodation) can carry its own text item positioned LEFT of the table's sequence
+//     column — confirmed directly: its Y-coordinate happened to cluster with one specific data
+//     row, becoming the row's leftmost item. Scanning every item for "the first one whose text
+//     starts with digits" is fooled the OTHER way by an unrelated numeric-looking cell
+//     elsewhere on the same row (e.g. a "1 min" travel-time cell, far to the right, on an
+//     otherwise unnumbered informational row) — confirmed directly to false-positive a
+//     "sequence number 1" out of a travel-time annotation when only content was checked.
+//
+// Requiring BOTH — the item's nearest column is the sequence column, AND its own text starts
+// with a digit — resolves both generically, without hardcoding any particular label text,
+// travel-time wording, or this specific document's layout: a margin label sits far enough left
+// of the sequence column's header to bucket into IT (not Name), but its text never looks like
+// a number, so it's skipped in favor of the row's real leading "14"/"31"/etc.; an unrelated
+// numeric-looking cell elsewhere (Cards count, travel time, phone number, GPS code) sits near
+// ITS OWN column, never nearest to the sequence column, so it's never even considered.
+function _extractLeadingSequence(row, columns) {
+  // `columns` is optional — callers that only have row.items (e.g. direct unit tests of
+  // _classifyRow's Sharaf-type recognition, which construct a minimal stub layout with no
+  // real column geometry) still get a usable, if less precise, result: fall back to "first
+  // item whose own text starts with a digit shape," skipping this function's real geometric
+  // disambiguation. Every actual PDF-parsing call path (via _classifyRow during real
+  // document parsing) always supplies real columns from _locateColumns.
+  const hasColumns = Array.isArray(columns) && columns.length > 0;
+  for (const item of row.items) {
+    if (hasColumns) {
+      let nearestIdx = 0, nearestDist = Infinity;
+      for (let i = 0; i < columns.length; i++) {
+        const d = Math.abs(item.x - columns[i].x);
+        if (d < nearestDist) { nearestDist = d; nearestIdx = i; }
+      }
+      if (nearestIdx !== 0) continue; // sequence number is always the table's leftmost column (index 0)
+    }
+    const m = /^(\d{1,2}[a-zA-Z]?)\b/.exec(item.str.trim());
+    if (m) return m[1];
+  }
+  return null;
 }
 
 function _classifyRow(row, cells, layout) {
-  const sequenceRaw = _extractLeadingSequence(row) || '';
+  const sequenceRaw = _extractLeadingSequence(row, layout.columns) || '';
   const sharaf       = (cells[layout.sharafIndex] || '').trim().toUpperCase();
   const addressText  = layout.addressIndex >= 0 ? (cells[layout.addressIndex] || '').trim() : '';
   const codeText      = layout.codeIndex >= 0 ? (cells[layout.codeIndex] || '').trim() : '';
@@ -250,8 +287,24 @@ function _classifyRow(row, cells, layout) {
   // Bs Incharge/Travel Time/Address populated) is an ordinary continuation row for the
   // person above — the common case, intentionally low-noise.
   const leadingText = cells.slice(0, layout.sharafIndex + 1).join(' ').trim();
-  if (leadingText) return { kind: 'banner', text: leadingText };
+  if (leadingText) return { kind: 'banner', text: leadingText, ambiguous: _isAmbiguousBanner(leadingText) };
   return { kind: 'continuation' };
+}
+
+// A banner is flagged ambiguous — reported to the operator rather than silently dropped —
+// when its own leading text contains BOTH a standalone sequence-number-shaped token and a
+// standalone recognized Sharaf-type token, as SEPARATE words. A genuine itinerary/activity
+// banner ("Waaz (Dhrangadhra Masjid)", "Ziyarat - Syedi...") never happens to contain both of
+// those together; a real numbered data row that still ends up misclassified as a banner for
+// some reason this module's own geometry/content checks did not anticipate (a different PDF
+// layout quirk than the ones already fixed) very plausibly still does, since its own number
+// and type text are still present somewhere in the row. Defense in depth, not the primary
+// fix — never hardcodes a specific label string or document layout.
+function _isAmbiguousBanner(text) {
+  const words = text.split(/\s+/);
+  const hasSeqToken = words.some(w => SEQUENCE_RAW_RE.test(w));
+  const hasTypeToken = words.some(w => SHARAF_TYPES.has(w.toUpperCase()));
+  return hasSeqToken && hasTypeToken;
 }
 
 // ── Sequence normalization — delegates to qmzService.js, never reimplements the model ────
@@ -349,7 +402,15 @@ function _detectSections(rowRecords) {
 
   for (const rec of rowRecords) {
     if (rec.row.kind === 'banner') {
-      if (isBareBannerLabel(rec.row.text)) pendingLabel = rec.row.text;
+      // An ambiguous banner (see _isAmbiguousBanner) is reported to the operator instead of
+      // being silently absorbed as a label or dropped — it may be a real numbered row this
+      // module's own checks still failed to recognize on some PDF layout not yet seen.
+      if (rec.row.ambiguous) {
+        if (!current) startSection();
+        current.excludedRows.push({ sourcePage: rec.sourcePage, sourceRow: rec.sourceRow, reason: 'ambiguous-banner', text: rec.row.text });
+      } else if (isBareBannerLabel(rec.row.text)) {
+        pendingLabel = rec.row.text;
+      }
       continue;
     }
     if (rec.row.kind === 'continuation') continue;
@@ -395,6 +456,24 @@ function _detectSections(rowRecords) {
     for (const e of s.entries) byFolder.set(e.folderName, [...(byFolder.get(e.folderName) || []), e.sourceRow]);
     const duplicates = [...byFolder.entries()].filter(([, rows]) => rows.length > 1).map(([folderName, rows]) => ({ folderName, occurrences: rows }));
 
+    // Numbering-gap detection — reported for operator review, never auto-"filled" or treated
+    // as an error on its own (a real program can legitimately skip a number). Computed over
+    // the DISTINCT whole numbers actually seen (a suffixed entry like "3a" shares its base
+    // number with "3" and is never itself a gap), only within this section's own min..max
+    // range, and only reported when entries were genuinely seen on both sides of the gap —
+    // never for numbers above the section's own highest entry (that's just where the list
+    // ends, not a gap) or below its lowest (the program may legitimately start at a number
+    // other than 1, e.g. a later day's continuation).
+    const seenNumbers = new Set(s.entries.map(e => e.number));
+    const gaps = [];
+    if (seenNumbers.size) {
+      const nums = [...seenNumbers].sort((a, b) => a - b);
+      for (let n = nums[0]; n <= nums[nums.length - 1]; n++) {
+        if (!seenNumbers.has(n)) gaps.push(n);
+      }
+    }
+    if (gaps.length) warnings.push({ reason: 'numbering-gap', missingNumbers: gaps });
+
     return {
       id: `section-${idx + 1}`,
       cityLabel,
@@ -403,6 +482,7 @@ function _detectSections(rowRecords) {
       entries: s.entries,
       excludedRows: s.excludedRows,
       duplicates,
+      numberingGaps: gaps,
       warnings,
     };
   });

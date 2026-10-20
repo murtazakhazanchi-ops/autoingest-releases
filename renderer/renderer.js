@@ -10956,8 +10956,21 @@ function _qprRenderWarnings() {
   const section = _qprActiveSection();
   const sectionWarnings = section ? section.warnings : [];
   const all = [...docWarnings, ...sectionWarnings];
-  if (!all.length) { el.innerHTML = ''; return; }
-  el.innerHTML = all.map(w => `<div class="qpr-warning-row">⚠ ${_qprEsc(_qprWarningMessage(w))}</div>`).join('');
+  const rows = all.map(w => `<div class="qpr-warning-row">⚠ ${_qprEsc(_qprWarningMessage(w))}</div>`);
+  // Excluded rows (a recognized-but-not-created row, or a row this module could not
+  // confidently classify) were previously computed by the parser but never shown anywhere —
+  // silently invisible to the operator even though the data existed. Surfaced here, grouped
+  // by reason so a real anomaly (an ambiguous row that might be lost data, a malformed
+  // number) is never mistaken for one of the routine, already-expected exclusions (an
+  // explicit "N" / not-applicable marker, an unrecognized Sharaf value).
+  if (section && section.excludedRows.length) {
+    const byReason = new Map();
+    for (const r of section.excludedRows) byReason.set(r.reason, (byReason.get(r.reason) || 0) + 1);
+    for (const [reason, count] of byReason) {
+      rows.push(`<div class="qpr-warning-row">⚠ ${_qprEsc(_qprExcludedRowMessage(reason, count))}</div>`);
+    }
+  }
+  el.innerHTML = rows.join('');
 }
 
 function _qprWarningMessage(w) {
@@ -10966,8 +10979,22 @@ function _qprWarningMessage(w) {
     'no-valid-qmz-entries':    'No numbered rows with a recognized QMZ type (Q/M/Z/MZ) were found.',
     'city-undetermined':       'This section\'s city could not be determined — please verify or correct it manually.',
     'mixed-code-prefixes':     'This section contains rows with more than one city code prefix — please review carefully.',
+    'numbering-gap':           `This section is missing sequence number${w.missingNumbers && w.missingNumbers.length !== 1 ? 's' : ''} ${(w.missingNumbers || []).join(', ')} — please verify against the source PDF.`,
   };
   return w.message || known[w.reason] || 'This PDF has an uncertain or unsupported structure in one area.';
+}
+
+function _qprExcludedRowMessage(reason, count) {
+  const n = count === 1 ? '1 row' : `${count} rows`;
+  const known = {
+    'ambiguous-banner':          `${n} could not be confidently classified and may contain an unrecognized sequence — please check the source PDF.`,
+    'malformed-sequence-number': `${n} had a sequence number this module could not parse.`,
+    'rejected-by-sequence-model': `${n} had a sequence number/type combination that is not a valid QMZ code.`,
+    'sharaf-not-applicable':     `${n} explicitly marked "N" (not applicable) in the Sharaf column — excluded as expected.`,
+    'unrecognized-sharaf':       `${n} had a Sharaf value that is not a recognized QMZ type (Q/M/Z/MZ/O/AQ).`,
+    'no-sequence-number':        `${n} had a sequence number but no recognized Sharaf type.`,
+  };
+  return known[reason] || `${n} excluded for an unrecognized reason ("${reason}") — please review the source PDF.`;
 }
 
 function _qprRenderEntryTable() {
