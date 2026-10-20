@@ -325,7 +325,10 @@ let currentFolderContext = {
 let selectedFiles    = new Set();   // absolute source paths — selection truth
 let currentFiles     = [];          // flat list of all files in current folder
 let sortKey          = 'date';
-let sortDir          = 'desc';
+// Default ascending (oldest capture first) — "AutoIngest — RC.4 Operator Bug Fixes" Part B.
+// Only the default direction changed; the operator's own explicit sort-direction choice
+// (toggled via the sort button, see the click handler below) is still fully preserved.
+let sortDir          = 'asc';
 let destPath         = '';
 let importRunning         = false;
 let _postImportSucceeded  = false; // true only after error-free import; gates the post-success chooser
@@ -351,7 +354,8 @@ let _qmzSelectedFiles  = new Set(); // file paths selected in center panel
 // ever mutate import state, even while QMZ sits on top of it as a full-screen overlay.
 let _qmzViewMode        = 'icon';   // 'icon' | 'list' — persists across QMZ opens, like import's viewMode
 let _qmzSortKey         = 'date';   // 'date' | 'name' | 'size'
-let _qmzSortDir         = 'desc';
+// Default ascending (oldest capture first) — "AutoIngest — RC.4 Operator Bug Fixes" Part B.
+let _qmzSortDir         = 'asc';
 let _qmzTileMap         = new Map(); // path → tile element, scoped to #qmzFileGrid only
 let _qmzThumbObserver   = null;      // QMZ's own IntersectionObserver instance
 let _qmzLastClickedPath = null;
@@ -6308,11 +6312,25 @@ function wireFolderListClicks(list, opts) {
 // ════════════════════════════════════════════════════════════════
 // SORT
 // ════════════════════════════════════════════════════════════════
+// Missing/invalid modifiedAt must never reach Date subtraction as NaN — a NaN-returning
+// comparator has unspecified/unstable behavior per spec, scattering files unpredictably
+// instead of just placing them consistently. Treat it as epoch 0 (sorts oldest/first in
+// ascending order), the same fallback QMZ's own _qmzGroupByTime already uses for capturedAt.
+function _validTimeOrEpoch(v) {
+  const t = v ? new Date(v).getTime() : NaN;
+  return Number.isFinite(t) ? t : 0;
+}
 function sortGroup(files) {
   const copy = [...files];
   copy.sort((a, b) => {
     let cmp = 0;
-    if      (sortKey === 'date') cmp = new Date(a.modifiedAt) - new Date(b.modifiedAt);
+    if (sortKey === 'date') {
+      cmp = _validTimeOrEpoch(a.modifiedAt) - _validTimeOrEpoch(b.modifiedAt);
+      // Deterministic tie-break on equal/missing timestamps — otherwise relies solely on
+      // Array.sort's stability (guaranteed by spec, but an explicit tie-break keeps the
+      // order deterministic from the comparator itself, not an implementation detail).
+      if (cmp === 0) cmp = a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    }
     else if (sortKey === 'size') cmp = (a.size ?? 0) - (b.size ?? 0);
     else                         cmp = a.name.localeCompare(b.name, undefined, { sensitivity:'base' });
     return sortDir === 'asc' ? cmp : -cmp;
@@ -6336,7 +6354,9 @@ document.querySelectorAll('.sort-btn').forEach(btn => {
       sortDir = sortDir === 'asc' ? 'desc' : 'asc';
     } else {
       sortKey = key;
-      sortDir = key === 'name' ? 'asc' : 'desc';
+      // "name" sorts A→Z by default; "date" defaults to ascending too (oldest capture
+      // first — Part B); "size" is unchanged (largest first by default).
+      sortDir = (key === 'name' || key === 'date') ? 'asc' : 'desc';
     }
     updateSortButtons();
     resetViewCache();
@@ -9335,7 +9355,13 @@ function _qmzSortGroup(files) {
   const copy = [...files];
   copy.sort((a, b) => {
     let cmp = 0;
-    if      (_qmzSortKey === 'date') cmp = new Date(a.capturedAt || 0) - new Date(b.capturedAt || 0);
+    if (_qmzSortKey === 'date') {
+      // _validTimeOrEpoch (defined alongside import's own sortGroup) guards against an
+      // invalid/malformed capturedAt producing NaN, which gives Array.sort unspecified
+      // behavior rather than a consistent placement; falls back to epoch (oldest).
+      cmp = _validTimeOrEpoch(a.capturedAt) - _validTimeOrEpoch(b.capturedAt);
+      if (cmp === 0) cmp = a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    }
     else if (_qmzSortKey === 'size') cmp = (a.size ?? 0) - (b.size ?? 0);
     else                              cmp = a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
     return _qmzSortDir === 'asc' ? cmp : -cmp;
@@ -9629,7 +9655,9 @@ function _qmzSetSort(key) {
     _qmzSortDir = _qmzSortDir === 'asc' ? 'desc' : 'asc';
   } else {
     _qmzSortKey = key;
-    _qmzSortDir = key === 'name' ? 'asc' : 'desc';
+    // "name" sorts A→Z by default; "date" defaults to ascending too (oldest capture
+    // first — Part B); "size" is unchanged (largest first by default).
+    _qmzSortDir = (key === 'name' || key === 'date') ? 'asc' : 'desc';
   }
   _qmzUpdateSortButtons();
   _renderQMZCenter();  // re-render only — no disk re-scan
