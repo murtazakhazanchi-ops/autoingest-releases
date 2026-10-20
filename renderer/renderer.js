@@ -10216,7 +10216,16 @@ function _qmzCanOpenQuickAssign() {
   if (!_qmzOpen) return false;
   if (_qmzQaOpen || _qmzAssignInFlight) return false;
   if (_qprOpen || _previewOpen) return false;
-  if (_isAnyBlockingOverlayOpen()) return false;
+  // _isAnyBlockingOverlayOpen() is deliberately NOT checked here, matching openPreview()'s
+  // own established "!_qmzOpen && _isAnyBlockingOverlayOpen()" convention (see that
+  // function's own comment): when QMZ is opened from the real Event Management → "Sequence
+  // Folders" flow, EventMgmt.isOpen() stays true the WHOLE time QMZ is open — only its CSS
+  // visibility was toggled, not its internal state (see the Escape-key handler's own
+  // "EventMgmt.isOpen() && !_qmzOpen" guard for the exact same reasoning). Since _qmzOpen is
+  // already confirmed true above, checking this here would silently block Quick Assign for
+  // every real operator who reaches QMZ through that normal entry point — confirmed live via
+  // an actual operator session (EventMgmt.isOpen() === true, _qmzOpen === true, a valid
+  // selection, no stale focus, and Option/Alt+A still doing nothing until this was removed).
   if (!_qmzSelectedFiles.size) return false;
   if (_isEditableTarget(document.activeElement)) return false;
   return true;

@@ -268,7 +268,44 @@ async function mkTmp(prefix) { return fsp.mkdtemp(path.join(os.tmpdir(), prefix)
   check(assignFocused, '17. existing bare "S" shortcut (focus sidebar assign input) still works, unaffected by this change');
   await window.evaluate(() => document.getElementById('qmzAssignInput')?.blur());
 
-  check(consoleErrors.length === 0, `18. no console/page errors occurred (found: ${JSON.stringify(consoleErrors)})`);
+  // ═══════════════ 9. QMZ opened via the real EventMgmt "Sequence Folders" flow ═══════════════
+  // The actual real-operator root cause, found only after the operator's own live diagnostic
+  // session: QMZ is normally reached through Event Management's "Sequence Folders" button, not
+  // by calling openQMZManager() directly (as every synthetic test above does). When opened that
+  // way, EventMgmt.isOpen() stays true the WHOLE time QMZ is open by the app's own documented
+  // design (only its CSS visibility is toggled, not its internal state — see the Escape-key
+  // handler's "EventMgmt.isOpen() && !_qmzOpen" guard). _qmzCanOpenQuickAssign() used to check
+  // _isAnyBlockingOverlayOpen(), which treats that as a real blocker — silently disabling
+  // Option/Alt+A for every operator who reaches QMZ through its normal, real entry point, while
+  // every direct-open synthetic test above kept passing. Fixed by removing that check (_qmzOpen
+  // is already confirmed true by that point), matching openPreview()'s own established
+  // "!_qmzOpen && _isAnyBlockingOverlayOpen()" convention for the exact same reason.
+  log('=== QMZ opened via EventMgmt (Sequence Folders flow) — EventMgmt.isOpen() stays true ===');
+  await window.evaluate(() => window._closeQMZManager());
+  await window.waitForTimeout(300);
+  await window.evaluate(() => EventMgmt.open({ mode: 'select' }));
+  await window.waitForTimeout(300);
+  await openQmz(root);
+  const emmState = await window.evaluate(() => ({ qmzOpen: _qmzOpen, eventMgmtOpen: EventMgmt.isOpen() }));
+  check(emmState.qmzOpen === true && emmState.eventMgmtOpen === true,
+    `setup: reproduces the real reported state (qmzOpen=${emmState.qmzOpen}, EventMgmt.isOpen()=${emmState.eventMgmtOpen})`);
+  await window.click(`.qmz-pg-row[data-pg="${pg}"]`);
+  await window.waitForTimeout(400);
+  cbs = await checkboxLocators();
+  const cbCountEmm = await cbs.count();
+  if (cbCountEmm > 0) {
+    await cbs.nth(0).click();
+    await window.waitForTimeout(150);
+    const canOpenEmm = await window.evaluate(() => _qmzCanOpenQuickAssign());
+    check(canOpenEmm === true, `18. _qmzCanOpenQuickAssign() returns true even while EventMgmt.isOpen() is true underneath QMZ (got ${canOpenEmm})`);
+    await pressOptAltA();
+    check(await qaIsOpen(), '19. Option/Alt+A opens Quick Assign when QMZ was reached via the real EventMgmt flow — the actual operator-reported failure');
+    await qaClose();
+  } else {
+    check(false, '18/19. (no checkboxes found — cannot verify)');
+  }
+
+  check(consoleErrors.length === 0, `20. no console/page errors occurred (found: ${JSON.stringify(consoleErrors)})`);
 
   log(failures === 0 ? 'ALL CHECKS PASSED' : `${failures} CHECK(S) FAILED`);
   await electronApp.close();
