@@ -132,6 +132,16 @@ async function mkTmp(prefix) { return fsp.mkdtemp(path.join(os.tmpdir(), prefix)
     }, key);
     await window.waitForTimeout(250);
   }
+  // "AutoIngest — Fix Quick Assign Shortcut (Option/Alt + A)": the activation shortcut moved
+  // from bare "A" to Option+A (macOS) / Alt+A (Windows), using e.code (physical key, layout-
+  // independent) + a real altKey modifier rather than e.key. Uses REAL keyboard down/press/up
+  // (not a synthetic dispatch) so Playwright/Chromium genuinely sets altKey on the event.
+  async function pressOptAltA() {
+    await window.keyboard.down('Alt');
+    await window.keyboard.press('a');
+    await window.keyboard.up('Alt');
+    await window.waitForTimeout(250);
+  }
   async function qaIsOpen() { return window.evaluate(() => !document.getElementById('qmzQuickAssignOverlay')?.classList.contains('hidden')); }
   async function qaInputFocused() { return window.evaluate(() => document.activeElement?.id === 'qmzQaInput'); }
   async function qaType(text) { await window.fill('#qmzQaInput', text); await window.waitForTimeout(150); }
@@ -169,14 +179,17 @@ async function mkTmp(prefix) { return fsp.mkdtemp(path.join(os.tmpdir(), prefix)
   check(scrollBefore > 0, `setup: grid genuinely scrolled before opening Quick Assign (scrollTop=${scrollBefore})`);
 
   await pressBareKey('a');
-  check(await qaIsOpen(), '1/2. pressing "A" opens Quick Assign while QMZ is active with a selection');
+  check(!(await qaIsOpen()), 'bare "A" (no modifier) no longer opens Quick Assign — see fix(qmz): use Option-Alt+A for Quick Assign');
+
+  await pressOptAltA();
+  check(await qaIsOpen(), '1/2. pressing Option/Alt+A opens Quick Assign while QMZ is active with a selection');
   check(await qaInputFocused(), '3. the sequence input receives focus automatically');
   const countText = await qaCountText();
   check(countText.includes('20'), `4. selected file count is accurate (got "${countText}")`);
   await shot('qa-open-20-selected');
 
   // Repeated "A" must not open a second instance / corrupt state.
-  await pressBareKey('a');
+  await pressOptAltA();
   const qaOverlayCount = await window.evaluate(() => document.querySelectorAll('#qmzQuickAssignOverlay').length);
   check(qaOverlayCount === 1, 'repeated "A" press does not create a second popup instance');
 
@@ -210,7 +223,7 @@ async function mkTmp(prefix) { return fsp.mkdtemp(path.join(os.tmpdir(), prefix)
   });
   await window.waitForTimeout(200);
   await scrollGridTo(300);
-  await pressBareKey('a');
+  await pressOptAltA();
   await qaType('03a');
   const preview2 = await qaPreviewText();
   check(preview2.includes('03aAQ') && preview2.includes('Aqeeqa'), `19/20. "03a" resolves to "03aAQ — Aqeeqa" (got "${preview2}")`);
@@ -232,7 +245,7 @@ async function mkTmp(prefix) { return fsp.mkdtemp(path.join(os.tmpdir(), prefix)
   await scrollGridTo(250);
   const scrollBeforeInvalid = await gridScrollTop();
   const selBeforeInvalid = await window.evaluate(() => _qmzSelectedFiles.size);
-  await pressBareKey('a');
+  await pressOptAltA();
   await qaType('99');
   const preview3 = await qaPreviewText();
   check(/not found/i.test(preview3), `24/25. "99" (nonexistent) shows a clear inline "not found" message (got "${preview3}")`);
@@ -262,7 +275,7 @@ async function mkTmp(prefix) { return fsp.mkdtemp(path.join(os.tmpdir(), prefix)
     if (cb) { cb.checked = true; cb.dispatchEvent(new Event('change', { bubbles: true })); }
   });
   await window.waitForTimeout(200);
-  await pressBareKey('a');
+  await pressOptAltA();
   await qaType('05');
   const matchTexts = await window.evaluate(() => [...document.querySelectorAll('#qmzQaMatches .qmz-qa-match')].map(el => el.textContent));
   check(matchTexts.length === 2, `10. ambiguous input shows both matching destinations (found ${matchTexts.length}: ${JSON.stringify(matchTexts)})`);
@@ -317,7 +330,7 @@ async function mkTmp(prefix) { return fsp.mkdtemp(path.join(os.tmpdir(), prefix)
   await window.waitForTimeout(200);
   await domClick('[data-qmz-view="list"]');
   await window.waitForTimeout(300);
-  await pressBareKey('a');
+  await pressOptAltA();
   check(await qaIsOpen(), '41. Quick Assign opens correctly in List view too');
   const popupRectList = await window.evaluate(() => {
     const r = document.querySelector('#qmzQuickAssignOverlay .qmz-qa-popup')?.getBoundingClientRect();
@@ -333,7 +346,7 @@ async function mkTmp(prefix) { return fsp.mkdtemp(path.join(os.tmpdir(), prefix)
   await window.waitForTimeout(300);
 
   await setWindowSize(1100, 700);
-  await pressBareKey('a');
+  await pressOptAltA();
   check(await qaIsOpen(), '15/39/42. Quick Assign opens at minimum supported window width');
   const popupRectMin = await window.evaluate(() => {
     const r = document.querySelector('#qmzQuickAssignOverlay .qmz-qa-popup')?.getBoundingClientRect();
@@ -349,7 +362,7 @@ async function mkTmp(prefix) { return fsp.mkdtemp(path.join(os.tmpdir(), prefix)
   for (const theme of ['dark', 'light']) {
     await window.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme);
     await window.waitForTimeout(200);
-    await pressBareKey('a');
+    await pressOptAltA();
     check(await qaIsOpen(), `17/18/37/38. Quick Assign opens correctly in theme=${theme}`);
     const bg = await window.evaluate(() => getComputedStyle(document.querySelector('#qmzQuickAssignOverlay .qmz-qa-popup')).backgroundColor);
     check(bg && bg !== 'rgba(0, 0, 0, 0)', `theme=${theme}: popup has an opaque background (${bg})`);
@@ -361,7 +374,7 @@ async function mkTmp(prefix) { return fsp.mkdtemp(path.join(os.tmpdir(), prefix)
   log('=== Keyboard safety: editable targets, no selection ===');
   await window.evaluate(() => { _qmzSelectedFiles.clear(); _qmzSyncAllTiles(); });
   await window.waitForTimeout(200);
-  await pressBareKey('a');
+  await pressOptAltA();
   check(!(await qaIsOpen()), '2. "A" does nothing when no photographs are selected');
 
   await domClick(`.qmz-pg-row[data-pg="${pg}"]`);

@@ -96,6 +96,16 @@ async function mkTmp(prefix) { return fsp.mkdtemp(path.join(os.tmpdir(), prefix)
   async function qaIsOpen() { return window.evaluate(() => !document.getElementById('qmzQuickAssignOverlay')?.classList.contains('hidden')); }
   async function qaClose() { if (await qaIsOpen()) { await window.keyboard.press('Escape'); await window.waitForTimeout(200); } }
   async function checkboxLocators() { return window.locator('#qmzFileGrid input[type="checkbox"][data-path]'); }
+  // "AutoIngest — Fix Quick Assign Shortcut (Option/Alt + A)": the activation shortcut moved
+  // from bare "A" to Option+A (macOS) / Alt+A (Windows) — a bare single letter proved
+  // unreliable for real operators even with the checkbox-focus fix below. Real keyboard
+  // down/press/up (not a synthetic dispatch) so Chromium genuinely sets altKey.
+  async function pressOptAltA() {
+    await window.keyboard.down('Alt');
+    await window.keyboard.press('a');
+    await window.keyboard.up('Alt');
+    await window.waitForTimeout(300);
+  }
 
   // ═══════════════ Setup: open QMZ with enough real photos to scroll ═══════════════
   await openQmz(root);
@@ -115,7 +125,7 @@ async function mkTmp(prefix) { return fsp.mkdtemp(path.join(os.tmpdir(), prefix)
   await window.evaluate(() => document.getElementById('qmzAddSpecificBtn')?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
   await window.waitForTimeout(500);
 
-  // ═══════════════ 1. Real checkbox click, then real "A" keypress ═══════════════
+  // ═══════════════ 1. Real checkbox click, then real Option/Alt+A keypress ═══════════════
   log('=== Real checkbox click selection ===');
   let cbs = await checkboxLocators();
   await cbs.nth(0).click();
@@ -123,9 +133,9 @@ async function mkTmp(prefix) { return fsp.mkdtemp(path.join(os.tmpdir(), prefix)
   const activeAfterClick = await window.evaluate(() => ({ tag: document.activeElement?.tagName, type: document.activeElement?.type }));
   check(activeAfterClick.tag === 'INPUT' && activeAfterClick.type === 'checkbox',
     `setup: a real click genuinely focuses the checkbox (got ${JSON.stringify(activeAfterClick)})`);
-  await window.keyboard.press('a');
+  await pressOptAltA();
   await window.waitForTimeout(300);
-  check(await qaIsOpen(), '1. "A" opens Quick Assign after a REAL checkbox click (the actual operator-reported failure)');
+  check(await qaIsOpen(), '1. Option/Alt+A opens Quick Assign after a REAL checkbox click (the actual operator-reported failure)');
   await shot('01-real-click-opens-qa');
   const qaFocused1 = await window.evaluate(() => document.activeElement?.id === 'qmzQaInput');
   check(qaFocused1, '2. Quick Assign input receives focus');
@@ -156,9 +166,9 @@ async function mkTmp(prefix) { return fsp.mkdtemp(path.join(os.tmpdir(), prefix)
   const selAfterShift = await window.evaluate(() => _qmzSelectedFiles.size);
   check(selAfterShift >= 2, `setup: shift-click produced a range selection (got ${selAfterShift})`);
   await window.evaluate(() => document.activeElement?.blur && document.activeElement.blur());
-  await window.keyboard.press('a');
+  await pressOptAltA();
   await window.waitForTimeout(300);
-  check(await qaIsOpen(), '5. "A" opens Quick Assign after shift-click range selection');
+  check(await qaIsOpen(), '5. Option/Alt+A opens Quick Assign after shift-click range selection');
   await qaClose();
 
   // ═══════════════ 4. Cmd/Ctrl-click (toggle) selection ═══════════════
@@ -172,9 +182,9 @@ async function mkTmp(prefix) { return fsp.mkdtemp(path.join(os.tmpdir(), prefix)
   await window.waitForTimeout(150);
   const selAfterCmd = await window.evaluate(() => _qmzSelectedFiles.size);
   check(selAfterCmd >= 1, `setup: cmd/ctrl-click selection present (got ${selAfterCmd})`);
-  await window.keyboard.press('a');
+  await pressOptAltA();
   await window.waitForTimeout(300);
-  check(await qaIsOpen(), '6. "A" opens Quick Assign after cmd/ctrl-click selection');
+  check(await qaIsOpen(), '6. Option/Alt+A opens Quick Assign after cmd/ctrl-click selection');
   await qaClose();
 
   // ═══════════════ 5. After scrolling the grid ═══════════════
@@ -186,9 +196,9 @@ async function mkTmp(prefix) { return fsp.mkdtemp(path.join(os.tmpdir(), prefix)
   if (cbCountAfterScroll > 0) {
     await cbs.nth(0).click();
     await window.waitForTimeout(150);
-    await window.keyboard.press('a');
+    await pressOptAltA();
     await window.waitForTimeout(300);
-    check(await qaIsOpen(), '7. "A" opens Quick Assign after scrolling the grid and clicking a checkbox');
+    check(await qaIsOpen(), '7. Option/Alt+A opens Quick Assign after scrolling the grid and clicking a checkbox');
     await qaClose();
   } else {
     check(false, '7. (no checkboxes found after scroll — cannot verify)');
@@ -202,9 +212,9 @@ async function mkTmp(prefix) { return fsp.mkdtemp(path.join(os.tmpdir(), prefix)
   cbs = await checkboxLocators();
   await cbs.nth(0).click();
   await window.waitForTimeout(150);
-  await window.keyboard.press('a');
+  await pressOptAltA();
   await window.waitForTimeout(300);
-  check(await qaIsOpen(), '8. "A" opens Quick Assign in List view after a real checkbox click');
+  check(await qaIsOpen(), '8. Option/Alt+A opens Quick Assign in List view after a real checkbox click');
   await qaClose();
   await window.click('[data-qmz-view="icon"]');
   await window.waitForTimeout(300);
@@ -221,9 +231,9 @@ async function mkTmp(prefix) { return fsp.mkdtemp(path.join(os.tmpdir(), prefix)
     await window.keyboard.press('Escape');
     await window.waitForTimeout(300);
   }
-  await window.keyboard.press('a');
+  await pressOptAltA();
   await window.waitForTimeout(300);
-  check(await qaIsOpen(), '9. "A" opens Quick Assign after closing a preview');
+  check(await qaIsOpen(), '9. Option/Alt+A opens Quick Assign after closing a preview');
   await qaClose();
 
   // ═══════════════ 8. After completing a previous assignment ═══════════════
@@ -231,7 +241,7 @@ async function mkTmp(prefix) { return fsp.mkdtemp(path.join(os.tmpdir(), prefix)
   cbs = await checkboxLocators();
   await cbs.nth(0).click();
   await window.waitForTimeout(150);
-  await window.keyboard.press('a');
+  await pressOptAltA();
   await window.waitForTimeout(300);
   if (await qaIsOpen()) {
     await window.fill('#qmzQaInput', '4');
@@ -244,9 +254,9 @@ async function mkTmp(prefix) { return fsp.mkdtemp(path.join(os.tmpdir(), prefix)
   if (cbCountAfterAssign > 0) {
     await cbs.nth(0).click();
     await window.waitForTimeout(150);
-    await window.keyboard.press('a');
+    await pressOptAltA();
     await window.waitForTimeout(300);
-    check(await qaIsOpen(), '10. "A" opens Quick Assign again after completing a previous assignment');
+    check(await qaIsOpen(), '10. Option/Alt+A opens Quick Assign again after completing a previous assignment');
     await qaClose();
   } else {
     check(false, '10. (no remaining checkboxes after assignment — cannot verify)');
@@ -264,9 +274,9 @@ async function mkTmp(prefix) { return fsp.mkdtemp(path.join(os.tmpdir(), prefix)
   if (cbCountAfterReopen > 0) {
     await cbs.nth(0).click();
     await window.waitForTimeout(150);
-    await window.keyboard.press('a');
+    await pressOptAltA();
     await window.waitForTimeout(300);
-    check(await qaIsOpen(), '11. "A" opens Quick Assign after closing and reopening the QMZ workspace');
+    check(await qaIsOpen(), '11. Option/Alt+A opens Quick Assign after closing and reopening the QMZ workspace');
     await qaClose();
   } else {
     check(false, '11. (no checkboxes found after reopening — cannot verify)');
@@ -276,9 +286,9 @@ async function mkTmp(prefix) { return fsp.mkdtemp(path.join(os.tmpdir(), prefix)
   log('=== No selection guard (real interaction) ===');
   await window.evaluate(() => { _qmzSelectedFiles.clear(); _qmzSyncAllTiles(); document.activeElement?.blur && document.activeElement.blur(); });
   await window.waitForTimeout(100);
-  await window.keyboard.press('a');
+  await pressOptAltA();
   await window.waitForTimeout(300);
-  check(!(await qaIsOpen()), '12. "A" does nothing when no photographs are selected (real interaction, no stale popup)');
+  check(!(await qaIsOpen()), '12. Option/Alt+A does nothing when no photographs are selected (real interaction, no stale popup)');
 
   check(consoleErrors.length === 0, `13. no console/page errors occurred (found: ${JSON.stringify(consoleErrors)})`);
 

@@ -15702,8 +15702,18 @@ document.addEventListener('keydown', e => {
   // shortcuts the moment an operator selected a file by its checkbox.
   if (_isEditableTarget(document.activeElement)) return;
 
-  // QMZ mode: S focuses the assign input; A opens Quick Assign (2A/2B — "QMZ Sorting
-  // Workflow Optimization"); Cmd+G is blocked.
+  // QMZ mode: S focuses the assign input; Option+A (macOS) / Alt+A (Windows) opens Quick
+  // Assign; Cmd+G is blocked.
+  //
+  // "AutoIngest — Fix Quick Assign Shortcut (Option/Alt + A)": bare "A" (no modifier) was
+  // switched to Option/Alt+A because a bare single letter proved unreliable for real
+  // operators despite the checkbox-focus fix (see fix(qmz): restore Quick Assign keyboard
+  // shortcut) — e.key reflects the CHARACTER PRODUCED, which is keyboard-layout-dependent
+  // (e.g. on AZERTY the physical A-key position never produces e.key==='a') and also
+  // case-sensitive (Shift/Caps-Lock state changes it to 'A'), neither of which this
+  // environment could rule out as the real-world cause. e.code is the PHYSICAL key
+  // position — layout- and case-independent — and requiring altKey makes bare typing of
+  // "a" (including while Caps Lock is on) completely unable to trigger this by accident.
   if (_qmzOpen) {
     if (e.key === 's' && !(e.metaKey || e.ctrlKey || e.altKey)) {
       e.preventDefault();
@@ -15711,12 +15721,13 @@ document.addEventListener('keydown', e => {
     }
     // The _isEditableTarget() check above already excludes text-entry/contenteditable focus
     // (including Quick Assign's own input while open, preventing re-triggering mid-typing —
-    // "Repeatedly pressing A must not open multiple popup instances"); this second call is
-    // redundant with it but kept for defense-in-depth and because _qmzOpenQuickAssign() is
-    // also reachable from other call sites that don't go through this handler's own guard.
-    // _qmzOpenQuickAssign() itself re-checks every other 2A activation condition (selection
-    // non-empty, no nested PDF-review/preview modal, no move in flight) before doing anything.
-    if (e.key === 'a' && !(e.metaKey || e.ctrlKey || e.altKey) && !_isEditableTarget(document.activeElement)) {
+    // "Repeatedly pressing Option/Alt+A must not open multiple popup instances"); this second
+    // call is redundant with it but kept for defense-in-depth and because
+    // _qmzOpenQuickAssign() is also reachable from other call sites that don't go through
+    // this handler's own guard. _qmzOpenQuickAssign() itself re-checks every other 2A
+    // activation condition (selection non-empty, no nested PDF-review/preview modal, no move
+    // in flight) before doing anything.
+    if (e.code === 'KeyA' && e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && !_isEditableTarget(document.activeElement)) {
       e.preventDefault();
       _qmzOpenQuickAssign();
     }
