@@ -11516,10 +11516,20 @@ function _qprRenderCreateResults(resp, section) {
 //   → IPC → main/rawPreviewService.js → LibRaw embedded JPEG → cached file URL
 // No renderer changes needed beyond swapping that one call.
 
+// Non-text-entry <input> types (checkbox, radio, buttons, …) never accept character typing,
+// so focusing one — e.g. clicking a file-selection checkbox, the primary way files are
+// selected in both import and QMZ grids — must not count as "the operator is typing" here.
+// Treating them as editable silently blocked every single-letter keyboard shortcut (QMZ's
+// A/S included) immediately after selecting a file by its checkbox, since real browser
+// clicks focus the checkbox element itself — a gap this file's own synthetic test harness
+// (`.checked = true` + a dispatched 'change' event, never a real `.click()`/`.focus()`)
+// never exercised, masking the bug from automated coverage.
+const NON_TEXT_INPUT_TYPES = new Set(['checkbox', 'radio', 'button', 'submit', 'reset', 'file', 'range', 'color', 'image']);
 function _isEditableTarget(el) {
   if (!el) return false;
   const t = el.tagName;
-  if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return true;
+  if (t === 'INPUT') return !NON_TEXT_INPUT_TYPES.has((el.type || 'text').toLowerCase());
+  if (t === 'TEXTAREA' || t === 'SELECT') return true;
   if (el.isContentEditable) return true;
   return false;
 }
@@ -15685,9 +15695,12 @@ document.addEventListener('keydown', e => {
     if (sm?.classList.contains('visible')) { sm.classList.remove('visible'); return; }
   }
 
-  // Never intercept shortcuts when the user is typing in a form field.
-  const tag = document.activeElement?.tagName;
-  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  // Never intercept shortcuts when the user is typing in a form field — but a focused
+  // checkbox/radio (the file-selection grid's own primary interaction) is never "typing",
+  // so it must not block shortcuts. See _isEditableTarget's own note: real browser clicks
+  // focus the checkbox, and a blunt INPUT-tag check here silently blocked QMZ's A/S
+  // shortcuts the moment an operator selected a file by its checkbox.
+  if (_isEditableTarget(document.activeElement)) return;
 
   // QMZ mode: S focuses the assign input; A opens Quick Assign (2A/2B — "QMZ Sorting
   // Workflow Optimization"); Cmd+G is blocked.
@@ -15696,10 +15709,11 @@ document.addEventListener('keydown', e => {
       e.preventDefault();
       document.getElementById('qmzAssignInput')?.focus();
     }
-    // The tag-only check above (line ~15634) already excludes INPUT/TEXTAREA/SELECT focus
+    // The _isEditableTarget() check above already excludes text-entry/contenteditable focus
     // (including Quick Assign's own input while open, preventing re-triggering mid-typing —
-    // "Repeatedly pressing A must not open multiple popup instances"); _isEditableTarget()
-    // additionally excludes contenteditable, which that tag-only check does not cover.
+    // "Repeatedly pressing A must not open multiple popup instances"); this second call is
+    // redundant with it but kept for defense-in-depth and because _qmzOpenQuickAssign() is
+    // also reachable from other call sites that don't go through this handler's own guard.
     // _qmzOpenQuickAssign() itself re-checks every other 2A activation condition (selection
     // non-empty, no nested PDF-review/preview modal, no move in flight) before doing anything.
     if (e.key === 'a' && !(e.metaKey || e.ctrlKey || e.altKey) && !_isEditableTarget(document.activeElement)) {
