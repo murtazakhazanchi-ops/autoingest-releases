@@ -296,7 +296,19 @@ async function readDescriptor(userDataDir) {
     r = await execViaWs(ws1, 'group.assign', { groupId: null }); // still in QMZ context — group.assign requires !isQmzOpen()
     check(r.result.ok === false && r.result.reason === 'not-applicable', 'an unavailable command (group.assign while in QMZ) returns not-applicable, not executed');
 
-    r = await execViaWs(ws1, 'qmz.assignToSequence', { sequenceCode: '05aQ' });
+    // '05X' — not '05aQ'. '05aQ' (number 05 + suffix 'a' + type 'Q') is a WELL-FORMED code
+    // under the current SEQ_RE (renderer/qmzSequenceFormat.js) — it just doesn't exist in
+    // this fixture's QMZ workspace (only 03Q was created above). A well-formed-but-nonexistent
+    // code is, by commandManager.js's own documented contract (see its 'qmz.assignToSequence'
+    // comment: "Never creates the sequence and never guesses a type... a nonexistent code is a
+    // normal 'ran, nothing to do' outcome"), ok:true/executed:false — NOT invalid-payload. This
+    // test predated the fix that taught isValid() to accept suffixed/combined-type codes (see
+    // that same file's "Stage 5 fix" comment) and was never updated afterward, so it asserted a
+    // rejection reason that the (correct, intentional) validator no longer produces for that
+    // input. '05X' has an unrecognized type letter ('X' is not MZ/AQ/Q/M/Z/O) and is genuinely
+    // malformed under every version of the validator, so it exercises the real invalid-payload
+    // path without loosening or re-tightening any production validation.
+    r = await execViaWs(ws1, 'qmz.assignToSequence', { sequenceCode: '05X' });
     check(r.result.ok === false && r.result.reason === 'invalid-payload', 'a malformed payload is rejected — the transport never invents/loosens validation');
 
     r = await execViaWs(ws1, 'totally.unknown.command', {});
