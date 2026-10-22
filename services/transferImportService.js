@@ -70,6 +70,7 @@ let _state = {
   changedSkipped: 0,
   copiedBytes:    0,
   errors:         [],
+  neverAttempted: 0,
   total:          0,
   result:         null,
   verifyStatus:   null,
@@ -233,15 +234,31 @@ async function _walkAndCopy(srcDir, destDir, stats, opts = {}) {
     if (entry.isDirectory()) {
       if (_skipDir(entry.name)) continue;
       if (opts.rootFilesOnly) continue;
+      const destSubDir = path.join(destDir, entry.name);
+      // Create the destination directory unconditionally, before recursing — not only as a
+      // side effect of copying a file into it. Previously, a directory with no files
+      // anywhere inside it (at any depth) was silently never created at the destination,
+      // since directory creation only ever happened inside _copyFileSafe's own
+      // mkdir(dirname(finalDest)). An empty directory is real source structure; dropping it
+      // was never a deliberate decision, just an unhandled case.
+      try { await fsp.mkdir(destSubDir, { recursive: true }); } catch {}
       await _walkAndCopy(
         path.join(srcDir, entry.name),
-        path.join(destDir, entry.name),
+        destSubDir,
         stats,
         opts
       );
     } else if (entry.isFile()) {
       if (_skipFile(entry.name)) continue;
-      if (stats.errors.length >= MAX_ERRORS) continue;
+      if (stats.errors.length >= MAX_ERRORS) {
+        // The error cap stops ATTEMPTS, not just display — every file reaching this branch
+        // is never copied, never skipped, never recorded as a failure. Counted separately
+        // (stats.neverAttempted) so the final result can say so explicitly instead of letting
+        // copied+skipped+renamed+errors silently fall short of the file count the operator
+        // was shown in Preview/Scan.
+        stats.neverAttempted = (stats.neverAttempted || 0) + 1;
+        continue;
+      }
 
       await _waitIfPaused();
 
@@ -261,6 +278,7 @@ async function _walkAndCopy(srcDir, destDir, stats, opts = {}) {
       _state.changedSkipped = stats.changedSkipped || 0;
       _state.errors         = [...stats.errors];
       _state.copiedBytes    = stats.copiedBytes || 0;
+      _state.neverAttempted = stats.neverAttempted || 0;
     }
   }
 }
@@ -411,15 +429,20 @@ async function _buildEventNode(name, evPath) {
   let subEntries;
   try { subEntries = await fsp.readdir(evPath, { withFileTypes: true }); } catch { subEntries = []; }
   const folders = [];
-  let hasRootFiles = false;
+  const files = [];
   for (const sub of subEntries) {
     if (sub.isDirectory() && !_skipDir(sub.name)) {
       folders.push({ name: sub.name, path: path.join(evPath, sub.name) });
     } else if (sub.isFile() && !_skipFile(sub.name)) {
-      hasRootFiles = true;
+      // Individually selectable, in addition to the existing hasEventRootFiles-driven
+      // "whole event, including all root files" bundle — see the Import Scope tree's
+      // recursive-selection comment for why both representations coexist.
+      files.push({ name: sub.name, path: path.join(evPath, sub.name), isDir: false });
     }
   }
-  return { name, path: evPath, folders, hasEventRootFiles: hasRootFiles };
+  folders.sort((a, b) => a.name.localeCompare(b.name));
+  files.sort((a, b) => a.name.localeCompare(b.name));
+  return { name, path: evPath, folders, files, hasEventRootFiles: files.length > 0 };
 }
 
 // ── Destination resolution ────────────────────────────────────────────────────
@@ -774,7 +797,14 @@ async function _resolveImportUnits(transferRoot, mainArchiveRoot, scope, isValid
     return info;
   }
 
-  async function resolveOne(absPath, rootFilesOnly, isExternal) {
+  // `isFile` is handled uniformly across every branch below, rather than as a separate
+  // resolver, precisely because a file nested inside a direct Event or a Collection-shaped
+  // folder must go through the SAME archive-aware/name-based destination math as its
+  // enclosing folder — a file's destination is never computed independently of the rules
+  // that already govern where its parent lands. Below the Event level (or anywhere under a
+  // folder with no Event at all), that math is already correct for arbitrary depth, since
+  // `rel`/`restRel` naturally carry the full relative path including the filename.
+  async function resolveOne(absPath, rootFilesOnly, isExternal, isFile = false) {
     const rel     = path.relative(transferRoot, absPath);
     const parts   = rel.split(path.sep);
     const topName = parts[0];
@@ -790,7 +820,7 @@ async function _resolveImportUnits(transferRoot, mainArchiveRoot, scope, isValid
       resolvedUnits.push({
         srcDir:             absPath,
         destDir:            restRel ? path.join(dest.destDir, restRel) : dest.destDir,
-        rootFilesOnly,
+        rootFilesOnly, isFile,
         sourceType:         'direct-event',
         collectionKey:      dest.collectionKey,
         eventKey:           topName,
@@ -806,7 +836,7 @@ async function _resolveImportUnits(transferRoot, mainArchiveRoot, scope, isValid
         // (an existing, archive-aware concept: it rides along with its Collection's destination,
         // not a standalone general-purpose transfer unit).
         resolvedUnits.push({
-          srcDir: absPath, destDir: path.join(mainArchiveRoot, rel), rootFilesOnly,
+          srcDir: absPath, destDir: path.join(mainArchiveRoot, rel), rootFilesOnly, isFile,
           sourceType: 'external', collectionKey: topName, eventKey: parts[0],
           destinationStatus: 'resolved', destinationReason: null,
         });
@@ -815,15 +845,16 @@ async function _resolveImportUnits(transferRoot, mainArchiveRoot, scope, isValid
       // General-purpose transfer: no Event anywhere under this top-level folder — it is not
       // AutoIngest archive content at all (a legacy year folder, a VHS lot, a recovered-files
       // dump), so it is never reinterpreted as a Collection or Event, never given an event.json,
-      // never fed into archive-identity resolution. It is an ordinary folder, copied recursively
-      // to the same deterministic, name-preserving destination (mainArchiveRoot/<relative path>)
-      // every other unit here already uses — not a guess, since the folder's own name and
-      // position IS the destination.
+      // never fed into archive-identity resolution. It is an ordinary folder/file, copied to
+      // the same deterministic, name-preserving destination (mainArchiveRoot/<relative path>)
+      // every other unit here already uses — not a guess, since the name and position IS the
+      // destination. Handled as its own unit — never swept into a sibling's rootFilesOnly walk —
+      // so selecting one file never pulls in unselected siblings.
       resolvedUnits.push({
         srcDir:             absPath,
         destDir:            path.join(mainArchiveRoot, rel),
-        rootFilesOnly,
-        sourceType:         'generic-folder',
+        rootFilesOnly, isFile,
+        sourceType:         isFile ? 'generic-file' : 'generic-folder',
         collectionKey:      null,
         eventKey:           null,
         destinationStatus:  'resolved',
@@ -843,7 +874,7 @@ async function _resolveImportUnits(transferRoot, mainArchiveRoot, scope, isValid
     resolvedUnits.push({
       srcDir:             absPath,
       destDir:            path.join(mainArchiveRoot, rel),
-      rootFilesOnly,
+      rootFilesOnly, isFile,
       sourceType:         'collection-event',
       collectionKey:      topName,
       eventKey:           parts.length > 1 ? `${parts[0]}/${parts[1]}` : parts[0],
@@ -853,30 +884,10 @@ async function _resolveImportUnits(transferRoot, mainArchiveRoot, scope, isValid
     });
   }
 
-  // General-purpose transfer: an ordinary file sitting directly at the Transfer Drive root.
-  // No event.json, no Collection/Event reinterpretation, no archive-identity resolution — the
-  // destination is simply mainArchiveRoot/<filename>, the same deterministic name-preserving
-  // mapping every folder unit above already uses. Handled as its own unit (never swept into a
-  // sibling folder's rootFilesOnly walk) so selecting one root file never pulls in others.
-  async function resolveOneFile(absPath) {
-    const rel = path.relative(transferRoot, absPath);
-    resolvedUnits.push({
-      srcDir:             absPath,
-      destDir:            path.join(mainArchiveRoot, rel),
-      rootFilesOnly:      false,
-      isFile:             true,
-      sourceType:         'generic-file',
-      collectionKey:      null,
-      eventKey:           null,
-      destinationStatus:  'resolved',
-      destinationReason:  null,
-    });
-  }
-
   for (const p of folderPaths)    await resolveOne(p, false, false);
   for (const p of eventRootPaths) await resolveOne(p, true,  false);
   for (const p of externalPaths)  await resolveOne(p, false, true);
-  for (const p of filePaths)      await resolveOneFile(p);
+  for (const p of filePaths)      await resolveOne(p, false, false, true);
 
   return { resolvedUnits: _dedupResolvedUnits(resolvedUnits), unresolvedUnits };
 }
@@ -1003,7 +1014,15 @@ function _computeScanFingerprint({ transferRoot, mainArchiveRoot, scope, resolve
 
 async function _finishImport(transferRoot, mainArchiveRoot, meta, startedAt, batches, stats, mode) {
   const completedAt = new Date().toISOString();
-  const finalStatus = stats.errors.length === 0 ? 'ok' : 'partial';
+  const neverAttempted = stats.neverAttempted || 0;
+  const errorsCapped   = stats.errors.length >= MAX_ERRORS;
+  const succeeded      = stats.copied + stats.skipped + stats.renamed + (stats.changedSkipped || 0);
+  // 'failed' — the error cap or a uniform failure (e.g. an unwritable destination) meant
+  // NOTHING landed on disk; never silently reported as a routine "completed with errors".
+  // 'partial' — some files succeeded, some failed. 'ok' — no errors at all.
+  const finalStatus = stats.errors.length === 0
+    ? 'ok'
+    : (succeeded === 0 ? 'failed' : 'partial');
 
   await _writeCheckpoint(mainArchiveRoot, {
     importId: meta.batchId, transferRoot, mainArchiveRoot, mode,
@@ -1015,6 +1034,7 @@ async function _finishImport(transferRoot, mainArchiveRoot, meta, startedAt, bat
     totalRenamed:        stats.renamed,
     totalChangedSkipped: stats.changedSkipped || 0,
     totalErrors:         stats.errors.length,
+    totalNeverAttempted: neverAttempted,
   });
 
   const auditEntry = {
@@ -1023,6 +1043,7 @@ async function _finishImport(transferRoot, mainArchiveRoot, meta, startedAt, bat
     startedAt, completedAt,
     copied: stats.copied, skipped: stats.skipped, renamed: stats.renamed,
     changedSkipped: stats.changedSkipped || 0, errorCount: stats.errors.length, status: finalStatus,
+    neverAttempted, errorsCapped,
   };
   try {
     const auditDir = path.join(mainArchiveRoot, '.autoingest', 'transfer-imports');
@@ -1039,11 +1060,13 @@ async function _finishImport(transferRoot, mainArchiveRoot, meta, startedAt, bat
   _state.renamed        = stats.renamed;
   _state.changedSkipped = stats.changedSkipped || 0;
   _state.errors         = [...stats.errors];
+  _state.neverAttempted = neverAttempted;
   _state.result = {
     ok: true, batchId: meta.batchId,
     copied: stats.copied, skipped: stats.skipped, renamed: stats.renamed,
     changedSkipped: stats.changedSkipped || 0,
     errorCount: stats.errors.length, startedAt, completedAt, status: finalStatus,
+    neverAttempted, errorsCapped,
   };
 
   // Fire-and-forget completion signal for main.js's IPC layer to orchestrate
@@ -1112,7 +1135,7 @@ async function _doImportPlain(transferRoot, mainArchiveRoot, resolvedUnits, meta
     totalFiles: _state.total, totalCopied: 0, totalSkipped: 0, totalRenamed: 0, totalChangedSkipped: 0, totalErrors: 0,
   });
 
-  const stats = { copied: 0, skipped: 0, renamed: 0, changedSkipped: 0, copiedBytes: 0, errors: [] };
+  const stats = { copied: 0, skipped: 0, renamed: 0, changedSkipped: 0, copiedBytes: 0, errors: [], neverAttempted: 0 };
   const transferRootIdentity = await _readTransferRootIdentity(transferRoot);
 
   for (let i = 0; i < batches.length; i++) {
@@ -1204,7 +1227,7 @@ async function _doImportUpdate(transferRoot, mainArchiveRoot, resolvedUnits, inv
     skipped: resumeBatches ? 0 : seedSkipped,
     renamed: 0,
     changedSkipped: resumeBatches ? 0 : seedChanged,
-    copiedBytes: 0, errors: [],
+    copiedBytes: 0, errors: [], neverAttempted: 0,
   };
   _state.skipped        = stats.skipped;
   _state.changedSkipped = stats.changedSkipped;
@@ -1251,8 +1274,16 @@ async function _doImportUpdate(transferRoot, mainArchiveRoot, resolvedUnits, inv
 
     const outcomeCtx = { batchId: meta.batchId, transferRoot, mainArchiveRoot, transferRootIdentity, eventPath: batch.destDir };
     const before = { copied: stats.copied, errors: stats.errors.length };
-    for (const f of batch.fileList) {
-      if (stats.errors.length >= MAX_ERRORS) break;
+    for (let fi = 0; fi < batch.fileList.length; fi++) {
+      if (stats.errors.length >= MAX_ERRORS) {
+        // Same rule as _walkAndCopy: the error cap stops attempts, not just display. Every
+        // remaining file in this batch is counted explicitly as never attempted rather than
+        // silently vanishing from copied+skipped+renamed+errors.
+        stats.neverAttempted = (stats.neverAttempted || 0) + (batch.fileList.length - fi);
+        _state.neverAttempted = stats.neverAttempted;
+        break;
+      }
+      const f = batch.fileList[fi];
       await _waitIfPaused();
       _state.current = path.basename(f.srcPath);
       try {
@@ -1412,7 +1443,7 @@ async function runImport(transferRoot, mainArchiveRoot, scope, isValidEventJsonF
     running: true, paused: false, batchId,
     batchIndex: 0, batchCount: 0, batchName: '',
     current: '', copied: 0, skipped: 0, renamed: 0, changedSkipped: 0, errors: [],
-    copiedBytes: 0, total: 0, result: null,
+    copiedBytes: 0, neverAttempted: 0, total: 0, result: null,
     verifyStatus: null, verifyTotal: 0, verifyDone: 0, verifyFailed: 0,
     checkpointHealthy: true, checkpointError: null,
   };
@@ -1460,6 +1491,7 @@ async function resumeImportFromCheckpoint(transferRoot, mainArchiveRoot, meta = 
     changedSkipped: checkpoint.totalChangedSkipped || 0,
     errors:         [],
     copiedBytes:    0,
+    neverAttempted: checkpoint.totalNeverAttempted || 0,
     total:          checkpoint.totalFiles || 0,
     result:         null,
     verifyStatus: null, verifyTotal: 0, verifyDone: 0, verifyFailed: 0,

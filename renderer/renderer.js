@@ -14522,6 +14522,7 @@ const _transferMonitor = (() => {
   function _phase(kind, s) {
     if (s.paused)     { const p = _pct(s); return { cls: 'paused',  txt: `${kind} paused${p == null ? '' : ' — ' + p + '%'}` }; }
     if (s.running)    { const p = _pct(s); return { cls: 'running', txt: `${kind} ${p == null ? '…' : p + '%'} · ${s.copied || 0} copied${_errs(s) ? ' · ' + _errs(s) + ' errors' : ''}` }; }
+    if (s.result?.ok && s.result.status === 'failed') return { cls: 'fail', txt: `${kind} failed — no files copied` };
     if (s.result?.ok) return { cls: s.result.status === 'partial' ? 'warn' : 'done', txt: `${kind} ${s.result.status === 'partial' ? 'completed with errors' : 'complete'} · ${s.copied || 0} copied` };
     if (s.result)     return { cls: 'fail', txt: `${kind} failed` };
     return null;
@@ -16202,27 +16203,19 @@ const _transferMonitor = (() => {
         );
 
         node.events.forEach((ev, ei) => {
-          const hasFolders = ev.folders.length > 0;
+          const hasChildren = ev.folders.length > 0 || (ev.files || []).length > 0;
           html.push(
-            `<div class="tx-tree-node" data-ti="${ti}" data-ei="${ei}">` +
+            `<div class="tx-tree-node tx-generic-node" data-ti="${ti}" data-ei="${ei}">` +
             `<div class="tx-tree-row tx-tree-row-ev"${rowAttrs(ev.destinationStatus, ev.destinationReason)}>` +
             `<input type="checkbox" class="ti-cb-ev" data-ti="${ti}" data-ei="${ei}"${cbAttrs(ev.destinationStatus)}>` +
-            `<span class="tx-tree-arrow" data-ti="${ti}" data-ei="${ei}">${hasFolders ? '▶' : ' '}</span>` +
+            `<span class="tx-tree-arrow" data-ti="${ti}" data-ei="${ei}">${hasChildren ? '▶' : ' '}</span>` +
             `<span class="tx-tree-name" title="${_esc(ev.path)}">${_esc(ev.name)}</span>` +
             unresolvedBadge(ev.destinationStatus) + newCollBadge(ev.destinationStatus, ev.destinationReason) +
             `</div>` +
-            `<div class="tx-tree-children tx-collapsed" data-ev-children="${ti}-${ei}">`
+            `<div class="tx-tree-children tx-collapsed tx-generic-children" data-loaded="1" data-ev-children="${ti}-${ei}">` +
+            _tiRenderEventChildren(ev, 'ti-cb-fold', 'ti-cb-evfile', (suffix) => `data-ti="${ti}" data-ei="${ei}" data-fi="${suffix}"`) +
+            `</div></div>`
           );
-          ev.folders.forEach((fold, fi) => {
-            html.push(
-              `<div class="tx-tree-row tx-tree-row-fold">` +
-              `<input type="checkbox" class="ti-cb-fold" data-ti="${ti}" data-ei="${ei}" data-fi="${fi}"${cbAttrs(ev.destinationStatus)}>` +
-              `<span class="tx-tree-arrow"> </span>` +
-              `<span class="tx-tree-name" title="${_esc(fold.path)}">${_esc(fold.name)}</span>` +
-              `</div>`
-            );
-          });
-          html.push('</div></div>');
         });
 
         node.externalFolders.forEach((ext, xi) => {
@@ -16238,27 +16231,19 @@ const _transferMonitor = (() => {
 
         html.push('</div></div>');
       } else if (node.type === 'event') {
-        const hasFolders = node.folders.length > 0;
+        const hasChildren = node.folders.length > 0 || (node.files || []).length > 0;
         html.push(
-          `<div class="tx-tree-node" data-ti="${ti}">` +
+          `<div class="tx-tree-node tx-generic-node" data-ti="${ti}">` +
           `<div class="tx-tree-row tx-tree-row-coll"${rowAttrs(node.destinationStatus, node.destinationReason)}>` +
           `<input type="checkbox" class="ti-cb-devent" data-ti="${ti}"${cbAttrs(node.destinationStatus)}>` +
-          `<span class="tx-tree-arrow" data-ti="${ti}" data-devent="1">${hasFolders ? '▶' : ' '}</span>` +
+          `<span class="tx-tree-arrow" data-ti="${ti}" data-devent="1">${hasChildren ? '▶' : ' '}</span>` +
           `<span class="tx-tree-name" title="${_esc(node.path)}">${_esc(node.name)}</span>` +
           unresolvedBadge(node.destinationStatus) +
           `</div>` +
-          `<div class="tx-tree-children tx-collapsed" data-devent-children="${ti}">`
+          `<div class="tx-tree-children tx-collapsed tx-generic-children" data-loaded="1" data-devent-children="${ti}">` +
+          _tiRenderEventChildren(node, 'ti-cb-dfold', 'ti-cb-devfile', (suffix) => `data-ti="${ti}" data-fi="${suffix}"`) +
+          `</div></div>`
         );
-        node.folders.forEach((fold, fi) => {
-          html.push(
-            `<div class="tx-tree-row tx-tree-row-fold">` +
-            `<input type="checkbox" class="ti-cb-dfold" data-ti="${ti}" data-fi="${fi}"${cbAttrs(node.destinationStatus)}>` +
-            `<span class="tx-tree-arrow"> </span>` +
-            `<span class="tx-tree-name" title="${_esc(fold.path)}">${_esc(fold.name)}</span>` +
-            `</div>`
-          );
-        });
-        html.push('</div></div>');
       } else if (node.type === 'generic-folder') {
         // General-purpose transfer: an ordinary folder with no AutoIngest Event anywhere
         // inside it (a legacy year folder, a VHS lot, a recovered-files dump). Selected and
@@ -16321,6 +16306,42 @@ const _transferMonitor = (() => {
       `<div class="tx-tree-children tx-collapsed tx-generic-children" data-loaded="0"></div>` +
       `</div>`
     );
+  }
+
+  // Shared by Collection-nested Events (.ti-cb-ev/.ti-cb-fold) and root-level direct Events
+  // (.ti-cb-devent/.ti-cb-dfold): renders an Event's immediate folders and individual files.
+  // Folders double as .ti-cb-generic-nested (dual class) so they stay expandable to any
+  // depth via the SAME delegated lazy-expand/cascade machinery generic folders already use —
+  // below the Event level there is nothing archive-specific left to classify. Files are
+  // individually selectable leaves — "one individual photograph" — never bundled into an
+  // opaque "whole event" unit.
+  function _tiRenderEventChildren(ev, foldClass, fileClass, destAttrs) {
+    const cbAttrs2 = ev.destinationStatus === 'unresolved' ? ' disabled data-unresolved="true"' : ' checked data-unresolved="false"';
+    const parts = [];
+    ev.folders.forEach((fold, fi) => {
+      const escPath = _esc(fold.path);
+      parts.push(
+        `<div class="tx-tree-node tx-generic-node">` +
+        `<div class="tx-tree-row tx-tree-row-fold">` +
+        `<input type="checkbox" class="${foldClass} ti-cb-generic-nested" ${destAttrs(fi)} data-path="${escPath}" data-isdir="1"${cbAttrs2}>` +
+        `<span class="tx-tree-arrow tx-generic-arrow" data-path="${escPath}">▶</span>` +
+        `<span class="tx-tree-name" title="${escPath}">${_esc(fold.name)}</span>` +
+        `</div>` +
+        `<div class="tx-tree-children tx-collapsed tx-generic-children" data-loaded="0"></div>` +
+        `</div>`
+      );
+    });
+    (ev.files || []).forEach((f, ffi) => {
+      const escPath = _esc(f.path);
+      parts.push(
+        `<div class="tx-tree-row tx-tree-row-fold">` +
+        `<input type="checkbox" class="${fileClass} ti-cb-generic-nested" ${destAttrs(`file${ffi}`)} data-path="${escPath}" data-isdir="0"${cbAttrs2}>` +
+        `<span class="tx-tree-arrow"> </span>` +
+        `<span class="tx-tree-name" title="${escPath}">${_esc(f.name)}</span>` +
+        `</div>`
+      );
+    });
+    return parts.join('');
   }
 
   // Propagates a parent's checked state down to every already-loaded descendant checkbox
@@ -16466,8 +16487,12 @@ const _transferMonitor = (() => {
       });
     });
 
-    // Collection-nested: folder → event → collection propagation
-    treeEl.querySelectorAll('.ti-cb-fold').forEach(cb => {
+    // Collection-nested: folder/file → event → collection propagation. _tiUpdateEvState
+    // considers both .ti-cb-fold (now also expandable to any depth) and the individually
+    // selectable .ti-cb-evfile event-root files together, and correctly treats an
+    // indeterminate child (one with its own partial nested selection) as making the Event
+    // itself indeterminate too — never just "unchecked".
+    treeEl.querySelectorAll('.ti-cb-fold, .ti-cb-evfile').forEach(cb => {
       cb.addEventListener('change', () => {
         _tiUpdateEvState(treeEl, cb.dataset.ti, cb.dataset.ei);
         _tiUpdateCollState(treeEl, cb.dataset.ti);
@@ -16477,9 +16502,14 @@ const _transferMonitor = (() => {
     treeEl.querySelectorAll('.ti-cb-ev').forEach(cb => {
       cb.addEventListener('change', () => {
         const checked = cb.checked;
-        treeEl.querySelectorAll(`.ti-cb-fold[data-ti="${cb.dataset.ti}"][data-ei="${cb.dataset.ei}"]`).forEach(f => {
+        treeEl.querySelectorAll(`.ti-cb-fold[data-ti="${cb.dataset.ti}"][data-ei="${cb.dataset.ei}"], .ti-cb-evfile[data-ti="${cb.dataset.ti}"][data-ei="${cb.dataset.ei}"]`).forEach(f => {
           if (f.disabled) return;
           f.checked = checked; f.indeterminate = false;
+          // A fold may itself have already-loaded nested generic descendants (from an
+          // earlier partial selection below it) — propagate all the way down, not just
+          // one level, so toggling the Event re-selects/deselects everything beneath it.
+          const nodeEl = f.closest('.tx-generic-node');
+          if (nodeEl) _tiPropagateGenericCheckedDown(nodeEl, checked);
         });
         cb.indeterminate = false;
         _tiUpdateCollState(treeEl, cb.dataset.ti);
@@ -16491,7 +16521,12 @@ const _transferMonitor = (() => {
         const checked = cb.checked;
         const ti = cb.dataset.ti;
         treeEl.querySelectorAll(`.ti-cb-ev[data-ti="${ti}"]`).forEach(e => { if (!e.disabled) { e.checked = checked; e.indeterminate = false; } });
-        treeEl.querySelectorAll(`.ti-cb-fold[data-ti="${ti}"]`).forEach(f => { if (!f.disabled) { f.checked = checked; f.indeterminate = false; } });
+        treeEl.querySelectorAll(`.ti-cb-fold[data-ti="${ti}"], .ti-cb-evfile[data-ti="${ti}"]`).forEach(f => {
+          if (f.disabled) return;
+          f.checked = checked; f.indeterminate = false;
+          const nodeEl = f.closest('.tx-generic-node');
+          if (nodeEl) _tiPropagateGenericCheckedDown(nodeEl, checked);
+        });
         treeEl.querySelectorAll(`.ti-cb-cext[data-ti="${ti}"]`).forEach(x => { if (!x.disabled) x.checked = checked; });
         cb.indeterminate = false;
         _tiInvalidatePreview();
@@ -16501,14 +16536,16 @@ const _transferMonitor = (() => {
       cb.addEventListener('change', _tiInvalidatePreview);
     });
 
-    // General-purpose transfer: arbitrary-depth nested selection for generic folders — lazy
-    // expand/collapse plus a recursive checked/indeterminate cascade, both ways. Delegated at
-    // the treeEl level (not bound per-checkbox) so nodes injected later by lazy expansion work
-    // immediately, with no re-binding step.
+    // General-purpose transfer: arbitrary-depth nested selection for generic folders (and,
+    // below the Event level, Collection/direct-Event content too — see _tiRenderEventChildren)
+    // — lazy expand/collapse plus a recursive checked/indeterminate cascade, both ways.
+    // Delegated at the treeEl level (not bound per-checkbox) so nodes injected later by lazy
+    // expansion work immediately, with no re-binding step.
     _tiBindGenericTreeDelegation(treeEl);
 
-    // Direct Event (root-level): folder → event propagation
-    treeEl.querySelectorAll('.ti-cb-dfold').forEach(cb => {
+    // Direct Event (root-level): folder/file → event propagation. Same shape as the
+    // Collection-nested case above, one level shallower (no Collection to cascade to).
+    treeEl.querySelectorAll('.ti-cb-dfold, .ti-cb-devfile').forEach(cb => {
       cb.addEventListener('change', () => {
         _tiUpdateDeventState(treeEl, cb.dataset.ti);
         _tiInvalidatePreview();
@@ -16517,9 +16554,11 @@ const _transferMonitor = (() => {
     treeEl.querySelectorAll('.ti-cb-devent').forEach(cb => {
       cb.addEventListener('change', () => {
         const checked = cb.checked;
-        treeEl.querySelectorAll(`.ti-cb-dfold[data-ti="${cb.dataset.ti}"]`).forEach(f => {
+        treeEl.querySelectorAll(`.ti-cb-dfold[data-ti="${cb.dataset.ti}"], .ti-cb-devfile[data-ti="${cb.dataset.ti}"]`).forEach(f => {
           if (f.disabled) return;
           f.checked = checked; f.indeterminate = false;
+          const nodeEl = f.closest('.tx-generic-node');
+          if (nodeEl) _tiPropagateGenericCheckedDown(nodeEl, checked);
         });
         cb.indeterminate = false;
         _tiInvalidatePreview();
@@ -16529,13 +16568,16 @@ const _transferMonitor = (() => {
 
   function _tiUpdateEvState(treeEl, ti, ei) {
     const folds = Array.from(treeEl.querySelectorAll(`.ti-cb-fold[data-ti="${ti}"][data-ei="${ei}"]`));
-    if (folds.length === 0) return;
+    const files = Array.from(treeEl.querySelectorAll(`.ti-cb-evfile[data-ti="${ti}"][data-ei="${ei}"]`));
+    const all = [...folds, ...files];
+    if (all.length === 0) return;
     const evCb = treeEl.querySelector(`.ti-cb-ev[data-ti="${ti}"][data-ei="${ei}"]`);
     if (!evCb || evCb.disabled) return;
-    const checkedCount = folds.filter(f => f.checked).length;
-    if (checkedCount === 0)                 { evCb.checked = false; evCb.indeterminate = false; }
-    else if (checkedCount === folds.length) { evCb.checked = true;  evCb.indeterminate = false; }
-    else                                    { evCb.checked = false; evCb.indeterminate = true;  }
+    const checkedCount = all.filter(c => c.checked && !c.indeterminate).length;
+    const anyIndeterminate = all.some(c => c.indeterminate);
+    if (checkedCount === all.length && !anyIndeterminate) { evCb.checked = true;  evCb.indeterminate = false; }
+    else if (checkedCount === 0 && !anyIndeterminate)      { evCb.checked = false; evCb.indeterminate = false; }
+    else                                                   { evCb.checked = false; evCb.indeterminate = true;  }
   }
 
   function _tiUpdateCollState(treeEl, ti) {
@@ -16553,13 +16595,16 @@ const _transferMonitor = (() => {
 
   function _tiUpdateDeventState(treeEl, ti) {
     const folds = Array.from(treeEl.querySelectorAll(`.ti-cb-dfold[data-ti="${ti}"]`));
-    if (folds.length === 0) return;
+    const files = Array.from(treeEl.querySelectorAll(`.ti-cb-devfile[data-ti="${ti}"]`));
+    const all = [...folds, ...files];
+    if (all.length === 0) return;
     const evCb = treeEl.querySelector(`.ti-cb-devent[data-ti="${ti}"]`);
     if (!evCb || evCb.disabled) return;
-    const checkedCount = folds.filter(f => f.checked).length;
-    if (checkedCount === 0)                 { evCb.checked = false; evCb.indeterminate = false; }
-    else if (checkedCount === folds.length) { evCb.checked = true;  evCb.indeterminate = false; }
-    else                                    { evCb.checked = false; evCb.indeterminate = true;  }
+    const checkedCount = all.filter(c => c.checked && !c.indeterminate).length;
+    const anyIndeterminate = all.some(c => c.indeterminate);
+    if (checkedCount === all.length && !anyIndeterminate) { evCb.checked = true;  evCb.indeterminate = false; }
+    else if (checkedCount === 0 && !anyIndeterminate)      { evCb.checked = false; evCb.indeterminate = false; }
+    else                                                   { evCb.checked = false; evCb.indeterminate = true;  }
   }
 
   function _tiInvalidatePreview() {
@@ -16589,23 +16634,30 @@ const _transferMonitor = (() => {
     const externalPaths  = new Set();
     const filePaths      = new Set();
 
-    treeEl.querySelectorAll('.ti-cb-fold:checked').forEach(cb => {
-      const p = _tiTree[parseInt(cb.dataset.ti, 10)]?.events?.[parseInt(cb.dataset.ei, 10)]?.folders?.[parseInt(cb.dataset.fi, 10)]?.path;
-      if (p) folderPaths.add(p);
+    // Collection/Event folders and individual event-root files are, below the Event level,
+    // exactly as recursively selectable as any generic folder — a fully-checked .ti-cb-fold/
+    // .ti-cb-dfold is emitted once as a whole-subtree folderPaths entry (archive-aware
+    // destination resolution still applies, via resolveOne — see transferImportService.js);
+    // an indeterminate one is walked via the same _tiCollectGenericSelections recursion
+    // generic folders already use, since nothing below the Event level needs reclassifying.
+    // Individual event-root files (.ti-cb-evfile/.ti-cb-devfile) replace the old
+    // "whole-event-root-files-as-one-bundle" approach with real per-file selection — "one
+    // individual photograph" is now literally one filePaths entry, not an all-or-nothing sweep.
+    treeEl.querySelectorAll('.ti-cb-fold').forEach(cb => {
+      const p = cb.dataset.path;
+      if (p) _tiCollectGenericSelections(cb, p, true, folderPaths, filePaths);
     });
-    treeEl.querySelectorAll('.ti-cb-dfold:checked').forEach(cb => {
-      const p = _tiTree[parseInt(cb.dataset.ti, 10)]?.folders?.[parseInt(cb.dataset.fi, 10)]?.path;
-      if (p) folderPaths.add(p);
+    treeEl.querySelectorAll('.ti-cb-dfold').forEach(cb => {
+      const p = cb.dataset.path;
+      if (p) _tiCollectGenericSelections(cb, p, true, folderPaths, filePaths);
     });
-    treeEl.querySelectorAll('.ti-cb-ev').forEach(evCb => {
-      if (!evCb.checked || evCb.indeterminate || evCb.disabled) return;
-      const ev = _tiTree[parseInt(evCb.dataset.ti, 10)]?.events?.[parseInt(evCb.dataset.ei, 10)];
-      if (ev?.hasEventRootFiles) eventRootPaths.add(ev.path);
+    treeEl.querySelectorAll('.ti-cb-evfile').forEach(cb => {
+      const p = cb.dataset.path;
+      if (p) _tiCollectGenericSelections(cb, p, false, folderPaths, filePaths);
     });
-    treeEl.querySelectorAll('.ti-cb-devent').forEach(evCb => {
-      if (!evCb.checked || evCb.indeterminate || evCb.disabled) return;
-      const node = _tiTree[parseInt(evCb.dataset.ti, 10)];
-      if (node?.hasEventRootFiles) eventRootPaths.add(node.path);
+    treeEl.querySelectorAll('.ti-cb-devfile').forEach(cb => {
+      const p = cb.dataset.path;
+      if (p) _tiCollectGenericSelections(cb, p, false, folderPaths, filePaths);
     });
     treeEl.querySelectorAll('.ti-cb-cext:checked').forEach(cb => {
       const p = _tiTree[parseInt(cb.dataset.ti, 10)]?.externalFolders?.[parseInt(cb.dataset.xi, 10)]?.path;
@@ -17003,23 +17055,50 @@ const _transferMonitor = (() => {
     if (!box) return;
     box.removeAttribute('hidden');
 
-    // Box class
+    // Box class — result.ok means "the run completed without crashing", not "it succeeded";
+    // the actual outcome is result.status, so a 'failed' result must never get the same
+    // success-styled class as 'ok'/'partial'.
     box.className = 'tx-status-box';
-    if (status.paused)          box.classList.add('tx-paused');
-    else if (status.running)    box.classList.add('tx-running');
+    if (status.paused) box.classList.add('tx-paused');
+    else if (status.running) box.classList.add('tx-running');
+    else if (status.result?.ok && status.result.status === 'failed') box.classList.add('tx-error');
     else if (status.result?.ok) box.classList.add('tx-done');
-    else if (status.result)     box.classList.add('tx-error');
-    else                        box.classList.add('tx-idle');
+    else if (status.result) box.classList.add('tx-error');
+    else box.classList.add('tx-idle');
 
-    // Headline
+    // Headline — three distinct completion states, never a generic "complete" when nothing
+    // was actually copied. 'failed' (zero files landed) is deliberately worded differently
+    // from 'partial' (some succeeded) — a silent "complete" would misrepresent a transfer
+    // that moved nothing at all.
     const headlineEl = _tiEl('tiStatusHeadline');
     if (headlineEl) {
       let headline = '';
       if (status.paused) headline = 'Import paused';
       else if (status.running) headline = 'Import in progress…';
+      else if (status.result?.ok && status.result.status === 'failed') headline = 'Import failed — no files copied';
       else if (status.result?.ok) headline = status.result.status === 'partial' ? 'Import complete — with errors' : 'Import complete';
       else if (status.result) headline = 'Import failed';
       headlineEl.textContent = headline;
+    }
+
+    // Error-cap warning — the error cap stops ATTEMPTS, not just how many are shown; once hit,
+    // every remaining file in the selection is left completely unattempted (never copied,
+    // never skipped, never recorded as a failure). Surfaced explicitly so "errors: 200" is
+    // never mistaken for "only 200 files were a problem" when the real number may be much
+    // higher, and so a uniform failure (e.g. an unwritable destination) is never read as a
+    // routine partial completion.
+    const errorCapEl = _tiEl('tiErrorCapWarning');
+    if (errorCapEl) {
+      const r = status.result;
+      const neverAttempted = r?.neverAttempted || 0;
+      if (!status.running && r?.errorsCapped) {
+        errorCapEl.textContent = neverAttempted > 0
+          ? `Stopped after 200 errors — ${neverAttempted.toLocaleString()} more file${neverAttempted === 1 ? '' : 's'} were never attempted. This usually means the destination could not be written to (check it is connected, mounted, and not read-only) rather than 200 unrelated file problems.`
+          : `Stopped after 200 errors. This usually means the destination could not be written to (check it is connected, mounted, and not read-only) rather than 200 unrelated file problems.`;
+        errorCapEl.removeAttribute('hidden');
+      } else {
+        errorCapEl.setAttribute('hidden', '');
+      }
     }
 
     // Checkpoint-health warning — inline, non-modal, persists silently while unhealthy
@@ -17163,6 +17242,9 @@ const _transferMonitor = (() => {
     } else if (status.running) {
       if (noteEl) noteEl.textContent = 'Import in progress…';
       _tiSetButtonPhase('running');
+    } else if (status.result?.ok && status.result.status === 'failed') {
+      if (noteEl) noteEl.textContent = 'Import failed — no files copied.';
+      _tiSetButtonPhase('failed');
     } else if (status.result?.ok) {
       const isPartial = status.result.status === 'partial';
       if (noteEl) noteEl.textContent = isPartial ? 'Completed with errors.' : 'Import complete.';

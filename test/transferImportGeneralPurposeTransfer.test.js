@@ -244,15 +244,13 @@ async function main() {
   });
 
   // ── 9. Empty folders ───────────────────────────────────────────────────────────
-  // A selected unit's own top-level destination directory is created unconditionally by the
-  // batch loop (mkdir before the walk), so an empty TOP-LEVEL folder is still created at the
-  // destination. A NESTED empty subdirectory inside an otherwise non-empty folder is a
-  // different, documented, pre-existing limitation shared with Transfer Export: destination
-  // directories below the top level are only ever created as a side effect of copying a file
-  // into them (_copyFileSafe's mkdir(dirname(finalDest))), so a nested folder with no files
-  // anywhere inside it is never created. Not claimed as "preserved" — verified as the real,
-  // shared copy-engine behavior, not invented here.
-  await t('9. an empty folder is a selectable, non-blocking unit; its own top-level directory is created, a nested empty subdirectory is not', async () => {
+  // SUPERSEDED 2026-10-22 ("Transfer Import: Recursive Collection Browsing and Zero-Copy
+  // Failure" brief, step 8): nested empty directories used to be silently dropped, because
+  // destination directories below the top level were only ever created as a side effect of
+  // copying a file into them. _walkAndCopy now creates each destination directory
+  // unconditionally, before recursing into it — fixed identically in Transfer Export's
+  // copy of the same function. Both top-level and nested empty folders are now preserved.
+  await t('9. an empty folder is a selectable, non-blocking unit; both top-level and nested empty directories are preserved', async () => {
     const transferRoot = await mkTmp('ti-gp-empty-src-');
     const mainArchiveRoot = await mkTmp('ti-gp-empty-dst-');
     await fsp.mkdir(path.join(transferRoot, 'EmptyFolder'), { recursive: true });
@@ -271,7 +269,7 @@ async function main() {
     await waitForImportDone();
     assert.ok(fs.existsSync(path.join(mainArchiveRoot, 'EmptyFolder')), 'a selected top-level empty folder IS created at the destination');
     assert.ok(fs.existsSync(path.join(mainArchiveRoot, 'PartlyEmpty', 'HasFile', 'f.txt')));
-    assert.ok(!fs.existsSync(path.join(mainArchiveRoot, 'PartlyEmpty', 'NoFilesAnywhere')), 'a nested empty subdirectory is NOT created — documented shared copy-engine limitation');
+    assert.ok(fs.existsSync(path.join(mainArchiveRoot, 'PartlyEmpty', 'NoFilesAnywhere')), 'a nested empty subdirectory IS now created — the shared copy-engine fix');
   });
 
   // ── 10. Reimport ───────────────────────────────────────────────────────────────
