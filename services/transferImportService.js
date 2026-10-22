@@ -566,6 +566,17 @@ async function scanImportTree(transferRoot, mainArchiveRoot, isValidEventJsonFn)
   const tree = [];
 
   for (const topEntry of topEntries) {
+    if (topEntry.isFile()) {
+      // General-purpose transfer: an ordinary file sitting directly at the Transfer Drive
+      // root is just as legitimate a transfer unit as a folder — AutoIngest Collection
+      // structure is for photographic archive content, not a gate on what can be moved.
+      if (_skipFile(topEntry.name)) continue;
+      tree.push({
+        type: 'generic-file', name: topEntry.name, path: path.join(transferRoot, topEntry.name),
+        destinationStatus: 'resolved', destinationReason: null, collectionKey: null,
+      });
+      continue;
+    }
     if (!topEntry.isDirectory() || _skipDir(topEntry.name)) continue;
     const topPath = path.join(transferRoot, topEntry.name);
 
@@ -597,12 +608,19 @@ async function scanImportTree(transferRoot, mainArchiveRoot, isValidEventJsonFn)
     }
 
     if (events.length === 0) {
+      // General-purpose transfer: no AutoIngest Event anywhere inside this folder (a legacy
+      // year folder, a VHS lot, a recovered-files dump — anything that isn't photographic
+      // archive content) is NOT an invalid transfer source. It is an ordinary folder, copied
+      // recursively, preserving its name and internal structure under the Main Archive Root —
+      // the exact same deterministic name-based destination the Collection branch below already
+      // uses, just without requiring Event-shaped children. Never reinterpreted as a Collection
+      // or Event, never given an event.json, never fed into archive-identity resolution.
       tree.push({
-        type: 'external',
+        type: 'generic-folder',
         name: topEntry.name,
         path: topPath,
-        destinationStatus: 'unresolved',
-        destinationReason: 'external-root-no-approved-destination',
+        destinationStatus: 'resolved',
+        destinationReason: null,
         collectionKey: null,
       });
       continue;
@@ -689,10 +707,11 @@ async function _resolveLegacyCollectionUnits(transferRoot, mainArchiveRoot, coll
 
 async function _resolveImportUnits(transferRoot, mainArchiveRoot, scope, isValidEventJsonFn) {
   const {
-    folderPaths = [], eventRootPaths = [], externalPaths = [], collectionPaths = [],
+    folderPaths = [], eventRootPaths = [], externalPaths = [], collectionPaths = [], filePaths = [],
   } = scope || {};
 
-  if (folderPaths.length === 0 && eventRootPaths.length === 0 && externalPaths.length === 0 && collectionPaths.length > 0) {
+  if (folderPaths.length === 0 && eventRootPaths.length === 0 && externalPaths.length === 0 &&
+      filePaths.length === 0 && collectionPaths.length > 0) {
     return _resolveLegacyCollectionUnits(transferRoot, mainArchiveRoot, collectionPaths);
   }
 
@@ -746,9 +765,34 @@ async function _resolveImportUnits(transferRoot, mainArchiveRoot, scope, isValid
     }
 
     if (!info.hasEventChildren) {
-      // Root-level external — never lands directly under the Main Archive Root, regardless
-      // of any coincidentally-named Collection.
-      unresolvedUnits.push({ path: absPath, name: path.basename(absPath), reason: 'external-root-no-approved-destination' });
+      if (isExternal) {
+        // A non-Event sibling folder inside a Collection-shaped parent — kept as 'external'
+        // (an existing, archive-aware concept: it rides along with its Collection's destination,
+        // not a standalone general-purpose transfer unit).
+        resolvedUnits.push({
+          srcDir: absPath, destDir: path.join(mainArchiveRoot, rel), rootFilesOnly,
+          sourceType: 'external', collectionKey: topName, eventKey: parts[0],
+          destinationStatus: 'resolved', destinationReason: null,
+        });
+        return;
+      }
+      // General-purpose transfer: no Event anywhere under this top-level folder — it is not
+      // AutoIngest archive content at all (a legacy year folder, a VHS lot, a recovered-files
+      // dump), so it is never reinterpreted as a Collection or Event, never given an event.json,
+      // never fed into archive-identity resolution. It is an ordinary folder, copied recursively
+      // to the same deterministic, name-preserving destination (mainArchiveRoot/<relative path>)
+      // every other unit here already uses — not a guess, since the folder's own name and
+      // position IS the destination.
+      resolvedUnits.push({
+        srcDir:             absPath,
+        destDir:            path.join(mainArchiveRoot, rel),
+        rootFilesOnly,
+        sourceType:         'generic-folder',
+        collectionKey:      null,
+        eventKey:           null,
+        destinationStatus:  'resolved',
+        destinationReason:  null,
+      });
       return;
     }
 
@@ -764,7 +808,7 @@ async function _resolveImportUnits(transferRoot, mainArchiveRoot, scope, isValid
       srcDir:             absPath,
       destDir:            path.join(mainArchiveRoot, rel),
       rootFilesOnly,
-      sourceType:         isExternal ? 'external' : 'collection-event',
+      sourceType:         'collection-event',
       collectionKey:      topName,
       eventKey:           parts.length > 1 ? `${parts[0]}/${parts[1]}` : parts[0],
       destinationStatus:  'resolved',
@@ -773,9 +817,30 @@ async function _resolveImportUnits(transferRoot, mainArchiveRoot, scope, isValid
     });
   }
 
+  // General-purpose transfer: an ordinary file sitting directly at the Transfer Drive root.
+  // No event.json, no Collection/Event reinterpretation, no archive-identity resolution — the
+  // destination is simply mainArchiveRoot/<filename>, the same deterministic name-preserving
+  // mapping every folder unit above already uses. Handled as its own unit (never swept into a
+  // sibling folder's rootFilesOnly walk) so selecting one root file never pulls in others.
+  async function resolveOneFile(absPath) {
+    const rel = path.relative(transferRoot, absPath);
+    resolvedUnits.push({
+      srcDir:             absPath,
+      destDir:            path.join(mainArchiveRoot, rel),
+      rootFilesOnly:      false,
+      isFile:             true,
+      sourceType:         'generic-file',
+      collectionKey:      null,
+      eventKey:           null,
+      destinationStatus:  'resolved',
+      destinationReason:  null,
+    });
+  }
+
   for (const p of folderPaths)    await resolveOne(p, false, false);
   for (const p of eventRootPaths) await resolveOne(p, true,  false);
   for (const p of externalPaths)  await resolveOne(p, false, true);
+  for (const p of filePaths)      await resolveOneFile(p);
 
   return { resolvedUnits: _dedupResolvedUnits(resolvedUnits), unresolvedUnits };
 }
@@ -786,6 +851,7 @@ function _scopePaths(scope) {
     ...(scope?.eventRootPaths  || []),
     ...(scope?.externalPaths   || []),
     ...(scope?.collectionPaths || []),
+    ...(scope?.filePaths       || []),
   ];
 }
 
@@ -839,8 +905,35 @@ async function _scanUnitsInventory(resolvedUnits) {
     }
   }
 
+  // A file-shaped unit (unit.isFile) is a single leaf, never a directory to readdir() —
+  // inventory it directly via one stat, same destination-state rules as any other file.
+  async function walkFile(unit) {
+    let srcStat;
+    try { srcStat = await fsp.stat(unit.srcDir); } catch {
+      groups.errors++;
+      entries.push({ unitSrcDir: unit.srcDir, unitDestDir: unit.destDir, rootFilesOnly: false, relativeFilePath: '.', sourceSize: 0, destinationState: 'error', destinationSize: null });
+      return;
+    }
+    let destStat = null;
+    try { destStat = await fsp.stat(unit.destDir); } catch {}
+
+    let destinationState, destinationSize;
+    if (!destStat) {
+      destinationState = 'missing'; destinationSize = null;
+      groups.newFiles++; newBytes += srcStat.size;
+    } else if (destStat.size === srcStat.size) {
+      destinationState = 'same-size'; destinationSize = destStat.size;
+      groups.alreadyImported++;
+    } else {
+      destinationState = 'changed-size'; destinationSize = destStat.size;
+      groups.changed++;
+    }
+    entries.push({ unitSrcDir: unit.srcDir, unitDestDir: unit.destDir, rootFilesOnly: false, relativeFilePath: '.', sourceSize: srcStat.size, destinationState, destinationSize });
+  }
+
   for (const unit of resolvedUnits) {
-    await walk(unit.srcDir, unit.destDir, unit.rootFilesOnly, unit.srcDir, unit.destDir);
+    if (unit.isFile) await walkFile(unit);
+    else await walk(unit.srcDir, unit.destDir, unit.rootFilesOnly, unit.srcDir, unit.destDir);
   }
 
   return { entries, groups, newBytes };
@@ -854,6 +947,7 @@ function _computeScanFingerprint({ transferRoot, mainArchiveRoot, scope, resolve
     eventRootPaths:  [...(scope?.eventRootPaths  || [])].sort(),
     externalPaths:   [...(scope?.externalPaths   || [])].sort(),
     collectionPaths: [...(scope?.collectionPaths || [])].sort(),
+    filePaths:       [...(scope?.filePaths       || [])].sort(),
   };
   const unitsSummary = resolvedUnits
     .map(u => ({ srcDir: u.srcDir, destDir: u.destDir, sourceType: u.sourceType, collectionKey: u.collectionKey, eventKey: u.eventKey, destinationReason: u.destinationReason }))
@@ -961,13 +1055,14 @@ async function _doImportPlain(transferRoot, mainArchiveRoot, resolvedUnits, meta
     batches = resolvedUnits.map((u, idx) => ({
       batchIdx:   idx,
       batchLabel: path.relative(transferRoot, u.srcDir).split(path.sep).join(' / '),
-      srcDir: u.srcDir, destDir: u.destDir, rootFilesOnly: !!u.rootFilesOnly,
+      srcDir: u.srcDir, destDir: u.destDir, rootFilesOnly: !!u.rootFilesOnly, isFile: !!u.isFile,
       fileCount: 0, status: 'pending',
       copied: 0, skipped: 0, renamed: 0, errors: 0,
     }));
     let totalFiles = 0;
     for (const batch of batches) {
-      batch.fileCount = await _countFiles(batch.srcDir, { rootFilesOnly: batch.rootFilesOnly });
+      // A file-shaped unit (batch.isFile) is a single leaf — never readdir()'d as a directory.
+      batch.fileCount = batch.isFile ? 1 : await _countFiles(batch.srcDir, { rootFilesOnly: batch.rootFilesOnly });
       totalFiles += batch.fileCount;
     }
     _state.total      = totalFiles;
@@ -995,11 +1090,19 @@ async function _doImportPlain(transferRoot, mainArchiveRoot, resolvedUnits, meta
     _state.batchIndex = i;
     _state.batchName  = batch.batchLabel;
 
-    try { await fsp.mkdir(batch.destDir, { recursive: true }); } catch {}
-
     const outcomeCtx = { batchId: meta.batchId, transferRoot, mainArchiveRoot, transferRootIdentity, eventPath: batch.destDir };
     const before = { copied: stats.copied, skipped: stats.skipped, renamed: stats.renamed, errors: stats.errors.length };
-    await _walkAndCopy(batch.srcDir, batch.destDir, stats, { rootFilesOnly: batch.rootFilesOnly, outcomeCtx });
+    if (batch.isFile) {
+      // A single ordinary file at the Transfer Drive root — destDir IS the destination file
+      // path, so only its parent directory is created, never a directory at destDir itself.
+      try { await fsp.mkdir(path.dirname(batch.destDir), { recursive: true }); } catch {}
+      _state.current = path.basename(batch.srcDir);
+      try { await _copyFileSafe(batch.srcDir, batch.destDir, stats, { outcomeCtx }); }
+      catch (e) { stats.errors.push({ file: batch.srcDir, error: e.message }); }
+    } else {
+      try { await fsp.mkdir(batch.destDir, { recursive: true }); } catch {}
+      await _walkAndCopy(batch.srcDir, batch.destDir, stats, { rootFilesOnly: batch.rootFilesOnly, outcomeCtx });
+    }
     batch.copied  = stats.copied  - before.copied;
     batch.skipped = stats.skipped - before.skipped;
     batch.renamed = stats.renamed - before.renamed;
@@ -1050,7 +1153,7 @@ async function _doImportUpdate(transferRoot, mainArchiveRoot, resolvedUnits, inv
     batches = resolvedUnits.map((u, idx) => ({
       batchIdx:   idx,
       batchLabel: path.relative(transferRoot, u.srcDir).split(path.sep).join(' / '),
-      srcDir: u.srcDir, destDir: u.destDir, rootFilesOnly: !!u.rootFilesOnly,
+      srcDir: u.srcDir, destDir: u.destDir, rootFilesOnly: !!u.rootFilesOnly, isFile: !!u.isFile,
       fileList: byUnit.get(u.srcDir) || [],
       status: 'pending', copied: 0, errors: 0,
     }));
@@ -1106,7 +1209,9 @@ async function _doImportUpdate(transferRoot, mainArchiveRoot, resolvedUnits, inv
     _state.batchIndex = i;
     _state.batchName  = batch.batchLabel;
 
-    try { await fsp.mkdir(batch.destDir, { recursive: true }); } catch {}
+    // batch.destDir is an exact destination FILE path for a file-shaped unit — only its
+    // parent directory is created, same as _doImportPlain's equivalent branch.
+    try { await fsp.mkdir(batch.isFile ? path.dirname(batch.destDir) : batch.destDir, { recursive: true }); } catch {}
 
     const outcomeCtx = { batchId: meta.batchId, transferRoot, mainArchiveRoot, transferRootIdentity, eventPath: batch.destDir };
     const before = { copied: stats.copied, errors: stats.errors.length };
@@ -1184,7 +1289,7 @@ async function previewImport(transferRoot, mainArchiveRoot, scope, isValidEventJ
       _isInsideDir(mainArchiveRoot, transferRoot)) {
     return { ok: false, reason: 'roots-overlap' };
   }
-  const hasNewScope    = (scope?.folderPaths?.length > 0) || (scope?.eventRootPaths?.length > 0) || (scope?.externalPaths?.length > 0);
+  const hasNewScope    = (scope?.folderPaths?.length > 0) || (scope?.eventRootPaths?.length > 0) || (scope?.externalPaths?.length > 0) || (scope?.filePaths?.length > 0);
   const hasLegacyScope = scope?.collectionPaths?.length > 0;
   if (!scope || (!hasNewScope && !hasLegacyScope)) {
     return { ok: false, reason: 'empty-scope' };
@@ -1199,22 +1304,25 @@ async function previewImport(transferRoot, mainArchiveRoot, scope, isValidEventJ
 
   const collectionSet = new Set();
   const eventSet      = new Set();
-  let externalFolders = 0, folders = 0, files = 0;
+  let externalFolders = 0, folders = 0, files = 0, genericItems = 0;
 
   for (const unit of resolvedUnits) {
-    if (unit.sourceType === 'external') {
+    if (unit.sourceType === 'generic-folder' || unit.sourceType === 'generic-file') {
+      genericItems++;
+      if (!unit.isFile) folders++;
+    } else if (unit.sourceType === 'external') {
       externalFolders++;
     } else {
       if (unit.collectionKey) collectionSet.add(unit.collectionKey);
       eventSet.add(unit.eventKey);
       if (!unit.rootFilesOnly) folders++;
     }
-    files += await _countFiles(unit.srcDir, { rootFilesOnly: unit.rootFilesOnly });
+    files += unit.isFile ? 1 : await _countFiles(unit.srcDir, { rootFilesOnly: unit.rootFilesOnly });
   }
 
   return {
     ok: true, transferRoot, mainArchiveRoot, scope,
-    collections: collectionSet.size, events: eventSet.size, externalFolders, folders, files,
+    collections: collectionSet.size, events: eventSet.size, externalFolders, folders, files, genericItems,
     unresolvedCount: unresolvedUnits.length,
     unresolvedItems: unresolvedUnits.map(u => ({ path: u.path, name: u.name, reason: u.reason })),
   };
@@ -1228,7 +1336,7 @@ async function runImport(transferRoot, mainArchiveRoot, scope, isValidEventJsonF
       _isInsideDir(mainArchiveRoot, transferRoot)) {
     return { ok: false, reason: 'roots-overlap' };
   }
-  const hasNewScope    = (scope?.folderPaths?.length > 0) || (scope?.eventRootPaths?.length > 0) || (scope?.externalPaths?.length > 0);
+  const hasNewScope    = (scope?.folderPaths?.length > 0) || (scope?.eventRootPaths?.length > 0) || (scope?.externalPaths?.length > 0) || (scope?.filePaths?.length > 0);
   const hasLegacyScope = scope?.collectionPaths?.length > 0;
   if (!scope || (!hasNewScope && !hasLegacyScope)) {
     return { ok: false, reason: 'empty-scope' };
@@ -1343,7 +1451,7 @@ async function scanImportSync(transferRoot, mainArchiveRoot, scope, isValidEvent
       _isInsideDir(mainArchiveRoot, transferRoot)) {
     return { ok: false, reason: 'roots-overlap' };
   }
-  const hasNewScope = (scope?.folderPaths?.length > 0) || (scope?.eventRootPaths?.length > 0) || (scope?.externalPaths?.length > 0);
+  const hasNewScope = (scope?.folderPaths?.length > 0) || (scope?.eventRootPaths?.length > 0) || (scope?.externalPaths?.length > 0) || (scope?.filePaths?.length > 0);
   if (!scope || !hasNewScope) return { ok: false, reason: 'empty-scope' };
   for (const p of _scopePaths(scope)) {
     if (!_isInsideDir(transferRoot, p)) {
@@ -1358,9 +1466,10 @@ async function scanImportSync(transferRoot, mainArchiveRoot, scope, isValidEvent
 
   const collectionSet = new Set();
   const eventSet      = new Set();
-  let externalFolders = 0;
+  let externalFolders = 0, genericItems = 0;
   for (const unit of resolvedUnits) {
-    if (unit.sourceType === 'external') externalFolders++;
+    if (unit.sourceType === 'generic-folder' || unit.sourceType === 'generic-file') genericItems++;
+    else if (unit.sourceType === 'external') externalFolders++;
     else {
       if (unit.collectionKey) collectionSet.add(unit.collectionKey);
       eventSet.add(unit.eventKey);
@@ -1380,7 +1489,7 @@ async function scanImportSync(transferRoot, mainArchiveRoot, scope, isValidEvent
   return {
     ok: true,
     totals: {
-      collections: collectionSet.size, events: eventSet.size, externalFolders,
+      collections: collectionSet.size, events: eventSet.size, externalFolders, genericItems,
       alreadyImported: groups.alreadyImported, newFiles: groups.newFiles, changed: groups.changed,
       totalFiles: entries.length, newBytes, unresolvedCount: unresolvedUnits.length,
     },
@@ -1473,8 +1582,46 @@ async function verifyImport(transferRoot, mainArchiveRoot, scope, isValidEventJs
     }
   }
 
+  // A file-shaped unit (unit.isFile) is a single leaf — verified directly, never readdir()'d.
+  async function verifyFile(srcPath, destPath) {
+    _state.verifyTotal++;
+    let srcStat;
+    try { srcStat = await fsp.stat(srcPath); } catch {
+      results.missing++; _state.verifyFailed++; _state.verifyDone++;
+      return;
+    }
+    let destStat = null;
+    try { destStat = await fsp.stat(destPath); } catch {}
+    if (!destStat) {
+      results.missing++; _state.verifyFailed++;
+      results.errors.push({ file: path.basename(srcPath), reason: 'missing-at-destination' });
+      _state.verifyDone++;
+      return;
+    }
+    if (destStat.size !== srcStat.size) {
+      results.failed++; _state.verifyFailed++;
+      results.errors.push({ file: path.basename(srcPath), reason: 'size-mismatch' });
+      _state.verifyDone++;
+      return;
+    }
+    try {
+      const [srcHash, destHash] = await Promise.all([_fileHash(srcPath), _fileHash(destPath)]);
+      if (srcHash !== destHash) {
+        results.failed++; _state.verifyFailed++;
+        results.errors.push({ file: path.basename(srcPath), reason: 'hash-mismatch' });
+      } else {
+        results.verified++;
+      }
+    } catch (e) {
+      results.failed++; _state.verifyFailed++;
+      results.errors.push({ file: path.basename(srcPath), reason: e.message });
+    }
+    _state.verifyDone++;
+  }
+
   for (const unit of resolvedUnits) {
-    await verifyDir(unit.srcDir, unit.destDir, unit.rootFilesOnly);
+    if (unit.isFile) await verifyFile(unit.srcDir, unit.destDir);
+    else await verifyDir(unit.srcDir, unit.destDir, unit.rootFilesOnly);
   }
 
   _state.verifyStatus = (results.failed > 0 || results.missing > 0) ? 'failed' : 'verified';

@@ -16028,9 +16028,8 @@ const _transferMonitor = (() => {
 
   function _tiUnresolvedReasonText(reason) {
     const msgs = {
-      'no-existing-collection-found':          'No matching Event was found anywhere in the Main Archive Root.',
-      'ambiguous-archive-match':                'This Event matches more than one existing Collection — cannot resolve automatically.',
-      'external-root-no-approved-destination': 'This folder is not part of a recognized Collection or Event.',
+      'no-existing-collection-found': 'No matching Event was found anywhere in the Main Archive Root.',
+      'ambiguous-archive-match':      'This Event matches more than one existing Collection — cannot resolve automatically.',
     };
     return msgs[reason] || 'Destination could not be resolved — this item will not be imported.';
   }
@@ -16260,14 +16259,26 @@ const _transferMonitor = (() => {
           );
         });
         html.push('</div></div>');
-      } else {
-        // type === 'external' — root-level, always unresolved (never lands at archive root)
+      } else if (node.type === 'generic-folder') {
+        // General-purpose transfer: an ordinary folder with no AutoIngest Event anywhere
+        // inside it (a legacy year folder, a VHS lot, a recovered-files dump). Selected and
+        // copied as a whole, recursively, preserving its internal structure — never split
+        // into a Collection/Event tree, so there is nothing to expand here.
         html.push(
-          `<div class="tx-tree-row tx-tree-row-coll" data-unresolved="true" title="${_esc(_tiUnresolvedReasonText(node.destinationReason))}">` +
-          `<input type="checkbox" class="ti-cb-rext" data-ti="${ti}" disabled data-unresolved="true">` +
+          `<div class="tx-tree-row tx-tree-row-coll">` +
+          `<input type="checkbox" class="ti-cb-genfolder" data-ti="${ti}" checked>` +
           `<span class="tx-tree-arrow"> </span>` +
           `<span class="tx-tree-name" title="${_esc(node.path)}">${_esc(node.name)}</span>` +
-          `<span class="tx-tree-status" data-status="review">⚠ Unresolved</span>` +
+          `</div>`
+        );
+      } else if (node.type === 'generic-file') {
+        // General-purpose transfer: an ordinary file sitting directly at the Transfer Drive
+        // root — selected and copied on its own.
+        html.push(
+          `<div class="tx-tree-row tx-tree-row-ev">` +
+          `<input type="checkbox" class="ti-cb-genfile" data-ti="${ti}" checked>` +
+          `<span class="tx-tree-arrow"> </span>` +
+          `<span class="tx-tree-name" title="${_esc(node.path)}">${_esc(node.name)}</span>` +
           `</div>`
         );
       }
@@ -16326,6 +16337,11 @@ const _transferMonitor = (() => {
       });
     });
     treeEl.querySelectorAll('.ti-cb-cext').forEach(cb => {
+      cb.addEventListener('change', _tiInvalidatePreview);
+    });
+
+    // General-purpose transfer: standalone top-level checkboxes, no children to cascade.
+    treeEl.querySelectorAll('.ti-cb-genfolder, .ti-cb-genfile').forEach(cb => {
       cb.addEventListener('change', _tiInvalidatePreview);
     });
 
@@ -16404,11 +16420,12 @@ const _transferMonitor = (() => {
 
   function _tiBuildScope() {
     const treeEl = _tiEl('tiScopeTree');
-    if (!treeEl) return { folderPaths: [], eventRootPaths: [], externalPaths: [] };
+    if (!treeEl) return { folderPaths: [], eventRootPaths: [], externalPaths: [], filePaths: [] };
 
     const folderPaths    = new Set();
     const eventRootPaths = new Set();
     const externalPaths  = new Set();
+    const filePaths      = new Set();
 
     treeEl.querySelectorAll('.ti-cb-fold:checked').forEach(cb => {
       const p = _tiTree[parseInt(cb.dataset.ti, 10)]?.events?.[parseInt(cb.dataset.ei, 10)]?.folders?.[parseInt(cb.dataset.fi, 10)]?.path;
@@ -16432,18 +16449,28 @@ const _transferMonitor = (() => {
       const p = _tiTree[parseInt(cb.dataset.ti, 10)]?.externalFolders?.[parseInt(cb.dataset.xi, 10)]?.path;
       if (p) externalPaths.add(p);
     });
-    // Root-level externals are always disabled/unresolved and can never be :checked; the
-    // selector below is a harmless no-op kept only for symmetry.
-    treeEl.querySelectorAll('.ti-cb-rext:checked').forEach(cb => {
+    // General-purpose transfer: a whole top-level folder with no AutoIngest Event anywhere
+    // inside it — copied recursively as one unit via the same folderPaths scope every
+    // Collection-Event folder already uses.
+    treeEl.querySelectorAll('.ti-cb-genfolder:checked').forEach(cb => {
       const p = _tiTree[parseInt(cb.dataset.ti, 10)]?.path;
-      if (p) externalPaths.add(p);
+      if (p) folderPaths.add(p);
+    });
+    // General-purpose transfer: an ordinary file directly at the Transfer Drive root.
+    treeEl.querySelectorAll('.ti-cb-genfile:checked').forEach(cb => {
+      const p = _tiTree[parseInt(cb.dataset.ti, 10)]?.path;
+      if (p) filePaths.add(p);
     });
 
-    return { folderPaths: [...folderPaths], eventRootPaths: [...eventRootPaths], externalPaths: [...externalPaths] };
+    return {
+      folderPaths: [...folderPaths], eventRootPaths: [...eventRootPaths],
+      externalPaths: [...externalPaths], filePaths: [...filePaths],
+    };
   }
 
   function _tiScopeIsEmpty(scope) {
-    return scope.folderPaths.length === 0 && scope.eventRootPaths.length === 0 && scope.externalPaths.length === 0;
+    return scope.folderPaths.length === 0 && scope.eventRootPaths.length === 0 &&
+      scope.externalPaths.length === 0 && (scope.filePaths?.length || 0) === 0;
   }
 
   // ── Preview ───────────────────────────────────────────────────────────────
@@ -16469,6 +16496,7 @@ const _transferMonitor = (() => {
       _tiEl('tiPvCollections').textContent = '…';
       _tiEl('tiPvEvents').textContent      = '…';
       _tiEl('tiPvExternal').textContent    = '…';
+      _tiEl('tiPvGeneric').textContent     = '…';
       _tiEl('tiPvFiles').textContent       = '…';
       _tiEl('tiPvUnresolvedNote')?.setAttribute('hidden', '');
     }
@@ -16498,6 +16526,7 @@ const _transferMonitor = (() => {
     _tiEl('tiPvCollections').textContent = result.collections;
     _tiEl('tiPvEvents').textContent      = result.events;
     _tiEl('tiPvExternal').textContent    = result.externalFolders;
+    _tiEl('tiPvGeneric').textContent     = result.genericItems ?? 0;
     _tiEl('tiPvFiles').textContent       = result.files.toLocaleString();
 
     const noteEl = _tiEl('tiPvUnresolvedNote');
@@ -17022,14 +17051,17 @@ const _transferMonitor = (() => {
   // Register the reopen hook so the persistent pill can restore this modal.
   _transferMonitor.setReopenImport(_tiOpen);
 
+  const TI_SELECT_ALL_SELECTOR =
+    '#tiScopeTree .ti-cb-coll:not(:disabled), #tiScopeTree .ti-cb-devent:not(:disabled), ' +
+    '#tiScopeTree .ti-cb-genfolder:not(:disabled), #tiScopeTree .ti-cb-genfile:not(:disabled)';
   _tiEl('tiSelectAllBtn')?.addEventListener('click', () => {
-    document.querySelectorAll('#tiScopeTree .ti-cb-coll:not(:disabled), #tiScopeTree .ti-cb-devent:not(:disabled)').forEach(cb => {
+    document.querySelectorAll(TI_SELECT_ALL_SELECTOR).forEach(cb => {
       cb.checked = true;
       cb.dispatchEvent(new Event('change'));
     });
   });
   _tiEl('tiSelectNoneBtn')?.addEventListener('click', () => {
-    document.querySelectorAll('#tiScopeTree .ti-cb-coll:not(:disabled), #tiScopeTree .ti-cb-devent:not(:disabled)').forEach(cb => {
+    document.querySelectorAll(TI_SELECT_ALL_SELECTOR).forEach(cb => {
       cb.checked = false;
       cb.dispatchEvent(new Event('change'));
     });

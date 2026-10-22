@@ -68,9 +68,12 @@ async function mkEvent(dir, seq, name) {
   await fsp.writeFile(path.join(transferRoot, '$RECYCLE.BIN', 'S-1-5-21', 'junk.dat'), 'x');
   await fsp.mkdir(path.join(transferRoot, 'System Volume Information'), { recursive: true });
   await fsp.writeFile(path.join(transferRoot, 'System Volume Information', 'IndexerVolumeGuid'), 'x');
-  // Genuinely unsupported structure — must remain blocked.
-  await fsp.mkdir(path.join(transferRoot, 'Random Notes', 'misc'), { recursive: true });
-  await fsp.writeFile(path.join(transferRoot, 'Random Notes', 'misc', 'readme.txt'), 'hi');
+  // Updated 2026-10-22 ("Restore general-purpose Transfer Import"): an ordinary folder like
+  // this is no longer "genuinely unsupported" — it's valid general-purpose transfer content,
+  // selectable and recursively importable (see test/transferImportGeneralPurposeLiveE2E.test.js
+  // for that full coverage). The one remaining genuinely-blocked case is a direct Event with no
+  // existing archive-identity match anywhere — real ambiguity (DEC-012), not a folder-shape gate.
+  await mkEvent(path.join(transferRoot, 'AmbiguousDirectEvent'), 9, 'AmbiguousDirectEvent');
 
   const electronApp = await electron.launch({
     args: [PROJECT_ROOT, `--user-data-dir=${userDataDir}`, '--no-sandbox'],
@@ -186,13 +189,13 @@ async function mkEvent(dir, seq, name) {
   });
   check(newBadgePresent, '5. a "New Collection" badge is shown for the new Collection (actionable explanation, not a scary generic Unresolved)');
 
-  const randomNotesBlocked = await window.evaluate(() => {
-    const row = Array.from(document.querySelectorAll('.tx-tree-name')).find(n => n.textContent === 'Random Notes');
+  const ambiguousEventBlocked = await window.evaluate(() => {
+    const row = Array.from(document.querySelectorAll('.tx-tree-name')).find(n => n.textContent === 'AmbiguousDirectEvent');
     const container = row?.closest('.tx-tree-row');
     const cb = container?.querySelector('input[type=checkbox]');
     return cb ? cb.disabled : null;
   });
-  check(randomNotesBlocked === true, '6. a genuinely unsupported folder ("Random Notes") remains correctly blocked');
+  check(ambiguousEventBlocked === true, '6. a direct Event with no existing archive-identity match remains correctly blocked (genuine ambiguity, not a folder-shape gate)');
 
   const existingCbEnabled = await window.evaluate(() => {
     const row = Array.from(document.querySelectorAll('.tx-tree-name')).find(n => n.textContent === 'EventB');
@@ -224,14 +227,19 @@ async function mkEvent(dir, seq, name) {
 
   await window.click('#tiImportBtn');
 
-  // Poll the real IPC status until the import finishes.
+  // Poll the real IPC status until the import finishes. _tiStartImport's click handler is
+  // itself async (awaits listUsers()/runTransferImport() before _state ever flips to
+  // running:true) — click() resolves as soon as the DOM event dispatches, not when that
+  // handler completes, so the very first poll can race ahead of the real run and see the
+  // pristine pre-run default (batchId:null, running:false) and wrongly conclude "already
+  // done". Requiring a real batchId closes that race without weakening the check.
   let status = null;
   for (let i = 0; i < 100; i++) {
     status = await window.evaluate(async () => window.api.getTransferImportStatus());
-    if (status && !status.running) break;
+    if (status && status.batchId && !status.running) break;
     await window.waitForTimeout(200);
   }
-  check(status && !status.running, '10. import completes (not left running/stuck)');
+  check(status && status.batchId && !status.running, '10. import completes (not left running/stuck)');
 
   // =============================================================================
   // 11. Verify real filesystem outcome — new Collection folder created, files copied

@@ -139,20 +139,30 @@ async function main() {
     assert.equal(node.events[0].destinationStatus, 'resolved');
   });
 
-  await t('3b. a year-named WRAPPER folder (Year/Collection/Event, 3 levels) stays safely unresolved — unsupported structure, never guessed', async () => {
+  // SUPERSEDED 2026-10-22 ("Restore general-purpose Transfer Import" brief): this check used
+  // to assert a 3-level Year/Collection/Event wrapper stayed unresolved as an unsupported
+  // structure. The operator clarified the real product contract — Transfer Import must support
+  // arbitrary non-archive content (legacy year folders, VHS lots, recovered files), not just
+  // AutoIngest Collections/Events — so a folder with no Event anywhere inside it is now a
+  // normal, selectable "generic-folder" unit, copied recursively with its full structure
+  // intact. See test/transferImportGeneralPurposeTransfer.test.js for the full matrix this
+  // change introduces; kept here (renamed, not deleted) so this file's "no Event found at any
+  // depth" coverage isn't silently lost.
+  await t('3b. a year-named WRAPPER folder (Year/Collection/Event, 3 levels) is now a generic, selectable, recursively-importable folder', async () => {
     const transferRoot = await mkTmp('ti-3b-src-');
     const mainArchiveRoot = await mkTmp('ti-3b-dst-');
     await mkEvent(path.join(transferRoot, '1446', 'CollectionX', 'EventY'), 1, 'EventY');
 
     const result = await svc.scanImportTree(transferRoot, mainArchiveRoot, isValidEventJsonFn);
     const node = findTreeNode(result.tree, '1446');
-    assert.equal(node.type, 'external');
-    assert.equal(node.destinationStatus, 'unresolved');
-    assert.equal(node.destinationReason, 'external-root-no-approved-destination');
+    assert.equal(node.type, 'generic-folder');
+    assert.equal(node.destinationStatus, 'resolved');
   });
 
   // ── 4. A source containing unrelated directories ─────────────────────────────
-  await t('4. an unrelated directory with no Event anywhere one level down stays unresolved', async () => {
+  // SUPERSEDED 2026-10-22 — see the note above test 3b. An "unrelated directory" is exactly
+  // the general-purpose content (Example C/D in the brief) Transfer Import must now support.
+  await t('4. an unrelated directory with no Event anywhere one level down is now a generic, selectable folder', async () => {
     const transferRoot = await mkTmp('ti-4-src-');
     const mainArchiveRoot = await mkTmp('ti-4-dst-');
     await fsp.mkdir(path.join(transferRoot, 'Random Notes', 'misc'), { recursive: true });
@@ -160,8 +170,8 @@ async function main() {
 
     const result = await svc.scanImportTree(transferRoot, mainArchiveRoot, isValidEventJsonFn);
     const node = findTreeNode(result.tree, 'Random Notes');
-    assert.equal(node.type, 'external');
-    assert.equal(node.destinationStatus, 'unresolved');
+    assert.equal(node.type, 'generic-folder');
+    assert.equal(node.destinationStatus, 'resolved');
   });
 
   // ── 5. $RECYCLE.BIN / System Volume Information ──────────────────────────────
@@ -254,14 +264,19 @@ async function main() {
   });
 
   // ── 9. A transfer drive containing a mixture of valid and invalid folders ────
-  await t('9. a mixed drive resolves new Collections, keeps ambiguous/junk blocked, in the same scan', async () => {
+  // Updated 2026-10-22: "Random Notes" (an ordinary, non-archive folder) is now correctly
+  // resolved as a generic folder — see test 4's superseded-note above. The remaining
+  // genuinely-blocked case in a mixed drive is a direct Event with no archive-identity match
+  // anywhere (real ambiguity, DEC-012) — covered here as "Ambiguous Event".
+  await t('9. a mixed drive resolves new Collections and generic folders, keeps real ambiguity/junk blocked, in the same scan', async () => {
     const transferRoot = await mkTmp('ti-9-src-');
     const mainArchiveRoot = await mkTmp('ti-9-dst-');
     await mkEvent(path.join(transferRoot, 'Africa Data', 'EventA'), 1, 'EventA');       // new collection -> resolved
     await mkEvent(path.join(transferRoot, 'ExistingColl', 'EventB'), 2, 'EventB');      // existing collection -> resolved
     await fsp.mkdir(path.join(mainArchiveRoot, 'ExistingColl'), { recursive: true });
     await fsp.mkdir(path.join(transferRoot, '$RECYCLE.BIN'), { recursive: true });       // junk -> excluded
-    await fsp.mkdir(path.join(transferRoot, 'Random Notes'), { recursive: true });       // unsupported -> unresolved
+    await fsp.mkdir(path.join(transferRoot, 'Random Notes'), { recursive: true });       // generic -> resolved
+    await mkEvent(path.join(transferRoot, 'AmbiguousEvent'), 9, 'AmbiguousEvent');       // direct event, no archive match -> unresolved
 
     const result = await svc.scanImportTree(transferRoot, mainArchiveRoot, isValidEventJsonFn);
     assert.equal(findTreeNode(result.tree, 'Africa Data').isNewCollection, true);
@@ -269,7 +284,9 @@ async function main() {
     assert.equal(findTreeNode(result.tree, 'ExistingColl').isNewCollection, false);
     assert.equal(findTreeNode(result.tree, 'ExistingColl').events[0].destinationStatus, 'resolved');
     assert.equal(findTreeNode(result.tree, '$RECYCLE.BIN'), undefined);
-    assert.equal(findTreeNode(result.tree, 'Random Notes').destinationStatus, 'unresolved');
+    assert.equal(findTreeNode(result.tree, 'Random Notes').type, 'generic-folder');
+    assert.equal(findTreeNode(result.tree, 'Random Notes').destinationStatus, 'resolved');
+    assert.equal(findTreeNode(result.tree, 'AmbiguousEvent').destinationStatus, 'unresolved');
   });
 
   // ── End-to-end: a new Collection actually imports, creates the folder, and is idempotent ──
