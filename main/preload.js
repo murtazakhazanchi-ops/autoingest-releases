@@ -273,6 +273,7 @@ contextBridge.exposeInMainWorld('api', {
 
   // ── Transfer Import ──
   getTransferImportTree:                 ()                        => ipcRenderer.invoke('archive:getTransferImportTree'),
+  getTransferImportFolderChildren:       (dirPath)                 => ipcRenderer.invoke('archive:getTransferImportFolderChildren', dirPath),
   previewTransferImport:                 (scope)                   => ipcRenderer.invoke('archive:previewTransferImport',              { scope }),
   scanImportSync:                        (scope)                   => ipcRenderer.invoke('archive:scanImportSync',                     { scope }),
   runTransferImport:                     (scope, operatorName)     => ipcRenderer.invoke('archive:runTransferImport',                  { scope, operatorName }),

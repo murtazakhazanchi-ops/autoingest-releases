@@ -4645,6 +4645,17 @@ ipcMain.handle('archive:getTransferImportTree', async () => {
   return transferImportService.scanImportTree(transferRoot, mainArchiveRoot, isValidEventJson);
 });
 
+// Lazy one-level expansion for a generic (non-archive-shaped) folder node in the Import Scope
+// tree. dirPath must be a real descendant of the current Transfer Drive root — validated here
+// (against the live setting, never trusting the renderer's own copy of it) and again inside
+// the service function itself.
+ipcMain.handle('archive:getTransferImportFolderChildren', async (_event, dirPath) => {
+  const transferRoot = settings.getTransferRoot();
+  if (!transferRoot) return { ok: false, reason: 'transfer-root-not-set' };
+  if (typeof dirPath !== 'string' || !dirPath) return { ok: false, reason: 'missing-params' };
+  return transferImportService.listGenericFolderChildren(transferRoot, dirPath);
+});
+
 ipcMain.handle('archive:previewTransferImport', async (_event, { scope } = {}) => {
   const transferRoot    = settings.getTransferRoot();
   const mainArchiveRoot = settings.getMainArchiveRoot();

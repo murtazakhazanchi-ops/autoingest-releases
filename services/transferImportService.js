@@ -663,6 +663,42 @@ async function scanImportTree(transferRoot, mainArchiveRoot, isValidEventJsonFn)
   return { ok: true, tree };
 }
 
+// Lazy, one-level child listing for a generic (non-archive-shaped) folder's nested-selection
+// tree. Intentionally shallow — the Import Scope tree fetches one level at a time, on first
+// expansion of each node, so a Transfer Drive with thousands of nested files never gets
+// eagerly walked or rendered in full. `dirPath` must be a real descendant of transferRoot
+// (never transferRoot itself — the top level is already enumerated by scanImportTree) to
+// prevent a crafted path from escaping the Transfer Drive. A child is never reclassified as
+// an AutoIngest Collection/Event here — nesting inside an already-generic folder stays
+// generic at every depth, exactly as scanImportTree's own generic-folder branch intends.
+async function listGenericFolderChildren(transferRoot, dirPath) {
+  if (!transferRoot || !dirPath) return { ok: false, reason: 'missing-params' };
+  if (dirPath === transferRoot || !_isInsideDir(transferRoot, dirPath)) {
+    return { ok: false, reason: 'path-outside-transfer-root' };
+  }
+  let entries;
+  try { entries = await fsp.readdir(dirPath, { withFileTypes: true }); } catch {
+    return { ok: false, reason: 'unreadable' };
+  }
+  const folders = [];
+  const files = [];
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      if (_skipDir(entry.name)) continue;
+      folders.push({ name: entry.name, path: path.join(dirPath, entry.name), isDir: true });
+    } else if (entry.isFile()) {
+      if (_skipFile(entry.name)) continue;
+      files.push({ name: entry.name, path: path.join(dirPath, entry.name), isDir: false });
+    }
+    // Symlinks (and any other non-regular dirent type) are neither isDirectory() nor isFile()
+    // for a readdir() Dirent — silently excluded here, the same safe-by-omission posture
+    // _walkAndCopy/_countFiles already rely on for the actual copy.
+  }
+  folders.sort((a, b) => a.name.localeCompare(b.name));
+  files.sort((a, b) => a.name.localeCompare(b.name));
+  return { ok: true, children: [...folders, ...files] };
+}
+
 // ── Shared unit resolver (Preview / Scan / Import / Verify all use this) ─────
 
 function _dedupResolvedUnits(units) {
@@ -1638,6 +1674,7 @@ async function verifyImport(transferRoot, mainArchiveRoot, scope, isValidEventJs
 
 module.exports = {
   scanImportTree,
+  listGenericFolderChildren,
   previewImport,
   runImport,
   resumeImportFromCheckpoint,

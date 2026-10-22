@@ -16262,13 +16262,17 @@ const _transferMonitor = (() => {
       } else if (node.type === 'generic-folder') {
         // General-purpose transfer: an ordinary folder with no AutoIngest Event anywhere
         // inside it (a legacy year folder, a VHS lot, a recovered-files dump). Selected and
-        // copied as a whole, recursively, preserving its internal structure — never split
-        // into a Collection/Event tree, so there is nothing to expand here.
+        // copied as a whole by default, recursively — but expandable to any depth so the
+        // operator can select only specific nested folders/files instead (see
+        // _tiBindGenericTreeDelegation above for the lazy-expand + selection cascade).
         html.push(
+          `<div class="tx-tree-node tx-generic-node" data-ti="${ti}">` +
           `<div class="tx-tree-row tx-tree-row-coll">` +
           `<input type="checkbox" class="ti-cb-genfolder" data-ti="${ti}" checked>` +
-          `<span class="tx-tree-arrow"> </span>` +
+          `<span class="tx-tree-arrow tx-generic-arrow" data-path="${_esc(node.path)}">▶</span>` +
           `<span class="tx-tree-name" title="${_esc(node.path)}">${_esc(node.name)}</span>` +
+          `</div>` +
+          `<div class="tx-tree-children tx-collapsed tx-generic-children" data-loaded="0"></div>` +
           `</div>`
         );
       } else if (node.type === 'generic-file') {
@@ -16286,6 +16290,163 @@ const _transferMonitor = (() => {
 
     treeEl.innerHTML = html.join('');
     _tiBindTreeEvents(treeEl);
+  }
+
+  // ── General-purpose transfer: arbitrary-depth nested selection ──────────────
+  // A generic folder (no AutoIngest Event anywhere inside it) is lazily expandable to any
+  // depth: each node fetches its own immediate children on first expansion
+  // (window.api.getTransferImportFolderChildren), never the whole subtree up front, so a
+  // Transfer Drive with thousands of nested files is never eagerly walked or rendered.
+  // Collapsing/reopening only toggles a CSS class — already-fetched DOM and its selection
+  // state are never destroyed or re-fetched.
+
+  function _tiRenderGenericChildNode(child) {
+    const escPath = _esc(child.path);
+    if (!child.isDir) {
+      return (
+        `<div class="tx-tree-row tx-tree-row-fold">` +
+        `<input type="checkbox" class="ti-cb-generic-nested" data-path="${escPath}" data-isdir="0" checked>` +
+        `<span class="tx-tree-arrow"> </span>` +
+        `<span class="tx-tree-name" title="${escPath}">${_esc(child.name)}</span>` +
+        `</div>`
+      );
+    }
+    return (
+      `<div class="tx-tree-node tx-generic-node">` +
+      `<div class="tx-tree-row tx-tree-row-fold">` +
+      `<input type="checkbox" class="ti-cb-generic-nested" data-path="${escPath}" data-isdir="1" checked>` +
+      `<span class="tx-tree-arrow tx-generic-arrow" data-path="${escPath}">▶</span>` +
+      `<span class="tx-tree-name" title="${escPath}">${_esc(child.name)}</span>` +
+      `</div>` +
+      `<div class="tx-tree-children tx-collapsed tx-generic-children" data-loaded="0"></div>` +
+      `</div>`
+    );
+  }
+
+  // Propagates a parent's checked state down to every already-loaded descendant checkbox
+  // (recursively). Descendants that were never expanded have no checkbox yet — nothing to
+  // update, and nothing lost: the parent's own checked value is authoritative for them until
+  // (and unless) the operator expands further and overrides a specific child.
+  function _tiPropagateGenericCheckedDown(nodeEl, checked) {
+    const childrenEl = nodeEl.querySelector(':scope > .tx-generic-children');
+    if (!childrenEl || childrenEl.dataset.loaded !== '1') return;
+    childrenEl.querySelectorAll(':scope > .tx-tree-row > .ti-cb-generic-nested, :scope > .tx-tree-node > .tx-tree-row > .ti-cb-generic-nested').forEach(cb => {
+      cb.checked = checked;
+      cb.indeterminate = false;
+      const childNode = cb.closest('.tx-generic-node');
+      if (childNode) _tiPropagateGenericCheckedDown(childNode, checked);
+    });
+  }
+
+  // Recomputes one generic node's own checkbox (checked / indeterminate) from its immediate
+  // loaded children, then walks up to the next ancestor generic node (or the top-level
+  // .ti-cb-genfolder) and does the same, all the way to the root of this selection.
+  function _tiUpdateGenericAncestorState(startEl) {
+    let current = startEl.closest('.tx-generic-node') || startEl.closest('.tx-tree-node[data-ti]');
+    while (current) {
+      const ownCb = current.querySelector(':scope > .tx-tree-row > input[type=checkbox]');
+      const childrenEl = current.querySelector(':scope > .tx-generic-children');
+      if (!ownCb || !childrenEl) break;
+      const childCbs = Array.from(childrenEl.querySelectorAll(
+        ':scope > .tx-tree-row > .ti-cb-generic-nested, :scope > .tx-tree-node > .tx-tree-row > .ti-cb-generic-nested'
+      ));
+      if (childCbs.length > 0) {
+        const checkedCount = childCbs.filter(c => c.checked && !c.indeterminate).length;
+        const anyIndeterminate = childCbs.some(c => c.indeterminate);
+        if (anyIndeterminate || (checkedCount > 0 && checkedCount < childCbs.length)) {
+          ownCb.checked = false; ownCb.indeterminate = true;
+        } else if (checkedCount === childCbs.length) {
+          ownCb.checked = true; ownCb.indeterminate = false;
+        } else {
+          ownCb.checked = false; ownCb.indeterminate = false;
+        }
+      }
+      const parentGenericNode = current.parentElement?.closest('.tx-generic-node');
+      current = parentGenericNode || null;
+    }
+  }
+
+  function _tiBindGenericTreeDelegation(treeEl) {
+    if (treeEl.dataset.genericBound === '1') return; // delegation only needs binding once per tree
+    treeEl.dataset.genericBound = '1';
+
+    treeEl.addEventListener('click', async (e) => {
+      const arrow = e.target.closest('.tx-generic-arrow');
+      if (!arrow) return;
+      const nodeEl = arrow.closest('.tx-generic-node');
+      const childrenEl = nodeEl?.querySelector(':scope > .tx-generic-children');
+      if (!childrenEl) return;
+
+      if (childrenEl.dataset.loaded !== '1') {
+        const dirPath = arrow.dataset.path;
+        const parentCb = nodeEl.querySelector(':scope > .tx-tree-row > input[type=checkbox]');
+        arrow.textContent = '▼';
+        childrenEl.classList.remove('tx-collapsed');
+        childrenEl.innerHTML = '<div class="tx-empty-note" style="padding-left:20px">Loading…</div>';
+        let result;
+        try { result = await window.api.getTransferImportFolderChildren(dirPath); } catch { result = null; }
+        childrenEl.dataset.loaded = '1';
+        if (!result || !result.ok) {
+          childrenEl.innerHTML = `<div class="tx-empty-note" style="padding-left:20px">Could not read this folder${result?.reason ? ` (${_esc(result.reason)})` : ''}.</div>`;
+          return;
+        }
+        if (result.children.length === 0) {
+          childrenEl.innerHTML = '<div class="tx-empty-note" style="padding-left:20px">Empty folder.</div>';
+          return;
+        }
+        const parentChecked = parentCb ? (parentCb.checked && !parentCb.indeterminate) : true;
+        childrenEl.innerHTML = result.children.map(_tiRenderGenericChildNode).join('');
+        if (!parentChecked) {
+          // The parent itself was unchecked (or indeterminate — shouldn't happen pre-expansion,
+          // but handled safely) before expansion; new children must not silently become selected.
+          childrenEl.querySelectorAll('.ti-cb-generic-nested').forEach(cb => { cb.checked = false; });
+        }
+        return;
+      }
+      // Already loaded — toggle visibility only; selection state is untouched.
+      const collapsed = childrenEl.classList.toggle('tx-collapsed');
+      arrow.textContent = collapsed ? '▶' : '▼';
+    });
+
+    treeEl.addEventListener('change', (e) => {
+      const cb = e.target;
+      const isTopGeneric    = cb.matches('.ti-cb-genfolder') || cb.matches('.ti-cb-genfile');
+      const isNestedGeneric = cb.matches('.ti-cb-generic-nested');
+      if (!isTopGeneric && !isNestedGeneric) return;
+
+      cb.indeterminate = false; // an explicit operator click always resolves to a definite state
+      const isDir = cb.matches('.ti-cb-genfolder') || cb.dataset.isdir === '1';
+      if (isDir) {
+        const nodeEl = cb.closest('.tx-generic-node') || cb.closest('.tx-tree-node[data-ti]');
+        if (nodeEl) _tiPropagateGenericCheckedDown(nodeEl, cb.checked);
+      }
+      if (isNestedGeneric) _tiUpdateGenericAncestorState(cb);
+      _tiInvalidatePreview();
+    });
+  }
+
+  // Walks one top-level generic-folder/file node's (possibly lazily-expanded) checkbox
+  // subtree and collects the MINIMAL set of fully-selected roots: a folder whose own checkbox
+  // is checked and not indeterminate is emitted once, whole, and never recursed into further
+  // (the backend already copies a selected folder's entire subtree) — this is what prevents
+  // double-counting and keeps the scope payload small even for huge trees. An indeterminate
+  // folder is never emitted itself; only its loaded children are inspected, recursively.
+  function _tiCollectGenericSelections(rootCb, rootPath, rootIsDir, folderPaths, filePaths) {
+    if (!rootIsDir) {
+      if (rootCb.checked) filePaths.add(rootPath);
+      return;
+    }
+    if (rootCb.checked && !rootCb.indeterminate) {
+      folderPaths.add(rootPath);
+      return;
+    }
+    if (!rootCb.indeterminate) return; // unchecked, not indeterminate — excluded entirely
+    const nodeEl = rootCb.closest('.tx-generic-node') || rootCb.closest('.tx-tree-node[data-ti]');
+    const childrenEl = nodeEl?.querySelector(':scope > .tx-generic-children');
+    if (!childrenEl || childrenEl.dataset.loaded !== '1') return;
+    childrenEl.querySelectorAll(':scope > .tx-tree-row > .ti-cb-generic-nested, :scope > .tx-tree-node > .tx-tree-row > .ti-cb-generic-nested').forEach(childCb => {
+      _tiCollectGenericSelections(childCb, childCb.dataset.path, childCb.dataset.isdir === '1', folderPaths, filePaths);
+    });
   }
 
   function _tiBindTreeEvents(treeEl) {
@@ -16340,10 +16501,11 @@ const _transferMonitor = (() => {
       cb.addEventListener('change', _tiInvalidatePreview);
     });
 
-    // General-purpose transfer: standalone top-level checkboxes, no children to cascade.
-    treeEl.querySelectorAll('.ti-cb-genfolder, .ti-cb-genfile').forEach(cb => {
-      cb.addEventListener('change', _tiInvalidatePreview);
-    });
+    // General-purpose transfer: arbitrary-depth nested selection for generic folders — lazy
+    // expand/collapse plus a recursive checked/indeterminate cascade, both ways. Delegated at
+    // the treeEl level (not bound per-checkbox) so nodes injected later by lazy expansion work
+    // immediately, with no re-binding step.
+    _tiBindGenericTreeDelegation(treeEl);
 
     // Direct Event (root-level): folder → event propagation
     treeEl.querySelectorAll('.ti-cb-dfold').forEach(cb => {
@@ -16449,17 +16611,19 @@ const _transferMonitor = (() => {
       const p = _tiTree[parseInt(cb.dataset.ti, 10)]?.externalFolders?.[parseInt(cb.dataset.xi, 10)]?.path;
       if (p) externalPaths.add(p);
     });
-    // General-purpose transfer: a whole top-level folder with no AutoIngest Event anywhere
-    // inside it — copied recursively as one unit via the same folderPaths scope every
-    // Collection-Event folder already uses.
-    treeEl.querySelectorAll('.ti-cb-genfolder:checked').forEach(cb => {
+    // General-purpose transfer: a top-level generic folder/file, selected whole, partially
+    // (nested selection — walked recursively via _tiCollectGenericSelections), or not at all.
+    // A fully-checked folder is emitted once as a single folderPaths entry (its entire subtree
+    // is copied by the existing recursive copy engine — never flattened, never double-counted);
+    // an indeterminate one is never emitted itself, only its selected descendants are, each as
+    // its own entry at whatever depth they were individually selected.
+    treeEl.querySelectorAll('.ti-cb-genfolder').forEach(cb => {
       const p = _tiTree[parseInt(cb.dataset.ti, 10)]?.path;
-      if (p) folderPaths.add(p);
+      if (p) _tiCollectGenericSelections(cb, p, true, folderPaths, filePaths);
     });
-    // General-purpose transfer: an ordinary file directly at the Transfer Drive root.
-    treeEl.querySelectorAll('.ti-cb-genfile:checked').forEach(cb => {
+    treeEl.querySelectorAll('.ti-cb-genfile').forEach(cb => {
       const p = _tiTree[parseInt(cb.dataset.ti, 10)]?.path;
-      if (p) filePaths.add(p);
+      if (p) _tiCollectGenericSelections(cb, p, false, folderPaths, filePaths);
     });
 
     return {
@@ -17057,13 +17221,16 @@ const _transferMonitor = (() => {
   _tiEl('tiSelectAllBtn')?.addEventListener('click', () => {
     document.querySelectorAll(TI_SELECT_ALL_SELECTOR).forEach(cb => {
       cb.checked = true;
-      cb.dispatchEvent(new Event('change'));
+      // bubbles:true — the generic-folder nested-selection cascade is delegated at the
+      // treeEl level (arbitrary tree depth, nodes added lazily), so it only ever sees
+      // events that actually bubble to it; a plain new Event('change') does not.
+      cb.dispatchEvent(new Event('change', { bubbles: true }));
     });
   });
   _tiEl('tiSelectNoneBtn')?.addEventListener('click', () => {
     document.querySelectorAll(TI_SELECT_ALL_SELECTOR).forEach(cb => {
       cb.checked = false;
-      cb.dispatchEvent(new Event('change'));
+      cb.dispatchEvent(new Event('change', { bubbles: true }));
     });
   });
 
