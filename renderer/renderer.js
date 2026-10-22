@@ -16028,12 +16028,18 @@ const _transferMonitor = (() => {
 
   function _tiUnresolvedReasonText(reason) {
     const msgs = {
-      'collection-not-found-in-archive':       'The matching Collection does not exist in the Main Archive Root.',
       'no-existing-collection-found':          'No matching Event was found anywhere in the Main Archive Root.',
       'ambiguous-archive-match':                'This Event matches more than one existing Collection — cannot resolve automatically.',
       'external-root-no-approved-destination': 'This folder is not part of a recognized Collection or Event.',
     };
     return msgs[reason] || 'Destination could not be resolved — this item will not be imported.';
+  }
+
+  // Informational only — paired with destinationStatus 'resolved', never 'unresolved'. The
+  // folder's own name is the destination Collection name; nothing is guessed (see
+  // transferImportService.js's scanImportTree comment for the full reasoning).
+  function _tiNewCollectionReasonText(name) {
+    return `"${name}" does not exist yet in the Main Archive Root — it will be created when you import.`;
   }
 
   function _tiSetButtonPhase(phase) {
@@ -16180,15 +16186,18 @@ const _transferMonitor = (() => {
     const rowAttrs   = (status, reason) => status === 'unresolved' ? ` data-unresolved="true" title="${_esc(_tiUnresolvedReasonText(reason))}"` : '';
     const cbAttrs    = status => status === 'unresolved' ? ' disabled data-unresolved="true"' : ' checked data-unresolved="false"';
     const unresolvedBadge = status => status === 'unresolved' ? '<span class="tx-tree-status" data-status="review">⚠ Unresolved</span>' : '';
+    const newCollBadge = (status, reason) => (status === 'resolved' && reason === 'new-collection')
+      ? '<span class="tx-tree-status" data-status="new">✨ New Collection</span>' : '';
 
     _tiTree.forEach((node, ti) => {
       if (node.type === 'collection') {
         html.push(
           `<div class="tx-tree-node" data-ti="${ti}">` +
-          `<div class="tx-tree-row tx-tree-row-coll">` +
+          `<div class="tx-tree-row tx-tree-row-coll"${node.isNewCollection ? ` title="${_esc(_tiNewCollectionReasonText(node.name))}"` : ''}>` +
           `<input type="checkbox" class="ti-cb-coll" data-ti="${ti}" checked>` +
           `<span class="tx-tree-arrow" data-ti="${ti}">▶</span>` +
           `<span class="tx-tree-name" title="${_esc(node.path)}">${_esc(node.name)}</span>` +
+          (node.isNewCollection ? '<span class="tx-tree-status" data-status="new">✨ New Collection</span>' : '') +
           `</div>` +
           `<div class="tx-tree-children tx-collapsed" data-coll-children="${ti}">`
         );
@@ -16201,7 +16210,7 @@ const _transferMonitor = (() => {
             `<input type="checkbox" class="ti-cb-ev" data-ti="${ti}" data-ei="${ei}"${cbAttrs(ev.destinationStatus)}>` +
             `<span class="tx-tree-arrow" data-ti="${ti}" data-ei="${ei}">${hasFolders ? '▶' : ' '}</span>` +
             `<span class="tx-tree-name" title="${_esc(ev.path)}">${_esc(ev.name)}</span>` +
-            unresolvedBadge(ev.destinationStatus) +
+            unresolvedBadge(ev.destinationStatus) + newCollBadge(ev.destinationStatus, ev.destinationReason) +
             `</div>` +
             `<div class="tx-tree-children tx-collapsed" data-ev-children="${ti}-${ei}">`
           );
@@ -16223,7 +16232,7 @@ const _transferMonitor = (() => {
             `<input type="checkbox" class="ti-cb-cext" data-ti="${ti}" data-xi="${xi}"${cbAttrs(ext.destinationStatus)}>` +
             `<span class="tx-tree-arrow"> </span>` +
             `<span class="tx-tree-name" title="${_esc(ext.path)}">${_esc(ext.name)}</span>` +
-            unresolvedBadge(ext.destinationStatus) +
+            unresolvedBadge(ext.destinationStatus) + newCollBadge(ext.destinationStatus, ext.destinationReason) +
             `</div>`
           );
         });

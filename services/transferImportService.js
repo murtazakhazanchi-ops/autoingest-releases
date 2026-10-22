@@ -47,6 +47,13 @@ const MAX_ERRORS             = 200;
 
 const _SKIP_SRC_DIRS = new Set(['.autoingest', '.autoingest-transfer', '__MACOSX']);
 
+// Operating-system junk directories a Transfer Drive may legitimately carry (Windows
+// recycle bin / volume-indexing metadata, seen on any external drive previously used
+// outside AutoIngest). Excluded the same way as _SKIP_SRC_DIRS — never read, never
+// classified as a candidate, never deleted or touched. Matched case-insensitively:
+// Windows filesystems are case-insensitive, so the exact casing on disk can vary.
+const _OS_JUNK_DIRS_LOWER = new Set(['$recycle.bin', 'system volume information']);
+
 // ── Module-scope state ────────────────────────────────────────────────────────
 
 let _state = {
@@ -102,7 +109,7 @@ function _isInsideDir(parent, child) {
 }
 
 function _skipDir(name) {
-  return _SKIP_SRC_DIRS.has(name) || name.startsWith('.');
+  return _SKIP_SRC_DIRS.has(name) || name.startsWith('.') || _OS_JUNK_DIRS_LOWER.has(name.toLowerCase());
 }
 
 function _skipFile(name) {
@@ -601,21 +608,38 @@ async function scanImportTree(transferRoot, mainArchiveRoot, isValidEventJsonFn)
       continue;
     }
 
+    // A Collection-shaped top-level folder (has real Event children, proven by event.json
+    // presence — never guessed) names its own destination Collection unambiguously: the
+    // operator's own folder name IS the destination, the same deterministic name-based
+    // mapping _resolveLegacyCollectionUnits and Transfer Export already use. This is not the
+    // "trust mere reachability" problem DEC-012 forbids — DEC-012 is about not guessing WHICH
+    // of several candidates an ambiguous item resolves to (see _resolveEventDestination for
+    // that real ambiguity, still fully unresolved/blocked when no identity match exists).
+    // Here there is exactly one candidate because the name itself is the evidence. A Collection
+    // that doesn't exist yet at the destination is therefore a normal, selectable, resolved
+    // outcome — not a validation failure — with destinationReason carrying 'new-collection'
+    // purely as informational UI context (so the operator sees it will be created, same
+    // confirm-before-import gate every other resolved item already goes through). Nothing is
+    // created here; the destination folder is created on demand, idempotently, at actual copy
+    // time (see the fsp.mkdir(..., {recursive:true}) calls in the copy/batch functions below).
     let collectionExists = false;
     try { collectionExists = (await fsp.stat(path.join(mainArchiveRoot, topEntry.name))).isDirectory(); } catch {}
-    const collDestStatus = collectionExists ? 'resolved' : 'unresolved';
-    const collDestReason = collectionExists ? null : 'collection-not-found-in-archive';
+    const collDestStatus = 'resolved';
+    const collDestReason = collectionExists ? null : 'new-collection';
 
     const eventNodes = [];
     for (const ev of events) {
       const node = await _buildEventNode(ev.name, ev.path);
-      eventNodes.push({ ...node, destinationStatus: collDestStatus, destinationReason: collDestReason, collectionKey: collectionExists ? topEntry.name : null });
+      eventNodes.push({ ...node, destinationStatus: collDestStatus, destinationReason: collDestReason, collectionKey: topEntry.name });
     }
     const externalNodes = externalFolders.map(f => ({
-      ...f, destinationStatus: collDestStatus, destinationReason: collDestReason, collectionKey: collectionExists ? topEntry.name : null,
+      ...f, destinationStatus: collDestStatus, destinationReason: collDestReason, collectionKey: topEntry.name,
     }));
 
-    tree.push({ type: 'collection', name: topEntry.name, path: topPath, events: eventNodes, externalFolders: externalNodes });
+    tree.push({
+      type: 'collection', name: topEntry.name, path: topPath, events: eventNodes, externalFolders: externalNodes,
+      isNewCollection: !collectionExists,
+    });
   }
 
   return { ok: true, tree };
@@ -728,12 +752,13 @@ async function _resolveImportUnits(transferRoot, mainArchiveRoot, scope, isValid
       return;
     }
 
+    // See scanImportTree's identical check for the full DEC-012 reasoning: a Collection-shaped
+    // folder names its own destination deterministically (the folder name itself), so a
+    // missing destination Collection is a normal "will be created" outcome, not an unresolved
+    // one — never a guess, since there is exactly one candidate. The destination directory is
+    // created on demand, idempotently, by the copy functions below; nothing is created here.
     let collectionExists = false;
     try { collectionExists = (await fsp.stat(path.join(mainArchiveRoot, topName))).isDirectory(); } catch {}
-    if (!collectionExists) {
-      unresolvedUnits.push({ path: absPath, name: path.basename(absPath), reason: 'collection-not-found-in-archive' });
-      return;
-    }
 
     resolvedUnits.push({
       srcDir:             absPath,
@@ -743,7 +768,8 @@ async function _resolveImportUnits(transferRoot, mainArchiveRoot, scope, isValid
       collectionKey:      topName,
       eventKey:           parts.length > 1 ? `${parts[0]}/${parts[1]}` : parts[0],
       destinationStatus:  'resolved',
-      destinationReason:  null,
+      destinationReason:  collectionExists ? null : 'new-collection',
+      isNewCollection:    !collectionExists,
     });
   }
 
