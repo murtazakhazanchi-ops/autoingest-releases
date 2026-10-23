@@ -8907,12 +8907,14 @@
           </div>
         </div>
 
-        <!-- Destination: Main Archive Root -->
+        <!-- Destination: Active Archive Root by default, or a manually chosen folder -->
         <div>
-          <div class="tx-section-label">Main Archive Root (destination)</div>
+          <div class="tx-section-label" id="tiDestLabel">Destination</div>
           <div class="tx-drive-wrap">
             <div class="tx-drive-path tx-unset" id="tiMainArchivePath">Not set</div>
+            <button type="button" class="aloc-btn" id="tiChangeDestBtn">Change Destination</button>
           </div>
+          <div class="aloc-validation" id="tiDestNote" hidden></div>
         </div>
 
         <!-- Import Scope -->

@@ -16019,6 +16019,13 @@ const _transferMonitor = (() => {
   let _tiEtaSamples   = [];
   let _tiSpeedSamples = [];
 
+  // Destination state. null = use the authoritative Active/Main Archive Root resolution
+  // (see main.js's _resolveEffectiveArchiveRoot); a path = an explicit operator override for
+  // THIS modal session only — never written to settings, never persisted across a close/
+  // reopen (reset in _tiOpen, matching the Transfer Import brief's Scenario D/requirement 7).
+  let _tiCustomDestRoot = null;
+  let _tiDestStatus     = null;  // last result from window.api.checkTransferImportDestination
+
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   function _tiEl(id) { return document.getElementById(id); }
@@ -16065,6 +16072,12 @@ const _transferMonitor = (() => {
     if (scanBtn)    { scanBtn.hidden = activePhase || phase === 'done'; scanBtn.disabled = scanningPhase; }
     if (previewBtn) previewBtn.hidden = activePhase || scanningPhase || phase === 'done';
 
+    // Changing destination mid-copy is prevented, not just handled after the fact (see the
+    // button's own click-guard too) — section 5's "a destination change during an active
+    // copy is prevented or handled safely."
+    const changeDestBtn = _tiEl('tiChangeDestBtn');
+    if (changeDestBtn) changeDestBtn.disabled = activePhase;
+
     // Lock tree during active operation; permanently-unresolved checkboxes stay disabled.
     const treeEl = _tiEl('tiScopeTree');
     if (treeEl) {
@@ -16098,13 +16111,117 @@ const _transferMonitor = (() => {
     _transferMonitor.start();
   }
 
+  // Resolves and displays the current destination (Active Archive Root by default, Main
+  // only when it is also Active, or an explicit _tiCustomDestRoot override), and reflects
+  // its live reachability — reusing the exact same preflight runImport() itself applies
+  // (abb4729), never a second guess. Scenario C: an unreachable destination is shown
+  // clearly and Import is disabled; it is never silently replaced with a different root.
+  // Disable-only guard: forces Import/Scan/Preview off while the current destination is
+  // unset or unreachable, regardless of what any other code path (a fresh Preview,
+  // _tiSetButtonPhase('idle') on open — which unconditionally sets scanBtn.disabled =
+  // false for the idle phase) might otherwise set. Never enables any button itself.
+  function _tiEnforceDestinationGate() {
+    if (_tiRunning) return;
+    const destBad = !_tiDestStatus?.path || !_tiDestStatus.reachable;
+    if (!destBad) return;
+    const importBtn  = _tiEl('tiImportBtn');
+    const scanBtn     = _tiEl('tiScanBtn');
+    const previewBtn  = _tiEl('tiPreviewBtn');
+    if (importBtn)  importBtn.disabled  = true;
+    if (scanBtn)     scanBtn.disabled    = true;
+    if (previewBtn)  previewBtn.disabled = true;
+  }
+
+  async function _tiRefreshDestination() {
+    let status;
+    try { status = await window.api.checkTransferImportDestination(_tiCustomDestRoot); }
+    catch { status = null; }
+    _tiDestStatus = status;
+
+    const destEl  = _tiEl('tiMainArchivePath');
+    const noteEl  = _tiEl('tiDestNote');
+    const labelEl = _tiEl('tiDestLabel');
+    if (destEl) {
+      destEl.textContent = status?.path || 'Not set';
+      destEl.classList.toggle('tx-unset', !status?.path);
+    }
+    if (labelEl) {
+      labelEl.textContent =
+        status?.source === 'custom'                       ? 'Destination (custom)' :
+        status?.source === 'main'                          ? 'Destination (Main Archive Root)' :
+        (status?.source === 'active' || status?.source === 'override') ? 'Destination (Active Archive Root)' :
+        'Destination';
+    }
+    if (noteEl) {
+      if (!status?.path) {
+        noteEl.textContent = 'No destination is set. Choose one or set an Active/Main Archive Root.';
+        noteEl.className = 'aloc-validation warn';
+        noteEl.removeAttribute('hidden');
+      } else if (!status.reachable) {
+        noteEl.textContent = _tiDestinationUnreachableText(status.reachReason, status.reachCode);
+        noteEl.className = 'aloc-validation err';
+        noteEl.removeAttribute('hidden');
+      } else {
+        noteEl.setAttribute('hidden', '');
+      }
+    }
+
+    // Destination unreachability is a one-way, override-nothing-else gate: it only ever
+    // FORCES Import disabled, never enables it — enabling is Preview/Scan's job alone (an
+    // unchanged destination that's already reachable must never fight the existing "scope
+    // changed since last Preview" gate). Applied again, last, at the end of _tiOpen()'s own
+    // flow so a later _tiSetButtonPhase('idle') call can't silently re-enable it either.
+    _tiEnforceDestinationGate();
+
+    return status;
+  }
+
+  // Shared by modal-open and "Change Destination": re-resolves the destination, loads the
+  // scope tree against it (or shows a blocked message if unreachable), and re-checks for an
+  // interrupted checkpoint under that SAME destination — never the stale literal Main
+  // Archive Root. Returns the destination status so the caller can branch further.
+  async function _tiReloadForDestination() {
+    const destStatus = await _tiRefreshDestination();
+
+    const scanBtn    = _tiEl('tiScanBtn');
+    const previewBtn = _tiEl('tiPreviewBtn');
+    const destOk = !!(destStatus?.path && destStatus.reachable);
+    if (destOk) {
+      await _tiLoadTree();
+      if (scanBtn)    scanBtn.disabled    = false;
+      if (previewBtn) previewBtn.disabled = false;
+    } else {
+      const treeEl = _tiEl('tiScopeTree');
+      if (treeEl) treeEl.innerHTML = '<div class="tx-empty-note">Choose a reachable destination to load scope.</div>';
+      _tiTree = [];
+      if (scanBtn)    scanBtn.disabled    = true;
+      if (previewBtn) previewBtn.disabled = true;
+    }
+
+    _tiEl('tiResumeOffer')?.setAttribute('hidden', '');
+    const checkpoint = destOk ? await window.api.getTransferImportCheckpoint(_tiCustomDestRoot).catch(() => null) : null;
+    if (checkpoint && checkpoint.status !== 'complete') {
+      const done  = checkpoint.batches?.filter(b => b.status === 'complete').length ?? 0;
+      const total = checkpoint.batches?.length ?? 0;
+      const msgEl = _tiEl('tiResumeMsg');
+      if (msgEl) msgEl.textContent = `A previous import was interrupted (${done} / ${total} batches done).`;
+      _tiEl('tiResumeOffer')?.removeAttribute('hidden');
+    }
+
+    return destStatus;
+  }
+
   async function _tiOpen() {
     const overlay = _tiEl('transferImportModal');
     if (!overlay || overlay.classList.contains('open')) return;
 
-    // Any prior scan is invalidated on every (re)open — see plan §5f.
-    _tiScanMode   = false;
-    _tiScanResult = null;
+    // Any prior scan is invalidated on every (re)open — see plan §5f. The destination
+    // override is ALSO reset here: closing and reopening restores the authoritative
+    // Active/Main Archive Root as the default (requirement 7) — a custom destination is
+    // an explicit override for one working session, not a sticky preference.
+    _tiScanMode       = false;
+    _tiScanResult     = null;
+    _tiCustomDestRoot = null;
 
     // Populate Transfer Drive path (read-only display)
     const savedTransferRoot = await window.api.getTransferRoot().catch(() => null);
@@ -16114,27 +16231,7 @@ const _transferMonitor = (() => {
       driveEl.classList.toggle('tx-unset', !savedTransferRoot);
     }
 
-    // Populate Main Archive Root path (read-only display)
-    const opsStatus = await window.api.getArchiveOperationsStatus().catch(() => null);
-    const mainEl = _tiEl('tiMainArchivePath');
-    if (mainEl) {
-      const mar = opsStatus?.mainArchiveRoot;
-      mainEl.textContent = mar || 'Not set';
-      mainEl.classList.toggle('tx-unset', !mar);
-    }
-
-    await _tiLoadTree();
-
-    // Check for incomplete checkpoint
-    _tiEl('tiResumeOffer')?.setAttribute('hidden', '');
-    const checkpoint = await window.api.getTransferImportCheckpoint().catch(() => null);
-    if (checkpoint && checkpoint.status !== 'complete') {
-      const done  = checkpoint.batches?.filter(b => b.status === 'complete').length ?? 0;
-      const total = checkpoint.batches?.length ?? 0;
-      const msgEl = _tiEl('tiResumeMsg');
-      if (msgEl) msgEl.textContent = `A previous import was interrupted (${done} / ${total} batches done).`;
-      _tiEl('tiResumeOffer')?.removeAttribute('hidden');
-    }
+    await _tiReloadForDestination();
 
     const importStatus = await window.api.getTransferImportStatus().catch(() => null);
     if (importStatus && (importStatus.running || importStatus.paused || importStatus.result)) {
@@ -16147,6 +16244,11 @@ const _transferMonitor = (() => {
       _tiEl('tiStatusBox')?.setAttribute('hidden', '');
       _tiSetButtonPhase('idle');
     }
+
+    // Applied last: _tiSetButtonPhase('idle') unconditionally re-enables Import for the
+    // default "ready with whatever is currently selected" case — an unreachable destination
+    // must override that, not be overridden by it.
+    _tiEnforceDestinationGate();
 
     overlay.classList.add('open');
     document.body.style.overflow = 'hidden';
@@ -16164,14 +16266,14 @@ const _transferMonitor = (() => {
     treeEl.innerHTML = '<div class="tx-empty-note">Loading…</div>';
 
     let result;
-    try { result = await window.api.getTransferImportTree(); } catch { result = null; }
+    try { result = await window.api.getTransferImportTree(_tiCustomDestRoot); } catch { result = null; }
 
     if (!result || !result.ok || !result.tree || result.tree.length === 0) {
       const reason = result?.reason;
       const msg = reason === 'transfer-root-not-set'
         ? 'Transfer Drive is not set.'
-        : reason === 'main-archive-not-set'
-        ? 'Main Archive Root is not set.'
+        : reason === 'destination-not-set'
+        ? 'No destination is set. Choose one or set an Active/Main Archive Root.'
         : reason === 'transfer-root-unreadable'
         ? 'Transfer Drive is offline or unreadable.'
         : 'No importable content found on Transfer Drive.';
@@ -16657,7 +16759,7 @@ const _transferMonitor = (() => {
 
   function _tiBuildScope() {
     const treeEl = _tiEl('tiScopeTree');
-    if (!treeEl) return { folderPaths: [], eventRootPaths: [], externalPaths: [], filePaths: [] };
+    if (!treeEl) return { folderPaths: [], eventRootPaths: [], externalPaths: [], filePaths: [], customDestRoot: _tiCustomDestRoot };
 
     const folderPaths    = new Set();
     const eventRootPaths = new Set();
@@ -16719,6 +16821,7 @@ const _transferMonitor = (() => {
     return {
       folderPaths: [...folderPaths], eventRootPaths: [...eventRootPaths],
       externalPaths: [...externalPaths], filePaths: [...filePaths],
+      customDestRoot: _tiCustomDestRoot,
     };
   }
 
@@ -16767,10 +16870,10 @@ const _transferMonitor = (() => {
     if (!result.ok) {
       const msgs = {
         'transfer-root-not-set':       'Transfer Drive is not set.',
-        'main-archive-not-set':        'Main Archive Root is not set.',
+        'destination-not-set':         'No destination is set. Choose one or set an Active/Main Archive Root.',
         'empty-scope':                 'Select at least one folder.',
         'scope-outside-transfer-root': 'Selected path is outside the Transfer Drive.',
-        'roots-overlap':               'Transfer Drive must not overlap with Main Archive Root.',
+        'roots-overlap':               'Transfer Drive must not overlap with the destination.',
       };
       showMessage(msgs[result.reason] || ('Preview error: ' + result.reason), 6000);
       if (previewBox) previewBox.setAttribute('hidden', '');
@@ -16819,7 +16922,7 @@ const _transferMonitor = (() => {
     if (reviewEl) {
       reviewEl.removeAttribute('hidden');
       reviewEl.innerHTML = '<div class="tx-scan-loading">'
-        + '<div class="tx-scan-loading-title">Checking Main Archive Root…</div>'
+        + '<div class="tx-scan-loading-title">Checking destination…</div>'
         + '<div class="tx-scan-loading-sub">Comparing selected folders against the archive. Nothing is being copied yet.</div>'
         + '</div>';
     }
@@ -16838,8 +16941,8 @@ const _transferMonitor = (() => {
       if (noteEl) noteEl.textContent = 'Scan failed';
       const msgs = {
         'transfer-root-not-set':       'Transfer Drive is not set.',
-        'main-archive-not-set':        'Main Archive Root is not set.',
-        'roots-overlap':               'Transfer Drive must not overlap with Main Archive Root.',
+        'destination-not-set':         'No destination is set. Choose one or set an Active/Main Archive Root.',
+        'roots-overlap':               'Transfer Drive must not overlap with the destination.',
         'empty-scope':                 'Select at least one folder to scan.',
         'scope-outside-transfer-root': 'Selected path is outside the Transfer Drive.',
       };
@@ -16987,9 +17090,9 @@ const _transferMonitor = (() => {
       const msgs = {
         'busy':                        'An import is already running.',
         'transfer-root-not-set':       'Transfer Drive is not set.',
-        'main-archive-not-set':        'Main Archive Root is not set.',
+        'destination-not-set':         'No destination is set. Choose one or set an Active/Main Archive Root.',
         'empty-scope':                 'Select at least one folder.',
-        'roots-overlap':               'Transfer Drive must not overlap with Main Archive Root.',
+        'roots-overlap':               'Transfer Drive must not overlap with the destination.',
         'scope-outside-transfer-root': 'A selected item is outside the Transfer Drive.',
         'missing-fingerprint':         'Run Scan for New Data again before importing.',
       };
@@ -17021,7 +17124,7 @@ const _transferMonitor = (() => {
     } catch {}
 
     let result;
-    try { result = await window.api.resumeTransferImportFromCheckpoint(operatorName); } catch (e) {
+    try { result = await window.api.resumeTransferImportFromCheckpoint(operatorName, _tiCustomDestRoot); } catch (e) {
       showMessage('Resume failed: ' + e.message, 6000);
       return;
     }
@@ -17044,7 +17147,7 @@ const _transferMonitor = (() => {
 
   async function _tiStartFresh() {
     _tiEl('tiResumeOffer')?.setAttribute('hidden', '');
-    await window.api.clearTransferImportCheckpoint().catch(() => {});
+    await window.api.clearTransferImportCheckpoint(_tiCustomDestRoot).catch(() => {});
     _tiSetButtonPhase('idle');
   }
 
@@ -17411,6 +17514,20 @@ const _transferMonitor = (() => {
   _tiEl('tiVerifyBtn')?.addEventListener('click',         _tiVerify);
   _tiEl('tiResumeBtn')?.addEventListener('click',         _tiResumeFromCheckpoint);
   _tiEl('tiStartFreshBtn')?.addEventListener('click',     _tiStartFresh);
+
+  // Change Destination — an explicit, session-local override (never a settings write; see
+  // plan Scenario D). Reuses the exact native folder-picker dialog Transfer Export's own
+  // custom-destination picker uses (archive:chooseCustomDestFolder, bound here as
+  // chooseCustomImportDestFolder). Cancellation (null) leaves the previous selection
+  // unchanged, per requirement 10.
+  _tiEl('tiChangeDestBtn')?.addEventListener('click', async () => {
+    if (_tiRunning) { showMessage('Cannot change the destination while an import is running.', 4000); return; }
+    const p = normalizePickedPath(await window.api.chooseCustomImportDestFolder().catch(() => null));
+    if (!p) return;
+    _tiCustomDestRoot = p;
+    _tiInvalidatePreview();
+    await _tiReloadForDestination();
+  });
 
 })();
 

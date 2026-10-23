@@ -272,17 +272,19 @@ contextBridge.exposeInMainWorld('api', {
   resumeCustomTransferExportFromCheckpoint: ({ customSrcRoot, customDestRoot, operatorName })        => ipcRenderer.invoke('archive:resumeCustomTransferExportFromCheckpoint', { customSrcRoot, customDestRoot, operatorName }),
 
   // ── Transfer Import ──
-  getTransferImportTree:                 ()                        => ipcRenderer.invoke('archive:getTransferImportTree'),
+  getTransferImportTree:                 (customDestRoot)          => ipcRenderer.invoke('archive:getTransferImportTree',              { customDestRoot }),
   getTransferImportFolderChildren:       (dirPath)                 => ipcRenderer.invoke('archive:getTransferImportFolderChildren', dirPath),
+  checkTransferImportDestination:        (customDestRoot)          => ipcRenderer.invoke('archive:checkTransferImportDestination',      { customDestRoot }),
+  chooseCustomImportDestFolder:          ()                        => ipcRenderer.invoke('archive:chooseCustomDestFolder'),
   previewTransferImport:                 (scope)                   => ipcRenderer.invoke('archive:previewTransferImport',              { scope }),
   scanImportSync:                        (scope)                   => ipcRenderer.invoke('archive:scanImportSync',                     { scope }),
   runTransferImport:                     (scope, operatorName)     => ipcRenderer.invoke('archive:runTransferImport',                  { scope, operatorName }),
   getTransferImportStatus:               ()                        => ipcRenderer.invoke('archive:getTransferImportStatus'),
   pauseTransferImport:                   ()                        => ipcRenderer.invoke('archive:pauseTransferImport'),
   resumeTransferImport:                  ()                        => ipcRenderer.invoke('archive:resumeTransferImport'),
-  getTransferImportCheckpoint:           ()                        => ipcRenderer.invoke('archive:getTransferImportCheckpoint'),
-  clearTransferImportCheckpoint:         ()                        => ipcRenderer.invoke('archive:clearTransferImportCheckpoint'),
-  resumeTransferImportFromCheckpoint:    (operatorName)            => ipcRenderer.invoke('archive:resumeTransferImportFromCheckpoint', { operatorName }),
+  getTransferImportCheckpoint:           (customDestRoot)          => ipcRenderer.invoke('archive:getTransferImportCheckpoint',        { customDestRoot }),
+  clearTransferImportCheckpoint:         (customDestRoot)          => ipcRenderer.invoke('archive:clearTransferImportCheckpoint',      { customDestRoot }),
+  resumeTransferImportFromCheckpoint:    (operatorName, customDestRoot) => ipcRenderer.invoke('archive:resumeTransferImportFromCheckpoint', { operatorName, customDestRoot }),
   verifyTransferImport:                  (scope)                   => ipcRenderer.invoke('archive:verifyTransferImport',               { scope }),
 
   // ── Archive Diagnostics ──

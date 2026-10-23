@@ -2877,6 +2877,39 @@ ipcMain.handle('archive:resolveEffectiveRoot', async () => {
   return _resolveEffectiveArchiveRoot();
 });
 
+// Resolves the destination Transfer Import should use for one call. An explicit
+// customDestRoot (the operator's "Change Destination" override — see plan, Scenario D) is
+// never persisted and always wins; otherwise this defers entirely to the SAME authoritative
+// effective-root resolution the rest of the app already uses (_resolveEffectiveArchiveRoot:
+// Active Archive Root by default, Main Archive Root automatically only when it is also
+// Active, never a silent fallback to Main when Active is merely unavailable). Transfer
+// Import previously bypassed this and read settings.getMainArchiveRoot() directly, which is
+// why it always defaulted to Main even when a different Active Archive Root was configured.
+async function _resolveTransferImportDestination(customDestRoot) {
+  if (customDestRoot) return { path: customDestRoot, source: 'custom', mainAvailable: null };
+  return _resolveEffectiveArchiveRoot();
+}
+
+// One-shot destination status for the Transfer Import modal: the resolved path, where it
+// came from (active/main/override/custom/none), and whether it is ACTUALLY reachable right
+// now — reusing transferImportService's own preflight probe (the abb4729 fix) rather than a
+// second, duplicate reachability check. Called at modal open, after Change Destination, and
+// before Scan/Preview/Import so a stale "looked fine a minute ago" status is never trusted.
+ipcMain.handle('archive:checkTransferImportDestination', async (_event, { customDestRoot } = {}) => {
+  const eff = await _resolveTransferImportDestination(customDestRoot);
+  if (!eff.path) return { ok: true, path: null, source: eff.source, mainAvailable: eff.mainAvailable, reachable: false, reachReason: 'destination-not-set' };
+  const reach = await transferImportService.checkDestinationReachable(eff.path);
+  return {
+    ok: true,
+    path: eff.path,
+    source: eff.source,
+    mainAvailable: eff.mainAvailable,
+    reachable: reach.ok,
+    reachCode: reach.code || null,
+    reachReason: reach.ok ? null : reach.reason,
+  };
+});
+
 // Dashboard "Events This Week": count managed event folders (containing event.json) under the
 // effective archive root whose folder was created/modified within the last 7 days. Read-only,
 // bounded (collection → event, 2 levels). Returns { ok:false } when the archive is unavailable
@@ -4637,12 +4670,12 @@ ipcMain.handle('archive:verifyTransferExport', async (_event, { scope } = {}) =>
 
 // ── Transfer Import ───────────────────────────────────────────────────────────
 
-ipcMain.handle('archive:getTransferImportTree', async () => {
-  const transferRoot    = settings.getTransferRoot();
-  const mainArchiveRoot = settings.getMainArchiveRoot();
-  if (!transferRoot)    return { ok: false, reason: 'transfer-root-not-set' };
-  if (!mainArchiveRoot) return { ok: false, reason: 'main-archive-not-set' };
-  return transferImportService.scanImportTree(transferRoot, mainArchiveRoot, isValidEventJson);
+ipcMain.handle('archive:getTransferImportTree', async (_event, { customDestRoot } = {}) => {
+  const transferRoot = settings.getTransferRoot();
+  if (!transferRoot) return { ok: false, reason: 'transfer-root-not-set' };
+  const eff = await _resolveTransferImportDestination(customDestRoot);
+  if (!eff.path) return { ok: false, reason: 'destination-not-set' };
+  return transferImportService.scanImportTree(transferRoot, eff.path, isValidEventJson);
 });
 
 // Lazy one-level expansion for a generic (non-archive-shaped) folder node in the Import Scope
@@ -4657,28 +4690,29 @@ ipcMain.handle('archive:getTransferImportFolderChildren', async (_event, dirPath
 });
 
 ipcMain.handle('archive:previewTransferImport', async (_event, { scope } = {}) => {
-  const transferRoot    = settings.getTransferRoot();
-  const mainArchiveRoot = settings.getMainArchiveRoot();
-  if (!transferRoot)    return { ok: false, reason: 'transfer-root-not-set' };
-  if (!mainArchiveRoot) return { ok: false, reason: 'main-archive-not-set' };
-  return transferImportService.previewImport(transferRoot, mainArchiveRoot, scope, isValidEventJson);
+  const transferRoot = settings.getTransferRoot();
+  if (!transferRoot) return { ok: false, reason: 'transfer-root-not-set' };
+  const eff = await _resolveTransferImportDestination(scope?.customDestRoot);
+  if (!eff.path) return { ok: false, reason: 'destination-not-set' };
+  return transferImportService.previewImport(transferRoot, eff.path, scope, isValidEventJson);
 });
 
-// Read-only pre-copy scan: classify the selected Transfer Drive scope against the Main
-// Archive Root by relative path + size (new / already-imported / changed / unresolved).
+// Read-only pre-copy scan: classify the selected Transfer Drive scope against the resolved
+// destination by relative path + size (new / already-imported / changed / unresolved).
 ipcMain.handle('archive:scanImportSync', async (_event, { scope } = {}) => {
-  const transferRoot    = settings.getTransferRoot();
-  const mainArchiveRoot = settings.getMainArchiveRoot();
-  if (!transferRoot)    return { ok: false, reason: 'transfer-root-not-set' };
-  if (!mainArchiveRoot) return { ok: false, reason: 'main-archive-not-set' };
-  return transferImportService.scanImportSync(transferRoot, mainArchiveRoot, scope, isValidEventJson);
+  const transferRoot = settings.getTransferRoot();
+  if (!transferRoot) return { ok: false, reason: 'transfer-root-not-set' };
+  const eff = await _resolveTransferImportDestination(scope?.customDestRoot);
+  if (!eff.path) return { ok: false, reason: 'destination-not-set' };
+  return transferImportService.scanImportSync(transferRoot, eff.path, scope, isValidEventJson);
 });
 
 ipcMain.handle('archive:runTransferImport', async (_event, { scope, operatorName } = {}) => {
-  const transferRoot    = settings.getTransferRoot();
-  const mainArchiveRoot = settings.getMainArchiveRoot();
-  if (!transferRoot)    return { ok: false, reason: 'transfer-root-not-set' };
-  if (!mainArchiveRoot) return { ok: false, reason: 'main-archive-not-set' };
+  const transferRoot = settings.getTransferRoot();
+  if (!transferRoot) return { ok: false, reason: 'transfer-root-not-set' };
+  const eff = await _resolveTransferImportDestination(scope?.customDestRoot);
+  if (!eff.path) return { ok: false, reason: 'destination-not-set' };
+  const mainArchiveRoot = eff.path;
   return transferImportService.runImport(transferRoot, mainArchiveRoot, scope, isValidEventJson, {
     operatorName: operatorName || null,
     deviceName:   os.hostname(),
@@ -4696,23 +4730,24 @@ ipcMain.handle('archive:getTransferImportStatus', () => transferImportService.ge
 ipcMain.handle('archive:pauseTransferImport',  () => transferImportService.pauseImport());
 ipcMain.handle('archive:resumeTransferImport', () => transferImportService.resumeImport());
 
-ipcMain.handle('archive:getTransferImportCheckpoint', async () => {
-  const mainArchiveRoot = settings.getMainArchiveRoot();
-  if (!mainArchiveRoot) return null;
-  return transferImportService.getImportCheckpoint(mainArchiveRoot);
+ipcMain.handle('archive:getTransferImportCheckpoint', async (_event, { customDestRoot } = {}) => {
+  const eff = await _resolveTransferImportDestination(customDestRoot);
+  if (!eff.path) return null;
+  return transferImportService.getImportCheckpoint(eff.path);
 });
 
-ipcMain.handle('archive:clearTransferImportCheckpoint', async () => {
-  const mainArchiveRoot = settings.getMainArchiveRoot();
-  if (!mainArchiveRoot) return { ok: false, reason: 'main-archive-not-set' };
-  return transferImportService.clearImportCheckpoint(mainArchiveRoot);
+ipcMain.handle('archive:clearTransferImportCheckpoint', async (_event, { customDestRoot } = {}) => {
+  const eff = await _resolveTransferImportDestination(customDestRoot);
+  if (!eff.path) return { ok: false, reason: 'destination-not-set' };
+  return transferImportService.clearImportCheckpoint(eff.path);
 });
 
-ipcMain.handle('archive:resumeTransferImportFromCheckpoint', async (_event, { operatorName } = {}) => {
-  const transferRoot    = settings.getTransferRoot();
-  const mainArchiveRoot = settings.getMainArchiveRoot();
-  if (!transferRoot)    return { ok: false, reason: 'transfer-root-not-set' };
-  if (!mainArchiveRoot) return { ok: false, reason: 'main-archive-not-set' };
+ipcMain.handle('archive:resumeTransferImportFromCheckpoint', async (_event, { operatorName, customDestRoot } = {}) => {
+  const transferRoot = settings.getTransferRoot();
+  if (!transferRoot) return { ok: false, reason: 'transfer-root-not-set' };
+  const eff = await _resolveTransferImportDestination(customDestRoot);
+  if (!eff.path) return { ok: false, reason: 'destination-not-set' };
+  const mainArchiveRoot = eff.path;
   return transferImportService.resumeImportFromCheckpoint(transferRoot, mainArchiveRoot, {
     operatorName: operatorName || null,
     deviceName:   os.hostname(),
@@ -4726,10 +4761,11 @@ ipcMain.handle('archive:resumeTransferImportFromCheckpoint', async (_event, { op
 });
 
 ipcMain.handle('archive:verifyTransferImport', async (_event, { scope } = {}) => {
-  const transferRoot    = settings.getTransferRoot();
-  const mainArchiveRoot = settings.getMainArchiveRoot();
-  if (!transferRoot)    return { ok: false, reason: 'transfer-root-not-set' };
-  if (!mainArchiveRoot) return { ok: false, reason: 'main-archive-not-set' };
+  const transferRoot = settings.getTransferRoot();
+  if (!transferRoot) return { ok: false, reason: 'transfer-root-not-set' };
+  const eff = await _resolveTransferImportDestination(scope?.customDestRoot);
+  if (!eff.path) return { ok: false, reason: 'destination-not-set' };
+  const mainArchiveRoot = eff.path;
   return transferImportService.verifyImport(transferRoot, mainArchiveRoot, scope, isValidEventJson);
 });
 

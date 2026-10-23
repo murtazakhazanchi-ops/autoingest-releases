@@ -234,34 +234,37 @@ async function countFilesOnDisk(dir) {
   await window2.click('#alocTransferImportBtn');
   await window2.waitForTimeout(800);
 
-  await window2.click('#tiSelectAllBtn');
-  await window2.waitForTimeout(300);
-  await window2.click('#tiPreviewBtn');
-  await window2.waitForTimeout(1000);
-  await window2.click('#tiImportBtn');
-  await window2.waitForTimeout(1000);
-
   // A destination that is unwritable AT THE ROOT is now caught by a real reachability
-  // preflight before the batch loop ever starts (see _checkDestinationReachable in
-  // transferImportService.js) — it never reaches "running" at all, so the old
-  // "let it run, hit the 200-error cap, then report failed" assertions no longer apply.
-  // This is a strict improvement over the previous behavior this test originally verified.
-  const status2 = await window2.evaluate(async () => window.api.getTransferImportStatus());
-  check(status2 && !status2.running && !status2.batchId, '6. the import never starts running — rejected before the batch loop, not left to fail mid-run');
+  // preflight at MODAL-OPEN time (see _tiRefreshDestination/_checkDestinationReachable) —
+  // even earlier than the previous fix's "caught before the batch loop starts" behavior.
+  // Preview/Scan/Import are all disabled before the operator can even attempt them; the old
+  // "click through to Import, then get rejected" flow no longer applies — this is a strict
+  // improvement over the previous behavior this test originally verified.
+  const destNote = await window2.evaluate(() => {
+    const el = document.getElementById('tiDestNote');
+    return { hidden: el?.hasAttribute('hidden'), text: el?.textContent };
+  });
+  log('destination note:', JSON.stringify(destNote));
+  check(destNote.hidden === false, '6. the modal shows the destination as a problem immediately on open, before any button is clicked');
+  check(/denied|permission/i.test(destNote.text), '7. the operator is told access was denied — not a vague "may be unwritable" guess');
+  check(/privacy|files and folders/i.test(destNote.text), '7b. on this permission-denied class, the message points at the real macOS remedy (Privacy & Security → Files and Folders)');
 
-  const rejectMsg = await window2.evaluate(() => document.getElementById('statusMessage')?.textContent || '');
-  log('rejection message:', rejectMsg);
-  check(/denied|permission/i.test(rejectMsg), '7. the operator is told access was denied — not a vague "may be unwritable" guess');
-  check(/privacy|files and folders/i.test(rejectMsg), '7b. on this permission-denied class, the message points at the real macOS remedy (Privacy & Security → Files and Folders)');
+  const buttonsDisabled = await window2.evaluate(() => ({
+    preview: document.getElementById('tiPreviewBtn')?.disabled,
+    scan:    document.getElementById('tiScanBtn')?.disabled,
+    import:  document.getElementById('tiImportBtn')?.disabled,
+  }));
+  log('buttons disabled:', JSON.stringify(buttonsDisabled));
+  check(buttonsDisabled.preview === true && buttonsDisabled.scan === true && buttonsDisabled.import === true,
+    '8. Preview, Scan, and Import are all disabled while the destination is unreachable');
+
+  const changeDestEnabled = await window2.evaluate(() => document.getElementById('tiChangeDestBtn')?.disabled === false);
+  check(changeDestEnabled === true, '9. Change Destination remains the available way forward');
 
   check(await countFilesOnDisk(path.join(archiveRoot2, 'recovered2')) === 0,
-    '8. zero files were actually copied (nothing ever started)');
-
-  const importBtnState = await window2.evaluate(() => document.getElementById('tiImportBtn')?.disabled);
-  check(importBtnState === false, '9. the Import button is re-enabled so the operator can retry after fixing access, not left stuck disabled');
-
+    '10. zero files were actually copied (nothing ever started)');
   check(!fs.existsSync(path.join(archiveRoot2, 'recovered2')) || (await countFilesOnDisk(path.join(archiveRoot2, 'recovered2'))) === 0,
-    '10. confirmed on disk — genuinely zero files landed at the unwritable destination');
+    '11. confirmed on disk — genuinely zero files landed at the unwritable destination');
 
   await fsp.chmod(archiveRoot2, 0o755).catch(() => {}); // restore for cleanup
 

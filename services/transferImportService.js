@@ -1803,4 +1803,9 @@ module.exports = {
   verifyImport,
   scanImportSync,
   readTransferOutcomes,
+  // Exported so main.js's IPC layer can check a candidate destination's live reachability
+  // (e.g. for the Transfer Import modal's "Change Destination" flow) using the exact same
+  // probe runImport()/resumeImportFromCheckpoint() apply internally — never a second,
+  // duplicate reachability check reimplemented at the IPC layer.
+  checkDestinationReachable: _checkDestinationReachable,
 };
