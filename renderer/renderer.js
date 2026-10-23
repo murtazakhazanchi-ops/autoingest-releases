@@ -16219,12 +16219,21 @@ const _transferMonitor = (() => {
         });
 
         node.externalFolders.forEach((ext, xi) => {
+          // A non-Event sibling folder inside a Collection (e.g. a numbered subfolder like
+          // "02E" sitting next to real Event folders) is always a directory (scanImportTree
+          // only ever populates externalFolders from directory entries) and, exactly like a
+          // generic folder or an Event's own folders, must be expandable to any depth —
+          // AutoIngest's own archive/Event rules are irrelevant below this point; it's
+          // ordinary filesystem content from here down.
           html.push(
+            `<div class="tx-tree-node tx-generic-node" data-ti="${ti}" data-xi="${xi}">` +
             `<div class="tx-tree-row tx-tree-row-ev"${rowAttrs(ext.destinationStatus, ext.destinationReason)}>` +
-            `<input type="checkbox" class="ti-cb-cext" data-ti="${ti}" data-xi="${xi}"${cbAttrs(ext.destinationStatus)}>` +
-            `<span class="tx-tree-arrow"> </span>` +
+            `<input type="checkbox" class="ti-cb-cext ti-cb-generic-nested" data-ti="${ti}" data-xi="${xi}" data-path="${_esc(ext.path)}" data-isdir="1"${cbAttrs(ext.destinationStatus)}>` +
+            `<span class="tx-tree-arrow tx-generic-arrow" data-path="${_esc(ext.path)}">▶</span>` +
             `<span class="tx-tree-name" title="${_esc(ext.path)}">${_esc(ext.name)}</span>` +
             unresolvedBadge(ext.destinationStatus) + newCollBadge(ext.destinationStatus, ext.destinationReason) +
+            `</div>` +
+            `<div class="tx-tree-children tx-collapsed tx-generic-children" data-loaded="0"></div>` +
             `</div>`
           );
         });
@@ -16354,8 +16363,18 @@ const _transferMonitor = (() => {
     childrenEl.querySelectorAll(':scope > .tx-tree-row > .ti-cb-generic-nested, :scope > .tx-tree-node > .tx-tree-row > .ti-cb-generic-nested').forEach(cb => {
       cb.checked = checked;
       cb.indeterminate = false;
-      const childNode = cb.closest('.tx-generic-node');
-      if (childNode) _tiPropagateGenericCheckedDown(childNode, checked);
+      // Only a DIRECTORY row has its own .tx-generic-node wrapper (data-isdir="1"). A leaf
+      // file has none — cb.closest('.tx-generic-node') on it would silently match its
+      // ENCLOSING parent's node instead (the nearest ancestor that happens to carry the
+      // class), re-entering this same parent recursively forever (stack overflow). That
+      // exception then silently aborts this entire cascade mid-flight, leaving every
+      // sibling queued after the crash point untouched — which is exactly why Select
+      // None/parent-deselection used to leave scattered checkboxes (including root-level
+      // files like event.json, processed later in the same enclosing loop) still checked.
+      if (cb.dataset.isdir === '1') {
+        const childNode = cb.closest('.tx-generic-node');
+        if (childNode) _tiPropagateGenericCheckedDown(childNode, checked);
+      }
     });
   }
 
@@ -16508,8 +16527,12 @@ const _transferMonitor = (() => {
           // A fold may itself have already-loaded nested generic descendants (from an
           // earlier partial selection below it) — propagate all the way down, not just
           // one level, so toggling the Event re-selects/deselects everything beneath it.
-          const nodeEl = f.closest('.tx-generic-node');
-          if (nodeEl) _tiPropagateGenericCheckedDown(nodeEl, checked);
+          // Files (.ti-cb-evfile) have no children at all — only a directory row owns a
+          // .tx-generic-node wrapper, so only those are eligible to recurse into.
+          if (f.dataset.isdir === '1') {
+            const nodeEl = f.closest('.tx-generic-node');
+            if (nodeEl) _tiPropagateGenericCheckedDown(nodeEl, checked);
+          }
         });
         cb.indeterminate = false;
         _tiUpdateCollState(treeEl, cb.dataset.ti);
@@ -16524,10 +16547,17 @@ const _transferMonitor = (() => {
         treeEl.querySelectorAll(`.ti-cb-fold[data-ti="${ti}"], .ti-cb-evfile[data-ti="${ti}"]`).forEach(f => {
           if (f.disabled) return;
           f.checked = checked; f.indeterminate = false;
-          const nodeEl = f.closest('.tx-generic-node');
+          if (f.dataset.isdir === '1') {
+            const nodeEl = f.closest('.tx-generic-node');
+            if (nodeEl) _tiPropagateGenericCheckedDown(nodeEl, checked);
+          }
+        });
+        treeEl.querySelectorAll(`.ti-cb-cext[data-ti="${ti}"]`).forEach(x => {
+          if (x.disabled) return;
+          x.checked = checked; x.indeterminate = false;
+          const nodeEl = x.closest('.tx-generic-node');
           if (nodeEl) _tiPropagateGenericCheckedDown(nodeEl, checked);
         });
-        treeEl.querySelectorAll(`.ti-cb-cext[data-ti="${ti}"]`).forEach(x => { if (!x.disabled) x.checked = checked; });
         cb.indeterminate = false;
         _tiInvalidatePreview();
       });
@@ -16659,9 +16689,17 @@ const _transferMonitor = (() => {
       const p = cb.dataset.path;
       if (p) _tiCollectGenericSelections(cb, p, false, folderPaths, filePaths);
     });
-    treeEl.querySelectorAll('.ti-cb-cext:checked').forEach(cb => {
-      const p = _tiTree[parseInt(cb.dataset.ti, 10)]?.externalFolders?.[parseInt(cb.dataset.xi, 10)]?.path;
-      if (p) externalPaths.add(p);
+    // A non-Event sibling folder (e.g. "02E") is, below its own level, exactly as recursively
+    // selectable as any Event folder — walked the same way via _tiCollectGenericSelections. A
+    // fully-selected one still resolves through the archive-aware 'external' sourceType
+    // (destDir math is identical either way — see resolveOne) via externalPaths; an
+    // indeterminate one is walked into generic folderPaths/filePaths entries for whichever
+    // descendants are actually selected.
+    treeEl.querySelectorAll('.ti-cb-cext').forEach(cb => {
+      const p = cb.dataset.path;
+      if (!p) return;
+      if (cb.checked && !cb.indeterminate) { externalPaths.add(p); return; }
+      if (cb.indeterminate) _tiCollectGenericSelections(cb, p, true, folderPaths, filePaths);
     });
     // General-purpose transfer: a top-level generic folder/file, selected whole, partially
     // (nested selection — walked recursively via _tiCollectGenericSelections), or not at all.
