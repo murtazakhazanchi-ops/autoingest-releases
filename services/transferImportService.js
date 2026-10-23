@@ -632,6 +632,20 @@ async function _resolveEventDestination(transferRoot, mainArchiveRoot, eventName
   return { destinationStatus: 'unresolved', collectionKey: null, destDir: null, destinationReason: 'no-existing-collection-found' };
 }
 
+// A Collection-shaped folder's own name is its deterministic destination Collection name (see
+// the big comment above the 'collection' tree-node push below) — but "does a directory with
+// that name already exist at the destination" must distinguish a clean, genuine absence from
+// a failed lookup (a permission error, a transient I/O fault, a disconnected mount). Only
+// 'absent' is evidence a Collection is new; 'unknown' must never be silently treated as
+// absence (see "Transfer Import Collection Status Correction" §4/§9 — a failed lookup is not
+// proof of absence, and an unresolved state must stay distinct from a confirmed new Collection).
+async function _checkDestinationCollectionState(mainArchiveRoot, name) {
+  let st;
+  try { st = await fsp.stat(path.join(mainArchiveRoot, name)); }
+  catch (e) { return (e && (e.code === 'ENOENT' || e.code === 'ENOTDIR')) ? 'absent' : 'unknown'; }
+  return st.isDirectory() ? 'exists' : 'occupied'; // a file, not a folder, already sits at that name
+}
+
 // ── Structure-aware tree scan (for the UI scope picker) ───────────────────────
 
 async function scanImportTree(transferRoot, mainArchiveRoot, isValidEventJsonFn) {
@@ -721,10 +735,13 @@ async function scanImportTree(transferRoot, mainArchiveRoot, isValidEventJsonFn)
     // confirm-before-import gate every other resolved item already goes through). Nothing is
     // created here; the destination folder is created on demand, idempotently, at actual copy
     // time (see the fsp.mkdir(..., {recursive:true}) calls in the copy/batch functions below).
-    let collectionExists = false;
-    try { collectionExists = (await fsp.stat(path.join(mainArchiveRoot, topEntry.name))).isDirectory(); } catch {}
-    const collDestStatus = 'resolved';
-    const collDestReason = collectionExists ? null : 'new-collection';
+    const collState       = await _checkDestinationCollectionState(mainArchiveRoot, topEntry.name);
+    const collectionExists = collState === 'exists';
+    const collUncertain     = collState === 'unknown' || collState === 'occupied';
+    const collDestStatus = collUncertain ? 'unresolved' : 'resolved';
+    const collDestReason = collUncertain
+      ? (collState === 'occupied' ? 'destination-name-conflict' : 'destination-lookup-failed')
+      : (collectionExists ? null : 'new-collection');
 
     const eventNodes = [];
     for (const ev of events) {
@@ -737,7 +754,8 @@ async function scanImportTree(transferRoot, mainArchiveRoot, isValidEventJsonFn)
 
     tree.push({
       type: 'collection', name: topEntry.name, path: topPath, events: eventNodes, externalFolders: externalNodes,
-      isNewCollection: !collectionExists,
+      // Never claimed true under uncertainty — only a clean, confirmed absence is "new".
+      isNewCollection: !collUncertain && !collectionExists,
     });
   }
 
@@ -926,8 +944,18 @@ async function _resolveImportUnits(transferRoot, mainArchiveRoot, scope, isValid
     // missing destination Collection is a normal "will be created" outcome, not an unresolved
     // one — never a guess, since there is exactly one candidate. The destination directory is
     // created on demand, idempotently, by the copy functions below; nothing is created here.
-    let collectionExists = false;
-    try { collectionExists = (await fsp.stat(path.join(mainArchiveRoot, topName))).isDirectory(); } catch {}
+    const collState = await _checkDestinationCollectionState(mainArchiveRoot, topName);
+    if (collState === 'unknown' || collState === 'occupied') {
+      // A failed lookup or a name occupied by a non-directory is never evidence of absence —
+      // kept out of both the "confirmed new" and "confirmed existing" buckets, same as
+      // scanImportTree's identical branch.
+      unresolvedUnits.push({
+        path: absPath, name: topName,
+        reason: collState === 'occupied' ? 'destination-name-conflict' : 'destination-lookup-failed',
+      });
+      return;
+    }
+    const collectionExists = collState === 'exists';
 
     resolvedUnits.push({
       srcDir:             absPath,

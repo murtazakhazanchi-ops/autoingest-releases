@@ -16049,8 +16049,10 @@ const _transferMonitor = (() => {
 
   function _tiUnresolvedReasonText(reason) {
     const msgs = {
-      'no-existing-collection-found': 'No matching Event was found anywhere in the Main Archive Root.',
-      'ambiguous-archive-match':      'This Event matches more than one existing Collection — cannot resolve automatically.',
+      'no-existing-collection-found':  'No matching Event was found anywhere in the Main Archive Root.',
+      'ambiguous-archive-match':       'This Event matches more than one existing Collection — cannot resolve automatically.',
+      'destination-lookup-failed':     'Could not determine whether this Collection already exists at the destination — check destination permissions and try again.',
+      'destination-name-conflict':     'A file (not a folder) already occupies this name at the destination — resolve the conflict manually before importing.',
     };
     return msgs[reason] || 'Destination could not be resolved — this item will not be imported.';
   }
@@ -16313,7 +16315,7 @@ const _transferMonitor = (() => {
     const cbAttrs    = status => status === 'unresolved' ? ' disabled data-unresolved="true"' : ' checked data-unresolved="false"';
     const unresolvedBadge = status => status === 'unresolved' ? '<span class="tx-tree-status" data-status="review">⚠ Unresolved</span>' : '';
     const newCollBadge = (status, reason) => (status === 'resolved' && reason === 'new-collection')
-      ? '<span class="tx-tree-status" data-status="new">✨ New Collection</span>' : '';
+      ? '<span class="tx-tree-status" data-status="new">New Collection</span>' : '';
 
     _tiTree.forEach((node, ti) => {
       if (node.type === 'collection') {
@@ -16323,7 +16325,7 @@ const _transferMonitor = (() => {
           `<input type="checkbox" class="ti-cb-coll" data-ti="${ti}" checked>` +
           `<span class="tx-tree-arrow" data-ti="${ti}">▶</span>` +
           `<span class="tx-tree-name" title="${_esc(node.path)}">${_esc(node.name)}</span>` +
-          (node.isNewCollection ? '<span class="tx-tree-status" data-status="new">✨ New Collection</span>' : '') +
+          (node.isNewCollection ? '<span class="tx-tree-status" data-status="new">New Collection</span>' : '') +
           `</div>` +
           `<div class="tx-tree-children tx-collapsed" data-coll-children="${ti}">`
         );
@@ -17246,6 +17248,11 @@ const _transferMonitor = (() => {
       if (!status.running && !status.paused) {
         _tiStopPoll();
         _tiRunning = false;
+        // A completed run (success, partial, or failed) may have changed what exists at the
+        // destination — most notably, a Collection the scope tree showed as "New Collection"
+        // now exists. Re-evaluate from the actual destination filesystem rather than trusting
+        // the copy result alone (see "Transfer Import Collection Status Correction" §7/§10.9).
+        await _tiReloadForDestination();
       }
     }, 800);
   }
