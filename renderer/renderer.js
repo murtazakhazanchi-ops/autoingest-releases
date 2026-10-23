@@ -16067,10 +16067,15 @@ const _transferMonitor = (() => {
     const minBtn = _tiEl('tiMinimizeBtn');
     if (minBtn) minBtn.hidden = !activePhase;
 
+    // 'done' (a successful/partial completion) must NOT hide Scan/Preview — unlike 'failed',
+    // which already left them visible, 'done' previously hid both with no way back short of
+    // closing the modal (and reopening re-applied the same persisted backend result, so even
+    // that didn't help). The completed result may stay visible; it must never block starting
+    // another operation. See the consecutive-import bug this fixes.
     const scanBtn    = _tiEl('tiScanBtn');
     const previewBtn = _tiEl('tiPreviewBtn');
-    if (scanBtn)    { scanBtn.hidden = activePhase || phase === 'done'; scanBtn.disabled = scanningPhase; }
-    if (previewBtn) previewBtn.hidden = activePhase || scanningPhase || phase === 'done';
+    if (scanBtn)    { scanBtn.hidden = activePhase; scanBtn.disabled = scanningPhase; }
+    if (previewBtn) previewBtn.hidden = activePhase || scanningPhase;
 
     // Changing destination mid-copy is prevented, not just handled after the fact (see the
     // button's own click-guard too) — section 5's "a destination change during an active
@@ -16899,6 +16904,10 @@ const _transferMonitor = (() => {
     }
 
     _tiLastScope = scope;
+    // A full phase transition, not just toggling .disabled — Import may still be .hidden
+    // from a just-completed previous run's 'done' phase; only _tiSetButtonPhase('idle')
+    // clears that (see consecutive-import fix).
+    _tiSetButtonPhase('idle');
     if (importBtn) importBtn.disabled = (result.files === 0);
   }
 
