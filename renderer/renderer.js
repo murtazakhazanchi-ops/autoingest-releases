@@ -16898,6 +16898,31 @@ const _transferMonitor = (() => {
 
   // ── Import ────────────────────────────────────────────────────────────────
 
+  // Builds an accurate, reason-specific message for a destination-reachability failure —
+  // never the old generic "destination may be unwritable" guess. 'permission-denied' in
+  // particular maps to a real, observed cause on macOS: the OS denying file access to an
+  // external volume because this app was never granted Privacy & Security → Files and
+  // Folders access for it, which looks identical to "the drive is fine" under shallow
+  // checks (diskutil/mount/df all report it mounted and writable) while every real file
+  // operation against it fails.
+  function _tiDestinationUnreachableText(detail, code) {
+    const codeSuffix = code ? ` (${code})` : '';
+    switch (detail) {
+      case 'permission-denied':
+        return `Destination access was denied by the operating system${codeSuffix}. On macOS, check System Settings → Privacy & Security → Files and Folders and confirm this app has access to the destination drive.`;
+      case 'destination-missing':
+        return `The destination could not be found${codeSuffix}. Confirm the drive is connected and mounted.`;
+      case 'destination-not-a-directory':
+        return `The destination path exists but is not a folder${codeSuffix}.`;
+      case 'read-only-filesystem':
+        return `The destination filesystem is mounted read-only${codeSuffix}.`;
+      case 'disk-full':
+        return `The destination has no free space left${codeSuffix}.`;
+      default:
+        return `The destination could not be written to${codeSuffix}.`;
+    }
+  }
+
   async function _tiStartImport() {
     const builtScope = _tiBuildScope();
     if (_tiScopeIsEmpty(builtScope)) {
@@ -16953,6 +16978,12 @@ const _transferMonitor = (() => {
         if (importBtn)  { importBtn.disabled = true; importBtn.textContent = 'Import'; }
         return;
       }
+      if (result.reason === 'destination-unreachable') {
+        showMessage(_tiDestinationUnreachableText(result.detail, result.code), 10000);
+        if (importBtn)  importBtn.disabled  = false;
+        if (previewBtn) previewBtn.disabled = false;
+        return;
+      }
       const msgs = {
         'busy':                        'An import is already running.',
         'transfer-root-not-set':       'Transfer Drive is not set.',
@@ -16996,7 +17027,11 @@ const _transferMonitor = (() => {
     }
 
     if (!result || !result.ok) {
-      showMessage('Could not resume: ' + (result?.reason || 'unknown'), 6000);
+      if (result?.reason === 'destination-unreachable') {
+        showMessage(_tiDestinationUnreachableText(result.detail, result.code), 10000);
+      } else {
+        showMessage('Could not resume: ' + (result?.reason || 'unknown'), 6000);
+      }
       return;
     }
 
@@ -17129,10 +17164,24 @@ const _transferMonitor = (() => {
     if (errorCapEl) {
       const r = status.result;
       const neverAttempted = r?.neverAttempted || 0;
+      // Shown either when the error cap was hit, or (even under the cap) when every
+      // recorded error shared one OS error code on a run that landed nothing — a small
+      // failed batch deserves the same real diagnosis as a capped one, not silence.
+      const showUniform = !status.running && r?.status === 'failed' && r?.uniformErrorReason;
       if (!status.running && r?.errorsCapped) {
+        // When every error shared one OS error code, say exactly what that cause was
+        // (see _tiDestinationUnreachableText) instead of guessing "may be unwritable" —
+        // a mixed set of codes falls back to the old general wording since that really is
+        // ambiguous.
+        const causeText = r.uniformErrorReason
+          ? _tiDestinationUnreachableText(r.uniformErrorReason, r.uniformErrorCode)
+          : 'This usually means the destination could not be written to (check it is connected, mounted, and not read-only) rather than 200 unrelated file problems.';
         errorCapEl.textContent = neverAttempted > 0
-          ? `Stopped after 200 errors — ${neverAttempted.toLocaleString()} more file${neverAttempted === 1 ? '' : 's'} were never attempted. This usually means the destination could not be written to (check it is connected, mounted, and not read-only) rather than 200 unrelated file problems.`
-          : `Stopped after 200 errors. This usually means the destination could not be written to (check it is connected, mounted, and not read-only) rather than 200 unrelated file problems.`;
+          ? `Stopped after 200 errors — ${neverAttempted.toLocaleString()} more file${neverAttempted === 1 ? '' : 's'} were never attempted. ${causeText}`
+          : `Stopped after 200 errors. ${causeText}`;
+        errorCapEl.removeAttribute('hidden');
+      } else if (showUniform) {
+        errorCapEl.textContent = _tiDestinationUnreachableText(r.uniformErrorReason, r.uniformErrorCode);
         errorCapEl.removeAttribute('hidden');
       } else {
         errorCapEl.setAttribute('hidden', '');

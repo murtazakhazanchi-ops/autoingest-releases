@@ -239,38 +239,29 @@ async function countFilesOnDisk(dir) {
   await window2.click('#tiPreviewBtn');
   await window2.waitForTimeout(1000);
   await window2.click('#tiImportBtn');
+  await window2.waitForTimeout(1000);
 
-  let status2 = null;
-  for (let i = 0; i < 100; i++) {
-    status2 = await window2.evaluate(async () => window.api.getTransferImportStatus());
-    if (status2 && status2.batchId && !status2.running) break;
-    await window2.waitForTimeout(200);
-  }
-  check(status2 && status2.batchId && !status2.running, '6. the zero-copy import run completes (does not hang)');
-  // The renderer's own UI-refresh poll runs on its own timer, separate from this test's
-  // direct backend poll above — give it a moment to catch up before reading the DOM.
-  await window2.waitForTimeout(1500);
-  check(status2.result?.status === 'failed', '7. the backend reports status "failed" — not "ok"/"partial" — when zero files are copied');
-  check(status2.copied === 0, '8. zero files were actually copied');
+  // A destination that is unwritable AT THE ROOT is now caught by a real reachability
+  // preflight before the batch loop ever starts (see _checkDestinationReachable in
+  // transferImportService.js) — it never reaches "running" at all, so the old
+  // "let it run, hit the 200-error cap, then report failed" assertions no longer apply.
+  // This is a strict improvement over the previous behavior this test originally verified.
+  const status2 = await window2.evaluate(async () => window.api.getTransferImportStatus());
+  check(status2 && !status2.running && !status2.batchId, '6. the import never starts running — rejected before the batch loop, not left to fail mid-run');
 
-  const headline = await window2.evaluate(() => document.getElementById('tiStatusHeadline')?.textContent);
-  log('headline:', headline);
-  check(headline === 'Import failed — no files copied', '9. the UI headline explicitly says the import failed and copied nothing — never a misleading "complete"');
+  const rejectMsg = await window2.evaluate(() => document.getElementById('statusMessage')?.textContent || '');
+  log('rejection message:', rejectMsg);
+  check(/denied|permission/i.test(rejectMsg), '7. the operator is told access was denied — not a vague "may be unwritable" guess');
+  check(/privacy|files and folders/i.test(rejectMsg), '7b. on this permission-denied class, the message points at the real macOS remedy (Privacy & Security → Files and Folders)');
 
-  const capWarningVisible = await window2.evaluate(() => {
-    const el = document.getElementById('tiErrorCapWarning');
-    return { hidden: el?.hasAttribute('hidden'), text: el?.textContent };
-  });
-  log('error cap warning:', JSON.stringify(capWarningVisible));
-  check(capWarningVisible.hidden === false, '10. the error-cap warning is shown (the 200-error cap stopped far short of all attempted files)');
-  check(capWarningVisible.text.includes('200'), '10b. the warning explicitly mentions the 200-error cap');
-  check(capWarningVisible.text.toLowerCase().includes('never attempted') || /never attempted/i.test(capWarningVisible.text), '10c. the warning explains that remaining files were never attempted, not just "200 errors"');
+  check(await countFilesOnDisk(path.join(archiveRoot2, 'recovered2')) === 0,
+    '8. zero files were actually copied (nothing ever started)');
 
-  const boxIsErrorStyled = await window2.evaluate(() => document.getElementById('tiStatusBox')?.classList.contains('tx-error'));
-  check(boxIsErrorStyled === true, '11. the status box is styled as an error/failure, not a success ("done") state');
+  const importBtnState = await window2.evaluate(() => document.getElementById('tiImportBtn')?.disabled);
+  check(importBtnState === false, '9. the Import button is re-enabled so the operator can retry after fixing access, not left stuck disabled');
 
   check(!fs.existsSync(path.join(archiveRoot2, 'recovered2')) || (await countFilesOnDisk(path.join(archiveRoot2, 'recovered2'))) === 0,
-    '12. confirmed on disk — genuinely zero files landed at the unwritable destination');
+    '10. confirmed on disk — genuinely zero files landed at the unwritable destination');
 
   await fsp.chmod(archiveRoot2, 0o755).catch(() => {}); // restore for cleanup
 

@@ -109,6 +109,64 @@ function _isInsideDir(parent, child) {
   return child.startsWith(base);
 }
 
+// Maps a raw OS error code to the semantic reason an operator-facing message should use.
+// Exists because "destination may be unwritable" was previously a guess applied uniformly
+// to every copy failure — EPERM/EACCES (permission denied, e.g. a macOS Privacy & Security
+// access grant never given to this app for an external volume), ENOENT (the path genuinely
+// doesn't exist, e.g. the drive isn't connected), EROFS (truly read-only filesystem), and
+// ENOSPC (disk full) are different problems with different fixes, and conflating them
+// under one vague message is exactly what sent the original zero-copy report in the wrong
+// direction (the destination tested "writable" by shallow checks while being rejected by
+// the OS on every real file operation).
+function _classifyFsErrorCode(code) {
+  switch (code) {
+    case 'EPERM':
+    case 'EACCES':  return 'permission-denied';
+    case 'ENOENT':  return 'destination-missing';
+    case 'ENOTDIR': return 'destination-not-a-directory';
+    case 'EROFS':   return 'read-only-filesystem';
+    case 'ENOSPC':  return 'disk-full';
+    default:        return code ? 'other' : 'unknown';
+  }
+}
+
+// A real reachability+write probe against the destination, scoped to the app's own
+// .autoingest/transfer-imports/ directory (the same directory checkpoints and the audit
+// log already live in — never a file dropped into the operator's actual archive content).
+// This is a preflight, not a guarantee: a drive can still disconnect mid-run after this
+// passes. Its job is only to fail fast, with the real OS error attached, instead of
+// burning through MAX_ERRORS identical per-file failures before anything is reported.
+async function _checkDestinationReachable(mainArchiveRoot) {
+  // Stat the root itself first, without creating anything. mkdir({recursive:true}) would
+  // otherwise silently CREATE a genuinely-missing mount point as an ordinary directory
+  // whenever its own parent happens to be writable — masking "the drive isn't actually
+  // there" as success. A disconnected external volume's mount point does not exist in the
+  // filesystem namespace at all; stat must see that directly, not have mkdir paper over it.
+  try {
+    const rootStat = await fsp.stat(mainArchiveRoot);
+    if (!rootStat.isDirectory()) {
+      return { ok: false, code: 'ENOTDIR', message: `${mainArchiveRoot} exists but is not a directory`, reason: 'destination-not-a-directory' };
+    }
+  } catch (e) {
+    return { ok: false, code: e.code || null, message: e.message, reason: _classifyFsErrorCode(e.code) };
+  }
+
+  const internalDir = path.join(mainArchiveRoot, '.autoingest', 'transfer-imports');
+  try {
+    await fsp.mkdir(internalDir, { recursive: true });
+  } catch (e) {
+    return { ok: false, code: e.code || null, message: e.message, reason: _classifyFsErrorCode(e.code) };
+  }
+  const probePath = path.join(internalDir, `.reachability-probe-${process.pid}-${Date.now()}`);
+  try {
+    await fsp.writeFile(probePath, '');
+    await fsp.unlink(probePath);
+  } catch (e) {
+    return { ok: false, code: e.code || null, message: e.message, reason: _classifyFsErrorCode(e.code) };
+  }
+  return { ok: true };
+}
+
 function _skipDir(name) {
   return _SKIP_SRC_DIRS.has(name) || name.startsWith('.') || _OS_JUNK_DIRS_LOWER.has(name.toLowerCase());
 }
@@ -269,7 +327,7 @@ async function _walkAndCopy(srcDir, destDir, stats, opts = {}) {
       try {
         await _copyFileSafe(srcPath, destPath, stats, opts);
       } catch (e) {
-        stats.errors.push({ file: srcPath, error: e.message });
+        stats.errors.push({ file: srcPath, error: e.message, code: e.code || null });
       }
 
       _state.copied         = stats.copied;
@@ -1024,6 +1082,20 @@ async function _finishImport(transferRoot, mainArchiveRoot, meta, startedAt, bat
     ? 'ok'
     : (succeeded === 0 ? 'failed' : 'partial');
 
+  // When every recorded error shares the same OS error code, this was one underlying
+  // problem repeated, not many unrelated file issues — classify it so the operator sees
+  // the real cause (e.g. "permission-denied") instead of a generic unwritable-destination
+  // guess. A mixed set of codes is left unclassified; that's genuinely ambiguous.
+  let uniformErrorCode = null;
+  if (stats.errors.length > 0) {
+    const codes = new Set(stats.errors.map(e => e.code || null));
+    if (codes.size === 1) {
+      const [only] = codes;
+      if (only) uniformErrorCode = only;
+    }
+  }
+  const uniformErrorReason = uniformErrorCode ? _classifyFsErrorCode(uniformErrorCode) : null;
+
   await _writeCheckpoint(mainArchiveRoot, {
     importId: meta.batchId, transferRoot, mainArchiveRoot, mode,
     scope: meta.scope, createdAt: startedAt, completedAt, status: 'complete',
@@ -1043,7 +1115,7 @@ async function _finishImport(transferRoot, mainArchiveRoot, meta, startedAt, bat
     startedAt, completedAt,
     copied: stats.copied, skipped: stats.skipped, renamed: stats.renamed,
     changedSkipped: stats.changedSkipped || 0, errorCount: stats.errors.length, status: finalStatus,
-    neverAttempted, errorsCapped,
+    neverAttempted, errorsCapped, uniformErrorCode, uniformErrorReason,
   };
   try {
     const auditDir = path.join(mainArchiveRoot, '.autoingest', 'transfer-imports');
@@ -1066,7 +1138,7 @@ async function _finishImport(transferRoot, mainArchiveRoot, meta, startedAt, bat
     copied: stats.copied, skipped: stats.skipped, renamed: stats.renamed,
     changedSkipped: stats.changedSkipped || 0,
     errorCount: stats.errors.length, startedAt, completedAt, status: finalStatus,
-    neverAttempted, errorsCapped,
+    neverAttempted, errorsCapped, uniformErrorCode, uniformErrorReason,
   };
 
   // Fire-and-forget completion signal for main.js's IPC layer to orchestrate
@@ -1157,7 +1229,7 @@ async function _doImportPlain(transferRoot, mainArchiveRoot, resolvedUnits, meta
       try { await fsp.mkdir(path.dirname(batch.destDir), { recursive: true }); } catch {}
       _state.current = path.basename(batch.srcDir);
       try { await _copyFileSafe(batch.srcDir, batch.destDir, stats, { outcomeCtx }); }
-      catch (e) { stats.errors.push({ file: batch.srcDir, error: e.message }); }
+      catch (e) { stats.errors.push({ file: batch.srcDir, error: e.message, code: e.code || null }); }
     } else {
       try { await fsp.mkdir(batch.destDir, { recursive: true }); } catch {}
       await _walkAndCopy(batch.srcDir, batch.destDir, stats, { rootFilesOnly: batch.rootFilesOnly, outcomeCtx });
@@ -1289,7 +1361,7 @@ async function _doImportUpdate(transferRoot, mainArchiveRoot, resolvedUnits, inv
       try {
         await _copyFileSafe(f.srcPath, f.destPath, stats, { backupUpdate: true, outcomeCtx });
       } catch (e) {
-        stats.errors.push({ file: f.srcPath, error: e.message });
+        stats.errors.push({ file: f.srcPath, error: e.message, code: e.code || null });
       }
       _state.copied         = stats.copied;
       _state.skipped        = stats.skipped;
@@ -1419,6 +1491,14 @@ async function runImport(transferRoot, mainArchiveRoot, scope, isValidEventJsonF
     return { ok: false, reason: 'missing-fingerprint' };
   }
 
+  // Fail fast with the real OS error, before resolving units or starting the batch loop —
+  // never let a destination that is unreachable from the first file onward burn through
+  // MAX_ERRORS identical failures first (see _checkDestinationReachable).
+  const reach = await _checkDestinationReachable(mainArchiveRoot);
+  if (!reach.ok) {
+    return { ok: false, reason: 'destination-unreachable', detail: reach.reason, code: reach.code, message: reach.message };
+  }
+
   const { resolvedUnits, unresolvedUnits } = await _resolveImportUnits(transferRoot, mainArchiveRoot, scope, isValidEventJsonFn);
   if (resolvedUnits.length === 0) return { ok: false, reason: 'empty-scope' };
 
@@ -1470,6 +1550,11 @@ async function resumeImportFromCheckpoint(transferRoot, mainArchiveRoot, meta = 
   if (checkpoint.transferRoot !== transferRoot) return { ok: false, reason: 'checkpoint-mismatch' };
   if (checkpoint.status === 'complete')         return { ok: false, reason: 'already-complete' };
   if (!Array.isArray(checkpoint.batches))       return { ok: false, reason: 'checkpoint-invalid' };
+
+  const reach = await _checkDestinationReachable(mainArchiveRoot);
+  if (!reach.ok) {
+    return { ok: false, reason: 'destination-unreachable', detail: reach.reason, code: reach.code, message: reach.message };
+  }
 
   const batchId    = checkpoint.importId;
   const deviceName = meta.deviceName || os.hostname();
