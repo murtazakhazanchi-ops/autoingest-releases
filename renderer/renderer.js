@@ -14623,13 +14623,22 @@ const _transferMonitor = (() => {
     verifyBtn.hidden    = phase !== 'done';
     const minBtn = _txEl('txMinimizeBtn');
     if (minBtn) minBtn.hidden = !activePhase;
+    // 'done' (a successful/partial completion) must NOT hide Scan/Preview — same fix as
+    // Transfer Import's consecutive-operation bug (a68aa1c): the completed result may stay
+    // visible, but it must never block starting another export.
     const scanBtn    = _txEl('txScanBtn');
     const previewBtn = _txEl('txPreviewBtn');
     if (scanBtn) {
-      scanBtn.hidden   = activePhase || phase === 'done';
+      scanBtn.hidden   = activePhase;
       scanBtn.disabled = scanningPhase;
     }
-    if (previewBtn) previewBtn.hidden = activePhase || scanningPhase || phase === 'done';
+    // Preview's .disabled is also phase-driven now, not left solely to _txPreview()'s own
+    // start/end toggle — _txStartExport() disables it while a run starts, and nothing but a
+    // SUCCESSFUL Preview call used to clear that, a chicken-and-egg deadlock once Preview is
+    // the only clickable path to trigger that very call (found live reproducing this exact
+    // defect). _txPreview()'s own in-flight disable during its async call still works
+    // exactly as before; it just can no longer get stuck true afterward.
+    if (previewBtn) { previewBtn.hidden = activePhase || scanningPhase; previewBtn.disabled = activePhase || scanningPhase; }
 
     // Lock tree during active operation to prevent scope drift
     const treeEl = _txEl('txScopeTree');
@@ -15017,6 +15026,10 @@ const _transferMonitor = (() => {
     }
 
     _txLastScope = scope;
+    // A full phase transition, not just toggling .disabled — Export may still be .hidden
+    // from a just-completed previous run's 'done' phase; only _txSetButtonPhase('idle')
+    // clears that (see consecutive-export fix, mirroring a68aa1c).
+    _txSetButtonPhase('idle');
     if (exportBtn) exportBtn.disabled = (result.files === 0);
   }
 
@@ -16072,10 +16085,16 @@ const _transferMonitor = (() => {
     // closing the modal (and reopening re-applied the same persisted backend result, so even
     // that didn't help). The completed result may stay visible; it must never block starting
     // another operation. See the consecutive-import bug this fixes.
+    // Preview's .disabled is also phase-driven now, not left solely to _tiPreview()'s own
+    // start/end toggle — _tiStartImport() disables it while a run starts, and nothing but a
+    // SUCCESSFUL Preview call used to clear that, a chicken-and-egg deadlock once Preview is
+    // the only clickable path to trigger that very call (found live while reproducing the
+    // analogous Export defect). _tiPreview()'s own in-flight disable during its async call
+    // still works exactly as before; it just can no longer get stuck true afterward.
     const scanBtn    = _tiEl('tiScanBtn');
     const previewBtn = _tiEl('tiPreviewBtn');
     if (scanBtn)    { scanBtn.hidden = activePhase; scanBtn.disabled = scanningPhase; }
-    if (previewBtn) previewBtn.hidden = activePhase || scanningPhase;
+    if (previewBtn) { previewBtn.hidden = activePhase || scanningPhase; previewBtn.disabled = activePhase || scanningPhase; }
 
     // Changing destination mid-copy is prevented, not just handled after the fact (see the
     // button's own click-guard too) — section 5's "a destination change during an active

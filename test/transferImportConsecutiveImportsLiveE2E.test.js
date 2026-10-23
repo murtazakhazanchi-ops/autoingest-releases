@@ -127,6 +127,7 @@ async function waitForImportDone(window, timeoutMs = 20000, previousBatchId = nu
   const destRoot      = await mkTmp('ai-e2e-ticonsec-dest-');
   const folderA = await buildFolder(transferRoot, 'FolderA', 5);
   const folderB = await buildFolder(transferRoot, 'FolderB', 7);
+  const folderC = await buildFolder(transferRoot, 'FolderC', 3);
 
   const { electronApp, window } = await launchApp(transferRoot);
   await window.evaluate(async (root) => { await window.api.setNasRoot(root); }, destRoot);
@@ -185,6 +186,31 @@ async function waitForImportDone(window, timeoutMs = 20000, previousBatchId = nu
   const headlineAfterB = await window.evaluate(() => document.getElementById('tiStatusHeadline')?.textContent);
   check(headlineAfterB === 'Import complete', '9. completion headline correctly reflects B\'s own completion');
 
+  // ── A THIRD operation, SAME session, via Preview (not Scan) ─────────────
+  // A/B above used Scan for New Data, which never depends on tiPreviewBtn's .disabled
+  // state. Preview has its OWN independent lockout: _tiStartImport() disables it while a
+  // run starts, and historically nothing but a SUCCESSFUL Preview call cleared that — a
+  // chicken-and-egg deadlock once Preview is the only clickable path to trigger that very
+  // call (this is exactly how the analogous Export defect was found). Deliberately run
+  // BEFORE any close/reopen — a later destination-refresh pass on reopen independently
+  // resets this same button and would mask the bug if checked only after reopening.
+  await selectOnlyFolder(window, 'FolderC');
+  const previewBtnBeforeC = await window.evaluate(() => ({
+    hidden:   document.getElementById('tiPreviewBtn')?.hidden,
+    disabled: document.getElementById('tiPreviewBtn')?.disabled,
+  }));
+  check(previewBtnBeforeC.hidden === false && previewBtnBeforeC.disabled === false,
+    '10. Preview is visible AND clickable for a third operation, same session (not left permanently disabled by a prior Import start)');
+
+  await window.click('#tiPreviewBtn');
+  await window.waitForTimeout(1000);
+  const previewBoxVisibleC = await window.evaluate(() => !document.getElementById('tiPreviewBox')?.hasAttribute('hidden'));
+  check(previewBoxVisibleC, '11. the Preview for Folder C actually ran');
+
+  await window.click('#tiImportBtn');
+  const statusC = await waitForImportDone(window, 20000, statusB.batchId);
+  check(statusC && statusC.result?.status === 'ok' && statusC.copied === 3, '12. Import C (via Preview, not Scan) completes and reports only its own 3 files');
+
   // ── Close and reopen — must NOT be stuck either (operator's bullet 5) ────
   await window.keyboard.press('Escape');
   await window.waitForTimeout(300);
@@ -195,14 +221,14 @@ async function waitForImportDone(window, timeoutMs = 20000, previousBatchId = nu
     previewHidden: document.getElementById('tiPreviewBtn')?.hidden,
   }));
   check(buttonsAfterReopen.scanHidden === false && buttonsAfterReopen.previewHidden === false,
-    '10. closing and reopening the modal does not re-trap Scan/Preview behind the old completed state');
+    '13. closing and reopening the modal does not re-trap Scan/Preview behind the old completed state');
 
-  // A third, consecutive import after reopen (mirrors mandatory scenario #2).
+  // A fourth, consecutive import after reopen.
   await selectOnlyFolder(window, 'FolderA'); // reselecting A again (mandatory scenario #4)
   await window.click('#tiScanBtn');
   await window.waitForTimeout(1200);
   const importBtnAfterReopenScan = await window.evaluate(() => document.getElementById('tiImportBtn')?.hidden);
-  check(importBtnAfterReopenScan === false, '11. a THIRD consecutive operation (after close/reopen) is reachable — reselecting A and scanning again works');
+  check(importBtnAfterReopenScan === false, '14. a FOURTH consecutive operation (after close/reopen) is reachable — reselecting A and scanning again works');
 
   await electronApp.close().catch(() => {});
 
