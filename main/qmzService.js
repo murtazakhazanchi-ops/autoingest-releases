@@ -776,7 +776,19 @@ function validateSequenceInput(number, letter, suffix = '') {
 // completely untouched. MZ (and any future letter with no entry in
 // LETTER_MAX) falls back to MAX_SEQUENCE_NUMBER — see that constant's own
 // comment for why no MZ-specific ceiling is invented here.
-async function createSequence(qmzRoot, number, letter, suffix = '') {
+// `hasNikah` (from the PDF-review parser's own per-entry flag — see
+// qmzProgramPdfParser.js's _groupClassifiedRows) is additive, backward-compatible, durable
+// sequence-level context: a real reference PDF's Nikah row applies to a NUMBERED SEQUENCE,
+// never to individual photographs — this is a strict, non-negotiable boundary (see
+// moveFilesToSequence()/listMediaFiles()/the metadata pipeline, none of which read this field
+// at all). Stored as `additionalActivities: ['Nikah']` on the sequence's own
+// qmz-sequences.json record — an array, matching the operator-approved illustrative shape,
+// left absent entirely on an ordinary sequence rather than written as an empty array (avoids
+// redundant persisted noise on the common case). Reconciliation on an ALREADY-EXISTING code
+// (e.g. a PDF reimport) only ever ADDS Nikah when newly identified — it is never removed by
+// a later import that simply doesn't mention it (see this function's own `already` branch);
+// the only way to remove it is the operator's own explicit action (removeSequenceNikah).
+async function createSequence(qmzRoot, number, letter, suffix = '', { hasNikah = false } = {}) {
   const v = validateSequenceInput(number, letter, suffix);
   if (!v.ok) return v;
   ({ number, letter, suffix } = v);
@@ -815,10 +827,22 @@ async function createSequence(qmzRoot, number, letter, suffix = '') {
   // Exact-string comparison on the full code (including suffix) — "05aMZ"
   // and "05bMZ" are different codes, so this already distinguishes different
   // suffixes of the same base number/type without any extra logic.
-  const already = state.sequences.some(s => s.code === code);
+  const already = state.sequences.find(s => s.code === code);
+  let stateChanged = false;
   if (!already) {
-    state.sequences.push({ code, number, letter, suffix, type: LETTER_TYPE[letter] });
+    const record = { code, number, letter, suffix, type: LETTER_TYPE[letter] };
+    if (hasNikah) record.additionalActivities = ['Nikah'];
+    state.sequences.push(record);
     state.sequences.sort((a, b) => (a.code < b.code ? -1 : 1));
+    stateChanged = true;
+  } else if (hasNikah && !(already.additionalActivities || []).includes('Nikah')) {
+    // Reimport reconciliation (Phase 7): a positive identification on an already-existing
+    // sequence ADDS Nikah — never duplicated (the `includes` check above), never removes
+    // anything, and never touches any other field (code/number/letter/suffix/type untouched).
+    already.additionalActivities = [...(already.additionalActivities || []), 'Nikah'];
+    stateChanged = true;
+  }
+  if (stateChanged) {
     const r = await saveState(qmzRoot, state);
     if (!r.ok) return { ok: false, error: r.error };
   }
@@ -962,7 +986,7 @@ async function createReviewedSequences(qmzRoot, entries, { includeEnroute = fals
       results.push({ number, letter, suffix, code: p.code, status: 'duplicate-in-request' });
       continue;
     }
-    const r = await createSequence(qmzRoot, p.v.number, p.v.letter, p.v.suffix);
+    const r = await createSequence(qmzRoot, p.v.number, p.v.letter, p.v.suffix, { hasNikah: !!p.input.hasNikah });
     if (r.ok) {
       results.push({ number: p.v.number, letter: p.v.letter, suffix: p.v.suffix, code: r.code, status: r.status });
     } else {
@@ -1034,8 +1058,11 @@ async function editSequenceType(qmzRoot, code, newLetter) {
   try { await fsp.rename(srcDir, destDir); }
   catch (err) { return { ok: false, error: err.message }; }
 
+  // Spread the existing record FIRST so any additive field (e.g. additionalActivities) that
+  // this edit doesn't itself concern survives untouched — only code/number/letter/type
+  // actually change here (Phase 3: "Changing the primary Sharaf preserves Nikah").
   state.sequences = state.sequences.map(s => s.code === code
-    ? { code: newCode, number: parsed.number, letter: newLetter, suffix: parsed.suffix, type: LETTER_TYPE[newLetter] }
+    ? { ...s, code: newCode, number: parsed.number, letter: newLetter, suffix: parsed.suffix, type: LETTER_TYPE[newLetter] }
     : s);
   state.sequences.sort((a, b) => (a.code < b.code ? -1 : 1));
   const r = await saveState(qmzRoot, state);
@@ -1043,6 +1070,32 @@ async function editSequenceType(qmzRoot, code, newLetter) {
 
   log(`[qmz] editSequenceType: ${code} → ${newCode}`);
   return { ok: true, code: newCode };
+}
+
+// Minimal operator-correction control (Phase 6 of "Durable QMZ Nikah Sequence Information") —
+// removes an incorrectly-recorded Nikah association WITHOUT touching the sequence's folder
+// name, number, type, or contents. The only supported direction is removal: adding Nikah
+// manually was not requested and isn't implemented here (PDF re-import already covers the
+// "positively identified" addition path — see createSequence()'s own comment). No files are
+// moved; this edits qmz-sequences.json only.
+async function removeSequenceNikah(qmzRoot, code) {
+  const parsed = parseCode(code);
+  if (!parsed) return { ok: false, error: `Invalid sequence code: ${code}` };
+
+  const state = await readState(qmzRoot);
+  const entry = state.sequences.find(s => s.code === code);
+  if (!entry) return { ok: false, error: `Sequence ${code} was not found.` };
+  if (!(entry.additionalActivities || []).includes('Nikah')) {
+    return { ok: true, code }; // already has no Nikah — idempotent no-op, not an error
+  }
+
+  entry.additionalActivities = entry.additionalActivities.filter(a => a !== 'Nikah');
+  if (entry.additionalActivities.length === 0) delete entry.additionalActivities;
+  const r = await saveState(qmzRoot, state);
+  if (!r.ok) return { ok: false, error: r.error };
+
+  log(`[qmz] removeSequenceNikah: ${code}`);
+  return { ok: true, code };
 }
 
 async function removeSequence(qmzRoot, code) {
@@ -1395,6 +1448,7 @@ module.exports = {
   createReviewedSequences,
   editSequenceType,
   removeSequence,
+  removeSequenceNikah,
   moveFilesToSequence,
   moveFilesToUnsequenced,
   moveFilesToEnroute,

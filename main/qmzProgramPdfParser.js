@@ -82,12 +82,14 @@ const { formatCode, parseCode, letterToType } = require('./qmzService');
 // Each value is the literal abbreviation the Sharaf column cell already contains — this is
 // an exact-string match against an explicit field the program's own authors fill in, never a
 // free-text keyword/NLP match against a full word like "Olda" or "Aqeeqa", exactly the same
-// mechanism already used for Q/M/Z/MZ (no guessing is introduced by this extension). "N" is
-// an explicit, recognized "not a QMZ row" marker in the real reference PDFs (e.g. an escort or
-// additional family member listed without a sequence of their own) — it is recognized and
-// silently excluded, never flagged as an unrecognized value.
+// mechanism already used for Q/M/Z/MZ (no guessing is introduced by this extension).
 const SHARAF_TYPES = new Set(['Q', 'M', 'Z', 'MZ', 'O', 'AQ']);
-const SHARAF_NOT_APPLICABLE = 'N';
+// "N" means Nikah — confirmed product decision ("QMZ Multi-Row PDF Parsing and Nikah
+// Recognition Fix") — NOT "Not Applicable" as earlier assumed. Nikah is an ADDITIONAL
+// activity within the same numbered sequence as whichever primary Sharaf (Q/M/Z/MZ/O/AQ) the
+// sequence already has; it never becomes its own folder and never changes the primary code.
+// See _groupClassifiedRows for how an "N" row is associated with its sequence's primary row.
+const SHARAF_NIKAH = 'N';
 
 // Row-clustering tolerance: sub-baseline fragments of one logical PDF row differ by well
 // under 1 unit in both reference documents; distinct rows differ by ~10+ units. A generous
@@ -200,8 +202,14 @@ function _bucketRow(row, columns) {
 
 /**
  * @returns one of:
- *   { kind: 'data', sequenceRaw, sharaf, addressText, codeText }
- *   { kind: 'excluded', reason: 'sharaf-not-applicable' | 'unrecognized-sharaf' | 'no-sequence-number', sharaf, sequenceRaw }
+ *   { kind: 'data', sequenceRaw, sharaf, addressText, codeText } — number + primary type together
+ *   { kind: 'sharaf-open', sequenceRaw:'', sharaf, addressText, codeText } — primary type, no
+ *     number on THIS row; see _groupClassifiedRows, which associates it with whichever row
+ *     later supplies the number (and any 'nikah' rows in between) for the same logical sequence
+ *   { kind: 'sequence-only', sequenceRaw, sharaf:'', addressText, codeText } — a number with no
+ *     type on THIS row; _groupClassifiedRows assigns it to an already-open 'sharaf-open' group
+ *   { kind: 'nikah', sequenceRaw, sharaf:'N', addressText, codeText } — an "N" (Nikah) row
+ *   { kind: 'excluded', reason: 'unrecognized-sharaf' | 'no-sequence-number', sharaf, sequenceRaw }
  *   { kind: 'banner', text }
  *   { kind: 'continuation' }
  */
@@ -264,21 +272,39 @@ function _classifyRow(row, cells, layout) {
   const addressText  = layout.addressIndex >= 0 ? (cells[layout.addressIndex] || '').trim() : '';
   const codeText      = layout.codeIndex >= 0 ? (cells[layout.codeIndex] || '').trim() : '';
 
-  const hasSeqShape = SEQUENCE_RAW_RE.test(sequenceRaw);
+  const hasSeqShape  = SEQUENCE_RAW_RE.test(sequenceRaw);
+  const isPrimaryType = SHARAF_TYPES.has(sharaf);
 
-  if (hasSeqShape && SHARAF_TYPES.has(sharaf)) {
+  if (hasSeqShape && isPrimaryType) {
     return { kind: 'data', sequenceRaw, sharaf, addressText, codeText };
   }
-  if (sharaf === SHARAF_NOT_APPLICABLE) {
-    return { kind: 'excluded', reason: 'sharaf-not-applicable', sharaf, sequenceRaw };
+  if (sharaf === SHARAF_NIKAH) {
+    // An "N" (Nikah) row — never excluded outright. _groupClassifiedRows associates it with
+    // whichever logical sequence is currently open (the common, real-PDF case: Nikah is a
+    // row of its own, within a multi-row sequence already opened by a primary-type row
+    // elsewhere). If no sequence is open at all, the caller reports it for operator review
+    // instead (Phase 8's "Only N, no primary Sharaf" edge case) — this function itself never
+    // makes that call, since it sees one row in isolation, not the surrounding group.
+    return { kind: 'nikah', sequenceRaw, sharaf, addressText, codeText };
   }
-  if (sharaf && !SHARAF_TYPES.has(sharaf)) {
+  if (isPrimaryType) {
+    // A recognized primary type with NO sequence number on this specific row — confirmed
+    // directly against the real Coimbatore reference PDF: a vertically-merged Sr cell for a
+    // multi-row sequence (most commonly one that also includes a Nikah) prints its own number
+    // on a DIFFERENT physical row than the primary Sharaf type. This OPENS or continues a
+    // logical sequence group (see _groupClassifiedRows) — never a plain itinerary banner,
+    // even though its own leading text (a name, often) would otherwise look like one.
+    return { kind: 'sharaf-open', sequenceRaw: '', sharaf, addressText, codeText };
+  }
+  if (sharaf && !isPrimaryType) {
     return { kind: 'excluded', reason: 'unrecognized-sharaf', sharaf, sequenceRaw };
   }
   if (hasSeqShape && !sharaf) {
-    // A numbered row with no recognizable QMZ type — per Phase 6, a number alone is never
-    // sufficient; flagged distinctly from a plain continuation row (which has no number either).
-    return { kind: 'excluded', reason: 'no-sequence-number', sharaf: '', sequenceRaw };
+    // A numbered row with no Sharaf value of its own. Per the real reference PDF, this is
+    // routinely the row supplying a MULTI-ROW sequence's number (see _groupClassifiedRows,
+    // which consumes this to complete an already-open 'sharaf-open' group) — never assumed
+    // to be an error here, where no surrounding-group context exists yet.
+    return { kind: 'sequence-only', sequenceRaw, sharaf: '', addressText, codeText };
   }
   // No sequence number and no Sharaf value. If the leading (sequence/sharaf/and anything
   // between them) region is otherwise non-blank, treat it as a section/activity banner —
@@ -289,6 +315,120 @@ function _classifyRow(row, cells, layout) {
   const leadingText = cells.slice(0, layout.sharafIndex + 1).join(' ').trim();
   if (leadingText) return { kind: 'banner', text: leadingText, ambiguous: _isAmbiguousBanner(leadingText) };
   return { kind: 'continuation' };
+}
+
+// ── Multi-row sequence grouping ───────────────────────────────────────────────────────────
+//
+// A numbered QMZ sequence is a logical unit, not necessarily one physical table row (see this
+// file's own header comment and the fix brief's worked example). Confirmed directly against
+// the real Coimbatore reference PDF: a vertically-merged Sr cell for a multi-person sequence
+// spreads its own content across several physical rows — the primary Sharaf type on one row
+// (sometimes carrying a name, sometimes bare), the bare sequence number on a DIFFERENT row
+// (often further down, not at the top of the group), and any Nikah ("N") rows and plain
+// name/continuation rows interspersed between and after.
+//
+// Rule, derived entirely from that evidence (never hardcoded to this one document's layout):
+// a new group OPENS at any row carrying a recognized primary Sharaf type ('data' — which also
+// supplies its own number — or 'sharaf-open', which does not). Opening a new group closes
+// whichever group was previously pending. While a group is open:
+//   - 'sequence-only' supplies the group's number, if it doesn't have one yet.
+//   - 'nikah' is recorded as an additional Nikah activity for the group — never its own entry,
+//     never changes the primary type, never consumes the group's number slot, and a group may
+//     collect more than one (duplicate "N" rows are still just one Nikah activity each, not
+//     separately reported — see nikahCount).
+//   - 'banner' / 'continuation' / 'excluded' (unrecognized-sharaf) rows pass straight through
+//     untouched, exactly as before grouping existed — they never participate in a group and
+//     still reach _detectSections for its own banner-labeling / ambiguous-banner reporting.
+//   - A second 'data'/'sharaf-open' row with a DIFFERENT primary type than the currently-open,
+//     still-numberless group is a genuine conflict (Phase 8's "conflicting primary types") —
+//     the stale group is closed and reported for review rather than silently overwritten; the
+//     new row then opens its own group as usual.
+// A group that closes (either because a new one opened, or the page ended) without ever
+// getting a number is reported for operator review ('no-sequence-number-in-group') — a number
+// is never guessed. A bare 'sequence-only' or 'nikah' row with NO group open at all (Phase 8's
+// "only N, no primary Sharaf") is likewise reported, never silently dropped and never
+// mistaken for an invented primary type.
+function _groupClassifiedRows(classifiedRows) {
+  const resolved = [];
+  let pending = null;
+
+  function closePending() {
+    if (!pending) return;
+    if (!pending.sequenceRaw) {
+      resolved.push({ classified: { kind: 'excluded', reason: 'no-sequence-number-in-group', sharaf: pending.sharaf, sequenceRaw: '' }, sourcePage: pending.sourcePage, sourceRow: pending.sourceRow });
+    } else {
+      resolved.push({
+        classified: {
+          kind: 'data', sequenceRaw: pending.sequenceRaw, sharaf: pending.sharaf,
+          addressText: pending.addressText, codeText: pending.codeText, nikahCount: pending.nikahCount,
+        },
+        sourcePage: pending.sourcePage, sourceRow: pending.sourceRow,
+      });
+    }
+    pending = null;
+  }
+
+  function openPending(classified, sourcePage, sourceRow) {
+    pending = {
+      sharaf: classified.sharaf,
+      sequenceRaw: classified.sequenceRaw || '',
+      addressText: classified.addressText,
+      codeText: classified.codeText,
+      nikahCount: 0,
+      sourcePage, sourceRow,
+    };
+  }
+
+  for (const rec of classifiedRows) {
+    const { classified, sourcePage, sourceRow } = rec;
+
+    if (classified.kind === 'data' || classified.kind === 'sharaf-open') {
+      // Merge into the still-open pending group ONLY while it has no number of its own yet
+      // AND the type matches — once a group has its number, it is a fully resolved, CLOSED
+      // unit in every way that matters here, and the next primary-type row always starts a
+      // brand new group even if its type happens to be the same letter (two consecutive real
+      // sequences are routinely both e.g. "Z" — confirmed directly: sequences 2 and 3 in the
+      // Coimbatore reference PDF are both Z, immediately adjacent, each with its own Nikah).
+      if (pending && !pending.sequenceRaw && pending.sharaf === classified.sharaf) {
+        if (classified.addressText && !pending.addressText) pending.addressText = classified.addressText;
+        if (classified.codeText && !pending.codeText) pending.codeText = classified.codeText;
+        if (classified.sequenceRaw) pending.sequenceRaw = classified.sequenceRaw;
+      } else {
+        closePending(); // a numbered, a differently-typed, or an absent pending group never silently merges
+        openPending(classified, sourcePage, sourceRow);
+      }
+      if (classified.kind === 'data') closePending(); // number + type together — self-contained, closes immediately
+      continue;
+    }
+
+    if (classified.kind === 'sequence-only') {
+      if (pending && !pending.sequenceRaw) { pending.sequenceRaw = classified.sequenceRaw; continue; }
+      if (!pending) { resolved.push({ classified: { kind: 'excluded', reason: 'no-sequence-number', sharaf: '', sequenceRaw: classified.sequenceRaw }, sourcePage, sourceRow }); continue; }
+      // A pending group that ALREADY has a number getting a second, different lone-number
+      // row is not expected from any evidence seen — kept, not silently dropped, but never
+      // overwrites the first number (first one wins; this one is reported for review).
+      resolved.push({ classified: { kind: 'excluded', reason: 'no-sequence-number', sharaf: '', sequenceRaw: classified.sequenceRaw }, sourcePage, sourceRow });
+      continue;
+    }
+
+    if (classified.kind === 'nikah') {
+      if (pending) {
+        pending.nikahCount += 1;
+        if (classified.addressText && !pending.addressText) pending.addressText = classified.addressText;
+        if (classified.codeText && !pending.codeText) pending.codeText = classified.codeText;
+        continue;
+      }
+      resolved.push({ classified: { kind: 'excluded', reason: 'nikah-without-primary-sharaf', sharaf: 'N', sequenceRaw: classified.sequenceRaw || '' }, sourcePage, sourceRow });
+      continue;
+    }
+
+    // banner / continuation / excluded(unrecognized-sharaf) — untouched passthrough. These
+    // commonly occur WHILE a group is open (address-label banners, blank continuation rows)
+    // and must never close it themselves.
+    resolved.push({ classified, sourcePage, sourceRow });
+  }
+  closePending();
+  return resolved;
 }
 
 // A banner is flagged ambiguous — reported to the operator rather than silently dropped —
@@ -342,6 +482,13 @@ function _normalizeEntry(dataRow, sourcePage, sourceRow) {
       folderName: reparsed.folderName,
       sourcePage,
       sourceRow,
+      // Additive fields — every existing caller reading only .number/.letter/.type/
+      // .folderName/.sequence is unaffected, same pattern as createSequence()'s own
+      // `status` field. Nikah is additional information about this sequence, never part of
+      // its folder code (dataRow.sharaf alone — the primary type — already determined that
+      // above, via formatCode/parseCode, completely unchanged).
+      nikahCount: dataRow.nikahCount || 0,
+      hasNikah: !!dataRow.nikahCount,
       warnings: [],
     },
     warning: null,
@@ -551,6 +698,12 @@ async function parseProgramPdf(input) {
 
     if (!layout) continue; // header not found on this page yet — nothing to classify until it is
 
+    // Classified per this page only, then grouped per this page only — a multi-row sequence
+    // group is never assumed to span a page break (Phase 4: "handle page-boundary
+    // continuation only when supported by reliable evidence"; no such evidence exists in
+    // either reference PDF — every group that opens on a page is also fully resolved,
+    // closed, or flagged for review before that same page ends).
+    const pageClassified = [];
     for (let r = 0; r < rows.length; r++) {
       // Skip the header row itself AND anything above it on the page where it was actually
       // found (e.g. a document title line like "14 Sep 2026 (Monday Evening) - Surendranagar"
@@ -562,12 +715,15 @@ async function parseProgramPdf(input) {
       if (pageLayout && r <= pageLayout.headerRowIndex) continue;
       globalRowIndex++;
       const cells = _bucketRow(rows[r], layout.columns);
-      const classified = _classifyRow(rows[r], cells, layout);
-      if (classified.kind === 'data') {
-        const { entry, warning } = _normalizeEntry(classified, p, globalRowIndex);
-        rowRecords.push({ row: classified, entry, warning, sourcePage: p, sourceRow: globalRowIndex });
+      pageClassified.push({ classified: _classifyRow(rows[r], cells, layout), sourcePage: p, sourceRow: globalRowIndex });
+    }
+
+    for (const g of _groupClassifiedRows(pageClassified)) {
+      if (g.classified.kind === 'data') {
+        const { entry, warning } = _normalizeEntry(g.classified, g.sourcePage, g.sourceRow);
+        rowRecords.push({ row: g.classified, entry, warning, sourcePage: g.sourcePage, sourceRow: g.sourceRow });
       } else {
-        rowRecords.push({ row: classified, entry: null, warning: null, sourcePage: p, sourceRow: globalRowIndex });
+        rowRecords.push({ row: g.classified, entry: null, warning: null, sourcePage: g.sourcePage, sourceRow: g.sourceRow });
       }
     }
   }
@@ -598,6 +754,7 @@ module.exports = {
   _locateColumns,
   _bucketRow,
   _classifyRow,
+  _groupClassifiedRows,
   _detectSections,
   _normalizeEntry,
 };

@@ -398,6 +398,7 @@ contextBridge.exposeInMainWorld('api', {
   qmzBulkCreate:        (params) => ipcRenderer.invoke('qmz:bulkCreate',        params),
   qmzEditSequence:      (params) => ipcRenderer.invoke('qmz:editSequence',      params),
   qmzRemoveSequence:    (params) => ipcRenderer.invoke('qmz:removeSequence',    params),
+  qmzRemoveSequenceNikah: (params) => ipcRenderer.invoke('qmz:removeSequenceNikah', params),
   qmzMoveToSequence:    (params) => ipcRenderer.invoke('qmz:moveToSequence',    params),
   qmzMoveToUnsequenced: (params) => ipcRenderer.invoke('qmz:moveToUnsequenced', params),
   qmzQueueMetadata:     (params) => ipcRenderer.invoke('qmz:queueMetadata',     params),

@@ -5617,6 +5617,10 @@ ipcMain.handle('qmz:removeSequence', async (_e, { qmzRoot, code }) => {
   return qmzService.removeSequence(qmzRoot, code);
 });
 
+ipcMain.handle('qmz:removeSequenceNikah', async (_e, { qmzRoot, code }) => {
+  return qmzService.removeSequenceNikah(qmzRoot, code);
+});
+
 ipcMain.handle('qmz:moveToSequence', async (_e, { qmzRoot, filePaths, sequenceCode, photographerName }) => {
   return qmzService.moveFilesToSequence(qmzRoot, filePaths, sequenceCode, photographerName);
 });
