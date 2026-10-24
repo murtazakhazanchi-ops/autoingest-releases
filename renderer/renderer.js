@@ -9834,12 +9834,22 @@ function _renderQMZRight() {
     return;
   }
 
+  // Durable Nikah is persisted only in state.sequences (see qmzService.js's createSequence /
+  // removeSequenceNikah) — this scanned `sequences` array is folder-derived and has no
+  // awareness of it, so cross-reference by code to find the badge for each chip.
+  const stateSeqByCode = new Map((_qmzData.state?.sequences || []).map(s => [s.code, s]));
+
   el.innerHTML = enrouteChipHtml + sequences.map(seq => {
     const total    = Object.values(seq.photographers).reduce((s, p) => s + p.count, 0);
     const isActive = _qmzViewScope === 'sequence' && _qmzActiveLocation === seq.code;
+    const hasNikah = !!stateSeqByCode.get(seq.code)?.additionalActivities?.includes('Nikah');
+    const nikahHtml = hasNikah
+      ? `<span class="qmz-seq-chip-nikah" data-action="remove-nikah" data-code="${escapeHtml(seq.code)}" title="Click to remove the Nikah designation from ${escapeHtml(seq.code)}">Nikah</span>`
+      : '';
     return `<div class="qmz-seq-chip ${seq.letter.toLowerCase()}${isActive ? ' active' : ''}" data-code="${escapeHtml(seq.code)}" role="button" tabindex="0" title="Review files in ${escapeHtml(seq.code)}">
       <span class="qmz-seq-chip-code">${escapeHtml(seq.code)}</span>
       <span class="qmz-seq-chip-type">${escapeHtml(seq.type)}</span>
+      ${nikahHtml}
       <span class="qmz-seq-chip-count">${total}</span>
       <span class="qmz-seq-chip-actions">
         <button class="qmz-seq-chip-action" data-action="edit" data-code="${escapeHtml(seq.code)}" data-letter="${escapeHtml(seq.letter)}" title="Edit sequence type" aria-label="Edit sequence type">
@@ -9873,6 +9883,12 @@ function _renderQMZRight() {
     btn.addEventListener('click', e => {
       e.stopPropagation();
       _qmzHandleRemoveSequence(btn.dataset.code);
+    });
+  });
+  el.querySelectorAll('.qmz-seq-chip-nikah[data-action="remove-nikah"]').forEach(badge => {
+    badge.addEventListener('click', e => {
+      e.stopPropagation(); // don't also trigger the chip's own "view sequence" click
+      _qmzHandleRemoveNikah(badge.dataset.code);
     });
   });
 }
@@ -9912,6 +9928,19 @@ async function _qmzHandleRemoveSequence(code) {
     }
     await _qmzRefresh();
   }
+}
+
+// Operator correction (Phase 6, "Implement Durable QMZ Nikah Sequence Information") — removes
+// only the persisted Nikah designation, never the sequence folder/code itself. Reuses the exact
+// window.confirm() pattern already used by _qmzHandleRemoveSequence above.
+async function _qmzHandleRemoveNikah(code) {
+  const confirmed = window.confirm(
+    `Remove the Nikah designation from ${code}?\n\nThis only clears the saved Nikah note. The sequence folder and its files are unaffected.`
+  );
+  if (!confirmed) return;
+  const r = await window.api.qmzRemoveSequenceNikah({ qmzRoot: _qmzRoot, code });
+  _qmzSetStatus(r.ok ? `Removed Nikah from ${code}` : (r.error || 'Remove failed'), r.ok ? 'ok' : 'err');
+  if (r.ok) await _qmzRefresh();
 }
 
 // Switch the center panel to review every photographer's files inside a
@@ -10957,12 +10986,21 @@ function _qprRenderWarnings() {
   const sectionWarnings = section ? section.warnings : [];
   const all = [...docWarnings, ...sectionWarnings];
   const rows = all.map(w => `<div class="qpr-warning-row">⚠ ${_qprEsc(_qprWarningMessage(w))}</div>`);
+  // Nikah is information, not an error — reported separately from the warning rows below,
+  // with no warning glyph, exactly like the fix brief's own example ("5 sequences include
+  // Nikah."). Never counted when there are zero (nothing to say).
+  if (section) {
+    const nikahCount = section.entries.filter(e => e.hasNikah).length;
+    if (nikahCount > 0) {
+      rows.push(`<div class="qpr-warning-row qpr-info-row">${nikahCount} sequence${nikahCount === 1 ? '' : 's'} include Nikah.</div>`);
+    }
+  }
   // Excluded rows (a recognized-but-not-created row, or a row this module could not
   // confidently classify) were previously computed by the parser but never shown anywhere —
   // silently invisible to the operator even though the data existed. Surfaced here, grouped
   // by reason so a real anomaly (an ambiguous row that might be lost data, a malformed
   // number) is never mistaken for one of the routine, already-expected exclusions (an
-  // explicit "N" / not-applicable marker, an unrecognized Sharaf value).
+  // unrecognized Sharaf value).
   if (section && section.excludedRows.length) {
     const byReason = new Map();
     for (const r of section.excludedRows) byReason.set(r.reason, (byReason.get(r.reason) || 0) + 1);
@@ -10990,9 +11028,14 @@ function _qprExcludedRowMessage(reason, count) {
     'ambiguous-banner':          `${n} could not be confidently classified and may contain an unrecognized sequence — please check the source PDF.`,
     'malformed-sequence-number': `${n} had a sequence number this module could not parse.`,
     'rejected-by-sequence-model': `${n} had a sequence number/type combination that is not a valid QMZ code.`,
-    'sharaf-not-applicable':     `${n} explicitly marked "N" (not applicable) in the Sharaf column — excluded as expected.`,
     'unrecognized-sharaf':       `${n} had a Sharaf value that is not a recognized QMZ type (Q/M/Z/MZ/O/AQ).`,
-    'no-sequence-number':        `${n} had a sequence number but no recognized Sharaf type.`,
+    'no-sequence-number':        `${n} had a sequence number but no recognized Sharaf type nearby.`,
+    // "N" means Nikah, never "Not Applicable" — these two reasons are genuine edge cases
+    // (no primary Sharaf could be associated with the sequence at all), not the normal,
+    // expected case of a Nikah correctly attached to a numbered sequence (see the separate,
+    // informational — not warning — Nikah count in _qprRenderWarnings).
+    'no-sequence-number-in-group': `${n} had a recognized Sharaf type (Q/M/Z/MZ/O/AQ) but no sequence number could be found for it — please check the source PDF.`,
+    'nikah-without-primary-sharaf': `${n} marked Nikah ("N") with no associated primary Sharaf type (Q/M/Z/MZ/O/AQ) nearby — please review; a Nikah-only row is never turned into its own sequence.`,
   };
   return known[reason] || `${n} excluded for an unrecognized reason ("${reason}") — please review the source PDF.`;
 }
@@ -11027,9 +11070,17 @@ function _qprRenderEntryTable() {
       : isDuplicate
         ? `<span class="qpr-status-pill duplicate" title="Duplicate folder name within this section">Duplicate</span>`
         : `<span class="qpr-status-pill valid">Valid</span>`;
+    // Nikah is additional information about this sequence, never part of its folder code
+    // (the primary Sharaf alone always determines that) and never its own column — a
+    // compact text-only indicator inside the already-flexible folder-name cell, per the fix
+    // brief's own "do not add a new column if a compact secondary indicator fits better"
+    // instruction. Survives any Sharaf-type edit untouched: `entry` itself (and its
+    // `hasNikah`/`nikahCount`, set once at parse time) is never replaced by a correction —
+    // only the overlaid `eff` values change — so there is nothing extra to wire up here.
+    const nikahHtml = entry.hasNikah ? ` <span class="qpr-nikah-badge" title="Nikah will also take place during this sequence">Nikah</span>` : '';
     const folderHtml = eff.invalid
       ? `<span class="qpr-folder-name">—</span>`
-      : `<span class="qpr-folder-name">${eff.edited ? `<span class="orig">${_qprEsc(entry.folderName)}</span>` : ''}${_qprEsc(eff.code)}</span>`;
+      : `<span class="qpr-folder-name">${eff.edited ? `<span class="orig">${_qprEsc(entry.folderName)}</span>` : ''}${_qprEsc(eff.code)}${nikahHtml}</span>`;
     return `
       <div class="qpr-entry-row${eff.invalid ? ' invalid' : ''}" data-key="${_qprEsc(key)}">
         <input type="checkbox" class="qpr-entry-check" data-key="${_qprEsc(key)}" ${checked ? 'checked' : ''} ${eff.invalid ? 'disabled' : ''} aria-label="Select ${_qprEsc(eff.code || entry.folderName)}">
@@ -11153,7 +11204,10 @@ function _qprRenderEnrouteSection() {
  *  (an entry that became invalid via a correction can never be "selected" — see
  *  _qprHandleEntryCorrection, which already removes it from the selection set on that
  *  transition) — mapped to the plain {number, letter, suffix} shape the IPC/service layer
- *  expects, using each entry's EFFECTIVE (corrected-or-original) values. */
+ *  expects, using each entry's EFFECTIVE (corrected-or-original) values. `hasNikah` is carried
+ *  through from the original parsed entry (set once at parse time by _groupClassifiedRows/
+ *  _normalizeEntry, untouched by number/letter/suffix corrections) so createReviewedSequences
+ *  can persist it — see "Implement Durable QMZ Nikah Sequence Information". */
 function _qprSelectedCreatableEntries() {
   const section = _qprActiveSection();
   if (!section) return [];
@@ -11164,7 +11218,7 @@ function _qprSelectedCreatableEntries() {
     if (!selected.has(key)) continue;
     const eff = _qprEffective(section, entry);
     if (eff.invalid) continue; // defensive — should already be unselected, never trust that alone
-    out.push({ number: eff.number, letter: eff.letter, suffix: eff.suffix, code: eff.code });
+    out.push({ number: eff.number, letter: eff.letter, suffix: eff.suffix, code: eff.code, hasNikah: !!entry.hasNikah });
   }
   return out;
 }
@@ -11314,7 +11368,7 @@ async function _qprConfirmCreate() {
   try {
     resp = await window.api.qmzCreateReviewedSequences({
       qmzRoot: _qmzRoot, // read fresh at call time, not captured when the PDF was imported
-      entries: entries.map(e => ({ number: e.number, letter: e.letter, suffix: e.suffix })),
+      entries: entries.map(e => ({ number: e.number, letter: e.letter, suffix: e.suffix, hasNikah: !!e.hasNikah })),
       includeEnroute: _qprEnrouteChecked,
     });
   } catch (err) {

@@ -6847,6 +6847,17 @@
   #qmzOverlay .qmz-seq-chip-action:hover { background: rgba(0,0,0,0.12); opacity: 1; }
   #qmzOverlay .qmz-seq-chip.active .qmz-seq-chip-action:hover { background: rgba(255,255,255,0.2); }
   #qmzOverlay .qmz-seq-chip-action--danger:hover { color: var(--red); }
+  /* Durable Nikah indicator (persisted additionalActivities, not the PDF-review-only flag) —
+     same text-only, blue-themed convention as .qpr-nikah-badge; clickable so the operator can
+     remove a mistaken designation via the existing window.confirm() correction pattern, without
+     deleting the sequence or changing its folder name. */
+  #qmzOverlay .qmz-seq-chip-nikah {
+    display: inline-block; font-size: 0.64rem; font-weight: 700; border-radius: 6px; padding: 1px 6px;
+    background: var(--blue-dim); color: var(--blue); flex-shrink: 0; cursor: pointer;
+    transition: opacity 0.12s;
+  }
+  #qmzOverlay .qmz-seq-chip-nikah:hover { opacity: 0.75; }
+  #qmzOverlay .qmz-seq-chip.active .qmz-seq-chip-nikah { background: rgba(255,255,255,0.22); color: #fff; }
   #qmzOverlay .qmz-seq-create {
     padding: 8px; border-top: 1px solid var(--border-subtle);
     display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;
@@ -7005,6 +7016,9 @@
     font-size: 0.76rem; line-height: 1.55; border-radius: 8px; padding: 7px 10px;
     background: var(--yellow-dim, rgba(255,204,0,0.1)); color: var(--text); border: 1px solid var(--border-subtle);
   }
+  /* Informational, not a warning (e.g. the Nikah count) — no warning glyph, a neutral/blue
+     tint instead of the yellow caution tint above. */
+  .qpr-warning-row.qpr-info-row { background: var(--blue-dim); }
   .qpr-table-toolbar { display: flex; align-items: center; gap: 8px; padding-top: 4px; }
   .qpr-sel-count { flex: 1; text-align: right; font-size: 0.76rem; color: var(--subtext); }
   .qpr-entry-list {
@@ -7033,6 +7047,10 @@
   .qpr-status-pill.valid      { background: var(--green-dim, rgba(52,199,89,0.12)); color: var(--green); }
   .qpr-status-pill.invalid    { background: var(--red-dim, rgba(255,59,48,0.12)); color: var(--red); }
   .qpr-status-pill.duplicate  { background: var(--yellow-dim, rgba(255,204,0,0.12)); color: var(--yellow); }
+  .qpr-nikah-badge {
+    display: inline-block; font-size: 0.64rem; font-weight: 700; border-radius: 6px; padding: 1px 6px;
+    background: var(--blue-dim); color: var(--blue); vertical-align: middle;
+  }
   .qpr-empty-state { padding: 24px 12px; font-size: 0.8rem; color: var(--subtext); text-align: center; line-height: 1.7; }
   .qpr-actions {
     display: flex; align-items: center; gap: 10px; padding: 14px 20px; flex-shrink: 0;
