@@ -960,6 +960,7 @@
     .tx-tree-status[data-status="partial"]    { color: #b45309; background: rgba(180,83,9,0.10); border-color: rgba(180,83,9,0.25); }
     .tx-tree-status[data-status="review"]     { color: #dc2626; background: rgba(220,38,38,0.09); border-color: rgba(220,38,38,0.22); }
     .tx-tree-status[data-status="not-copied"] { color: var(--subtext); background: var(--card-bg,rgba(0,0,0,0.04)); border-color: var(--border); }
+    .tx-tree-status[data-status="new"]        { color: #2563eb; background: rgba(37,99,235,0.09); border-color: rgba(37,99,235,0.22); }
     .tx-tree-row[data-unresolved="true"] { opacity: .6; }
     .tx-tree-row[data-unresolved="true"] .tx-tree-name { text-decoration: line-through; text-decoration-color: rgba(220,38,38,0.4); }
     .tx-tree-name.tx-tree-event-root { color: var(--subtext); font-style: italic; }
@@ -967,6 +968,7 @@
     .tx-tree-row-ev   { padding-left: 18px; }
     .tx-tree-row-fold { padding-left: 34px; }
     .tx-tree-children.tx-collapsed { display: none; }
+    .tx-generic-children { margin-left: 16px; } /* arbitrary-depth nesting: each level compounds this */
     .tx-preview-box { background: var(--card-bg, rgba(255,255,255,0.03)); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; font-size: 12px; color: var(--subtext); }
     .tx-preview-row { display: flex; gap: 16px; flex-wrap: wrap; }
     .tx-scan-review { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: var(--subtext); }
@@ -9307,12 +9309,14 @@
           </div>
         </div>
 
-        <!-- Destination: Main Archive Root -->
+        <!-- Destination: Active Archive Root by default, or a manually chosen folder -->
         <div>
-          <div class="tx-section-label">Main Archive Root (destination)</div>
+          <div class="tx-section-label" id="tiDestLabel">Destination</div>
           <div class="tx-drive-wrap">
             <div class="tx-drive-path tx-unset" id="tiMainArchivePath">Not set</div>
+            <button type="button" class="aloc-btn" id="tiChangeDestBtn">Change Destination</button>
           </div>
+          <div class="aloc-validation" id="tiDestNote" hidden></div>
         </div>
 
         <!-- Import Scope -->
@@ -9337,6 +9341,7 @@
             <div class="tx-preview-stat"><span class="tx-preview-val" id="tiPvCollections">—</span><span class="tx-preview-lbl">Collections</span></div>
             <div class="tx-preview-stat"><span class="tx-preview-val" id="tiPvEvents">—</span><span class="tx-preview-lbl">Events</span></div>
             <div class="tx-preview-stat"><span class="tx-preview-val" id="tiPvExternal">—</span><span class="tx-preview-lbl">External</span></div>
+            <div class="tx-preview-stat"><span class="tx-preview-val" id="tiPvGeneric">—</span><span class="tx-preview-lbl">General</span></div>
             <div class="tx-preview-stat"><span class="tx-preview-val" id="tiPvFiles">—</span><span class="tx-preview-lbl">Files</span></div>
           </div>
           <div id="tiPvUnresolvedNote" class="tx-scan-group tx-scan--err" hidden></div>
@@ -9358,6 +9363,7 @@
         <div id="tiStatusBox" class="tx-status-box tx-idle" hidden>
           <div class="tx-status-headline" id="tiStatusHeadline"></div>
           <div class="tx-checkpoint-warning" id="tiCheckpointWarning" hidden></div>
+          <div class="tx-checkpoint-warning" id="tiErrorCapWarning" hidden></div>
           <div class="tx-batch-info" id="tiBatchInfo"></div>
           <div class="tx-progress-wrap" id="tiProgressWrap" hidden>
             <div class="tx-progress-bar"><div class="tx-progress-fill" id="tiProgressFill"></div></div>

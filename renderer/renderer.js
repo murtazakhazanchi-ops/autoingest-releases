@@ -15896,6 +15896,7 @@ const _transferMonitor = (() => {
   function _phase(kind, s) {
     if (s.paused)     { const p = _pct(s); return { cls: 'paused',  txt: `${kind} paused${p == null ? '' : ' — ' + p + '%'}` }; }
     if (s.running)    { const p = _pct(s); return { cls: 'running', txt: `${kind} ${p == null ? '…' : p + '%'} · ${s.copied || 0} copied${_errs(s) ? ' · ' + _errs(s) + ' errors' : ''}` }; }
+    if (s.result?.ok && s.result.status === 'failed') return { cls: 'fail', txt: `${kind} failed — no files copied` };
     if (s.result?.ok) return { cls: s.result.status === 'partial' ? 'warn' : 'done', txt: `${kind} ${s.result.status === 'partial' ? 'completed with errors' : 'complete'} · ${s.copied || 0} copied` };
     if (s.result)     return { cls: 'fail', txt: `${kind} failed` };
     return null;
@@ -15996,13 +15997,22 @@ const _transferMonitor = (() => {
     verifyBtn.hidden    = phase !== 'done';
     const minBtn = _txEl('txMinimizeBtn');
     if (minBtn) minBtn.hidden = !activePhase;
+    // 'done' (a successful/partial completion) must NOT hide Scan/Preview — same fix as
+    // Transfer Import's consecutive-operation bug (a68aa1c): the completed result may stay
+    // visible, but it must never block starting another export.
     const scanBtn    = _txEl('txScanBtn');
     const previewBtn = _txEl('txPreviewBtn');
     if (scanBtn) {
-      scanBtn.hidden   = activePhase || phase === 'done';
+      scanBtn.hidden   = activePhase;
       scanBtn.disabled = scanningPhase;
     }
-    if (previewBtn) previewBtn.hidden = activePhase || scanningPhase || phase === 'done';
+    // Preview's .disabled is also phase-driven now, not left solely to _txPreview()'s own
+    // start/end toggle — _txStartExport() disables it while a run starts, and nothing but a
+    // SUCCESSFUL Preview call used to clear that, a chicken-and-egg deadlock once Preview is
+    // the only clickable path to trigger that very call (found live reproducing this exact
+    // defect). _txPreview()'s own in-flight disable during its async call still works
+    // exactly as before; it just can no longer get stuck true afterward.
+    if (previewBtn) { previewBtn.hidden = activePhase || scanningPhase; previewBtn.disabled = activePhase || scanningPhase; }
 
     // Lock tree during active operation to prevent scope drift
     const treeEl = _txEl('txScopeTree');
@@ -16390,6 +16400,10 @@ const _transferMonitor = (() => {
     }
 
     _txLastScope = scope;
+    // A full phase transition, not just toggling .disabled — Export may still be .hidden
+    // from a just-completed previous run's 'done' phase; only _txSetButtonPhase('idle')
+    // clears that (see consecutive-export fix, mirroring a68aa1c).
+    _txSetButtonPhase('idle');
     if (exportBtn) exportBtn.disabled = (result.files === 0);
   }
 
@@ -17392,6 +17406,13 @@ const _transferMonitor = (() => {
   let _tiEtaSamples   = [];
   let _tiSpeedSamples = [];
 
+  // Destination state. null = use the authoritative Active/Main Archive Root resolution
+  // (see main.js's _resolveEffectiveArchiveRoot); a path = an explicit operator override for
+  // THIS modal session only — never written to settings, never persisted across a close/
+  // reopen (reset in _tiOpen, matching the Transfer Import brief's Scenario D/requirement 7).
+  let _tiCustomDestRoot = null;
+  let _tiDestStatus     = null;  // last result from window.api.checkTransferImportDestination
+
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   function _tiEl(id) { return document.getElementById(id); }
@@ -17402,12 +17423,19 @@ const _transferMonitor = (() => {
 
   function _tiUnresolvedReasonText(reason) {
     const msgs = {
-      'collection-not-found-in-archive':       'The matching Collection does not exist in the Main Archive Root.',
-      'no-existing-collection-found':          'No matching Event was found anywhere in the Main Archive Root.',
-      'ambiguous-archive-match':                'This Event matches more than one existing Collection — cannot resolve automatically.',
-      'external-root-no-approved-destination': 'This folder is not part of a recognized Collection or Event.',
+      'no-existing-collection-found':  'No matching Event was found anywhere in the Main Archive Root.',
+      'ambiguous-archive-match':       'This Event matches more than one existing Collection — cannot resolve automatically.',
+      'destination-lookup-failed':     'Could not determine whether this Collection already exists at the destination — check destination permissions and try again.',
+      'destination-name-conflict':     'A file (not a folder) already occupies this name at the destination — resolve the conflict manually before importing.',
     };
     return msgs[reason] || 'Destination could not be resolved — this item will not be imported.';
+  }
+
+  // Informational only — paired with destinationStatus 'resolved', never 'unresolved'. The
+  // folder's own name is the destination Collection name; nothing is guessed (see
+  // transferImportService.js's scanImportTree comment for the full reasoning).
+  function _tiNewCollectionReasonText(name) {
+    return `"${name}" does not exist yet in the Main Archive Root — it will be created when you import.`;
   }
 
   function _tiSetButtonPhase(phase) {
@@ -17428,10 +17456,27 @@ const _transferMonitor = (() => {
     const minBtn = _tiEl('tiMinimizeBtn');
     if (minBtn) minBtn.hidden = !activePhase;
 
+    // 'done' (a successful/partial completion) must NOT hide Scan/Preview — unlike 'failed',
+    // which already left them visible, 'done' previously hid both with no way back short of
+    // closing the modal (and reopening re-applied the same persisted backend result, so even
+    // that didn't help). The completed result may stay visible; it must never block starting
+    // another operation. See the consecutive-import bug this fixes.
+    // Preview's .disabled is also phase-driven now, not left solely to _tiPreview()'s own
+    // start/end toggle — _tiStartImport() disables it while a run starts, and nothing but a
+    // SUCCESSFUL Preview call used to clear that, a chicken-and-egg deadlock once Preview is
+    // the only clickable path to trigger that very call (found live while reproducing the
+    // analogous Export defect). _tiPreview()'s own in-flight disable during its async call
+    // still works exactly as before; it just can no longer get stuck true afterward.
     const scanBtn    = _tiEl('tiScanBtn');
     const previewBtn = _tiEl('tiPreviewBtn');
-    if (scanBtn)    { scanBtn.hidden = activePhase || phase === 'done'; scanBtn.disabled = scanningPhase; }
-    if (previewBtn) previewBtn.hidden = activePhase || scanningPhase || phase === 'done';
+    if (scanBtn)    { scanBtn.hidden = activePhase; scanBtn.disabled = scanningPhase; }
+    if (previewBtn) { previewBtn.hidden = activePhase || scanningPhase; previewBtn.disabled = activePhase || scanningPhase; }
+
+    // Changing destination mid-copy is prevented, not just handled after the fact (see the
+    // button's own click-guard too) — section 5's "a destination change during an active
+    // copy is prevented or handled safely."
+    const changeDestBtn = _tiEl('tiChangeDestBtn');
+    if (changeDestBtn) changeDestBtn.disabled = activePhase;
 
     // Lock tree during active operation; permanently-unresolved checkboxes stay disabled.
     const treeEl = _tiEl('tiScopeTree');
@@ -17466,13 +17511,117 @@ const _transferMonitor = (() => {
     _transferMonitor.start();
   }
 
+  // Resolves and displays the current destination (Active Archive Root by default, Main
+  // only when it is also Active, or an explicit _tiCustomDestRoot override), and reflects
+  // its live reachability — reusing the exact same preflight runImport() itself applies
+  // (abb4729), never a second guess. Scenario C: an unreachable destination is shown
+  // clearly and Import is disabled; it is never silently replaced with a different root.
+  // Disable-only guard: forces Import/Scan/Preview off while the current destination is
+  // unset or unreachable, regardless of what any other code path (a fresh Preview,
+  // _tiSetButtonPhase('idle') on open — which unconditionally sets scanBtn.disabled =
+  // false for the idle phase) might otherwise set. Never enables any button itself.
+  function _tiEnforceDestinationGate() {
+    if (_tiRunning) return;
+    const destBad = !_tiDestStatus?.path || !_tiDestStatus.reachable;
+    if (!destBad) return;
+    const importBtn  = _tiEl('tiImportBtn');
+    const scanBtn     = _tiEl('tiScanBtn');
+    const previewBtn  = _tiEl('tiPreviewBtn');
+    if (importBtn)  importBtn.disabled  = true;
+    if (scanBtn)     scanBtn.disabled    = true;
+    if (previewBtn)  previewBtn.disabled = true;
+  }
+
+  async function _tiRefreshDestination() {
+    let status;
+    try { status = await window.api.checkTransferImportDestination(_tiCustomDestRoot); }
+    catch { status = null; }
+    _tiDestStatus = status;
+
+    const destEl  = _tiEl('tiMainArchivePath');
+    const noteEl  = _tiEl('tiDestNote');
+    const labelEl = _tiEl('tiDestLabel');
+    if (destEl) {
+      destEl.textContent = status?.path || 'Not set';
+      destEl.classList.toggle('tx-unset', !status?.path);
+    }
+    if (labelEl) {
+      labelEl.textContent =
+        status?.source === 'custom'                       ? 'Destination (custom)' :
+        status?.source === 'main'                          ? 'Destination (Main Archive Root)' :
+        (status?.source === 'active' || status?.source === 'override') ? 'Destination (Active Archive Root)' :
+        'Destination';
+    }
+    if (noteEl) {
+      if (!status?.path) {
+        noteEl.textContent = 'No destination is set. Choose one or set an Active/Main Archive Root.';
+        noteEl.className = 'aloc-validation warn';
+        noteEl.removeAttribute('hidden');
+      } else if (!status.reachable) {
+        noteEl.textContent = _tiDestinationUnreachableText(status.reachReason, status.reachCode);
+        noteEl.className = 'aloc-validation err';
+        noteEl.removeAttribute('hidden');
+      } else {
+        noteEl.setAttribute('hidden', '');
+      }
+    }
+
+    // Destination unreachability is a one-way, override-nothing-else gate: it only ever
+    // FORCES Import disabled, never enables it — enabling is Preview/Scan's job alone (an
+    // unchanged destination that's already reachable must never fight the existing "scope
+    // changed since last Preview" gate). Applied again, last, at the end of _tiOpen()'s own
+    // flow so a later _tiSetButtonPhase('idle') call can't silently re-enable it either.
+    _tiEnforceDestinationGate();
+
+    return status;
+  }
+
+  // Shared by modal-open and "Change Destination": re-resolves the destination, loads the
+  // scope tree against it (or shows a blocked message if unreachable), and re-checks for an
+  // interrupted checkpoint under that SAME destination — never the stale literal Main
+  // Archive Root. Returns the destination status so the caller can branch further.
+  async function _tiReloadForDestination() {
+    const destStatus = await _tiRefreshDestination();
+
+    const scanBtn    = _tiEl('tiScanBtn');
+    const previewBtn = _tiEl('tiPreviewBtn');
+    const destOk = !!(destStatus?.path && destStatus.reachable);
+    if (destOk) {
+      await _tiLoadTree();
+      if (scanBtn)    scanBtn.disabled    = false;
+      if (previewBtn) previewBtn.disabled = false;
+    } else {
+      const treeEl = _tiEl('tiScopeTree');
+      if (treeEl) treeEl.innerHTML = '<div class="tx-empty-note">Choose a reachable destination to load scope.</div>';
+      _tiTree = [];
+      if (scanBtn)    scanBtn.disabled    = true;
+      if (previewBtn) previewBtn.disabled = true;
+    }
+
+    _tiEl('tiResumeOffer')?.setAttribute('hidden', '');
+    const checkpoint = destOk ? await window.api.getTransferImportCheckpoint(_tiCustomDestRoot).catch(() => null) : null;
+    if (checkpoint && checkpoint.status !== 'complete') {
+      const done  = checkpoint.batches?.filter(b => b.status === 'complete').length ?? 0;
+      const total = checkpoint.batches?.length ?? 0;
+      const msgEl = _tiEl('tiResumeMsg');
+      if (msgEl) msgEl.textContent = `A previous import was interrupted (${done} / ${total} batches done).`;
+      _tiEl('tiResumeOffer')?.removeAttribute('hidden');
+    }
+
+    return destStatus;
+  }
+
   async function _tiOpen() {
     const overlay = _tiEl('transferImportModal');
     if (!overlay || overlay.classList.contains('open')) return;
 
-    // Any prior scan is invalidated on every (re)open — see plan §5f.
-    _tiScanMode   = false;
-    _tiScanResult = null;
+    // Any prior scan is invalidated on every (re)open — see plan §5f. The destination
+    // override is ALSO reset here: closing and reopening restores the authoritative
+    // Active/Main Archive Root as the default (requirement 7) — a custom destination is
+    // an explicit override for one working session, not a sticky preference.
+    _tiScanMode       = false;
+    _tiScanResult     = null;
+    _tiCustomDestRoot = null;
 
     // Populate Transfer Drive path (read-only display)
     const savedTransferRoot = await window.api.getTransferRoot().catch(() => null);
@@ -17482,27 +17631,7 @@ const _transferMonitor = (() => {
       driveEl.classList.toggle('tx-unset', !savedTransferRoot);
     }
 
-    // Populate Main Archive Root path (read-only display)
-    const opsStatus = await window.api.getArchiveOperationsStatus().catch(() => null);
-    const mainEl = _tiEl('tiMainArchivePath');
-    if (mainEl) {
-      const mar = opsStatus?.mainArchiveRoot;
-      mainEl.textContent = mar || 'Not set';
-      mainEl.classList.toggle('tx-unset', !mar);
-    }
-
-    await _tiLoadTree();
-
-    // Check for incomplete checkpoint
-    _tiEl('tiResumeOffer')?.setAttribute('hidden', '');
-    const checkpoint = await window.api.getTransferImportCheckpoint().catch(() => null);
-    if (checkpoint && checkpoint.status !== 'complete') {
-      const done  = checkpoint.batches?.filter(b => b.status === 'complete').length ?? 0;
-      const total = checkpoint.batches?.length ?? 0;
-      const msgEl = _tiEl('tiResumeMsg');
-      if (msgEl) msgEl.textContent = `A previous import was interrupted (${done} / ${total} batches done).`;
-      _tiEl('tiResumeOffer')?.removeAttribute('hidden');
-    }
+    await _tiReloadForDestination();
 
     const importStatus = await window.api.getTransferImportStatus().catch(() => null);
     if (importStatus && (importStatus.running || importStatus.paused || importStatus.result)) {
@@ -17515,6 +17644,11 @@ const _transferMonitor = (() => {
       _tiEl('tiStatusBox')?.setAttribute('hidden', '');
       _tiSetButtonPhase('idle');
     }
+
+    // Applied last: _tiSetButtonPhase('idle') unconditionally re-enables Import for the
+    // default "ready with whatever is currently selected" case — an unreachable destination
+    // must override that, not be overridden by it.
+    _tiEnforceDestinationGate();
 
     overlay.classList.add('open');
     document.body.style.overflow = 'hidden';
@@ -17532,14 +17666,14 @@ const _transferMonitor = (() => {
     treeEl.innerHTML = '<div class="tx-empty-note">Loading…</div>';
 
     let result;
-    try { result = await window.api.getTransferImportTree(); } catch { result = null; }
+    try { result = await window.api.getTransferImportTree(_tiCustomDestRoot); } catch { result = null; }
 
     if (!result || !result.ok || !result.tree || result.tree.length === 0) {
       const reason = result?.reason;
       const msg = reason === 'transfer-root-not-set'
         ? 'Transfer Drive is not set.'
-        : reason === 'main-archive-not-set'
-        ? 'Main Archive Root is not set.'
+        : reason === 'destination-not-set'
+        ? 'No destination is set. Choose one or set an Active/Main Archive Root.'
         : reason === 'transfer-root-unreadable'
         ? 'Transfer Drive is offline or unreadable.'
         : 'No importable content found on Transfer Drive.';
@@ -17554,85 +17688,97 @@ const _transferMonitor = (() => {
     const rowAttrs   = (status, reason) => status === 'unresolved' ? ` data-unresolved="true" title="${_esc(_tiUnresolvedReasonText(reason))}"` : '';
     const cbAttrs    = status => status === 'unresolved' ? ' disabled data-unresolved="true"' : ' checked data-unresolved="false"';
     const unresolvedBadge = status => status === 'unresolved' ? '<span class="tx-tree-status" data-status="review">⚠ Unresolved</span>' : '';
+    const newCollBadge = (status, reason) => (status === 'resolved' && reason === 'new-collection')
+      ? '<span class="tx-tree-status" data-status="new">New Collection</span>' : '';
 
     _tiTree.forEach((node, ti) => {
       if (node.type === 'collection') {
         html.push(
           `<div class="tx-tree-node" data-ti="${ti}">` +
-          `<div class="tx-tree-row tx-tree-row-coll">` +
+          `<div class="tx-tree-row tx-tree-row-coll"${node.isNewCollection ? ` title="${_esc(_tiNewCollectionReasonText(node.name))}"` : ''}>` +
           `<input type="checkbox" class="ti-cb-coll" data-ti="${ti}" checked>` +
           `<span class="tx-tree-arrow" data-ti="${ti}">▶</span>` +
           `<span class="tx-tree-name" title="${_esc(node.path)}">${_esc(node.name)}</span>` +
+          (node.isNewCollection ? '<span class="tx-tree-status" data-status="new">New Collection</span>' : '') +
           `</div>` +
           `<div class="tx-tree-children tx-collapsed" data-coll-children="${ti}">`
         );
 
         node.events.forEach((ev, ei) => {
-          const hasFolders = ev.folders.length > 0;
+          const hasChildren = ev.folders.length > 0 || (ev.files || []).length > 0;
           html.push(
-            `<div class="tx-tree-node" data-ti="${ti}" data-ei="${ei}">` +
+            `<div class="tx-tree-node tx-generic-node" data-ti="${ti}" data-ei="${ei}">` +
             `<div class="tx-tree-row tx-tree-row-ev"${rowAttrs(ev.destinationStatus, ev.destinationReason)}>` +
             `<input type="checkbox" class="ti-cb-ev" data-ti="${ti}" data-ei="${ei}"${cbAttrs(ev.destinationStatus)}>` +
-            `<span class="tx-tree-arrow" data-ti="${ti}" data-ei="${ei}">${hasFolders ? '▶' : ' '}</span>` +
+            `<span class="tx-tree-arrow" data-ti="${ti}" data-ei="${ei}">${hasChildren ? '▶' : ' '}</span>` +
             `<span class="tx-tree-name" title="${_esc(ev.path)}">${_esc(ev.name)}</span>` +
-            unresolvedBadge(ev.destinationStatus) +
+            unresolvedBadge(ev.destinationStatus) + newCollBadge(ev.destinationStatus, ev.destinationReason) +
             `</div>` +
-            `<div class="tx-tree-children tx-collapsed" data-ev-children="${ti}-${ei}">`
+            `<div class="tx-tree-children tx-collapsed tx-generic-children" data-loaded="1" data-ev-children="${ti}-${ei}">` +
+            _tiRenderEventChildren(ev, 'ti-cb-fold', 'ti-cb-evfile', (suffix) => `data-ti="${ti}" data-ei="${ei}" data-fi="${suffix}"`) +
+            `</div></div>`
           );
-          ev.folders.forEach((fold, fi) => {
-            html.push(
-              `<div class="tx-tree-row tx-tree-row-fold">` +
-              `<input type="checkbox" class="ti-cb-fold" data-ti="${ti}" data-ei="${ei}" data-fi="${fi}"${cbAttrs(ev.destinationStatus)}>` +
-              `<span class="tx-tree-arrow"> </span>` +
-              `<span class="tx-tree-name" title="${_esc(fold.path)}">${_esc(fold.name)}</span>` +
-              `</div>`
-            );
-          });
-          html.push('</div></div>');
         });
 
         node.externalFolders.forEach((ext, xi) => {
+          // A non-Event sibling folder inside a Collection (e.g. a numbered subfolder like
+          // "02E" sitting next to real Event folders) is always a directory (scanImportTree
+          // only ever populates externalFolders from directory entries) and, exactly like a
+          // generic folder or an Event's own folders, must be expandable to any depth —
+          // AutoIngest's own archive/Event rules are irrelevant below this point; it's
+          // ordinary filesystem content from here down.
           html.push(
+            `<div class="tx-tree-node tx-generic-node" data-ti="${ti}" data-xi="${xi}">` +
             `<div class="tx-tree-row tx-tree-row-ev"${rowAttrs(ext.destinationStatus, ext.destinationReason)}>` +
-            `<input type="checkbox" class="ti-cb-cext" data-ti="${ti}" data-xi="${xi}"${cbAttrs(ext.destinationStatus)}>` +
-            `<span class="tx-tree-arrow"> </span>` +
+            `<input type="checkbox" class="ti-cb-cext ti-cb-generic-nested" data-ti="${ti}" data-xi="${xi}" data-path="${_esc(ext.path)}" data-isdir="1"${cbAttrs(ext.destinationStatus)}>` +
+            `<span class="tx-tree-arrow tx-generic-arrow" data-path="${_esc(ext.path)}">▶</span>` +
             `<span class="tx-tree-name" title="${_esc(ext.path)}">${_esc(ext.name)}</span>` +
-            unresolvedBadge(ext.destinationStatus) +
+            unresolvedBadge(ext.destinationStatus) + newCollBadge(ext.destinationStatus, ext.destinationReason) +
+            `</div>` +
+            `<div class="tx-tree-children tx-collapsed tx-generic-children" data-loaded="0"></div>` +
             `</div>`
           );
         });
 
         html.push('</div></div>');
       } else if (node.type === 'event') {
-        const hasFolders = node.folders.length > 0;
+        const hasChildren = node.folders.length > 0 || (node.files || []).length > 0;
         html.push(
-          `<div class="tx-tree-node" data-ti="${ti}">` +
+          `<div class="tx-tree-node tx-generic-node" data-ti="${ti}">` +
           `<div class="tx-tree-row tx-tree-row-coll"${rowAttrs(node.destinationStatus, node.destinationReason)}>` +
           `<input type="checkbox" class="ti-cb-devent" data-ti="${ti}"${cbAttrs(node.destinationStatus)}>` +
-          `<span class="tx-tree-arrow" data-ti="${ti}" data-devent="1">${hasFolders ? '▶' : ' '}</span>` +
+          `<span class="tx-tree-arrow" data-ti="${ti}" data-devent="1">${hasChildren ? '▶' : ' '}</span>` +
           `<span class="tx-tree-name" title="${_esc(node.path)}">${_esc(node.name)}</span>` +
           unresolvedBadge(node.destinationStatus) +
           `</div>` +
-          `<div class="tx-tree-children tx-collapsed" data-devent-children="${ti}">`
+          `<div class="tx-tree-children tx-collapsed tx-generic-children" data-loaded="1" data-devent-children="${ti}">` +
+          _tiRenderEventChildren(node, 'ti-cb-dfold', 'ti-cb-devfile', (suffix) => `data-ti="${ti}" data-fi="${suffix}"`) +
+          `</div></div>`
         );
-        node.folders.forEach((fold, fi) => {
-          html.push(
-            `<div class="tx-tree-row tx-tree-row-fold">` +
-            `<input type="checkbox" class="ti-cb-dfold" data-ti="${ti}" data-fi="${fi}"${cbAttrs(node.destinationStatus)}>` +
-            `<span class="tx-tree-arrow"> </span>` +
-            `<span class="tx-tree-name" title="${_esc(fold.path)}">${_esc(fold.name)}</span>` +
-            `</div>`
-          );
-        });
-        html.push('</div></div>');
-      } else {
-        // type === 'external' — root-level, always unresolved (never lands at archive root)
+      } else if (node.type === 'generic-folder') {
+        // General-purpose transfer: an ordinary folder with no AutoIngest Event anywhere
+        // inside it (a legacy year folder, a VHS lot, a recovered-files dump). Selected and
+        // copied as a whole by default, recursively — but expandable to any depth so the
+        // operator can select only specific nested folders/files instead (see
+        // _tiBindGenericTreeDelegation above for the lazy-expand + selection cascade).
         html.push(
-          `<div class="tx-tree-row tx-tree-row-coll" data-unresolved="true" title="${_esc(_tiUnresolvedReasonText(node.destinationReason))}">` +
-          `<input type="checkbox" class="ti-cb-rext" data-ti="${ti}" disabled data-unresolved="true">` +
+          `<div class="tx-tree-node tx-generic-node" data-ti="${ti}">` +
+          `<div class="tx-tree-row tx-tree-row-coll">` +
+          `<input type="checkbox" class="ti-cb-genfolder" data-ti="${ti}" checked>` +
+          `<span class="tx-tree-arrow tx-generic-arrow" data-path="${_esc(node.path)}">▶</span>` +
+          `<span class="tx-tree-name" title="${_esc(node.path)}">${_esc(node.name)}</span>` +
+          `</div>` +
+          `<div class="tx-tree-children tx-collapsed tx-generic-children" data-loaded="0"></div>` +
+          `</div>`
+        );
+      } else if (node.type === 'generic-file') {
+        // General-purpose transfer: an ordinary file sitting directly at the Transfer Drive
+        // root — selected and copied on its own.
+        html.push(
+          `<div class="tx-tree-row tx-tree-row-ev">` +
+          `<input type="checkbox" class="ti-cb-genfile" data-ti="${ti}" checked>` +
           `<span class="tx-tree-arrow"> </span>` +
           `<span class="tx-tree-name" title="${_esc(node.path)}">${_esc(node.name)}</span>` +
-          `<span class="tx-tree-status" data-status="review">⚠ Unresolved</span>` +
           `</div>`
         );
       }
@@ -17640,6 +17786,209 @@ const _transferMonitor = (() => {
 
     treeEl.innerHTML = html.join('');
     _tiBindTreeEvents(treeEl);
+  }
+
+  // ── General-purpose transfer: arbitrary-depth nested selection ──────────────
+  // A generic folder (no AutoIngest Event anywhere inside it) is lazily expandable to any
+  // depth: each node fetches its own immediate children on first expansion
+  // (window.api.getTransferImportFolderChildren), never the whole subtree up front, so a
+  // Transfer Drive with thousands of nested files is never eagerly walked or rendered.
+  // Collapsing/reopening only toggles a CSS class — already-fetched DOM and its selection
+  // state are never destroyed or re-fetched.
+
+  function _tiRenderGenericChildNode(child) {
+    const escPath = _esc(child.path);
+    if (!child.isDir) {
+      return (
+        `<div class="tx-tree-row tx-tree-row-fold">` +
+        `<input type="checkbox" class="ti-cb-generic-nested" data-path="${escPath}" data-isdir="0" checked>` +
+        `<span class="tx-tree-arrow"> </span>` +
+        `<span class="tx-tree-name" title="${escPath}">${_esc(child.name)}</span>` +
+        `</div>`
+      );
+    }
+    return (
+      `<div class="tx-tree-node tx-generic-node">` +
+      `<div class="tx-tree-row tx-tree-row-fold">` +
+      `<input type="checkbox" class="ti-cb-generic-nested" data-path="${escPath}" data-isdir="1" checked>` +
+      `<span class="tx-tree-arrow tx-generic-arrow" data-path="${escPath}">▶</span>` +
+      `<span class="tx-tree-name" title="${escPath}">${_esc(child.name)}</span>` +
+      `</div>` +
+      `<div class="tx-tree-children tx-collapsed tx-generic-children" data-loaded="0"></div>` +
+      `</div>`
+    );
+  }
+
+  // Shared by Collection-nested Events (.ti-cb-ev/.ti-cb-fold) and root-level direct Events
+  // (.ti-cb-devent/.ti-cb-dfold): renders an Event's immediate folders and individual files.
+  // Folders double as .ti-cb-generic-nested (dual class) so they stay expandable to any
+  // depth via the SAME delegated lazy-expand/cascade machinery generic folders already use —
+  // below the Event level there is nothing archive-specific left to classify. Files are
+  // individually selectable leaves — "one individual photograph" — never bundled into an
+  // opaque "whole event" unit.
+  function _tiRenderEventChildren(ev, foldClass, fileClass, destAttrs) {
+    const cbAttrs2 = ev.destinationStatus === 'unresolved' ? ' disabled data-unresolved="true"' : ' checked data-unresolved="false"';
+    const parts = [];
+    ev.folders.forEach((fold, fi) => {
+      const escPath = _esc(fold.path);
+      parts.push(
+        `<div class="tx-tree-node tx-generic-node">` +
+        `<div class="tx-tree-row tx-tree-row-fold">` +
+        `<input type="checkbox" class="${foldClass} ti-cb-generic-nested" ${destAttrs(fi)} data-path="${escPath}" data-isdir="1"${cbAttrs2}>` +
+        `<span class="tx-tree-arrow tx-generic-arrow" data-path="${escPath}">▶</span>` +
+        `<span class="tx-tree-name" title="${escPath}">${_esc(fold.name)}</span>` +
+        `</div>` +
+        `<div class="tx-tree-children tx-collapsed tx-generic-children" data-loaded="0"></div>` +
+        `</div>`
+      );
+    });
+    (ev.files || []).forEach((f, ffi) => {
+      const escPath = _esc(f.path);
+      parts.push(
+        `<div class="tx-tree-row tx-tree-row-fold">` +
+        `<input type="checkbox" class="${fileClass} ti-cb-generic-nested" ${destAttrs(`file${ffi}`)} data-path="${escPath}" data-isdir="0"${cbAttrs2}>` +
+        `<span class="tx-tree-arrow"> </span>` +
+        `<span class="tx-tree-name" title="${escPath}">${_esc(f.name)}</span>` +
+        `</div>`
+      );
+    });
+    return parts.join('');
+  }
+
+  // Propagates a parent's checked state down to every already-loaded descendant checkbox
+  // (recursively). Descendants that were never expanded have no checkbox yet — nothing to
+  // update, and nothing lost: the parent's own checked value is authoritative for them until
+  // (and unless) the operator expands further and overrides a specific child.
+  function _tiPropagateGenericCheckedDown(nodeEl, checked) {
+    const childrenEl = nodeEl.querySelector(':scope > .tx-generic-children');
+    if (!childrenEl || childrenEl.dataset.loaded !== '1') return;
+    childrenEl.querySelectorAll(':scope > .tx-tree-row > .ti-cb-generic-nested, :scope > .tx-tree-node > .tx-tree-row > .ti-cb-generic-nested').forEach(cb => {
+      cb.checked = checked;
+      cb.indeterminate = false;
+      // Only a DIRECTORY row has its own .tx-generic-node wrapper (data-isdir="1"). A leaf
+      // file has none — cb.closest('.tx-generic-node') on it would silently match its
+      // ENCLOSING parent's node instead (the nearest ancestor that happens to carry the
+      // class), re-entering this same parent recursively forever (stack overflow). That
+      // exception then silently aborts this entire cascade mid-flight, leaving every
+      // sibling queued after the crash point untouched — which is exactly why Select
+      // None/parent-deselection used to leave scattered checkboxes (including root-level
+      // files like event.json, processed later in the same enclosing loop) still checked.
+      if (cb.dataset.isdir === '1') {
+        const childNode = cb.closest('.tx-generic-node');
+        if (childNode) _tiPropagateGenericCheckedDown(childNode, checked);
+      }
+    });
+  }
+
+  // Recomputes one generic node's own checkbox (checked / indeterminate) from its immediate
+  // loaded children, then walks up to the next ancestor generic node (or the top-level
+  // .ti-cb-genfolder) and does the same, all the way to the root of this selection.
+  function _tiUpdateGenericAncestorState(startEl) {
+    let current = startEl.closest('.tx-generic-node') || startEl.closest('.tx-tree-node[data-ti]');
+    while (current) {
+      const ownCb = current.querySelector(':scope > .tx-tree-row > input[type=checkbox]');
+      const childrenEl = current.querySelector(':scope > .tx-generic-children');
+      if (!ownCb || !childrenEl) break;
+      const childCbs = Array.from(childrenEl.querySelectorAll(
+        ':scope > .tx-tree-row > .ti-cb-generic-nested, :scope > .tx-tree-node > .tx-tree-row > .ti-cb-generic-nested'
+      ));
+      if (childCbs.length > 0) {
+        const checkedCount = childCbs.filter(c => c.checked && !c.indeterminate).length;
+        const anyIndeterminate = childCbs.some(c => c.indeterminate);
+        if (anyIndeterminate || (checkedCount > 0 && checkedCount < childCbs.length)) {
+          ownCb.checked = false; ownCb.indeterminate = true;
+        } else if (checkedCount === childCbs.length) {
+          ownCb.checked = true; ownCb.indeterminate = false;
+        } else {
+          ownCb.checked = false; ownCb.indeterminate = false;
+        }
+      }
+      const parentGenericNode = current.parentElement?.closest('.tx-generic-node');
+      current = parentGenericNode || null;
+    }
+  }
+
+  function _tiBindGenericTreeDelegation(treeEl) {
+    if (treeEl.dataset.genericBound === '1') return; // delegation only needs binding once per tree
+    treeEl.dataset.genericBound = '1';
+
+    treeEl.addEventListener('click', async (e) => {
+      const arrow = e.target.closest('.tx-generic-arrow');
+      if (!arrow) return;
+      const nodeEl = arrow.closest('.tx-generic-node');
+      const childrenEl = nodeEl?.querySelector(':scope > .tx-generic-children');
+      if (!childrenEl) return;
+
+      if (childrenEl.dataset.loaded !== '1') {
+        const dirPath = arrow.dataset.path;
+        const parentCb = nodeEl.querySelector(':scope > .tx-tree-row > input[type=checkbox]');
+        arrow.textContent = '▼';
+        childrenEl.classList.remove('tx-collapsed');
+        childrenEl.innerHTML = '<div class="tx-empty-note" style="padding-left:20px">Loading…</div>';
+        let result;
+        try { result = await window.api.getTransferImportFolderChildren(dirPath); } catch { result = null; }
+        childrenEl.dataset.loaded = '1';
+        if (!result || !result.ok) {
+          childrenEl.innerHTML = `<div class="tx-empty-note" style="padding-left:20px">Could not read this folder${result?.reason ? ` (${_esc(result.reason)})` : ''}.</div>`;
+          return;
+        }
+        if (result.children.length === 0) {
+          childrenEl.innerHTML = '<div class="tx-empty-note" style="padding-left:20px">Empty folder.</div>';
+          return;
+        }
+        const parentChecked = parentCb ? (parentCb.checked && !parentCb.indeterminate) : true;
+        childrenEl.innerHTML = result.children.map(_tiRenderGenericChildNode).join('');
+        if (!parentChecked) {
+          // The parent itself was unchecked (or indeterminate — shouldn't happen pre-expansion,
+          // but handled safely) before expansion; new children must not silently become selected.
+          childrenEl.querySelectorAll('.ti-cb-generic-nested').forEach(cb => { cb.checked = false; });
+        }
+        return;
+      }
+      // Already loaded — toggle visibility only; selection state is untouched.
+      const collapsed = childrenEl.classList.toggle('tx-collapsed');
+      arrow.textContent = collapsed ? '▶' : '▼';
+    });
+
+    treeEl.addEventListener('change', (e) => {
+      const cb = e.target;
+      const isTopGeneric    = cb.matches('.ti-cb-genfolder') || cb.matches('.ti-cb-genfile');
+      const isNestedGeneric = cb.matches('.ti-cb-generic-nested');
+      if (!isTopGeneric && !isNestedGeneric) return;
+
+      cb.indeterminate = false; // an explicit operator click always resolves to a definite state
+      const isDir = cb.matches('.ti-cb-genfolder') || cb.dataset.isdir === '1';
+      if (isDir) {
+        const nodeEl = cb.closest('.tx-generic-node') || cb.closest('.tx-tree-node[data-ti]');
+        if (nodeEl) _tiPropagateGenericCheckedDown(nodeEl, cb.checked);
+      }
+      if (isNestedGeneric) _tiUpdateGenericAncestorState(cb);
+      _tiInvalidatePreview();
+    });
+  }
+
+  // Walks one top-level generic-folder/file node's (possibly lazily-expanded) checkbox
+  // subtree and collects the MINIMAL set of fully-selected roots: a folder whose own checkbox
+  // is checked and not indeterminate is emitted once, whole, and never recursed into further
+  // (the backend already copies a selected folder's entire subtree) — this is what prevents
+  // double-counting and keeps the scope payload small even for huge trees. An indeterminate
+  // folder is never emitted itself; only its loaded children are inspected, recursively.
+  function _tiCollectGenericSelections(rootCb, rootPath, rootIsDir, folderPaths, filePaths) {
+    if (!rootIsDir) {
+      if (rootCb.checked) filePaths.add(rootPath);
+      return;
+    }
+    if (rootCb.checked && !rootCb.indeterminate) {
+      folderPaths.add(rootPath);
+      return;
+    }
+    if (!rootCb.indeterminate) return; // unchecked, not indeterminate — excluded entirely
+    const nodeEl = rootCb.closest('.tx-generic-node') || rootCb.closest('.tx-tree-node[data-ti]');
+    const childrenEl = nodeEl?.querySelector(':scope > .tx-generic-children');
+    if (!childrenEl || childrenEl.dataset.loaded !== '1') return;
+    childrenEl.querySelectorAll(':scope > .tx-tree-row > .ti-cb-generic-nested, :scope > .tx-tree-node > .tx-tree-row > .ti-cb-generic-nested').forEach(childCb => {
+      _tiCollectGenericSelections(childCb, childCb.dataset.path, childCb.dataset.isdir === '1', folderPaths, filePaths);
+    });
   }
 
   function _tiBindTreeEvents(treeEl) {
@@ -17659,8 +18008,12 @@ const _transferMonitor = (() => {
       });
     });
 
-    // Collection-nested: folder → event → collection propagation
-    treeEl.querySelectorAll('.ti-cb-fold').forEach(cb => {
+    // Collection-nested: folder/file → event → collection propagation. _tiUpdateEvState
+    // considers both .ti-cb-fold (now also expandable to any depth) and the individually
+    // selectable .ti-cb-evfile event-root files together, and correctly treats an
+    // indeterminate child (one with its own partial nested selection) as making the Event
+    // itself indeterminate too — never just "unchecked".
+    treeEl.querySelectorAll('.ti-cb-fold, .ti-cb-evfile').forEach(cb => {
       cb.addEventListener('change', () => {
         _tiUpdateEvState(treeEl, cb.dataset.ti, cb.dataset.ei);
         _tiUpdateCollState(treeEl, cb.dataset.ti);
@@ -17670,9 +18023,18 @@ const _transferMonitor = (() => {
     treeEl.querySelectorAll('.ti-cb-ev').forEach(cb => {
       cb.addEventListener('change', () => {
         const checked = cb.checked;
-        treeEl.querySelectorAll(`.ti-cb-fold[data-ti="${cb.dataset.ti}"][data-ei="${cb.dataset.ei}"]`).forEach(f => {
+        treeEl.querySelectorAll(`.ti-cb-fold[data-ti="${cb.dataset.ti}"][data-ei="${cb.dataset.ei}"], .ti-cb-evfile[data-ti="${cb.dataset.ti}"][data-ei="${cb.dataset.ei}"]`).forEach(f => {
           if (f.disabled) return;
           f.checked = checked; f.indeterminate = false;
+          // A fold may itself have already-loaded nested generic descendants (from an
+          // earlier partial selection below it) — propagate all the way down, not just
+          // one level, so toggling the Event re-selects/deselects everything beneath it.
+          // Files (.ti-cb-evfile) have no children at all — only a directory row owns a
+          // .tx-generic-node wrapper, so only those are eligible to recurse into.
+          if (f.dataset.isdir === '1') {
+            const nodeEl = f.closest('.tx-generic-node');
+            if (nodeEl) _tiPropagateGenericCheckedDown(nodeEl, checked);
+          }
         });
         cb.indeterminate = false;
         _tiUpdateCollState(treeEl, cb.dataset.ti);
@@ -17684,8 +18046,20 @@ const _transferMonitor = (() => {
         const checked = cb.checked;
         const ti = cb.dataset.ti;
         treeEl.querySelectorAll(`.ti-cb-ev[data-ti="${ti}"]`).forEach(e => { if (!e.disabled) { e.checked = checked; e.indeterminate = false; } });
-        treeEl.querySelectorAll(`.ti-cb-fold[data-ti="${ti}"]`).forEach(f => { if (!f.disabled) { f.checked = checked; f.indeterminate = false; } });
-        treeEl.querySelectorAll(`.ti-cb-cext[data-ti="${ti}"]`).forEach(x => { if (!x.disabled) x.checked = checked; });
+        treeEl.querySelectorAll(`.ti-cb-fold[data-ti="${ti}"], .ti-cb-evfile[data-ti="${ti}"]`).forEach(f => {
+          if (f.disabled) return;
+          f.checked = checked; f.indeterminate = false;
+          if (f.dataset.isdir === '1') {
+            const nodeEl = f.closest('.tx-generic-node');
+            if (nodeEl) _tiPropagateGenericCheckedDown(nodeEl, checked);
+          }
+        });
+        treeEl.querySelectorAll(`.ti-cb-cext[data-ti="${ti}"]`).forEach(x => {
+          if (x.disabled) return;
+          x.checked = checked; x.indeterminate = false;
+          const nodeEl = x.closest('.tx-generic-node');
+          if (nodeEl) _tiPropagateGenericCheckedDown(nodeEl, checked);
+        });
         cb.indeterminate = false;
         _tiInvalidatePreview();
       });
@@ -17694,8 +18068,16 @@ const _transferMonitor = (() => {
       cb.addEventListener('change', _tiInvalidatePreview);
     });
 
-    // Direct Event (root-level): folder → event propagation
-    treeEl.querySelectorAll('.ti-cb-dfold').forEach(cb => {
+    // General-purpose transfer: arbitrary-depth nested selection for generic folders (and,
+    // below the Event level, Collection/direct-Event content too — see _tiRenderEventChildren)
+    // — lazy expand/collapse plus a recursive checked/indeterminate cascade, both ways.
+    // Delegated at the treeEl level (not bound per-checkbox) so nodes injected later by lazy
+    // expansion work immediately, with no re-binding step.
+    _tiBindGenericTreeDelegation(treeEl);
+
+    // Direct Event (root-level): folder/file → event propagation. Same shape as the
+    // Collection-nested case above, one level shallower (no Collection to cascade to).
+    treeEl.querySelectorAll('.ti-cb-dfold, .ti-cb-devfile').forEach(cb => {
       cb.addEventListener('change', () => {
         _tiUpdateDeventState(treeEl, cb.dataset.ti);
         _tiInvalidatePreview();
@@ -17704,9 +18086,11 @@ const _transferMonitor = (() => {
     treeEl.querySelectorAll('.ti-cb-devent').forEach(cb => {
       cb.addEventListener('change', () => {
         const checked = cb.checked;
-        treeEl.querySelectorAll(`.ti-cb-dfold[data-ti="${cb.dataset.ti}"]`).forEach(f => {
+        treeEl.querySelectorAll(`.ti-cb-dfold[data-ti="${cb.dataset.ti}"], .ti-cb-devfile[data-ti="${cb.dataset.ti}"]`).forEach(f => {
           if (f.disabled) return;
           f.checked = checked; f.indeterminate = false;
+          const nodeEl = f.closest('.tx-generic-node');
+          if (nodeEl) _tiPropagateGenericCheckedDown(nodeEl, checked);
         });
         cb.indeterminate = false;
         _tiInvalidatePreview();
@@ -17716,13 +18100,16 @@ const _transferMonitor = (() => {
 
   function _tiUpdateEvState(treeEl, ti, ei) {
     const folds = Array.from(treeEl.querySelectorAll(`.ti-cb-fold[data-ti="${ti}"][data-ei="${ei}"]`));
-    if (folds.length === 0) return;
+    const files = Array.from(treeEl.querySelectorAll(`.ti-cb-evfile[data-ti="${ti}"][data-ei="${ei}"]`));
+    const all = [...folds, ...files];
+    if (all.length === 0) return;
     const evCb = treeEl.querySelector(`.ti-cb-ev[data-ti="${ti}"][data-ei="${ei}"]`);
     if (!evCb || evCb.disabled) return;
-    const checkedCount = folds.filter(f => f.checked).length;
-    if (checkedCount === 0)                 { evCb.checked = false; evCb.indeterminate = false; }
-    else if (checkedCount === folds.length) { evCb.checked = true;  evCb.indeterminate = false; }
-    else                                    { evCb.checked = false; evCb.indeterminate = true;  }
+    const checkedCount = all.filter(c => c.checked && !c.indeterminate).length;
+    const anyIndeterminate = all.some(c => c.indeterminate);
+    if (checkedCount === all.length && !anyIndeterminate) { evCb.checked = true;  evCb.indeterminate = false; }
+    else if (checkedCount === 0 && !anyIndeterminate)      { evCb.checked = false; evCb.indeterminate = false; }
+    else                                                   { evCb.checked = false; evCb.indeterminate = true;  }
   }
 
   function _tiUpdateCollState(treeEl, ti) {
@@ -17740,13 +18127,16 @@ const _transferMonitor = (() => {
 
   function _tiUpdateDeventState(treeEl, ti) {
     const folds = Array.from(treeEl.querySelectorAll(`.ti-cb-dfold[data-ti="${ti}"]`));
-    if (folds.length === 0) return;
+    const files = Array.from(treeEl.querySelectorAll(`.ti-cb-devfile[data-ti="${ti}"]`));
+    const all = [...folds, ...files];
+    if (all.length === 0) return;
     const evCb = treeEl.querySelector(`.ti-cb-devent[data-ti="${ti}"]`);
     if (!evCb || evCb.disabled) return;
-    const checkedCount = folds.filter(f => f.checked).length;
-    if (checkedCount === 0)                 { evCb.checked = false; evCb.indeterminate = false; }
-    else if (checkedCount === folds.length) { evCb.checked = true;  evCb.indeterminate = false; }
-    else                                    { evCb.checked = false; evCb.indeterminate = true;  }
+    const checkedCount = all.filter(c => c.checked && !c.indeterminate).length;
+    const anyIndeterminate = all.some(c => c.indeterminate);
+    if (checkedCount === all.length && !anyIndeterminate) { evCb.checked = true;  evCb.indeterminate = false; }
+    else if (checkedCount === 0 && !anyIndeterminate)      { evCb.checked = false; evCb.indeterminate = false; }
+    else                                                   { evCb.checked = false; evCb.indeterminate = true;  }
   }
 
   function _tiInvalidatePreview() {
@@ -17769,46 +18159,75 @@ const _transferMonitor = (() => {
 
   function _tiBuildScope() {
     const treeEl = _tiEl('tiScopeTree');
-    if (!treeEl) return { folderPaths: [], eventRootPaths: [], externalPaths: [] };
+    if (!treeEl) return { folderPaths: [], eventRootPaths: [], externalPaths: [], filePaths: [], customDestRoot: _tiCustomDestRoot };
 
     const folderPaths    = new Set();
     const eventRootPaths = new Set();
     const externalPaths  = new Set();
+    const filePaths      = new Set();
 
-    treeEl.querySelectorAll('.ti-cb-fold:checked').forEach(cb => {
-      const p = _tiTree[parseInt(cb.dataset.ti, 10)]?.events?.[parseInt(cb.dataset.ei, 10)]?.folders?.[parseInt(cb.dataset.fi, 10)]?.path;
-      if (p) folderPaths.add(p);
+    // Collection/Event folders and individual event-root files are, below the Event level,
+    // exactly as recursively selectable as any generic folder — a fully-checked .ti-cb-fold/
+    // .ti-cb-dfold is emitted once as a whole-subtree folderPaths entry (archive-aware
+    // destination resolution still applies, via resolveOne — see transferImportService.js);
+    // an indeterminate one is walked via the same _tiCollectGenericSelections recursion
+    // generic folders already use, since nothing below the Event level needs reclassifying.
+    // Individual event-root files (.ti-cb-evfile/.ti-cb-devfile) replace the old
+    // "whole-event-root-files-as-one-bundle" approach with real per-file selection — "one
+    // individual photograph" is now literally one filePaths entry, not an all-or-nothing sweep.
+    treeEl.querySelectorAll('.ti-cb-fold').forEach(cb => {
+      const p = cb.dataset.path;
+      if (p) _tiCollectGenericSelections(cb, p, true, folderPaths, filePaths);
     });
-    treeEl.querySelectorAll('.ti-cb-dfold:checked').forEach(cb => {
-      const p = _tiTree[parseInt(cb.dataset.ti, 10)]?.folders?.[parseInt(cb.dataset.fi, 10)]?.path;
-      if (p) folderPaths.add(p);
+    treeEl.querySelectorAll('.ti-cb-dfold').forEach(cb => {
+      const p = cb.dataset.path;
+      if (p) _tiCollectGenericSelections(cb, p, true, folderPaths, filePaths);
     });
-    treeEl.querySelectorAll('.ti-cb-ev').forEach(evCb => {
-      if (!evCb.checked || evCb.indeterminate || evCb.disabled) return;
-      const ev = _tiTree[parseInt(evCb.dataset.ti, 10)]?.events?.[parseInt(evCb.dataset.ei, 10)];
-      if (ev?.hasEventRootFiles) eventRootPaths.add(ev.path);
+    treeEl.querySelectorAll('.ti-cb-evfile').forEach(cb => {
+      const p = cb.dataset.path;
+      if (p) _tiCollectGenericSelections(cb, p, false, folderPaths, filePaths);
     });
-    treeEl.querySelectorAll('.ti-cb-devent').forEach(evCb => {
-      if (!evCb.checked || evCb.indeterminate || evCb.disabled) return;
-      const node = _tiTree[parseInt(evCb.dataset.ti, 10)];
-      if (node?.hasEventRootFiles) eventRootPaths.add(node.path);
+    treeEl.querySelectorAll('.ti-cb-devfile').forEach(cb => {
+      const p = cb.dataset.path;
+      if (p) _tiCollectGenericSelections(cb, p, false, folderPaths, filePaths);
     });
-    treeEl.querySelectorAll('.ti-cb-cext:checked').forEach(cb => {
-      const p = _tiTree[parseInt(cb.dataset.ti, 10)]?.externalFolders?.[parseInt(cb.dataset.xi, 10)]?.path;
-      if (p) externalPaths.add(p);
+    // A non-Event sibling folder (e.g. "02E") is, below its own level, exactly as recursively
+    // selectable as any Event folder — walked the same way via _tiCollectGenericSelections. A
+    // fully-selected one still resolves through the archive-aware 'external' sourceType
+    // (destDir math is identical either way — see resolveOne) via externalPaths; an
+    // indeterminate one is walked into generic folderPaths/filePaths entries for whichever
+    // descendants are actually selected.
+    treeEl.querySelectorAll('.ti-cb-cext').forEach(cb => {
+      const p = cb.dataset.path;
+      if (!p) return;
+      if (cb.checked && !cb.indeterminate) { externalPaths.add(p); return; }
+      if (cb.indeterminate) _tiCollectGenericSelections(cb, p, true, folderPaths, filePaths);
     });
-    // Root-level externals are always disabled/unresolved and can never be :checked; the
-    // selector below is a harmless no-op kept only for symmetry.
-    treeEl.querySelectorAll('.ti-cb-rext:checked').forEach(cb => {
+    // General-purpose transfer: a top-level generic folder/file, selected whole, partially
+    // (nested selection — walked recursively via _tiCollectGenericSelections), or not at all.
+    // A fully-checked folder is emitted once as a single folderPaths entry (its entire subtree
+    // is copied by the existing recursive copy engine — never flattened, never double-counted);
+    // an indeterminate one is never emitted itself, only its selected descendants are, each as
+    // its own entry at whatever depth they were individually selected.
+    treeEl.querySelectorAll('.ti-cb-genfolder').forEach(cb => {
       const p = _tiTree[parseInt(cb.dataset.ti, 10)]?.path;
-      if (p) externalPaths.add(p);
+      if (p) _tiCollectGenericSelections(cb, p, true, folderPaths, filePaths);
+    });
+    treeEl.querySelectorAll('.ti-cb-genfile').forEach(cb => {
+      const p = _tiTree[parseInt(cb.dataset.ti, 10)]?.path;
+      if (p) _tiCollectGenericSelections(cb, p, false, folderPaths, filePaths);
     });
 
-    return { folderPaths: [...folderPaths], eventRootPaths: [...eventRootPaths], externalPaths: [...externalPaths] };
+    return {
+      folderPaths: [...folderPaths], eventRootPaths: [...eventRootPaths],
+      externalPaths: [...externalPaths], filePaths: [...filePaths],
+      customDestRoot: _tiCustomDestRoot,
+    };
   }
 
   function _tiScopeIsEmpty(scope) {
-    return scope.folderPaths.length === 0 && scope.eventRootPaths.length === 0 && scope.externalPaths.length === 0;
+    return scope.folderPaths.length === 0 && scope.eventRootPaths.length === 0 &&
+      scope.externalPaths.length === 0 && (scope.filePaths?.length || 0) === 0;
   }
 
   // ── Preview ───────────────────────────────────────────────────────────────
@@ -17834,6 +18253,7 @@ const _transferMonitor = (() => {
       _tiEl('tiPvCollections').textContent = '…';
       _tiEl('tiPvEvents').textContent      = '…';
       _tiEl('tiPvExternal').textContent    = '…';
+      _tiEl('tiPvGeneric').textContent     = '…';
       _tiEl('tiPvFiles').textContent       = '…';
       _tiEl('tiPvUnresolvedNote')?.setAttribute('hidden', '');
     }
@@ -17850,10 +18270,10 @@ const _transferMonitor = (() => {
     if (!result.ok) {
       const msgs = {
         'transfer-root-not-set':       'Transfer Drive is not set.',
-        'main-archive-not-set':        'Main Archive Root is not set.',
+        'destination-not-set':         'No destination is set. Choose one or set an Active/Main Archive Root.',
         'empty-scope':                 'Select at least one folder.',
         'scope-outside-transfer-root': 'Selected path is outside the Transfer Drive.',
-        'roots-overlap':               'Transfer Drive must not overlap with Main Archive Root.',
+        'roots-overlap':               'Transfer Drive must not overlap with the destination.',
       };
       showMessage(msgs[result.reason] || ('Preview error: ' + result.reason), 6000);
       if (previewBox) previewBox.setAttribute('hidden', '');
@@ -17863,6 +18283,7 @@ const _transferMonitor = (() => {
     _tiEl('tiPvCollections').textContent = result.collections;
     _tiEl('tiPvEvents').textContent      = result.events;
     _tiEl('tiPvExternal').textContent    = result.externalFolders;
+    _tiEl('tiPvGeneric').textContent     = result.genericItems ?? 0;
     _tiEl('tiPvFiles').textContent       = result.files.toLocaleString();
 
     const noteEl = _tiEl('tiPvUnresolvedNote');
@@ -17878,6 +18299,10 @@ const _transferMonitor = (() => {
     }
 
     _tiLastScope = scope;
+    // A full phase transition, not just toggling .disabled — Import may still be .hidden
+    // from a just-completed previous run's 'done' phase; only _tiSetButtonPhase('idle')
+    // clears that (see consecutive-import fix).
+    _tiSetButtonPhase('idle');
     if (importBtn) importBtn.disabled = (result.files === 0);
   }
 
@@ -17901,7 +18326,7 @@ const _transferMonitor = (() => {
     if (reviewEl) {
       reviewEl.removeAttribute('hidden');
       reviewEl.innerHTML = '<div class="tx-scan-loading">'
-        + '<div class="tx-scan-loading-title">Checking Main Archive Root…</div>'
+        + '<div class="tx-scan-loading-title">Checking destination…</div>'
         + '<div class="tx-scan-loading-sub">Comparing selected folders against the archive. Nothing is being copied yet.</div>'
         + '</div>';
     }
@@ -17920,8 +18345,8 @@ const _transferMonitor = (() => {
       if (noteEl) noteEl.textContent = 'Scan failed';
       const msgs = {
         'transfer-root-not-set':       'Transfer Drive is not set.',
-        'main-archive-not-set':        'Main Archive Root is not set.',
-        'roots-overlap':               'Transfer Drive must not overlap with Main Archive Root.',
+        'destination-not-set':         'No destination is set. Choose one or set an Active/Main Archive Root.',
+        'roots-overlap':               'Transfer Drive must not overlap with the destination.',
         'empty-scope':                 'Select at least one folder to scan.',
         'scope-outside-transfer-root': 'Selected path is outside the Transfer Drive.',
       };
@@ -17980,6 +18405,31 @@ const _transferMonitor = (() => {
 
   // ── Import ────────────────────────────────────────────────────────────────
 
+  // Builds an accurate, reason-specific message for a destination-reachability failure —
+  // never the old generic "destination may be unwritable" guess. 'permission-denied' in
+  // particular maps to a real, observed cause on macOS: the OS denying file access to an
+  // external volume because this app was never granted Privacy & Security → Files and
+  // Folders access for it, which looks identical to "the drive is fine" under shallow
+  // checks (diskutil/mount/df all report it mounted and writable) while every real file
+  // operation against it fails.
+  function _tiDestinationUnreachableText(detail, code) {
+    const codeSuffix = code ? ` (${code})` : '';
+    switch (detail) {
+      case 'permission-denied':
+        return `Destination access was denied by the operating system${codeSuffix}. On macOS, check System Settings → Privacy & Security → Files and Folders and confirm this app has access to the destination drive.`;
+      case 'destination-missing':
+        return `The destination could not be found${codeSuffix}. Confirm the drive is connected and mounted.`;
+      case 'destination-not-a-directory':
+        return `The destination path exists but is not a folder${codeSuffix}.`;
+      case 'read-only-filesystem':
+        return `The destination filesystem is mounted read-only${codeSuffix}.`;
+      case 'disk-full':
+        return `The destination has no free space left${codeSuffix}.`;
+      default:
+        return `The destination could not be written to${codeSuffix}.`;
+    }
+  }
+
   async function _tiStartImport() {
     const builtScope = _tiBuildScope();
     if (_tiScopeIsEmpty(builtScope)) {
@@ -18035,12 +18485,18 @@ const _transferMonitor = (() => {
         if (importBtn)  { importBtn.disabled = true; importBtn.textContent = 'Import'; }
         return;
       }
+      if (result.reason === 'destination-unreachable') {
+        showMessage(_tiDestinationUnreachableText(result.detail, result.code), 10000);
+        if (importBtn)  importBtn.disabled  = false;
+        if (previewBtn) previewBtn.disabled = false;
+        return;
+      }
       const msgs = {
         'busy':                        'An import is already running.',
         'transfer-root-not-set':       'Transfer Drive is not set.',
-        'main-archive-not-set':        'Main Archive Root is not set.',
+        'destination-not-set':         'No destination is set. Choose one or set an Active/Main Archive Root.',
         'empty-scope':                 'Select at least one folder.',
-        'roots-overlap':               'Transfer Drive must not overlap with Main Archive Root.',
+        'roots-overlap':               'Transfer Drive must not overlap with the destination.',
         'scope-outside-transfer-root': 'A selected item is outside the Transfer Drive.',
         'missing-fingerprint':         'Run Scan for New Data again before importing.',
       };
@@ -18072,13 +18528,17 @@ const _transferMonitor = (() => {
     } catch {}
 
     let result;
-    try { result = await window.api.resumeTransferImportFromCheckpoint(operatorName); } catch (e) {
+    try { result = await window.api.resumeTransferImportFromCheckpoint(operatorName, _tiCustomDestRoot); } catch (e) {
       showMessage('Resume failed: ' + e.message, 6000);
       return;
     }
 
     if (!result || !result.ok) {
-      showMessage('Could not resume: ' + (result?.reason || 'unknown'), 6000);
+      if (result?.reason === 'destination-unreachable') {
+        showMessage(_tiDestinationUnreachableText(result.detail, result.code), 10000);
+      } else {
+        showMessage('Could not resume: ' + (result?.reason || 'unknown'), 6000);
+      }
       return;
     }
 
@@ -18091,7 +18551,7 @@ const _transferMonitor = (() => {
 
   async function _tiStartFresh() {
     _tiEl('tiResumeOffer')?.setAttribute('hidden', '');
-    await window.api.clearTransferImportCheckpoint().catch(() => {});
+    await window.api.clearTransferImportCheckpoint(_tiCustomDestRoot).catch(() => {});
     _tiSetButtonPhase('idle');
   }
 
@@ -18162,6 +18622,11 @@ const _transferMonitor = (() => {
       if (!status.running && !status.paused) {
         _tiStopPoll();
         _tiRunning = false;
+        // A completed run (success, partial, or failed) may have changed what exists at the
+        // destination — most notably, a Collection the scope tree showed as "New Collection"
+        // now exists. Re-evaluate from the actual destination filesystem rather than trusting
+        // the copy result alone (see "Transfer Import Collection Status Correction" §7/§10.9).
+        await _tiReloadForDestination();
       }
     }, 800);
   }
@@ -18175,23 +18640,64 @@ const _transferMonitor = (() => {
     if (!box) return;
     box.removeAttribute('hidden');
 
-    // Box class
+    // Box class — result.ok means "the run completed without crashing", not "it succeeded";
+    // the actual outcome is result.status, so a 'failed' result must never get the same
+    // success-styled class as 'ok'/'partial'.
     box.className = 'tx-status-box';
-    if (status.paused)          box.classList.add('tx-paused');
-    else if (status.running)    box.classList.add('tx-running');
+    if (status.paused) box.classList.add('tx-paused');
+    else if (status.running) box.classList.add('tx-running');
+    else if (status.result?.ok && status.result.status === 'failed') box.classList.add('tx-error');
     else if (status.result?.ok) box.classList.add('tx-done');
-    else if (status.result)     box.classList.add('tx-error');
-    else                        box.classList.add('tx-idle');
+    else if (status.result) box.classList.add('tx-error');
+    else box.classList.add('tx-idle');
 
-    // Headline
+    // Headline — three distinct completion states, never a generic "complete" when nothing
+    // was actually copied. 'failed' (zero files landed) is deliberately worded differently
+    // from 'partial' (some succeeded) — a silent "complete" would misrepresent a transfer
+    // that moved nothing at all.
     const headlineEl = _tiEl('tiStatusHeadline');
     if (headlineEl) {
       let headline = '';
       if (status.paused) headline = 'Import paused';
       else if (status.running) headline = 'Import in progress…';
+      else if (status.result?.ok && status.result.status === 'failed') headline = 'Import failed — no files copied';
       else if (status.result?.ok) headline = status.result.status === 'partial' ? 'Import complete — with errors' : 'Import complete';
       else if (status.result) headline = 'Import failed';
       headlineEl.textContent = headline;
+    }
+
+    // Error-cap warning — the error cap stops ATTEMPTS, not just how many are shown; once hit,
+    // every remaining file in the selection is left completely unattempted (never copied,
+    // never skipped, never recorded as a failure). Surfaced explicitly so "errors: 200" is
+    // never mistaken for "only 200 files were a problem" when the real number may be much
+    // higher, and so a uniform failure (e.g. an unwritable destination) is never read as a
+    // routine partial completion.
+    const errorCapEl = _tiEl('tiErrorCapWarning');
+    if (errorCapEl) {
+      const r = status.result;
+      const neverAttempted = r?.neverAttempted || 0;
+      // Shown either when the error cap was hit, or (even under the cap) when every
+      // recorded error shared one OS error code on a run that landed nothing — a small
+      // failed batch deserves the same real diagnosis as a capped one, not silence.
+      const showUniform = !status.running && r?.status === 'failed' && r?.uniformErrorReason;
+      if (!status.running && r?.errorsCapped) {
+        // When every error shared one OS error code, say exactly what that cause was
+        // (see _tiDestinationUnreachableText) instead of guessing "may be unwritable" —
+        // a mixed set of codes falls back to the old general wording since that really is
+        // ambiguous.
+        const causeText = r.uniformErrorReason
+          ? _tiDestinationUnreachableText(r.uniformErrorReason, r.uniformErrorCode)
+          : 'This usually means the destination could not be written to (check it is connected, mounted, and not read-only) rather than 200 unrelated file problems.';
+        errorCapEl.textContent = neverAttempted > 0
+          ? `Stopped after 200 errors — ${neverAttempted.toLocaleString()} more file${neverAttempted === 1 ? '' : 's'} were never attempted. ${causeText}`
+          : `Stopped after 200 errors. ${causeText}`;
+        errorCapEl.removeAttribute('hidden');
+      } else if (showUniform) {
+        errorCapEl.textContent = _tiDestinationUnreachableText(r.uniformErrorReason, r.uniformErrorCode);
+        errorCapEl.removeAttribute('hidden');
+      } else {
+        errorCapEl.setAttribute('hidden', '');
+      }
     }
 
     // Checkpoint-health warning — inline, non-modal, persists silently while unhealthy
@@ -18335,6 +18841,9 @@ const _transferMonitor = (() => {
     } else if (status.running) {
       if (noteEl) noteEl.textContent = 'Import in progress…';
       _tiSetButtonPhase('running');
+    } else if (status.result?.ok && status.result.status === 'failed') {
+      if (noteEl) noteEl.textContent = 'Import failed — no files copied.';
+      _tiSetButtonPhase('failed');
     } else if (status.result?.ok) {
       const isPartial = status.result.status === 'partial';
       if (noteEl) noteEl.textContent = isPartial ? 'Completed with errors.' : 'Import complete.';
@@ -18387,16 +18896,22 @@ const _transferMonitor = (() => {
   // Register the reopen hook so the persistent pill can restore this modal.
   _transferMonitor.setReopenImport(_tiOpen);
 
+  const TI_SELECT_ALL_SELECTOR =
+    '#tiScopeTree .ti-cb-coll:not(:disabled), #tiScopeTree .ti-cb-devent:not(:disabled), ' +
+    '#tiScopeTree .ti-cb-genfolder:not(:disabled), #tiScopeTree .ti-cb-genfile:not(:disabled)';
   _tiEl('tiSelectAllBtn')?.addEventListener('click', () => {
-    document.querySelectorAll('#tiScopeTree .ti-cb-coll:not(:disabled), #tiScopeTree .ti-cb-devent:not(:disabled)').forEach(cb => {
+    document.querySelectorAll(TI_SELECT_ALL_SELECTOR).forEach(cb => {
       cb.checked = true;
-      cb.dispatchEvent(new Event('change'));
+      // bubbles:true — the generic-folder nested-selection cascade is delegated at the
+      // treeEl level (arbitrary tree depth, nodes added lazily), so it only ever sees
+      // events that actually bubble to it; a plain new Event('change') does not.
+      cb.dispatchEvent(new Event('change', { bubbles: true }));
     });
   });
   _tiEl('tiSelectNoneBtn')?.addEventListener('click', () => {
-    document.querySelectorAll('#tiScopeTree .ti-cb-coll:not(:disabled), #tiScopeTree .ti-cb-devent:not(:disabled)').forEach(cb => {
+    document.querySelectorAll(TI_SELECT_ALL_SELECTOR).forEach(cb => {
       cb.checked = false;
-      cb.dispatchEvent(new Event('change'));
+      cb.dispatchEvent(new Event('change', { bubbles: true }));
     });
   });
 
@@ -18408,6 +18923,20 @@ const _transferMonitor = (() => {
   _tiEl('tiVerifyBtn')?.addEventListener('click',         _tiVerify);
   _tiEl('tiResumeBtn')?.addEventListener('click',         _tiResumeFromCheckpoint);
   _tiEl('tiStartFreshBtn')?.addEventListener('click',     _tiStartFresh);
+
+  // Change Destination — an explicit, session-local override (never a settings write; see
+  // plan Scenario D). Reuses the exact native folder-picker dialog Transfer Export's own
+  // custom-destination picker uses (archive:chooseCustomDestFolder, bound here as
+  // chooseCustomImportDestFolder). Cancellation (null) leaves the previous selection
+  // unchanged, per requirement 10.
+  _tiEl('tiChangeDestBtn')?.addEventListener('click', async () => {
+    if (_tiRunning) { showMessage('Cannot change the destination while an import is running.', 4000); return; }
+    const p = normalizePickedPath(await window.api.chooseCustomImportDestFolder().catch(() => null));
+    if (!p) return;
+    _tiCustomDestRoot = p;
+    _tiInvalidatePreview();
+    await _tiReloadForDestination();
+  });
 
 })();
 

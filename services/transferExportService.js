@@ -179,9 +179,18 @@ async function _walkAndCopy(srcDir, destDir, stats, opts = {}) {
     if (entry.isDirectory()) {
       if (_skipDir(entry.name)) continue;
       if (opts.rootFilesOnly) continue;
+      const destSubDir = path.join(destDir, entry.name);
+      // Create the destination directory unconditionally, before recursing — not only as a
+      // side effect of copying a file into it. Previously, a directory with no files
+      // anywhere inside it (at any depth) was silently never created at the destination,
+      // since directory creation only ever happened inside _copyFileSafe's own
+      // mkdir(dirname(finalDest)). An empty directory is real source structure; dropping it
+      // was never a deliberate decision, just an unhandled case. Shared with Import's
+      // identical fix in transferImportService.js.
+      try { await fsp.mkdir(destSubDir, { recursive: true }); } catch {}
       await _walkAndCopy(
         path.join(srcDir, entry.name),
-        path.join(destDir, entry.name),
+        destSubDir,
         stats,
         opts
       );

@@ -47,6 +47,13 @@ const MAX_ERRORS             = 200;
 
 const _SKIP_SRC_DIRS = new Set(['.autoingest', '.autoingest-transfer', '__MACOSX']);
 
+// Operating-system junk directories a Transfer Drive may legitimately carry (Windows
+// recycle bin / volume-indexing metadata, seen on any external drive previously used
+// outside AutoIngest). Excluded the same way as _SKIP_SRC_DIRS — never read, never
+// classified as a candidate, never deleted or touched. Matched case-insensitively:
+// Windows filesystems are case-insensitive, so the exact casing on disk can vary.
+const _OS_JUNK_DIRS_LOWER = new Set(['$recycle.bin', 'system volume information']);
+
 // ── Module-scope state ────────────────────────────────────────────────────────
 
 let _state = {
@@ -63,6 +70,7 @@ let _state = {
   changedSkipped: 0,
   copiedBytes:    0,
   errors:         [],
+  neverAttempted: 0,
   total:          0,
   result:         null,
   verifyStatus:   null,
@@ -101,8 +109,66 @@ function _isInsideDir(parent, child) {
   return child.startsWith(base);
 }
 
+// Maps a raw OS error code to the semantic reason an operator-facing message should use.
+// Exists because "destination may be unwritable" was previously a guess applied uniformly
+// to every copy failure — EPERM/EACCES (permission denied, e.g. a macOS Privacy & Security
+// access grant never given to this app for an external volume), ENOENT (the path genuinely
+// doesn't exist, e.g. the drive isn't connected), EROFS (truly read-only filesystem), and
+// ENOSPC (disk full) are different problems with different fixes, and conflating them
+// under one vague message is exactly what sent the original zero-copy report in the wrong
+// direction (the destination tested "writable" by shallow checks while being rejected by
+// the OS on every real file operation).
+function _classifyFsErrorCode(code) {
+  switch (code) {
+    case 'EPERM':
+    case 'EACCES':  return 'permission-denied';
+    case 'ENOENT':  return 'destination-missing';
+    case 'ENOTDIR': return 'destination-not-a-directory';
+    case 'EROFS':   return 'read-only-filesystem';
+    case 'ENOSPC':  return 'disk-full';
+    default:        return code ? 'other' : 'unknown';
+  }
+}
+
+// A real reachability+write probe against the destination, scoped to the app's own
+// .autoingest/transfer-imports/ directory (the same directory checkpoints and the audit
+// log already live in — never a file dropped into the operator's actual archive content).
+// This is a preflight, not a guarantee: a drive can still disconnect mid-run after this
+// passes. Its job is only to fail fast, with the real OS error attached, instead of
+// burning through MAX_ERRORS identical per-file failures before anything is reported.
+async function _checkDestinationReachable(mainArchiveRoot) {
+  // Stat the root itself first, without creating anything. mkdir({recursive:true}) would
+  // otherwise silently CREATE a genuinely-missing mount point as an ordinary directory
+  // whenever its own parent happens to be writable — masking "the drive isn't actually
+  // there" as success. A disconnected external volume's mount point does not exist in the
+  // filesystem namespace at all; stat must see that directly, not have mkdir paper over it.
+  try {
+    const rootStat = await fsp.stat(mainArchiveRoot);
+    if (!rootStat.isDirectory()) {
+      return { ok: false, code: 'ENOTDIR', message: `${mainArchiveRoot} exists but is not a directory`, reason: 'destination-not-a-directory' };
+    }
+  } catch (e) {
+    return { ok: false, code: e.code || null, message: e.message, reason: _classifyFsErrorCode(e.code) };
+  }
+
+  const internalDir = path.join(mainArchiveRoot, '.autoingest', 'transfer-imports');
+  try {
+    await fsp.mkdir(internalDir, { recursive: true });
+  } catch (e) {
+    return { ok: false, code: e.code || null, message: e.message, reason: _classifyFsErrorCode(e.code) };
+  }
+  const probePath = path.join(internalDir, `.reachability-probe-${process.pid}-${Date.now()}`);
+  try {
+    await fsp.writeFile(probePath, '');
+    await fsp.unlink(probePath);
+  } catch (e) {
+    return { ok: false, code: e.code || null, message: e.message, reason: _classifyFsErrorCode(e.code) };
+  }
+  return { ok: true };
+}
+
 function _skipDir(name) {
-  return _SKIP_SRC_DIRS.has(name) || name.startsWith('.');
+  return _SKIP_SRC_DIRS.has(name) || name.startsWith('.') || _OS_JUNK_DIRS_LOWER.has(name.toLowerCase());
 }
 
 function _skipFile(name) {
@@ -226,15 +292,31 @@ async function _walkAndCopy(srcDir, destDir, stats, opts = {}) {
     if (entry.isDirectory()) {
       if (_skipDir(entry.name)) continue;
       if (opts.rootFilesOnly) continue;
+      const destSubDir = path.join(destDir, entry.name);
+      // Create the destination directory unconditionally, before recursing — not only as a
+      // side effect of copying a file into it. Previously, a directory with no files
+      // anywhere inside it (at any depth) was silently never created at the destination,
+      // since directory creation only ever happened inside _copyFileSafe's own
+      // mkdir(dirname(finalDest)). An empty directory is real source structure; dropping it
+      // was never a deliberate decision, just an unhandled case.
+      try { await fsp.mkdir(destSubDir, { recursive: true }); } catch {}
       await _walkAndCopy(
         path.join(srcDir, entry.name),
-        path.join(destDir, entry.name),
+        destSubDir,
         stats,
         opts
       );
     } else if (entry.isFile()) {
       if (_skipFile(entry.name)) continue;
-      if (stats.errors.length >= MAX_ERRORS) continue;
+      if (stats.errors.length >= MAX_ERRORS) {
+        // The error cap stops ATTEMPTS, not just display — every file reaching this branch
+        // is never copied, never skipped, never recorded as a failure. Counted separately
+        // (stats.neverAttempted) so the final result can say so explicitly instead of letting
+        // copied+skipped+renamed+errors silently fall short of the file count the operator
+        // was shown in Preview/Scan.
+        stats.neverAttempted = (stats.neverAttempted || 0) + 1;
+        continue;
+      }
 
       await _waitIfPaused();
 
@@ -245,7 +327,7 @@ async function _walkAndCopy(srcDir, destDir, stats, opts = {}) {
       try {
         await _copyFileSafe(srcPath, destPath, stats, opts);
       } catch (e) {
-        stats.errors.push({ file: srcPath, error: e.message });
+        stats.errors.push({ file: srcPath, error: e.message, code: e.code || null });
       }
 
       _state.copied         = stats.copied;
@@ -254,6 +336,7 @@ async function _walkAndCopy(srcDir, destDir, stats, opts = {}) {
       _state.changedSkipped = stats.changedSkipped || 0;
       _state.errors         = [...stats.errors];
       _state.copiedBytes    = stats.copiedBytes || 0;
+      _state.neverAttempted = stats.neverAttempted || 0;
     }
   }
 }
@@ -404,15 +487,20 @@ async function _buildEventNode(name, evPath) {
   let subEntries;
   try { subEntries = await fsp.readdir(evPath, { withFileTypes: true }); } catch { subEntries = []; }
   const folders = [];
-  let hasRootFiles = false;
+  const files = [];
   for (const sub of subEntries) {
     if (sub.isDirectory() && !_skipDir(sub.name)) {
       folders.push({ name: sub.name, path: path.join(evPath, sub.name) });
     } else if (sub.isFile() && !_skipFile(sub.name)) {
-      hasRootFiles = true;
+      // Individually selectable, in addition to the existing hasEventRootFiles-driven
+      // "whole event, including all root files" bundle — see the Import Scope tree's
+      // recursive-selection comment for why both representations coexist.
+      files.push({ name: sub.name, path: path.join(evPath, sub.name), isDir: false });
     }
   }
-  return { name, path: evPath, folders, hasEventRootFiles: hasRootFiles };
+  folders.sort((a, b) => a.name.localeCompare(b.name));
+  files.sort((a, b) => a.name.localeCompare(b.name));
+  return { name, path: evPath, folders, files, hasEventRootFiles: files.length > 0 };
 }
 
 // ── Destination resolution ────────────────────────────────────────────────────
@@ -544,6 +632,20 @@ async function _resolveEventDestination(transferRoot, mainArchiveRoot, eventName
   return { destinationStatus: 'unresolved', collectionKey: null, destDir: null, destinationReason: 'no-existing-collection-found' };
 }
 
+// A Collection-shaped folder's own name is its deterministic destination Collection name (see
+// the big comment above the 'collection' tree-node push below) — but "does a directory with
+// that name already exist at the destination" must distinguish a clean, genuine absence from
+// a failed lookup (a permission error, a transient I/O fault, a disconnected mount). Only
+// 'absent' is evidence a Collection is new; 'unknown' must never be silently treated as
+// absence (see "Transfer Import Collection Status Correction" §4/§9 — a failed lookup is not
+// proof of absence, and an unresolved state must stay distinct from a confirmed new Collection).
+async function _checkDestinationCollectionState(mainArchiveRoot, name) {
+  let st;
+  try { st = await fsp.stat(path.join(mainArchiveRoot, name)); }
+  catch (e) { return (e && (e.code === 'ENOENT' || e.code === 'ENOTDIR')) ? 'absent' : 'unknown'; }
+  return st.isDirectory() ? 'exists' : 'occupied'; // a file, not a folder, already sits at that name
+}
+
 // ── Structure-aware tree scan (for the UI scope picker) ───────────────────────
 
 async function scanImportTree(transferRoot, mainArchiveRoot, isValidEventJsonFn) {
@@ -559,6 +661,17 @@ async function scanImportTree(transferRoot, mainArchiveRoot, isValidEventJsonFn)
   const tree = [];
 
   for (const topEntry of topEntries) {
+    if (topEntry.isFile()) {
+      // General-purpose transfer: an ordinary file sitting directly at the Transfer Drive
+      // root is just as legitimate a transfer unit as a folder — AutoIngest Collection
+      // structure is for photographic archive content, not a gate on what can be moved.
+      if (_skipFile(topEntry.name)) continue;
+      tree.push({
+        type: 'generic-file', name: topEntry.name, path: path.join(transferRoot, topEntry.name),
+        destinationStatus: 'resolved', destinationReason: null, collectionKey: null,
+      });
+      continue;
+    }
     if (!topEntry.isDirectory() || _skipDir(topEntry.name)) continue;
     const topPath = path.join(transferRoot, topEntry.name);
 
@@ -590,35 +703,99 @@ async function scanImportTree(transferRoot, mainArchiveRoot, isValidEventJsonFn)
     }
 
     if (events.length === 0) {
+      // General-purpose transfer: no AutoIngest Event anywhere inside this folder (a legacy
+      // year folder, a VHS lot, a recovered-files dump — anything that isn't photographic
+      // archive content) is NOT an invalid transfer source. It is an ordinary folder, copied
+      // recursively, preserving its name and internal structure under the Main Archive Root —
+      // the exact same deterministic name-based destination the Collection branch below already
+      // uses, just without requiring Event-shaped children. Never reinterpreted as a Collection
+      // or Event, never given an event.json, never fed into archive-identity resolution.
       tree.push({
-        type: 'external',
+        type: 'generic-folder',
         name: topEntry.name,
         path: topPath,
-        destinationStatus: 'unresolved',
-        destinationReason: 'external-root-no-approved-destination',
+        destinationStatus: 'resolved',
+        destinationReason: null,
         collectionKey: null,
       });
       continue;
     }
 
-    let collectionExists = false;
-    try { collectionExists = (await fsp.stat(path.join(mainArchiveRoot, topEntry.name))).isDirectory(); } catch {}
-    const collDestStatus = collectionExists ? 'resolved' : 'unresolved';
-    const collDestReason = collectionExists ? null : 'collection-not-found-in-archive';
+    // A Collection-shaped top-level folder (has real Event children, proven by event.json
+    // presence — never guessed) names its own destination Collection unambiguously: the
+    // operator's own folder name IS the destination, the same deterministic name-based
+    // mapping _resolveLegacyCollectionUnits and Transfer Export already use. This is not the
+    // "trust mere reachability" problem DEC-012 forbids — DEC-012 is about not guessing WHICH
+    // of several candidates an ambiguous item resolves to (see _resolveEventDestination for
+    // that real ambiguity, still fully unresolved/blocked when no identity match exists).
+    // Here there is exactly one candidate because the name itself is the evidence. A Collection
+    // that doesn't exist yet at the destination is therefore a normal, selectable, resolved
+    // outcome — not a validation failure — with destinationReason carrying 'new-collection'
+    // purely as informational UI context (so the operator sees it will be created, same
+    // confirm-before-import gate every other resolved item already goes through). Nothing is
+    // created here; the destination folder is created on demand, idempotently, at actual copy
+    // time (see the fsp.mkdir(..., {recursive:true}) calls in the copy/batch functions below).
+    const collState       = await _checkDestinationCollectionState(mainArchiveRoot, topEntry.name);
+    const collectionExists = collState === 'exists';
+    const collUncertain     = collState === 'unknown' || collState === 'occupied';
+    const collDestStatus = collUncertain ? 'unresolved' : 'resolved';
+    const collDestReason = collUncertain
+      ? (collState === 'occupied' ? 'destination-name-conflict' : 'destination-lookup-failed')
+      : (collectionExists ? null : 'new-collection');
 
     const eventNodes = [];
     for (const ev of events) {
       const node = await _buildEventNode(ev.name, ev.path);
-      eventNodes.push({ ...node, destinationStatus: collDestStatus, destinationReason: collDestReason, collectionKey: collectionExists ? topEntry.name : null });
+      eventNodes.push({ ...node, destinationStatus: collDestStatus, destinationReason: collDestReason, collectionKey: topEntry.name });
     }
     const externalNodes = externalFolders.map(f => ({
-      ...f, destinationStatus: collDestStatus, destinationReason: collDestReason, collectionKey: collectionExists ? topEntry.name : null,
+      ...f, destinationStatus: collDestStatus, destinationReason: collDestReason, collectionKey: topEntry.name,
     }));
 
-    tree.push({ type: 'collection', name: topEntry.name, path: topPath, events: eventNodes, externalFolders: externalNodes });
+    tree.push({
+      type: 'collection', name: topEntry.name, path: topPath, events: eventNodes, externalFolders: externalNodes,
+      // Never claimed true under uncertainty — only a clean, confirmed absence is "new".
+      isNewCollection: !collUncertain && !collectionExists,
+    });
   }
 
   return { ok: true, tree };
+}
+
+// Lazy, one-level child listing for a generic (non-archive-shaped) folder's nested-selection
+// tree. Intentionally shallow — the Import Scope tree fetches one level at a time, on first
+// expansion of each node, so a Transfer Drive with thousands of nested files never gets
+// eagerly walked or rendered in full. `dirPath` must be a real descendant of transferRoot
+// (never transferRoot itself — the top level is already enumerated by scanImportTree) to
+// prevent a crafted path from escaping the Transfer Drive. A child is never reclassified as
+// an AutoIngest Collection/Event here — nesting inside an already-generic folder stays
+// generic at every depth, exactly as scanImportTree's own generic-folder branch intends.
+async function listGenericFolderChildren(transferRoot, dirPath) {
+  if (!transferRoot || !dirPath) return { ok: false, reason: 'missing-params' };
+  if (dirPath === transferRoot || !_isInsideDir(transferRoot, dirPath)) {
+    return { ok: false, reason: 'path-outside-transfer-root' };
+  }
+  let entries;
+  try { entries = await fsp.readdir(dirPath, { withFileTypes: true }); } catch {
+    return { ok: false, reason: 'unreadable' };
+  }
+  const folders = [];
+  const files = [];
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      if (_skipDir(entry.name)) continue;
+      folders.push({ name: entry.name, path: path.join(dirPath, entry.name), isDir: true });
+    } else if (entry.isFile()) {
+      if (_skipFile(entry.name)) continue;
+      files.push({ name: entry.name, path: path.join(dirPath, entry.name), isDir: false });
+    }
+    // Symlinks (and any other non-regular dirent type) are neither isDirectory() nor isFile()
+    // for a readdir() Dirent — silently excluded here, the same safe-by-omission posture
+    // _walkAndCopy/_countFiles already rely on for the actual copy.
+  }
+  folders.sort((a, b) => a.name.localeCompare(b.name));
+  files.sort((a, b) => a.name.localeCompare(b.name));
+  return { ok: true, children: [...folders, ...files] };
 }
 
 // ── Shared unit resolver (Preview / Scan / Import / Verify all use this) ─────
@@ -665,10 +842,11 @@ async function _resolveLegacyCollectionUnits(transferRoot, mainArchiveRoot, coll
 
 async function _resolveImportUnits(transferRoot, mainArchiveRoot, scope, isValidEventJsonFn) {
   const {
-    folderPaths = [], eventRootPaths = [], externalPaths = [], collectionPaths = [],
+    folderPaths = [], eventRootPaths = [], externalPaths = [], collectionPaths = [], filePaths = [],
   } = scope || {};
 
-  if (folderPaths.length === 0 && eventRootPaths.length === 0 && externalPaths.length === 0 && collectionPaths.length > 0) {
+  if (folderPaths.length === 0 && eventRootPaths.length === 0 && externalPaths.length === 0 &&
+      filePaths.length === 0 && collectionPaths.length > 0) {
     return _resolveLegacyCollectionUnits(transferRoot, mainArchiveRoot, collectionPaths);
   }
 
@@ -695,7 +873,14 @@ async function _resolveImportUnits(transferRoot, mainArchiveRoot, scope, isValid
     return info;
   }
 
-  async function resolveOne(absPath, rootFilesOnly, isExternal) {
+  // `isFile` is handled uniformly across every branch below, rather than as a separate
+  // resolver, precisely because a file nested inside a direct Event or a Collection-shaped
+  // folder must go through the SAME archive-aware/name-based destination math as its
+  // enclosing folder — a file's destination is never computed independently of the rules
+  // that already govern where its parent lands. Below the Event level (or anywhere under a
+  // folder with no Event at all), that math is already correct for arbitrary depth, since
+  // `rel`/`restRel` naturally carry the full relative path including the filename.
+  async function resolveOne(absPath, rootFilesOnly, isExternal, isFile = false) {
     const rel     = path.relative(transferRoot, absPath);
     const parts   = rel.split(path.sep);
     const topName = parts[0];
@@ -711,7 +896,7 @@ async function _resolveImportUnits(transferRoot, mainArchiveRoot, scope, isValid
       resolvedUnits.push({
         srcDir:             absPath,
         destDir:            restRel ? path.join(dest.destDir, restRel) : dest.destDir,
-        rootFilesOnly,
+        rootFilesOnly, isFile,
         sourceType:         'direct-event',
         collectionKey:      dest.collectionKey,
         eventKey:           topName,
@@ -722,34 +907,73 @@ async function _resolveImportUnits(transferRoot, mainArchiveRoot, scope, isValid
     }
 
     if (!info.hasEventChildren) {
-      // Root-level external — never lands directly under the Main Archive Root, regardless
-      // of any coincidentally-named Collection.
-      unresolvedUnits.push({ path: absPath, name: path.basename(absPath), reason: 'external-root-no-approved-destination' });
+      if (isExternal) {
+        // A non-Event sibling folder inside a Collection-shaped parent — kept as 'external'
+        // (an existing, archive-aware concept: it rides along with its Collection's destination,
+        // not a standalone general-purpose transfer unit).
+        resolvedUnits.push({
+          srcDir: absPath, destDir: path.join(mainArchiveRoot, rel), rootFilesOnly, isFile,
+          sourceType: 'external', collectionKey: topName, eventKey: parts[0],
+          destinationStatus: 'resolved', destinationReason: null,
+        });
+        return;
+      }
+      // General-purpose transfer: no Event anywhere under this top-level folder — it is not
+      // AutoIngest archive content at all (a legacy year folder, a VHS lot, a recovered-files
+      // dump), so it is never reinterpreted as a Collection or Event, never given an event.json,
+      // never fed into archive-identity resolution. It is an ordinary folder/file, copied to
+      // the same deterministic, name-preserving destination (mainArchiveRoot/<relative path>)
+      // every other unit here already uses — not a guess, since the name and position IS the
+      // destination. Handled as its own unit — never swept into a sibling's rootFilesOnly walk —
+      // so selecting one file never pulls in unselected siblings.
+      resolvedUnits.push({
+        srcDir:             absPath,
+        destDir:            path.join(mainArchiveRoot, rel),
+        rootFilesOnly, isFile,
+        sourceType:         isFile ? 'generic-file' : 'generic-folder',
+        collectionKey:      null,
+        eventKey:           null,
+        destinationStatus:  'resolved',
+        destinationReason:  null,
+      });
       return;
     }
 
-    let collectionExists = false;
-    try { collectionExists = (await fsp.stat(path.join(mainArchiveRoot, topName))).isDirectory(); } catch {}
-    if (!collectionExists) {
-      unresolvedUnits.push({ path: absPath, name: path.basename(absPath), reason: 'collection-not-found-in-archive' });
+    // See scanImportTree's identical check for the full DEC-012 reasoning: a Collection-shaped
+    // folder names its own destination deterministically (the folder name itself), so a
+    // missing destination Collection is a normal "will be created" outcome, not an unresolved
+    // one — never a guess, since there is exactly one candidate. The destination directory is
+    // created on demand, idempotently, by the copy functions below; nothing is created here.
+    const collState = await _checkDestinationCollectionState(mainArchiveRoot, topName);
+    if (collState === 'unknown' || collState === 'occupied') {
+      // A failed lookup or a name occupied by a non-directory is never evidence of absence —
+      // kept out of both the "confirmed new" and "confirmed existing" buckets, same as
+      // scanImportTree's identical branch.
+      unresolvedUnits.push({
+        path: absPath, name: topName,
+        reason: collState === 'occupied' ? 'destination-name-conflict' : 'destination-lookup-failed',
+      });
       return;
     }
+    const collectionExists = collState === 'exists';
 
     resolvedUnits.push({
       srcDir:             absPath,
       destDir:            path.join(mainArchiveRoot, rel),
-      rootFilesOnly,
-      sourceType:         isExternal ? 'external' : 'collection-event',
+      rootFilesOnly, isFile,
+      sourceType:         'collection-event',
       collectionKey:      topName,
       eventKey:           parts.length > 1 ? `${parts[0]}/${parts[1]}` : parts[0],
       destinationStatus:  'resolved',
-      destinationReason:  null,
+      destinationReason:  collectionExists ? null : 'new-collection',
+      isNewCollection:    !collectionExists,
     });
   }
 
   for (const p of folderPaths)    await resolveOne(p, false, false);
   for (const p of eventRootPaths) await resolveOne(p, true,  false);
   for (const p of externalPaths)  await resolveOne(p, false, true);
+  for (const p of filePaths)      await resolveOne(p, false, false, true);
 
   return { resolvedUnits: _dedupResolvedUnits(resolvedUnits), unresolvedUnits };
 }
@@ -760,6 +984,7 @@ function _scopePaths(scope) {
     ...(scope?.eventRootPaths  || []),
     ...(scope?.externalPaths   || []),
     ...(scope?.collectionPaths || []),
+    ...(scope?.filePaths       || []),
   ];
 }
 
@@ -813,8 +1038,35 @@ async function _scanUnitsInventory(resolvedUnits) {
     }
   }
 
+  // A file-shaped unit (unit.isFile) is a single leaf, never a directory to readdir() —
+  // inventory it directly via one stat, same destination-state rules as any other file.
+  async function walkFile(unit) {
+    let srcStat;
+    try { srcStat = await fsp.stat(unit.srcDir); } catch {
+      groups.errors++;
+      entries.push({ unitSrcDir: unit.srcDir, unitDestDir: unit.destDir, rootFilesOnly: false, relativeFilePath: '.', sourceSize: 0, destinationState: 'error', destinationSize: null });
+      return;
+    }
+    let destStat = null;
+    try { destStat = await fsp.stat(unit.destDir); } catch {}
+
+    let destinationState, destinationSize;
+    if (!destStat) {
+      destinationState = 'missing'; destinationSize = null;
+      groups.newFiles++; newBytes += srcStat.size;
+    } else if (destStat.size === srcStat.size) {
+      destinationState = 'same-size'; destinationSize = destStat.size;
+      groups.alreadyImported++;
+    } else {
+      destinationState = 'changed-size'; destinationSize = destStat.size;
+      groups.changed++;
+    }
+    entries.push({ unitSrcDir: unit.srcDir, unitDestDir: unit.destDir, rootFilesOnly: false, relativeFilePath: '.', sourceSize: srcStat.size, destinationState, destinationSize });
+  }
+
   for (const unit of resolvedUnits) {
-    await walk(unit.srcDir, unit.destDir, unit.rootFilesOnly, unit.srcDir, unit.destDir);
+    if (unit.isFile) await walkFile(unit);
+    else await walk(unit.srcDir, unit.destDir, unit.rootFilesOnly, unit.srcDir, unit.destDir);
   }
 
   return { entries, groups, newBytes };
@@ -828,6 +1080,7 @@ function _computeScanFingerprint({ transferRoot, mainArchiveRoot, scope, resolve
     eventRootPaths:  [...(scope?.eventRootPaths  || [])].sort(),
     externalPaths:   [...(scope?.externalPaths   || [])].sort(),
     collectionPaths: [...(scope?.collectionPaths || [])].sort(),
+    filePaths:       [...(scope?.filePaths       || [])].sort(),
   };
   const unitsSummary = resolvedUnits
     .map(u => ({ srcDir: u.srcDir, destDir: u.destDir, sourceType: u.sourceType, collectionKey: u.collectionKey, eventKey: u.eventKey, destinationReason: u.destinationReason }))
@@ -847,7 +1100,29 @@ function _computeScanFingerprint({ transferRoot, mainArchiveRoot, scope, resolve
 
 async function _finishImport(transferRoot, mainArchiveRoot, meta, startedAt, batches, stats, mode) {
   const completedAt = new Date().toISOString();
-  const finalStatus = stats.errors.length === 0 ? 'ok' : 'partial';
+  const neverAttempted = stats.neverAttempted || 0;
+  const errorsCapped   = stats.errors.length >= MAX_ERRORS;
+  const succeeded      = stats.copied + stats.skipped + stats.renamed + (stats.changedSkipped || 0);
+  // 'failed' — the error cap or a uniform failure (e.g. an unwritable destination) meant
+  // NOTHING landed on disk; never silently reported as a routine "completed with errors".
+  // 'partial' — some files succeeded, some failed. 'ok' — no errors at all.
+  const finalStatus = stats.errors.length === 0
+    ? 'ok'
+    : (succeeded === 0 ? 'failed' : 'partial');
+
+  // When every recorded error shares the same OS error code, this was one underlying
+  // problem repeated, not many unrelated file issues — classify it so the operator sees
+  // the real cause (e.g. "permission-denied") instead of a generic unwritable-destination
+  // guess. A mixed set of codes is left unclassified; that's genuinely ambiguous.
+  let uniformErrorCode = null;
+  if (stats.errors.length > 0) {
+    const codes = new Set(stats.errors.map(e => e.code || null));
+    if (codes.size === 1) {
+      const [only] = codes;
+      if (only) uniformErrorCode = only;
+    }
+  }
+  const uniformErrorReason = uniformErrorCode ? _classifyFsErrorCode(uniformErrorCode) : null;
 
   await _writeCheckpoint(mainArchiveRoot, {
     importId: meta.batchId, transferRoot, mainArchiveRoot, mode,
@@ -859,6 +1134,7 @@ async function _finishImport(transferRoot, mainArchiveRoot, meta, startedAt, bat
     totalRenamed:        stats.renamed,
     totalChangedSkipped: stats.changedSkipped || 0,
     totalErrors:         stats.errors.length,
+    totalNeverAttempted: neverAttempted,
   });
 
   const auditEntry = {
@@ -867,6 +1143,7 @@ async function _finishImport(transferRoot, mainArchiveRoot, meta, startedAt, bat
     startedAt, completedAt,
     copied: stats.copied, skipped: stats.skipped, renamed: stats.renamed,
     changedSkipped: stats.changedSkipped || 0, errorCount: stats.errors.length, status: finalStatus,
+    neverAttempted, errorsCapped, uniformErrorCode, uniformErrorReason,
   };
   try {
     const auditDir = path.join(mainArchiveRoot, '.autoingest', 'transfer-imports');
@@ -883,11 +1160,13 @@ async function _finishImport(transferRoot, mainArchiveRoot, meta, startedAt, bat
   _state.renamed        = stats.renamed;
   _state.changedSkipped = stats.changedSkipped || 0;
   _state.errors         = [...stats.errors];
+  _state.neverAttempted = neverAttempted;
   _state.result = {
     ok: true, batchId: meta.batchId,
     copied: stats.copied, skipped: stats.skipped, renamed: stats.renamed,
     changedSkipped: stats.changedSkipped || 0,
     errorCount: stats.errors.length, startedAt, completedAt, status: finalStatus,
+    neverAttempted, errorsCapped, uniformErrorCode, uniformErrorReason,
   };
 
   // Fire-and-forget completion signal for main.js's IPC layer to orchestrate
@@ -935,13 +1214,14 @@ async function _doImportPlain(transferRoot, mainArchiveRoot, resolvedUnits, meta
     batches = resolvedUnits.map((u, idx) => ({
       batchIdx:   idx,
       batchLabel: path.relative(transferRoot, u.srcDir).split(path.sep).join(' / '),
-      srcDir: u.srcDir, destDir: u.destDir, rootFilesOnly: !!u.rootFilesOnly,
+      srcDir: u.srcDir, destDir: u.destDir, rootFilesOnly: !!u.rootFilesOnly, isFile: !!u.isFile,
       fileCount: 0, status: 'pending',
       copied: 0, skipped: 0, renamed: 0, errors: 0,
     }));
     let totalFiles = 0;
     for (const batch of batches) {
-      batch.fileCount = await _countFiles(batch.srcDir, { rootFilesOnly: batch.rootFilesOnly });
+      // A file-shaped unit (batch.isFile) is a single leaf — never readdir()'d as a directory.
+      batch.fileCount = batch.isFile ? 1 : await _countFiles(batch.srcDir, { rootFilesOnly: batch.rootFilesOnly });
       totalFiles += batch.fileCount;
     }
     _state.total      = totalFiles;
@@ -955,7 +1235,7 @@ async function _doImportPlain(transferRoot, mainArchiveRoot, resolvedUnits, meta
     totalFiles: _state.total, totalCopied: 0, totalSkipped: 0, totalRenamed: 0, totalChangedSkipped: 0, totalErrors: 0,
   });
 
-  const stats = { copied: 0, skipped: 0, renamed: 0, changedSkipped: 0, copiedBytes: 0, errors: [] };
+  const stats = { copied: 0, skipped: 0, renamed: 0, changedSkipped: 0, copiedBytes: 0, errors: [], neverAttempted: 0 };
   const transferRootIdentity = await _readTransferRootIdentity(transferRoot);
 
   for (let i = 0; i < batches.length; i++) {
@@ -969,11 +1249,19 @@ async function _doImportPlain(transferRoot, mainArchiveRoot, resolvedUnits, meta
     _state.batchIndex = i;
     _state.batchName  = batch.batchLabel;
 
-    try { await fsp.mkdir(batch.destDir, { recursive: true }); } catch {}
-
     const outcomeCtx = { batchId: meta.batchId, transferRoot, mainArchiveRoot, transferRootIdentity, eventPath: batch.destDir };
     const before = { copied: stats.copied, skipped: stats.skipped, renamed: stats.renamed, errors: stats.errors.length };
-    await _walkAndCopy(batch.srcDir, batch.destDir, stats, { rootFilesOnly: batch.rootFilesOnly, outcomeCtx });
+    if (batch.isFile) {
+      // A single ordinary file at the Transfer Drive root — destDir IS the destination file
+      // path, so only its parent directory is created, never a directory at destDir itself.
+      try { await fsp.mkdir(path.dirname(batch.destDir), { recursive: true }); } catch {}
+      _state.current = path.basename(batch.srcDir);
+      try { await _copyFileSafe(batch.srcDir, batch.destDir, stats, { outcomeCtx }); }
+      catch (e) { stats.errors.push({ file: batch.srcDir, error: e.message, code: e.code || null }); }
+    } else {
+      try { await fsp.mkdir(batch.destDir, { recursive: true }); } catch {}
+      await _walkAndCopy(batch.srcDir, batch.destDir, stats, { rootFilesOnly: batch.rootFilesOnly, outcomeCtx });
+    }
     batch.copied  = stats.copied  - before.copied;
     batch.skipped = stats.skipped - before.skipped;
     batch.renamed = stats.renamed - before.renamed;
@@ -1024,7 +1312,7 @@ async function _doImportUpdate(transferRoot, mainArchiveRoot, resolvedUnits, inv
     batches = resolvedUnits.map((u, idx) => ({
       batchIdx:   idx,
       batchLabel: path.relative(transferRoot, u.srcDir).split(path.sep).join(' / '),
-      srcDir: u.srcDir, destDir: u.destDir, rootFilesOnly: !!u.rootFilesOnly,
+      srcDir: u.srcDir, destDir: u.destDir, rootFilesOnly: !!u.rootFilesOnly, isFile: !!u.isFile,
       fileList: byUnit.get(u.srcDir) || [],
       status: 'pending', copied: 0, errors: 0,
     }));
@@ -1039,7 +1327,7 @@ async function _doImportUpdate(transferRoot, mainArchiveRoot, resolvedUnits, inv
     skipped: resumeBatches ? 0 : seedSkipped,
     renamed: 0,
     changedSkipped: resumeBatches ? 0 : seedChanged,
-    copiedBytes: 0, errors: [],
+    copiedBytes: 0, errors: [], neverAttempted: 0,
   };
   _state.skipped        = stats.skipped;
   _state.changedSkipped = stats.changedSkipped;
@@ -1080,18 +1368,28 @@ async function _doImportUpdate(transferRoot, mainArchiveRoot, resolvedUnits, inv
     _state.batchIndex = i;
     _state.batchName  = batch.batchLabel;
 
-    try { await fsp.mkdir(batch.destDir, { recursive: true }); } catch {}
+    // batch.destDir is an exact destination FILE path for a file-shaped unit — only its
+    // parent directory is created, same as _doImportPlain's equivalent branch.
+    try { await fsp.mkdir(batch.isFile ? path.dirname(batch.destDir) : batch.destDir, { recursive: true }); } catch {}
 
     const outcomeCtx = { batchId: meta.batchId, transferRoot, mainArchiveRoot, transferRootIdentity, eventPath: batch.destDir };
     const before = { copied: stats.copied, errors: stats.errors.length };
-    for (const f of batch.fileList) {
-      if (stats.errors.length >= MAX_ERRORS) break;
+    for (let fi = 0; fi < batch.fileList.length; fi++) {
+      if (stats.errors.length >= MAX_ERRORS) {
+        // Same rule as _walkAndCopy: the error cap stops attempts, not just display. Every
+        // remaining file in this batch is counted explicitly as never attempted rather than
+        // silently vanishing from copied+skipped+renamed+errors.
+        stats.neverAttempted = (stats.neverAttempted || 0) + (batch.fileList.length - fi);
+        _state.neverAttempted = stats.neverAttempted;
+        break;
+      }
+      const f = batch.fileList[fi];
       await _waitIfPaused();
       _state.current = path.basename(f.srcPath);
       try {
         await _copyFileSafe(f.srcPath, f.destPath, stats, { backupUpdate: true, outcomeCtx });
       } catch (e) {
-        stats.errors.push({ file: f.srcPath, error: e.message });
+        stats.errors.push({ file: f.srcPath, error: e.message, code: e.code || null });
       }
       _state.copied         = stats.copied;
       _state.skipped        = stats.skipped;
@@ -1158,7 +1456,7 @@ async function previewImport(transferRoot, mainArchiveRoot, scope, isValidEventJ
       _isInsideDir(mainArchiveRoot, transferRoot)) {
     return { ok: false, reason: 'roots-overlap' };
   }
-  const hasNewScope    = (scope?.folderPaths?.length > 0) || (scope?.eventRootPaths?.length > 0) || (scope?.externalPaths?.length > 0);
+  const hasNewScope    = (scope?.folderPaths?.length > 0) || (scope?.eventRootPaths?.length > 0) || (scope?.externalPaths?.length > 0) || (scope?.filePaths?.length > 0);
   const hasLegacyScope = scope?.collectionPaths?.length > 0;
   if (!scope || (!hasNewScope && !hasLegacyScope)) {
     return { ok: false, reason: 'empty-scope' };
@@ -1173,22 +1471,25 @@ async function previewImport(transferRoot, mainArchiveRoot, scope, isValidEventJ
 
   const collectionSet = new Set();
   const eventSet      = new Set();
-  let externalFolders = 0, folders = 0, files = 0;
+  let externalFolders = 0, folders = 0, files = 0, genericItems = 0;
 
   for (const unit of resolvedUnits) {
-    if (unit.sourceType === 'external') {
+    if (unit.sourceType === 'generic-folder' || unit.sourceType === 'generic-file') {
+      genericItems++;
+      if (!unit.isFile) folders++;
+    } else if (unit.sourceType === 'external') {
       externalFolders++;
     } else {
       if (unit.collectionKey) collectionSet.add(unit.collectionKey);
       eventSet.add(unit.eventKey);
       if (!unit.rootFilesOnly) folders++;
     }
-    files += await _countFiles(unit.srcDir, { rootFilesOnly: unit.rootFilesOnly });
+    files += unit.isFile ? 1 : await _countFiles(unit.srcDir, { rootFilesOnly: unit.rootFilesOnly });
   }
 
   return {
     ok: true, transferRoot, mainArchiveRoot, scope,
-    collections: collectionSet.size, events: eventSet.size, externalFolders, folders, files,
+    collections: collectionSet.size, events: eventSet.size, externalFolders, folders, files, genericItems,
     unresolvedCount: unresolvedUnits.length,
     unresolvedItems: unresolvedUnits.map(u => ({ path: u.path, name: u.name, reason: u.reason })),
   };
@@ -1202,7 +1503,7 @@ async function runImport(transferRoot, mainArchiveRoot, scope, isValidEventJsonF
       _isInsideDir(mainArchiveRoot, transferRoot)) {
     return { ok: false, reason: 'roots-overlap' };
   }
-  const hasNewScope    = (scope?.folderPaths?.length > 0) || (scope?.eventRootPaths?.length > 0) || (scope?.externalPaths?.length > 0);
+  const hasNewScope    = (scope?.folderPaths?.length > 0) || (scope?.eventRootPaths?.length > 0) || (scope?.externalPaths?.length > 0) || (scope?.filePaths?.length > 0);
   const hasLegacyScope = scope?.collectionPaths?.length > 0;
   if (!scope || (!hasNewScope && !hasLegacyScope)) {
     return { ok: false, reason: 'empty-scope' };
@@ -1216,6 +1517,14 @@ async function runImport(transferRoot, mainArchiveRoot, scope, isValidEventJsonF
   const isUpdate = !!scope.backupUpdate;
   if (isUpdate && !scope.expectedFingerprint) {
     return { ok: false, reason: 'missing-fingerprint' };
+  }
+
+  // Fail fast with the real OS error, before resolving units or starting the batch loop —
+  // never let a destination that is unreachable from the first file onward burn through
+  // MAX_ERRORS identical failures first (see _checkDestinationReachable).
+  const reach = await _checkDestinationReachable(mainArchiveRoot);
+  if (!reach.ok) {
+    return { ok: false, reason: 'destination-unreachable', detail: reach.reason, code: reach.code, message: reach.message };
   }
 
   const { resolvedUnits, unresolvedUnits } = await _resolveImportUnits(transferRoot, mainArchiveRoot, scope, isValidEventJsonFn);
@@ -1242,7 +1551,7 @@ async function runImport(transferRoot, mainArchiveRoot, scope, isValidEventJsonF
     running: true, paused: false, batchId,
     batchIndex: 0, batchCount: 0, batchName: '',
     current: '', copied: 0, skipped: 0, renamed: 0, changedSkipped: 0, errors: [],
-    copiedBytes: 0, total: 0, result: null,
+    copiedBytes: 0, neverAttempted: 0, total: 0, result: null,
     verifyStatus: null, verifyTotal: 0, verifyDone: 0, verifyFailed: 0,
     checkpointHealthy: true, checkpointError: null,
   };
@@ -1270,6 +1579,11 @@ async function resumeImportFromCheckpoint(transferRoot, mainArchiveRoot, meta = 
   if (checkpoint.status === 'complete')         return { ok: false, reason: 'already-complete' };
   if (!Array.isArray(checkpoint.batches))       return { ok: false, reason: 'checkpoint-invalid' };
 
+  const reach = await _checkDestinationReachable(mainArchiveRoot);
+  if (!reach.ok) {
+    return { ok: false, reason: 'destination-unreachable', detail: reach.reason, code: reach.code, message: reach.message };
+  }
+
   const batchId    = checkpoint.importId;
   const deviceName = meta.deviceName || os.hostname();
   const isUpdate   = checkpoint.mode === 'update';
@@ -1290,6 +1604,7 @@ async function resumeImportFromCheckpoint(transferRoot, mainArchiveRoot, meta = 
     changedSkipped: checkpoint.totalChangedSkipped || 0,
     errors:         [],
     copiedBytes:    0,
+    neverAttempted: checkpoint.totalNeverAttempted || 0,
     total:          checkpoint.totalFiles || 0,
     result:         null,
     verifyStatus: null, verifyTotal: 0, verifyDone: 0, verifyFailed: 0,
@@ -1317,7 +1632,7 @@ async function scanImportSync(transferRoot, mainArchiveRoot, scope, isValidEvent
       _isInsideDir(mainArchiveRoot, transferRoot)) {
     return { ok: false, reason: 'roots-overlap' };
   }
-  const hasNewScope = (scope?.folderPaths?.length > 0) || (scope?.eventRootPaths?.length > 0) || (scope?.externalPaths?.length > 0);
+  const hasNewScope = (scope?.folderPaths?.length > 0) || (scope?.eventRootPaths?.length > 0) || (scope?.externalPaths?.length > 0) || (scope?.filePaths?.length > 0);
   if (!scope || !hasNewScope) return { ok: false, reason: 'empty-scope' };
   for (const p of _scopePaths(scope)) {
     if (!_isInsideDir(transferRoot, p)) {
@@ -1332,9 +1647,10 @@ async function scanImportSync(transferRoot, mainArchiveRoot, scope, isValidEvent
 
   const collectionSet = new Set();
   const eventSet      = new Set();
-  let externalFolders = 0;
+  let externalFolders = 0, genericItems = 0;
   for (const unit of resolvedUnits) {
-    if (unit.sourceType === 'external') externalFolders++;
+    if (unit.sourceType === 'generic-folder' || unit.sourceType === 'generic-file') genericItems++;
+    else if (unit.sourceType === 'external') externalFolders++;
     else {
       if (unit.collectionKey) collectionSet.add(unit.collectionKey);
       eventSet.add(unit.eventKey);
@@ -1354,7 +1670,7 @@ async function scanImportSync(transferRoot, mainArchiveRoot, scope, isValidEvent
   return {
     ok: true,
     totals: {
-      collections: collectionSet.size, events: eventSet.size, externalFolders,
+      collections: collectionSet.size, events: eventSet.size, externalFolders, genericItems,
       alreadyImported: groups.alreadyImported, newFiles: groups.newFiles, changed: groups.changed,
       totalFiles: entries.length, newBytes, unresolvedCount: unresolvedUnits.length,
     },
@@ -1447,8 +1763,46 @@ async function verifyImport(transferRoot, mainArchiveRoot, scope, isValidEventJs
     }
   }
 
+  // A file-shaped unit (unit.isFile) is a single leaf — verified directly, never readdir()'d.
+  async function verifyFile(srcPath, destPath) {
+    _state.verifyTotal++;
+    let srcStat;
+    try { srcStat = await fsp.stat(srcPath); } catch {
+      results.missing++; _state.verifyFailed++; _state.verifyDone++;
+      return;
+    }
+    let destStat = null;
+    try { destStat = await fsp.stat(destPath); } catch {}
+    if (!destStat) {
+      results.missing++; _state.verifyFailed++;
+      results.errors.push({ file: path.basename(srcPath), reason: 'missing-at-destination' });
+      _state.verifyDone++;
+      return;
+    }
+    if (destStat.size !== srcStat.size) {
+      results.failed++; _state.verifyFailed++;
+      results.errors.push({ file: path.basename(srcPath), reason: 'size-mismatch' });
+      _state.verifyDone++;
+      return;
+    }
+    try {
+      const [srcHash, destHash] = await Promise.all([_fileHash(srcPath), _fileHash(destPath)]);
+      if (srcHash !== destHash) {
+        results.failed++; _state.verifyFailed++;
+        results.errors.push({ file: path.basename(srcPath), reason: 'hash-mismatch' });
+      } else {
+        results.verified++;
+      }
+    } catch (e) {
+      results.failed++; _state.verifyFailed++;
+      results.errors.push({ file: path.basename(srcPath), reason: e.message });
+    }
+    _state.verifyDone++;
+  }
+
   for (const unit of resolvedUnits) {
-    await verifyDir(unit.srcDir, unit.destDir, unit.rootFilesOnly);
+    if (unit.isFile) await verifyFile(unit.srcDir, unit.destDir);
+    else await verifyDir(unit.srcDir, unit.destDir, unit.rootFilesOnly);
   }
 
   _state.verifyStatus = (results.failed > 0 || results.missing > 0) ? 'failed' : 'verified';
@@ -1465,6 +1819,7 @@ async function verifyImport(transferRoot, mainArchiveRoot, scope, isValidEventJs
 
 module.exports = {
   scanImportTree,
+  listGenericFolderChildren,
   previewImport,
   runImport,
   resumeImportFromCheckpoint,
@@ -1476,4 +1831,9 @@ module.exports = {
   verifyImport,
   scanImportSync,
   readTransferOutcomes,
+  // Exported so main.js's IPC layer can check a candidate destination's live reachability
+  // (e.g. for the Transfer Import modal's "Change Destination" flow) using the exact same
+  // probe runImport()/resumeImportFromCheckpoint() apply internally — never a second,
+  // duplicate reachability check reimplemented at the IPC layer.
+  checkDestinationReachable: _checkDestinationReachable,
 };
