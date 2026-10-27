@@ -1,4 +1,16 @@
 const { app, BrowserWindow, ipcMain, dialog, screen, Menu } = require('electron');
+
+// ── Single instance (AI-FEAT-061 Q1) ─────────────────────────────────────────
+// Must run before anything below has side effects (e.g. the What's New file is
+// read-and-deleted at module load). A second launch hands its arguments to the
+// running instance — via additionalData too, because Chromium may reorder or
+// strip argv on Windows — and exits without creating windows, pollers or trays.
+const _gotSingleInstanceLock = app.requestSingleInstanceLock({ argv: process.argv.slice(1), cwd: process.cwd() });
+if (!_gotSingleInstanceLock) {
+  app.quit();
+  return; // CommonJS module scope: stop evaluating this entry module in the second instance
+}
+
 const path = require('path');
 const os   = require('os');
 const fs   = require('fs');
@@ -19,6 +31,9 @@ const perf          = require('../services/performanceMonitor');
 const autoUpdater   = require('../services/autoUpdater');
 const settings        = require('../services/settings');
 const mxControlService = require('../services/mxControlService');
+const windowRegistry   = require('../services/windowRegistry');
+const { createSourceMonitor } = require('../services/sourceMonitorService');
+const companionService = require('../services/companionService');
 // Canonical Representation Audit, L1 (2026-08-11): the ONE path-containment
 // implementation for this whole codebase — already proven correct under
 // BUG-013 for the renderer's own UNC/case-sensitivity handling. Dual-exported
@@ -211,6 +226,7 @@ function createMainWindow() {
   });
   win.on('close', () => settings.setWindowBoundsSync(win.getBounds()));
   win.loadFile(path.join(__dirname, '../renderer/index.html'));
+  _appWindowOpenedSinceShutdown = true;
   return win;
 }
 
@@ -233,33 +249,29 @@ function createSplashWindow() {
   });
   win.once('ready-to-show', () => win.show());
   win.loadFile(path.join(__dirname, '../renderer/splash.html'));
+  _appWindowOpenedSinceShutdown = true;
   return win;
 }
 
 // ── Drive polling ─────────────────────────────────────────────────────────────
-function startDrivePolling() {
-  async function poll() {
-    try {
-      const { dcim, removable } = await listAllDrives();
-      if (dcim.length) {
-        dcim.forEach(c => log(`Drive detected: ${c.mountpoint} (${c.label})`));
-      }
-      for (const win of BrowserWindow.getAllWindows()) {
-        if (!win.isDestroyed() && !win.webContents.isDestroyed()) {
-          win.webContents.send('drives:updated', dcim);
-          win.webContents.send('drives:allUpdated', removable);
-        }
-      }
-    } catch (err) {
-      console.error('[driveDetector] poll error:', err.message);
-    }
-  }
-  poll();
-  return setInterval(poll, POLL_INTERVAL_MS);
-}
+// ONE application-scope poller (services/sourceMonitorService.js). Consumers:
+// 'main-window' (acquired where the old interval started, released where it was
+// cleared) and 'companion' (the menu-bar/tray icon, while it exists). Broadcasts go
+// to the app windows only — never to the companion popup.
+const MAIN_WINDOW_POLL_CONSUMER = 'main-window';
+const sourceMonitor = createSourceMonitor({
+  listDrives: listAllDrives,
+  getTargets: () => windowRegistry.getAppWindows(),
+  log,
+  intervalMs: POLL_INTERVAL_MS,
+});
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
-let pollHandle = null;
+// True once a splash/main window has been created since window-all-closed last ran
+// its shutdown. The companion popup is a window too; when it is the last window to
+// close (macOS, main window already closed) window-all-closed fires again and must
+// not repeat the per-window service shutdown below.
+let _appWindowOpenedSinceShutdown = false;
 let _splashWin = null;
 // Tracked so mxControlService can reach the current renderer for forwarded
 // commands, and so it can fail closed (never invent state/results) when no
@@ -317,7 +329,7 @@ app.whenReady().then(() => {
   mxControlService.init({ getMainWindow: () => _mxMainWin })
     .catch((err) => log(`[main] mxControlService failed to start: ${err.message}`));
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
+    if (windowRegistry.getAppWindows().length === 0) {
       _splashWin = createSplashWindow();
     }
     // window-all-closed shuts the control service down alongside the other
@@ -326,9 +338,49 @@ app.whenReady().then(() => {
     mxControlService.init({ getMainWindow: () => _mxMainWin })
       .catch((err) => log(`[main] mxControlService failed to restart: ${err.message}`));
   });
+  _startCompanion();
+});
+
+// Menu-bar (macOS) / system-tray (Windows) companion — AI-FEAT-061. Opt out with
+// "companionEnabled": false in settings.json, or AUTOINGEST_DISABLE_COMPANION=1.
+function _startCompanion() {
+  if (process.env.AUTOINGEST_DISABLE_COMPANION === '1' || !settings.getCompanionEnabled()) return;
+  try {
+    companionService.init({ monitor: sourceMonitor, openApp: _openAutoIngest, log });
+  } catch (err) {
+    log(`[main] companion failed to start: ${err.message}`);
+  }
+}
+
+// Brings AutoIngest's own window forward: the main window if it exists (restored if
+// minimized), else the splash, else — no window at all (macOS after close) — the
+// same reopen path as clicking the Dock icon. Used by the companion's "Open
+// AutoIngest" and by second-instance launches.
+function _openAutoIngest() {
+  if (isMac) app.focus({ steal: true });
+  const target = windowRegistry.getMainWindow() || windowRegistry.getAppWindows()[0];
+  if (target) {
+    if (target.isMinimized()) target.restore();
+    target.show();
+    target.focus();
+    return;
+  }
+  app.emit('activate');
+}
+
+// Arguments from a second launch are kept (not acted on — AutoIngest consumes no
+// launch arguments today) so a future handoff (AI-FEAT-061 Q4) can use them.
+let _lastSecondInstanceLaunch = null;
+app.on('second-instance', (_event, argv, workingDirectory, additionalData) => {
+  const forwarded = additionalData && Array.isArray(additionalData.argv) ? additionalData.argv : argv;
+  _lastSecondInstanceLaunch = { argv: forwarded.slice(), cwd: (additionalData && additionalData.cwd) || workingDirectory, at: Date.now() };
+  log(`[main] second instance launched (${forwarded.length} arg(s)); focusing existing window`);
+  if (app.isReady()) _openAutoIngest();
 });
 
 app.on('window-all-closed', () => {
+  if (!_appWindowOpenedSinceShutdown) return; // only the companion popup closed
+  _appWindowOpenedSinceShutdown = false;
   log('App closing');
   perf.stop();
   telemetry.flush().catch(() => {});
@@ -336,8 +388,13 @@ app.on('window-all-closed', () => {
   exifService.shutdown().catch(() => {});
   realtimeOps.shutdown();
   mxControlService.shutdown().catch(() => {});
-  if (pollHandle) clearInterval(pollHandle);
+  sourceMonitor.release(MAIN_WINDOW_POLL_CONSUMER);
   if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('will-quit', () => {
+  companionService.shutdown();
+  sourceMonitor.release(MAIN_WINDOW_POLL_CONSUMER);
 });
 
 // mxControlService's shutdown (closing the WS server, deleting the discovery
@@ -376,8 +433,8 @@ ipcMain.handle('splash:complete', () => {
   crashReporter.init(mainWin);
   _mxMainWin = mainWin;
   mainWin.on('closed', () => { if (_mxMainWin === mainWin) _mxMainWin = null; });
-  if (pollHandle) clearInterval(pollHandle);
-  pollHandle = startDrivePolling();
+  windowRegistry.setMainWindow(mainWin);
+  sourceMonitor.acquire(MAIN_WINDOW_POLL_CONSUMER);
   // Start invisible so we can fade in after the splash closes
   mainWin.setOpacity(0);
   mainWin.once('ready-to-show', () => {
@@ -1318,7 +1375,7 @@ ipcMain.handle('import:commitTransaction', async (event, {
 
     if (settings.getAutoMetadataEnabled() && result.copiedFiles?.length > 0) {
       const batchId = result.auditLogs?.[0]?.id || Date.now().toString(36);
-      const win = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
+      const win = windowRegistry.getProgressTarget();
       const metaContext = {
         photographer:     photographer || '',
         eventName:        eventJsonPath ? path.basename(eventJsonPath) : '',
@@ -1464,7 +1521,7 @@ ipcMain.on('checksum:cancel', () => { checksumCancelled = true; });
 // Sends 'checksum:progress' after each file and 'checksum:complete' when done.
 ipcMain.handle('checksum:run', async () => {
   checksumCancelled = false; // reset at start
-  const win   = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
+  const win   = windowRegistry.getProgressTarget();
   const total = lastImportedFiles.length;
   let completed = 0;
   let failed    = 0;
@@ -3492,7 +3549,7 @@ ipcMain.handle('archive:syncJobNow', async (_event, jobId) => {
 
   let _tlSyncThrottleTs = 0;
   const progressCallback = (progress) => {
-    const w = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
+    const w = windowRegistry.getProgressTarget();
     if (w) w.webContents.send('sync:jobProgress', { jobId, ...progress });
 
     // Throttled advisory team activity update — at most once per second.
@@ -3596,7 +3653,7 @@ ipcMain.handle('archive:verifyJobChecksum', async (_event, jobId) => {
   _verifyingJobIds.add(jobId);
 
   const progressCallback = (progress) => {
-    const w = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
+    const w = windowRegistry.getProgressTarget();
     if (w) w.webContents.send('sync:checksumProgress', { jobId, ...progress });
   };
 
@@ -3680,7 +3737,7 @@ ipcMain.handle('archive:syncAllReadyJobs', async () => {
       const _batchPause = { paused: false };
       _jobPauseSignals.set(job.jobId, _batchPause);
       const _batchProgress = (progress) => {
-        const w = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
+        const w = windowRegistry.getProgressTarget();
         if (w) w.webContents.send('sync:jobProgress', { jobId: job.jobId, ...progress });
       };
       try {
@@ -3775,7 +3832,7 @@ ipcMain.handle('metadata:getStatus', (_event, batchId) => {
 });
 
 ipcMain.handle('metadata:retry', async (_event, batchId) => {
-  const win = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
+  const win = windowRegistry.getProgressTarget();
   // eventJsonPath was stored on the batch's context at applyBatch time (Standard
   // Import / Reapply) so a retry can persist lastMetadataRun the same way the
   // original run did — retry previously never wrote this at all.
@@ -3885,7 +3942,7 @@ ipcMain.handle('metadata:reapplyEvent', async (_event, eventFolderPath) => {
   }
 
   const batchId = `reapply-${Date.now().toString(36)}`;
-  const win     = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
+  const win     = windowRegistry.getProgressTarget();
   const reapplyEventJsonPath = path.join(eventFolderPath, 'event.json');
   const reapplyContext = { ...reapplyBase, eventName, collName, eventJsonPath: reapplyEventJsonPath };
   const baseEmit = win

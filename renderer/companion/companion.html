@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'">
+  <title>AutoIngest</title>
+  <script src="../theme-init.js"></script>
+  <link rel="stylesheet" href="companion.css">
+</head>
+<body>
+  <main class="popup" aria-labelledby="popup-title">
+    <header class="popup-header">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+        <rect x="1" y="1" width="30" height="30" rx="8" class="brand-tile"/>
+        <g transform="translate(5 5) scale(1.22)">
+          <path fill-rule="evenodd" d="M1 15.5 5.2 2.5h2.4l4.2 13H9.3l-.9-2.9H4.4l-.9 2.9zM5.1 10.4h2.6L6.4 6.3z" class="brand-a"/>
+          <rect x="13" y="2.5" width="2.5" height="13" rx="0.5" class="brand-i"/>
+          <path d="M4.2 14.2c3.1.1 5.6-1.3 7-4.1l-1.5-.1 2.8-2 .8 3.3-1.2-.8c-1.6 3-4.3 4.4-7.9 3.7z" class="brand-arrow"/>
+        </g>
+      </svg>
+      <div class="brand-text">
+        <h1 id="popup-title">AutoIngest</h1>
+        <p class="brand-sub">Card companion</p>
+      </div>
+    </header>
+
+    <section class="status" aria-live="polite" aria-labelledby="status-heading">
+      <h2 id="status-heading" class="status-heading">Checking for cards…</h2>
+
+      <div id="empty-state" class="empty" hidden>
+        <svg class="empty-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M7 3h7.5L19 7.5V20a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/>
+          <path d="M10 3v4M13 3v4"/>
+        </svg>
+        <p>Insert a memory card to see it here.</p>
+      </div>
+
+      <ul id="card-list" class="card-list" hidden></ul>
+    </section>
+
+    <footer class="actions">
+      <button type="button" id="open-btn" class="btn btn-primary">Open AutoIngest</button>
+      <button type="button" id="quit-btn" class="btn btn-quiet">Quit AutoIngest</button>
+    </footer>
+  </main>
+
+  <template id="card-row">
+    <li class="card-row">
+      <svg class="card-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M7 3h7.5L19 7.5V20a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/>
+        <path d="M10 3v4M13 3v4"/>
+      </svg>
+      <div class="card-text">
+        <span class="card-label"></span>
+        <span class="card-meta"><span class="status-dot" aria-hidden="true"></span><span class="card-status">Detected</span> · Memory card<span class="card-disambiguator"></span></span>
+      </div>
+    </li>
+  </template>
+
+  <script src="companion.js"></script>
+</body>
+</html>

@@ -310,6 +310,21 @@ async function setAutoMetadataEnabled(value) {
   await _save();
 }
 
+// ─── Menu-bar / tray companion (AI-FEAT-061 Q1) ───────────────────────────────
+
+/**
+ * Returns whether the menu-bar/tray companion is enabled (default: true).
+ * Read-only in Q1: there is deliberately no setter or main-window control, because
+ * the existing main-window UI is frozen (DEC-027). `"companionEnabled": false` in
+ * settings.json opts out.
+ * @returns {boolean}
+ */
+function getCompanionEnabled() {
+  if (!_loaded) init();
+  const v = _state.companionEnabled;
+  return v === undefined ? true : Boolean(v);
+}
+
 // ─── Update channel (Part 9) ───────────────────────────────────────────────────
 
 const VALID_UPDATE_CHANNELS = ['stable', 'preview'];
@@ -613,6 +628,7 @@ module.exports = {
   getWindowBounds, setWindowBounds, setWindowBoundsSync,
   getLastActiveUserId, setLastActiveUserId,
   getAutoMetadataEnabled, setAutoMetadataEnabled,
+  getCompanionEnabled,
   getUpdateChannel, setUpdateChannel,
   getNasRoot, setNasRoot,
   getLocalStagingRoot, setLocalStagingRoot,
