@@ -4,7 +4,7 @@ Live project status. Update alongside meaningful feature work — see [05_DOCUME
 
 | Field | Value |
 |---|---|
-| Last updated | 2026-10-27 |
+| Last updated | 2026-10-28 |
 | Current product version | 0.9.16 (`package.json` on `origin/stable/0.9` @ `0eb9c43`, tag `v0.9.16`, 2026-10-26) |
 | Current branch | `stable/0.9` is the production baseline (verify against `origin/stable/0.9`; the local `stable/0.9` ref was 43 commits behind on 2026-10-27). This update was authored on `docs/roadmap-quick-ingest-priority`, cut from `origin/stable/0.9` @ `0eb9c43`. |
 | Latest relevant commit | `0eb9c43` — "chore(release): bump AutoIngest to v0.9.16" (Stable HEAD at the time of this update) |
@@ -13,12 +13,12 @@ Live project status. Update alongside meaningful feature work — see [05_DOCUME
 | Implemented features | 45 (includes AI-FEAT-057) |
 | Implemented — evolving | 7 (AI-FEAT-003, AI-FEAT-008, AI-FEAT-034, AI-FEAT-035, AI-FEAT-058, AI-FEAT-059, AI-FEAT-060) |
 | Partially implemented | 0 |
-| In active development | 0 — AI-FEAT-061 (AI-RM-014) is the next active milestone but is at Q0 (specification) only; no implementation has started *(Prior value, superseded 2026-10-27: 1 (AI-FEAT-058 Multi-Event Import — implemented and verified on branch `feature/multi-event-import`; merge and release pending; AI-RM-011, a parallel ingestion-workflow track outside the AI-RM-001…009 sequence))* |
-| Planned features | 10 (AI-FEAT-049 through AI-FEAT-056 mapped 1:1 to AI-RM-002 through AI-RM-009; AI-FEAT-061 → AI-RM-014; AI-FEAT-062 → AI-RM-015) |
+| In active development | 1 — AI-FEAT-061 (AI-RM-014): Q1 foundation implemented and verified on `feature/menu-bar-companion-q1` @ `dd9493f`, not merged *(Prior value, superseded 2026-10-28: 0 — AI-FEAT-061 (AI-RM-014) is the next active milestone but is at Q0 (specification) only; no implementation has started (Prior value, superseded 2026-10-27: 1 (AI-FEAT-058 Multi-Event Import — implemented and verified on branch `feature/multi-event-import`; merge and release pending; AI-RM-011, a parallel ingestion-workflow track outside the AI-RM-001…009 sequence)))* |
+| Planned features | 9 (AI-FEAT-049 through AI-FEAT-056 → AI-RM-002 through AI-RM-009; AI-FEAT-062 → AI-RM-015) *(Prior value, superseded 2026-10-28: 10 (AI-FEAT-049 through AI-FEAT-056 mapped 1:1 to AI-RM-002 through AI-RM-009; AI-FEAT-061 → AI-RM-014; AI-FEAT-062 → AI-RM-015))* |
 | Overall roadmap progress | 5/15 milestones Completed (AI-RM-001, AI-RM-010, AI-RM-011, AI-RM-012, AI-RM-013) — completion = Stable promoted or merged per each entry; see 02_MASTER_ROADMAP.md § Status Ladder *(Prior value, superseded 2026-10-27: 1/9 milestones complete)* |
 | Completed roadmap milestones | AI-RM-001 (Metadata Audit & Repair); AI-RM-010 (Multi-Channel Release & Update System — a parallel infrastructure track, not part of the AI-RM-001…009 archive-capability sequence this dashboard otherwise tracks); AI-RM-012 (AutoIngest Knowledge & Onboarding Portal — a parallel documentation/tooling track, merged to `main` 2026-08-14); AI-RM-013 (MX Creative Console Hardware Integration — a parallel hardware-integration track, released in AutoIngest v0.9.14 Stable 2026-10-16); AI-RM-011 (Multi-Event Import — Stable promoted in v0.9.13, tag `v0.9.13` @ `a1223ad`; status reconciled 2026-10-27) |
 | Current roadmap milestone | AI-RM-014 (Quick Ingest & Desktop Experience) — next active, PRIORITY 1; Q0 specification recorded, Q1 not started (owner-directed reprioritization, DEC-027) *(Prior value, superseded 2026-10-27: Archive Maintenance — not started; ID omitted here because this field is machine-parsed)* |
-| Active implementation task | None — Q0 (architecture & specification) recorded in AI-FEAT-061; Q1 awaits owner approval *(Prior value, superseded 2026-10-27: None — not started (confirmed via exhaustive code/git search, see AI-FEAT-049))* |
+| Active implementation task | AI-RM-014 Q1 — implemented on `feature/menu-bar-companion-q1`, awaiting owner review (no Preview RC, no Stable merge) *(Prior value, superseded 2026-10-28: None — Q0 (architecture & specification) recorded in AI-FEAT-061; Q1 awaits owner approval (Prior value, superseded 2026-10-27: None — not started (confirmed via exhaustive code/git search, see AI-FEAT-049)))* |
 | Next milestone | AI-RM-014 (Quick Ingest & Desktop Experience) *(Prior value, superseded 2026-10-27: AI-RM-002 (Archive Maintenance))* |
 | Following milestone | AI-RM-015 (Backup Intelligence Foundation), with Ask AutoIngest continuing in parallel on `feature/ask-autoingest` — see 02_MASTER_ROADMAP.md § Priority Order *(Prior value, superseded 2026-10-27: AI-RM-003 (Event Maintenance))* |
 | Blockers | None for AI-RM-014 Q1. It was approved by the owner on 2026-10-27 and is being implemented on `feature/menu-bar-companion-q1`. Q2, a Preview RC and any Stable merge each need separate approval. *(Prior value, superseded 2026-10-27 after owner Q1 approval: Owner approval of the AI-FEAT-061 Q1 plan (including the behavior-preserving main-window targeting refactor and the single-instance-lock compatibility decision)  (Prior value, superseded 2026-10-27: None identified for AI-RM-002 beyond the absence of a defined scope))* |
@@ -35,7 +35,7 @@ Priority order (DEC-027, 2026-10-27):
 ```
 1  AI-RM-001  Metadata Audit & Repair            [ COMPLETE — Stable ]
 2  AI-RM-013  MX Creative Console                [ COMPLETE — Stable v0.9.14 ]
-3  AI-RM-014  Quick Ingest & Desktop Experience  [ Q1 approved 2026-10-27 — in development ]  ← ACTIVE
+3  AI-RM-014  Quick Ingest & Desktop Experience  [ Q1 implemented on feature branch — review ]  ← ACTIVE
 4  —          Ask AutoIngest (feature branch)    [ in progress on feature/ask-autoingest ]
 5  AI-RM-015  Backup Intelligence Foundation     [ planned ]  + hosts AI-RM-006
 6  AI-RM-002  Archive Maintenance & Archive Node [ planned ]  + hosts AI-RM-007, AI-RM-008

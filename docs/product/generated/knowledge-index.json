@@ -3139,10 +3139,10 @@
     {
       "availability": {
         "evidence": [
-          "canonical Status field: \"Planned\""
+          "canonical Status field: \"In active development\""
         ],
-        "operatorStatus": "PLANNED",
-        "reason": "Feature record status is Planned — not yet implemented."
+        "operatorStatus": "PARTIALLY_AVAILABLE",
+        "reason": "Implemented, but the record's own status marks it evolving or partial."
       },
       "canonicalDocument": "features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md",
       "category": "Application Platform",
@@ -3154,10 +3154,10 @@
       },
       "lastUpdated": {
         "evidenceStatus": "Confirmed zero implementation (2026-10-27 audit of `origin/stable/0.9` @ `0eb9c43`): no `Tray`, `Notification`, `setLoginItemSettings`, `requestSingleInstanceLock`, `powerMonitor` or `app.dock` usage anywhere under `main/`, `services/`, `renderer/`. Architecture below is a **proposal awaiting owner approval**, not a description of shipped behavior.",
-        "introducedVersion": "Not started",
-        "lastModifiedVersion": "2026-10-27 — Q0 architecture & specification recorded (this file)"
+        "introducedVersion": "2026-10-27 — Q1 foundation on `feature/menu-bar-companion-q1` @ `dd9493f` (not merged; owner review pending)",
+        "lastModifiedVersion": "2026-10-28 — Q1 foundation implemented and verified on its feature branch"
       },
-      "operatorStatus": "PLANNED",
+      "operatorStatus": "PARTIALLY_AVAILABLE",
       "relatedFeatures": [
         "AI-FEAT-001",
         "AI-FEAT-005",
@@ -3171,7 +3171,7 @@
       "roadmapRelationship": [
         {
           "roadmapId": "AI-RM-014",
-          "status": "**Active — next milestone (Priority Order #3, PRIORITY 1).** Q0 (audit, architecture, UX specification, test matrix) recorded 2026-10-27. Q1 implementation not started; it awaits owner approval."
+          "status": "**Active — PRIORITY 1.** Q0 complete (2026-10-27). **Q1 foundation implemented and verified on `feature/menu-bar-companion-q1` @ `dd9493f`** (2026-10-28), not merged and not released, awaiting owner review. Q2 not started. *(Prior value, superseded 2026-10-28: **Active — next milestone (Priority Order #3, PRIORITY 1).** Q0 (audit, architecture, UX specification, test matrix) recorded 2026-10-27. Q1 implementation not started; it awaits owner approval.)*"
         }
       ],
       "searchTerms": [
@@ -3197,7 +3197,7 @@
         "features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md",
         "file-copy rules)"
       ],
-      "status": "Planned",
+      "status": "In active development",
       "summary": "A small, always-available AutoIngest presence in the macOS menu bar and the Windows system tray. It shows whether a memory card is connected, how many supported media files it holds, what is honestly known about whether those files were imported before, and whether the active archive is reachable — and offers a fast path into the **existing** import workflow. It is a presentation/control layer around existing AutoIngest services. It is not a second import engine, and it does not change the existing main window ([DEC-027](../decisions/DEC-027_QUICK_INGEST_PRIORITY_AND_MAIN_WINDOW_UI_FREEZE.md)).",
       "title": "Quick Ingest & Desktop Companion (Menu Bar / System Tray)",
       "whatItDoes": "A small, always-available AutoIngest presence in the macOS menu bar and the Windows system tray. It shows whether a memory card is connected, how many supported media files it holds, what is honestly known about whether those files were imported before, and whether the active archive is reachable — and offers a fast path into the **existing** import workflow. It is a presentation/control layer around existing AutoIngest services. It is not a second import engine, and it does not change the existing main window ([DEC-027](../decisions/DEC-027_QUICK_INGEST_PRIORITY_AND_MAIN_WINDOW_UI_FREEZE.md))."

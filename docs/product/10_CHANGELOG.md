@@ -7,6 +7,15 @@ Append newest first. Never edit or delete a prior entry — if something was wro
 ---
 
 
+## 2026-10-28 — AI-RM-014 Q1 foundation recorded (AI-FEAT-061)
+
+- **Task type**: feature journal (documentation only, on `docs/roadmap-quick-ingest-priority`; the application code lives on `feature/menu-bar-companion-q1` @ `dd9493f`, a separate branch, so the two are reviewed separately)
+- **What changed**: AI-FEAT-061 moved Planned → In active development (Experimental), with a Q1 journal entry covering the R1 fix (reproduced live), the single poller, single-instance handling, the measured popup-lifecycle decision (A chosen, B rejected), the deviation from Q0 (companion on by default), verification results and what was not done. Registry, roadmap and dashboard status updated to match.
+- **Affected feature(s)**: AI-FEAT-061
+- **Affected roadmap milestone(s)**: AI-RM-014
+- **Unresolved gaps**: Windows hardware run; Windows package; Preview RC; companion default before Stable
+- **Evidence confidence**: strong (tests and live runs on the feature branch, cited in the journal entry)
+
 ## 2026-10-27 — Workstream placement of AI-RM-005…009; AI-RM-014 Q1 approved (DEC-027 Addendum)
 
 - **Task type**: roadmap housekeeping (documentation only — kept in a separate commit from the Q1 application changes, which live on `feature/menu-bar-companion-q1`)

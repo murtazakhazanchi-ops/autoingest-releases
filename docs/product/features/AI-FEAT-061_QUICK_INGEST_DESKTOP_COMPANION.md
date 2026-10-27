@@ -4,16 +4,16 @@
 |---|---|
 | Feature ID | AI-FEAT-061 |
 | Category | Application Platform |
-| Status | Planned |
-| Maturity | Planned |
+| Status | In active development |
+| Maturity | Experimental |
 | Parent feature | None |
 | Subfeatures | None |
 | Dependencies | AI-FEAT-001 (Electron Application Shell & Security Model), AI-FEAT-005 (Application Settings & Configuration Store), AI-FEAT-019 (Import Pipeline & Copy Engine — reused, never duplicated), AI-FEAT-020 (Duplicate Detection — import index reused as indicative evidence only), AI-FEAT-025 (Checksum-Based File Verification), AI-FEAT-042 (Archive Root Configuration & Resolution), AI-FEAT-058 (Multi-Event Import — existing workspace the companion hands off to) |
 | Related roadmap milestone | AI-RM-014 |
 | Related technical docs | `docs/CLAUDE.md` (security model, file-copy rules), `docs/ingestion-flow.md`, `docs/multi-event-import.md`, `docs/archive-operations-layer.md`, `docs/commandLayer.md`, `docs/mxControlTransport.md` — none yet describe the companion, because nothing is implemented |
 | Evidence status | Confirmed zero implementation (2026-10-27 audit of `origin/stable/0.9` @ `0eb9c43`): no `Tray`, `Notification`, `setLoginItemSettings`, `requestSingleInstanceLock`, `powerMonitor` or `app.dock` usage anywhere under `main/`, `services/`, `renderer/`. Architecture below is a **proposal awaiting owner approval**, not a description of shipped behavior. |
-| First-known implementation | Not started |
-| Latest major update | 2026-10-27 — Q0 architecture & specification recorded (this file) |
+| First-known implementation | 2026-10-27 — Q1 foundation on `feature/menu-bar-companion-q1` @ `dd9493f` (not merged; owner review pending) |
+| Latest major update | 2026-10-28 — Q1 foundation implemented and verified on its feature branch |
 
 ## Lifecycle Metadata
 
@@ -25,7 +25,7 @@
 | Related postmortems | None |
 | Related architectural evolution sections | None yet — will qualify once the app gains an app-lifetime (not window-lifetime) source monitor |
 | Related release notes | Not applicable — not released |
-| Testing coverage | Not applicable — feature not yet implemented. Planned matrix below. |
+| Testing coverage | On `feature/menu-bar-companion-q1` @ `dd9493f`: `test/companionQ1.test.js` (unit), `test/companionQ1UiFreeze.test.js` (static UI-freeze guard), `test/companionQ1Live.test.js` (live Electron), `test/companionPopupLifecycle.bench.js`, `test/mainWindowVisualRegression.live.js`. Runtime reference on that branch: `docs/menu-bar-companion.md`. |
 | Documentation completeness | Q0 complete; Q1–Q7 sections are plans, not evidence |
 
 ## Summary
@@ -259,6 +259,16 @@ Unit and integration tests follow the existing `test/*.test.js` style. Live Elec
 
 - **2026-10-27 — Q0 recorded.** Owner reprioritized Quick Ingest & Desktop Experience to the next active milestone (AI-RM-014). A read-only audit of `origin/stable/0.9` @ `0eb9c43` established the "Current Behavior" table above. Architecture, contract, terminology, lifecycle, risks, phase plan and test matrix proposed. No application code changed. Awaiting owner approval before Q1.
 
+- **2026-10-27/28 — Q1 foundation implemented** (owner-approved scope; branch `feature/menu-bar-companion-q1` @ `dd9493f`, cut from `origin/stable/0.9` @ `0eb9c43`; not merged, no Preview RC).
+  - *Window targeting (R1)*: `services/windowRegistry.js`. All 7 `getAllWindows().find(...)` progress sites in `main/main.js` now use `getProgressTarget()`; `activate` counts app windows only. **R1 reproduced live**: with the popup open, the old expression returned the popup (window 3) instead of the main window (window 2). After the fix, `checksum:complete` reached the main window.
+  - *One poller (R2)*: `services/sourceMonitorService.js` with named consumers (`main-window`, `companion`); one interval, polls never overlap; `drives:updated`/`drives:allUpdated` contract unchanged. The visual regression run found that the first main-window drive result arrived up to 5 s earlier than on Stable while the companion's interval was already running. Fixed: a new consumer now restarts the interval phase, as the old `splash:complete` code did.
+  - *Single instance (R3, approved)*: lock at the top of `main.js`, before module-load side effects. A second launch exits (live: 210 ms, exit code 0) and forwards argv via `additionalData`; the running instance restores and focuses its window. The lock is per profile; a different `--user-data-dir` is not blocked.
+  - *Popup lifecycle decision* (owner asked for an A/B comparison; measured by the benchmark): **A, on-demand create/destroy, chosen.** It opens in ~105 ms against ~4 ms for B. While closed, B costs +1 renderer process and +91 MB, and its hidden window stays in `getAllWindows()`, which would stop `window-all-closed` firing and stop Windows quitting when the main window closes — a behaviour change Q1 must not make. B is **rejected** for that reason.
+  - *Deviation from Q0*: Q0 proposed the companion **off** by default for the first Preview. Q1 ships it **on** (`settings.getCompanionEnabled()`, opt out with `"companionEnabled": false` or `AUTOINGEST_DISABLE_COMPANION=1`), because no in-app toggle can exist while the main-window UI is frozen. The default before Stable is still an owner decision.
+  - *Q4 handoff listener*: architecturally approved, **not implemented** (not needed by Q1).
+  - *Verification*: unit 24/24; UI-freeze guard 5/5 (no existing renderer, preload or asset file differs from Stable); live companion test all checks pass. Main-window pixel comparison against a Stable export: splash identical; the remaining differences on the landing and folder-browse screens are confined to the status-bar clock line, plus 5 anti-aliasing pixels with a colour delta of 2/765. Existing unit suites: 54/73 pass under Node; the other 19 need Electron and give results identical to Stable under Electron. Existing live suites: 14 of 14 import, metadata, MX, transfer, QMZ and event-management live suites pass on the Q1 checkout with the companion enabled (multiEventImportUiLive, multiEventImportLive, multiEventLocalFirstUiLive, multiEventNewEventUiLive, multiEventCountSyncUiLive, cardFolderTreeBugfixUiLive, cardFolderTreeBugfixLive, metadataPipelineLive, mxControlTransportLive, mxCommandLayerImportLive, transferImportGeneralPurposeLiveE2E, transferExportConsecutiveExportsLiveE2E, qmzLiveE2E, eventManagementReliabilityLive); the remaining 39 live suites (other QMZ/transfer/tag-refinement variants and packaged-app E2E) were not run. Packaged macOS arm64 `--dir` build: companion files are in `app.asar`, and the packaged app shows its menu-bar item and popup.
+  - *Not done in Q1*: Windows hardware run, Windows package, Preview RC. The live tests stub only `drivelist.list()`, because mounting synthetic disk images was not permitted in this environment.
+
 ## Engineering Evolution
 
 **Initial implementation**: Not applicable — not yet implemented.
@@ -267,7 +277,7 @@ Unit and integration tests follow the existing `test/*.test.js` style. Live Elec
 
 **Reliability / correctness fixes**: None recorded.
 
-**Other dated milestones**: 2026-10-27 — Q0 specification.
+**Other dated milestones**: 2026-10-27 — Q0 specification; 2026-10-27/28 — Q1 foundation on its feature branch.
 
 ## Known Bugs / Troubleshooting
 
@@ -285,4 +295,4 @@ None recorded.
 
 ## Related Files
 
-None yet — no implementation exists. Expected new files: `services/sourceMonitorService.js`, `services/sourceSummaryService.js`, `services/archiveStatusService.js`, `services/companionService.js`, `main/companionPreload.js`, `renderer/companion/companion.{html,js,css}`, `assets/tray/*`. Existing files expected to change are listed in "Proposed architecture" above.
+On `feature/menu-bar-companion-q1` @ `dd9493f` (not yet on `stable/0.9`): `services/windowRegistry.js`, `services/sourceMonitorService.js`, `services/companionModel.js`, `services/companionService.js`, `main/companionPreload.js`, `renderer/companion/companion.{html,css,js}`, `assets/tray/trayTemplate{,@2x}.png`; modified `main/main.js`, `services/settings.js`. Originally expected new files (Q0 plan, kept for history): `services/sourceMonitorService.js`, `services/sourceSummaryService.js`, `services/archiveStatusService.js`, `services/companionService.js`, `main/companionPreload.js`, `renderer/companion/companion.{html,js,css}`, `assets/tray/*`. Existing files expected to change are listed in "Proposed architecture" above.

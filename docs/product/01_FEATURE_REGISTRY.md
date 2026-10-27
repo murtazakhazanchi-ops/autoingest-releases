@@ -23,7 +23,7 @@ IDs are assigned once and never reused or renumbered, even if a feature is later
 | AI-FEAT-006 | Application Auto-Update | Implemented | Stable | — | — | [features/AI-FEAT-006_APPLICATION_AUTO_UPDATE.md](features/AI-FEAT-006_APPLICATION_AUTO_UPDATE.md) |
 | AI-FEAT-007 | Telemetry Pipeline | Implemented | Operational | — | — | [features/AI-FEAT-007_TELEMETRY_PIPELINE.md](features/AI-FEAT-007_TELEMETRY_PIPELINE.md) |
 | AI-FEAT-057 | Multi-Channel Release & Update System | Implemented | Evolving | AI-FEAT-006 | AI-RM-010 | [features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md](features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md) |
-| AI-FEAT-061 | Quick Ingest & Desktop Companion (Menu Bar / System Tray) | Planned | Planned | — | AI-RM-014 | [features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md](features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md) |
+| AI-FEAT-061 | Quick Ingest & Desktop Companion (Menu Bar / System Tray) | In active development | Experimental | — | AI-RM-014 | [features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md](features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md) |
 
 ## Product UI
 
@@ -167,7 +167,8 @@ IDs are assigned once and never reused or renumbered, even if a feature is later
 
 ## Totals
 
-- **62 features registered** (2026-10-27): 52 Implemented-family (45 plain "Implemented", including AI-FEAT-057 + 7 "Implemented — evolving", including AI-FEAT-058/AI-FEAT-059/AI-FEAT-060), 0 "Partially implemented", 0 "In active development", 10 "Planned" (0% implementation confirmed for all 10).
+- **62 features registered** (2026-10-28): 52 Implemented-family (45 plain "Implemented", including AI-FEAT-057 + 7 "Implemented — evolving", including AI-FEAT-058/AI-FEAT-059/AI-FEAT-060), 0 "Partially implemented", 1 "In active development" (AI-FEAT-061, Q1 on its feature branch), 9 "Planned".
+- *Superseded totals line (kept per Append, Never Erase):* **62 features registered** (2026-10-27): 52 Implemented-family (45 plain "Implemented", including AI-FEAT-057 + 7 "Implemented — evolving", including AI-FEAT-058/AI-FEAT-059/AI-FEAT-060), 0 "Partially implemented", 0 "In active development", 10 "Planned" (0% implementation confirmed for all 10).
 - *Superseded totals line (kept per Append, Never Erase):* **60 features registered**: 51 Implemented-family (45 plain "Implemented", including AI-FEAT-057 + 6 "Implemented — evolving", including AI-FEAT-059/AI-FEAT-060), 0 "Partially implemented", 1 "In active development" (AI-FEAT-058), 8 "Planned" (0% implementation confirmed for all 8).
 - Planned: 8 (all mapped 1:1 to AI-RM-002 through AI-RM-009, except AI-RM-001 which has no dedicated "planned" row because it is already complete — see AI-FEAT-033)
 - Planned (added 2026-10-27): AI-FEAT-061 → AI-RM-014 (Quick Ingest & Desktop Experience, next active milestone) and AI-FEAT-062 → AI-RM-015 (Backup Intelligence Foundation) — see 02_MASTER_ROADMAP.md § Priority Order and DEC-027.

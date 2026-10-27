@@ -3732,9 +3732,9 @@
       },
       "evidence_status": "Confirmed zero implementation (2026-10-27 audit of `origin/stable/0.9` @ `0eb9c43`): no `Tray`, `Notification`, `setLoginItemSettings`, `requestSingleInstanceLock`, `powerMonitor` or `app.dock` usage anywhere under `main/`, `services/`, `renderer/`. Architecture below is a **proposal awaiting owner approval**, not a description of shipped behavior.",
       "feature_id": "AI-FEAT-061",
-      "introduced_version": "Not started",
-      "last_modified_version": "2026-10-27 — Q0 architecture & specification recorded (this file)",
-      "maturity": "Planned",
+      "introduced_version": "2026-10-27 — Q1 foundation on `feature/menu-bar-companion-q1` @ `dd9493f` (not merged; owner review pending)",
+      "last_modified_version": "2026-10-28 — Q1 foundation implemented and verified on its feature branch",
+      "maturity": "Experimental",
       "name": "Quick Ingest & Desktop Companion (Menu Bar / System Tray)",
       "parent_feature": [],
       "related_architecture_sections": [
@@ -3742,6 +3742,18 @@
       ],
       "related_bugs": [],
       "related_changelog_entries": [
+        {
+          "date": "2026-10-28",
+          "excerpt": "## 2026-10-28 — AI-RM-014 Q1 foundation recorded (AI-FEAT-061)"
+        },
+        {
+          "date": "2026-10-28",
+          "excerpt": "**What changed**: AI-FEAT-061 moved Planned → In active development (Experimental), with a Q1 journal entry covering the R1 fix (reproduced live), the single poller, single-instance handling, the meas"
+        },
+        {
+          "date": "2026-10-28",
+          "excerpt": "**Affected feature(s)**: AI-FEAT-061"
+        },
         {
           "date": "2026-10-27",
           "excerpt": "**What changed**: Added an authoritative owner-directed **Priority Order**, a **Status Ladder** (implementation complete → Preview verified → Stable promoted → production validated) and standing guard"
@@ -3769,7 +3781,11 @@
         "docs/mxControlTransport.md — none yet describe the companion",
         "because nothing is implemented"
       ],
-      "related_tests": [],
+      "related_tests": [
+        "test/companionQ1.test.js",
+        "test/companionQ1Live.test.js",
+        "test/companionQ1UiFreeze.test.js"
+      ],
       "roadmap_ids": [
         "AI-RM-014"
       ],
@@ -3784,7 +3800,7 @@
         "system",
         "tray"
       ],
-      "status": "Planned",
+      "status": "In active development",
       "subfeatures": [],
       "summary": "A small, always-available AutoIngest presence in the macOS menu bar and the Windows system tray. It shows whether a memory card is connected, how many supported media files it holds, what is honestly known about whether those files were imported before, and whether the active archive is reachable — and offers a fast path into the **existing** import workflow. It is a presentation/control layer around existing AutoIngest services. It is not a second import engine, and it does not change the existing main window ([DEC-027](../decisions/DEC-027_QUICK_INGEST_PRIORITY_AND_MAIN_WINDOW_UI_FREEZE.md)).",
       "timeline_path": "generated/feature-timelines/AI-FEAT-061_TIMELINE.md"

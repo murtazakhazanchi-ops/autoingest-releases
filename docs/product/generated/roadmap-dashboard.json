@@ -15,7 +15,8 @@
   "feature_status_counts_overall": {
     "Implemented": 45,
     "Implemented — evolving": 7,
-    "Planned": 10
+    "In active development": 1,
+    "Planned": 9
   },
   "following_milestone_id": "AI-RM-015",
   "milestones": [
@@ -316,17 +317,17 @@
         "AI-FEAT-058"
       ],
       "feature_status_counts": {
-        "Planned": 1
+        "In active development": 1
       },
       "id": "AI-RM-014",
       "included_features": [
         "AI-FEAT-061"
       ],
       "name": "Quick Ingest & Desktop Experience",
-      "next_action": "Owner review/approval of the AI-FEAT-061 plan (including R1 refactor, R3 single-instance, and the Q4 handoff listener as the only main-window code touch); then cut `feature/quick-ingest-companion-q1` worktree from the verified `origin/stable/0.9` HEAD.",
+      "next_action": "Owner review of the Q1 report on `feature/menu-bar-companion-q1`. Before Q2: a Windows hardware tray run, and the owner decision on the companion default (on in Q1). No Preview RC, Stable merge or Q2 without approval. *(Prior value, superseded 2026-10-28: Owner review/approval of the AI-FEAT-061 plan (including R1 refactor, R3 single-instance, and the Q4 handoff listener as the only main-window code touch); then cut `feature/quick-ingest-companion-q1` worktree from the verified `origin/stable/0.9` HEAD.)*",
       "objective": "Give operators an always-available macOS menu-bar / Windows system-tray companion that shows connected-card status, honest prior-import evidence and archive reachability, and opens the **existing** import workflow quickly. The existing main-window UI is not changed ([DEC-027](decisions/DEC-027_QUICK_INGEST_PRIORITY_AND_MAIN_WINDOW_UI_FREEZE.md)).",
       "planned_estimate": "Evidence pending — not yet documented as fact (no owner estimate given)",
-      "status": "**Active — next milestone (Priority Order #3, PRIORITY 1).** Q0 (audit, architecture, UX specification, test matrix) recorded 2026-10-27. Q1 implementation not started; it awaits owner approval."
+      "status": "**Active — PRIORITY 1.** Q0 complete (2026-10-27). **Q1 foundation implemented and verified on `feature/menu-bar-companion-q1` @ `dd9493f`** (2026-10-28), not merged and not released, awaiting owner review. Q2 not started. *(Prior value, superseded 2026-10-28: **Active — next milestone (Priority Order #3, PRIORITY 1).** Q0 (audit, architecture, UX specification, test matrix) recorded 2026-10-27. Q1 implementation not started; it awaits owner approval.)*"
     },
     {
       "current_risks": "Hosts the remaining scope of AI-RM-006 (Integrity Verification — Archive-Wide) since 2026-10-27, including its AI-FEAT-025 disambiguation risk. Migration from the existing capped, per-computer name+size import index has to be designed so that history is not lost and confidence is not overstated.",

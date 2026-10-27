@@ -1502,7 +1502,11 @@
     ],
     "AI-FEAT-059": [],
     "AI-FEAT-060": [],
-    "AI-FEAT-061": [],
+    "AI-FEAT-061": [
+      "test/companionQ1.test.js",
+      "test/companionQ1Live.test.js",
+      "test/companionQ1UiFreeze.test.js"
+    ],
     "AI-FEAT-062": []
   },
   "ipc_to_features": {
@@ -1756,6 +1760,15 @@
     ]
   },
   "test_to_features": {
+    "test/companionQ1.test.js": [
+      "AI-FEAT-061"
+    ],
+    "test/companionQ1Live.test.js": [
+      "AI-FEAT-061"
+    ],
+    "test/companionQ1UiFreeze.test.js": [
+      "AI-FEAT-061"
+    ],
     "test/dashboardMetadataHealthCard.test.js": [
       "AI-FEAT-034",
       "AI-FEAT-035"

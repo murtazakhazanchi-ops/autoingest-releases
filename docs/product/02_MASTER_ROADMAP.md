@@ -16,7 +16,7 @@ Milestone sections below remain in ID order, so existing links and other branche
 |---|---|---|
 | 1 | AI-RM-001 — Metadata Audit & Repair | Completed — Stable promoted. Preserve implementation and regression coverage. |
 | 2 | AI-RM-013 — Logitech MX Creative Console Integration | Completed — Stable promoted in v0.9.14 (tag `v0.9.14` @ `093c721`, 2026-10-16), carried forward in v0.9.16. Production validation: evidence pending. |
-| 3 | **AI-RM-014 — Quick Ingest & Desktop Experience** | **NEXT ACTIVE — PRIORITY 1.** First delivery is the menu-bar/tray companion, not a main-window redesign. |
+| 3 | **AI-RM-014 — Quick Ingest & Desktop Experience** | **ACTIVE — PRIORITY 1.** Q1 foundation implemented on `feature/menu-bar-companion-q1` (review pending). The first delivery is the menu-bar/tray companion, not a main-window redesign. |
 | 4 | Ask AutoIngest — Knowledge & Assistance (continuation of AI-RM-012's knowledge track) | Existing in-progress work on `feature/ask-autoingest`. Do not interrupt, merge, rewrite or discard it. No new AI-RM ID is allocated here (that branch still uses pre-DEC-022 numbering; reconcile IDs at its merge). |
 | 5 | AI-RM-015 — Backup Intelligence Foundation | Planned. Also hosts AI-RM-006. |
 | 6 | AI-RM-002 — Archive Maintenance & AutoIngest Archive Node | Planned. Also hosts AI-RM-007 and AI-RM-008. |
@@ -288,7 +288,7 @@ The `Status` field keeps the word **Completed** only for milestones that reached
 
 | Field | Value |
 |---|---|
-| Status | **Active — next milestone (Priority Order #3, PRIORITY 1).** Q0 (audit, architecture, UX specification, test matrix) recorded 2026-10-27. Q1 implementation not started; it awaits owner approval. |
+| Status | **Active — PRIORITY 1.** Q0 complete (2026-10-27). **Q1 foundation implemented and verified on `feature/menu-bar-companion-q1` @ `dd9493f`** (2026-10-28), not merged and not released, awaiting owner review. Q2 not started. *(Prior value, superseded 2026-10-28: **Active — next milestone (Priority Order #3, PRIORITY 1).** Q0 (audit, architecture, UX specification, test matrix) recorded 2026-10-27. Q1 implementation not started; it awaits owner approval.)* |
 | Objective | Give operators an always-available macOS menu-bar / Windows system-tray companion that shows connected-card status, honest prior-import evidence and archive reachability, and opens the **existing** import workflow quickly. The existing main-window UI is not changed ([DEC-027](decisions/DEC-027_QUICK_INGEST_PRIORITY_AND_MAIN_WINDOW_UI_FREEZE.md)). |
 | Included AI-FEAT IDs | AI-FEAT-061 |
 | Existing features extended | AI-FEAT-001 (app lifecycle / windows), AI-FEAT-005 (companion preferences), AI-FEAT-042 (read-only archive status) — reused through new modules; AI-FEAT-019 / AI-FEAT-020 / AI-FEAT-025 / AI-FEAT-058 are reused unchanged |
@@ -297,7 +297,7 @@ The `Status` field keeps the word **Completed** only for milestones that reached
 | Acceptance criteria | AI-FEAT-061 test matrix (17 rows) green, including the main-window visual and functional regression guarantee (no unexpected change to main-window UI, CSS, layout, event workflow or operator interactions). "Checksum verified" and per-card history are never shown before they are genuinely available. Preview RC first; Stable only after packaged physical validation and explicit approval. |
 | Planned estimate | Evidence pending — not yet documented as fact (no owner estimate given) |
 | Current risks | (R1) a companion `BrowserWindow` would be picked up by ≥7 `getAllWindows().find(...)` progress-routing sites and by the `activate` / `window-all-closed` window counts — a behavior-preserving fix must land first in Q1. (R2) drive polling currently starts with the main window; moving it to app lifetime must keep the single poller and the same broadcast contract. (R3) single-instance lock is a behavior change that needs approval. (R4) no volume UUID in `drivelist` output — labels are not identities. (R6) macOS builds are ad-hoc signed, not notarized; notification and login-item behavior must be physically verified. |
-| Next action | Owner review/approval of the AI-FEAT-061 plan (including R1 refactor, R3 single-instance, and the Q4 handoff listener as the only main-window code touch); then cut `feature/quick-ingest-companion-q1` worktree from the verified `origin/stable/0.9` HEAD. |
+| Next action | Owner review of the Q1 report on `feature/menu-bar-companion-q1`. Before Q2: a Windows hardware tray run, and the owner decision on the companion default (on in Q1). No Preview RC, Stable merge or Q2 without approval. *(Prior value, superseded 2026-10-28: Owner review/approval of the AI-FEAT-061 plan (including R1 refactor, R3 single-instance, and the Q4 handoff listener as the only main-window code touch); then cut `feature/quick-ingest-companion-q1` worktree from the verified `origin/stable/0.9` HEAD.)* |
 
 ---
 
