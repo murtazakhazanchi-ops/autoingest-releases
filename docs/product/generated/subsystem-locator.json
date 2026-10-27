@@ -14,13 +14,21 @@
       "canonicalTechnicalDocs": [
         ".github/workflows/release.yml",
         "CLAUDE.md § Security Model",
+        "because nothing is implemented",
+        "docs/CLAUDE.md (security model",
         "docs/README.md § Security Model",
+        "docs/archive-operations-layer.md",
+        "docs/commandLayer.md",
         "docs/data-model.md",
         "docs/event-system.md",
         "docs/features.md #7 \"UI Dashboard\"",
         "docs/history.md v0.8.1",
+        "docs/ingestion-flow.md",
+        "docs/multi-event-import.md",
+        "docs/mxControlTransport.md — none yet describe the companion",
         "docs/system-contracts.md §1-2",
         "docs/ui-system.md § Dashboard",
+        "file-copy rules)",
         "scripts/product-docs/README.md"
       ],
       "changeImpactChecklist": [
@@ -38,7 +46,8 @@
         "AI-FEAT-005",
         "AI-FEAT-006",
         "AI-FEAT-007",
-        "AI-FEAT-057"
+        "AI-FEAT-057",
+        "AI-FEAT-061"
       ],
       "relatedBugs": [],
       "relatedDecisions": [],
@@ -673,7 +682,8 @@
       "id": "SUBSYS-reliability-and-recovery",
       "name": "Reliability and Recovery",
       "primaryFeatures": [
-        "AI-FEAT-054"
+        "AI-FEAT-054",
+        "AI-FEAT-062"
       ],
       "relatedBugs": [],
       "relatedDecisions": [],

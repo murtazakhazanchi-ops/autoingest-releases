@@ -1,23 +1,23 @@
 {
-  "blockers": "None identified for AI-RM-002 beyond the absence of a defined scope",
-  "completed_count": 4,
+  "blockers": "Owner approval of the AI-FEAT-061 Q1 plan (including the behavior-preserving main-window targeting refactor and the single-instance-lock compatibility decision) *(Prior value, superseded 2026-10-27: None identified for AI-RM-002 beyond the absence of a defined scope)*",
+  "completed_count": 5,
   "completed_milestones": [
     "AI-RM-001",
     "AI-RM-010",
+    "AI-RM-011",
     "AI-RM-012",
     "AI-RM-013"
   ],
-  "current_milestone_id": "AI-RM-002",
-  "current_risks": "(1) AI-RM-007's planned service name collides with an existing, unrelated `archiveRepairService.js` (temp-file cleanup only) — needs resolution before implementation starts. (2) AI-RM-006's scope needs explicit disambiguation from the already-implemented AI-FEAT-025 (narrower checksum verification) to avoid duplicating existing work without a clear reason.",
+  "current_milestone_id": "AI-RM-014",
+  "current_risks": "(1) AI-RM-014 R1: a companion BrowserWindow would be caught by ≥7 `getAllWindows().find(...)` progress-routing sites plus the `activate`/`window-all-closed` window counts — must be fixed first and without behavior change. (2) Main-window UI is frozen for AI-RM-014 (DEC-027) — any regression there is a release blocker. (3) `feature/ask-autoingest` still uses pre-DEC-022 IDs (AI-RM-011/AI-FEAT-058 for the knowledge portal) and edits 02_MASTER_ROADMAP.md — ID reconciliation needed at its merge. (4) Carried forward: AI-RM-007 service-name collision with `archiveRepairService.js`; AI-RM-006 vs AI-FEAT-025 scope disambiguation. *(Prior value, superseded 2026-10-27: (1) AI-RM-007's planned service name collides with an existing, unrelated `archiveRepairService.js` (temp-file cleanup only) — needs resolution before implementation starts. (2) AI-RM-006's scope needs explicit disambiguation from the already-implemented AI-FEAT-025 (narrower checksum verification) to avoid duplicating existing work without a clear reason.)*",
   "docsys_version": "1.3.0",
   "evidence_gaps_note": "See each feature file's \"Evidence status\" field. Notable gaps: AI-FEAT-037 (Metadata Reapply/Sync — file-existence + learning-log evidence only, not independently code-audited), AI-FEAT-007 (Telemetry Pipeline — scope of data collected not yet audited), AI-FEAT-022 (Photographer-Folder Resolution — relationship to the v0.9.0 \"Photographer Folder Sequencing\" release-note item not yet confirmed as same-or-different code path)",
   "feature_status_counts_overall": {
     "Implemented": 45,
-    "Implemented — evolving": 6,
-    "In active development": 1,
-    "Planned": 8
+    "Implemented — evolving": 7,
+    "Planned": 10
   },
-  "following_milestone_id": "AI-RM-003",
+  "following_milestone_id": "AI-RM-015",
   "milestones": [
     {
       "current_risks": "None blocking — see AI-FEAT-033's Known Bugs section for the one documented, non-blocking limitation (preview-session identifier does not survive the Preview→Confirm round trip)",
@@ -49,11 +49,16 @@
       "status": "**Completed**"
     },
     {
-      "current_risks": "Scope not yet defined",
+      "current_risks": "Scope overlap with AI-RM-007 (Archive Repair) — owner decision pending on whether repair actions belong here",
       "dependencies": [
-        "AI-RM-001"
+        "AI-RM-001",
+        "AI-RM-015"
       ],
-      "existing_features_extended": [],
+      "existing_features_extended": [
+        "AI-FEAT-042",
+        "AI-FEAT-043",
+        "AI-FEAT-049"
+      ],
       "feature_status_counts": {
         "Planned": 1
       },
@@ -62,10 +67,10 @@
         "AI-FEAT-049"
       ],
       "name": "Archive Maintenance",
-      "next_action": "Discovery and specification",
-      "objective": "Evidence pending — not yet documented as fact",
-      "planned_estimate": "3–5 weeks (see [03_IMPLEMENTATION_TIMELINE.md](03_IMPLEMENTATION_TIMELINE.md))",
-      "status": "Planned — not started"
+      "next_action": "Not started — follows AI-RM-015 in the Priority Order",
+      "objective": "Owner-stated scope (2026-10-27): archive-health checks covering missing copies, sidecars, duplicates, orphan files, broken event structures, folder integrity and `event.json` issues, plus long-running archive operations. Also covers the **AutoIngest Archive Node**: the existing NAS server PC runs long-running archive work. **No Raspberry Pi requirement.** Detailed design: evidence pending.",
+      "planned_estimate": "3–5 weeks (see [03_IMPLEMENTATION_TIMELINE.md](03_IMPLEMENTATION_TIMELINE.md)) — original estimate, predates the Archive Node scope addition",
+      "status": "Planned — not started. Priority Order #6 (moved behind AI-RM-014 and AI-RM-015 on 2026-10-27, DEC-027)."
     },
     {
       "current_risks": "Scope not yet defined",
@@ -82,9 +87,9 @@
       ],
       "name": "Event Maintenance",
       "next_action": "Not started — follows AI-RM-002",
-      "objective": "Evidence pending — not yet documented as fact",
+      "objective": "Owner-stated scope (preserved from prior agreement, restated 2026-10-27): event renaming, editing, splitting, merging, relocation and metadata reconciliation. Detailed design: evidence pending.",
       "planned_estimate": "4–6 weeks",
-      "status": "Planned — not started"
+      "status": "Planned — not started. Priority Order #7."
     },
     {
       "current_risks": "Scope not yet defined",
@@ -101,9 +106,9 @@
       ],
       "name": "Archive Browser",
       "next_action": "Not started — follows AI-RM-003",
-      "objective": "Evidence pending — not yet documented as fact",
+      "objective": "Owner-stated scope (2026-10-27): collection / event / photographer browsing, later extended with verification receipts, content identity, import history and archive-copy status from AI-RM-015. Detailed design: evidence pending.",
       "planned_estimate": "5–7 weeks",
-      "status": "Planned — not started"
+      "status": "Planned — not started. Priority Order #8."
     },
     {
       "current_risks": "Scope not yet defined",
@@ -125,7 +130,7 @@
       "status": "Planned — not started"
     },
     {
-      "current_risks": "Scope overlap with AI-FEAT-025 needs explicit disambiguation before implementation starts, to avoid duplicating the existing `getFileHash()`-based mechanism without a clear reason",
+      "current_risks": "Scope overlap with AI-FEAT-025 needs explicit disambiguation before implementation starts, to avoid duplicating the existing `getFileHash()`-based mechanism without a clear reason. **Added 2026-10-27:** also overlaps AI-RM-015 (Backup Intelligence Foundation — durable verification evidence/receipts); owner decision pending on fold-in vs consumer vs separate. Not superseded until decided.",
       "dependencies": [
         "AI-RM-005"
       ],
@@ -244,17 +249,17 @@
         "AI-FEAT-044"
       ],
       "feature_status_counts": {
-        "In active development": 1
+        "Implemented — evolving": 1
       },
       "id": "AI-RM-011",
       "included_features": [
         "AI-FEAT-058"
       ],
       "name": "Multi-Event Import",
-      "next_action": "Owner review of the final report; commit breakdown approval; merge decision.",
+      "next_action": "None — Stable promoted. *Prior next action (superseded 2026-10-27): \"Owner review of the final report; commit breakdown approval; merge decision.\"*",
       "objective": "Let an operator open one import source (card, drive, USB, local folder — source-agnostic), assign its files to several events, and import them in ONE pass, with every file routed and tagged by its own event, without weakening any copy-safety, naming, metadata or transaction rule.",
       "planned_estimate": "Single implementation session (2026-09-20)",
-      "status": "**In progress** (implemented and verified on `feature/multi-event-import`; not yet merged to `stable/0.9` or released)"
+      "status": "**Completed** — Stable promoted in v0.9.13 (tag `v0.9.13` @ `a1223ad`, 2026-09-28; `git merge-base --is-ancestor feature/multi-event-import v0.9.13` confirmed 2026-10-27). Production validated: evidence pending. *Prior status (superseded 2026-10-27): \"In progress (implemented and verified on `feature/multi-event-import`; not yet merged to `stable/0.9` or released)\".*"
     },
     {
       "current_risks": "Retrieval-precision gaps inherent to reusing `lib/query.js` unchanged remain for cases with no curated concept/boundary coverage (no stemming, no typo tolerance, no compound-claim verification) — disclosed per-question in both eval corpora's `knownLimitation` fields rather than silently patched; see AI-FEAT-059's Future Enhancements. No blocking risk to what has shipped — every disclosed gap resolves to an honest hedge or `UNKNOWN`, never a confident false claim, verified specifically by the Phase 21/24/merge-readiness hallucination/adversarial suites.",
@@ -295,14 +300,63 @@
       "objective": "Let an operator drive AutoIngest's core Browse/Groups/Map Group/Refine Tags workflows directly from the physical Logitech MX Creative Console Keypad and dial, without the software UI, as a hardware control surface that stays in sync with AutoIngest's own authoritative state.",
       "planned_estimate": "Evidence pending for phases predating this session (Phase 1A/3A-D/4A/4B — see AI-FEAT-060's Original Plan / Intent). This session's own Unified Contextual Keypad migration (native multistate spike → contextual keypad spike → production migration → three physical bug fixes) ran in a single extended session (2026-10-15).",
       "status": "**Completed** — released in AutoIngest v0.9.14 Stable (commit `093c721`, tag `v0.9.14`, 2026-10-16)"
+    },
+    {
+      "current_risks": "(R1) a companion `BrowserWindow` would be picked up by ≥7 `getAllWindows().find(...)` progress-routing sites and by the `activate` / `window-all-closed` window counts — a behavior-preserving fix must land first in Q1. (R2) drive polling currently starts with the main window; moving it to app lifetime must keep the single poller and the same broadcast contract. (R3) single-instance lock is a behavior change that needs approval. (R4) no volume UUID in `drivelist` output — labels are not identities. (R6) macOS builds are ad-hoc signed, not notarized; notification and login-item behavior must be physically verified.",
+      "dependencies": [
+        "AI-RM-015"
+      ],
+      "existing_features_extended": [
+        "AI-FEAT-001",
+        "AI-FEAT-005",
+        "AI-FEAT-019",
+        "AI-FEAT-020",
+        "AI-FEAT-025",
+        "AI-FEAT-042",
+        "AI-FEAT-058"
+      ],
+      "feature_status_counts": {
+        "Planned": 1
+      },
+      "id": "AI-RM-014",
+      "included_features": [
+        "AI-FEAT-061"
+      ],
+      "name": "Quick Ingest & Desktop Experience",
+      "next_action": "Owner review/approval of the AI-FEAT-061 plan (including R1 refactor, R3 single-instance, and the Q4 handoff listener as the only main-window code touch); then cut `feature/quick-ingest-companion-q1` worktree from the verified `origin/stable/0.9` HEAD.",
+      "objective": "Give operators an always-available macOS menu-bar / Windows system-tray companion that shows connected-card status, honest prior-import evidence and archive reachability, and opens the **existing** import workflow quickly. The existing main-window UI is not changed ([DEC-027](decisions/DEC-027_QUICK_INGEST_PRIORITY_AND_MAIN_WINDOW_UI_FREEZE.md)).",
+      "planned_estimate": "Evidence pending — not yet documented as fact (no owner estimate given)",
+      "status": "**Active — next milestone (Priority Order #3, PRIORITY 1).** Q0 (audit, architecture, UX specification, test matrix) recorded 2026-10-27. Q1 implementation not started; it awaits owner approval."
+    },
+    {
+      "current_risks": "Overlap with AI-RM-006 (Integrity Verification — Archive-Wide); owner decision pending. Migration from the existing capped, per-computer name+size import index has to be designed so that history is not lost and confidence is not overstated.",
+      "dependencies": [
+        "AI-RM-014"
+      ],
+      "existing_features_extended": [
+        "AI-FEAT-020",
+        "AI-FEAT-025"
+      ],
+      "feature_status_counts": {
+        "Planned": 1
+      },
+      "id": "AI-RM-015",
+      "included_features": [
+        "AI-FEAT-062"
+      ],
+      "name": "Backup Intelligence Foundation",
+      "next_action": "Not started — follows AI-RM-014 (Ask AutoIngest continues in parallel on its own branch)",
+      "objective": "Owner-stated scope (2026-10-27): unified SHA-256 content identity; source-content and final-archive identity; card/source session identity; archive-instance tracking across NAS roots; durable verification evidence; verification receipts; per-card import history; safe cross-device reconciliation. Detailed design: evidence pending.",
+      "planned_estimate": "Evidence pending — not yet documented as fact",
+      "status": "Planned — not started. Priority Order #5."
     }
   ],
-  "next_milestone_id": "AI-RM-002",
-  "next_planned_action": "Discovery and specification for AI-RM-002 (Archive Maintenance) — no scope exists yet",
-  "pending_decisions": "Naming collision for AI-RM-007's service (see Current risks); scope disambiguation for AI-RM-006 vs. AI-FEAT-025",
-  "progress_percent": 30.8,
-  "recently_completed_documentation_work": "UI polish to the Metadata Management Modal / Audit & Repair tab (commits `4446a30` → `c5d200f`, 2026-08-02 through 2026-08-04) — cosmetic/layout only, no behavior change, all part of the already-complete AI-RM-001",
+  "next_milestone_id": "AI-RM-014",
+  "next_planned_action": "Owner review of AI-FEAT-061 (architecture, phase plan, test matrix); on approval, start AI-RM-014 Q1 in a dedicated worktree cut from the verified `origin/stable/0.9` HEAD *(Prior value, superseded 2026-10-27: Discovery and specification for AI-RM-002 (Archive Maintenance) — no scope exists yet)*",
+  "pending_decisions": "(1) AI-FEAT-061 Q1 approval, including single-instance lock and the Q4 handoff listener as the only main-window code touch. (2) AI-RM-006 vs AI-RM-015 overlap. (3) AI-RM-007 vs AI-RM-002 overlap. (4) Placement of AI-RM-005…009 in the Priority Order. (5) Carried forward: AI-RM-007 naming collision; AI-RM-006 vs AI-FEAT-025. *(Prior value, superseded 2026-10-27: Naming collision for AI-RM-007's service (see Current risks); scope disambiguation for AI-RM-006 vs. AI-FEAT-025)*",
+  "progress_percent": 33.3,
+  "recently_completed_documentation_work": "2026-10-27 — roadmap reprioritization and AI-RM-014 Q0 specification (documentation only, no application code). Releases since the prior dashboard update: v0.9.13 (Multi-Event Import), v0.9.14 (MX Creative Console), v0.9.16 (current Stable). *(Prior value, superseded 2026-10-27: UI polish to the Metadata Management Modal / Audit & Repair tab (commits `4446a30` → `c5d200f`, 2026-08-02 through 2026-08-04) — cosmetic/layout only, no behavior change, all part of the already-complete AI-RM-001)*",
   "schema_version": "1.3.0",
-  "total_features": 60,
-  "total_milestones": 13
+  "total_features": 62,
+  "total_milestones": 15
 }

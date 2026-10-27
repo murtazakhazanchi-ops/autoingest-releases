@@ -4,13 +4,52 @@ Canonical, ordered implementation roadmap. Do not reorder unless the project own
 
 **Roadmap IDs (`AI-RM-###`) are milestone identities, not feature identities.** A milestone may introduce one feature, expand several existing features, depend on multiple features, or consolidate multiple feature areas — see [01_FEATURE_REGISTRY.md](01_FEATURE_REGISTRY.md) for the actual product-capability inventory (`AI-FEAT-###`).
 
-**Current position**: Completed milestone: **AI-RM-001**. Next milestone: **AI-RM-002**. Active implementation of AI-RM-002: **Not started** (confirmed — see AI-FEAT-049's evidence status). Following milestone: **AI-RM-003**. Overall milestone progress (AI-RM-001…009 archive-capability sequence): **1/9 complete**.
+**Current position (2026-10-27)**: Next active milestone: **AI-RM-014 — Quick Ingest & Desktop Experience** (owner reprioritization, [DEC-027](decisions/DEC-027_QUICK_INGEST_PRIORITY_AND_MAIN_WINDOW_UI_FREEZE.md)). Its Q0 phase (audit, architecture, test matrix) is recorded in AI-FEAT-061. Q1 implementation has **not started** and awaits owner approval. Following new milestone: **AI-RM-015 — Backup Intelligence Foundation**. AI-RM-002 (Archive Maintenance) is no longer next; it keeps its record and moves later in the Priority Order below.
+
+*Superseded position statement (kept per Append, Never Erase):* "Completed milestone: AI-RM-001. Next milestone: AI-RM-002. Active implementation of AI-RM-002: Not started. Following milestone: AI-RM-003. Overall milestone progress (AI-RM-001…009 archive-capability sequence): 1/9 complete." — superseded 2026-10-27 by DEC-027.
+
+## Priority Order (authoritative, owner-directed 2026-10-27)
+
+Milestone sections below remain in ID order, so existing links and other branches' edits keep working. **This list, not the section order, is the working priority.**
+
+| # | Milestone | Status (see Status Ladder) |
+|---|---|---|
+| 1 | AI-RM-001 — Metadata Audit & Repair | Completed — Stable promoted. Preserve implementation and regression coverage. |
+| 2 | AI-RM-013 — Logitech MX Creative Console Integration | Completed — Stable promoted in v0.9.14 (tag `v0.9.14` @ `093c721`, 2026-10-16), carried forward in v0.9.16. Production validation: evidence pending. |
+| 3 | **AI-RM-014 — Quick Ingest & Desktop Experience** | **NEXT ACTIVE — PRIORITY 1.** First delivery is the menu-bar/tray companion, not a main-window redesign. |
+| 4 | Ask AutoIngest — Knowledge & Assistance (continuation of AI-RM-012's knowledge track) | Existing in-progress work on `feature/ask-autoingest`. Do not interrupt, merge, rewrite or discard it. No new AI-RM ID is allocated here (that branch still uses pre-DEC-022 numbering; reconcile IDs at its merge). |
+| 5 | AI-RM-015 — Backup Intelligence Foundation | Planned |
+| 6 | AI-RM-002 — Archive Maintenance & AutoIngest Archive Node | Planned |
+| 7 | AI-RM-003 — Event Maintenance | Planned |
+| 8 | AI-RM-004 — Archive Browser | Planned |
+
+Not yet placed by the owner (records unchanged, not cancelled): AI-RM-005 Global Search, AI-RM-006 Integrity Verification (overlaps AI-RM-015 — decision pending), AI-RM-007 Archive Repair (overlaps AI-RM-002 — decision pending), AI-RM-008 Archive Analytics, AI-RM-009 AI Archive Intelligence. Parallel tracks AI-RM-010, AI-RM-011 and AI-RM-012 are complete.
+
+### Standing guardrails for this priority period
+
+- **Main-window UI is frozen** for AI-RM-014 ([DEC-027](decisions/DEC-027_QUICK_INGEST_PRIORITY_AND_MAIN_WINDOW_UI_FREEZE.md)). New UI is limited to the menu-bar/tray companion, native notifications and explicitly approved companion windows.
+- `stable/0.9` (verify against `origin/stable/0.9`; the local ref can lag) is the production baseline. `main` is not a production development base until reconciled.
+- New work happens in a dedicated worktree + feature branch cut from the verified Stable HEAD, with one Claude Code session per worktree. Existing feature worktrees are never reset, cleaned, rebased or deleted.
+- Preview RC → packaged physical validation → explicit approval → Stable. No merge to Stable and no publish without explicit approval.
+
+### Status Ladder
+
+A milestone is not "Completed" merely because a Preview exists. Statuses use these rungs, in order:
+
+1. **Implementation complete** — built and tested on its feature branch.
+2. **Preview verified** — shipped in a Preview/RC build and verified there.
+3. **Stable promoted** — merged into `stable/0.9` and released under a Stable tag.
+4. **Production validated** — confirmed in real operator use after Stable release, with recorded evidence.
+
+The `Status` field keeps the word **Completed** only for milestones that reached at least rung 3 (the tooling's roadmap/dashboard agreement check keys on that word).
 
 **AI-RM-010** (Multi-Channel Release & Update System) is a separate, parallel release-infrastructure track, not a continuation of the sequence above — see its own entry below. Status: **Completed** — verified on real Windows hardware (2026-08-13).
 
 **AI-RM-012** (AutoIngest Knowledge & Onboarding Portal — Stage 1) is also a separate, parallel track — a documentation/tooling initiative, not a continuation of the AI-RM-001…009 archive-capability sequence. Status: **In Progress** — Stage 1 (prototype) complete, Stage 2 not started (see AI-FEAT-059; the full multi-stage portal is not scheduled here as a single milestone, see that milestone's own entry for why).
 
-**AI-RM-011** (Multi-Event Import) is likewise a separate track, not a continuation of the AI-RM-001…009 archive-capability sequence: an ingestion-workflow enhancement. Status: **In progress** — implemented and verified on branch `feature/multi-event-import`; merge and release pending. See its own entry below.
+**AI-RM-011** (Multi-Event Import) is likewise a separate track, not a continuation of the AI-RM-001…009 archive-capability sequence: an ingestion-workflow enhancement. Status: **Completed** — Stable promoted in v0.9.13 (tag `v0.9.13` @ `a1223ad`, 2026-09-28, contains `feature/multi-event-import`). See its own entry below.
+
+**AI-RM-014** (Quick Ingest & Desktop Experience) and **AI-RM-015** (Backup Intelligence Foundation) were added 2026-10-27 — see the Priority Order above and their own entries below.
 
 ---
 
@@ -35,16 +74,16 @@ Canonical, ordered implementation roadmap. Do not reorder unless the project own
 
 | Field | Value |
 |---|---|
-| Status | Planned — not started |
-| Objective | Evidence pending — not yet documented as fact |
+| Status | Planned — not started. Priority Order #6 (moved behind AI-RM-014 and AI-RM-015 on 2026-10-27, DEC-027). |
+| Objective | Owner-stated scope (2026-10-27): archive-health checks covering missing copies, sidecars, duplicates, orphan files, broken event structures, folder integrity and `event.json` issues, plus long-running archive operations. Also covers the **AutoIngest Archive Node**: the existing NAS server PC runs long-running archive work. **No Raspberry Pi requirement.** Detailed design: evidence pending. |
 | Included AI-FEAT IDs | AI-FEAT-049 |
-| Existing features extended | Evidence pending |
-| Dependencies | AI-RM-001 (complete) |
+| Existing features extended | AI-FEAT-042, AI-FEAT-043 (expected — see AI-FEAT-049) |
+| Dependencies | AI-RM-001 (complete). Sequenced after AI-RM-015 by owner priority; content identity is expected to inform the missing-copy and duplicate checks. |
 | Deliverables | Evidence pending |
 | Acceptance criteria | Evidence pending |
-| Planned estimate | 3–5 weeks (see [03_IMPLEMENTATION_TIMELINE.md](03_IMPLEMENTATION_TIMELINE.md)) |
-| Current risks | Scope not yet defined |
-| Next action | Discovery and specification |
+| Planned estimate | 3–5 weeks (see [03_IMPLEMENTATION_TIMELINE.md](03_IMPLEMENTATION_TIMELINE.md)) — original estimate, predates the Archive Node scope addition |
+| Current risks | Scope overlap with AI-RM-007 (Archive Repair) — owner decision pending on whether repair actions belong here |
+| Next action | Not started — follows AI-RM-015 in the Priority Order |
 
 ---
 
@@ -52,8 +91,8 @@ Canonical, ordered implementation roadmap. Do not reorder unless the project own
 
 | Field | Value |
 |---|---|
-| Status | Planned — not started |
-| Objective | Evidence pending — not yet documented as fact |
+| Status | Planned — not started. Priority Order #7. |
+| Objective | Owner-stated scope (preserved from prior agreement, restated 2026-10-27): event renaming, editing, splitting, merging, relocation and metadata reconciliation. Detailed design: evidence pending. |
 | Included AI-FEAT IDs | AI-FEAT-050 |
 | Existing features extended | Evidence pending |
 | Dependencies | AI-RM-002 |
@@ -69,8 +108,8 @@ Canonical, ordered implementation roadmap. Do not reorder unless the project own
 
 | Field | Value |
 |---|---|
-| Status | Planned — not started |
-| Objective | Evidence pending — not yet documented as fact |
+| Status | Planned — not started. Priority Order #8. |
+| Objective | Owner-stated scope (2026-10-27): collection / event / photographer browsing, later extended with verification receipts, content identity, import history and archive-copy status from AI-RM-015. Detailed design: evidence pending. |
 | Included AI-FEAT IDs | AI-FEAT-051 |
 | Existing features extended | Evidence pending |
 | Dependencies | AI-RM-003 |
@@ -111,7 +150,7 @@ Canonical, ordered implementation roadmap. Do not reorder unless the project own
 | Deliverables | Evidence pending |
 | Acceptance criteria | Evidence pending |
 | Planned estimate | 3–4 weeks |
-| Current risks | Scope overlap with AI-FEAT-025 needs explicit disambiguation before implementation starts, to avoid duplicating the existing `getFileHash()`-based mechanism without a clear reason |
+| Current risks | Scope overlap with AI-FEAT-025 needs explicit disambiguation before implementation starts, to avoid duplicating the existing `getFileHash()`-based mechanism without a clear reason. **Added 2026-10-27:** also overlaps AI-RM-015 (Backup Intelligence Foundation — durable verification evidence/receipts); owner decision pending on fold-in vs consumer vs separate. Not superseded until decided. |
 | Next action | Not started — follows AI-RM-005 |
 
 ---
@@ -188,7 +227,7 @@ Canonical, ordered implementation roadmap. Do not reorder unless the project own
 
 | Field | Value |
 |---|---|
-| Status | **In progress** (implemented and verified on `feature/multi-event-import`; not yet merged to `stable/0.9` or released) |
+| Status | **Completed** — Stable promoted in v0.9.13 (tag `v0.9.13` @ `a1223ad`, 2026-09-28; `git merge-base --is-ancestor feature/multi-event-import v0.9.13` confirmed 2026-10-27). Production validated: evidence pending. *Prior status (superseded 2026-10-27): "In progress (implemented and verified on `feature/multi-event-import`; not yet merged to `stable/0.9` or released)".* |
 | Objective | Let an operator open one import source (card, drive, USB, local folder — source-agnostic), assign its files to several events, and import them in ONE pass, with every file routed and tagged by its own event, without weakening any copy-safety, naming, metadata or transaction rule. |
 | Included AI-FEAT IDs | AI-FEAT-058 |
 | Existing features extended | AI-FEAT-017 (Grouping System — per-event instances), AI-FEAT-019 (Import Pipeline & Copy Engine), AI-FEAT-021 (Atomic Import Transaction — orchestrated per event), AI-FEAT-009 / AI-FEAT-010 (event picker/creator reused), AI-FEAT-024 (Source Cleanup — eligibility unchanged), AI-FEAT-025 (Deep Verify accumulation), AI-FEAT-044 (Local First sync manifests per event) |
@@ -197,7 +236,7 @@ Canonical, ordered implementation roadmap. Do not reorder unless the project own
 | Acceptance criteria | Live verification with synthetic fixtures: camera-card-style and plain-folder sources; A→B→C→A switching without rescanning; one combined review and one import; exact per-event routing and per-event metadata isolation (real ExifTool); event-local failure continues and retries; source removal resets the session; exact cleanup list; new-event creation from inside the workspace; multi-event Local First; the original single-event path unchanged; no Tag Refinement code reintroduced. |
 | Planned estimate | Single implementation session (2026-09-20) |
 | Current risks | Merge and release verification not yet performed. Two import code paths coexist (transitional). Known limitations in `docs/multi-event-import.md` §11. Per-Photo Tag Refinement is held out of Stable and is not part of this milestone. |
-| Next action | Owner review of the final report; commit breakdown approval; merge decision. |
+| Next action | None — Stable promoted. *Prior next action (superseded 2026-10-27): "Owner review of the final report; commit breakdown approval; merge decision."* |
 
 ---
 
@@ -232,3 +271,37 @@ Canonical, ordered implementation roadmap. Do not reorder unless the project own
 | Planned estimate | Evidence pending for phases predating this session (Phase 1A/3A-D/4A/4B — see AI-FEAT-060's Original Plan / Intent). This session's own Unified Contextual Keypad migration (native multistate spike → contextual keypad spike → production migration → three physical bug fixes) ran in a single extended session (2026-10-15). |
 | Current risks | `RefineTagsFolder`/`GroupsFolder`/`GroupMappingFolder` (the retired `PluginDynamicFolder`-based implementation) are kept as source/reference, not deleted — a future session should decide whether to remove them now that the native replacement is physically proven and released. macOS Stable distribution remains ad-hoc signed, not notarized (Apple Developer signing credentials not available) — same disclosed limitation as v0.9.13, not specific to this milestone. |
 | Next action | None for this milestone — complete and released. Optional follow-up: remove the retired `PluginDynamicFolder` source now that it is superseded and shipped. |
+
+---
+
+## AI-RM-014 — Quick Ingest & Desktop Experience
+
+| Field | Value |
+|---|---|
+| Status | **Active — next milestone (Priority Order #3, PRIORITY 1).** Q0 (audit, architecture, UX specification, test matrix) recorded 2026-10-27. Q1 implementation not started; it awaits owner approval. |
+| Objective | Give operators an always-available macOS menu-bar / Windows system-tray companion that shows connected-card status, honest prior-import evidence and archive reachability, and opens the **existing** import workflow quickly. The existing main-window UI is not changed ([DEC-027](decisions/DEC-027_QUICK_INGEST_PRIORITY_AND_MAIN_WINDOW_UI_FREEZE.md)). |
+| Included AI-FEAT IDs | AI-FEAT-061 |
+| Existing features extended | AI-FEAT-001 (app lifecycle / windows), AI-FEAT-005 (companion preferences), AI-FEAT-042 (read-only archive status) — reused through new modules; AI-FEAT-019 / AI-FEAT-020 / AI-FEAT-025 / AI-FEAT-058 are reused unchanged |
+| Dependencies | None blocking. It deliberately does not depend on AI-RM-015: the companion works without Backup Intelligence and gains confidence from it later through capability flags. |
+| Deliverables | Sub-phases (each in its own worktree/branch, each owner-approved): **Q0** repository audit, architecture & UX spec · **Q1** menu-bar/tray foundation & lifecycle · **Q2** connected-card detection & compact card-status popover · **Q3** archive destination & import-index status · **Q4** launch Quick Ingest & full-workspace handoff · **Q5** native notifications & card activity indicators · **Q6** card-aware history entry points & verification hooks (capability-flagged) · **Q7** physical-device E2E, packaging (macOS x64/arm64, Windows x64) & Preview RC. Full plan: AI-FEAT-061. |
+| Acceptance criteria | AI-FEAT-061 test matrix (17 rows) green, including the main-window visual and functional regression guarantee (no unexpected change to main-window UI, CSS, layout, event workflow or operator interactions). "Checksum verified" and per-card history are never shown before they are genuinely available. Preview RC first; Stable only after packaged physical validation and explicit approval. |
+| Planned estimate | Evidence pending — not yet documented as fact (no owner estimate given) |
+| Current risks | (R1) a companion `BrowserWindow` would be picked up by ≥7 `getAllWindows().find(...)` progress-routing sites and by the `activate` / `window-all-closed` window counts — a behavior-preserving fix must land first in Q1. (R2) drive polling currently starts with the main window; moving it to app lifetime must keep the single poller and the same broadcast contract. (R3) single-instance lock is a behavior change that needs approval. (R4) no volume UUID in `drivelist` output — labels are not identities. (R6) macOS builds are ad-hoc signed, not notarized; notification and login-item behavior must be physically verified. |
+| Next action | Owner review/approval of the AI-FEAT-061 plan (including R1 refactor, R3 single-instance, and the Q4 handoff listener as the only main-window code touch); then cut `feature/quick-ingest-companion-q1` worktree from the verified `origin/stable/0.9` HEAD. |
+
+---
+
+## AI-RM-015 — Backup Intelligence Foundation
+
+| Field | Value |
+|---|---|
+| Status | Planned — not started. Priority Order #5. |
+| Objective | Owner-stated scope (2026-10-27): unified SHA-256 content identity; source-content and final-archive identity; card/source session identity; archive-instance tracking across NAS roots; durable verification evidence; verification receipts; per-card import history; safe cross-device reconciliation. Detailed design: evidence pending. |
+| Included AI-FEAT IDs | AI-FEAT-062 |
+| Existing features extended | AI-FEAT-020 (name+size import index — expected to be superseded or backed by content identity), AI-FEAT-025 (checksum verification — expected to become durable) |
+| Dependencies | AI-RM-014 sequenced first by owner priority (not a technical dependency) |
+| Deliverables | Evidence pending |
+| Acceptance criteria | Evidence pending |
+| Planned estimate | Evidence pending — not yet documented as fact |
+| Current risks | Overlap with AI-RM-006 (Integrity Verification — Archive-Wide); owner decision pending. Migration from the existing capped, per-computer name+size import index has to be designed so that history is not lost and confidence is not overstated. |
+| Next action | Not started — follows AI-RM-014 (Ask AutoIngest continues in parallel on its own branch) |

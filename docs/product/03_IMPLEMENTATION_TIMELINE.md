@@ -143,8 +143,37 @@ No dates are invented in this document. Where a date is not verifiable from Git 
 | Planned start | 2026-09-20 |
 | Actual start | 2026-09-20 (branch `feature/multi-event-import` created from `stable/0.9`) |
 | Planned completion | Evidence pending — not yet documented as fact. |
-| Actual completion | Not yet — implemented and verified on the branch; merge/release pending |
+| Actual completion | 2026-09-28 — Stable promoted in v0.9.13 (tag `v0.9.13` @ `a1223ad`), reconciled 2026-10-27. *Prior value (superseded): "Not yet — implemented and verified on the branch; merge/release pending"* |
 | Actual duration | Evidence pending — not yet documented as fact. |
 | Reason for deviation | The branch base was re-cut from `61eba47` onto `7f72e51` after `stable/0.9` intentionally held Per-Photo Tag Refinement out of v0.9.12 (`ac75466`); refinement-dependent parts were removed. |
 | Evidence source | Git history (`61eba47`, `ac75466`, `7f72e51`), the feature record AI-FEAT-058, and the test files it cites |
 
+---
+
+## AI-RM-014 — Quick Ingest & Desktop Experience
+
+| Field | Value |
+|---|---|
+| Original estimate | Evidence pending — not yet documented as fact (no owner estimate given) |
+| Revised estimate | None |
+| Planned start | 2026-10-27 (Q0 specification); Q1 start depends on owner approval |
+| Actual start | 2026-10-27 — Q0 only (documentation/specification, no application code) |
+| Planned completion | Not yet scheduled |
+| Actual completion | Not applicable |
+| Actual duration | Not applicable |
+| Reason for deviation | Not applicable |
+| Evidence source | AI-FEAT-061 (Q0 record), DEC-027 |
+
+## AI-RM-015 — Backup Intelligence Foundation
+
+| Field | Value |
+|---|---|
+| Original estimate | Evidence pending — not yet documented as fact |
+| Revised estimate | None |
+| Planned start | Not yet scheduled — follows AI-RM-014 |
+| Actual start | Not started |
+| Planned completion | Not yet scheduled |
+| Actual completion | Not applicable |
+| Actual duration | Not applicable |
+| Reason for deviation | Not applicable |
+| Evidence source | AI-FEAT-062, DEC-027 |

@@ -10,7 +10,8 @@
         "AI-FEAT-005",
         "AI-FEAT-006",
         "AI-FEAT-007",
-        "AI-FEAT-057"
+        "AI-FEAT-057",
+        "AI-FEAT-061"
       ]
     },
     "data/keywords.registry.json": {
@@ -224,7 +225,8 @@
         "AI-FEAT-036",
         "AI-FEAT-037",
         "AI-FEAT-057",
-        "AI-FEAT-058"
+        "AI-FEAT-058",
+        "AI-FEAT-061"
       ]
     },
     "main/exifService.js": {
@@ -298,7 +300,8 @@
         "AI-FEAT-036",
         "AI-FEAT-037",
         "AI-FEAT-057",
-        "AI-FEAT-058"
+        "AI-FEAT-058",
+        "AI-FEAT-061"
       ]
     },
     "main/metadataQueueRecovery.js": {
@@ -395,7 +398,8 @@
         "AI-FEAT-005",
         "AI-FEAT-006",
         "AI-FEAT-007",
-        "AI-FEAT-057"
+        "AI-FEAT-057",
+        "AI-FEAT-061"
       ]
     },
     "main/qmzService.js": {
@@ -423,7 +427,8 @@
         "AI-FEAT-005",
         "AI-FEAT-006",
         "AI-FEAT-007",
-        "AI-FEAT-057"
+        "AI-FEAT-057",
+        "AI-FEAT-061"
       ]
     },
     "main/videoThumbService.js": {
@@ -527,7 +532,8 @@
         "AI-FEAT-039",
         "AI-FEAT-040",
         "AI-FEAT-041",
-        "AI-FEAT-057"
+        "AI-FEAT-057",
+        "AI-FEAT-061"
       ]
     },
     "renderer/renderer.js": {
@@ -567,7 +573,8 @@
         "AI-FEAT-037",
         "AI-FEAT-047",
         "AI-FEAT-057",
-        "AI-FEAT-058"
+        "AI-FEAT-058",
+        "AI-FEAT-061"
       ]
     },
     "renderer/splash.html": {
@@ -580,7 +587,8 @@
         "AI-FEAT-005",
         "AI-FEAT-006",
         "AI-FEAT-007",
-        "AI-FEAT-057"
+        "AI-FEAT-057",
+        "AI-FEAT-061"
       ]
     },
     "renderer/theme-init.js": {
@@ -593,7 +601,8 @@
         "AI-FEAT-005",
         "AI-FEAT-006",
         "AI-FEAT-007",
-        "AI-FEAT-057"
+        "AI-FEAT-057",
+        "AI-FEAT-061"
       ]
     },
     "renderer/treeAutocomplete.js": {
@@ -613,7 +622,8 @@
         "AI-FEAT-005",
         "AI-FEAT-006",
         "AI-FEAT-007",
-        "AI-FEAT-057"
+        "AI-FEAT-057",
+        "AI-FEAT-061"
       ]
     },
     "scripts/product-docs/cli.js": {
@@ -627,7 +637,8 @@
         "AI-FEAT-006",
         "AI-FEAT-007",
         "AI-FEAT-057",
-        "AI-FEAT-059"
+        "AI-FEAT-059",
+        "AI-FEAT-061"
       ]
     },
     "scripts/product-docs/knowledge-portal/index.html": {
@@ -736,7 +747,8 @@
         "AI-FEAT-005",
         "AI-FEAT-006",
         "AI-FEAT-007",
-        "AI-FEAT-057"
+        "AI-FEAT-057",
+        "AI-FEAT-061"
       ]
     },
     "scripts/product-docs/lib/validators.js": {
@@ -861,7 +873,8 @@
         "AI-FEAT-005",
         "AI-FEAT-006",
         "AI-FEAT-007",
-        "AI-FEAT-057"
+        "AI-FEAT-057",
+        "AI-FEAT-061"
       ]
     },
     "services/localSyncManifest.js": {
@@ -974,7 +987,8 @@
         "AI-FEAT-044",
         "AI-FEAT-045",
         "AI-FEAT-046",
-        "AI-FEAT-057"
+        "AI-FEAT-057",
+        "AI-FEAT-061"
       ]
     },
     "services/syncQueueService.js": {
@@ -1007,7 +1021,8 @@
         "AI-FEAT-005",
         "AI-FEAT-006",
         "AI-FEAT-007",
-        "AI-FEAT-057"
+        "AI-FEAT-057",
+        "AI-FEAT-061"
       ]
     },
     "services/thumbnailCache.js": {
@@ -1369,7 +1384,9 @@
       "integrations/logitech/autoingest-mx-csharp/src/Helpers/RefinementButtonImageRenderer.cs",
       "integrations/logitech/autoingest-mx-csharp/src/Helpers/RefinementWorkspaceModel.cs",
       "integrations/logitech/autoingest-mx-csharp/test/AutoIngestMxCsDevPlugin.Tests/ContextualKeypadModelTests.cs"
-    ]
+    ],
+    "AI-FEAT-061": [],
+    "AI-FEAT-062": []
   },
   "feature_to_tests": {
     "AI-FEAT-001": [],
@@ -1484,7 +1501,9 @@
       "test/multiEventNewEventUiLive.test.js"
     ],
     "AI-FEAT-059": [],
-    "AI-FEAT-060": []
+    "AI-FEAT-060": [],
+    "AI-FEAT-061": [],
+    "AI-FEAT-062": []
   },
   "ipc_to_features": {
     "SUBSYS-application-platform": {
@@ -1497,7 +1516,8 @@
         "AI-FEAT-005",
         "AI-FEAT-006",
         "AI-FEAT-007",
-        "AI-FEAT-057"
+        "AI-FEAT-057",
+        "AI-FEAT-061"
       ]
     },
     "SUBSYS-import-and-archive-writing": {
@@ -1566,7 +1586,8 @@
         "AI-FEAT-005",
         "AI-FEAT-006",
         "AI-FEAT-007",
-        "AI-FEAT-057"
+        "AI-FEAT-057",
+        "AI-FEAT-061"
       ]
     },
     "SUBSYS-archive-operations": {
@@ -1647,7 +1668,8 @@
       "AI-FEAT-005",
       "AI-FEAT-006",
       "AI-FEAT-007",
-      "AI-FEAT-057"
+      "AI-FEAT-057",
+      "AI-FEAT-061"
     ],
     "SUBSYS-archive-operations": [
       "AI-FEAT-042",
@@ -1713,7 +1735,8 @@
       "AI-FEAT-008"
     ],
     "SUBSYS-reliability-and-recovery": [
-      "AI-FEAT-054"
+      "AI-FEAT-054",
+      "AI-FEAT-062"
     ],
     "SUBSYS-search-and-discovery": [
       "AI-FEAT-053"

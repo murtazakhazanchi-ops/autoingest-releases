@@ -2,11 +2,11 @@
 
 > Generated artifact — locator only. Regenerate with `node scripts/product-docs/cli.js build`. Full machine-readable graph: `dependency-graph.json`. Views below are deliberately bounded (one subsystem or milestone chain per diagram) rather than one unreadable graph of every node.
 
-Total: 138 nodes, 600 edges.
+Total: 143 nodes, 639 edges.
 
 ### Roadmap milestone relationships
 
-13 node(s), 13 edge(s) in this view.
+15 node(s), 16 edge(s) in this view.
 
 ```mermaid
 flowchart LR
@@ -24,7 +24,10 @@ flowchart LR
   AI_RM_011(("AI-RM-011: Multi-Event Import"))
   AI_RM_012(("AI-RM-012: AutoIngest Knowledge & Onboarding Portal (Stage 1 + Stage 2)"))
   AI_RM_013(("AI-RM-013: MX Creative Console Hardware Integration (Unified Contextual Keypad)"))
+  AI_RM_014(("AI-RM-014: Quick Ingest & Desktop Experience"))
+  AI_RM_015(("AI-RM-015: Backup Intelligence Foundation"))
   AI_RM_002 -->|depends_on| AI_RM_001
+  AI_RM_002 -->|depends_on| AI_RM_015
   AI_RM_003 -->|depends_on| AI_RM_002
   AI_RM_004 -->|depends_on| AI_RM_003
   AI_RM_005 -->|depends_on| AI_RM_004
@@ -37,15 +40,18 @@ flowchart LR
   AI_RM_012 -->|depends_on| AI_RM_010
   AI_RM_013 -->|depends_on| AI_RM_001
   AI_RM_013 -->|depends_on| AI_RM_010
+  AI_RM_014 -->|depends_on| AI_RM_015
+  AI_RM_015 -->|depends_on| AI_RM_014
 ```
 
 ### Feature dependency overview (features with a depends_on/extended_by edge)
 
-55 node(s), 161 edge(s) in this view.
+58 node(s), 178 edge(s) in this view.
 
 ```mermaid
 flowchart LR
   %% Feature dependency overview (features with a depends_on/extended_by edge)
+  AI_FEAT_001["AI-FEAT-001: Electron Application Shell & Security Model"]
   AI_FEAT_002["AI-FEAT-002: Login & Operator Identity"]
   AI_FEAT_003["AI-FEAT-003: Dashboard & System Status"]
   AI_FEAT_004["AI-FEAT-004: event.json Data Model & Persistence Contract"]
@@ -101,15 +107,20 @@ flowchart LR
   AI_FEAT_056["AI-FEAT-056: AI Archive Intelligence"]
   AI_FEAT_057["AI-FEAT-057: Multi-Channel Release & Update System"]
   AI_FEAT_058["AI-FEAT-058: Multi-Event Import"]
+  AI_FEAT_061["AI-FEAT-061: Quick Ingest & Desktop Companion (Menu Bar / System Tray)"]
+  AI_FEAT_062["AI-FEAT-062: Backup Intelligence Foundation"]
+  AI_FEAT_001 -->|related_to| AI_FEAT_003
   AI_FEAT_002 -->|depends_on| AI_FEAT_005
   AI_FEAT_002 -->|related_to| AI_FEAT_022
   AI_FEAT_002 -->|related_to| AI_FEAT_027
   AI_FEAT_002 -->|related_to| AI_FEAT_028
+  AI_FEAT_003 -->|related_to| AI_FEAT_001
   AI_FEAT_003 -->|depends_on| AI_FEAT_004
   AI_FEAT_003 -->|related_to| AI_FEAT_031
   AI_FEAT_003 -->|related_to| AI_FEAT_034
   AI_FEAT_003 -->|related_to| AI_FEAT_035
   AI_FEAT_004 -->|related_to| AI_FEAT_021
+  AI_FEAT_005 -->|related_to| AI_FEAT_001
   AI_FEAT_005 -->|related_to| AI_FEAT_002
   AI_FEAT_005 -->|related_to| AI_FEAT_004
   AI_FEAT_005 -->|related_to| AI_FEAT_029
@@ -262,6 +273,20 @@ flowchart LR
   AI_FEAT_058 -->|related_to| AI_FEAT_028
   AI_FEAT_058 -->|related_to| AI_FEAT_029
   AI_FEAT_058 -->|related_to| AI_FEAT_044
+  AI_FEAT_061 -->|depends_on| AI_FEAT_001
+  AI_FEAT_061 -->|depends_on| AI_FEAT_005
+  AI_FEAT_061 -->|depends_on| AI_FEAT_019
+  AI_FEAT_061 -->|depends_on| AI_FEAT_020
+  AI_FEAT_061 -->|depends_on| AI_FEAT_025
+  AI_FEAT_061 -->|depends_on| AI_FEAT_042
+  AI_FEAT_061 -->|depends_on| AI_FEAT_058
+  AI_FEAT_061 -->|related_to| AI_FEAT_062
+  AI_FEAT_062 -->|depends_on| AI_FEAT_019
+  AI_FEAT_062 -->|depends_on| AI_FEAT_020
+  AI_FEAT_062 -->|depends_on| AI_FEAT_025
+  AI_FEAT_062 -->|depends_on| AI_FEAT_042
+  AI_FEAT_062 -->|related_to| AI_FEAT_054
+  AI_FEAT_062 -->|related_to| AI_FEAT_061
 ```
 
 ### Metadata subsystem
@@ -405,7 +430,7 @@ flowchart LR
 
 ### Planned archive-management direction
 
-20 node(s), 29 edge(s) in this view.
+22 node(s), 33 edge(s) in this view.
 
 ```mermaid
 flowchart LR
@@ -430,6 +455,9 @@ flowchart LR
   AI_RM_011(("AI-RM-011: Multi-Event Import"))
   AI_RM_012(("AI-RM-012: AutoIngest Knowledge & Onboarding Portal (Stage 1 + Stage 2)"))
   AI_RM_013(("AI-RM-013: MX Creative Console Hardware Integration (Unified Contextual Keypad)"))
+  AI_RM_014(("AI-RM-014: Quick Ingest & Desktop Experience"))
+  AI_RM_015(("AI-RM-015: Backup Intelligence Foundation"))
+  AI_FEAT_049 -->|extended_by| AI_RM_002
   AI_FEAT_049 -->|planned_in| AI_RM_002
   AI_FEAT_050 -->|planned_in| AI_RM_003
   AI_FEAT_051 -->|planned_in| AI_RM_004
@@ -442,6 +470,7 @@ flowchart LR
   AI_FEAT_056 -->|depends_on| AI_FEAT_055
   AI_FEAT_056 -->|planned_in| AI_RM_009
   AI_RM_002 -->|implements| AI_FEAT_049
+  AI_RM_002 -->|depends_on| AI_RM_015
   AI_RM_003 -->|implements| AI_FEAT_050
   AI_RM_003 -->|depends_on| AI_RM_002
   AI_RM_004 -->|implements| AI_FEAT_051
@@ -459,5 +488,7 @@ flowchart LR
   AI_RM_011 -->|depends_on| AI_RM_010
   AI_RM_012 -->|depends_on| AI_RM_010
   AI_RM_013 -->|depends_on| AI_RM_010
+  AI_RM_014 -->|depends_on| AI_RM_015
+  AI_RM_015 -->|depends_on| AI_RM_014
 ```
 

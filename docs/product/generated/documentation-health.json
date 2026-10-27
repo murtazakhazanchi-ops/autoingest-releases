@@ -4,8 +4,8 @@
     {
       "file": "11_ARCHITECTURAL_EVOLUTION.md",
       "level": "information",
-      "message": "42/60 features placed in the architectural-evolution relationship map",
-      "note": "Unplaced: AI-FEAT-002, AI-FEAT-003, AI-FEAT-005, AI-FEAT-007, AI-FEAT-008, AI-FEAT-010, AI-FEAT-012, AI-FEAT-013, AI-FEAT-014, AI-FEAT-015, AI-FEAT-016, AI-FEAT-023, AI-FEAT-026, AI-FEAT-034, AI-FEAT-035, AI-FEAT-048, AI-FEAT-059, AI-FEAT-060",
+      "message": "42/62 features placed in the architectural-evolution relationship map",
+      "note": "Unplaced: AI-FEAT-002, AI-FEAT-003, AI-FEAT-005, AI-FEAT-007, AI-FEAT-008, AI-FEAT-010, AI-FEAT-012, AI-FEAT-013, AI-FEAT-014, AI-FEAT-015, AI-FEAT-016, AI-FEAT-023, AI-FEAT-026, AI-FEAT-034, AI-FEAT-035, AI-FEAT-048, AI-FEAT-059, AI-FEAT-060, AI-FEAT-061, AI-FEAT-062",
       "rule": "architecture-coverage"
     },
     {
@@ -422,6 +422,13 @@
       "rule": "documentation-completeness"
     },
     {
+      "file": "features/AI-FEAT-062_BACKUP_INTELLIGENCE_FOUNDATION.md",
+      "level": "evidence_gap",
+      "message": "AI-FEAT-062 has 2 evidence-pending marker(s)",
+      "note": null,
+      "rule": "documentation-completeness"
+    },
+    {
       "file": "features/AI-FEAT-060_MX_CREATIVE_CONSOLE_LOGITECH_HARDWARE_CONTROL_SURFACE.md",
       "level": "warning",
       "message": "AI-FEAT-060 has no Lifecycle Metadata section",
@@ -537,6 +544,13 @@
       "file": "generated/dependency-graph.json",
       "level": "warning",
       "message": "Undocumented dependency cycle: AI-FEAT-032 -> AI-FEAT-039 -> AI-FEAT-032",
+      "note": null,
+      "rule": "cyclic-dependency"
+    },
+    {
+      "file": "generated/dependency-graph.json",
+      "level": "warning",
+      "message": "Undocumented dependency cycle: AI-RM-015 -> AI-RM-014 -> AI-RM-015",
       "note": null,
       "rule": "cyclic-dependency"
     },
@@ -731,11 +745,11 @@
     }
   ],
   "schema_version": "1.3.0",
-  "source_commit": "093c7212bdab45c2486f15fe99ee84db8ccb56f3",
+  "source_commit": "3c2c73b04a78e719b51f41827b3e5c93f5d5f03c",
   "summary": {
     "error": 0,
-    "evidence_gap": 59,
+    "evidence_gap": 60,
     "information": 27,
-    "warning": 18
+    "warning": 19
   }
 }

@@ -4,43 +4,45 @@ Live project status. Update alongside meaningful feature work — see [05_DOCUME
 
 | Field | Value |
 |---|---|
-| Last updated | 2026-08-05 |
-| Current product version | 0.9.9 (`package.json`) |
-| Current branch | `main` |
-| Latest relevant commit | `a78b97c` — "docs(product): add queryable documentation intelligence tooling" (Part 4), merged to `main`. |
+| Last updated | 2026-10-27 |
+| Current product version | 0.9.16 (`package.json` on `origin/stable/0.9` @ `0eb9c43`, tag `v0.9.16`, 2026-10-26) |
+| Current branch | `stable/0.9` is the production baseline (verify against `origin/stable/0.9`; the local `stable/0.9` ref was 43 commits behind on 2026-10-27). This update was authored on `docs/roadmap-quick-ingest-priority`, cut from `origin/stable/0.9` @ `0eb9c43`. |
+| Latest relevant commit | `0eb9c43` — "chore(release): bump AutoIngest to v0.9.16" (Stable HEAD at the time of this update) |
 | Documentation system status | Part 1 (feature registry, roadmap, dashboard) complete; Architectural Evolution complete; Part 2 (bugs/decisions/postmortems) complete; Part 3 (Documentation Intelligence & Lifecycle System) complete; Part 4 (Queryable Documentation & Engineering Intelligence — the `scripts/product-docs/` CLI's `build`/`validate`/`query`/`impact`/`changes` commands and the `docs/product/generated/` indexes) complete — all committed to `main` as of `a78b97c`. Part 5 (Autonomous Engineering Documentation Orchestration — `scripts/product-docs/automation/`, the `automation <sub>` CLI commands, Engineering Evidence Packets, and the version-controlled but not-yet-installed pre-commit/post-commit/pre-push hooks) implemented, reviewed, and locally validated 2026-08-05, committed to `main` 2026-08-06 — see [10_CHANGELOG.md](10_CHANGELOG.md) for the full entry. This documentation-system progress is independent of, and must not be read as advancing, the AutoIngest application roadmap below. |
-| Total registered features | 59 (`AI-FEAT-001` through `AI-FEAT-059`, with IDs 001-057 shared history, `AI-FEAT-058` = Multi-Event Import (stable/0.9), `AI-FEAT-059` = Knowledge Engine (main) — see [DEC-022](decisions/DEC-022_MAIN_STABLE_RECONCILIATION_CANONICAL_ID_COLLISION_RESOLUTION.md) for why the Knowledge Engine's original `AI-FEAT-058` was renumbered) — this field and the rest of this dashboard were last fully reconciled 2026-08-05; only the counts directly touched by AI-FEAT-057/AI-RM-010 (2026-08-12), AI-FEAT-058/AI-RM-011 (2026-09-20), AI-FEAT-059/AI-RM-012 (2026-08-13), and the main/stable reconciliation itself (2026-09-28) were updated here — the remaining fields below predate and are independent of that work and carry their own pre-existing staleness (see Documentation health row) |
+| Total registered features | 62 (`AI-FEAT-001` through `AI-FEAT-062`; AI-FEAT-061 Quick Ingest & Desktop Companion and AI-FEAT-062 Backup Intelligence Foundation added 2026-10-27 as Planned). ID-history note unchanged: IDs 001-057 shared history, `AI-FEAT-058` = Multi-Event Import, `AI-FEAT-059` = Knowledge Engine — see [DEC-022](decisions/DEC-022_MAIN_STABLE_RECONCILIATION_CANONICAL_ID_COLLISION_RESOLUTION.md). |
 | Implemented features | 45 (includes AI-FEAT-057) |
-| Implemented — evolving | 5 (AI-FEAT-003, AI-FEAT-008, AI-FEAT-034, AI-FEAT-035, AI-FEAT-059) |
+| Implemented — evolving | 7 (AI-FEAT-003, AI-FEAT-008, AI-FEAT-034, AI-FEAT-035, AI-FEAT-058, AI-FEAT-059, AI-FEAT-060) |
 | Partially implemented | 0 |
-| In active development | 1 (AI-FEAT-058 Multi-Event Import — implemented and verified on branch `feature/multi-event-import`; merge and release pending; AI-RM-011, a parallel ingestion-workflow track outside the AI-RM-001…009 sequence) |
-| Planned features | 8 (AI-FEAT-049 through AI-FEAT-056, mapped 1:1 to AI-RM-002 through AI-RM-009) |
-| Overall roadmap progress | 1/9 milestones complete |
-| Completed roadmap milestones | AI-RM-001 (Metadata Audit & Repair); AI-RM-010 (Multi-Channel Release & Update System — a parallel infrastructure track, not part of the AI-RM-001…009 archive-capability sequence this dashboard otherwise tracks); AI-RM-012 (AutoIngest Knowledge & Onboarding Portal — a parallel documentation/tooling track, merged to `main` 2026-08-14); AI-RM-013 (MX Creative Console Hardware Integration — a parallel hardware-integration track, released in AutoIngest v0.9.14 Stable 2026-10-16) |
-| Current roadmap milestone | AI-RM-002 (Archive Maintenance) — not started |
-| Active implementation task | None — not started (confirmed via exhaustive code/git search, see AI-FEAT-049) |
-| Next milestone | AI-RM-002 (Archive Maintenance) |
-| Following milestone | AI-RM-003 (Event Maintenance) |
-| Blockers | None identified for AI-RM-002 beyond the absence of a defined scope |
-| Current risks | (1) AI-RM-007's planned service name collides with an existing, unrelated `archiveRepairService.js` (temp-file cleanup only) — needs resolution before implementation starts. (2) AI-RM-006's scope needs explicit disambiguation from the already-implemented AI-FEAT-025 (narrower checksum verification) to avoid duplicating existing work without a clear reason. |
-| Recently completed work | UI polish to the Metadata Management Modal / Audit & Repair tab (commits `4446a30` → `c5d200f`, 2026-08-02 through 2026-08-04) — cosmetic/layout only, no behavior change, all part of the already-complete AI-RM-001 |
-| Next planned action | Discovery and specification for AI-RM-002 (Archive Maintenance) — no scope exists yet |
+| In active development | 0 — AI-FEAT-061 (AI-RM-014) is the next active milestone but is at Q0 (specification) only; no implementation has started *(Prior value, superseded 2026-10-27: 1 (AI-FEAT-058 Multi-Event Import — implemented and verified on branch `feature/multi-event-import`; merge and release pending; AI-RM-011, a parallel ingestion-workflow track outside the AI-RM-001…009 sequence))* |
+| Planned features | 10 (AI-FEAT-049 through AI-FEAT-056 mapped 1:1 to AI-RM-002 through AI-RM-009; AI-FEAT-061 → AI-RM-014; AI-FEAT-062 → AI-RM-015) |
+| Overall roadmap progress | 5/15 milestones Completed (AI-RM-001, AI-RM-010, AI-RM-011, AI-RM-012, AI-RM-013) — completion = Stable promoted or merged per each entry; see 02_MASTER_ROADMAP.md § Status Ladder *(Prior value, superseded 2026-10-27: 1/9 milestones complete)* |
+| Completed roadmap milestones | AI-RM-001 (Metadata Audit & Repair); AI-RM-010 (Multi-Channel Release & Update System — a parallel infrastructure track, not part of the AI-RM-001…009 archive-capability sequence this dashboard otherwise tracks); AI-RM-012 (AutoIngest Knowledge & Onboarding Portal — a parallel documentation/tooling track, merged to `main` 2026-08-14); AI-RM-013 (MX Creative Console Hardware Integration — a parallel hardware-integration track, released in AutoIngest v0.9.14 Stable 2026-10-16); AI-RM-011 (Multi-Event Import — Stable promoted in v0.9.13, tag `v0.9.13` @ `a1223ad`; status reconciled 2026-10-27) |
+| Current roadmap milestone | AI-RM-014 (Quick Ingest & Desktop Experience) — next active, PRIORITY 1; Q0 specification recorded, Q1 not started (owner-directed reprioritization, DEC-027) *(Prior value, superseded 2026-10-27: Archive Maintenance — not started; ID omitted here because this field is machine-parsed)* |
+| Active implementation task | None — Q0 (architecture & specification) recorded in AI-FEAT-061; Q1 awaits owner approval *(Prior value, superseded 2026-10-27: None — not started (confirmed via exhaustive code/git search, see AI-FEAT-049))* |
+| Next milestone | AI-RM-014 (Quick Ingest & Desktop Experience) *(Prior value, superseded 2026-10-27: AI-RM-002 (Archive Maintenance))* |
+| Following milestone | AI-RM-015 (Backup Intelligence Foundation), with Ask AutoIngest continuing in parallel on `feature/ask-autoingest` — see 02_MASTER_ROADMAP.md § Priority Order *(Prior value, superseded 2026-10-27: AI-RM-003 (Event Maintenance))* |
+| Blockers | Owner approval of the AI-FEAT-061 Q1 plan (including the behavior-preserving main-window targeting refactor and the single-instance-lock compatibility decision) *(Prior value, superseded 2026-10-27: None identified for AI-RM-002 beyond the absence of a defined scope)* |
+| Current risks | (1) AI-RM-014 R1: a companion BrowserWindow would be caught by ≥7 `getAllWindows().find(...)` progress-routing sites plus the `activate`/`window-all-closed` window counts — must be fixed first and without behavior change. (2) Main-window UI is frozen for AI-RM-014 (DEC-027) — any regression there is a release blocker. (3) `feature/ask-autoingest` still uses pre-DEC-022 IDs (AI-RM-011/AI-FEAT-058 for the knowledge portal) and edits 02_MASTER_ROADMAP.md — ID reconciliation needed at its merge. (4) Carried forward: AI-RM-007 service-name collision with `archiveRepairService.js`; AI-RM-006 vs AI-FEAT-025 scope disambiguation. *(Prior value, superseded 2026-10-27: (1) AI-RM-007's planned service name collides with an existing, unrelated `archiveRepairService.js` (temp-file cleanup only) — needs resolution before implementation starts. (2) AI-RM-006's scope needs explicit disambiguation from the already-implemented AI-FEAT-025 (narrower checksum verification) to avoid duplicating existing work without a clear reason.)* |
+| Recently completed work | 2026-10-27 — roadmap reprioritization and AI-RM-014 Q0 specification (documentation only, no application code). Releases since the prior dashboard update: v0.9.13 (Multi-Event Import), v0.9.14 (MX Creative Console), v0.9.16 (current Stable). *(Prior value, superseded 2026-10-27: UI polish to the Metadata Management Modal / Audit & Repair tab (commits `4446a30` → `c5d200f`, 2026-08-02 through 2026-08-04) — cosmetic/layout only, no behavior change, all part of the already-complete AI-RM-001)* |
+| Next planned action | Owner review of AI-FEAT-061 (architecture, phase plan, test matrix); on approval, start AI-RM-014 Q1 in a dedicated worktree cut from the verified `origin/stable/0.9` HEAD *(Prior value, superseded 2026-10-27: Discovery and specification for AI-RM-002 (Archive Maintenance) — no scope exists yet)* |
 | Documentation health | This system (`docs/product/`) was established 2026-08-04 and extended through Parts 1–3 the same day; Part 4 (2026-08-05) added `docs/product/generated/documentation-health.md`/`.json` as a first mechanically-runnable implementation of [14_VALIDATION_SPECIFICATION.md](14_VALIDATION_SPECIFICATION.md)'s rules — see that generated report for the current live count (0 errors as of this update). All 56 feature files exist; evidence status varies per file (most are "Verified from current code," a minority — notably AI-FEAT-037 Metadata Reapply/Sync — are marked with intentionally lower evidence confidence pending a follow-up function-level audit). `bugs/`, `decisions/`, and `postmortems/` are populated (`BUG-001`–`BUG-010`, `DEC-001`–`DEC-015`, `PM-001`). Every feature file now also carries a mechanically-generated Lifecycle Metadata section (documentation-completeness is a computed field per file, not a subjective claim) and an Engineering Evolution section. |
 | Evidence gaps | See each feature file's "Evidence status" field. Notable gaps: AI-FEAT-037 (Metadata Reapply/Sync — file-existence + learning-log evidence only, not independently code-audited), AI-FEAT-007 (Telemetry Pipeline — scope of data collected not yet audited), AI-FEAT-022 (Photographer-Folder Resolution — relationship to the v0.9.0 "Photographer Folder Sequencing" release-note item not yet confirmed as same-or-different code path) |
-| Pending decisions | Naming collision for AI-RM-007's service (see Current risks); scope disambiguation for AI-RM-006 vs. AI-FEAT-025 |
+| Pending decisions | (1) AI-FEAT-061 Q1 approval, including single-instance lock and the Q4 handoff listener as the only main-window code touch. (2) AI-RM-006 vs AI-RM-015 overlap. (3) AI-RM-007 vs AI-RM-002 overlap. (4) Placement of AI-RM-005…009 in the Priority Order. (5) Carried forward: AI-RM-007 naming collision; AI-RM-006 vs AI-FEAT-025. *(Prior value, superseded 2026-10-27: Naming collision for AI-RM-007's service (see Current risks); scope disambiguation for AI-RM-006 vs. AI-FEAT-025)* |
 
 ## Roadmap Snapshot
 
+Priority order (DEC-027, 2026-10-27):
 ```
-AI-RM-001  Metadata Audit & Repair        [========== COMPLETE ==========]
-AI-RM-002  Archive Maintenance            [ not started ]  ← next
-AI-RM-003  Event Maintenance              [ not started ]
-AI-RM-004  Archive Browser                [ not started ]
-AI-RM-005  Global Search                  [ not started ]
-AI-RM-006  Integrity Verification         [ not started ]
-AI-RM-007  Archive Repair                 [ not started ]
-AI-RM-008  Archive Analytics              [ not started ]
-AI-RM-009  AI Archive Intelligence        [ not started ]
+1  AI-RM-001  Metadata Audit & Repair            [ COMPLETE — Stable ]
+2  AI-RM-013  MX Creative Console                [ COMPLETE — Stable v0.9.14 ]
+3  AI-RM-014  Quick Ingest & Desktop Experience  [ Q0 spec done; Q1 awaiting approval ]  ← NEXT ACTIVE
+4  —          Ask AutoIngest (feature branch)    [ in progress on feature/ask-autoingest ]
+5  AI-RM-015  Backup Intelligence Foundation     [ planned ]
+6  AI-RM-002  Archive Maintenance & Archive Node [ planned ]
+7  AI-RM-003  Event Maintenance                  [ planned ]
+8  AI-RM-004  Archive Browser                    [ planned ]
+   AI-RM-005…009                                 [ planned, not yet placed ]
+   AI-RM-010 / 011 / 012                         [ parallel tracks — COMPLETE ]
 ```
 
 ## How This Was Established

@@ -2,51 +2,52 @@
 
 > Generated artifact — cross-checked against 01_FEATURE_REGISTRY.md, 02_MASTER_ROADMAP.md, 03_IMPLEMENTATION_TIMELINE.md, and 04_PROJECT_DASHBOARD.md at generation time; generation fails with a diagnostic instead of silently picking a side if those sources disagree. Regenerate with `node scripts/product-docs/cli.js build`.
 
-**Progress**: 4/13 milestones complete (30.8%)
-**Current milestone**: AI-RM-002
-**Following milestone**: AI-RM-003
-**Total features**: 60
+**Progress**: 5/15 milestones complete (33.3%)
+**Current milestone**: AI-RM-014
+**Following milestone**: AI-RM-015
+**Total features**: 62
 
 ## Feature status counts (overall)
 
 | Status | Count |
 |---|---|
-| Implemented — evolving | 6 |
+| Implemented — evolving | 7 |
 | Implemented | 45 |
-| In active development | 1 |
-| Planned | 8 |
+| Planned | 10 |
 
 ## Milestones
 
 | ID | Name | Status | Included features | Dependencies | Planned estimate | Next action |
 |---|---|---|---|---|---|---|
 | AI-RM-001 | Metadata Audit & Repair | **Completed** | AI-FEAT-029, AI-FEAT-030, AI-FEAT-031, AI-FEAT-032, AI-FEAT-033, AI-FEAT-034, AI-FEAT-035, AI-FEAT-036, AI-FEAT-037 | — | Evidence pending (predates this documentation system) | None — complete. Recent work (2026-08-02 through 2026-08-04) has been UI polish on the already-delivered Metadata Management Modal, not new scope. |
-| AI-RM-002 | Archive Maintenance | Planned — not started | AI-FEAT-049 | AI-RM-001 | 3–5 weeks (see [03_IMPLEMENTATION_TIMELINE.md](03_IMPLEMENTATION_TIMELINE.md)) | Discovery and specification |
-| AI-RM-003 | Event Maintenance | Planned — not started | AI-FEAT-050 | AI-RM-002 | 4–6 weeks | Not started — follows AI-RM-002 |
-| AI-RM-004 | Archive Browser | Planned — not started | AI-FEAT-051 | AI-RM-003 | 5–7 weeks | Not started — follows AI-RM-003 |
+| AI-RM-002 | Archive Maintenance | Planned — not started. Priority Order #6 (moved behind AI-RM-014 and AI-RM-015 on 2026-10-27, DEC-027). | AI-FEAT-049 | AI-RM-001, AI-RM-015 | 3–5 weeks (see [03_IMPLEMENTATION_TIMELINE.md](03_IMPLEMENTATION_TIMELINE.md)) — original estimate, predates the Archive Node scope addition | Not started — follows AI-RM-015 in the Priority Order |
+| AI-RM-003 | Event Maintenance | Planned — not started. Priority Order #7. | AI-FEAT-050 | AI-RM-002 | 4–6 weeks | Not started — follows AI-RM-002 |
+| AI-RM-004 | Archive Browser | Planned — not started. Priority Order #8. | AI-FEAT-051 | AI-RM-003 | 5–7 weeks | Not started — follows AI-RM-003 |
 | AI-RM-005 | Global Search | Planned — not started | AI-FEAT-053 | AI-RM-004 | 3–5 weeks | Not started — follows AI-RM-004 |
 | AI-RM-006 | Integrity Verification | Planned — not started | AI-FEAT-054 | AI-RM-005 | 3–4 weeks | Not started — follows AI-RM-005 |
 | AI-RM-007 | Archive Repair | Planned — not started | AI-FEAT-052 | AI-RM-006 | 4–6 weeks | Not started — follows AI-RM-006 |
 | AI-RM-008 | Archive Analytics | Planned — not started | AI-FEAT-055 | AI-RM-007 | 2–4 weeks | Not started — follows AI-RM-007 |
 | AI-RM-009 | AI Archive Intelligence | Planned — not started | AI-FEAT-056 | AI-RM-008 | 6–10 weeks | Not started — follows AI-RM-008; final milestone in the AI-RM-001…009 archive-capability sequence (AI-RM-010 is a separate, parallel release-infrastructure track — see below, not a continuation of this sequence) |
 | AI-RM-010 | Multi-Channel Release & Update System | **Completed** — verified on real Windows hardware (2026-08-13) | AI-FEAT-057 | — | Single implementation session (2026-08-12), plus a three-part live-pilot verification arc (2026-08-13) | None — complete. A future real Stable release (whenever separately authorized) will automatically carry the Update Channel selector to the entire existing Stable install base as an ordinary update; no further migration work is required for that transition. |
-| AI-RM-011 | Multi-Event Import | **In progress** (implemented and verified on `feature/multi-event-import`; not yet merged to `stable/0.9` or released) | AI-FEAT-058 | AI-RM-010 | Single implementation session (2026-09-20) | Owner review of the final report; commit breakdown approval; merge decision. |
+| AI-RM-011 | Multi-Event Import | **Completed** — Stable promoted in v0.9.13 (tag `v0.9.13` @ `a1223ad`, 2026-09-28; `git merge-base --is-ancestor feature/multi-event-import v0.9.13` confirmed 2026-10-27). Production validated: evidence pending. *Prior status (superseded 2026-10-27): "In progress (implemented and verified on `feature/multi-event-import`; not yet merged to `stable/0.9` or released)".* | AI-FEAT-058 | AI-RM-010 | Single implementation session (2026-09-20) | None — Stable promoted. *Prior next action (superseded 2026-10-27): "Owner review of the final report; commit breakdown approval; merge decision."* |
 | AI-RM-012 | AutoIngest Knowledge & Onboarding Portal (Stage 1 + Stage 2) | **Completed — Stage 1 + Stage 2 merged to `main`** (merge commit `765e9b8`, 2026-08-14). Stage 1 (prototype) and Stage 2 Phases 4–27 (concept/intent retrieval layer, Workflow record type, roadmap routing, Online Registry/teamwork coverage, 119-question eval corpus, hallucination/grounding + adversarial suites, 9-tab portal UX + directory/onboarding mode, mandatory final-report sections, and a pre-merge acceptance pass) all complete and verified from the actual merged `main` state. Stage 3 has not begun and requires separate approval. | AI-FEAT-059 | AI-RM-001, AI-RM-010 | Stage 1: single implementation session (2026-08-13). Stage 2: single extended implementation session spanning 2026-08-13 to 2026-08-14 (Phases 1-27 plus a user-directed pre-merge acceptance pass and merge). | None for this milestone — complete and merged. Deferred future-work items (true rendered-browser verification, remaining Workflow-record coverage, a production-integration decision, a semantic/AI-assisted-retrieval necessity review, a separate live-Registry-integration architecture decision, UX polish from real operator use, and an automatic-discoverability maintenance process) are recorded, not scheduled — see AI-FEAT-059's Future Enhancements. Any Stage 3 work requires separate review and authorization. |
 | AI-RM-013 | MX Creative Console Hardware Integration (Unified Contextual Keypad) | **Completed** — released in AutoIngest v0.9.14 Stable (commit `093c721`, tag `v0.9.14`, 2026-10-16) | AI-FEAT-060 | AI-RM-001, AI-RM-010 | Evidence pending for phases predating this session (Phase 1A/3A-D/4A/4B — see AI-FEAT-060's Original Plan / Intent). This session's own Unified Contextual Keypad migration (native multistate spike → contextual keypad spike → production migration → three physical bug fixes) ran in a single extended session (2026-10-15). | None for this milestone — complete and released. Optional follow-up: remove the retired `PluginDynamicFolder` source now that it is superseded and shipped. |
+| AI-RM-014 | Quick Ingest & Desktop Experience | **Active — next milestone (Priority Order #3, PRIORITY 1).** Q0 (audit, architecture, UX specification, test matrix) recorded 2026-10-27. Q1 implementation not started; it awaits owner approval. | AI-FEAT-061 | AI-RM-015 | Evidence pending — not yet documented as fact (no owner estimate given) | Owner review/approval of the AI-FEAT-061 plan (including R1 refactor, R3 single-instance, and the Q4 handoff listener as the only main-window code touch); then cut `feature/quick-ingest-companion-q1` worktree from the verified `origin/stable/0.9` HEAD. |
+| AI-RM-015 | Backup Intelligence Foundation | Planned — not started. Priority Order #5. | AI-FEAT-062 | AI-RM-014 | Evidence pending — not yet documented as fact | Not started — follows AI-RM-014 (Ask AutoIngest continues in parallel on its own branch) |
 
 ## Blockers and risks
 
-**Blockers**: None identified for AI-RM-002 beyond the absence of a defined scope
+**Blockers**: Owner approval of the AI-FEAT-061 Q1 plan (including the behavior-preserving main-window targeting refactor and the single-instance-lock compatibility decision) *(Prior value, superseded 2026-10-27: None identified for AI-RM-002 beyond the absence of a defined scope)*
 
-**Current risks**: (1) AI-RM-007's planned service name collides with an existing, unrelated `archiveRepairService.js` (temp-file cleanup only) — needs resolution before implementation starts. (2) AI-RM-006's scope needs explicit disambiguation from the already-implemented AI-FEAT-025 (narrower checksum verification) to avoid duplicating existing work without a clear reason.
+**Current risks**: (1) AI-RM-014 R1: a companion BrowserWindow would be caught by ≥7 `getAllWindows().find(...)` progress-routing sites plus the `activate`/`window-all-closed` window counts — must be fixed first and without behavior change. (2) Main-window UI is frozen for AI-RM-014 (DEC-027) — any regression there is a release blocker. (3) `feature/ask-autoingest` still uses pre-DEC-022 IDs (AI-RM-011/AI-FEAT-058 for the knowledge portal) and edits 02_MASTER_ROADMAP.md — ID reconciliation needed at its merge. (4) Carried forward: AI-RM-007 service-name collision with `archiveRepairService.js`; AI-RM-006 vs AI-FEAT-025 scope disambiguation. *(Prior value, superseded 2026-10-27: (1) AI-RM-007's planned service name collides with an existing, unrelated `archiveRepairService.js` (temp-file cleanup only) — needs resolution before implementation starts. (2) AI-RM-006's scope needs explicit disambiguation from the already-implemented AI-FEAT-025 (narrower checksum verification) to avoid duplicating existing work without a clear reason.)*
 
 ## Recent and next
 
-**Recently completed documentation work**: UI polish to the Metadata Management Modal / Audit & Repair tab (commits `4446a30` → `c5d200f`, 2026-08-02 through 2026-08-04) — cosmetic/layout only, no behavior change, all part of the already-complete AI-RM-001
+**Recently completed documentation work**: 2026-10-27 — roadmap reprioritization and AI-RM-014 Q0 specification (documentation only, no application code). Releases since the prior dashboard update: v0.9.13 (Multi-Event Import), v0.9.14 (MX Creative Console), v0.9.16 (current Stable). *(Prior value, superseded 2026-10-27: UI polish to the Metadata Management Modal / Audit & Repair tab (commits `4446a30` → `c5d200f`, 2026-08-02 through 2026-08-04) — cosmetic/layout only, no behavior change, all part of the already-complete AI-RM-001)*
 
-**Next planned action**: Discovery and specification for AI-RM-002 (Archive Maintenance) — no scope exists yet
+**Next planned action**: Owner review of AI-FEAT-061 (architecture, phase plan, test matrix); on approval, start AI-RM-014 Q1 in a dedicated worktree cut from the verified `origin/stable/0.9` HEAD *(Prior value, superseded 2026-10-27: Discovery and specification for AI-RM-002 (Archive Maintenance) — no scope exists yet)*
 
-**Pending decisions**: Naming collision for AI-RM-007's service (see Current risks); scope disambiguation for AI-RM-006 vs. AI-FEAT-025
+**Pending decisions**: (1) AI-FEAT-061 Q1 approval, including single-instance lock and the Q4 handoff listener as the only main-window code touch. (2) AI-RM-006 vs AI-RM-015 overlap. (3) AI-RM-007 vs AI-RM-002 overlap. (4) Placement of AI-RM-005…009 in the Priority Order. (5) Carried forward: AI-RM-007 naming collision; AI-RM-006 vs AI-FEAT-025. *(Prior value, superseded 2026-10-27: Naming collision for AI-RM-007's service (see Current risks); scope disambiguation for AI-RM-006 vs. AI-FEAT-025)*
 
 **Evidence gaps**: See each feature file's "Evidence status" field. Notable gaps: AI-FEAT-037 (Metadata Reapply/Sync — file-existence + learning-log evidence only, not independently code-audited), AI-FEAT-007 (Telemetry Pipeline — scope of data collected not yet audited), AI-FEAT-022 (Photographer-Folder Resolution — relationship to the v0.9.0 "Photographer Folder Sequencing" release-note item not yet confirmed as same-or-different code path)
 

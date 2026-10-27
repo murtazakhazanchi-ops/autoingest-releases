@@ -6,7 +6,9 @@
       "canonical_document": "features/AI-FEAT-001_ELECTRON_APPLICATION_SHELL_SECURITY_MODEL.md",
       "category": "Application Platform",
       "dependencies": [],
-      "dependents": [],
+      "dependents": [
+        "AI-FEAT-061"
+      ],
       "documentation_completeness": {
         "evidence_gap_count": 7,
         "narrative": "Partial — 3 unresolved evidence gaps in this file (see fields/sections marked \"Evidence pending\" above)"
@@ -263,7 +265,8 @@
         "AI-FEAT-007",
         "AI-FEAT-042",
         "AI-FEAT-048",
-        "AI-FEAT-057"
+        "AI-FEAT-057",
+        "AI-FEAT-061"
       ],
       "documentation_completeness": {
         "evidence_gap_count": 6,
@@ -1022,7 +1025,9 @@
         "AI-FEAT-024",
         "AI-FEAT-025",
         "AI-FEAT-044",
-        "AI-FEAT-058"
+        "AI-FEAT-058",
+        "AI-FEAT-061",
+        "AI-FEAT-062"
       ],
       "documentation_completeness": {
         "evidence_gap_count": 4,
@@ -1084,7 +1089,10 @@
       "dependencies": [
         "AI-FEAT-019"
       ],
-      "dependents": [],
+      "dependents": [
+        "AI-FEAT-061",
+        "AI-FEAT-062"
+      ],
       "documentation_completeness": {
         "evidence_gap_count": 8,
         "narrative": "Partial — 3 unresolved evidence gaps in this file (see fields/sections marked \"Evidence pending\" above)"
@@ -1360,7 +1368,9 @@
         "AI-FEAT-019"
       ],
       "dependents": [
-        "AI-FEAT-054"
+        "AI-FEAT-054",
+        "AI-FEAT-061",
+        "AI-FEAT-062"
       ],
       "documentation_completeness": {
         "evidence_gap_count": 9,
@@ -2405,7 +2415,9 @@
         "AI-FEAT-043",
         "AI-FEAT-044",
         "AI-FEAT-046",
-        "AI-FEAT-049"
+        "AI-FEAT-049",
+        "AI-FEAT-061",
+        "AI-FEAT-062"
       ],
       "documentation_completeness": {
         "evidence_gap_count": 2,
@@ -3360,7 +3372,9 @@
         "AI-FEAT-019",
         "AI-FEAT-021"
       ],
-      "dependents": [],
+      "dependents": [
+        "AI-FEAT-061"
+      ],
       "documentation_completeness": {
         "evidence_gap_count": 1,
         "narrative": "Complete for the implemented scope; merge/release evidence is pending (see fields above)"
@@ -3368,8 +3382,8 @@
       "evidence_status": "Verified from current code (branch `feature/multi-event-import`, uncommitted at the time of writing), tests, and live synthetic runs. Not yet merged to `stable/0.9` or released — see Status.",
       "feature_id": "AI-FEAT-058",
       "introduced_version": "2026-09-20 (branch created from `stable/0.9`; implementation and verification the same session)",
-      "last_modified_version": "2026-09-20",
-      "maturity": "Experimental",
+      "last_modified_version": "2026-09-28 — Stable promoted in v0.9.13 (tag `v0.9.13` @ `a1223ad`); status reconciled 2026-10-27",
+      "maturity": "Evolving",
       "name": "Multi-Event Import",
       "parent_feature": [],
       "related_architecture_sections": [
@@ -3377,6 +3391,14 @@
       ],
       "related_bugs": [],
       "related_changelog_entries": [
+        {
+          "date": "2026-10-27",
+          "excerpt": "**Stale-status reconciliation on Stable**: cherry-picked main's `36a562a` (AI-RM-013 released in v0.9.14), which had never reached `stable/0.9`'s docs. AI-RM-011 / AI-FEAT-058 moved to Completed / \"Im"
+        },
+        {
+          "date": "2026-10-27",
+          "excerpt": "**Affected feature(s)**: AI-FEAT-058, AI-FEAT-061 (new), AI-FEAT-062 (new)"
+        },
         {
           "date": "2026-10-13",
           "excerpt": "**Registry-ID note, resolved by this merge**: this entry's bug record was written against `main`, which at the time still had the pre-`DEC-022` numbering (`AI-FEAT-058` = Knowledge Engine). Merging th"
@@ -3443,7 +3465,7 @@
         "import and archive writing",
         "multi"
       ],
-      "status": "In active development",
+      "status": "Implemented — evolving",
       "subfeatures": [],
       "summary": "Imports **one opened source into several events with one final Import**: one opened import source → multiple event assignments → one final import. The source can be any source the normal workflow supports (camera card, drive, USB, local folder); the model is deliberately source-agnostic. Files are assigned to events through persistent, exclusive file→event ownership; the operator switches the Current Event from inside the Import workspace (reusing the existing picker/creator, returning to the same un-rescanned workspace); one combined review validates every participating event; one Import runs one existing transaction per event.",
       "timeline_path": "generated/feature-timelines/AI-FEAT-058_TIMELINE.md"
@@ -3601,6 +3623,10 @@
       "related_bugs": [],
       "related_changelog_entries": [
         {
+          "date": "2026-10-27",
+          "excerpt": "**ID allocation**: checked across every local and remote branch before allocating (DEC-022 guidance). Max AI-RM-013, AI-FEAT-060 everywhere; DEC-024…026 exist only on `feature/ask-autoingest`, hence D"
+        },
+        {
           "date": "2026-10-16",
           "excerpt": "## 2026-10-16 — AutoIngest v0.9.14 Stable released (AI-FEAT-060 / AI-RM-013)"
         },
@@ -3661,6 +3687,144 @@
       "subfeatures": [],
       "summary": "A separate C# plugin for the Logitech MX Creative Console (Keypad + dial) that lets an operator drive AutoIngest's Browse/Groups/Map Group/Refine Tags workflows directly from physical hardware, talking to the running AutoIngest Electron app over its existing local WebSocket command layer (`docs/commandLayer.md`) rather than through the on-screen UI. It exists under `integrations/logitech/autoingest-mx-csharp/`, outside the Electron app's own source tree, and was developed on `feature/mx-creative-console-v2` before being promoted through `integration/main-stable-reconcile` into `main`/`stable/0.9` and released in AutoIngest v0.9.14 Stable (commit `093c721`, tag `v0.9.14`, 2026-10-16).",
       "timeline_path": "generated/feature-timelines/AI-FEAT-060_TIMELINE.md"
+    },
+    {
+      "aliases": [],
+      "canonical_document": "features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md",
+      "category": "Application Platform",
+      "dependencies": [
+        "AI-FEAT-001",
+        "AI-FEAT-005",
+        "AI-FEAT-019",
+        "AI-FEAT-020",
+        "AI-FEAT-025",
+        "AI-FEAT-042",
+        "AI-FEAT-058"
+      ],
+      "dependents": [],
+      "documentation_completeness": {
+        "evidence_gap_count": 0,
+        "narrative": "Q0 complete; Q1–Q7 sections are plans, not evidence"
+      },
+      "evidence_status": "Confirmed zero implementation (2026-10-27 audit of `origin/stable/0.9` @ `0eb9c43`): no `Tray`, `Notification`, `setLoginItemSettings`, `requestSingleInstanceLock`, `powerMonitor` or `app.dock` usage anywhere under `main/`, `services/`, `renderer/`. Architecture below is a **proposal awaiting owner approval**, not a description of shipped behavior.",
+      "feature_id": "AI-FEAT-061",
+      "introduced_version": "Not started",
+      "last_modified_version": "2026-10-27 — Q0 architecture & specification recorded (this file)",
+      "maturity": "Planned",
+      "name": "Quick Ingest & Desktop Companion (Menu Bar / System Tray)",
+      "parent_feature": [],
+      "related_architecture_sections": [
+        "None yet — will qualify once the app gains an app-lifetime (not window-lifetime) source monitor"
+      ],
+      "related_bugs": [],
+      "related_changelog_entries": [
+        {
+          "date": "2026-10-27",
+          "excerpt": "**What changed**: Added an authoritative owner-directed **Priority Order**, a **Status Ladder** (implementation complete → Preview verified → Stable promoted → production validated) and standing guard"
+        },
+        {
+          "date": "2026-10-27",
+          "excerpt": "**Affected feature(s)**: AI-FEAT-058, AI-FEAT-061 (new), AI-FEAT-062 (new)"
+        }
+      ],
+      "related_code_paths": [],
+      "related_decisions": [
+        "DEC-027"
+      ],
+      "related_features": [
+        "AI-FEAT-062"
+      ],
+      "related_postmortems": [],
+      "related_technical_docs": [
+        "docs/CLAUDE.md (security model",
+        "file-copy rules)",
+        "docs/ingestion-flow.md",
+        "docs/multi-event-import.md",
+        "docs/archive-operations-layer.md",
+        "docs/commandLayer.md",
+        "docs/mxControlTransport.md — none yet describe the companion",
+        "because nothing is implemented"
+      ],
+      "related_tests": [],
+      "roadmap_ids": [
+        "AI-RM-014"
+      ],
+      "search_keywords": [
+        "application platform",
+        "bar",
+        "companion",
+        "desktop",
+        "ingest",
+        "menu",
+        "quick",
+        "system",
+        "tray"
+      ],
+      "status": "Planned",
+      "subfeatures": [],
+      "summary": "A small, always-available AutoIngest presence in the macOS menu bar and the Windows system tray. It shows whether a memory card is connected, how many supported media files it holds, what is honestly known about whether those files were imported before, and whether the active archive is reachable — and offers a fast path into the **existing** import workflow. It is a presentation/control layer around existing AutoIngest services. It is not a second import engine, and it does not change the existing main window ([DEC-027](../decisions/DEC-027_QUICK_INGEST_PRIORITY_AND_MAIN_WINDOW_UI_FREEZE.md)).",
+      "timeline_path": "generated/feature-timelines/AI-FEAT-061_TIMELINE.md"
+    },
+    {
+      "aliases": [],
+      "canonical_document": "features/AI-FEAT-062_BACKUP_INTELLIGENCE_FOUNDATION.md",
+      "category": "Reliability and Recovery",
+      "dependencies": [
+        "AI-FEAT-019",
+        "AI-FEAT-020",
+        "AI-FEAT-025",
+        "AI-FEAT-042"
+      ],
+      "dependents": [],
+      "documentation_completeness": {
+        "evidence_gap_count": 2,
+        "narrative": "Scope only; design pending"
+      },
+      "evidence_status": "Confirmed zero implementation (2026-10-27 audit of `origin/stable/0.9` @ `0eb9c43`). Today's related mechanisms are narrower. The global import index (`main/main.js` `importIndex`) is keyed by lowercase filename + size, capped at 5000 entries and local to one computer. SHA-256 at copy time is disabled (`main/fileManager.js` `ENABLE_CHECKSUM = false`; size check only). A user-triggered `checksum:run` hashes only the current session's `lastImportedFiles`.",
+      "feature_id": "AI-FEAT-062",
+      "introduced_version": "Not started",
+      "last_modified_version": "2026-10-27 — scope recorded from owner direction",
+      "maturity": "Planned",
+      "name": "Backup Intelligence Foundation",
+      "parent_feature": [],
+      "related_architecture_sections": [
+        "None yet"
+      ],
+      "related_bugs": [],
+      "related_changelog_entries": [
+        {
+          "date": "2026-10-27",
+          "excerpt": "**What changed**: Added an authoritative owner-directed **Priority Order**, a **Status Ladder** (implementation complete → Preview verified → Stable promoted → production validated) and standing guard"
+        },
+        {
+          "date": "2026-10-27",
+          "excerpt": "**Affected feature(s)**: AI-FEAT-058, AI-FEAT-061 (new), AI-FEAT-062 (new)"
+        }
+      ],
+      "related_code_paths": [],
+      "related_decisions": [
+        "DEC-027"
+      ],
+      "related_features": [
+        "AI-FEAT-054",
+        "AI-FEAT-061"
+      ],
+      "related_postmortems": [],
+      "related_technical_docs": [],
+      "related_tests": [],
+      "roadmap_ids": [
+        "AI-RM-015"
+      ],
+      "search_keywords": [
+        "backup",
+        "foundation",
+        "intelligence",
+        "reliability and recovery"
+      ],
+      "status": "Planned",
+      "subfeatures": [],
+      "summary": "Planned foundation for knowing, with evidence rather than inference, **which content** was imported, **where every copy lives**, and **whether each copy was verified**. It is the prerequisite for honest \"Checksum verified\" and per-card history in the Quick Ingest companion (AI-FEAT-061), and for later Archive Maintenance and Archive Browser work.",
+      "timeline_path": "generated/feature-timelines/AI-FEAT-062_TIMELINE.md"
     }
   ],
   "schema_version": "1.3.0"

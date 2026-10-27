@@ -7,6 +7,18 @@ Append newest first. Never edit or delete a prior entry — if something was wro
 ---
 
 
+## 2026-10-27 — Roadmap reprioritization: Quick Ingest & Desktop Experience next (AI-RM-014 / AI-RM-015 / DEC-027)
+
+- **Task type**: roadmap / planning (documentation only — no application code or UI changed)
+- **What changed**: Added an authoritative owner-directed **Priority Order**, a **Status Ladder** (implementation complete → Preview verified → Stable promoted → production validated) and standing guardrails (main-window UI freeze, `stable/0.9` baseline, dedicated worktrees, Preview→Stable promotion) to 02_MASTER_ROADMAP.md. Registered **AI-RM-014 / AI-FEAT-061** (Quick Ingest & Desktop Companion — next active milestone, Q0 architecture/plan/test matrix recorded) and **AI-RM-015 / AI-FEAT-062** (Backup Intelligence Foundation — planned). Recorded **DEC-027**. Expanded the AI-RM-002/003/004 objectives with owner-stated scope (Archive Node on the existing NAS server PC, no Raspberry Pi; event maintenance operations; archive-browser extensions). Recorded AI-RM-006↔015 and AI-RM-007↔002 overlaps as pending decisions.
+- **Stale-status reconciliation on Stable**: cherry-picked main's `36a562a` (AI-RM-013 released in v0.9.14), which had never reached `stable/0.9`'s docs. AI-RM-011 / AI-FEAT-058 moved to Completed / "Implemented — evolving" because `feature/multi-event-import` is an ancestor of tag `v0.9.13` (`a1223ad`). The dashboard was refreshed from v0.9.9-era values to v0.9.16.
+- **ID allocation**: checked across every local and remote branch before allocating (DEC-022 guidance). Max AI-RM-013, AI-FEAT-060 everywhere; DEC-024…026 exist only on `feature/ask-autoingest`, hence DEC-027.
+- **Affected feature(s)**: AI-FEAT-058, AI-FEAT-061 (new), AI-FEAT-062 (new)
+- **Affected roadmap milestone(s)**: AI-RM-002, AI-RM-003, AI-RM-004, AI-RM-006, AI-RM-011, AI-RM-014 (new), AI-RM-015 (new)
+- **Tests**: `scripts/product-docs/test/integration.test.js` count assertions updated (60→62 features, 13→15 milestones, 4→5 completed, current AI-RM-002→AI-RM-014)
+- **Unresolved gaps**: production-validation evidence for v0.9.13/v0.9.14 features; AI-RM-014/015 estimates; Ask AutoIngest ID reconciliation at its eventual merge.
+- **Evidence confidence**: strong for git/tag facts and code audit (`origin/stable/0.9` @ `0eb9c43`); owner direction for priorities and scope
+
 ## 2026-10-16 — AutoIngest v0.9.14 Stable released (AI-FEAT-060 / AI-RM-013)
 
 - **Task type**: release-status documentation update, following the real Stable promotion and packaged smoke test (not new implementation work).

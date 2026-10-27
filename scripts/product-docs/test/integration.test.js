@@ -20,17 +20,17 @@ async function main() {
 
   const { parsed, built, files, manifest } = build.assemble();
 
-  await t('all 60 AI-FEAT records are present', () => {
-    assert.equal(parsed.features.size, 60);
+  await t('all 62 AI-FEAT records are present', () => {
+    assert.equal(parsed.features.size, 62);
   });
 
-  await t('all 13 AI-RM roadmap milestones are present', () => {
-    assert.equal(parsed.roadmap.size, 13);
+  await t('all 15 AI-RM roadmap milestones are present', () => {
+    assert.equal(parsed.roadmap.size, 15);
   });
 
-  await t('bug/decision/postmortem counts match the current repository (BUG-001..020, DEC-001..023, PM-001..002)', () => {
+  await t('bug/decision/postmortem counts match the current repository (BUG-001..020, DEC-001..023 + DEC-027, PM-001..002; DEC-024..026 exist only on feature/ask-autoingest)', () => {
     assert.equal(parsed.bugs.size, 20);
-    assert.equal(parsed.decisions.size, 23);
+    assert.equal(parsed.decisions.size, 24);
     assert.equal(parsed.postmortems.size, 2);
   });
 
@@ -96,10 +96,10 @@ async function main() {
     }
   });
 
-  await t('the roadmap dashboard matches the canonical current-position statement (AI-RM-001 + AI-RM-010 + AI-RM-012 + AI-RM-013 complete, AI-RM-002 next, 4/13)', () => {
-    assert.equal(built.dashboard.completed_count, 4);
-    assert.equal(built.dashboard.total_milestones, 13);
-    assert.equal(built.dashboard.current_milestone_id, 'AI-RM-002');
+  await t('the roadmap dashboard matches the canonical current-position statement (AI-RM-001 + AI-RM-010 + AI-RM-011 + AI-RM-012 + AI-RM-013 complete, AI-RM-014 next, 5/15)', () => {
+    assert.equal(built.dashboard.completed_count, 5);
+    assert.equal(built.dashboard.total_milestones, 15);
+    assert.equal(built.dashboard.current_milestone_id, 'AI-RM-014');
   });
 
   await t('every generated JSON artifact with a schema passes schema validation', () => {
@@ -112,7 +112,7 @@ async function main() {
     assert.ok(manifest.schema_version);
     assert.ok(manifest.source_commit);
     assert.ok(manifest.generation_command);
-    assert.equal(manifest.entity_counts.features, 60);
+    assert.equal(manifest.entity_counts.features, 62);
   });
 
   summarize('integration.test.js');

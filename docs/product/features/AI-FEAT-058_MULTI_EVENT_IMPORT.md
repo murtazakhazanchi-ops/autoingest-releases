@@ -4,8 +4,8 @@
 |---|---|
 | Feature ID | AI-FEAT-058 |
 | Category | Import and Archive Writing |
-| Status | In active development |
-| Maturity | Experimental |
+| Status | Implemented — evolving |
+| Maturity | Evolving |
 | Parent feature | None |
 | Subfeatures | None |
 | Dependencies | AI-FEAT-017 (Grouping System — per-event instances), AI-FEAT-018 (Event-Component Import Routing), AI-FEAT-019 (Import Pipeline & Copy Engine), AI-FEAT-021 (Atomic Import Transaction), AI-FEAT-009 / AI-FEAT-010 (Event Creation / Management — reused picker and creator), AI-FEAT-012 (Source Selection) |
@@ -13,7 +13,7 @@
 | Related technical docs | `docs/multi-event-import.md`, `docs/group-manager.md`, `docs/ingestion-flow.md`, `docs/system-contracts.md`, `docs/ui-system.md`, `docs/features.md` #16 |
 | Evidence status | Verified from current code (branch `feature/multi-event-import`, uncommitted at the time of writing), tests, and live synthetic runs. Not yet merged to `stable/0.9` or released — see Status. |
 | First-known implementation | 2026-09-20 (branch created from `stable/0.9`; implementation and verification the same session) |
-| Latest major update | 2026-09-20 |
+| Latest major update | 2026-09-28 — Stable promoted in v0.9.13 (tag `v0.9.13` @ `a1223ad`); status reconciled 2026-10-27 |
 
 ## Lifecycle Metadata
 
@@ -26,7 +26,7 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 | Related bugs | None recorded — the single-slot hazards found (see Engineering Evolution) were latent assumptions discovered during design, not defects observed in shipped behavior |
 | Related postmortems | None |
 | Related architectural evolution sections | [11_ARCHITECTURAL_EVOLUTION.md](../11_ARCHITECTURAL_EVOLUTION.md) — "Multi-Event Import Architecture" |
-| Related release notes | Evidence pending — not yet released |
+| Related release notes | Released in v0.9.13 Stable (tag `v0.9.13` @ `a1223ad`, 2026-09-28); no `docs/release-notes-v0.9.13.md` file exists on `stable/0.9` |
 | Testing coverage | `test/importSession.test.js`, `test/importSessionRunner.test.js`, `test/metadataBatchTracker.test.js`, `test/multiEventImportLive.test.js`, `test/multiEventImportUiLive.test.js`, `test/multiEventNewEventUiLive.test.js`, `test/multiEventLocalFirstUiLive.test.js` |
 | Documentation completeness | Complete for the implemented scope; merge/release evidence is pending (see fields above) |
 
@@ -61,6 +61,7 @@ Append-only.
 - **2026-09-20 — Base reconciliation.** Built first on `61eba47` (the last refinement-bearing Stable). `stable/0.9` then advanced (`ac75466`: per-photo tag refinement intentionally held out of v0.9.12; then the v0.9.12 version bump and a CI fix, tip `7f72e51`). The branch was **re-cut onto `7f72e51`**: the refinement-dependent parts (a `TagRefinementManager` factory, per-event refinement instances, `fileTagRefinements` in plans/payloads, a refinement summary in the review, refinement tests/fixtures) were removed; the held feature was not reintroduced. The workspace remains the documented extension point for any future event-scoped state (`docs/multi-event-import.md` §2).
 - **2026-09-20 — Independent code review** (no CRITICAL/HIGH findings). Valid findings fixed: a stale Change-Event return target after card removal with the picker open (target now self-heals); retry after a per-file error could re-import already-tagged JPEG/PNG/TIFF files because metadata tagging rewrites destinations in place (a completed-with-errors event now keeps only its failed files — **the earlier claim that retry is idempotent by same-size skip was superseded**); a failed picker return could leave the group facade bound to the wrong event; source/operator audit identity is captured once at click time; the runner tolerates throwing UI callbacks; the pause controls reset right before each copy; the metadata batch snapshot no longer falls back to the current event; the Local First manifest registration cannot turn a committed event into a failed one; the session strip does no O(files) work outside a session; the tracker prunes finished batches.
 - **2026-09-20 — Verification.** See Testing coverage. Live runs used synthetic fixtures only (temp userData, archive, staging and source directories).
+- **2026-10-27 — Status reconciliation (documentation only).** `feature/multi-event-import` was confirmed to be an ancestor of tag `v0.9.13` (`a1223ad`, 2026-09-28), which is in turn an ancestor of the current Stable HEAD `0eb9c43` (v0.9.16). Status changed from "In active development" to "Implemented — evolving" (Stable promoted; production validation evidence pending). The Evidence status field above still describes the original 2026-09-20 branch-era verification and is kept as written.
 
 ## Engineering Evolution
 

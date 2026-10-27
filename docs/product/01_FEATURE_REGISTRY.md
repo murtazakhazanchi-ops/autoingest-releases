@@ -23,6 +23,7 @@ IDs are assigned once and never reused or renumbered, even if a feature is later
 | AI-FEAT-006 | Application Auto-Update | Implemented | Stable | — | — | [features/AI-FEAT-006_APPLICATION_AUTO_UPDATE.md](features/AI-FEAT-006_APPLICATION_AUTO_UPDATE.md) |
 | AI-FEAT-007 | Telemetry Pipeline | Implemented | Operational | — | — | [features/AI-FEAT-007_TELEMETRY_PIPELINE.md](features/AI-FEAT-007_TELEMETRY_PIPELINE.md) |
 | AI-FEAT-057 | Multi-Channel Release & Update System | Implemented | Evolving | AI-FEAT-006 | AI-RM-010 | [features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md](features/AI-FEAT-057_MULTI_CHANNEL_RELEASE_UPDATE_SYSTEM.md) |
+| AI-FEAT-061 | Quick Ingest & Desktop Companion (Menu Bar / System Tray) | Planned | Planned | — | AI-RM-014 | [features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md](features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md) |
 
 ## Product UI
 
@@ -74,7 +75,7 @@ IDs are assigned once and never reused or renumbered, even if a feature is later
 | AI-FEAT-026 | Audit Integrity Verification (Count-Based) | Implemented | Operational | — | — | [features/AI-FEAT-026_AUDIT_INTEGRITY_VERIFICATION.md](features/AI-FEAT-026_AUDIT_INTEGRITY_VERIFICATION.md) |
 | AI-FEAT-027 | Activity Log | Implemented | Stable | — | — | [features/AI-FEAT-027_ACTIVITY_LOG.md](features/AI-FEAT-027_ACTIVITY_LOG.md) |
 | AI-FEAT-028 | Import Source Attribution | Implemented | Stable | — | — | [features/AI-FEAT-028_IMPORT_SOURCE_ATTRIBUTION.md](features/AI-FEAT-028_IMPORT_SOURCE_ATTRIBUTION.md) |
-| AI-FEAT-058 | Multi-Event Import | In active development | Experimental | — | AI-RM-011 | [features/AI-FEAT-058_MULTI_EVENT_IMPORT.md](features/AI-FEAT-058_MULTI_EVENT_IMPORT.md) |
+| AI-FEAT-058 | Multi-Event Import | Implemented — evolving | Evolving | — | AI-RM-011 | [features/AI-FEAT-058_MULTI_EVENT_IMPORT.md](features/AI-FEAT-058_MULTI_EVENT_IMPORT.md) |
 
 ## Metadata
 
@@ -147,6 +148,7 @@ IDs are assigned once and never reused or renumbered, even if a feature is later
 | ID | Name | Status | Maturity | Parent | Roadmap | Doc |
 |---|---|---|---|---|---|---|
 | AI-FEAT-054 | Integrity Verification — Archive-Wide | Planned | Planned | — | AI-RM-006 | [features/AI-FEAT-054_INTEGRITY_VERIFICATION_ARCHIVE_WIDE.md](features/AI-FEAT-054_INTEGRITY_VERIFICATION_ARCHIVE_WIDE.md) |
+| AI-FEAT-062 | Backup Intelligence Foundation | Planned | Planned | — | AI-RM-015 | [features/AI-FEAT-062_BACKUP_INTELLIGENCE_FOUNDATION.md](features/AI-FEAT-062_BACKUP_INTELLIGENCE_FOUNDATION.md) |
 
 ## Analytics and Intelligence
 
@@ -165,12 +167,14 @@ IDs are assigned once and never reused or renumbered, even if a feature is later
 
 ## Totals
 
-- **60 features registered**: 51 Implemented-family (45 plain "Implemented", including AI-FEAT-057 + 6 "Implemented — evolving", including AI-FEAT-059/AI-FEAT-060), 0 "Partially implemented", 1 "In active development" (AI-FEAT-058), 8 "Planned" (0% implementation confirmed for all 8).
+- **62 features registered** (2026-10-27): 52 Implemented-family (45 plain "Implemented", including AI-FEAT-057 + 7 "Implemented — evolving", including AI-FEAT-058/AI-FEAT-059/AI-FEAT-060), 0 "Partially implemented", 0 "In active development", 10 "Planned" (0% implementation confirmed for all 10).
+- *Superseded totals line (kept per Append, Never Erase):* **60 features registered**: 51 Implemented-family (45 plain "Implemented", including AI-FEAT-057 + 6 "Implemented — evolving", including AI-FEAT-059/AI-FEAT-060), 0 "Partially implemented", 1 "In active development" (AI-FEAT-058), 8 "Planned" (0% implementation confirmed for all 8).
 - Planned: 8 (all mapped 1:1 to AI-RM-002 through AI-RM-009, except AI-RM-001 which has no dedicated "planned" row because it is already complete — see AI-FEAT-033)
+- Planned (added 2026-10-27): AI-FEAT-061 → AI-RM-014 (Quick Ingest & Desktop Experience, next active milestone) and AI-FEAT-062 → AI-RM-015 (Backup Intelligence Foundation) — see 02_MASTER_ROADMAP.md § Priority Order and DEC-027.
 - AI-FEAT-057 maps to AI-RM-010, a parallel release-infrastructure track outside the AI-RM-001…009 archive-capability sequence — see 02_MASTER_ROADMAP.md.
-- AI-FEAT-058 maps to AI-RM-011, a parallel ingestion-workflow track outside that sequence — see 02_MASTER_ROADMAP.md.
+- AI-FEAT-058 maps to AI-RM-011, a parallel ingestion-workflow track outside that sequence — see 02_MASTER_ROADMAP.md. Stable promoted in v0.9.13 (tag `v0.9.13` @ `a1223ad`); status reconciled 2026-10-27.
 - AI-FEAT-059 maps to AI-RM-012, a parallel documentation/tooling track (Knowledge & Onboarding Portal, Stage 1 + Stage 2 Phases 4-24) outside both the AI-RM-001…009 sequence and the AI-RM-010 release-infrastructure track — see 02_MASTER_ROADMAP.md.
-- AI-FEAT-060 maps to AI-RM-013, a parallel hardware-integration track (the MX Creative Console Logitech plugin, developed entirely on `feature/mx-creative-console-v2`, not yet merged) outside all three tracks above — see 02_MASTER_ROADMAP.md.
+- AI-FEAT-060 maps to AI-RM-013, a parallel hardware-integration track (the MX Creative Console Logitech plugin, developed entirely on `feature/mx-creative-console-v2`, not yet merged) outside all three tracks above — see 02_MASTER_ROADMAP.md. *(Superseded wording: released in v0.9.14 Stable, see the AI-RM-013 roadmap entry.)*
 
 ## Cross-Cutting Patterns (documented, not given their own AI-FEAT ID)
 

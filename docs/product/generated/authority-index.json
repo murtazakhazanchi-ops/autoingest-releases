@@ -1411,6 +1411,51 @@
         "AI-RM-013"
       ],
       "topic": "MX Creative Console — Logitech Hardware Control Surface"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md",
+      "canonicalTechnicalDocs": [
+        "docs/CLAUDE.md (security model",
+        "file-copy rules)",
+        "docs/ingestion-flow.md",
+        "docs/multi-event-import.md",
+        "docs/archive-operations-layer.md",
+        "docs/commandLayer.md",
+        "docs/mxControlTransport.md — none yet describe the companion",
+        "because nothing is implemented"
+      ],
+      "codeAreas": [],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-061",
+      "relatedBugs": [],
+      "relatedDecisions": [
+        "DEC-027"
+      ],
+      "relatedPostmortems": [],
+      "roadmapIds": [
+        "AI-RM-014"
+      ],
+      "topic": "Quick Ingest & Desktop Companion (Menu Bar / System Tray)"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-062_BACKUP_INTELLIGENCE_FOUNDATION.md",
+      "canonicalTechnicalDocs": [],
+      "codeAreas": [],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-062_BACKUP_INTELLIGENCE_FOUNDATION.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-062",
+      "relatedBugs": [],
+      "relatedDecisions": [
+        "DEC-027"
+      ],
+      "relatedPostmortems": [],
+      "roadmapIds": [
+        "AI-RM-015"
+      ],
+      "topic": "Backup Intelligence Foundation"
     }
   ]
 }

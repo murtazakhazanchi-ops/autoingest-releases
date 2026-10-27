@@ -11,6 +11,14 @@
     },
     {
       "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-014:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-001",
+      "target": "AI-RM-014"
+    },
+    {
+      "evidence_status": "explicit",
       "note": null,
       "provenance_path": "features/AI-FEAT-001_ELECTRON_APPLICATION_SHELL_SECURITY_MODEL.md#lifecycle-metadata:Related-architectural-evolution-sections",
       "relationship": "documented_by",
@@ -272,6 +280,14 @@
       "relationship": "extended_by",
       "source": "AI-FEAT-005",
       "target": "AI-RM-010"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-014:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-005",
+      "target": "AI-RM-014"
     },
     {
       "evidence_status": "explicit",
@@ -843,6 +859,14 @@
     },
     {
       "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-014:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-019",
+      "target": "AI-RM-014"
+    },
+    {
+      "evidence_status": "explicit",
       "note": null,
       "provenance_path": "features/AI-FEAT-019_IMPORT_PIPELINE_COPY_ENGINE.md#lifecycle-metadata:Related-architectural-evolution-sections",
       "relationship": "documented_by",
@@ -936,6 +960,22 @@
       "relationship": "depends_on",
       "source": "AI-FEAT-020",
       "target": "AI-FEAT-019"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-014:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-020",
+      "target": "AI-RM-014"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-015:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-020",
+      "target": "AI-RM-015"
     },
     {
       "evidence_status": "explicit",
@@ -1280,6 +1320,22 @@
       "relationship": "extended_by",
       "source": "AI-FEAT-025",
       "target": "AI-RM-011"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-014:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-025",
+      "target": "AI-RM-014"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-015:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-025",
+      "target": "AI-RM-015"
     },
     {
       "evidence_status": "explicit",
@@ -2531,6 +2587,22 @@
     },
     {
       "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-002:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-042",
+      "target": "AI-RM-002"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-014:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-042",
+      "target": "AI-RM-014"
+    },
+    {
+      "evidence_status": "explicit",
       "note": null,
       "provenance_path": "features/AI-FEAT-042_ARCHIVE_ROOT_CONFIGURATION_RESOLUTION.md#lifecycle-metadata:Related-architectural-evolution-sections",
       "relationship": "documented_by",
@@ -2632,6 +2704,14 @@
       "relationship": "related_to",
       "source": "AI-FEAT-043",
       "target": "AI-FEAT-052"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-002:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-043",
+      "target": "AI-RM-002"
     },
     {
       "evidence_status": "explicit",
@@ -3016,6 +3096,14 @@
       "relationship": "planned_in",
       "source": "AI-FEAT-049",
       "target": "AI-RM-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-002:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-049",
+      "target": "AI-RM-002"
     },
     {
       "evidence_status": "explicit",
@@ -3547,6 +3635,14 @@
     },
     {
       "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-014:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-058",
+      "target": "AI-RM-014"
+    },
+    {
+      "evidence_status": "explicit",
       "note": null,
       "provenance_path": "bugs/BUG-017_EVENT_CREATE_SUBFOLDER_PATH_DIVERGES_FROM_EVENT_JSON_WRITE_PATH_AFTER_OFFLINE_EPISODE.md#header-table:Related-feature(s)",
       "relationship": "affected_by_bug",
@@ -3660,6 +3756,166 @@
     {
       "evidence_status": "explicit",
       "note": null,
+      "provenance_path": "features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-061",
+      "target": "AI-FEAT-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-061",
+      "target": "AI-FEAT-005"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-061",
+      "target": "AI-FEAT-019"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-061",
+      "target": "AI-FEAT-020"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-061",
+      "target": "AI-FEAT-025"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-061",
+      "target": "AI-FEAT-042"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-061",
+      "target": "AI-FEAT-058"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-061",
+      "target": "AI-FEAT-062"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md#header-table:Related-roadmap-milestone",
+      "relationship": "planned_in",
+      "source": "AI-FEAT-061",
+      "target": "AI-RM-014"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-061",
+      "target": "DEC-027"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-027_QUICK_INGEST_PRIORITY_AND_MAIN_WINDOW_UI_FREEZE.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-061",
+      "target": "DEC-027"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-062_BACKUP_INTELLIGENCE_FOUNDATION.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-062",
+      "target": "AI-FEAT-019"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-062_BACKUP_INTELLIGENCE_FOUNDATION.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-062",
+      "target": "AI-FEAT-020"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-062_BACKUP_INTELLIGENCE_FOUNDATION.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-062",
+      "target": "AI-FEAT-025"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-062_BACKUP_INTELLIGENCE_FOUNDATION.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-062",
+      "target": "AI-FEAT-042"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-062_BACKUP_INTELLIGENCE_FOUNDATION.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-062",
+      "target": "AI-FEAT-054"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-062_BACKUP_INTELLIGENCE_FOUNDATION.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-062",
+      "target": "AI-FEAT-061"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-062_BACKUP_INTELLIGENCE_FOUNDATION.md#header-table:Related-roadmap-milestone",
+      "relationship": "planned_in",
+      "source": "AI-FEAT-062",
+      "target": "AI-RM-015"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-062_BACKUP_INTELLIGENCE_FOUNDATION.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-062",
+      "target": "DEC-027"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-027_QUICK_INGEST_PRIORITY_AND_MAIN_WINDOW_UI_FREEZE.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-062",
+      "target": "DEC-027"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
       "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-001:Included-AI-FEAT-IDs",
       "relationship": "implements",
       "source": "AI-RM-001",
@@ -3760,6 +4016,14 @@
       "relationship": "depends_on",
       "source": "AI-RM-002",
       "target": "AI-RM-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-002:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-RM-002",
+      "target": "AI-RM-015"
     },
     {
       "evidence_status": "explicit",
@@ -4072,6 +4336,54 @@
       "relationship": "governed_by",
       "source": "AI-RM-013",
       "target": "DEC-023"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-014:Included-AI-FEAT-IDs",
+      "relationship": "implements",
+      "source": "AI-RM-014",
+      "target": "AI-FEAT-061"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-014:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-RM-014",
+      "target": "AI-RM-015"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-027_QUICK_INGEST_PRIORITY_AND_MAIN_WINDOW_UI_FREEZE.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-RM-014",
+      "target": "DEC-027"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-015:Included-AI-FEAT-IDs",
+      "relationship": "implements",
+      "source": "AI-RM-015",
+      "target": "AI-FEAT-062"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-015:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-RM-015",
+      "target": "AI-RM-014"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-027_QUICK_INGEST_PRIORITY_AND_MAIN_WINDOW_UI_FREEZE.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-RM-015",
+      "target": "DEC-027"
     },
     {
       "evidence_status": "explicit",
@@ -5164,6 +5476,18 @@
       "type": "feature"
     },
     {
+      "doc_path": "features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md",
+      "id": "AI-FEAT-061",
+      "label": "Quick Ingest & Desktop Companion (Menu Bar / System Tray)",
+      "type": "feature"
+    },
+    {
+      "doc_path": "features/AI-FEAT-062_BACKUP_INTELLIGENCE_FOUNDATION.md",
+      "id": "AI-FEAT-062",
+      "label": "Backup Intelligence Foundation",
+      "type": "feature"
+    },
+    {
       "doc_path": "memory/AI-MEM-0001_METADATA_MANAGEMENT_MODAL_AUDIT_REPAIR_EVOLUTION.md",
       "id": "AI-MEM-0001",
       "label": "Metadata Management Modal Consolidation and Audit & Repair Tab Evolution",
@@ -5269,6 +5593,18 @@
       "doc_path": "02_MASTER_ROADMAP.md",
       "id": "AI-RM-013",
       "label": "MX Creative Console Hardware Integration (Unified Contextual Keypad)",
+      "type": "milestone"
+    },
+    {
+      "doc_path": "02_MASTER_ROADMAP.md",
+      "id": "AI-RM-014",
+      "label": "Quick Ingest & Desktop Experience",
+      "type": "milestone"
+    },
+    {
+      "doc_path": "02_MASTER_ROADMAP.md",
+      "id": "AI-RM-015",
+      "label": "Backup Intelligence Foundation",
       "type": "milestone"
     },
     {
@@ -5593,6 +5929,12 @@
       "doc_path": "decisions/DEC-023_MX_CREATIVE_CONSOLE_UNIFIED_CONTEXTUAL_KEYPAD_MIGRATION.md",
       "id": "DEC-023",
       "label": "MX Creative Console: Unified Contextual Keypad migration",
+      "type": "decision"
+    },
+    {
+      "doc_path": "decisions/DEC-027_QUICK_INGEST_PRIORITY_AND_MAIN_WINDOW_UI_FREEZE.md",
+      "id": "DEC-027",
+      "label": "Quick Ingest Prioritized; Main-Window UI Frozen; Companion as an Isolated Layer",
       "type": "decision"
     },
     {

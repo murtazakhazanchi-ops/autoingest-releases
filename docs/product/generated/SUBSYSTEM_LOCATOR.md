@@ -5,8 +5,8 @@
 ## Application Platform (`SUBSYS-application-platform`)
 
 **Aliases**: electron shell, security model, settings store, auto-update, telemetry
-**Primary features**: AI-FEAT-001, AI-FEAT-002, AI-FEAT-003, AI-FEAT-004, AI-FEAT-005, AI-FEAT-006, AI-FEAT-007, AI-FEAT-057
-**Canonical technical docs**: .github/workflows/release.yml, CLAUDE.md § Security Model, docs/README.md § Security Model, docs/data-model.md, docs/event-system.md, docs/features.md #7 "UI Dashboard", docs/history.md v0.8.1, docs/system-contracts.md §1-2, docs/ui-system.md § Dashboard, scripts/product-docs/README.md
+**Primary features**: AI-FEAT-001, AI-FEAT-002, AI-FEAT-003, AI-FEAT-004, AI-FEAT-005, AI-FEAT-006, AI-FEAT-007, AI-FEAT-057, AI-FEAT-061
+**Canonical technical docs**: .github/workflows/release.yml, CLAUDE.md § Security Model, because nothing is implemented, docs/CLAUDE.md (security model, docs/README.md § Security Model, docs/archive-operations-layer.md, docs/commandLayer.md, docs/data-model.md, docs/event-system.md, docs/features.md #7 "UI Dashboard", docs/history.md v0.8.1, docs/ingestion-flow.md, docs/multi-event-import.md, docs/mxControlTransport.md — none yet describe the companion, docs/system-contracts.md §1-2, docs/ui-system.md § Dashboard, file-copy rules), scripts/product-docs/README.md
 **Related bugs**: None recorded
 **Related decisions**: None recorded
 
@@ -397,7 +397,7 @@
 ## Reliability and Recovery (`SUBSYS-reliability-and-recovery`)
 
 **Aliases**: integrity verification
-**Primary features**: AI-FEAT-054
+**Primary features**: AI-FEAT-054, AI-FEAT-062
 **Canonical technical docs**: None cited
 **Related bugs**: None recorded
 **Related decisions**: None recorded

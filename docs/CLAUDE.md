@@ -133,6 +133,13 @@ Debugging / stabilization
 Archive operations / local mirror / sync review / archive repair  
 → docs/archive-operations-layer.md
 
+Menu-bar / system-tray companion / Quick Ingest / native notifications / app lifecycle (window close vs quit, launch at login, single instance)
+→ docs/product/features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md (plan — not yet implemented)
+→ docs/product/decisions/DEC-027_QUICK_INGEST_PRIORITY_AND_MAIN_WINDOW_UI_FREEZE.md (main-window UI freeze)
+→ docs/ingestion-flow.md
+→ docs/multi-event-import.md
+→ docs/archive-operations-layer.md
+
 New feature planning  
 → docs/features.md  
 → docs/workflows.md  
