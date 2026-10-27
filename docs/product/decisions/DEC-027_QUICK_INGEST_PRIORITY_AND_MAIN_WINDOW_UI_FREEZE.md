@@ -33,6 +33,11 @@ The project owner approved two new capability areas: Backup Intelligence and Qui
 - AI-RM-002/003/004 move later. Their scope is preserved and expanded with owner-stated items. Nothing is removed.
 - AI-RM-005…009 keep their records unchanged and sit outside the priority list until the owner re-sequences them. Overlaps (AI-RM-006 vs AI-RM-015; AI-RM-007 vs AI-RM-002) are recorded as pending decisions, not silently merged.
 
+## Addendum — 2026-10-27 (owner Q1 approval)
+
+- **Workstream placement** (no renumbering, no deletion, nothing marked superseded): AI-RM-006 goes under AI-RM-015; AI-RM-007 and AI-RM-008 go under AI-RM-002; AI-RM-005 and AI-RM-009 (long-horizon) go under AI-RM-004. See 02_MASTER_ROADMAP.md § Workstreams. This resolves the overlaps that the Consequences section above listed as pending.
+- **Q1 approved** for AI-RM-014: behavior-preserving main-window progress targeting, app-scope single drive poller, single-instance lock (second launch must focus/restore the main window and preserve launch arguments), and — architecturally only — the Q4 invisible handoff listener (not to be implemented in Q1). No launch-at-login. Main-window UI freeze reaffirmed.
+
 ## Reconciliation Note
 
 None — no conflict with a technical doc under `docs/`.

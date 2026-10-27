@@ -3025,7 +3025,12 @@
         "Not yet covered in 11_ARCHITECTURAL_EVOLUTION.md's relationship map"
       ],
       "related_bugs": [],
-      "related_changelog_entries": [],
+      "related_changelog_entries": [
+        {
+          "date": "2026-10-27",
+          "excerpt": "**Affected feature(s)**: AI-FEAT-052, AI-FEAT-053, AI-FEAT-054, AI-FEAT-055, AI-FEAT-056, AI-FEAT-062"
+        }
+      ],
       "related_code_paths": [],
       "related_decisions": [],
       "related_features": [],
@@ -3072,7 +3077,12 @@
         "Not yet covered in 11_ARCHITECTURAL_EVOLUTION.md's relationship map"
       ],
       "related_bugs": [],
-      "related_changelog_entries": [],
+      "related_changelog_entries": [
+        {
+          "date": "2026-10-27",
+          "excerpt": "**Affected feature(s)**: AI-FEAT-052, AI-FEAT-053, AI-FEAT-054, AI-FEAT-055, AI-FEAT-056, AI-FEAT-062"
+        }
+      ],
       "related_code_paths": [],
       "related_decisions": [],
       "related_features": [],
@@ -3119,7 +3129,12 @@
         "Not yet covered in 11_ARCHITECTURAL_EVOLUTION.md's relationship map"
       ],
       "related_bugs": [],
-      "related_changelog_entries": [],
+      "related_changelog_entries": [
+        {
+          "date": "2026-10-27",
+          "excerpt": "**Affected feature(s)**: AI-FEAT-052, AI-FEAT-053, AI-FEAT-054, AI-FEAT-055, AI-FEAT-056, AI-FEAT-062"
+        }
+      ],
       "related_code_paths": [],
       "related_decisions": [],
       "related_features": [],
@@ -3170,7 +3185,12 @@
         "Not yet covered in 11_ARCHITECTURAL_EVOLUTION.md's relationship map"
       ],
       "related_bugs": [],
-      "related_changelog_entries": [],
+      "related_changelog_entries": [
+        {
+          "date": "2026-10-27",
+          "excerpt": "**Affected feature(s)**: AI-FEAT-052, AI-FEAT-053, AI-FEAT-054, AI-FEAT-055, AI-FEAT-056, AI-FEAT-062"
+        }
+      ],
       "related_code_paths": [],
       "related_decisions": [],
       "related_features": [],
@@ -3217,6 +3237,10 @@
       ],
       "related_bugs": [],
       "related_changelog_entries": [
+        {
+          "date": "2026-10-27",
+          "excerpt": "**Affected feature(s)**: AI-FEAT-052, AI-FEAT-053, AI-FEAT-054, AI-FEAT-055, AI-FEAT-056, AI-FEAT-062"
+        },
         {
           "date": "2026-08-05",
           "excerpt": "**Two real correctness bugs found by code review and fixed before commit**: (1) `lib/ids.js`'s ID extraction only captured the two endpoints of an \"A through B\" / \"A – B\" prose range (a convention use"
@@ -3792,6 +3816,10 @@
       ],
       "related_bugs": [],
       "related_changelog_entries": [
+        {
+          "date": "2026-10-27",
+          "excerpt": "**Affected feature(s)**: AI-FEAT-052, AI-FEAT-053, AI-FEAT-054, AI-FEAT-055, AI-FEAT-056, AI-FEAT-062"
+        },
         {
           "date": "2026-10-27",
           "excerpt": "**What changed**: Added an authoritative owner-directed **Priority Order**, a **Status Ladder** (implementation complete → Preview verified → Stable promoted → production validated) and standing guard"

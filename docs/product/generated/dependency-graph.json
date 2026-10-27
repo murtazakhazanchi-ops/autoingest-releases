@@ -4119,7 +4119,7 @@
       "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-006:Dependencies",
       "relationship": "depends_on",
       "source": "AI-RM-006",
-      "target": "AI-RM-005"
+      "target": "AI-RM-015"
     },
     {
       "evidence_status": "explicit",
@@ -4143,7 +4143,7 @@
       "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-007:Dependencies",
       "relationship": "depends_on",
       "source": "AI-RM-007",
-      "target": "AI-RM-006"
+      "target": "AI-RM-002"
     },
     {
       "evidence_status": "explicit",
@@ -4167,7 +4167,7 @@
       "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-008:Dependencies",
       "relationship": "depends_on",
       "source": "AI-RM-008",
-      "target": "AI-RM-007"
+      "target": "AI-RM-002"
     },
     {
       "evidence_status": "explicit",

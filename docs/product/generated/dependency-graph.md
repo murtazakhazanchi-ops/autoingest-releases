@@ -31,9 +31,9 @@ flowchart LR
   AI_RM_003 -->|depends_on| AI_RM_002
   AI_RM_004 -->|depends_on| AI_RM_003
   AI_RM_005 -->|depends_on| AI_RM_004
-  AI_RM_006 -->|depends_on| AI_RM_005
-  AI_RM_007 -->|depends_on| AI_RM_006
-  AI_RM_008 -->|depends_on| AI_RM_007
+  AI_RM_006 -->|depends_on| AI_RM_015
+  AI_RM_007 -->|depends_on| AI_RM_002
+  AI_RM_008 -->|depends_on| AI_RM_002
   AI_RM_009 -->|depends_on| AI_RM_008
   AI_RM_011 -->|depends_on| AI_RM_010
   AI_RM_012 -->|depends_on| AI_RM_001
@@ -478,11 +478,11 @@ flowchart LR
   AI_RM_005 -->|implements| AI_FEAT_053
   AI_RM_005 -->|depends_on| AI_RM_004
   AI_RM_006 -->|implements| AI_FEAT_054
-  AI_RM_006 -->|depends_on| AI_RM_005
+  AI_RM_006 -->|depends_on| AI_RM_015
   AI_RM_007 -->|implements| AI_FEAT_052
-  AI_RM_007 -->|depends_on| AI_RM_006
+  AI_RM_007 -->|depends_on| AI_RM_002
   AI_RM_008 -->|implements| AI_FEAT_055
-  AI_RM_008 -->|depends_on| AI_RM_007
+  AI_RM_008 -->|depends_on| AI_RM_002
   AI_RM_009 -->|implements| AI_FEAT_056
   AI_RM_009 -->|depends_on| AI_RM_008
   AI_RM_011 -->|depends_on| AI_RM_010

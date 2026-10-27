@@ -46,6 +46,8 @@ Named as "Archive Repair" in the canonical roadmap order (see [../02_MASTER_ROAD
 
 Not started (for the planned broad-repair scope). The existing `archiveRepairService.js` temp-file-cleanup utility is a separate, already-shipped, narrow capability — not part of this feature's evolution.
 
+- **2026-10-27 — Roadmap placement (documentation only).** Remaining scope of AI-RM-007 placed under AI-RM-002 / AI-FEAT-049 (Archive Maintenance & Archive Node) per owner direction ([DEC-027](../decisions/DEC-027_QUICK_INGEST_PRIORITY_AND_MAIN_WINDOW_UI_FREEZE.md) Addendum). ID, record and history retained; status unchanged (Planned).
+
 ## Engineering Evolution
 
 This section classifies this feature's already-evidenced history by milestone type. It adds no new facts beyond what the header table, Evolution / Implementation Journal, Known Bugs, and Decisions sections above already establish — it is a categorized index over that same evidence, not a second changelog.

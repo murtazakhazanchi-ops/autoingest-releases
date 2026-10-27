@@ -71,7 +71,7 @@ Not applicable.
 
 ## Decisions
 
-- **Open question (owner decision required before AI-RM-015 design starts):** how this relates to AI-RM-006 / AI-FEAT-054 (Integrity Verification — Archive-Wide). The owner can choose to fold AI-FEAT-054 into this foundation, keep it as a consumer of it, or keep the two separate. Neither record is superseded until that decision is made.
+- **Resolved 2026-10-27:** the owner placed the remaining AI-RM-006 / AI-FEAT-054 scope under this foundation (DEC-027 Addendum). Both records are retained. *Original open question, kept for history:* how this relates to AI-RM-006 / AI-FEAT-054 (Integrity Verification — Archive-Wide). The owner can choose to fold AI-FEAT-054 into this foundation, keep it as a consumer of it, or keep the two separate. Neither record is superseded until that decision is made.
 
 ## Future Enhancements
 

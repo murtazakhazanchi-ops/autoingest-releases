@@ -46,6 +46,8 @@ Named as "AI Archive Intelligence" in the canonical roadmap order (see [../02_MA
 
 Not started.
 
+- **2026-10-27 — Roadmap placement (documentation only).** Remaining scope of AI-RM-009 placed in the Archive Browser & Discovery workstream (host AI-RM-004) as its long-horizon last item per owner direction ([DEC-027](../decisions/DEC-027_QUICK_INGEST_PRIORITY_AND_MAIN_WINDOW_UI_FREEZE.md) Addendum). ID, record and history retained; status unchanged (Planned).
+
 ## Engineering Evolution
 
 This section classifies this feature's already-evidenced history by milestone type. It adds no new facts beyond what the header table, Evolution / Implementation Journal, Known Bugs, and Decisions sections above already establish — it is a categorized index over that same evidence, not a second changelog.

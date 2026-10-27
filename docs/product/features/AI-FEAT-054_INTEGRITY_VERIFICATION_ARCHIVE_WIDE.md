@@ -46,6 +46,8 @@ Named as "Integrity Verification" in the canonical roadmap order (see [../02_MAS
 
 Not started (for archive-wide scope). See AI-FEAT-025 for the existing narrower capability's history.
 
+- **2026-10-27 — Roadmap placement (documentation only).** Remaining scope of AI-RM-006 placed under AI-RM-015 / AI-FEAT-062 (Backup Intelligence Foundation) per owner direction ([DEC-027](../decisions/DEC-027_QUICK_INGEST_PRIORITY_AND_MAIN_WINDOW_UI_FREEZE.md) Addendum). ID, record and history retained; status unchanged (Planned).
+
 ## Engineering Evolution
 
 This section classifies this feature's already-evidenced history by milestone type. It adds no new facts beyond what the header table, Evolution / Implementation Journal, Known Bugs, and Decisions sections above already establish — it is a categorized index over that same evidence, not a second changelog.

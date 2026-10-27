@@ -7,6 +7,14 @@ Append newest first. Never edit or delete a prior entry — if something was wro
 ---
 
 
+## 2026-10-27 — Workstream placement of AI-RM-005…009; AI-RM-014 Q1 approved (DEC-027 Addendum)
+
+- **Task type**: roadmap housekeeping (documentation only — kept in a separate commit from the Q1 application changes, which live on `feature/menu-bar-companion-q1`)
+- **What changed**: Added 02_MASTER_ROADMAP.md § Workstreams. AI-RM-006 goes under AI-RM-015. AI-RM-007 and AI-RM-008 go under AI-RM-002. AI-RM-005 and AI-RM-009 (long-horizon) go under AI-RM-004, now named "Archive Browser & Discovery" in the Priority Order. Placement follows owner direction and each feature record's own recorded dependency. No ID was renumbered, no record deleted, and nothing was marked superseded; each placed feature record received an append-only journal entry. DEC-027 gained an Addendum recording the placement and the Q1 approval. The dashboard's pending decisions were updated.
+- **Affected feature(s)**: AI-FEAT-052, AI-FEAT-053, AI-FEAT-054, AI-FEAT-055, AI-FEAT-056, AI-FEAT-062
+- **Affected roadmap milestone(s)**: AI-RM-002, AI-RM-004, AI-RM-005, AI-RM-006, AI-RM-007, AI-RM-008, AI-RM-009, AI-RM-014, AI-RM-015
+- **Evidence confidence**: owner direction; placement basis cited per row in § Workstreams
+
 ## 2026-10-27 — Roadmap reprioritization: Quick Ingest & Desktop Experience next (AI-RM-014 / AI-RM-015 / DEC-027)
 
 - **Task type**: roadmap / planning (documentation only — no application code or UI changed)

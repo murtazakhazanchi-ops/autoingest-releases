@@ -18,12 +18,22 @@ Milestone sections below remain in ID order, so existing links and other branche
 | 2 | AI-RM-013 — Logitech MX Creative Console Integration | Completed — Stable promoted in v0.9.14 (tag `v0.9.14` @ `093c721`, 2026-10-16), carried forward in v0.9.16. Production validation: evidence pending. |
 | 3 | **AI-RM-014 — Quick Ingest & Desktop Experience** | **NEXT ACTIVE — PRIORITY 1.** First delivery is the menu-bar/tray companion, not a main-window redesign. |
 | 4 | Ask AutoIngest — Knowledge & Assistance (continuation of AI-RM-012's knowledge track) | Existing in-progress work on `feature/ask-autoingest`. Do not interrupt, merge, rewrite or discard it. No new AI-RM ID is allocated here (that branch still uses pre-DEC-022 numbering; reconcile IDs at its merge). |
-| 5 | AI-RM-015 — Backup Intelligence Foundation | Planned |
-| 6 | AI-RM-002 — Archive Maintenance & AutoIngest Archive Node | Planned |
+| 5 | AI-RM-015 — Backup Intelligence Foundation | Planned. Also hosts AI-RM-006. |
+| 6 | AI-RM-002 — Archive Maintenance & AutoIngest Archive Node | Planned. Also hosts AI-RM-007 and AI-RM-008. |
 | 7 | AI-RM-003 — Event Maintenance | Planned |
-| 8 | AI-RM-004 — Archive Browser | Planned |
+| 8 | AI-RM-004 — Archive Browser & Discovery | Planned. Also hosts AI-RM-005 and, long-horizon, AI-RM-009. |
 
-Not yet placed by the owner (records unchanged, not cancelled): AI-RM-005 Global Search, AI-RM-006 Integrity Verification (overlaps AI-RM-015 — decision pending), AI-RM-007 Archive Repair (overlaps AI-RM-002 — decision pending), AI-RM-008 Archive Analytics, AI-RM-009 AI Archive Intelligence. Parallel tracks AI-RM-010, AI-RM-011 and AI-RM-012 are complete.
+### Workstreams (owner-directed placement, 2026-10-27)
+
+Each remaining milestone now sits in a workstream. No record was renumbered, deleted or marked superseded. A milestone placed under another one keeps its own ID, its history and its section below; its *remaining* scope is delivered as part of the host workstream.
+
+| Workstream (host milestone) | Placed milestones | Basis for placement |
+|---|---|---|
+| Backup Intelligence (AI-RM-015) | AI-RM-006 Integrity Verification — Archive-Wide | Owner direction. AI-FEAT-054's archive-wide verification is the durable-verification/receipt scope of AI-FEAT-062 |
+| Archive Maintenance & Archive Node (AI-RM-002) | AI-RM-007 Archive Repair; AI-RM-008 Archive Analytics | Owner direction for Repair. Analytics is placed here because AI-FEAT-055's only recorded dependency is AI-FEAT-043 archive health data, the same foundation AI-FEAT-049 builds on |
+| Archive Browser & Discovery (AI-RM-004) | AI-RM-005 Global Search; AI-RM-009 AI Archive Intelligence (long-horizon, last) | AI-FEAT-053 depends on AI-FEAT-051 (Archive Browser). AI-FEAT-056's recorded dependency (AI-FEAT-055) is kept as a cross-workstream dependency. It is **not** placed under Ask AutoIngest: that track answers questions about AutoIngest itself, while AI-FEAT-056 concerns archive content |
+
+*Superseded paragraph (kept per Append, Never Erase):* "Not yet placed by the owner (records unchanged, not cancelled): AI-RM-005 Global Search, AI-RM-006 Integrity Verification (overlaps AI-RM-015 — decision pending), AI-RM-007 Archive Repair (overlaps AI-RM-002 — decision pending), AI-RM-008 Archive Analytics, AI-RM-009 AI Archive Intelligence. Parallel tracks AI-RM-010, AI-RM-011 and AI-RM-012 are complete." — superseded 2026-10-27 by the owner's placement decision (DEC-027 Addendum).
 
 ### Standing guardrails for this priority period
 
@@ -82,7 +92,7 @@ The `Status` field keeps the word **Completed** only for milestones that reached
 | Deliverables | Evidence pending |
 | Acceptance criteria | Evidence pending |
 | Planned estimate | 3–5 weeks (see [03_IMPLEMENTATION_TIMELINE.md](03_IMPLEMENTATION_TIMELINE.md)) — original estimate, predates the Archive Node scope addition |
-| Current risks | Scope overlap with AI-RM-007 (Archive Repair) — owner decision pending on whether repair actions belong here |
+| Current risks | Hosts the remaining scope of AI-RM-007 (Archive Repair) and AI-RM-008 (Archive Analytics) since 2026-10-27; the `services/archiveRepairService.js` naming collision (see AI-RM-007) must be resolved here |
 | Next action | Not started — follows AI-RM-015 in the Priority Order |
 
 ---
@@ -125,7 +135,7 @@ The `Status` field keeps the word **Completed** only for milestones that reached
 
 | Field | Value |
 |---|---|
-| Status | Planned — not started |
+| Status | Planned — not started. Workstream: Archive Browser & Discovery (host AI-RM-004), placed 2026-10-27. |
 | Objective | Evidence pending — not yet documented as fact |
 | Included AI-FEAT IDs | AI-FEAT-053 |
 | Existing features extended | Evidence pending |
@@ -134,7 +144,7 @@ The `Status` field keeps the word **Completed** only for milestones that reached
 | Acceptance criteria | Evidence pending |
 | Planned estimate | 3–5 weeks |
 | Current risks | Scope not yet defined |
-| Next action | Not started — follows AI-RM-004 |
+| Next action | Not started — delivered within the Archive Browser & Discovery workstream after AI-RM-004 |
 
 ---
 
@@ -142,16 +152,16 @@ The `Status` field keeps the word **Completed** only for milestones that reached
 
 | Field | Value |
 |---|---|
-| Status | Planned — not started |
+| Status | Planned — not started. **Remaining scope placed under AI-RM-015 (Backup Intelligence Foundation)** on 2026-10-27 per owner direction. This record, its ID and AI-FEAT-054 are retained for history. |
 | Objective | Evidence pending — not yet documented as fact. Narrower prior art exists: AI-FEAT-025 (import-batch and sync-job checksum verification) — this milestone's scope is expected to be broader (archive-wide), not merely a rename of that existing capability. |
 | Included AI-FEAT IDs | AI-FEAT-054 |
 | Existing features extended | AI-FEAT-025 (prior art, narrower scope) |
-| Dependencies | AI-RM-005 |
+| Dependencies | AI-RM-015 (host workstream). *Prior value (superseded 2026-10-27): followed the Global Search milestone in the original sequence.* |
 | Deliverables | Evidence pending |
 | Acceptance criteria | Evidence pending |
 | Planned estimate | 3–4 weeks |
-| Current risks | Scope overlap with AI-FEAT-025 needs explicit disambiguation before implementation starts, to avoid duplicating the existing `getFileHash()`-based mechanism without a clear reason. **Added 2026-10-27:** also overlaps AI-RM-015 (Backup Intelligence Foundation — durable verification evidence/receipts); owner decision pending on fold-in vs consumer vs separate. Not superseded until decided. |
-| Next action | Not started — follows AI-RM-005 |
+| Current risks | Scope overlap with AI-FEAT-025 needs explicit disambiguation before implementation starts, to avoid duplicating the existing `getFileHash()`-based mechanism without a clear reason. **Added 2026-10-27:** also overlaps AI-RM-015 (Backup Intelligence Foundation — durable verification evidence/receipts); **resolved 2026-10-27: remaining scope placed under AI-RM-015** (record retained, not superseded). |
+| Next action | Not started — scope is designed and delivered inside AI-RM-015. Its AI-FEAT-025 disambiguation risk carries over there. |
 
 ---
 
@@ -159,16 +169,16 @@ The `Status` field keeps the word **Completed** only for milestones that reached
 
 | Field | Value |
 |---|---|
-| Status | Planned — not started |
+| Status | Planned — not started. **Remaining scope placed under AI-RM-002 (Archive Maintenance & Archive Node)** on 2026-10-27 per owner direction. This record, its ID and AI-FEAT-052 are retained for history. |
 | Objective | Close the documented gap in AI-FEAT-043: "the diagnostics layer reports issues but does not auto-fix them" (`docs/archive-operations-layer.md`). |
 | Included AI-FEAT IDs | AI-FEAT-052 |
 | Existing features extended | AI-FEAT-043 (Archive Health Reporting — this milestone is expected to act on what that feature detects) |
-| Dependencies | AI-RM-006 |
+| Dependencies | AI-RM-002 (host workstream). *Prior value (superseded 2026-10-27): followed the Integrity Verification milestone in the original sequence.* |
 | Deliverables | Evidence pending |
 | Acceptance criteria | Evidence pending |
 | Planned estimate | 4–6 weeks |
 | Current risks | **Naming collision**: `services/archiveRepairService.js` already exists but implements an unrelated narrow temp-file-cleanup utility (Phase 13B-2, `.autoingest-sync-tmp`/`.autoingest-tx-tmp` only) — see AI-FEAT-052's Decisions section. Whoever scopes this milestone should resolve the naming collision before adding code to that file. |
-| Next action | Not started — follows AI-RM-006 |
+| Next action | Not started — scope is designed and delivered inside AI-RM-002. The `archiveRepairService.js` naming collision must still be resolved there. |
 
 ---
 
@@ -176,16 +186,16 @@ The `Status` field keeps the word **Completed** only for milestones that reached
 
 | Field | Value |
 |---|---|
-| Status | Planned — not started |
+| Status | Planned — not started. Workstream: Archive Maintenance & Archive Node (host AI-RM-002), placed 2026-10-27. |
 | Objective | Evidence pending — not yet documented as fact |
 | Included AI-FEAT IDs | AI-FEAT-055 |
 | Existing features extended | AI-FEAT-043 (expected data source) |
-| Dependencies | AI-RM-007 |
+| Dependencies | AI-RM-002 (host workstream; AI-FEAT-043 health data). *Prior value (superseded 2026-10-27): followed the Archive Repair milestone in the original sequence.* |
 | Deliverables | Evidence pending |
 | Acceptance criteria | Evidence pending |
 | Planned estimate | 2–4 weeks |
 | Current risks | Scope not yet defined |
-| Next action | Not started — follows AI-RM-007 |
+| Next action | Not started — follows AI-RM-002 within its workstream |
 
 ---
 
@@ -193,7 +203,7 @@ The `Status` field keeps the word **Completed** only for milestones that reached
 
 | Field | Value |
 |---|---|
-| Status | Planned — not started |
+| Status | Planned — not started. Workstream: Archive Browser & Discovery (host AI-RM-004), long-horizon last item, placed 2026-10-27. |
 | Objective | Evidence pending — not yet documented as fact |
 | Included AI-FEAT IDs | AI-FEAT-056 |
 | Existing features extended | AI-FEAT-055 (expected foundation) |
@@ -202,7 +212,7 @@ The `Status` field keeps the word **Completed** only for milestones that reached
 | Acceptance criteria | Evidence pending |
 | Planned estimate | 6–10 weeks |
 | Current risks | Least-scoped item in the entire roadmap — nothing about its eventual shape should be assumed from its name alone |
-| Next action | Not started — follows AI-RM-008; final milestone in the AI-RM-001…009 archive-capability sequence (AI-RM-010 is a separate, parallel release-infrastructure track — see below, not a continuation of this sequence) |
+| Next action | Not started — follows AI-RM-008 (dependency unchanged). Still the least-scoped item; whether it should relate to Ask AutoIngest's model runtime is an open design question, not an assumption. |
 
 ---
 
@@ -303,5 +313,5 @@ The `Status` field keeps the word **Completed** only for milestones that reached
 | Deliverables | Evidence pending |
 | Acceptance criteria | Evidence pending |
 | Planned estimate | Evidence pending — not yet documented as fact |
-| Current risks | Overlap with AI-RM-006 (Integrity Verification — Archive-Wide); owner decision pending. Migration from the existing capped, per-computer name+size import index has to be designed so that history is not lost and confidence is not overstated. |
+| Current risks | Hosts the remaining scope of AI-RM-006 (Integrity Verification — Archive-Wide) since 2026-10-27, including its AI-FEAT-025 disambiguation risk. Migration from the existing capped, per-computer name+size import index has to be designed so that history is not lost and confidence is not overstated. |
 | Next action | Not started — follows AI-RM-014 (Ask AutoIngest continues in parallel on its own branch) |

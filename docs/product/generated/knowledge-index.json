@@ -1227,7 +1227,7 @@
       "roadmapRelationship": [
         {
           "roadmapId": "AI-RM-006",
-          "status": "Planned — not started"
+          "status": "Planned — not started. **Remaining scope placed under AI-RM-015 (Backup Intelligence Foundation)** on 2026-10-27 per owner direction. This record, its ID and AI-FEAT-054 are retained for history."
         }
       ],
       "searchTerms": [
@@ -2649,7 +2649,7 @@
       "roadmapRelationship": [
         {
           "roadmapId": "AI-RM-007",
-          "status": "Planned — not started"
+          "status": "Planned — not started. **Remaining scope placed under AI-RM-002 (Archive Maintenance & Archive Node)** on 2026-10-27 per owner direction. This record, its ID and AI-FEAT-052 are retained for history."
         }
       ],
       "searchTerms": [
@@ -2695,7 +2695,7 @@
       "roadmapRelationship": [
         {
           "roadmapId": "AI-RM-005",
-          "status": "Planned — not started"
+          "status": "Planned — not started. Workstream: Archive Browser & Discovery (host AI-RM-004), placed 2026-10-27."
         }
       ],
       "searchTerms": [
@@ -2741,7 +2741,7 @@
       "roadmapRelationship": [
         {
           "roadmapId": "AI-RM-006",
-          "status": "Planned — not started"
+          "status": "Planned — not started. **Remaining scope placed under AI-RM-015 (Backup Intelligence Foundation)** on 2026-10-27 per owner direction. This record, its ID and AI-FEAT-054 are retained for history."
         }
       ],
       "searchTerms": [
@@ -2791,7 +2791,7 @@
       "roadmapRelationship": [
         {
           "roadmapId": "AI-RM-008",
-          "status": "Planned — not started"
+          "status": "Planned — not started. Workstream: Archive Maintenance & Archive Node (host AI-RM-002), placed 2026-10-27."
         }
       ],
       "searchTerms": [
@@ -2837,7 +2837,7 @@
       "roadmapRelationship": [
         {
           "roadmapId": "AI-RM-009",
-          "status": "Planned — not started"
+          "status": "Planned — not started. Workstream: Archive Browser & Discovery (host AI-RM-004), long-horizon last item, placed 2026-10-27."
         }
       ],
       "searchTerms": [

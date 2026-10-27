@@ -1,5 +1,5 @@
 {
-  "blockers": "Owner approval of the AI-FEAT-061 Q1 plan (including the behavior-preserving main-window targeting refactor and the single-instance-lock compatibility decision) *(Prior value, superseded 2026-10-27: None identified for AI-RM-002 beyond the absence of a defined scope)*",
+  "blockers": "None for AI-RM-014 Q1. It was approved by the owner on 2026-10-27 and is being implemented on `feature/menu-bar-companion-q1`. Q2, a Preview RC and any Stable merge each need separate approval. *(Prior value, superseded 2026-10-27 after owner Q1 approval: Owner approval of the AI-FEAT-061 Q1 plan (including the behavior-preserving main-window targeting refactor and the single-instance-lock compatibility decision)  (Prior value, superseded 2026-10-27: None identified for AI-RM-002 beyond the absence of a defined scope))*",
   "completed_count": 5,
   "completed_milestones": [
     "AI-RM-001",
@@ -49,7 +49,7 @@
       "status": "**Completed**"
     },
     {
-      "current_risks": "Scope overlap with AI-RM-007 (Archive Repair) — owner decision pending on whether repair actions belong here",
+      "current_risks": "Hosts the remaining scope of AI-RM-007 (Archive Repair) and AI-RM-008 (Archive Analytics) since 2026-10-27; the `services/archiveRepairService.js` naming collision (see AI-RM-007) must be resolved here",
       "dependencies": [
         "AI-RM-001",
         "AI-RM-015"
@@ -124,15 +124,15 @@
         "AI-FEAT-053"
       ],
       "name": "Global Search",
-      "next_action": "Not started — follows AI-RM-004",
+      "next_action": "Not started — delivered within the Archive Browser & Discovery workstream after AI-RM-004",
       "objective": "Evidence pending — not yet documented as fact",
       "planned_estimate": "3–5 weeks",
-      "status": "Planned — not started"
+      "status": "Planned — not started. Workstream: Archive Browser & Discovery (host AI-RM-004), placed 2026-10-27."
     },
     {
-      "current_risks": "Scope overlap with AI-FEAT-025 needs explicit disambiguation before implementation starts, to avoid duplicating the existing `getFileHash()`-based mechanism without a clear reason. **Added 2026-10-27:** also overlaps AI-RM-015 (Backup Intelligence Foundation — durable verification evidence/receipts); owner decision pending on fold-in vs consumer vs separate. Not superseded until decided.",
+      "current_risks": "Scope overlap with AI-FEAT-025 needs explicit disambiguation before implementation starts, to avoid duplicating the existing `getFileHash()`-based mechanism without a clear reason. **Added 2026-10-27:** also overlaps AI-RM-015 (Backup Intelligence Foundation — durable verification evidence/receipts); **resolved 2026-10-27: remaining scope placed under AI-RM-015** (record retained, not superseded).",
       "dependencies": [
-        "AI-RM-005"
+        "AI-RM-015"
       ],
       "existing_features_extended": [
         "AI-FEAT-025"
@@ -145,15 +145,15 @@
         "AI-FEAT-054"
       ],
       "name": "Integrity Verification",
-      "next_action": "Not started — follows AI-RM-005",
+      "next_action": "Not started — scope is designed and delivered inside AI-RM-015. Its AI-FEAT-025 disambiguation risk carries over there.",
       "objective": "Evidence pending — not yet documented as fact. Narrower prior art exists: AI-FEAT-025 (import-batch and sync-job checksum verification) — this milestone's scope is expected to be broader (archive-wide), not merely a rename of that existing capability.",
       "planned_estimate": "3–4 weeks",
-      "status": "Planned — not started"
+      "status": "Planned — not started. **Remaining scope placed under AI-RM-015 (Backup Intelligence Foundation)** on 2026-10-27 per owner direction. This record, its ID and AI-FEAT-054 are retained for history."
     },
     {
       "current_risks": "**Naming collision**: `services/archiveRepairService.js` already exists but implements an unrelated narrow temp-file-cleanup utility (Phase 13B-2, `.autoingest-sync-tmp`/`.autoingest-tx-tmp` only) — see AI-FEAT-052's Decisions section. Whoever scopes this milestone should resolve the naming collision before adding code to that file.",
       "dependencies": [
-        "AI-RM-006"
+        "AI-RM-002"
       ],
       "existing_features_extended": [
         "AI-FEAT-043"
@@ -166,15 +166,15 @@
         "AI-FEAT-052"
       ],
       "name": "Archive Repair",
-      "next_action": "Not started — follows AI-RM-006",
+      "next_action": "Not started — scope is designed and delivered inside AI-RM-002. The `archiveRepairService.js` naming collision must still be resolved there.",
       "objective": "Close the documented gap in AI-FEAT-043: \"the diagnostics layer reports issues but does not auto-fix them\" (`docs/archive-operations-layer.md`).",
       "planned_estimate": "4–6 weeks",
-      "status": "Planned — not started"
+      "status": "Planned — not started. **Remaining scope placed under AI-RM-002 (Archive Maintenance & Archive Node)** on 2026-10-27 per owner direction. This record, its ID and AI-FEAT-052 are retained for history."
     },
     {
       "current_risks": "Scope not yet defined",
       "dependencies": [
-        "AI-RM-007"
+        "AI-RM-002"
       ],
       "existing_features_extended": [
         "AI-FEAT-043"
@@ -187,10 +187,10 @@
         "AI-FEAT-055"
       ],
       "name": "Archive Analytics",
-      "next_action": "Not started — follows AI-RM-007",
+      "next_action": "Not started — follows AI-RM-002 within its workstream",
       "objective": "Evidence pending — not yet documented as fact",
       "planned_estimate": "2–4 weeks",
-      "status": "Planned — not started"
+      "status": "Planned — not started. Workstream: Archive Maintenance & Archive Node (host AI-RM-002), placed 2026-10-27."
     },
     {
       "current_risks": "Least-scoped item in the entire roadmap — nothing about its eventual shape should be assumed from its name alone",
@@ -208,10 +208,10 @@
         "AI-FEAT-056"
       ],
       "name": "AI Archive Intelligence",
-      "next_action": "Not started — follows AI-RM-008; final milestone in the AI-RM-001…009 archive-capability sequence (AI-RM-010 is a separate, parallel release-infrastructure track — see below, not a continuation of this sequence)",
+      "next_action": "Not started — follows AI-RM-008 (dependency unchanged). Still the least-scoped item; whether it should relate to Ask AutoIngest's model runtime is an open design question, not an assumption.",
       "objective": "Evidence pending — not yet documented as fact",
       "planned_estimate": "6–10 weeks",
-      "status": "Planned — not started"
+      "status": "Planned — not started. Workstream: Archive Browser & Discovery (host AI-RM-004), long-horizon last item, placed 2026-10-27."
     },
     {
       "current_risks": "None blocking. Two CI-only bugs were found and fixed during the pilot ([BUG-015](bugs/BUG-015_WINDOWS_RUNNER_DEFAULT_POWERSHELL_SHELL_MANGLES_ELECTRON_BUILDER_DOT_NOTATION_CLI_OVERRIDES.md), [BUG-016](bugs/BUG-016_UNDECLARED_NPM_DEPENDENCY_IN_PRODUCT_DOCS_TOOLING_MASKED_BY_LOCALLY_HOISTED_NODE_MODULES.md)) — both closed. One accepted (non-blocking) structural note: `rc-build-windows`/`rc-build-mac` have no atomic dual-platform publish gate (see AI-FEAT-057's Decisions section). One non-blocking UX candidate identified (exact running version, including prerelease suffix, not confidently visible to a tester in-app — see AI-FEAT-057's Future Enhancements).",
@@ -329,7 +329,7 @@
       "status": "**Active — next milestone (Priority Order #3, PRIORITY 1).** Q0 (audit, architecture, UX specification, test matrix) recorded 2026-10-27. Q1 implementation not started; it awaits owner approval."
     },
     {
-      "current_risks": "Overlap with AI-RM-006 (Integrity Verification — Archive-Wide); owner decision pending. Migration from the existing capped, per-computer name+size import index has to be designed so that history is not lost and confidence is not overstated.",
+      "current_risks": "Hosts the remaining scope of AI-RM-006 (Integrity Verification — Archive-Wide) since 2026-10-27, including its AI-FEAT-025 disambiguation risk. Migration from the existing capped, per-computer name+size import index has to be designed so that history is not lost and confidence is not overstated.",
       "dependencies": [
         "AI-RM-014"
       ],
@@ -353,7 +353,7 @@
   ],
   "next_milestone_id": "AI-RM-014",
   "next_planned_action": "Owner review of AI-FEAT-061 (architecture, phase plan, test matrix); on approval, start AI-RM-014 Q1 in a dedicated worktree cut from the verified `origin/stable/0.9` HEAD *(Prior value, superseded 2026-10-27: Discovery and specification for AI-RM-002 (Archive Maintenance) — no scope exists yet)*",
-  "pending_decisions": "(1) AI-FEAT-061 Q1 approval, including single-instance lock and the Q4 handoff listener as the only main-window code touch. (2) AI-RM-006 vs AI-RM-015 overlap. (3) AI-RM-007 vs AI-RM-002 overlap. (4) Placement of AI-RM-005…009 in the Priority Order. (5) Carried forward: AI-RM-007 naming collision; AI-RM-006 vs AI-FEAT-025. *(Prior value, superseded 2026-10-27: Naming collision for AI-RM-007's service (see Current risks); scope disambiguation for AI-RM-006 vs. AI-FEAT-025)*",
+  "pending_decisions": "(1) Q1 review on `feature/menu-bar-companion-q1`. (2) Default-on companion and launch-at-login before Stable (launch-at-login excluded from Q1). (3) Carried forward: the `archiveRepairService.js` naming collision (now inside AI-RM-002) and AI-RM-006 vs AI-FEAT-025 disambiguation (now inside AI-RM-015). The AI-RM-005…009 placement was resolved 2026-10-27 (02_MASTER_ROADMAP.md § Workstreams). *(Prior value, superseded 2026-10-27 after owner Q1 approval: (1) AI-FEAT-061 Q1 approval, including single-instance lock and the Q4 handoff listener as the only main-window code touch. (2) AI-RM-006 vs AI-RM-015 overlap. (3) AI-RM-007 vs AI-RM-002 overlap. (4) Placement of AI-RM-005…009 in the Priority Order. (5) Carried forward: AI-RM-007 naming collision; AI-RM-006 vs AI-FEAT-025.  (Prior value, superseded 2026-10-27: Naming collision for AI-RM-007's service (see Current risks); scope disambiguation for AI-RM-006 vs. AI-FEAT-025))*",
   "progress_percent": 33.3,
   "recently_completed_documentation_work": "2026-10-27 — roadmap reprioritization and AI-RM-014 Q0 specification (documentation only, no application code). Releases since the prior dashboard update: v0.9.13 (Multi-Event Import), v0.9.14 (MX Creative Console), v0.9.16 (current Stable). *(Prior value, superseded 2026-10-27: UI polish to the Metadata Management Modal / Audit & Repair tab (commits `4446a30` → `c5d200f`, 2026-08-02 through 2026-08-04) — cosmetic/layout only, no behavior change, all part of the already-complete AI-RM-001)*",
   "schema_version": "1.3.0",
