@@ -835,6 +835,23 @@ Validation:
 - For any new untrusted-content-processing function, trace every call site back to confirm none is reachable from an automatic hook — only from an explicit human-invoked entry point.
 - Confirm automatic hook-reachable code that touches the same records only reads/updates from already-canonical, already-trusted state.
 
+### Window Registry, Auxiliary Windows, and Single-Instance Lock
+
+Context:
+- Applies when adding any auxiliary BrowserWindow (popup, tray window) or changing app launch/quit behavior. Source: learning-log 2026-10-28.
+
+Rule:
+- `BrowserWindow.getAllWindows().find(...)` means "first window", not "main window"; once an auxiliary window exists, route window-targeted sends through `windowRegistry.getProgressTarget()` and count only app windows for `activate`.
+- Prefer create-on-demand/destroy for occasional popups; a hidden persistent window stops `window-all-closed` from firing. Guard that handler so an auxiliary close does not re-run per-window shutdown.
+- The single-instance lock must be the first thing in `main.js`, before module-load side effects; pass argv via `additionalData`.
+- Verify Stable against `origin/stable/0.9` (local ref can lag) and check new product-doc IDs across all branches.
+
+Avoid:
+- New `getAllWindows().find(...)` send targets; hidden keep-alive windows; side effects before the lock.
+
+Validation:
+- Live-test with the popup open that progress events reach the main window; confirm app quits when the main window closes.
+
 ## Validation Checklist
 
 When invoked, return:

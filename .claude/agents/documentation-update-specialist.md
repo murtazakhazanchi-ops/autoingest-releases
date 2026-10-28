@@ -281,6 +281,22 @@ Validation:
 - Confirm architecture doc covers stable contracts, not transient task notes.
 - Confirm release notes doc includes a validation checklist section.
 
+### Product-Docs System Gotchas
+
+Context:
+- Applies when editing `docs/product/` records or `scripts/product-docs/`. Source: learning-log 2026-10-28.
+
+Rule:
+- The dashboard "Current roadmap milestone" field is parsed by an ID extractor; do not leave a superseded AI-RM ID in its annotation.
+- Update hardcoded counts in `scripts/product-docs/test/integration.test.js` when records are added; these tests need a `.git` directory.
+- Git hooks re-stamp `generated/manifest.json` `source_commit` on each commit; restore it rather than chase it.
+
+Avoid:
+- Mentioning old roadmap IDs in the milestone field; leaving integration counts stale.
+
+Validation:
+- Run product-docs tests after edits and confirm the dashboard milestone resolves to one ID.
+
 ## Validation Checklist
 
 Before making documentation changes, read:

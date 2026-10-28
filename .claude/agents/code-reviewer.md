@@ -310,6 +310,22 @@ Validation:
 - Grep the diff for `.replace(` calls where the second argument is a template literal or string concatenation containing a variable.
 - For each match, confirm the variable's value cannot originate from untrusted/dynamic input, or confirm the call uses a replacer function instead.
 
+### Auxiliary Window, Shared Poller, and Hidden-Attribute Review
+
+Context:
+- Applies to diffs adding popup/tray windows or moving per-window timers to app scope. Source: learning-log 2026-10-28.
+
+Rule:
+- Auxiliary-window IPC requires a dedicated sandboxed preload, an `event.sender === popup.webContents` check in every handler, path-free payloads, denied navigation/`window.open`, and strict CSP.
+- A shared poller extracted from a window-owned `setInterval` must keep first-result timing (acquire restarts the phase and polls immediately), dedupe in-flight polls, and keep the broadcast contract unchanged.
+- A class with `display:flex` overrides the `hidden` attribute; require `[hidden]{display:none !important}`.
+
+Avoid:
+- Approving handlers without sender checks, or poller refactors without a visual/timing regression check.
+
+Validation:
+- Grep new `ipcMain.handle` for sender checks; confirm poller acquire/release parity with the old lifecycle points.
+
 ## Validation Checklist
 
 Before giving a verdict, review:

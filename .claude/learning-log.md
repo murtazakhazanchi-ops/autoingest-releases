@@ -2428,6 +2428,48 @@ Status:
 
 ---
 
+### 2026-10-28 — AI-RM-014 Q0/Q1: Menu-Bar/Tray Companion Foundation
+
+Task type:
+- Architecture / Window Lifecycle / Performance / Testing / Product Docs
+
+What happened:
+- Q1 added a tray companion and popup under a main-window UI freeze (DEC-027), touching window targeting, drive polling, and single-instance handling in `main/main.js`.
+- Seven progress-send sites used `BrowserWindow.getAllWindows().find(w => !w.isDestroyed())`; with the popup open Electron listed the popup first and the live test reproduced events going to the popup. Fixed via `windowRegistry.getProgressTarget()`.
+- A hidden persistent window would have kept `window-all-closed` from firing (breaking quit-on-close on Windows) and cost about +91 MB and +1 renderer; create-on-demand opens in about 105 ms.
+- Converting the window-owned drive `setInterval` to a consumer-counted app poller changed first-result timing until `acquire` restarted the phase and polled immediately; pixel visual regression caught it.
+- Product-docs and branch hygiene surprises: local `stable/0.9` lagged origin by 43 commits; DEC numbering differs on feature/ask-autoingest; dashboard milestone field and hardcoded integration-test counts broke on edits.
+
+Reusable lessons:
+1. "First window" is not "main window": once any auxiliary BrowserWindow exists, route window-targeted sends through a registry; auxiliary windows must be registered as such and excluded from `activate` counts.
+2. Hidden persistent windows keep `getAllWindows()` non-empty, so `window-all-closed` never fires; prefer create-on-demand/destroy for occasional popups, and guard `window-all-closed` against auxiliary-window closes.
+3. When moving a window-owned poller to a shared consumer-counted poller, preserve first-result timing (restart phase and poll on first acquire), dedupe in-flight polls, and keep the broadcast contract identical.
+4. The single-instance lock must run first in `main.js`, before module-load side effects, passing argv via `additionalData`.
+5. A UI freeze is verified by a git-based static test (no renderer/preload/asset diff vs origin Stable) plus pixel visual regression against a Stable export.
+6. A component class with `display:flex` overrides the `hidden` attribute; add `[hidden]{display:none !important}` and assert computed visibility in live tests.
+7. Auxiliary-window IPC needs a dedicated sandboxed preload, `event.sender` checks on every handler, path-free payloads, denied navigation/window.open, and strict CSP.
+8. Product-docs: no superseded AI-RM ID in the dashboard milestone field annotation; update hardcoded integration-test counts; tests need a `.git` dir; restore the hook-restamped manifest `source_commit` instead of chasing it.
+9. Verify Stable against `origin/stable/0.9`, not the local ref; check new product-doc IDs across all branches.
+
+Common failure mode:
+- Treating `getAllWindows()[0]`-style lookups as the main window; keeping hidden windows alive; silently changing timing when refactoring pollers.
+
+Preferred pattern:
+- Window registry for targeting, on-demand auxiliary windows, behavior-preserving poller extraction verified by visual regression, git-based freeze test.
+
+Promote to agents:
+- `autoingest-architect.md` — lessons 1, 2, 4, 9
+- `code-reviewer.md` — lessons 3, 6, 7 (review checks)
+- `performance-auditor.md` — lessons 2, 3 (cost and timing)
+- `ui-system-specialist.md` — lessons 5, 6
+- `documentation-update-specialist.md` — lesson 8
+- Not promoted: contract-debugger (duplicates the above); live-test setup tips (worktree-specific, kept in project memory/docs)
+
+Status:
+- Promoted
+
+---
+
 ## Entry Template
 
 ### YYYY-MM-DD — Task Name

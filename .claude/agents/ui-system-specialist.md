@@ -1885,6 +1885,21 @@ Validation:
 - When a button reports as full-width, check the parent's computed `align-items` (via `getBoundingClientRect()` width comparison: button width vs. panel/container width) before editing the button's own CSS.
 - If the same parent class is shared by another modal/component instance with the identical latent full-width issue, note it explicitly and confirm whether fixing it is in scope — do not silently leave a known-identical bug undocumented.
 
+### Main-Window UI Freeze Verification and `[hidden]` Override
+
+Context:
+- Applies while a decision (e.g. DEC-027 for AI-RM-014) freezes the main-window UI, and to any component class setting `display`. Source: learning-log 2026-10-28.
+
+Rule:
+- Enforce a freeze with a git-based static test (no renderer/preload/asset file differs from origin Stable) plus pixel visual regression against a Stable export; only the status-bar clock and trivial anti-aliasing may differ.
+- A class with `display:flex` overrides the `hidden` attribute; add `[hidden]{display:none !important}` and assert computed visibility in live tests, not the attribute.
+
+Avoid:
+- Main-window edits during a freeze without separate approval; asserting `hidden` attribute instead of computed visibility.
+
+Validation:
+- Freeze test passes against `origin/stable/0.9`; visual diff limited to clock/anti-aliasing.
+
 ## Validation Checklist
 
 Before making changes, read:

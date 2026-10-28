@@ -525,6 +525,21 @@ Validation:
 - Confirm main window loads after confirmation.
 - Confirm user switch avoids unnecessary workflow reset.
 
+### Keep-Alive Windows and Shared Pollers
+
+Context:
+- Applies to tray/popup windows and any poller shared across windows. Source: learning-log 2026-10-28.
+
+Rule:
+- For occasional popups, create on demand and destroy (measured about 105 ms open) rather than keeping a hidden window (about +91 MB, +1 renderer, and `window-all-closed` never fires).
+- A shared consumer-counted poller must not change when first results arrive; restart phase and poll on first acquire, and dedupe in-flight polls.
+
+Avoid:
+- Hidden persistent windows for rarely used UI; poller refactors that shift first-result timing.
+
+Validation:
+- Measure memory and process count before adopting keep-alive; compare visual regression of loading states after poller changes.
+
 ### Cheap Pre-Check Before Expensive Operation in Hot/Frequently-Triggered Paths
 
 Context:
