@@ -13,20 +13,20 @@
 | Related technical docs | `docs/CLAUDE.md` (security model, file-copy rules), `docs/ingestion-flow.md`, `docs/multi-event-import.md`, `docs/archive-operations-layer.md`, `docs/commandLayer.md`, `docs/mxControlTransport.md` — none yet describe the companion, because nothing is implemented |
 | Evidence status | Confirmed zero implementation (2026-10-27 audit of `origin/stable/0.9` @ `0eb9c43`): no `Tray`, `Notification`, `setLoginItemSettings`, `requestSingleInstanceLock`, `powerMonitor` or `app.dock` usage anywhere under `main/`, `services/`, `renderer/`. Architecture below is a **proposal awaiting owner approval**, not a description of shipped behavior. |
 | First-known implementation | 2026-10-27 — Q1 foundation on `feature/menu-bar-companion-q1` @ `dd9493f` (not merged; owner review pending) |
-| Latest major update | 2026-10-28 — Q1 foundation implemented and verified on its feature branch |
+| Latest major update | 2026-10-28 — phase plan expanded to Q0–Q9 (DEC-028); Q1 foundation implemented and verified on its feature branch |
 
 ## Lifecycle Metadata
 
 | Field | Value |
 |---|---|
-| Related features | AI-FEAT-062 (Backup Intelligence Foundation — later improves the confidence of what the companion displays; the companion must work without it) |
-| Related decisions | [DEC-027](../decisions/DEC-027_QUICK_INGEST_PRIORITY_AND_MAIN_WINDOW_UI_FREEZE.md) |
+| Related features | AI-FEAT-062 (Backup Intelligence Foundation — later improves the confidence of what the companion displays; the companion must work without it); AI-FEAT-063 (Photographer & Camera Identity Registry — shared learning/registry service delivered in AI-RM-014 Q4–Q7 and consumed by the companion) |
+| Related decisions | [DEC-027](../decisions/DEC-027_QUICK_INGEST_PRIORITY_AND_MAIN_WINDOW_UI_FREEZE.md), [DEC-028](../decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md) |
 | Related bugs | None recorded |
 | Related postmortems | None |
 | Related architectural evolution sections | None yet — will qualify once the app gains an app-lifetime (not window-lifetime) source monitor |
 | Related release notes | Not applicable — not released |
 | Testing coverage | On `feature/menu-bar-companion-q1` @ `dd9493f`: `test/companionQ1.test.js` (unit), `test/companionQ1UiFreeze.test.js` (static UI-freeze guard), `test/companionQ1Live.test.js` (live Electron), `test/companionPopupLifecycle.bench.js`, `test/mainWindowVisualRegression.live.js`. Runtime reference on that branch: `docs/menu-bar-companion.md`. |
-| Documentation completeness | Q0 complete; Q1–Q7 sections are plans, not evidence |
+| Documentation completeness | Q0 complete; Q1 recorded with evidence; Q2–Q9 (§ Expanded phase plan) are plans, not evidence |
 
 ## Summary
 
@@ -56,7 +56,7 @@ Recorded 2026-10-27 from the project owner's direction ([DEC-027](../decisions/D
 
 ### Hard constraints
 
-1. **Existing main-window UI is frozen.** Nothing in the main window may change in appearance, layout or behavior: landing page, step rail, Event Creator, card browsing, file grid, grouping, metadata/tag refinement, QMZ, Transfer, Archive Locations/settings, diagnostics/audit/repair, MX mappings. No card widgets, banners, buttons or panels are to be added there. The one proposed non-visual touchpoint (handoff listener, Q4) needs its own explicit approval.
+1. **Existing main-window UI is frozen.** Nothing in the main window may change in appearance, layout or behavior: landing page, step rail, Event Creator, card browsing, file grid, grouping, metadata/tag refinement, QMZ, Transfer, Archive Locations/settings, diagnostics/audit/repair, MX mappings. No card widgets, banners, buttons or panels are to be added there. The one proposed non-visual touchpoint (handoff listener, Q4) needs its own explicit approval. *(Amended 2026-10-28, [DEC-028](../decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md): exactly two approved exceptions — a Photographer Registry tab beside Keyword Registry in Metadata Management, and suggestions + inline Add Photographer in the Confirm Event Import modal's photographer field. Everything else stays frozen.)*
 2. **No second copy engine and no parallel metadata pipeline.** Quick Ingest reuses event/photographer selection, routing, copy, duplicate protection, metadata writing, import tracking and existing verification.
 3. **No destructive actions.** No automatic source deletion, formatting or cleanup.
 4. **Honest status.** "Verified" is never shown on the basis of filename, size or import-index history.
@@ -185,7 +185,7 @@ Companion → main requests (each validated in main; unknown fields rejected):
 4. Everything after that is the existing workflow (event/photographer/component resolution, duplicate decisions, copy, metadata, tracking).
 5. If the workspace is busy (import running, or another source with a selection), the handoff is **refused**. The companion says "AutoIngest is busy — finish the current import first", and the workspace is left untouched.
 
-A fully independent one-click "import into last event" transaction is **deferred**. It cannot safely resolve event, photographer, component and duplicate decisions without either new main-window UI (frozen) or an unreviewed second pipeline. It needs its own proposal after Q4 proves the handoff.
+*(Superseded 2026-10-28 by Q8 in § Expanded phase plan — one-step import is now in scope when every mandatory input is already satisfied, using only the existing pipeline. Original text kept:)* A fully independent one-click "import into last event" transaction is **deferred**. It cannot safely resolve event, photographer, component and duplicate decisions without either new main-window UI (frozen) or an unreviewed second pipeline. It needs its own proposal after Q4 proves the handoff.
 
 ### Background operation & lifecycle
 
@@ -218,6 +218,8 @@ A fully independent one-click "import into last event" transaction is **deferred
 
 ## Phased implementation plan
 
+> **Superseded 2026-10-28 by § Expanded phase plan below** ([DEC-028](../decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md)). The original Q0–Q7 table is kept unchanged for history; the mapping from these rows to the new phases is in that section. Q0 and Q1 keep their meaning and their recorded evidence.
+
 Every phase runs in its own dedicated worktree and feature branch cut from the verified `origin/stable/0.9` HEAD (one Claude Code session per worktree), ends with tests and a review, and needs owner approval before the next phase starts. Nothing is merged to `stable/0.9` and nothing is published without explicit approval.
 
 | Phase | Scope | Exit criteria |
@@ -230,6 +232,83 @@ Every phase runs in its own dedicated worktree and feature branch cut from the v
 | **Q5** | Native notifications & activity indicators: card / import-complete / failure notifications, tray icon activity state | Debounce verified; AUMID on Windows; macOS packaged behavior recorded |
 | **Q6** | Card-aware history entry points & verification hooks: capability-flagged slots wired to the v1 contract; "Checksum verified" from this session's `checksum:run` only | History stays omitted while `sourceHistory` is false; contract unchanged |
 | **Q7** | Physical-device E2E, packaging, Preview RC: real cards (read-only), sleep/wake, prolonged run, macOS x64/arm64 + Windows x64 packaged builds | All rows of the test matrix pass → Preview RC. Stable needs packaged physical validation + explicit approval |
+
+## Expanded phase plan (owner direction, 2026-10-28)
+
+Recorded from the owner's "Consolidate Quick Ingest Roadmap & Photographer Intelligence" brief ([DEC-028](../decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md)). Phases Q4–Q7 are delivered through the shared feature [AI-FEAT-063](AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md); this file keeps the companion-side scope. The same delivery rules apply: one dedicated worktree and branch per phase cut from the verified `origin/stable/0.9`, tests and review at the end of each phase, owner approval before the next, nothing merged or published without explicit approval.
+
+**Target workflow:** Insert card → detect camera → identify today's files → suggest photographer → confirm → import.
+
+| Phase | Scope | Status / exit criteria |
+|---|---|---|
+| **Q0** | Audit, architecture, contract, test matrix | **Complete** (2026-10-27) |
+| **Q1** | Menu-bar / system-tray foundation: macOS menu-bar companion, Windows tray foundation, shared card detection (one app-scope poller), single-instance handling, main-window progress-event routing correction (R1), companion popup lifecycle (create/destroy on demand) | **Implementation complete** (Status Ladder rung 1) on `feature/menu-bar-companion-q1` @ `dd9493f`, verified on macOS only, local and unmerged. Not Preview verified. Windows tray not run on hardware; no Windows package. Owner review pending. Not to be changed or re-implemented by later documentation work. |
+| **Q2** | **Smart date-based card assessment** (detail below) | Fixture counts per date bucket equal a reference ExifTool read; no filesystem-timestamp-only file is ever counted as dated; cancel on eject |
+| **Q3** | **Automatic camera identification** (detail below); popup shows camera name **and** card name | One / several / unknown / conflicting cameras handled on fixtures; model alone never treated as unique identity |
+| **Q4** | **Photographer & Camera Learning System** — shared backend service (AI-FEAT-063) | AI-FEAT-063 test rows 1–6 |
+| **Q5** | **Centralized Photographer Registry** — new tab beside Keyword Registry in Metadata Management (DEC-028 exception 1) | Registry view/search/edit/associations; visual regression clean outside the new tab |
+| **Q6** | **Automatic photographer creation during import** — Confirm Event Import modal photographer field (DEC-028 exception 2) **and** the companion, same service | 8-step flow in AI-FEAT-063; no technical fields typed by the operator; unknowns stay unknown; rest of the modal unchanged |
+| **Q7** | **Registry import/export & intelligent merge** (AI-FEAT-063 § Registry exchange format & merge rules) | AI-FEAT-063 test rows 7–11 |
+| **Q8** | **Streamlined Quick Ingest** (detail below) | One-step import only when every mandatory input is already satisfied; otherwise safe handoff; existing pipeline only |
+| **Q9** | **Notifications, verification integration & final release**: native notifications, import progress in the companion, interrupted-import handling, content-hash / verification-receipt hooks (capability-flagged for AI-FEAT-062), cross-platform testing, multi-camera / multi-photographer scenarios, regression validation, Preview RC → Stable | Full matrix (Q0 rows 1–17 + rows 18–27 below + AI-FEAT-063 matrix) green; packaged physical validation on macOS x64/arm64 and Windows x64; explicit approval for each of Preview RC and Stable |
+
+**Mapping from the original Q0–Q7 plan (nothing dropped):**
+
+| Original row | Where it went |
+|---|---|
+| Q0 Audit & spec | Q0 (unchanged, complete) |
+| Q1 Foundation & lifecycle | Q1 (unchanged scope; implemented) |
+| Q2 Card detection & compact card-status popover | Popover, no-card/card-present states and multi-card list delivered in Q1; media counts and scan states move into new Q2 |
+| Q3 Archive destination & import-index status | Destination display and archive reachability → Q8 (destination is a Quick Ingest prerequisite); the honest terminology table still binds all phases |
+| Q4 Launch Quick Ingest & workspace handoff (non-visual listener, architecturally approved) | First needed by new Q2 ("review earlier files in the full workspace"); full Quick Ingest → Q8 |
+| Q5 Notifications & activity indicators | Q9 |
+| Q6 History entry points & verification hooks | Q9 (still capability-flagged; AI-FEAT-062) |
+| Q7 Physical E2E, packaging, Preview RC | Q9, with per-phase Preview RCs allowed when the owner approves |
+
+**Independently releasable increments.** Q2 + Q3 (read-only assessment, no main-window change) · Q4 + Q5 (learning service + registry tab) · Q6 · Q7 · Q8 · Q9. Main-window code changes are confined to Q5 and Q6 (DEC-028), plus the already-approved non-visual handoff listener first used in Q2.
+
+### Q2 — Smart date-based card assessment
+
+- On card insert, detect supported media (extensions only from `config/app.config.js`) and read **original capture date/time from media metadata** (`SubSecDateTimeOriginal` / `DateTimeOriginal`, with `OffsetTimeOriginal` when present; `CreateDate` next; for video the container creation dates). Filesystem timestamps are **not** capture evidence: a file with only a filesystem date goes to the *date uncertain* bucket (the timestamp may be shown as a hint).
+- Reuse, do not duplicate: `main/qmzService.js` already reads `DateTimeOriginal`/`CreateDate` via `exifr` with an mtime fallback. Q2 should factor one shared capture-date reader without changing QMZ behaviour (its mtime fallback stays QMZ-only).
+- Buckets with counts: **selected shoot date** (default: today, local time), **earlier dates** (with a per-date breakdown), **date uncertain**. Files dated *after* today are reported as uncertain (camera clock ahead).
+- The operator can pick another shoot date from the dates actually present. Only selected-date files are prepared for Quick Ingest.
+- "Review earlier files" opens the source in the **existing** full workspace through the approved non-visual handoff. The workspace shows the whole card exactly as today; **no date filter is added to the main window** (that would need separate approval).
+- Edge cases: **incorrect camera clocks** (e.g. no files today but a large cluster on one other date → the popup says so and offers that date; dates are never shifted or rewritten); **missing time zones** (naive capture times are compared as local wall-clock dates, never converted); **RAW+JPEG pairs** (grouped by folder + filename stem; the pair takes the best-evidenced date; disagreeing members mark the pair *inconsistent* and it counts as uncertain); **videos** (container dates whose time-zone semantics vary by camera are treated as lower-confidence; Evidence pending — per-brand behaviour to be measured on real fixtures); **inconsistent metadata** across a pair or burst → uncertain, never guessed.
+- Performance: reads are bounded, cancellable (eject, sleep), concurrency-limited and incremental, and must not block the shared poller. Counts show as *scanning* until complete.
+- Open question for the owner: shoots that cross midnight (e.g. an evening event finishing after 00:00). Default until decided: calendar date, with the next-day files visible in the breakdown.
+
+### Q3 — Automatic camera identification
+
+- Extract, read-only: manufacturer (`Make`), model (`Model`), serial number when present (e.g. EXIF `BodySerialNumber`, maker-note serials such as Canon `InternalSerialNumber`), other device identifiers the metadata genuinely provides, the card/volume name (from the existing `drivelist` label), and the source session (the Q1 per-attach `sourceId` + scan time). Which tags each manufacturer writes, especially for video, is **Evidence pending** — to be measured on real fixtures, never assumed.
+- Popup shows **camera name and card name** (e.g. "Canon EOS R5 · EOS_DIGITAL").
+- Cases: one camera; several cameras (per-camera counts); camera metadata unavailable (*Unknown camera* group, never blocks manual selection); conflicting metadata (e.g. RAW and JPEG of one stem disagree → flagged); files from different cameras on one card (each grouped separately).
+- **Camera model alone is never a unique device identity.** Device identity and fingerprint rules belong to AI-FEAT-063.
+- `CompanionSnapshot` grows **additively** (schemaVersion 2): `dateAssessment`, `cameras[]`, later `suggestedPhotographer` and `destination`. No path ever reaches the companion renderer; the v1 security rules stay.
+
+### Q8 — Streamlined Quick Ingest
+
+Popup shows: card name · detected camera(s) · today's file count · earlier-file count · unknown-date count where relevant · suggested photographer · selected archive destination · import availability and status.
+
+- **One-step import of the selected date's files without opening the full app is allowed only when** the event, photographer, destination and grouping requirements are all already satisfied and unambiguous. Otherwise the companion **hands off** to the existing workspace with the source selected.
+- Reuses the existing import routing, metadata tagging, duplicate handling and verification services; **never a parallel copy engine**. This supersedes the Q0 "Quick Ingest behaviour (phase 1)" deferral of an independent transaction, on that condition.
+- Q8 starts with an audit (before design approval) of whether the existing import IPC can be driven from main without the renderer's grouping state. Evidence pending — not yet audited.
+- Busy rule from Q0 stays: no Quick Ingest while an import is running or another source holds a selection.
+
+### Additional test rows (2026-10-28)
+
+| # | Area | Method | Key assertions |
+|---|---|---|---|
+| 18 | Date buckets | unit (fixture metadata) + live | today / earlier / uncertain counts correct; filesystem-only dates → uncertain |
+| 19 | Camera clock wrong | unit | off-date cluster surfaced as a suggestion; no date rewritten |
+| 20 | RAW+JPEG pairs & video | unit | pair dated once; disagreement → uncertain; video handled without false certainty |
+| 21 | Alternate shoot date | live | choosing another date updates counts and the prepared set only |
+| 22 | Camera identification cases | unit + live | one / many / unknown / conflicting cameras; model-only never a unique identity |
+| 23 | Camera + card display | live | popup shows both names; label collisions still disambiguated |
+| 24 | Learning shared across workflows | live | an association confirmed in the companion is suggested in the Confirm Event Import modal and vice versa |
+| 25 | Quick Ingest gate | live | one-step import only when all mandatory inputs are satisfied; otherwise handoff; existing pipeline used (no new copy path) |
+| 26 | Multi-camera / multi-photographer card | live | explicit per-camera handling or handoff; no silent single attribution |
+| 27 | Main-window exceptions only | visual regression + static guard | diffs limited to the Photographer Registry tab and the photographer field (DEC-028) |
 
 ## Test matrix
 
@@ -269,6 +348,8 @@ Unit and integration tests follow the existing `test/*.test.js` style. Live Elec
   - *Verification*: unit 24/24; UI-freeze guard 5/5 (no existing renderer, preload or asset file differs from Stable); live companion test all checks pass. Main-window pixel comparison against a Stable export: splash identical; the remaining differences on the landing and folder-browse screens are confined to the status-bar clock line, plus 5 anti-aliasing pixels with a colour delta of 2/765. Existing unit suites: 54/73 pass under Node; the other 19 need Electron and give results identical to Stable under Electron. Existing live suites: 14 of 14 import, metadata, MX, transfer, QMZ and event-management live suites pass on the Q1 checkout with the companion enabled (multiEventImportUiLive, multiEventImportLive, multiEventLocalFirstUiLive, multiEventNewEventUiLive, multiEventCountSyncUiLive, cardFolderTreeBugfixUiLive, cardFolderTreeBugfixLive, metadataPipelineLive, mxControlTransportLive, mxCommandLayerImportLive, transferImportGeneralPurposeLiveE2E, transferExportConsecutiveExportsLiveE2E, qmzLiveE2E, eventManagementReliabilityLive); the remaining 39 live suites (other QMZ/transfer/tag-refinement variants and packaged-app E2E) were not run. Packaged macOS arm64 `--dir` build: companion files are in `app.asar`, and the packaged app shows its menu-bar item and popup.
   - *Not done in Q1*: Windows hardware run, Windows package, Preview RC. The live tests stub only `drivelist.list()`, because mounting synthetic disk images was not permitted in this environment.
 
+- **2026-10-28 — Phase plan expanded (documentation only).** Owner added smart date-based assessment, automatic camera identification, a shared photographer↔camera learning system, a Photographer Registry, merge-safe registry exchange, photographer suggestions in the Confirm Event Import modal and one-step Quick Ingest. Re-planned as Q0–Q9 (§ Expanded phase plan); the original Q0–Q7 table is kept and marked superseded, with a row-by-row mapping. Shared photographer/camera capability registered as [AI-FEAT-063](AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md). Two main-window exceptions to the DEC-027 freeze approved as design scope ([DEC-028](../decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md)). The Q0 deferral of an independent Quick Ingest transaction is superseded by Q8, conditionally. Q1 code untouched.
+
 ## Engineering Evolution
 
 **Initial implementation**: Not applicable — not yet implemented.
@@ -286,10 +367,11 @@ None recorded.
 ## Decisions
 
 - [DEC-027](../decisions/DEC-027_QUICK_INGEST_PRIORITY_AND_MAIN_WINDOW_UI_FREEZE.md) — Quick Ingest prioritized; main-window UI frozen; companion built as an isolated presentation/control layer.
+- [DEC-028](../decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md) — shared photographer/camera learning (AI-FEAT-063); merge-not-replace registry exchange; two approved main-window exceptions; Q0–Q9 re-plan; conditional one-step Quick Ingest (Q8).
 
 ## Future Enhancements
 
-- Independent one-click Quick Ingest transaction (deferred — see Quick Ingest behaviour).
+- Independent one-click Quick Ingest transaction (deferred — see Quick Ingest behaviour). *(Superseded 2026-10-28: now planned as Q8, conditionally — see § Expanded phase plan.)*
 - Per-card history, content identity and verification receipts once AI-FEAT-062 provides them (capability-flagged in the v1 contract).
 - Default-on companion and launch-at-login decision before Stable promotion.
 

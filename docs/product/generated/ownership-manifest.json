@@ -25,7 +25,8 @@
         "AI-FEAT-034",
         "AI-FEAT-035",
         "AI-FEAT-036",
-        "AI-FEAT-037"
+        "AI-FEAT-037",
+        "AI-FEAT-063"
       ]
     },
     "docs/multi-event-import.md": {
@@ -226,7 +227,8 @@
         "AI-FEAT-037",
         "AI-FEAT-057",
         "AI-FEAT-058",
-        "AI-FEAT-061"
+        "AI-FEAT-061",
+        "AI-FEAT-063"
       ]
     },
     "main/exifService.js": {
@@ -240,7 +242,8 @@
         "AI-FEAT-034",
         "AI-FEAT-035",
         "AI-FEAT-036",
-        "AI-FEAT-037"
+        "AI-FEAT-037",
+        "AI-FEAT-063"
       ]
     },
     "main/fileBrowser.js": {
@@ -301,7 +304,8 @@
         "AI-FEAT-037",
         "AI-FEAT-057",
         "AI-FEAT-058",
-        "AI-FEAT-061"
+        "AI-FEAT-061",
+        "AI-FEAT-063"
       ]
     },
     "main/metadataQueueRecovery.js": {
@@ -315,7 +319,8 @@
         "AI-FEAT-034",
         "AI-FEAT-035",
         "AI-FEAT-036",
-        "AI-FEAT-037"
+        "AI-FEAT-037",
+        "AI-FEAT-063"
       ]
     },
     "main/metadataQueueStore.js": {
@@ -329,7 +334,8 @@
         "AI-FEAT-034",
         "AI-FEAT-035",
         "AI-FEAT-036",
-        "AI-FEAT-037"
+        "AI-FEAT-037",
+        "AI-FEAT-063"
       ]
     },
     "main/metadataRepairService.js": {
@@ -343,7 +349,8 @@
         "AI-FEAT-034",
         "AI-FEAT-035",
         "AI-FEAT-036",
-        "AI-FEAT-037"
+        "AI-FEAT-037",
+        "AI-FEAT-063"
       ]
     },
     "main/metadataStateService.js": {
@@ -357,7 +364,8 @@
         "AI-FEAT-034",
         "AI-FEAT-035",
         "AI-FEAT-036",
-        "AI-FEAT-037"
+        "AI-FEAT-037",
+        "AI-FEAT-063"
       ]
     },
     "main/metadataSyncService.js": {
@@ -371,7 +379,8 @@
         "AI-FEAT-034",
         "AI-FEAT-035",
         "AI-FEAT-036",
-        "AI-FEAT-037"
+        "AI-FEAT-037",
+        "AI-FEAT-063"
       ]
     },
     "main/metadataVerificationService.js": {
@@ -385,7 +394,8 @@
         "AI-FEAT-034",
         "AI-FEAT-035",
         "AI-FEAT-036",
-        "AI-FEAT-037"
+        "AI-FEAT-037",
+        "AI-FEAT-063"
       ]
     },
     "main/preload.js": {
@@ -533,7 +543,8 @@
         "AI-FEAT-040",
         "AI-FEAT-041",
         "AI-FEAT-057",
-        "AI-FEAT-061"
+        "AI-FEAT-061",
+        "AI-FEAT-063"
       ]
     },
     "renderer/renderer.js": {
@@ -574,7 +585,8 @@
         "AI-FEAT-047",
         "AI-FEAT-057",
         "AI-FEAT-058",
-        "AI-FEAT-061"
+        "AI-FEAT-061",
+        "AI-FEAT-063"
       ]
     },
     "renderer/splash.html": {
@@ -898,7 +910,8 @@
         "AI-FEAT-034",
         "AI-FEAT-035",
         "AI-FEAT-036",
-        "AI-FEAT-037"
+        "AI-FEAT-037",
+        "AI-FEAT-063"
       ]
     },
     "services/metadataAuditService.js": {
@@ -912,7 +925,8 @@
         "AI-FEAT-034",
         "AI-FEAT-035",
         "AI-FEAT-036",
-        "AI-FEAT-037"
+        "AI-FEAT-037",
+        "AI-FEAT-063"
       ]
     },
     "services/metadataExpectationService.js": {
@@ -926,7 +940,8 @@
         "AI-FEAT-034",
         "AI-FEAT-035",
         "AI-FEAT-036",
-        "AI-FEAT-037"
+        "AI-FEAT-037",
+        "AI-FEAT-063"
       ]
     },
     "services/nasEventCache.js": {
@@ -1063,7 +1078,8 @@
         "AI-FEAT-034",
         "AI-FEAT-035",
         "AI-FEAT-036",
-        "AI-FEAT-037"
+        "AI-FEAT-037",
+        "AI-FEAT-063"
       ]
     },
     "test/importSession.test.js": {
@@ -1093,7 +1109,8 @@
         "AI-FEAT-034",
         "AI-FEAT-035",
         "AI-FEAT-036",
-        "AI-FEAT-037"
+        "AI-FEAT-037",
+        "AI-FEAT-063"
       ]
     },
     "test/qmzLiveE2E.test.js": {
@@ -1386,7 +1403,8 @@
       "integrations/logitech/autoingest-mx-csharp/test/AutoIngestMxCsDevPlugin.Tests/ContextualKeypadModelTests.cs"
     ],
     "AI-FEAT-061": [],
-    "AI-FEAT-062": []
+    "AI-FEAT-062": [],
+    "AI-FEAT-063": []
   },
   "feature_to_tests": {
     "AI-FEAT-001": [],
@@ -1507,7 +1525,8 @@
       "test/companionQ1Live.test.js",
       "test/companionQ1UiFreeze.test.js"
     ],
-    "AI-FEAT-062": []
+    "AI-FEAT-062": [],
+    "AI-FEAT-063": []
   },
   "ipc_to_features": {
     "SUBSYS-application-platform": {
@@ -1560,7 +1579,8 @@
         "AI-FEAT-034",
         "AI-FEAT-035",
         "AI-FEAT-036",
-        "AI-FEAT-037"
+        "AI-FEAT-037",
+        "AI-FEAT-063"
       ]
     },
     "SUBSYS-source-acquisition": {
@@ -1646,7 +1666,8 @@
         "AI-FEAT-034",
         "AI-FEAT-035",
         "AI-FEAT-036",
-        "AI-FEAT-037"
+        "AI-FEAT-037",
+        "AI-FEAT-063"
       ]
     },
     "SUBSYS-transfer-and-backup": {
@@ -1727,7 +1748,8 @@
       "AI-FEAT-034",
       "AI-FEAT-035",
       "AI-FEAT-036",
-      "AI-FEAT-037"
+      "AI-FEAT-037",
+      "AI-FEAT-063"
     ],
     "SUBSYS-planned-archive-management": [
       "AI-FEAT-049",

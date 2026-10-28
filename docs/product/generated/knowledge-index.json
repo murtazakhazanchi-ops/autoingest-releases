@@ -1076,7 +1076,8 @@
       "relatedFeatures": [
         "AI-FEAT-002",
         "AI-FEAT-018",
-        "AI-FEAT-028"
+        "AI-FEAT-028",
+        "AI-FEAT-063"
       ],
       "roadmapRelationship": [],
       "searchTerms": [
@@ -1432,7 +1433,8 @@
         "AI-FEAT-032",
         "AI-FEAT-033",
         "AI-FEAT-037",
-        "AI-FEAT-047"
+        "AI-FEAT-047",
+        "AI-FEAT-063"
       ],
       "roadmapRelationship": [
         {
@@ -1726,7 +1728,8 @@
         "AI-FEAT-008",
         "AI-FEAT-031",
         "AI-FEAT-033",
-        "AI-FEAT-036"
+        "AI-FEAT-036",
+        "AI-FEAT-063"
       ],
       "roadmapRelationship": [
         {
@@ -1827,7 +1830,8 @@
       "operatorStatus": "AVAILABLE",
       "relatedFeatures": [
         "AI-FEAT-034",
-        "AI-FEAT-037"
+        "AI-FEAT-037",
+        "AI-FEAT-063"
       ],
       "roadmapRelationship": [],
       "searchTerms": [
@@ -3148,14 +3152,14 @@
       "category": "Application Platform",
       "id": "AI-FEAT-061",
       "knownLimitations": {
-        "evidenceGapCount": 0,
-        "futureEnhancements": "- Independent one-click Quick Ingest transaction (deferred — see Quick Ingest behaviour).\n- Per-card history, content identity and verification receipts once AI-FEAT-062 provides them (capability-flagged in the v1 contract).\n- Default-on companion and launch-at-login decision before Stable promotion.",
+        "evidenceGapCount": 3,
+        "futureEnhancements": "- Independent one-click Quick Ingest transaction (deferred — see Quick Ingest behaviour). *(Superseded 2026-10-28: now planned as Q8, conditionally — see § Expanded phase plan.)*\n- Per-card history, content identity and verification receipts once AI-FEAT-062 provides them (capability-flagged in the v1 contract).\n- Default-on companion and launch-at-login decision before Stable promotion.",
         "openBugs": []
       },
       "lastUpdated": {
         "evidenceStatus": "Confirmed zero implementation (2026-10-27 audit of `origin/stable/0.9` @ `0eb9c43`): no `Tray`, `Notification`, `setLoginItemSettings`, `requestSingleInstanceLock`, `powerMonitor` or `app.dock` usage anywhere under `main/`, `services/`, `renderer/`. Architecture below is a **proposal awaiting owner approval**, not a description of shipped behavior.",
         "introducedVersion": "2026-10-27 — Q1 foundation on `feature/menu-bar-companion-q1` @ `dd9493f` (not merged; owner review pending)",
-        "lastModifiedVersion": "2026-10-28 — Q1 foundation implemented and verified on its feature branch"
+        "lastModifiedVersion": "2026-10-28 — phase plan expanded to Q0–Q9 (DEC-028); Q1 foundation implemented and verified on its feature branch"
       },
       "operatorStatus": "PARTIALLY_AVAILABLE",
       "relatedFeatures": [
@@ -3166,12 +3170,13 @@
         "AI-FEAT-025",
         "AI-FEAT-042",
         "AI-FEAT-058",
-        "AI-FEAT-062"
+        "AI-FEAT-062",
+        "AI-FEAT-063"
       ],
       "roadmapRelationship": [
         {
           "roadmapId": "AI-RM-014",
-          "status": "**Active — PRIORITY 1.** Q0 complete (2026-10-27). **Q1 foundation implemented and verified on `feature/menu-bar-companion-q1` @ `dd9493f`** (2026-10-28), not merged and not released, awaiting owner review. Q2 not started. *(Prior value, superseded 2026-10-28: **Active — next milestone (Priority Order #3, PRIORITY 1).** Q0 (audit, architecture, UX specification, test matrix) recorded 2026-10-27. Q1 implementation not started; it awaits owner approval.)*"
+          "status": "**Active — PRIORITY 1.** Q0 done (2026-10-27). Q1 foundation implemented and verified on `feature/menu-bar-companion-q1` @ `dd9493f` (Status Ladder rung 1; macOS only; local, unmerged, unreleased), awaiting owner review. Phases re-planned 2026-10-28 as Q0–Q9 (DEC-028). Q2 not started. *(Prior value, superseded 2026-10-28: **Active — PRIORITY 1.** Q0 complete (2026-10-27). **Q1 foundation implemented and verified on `feature/menu-bar-companion-q1` @ `dd9493f`** (2026-10-28), not merged and not released, awaiting owner review. Q2 not started. *(Prior value, superseded 2026-10-28: **Active — next milestone (Priority Order #3, PRIORITY 1).** Q0 (audit, architecture, UX specification, test matrix) recorded 2026-10-27. Q1 implementation not started; it awaits owner approval.)*)*"
         }
       ],
       "searchTerms": [
@@ -3230,7 +3235,8 @@
         "AI-FEAT-025",
         "AI-FEAT-042",
         "AI-FEAT-054",
-        "AI-FEAT-061"
+        "AI-FEAT-061",
+        "AI-FEAT-063"
       ],
       "roadmapRelationship": [
         {
@@ -3252,6 +3258,64 @@
       "summary": "Planned foundation for knowing, with evidence rather than inference, **which content** was imported, **where every copy lives**, and **whether each copy was verified**. It is the prerequisite for honest \"Checksum verified\" and per-card history in the Quick Ingest companion (AI-FEAT-061), and for later Archive Maintenance and Archive Browser work.",
       "title": "Backup Intelligence Foundation",
       "whatItDoes": "Planned foundation for knowing, with evidence rather than inference, **which content** was imported, **where every copy lives**, and **whether each copy was verified**. It is the prerequisite for honest \"Checksum verified\" and per-card history in the Quick Ingest companion (AI-FEAT-061), and for later Archive Maintenance and Archive Browser work."
+    },
+    {
+      "availability": {
+        "evidence": [
+          "canonical Status field: \"Planned\""
+        ],
+        "operatorStatus": "PLANNED",
+        "reason": "Feature record status is Planned — not yet implemented."
+      },
+      "canonicalDocument": "features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md",
+      "category": "Metadata",
+      "id": "AI-FEAT-063",
+      "knownLimitations": {
+        "evidenceGapCount": 1,
+        "futureEnhancements": "- Incremental (delta) registry exports.\n- Further consumers: Archive Browser (AI-RM-004), Event Maintenance (AI-RM-003), AutoIngest Archive Node (AI-RM-002).\n- Linking devices to source sessions and verification receipts once AI-FEAT-062 provides them.",
+        "openBugs": []
+      },
+      "lastUpdated": {
+        "evidenceStatus": "Confirmed zero implementation (2026-10-28 read-only audit of `origin/stable/0.9` @ `0eb9c43`): no camera make/model/serial extraction and no photographer↔device association anywhere under `main/`, `services/`, `renderer/`. Requirements below are owner direction recorded 2026-10-28; the data model is a **proposal for review**, not shipped behaviour.",
+        "introducedVersion": "Not started",
+        "lastModifiedVersion": "2026-10-28 — requirements recorded from owner direction ([DEC-028](../decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md))"
+      },
+      "operatorStatus": "PLANNED",
+      "relatedFeatures": [
+        "AI-FEAT-022",
+        "AI-FEAT-029",
+        "AI-FEAT-034",
+        "AI-FEAT-036",
+        "AI-FEAT-061",
+        "AI-FEAT-062"
+      ],
+      "roadmapRelationship": [
+        {
+          "roadmapId": "AI-RM-014",
+          "status": "**Active — PRIORITY 1.** Q0 done (2026-10-27). Q1 foundation implemented and verified on `feature/menu-bar-companion-q1` @ `dd9493f` (Status Ladder rung 1; macOS only; local, unmerged, unreleased), awaiting owner review. Phases re-planned 2026-10-28 as Q0–Q9 (DEC-028). Q2 not started. *(Prior value, superseded 2026-10-28: **Active — PRIORITY 1.** Q0 complete (2026-10-27). **Q1 foundation implemented and verified on `feature/menu-bar-companion-q1` @ `dd9493f`** (2026-10-28), not merged and not released, awaiting owner review. Q2 not started. *(Prior value, superseded 2026-10-28: **Active — next milestone (Priority Order #3, PRIORITY 1).** Q0 (audit, architecture, UX specification, test matrix) recorded 2026-10-27. Q1 implementation not started; it awaits owner approval.)*)*"
+        }
+      ],
+      "searchTerms": [
+        "camera",
+        "exchange",
+        "identity",
+        "learning",
+        "metadata",
+        "photographer",
+        "registry"
+      ],
+      "sourceAuthority": "canonical",
+      "sourceFiles": [
+        "because nothing is implemented",
+        "docs/data-model.md — none yet describe this feature",
+        "docs/ingestion-flow.md",
+        "docs/metadata-system.md",
+        "features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md"
+      ],
+      "status": "Planned",
+      "summary": "One shared backend capability that remembers which photographers use which cameras, so AutoIngest can **suggest** (never decide) the photographer for an import. Camera details are captured automatically from the media, confirmed once by the operator, and reused everywhere photographer identification is needed: the menu-bar Quick Ingest companion, the existing Confirm Event Import modal, and a new Photographer Registry tab in Metadata Management. Registries are portable between AutoIngest computers through a versioned export file whose import **merges, never replaces**.",
+      "title": "Photographer & Camera Identity Registry (Learning, Registry, Exchange)",
+      "whatItDoes": "One shared backend capability that remembers which photographers use which cameras, so AutoIngest can **suggest** (never decide) the photographer for an import. Camera details are captured automatically from the media, confirmed once by the operator, and reused everywhere photographer identification is needed: the menu-bar Quick Ingest companion, the existing Confirm Event Import modal, and a new Photographer Registry tab in Metadata Management. Registries are portable between AutoIngest computers through a versioned export file whose import **merges, never replaces**."
     }
   ],
   "docsys_version": "1.3.0",

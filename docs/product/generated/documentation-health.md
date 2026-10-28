@@ -2,7 +2,7 @@
 
 > Generated artifact. Implements the 13 rules specified in [14_VALIDATION_SPECIFICATION.md](../14_VALIDATION_SPECIFICATION.md) plus Part 4 tooling-integrity checks. Regenerate with `node scripts/product-docs/cli.js validate`.
 
-Generated against source commit `f7fb9597d4053482ddf77dd83129cf8c98b2b211`.
+Generated against source commit `7e534d498722f6e807ebfd205ba1393714057966`.
 
 ## Summary
 
@@ -11,7 +11,7 @@ Generated against source commit `f7fb9597d4053482ddf77dd83129cf8c98b2b211`.
 | Error | 0 | Fails the build (non-zero exit) |
 | Warning | 19 | Reported, does not fail the build |
 | Information | 27 | Reported, does not fail the build |
-| Evidence gap | 60 | Reported, does not fail the build — visibility only, per 14_VALIDATION_SPECIFICATION.md Rule 13 |
+| Evidence gap | 62 | Reported, does not fail the build — visibility only, per 14_VALIDATION_SPECIFICATION.md Rule 13 |
 
 **Result**: PASS
 
@@ -47,7 +47,7 @@ None.
 
 | Rule | Message | File | Note |
 |---|---|---|---|
-| architecture-coverage | 42/62 features placed in the architectural-evolution relationship map | 11_ARCHITECTURAL_EVOLUTION.md | Unplaced: AI-FEAT-002, AI-FEAT-003, AI-FEAT-005, AI-FEAT-007, AI-FEAT-008, AI-FEAT-010, AI-FEAT-012, AI-FEAT-013, AI-FEAT-014, AI-FEAT-015, AI-FEAT-016, AI-FEAT-023, AI-FEAT-026, AI-FEAT-034, AI-FEAT-035, AI-FEAT-048, AI-FEAT-059, AI-FEAT-060, AI-FEAT-061, AI-FEAT-062 |
+| architecture-coverage | 42/63 features placed in the architectural-evolution relationship map | 11_ARCHITECTURAL_EVOLUTION.md | Unplaced: AI-FEAT-002, AI-FEAT-003, AI-FEAT-005, AI-FEAT-007, AI-FEAT-008, AI-FEAT-010, AI-FEAT-012, AI-FEAT-013, AI-FEAT-014, AI-FEAT-015, AI-FEAT-016, AI-FEAT-023, AI-FEAT-026, AI-FEAT-034, AI-FEAT-035, AI-FEAT-048, AI-FEAT-059, AI-FEAT-060, AI-FEAT-061, AI-FEAT-062, AI-FEAT-063 |
 | overlapping-active-decisions | 2 Accepted decisions (DEC-006, DEC-007) all govern the exact same feature/milestone set (AI-FEAT-029) — worth a human check that they don't contradict each other | DEC-006 | — |
 | overlapping-active-decisions | 2 Accepted decisions (DEC-020, DEC-021) all govern the exact same feature/milestone set (AI-FEAT-059) — worth a human check that they don't contradict each other | DEC-020 | — |
 | shared-code-path | main/main.js is explicitly owned by 7 features (shared, not exclusive) | main/main.js | AI-FEAT-001, AI-FEAT-021, AI-FEAT-024, AI-FEAT-025, AI-FEAT-036, AI-FEAT-057, AI-FEAT-058 |
@@ -75,7 +75,7 @@ None.
 | shared-code-path | scripts/product-docs/lib/questionClassifier.js is explicitly owned by 3 features (shared, not exclusive) | scripts/product-docs/lib/questionClassifier.js | AI-FEAT-059, AI-FEAT-059, AI-FEAT-059 |
 | shared-code-path | scripts/product-docs/lib/knowledgeTestCorpusV2.js is explicitly owned by 2 features (shared, not exclusive) | scripts/product-docs/lib/knowledgeTestCorpusV2.js | AI-FEAT-059, AI-FEAT-059 |
 
-## Evidence gap (60)
+## Evidence gap (62)
 
 | Rule | Message | File | Note |
 |---|---|---|---|
@@ -138,5 +138,7 @@ None.
 | documentation-completeness | AI-FEAT-058 has 1 evidence-pending marker(s) | features/AI-FEAT-058_MULTI_EVENT_IMPORT.md | — |
 | documentation-completeness | AI-FEAT-059 has 2 evidence-pending marker(s) | features/AI-FEAT-059_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md | — |
 | documentation-completeness | AI-FEAT-060 has 5 evidence-pending marker(s) | features/AI-FEAT-060_MX_CREATIVE_CONSOLE_LOGITECH_HARDWARE_CONTROL_SURFACE.md | — |
+| documentation-completeness | AI-FEAT-061 has 3 evidence-pending marker(s) | features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md | — |
 | documentation-completeness | AI-FEAT-062 has 2 evidence-pending marker(s) | features/AI-FEAT-062_BACKUP_INTELLIGENCE_FOUNDATION.md | — |
+| documentation-completeness | AI-FEAT-063 has 1 evidence-pending marker(s) | features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md | — |
 

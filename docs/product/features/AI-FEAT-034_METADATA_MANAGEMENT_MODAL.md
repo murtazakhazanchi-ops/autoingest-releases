@@ -25,7 +25,7 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 
 | Field | Value |
 |---|---|
-| Related features | None beyond Dependencies/Parent/Subfeatures already listed in the header table above |
+| Related features | AI-FEAT-063 (Photographer & Camera Identity Registry — approved future Photographer Registry tab in this modal, beside Keyword Registry; DEC-028 exception 1; not implemented) *(Prior value, superseded 2026-10-28: None beyond Dependencies/Parent/Subfeatures already listed in the header table above)* |
 | Related decisions | None recorded |
 | Related bugs | None recorded |
 | Related postmortems | None |
@@ -51,6 +51,7 @@ Evidence pending beyond the commit/learning-log trail below.
 - **2026-08-02** — "Metadata Management Modal: Consolidating 3 UI Surfaces Into One Tabbed Modal" (learning-log; commit `4446a30` "consolidate metadata surfaces into a Metadata Management modal").
 - **2026-08-03** — "compact Run Audit button; remove obsolete Metadata Audit entry point" (commit `6349c62`).
 - **2026-08-03/04** — "rebalance Audit & Repair tab into a full-height flex layout with a single scroll region" (commit `2c2090a`); "polish Audit & Repair spacing across window heights" (commit `c5d200f`) — adds a media query so the documented minimum window height (700px) gets its own correctly-tuned spacing.
+- **2026-10-28** — Approved future scope, not implemented: a **Photographer Registry** tab immediately beside the Keyword Registry tab ([DEC-028](../decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md) exception 1 to the DEC-027 main-window freeze; feature [AI-FEAT-063](AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md)). The other tabs and the modal layout stay unchanged.
 
 ## Engineering Evolution
 

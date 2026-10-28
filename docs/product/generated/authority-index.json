@@ -1431,7 +1431,8 @@
       "featureId": "AI-FEAT-061",
       "relatedBugs": [],
       "relatedDecisions": [
-        "DEC-027"
+        "DEC-027",
+        "DEC-028"
       ],
       "relatedPostmortems": [],
       "roadmapIds": [
@@ -1449,13 +1450,38 @@
       "featureId": "AI-FEAT-062",
       "relatedBugs": [],
       "relatedDecisions": [
-        "DEC-027"
+        "DEC-027",
+        "DEC-028"
       ],
       "relatedPostmortems": [],
       "roadmapIds": [
         "AI-RM-015"
       ],
       "topic": "Backup Intelligence Foundation"
+    },
+    {
+      "aliases": [],
+      "canonicalProductDoc": "features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md",
+      "canonicalTechnicalDocs": [
+        "docs/metadata-system.md",
+        "docs/ingestion-flow.md",
+        "docs/data-model.md — none yet describe this feature",
+        "because nothing is implemented"
+      ],
+      "codeAreas": [],
+      "confidenceLevel": "explicit",
+      "evidenceNote": "Derived directly from features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md's header table and Lifecycle Metadata section.",
+      "featureId": "AI-FEAT-063",
+      "relatedBugs": [],
+      "relatedDecisions": [
+        "DEC-027",
+        "DEC-028"
+      ],
+      "relatedPostmortems": [],
+      "roadmapIds": [
+        "AI-RM-014"
+      ],
+      "topic": "Photographer & Camera Identity Registry (Learning, Registry, Exchange)"
     }
   ]
 }

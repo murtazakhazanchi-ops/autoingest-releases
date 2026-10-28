@@ -134,11 +134,17 @@ Archive operations / local mirror / sync review / archive repair
 → docs/archive-operations-layer.md
 
 Menu-bar / system-tray companion / Quick Ingest / native notifications / app lifecycle (window close vs quit, launch at login, single instance)
-→ docs/product/features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md (plan — not yet implemented)
+→ docs/product/features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md (plan Q0–Q9; Q1 implemented on a feature branch only)
 → docs/product/decisions/DEC-027_QUICK_INGEST_PRIORITY_AND_MAIN_WINDOW_UI_FREEZE.md (main-window UI freeze)
 → docs/ingestion-flow.md
 → docs/multi-event-import.md
 → docs/archive-operations-layer.md
+
+Photographer registry / photographer↔camera learning / camera identification / photographer suggestions / registry import-export-merge
+→ docs/product/features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md (planned — not yet implemented)
+→ docs/product/decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md (two approved main-window exceptions)
+→ docs/metadata-system.md
+→ docs/ingestion-flow.md
 
 New feature planning  
 → docs/features.md  

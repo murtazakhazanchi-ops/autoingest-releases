@@ -20,17 +20,17 @@ async function main() {
 
   const { parsed, built, files, manifest } = build.assemble();
 
-  await t('all 62 AI-FEAT records are present', () => {
-    assert.equal(parsed.features.size, 62);
+  await t('all 63 AI-FEAT records are present', () => {
+    assert.equal(parsed.features.size, 63);
   });
 
   await t('all 15 AI-RM roadmap milestones are present', () => {
     assert.equal(parsed.roadmap.size, 15);
   });
 
-  await t('bug/decision/postmortem counts match the current repository (BUG-001..020, DEC-001..023 + DEC-027, PM-001..002; DEC-024..026 exist only on feature/ask-autoingest)', () => {
+  await t('bug/decision/postmortem counts match the current repository (BUG-001..020, DEC-001..023 + DEC-027..028, PM-001..002; DEC-024..026 exist only on feature/ask-autoingest)', () => {
     assert.equal(parsed.bugs.size, 20);
-    assert.equal(parsed.decisions.size, 24);
+    assert.equal(parsed.decisions.size, 25);
     assert.equal(parsed.postmortems.size, 2);
   });
 
@@ -112,7 +112,7 @@ async function main() {
     assert.ok(manifest.schema_version);
     assert.ok(manifest.source_commit);
     assert.ok(manifest.generation_command);
-    assert.equal(manifest.entity_counts.features, 62);
+    assert.equal(manifest.entity_counts.features, 63);
   });
 
   summarize('integration.test.js');

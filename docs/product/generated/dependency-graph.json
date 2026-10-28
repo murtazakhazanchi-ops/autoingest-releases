@@ -1099,6 +1099,14 @@
     },
     {
       "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-014:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-022",
+      "target": "AI-RM-014"
+    },
+    {
+      "evidence_status": "explicit",
       "note": null,
       "provenance_path": "features/AI-FEAT-022_PHOTOGRAPHER_FOLDER_RESOLUTION.md#lifecycle-metadata:Related-architectural-evolution-sections",
       "relationship": "documented_by",
@@ -1584,6 +1592,14 @@
       "relationship": "planned_in",
       "source": "AI-FEAT-029",
       "target": "AI-RM-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-014:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-029",
+      "target": "AI-RM-014"
     },
     {
       "evidence_status": "explicit",
@@ -2172,10 +2188,34 @@
     {
       "evidence_status": "explicit",
       "note": null,
+      "provenance_path": "features/AI-FEAT-034_METADATA_MANAGEMENT_MODAL.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-034",
+      "target": "AI-FEAT-063"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
       "provenance_path": "features/AI-FEAT-034_METADATA_MANAGEMENT_MODAL.md#header-table:Related-roadmap-milestone",
       "relationship": "planned_in",
       "source": "AI-FEAT-034",
       "target": "AI-RM-001"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-014:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-034",
+      "target": "AI-RM-014"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-034",
+      "target": "DEC-028"
     },
     {
       "evidence_status": "explicit",
@@ -2224,6 +2264,14 @@
       "relationship": "extended_by",
       "source": "AI-FEAT-036",
       "target": "AI-FEAT-034"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "feature extended by this milestone",
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-014:Existing-features-extended",
+      "relationship": "extended_by",
+      "source": "AI-FEAT-036",
+      "target": "AI-RM-014"
     },
     {
       "evidence_status": "explicit",
@@ -3820,6 +3868,14 @@
     {
       "evidence_status": "explicit",
       "note": null,
+      "provenance_path": "features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-061",
+      "target": "AI-FEAT-063"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
       "provenance_path": "features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md#header-table:Related-roadmap-milestone",
       "relationship": "planned_in",
       "source": "AI-FEAT-061",
@@ -3840,6 +3896,22 @@
       "relationship": "governed_by",
       "source": "AI-FEAT-061",
       "target": "DEC-027"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-061",
+      "target": "DEC-028"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-061",
+      "target": "DEC-028"
     },
     {
       "evidence_status": "explicit",
@@ -3892,6 +3964,14 @@
     {
       "evidence_status": "explicit",
       "note": null,
+      "provenance_path": "features/AI-FEAT-062_BACKUP_INTELLIGENCE_FOUNDATION.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-062",
+      "target": "AI-FEAT-063"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
       "provenance_path": "features/AI-FEAT-062_BACKUP_INTELLIGENCE_FOUNDATION.md#header-table:Related-roadmap-milestone",
       "relationship": "planned_in",
       "source": "AI-FEAT-062",
@@ -3912,6 +3992,102 @@
       "relationship": "governed_by",
       "source": "AI-FEAT-062",
       "target": "DEC-027"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-062_BACKUP_INTELLIGENCE_FOUNDATION.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-062",
+      "target": "DEC-028"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-063",
+      "target": "AI-FEAT-022"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-063",
+      "target": "AI-FEAT-029"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-063",
+      "target": "AI-FEAT-034"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-063",
+      "target": "AI-FEAT-036"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md#header-table:Dependencies",
+      "relationship": "depends_on",
+      "source": "AI-FEAT-063",
+      "target": "AI-FEAT-061"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-063",
+      "target": "AI-FEAT-061"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md#lifecycle-metadata:Related-features",
+      "relationship": "related_to",
+      "source": "AI-FEAT-063",
+      "target": "AI-FEAT-062"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md#header-table:Related-roadmap-milestone",
+      "relationship": "planned_in",
+      "source": "AI-FEAT-063",
+      "target": "AI-RM-014"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-063",
+      "target": "DEC-027"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-063",
+      "target": "DEC-028"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-063",
+      "target": "DEC-028"
     },
     {
       "evidence_status": "explicit",
@@ -4348,6 +4524,14 @@
     {
       "evidence_status": "explicit",
       "note": null,
+      "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-014:Included-AI-FEAT-IDs",
+      "relationship": "implements",
+      "source": "AI-RM-014",
+      "target": "AI-FEAT-063"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
       "provenance_path": "02_MASTER_ROADMAP.md#ai-rm-014:Dependencies",
       "relationship": "depends_on",
       "source": "AI-RM-014",
@@ -4360,6 +4544,14 @@
       "relationship": "governed_by",
       "source": "AI-RM-014",
       "target": "DEC-027"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-RM-014",
+      "target": "DEC-028"
     },
     {
       "evidence_status": "explicit",
@@ -4824,6 +5016,22 @@
       "relationship": "related_to",
       "source": "DEC-022",
       "target": "DEC-021"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "decision-to-decision body reference",
+      "provenance_path": "decisions/DEC-027_QUICK_INGEST_PRIORITY_AND_MAIN_WINDOW_UI_FREEZE.md#body",
+      "relationship": "related_to",
+      "source": "DEC-027",
+      "target": "DEC-028"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "decision-to-decision body reference",
+      "provenance_path": "decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md#body",
+      "relationship": "related_to",
+      "source": "DEC-028",
+      "target": "DEC-027"
     },
     {
       "evidence_status": "explicit",
@@ -5488,6 +5696,12 @@
       "type": "feature"
     },
     {
+      "doc_path": "features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md",
+      "id": "AI-FEAT-063",
+      "label": "Photographer & Camera Identity Registry (Learning, Registry, Exchange)",
+      "type": "feature"
+    },
+    {
       "doc_path": "memory/AI-MEM-0001_METADATA_MANAGEMENT_MODAL_AUDIT_REPAIR_EVOLUTION.md",
       "id": "AI-MEM-0001",
       "label": "Metadata Management Modal Consolidation and Audit & Repair Tab Evolution",
@@ -5935,6 +6149,12 @@
       "doc_path": "decisions/DEC-027_QUICK_INGEST_PRIORITY_AND_MAIN_WINDOW_UI_FREEZE.md",
       "id": "DEC-027",
       "label": "Quick Ingest Prioritized; Main-Window UI Frozen; Companion as an Isolated Layer",
+      "type": "decision"
+    },
+    {
+      "doc_path": "decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md",
+      "id": "DEC-028",
+      "label": "Shared Photographer & Camera Learning; Merge-Not-Replace Registry Exchange; Two Approved Main-Window Exceptions",
       "type": "decision"
     },
     {

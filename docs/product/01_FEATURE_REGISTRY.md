@@ -90,6 +90,7 @@ IDs are assigned once and never reused or renumbered, even if a feature is later
 | AI-FEAT-035 | Dashboard Metadata Health | Implemented — evolving | Operational | AI-FEAT-031 | — | [features/AI-FEAT-035_DASHBOARD_METADATA_HEALTH.md](features/AI-FEAT-035_DASHBOARD_METADATA_HEALTH.md) |
 | AI-FEAT-036 | Keyword Registry | Implemented | Stable | — | — | [features/AI-FEAT-036_KEYWORD_REGISTRY.md](features/AI-FEAT-036_KEYWORD_REGISTRY.md) |
 | AI-FEAT-037 | Metadata Reapply / Sync | Implemented | Evolving | AI-FEAT-029 | — | [features/AI-FEAT-037_METADATA_REAPPLY_SYNC.md](features/AI-FEAT-037_METADATA_REAPPLY_SYNC.md) |
+| AI-FEAT-063 | Photographer & Camera Identity Registry (Learning, Registry, Exchange) | Planned | Planned | — | AI-RM-014 | [features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md](features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md) |
 
 ## Transfer and Backup
 
@@ -167,11 +168,13 @@ IDs are assigned once and never reused or renumbered, even if a feature is later
 
 ## Totals
 
-- **62 features registered** (2026-10-28): 52 Implemented-family (45 plain "Implemented", including AI-FEAT-057 + 7 "Implemented — evolving", including AI-FEAT-058/AI-FEAT-059/AI-FEAT-060), 0 "Partially implemented", 1 "In active development" (AI-FEAT-061, Q1 on its feature branch), 9 "Planned".
+- **63 features registered** (2026-10-28): 52 Implemented-family (45 plain "Implemented", including AI-FEAT-057 + 7 "Implemented — evolving", including AI-FEAT-058/AI-FEAT-059/AI-FEAT-060), 0 "Partially implemented", 1 "In active development" (AI-FEAT-061, Q1 on its feature branch), 10 "Planned" (including AI-FEAT-063).
+- *Superseded totals line (kept per Append, Never Erase):* **62 features registered** (2026-10-28): 52 Implemented-family (45 plain "Implemented", including AI-FEAT-057 + 7 "Implemented — evolving", including AI-FEAT-058/AI-FEAT-059/AI-FEAT-060), 0 "Partially implemented", 1 "In active development" (AI-FEAT-061, Q1 on its feature branch), 9 "Planned".
 - *Superseded totals line (kept per Append, Never Erase):* **62 features registered** (2026-10-27): 52 Implemented-family (45 plain "Implemented", including AI-FEAT-057 + 7 "Implemented — evolving", including AI-FEAT-058/AI-FEAT-059/AI-FEAT-060), 0 "Partially implemented", 0 "In active development", 10 "Planned" (0% implementation confirmed for all 10).
 - *Superseded totals line (kept per Append, Never Erase):* **60 features registered**: 51 Implemented-family (45 plain "Implemented", including AI-FEAT-057 + 6 "Implemented — evolving", including AI-FEAT-059/AI-FEAT-060), 0 "Partially implemented", 1 "In active development" (AI-FEAT-058), 8 "Planned" (0% implementation confirmed for all 8).
 - Planned: 8 (all mapped 1:1 to AI-RM-002 through AI-RM-009, except AI-RM-001 which has no dedicated "planned" row because it is already complete — see AI-FEAT-033)
 - Planned (added 2026-10-27): AI-FEAT-061 → AI-RM-014 (Quick Ingest & Desktop Experience, next active milestone) and AI-FEAT-062 → AI-RM-015 (Backup Intelligence Foundation) — see 02_MASTER_ROADMAP.md § Priority Order and DEC-027.
+- Planned (added 2026-10-28): AI-FEAT-063 → AI-RM-014 (Photographer & Camera Identity Registry — the shared learning/registry/exchange capability behind AI-RM-014 Q4–Q7; used by the companion, the Confirm Event Import modal and the Metadata Management modal) — see DEC-028.
 - AI-FEAT-057 maps to AI-RM-010, a parallel release-infrastructure track outside the AI-RM-001…009 archive-capability sequence — see 02_MASTER_ROADMAP.md.
 - AI-FEAT-058 maps to AI-RM-011, a parallel ingestion-workflow track outside that sequence — see 02_MASTER_ROADMAP.md. Stable promoted in v0.9.13 (tag `v0.9.13` @ `a1223ad`); status reconciled 2026-10-27.
 - AI-FEAT-059 maps to AI-RM-012, a parallel documentation/tooling track (Knowledge & Onboarding Portal, Stage 1 + Stage 2 Phases 4-24) outside both the AI-RM-001…009 sequence and the AI-RM-010 release-infrastructure track — see 02_MASTER_ROADMAP.md.

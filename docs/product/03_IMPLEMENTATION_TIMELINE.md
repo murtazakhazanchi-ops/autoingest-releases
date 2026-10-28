@@ -155,14 +155,14 @@ No dates are invented in this document. Where a date is not verifiable from Git 
 | Field | Value |
 |---|---|
 | Original estimate | Evidence pending — not yet documented as fact (no owner estimate given) |
-| Revised estimate | None |
+| Revised estimate | None given. Scope expanded 2026-10-28 from Q0–Q7 to Q0–Q9 plus AI-FEAT-063 (DEC-028); no owner estimate for the expanded scope. *(Prior value, superseded 2026-10-28: None)* |
 | Planned start | 2026-10-27 (Q0 specification); Q1 start depends on owner approval |
-| Actual start | 2026-10-27 — Q0 only (documentation/specification, no application code) |
+| Actual start | 2026-10-27 — Q0 (specification). Q1 implemented 2026-10-27/28 on `feature/menu-bar-companion-q1` @ `dd9493f` (unmerged). *(Prior value, superseded 2026-10-28: 2026-10-27 — Q0 only (documentation/specification, no application code))* |
 | Planned completion | Not yet scheduled |
 | Actual completion | Not applicable |
 | Actual duration | Not applicable |
-| Reason for deviation | Not applicable |
-| Evidence source | AI-FEAT-061 (Q0 record), DEC-027 |
+| Reason for deviation | Scope expansion by owner direction (2026-10-28, DEC-028) — not a schedule slip. *(Prior value, superseded 2026-10-28: Not applicable)* |
+| Evidence source | AI-FEAT-061, AI-FEAT-063, DEC-027, DEC-028 *(Prior value, superseded 2026-10-28: AI-FEAT-061 (Q0 record), DEC-027)* |
 
 ## AI-RM-015 — Backup Intelligence Foundation
 

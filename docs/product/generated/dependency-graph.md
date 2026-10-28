@@ -2,7 +2,7 @@
 
 > Generated artifact — locator only. Regenerate with `node scripts/product-docs/cli.js build`. Full machine-readable graph: `dependency-graph.json`. Views below are deliberately bounded (one subsystem or milestone chain per diagram) rather than one unreadable graph of every node.
 
-Total: 143 nodes, 639 edges.
+Total: 145 nodes, 665 edges.
 
 ### Roadmap milestone relationships
 
@@ -46,7 +46,7 @@ flowchart LR
 
 ### Feature dependency overview (features with a depends_on/extended_by edge)
 
-58 node(s), 178 edge(s) in this view.
+59 node(s), 188 edge(s) in this view.
 
 ```mermaid
 flowchart LR
@@ -109,6 +109,7 @@ flowchart LR
   AI_FEAT_058["AI-FEAT-058: Multi-Event Import"]
   AI_FEAT_061["AI-FEAT-061: Quick Ingest & Desktop Companion (Menu Bar / System Tray)"]
   AI_FEAT_062["AI-FEAT-062: Backup Intelligence Foundation"]
+  AI_FEAT_063["AI-FEAT-063: Photographer & Camera Identity Registry (Learning, Registry, Exchange)"]
   AI_FEAT_001 -->|related_to| AI_FEAT_003
   AI_FEAT_002 -->|depends_on| AI_FEAT_005
   AI_FEAT_002 -->|related_to| AI_FEAT_022
@@ -213,6 +214,7 @@ flowchart LR
   AI_FEAT_034 -->|depends_on| AI_FEAT_031
   AI_FEAT_034 -->|depends_on| AI_FEAT_033
   AI_FEAT_034 -->|depends_on| AI_FEAT_036
+  AI_FEAT_034 -->|related_to| AI_FEAT_063
   AI_FEAT_035 -->|depends_on| AI_FEAT_003
   AI_FEAT_035 -->|depends_on| AI_FEAT_031
   AI_FEAT_036 -->|extended_by| AI_FEAT_034
@@ -281,17 +283,26 @@ flowchart LR
   AI_FEAT_061 -->|depends_on| AI_FEAT_042
   AI_FEAT_061 -->|depends_on| AI_FEAT_058
   AI_FEAT_061 -->|related_to| AI_FEAT_062
+  AI_FEAT_061 -->|related_to| AI_FEAT_063
   AI_FEAT_062 -->|depends_on| AI_FEAT_019
   AI_FEAT_062 -->|depends_on| AI_FEAT_020
   AI_FEAT_062 -->|depends_on| AI_FEAT_025
   AI_FEAT_062 -->|depends_on| AI_FEAT_042
   AI_FEAT_062 -->|related_to| AI_FEAT_054
   AI_FEAT_062 -->|related_to| AI_FEAT_061
+  AI_FEAT_062 -->|related_to| AI_FEAT_063
+  AI_FEAT_063 -->|depends_on| AI_FEAT_022
+  AI_FEAT_063 -->|depends_on| AI_FEAT_029
+  AI_FEAT_063 -->|depends_on| AI_FEAT_034
+  AI_FEAT_063 -->|depends_on| AI_FEAT_036
+  AI_FEAT_063 -->|depends_on| AI_FEAT_061
+  AI_FEAT_063 -->|related_to| AI_FEAT_061
+  AI_FEAT_063 -->|related_to| AI_FEAT_062
 ```
 
 ### Metadata subsystem
 
-9 node(s), 29 edge(s) in this view.
+10 node(s), 33 edge(s) in this view.
 
 ```mermaid
 flowchart LR
@@ -305,6 +316,7 @@ flowchart LR
   AI_FEAT_035["AI-FEAT-035: Dashboard Metadata Health"]
   AI_FEAT_036["AI-FEAT-036: Keyword Registry"]
   AI_FEAT_037["AI-FEAT-037: Metadata Reapply / Sync"]
+  AI_FEAT_063["AI-FEAT-063: Photographer & Camera Identity Registry (Learning, Registry, Exchange)"]
   AI_FEAT_029 -->|extended_by| AI_FEAT_030
   AI_FEAT_029 -->|extended_by| AI_FEAT_030
   AI_FEAT_029 -->|extended_by| AI_FEAT_031
@@ -330,10 +342,14 @@ flowchart LR
   AI_FEAT_034 -->|depends_on| AI_FEAT_031
   AI_FEAT_034 -->|depends_on| AI_FEAT_033
   AI_FEAT_034 -->|depends_on| AI_FEAT_036
+  AI_FEAT_034 -->|related_to| AI_FEAT_063
   AI_FEAT_035 -->|depends_on| AI_FEAT_031
   AI_FEAT_036 -->|extended_by| AI_FEAT_034
   AI_FEAT_037 -->|depends_on| AI_FEAT_029
   AI_FEAT_037 -->|depends_on| AI_FEAT_036
+  AI_FEAT_063 -->|depends_on| AI_FEAT_029
+  AI_FEAT_063 -->|depends_on| AI_FEAT_034
+  AI_FEAT_063 -->|depends_on| AI_FEAT_036
 ```
 
 ### Import and Archive Writing subsystem

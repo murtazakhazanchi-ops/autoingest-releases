@@ -355,7 +355,10 @@
       ],
       "canonicalProductDoc": "docs/product/01_FEATURE_REGISTRY.md",
       "canonicalTechnicalDocs": [
+        "because nothing is implemented",
+        "docs/data-model.md — none yet describe this feature",
         "docs/features.md #15",
+        "docs/ingestion-flow.md",
         "docs/metadata-system.md",
         "docs/metadata-system.md § Durable Queue Storage and Recovery Behavior",
         "docs/metadata-system.md § Event-Level Metadata State",
@@ -379,7 +382,8 @@
         "AI-FEAT-034",
         "AI-FEAT-035",
         "AI-FEAT-036",
-        "AI-FEAT-037"
+        "AI-FEAT-037",
+        "AI-FEAT-063"
       ],
       "relatedBugs": [],
       "relatedDecisions": [],

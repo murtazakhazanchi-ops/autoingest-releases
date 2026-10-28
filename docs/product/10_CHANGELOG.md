@@ -7,6 +7,15 @@ Append newest first. Never edit or delete a prior entry — if something was wro
 ---
 
 
+## 2026-10-28 — AI-RM-014 expanded: smart date assessment, camera identification, Photographer & Camera Identity Registry (AI-FEAT-063 / DEC-028)
+
+- **Task type**: roadmap / planning (documentation only — no application code or UI changed; Q1 branch untouched)
+- **What changed**: Registered AI-FEAT-063 (Photographer & Camera Identity Registry — shared learning system, Photographer Registry, merge-not-replace exchange, permanent association safety rules, proposed data model, open design questions, test matrix) and DEC-028 (shared learning service; two approved main-window exceptions to DEC-027; merge-not-replace; conditional one-step Quick Ingest). AI-FEAT-061 re-planned as Q0–Q9 (§ Expanded phase plan) with Q2/Q3/Q8 detail, 10 new test rows and a mapping from the original Q0–Q7 table, which is kept and marked superseded. Roadmap AI-RM-014 fields, priority row and guardrails updated; AI-RM-015 dependency boundary recorded (also in AI-FEAT-062). DEC-027 Addendum; AI-FEAT-034 journal (future tab). Registry 62 → 63 features (10 Planned); dashboard, timeline, root and docs CLAUDE.md pointers, and integration-test counts updated.
+- **Affected feature(s)**: AI-FEAT-061, AI-FEAT-062, AI-FEAT-063, AI-FEAT-034
+- **Affected roadmap milestone(s)**: AI-RM-014, AI-RM-015
+- **Unresolved gaps**: per-manufacturer serial/date tag behaviour (measure on real fixtures in Q2/Q3); one-vocabulary integration choice; Q8 pipeline audit; shoot-day boundary
+- **Evidence confidence**: owner direction for requirements; code facts from a read-only audit of `origin/stable/0.9` @ `0eb9c43`, cited in AI-FEAT-063
+
 ## 2026-10-28 — AI-RM-014 Q1 foundation recorded (AI-FEAT-061)
 
 - **Task type**: feature journal (documentation only, on `docs/roadmap-quick-ingest-priority`; the application code lives on `feature/menu-bar-companion-q1` @ `dd9493f`, a separate branch, so the two are reviewed separately)

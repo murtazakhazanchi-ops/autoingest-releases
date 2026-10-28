@@ -38,6 +38,11 @@ The project owner approved two new capability areas: Backup Intelligence and Qui
 - **Workstream placement** (no renumbering, no deletion, nothing marked superseded): AI-RM-006 goes under AI-RM-015; AI-RM-007 and AI-RM-008 go under AI-RM-002; AI-RM-005 and AI-RM-009 (long-horizon) go under AI-RM-004. See 02_MASTER_ROADMAP.md § Workstreams. This resolves the overlaps that the Consequences section above listed as pending.
 - **Q1 approved** for AI-RM-014: behavior-preserving main-window progress targeting, app-scope single drive poller, single-instance lock (second launch must focus/restore the main window and preserve launch arguments), and — architecturally only — the Q4 invisible handoff listener (not to be implemented in Q1). No launch-at-login. Main-window UI freeze reaffirmed.
 
+## Addendum — 2026-10-28 (owner: Photographer Intelligence)
+
+- The main-window UI freeze stays in force with **exactly two approved exceptions**, recorded in [DEC-028](DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md): a Photographer Registry tab beside Keyword Registry in Metadata Management, and suggestions + inline Add Photographer in the Confirm Event Import modal's photographer field. These are design scope for future phases (AI-RM-014 Q5, Q6), not permission to implement during documentation work. Every other main-window surface remains frozen.
+- AI-RM-014 phases re-planned as Q0–Q9 (AI-FEAT-061 § Expanded phase plan). The Decision bullet above that "Quick Ingest starts as a handoff into the existing workspace" still holds for Q1–Q7; Q8 adds a conditional one-step import that reuses the existing pipeline.
+
 ## Reconciliation Note
 
 None — no conflict with a technical doc under `docs/`.
