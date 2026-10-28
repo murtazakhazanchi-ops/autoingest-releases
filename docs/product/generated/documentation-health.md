@@ -2,7 +2,7 @@
 
 > Generated artifact. Implements the 13 rules specified in [14_VALIDATION_SPECIFICATION.md](../14_VALIDATION_SPECIFICATION.md) plus Part 4 tooling-integrity checks. Regenerate with `node scripts/product-docs/cli.js validate`.
 
-Generated against source commit `7e534d498722f6e807ebfd205ba1393714057966`.
+Generated against source commit `44e872fc5c0079030ad7ca62b97806638d12e49a`.
 
 ## Summary
 
@@ -138,7 +138,7 @@ None.
 | documentation-completeness | AI-FEAT-058 has 1 evidence-pending marker(s) | features/AI-FEAT-058_MULTI_EVENT_IMPORT.md | — |
 | documentation-completeness | AI-FEAT-059 has 2 evidence-pending marker(s) | features/AI-FEAT-059_AUTOINGEST_KNOWLEDGE_ENGINE_STAGE_1.md | — |
 | documentation-completeness | AI-FEAT-060 has 5 evidence-pending marker(s) | features/AI-FEAT-060_MX_CREATIVE_CONSOLE_LOGITECH_HARDWARE_CONTROL_SURFACE.md | — |
-| documentation-completeness | AI-FEAT-061 has 3 evidence-pending marker(s) | features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md | — |
+| documentation-completeness | AI-FEAT-061 has 5 evidence-pending marker(s) | features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md | — |
 | documentation-completeness | AI-FEAT-062 has 2 evidence-pending marker(s) | features/AI-FEAT-062_BACKUP_INTELLIGENCE_FOUNDATION.md | — |
-| documentation-completeness | AI-FEAT-063 has 1 evidence-pending marker(s) | features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md | — |
+| documentation-completeness | AI-FEAT-063 has 3 evidence-pending marker(s) | features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md | — |
 

@@ -7,6 +7,15 @@ Append newest first. Never edit or delete a prior entry — if something was wro
 ---
 
 
+## 2026-10-28 — Six AI-RM-014 design decisions approved (DEC-029)
+
+- **Task type**: decision record (documentation only — no application code or UI changed; Q1 branch untouched; Q2/Q3 not started)
+- **What changed**: Added DEC-029 recording six owner-approved decisions, split into final architectural decisions (1 single photographer list, option b; 2 rename keeps alias with pre-save collision check; 3 multi-photographer cards hand off to the existing workspace; 4 calendar-date default with an optional cross-midnight date-and-time range, kept as a planned requirement, and no automatic Hijri date or naming changes) and approved rules whose investigations remain pending (5 Q8 conditional on an import-pipeline dependency audit and a separate design review; 6 evidence-based camera identification, per-manufacturer tags measured on real files before Q3 approval). AI-FEAT-063: open questions 1–3 marked resolved (original text kept), new § Approved design decisions with a finalized-vs-pending table, test rows 13–15. AI-FEAT-061: Q2/Q3/Q8 updated, § Approved decisions vs pending investigations, test row 28. DEC-028 addendum. Roadmap AI-RM-014 Status/Deliverables/Risks/Next action (prior values kept), dashboard, timeline, docs CLAUDE.md routing and integration-test decision count (25 → 26) updated.
+- **Affected feature(s)**: AI-FEAT-061, AI-FEAT-063
+- **Affected roadmap milestone(s)**: AI-RM-014
+- **Unresolved gaps**: per-manufacturer camera tags (Evidence pending); Q8 dependency audit (Evidence pending); integration mechanics within option (b) for the Q4 design review
+- **Evidence confidence**: owner approval for the decisions; code facts from the earlier read-only audit of `origin/stable/0.9` @ `0eb9c43`
+
 ## 2026-10-28 — AI-RM-014 expanded: smart date assessment, camera identification, Photographer & Camera Identity Registry (AI-FEAT-063 / DEC-028)
 
 - **Task type**: roadmap / planning (documentation only — no application code or UI changed; Q1 branch untouched)

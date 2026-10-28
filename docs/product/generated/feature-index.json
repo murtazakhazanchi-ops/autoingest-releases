@@ -3745,13 +3745,13 @@
         "AI-FEAT-063"
       ],
       "documentation_completeness": {
-        "evidence_gap_count": 3,
+        "evidence_gap_count": 5,
         "narrative": "Q0 complete; Q1 recorded with evidence; Q2–Q9 (§ Expanded phase plan) are plans, not evidence"
       },
       "evidence_status": "Confirmed zero implementation (2026-10-27 audit of `origin/stable/0.9` @ `0eb9c43`): no `Tray`, `Notification`, `setLoginItemSettings`, `requestSingleInstanceLock`, `powerMonitor` or `app.dock` usage anywhere under `main/`, `services/`, `renderer/`. Architecture below is a **proposal awaiting owner approval**, not a description of shipped behavior.",
       "feature_id": "AI-FEAT-061",
       "introduced_version": "2026-10-27 — Q1 foundation on `feature/menu-bar-companion-q1` @ `dd9493f` (not merged; owner review pending)",
-      "last_modified_version": "2026-10-28 — phase plan expanded to Q0–Q9 (DEC-028); Q1 foundation implemented and verified on its feature branch",
+      "last_modified_version": "2026-10-28 — six design decisions approved ([DEC-029](../decisions/DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md)); phase plan expanded to Q0–Q9 (DEC-028); Q1 foundation implemented and verified on its feature branch",
       "maturity": "Experimental",
       "name": "Quick Ingest & Desktop Companion (Menu Bar / System Tray)",
       "parent_feature": [],
@@ -3760,6 +3760,14 @@
       ],
       "related_bugs": [],
       "related_changelog_entries": [
+        {
+          "date": "2026-10-28",
+          "excerpt": "**What changed**: Added DEC-029 recording six owner-approved decisions, split into final architectural decisions (1 single photographer list, option b; 2 rename keeps alias with pre-save collision che"
+        },
+        {
+          "date": "2026-10-28",
+          "excerpt": "**Affected feature(s)**: AI-FEAT-061, AI-FEAT-063"
+        },
         {
           "date": "2026-10-28",
           "excerpt": "**What changed**: Registered AI-FEAT-063 (Photographer & Camera Identity Registry — shared learning system, Photographer Registry, merge-not-replace exchange, permanent association safety rules, propo"
@@ -3792,7 +3800,8 @@
       "related_code_paths": [],
       "related_decisions": [
         "DEC-027",
-        "DEC-028"
+        "DEC-028",
+        "DEC-029"
       ],
       "related_features": [
         "AI-FEAT-062",
@@ -3921,13 +3930,13 @@
       ],
       "dependents": [],
       "documentation_completeness": {
-        "evidence_gap_count": 1,
-        "narrative": "Requirements and proposed model recorded; storage/vocabulary integration choice is an open design question (see below)"
+        "evidence_gap_count": 3,
+        "narrative": "Requirements, proposed model and the approved design decisions (DEC-029) recorded; technical investigations (per-manufacturer tags) still pending"
       },
       "evidence_status": "Confirmed zero implementation (2026-10-28 read-only audit of `origin/stable/0.9` @ `0eb9c43`): no camera make/model/serial extraction and no photographer↔device association anywhere under `main/`, `services/`, `renderer/`. Requirements below are owner direction recorded 2026-10-28; the data model is a **proposal for review**, not shipped behaviour.",
       "feature_id": "AI-FEAT-063",
       "introduced_version": "Not started",
-      "last_modified_version": "2026-10-28 — requirements recorded from owner direction ([DEC-028](../decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md))",
+      "last_modified_version": "2026-10-28 — six owner design decisions approved ([DEC-029](../decisions/DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md)): option (b) single photographer list, rename keeps alias, multi-photographer handoff",
       "maturity": "Planned",
       "name": "Photographer & Camera Identity Registry (Learning, Registry, Exchange)",
       "parent_feature": [],
@@ -3936,6 +3945,14 @@
       ],
       "related_bugs": [],
       "related_changelog_entries": [
+        {
+          "date": "2026-10-28",
+          "excerpt": "**What changed**: Added DEC-029 recording six owner-approved decisions, split into final architectural decisions (1 single photographer list, option b; 2 rename keeps alias with pre-save collision che"
+        },
+        {
+          "date": "2026-10-28",
+          "excerpt": "**Affected feature(s)**: AI-FEAT-061, AI-FEAT-063"
+        },
         {
           "date": "2026-10-28",
           "excerpt": "## 2026-10-28 — AI-RM-014 expanded: smart date assessment, camera identification, Photographer & Camera Identity Registry (AI-FEAT-063 / DEC-028)"
@@ -3956,7 +3973,8 @@
       "related_code_paths": [],
       "related_decisions": [
         "DEC-027",
-        "DEC-028"
+        "DEC-028",
+        "DEC-029"
       ],
       "related_features": [
         "AI-FEAT-061",

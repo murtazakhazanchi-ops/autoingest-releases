@@ -3152,14 +3152,14 @@
       "category": "Application Platform",
       "id": "AI-FEAT-061",
       "knownLimitations": {
-        "evidenceGapCount": 3,
+        "evidenceGapCount": 5,
         "futureEnhancements": "- Independent one-click Quick Ingest transaction (deferred — see Quick Ingest behaviour). *(Superseded 2026-10-28: now planned as Q8, conditionally — see § Expanded phase plan.)*\n- Per-card history, content identity and verification receipts once AI-FEAT-062 provides them (capability-flagged in the v1 contract).\n- Default-on companion and launch-at-login decision before Stable promotion.",
         "openBugs": []
       },
       "lastUpdated": {
         "evidenceStatus": "Confirmed zero implementation (2026-10-27 audit of `origin/stable/0.9` @ `0eb9c43`): no `Tray`, `Notification`, `setLoginItemSettings`, `requestSingleInstanceLock`, `powerMonitor` or `app.dock` usage anywhere under `main/`, `services/`, `renderer/`. Architecture below is a **proposal awaiting owner approval**, not a description of shipped behavior.",
         "introducedVersion": "2026-10-27 — Q1 foundation on `feature/menu-bar-companion-q1` @ `dd9493f` (not merged; owner review pending)",
-        "lastModifiedVersion": "2026-10-28 — phase plan expanded to Q0–Q9 (DEC-028); Q1 foundation implemented and verified on its feature branch"
+        "lastModifiedVersion": "2026-10-28 — six design decisions approved ([DEC-029](../decisions/DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md)); phase plan expanded to Q0–Q9 (DEC-028); Q1 foundation implemented and verified on its feature branch"
       },
       "operatorStatus": "PARTIALLY_AVAILABLE",
       "relatedFeatures": [
@@ -3176,7 +3176,7 @@
       "roadmapRelationship": [
         {
           "roadmapId": "AI-RM-014",
-          "status": "**Active — PRIORITY 1.** Q0 done (2026-10-27). Q1 foundation implemented and verified on `feature/menu-bar-companion-q1` @ `dd9493f` (Status Ladder rung 1; macOS only; local, unmerged, unreleased), awaiting owner review. Phases re-planned 2026-10-28 as Q0–Q9 (DEC-028). Q2 not started. *(Prior value, superseded 2026-10-28: **Active — PRIORITY 1.** Q0 complete (2026-10-27). **Q1 foundation implemented and verified on `feature/menu-bar-companion-q1` @ `dd9493f`** (2026-10-28), not merged and not released, awaiting owner review. Q2 not started. *(Prior value, superseded 2026-10-28: **Active — next milestone (Priority Order #3, PRIORITY 1).** Q0 (audit, architecture, UX specification, test matrix) recorded 2026-10-27. Q1 implementation not started; it awaits owner approval.)*)*"
+          "status": "**Active — PRIORITY 1.** Q0 done (2026-10-27). Q1 foundation implemented and verified on `feature/menu-bar-companion-q1` @ `dd9493f` (Status Ladder rung 1; macOS only; local, unmerged, unreleased), awaiting owner review. Phases re-planned 2026-10-28 as Q0–Q9 (DEC-028); six design decisions approved 2026-10-28 (DEC-029). Q2 not started. *(Prior value, superseded 2026-10-28: **Active — PRIORITY 1.** Q0 done (2026-10-27). Q1 foundation implemented and verified on `feature/menu-bar-companion-q1` @ `dd9493f` (Status Ladder rung 1; macOS only; local, unmerged, unreleased), awaiting owner review. Phases re-planned 2026-10-28 as Q0–Q9 (DEC-028). Q2 not started. *(Prior value, superseded 2026-10-28: **Active — PRIORITY 1.** Q0 complete (2026-10-27). **Q1 foundation implemented and verified on `feature/menu-bar-companion-q1` @ `dd9493f`** (2026-10-28), not merged and not released, awaiting owner review. Q2 not started. *(Prior value, superseded 2026-10-28: **Active — next milestone (Priority Order #3, PRIORITY 1).** Q0 (audit, architecture, UX specification, test matrix) recorded 2026-10-27. Q1 implementation not started; it awaits owner approval.)*)*)*"
         }
       ],
       "searchTerms": [
@@ -3271,14 +3271,14 @@
       "category": "Metadata",
       "id": "AI-FEAT-063",
       "knownLimitations": {
-        "evidenceGapCount": 1,
+        "evidenceGapCount": 3,
         "futureEnhancements": "- Incremental (delta) registry exports.\n- Further consumers: Archive Browser (AI-RM-004), Event Maintenance (AI-RM-003), AutoIngest Archive Node (AI-RM-002).\n- Linking devices to source sessions and verification receipts once AI-FEAT-062 provides them.",
         "openBugs": []
       },
       "lastUpdated": {
         "evidenceStatus": "Confirmed zero implementation (2026-10-28 read-only audit of `origin/stable/0.9` @ `0eb9c43`): no camera make/model/serial extraction and no photographer↔device association anywhere under `main/`, `services/`, `renderer/`. Requirements below are owner direction recorded 2026-10-28; the data model is a **proposal for review**, not shipped behaviour.",
         "introducedVersion": "Not started",
-        "lastModifiedVersion": "2026-10-28 — requirements recorded from owner direction ([DEC-028](../decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md))"
+        "lastModifiedVersion": "2026-10-28 — six owner design decisions approved ([DEC-029](../decisions/DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md)): option (b) single photographer list, rename keeps alias, multi-photographer handoff"
       },
       "operatorStatus": "PLANNED",
       "relatedFeatures": [
@@ -3292,7 +3292,7 @@
       "roadmapRelationship": [
         {
           "roadmapId": "AI-RM-014",
-          "status": "**Active — PRIORITY 1.** Q0 done (2026-10-27). Q1 foundation implemented and verified on `feature/menu-bar-companion-q1` @ `dd9493f` (Status Ladder rung 1; macOS only; local, unmerged, unreleased), awaiting owner review. Phases re-planned 2026-10-28 as Q0–Q9 (DEC-028). Q2 not started. *(Prior value, superseded 2026-10-28: **Active — PRIORITY 1.** Q0 complete (2026-10-27). **Q1 foundation implemented and verified on `feature/menu-bar-companion-q1` @ `dd9493f`** (2026-10-28), not merged and not released, awaiting owner review. Q2 not started. *(Prior value, superseded 2026-10-28: **Active — next milestone (Priority Order #3, PRIORITY 1).** Q0 (audit, architecture, UX specification, test matrix) recorded 2026-10-27. Q1 implementation not started; it awaits owner approval.)*)*"
+          "status": "**Active — PRIORITY 1.** Q0 done (2026-10-27). Q1 foundation implemented and verified on `feature/menu-bar-companion-q1` @ `dd9493f` (Status Ladder rung 1; macOS only; local, unmerged, unreleased), awaiting owner review. Phases re-planned 2026-10-28 as Q0–Q9 (DEC-028); six design decisions approved 2026-10-28 (DEC-029). Q2 not started. *(Prior value, superseded 2026-10-28: **Active — PRIORITY 1.** Q0 done (2026-10-27). Q1 foundation implemented and verified on `feature/menu-bar-companion-q1` @ `dd9493f` (Status Ladder rung 1; macOS only; local, unmerged, unreleased), awaiting owner review. Phases re-planned 2026-10-28 as Q0–Q9 (DEC-028). Q2 not started. *(Prior value, superseded 2026-10-28: **Active — PRIORITY 1.** Q0 complete (2026-10-27). **Q1 foundation implemented and verified on `feature/menu-bar-companion-q1` @ `dd9493f`** (2026-10-28), not merged and not released, awaiting owner review. Q2 not started. *(Prior value, superseded 2026-10-28: **Active — next milestone (Priority Order #3, PRIORITY 1).** Q0 (audit, architecture, UX specification, test matrix) recorded 2026-10-27. Q1 implementation not started; it awaits owner approval.)*)*)*"
         }
       ],
       "searchTerms": [

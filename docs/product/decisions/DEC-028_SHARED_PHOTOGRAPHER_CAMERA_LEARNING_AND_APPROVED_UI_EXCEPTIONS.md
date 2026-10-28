@@ -40,6 +40,10 @@ The owner expanded AI-RM-014 beyond the Q0 plan: smart date-based card assessmen
 - The photographer vocabulary gains stable IDs without a second list; the integration choice is an open design question recorded in AI-FEAT-063.
 - Q8 requires an audit of whether the existing import IPC can be driven without the renderer's grouping state before any design is approved (evidence pending).
 
+## Addendum — 2026-10-28 (owner: six design decisions)
+
+The open questions listed under § Consequences (one photographer vocabulary; and, in AI-FEAT-063/AI-FEAT-061, rename semantics, multi-photographer cards, the shoot-day boundary, the Q8 pipeline audit and per-manufacturer camera tags) were answered by the owner and recorded in [DEC-029](DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md). DEC-028 is not superseded; DEC-029 refines it. Decisions 1–4 are final; decision 5 (Q8) remains conditional on a dependency audit and a separate design review; decision 6 (camera tags) remains subject to measurement on real camera files before Q3 approval.
+
 ## Reconciliation Note
 
 None — no conflict with a technical doc under `docs/`. DEC-027 remains in force except for the two exceptions above (see DEC-027 Addendum 2026-10-28).

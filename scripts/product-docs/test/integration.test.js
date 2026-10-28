@@ -30,7 +30,7 @@ async function main() {
 
   await t('bug/decision/postmortem counts match the current repository (BUG-001..020, DEC-001..023 + DEC-027..028, PM-001..002; DEC-024..026 exist only on feature/ask-autoingest)', () => {
     assert.equal(parsed.bugs.size, 20);
-    assert.equal(parsed.decisions.size, 25);
+    assert.equal(parsed.decisions.size, 26);
     assert.equal(parsed.postmortems.size, 2);
   });
 

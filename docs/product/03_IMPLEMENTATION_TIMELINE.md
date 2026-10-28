@@ -162,7 +162,7 @@ No dates are invented in this document. Where a date is not verifiable from Git 
 | Actual completion | Not applicable |
 | Actual duration | Not applicable |
 | Reason for deviation | Scope expansion by owner direction (2026-10-28, DEC-028) — not a schedule slip. *(Prior value, superseded 2026-10-28: Not applicable)* |
-| Evidence source | AI-FEAT-061, AI-FEAT-063, DEC-027, DEC-028 *(Prior value, superseded 2026-10-28: AI-FEAT-061 (Q0 record), DEC-027)* |
+| Evidence source | AI-FEAT-061, AI-FEAT-063, DEC-027, DEC-028, DEC-029 *(Prior value, superseded 2026-10-28: AI-FEAT-061, AI-FEAT-063, DEC-027, DEC-028 *(Prior value, superseded 2026-10-28: AI-FEAT-061 (Q0 record), DEC-027)*)* |
 
 ## AI-RM-015 — Backup Intelligence Foundation
 

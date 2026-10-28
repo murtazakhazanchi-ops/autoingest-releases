@@ -13,14 +13,14 @@
 | Related technical docs | `docs/CLAUDE.md` (security model, file-copy rules), `docs/ingestion-flow.md`, `docs/multi-event-import.md`, `docs/archive-operations-layer.md`, `docs/commandLayer.md`, `docs/mxControlTransport.md` — none yet describe the companion, because nothing is implemented |
 | Evidence status | Confirmed zero implementation (2026-10-27 audit of `origin/stable/0.9` @ `0eb9c43`): no `Tray`, `Notification`, `setLoginItemSettings`, `requestSingleInstanceLock`, `powerMonitor` or `app.dock` usage anywhere under `main/`, `services/`, `renderer/`. Architecture below is a **proposal awaiting owner approval**, not a description of shipped behavior. |
 | First-known implementation | 2026-10-27 — Q1 foundation on `feature/menu-bar-companion-q1` @ `dd9493f` (not merged; owner review pending) |
-| Latest major update | 2026-10-28 — phase plan expanded to Q0–Q9 (DEC-028); Q1 foundation implemented and verified on its feature branch |
+| Latest major update | 2026-10-28 — six design decisions approved ([DEC-029](../decisions/DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md)); phase plan expanded to Q0–Q9 (DEC-028); Q1 foundation implemented and verified on its feature branch |
 
 ## Lifecycle Metadata
 
 | Field | Value |
 |---|---|
 | Related features | AI-FEAT-062 (Backup Intelligence Foundation — later improves the confidence of what the companion displays; the companion must work without it); AI-FEAT-063 (Photographer & Camera Identity Registry — shared learning/registry service delivered in AI-RM-014 Q4–Q7 and consumed by the companion) |
-| Related decisions | [DEC-027](../decisions/DEC-027_QUICK_INGEST_PRIORITY_AND_MAIN_WINDOW_UI_FREEZE.md), [DEC-028](../decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md) |
+| Related decisions | [DEC-027](../decisions/DEC-027_QUICK_INGEST_PRIORITY_AND_MAIN_WINDOW_UI_FREEZE.md), [DEC-028](../decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md), [DEC-029](../decisions/DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md) |
 | Related bugs | None recorded |
 | Related postmortems | None |
 | Related architectural evolution sections | None yet — will qualify once the app gains an app-lifetime (not window-lifetime) source monitor |
@@ -277,6 +277,8 @@ Recorded from the owner's "Consolidate Quick Ingest Roadmap & Photographer Intel
 - Edge cases: **incorrect camera clocks** (e.g. no files today but a large cluster on one other date → the popup says so and offers that date; dates are never shifted or rewritten); **missing time zones** (naive capture times are compared as local wall-clock dates, never converted); **RAW+JPEG pairs** (grouped by folder + filename stem; the pair takes the best-evidenced date; disagreeing members mark the pair *inconsistent* and it counts as uncertain); **videos** (container dates whose time-zone semantics vary by camera are treated as lower-confidence; Evidence pending — per-brand behaviour to be measured on real fixtures); **inconsistent metadata** across a pair or burst → uncertain, never guessed.
 - Performance: reads are bounded, cancellable (eject, sleep), concurrency-limited and incremental, and must not block the shared poller. Counts show as *scanning* until complete.
 - Open question for the owner: shoots that cross midnight (e.g. an evening event finishing after 00:00). Default until decided: calendar date, with the next-day files visible in the breakdown.
+- **Resolved 2026-10-28 ([DEC-029](../decisions/DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md) decision 4 — final):** classify by original capture **calendar date** by default; today's files preselected; files captured after midnight appear under the next calendar date. An **optional date-and-time range** lets the operator include a shoot that continues past midnight; when a range is explicitly selected, files captured inside it are included even across two dates. Uncertain capture dates stay separate for manual review. Camera timestamps **never** change an event's Hijri date or naming automatically.
+- The first Q2 implementation may ship calendar-date classification only. **The cross-midnight range is an explicit planned requirement of AI-RM-014 and must not be dropped** (test row 28).
 
 ### Q3 — Automatic camera identification
 
@@ -284,6 +286,8 @@ Recorded from the owner's "Consolidate Quick Ingest Roadmap & Photographer Intel
 - Popup shows **camera name and card name** (e.g. "Canon EOS R5 · EOS_DIGITAL").
 - Cases: one camera; several cameras (per-camera counts); camera metadata unavailable (*Unknown camera* group, never blocks manual selection); conflicting metadata (e.g. RAW and JPEG of one stem disagree → flagged); files from different cameras on one card (each grouped separately).
 - **Camera model alone is never a unique device identity.** Device identity and fingerprint rules belong to AI-FEAT-063.
+- **Approved rule ([DEC-029](../decisions/DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md) decision 6):** identification is evidence-based only. Use the existing ExifTool infrastructure (`exiftool-vendored`, `main/exifService.js`) where appropriate; investigate actual manufacturer / model / serial / date availability on representative Canon, Sony, Nikon and other supported camera files; never assume identical tags across manufacturers; keep provenance (which tag supplied each value) and distinguish **missing**, **ambiguous** and **conflicting** metadata. Manufacturer + model alone never establishes a unique photographer identity.
+- **Pending investigation:** exact per-manufacturer tag mappings — Evidence pending; must be measured on real camera files **before Q3 implementation approval**.
 - `CompanionSnapshot` grows **additively** (schemaVersion 2): `dateAssessment`, `cameras[]`, later `suggestedPhotographer` and `destination`. No path ever reaches the companion renderer; the v1 security rules stay.
 
 ### Q8 — Streamlined Quick Ingest
@@ -294,6 +298,19 @@ Popup shows: card name · detected camera(s) · today's file count · earlier-fi
 - Reuses the existing import routing, metadata tagging, duplicate handling and verification services; **never a parallel copy engine**. This supersedes the Q0 "Quick Ingest behaviour (phase 1)" deferral of an independent transaction, on that condition.
 - Q8 starts with an audit (before design approval) of whether the existing import IPC can be driven from main without the renderer's grouping state. Evidence pending — not yet audited.
 - Busy rule from Q0 stays: no Quick Ingest while an import is running or another source holds a selection.
+- **Approved 2026-10-28 as a conditional requirement, not an implementation design ([DEC-029](../decisions/DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md) decision 5).** Before Q8 is implemented: audit whether the existing import pipeline can run safely without the main window's grouping state; confirm event, component, photographer and archive routing requirements; reuse the existing copy, metadata and verification services; never create a second import engine; hand off to the existing workspace when mandatory information is missing. Q8's detailed technical design needs a **separate review after the dependency audit**. Audit status: Evidence pending — not yet audited.
+- **Multiple photographers on one card ([DEC-029](../decisions/DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md) decision 3 — final):** show the detected cameras and possible photographer associations; never assign every file to one photographer automatically; never split the import silently; open the existing full workspace for normal selection, grouping and photographer assignment, keeping relevant source context during the handoff where technically safe.
+
+### Approved decisions vs pending investigations ([DEC-029](../decisions/DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md))
+
+| # | Decision | Status | Still pending |
+|---|---|---|---|
+| 1 | Single photographer list; registry links by stable ID (AI-FEAT-063) | **Final** | Integration detail at the Q4 design review |
+| 2 | Rename keeps the old name as an alias (AI-FEAT-063) | **Final** | — |
+| 3 | Multi-photographer card → existing workspace | **Final** | Which source context can safely travel with the handoff |
+| 4 | Calendar date by default + optional cross-midnight range (Q2) | **Final** | Range may follow the first Q2 implementation; tracked, must not be dropped |
+| 5 | Q8 one-step Quick Ingest | **Conditional requirement — design not approved** | Import-pipeline dependency audit, then a separate design review |
+| 6 | Evidence-based camera identification (Q3) | **Approved rule** | Per-manufacturer tag measurement before Q3 implementation approval |
 
 ### Additional test rows (2026-10-28)
 
@@ -309,6 +326,7 @@ Popup shows: card name · detected camera(s) · today's file count · earlier-fi
 | 25 | Quick Ingest gate | live | one-step import only when all mandatory inputs are satisfied; otherwise handoff; existing pipeline used (no new copy path) |
 | 26 | Multi-camera / multi-photographer card | live | explicit per-camera handling or handoff; no silent single attribution |
 | 27 | Main-window exceptions only | visual regression + static guard | diffs limited to the Photographer Registry tab and the photographer field (DEC-028) |
+| 28 | Cross-midnight range (DEC-029 decision 4) | unit (fixture metadata) + live | calendar-date default; after-midnight files listed under the next date; an explicitly selected date-and-time range includes files across both dates; uncertain dates stay separate; event Hijri date and naming never changed by camera timestamps. Planned requirement — may land after the first Q2 implementation, must not be dropped |
 
 ## Test matrix
 
@@ -350,11 +368,13 @@ Unit and integration tests follow the existing `test/*.test.js` style. Live Elec
 
 - **2026-10-28 — Phase plan expanded (documentation only).** Owner added smart date-based assessment, automatic camera identification, a shared photographer↔camera learning system, a Photographer Registry, merge-safe registry exchange, photographer suggestions in the Confirm Event Import modal and one-step Quick Ingest. Re-planned as Q0–Q9 (§ Expanded phase plan); the original Q0–Q7 table is kept and marked superseded, with a row-by-row mapping. Shared photographer/camera capability registered as [AI-FEAT-063](AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md). Two main-window exceptions to the DEC-027 freeze approved as design scope ([DEC-028](../decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md)). The Q0 deferral of an independent Quick Ingest transaction is superseded by Q8, conditionally. Q1 code untouched.
 
+- **2026-10-28 — Six design decisions approved ([DEC-029](../decisions/DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md), documentation only).** Final: single photographer list (option b), rename keeps alias, multi-photographer handoff, calendar-date default with an optional cross-midnight range (planned requirement, test row 28; Hijri date and naming never changed by camera timestamps). Approved with investigations still pending: Q8 is a conditional requirement whose design needs a separate review after the import-pipeline dependency audit; camera identification is evidence-based only, with per-manufacturer tag mappings measured on real files before Q3 approval. See § Approved decisions vs pending investigations. Q2, Q3 and the Q1 branch untouched.
+
 ## Engineering Evolution
 
 **Initial implementation**: Not applicable — not yet implemented.
 
-**Architectural / workflow decisions**: [DEC-027](../decisions/DEC-027_QUICK_INGEST_PRIORITY_AND_MAIN_WINDOW_UI_FREEZE.md).
+**Architectural / workflow decisions**: [DEC-027](../decisions/DEC-027_QUICK_INGEST_PRIORITY_AND_MAIN_WINDOW_UI_FREEZE.md), [DEC-028](../decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md), [DEC-029](../decisions/DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md).
 
 **Reliability / correctness fixes**: None recorded.
 
@@ -368,6 +388,7 @@ None recorded.
 
 - [DEC-027](../decisions/DEC-027_QUICK_INGEST_PRIORITY_AND_MAIN_WINDOW_UI_FREEZE.md) — Quick Ingest prioritized; main-window UI frozen; companion built as an isolated presentation/control layer.
 - [DEC-028](../decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md) — shared photographer/camera learning (AI-FEAT-063); merge-not-replace registry exchange; two approved main-window exceptions; Q0–Q9 re-plan; conditional one-step Quick Ingest (Q8).
+- [DEC-029](../decisions/DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md) — six approved design decisions: single photographer list, rename keeps alias, multi-photographer handoff, calendar date + optional cross-midnight range, Q8 conditional on a dependency audit, evidence-based camera identification.
 
 ## Future Enhancements
 

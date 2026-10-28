@@ -13,20 +13,20 @@
 | Related technical docs | `docs/metadata-system.md`, `docs/ingestion-flow.md`, `docs/data-model.md` — none yet describe this feature, because nothing is implemented |
 | Evidence status | Confirmed zero implementation (2026-10-28 read-only audit of `origin/stable/0.9` @ `0eb9c43`): no camera make/model/serial extraction and no photographer↔device association anywhere under `main/`, `services/`, `renderer/`. Requirements below are owner direction recorded 2026-10-28; the data model is a **proposal for review**, not shipped behaviour. |
 | First-known implementation | Not started |
-| Latest major update | 2026-10-28 — requirements recorded from owner direction ([DEC-028](../decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md)) |
+| Latest major update | 2026-10-28 — six owner design decisions approved ([DEC-029](../decisions/DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md)): option (b) single photographer list, rename keeps alias, multi-photographer handoff |
 
 ## Lifecycle Metadata
 
 | Field | Value |
 |---|---|
 | Related features | AI-FEAT-061 (phases Q3–Q8 consume this feature); AI-FEAT-062 (Backup Intelligence — later archive-wide identity; this feature must not depend on it, see Dependency on AI-RM-015) |
-| Related decisions | [DEC-028](../decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md), [DEC-027](../decisions/DEC-027_QUICK_INGEST_PRIORITY_AND_MAIN_WINDOW_UI_FREEZE.md) (main-window UI freeze; DEC-028 records the two approved exceptions) |
+| Related decisions | [DEC-029](../decisions/DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md) (approved design decisions), [DEC-028](../decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md), [DEC-027](../decisions/DEC-027_QUICK_INGEST_PRIORITY_AND_MAIN_WINDOW_UI_FREEZE.md) (main-window UI freeze; DEC-028 records the two approved exceptions) |
 | Related bugs | None recorded |
 | Related postmortems | None |
 | Related architectural evolution sections | None yet — will qualify when a persistent, app-wide identity store exists |
 | Related release notes | Not applicable — not released |
 | Testing coverage | Not applicable — feature not yet implemented (planned matrix below) |
-| Documentation completeness | Requirements and proposed model recorded; storage/vocabulary integration choice is an open design question (see below) |
+| Documentation completeness | Requirements, proposed model and the approved design decisions (DEC-029) recorded; technical investigations (per-manufacturer tags) still pending |
 
 ## Summary
 
@@ -161,11 +161,46 @@ The operator can also **cancel the entire import** at any point before apply. "K
 
 This is a portable, operator-driven exchange. It is **not** an automatic or destructive synchronization mechanism.
 
-## Open design questions (to resolve at the start of Q4, before code)
+## Open design questions (to resolve at the start of Q4, before code) — resolved 2026-10-28 by DEC-029
 
 1. **One vocabulary, two stores?** The registry must not become a second photographer list. Options: (a) the registry becomes the source and `listManager`'s `photographers` list reads through it; (b) the registry references vocabulary names by `vocabularyKey` and every new profile is also written through the existing `lists:add` path. Needs an `autoingest-architect` review. Evidence pending — not yet decided.
+   **Resolved 2026-10-28 (DEC-029 decision 1): option (b).**
 2. **Rename semantics.** Renaming a profile changes future suggestions only. Whether a rename should also add the old name as an alias is to be decided; it must never rename folders or rewrite past `event.json`.
+   **Resolved 2026-10-28 (DEC-029 decision 2): the old name is kept as a searchable alias.**
 3. **Multi-photographer cards.** When one card holds several cameras with different suggested photographers, does the existing import (one photographer per import job today) need to split, or hand off to the workspace? Default until decided: hand off (AI-FEAT-061 Q8).
+   **Resolved 2026-10-28 (DEC-029 decision 3): hand off to the existing full workspace.**
+
+## Approved design decisions ([DEC-029](../decisions/DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md), 2026-10-28)
+
+Final architectural decisions — binding on Q4–Q7 design and implementation.
+
+**Decision 1 — Unified Photographer Registry: option (b).**
+- The existing photographer list (`data/photographers.json` + `photographers.override.json` via `main/listManager.js`; aliases via `main/aliasEngine.js`) remains the **authoritative source of photographer names**.
+- Registry profiles link to existing photographer records by stable IDs (`vocabularyKey`).
+- A new photographer is also created through the established add-photographer mechanism (`lists:add`).
+- Existing names, IDs, aliases and autocomplete behaviour stay compatible. There are never two independently maintained photographer-name lists.
+- Camera associations, device identities and learning history belong to the registry.
+
+**Decision 2 — Renaming keeps the old name as an alias.**
+- The permanent `photographerId` never changes; the new display name becomes the current canonical name; the previous name stays searchable as an alias.
+- A rename never renames archive folders, changes media metadata or rewrites existing `event.json` files.
+- Name collisions and ambiguous aliases are detected **before** saving.
+
+**Decision 3 — Several photographers on one card: hand off.**
+- Show the detected cameras and possible photographer associations; never assign every file to one photographer automatically; never split the import silently.
+- Open the existing full workspace for normal selection, grouping and photographer assignment, keeping relevant source context where technically safe (AI-FEAT-061 Q8).
+
+**Decision 6 (shared with AI-FEAT-061 Q3) — Evidence-based camera identification.** Manufacturer + model alone never establishes a unique photographer identity. Provenance is kept for each device field, and missing, ambiguous and conflicting metadata are distinguished. Per-manufacturer tag mappings are measured on real camera files before Q3 approval.
+
+### Finalized vs pending (this feature)
+
+| Item | Status |
+|---|---|
+| Single photographer-name list, registry links by stable ID | **Final** (decision 1) |
+| Rename keeps alias; no archive side effects; pre-save collision check | **Final** (decision 2) |
+| Multi-photographer cards hand off | **Final** (decision 3) |
+| Exact integration mechanics within option (b) (how `vocabularyKey` maps to `listManager`/`aliasEngine` entries) | Design detail for the Q4 design review — Evidence pending |
+| Which device tags each manufacturer writes | Technical investigation — Evidence pending (DEC-029 decision 6) |
 
 ## Dependency on AI-RM-015 (Backup Intelligence)
 
@@ -187,16 +222,20 @@ This feature does **not** depend on AI-RM-015 and can ship before it. Compatibil
 | 10 | Cancel & failure | cancel or an injected write failure leaves the registry byte-identical; backup restorable |
 | 11 | Unsupported version / malformed file | rejected with a clear message; nothing written |
 | 12 | Main-window freeze | the only main-window diffs are the Photographer Registry tab and the photographer-field enhancement (DEC-028); visual regression elsewhere unchanged |
+| 13 | Rename keeps alias (DEC-029) | rename keeps `photographerId`; old name found by search and autocomplete as an alias; fixture folders, media and `event.json` byte-identical |
+| 14 | Pre-save collision check (DEC-029) | a rename or new profile that collides with an existing name or alias, or makes an alias ambiguous, is reported before anything is written |
+| 15 | Single list (DEC-029) | a profile created in the registry or the import modal appears in the existing photographer list through `lists:add`; no second name list exists on disk |
 
 ## Evolution / Implementation Journal
 
 - **2026-10-28 — Requirements recorded.** Owner approved the Photographer & Camera Learning System, centralized Photographer Registry, safe registry import/export with conflict resolution, and photographer suggestions in the existing Confirm Event Import modal, as part of AI-RM-014 ([DEC-028](../decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md)). Read-only audit of `origin/stable/0.9` @ `0eb9c43` established the Current Behavior table. Documentation only; no application code.
+- **2026-10-28 — Design decisions approved ([DEC-029](../decisions/DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md)).** Owner approved option (b) (the existing photographer list stays the single source of names; the registry links by stable ID and creates names through `lists:add`), rename-keeps-alias with a pre-save collision check, and workspace handoff for multi-photographer cards. Open design questions 1–3 marked resolved (original text kept). Test rows 13–15 added. Documentation only; no application code.
 
 ## Engineering Evolution
 
 **Initial implementation**: Not applicable — feature not yet implemented.
 
-**Architectural / workflow decisions**: [DEC-028](../decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md).
+**Architectural / workflow decisions**: [DEC-028](../decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md), [DEC-029](../decisions/DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md).
 
 **Reliability / correctness fixes**: None recorded.
 
@@ -209,6 +248,7 @@ Not applicable.
 ## Decisions
 
 - [DEC-028](../decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md) — shared learning service; merge-not-replace exchange; two approved main-window exceptions.
+- [DEC-029](../decisions/DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md) — single photographer list (option b); rename keeps alias; multi-photographer handoff; evidence-based camera identification.
 
 ## Future Enhancements
 

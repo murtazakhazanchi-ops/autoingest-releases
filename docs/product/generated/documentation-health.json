@@ -424,7 +424,7 @@
     {
       "file": "features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-061 has 3 evidence-pending marker(s)",
+      "message": "AI-FEAT-061 has 5 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
@@ -438,7 +438,7 @@
     {
       "file": "features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-063 has 1 evidence-pending marker(s)",
+      "message": "AI-FEAT-063 has 3 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
@@ -759,7 +759,7 @@
     }
   ],
   "schema_version": "1.3.0",
-  "source_commit": "7e534d498722f6e807ebfd205ba1393714057966",
+  "source_commit": "44e872fc5c0079030ad7ca62b97806638d12e49a",
   "summary": {
     "error": 0,
     "evidence_gap": 62,

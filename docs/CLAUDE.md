@@ -143,6 +143,7 @@ Menu-bar / system-tray companion / Quick Ingest / native notifications / app lif
 Photographer registry / photographer↔camera learning / camera identification / photographer suggestions / registry import-export-merge
 → docs/product/features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md (planned — not yet implemented)
 → docs/product/decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md (two approved main-window exceptions)
+→ docs/product/decisions/DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md (approved design decisions: single photographer list, rename alias, handoff, midnight range)
 → docs/metadata-system.md
 → docs/ingestion-flow.md
 

@@ -3916,6 +3916,22 @@
     {
       "evidence_status": "explicit",
       "note": null,
+      "provenance_path": "features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-061",
+      "target": "DEC-029"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-061",
+      "target": "DEC-029"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
       "provenance_path": "features/AI-FEAT-062_BACKUP_INTELLIGENCE_FOUNDATION.md#header-table:Dependencies",
       "relationship": "depends_on",
       "source": "AI-FEAT-062",
@@ -4088,6 +4104,22 @@
       "relationship": "governed_by",
       "source": "AI-FEAT-063",
       "target": "DEC-028"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md#lifecycle-metadata:Related-decisions",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-063",
+      "target": "DEC-029"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-FEAT-063",
+      "target": "DEC-029"
     },
     {
       "evidence_status": "explicit",
@@ -4552,6 +4584,14 @@
       "relationship": "governed_by",
       "source": "AI-RM-014",
       "target": "DEC-028"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": null,
+      "provenance_path": "decisions/DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md#header-table:Related-feature(s)-/-roadmap-milestone",
+      "relationship": "governed_by",
+      "source": "AI-RM-014",
+      "target": "DEC-029"
     },
     {
       "evidence_status": "explicit",
@@ -5032,6 +5072,30 @@
       "relationship": "related_to",
       "source": "DEC-028",
       "target": "DEC-027"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "decision-to-decision body reference",
+      "provenance_path": "decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md#body",
+      "relationship": "related_to",
+      "source": "DEC-028",
+      "target": "DEC-029"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "decision-to-decision body reference",
+      "provenance_path": "decisions/DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md#body",
+      "relationship": "related_to",
+      "source": "DEC-029",
+      "target": "DEC-027"
+    },
+    {
+      "evidence_status": "explicit",
+      "note": "decision-to-decision body reference",
+      "provenance_path": "decisions/DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md#body",
+      "relationship": "related_to",
+      "source": "DEC-029",
+      "target": "DEC-028"
     },
     {
       "evidence_status": "explicit",
@@ -6155,6 +6219,12 @@
       "doc_path": "decisions/DEC-028_SHARED_PHOTOGRAPHER_CAMERA_LEARNING_AND_APPROVED_UI_EXCEPTIONS.md",
       "id": "DEC-028",
       "label": "Shared Photographer & Camera Learning; Merge-Not-Replace Registry Exchange; Two Approved Main-Window Exceptions",
+      "type": "decision"
+    },
+    {
+      "doc_path": "decisions/DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md",
+      "id": "DEC-029",
+      "label": "Photographer Registry & Quick Ingest Design Decisions (Six Owner Approvals)",
       "type": "decision"
     },
     {

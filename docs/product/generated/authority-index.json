@@ -1432,7 +1432,8 @@
       "relatedBugs": [],
       "relatedDecisions": [
         "DEC-027",
-        "DEC-028"
+        "DEC-028",
+        "DEC-029"
       ],
       "relatedPostmortems": [],
       "roadmapIds": [
@@ -1475,7 +1476,8 @@
       "relatedBugs": [],
       "relatedDecisions": [
         "DEC-027",
-        "DEC-028"
+        "DEC-028",
+        "DEC-029"
       ],
       "relatedPostmortems": [],
       "roadmapIds": [
