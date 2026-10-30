@@ -268,5 +268,60 @@ function monitorWith({ drives = { dcim: [], removable: [] }, windows = [], inter
     assert.equal(q.x, 0);
   });
 
+  // ── Request-window routing (windowRegistry.getRequestWindow) ────────────────
+  // windowRegistry needs only BrowserWindow.getFocusedWindow/fromWebContents/getAllWindows;
+  // a stand-in electron module is placed in the require cache for this block.
+  const fakeBW = { focused: null, all: [], getFocusedWindow() { return this.focused; }, getAllWindows() { return this.all; }, fromWebContents(wc) { return this.all.find(w => w.webContents === wc) || null; } };
+  require.cache[require.resolve('electron')] = { id: 'electron', filename: 'electron', loaded: true, exports: { BrowserWindow: fakeBW } };
+  const reg = require('../services/windowRegistry');
+  const win = (id) => ({ id, destroyed: false, isDestroyed() { return this.destroyed; }, once() {}, webContents: { id, isDestroyed: () => false } });
+  const mainW = win(1), popupW = win(2), splashW = win(3);
+  fakeBW.all = [mainW, popupW, splashW];
+  reg.registerAuxiliary(popupW);
+  const fromSender = (w) => ({ sender: w.webContents });
+
+  await t('getRequestWindow: no auxiliary focused → exactly getFocusedWindow() (Stable behaviour)', () => {
+    fakeBW.focused = mainW; assert.equal(reg.getRequestWindow(fromSender(mainW)), mainW);
+    fakeBW.focused = splashW; assert.equal(reg.getRequestWindow(fromSender(mainW)), splashW);
+    fakeBW.focused = null; assert.equal(reg.getRequestWindow(fromSender(mainW)), null);
+  });
+
+  await t('getRequestWindow: popup focused → the requesting app window, never the popup', () => {
+    fakeBW.focused = popupW;
+    assert.equal(reg.getRequestWindow(fromSender(mainW)), mainW);
+    assert.equal(reg.getRequestWindow(fromSender(splashW)), splashW);
+  });
+
+  await t('getRequestWindow: popup focused and sender unusable → null (parentless dialog / no-op)', () => {
+    fakeBW.focused = popupW;
+    assert.equal(reg.getRequestWindow(fromSender(popupW)), null);
+    assert.equal(reg.getRequestWindow(undefined), null);
+    mainW.destroyed = true;
+    assert.equal(reg.getRequestWindow(fromSender(mainW)), null);
+    mainW.destroyed = false;
+  });
+
+  await t('getAppWindows excludes the popup (update/realtime broadcast recipients)', () => {
+    assert.deepEqual(reg.getAppWindows(), [mainW, splashW]);
+  });
+
+  // ── Windows tray icon asset ─────────────────────────────────────────────────
+  await t('assets/tray/tray.ico holds square PNG frames for 100–300 % scaling (16…48 px)', () => {
+    const ico = require('fs').readFileSync(require('path').join(__dirname, '..', 'assets', 'tray', 'tray.ico'));
+    assert.equal(ico.readUInt16LE(2), 1, 'ICO type');
+    const frames = [];
+    for (let i = 0; i < ico.readUInt16LE(4); i++) {
+      const o = 6 + 16 * i;
+      const off = ico.readUInt32LE(o + 12);
+      const png = ico.subarray(off, off + 24);
+      assert.equal(png.subarray(1, 4).toString(), 'PNG', `frame ${i} is PNG`);
+      const w = png.readUInt32BE(16), h = png.readUInt32BE(20);
+      assert.equal(w, h, `frame ${i} is square`);
+      assert.equal(w, ico[o] || 256, `frame ${i} directory size matches image`);
+      frames.push(w);
+    }
+    assert.deepEqual(frames, [16, 20, 24, 32, 40, 48]);
+  });
+
   console.log(`${passed} passed`);
 })();

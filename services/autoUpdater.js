@@ -16,10 +16,11 @@
  */
 
 const { autoUpdater } = require('electron-updater');
-const { app, ipcMain, BrowserWindow } = require('electron');
+const { app, ipcMain } = require('electron');
 const { log } = require('./logger');
 const telemetry = require('./telemetry');
 const settings = require('./settings');
+const windowRegistry = require('./windowRegistry');
 const fs   = require('fs');
 const path = require('path');
 
@@ -90,7 +91,8 @@ let _lastUpdateState = null;
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function broadcast(channel, payload) {
   _lastUpdateState = { channel, payload }; // Patch 43: track for replay
-  BrowserWindow.getAllWindows().forEach(win => {
+  // App windows only (splash + main): the companion popup has no update UI.
+  windowRegistry.getAppWindows().forEach(win => {
     if (!win.isDestroyed()) win.webContents.send(channel, payload);
   });
 }

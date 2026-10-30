@@ -47,6 +47,8 @@ let _log = () => {};
 let _lastBlurCloseAt = 0;
 let _ipcRegistered = false;
 let _popupOpenCount = 0;
+/** Popup windows currently inside a native show/focus call (see _nativeShow). */
+const _inNativeShow = new Set();
 
 function _trayImage() {
   if (process.platform === 'darwin') {
@@ -54,6 +56,11 @@ function _trayImage() {
     const img = nativeImage.createFromPath(path.join(ASSETS_DIR, 'tray', 'trayTemplate.png'));
     img.setTemplateImage(true);
     return img;
+  }
+  if (process.platform === 'win32') {
+    // Full-colour emblem drawn for the notification area: 16/20/24/32/40/48 px
+    // (100–300 % scaling); Windows picks the size for the current DPI.
+    return nativeImage.createFromPath(path.join(ASSETS_DIR, 'tray', 'tray.ico'));
   }
   return nativeImage.createFromPath(path.join(ASSETS_DIR, 'icon.png')).resize({ width: 16, height: 16, quality: 'best' });
 }
@@ -130,6 +137,8 @@ function _createPopup() {
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', (e) => e.preventDefault());
   win.on('blur', () => {
+    // A popup already closing (destroy pending) must not close its successor.
+    if (_popup !== win) return;
     _lastBlurCloseAt = Date.now();
     hidePopup();
   });
@@ -146,24 +155,64 @@ function _positionPopup(win) {
   win.setPosition(x, y, false);
 }
 
+/**
+ * Runs a native show/focus call on the popup. On macOS those calls can pump a nested
+ * run loop, so hidePopup() (tray click, blur, IPC) may run INSIDE them. The window is
+ * marked as "in a native call" so a hide requested meanwhile only detaches it; the
+ * destroy happens after the native call has returned (see _destroyPopupLater).
+ */
+function _nativeShow(win, fn) {
+  _inNativeShow.add(win);
+  try {
+    fn();
+  } catch (err) {
+    _log(`[companion] popup show failed: ${err && err.message}`);
+  } finally {
+    _inNativeShow.delete(win);
+  }
+  if (_popup !== win) _destroyPopupLater(win); // hidden while the native call ran
+}
+
+/**
+ * Never destroy the popup synchronously: destroying an NSWindow while AppKit is still
+ * ordering or focusing it crashed the main process (SIGTRAP) under stress, and the
+ * pending JS continuation then threw "Object has been destroyed".
+ */
+function _destroyPopupLater(win) {
+  setImmediate(() => {
+    if (win.isDestroyed() || _inNativeShow.has(win)) return; // _nativeShow retries on return
+    win.destroy();
+  });
+}
+
 function showPopup() {
-  if (_popup && !_popup.isDestroyed()) { _popup.focus(); return; }
+  if (_popup && !_popup.isDestroyed()) {
+    const existing = _popup;
+    _nativeShow(existing, () => existing.focus());
+    return;
+  }
   _popup = _createPopup();
   _popupOpenCount++;
   const win = _popup;
   win.once('ready-to-show', () => {
-    if (win.isDestroyed()) return;
+    if (_popup !== win || win.isDestroyed()) return;
     _positionPopup(win);
-    win.show();
-    win.focus();
+    _nativeShow(win, () => {
+      win.show();
+      if (_popup === win && !win.isDestroyed()) win.focus();
+    });
   });
 }
 
-/** Destroys the popup (on-demand lifecycle: a hidden popup holds no renderer). */
+/**
+ * Closes the popup (on-demand lifecycle: a hidden popup holds no renderer). The popup
+ * is detached at once — it stops counting as open and its IPC is rejected — and is
+ * destroyed on the next turn of the event loop.
+ */
 function hidePopup() {
   const win = _popup;
   _popup = null;
-  if (win && !win.isDestroyed()) win.destroy();
+  if (win && !win.isDestroyed()) _destroyPopupLater(win);
 }
 
 function togglePopup() {

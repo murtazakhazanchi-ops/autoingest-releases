@@ -63,8 +63,11 @@ const inMain = {
   windows: (app) => app.evaluate(({ BrowserWindow }, mainJs) => {
     const req = process.getBuiltinModule('module').createRequire(mainJs);
     const reg = req('../services/windowRegistry');
+    // A window that is already closing/destroyed is not part of the state under test;
+    // reading its webContents would throw. Live windows are still all reported.
+    const live = BrowserWindow.getAllWindows().filter(w => !w.isDestroyed() && !w.webContents.isDestroyed());
     return {
-      all: BrowserWindow.getAllWindows().map(w => ({ id: w.id, url: w.webContents.getURL().split('/').slice(-1)[0], aux: reg.isAuxiliary(w) })),
+      all: live.map(w => ({ id: w.id, url: w.webContents.getURL().split('/').slice(-1)[0], aux: reg.isAuxiliary(w) })),
       mainId: reg.getMainWindow() ? reg.getMainWindow().id : null,
       progressTargetId: reg.getProgressTarget() ? reg.getProgressTarget().id : null,
       legacyFirstWindowId: (BrowserWindow.getAllWindows().find(w => !w.isDestroyed()) || {}).id || null,
@@ -89,7 +92,17 @@ async function makeCardDir(root, name) {
 }
 
 async function popupPage(app) {
-  return waitFor(async () => app.windows().find(p => p.url().endsWith('companion.html')), 10000);
+  // Skip pages of popups already closed (the popup is destroyed on hide); the newest
+  // live page is the current popup.
+  return waitFor(async () => app.windows().filter(p => !p.isClosed() && p.url().endsWith('companion.html')).pop(), 10000);
+}
+
+// Closed means BOTH: the companion reports no popup AND its window/page is really gone
+// (hidePopup() detaches at once and destroys on the next event-loop turn).
+async function popupGone(app) {
+  const d = await inMain.diag(app);
+  const w = await inMain.windows(app);
+  return !d.popupOpen && !w.all.some(x => x.aux) && !app.windows().some(p => !p.isClosed() && p.url().endsWith('companion.html'));
 }
 
 async function popupState(page) {
@@ -222,13 +235,13 @@ function spawnSecondInstance(userDataDir, marker) {
 
     // ── Popup open/close repeatedly: no leaks ──────────────────────────────
     await inMain.call(app, 'hidePopup');
-    await waitFor(async () => !(await inMain.diag(app)).popupOpen, 3000);
+    check(await waitFor(() => popupGone(app), 3000), 'popup window destroyed after hide');
     const base = await inMain.metrics(app);
     for (let i = 0; i < 8; i++) {
       await inMain.call(app, 'showPopup');
       await popupPage(app);
       await inMain.call(app, 'hidePopup');
-      await waitFor(async () => !(await inMain.diag(app)).popupOpen, 3000);
+      if (!(await waitFor(() => popupGone(app), 3000))) check(false, `popup not destroyed after hide (cycle ${i + 1})`);
     }
     await sleep(1500);
     const after = await inMain.metrics(app);
@@ -246,6 +259,33 @@ function spawnSecondInstance(userDataDir, marker) {
     st = await popupState(popup);
     check(st.emptyVisible && !st.listVisible && st.labels.length === 0, 'no-card state rendered (empty-state shown, list hidden)');
     await popup.screenshot({ path: path.join(shotDir, 'popup-no-card.png') });
+
+    // ── Window routing with the popup FOCUSED ──────────────────────────────
+    // A main-window dialog must not be parented to the popup, and main-window
+    // minimize must not be applied to it. The dialog is stubbed: none opens.
+    const focusedIsPopup = await app.evaluate(async ({ app: a, BrowserWindow, dialog }, mainJs) => {
+      const reg = process.getBuiltinModule('module').createRequire(mainJs)('../services/windowRegistry');
+      globalThis.__q1DialogParents = [];
+      dialog.showOpenDialog = async (w) => { globalThis.__q1DialogParents.push(w && !w.isDestroyed() ? (reg.isAuxiliary(w) ? 'popup' : w.webContents.getURL().split('/').pop()) : 'none'); return { canceled: true, filePaths: [] }; };
+      a.focus({ steal: true });
+      const p = BrowserWindow.getAllWindows().find(w => reg.isAuxiliary(w) && !w.isDestroyed());
+      if (p) p.focus();
+      await new Promise(r => setTimeout(r, 300));
+      const f = BrowserWindow.getFocusedWindow();
+      return !!f && reg.isAuxiliary(f);
+    }, MAIN_JS);
+    if (focusedIsPopup) {
+      await main.evaluate(() => window.electronAPI.invoke('dest:choose'));
+      const parents = await app.evaluate(() => globalThis.__q1DialogParents);
+      check(JSON.stringify(parents) === JSON.stringify(['index.html']), `main-window dialog parented to the main window while the popup is focused: ${JSON.stringify(parents)}`);
+      await main.evaluate(() => window.api.minimize());
+      const minimized = await waitFor(() => app.evaluate(({}, mainJs) => process.getBuiltinModule('module').createRequire(mainJs)('../services/windowRegistry').getMainWindow().isMinimized(), MAIN_JS), 3000);
+      check(minimized, 'main-window minimize applies to the main window while the popup is focused');
+      await app.evaluate(({}, mainJs) => { const w = process.getBuiltinModule('module').createRequire(mainJs)('../services/windowRegistry').getMainWindow(); if (w.isMinimized()) w.restore(); }, MAIN_JS);
+      await sleep(800);
+    } else {
+      log('NOTE — could not give the popup focus in this session; focused-window routing not exercised live');
+    }
     await inMain.call(app, 'hidePopup');
 
     // ── Second instance (same profile): forwarded, exits, no second app ────
@@ -294,7 +334,11 @@ function spawnSecondInstance(userDataDir, marker) {
       const reopened = app.waitForEvent('window', { predicate: p => p.url().endsWith('splash.html'), timeout: 15000 }).catch(() => null);
       await popup.click('#open-btn');
       check(!!(await reopened), '"Open AutoIngest" with no window reopens AutoIngest (splash, same as Dock click)');
-      check(!(await inMain.diag(app)).popupOpen, 'popup closed after Open AutoIngest');
+      check(await waitFor(() => popupGone(app), 3000), 'popup closed after Open AutoIngest');
+      // The reopened splash takes focus when it is shown; a popup opened before that
+      // closes on blur by design. Let the splash appear before the Quit step.
+      await waitFor(() => app.evaluate(({}, mainJs) => process.getBuiltinModule('module').createRequire(mainJs)('../services/windowRegistry').getAppWindows().some(w => w.isVisible()), MAIN_JS), 10000);
+      await sleep(500);
     }
 
     // ── Explicit Quit from the popup ───────────────────────────────────────

@@ -17,10 +17,10 @@
  *   authoritative. This service is advisory/live-awareness only.
  */
 
-const { BrowserWindow } = require('electron');
 const os      = require('os');
 const crypto  = require('crypto');
 const settings = require('./settings');
+const windowRegistry = require('./windowRegistry');
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let _socket        = null;
@@ -77,7 +77,8 @@ function _send(eventName, payload) {
 }
 
 function _broadcast(channel, data) {
-  const wins = BrowserWindow.getAllWindows().filter(w => !w.isDestroyed());
+  // App windows only (splash + main): the companion popup has no realtime UI.
+  const wins = windowRegistry.getAppWindows();
   for (const w of wins) w.webContents.send(channel, data);
 }
 

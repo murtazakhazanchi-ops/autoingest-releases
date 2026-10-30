@@ -567,8 +567,8 @@ ipcMain.handle('files:getDirect', async (_event, { folderPath }) => {
 ipcMain.handle('dest:getDefault', async () => DEFAULT_DEST);
 
 // Native folder-picker dialog
-ipcMain.handle('dest:choose', async () => {
-  const win    = BrowserWindow.getFocusedWindow();
+ipcMain.handle('dest:choose', async (event) => {
+  const win    = windowRegistry.getRequestWindow(event);
   const result = await dialog.showOpenDialog(win, {
     title:      'Choose Import Destination',
     properties: ['openDirectory', 'createDirectory']
@@ -1581,8 +1581,8 @@ ipcMain.handle('feedback:send', async (_evt, opts) => {
 
 // ── Master folder operations ──────────────────────────────────────────────────
 
-ipcMain.handle('master:chooseArchiveRoot', async () => {
-  const win    = BrowserWindow.getFocusedWindow();
+ipcMain.handle('master:chooseArchiveRoot', async (event) => {
+  const win    = windowRegistry.getRequestWindow(event);
   const result = await dialog.showOpenDialog(win, {
     title:      'Choose Archive Location',
     properties: ['openDirectory', 'createDirectory']
@@ -1590,8 +1590,8 @@ ipcMain.handle('master:chooseArchiveRoot', async () => {
   return result.canceled ? null : { path: result.filePaths[0] };
 });
 
-ipcMain.handle('master:chooseExisting', async (_event, startPath) => {
-  const win    = BrowserWindow.getFocusedWindow();
+ipcMain.handle('master:chooseExisting', async (event, startPath) => {
+  const win    = windowRegistry.getRequestWindow(event);
   const opts = {
     title:      'Select Existing Master Folder',
     properties: ['openDirectory']
@@ -4232,8 +4232,8 @@ ipcMain.handle('metadataSync:listEventsInMaster', async (_event, masterPath) => 
   return metadataSyncService.listEventsInMaster(masterPath);
 });
 
-ipcMain.handle('metadataSync:chooseEventFolder', async () => {
-  const win = BrowserWindow.getFocusedWindow();
+ipcMain.handle('metadataSync:chooseEventFolder', async (event) => {
+  const win = windowRegistry.getRequestWindow(event);
   const { canceled, filePaths } = await dialog.showOpenDialog(win, {
     title:      'Choose Event Folder',
     properties: ['openDirectory'],
@@ -4547,8 +4547,8 @@ ipcMain.handle('keywords:addKeyword', async (_event, params) => {
 
 // ── Transfer Export ───────────────────────────────────────────────────────────
 
-ipcMain.handle('archive:chooseTransferRoot', async () => {
-  const win    = BrowserWindow.getFocusedWindow();
+ipcMain.handle('archive:chooseTransferRoot', async (event) => {
+  const win    = windowRegistry.getRequestWindow(event);
   const result = await dialog.showOpenDialog(win, {
     title:      'Choose Transfer Drive',
     properties: ['openDirectory', 'createDirectory'],
@@ -4627,8 +4627,8 @@ ipcMain.handle('archive:runTransferExport', async (_event, { scope, operatorName
   });
 });
 
-ipcMain.handle('archive:chooseCustomSrcFolder', async () => {
-  const win    = BrowserWindow.getFocusedWindow();
+ipcMain.handle('archive:chooseCustomSrcFolder', async (event) => {
+  const win    = windowRegistry.getRequestWindow(event);
   const result = await dialog.showOpenDialog(win, {
     title:      'Choose Source Folder',
     properties: ['openDirectory'],
@@ -4637,8 +4637,8 @@ ipcMain.handle('archive:chooseCustomSrcFolder', async () => {
   return result.filePaths[0];
 });
 
-ipcMain.handle('archive:chooseCustomDestFolder', async () => {
-  const win    = BrowserWindow.getFocusedWindow();
+ipcMain.handle('archive:chooseCustomDestFolder', async (event) => {
+  const win    = windowRegistry.getRequestWindow(event);
   const result = await dialog.showOpenDialog(win, {
     title:      'Choose Destination Folder',
     properties: ['openDirectory', 'createDirectory'],
@@ -4850,8 +4850,8 @@ ipcMain.handle('archive:getMetadataAuditStatus', async (_event, { jobId } = {}) 
 ipcMain.handle('archive:getMetadataAuditReport', async (_event, { jobId, offset, limit, statusFilter } = {}) =>
   metadataAuditService.getMetadataAuditReport(jobId, { offset, limit, statusFilter }));
 
-ipcMain.handle('archive:exportMetadataAuditReport', async (_event, { jobId, format, exceptionsOnly } = {}) => {
-  const win = BrowserWindow.getFocusedWindow();
+ipcMain.handle('archive:exportMetadataAuditReport', async (event, { jobId, format, exceptionsOnly } = {}) => {
+  const win = windowRegistry.getRequestWindow(event);
   const ext = format === 'csv' ? 'csv' : (format === 'jsonl' ? 'jsonl' : 'json');
   const { canceled, filePath } = await dialog.showSaveDialog(win, {
     title: 'Export Metadata Audit Report',
@@ -4862,8 +4862,8 @@ ipcMain.handle('archive:exportMetadataAuditReport', async (_event, { jobId, form
   return metadataAuditExport.exportMetadataAuditReport(jobId, { format: format || 'json', destPath: filePath, exceptionsOnly: !!exceptionsOnly });
 });
 
-ipcMain.handle('archive:chooseMetadataAuditFolder', async () => {
-  const win = BrowserWindow.getFocusedWindow();
+ipcMain.handle('archive:chooseMetadataAuditFolder', async (event) => {
+  const win = windowRegistry.getRequestWindow(event);
   const { canceled, filePaths } = await dialog.showOpenDialog(win, {
     title: 'Choose Audit Scope Folder',
     properties: ['openDirectory'],
@@ -5382,15 +5382,15 @@ ipcMain.handle('realtime:configure', async (_event, cfg) => {
   return { ok: true, status: realtimeOps.getStatus() };
 });
 
-ipcMain.handle('window:minimize', () => {
-  BrowserWindow.getFocusedWindow()?.minimize();
+ipcMain.handle('window:minimize', (event) => {
+  windowRegistry.getRequestWindow(event)?.minimize();
 });
-ipcMain.handle('window:toggleMaximize', () => {
-  const win = BrowserWindow.getFocusedWindow();
+ipcMain.handle('window:toggleMaximize', (event) => {
+  const win = windowRegistry.getRequestWindow(event);
   if (win) win.isMaximized() ? win.unmaximize() : win.maximize();
 });
-ipcMain.handle('window:close', () => {
-  BrowserWindow.getFocusedWindow()?.close();
+ipcMain.handle('window:close', (event) => {
+  windowRegistry.getRequestWindow(event)?.close();
 });
 
 // ── Photographer Folder Sequencing ────────────────────────────────────────────
@@ -5642,8 +5642,8 @@ ipcMain.handle('qmz:validateSequenceInput', async (_e, { number, letter, suffix 
 // path for this — it only ever receives the parser's own structured result (see
 // qmzProgramPdfParser.js's own header comment for that contract). Never creates, renames,
 // moves, or deletes anything — parseProgramPdf() is read-only by construction (Stage 2).
-ipcMain.handle('qmz:importProgramPdf', async (_e) => {
-  const win = BrowserWindow.getFocusedWindow();
+ipcMain.handle('qmz:importProgramPdf', async (event) => {
+  const win = windowRegistry.getRequestWindow(event);
   const result = await dialog.showOpenDialog(win, {
     title:      'Select QMZ Program PDF',
     properties: ['openFile'],

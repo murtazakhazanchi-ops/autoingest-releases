@@ -71,6 +71,21 @@ function getProgressTarget() {
   return getMainWindow() || getAppWindows()[0];
 }
 
+/**
+ * The window an app-window request (native dialog parent, minimize/maximize/close)
+ * should act on. Identical to BrowserWindow.getFocusedWindow() unless the focused
+ * window is auxiliary: then the window that sent the request, so a main-window
+ * dialog or window control is never attached to / applied to the companion popup.
+ * @param {import('electron').IpcMainInvokeEvent} [event]
+ * @returns {import('electron').BrowserWindow|null}
+ */
+function getRequestWindow(event) {
+  const focused = BrowserWindow.getFocusedWindow();
+  if (!focused || !_auxiliary.has(focused)) return focused;
+  const sender = event && event.sender ? BrowserWindow.fromWebContents(event.sender) : null;
+  return sender && !sender.isDestroyed() && !_auxiliary.has(sender) ? sender : null;
+}
+
 module.exports = {
   setMainWindow,
   getMainWindow,
@@ -78,4 +93,5 @@ module.exports = {
   isAuxiliary,
   getAppWindows,
   getProgressTarget,
+  getRequestWindow,
 };
