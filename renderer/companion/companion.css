@@ -12,7 +12,6 @@
   --text-muted: #6b7280;
   --accent: #89b4fa;
   --accent-strong: #2f6fe0;
-  --gold: #e2b04a;
   --success: #a6e3a1;
   --border: color-mix(in srgb, white 10%, transparent);
   --focus-ring: color-mix(in srgb, var(--accent) 70%, transparent);
@@ -37,7 +36,6 @@
   --text-muted: #9aa3af;
   --accent: #2f6fe0;
   --accent-strong: #1f56c2;
-  --gold: #b9871c;
   --success: #2f8f46;
   --border: color-mix(in srgb, black 10%, transparent);
 }
@@ -79,10 +77,6 @@ html, body {
   border-bottom: 1px solid var(--border);
 }
 .brand-mark { width: 32px; height: 32px; flex: none; }
-.brand-tile { fill: #10203f; }
-.brand-a { fill: #dfe5ee; }
-.brand-i { fill: var(--accent-strong); }
-.brand-arrow { fill: var(--gold); }
 .brand-text h1 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: 0.01em; }
 .brand-sub { margin: 1px 0 0; font-size: 11px; color: var(--text-muted); letter-spacing: 0.04em; text-transform: uppercase; }
 

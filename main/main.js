@@ -32,6 +32,7 @@ const autoUpdater   = require('../services/autoUpdater');
 const settings        = require('../services/settings');
 const mxControlService = require('../services/mxControlService');
 const windowRegistry   = require('../services/windowRegistry');
+const operatorActivity = require('../services/operatorActivity');
 const { createSourceMonitor } = require('../services/sourceMonitorService');
 const companionService = require('../services/companionService');
 // Canonical Representation Audit, L1 (2026-08-11): the ONE path-containment
@@ -341,6 +342,14 @@ app.whenReady().then(() => {
   _startCompanion();
 });
 
+// IPC handlers the operator is actively waiting on — imports, syncs, transfers,
+// checksums and native dialogs. Registered like ipcMain.handle (same channel, same
+// result); operatorActivity only records that one is in flight, so the companion's
+// automatic card popup never interrupts them.
+function _handleTracked(channel, kind, handler) {
+  ipcMain.handle(channel, operatorActivity.wrap(kind, handler));
+}
+
 // Menu-bar (macOS) / system-tray (Windows) companion — AI-FEAT-061. Opt out with
 // "companionEnabled": false in settings.json, or AUTOINGEST_DISABLE_COMPANION=1.
 function _startCompanion() {
@@ -567,7 +576,7 @@ ipcMain.handle('files:getDirect', async (_event, { folderPath }) => {
 ipcMain.handle('dest:getDefault', async () => DEFAULT_DEST);
 
 // Native folder-picker dialog
-ipcMain.handle('dest:choose', async (event) => {
+_handleTracked('dest:choose', 'dialog', async (event) => {
   const win    = windowRegistry.getRequestWindow(event);
   const result = await dialog.showOpenDialog(win, {
     title:      'Choose Import Destination',
@@ -1089,7 +1098,7 @@ async function _verifyTransferBatch(mainArchiveRoot, batchId) {
   }
 }
 
-ipcMain.handle('import:commitTransaction', async (event, {
+_handleTracked('import:commitTransaction', 'import', async (event, {
   fileJobs,
   eventJsonPath,
   groups,
@@ -1519,7 +1528,7 @@ ipcMain.on('checksum:cancel', () => { checksumCancelled = true; });
 // Optional post-import checksum verification (user-triggered, runs in background).
 // Compares SHA-256 of each copied file's source against its destination.
 // Sends 'checksum:progress' after each file and 'checksum:complete' when done.
-ipcMain.handle('checksum:run', async () => {
+_handleTracked('checksum:run', 'checksum', async () => {
   checksumCancelled = false; // reset at start
   const win   = windowRegistry.getProgressTarget();
   const total = lastImportedFiles.length;
@@ -1581,7 +1590,7 @@ ipcMain.handle('feedback:send', async (_evt, opts) => {
 
 // ── Master folder operations ──────────────────────────────────────────────────
 
-ipcMain.handle('master:chooseArchiveRoot', async (event) => {
+_handleTracked('master:chooseArchiveRoot', 'dialog', async (event) => {
   const win    = windowRegistry.getRequestWindow(event);
   const result = await dialog.showOpenDialog(win, {
     title:      'Choose Archive Location',
@@ -1590,7 +1599,7 @@ ipcMain.handle('master:chooseArchiveRoot', async (event) => {
   return result.canceled ? null : { path: result.filePaths[0] };
 });
 
-ipcMain.handle('master:chooseExisting', async (event, startPath) => {
+_handleTracked('master:chooseExisting', 'dialog', async (event, startPath) => {
   const win    = windowRegistry.getRequestWindow(event);
   const opts = {
     title:      'Select Existing Master Folder',
@@ -3473,7 +3482,7 @@ ipcMain.handle('archive:readSyncJob',         async (_event, jobId) => syncQueue
 
 // ── Background archive sync ───────────────────────────────────────────────────
 
-ipcMain.handle('archive:syncJobNow', async (_event, jobId) => {
+_handleTracked('archive:syncJobNow', 'sync', async (_event, jobId) => {
   if (!jobId || typeof jobId !== 'string') return { ok: false, error: 'Invalid jobId' };
   if (_syncingJobIds.has(jobId)) return { ok: false, error: 'Already syncing' };
 
@@ -3626,7 +3635,7 @@ ipcMain.handle('archive:pauseJob', async (_event, jobId) => {
   return { ok: true };
 });
 
-ipcMain.handle('archive:verifyJobChecksum', async (_event, jobId) => {
+_handleTracked('archive:verifyJobChecksum', 'checksum', async (_event, jobId) => {
   if (!jobId || typeof jobId !== 'string') return { ok: false, error: 'Invalid jobId' };
   if (_verifyingJobIds.has(jobId))         return { ok: false, error: 'Already verifying' };
 
@@ -3677,7 +3686,7 @@ ipcMain.handle('archive:verifyJobChecksum', async (_event, jobId) => {
   }
 });
 
-ipcMain.handle('archive:syncAllReadyJobs', async () => {
+_handleTracked('archive:syncAllReadyJobs', 'sync', async () => {
   const nasRoot     = settings.getNasRoot();
   const stagingRoot = settings.getLocalStagingRoot();
   if (!nasRoot)     return { ok: false, error: 'Active Archive Root not configured' };
@@ -4232,7 +4241,7 @@ ipcMain.handle('metadataSync:listEventsInMaster', async (_event, masterPath) => 
   return metadataSyncService.listEventsInMaster(masterPath);
 });
 
-ipcMain.handle('metadataSync:chooseEventFolder', async (event) => {
+_handleTracked('metadataSync:chooseEventFolder', 'dialog', async (event) => {
   const win = windowRegistry.getRequestWindow(event);
   const { canceled, filePaths } = await dialog.showOpenDialog(win, {
     title:      'Choose Event Folder',
@@ -4275,7 +4284,7 @@ ipcMain.handle('keywords:repairIds', async () => {
   return metadataSyncService.repairOverrideIds(userDataPath);
 });
 
-ipcMain.handle('keywords:chooseBridgeTxt', async () => {
+_handleTracked('keywords:chooseBridgeTxt', 'dialog', async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
     title: 'Select Bridge Keyword Export (.txt)',
     filters: [{ name: 'Text Files', extensions: ['txt'] }],
@@ -4547,7 +4556,7 @@ ipcMain.handle('keywords:addKeyword', async (_event, params) => {
 
 // ── Transfer Export ───────────────────────────────────────────────────────────
 
-ipcMain.handle('archive:chooseTransferRoot', async (event) => {
+_handleTracked('archive:chooseTransferRoot', 'dialog', async (event) => {
   const win    = windowRegistry.getRequestWindow(event);
   const result = await dialog.showOpenDialog(win, {
     title:      'Choose Transfer Drive',
@@ -4614,7 +4623,7 @@ ipcMain.handle('archive:scanBackupSync', async (_event, { scope } = {}) => {
   return transferExportService.scanBackupSync(nasRoot, transferRoot, scope);
 });
 
-ipcMain.handle('archive:runTransferExport', async (_event, { scope, operatorName } = {}) => {
+_handleTracked('archive:runTransferExport', 'transfer', async (_event, { scope, operatorName } = {}) => {
   const isCustom     = scope?.sourceMode === 'custom';
   const nasRoot      = isCustom ? scope.customSrcRoot  : settings.getNasRoot();
   const transferRoot = isCustom ? scope.customDestRoot : settings.getTransferRoot();
@@ -4627,7 +4636,7 @@ ipcMain.handle('archive:runTransferExport', async (_event, { scope, operatorName
   });
 });
 
-ipcMain.handle('archive:chooseCustomSrcFolder', async (event) => {
+_handleTracked('archive:chooseCustomSrcFolder', 'dialog', async (event) => {
   const win    = windowRegistry.getRequestWindow(event);
   const result = await dialog.showOpenDialog(win, {
     title:      'Choose Source Folder',
@@ -4637,7 +4646,7 @@ ipcMain.handle('archive:chooseCustomSrcFolder', async (event) => {
   return result.filePaths[0];
 });
 
-ipcMain.handle('archive:chooseCustomDestFolder', async (event) => {
+_handleTracked('archive:chooseCustomDestFolder', 'dialog', async (event) => {
   const win    = windowRegistry.getRequestWindow(event);
   const result = await dialog.showOpenDialog(win, {
     title:      'Choose Destination Folder',
@@ -4765,7 +4774,7 @@ ipcMain.handle('archive:scanImportSync', async (_event, { scope } = {}) => {
   return transferImportService.scanImportSync(transferRoot, eff.path, scope, isValidEventJson);
 });
 
-ipcMain.handle('archive:runTransferImport', async (_event, { scope, operatorName } = {}) => {
+_handleTracked('archive:runTransferImport', 'transfer', async (_event, { scope, operatorName } = {}) => {
   const transferRoot = settings.getTransferRoot();
   if (!transferRoot) return { ok: false, reason: 'transfer-root-not-set' };
   const eff = await _resolveTransferImportDestination(scope?.customDestRoot);
@@ -4850,7 +4859,7 @@ ipcMain.handle('archive:getMetadataAuditStatus', async (_event, { jobId } = {}) 
 ipcMain.handle('archive:getMetadataAuditReport', async (_event, { jobId, offset, limit, statusFilter } = {}) =>
   metadataAuditService.getMetadataAuditReport(jobId, { offset, limit, statusFilter }));
 
-ipcMain.handle('archive:exportMetadataAuditReport', async (event, { jobId, format, exceptionsOnly } = {}) => {
+_handleTracked('archive:exportMetadataAuditReport', 'dialog', async (event, { jobId, format, exceptionsOnly } = {}) => {
   const win = windowRegistry.getRequestWindow(event);
   const ext = format === 'csv' ? 'csv' : (format === 'jsonl' ? 'jsonl' : 'json');
   const { canceled, filePath } = await dialog.showSaveDialog(win, {
@@ -4862,7 +4871,7 @@ ipcMain.handle('archive:exportMetadataAuditReport', async (event, { jobId, forma
   return metadataAuditExport.exportMetadataAuditReport(jobId, { format: format || 'json', destPath: filePath, exceptionsOnly: !!exceptionsOnly });
 });
 
-ipcMain.handle('archive:chooseMetadataAuditFolder', async (event) => {
+_handleTracked('archive:chooseMetadataAuditFolder', 'dialog', async (event) => {
   const win = windowRegistry.getRequestWindow(event);
   const { canceled, filePaths } = await dialog.showOpenDialog(win, {
     title: 'Choose Audit Scope Folder',
@@ -5642,7 +5651,7 @@ ipcMain.handle('qmz:validateSequenceInput', async (_e, { number, letter, suffix 
 // path for this — it only ever receives the parser's own structured result (see
 // qmzProgramPdfParser.js's own header comment for that contract). Never creates, renames,
 // moves, or deletes anything — parseProgramPdf() is read-only by construction (Stage 2).
-ipcMain.handle('qmz:importProgramPdf', async (event) => {
+_handleTracked('qmz:importProgramPdf', 'dialog', async (event) => {
   const win = windowRegistry.getRequestWindow(event);
   const result = await dialog.showOpenDialog(win, {
     title:      'Select QMZ Program PDF',

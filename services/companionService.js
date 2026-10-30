@@ -6,7 +6,8 @@
  *   - the popup window — created on demand and DESTROYED when hidden (see
  *     docs/product/features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md
  *     § Popup lifecycle decision for the measured comparison),
- *   - the companion:* IPC surface, reachable only from the popup's own webContents.
+ *   - the companion:* IPC surface, reachable only from the popup's own webContents,
+ *   - the automatic popup when a camera card is newly connected (see _maybeAutoOpen).
  *
  * It never scans, copies or writes anything. Card data comes from the single shared
  * poller (sourceMonitorService) as a 'companion' consumer; the popup receives only
@@ -21,7 +22,10 @@
 const path = require('path');
 const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, screen } = require('electron');
 const windowRegistry = require('./windowRegistry');
-const { buildSnapshot, computePopupPosition, POPUP_WIDTH, POPUP_HEIGHT } = require('./companionModel');
+const operatorActivity = require('./operatorActivity');
+const {
+  buildSnapshot, computePopupPosition, resolveTrayAnchor, createAutoOpenTracker, POPUP_WIDTH, POPUP_HEIGHT,
+} = require('./companionModel');
 
 const MONITOR_CONSUMER = 'companion';
 const TOOLTIP = 'AutoIngest';
@@ -31,6 +35,11 @@ const TOOLTIP = 'AutoIngest';
  * blur-close is treated as "close", not "reopen".
  */
 const BLUR_TOGGLE_GUARD_MS = 300;
+/**
+ * An automatically opened popup is shown WITHOUT taking focus, so it cannot close on
+ * blur. If the operator does not interact with it, it hides itself after this long.
+ */
+const AUTO_POPUP_DISMISS_MS = 15000;
 
 const IPC_HANDLE_CHANNELS = ['companion:getSnapshot', 'companion:openAutoIngest', 'companion:quit', 'companion:hide'];
 
@@ -47,6 +56,10 @@ let _log = () => {};
 let _lastBlurCloseAt = 0;
 let _ipcRegistered = false;
 let _popupOpenCount = 0;
+let _autoOpen = null;            // createAutoOpenTracker() while the companion runs
+let _autoDismissTimer = null;
+let _autoOpenCount = 0;
+let _autoOpenSuppressedCount = 0;
 /** Popup windows currently inside a native show/focus call (see _nativeShow). */
 const _inNativeShow = new Set();
 
@@ -123,6 +136,8 @@ function _createPopup() {
     fullscreenable: false,
     skipTaskbar: true,
     alwaysOnTop: true,
+    // An automatically shown popup is not focused; let the first click act on it (macOS).
+    acceptFirstMouse: true,
     backgroundColor: '#0b0f1a',
     webPreferences: {
       preload: PRELOAD,
@@ -136,6 +151,9 @@ function _createPopup() {
   // The popup only ever shows its own bundled page.
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', (e) => e.preventDefault());
+  // Once the operator interacts with an automatically shown popup it behaves like a
+  // clicked-open one: it stays until dismissed or blurred.
+  win.on('focus', () => { if (_popup === win) _clearAutoDismiss(); });
   win.on('blur', () => {
     // A popup already closing (destroy pending) must not close its successor.
     if (_popup !== win) return;
@@ -149,7 +167,12 @@ function _createPopup() {
 
 function _positionPopup(win) {
   if (!_tray) return;
-  const trayBounds = _tray.getBounds();
+  const trayBounds = resolveTrayAnchor({
+    trayBounds: _tray.getBounds(),
+    displays: screen.getAllDisplays(),
+    primary: screen.getPrimaryDisplay(),
+    platform: process.platform,
+  });
   const { workArea } = screen.getDisplayNearestPoint({ x: trayBounds.x, y: trayBounds.y });
   const { x, y } = computePopupPosition({ trayBounds, workArea, platform: process.platform });
   win.setPosition(x, y, false);
@@ -185,9 +208,15 @@ function _destroyPopupLater(win) {
   });
 }
 
-function showPopup() {
+/**
+ * @param {{ inactive?: boolean }} [opts]  inactive: show without taking focus (automatic
+ *   popup) and hide again after AUTO_POPUP_DISMISS_MS unless the operator interacts.
+ */
+function showPopup({ inactive = false } = {}) {
   if (_popup && !_popup.isDestroyed()) {
+    if (inactive) return; // already open: it updates in place, never steals focus
     const existing = _popup;
+    _clearAutoDismiss();
     _nativeShow(existing, () => existing.focus());
     return;
   }
@@ -198,10 +227,55 @@ function showPopup() {
     if (_popup !== win || win.isDestroyed()) return;
     _positionPopup(win);
     _nativeShow(win, () => {
+      if (inactive) {
+        win.showInactive();
+        if (_popup === win && !win.isDestroyed()) _startAutoDismiss(win);
+        return;
+      }
       win.show();
       if (_popup === win && !win.isDestroyed()) win.focus();
     });
   });
+}
+
+function _startAutoDismiss(win) {
+  _clearAutoDismiss();
+  _autoDismissTimer = setTimeout(() => {
+    _autoDismissTimer = null;
+    if (_popup === win && !win.isDestroyed() && !win.isFocused()) hidePopup();
+  }, AUTO_POPUP_DISMISS_MS);
+}
+
+function _clearAutoDismiss() {
+  if (_autoDismissTimer) { clearTimeout(_autoDismissTimer); _autoDismissTimer = null; }
+}
+
+/** True while an import/sync/transfer/checksum or a native dialog is in flight, or an AutoIngest window has focus. */
+function _isOperatorBusy() {
+  if (operatorActivity.isBusy()) return true;
+  const focused = BrowserWindow.getFocusedWindow();
+  return !!focused && !focused.isDestroyed() && !windowRegistry.isAuxiliary(focused);
+}
+
+/**
+ * Opens the popup once per genuine new camera-card connection (a new attachment
+ * sourceId). Repeated polls of the same card, cards present at startup, and cards seen
+ * while the operator is busy never open it; a dismissed popup is not reopened until a
+ * further card is connected.
+ */
+function _maybeAutoOpen(latest) {
+  if (!_autoOpen) return;
+  const fresh = _autoOpen.observe(latest && latest.cards);
+  if (fresh.length === 0) return;
+  if (_popup && !_popup.isDestroyed()) return; // already showing; the snapshot push updates it
+  if (_isOperatorBusy()) {
+    _autoOpenSuppressedCount++;
+    _log(`[companion] card connected; automatic popup suppressed (operator busy: ${operatorActivity.activeKinds().join(',') || 'app window focused'})`);
+    return;
+  }
+  _autoOpenCount++;
+  _log(`[companion] card connected; showing popup (${fresh.length} new)`);
+  showPopup({ inactive: true });
 }
 
 /**
@@ -210,6 +284,7 @@ function showPopup() {
  * destroyed on the next turn of the event loop.
  */
 function hidePopup() {
+  _clearAutoDismiss();
   const win = _popup;
   _popup = null;
   if (win && !win.isDestroyed()) _destroyPopupLater(win);
@@ -249,7 +324,11 @@ function init({ monitor, openApp, log }) {
     _tray.on('right-click', () => { hidePopup(); _tray.popUpContextMenu(_contextMenu()); });
   }
 
-  _unsubscribe = _monitor.subscribe(() => _pushSnapshot());
+  _autoOpen = createAutoOpenTracker();
+  _unsubscribe = _monitor.subscribe((latest) => {
+    _pushSnapshot();
+    _maybeAutoOpen(latest);
+  });
   _monitor.acquire(MONITOR_CONSUMER);
   _log('[companion] tray started');
 }
@@ -258,6 +337,7 @@ function init({ monitor, openApp, log }) {
 function shutdown() {
   hidePopup();
   if (_unsubscribe) { _unsubscribe(); _unsubscribe = null; }
+  _autoOpen = null;
   if (_monitor) { _monitor.release(MONITOR_CONSUMER); _monitor = null; }
   _unregisterIpc();
   if (_tray) {
@@ -274,6 +354,10 @@ function getDiagnostics() {
     trayBounds: _tray && !_tray.isDestroyed() ? _tray.getBounds() : null,
     popupOpen: !!_popup && !_popup.isDestroyed(),
     popupOpenCount: _popupOpenCount,
+    popupFocused: !!_popup && !_popup.isDestroyed() && _popup.isFocused(),
+    autoOpenCount: _autoOpenCount,
+    autoOpenSuppressedCount: _autoOpenSuppressedCount,
+    autoDismissPending: !!_autoDismissTimer,
     ipcRegistered: _ipcRegistered,
     monitor: _monitor ? _monitor.getDiagnostics() : null,
     snapshot: _monitor ? _snapshot() : null,

@@ -9,7 +9,9 @@
 
 const assert = require('node:assert/strict');
 const { createSourceMonitor, createAttachmentTracker } = require('../services/sourceMonitorService');
-const { buildSnapshot, computePopupPosition, formatCapacity, POPUP_WIDTH, POPUP_HEIGHT } = require('../services/companionModel');
+const {
+  buildSnapshot, computePopupPosition, formatCapacity, resolveTrayAnchor, createAutoOpenTracker, POPUP_WIDTH, POPUP_HEIGHT,
+} = require('../services/companionModel');
 
 let passed = 0;
 async function t(name, fn) {
@@ -321,6 +323,93 @@ function monitorWith({ drives = { dcim: [], removable: [] }, windows = [], inter
       frames.push(w);
     }
     assert.deepEqual(frames, [16, 20, 24, 32, 40, 48]);
+  });
+
+  // ── Automatic card popup: connection identity / deduplication ───────────────
+  const ids = (...list) => list.map(sourceId => ({ sourceId }));
+
+  await t('auto-open: cards already connected at startup are a baseline, not connection events', () => {
+    const tr = createAutoOpenTracker();
+    assert.deepEqual(tr.observe(ids('src-1', 'src-2')), []);
+    assert.deepEqual(tr.observe(ids('src-1', 'src-2')), []);
+  });
+
+  await t('auto-open: a newly inserted card is reported exactly once, never on later polls', () => {
+    const tr = createAutoOpenTracker();
+    tr.observe([]);
+    assert.deepEqual(tr.observe(ids('src-1')), ['src-1']);
+    for (let i = 0; i < 5; i++) assert.deepEqual(tr.observe(ids('src-1')), []);
+  });
+
+  await t('auto-open: removal + reinsertion (fresh attachment id) is a new connection', () => {
+    const tr = createAutoOpenTracker();
+    tr.observe([]);
+    tr.observe(ids('src-1'));
+    assert.deepEqual(tr.observe([]), []);
+    assert.deepEqual(tr.observe(ids('src-2')), ['src-2']);
+  });
+
+  await t('auto-open: several cards — one event per new card, existing ones ignored', () => {
+    const tr = createAutoOpenTracker();
+    tr.observe(ids('src-1'));
+    assert.deepEqual(tr.observe(ids('src-1', 'src-2', 'src-3')), ['src-2', 'src-3']);
+    assert.deepEqual(tr.observe(ids('src-1', 'src-3')), []);
+  });
+
+  await t('auto-open: end to end with the real attachment tracker (same mount keeps its id)', () => {
+    const at = createAttachmentTracker();
+    const tr = createAutoOpenTracker();
+    tr.observe(at.update([]));
+    assert.equal(tr.observe(at.update([card('/Volumes/EOS_DIGITAL')])).length, 1);
+    assert.equal(tr.observe(at.update([card('/Volumes/EOS_DIGITAL')])).length, 0, 'repeated poll');
+    tr.observe(at.update([]));
+    assert.equal(tr.observe(at.update([card('/Volumes/EOS_DIGITAL')])).length, 1, 'reinserted');
+    assert.equal(tr.observe(at.update([card('/Volumes/EOS_DIGITAL'), card('/Volumes/EOS_DIGITAL 1')])).length, 1, 'second card, same label');
+  });
+
+  await t('auto-open: malformed input never throws and never reports an event', () => {
+    const tr = createAutoOpenTracker();
+    tr.observe(null);
+    assert.deepEqual(tr.observe([null, {}, { sourceId: '' }]), []);
+  });
+
+  // ── Popup anchor when the tray icon is hidden ───────────────────────────────
+  const displays = [
+    { bounds: { x: 0, y: 0, width: 2560, height: 1080 }, workArea: { x: 0, y: 30, width: 2500, height: 1050 } },
+    { bounds: { x: -1512, y: 0, width: 1512, height: 982 }, workArea: { x: -1512, y: 33, width: 1512, height: 949 } },
+  ];
+  await t('anchor: a visible tray icon is used as-is', () => {
+    const tb = { x: 2000, y: 0, width: 34, height: 30 };
+    assert.deepEqual(resolveTrayAnchor({ trayBounds: tb, displays, primary: displays[0], platform: 'darwin' }), tb);
+  });
+
+  await t('anchor: icon pushed off-screen by a menu-bar manager → right end of the primary menu bar (measured case x=-3394)', () => {
+    const a = resolveTrayAnchor({ trayBounds: { x: -3394, y: 0, width: 34, height: 30 }, displays, primary: displays[0], platform: 'darwin' });
+    assert.deepEqual(a, { x: 2538, y: 0, width: 22, height: 30 });
+    const pos = computePopupPosition({ trayBounds: a, workArea: displays[0].workArea, platform: 'darwin' });
+    assert.ok(pos.x + POPUP_WIDTH <= 2500 && pos.y >= 30, JSON.stringify(pos));
+  });
+
+  await t('anchor: zero-size bounds (no icon geometry) fall back too; Windows uses the taskbar corner', () => {
+    const a = resolveTrayAnchor({ trayBounds: { x: 0, y: 0, width: 0, height: 0 }, displays, primary: displays[0], platform: 'win32' });
+    assert.deepEqual(a, { x: 2478, y: 1080, width: 22, height: 22 });
+  });
+
+  // ── Operator activity (automatic-popup suppression) ─────────────────────────
+  await t('operatorActivity: busy exactly while a wrapped handler runs; result and errors pass through', async () => {
+    const activity = require('../services/operatorActivity');
+    let release;
+    const wrapped = activity.wrap('import', (a, b) => new Promise(r => { release = () => r(a + b); }));
+    assert.equal(activity.isBusy(), false);
+    const p = wrapped(2, 3);
+    assert.equal(activity.isBusy(), true);
+    assert.deepEqual(activity.activeKinds(), ['import']);
+    release();
+    assert.equal(await p, 5);
+    assert.equal(activity.isBusy(), false);
+    const failing = activity.wrap('dialog', async () => { throw new Error('boom'); });
+    await assert.rejects(failing(), /boom/);
+    assert.equal(activity.isBusy(), false, 'cleared after a rejection');
   });
 
   console.log(`${passed} passed`);

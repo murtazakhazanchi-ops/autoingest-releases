@@ -80,6 +80,63 @@ function computePopupPosition({ trayBounds, workArea, platform, width = POPUP_WI
   return { x, y };
 }
 
+/**
+ * Where to anchor the popup. Normally the tray icon itself. When the icon is not on
+ * any display — e.g. a menu-bar manager (Vanilla, Bartender) or the notch has pushed
+ * it off-screen — fall back to where the icon would sit: the right end of the primary
+ * display's menu bar (macOS) or its taskbar corner (Windows).
+ *
+ * @param {{ trayBounds: {x:number,y:number,width:number,height:number}|null,
+ *           displays: Array<{bounds: {x:number,y:number,width:number,height:number}}>,
+ *           primary: {bounds: {x:number,y:number,width:number,height:number},
+ *                     workArea: {x:number,y:number,width:number,height:number}},
+ *           platform: string }} args
+ * @returns {{ x: number, y: number, width: number, height: number }}
+ */
+function resolveTrayAnchor({ trayBounds, displays, primary, platform }) {
+  const onSomeDisplay = !!trayBounds && trayBounds.width > 0 && trayBounds.height > 0 && displays.some(({ bounds: b }) => {
+    const cx = trayBounds.x + trayBounds.width / 2;
+    const cy = trayBounds.y + trayBounds.height / 2;
+    return cx >= b.x && cx < b.x + b.width && cy >= b.y && cy < b.y + b.height;
+  });
+  if (onSomeDisplay) return trayBounds;
+  const { bounds: b, workArea: wa } = primary;
+  const size = 22;
+  if (platform === 'darwin') {
+    const menuBarHeight = Math.max(wa.y - b.y, size);
+    return { x: b.x + b.width - size, y: b.y, width: size, height: menuBarHeight };
+  }
+  return { x: wa.x + wa.width - size, y: wa.y + wa.height, width: size, height: size };
+}
+
+/**
+ * Decides which card attachments are NEW connections, for the automatic popup.
+ * Identity is the per-attachment sourceId from sourceMonitorService (a card removed
+ * and reinserted gets a fresh id; a card left in place keeps its id across polls).
+ * The first observation is a baseline: cards already connected when the companion
+ * starts are not connection events.
+ */
+function createAutoOpenTracker() {
+  /** @type {Set<string>|null} */
+  let known = null;
+  return {
+    /**
+     * @param {Array<{sourceId: string}>} cards  the current poll's camera cards
+     * @returns {string[]} sourceIds that were not present in the previous poll
+     */
+    observe(cards) {
+      const ids = (cards || []).map(c => c && c.sourceId).filter(id => typeof id === 'string' && id);
+      if (known === null) {
+        known = new Set(ids);
+        return [];
+      }
+      const fresh = ids.filter(id => !known.has(id));
+      known = new Set(ids);
+      return fresh;
+    },
+  };
+}
+
 module.exports = {
   SNAPSHOT_SCHEMA_VERSION,
   POPUP_WIDTH,
@@ -87,4 +144,6 @@ module.exports = {
   buildSnapshot,
   formatCapacity,
   computePopupPosition,
+  resolveTrayAnchor,
+  createAutoOpenTracker,
 };
