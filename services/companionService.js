@@ -7,25 +7,33 @@
  *     docs/product/features/AI-FEAT-061_QUICK_INGEST_DESKTOP_COMPANION.md
  *     § Popup lifecycle decision for the measured comparison),
  *   - the companion:* IPC surface, reachable only from the popup's own webContents,
- *   - the automatic popup when a camera card is newly connected (see _maybeAutoOpen).
+ *   - the automatic popup when a camera card is newly connected (see _maybeAutoOpen),
+ *   - Q2: the read-only capture-date assessment of each connected card
+ *     (cardAssessmentService), the operator's chosen shoot date per card, and the
+ *     "Review" handoffs into the existing workspace (workspaceHandoff).
  *
- * It never scans, copies or writes anything. Card data comes from the single shared
- * poller (sourceMonitorService) as a 'companion' consumer; the popup receives only
- * the path-free snapshot from companionModel.buildSnapshot().
+ * It never copies or writes anything, and never starts an import. Card data comes
+ * from the single shared poller (sourceMonitorService) as a 'companion' consumer; the
+ * popup receives only the path-free snapshot from companionModel.buildSnapshot().
  *
- * The existing main window is never touched: "Open AutoIngest" goes through the same
- * function main.js uses for dock activation / second-instance focus.
+ * "Open AutoIngest" goes through the same function main.js uses for dock activation /
+ * second-instance focus; the Review actions use the approved non-visual handoff.
  */
 
 'use strict';
 
+const fs = require('fs');
 const path = require('path');
 const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, screen } = require('electron');
 const windowRegistry = require('./windowRegistry');
 const operatorActivity = require('./operatorActivity');
 const {
-  buildSnapshot, computePopupPosition, resolveTrayAnchor, createAutoOpenTracker, POPUP_WIDTH, POPUP_HEIGHT,
+  buildSnapshot, computePopupPosition, resolveTrayAnchor, createAutoOpenTracker, handoffMessage, localDateString,
+  POPUP_WIDTH, POPUP_HEIGHT,
 } = require('./companionModel');
+const { createCardAssessor } = require('./cardAssessmentService');
+const { summarize, filesForSelection, normalizeSelection } = require('./dateAssessmentModel');
+const { createWorkspaceHandoff } = require('./workspaceHandoff');
 
 const MONITOR_CONSUMER = 'companion';
 const TOOLTIP = 'AutoIngest';
@@ -40,8 +48,14 @@ const BLUR_TOGGLE_GUARD_MS = 300;
  * blur. If the operator does not interact with it, it hides itself after this long.
  */
 const AUTO_POPUP_DISMISS_MS = 15000;
+/** A refused Review handoff is explained in the popup for this long. */
+const NOTICE_TTL_MS = 60000;
+const SOURCE_ID_RE = /^src-\d+$/;
 
-const IPC_HANDLE_CHANNELS = ['companion:getSnapshot', 'companion:openAutoIngest', 'companion:quit', 'companion:hide'];
+const IPC_HANDLE_CHANNELS = [
+  'companion:getSnapshot', 'companion:openAutoIngest', 'companion:quit', 'companion:hide',
+  'companion:selectDate', 'companion:reviewSelected', 'companion:reviewEarlier',
+];
 
 const ASSETS_DIR = path.join(__dirname, '..', 'assets');
 const RENDERER_HTML = path.join(__dirname, '..', 'renderer', 'companion', 'companion.html');
@@ -60,6 +74,12 @@ let _autoOpen = null;            // createAutoOpenTracker() while the companion 
 let _autoDismissTimer = null;
 let _autoOpenCount = 0;
 let _autoOpenSuppressedCount = 0;
+let _assessor = null;
+let _handoff = null;
+/** sourceId -> the operator's chosen { date, untilTime }; absent = today. */
+const _selections = new Map();
+/** sourceId -> { reason, at } of the last refused Review handoff. */
+const _notices = new Map();
 /** Popup windows currently inside a native show/focus call (see _nativeShow). */
 const _inNativeShow = new Set();
 
@@ -82,8 +102,27 @@ function _isFromPopup(event) {
   return !!_popup && !_popup.isDestroyed() && event.sender === _popup.webContents;
 }
 
+/** Path-free assessment view of one card for the popup (null before Q2 starts). */
+function _assessmentView(sourceId) {
+  if (!_assessor) return null;
+  const job = _assessor.get(sourceId);
+  if (!job) return null;
+  const notice = _notices.get(sourceId);
+  const view = {
+    state: job.state,
+    progress: { done: job.done, total: job.total },
+    error: job.error,
+    notice: notice && Date.now() - notice.at < NOTICE_TTL_MS ? handoffMessage(notice.reason) : null,
+    summary: null,
+  };
+  if (job.state === 'complete') {
+    view.summary = summarize(job.records, { today: localDateString(new Date()), selection: _selections.get(sourceId) });
+  }
+  return view;
+}
+
 function _snapshot() {
-  return buildSnapshot(_monitor ? _monitor.getLatest() : null);
+  return buildSnapshot(_monitor ? _monitor.getLatest() : null, new Date(), _assessmentView);
 }
 
 function _pushSnapshot() {
@@ -107,6 +146,18 @@ function _registerIpc() {
     if (!_isFromPopup(event)) return { ok: false };
     hidePopup();
     return { ok: true };
+  });
+  ipcMain.handle('companion:selectDate', (event, payload) => {
+    if (!_isFromPopup(event)) return { ok: false };
+    return _selectDate(payload);
+  });
+  ipcMain.handle('companion:reviewSelected', (event, payload) => {
+    if (!_isFromPopup(event)) return { ok: false };
+    return _review(payload, 'selected');
+  });
+  ipcMain.handle('companion:reviewEarlier', (event, payload) => {
+    if (!_isFromPopup(event)) return { ok: false };
+    return _review(payload, 'card');
   });
   ipcMain.handle('companion:quit', (event) => {
     if (!_isFromPopup(event)) return { ok: false };
@@ -250,6 +301,78 @@ function _clearAutoDismiss() {
   if (_autoDismissTimer) { clearTimeout(_autoDismissTimer); _autoDismissTimer = null; }
 }
 
+function _attachedCard(sourceId) {
+  const latest = _monitor ? _monitor.getLatest() : null;
+  return ((latest && latest.cards) || []).find(c => c.sourceId === sourceId) || null;
+}
+
+/** @param {unknown} payload  { sourceId, date, untilTime? } from the popup (untrusted) */
+function _selectDate(payload) {
+  const p = payload && typeof payload === 'object' ? payload : {};
+  const keys = Object.keys(p);
+  if (keys.some(k => !['sourceId', 'date', 'untilTime'].includes(k))) return { ok: false, reason: 'invalid' };
+  if (typeof p.sourceId !== 'string' || !SOURCE_ID_RE.test(p.sourceId)) return { ok: false, reason: 'invalid' };
+  const view = _assessmentView(p.sourceId);
+  if (!view || !view.summary) return { ok: false, reason: 'assessment-unavailable' };
+  if (!view.summary.options.some(o => o.date === p.date)) return { ok: false, reason: 'invalid' };
+  if (p.untilTime != null && !view.summary.afterMidnightOptions.includes(p.untilTime)) return { ok: false, reason: 'invalid' };
+  _selections.set(p.sourceId, normalizeSelection({ date: p.date, untilTime: p.untilTime }, view.summary.today));
+  _notices.delete(p.sourceId);
+  _pushSnapshot();
+  return { ok: true };
+}
+
+/**
+ * Review in the existing workspace. 'selected': open the card with the chosen date's
+ * files selected; 'card': open the whole card (earlier files included), no selection.
+ * @param {unknown} payload  { sourceId } from the popup (untrusted)
+ * @param {'selected'|'card'} mode
+ */
+async function _review(payload, mode) {
+  const p = payload && typeof payload === 'object' ? payload : {};
+  if (Object.keys(p).some(k => k !== 'sourceId') || typeof p.sourceId !== 'string' || !SOURCE_ID_RE.test(p.sourceId)) {
+    return { ok: false, reason: 'invalid' };
+  }
+  const { sourceId } = p;
+  const refuse = (reason) => {
+    _notices.set(sourceId, { reason, at: Date.now() });
+    _pushSnapshot();
+    return { ok: false, reason };
+  };
+  const card = _attachedCard(sourceId);
+  if (!card) return refuse('source-detached');
+  if (operatorActivity.isBusy()) return refuse('busy');
+  let selectPaths = null;
+  if (mode === 'selected') {
+    const job = _assessor ? await _assessor.verify(sourceId) : null;
+    if (!job || !_attachedCard(sourceId)) return refuse('assessment-unavailable');
+    selectPaths = filesForSelection(job.records, normalizeSelection(_selections.get(sourceId), localDateString(new Date())));
+    if (selectPaths.length === 0) return refuse('nothing-selected');
+  }
+  _notices.delete(sourceId);
+  hidePopup(); // the main window is about to take focus
+  const result = await _handoff.openSource({ mountpoint: card.mountpoint, label: card.label, selectPaths });
+  if (!result.ok && _tray) {
+    _notices.set(sourceId, { reason: result.reason, at: Date.now() });
+    showPopup({ inactive: true }); // explain the refusal where the operator asked
+  }
+  return result;
+}
+
+function _statMount(mountpoint) {
+  return fs.promises.stat(mountpoint).then(st => ({ dev: st.dev, ino: st.ino }), () => null);
+}
+
+function _onPoll(latest) {
+  const ids = new Set(((latest && latest.cards) || []).map(c => c.sourceId));
+  for (const id of [..._selections.keys(), ..._notices.keys()]) {
+    if (!ids.has(id)) { _selections.delete(id); _notices.delete(id); }
+  }
+  if (_assessor) _assessor.sync(latest && latest.cards);
+  _pushSnapshot();
+  _maybeAutoOpen(latest);
+}
+
 /** True while an import/sync/transfer/checksum or a native dialog is in flight, or an AutoIngest window has focus. */
 function _isOperatorBusy() {
   if (operatorActivity.isBusy()) return true;
@@ -325,10 +448,25 @@ function init({ monitor, openApp, log }) {
   }
 
   _autoOpen = createAutoOpenTracker();
-  _unsubscribe = _monitor.subscribe((latest) => {
-    _pushSnapshot();
-    _maybeAutoOpen(latest);
+  _assessor = createCardAssessor({
+    // The workspace's own discovery rules; exifr / the shared ExifTool pool (read-only).
+    listMedia: (mountpoint) => require('../main/fileBrowser').scanMediaRecursive(mountpoint),
+    readTags: (filePath, type) => require('./captureDateReader').readCaptureTags(filePath, type),
+    statMount: _statMount,
+    // Never compete with an import/sync/transfer/checksum for disk or ExifTool.
+    isPaused: () => operatorActivity.activeKinds().some(k => k !== 'dialog'),
+    onChange: _pushSnapshot,
+    log: _log,
   });
+  _handoff = createWorkspaceHandoff({
+    ipcMain,
+    getMainWindow: () => windowRegistry.getMainWindow(),
+    openApp: () => { if (_openApp) _openApp(); },
+    isBusy: () => operatorActivity.isBusy(),
+    log: _log,
+  });
+  _handoff.register();
+  _unsubscribe = _monitor.subscribe(_onPoll);
   _monitor.acquire(MONITOR_CONSUMER);
   _log('[companion] tray started');
 }
@@ -338,6 +476,10 @@ function shutdown() {
   hidePopup();
   if (_unsubscribe) { _unsubscribe(); _unsubscribe = null; }
   _autoOpen = null;
+  if (_assessor) { _assessor.shutdown(); _assessor = null; }
+  if (_handoff) { _handoff.unregister(); _handoff = null; }
+  _selections.clear();
+  _notices.clear();
   if (_monitor) { _monitor.release(MONITOR_CONSUMER); _monitor = null; }
   _unregisterIpc();
   if (_tray) {
@@ -360,6 +502,8 @@ function getDiagnostics() {
     autoDismissPending: !!_autoDismissTimer,
     ipcRegistered: _ipcRegistered,
     monitor: _monitor ? _monitor.getDiagnostics() : null,
+    assessment: _assessor ? _assessor.getDiagnostics() : null,
+    handoff: _handoff ? _handoff.getDiagnostics() : null,
     snapshot: _monitor ? _snapshot() : null,
   };
 }

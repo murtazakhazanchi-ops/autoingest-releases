@@ -13,6 +13,8 @@
   --accent: #89b4fa;
   --accent-strong: #2f6fe0;
   --success: #a6e3a1;
+  --warning: #f9e2af;
+  --danger: #f38ba8;
   --border: color-mix(in srgb, white 10%, transparent);
   --focus-ring: color-mix(in srgb, var(--accent) 70%, transparent);
 
@@ -37,6 +39,8 @@
   --accent: #2f6fe0;
   --accent-strong: #1f56c2;
   --success: #2f8f46;
+  --warning: #9a6700;
+  --danger: #c0364f;
   --border: color-mix(in srgb, black 10%, transparent);
 }
 
@@ -120,15 +124,15 @@ html, body {
 }
 .card-row {
   display: flex;
-  align-items: center;
-  gap: var(--space-3);
+  flex-direction: column;
+  gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-row);
   background: var(--surface);
   border: 1px solid var(--border);
   transition: background var(--duration-fast) ease;
 }
-.card-row:hover { background: var(--surface-hover); }
+.card-head { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
 .card-icon { width: 22px; height: 22px; flex: none; fill: none; stroke: var(--accent); stroke-width: 1.6; stroke-linejoin: round; }
 .card-text { display: flex; flex-direction: column; min-width: 0; }
 .card-label { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -136,6 +140,68 @@ html, body {
 .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
 .card-disambiguator:not(:empty)::before { content: '·'; margin: 0 5px 0 1px; }
 .card-disambiguator { color: var(--text-muted); }
+
+/* Date assessment (Q2) ------------------------------------------------------- */
+.assessment { display: flex; flex-direction: column; gap: var(--space-2); }
+.assessment p { margin: 0; }
+
+.assess-progress { display: flex; flex-direction: column; gap: 5px; font-size: 11px; color: var(--text-secondary); }
+.progress-track { height: 3px; border-radius: 2px; background: var(--border); overflow: hidden; }
+.progress-bar { height: 100%; width: 0; background: var(--accent); transition: width var(--duration-fast) linear; }
+.assess-error { font-size: 12px; color: var(--danger); }
+.assess-notice {
+  font-size: 12px;
+  color: var(--warning);
+  padding: var(--space-2);
+  border-radius: var(--radius-btn);
+  background: color-mix(in srgb, var(--warning) 10%, transparent);
+}
+
+.assess-result { display: flex; flex-direction: column; gap: var(--space-2); }
+.field { display: flex; flex-direction: column; gap: 3px; }
+.field-inline { flex-direction: row; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.field-label { font-size: 11px; color: var(--text-muted); }
+select {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-btn);
+  padding: 5px var(--space-2);
+}
+select:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.field-inline select { padding: 3px 6px; font-size: 12px; }
+
+.selected-line { display: flex; align-items: baseline; gap: 6px; }
+.selected-num { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.selected-caption { color: var(--text-secondary); font-size: 12px; }
+.selected-breakdown { font-size: 11px; color: var(--text-muted); }
+
+.buckets { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-1); margin: 0; }
+.bucket {
+  padding: 5px var(--space-2);
+  border-radius: var(--radius-btn);
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+}
+.bucket dt { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.bucket dd { margin: 1px 0 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.assess-note, .suggestion { font-size: 11px; color: var(--text-secondary); line-height: 1.4; }
+.link-btn {
+  font: inherit;
+  font-weight: 600;
+  color: var(--accent);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.link-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 3px; }
+
+.card-actions { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-1); margin-top: 2px; }
+.card-actions .btn { padding: 7px var(--space-2); font-size: 12px; }
+.btn-secondary { border: 1px solid var(--border); background: transparent; color: var(--text); }
+.btn-secondary:hover { background: var(--surface-hover); }
+.btn:disabled { opacity: 0.45; cursor: default; transform: none; }
 
 /* Actions ------------------------------------------------------------------ */
 .actions {

@@ -8,22 +8,25 @@
 
 'use strict';
 
-const SNAPSHOT_SCHEMA_VERSION = 1;
+// v2 (Q2) adds sources[].assessment; every v1 field is unchanged.
+const SNAPSHOT_SCHEMA_VERSION = 2;
 
 const POPUP_WIDTH = 340;
-const POPUP_HEIGHT = 320;
+/** Tall enough for one card's date assessment; several cards scroll inside the list. */
+const POPUP_HEIGHT = 520;
 /** Gap between the tray icon and the popup edge. */
 const POPUP_MARGIN = 6;
 
 /**
- * Builds the Q1 subset of the CompanionSnapshot v1 contract.
- * Q1 reports detection only; scan counts (Q2), archive status (Q3) and
- * Backup Intelligence evidence (AI-FEAT-062) are explicitly absent, not guessed.
+ * Builds the CompanionSnapshot (v2). Q1 detection fields plus, per card, the Q2
+ * capture-date assessment view (counts and dates only — never a path). Archive status
+ * (Q3) and Backup Intelligence evidence (AI-FEAT-062) are explicitly absent, not guessed.
  *
  * @param {{ cards: Array<{sourceId: string, label: string, labelCollision: boolean, size?: number}>, polledAt: string|null }} latest
  * @param {Date} [now]
+ * @param {(sourceId: string) => object|null} [assessmentFor]  path-free assessment view
  */
-function buildSnapshot(latest, now = new Date()) {
+function buildSnapshot(latest, now = new Date(), assessmentFor = () => null) {
   const cards = (latest && Array.isArray(latest.cards)) ? latest.cards : [];
   return {
     schemaVersion: SNAPSHOT_SCHEMA_VERSION,
@@ -38,6 +41,7 @@ function buildSnapshot(latest, now = new Date()) {
       // Only shown when two attached cards share a label; capacity is a hint, never an identity.
       disambiguator: c.labelCollision ? formatCapacity(c.size) : null,
       evidence: { detected: { confidence: 'certain' } },
+      assessment: assessmentFor(c.sourceId) || null,
     })),
     archive: null,
     importSession: { state: 'unknown' },
@@ -137,6 +141,25 @@ function createAutoOpenTracker() {
   };
 }
 
+/** This computer's local calendar date, 'YYYY-MM-DD' ("today" for the assessment). */
+function localDateString(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+const HANDOFF_MESSAGES = {
+  'busy': 'AutoIngest is busy. Finish the current import or dialog, then try again.',
+  'workspace-in-use': 'The workspace already has files in progress. Finish or clear them, then try again.',
+  'source-detached': 'This card is no longer connected.',
+  'assessment-unavailable': 'The card is still being checked. Try again in a moment.',
+  'nothing-selected': 'No files were captured on the selected date.',
+  'handoff-in-progress': 'AutoIngest is already opening a card.',
+};
+
+/** Operator-facing text for a refused Review handoff (main → popup; never a path). */
+function handoffMessage(reason) {
+  return HANDOFF_MESSAGES[reason] || 'The workspace could not open the card. Open AutoIngest and choose the card there.';
+}
+
 module.exports = {
   SNAPSHOT_SCHEMA_VERSION,
   POPUP_WIDTH,
@@ -146,4 +169,6 @@ module.exports = {
   computePopupPosition,
   resolveTrayAnchor,
   createAutoOpenTracker,
+  localDateString,
+  handoffMessage,
 };

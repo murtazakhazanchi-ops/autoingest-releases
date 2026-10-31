@@ -451,4 +451,12 @@ contextBridge.exposeInMainWorld('api', {
   onMxControlExecuteCommand:  (cb)                   => _register('mx-control:execute-command', (_e, msg) => cb(msg)),
   mxControlSendCommandResult: (requestId, result)    => ipcRenderer.send('mx-control:command-result', { requestId, result }),
 
+  // ── Companion handoff (AI-FEAT-061 Q2/Q4 — approved non-visual listener) ──
+  // Main asks the workspace to open a camera card (optionally with a file selection)
+  // after the menu-bar/tray companion's Review actions; the renderer answers once.
+  // Fire-and-forget sends: harmless when the companion is disabled.
+  companionWorkspaceReady:    ()                   => ipcRenderer.send('companion:workspaceReady'),
+  onCompanionOpenSource:      (cb)                 => _register('companion:openSource', (_e, req) => cb(req)),
+  companionOpenSourceResult:  (requestId, result)  => ipcRenderer.send('companion:openSourceResult', { requestId, result }),
+
 });

@@ -182,7 +182,8 @@ async function launch(userDataDir, drivesFile, stubFile) {
     setDrives([drive('A'), drive('B')]);
     d = await waitFor(async () => { const x = await inMain.diag(app); return x.popupOpen && x.autoOpenCount === 2 ? x : null; }, 15000);
     check(!!d, 'removing and reinserting a card opens the popup again');
-    const page = app.windows().filter(p => !p.isClosed() && p.url().endsWith('companion.html')).pop();
+    // Main reports the popup as soon as its window exists; Playwright sees the page a moment later.
+    const page = await waitFor(async () => app.windows().filter(p => !p.isClosed() && p.url().endsWith('companion.html')).pop(), 5000, 50);
     // hide() destroys the popup page, so the evaluate itself may report the page closed.
     await page.evaluate(() => window.companion.hide()).catch(() => {});
     await waitFor(async () => !(await inMain.diag(app)).popupOpen, 5000);
@@ -254,7 +255,7 @@ async function launch(userDataDir, drivesFile, stubFile) {
       setDrives([drive('A'), drive('F'), drive('G'), drive('H')]);
       await polls(app, 2);
       d = await inMain.diag(app);
-      check(!d.popupOpen && d.autoOpenSuppressedCount === before + 1, `no automatic popup while an AutoIngest window (${focusedName}) is focused`);
+      check(!d.popupOpen && d.autoOpenSuppressedCount === before + 1, `no automatic popup while an AutoIngest window (${focusedName}) is focused (popupOpen=${d.popupOpen}, suppressed ${before}→${d.autoOpenSuppressedCount}, autoOpen=${d.autoOpenCount}, focusedNow=${await inMain.focused(app)})`);
     } else {
       log(`PARTIAL — could not focus an AutoIngest window in this session (window=${!!appWin}, focused=${focusedName}); focused-window suppression not exercised`);
     }

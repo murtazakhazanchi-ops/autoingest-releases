@@ -209,7 +209,7 @@ function monitorWith({ drives = { dcim: [], removable: [] }, windows = [], inter
   // ── Snapshot (the only data the popup receives) ─────────────────────────────
   await t('snapshot: no-card state', () => {
     const s = buildSnapshot({ cards: [], polledAt: null });
-    assert.equal(s.schemaVersion, 1);
+    assert.equal(s.schemaVersion, 2, 'v2 (Q2) is additive: sources[].assessment');
     assert.deepEqual(s.sources, []);
     assert.deepEqual(s.capabilities, { contentIdentity: false, verificationReceipts: false, sourceHistory: false });
     assert.equal(s.archive, null, 'archive status is Q3 — absent, not guessed');

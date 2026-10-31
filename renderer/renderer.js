@@ -5932,6 +5932,82 @@ async function selectSource({ type, path, label = null, driveObj = null }) {
   }
 }
 
+// ════════════════════════════════════════════════════════════════
+// COMPANION HANDOFF (AI-FEAT-061 Q2/Q4 — approved non-visual listener)
+// The menu-bar/tray companion's "Review" actions ask the workspace to open a
+// camera card, optionally with a set of files selected. Nothing new is drawn:
+// the card opens through selectSource() exactly as choosing it and pressing
+// Continue does, and the selection uses the same selectedFiles set the Select
+// All buttons use. Nothing is imported — event, grouping, metadata and Confirm
+// Event Import stay the operator's steps. Fails closed (refuses, changes
+// nothing) whenever the workspace is busy or already holds work in progress.
+// ════════════════════════════════════════════════════════════════
+const COMPANION_MAX_SELECT_PATHS = 50000;
+
+// The workspace's own blocking-overlay check first; then any other modal scrim. Scrims
+// stay in the DOM and show via an .open / .visible class (opacity + pointer-events), so
+// "open" is judged from the computed state, not presence.
+function _companionModalOpen() {
+  if (_isAnyBlockingOverlayOpen()) return true;
+  const candidates = document.querySelectorAll('[class*="overlay"], [class*="modal"], [id$="Overlay"], [id$="Modal"], [role="dialog"], [aria-modal="true"]');
+  return [...candidates].some(el => {
+    const cs = getComputedStyle(el);
+    return cs.position === 'fixed' && cs.display !== 'none' && cs.visibility !== 'hidden' &&
+      cs.pointerEvents !== 'none' && Number(cs.opacity) > 0.01 && el.getClientRects().length > 0;
+  });
+}
+
+async function _companionOpenSource(req) {
+  if (!req || req.type !== 'memory-card' || typeof req.path !== 'string' || !req.path) return { ok: false, reason: 'invalid' };
+  const label = typeof req.label === 'string' && req.label ? req.label : null;
+  const selectPaths = Array.isArray(req.selectPaths)
+    ? req.selectPaths.filter(p => typeof p === 'string').slice(0, COMPANION_MAX_SELECT_PATHS)
+    : null;
+
+  if (isShuttingDown || importRunning || isLoadingFiles || _qmzOpen || _companionModalOpen()) {
+    return { ok: false, reason: 'busy' };
+  }
+  // Never discard the operator's grouping/assignments, or a selection on another source.
+  if (ImportSession.hasAssignments()) return { ok: false, reason: 'workspace-in-use' };
+  const workspaceVisible = document.getElementById('workspace')?.classList.contains('visible');
+  const sameSourceOpen = workspaceVisible && activeSource?.path === req.path;
+  if (!sameSourceOpen && workspaceVisible && selectedFiles.size > 0) return { ok: false, reason: 'workspace-in-use' };
+
+  if (!sameSourceOpen) {
+    _setActiveSource({ type: 'memory-card', name: label || req.path, path: req.path });
+    await selectSource({ type: 'memory-card', path: req.path, label });
+    const opened = activeSource?.path === req.path && document.getElementById('workspace')?.classList.contains('visible');
+    if (!opened) return { ok: false, reason: 'open-failed' };
+  }
+
+  if (!selectPaths) return { ok: true, selected: 0 };
+  const wanted = new Set(selectPaths);
+  const paths = currentFiles.map(f => f.path).filter(p => wanted.has(p));
+  selectedFiles.clear();
+  _selectionAnchor = null;
+  paths.forEach(p => selectedFiles.add(p));
+  syncAllTiles();
+  requestThumbsForPaths(paths);
+  updateSelectionBar();
+  updateSteps();
+  return { ok: true, selected: paths.length };
+}
+
+function _registerCompanionHandoff() {
+  if (!window.api.onCompanionOpenSource) return;
+  window.api.onCompanionOpenSource(async (req) => {
+    let result;
+    try {
+      result = await _companionOpenSource(req);
+    } catch (err) {
+      console.error('[companion handoff] failed:', err);
+      result = { ok: false, reason: 'error' };
+    }
+    window.api.companionOpenSourceResult(req && req.requestId, result);
+  });
+  window.api.companionWorkspaceReady();
+}
+
 document.getElementById('changeDriveBtn').addEventListener('click', () => {
   hideSourceScanState();
   resetWorkspaceState();
@@ -13399,6 +13475,8 @@ async function initApp() {
   // first paint so the user sees the flat-list-only layout from the start.
   const sidebar = document.getElementById('sidebar');
   if (sidebar && viewModeType === 'media') sidebar.style.display = 'none';
+  // Last: the workspace is fully initialised, so the companion may hand off a card.
+  _registerCompanionHandoff();
 }
 
 // ════════════════════════════════════════════════════════════════

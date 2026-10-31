@@ -197,7 +197,7 @@ function spawnSecondInstance(userDataDir, marker) {
     check(st.heading === '1 card connected' && st.labels[0] === 'AI_Q1_TEST', `popup shows the card: ${JSON.stringify(st)}`);
     check(!st.emptyVisible && st.listVisible, 'card state: empty-state is NOT rendered, list is');
     check(!st.hasMainApi, 'popup has NO access to the main window API (window.api undefined)');
-    check(JSON.stringify(st.companionKeys) === JSON.stringify(['getSnapshot', 'hide', 'onSnapshot', 'openAutoIngest', 'quit']), `popup API is exactly the companion surface: ${st.companionKeys}`);
+    check(JSON.stringify(st.companionKeys) === JSON.stringify(['getSnapshot', 'hide', 'onSnapshot', 'openAutoIngest', 'quit', 'reviewEarlier', 'reviewSelected', 'selectDate']), `popup API is exactly the companion surface (Q1 + Q2 date assessment): ${st.companionKeys}`);
     check(!JSON.stringify(st).includes(cardRoot), 'no filesystem path reached the popup');
     await popup.screenshot({ path: path.join(shotDir, 'popup-one-card.png') });
 
@@ -312,7 +312,8 @@ function spawnSecondInstance(userDataDir, marker) {
         req('../services/windowRegistry').getMainWindow().close();
       }, MAIN_JS);
       await waitFor(async () => (await inMain.windows(app)).appWindowCount === 0, 8000);
-      d = await inMain.diag(app);
+      // window-all-closed (which releases the main-window consumer) fires just after the last 'closed'.
+      d = await waitFor(async () => { const x = await inMain.diag(app); return JSON.stringify(x.monitor.consumers) === JSON.stringify(['companion']) ? x : null; }, 8000) || await inMain.diag(app);
       check(JSON.stringify(d.monitor.consumers) === JSON.stringify(['companion']) && d.monitor.running, `after main-window close the poller keeps running for the companion only: ${JSON.stringify(d.monitor)}`);
       await inMain.setFakeDrives(app, [fakeDrive(cardA, 'AI_Q1_TEST', 64e9)]);
       d = await waitFor(async () => { const x = await inMain.diag(app); return x.snapshot.sources.length === 1 ? x : null; }, POLL_WAIT_MS);
