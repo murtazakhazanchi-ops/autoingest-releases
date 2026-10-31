@@ -28,7 +28,7 @@ const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, screen } = require
 const windowRegistry = require('./windowRegistry');
 const operatorActivity = require('./operatorActivity');
 const {
-  buildSnapshot, computePopupPosition, resolveTrayAnchor, createAutoOpenTracker, handoffMessage, localDateString,
+  buildSnapshot, computePopupPosition, resolveTrayAnchor, createAutoOpenTracker, handoffStatusText, localDateString,
   POPUP_WIDTH, POPUP_HEIGHT,
 } = require('./companionModel');
 const { createCardAssessor } = require('./cardAssessmentService');
@@ -48,7 +48,7 @@ const BLUR_TOGGLE_GUARD_MS = 300;
  * blur. If the operator does not interact with it, it hides itself after this long.
  */
 const AUTO_POPUP_DISMISS_MS = 15000;
-/** A refused Review handoff is explained in the popup for this long. */
+/** A finished Review handoff's outcome stays visible in the popup for this long. */
 const NOTICE_TTL_MS = 60000;
 const SOURCE_ID_RE = /^src-\d+$/;
 
@@ -78,8 +78,10 @@ let _assessor = null;
 let _handoff = null;
 /** sourceId -> the operator's chosen { date, untilTime }; absent = today. */
 const _selections = new Map();
-/** sourceId -> { reason, at } of the last refused Review handoff. */
-const _notices = new Map();
+/** sourceId -> the latest Review handoff operation for that card ({ state, reason, selected, at, ... }). */
+const _ops = new Map();
+/** True from a Review click until its handoff operation exists (blocks double clicks during the awaits). */
+let _reviewStarting = false;
 /** Popup windows currently inside a native show/focus call (see _nativeShow). */
 const _inNativeShow = new Set();
 
@@ -107,12 +109,15 @@ function _assessmentView(sourceId) {
   if (!_assessor) return null;
   const job = _assessor.get(sourceId);
   if (!job) return null;
-  const notice = _notices.get(sourceId);
+  const op = _ops.get(sourceId);
+  const showOp = op && (op.state === 'pending' || Date.now() - op.at < NOTICE_TTL_MS);
   const view = {
     state: job.state,
     progress: { done: job.done, total: job.total },
     error: job.error,
-    notice: notice && Date.now() - notice.at < NOTICE_TTL_MS ? handoffMessage(notice.reason) : null,
+    handoff: showOp ? { state: op.state, message: handoffStatusText(op), at: op.at } : null,
+    // One handoff at a time: while any is pending, every card's Review actions wait.
+    handoffPending: _reviewStarting || !!(_handoff && _handoff.getActive()),
     summary: null,
   };
   if (job.state === 'complete') {
@@ -317,46 +322,62 @@ function _selectDate(payload) {
   if (!view.summary.options.some(o => o.date === p.date)) return { ok: false, reason: 'invalid' };
   if (p.untilTime != null && !view.summary.afterMidnightOptions.includes(p.untilTime)) return { ok: false, reason: 'invalid' };
   _selections.set(p.sourceId, normalizeSelection({ date: p.date, untilTime: p.untilTime }, view.summary.today));
-  _notices.delete(p.sourceId);
+  if (_ops.get(p.sourceId) && _ops.get(p.sourceId).state !== 'pending') _ops.delete(p.sourceId);
   _pushSnapshot();
   return { ok: true };
+}
+
+function _recordOp(op) {
+  _ops.set(op.sourceId, { ...op, at: Date.now() });
+  _pushSnapshot();
 }
 
 /**
  * Review in the existing workspace. 'selected': open the card with the chosen date's
  * files selected; 'card': open the whole card (earlier files included), no selection.
+ * One handoff at a time: a click while one is pending (or still starting) is answered
+ * with the pending operation and starts nothing.
  * @param {unknown} payload  { sourceId } from the popup (untrusted)
  * @param {'selected'|'card'} mode
+ * @returns {Promise<object>} the operation's terminal state (or the pending one)
  */
 async function _review(payload, mode) {
   const p = payload && typeof payload === 'object' ? payload : {};
   if (Object.keys(p).some(k => k !== 'sourceId') || typeof p.sourceId !== 'string' || !SOURCE_ID_RE.test(p.sourceId)) {
-    return { ok: false, reason: 'invalid' };
+    return { state: 'refused', reason: 'invalid' };
   }
+  const active = _handoff && _handoff.getActive();
+  if (_reviewStarting || active) return active || { state: 'pending', reason: 'handoff-in-progress' };
   const { sourceId } = p;
   const refuse = (reason) => {
-    _notices.set(sourceId, { reason, at: Date.now() });
-    _pushSnapshot();
-    return { ok: false, reason };
+    const op = { sourceId, state: 'refused', reason, selected: 0 };
+    _recordOp(op);
+    return op;
   };
-  const card = _attachedCard(sourceId);
-  if (!card) return refuse('source-detached');
-  if (operatorActivity.isBusy()) return refuse('busy');
-  let selectPaths = null;
-  if (mode === 'selected') {
-    const job = _assessor ? await _assessor.verify(sourceId) : null;
-    if (!job || !_attachedCard(sourceId)) return refuse('assessment-unavailable');
-    selectPaths = filesForSelection(job.records, normalizeSelection(_selections.get(sourceId), localDateString(new Date())));
-    if (selectPaths.length === 0) return refuse('nothing-selected');
+  _reviewStarting = true;
+  _pushSnapshot();
+  let started;
+  try {
+    const card = _attachedCard(sourceId);
+    if (!card) return refuse('source-detached');
+    if (operatorActivity.isBusy()) return refuse('busy');
+    let selectPaths = null;
+    if (mode === 'selected') {
+      const job = _assessor ? await _assessor.verify(sourceId) : null;
+      if (!job || !_attachedCard(sourceId)) return refuse('assessment-unavailable');
+      selectPaths = filesForSelection(job.records, normalizeSelection(_selections.get(sourceId), localDateString(new Date())));
+      if (selectPaths.length === 0) return refuse('nothing-selected');
+    }
+    hidePopup(); // the main window is about to take focus
+    started = _handoff.openSource({ sourceId, mountpoint: card.mountpoint, label: card.label, selectPaths });
+  } finally {
+    _reviewStarting = false;
   }
-  _notices.delete(sourceId);
-  hidePopup(); // the main window is about to take focus
-  const result = await _handoff.openSource({ mountpoint: card.mountpoint, label: card.label, selectPaths });
-  if (!result.ok && _tray) {
-    _notices.set(sourceId, { reason: result.reason, at: Date.now() });
-    showPopup({ inactive: true }); // explain the refusal where the operator asked
-  }
-  return result;
+  _recordOp(started.operation);
+  const final = await started.done;
+  // Explain anything but success where the operator asked (the main window has focus).
+  if (final.state !== 'completed' && _tray && _attachedCard(sourceId)) showPopup({ inactive: true });
+  return final;
 }
 
 function _statMount(mountpoint) {
@@ -365,8 +386,12 @@ function _statMount(mountpoint) {
 
 function _onPoll(latest) {
   const ids = new Set(((latest && latest.cards) || []).map(c => c.sourceId));
-  for (const id of [..._selections.keys(), ..._notices.keys()]) {
-    if (!ids.has(id)) { _selections.delete(id); _notices.delete(id); }
+  for (const id of new Set([..._selections.keys(), ..._ops.keys()])) {
+    if (ids.has(id)) continue;
+    // A removed card ends any handoff still opening it; its state is forgotten.
+    if (_handoff) _handoff.cancelForSource(id, 'source-detached');
+    _selections.delete(id);
+    _ops.delete(id);
   }
   if (_assessor) _assessor.sync(latest && latest.cards);
   _pushSnapshot();
@@ -463,6 +488,7 @@ function init({ monitor, openApp, log }) {
     getMainWindow: () => windowRegistry.getMainWindow(),
     openApp: () => { if (_openApp) _openApp(); },
     isBusy: () => operatorActivity.isBusy(),
+    onChange: _recordOp,
     log: _log,
   });
   _handoff.register();
@@ -479,7 +505,8 @@ function shutdown() {
   if (_assessor) { _assessor.shutdown(); _assessor = null; }
   if (_handoff) { _handoff.unregister(); _handoff = null; }
   _selections.clear();
-  _notices.clear();
+  _ops.clear();
+  _reviewStarting = false;
   if (_monitor) { _monitor.release(MONITOR_CONSUMER); _monitor = null; }
   _unregisterIpc();
   if (_tray) {

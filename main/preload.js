@@ -453,10 +453,12 @@ contextBridge.exposeInMainWorld('api', {
 
   // ── Companion handoff (AI-FEAT-061 Q2/Q4 — approved non-visual listener) ──
   // Main asks the workspace to open a camera card (optionally with a file selection)
-  // after the menu-bar/tray companion's Review actions; the renderer answers once.
+  // after the menu-bar/tray companion's Review actions; the renderer acknowledges,
+  // sends a heartbeat while the card opens, then answers once.
   // Fire-and-forget sends: harmless when the companion is disabled.
   companionWorkspaceReady:    ()                   => ipcRenderer.send('companion:workspaceReady'),
   onCompanionOpenSource:      (cb)                 => _register('companion:openSource', (_e, req) => cb(req)),
+  companionOpenSourceProgress: (requestId)         => ipcRenderer.send('companion:openSourceProgress', { requestId }),
   companionOpenSourceResult:  (requestId, result)  => ipcRenderer.send('companion:openSourceResult', { requestId, result }),
 
 });

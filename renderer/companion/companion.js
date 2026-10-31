@@ -95,7 +95,7 @@
     return notes.join(' ');
   }
 
-  function renderSummary(row, sourceId, s) {
+  function renderSummary(row, sourceId, s, handoffPending) {
     const dateSelect = row.querySelector('.date-select');
     syncSelect(dateSelect, s.options.map(o => [o.date, optionLabel(o)]), s.selection.date);
     dateSelect.onchange = () => { api.selectDate(sourceId, dateSelect.value, s.selection.untilTime); };
@@ -131,10 +131,10 @@
     }
 
     const reviewSelected = row.querySelector('.review-selected');
-    reviewSelected.disabled = s.counts.selected === 0;
+    reviewSelected.disabled = handoffPending || s.counts.selected === 0;
     reviewSelected.onclick = () => { api.reviewSelected(sourceId); };
     const reviewEarlier = row.querySelector('.review-earlier');
-    reviewEarlier.disabled = s.counts.earlier + s.counts.later + s.counts.uncertain === 0;
+    reviewEarlier.disabled = handoffPending || s.counts.earlier + s.counts.later + s.counts.uncertain === 0;
     reviewEarlier.onclick = () => { api.reviewEarlier(sourceId); };
   }
 
@@ -155,9 +155,11 @@
     error.hidden = !(a && a.state === 'error');
     error.textContent = a && a.state === 'error' ? (a.error || 'The card could not be read.') : '';
     result.hidden = !(a && a.summary);
-    if (a && a.summary) renderSummary(row, src.sourceId, a.summary);
-    notice.hidden = !(a && a.notice);
-    notice.textContent = a && a.notice ? a.notice : '';
+    if (a && a.summary) renderSummary(row, src.sourceId, a.summary, !!a.handoffPending);
+    // Review handoff: pending / completed / refused / cancelled / failed, from main.
+    notice.hidden = !(a && a.handoff);
+    notice.textContent = a && a.handoff ? a.handoff.message : '';
+    notice.dataset.state = a && a.handoff ? a.handoff.state : '';
   }
 
   function rowFor(src) {

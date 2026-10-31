@@ -156,6 +156,9 @@ html, body {
   border-radius: var(--radius-btn);
   background: color-mix(in srgb, var(--warning) 10%, transparent);
 }
+.assess-notice[data-state="pending"] { color: var(--text-secondary); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.assess-notice[data-state="completed"] { color: var(--success); background: color-mix(in srgb, var(--success) 10%, transparent); }
+.assess-notice[data-state="failed"] { color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); }
 
 .assess-result { display: flex; flex-direction: column; gap: var(--space-2); }
 .field { display: flex; flex-direction: column; gap: 3px; }

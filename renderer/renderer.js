@@ -5943,18 +5943,33 @@ async function selectSource({ type, path, label = null, driveObj = null }) {
 // nothing) whenever the workspace is busy or already holds work in progress.
 // ════════════════════════════════════════════════════════════════
 const COMPANION_MAX_SELECT_PATHS = 50000;
+const COMPANION_HEARTBEAT_MS = 2000;
+let _companionHandoffRunning = false;
 
-// The workspace's own blocking-overlay check first; then any other modal scrim. Scrims
-// stay in the DOM and show via an .open / .visible class (opacity + pointer-events), so
-// "open" is judged from the computed state, not presence.
-function _companionModalOpen() {
-  if (_isAnyBlockingOverlayOpen()) return true;
+// Why the workspace cannot take a handoff right now (null = it can). The workspace's
+// own blocking-overlay check first; then any other modal scrim. Scrims stay in the DOM
+// and show via an .open / .visible class (opacity + pointer-events), so "open" is judged
+// from the computed state, not presence. The returned detail is for the log only.
+function _companionBusyReason() {
+  if (isShuttingDown) return 'ejecting';
+  if (importRunning) return 'import-running';
+  if (isLoadingFiles) return 'loading-files';
+  if (_qmzOpen) return 'qmz-open';
+  if (_isAnyBlockingOverlayOpen()) return 'blocking-overlay';
   const candidates = document.querySelectorAll('[class*="overlay"], [class*="modal"], [id$="Overlay"], [id$="Modal"], [role="dialog"], [aria-modal="true"]');
-  return [...candidates].some(el => {
+  const open = [...candidates].find(el => {
     const cs = getComputedStyle(el);
     return cs.position === 'fixed' && cs.display !== 'none' && cs.visibility !== 'hidden' &&
       cs.pointerEvents !== 'none' && Number(cs.opacity) > 0.01 && el.getClientRects().length > 0;
   });
+  return open ? `modal:${open.id || open.className}` : null;
+}
+
+// Every media file of the open source, whatever folder is showing. In card folder view
+// enterFolderView() narrows currentFiles to the visible folder but keeps selectedFiles,
+// so the selection may span folders; the whole card lives in currentFolderTree.
+function _companionSourceFiles() {
+  return (_folderNavMode === 'tree' && currentFolderTree) ? collectFilesRecursive(currentFolderTree) : currentFiles;
 }
 
 async function _companionOpenSource(req) {
@@ -5964,10 +5979,9 @@ async function _companionOpenSource(req) {
     ? req.selectPaths.filter(p => typeof p === 'string').slice(0, COMPANION_MAX_SELECT_PATHS)
     : null;
 
-  if (isShuttingDown || importRunning || isLoadingFiles || _qmzOpen || _companionModalOpen()) {
-    return { ok: false, reason: 'busy' };
-  }
-  // Never discard the operator's grouping/assignments, or a selection on another source.
+  const busy = _companionBusyReason();
+  if (busy) return { ok: false, reason: 'busy', detail: busy };
+  // Never discard the operator's grouping/assignments.
   if (ImportSession.hasAssignments()) return { ok: false, reason: 'workspace-in-use' };
   const workspaceVisible = document.getElementById('workspace')?.classList.contains('visible');
   const sameSourceOpen = workspaceVisible && activeSource?.path === req.path;
@@ -5982,8 +5996,13 @@ async function _companionOpenSource(req) {
 
   if (!selectPaths) return { ok: true, selected: 0 };
   const wanted = new Set(selectPaths);
-  const paths = currentFiles.map(f => f.path).filter(p => wanted.has(p));
-  selectedFiles.clear();
+  const paths = _companionSourceFiles().map(f => f.path).filter(p => wanted.has(p));
+  // An existing selection is the operator's work in progress: never replace it silently.
+  // (Asking again for exactly the same files is not a change.)
+  if (selectedFiles.size > 0) {
+    const same = selectedFiles.size === paths.length && paths.every(p => selectedFiles.has(p));
+    return same ? { ok: true, selected: paths.length } : { ok: false, reason: 'workspace-in-use' };
+  }
   _selectionAnchor = null;
   paths.forEach(p => selectedFiles.add(p));
   syncAllTiles();
@@ -5996,14 +6015,28 @@ async function _companionOpenSource(req) {
 function _registerCompanionHandoff() {
   if (!window.api.onCompanionOpenSource) return;
   window.api.onCompanionOpenSource(async (req) => {
+    const requestId = req && req.requestId;
+    // One handoff at a time, even if main ever sent a second request.
+    if (_companionHandoffRunning) {
+      window.api.companionOpenSourceResult(requestId, { ok: false, reason: 'handoff-in-progress' });
+      return;
+    }
+    _companionHandoffRunning = true;
+    // Acknowledge now and keep a heartbeat while the card is opening, so main can tell
+    // a slow scan (still pending) from a workspace that stopped responding.
+    window.api.companionOpenSourceProgress(requestId);
+    const heartbeat = setInterval(() => window.api.companionOpenSourceProgress(requestId), COMPANION_HEARTBEAT_MS);
     let result;
     try {
       result = await _companionOpenSource(req);
     } catch (err) {
       console.error('[companion handoff] failed:', err);
       result = { ok: false, reason: 'error' };
+    } finally {
+      clearInterval(heartbeat);
+      _companionHandoffRunning = false;
     }
-    window.api.companionOpenSourceResult(req && req.requestId, result);
+    window.api.companionOpenSourceResult(requestId, result);
   });
   window.api.companionWorkspaceReady();
 }

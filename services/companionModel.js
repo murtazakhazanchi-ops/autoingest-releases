@@ -153,11 +153,29 @@ const HANDOFF_MESSAGES = {
   'assessment-unavailable': 'The card is still being checked. Try again in a moment.',
   'nothing-selected': 'No files were captured on the selected date.',
   'handoff-in-progress': 'AutoIngest is already opening a card.',
+  'workspace-not-opened': 'AutoIngest was not opened, so the card was not handed over. Try again.',
+  'workspace-closed': 'The AutoIngest window closed before the card opened.',
+  'no-response': 'AutoIngest stopped responding while opening the card. Open AutoIngest and choose the card there.',
+  'open-failed': 'The workspace could not read the card.',
 };
 
-/** Operator-facing text for a refused Review handoff (main → popup; never a path). */
+/** Operator-facing text for a refused / cancelled / failed Review handoff (never a path). */
 function handoffMessage(reason) {
   return HANDOFF_MESSAGES[reason] || 'The workspace could not open the card. Open AutoIngest and choose the card there.';
+}
+
+/**
+ * Popup text for a Review handoff operation in any state.
+ * @param {{ state: string, phase?: string, reason?: string|null, selected?: number }} op
+ */
+function handoffStatusText(op) {
+  if (op.state === 'pending') {
+    return op.phase === 'waiting-for-workspace' ? 'Opening AutoIngest…' : 'Opening the card in AutoIngest…';
+  }
+  if (op.state === 'completed') {
+    return op.selected ? `Opened in AutoIngest with ${op.selected.toLocaleString()} ${op.selected === 1 ? 'file' : 'files'} selected.` : 'Opened in AutoIngest.';
+  }
+  return handoffMessage(op.reason);
 }
 
 module.exports = {
@@ -171,4 +189,5 @@ module.exports = {
   createAutoOpenTracker,
   localDateString,
   handoffMessage,
+  handoffStatusText,
 };

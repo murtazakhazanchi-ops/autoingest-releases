@@ -52,7 +52,7 @@ t('renderer.js: handoff listener is additions only and draws nothing', () => {
 t('main-window preload: only the companion handoff channels were added', () => {
   const lines = diffLines('main/preload.js');
   assert.deepEqual(lines.filter(l => l.startsWith('-')), [], 'no existing API removed or changed');
-  const allowed = new Set(['companion:openSource', 'companion:openSourceResult', 'companion:workspaceReady']);
+  const allowed = new Set(['companion:openSource', 'companion:openSourceProgress', 'companion:openSourceResult', 'companion:workspaceReady']);
   const channels = [...lines.join('\n').matchAll(/'([a-z-]+:[A-Za-z]+)'/g)].map(m => m[1]);
   assert.deepEqual(channels.filter(c => !allowed.has(c)), [], 'no other channel exposed to the main window');
 });

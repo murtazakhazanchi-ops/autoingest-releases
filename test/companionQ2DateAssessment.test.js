@@ -347,42 +347,134 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     return { ipcMain, wc, win };
   }
 
+  const ready = (ipcMain, wc) => ipcMain.emit('companion:workspaceReady', { sender: wc });
+  const progress = (ipcMain, wc, id) => ipcMain.emit('companion:openSourceProgress', { sender: wc }, { requestId: id });
+  const answer = (ipcMain, wc, id, result) => ipcMain.emit('companion:openSourceResult', { sender: wc }, { requestId: id, result });
+
   await t('handoff: refused while busy — the main window is not even focused', async () => {
     const { ipcMain, win } = fakeWorld();
     let opened = 0;
     const h = createWorkspaceHandoff({ ipcMain, getMainWindow: () => win, openApp: () => opened++, isBusy: () => true });
     h.register();
-    assert.deepEqual(await h.openSource({ mountpoint: '/V', label: 'X' }), { ok: false, reason: 'busy', selected: 0 });
+    const r = h.openSource({ sourceId: 'src-1', mountpoint: '/V', label: 'X' });
+    assert.equal(r.started, false);
+    assert.deepEqual([(await r.done).state, (await r.done).reason], ['refused', 'busy']);
     assert.equal(opened, 0);
+    assert.equal(h.getActive(), null);
   });
 
-  await t('handoff: waits for the workspace to be ready, sends one request, returns its answer', async () => {
+  await t('handoff: pending until ready; one request; completed with the exact selected count', async () => {
     const { ipcMain, wc, win } = fakeWorld();
-    const h = createWorkspaceHandoff({ ipcMain, getMainWindow: () => win, openApp: () => {}, isBusy: () => false });
+    const seen = [];
+    const h = createWorkspaceHandoff({ ipcMain, getMainWindow: () => win, openApp: () => {}, isBusy: () => false, onChange: (op) => seen.push(op.state) });
     h.register();
-    const p = h.openSource({ mountpoint: '/V', label: 'EOS', selectPaths: ['/V/a.JPG'] });
+    const r = h.openSource({ sourceId: 'src-1', mountpoint: '/V', label: 'EOS', selectPaths: ['/V/a.JPG'] });
+    assert.equal(r.started, true);
+    assert.equal(r.operation.state, 'pending');
     await sleep(150);
     assert.equal(wc.sent.length, 0, 'nothing sent before the renderer announced ready');
-    ipcMain.emit('companion:workspaceReady', { sender: wc });
+    ready(ipcMain, wc);
     await waitFor(() => wc.sent.length === 1);
     const [ch, msg] = wc.sent[0];
     assert.equal(ch, 'companion:openSource');
     assert.deepEqual({ ...msg, requestId: 0 }, { requestId: 0, type: 'memory-card', path: '/V', label: 'EOS', selectPaths: ['/V/a.JPG'] });
-    ipcMain.emit('companion:openSourceResult', { sender: { id: 99 } }, { requestId: msg.requestId, result: { ok: true, selected: 1 } }); // wrong sender ignored
-    ipcMain.emit('companion:openSourceResult', { sender: wc }, { requestId: msg.requestId, result: { ok: true, selected: 1 } });
-    assert.deepEqual(await p, { ok: true, reason: null, selected: 1 });
+    answer(ipcMain, { id: 99 }, msg.requestId, { ok: true, selected: 1 }); // another sender: ignored
+    assert.equal(h.getActive().state, 'pending');
+    answer(ipcMain, wc, msg.requestId, { ok: true, selected: 1 });
+    const done = await r.done;
+    assert.deepEqual([done.state, done.selected], ['completed', 1]);
+    assert.equal(seen[0], 'pending');
+    assert.equal(seen[seen.length - 1], 'completed');
   });
 
-  await t('handoff: no answer → timeout; a reload forgets readiness; one handoff at a time', async () => {
+  await t('handoff: a slow scan with heartbeats stays pending (no fixed overall timeout)', async () => {
     const { ipcMain, wc, win } = fakeWorld();
-    const h = createWorkspaceHandoff({ ipcMain, getMainWindow: () => win, openApp: () => {}, isBusy: () => false, resultTimeoutMs: 80, readyTimeoutMs: 200 });
+    const h = createWorkspaceHandoff({ ipcMain, getMainWindow: () => win, openApp: () => {}, isBusy: () => false, ackTimeoutMs: 60, heartbeatTimeoutMs: 80 });
     h.register();
-    ipcMain.emit('companion:workspaceReady', { sender: wc });
-    const first = h.openSource({ mountpoint: '/V', label: 'A' });
-    assert.equal((await h.openSource({ mountpoint: '/V', label: 'A' })).reason, 'handoff-in-progress');
-    assert.equal((await first).reason, 'timeout');
+    ready(ipcMain, wc);
+    const r = h.openSource({ sourceId: 'src-1', mountpoint: '/V', label: 'A' });
+    await waitFor(() => wc.sent.length === 1);
+    const id = wc.sent[0][1].requestId;
+    for (let i = 0; i < 8; i++) { progress(ipcMain, wc, id); await sleep(40); } // ~320 ms, 4× the silence limit
+    assert.equal(h.getActive() && h.getActive().state, 'pending', 'still pending while the workspace is working');
+    answer(ipcMain, wc, id, { ok: true, selected: 0 });
+    assert.equal((await r.done).state, 'completed');
+  });
+
+  await t('handoff: no acknowledgement, or heartbeat silence → failed (no-response)', async () => {
+    const { ipcMain, wc, win } = fakeWorld();
+    const h = createWorkspaceHandoff({ ipcMain, getMainWindow: () => win, openApp: () => {}, isBusy: () => false, ackTimeoutMs: 60, heartbeatTimeoutMs: 80 });
+    h.register();
+    ready(ipcMain, wc);
+    const a = h.openSource({ sourceId: 'src-1', mountpoint: '/V', label: 'A' });
+    assert.deepEqual([(await a.done).state, (await a.done).reason], ['failed', 'no-response']);
+    const b = h.openSource({ sourceId: 'src-1', mountpoint: '/V', label: 'A' });
+    await waitFor(() => wc.sent.length === 2);
+    progress(ipcMain, wc, wc.sent[1][1].requestId); // acknowledged, then silent
+    assert.deepEqual([(await b.done).state, (await b.done).reason], ['failed', 'no-response']);
+  });
+
+  await t('handoff: workspace refusal → refused; open failure → failed', async () => {
+    const { ipcMain, wc, win } = fakeWorld();
+    const h = createWorkspaceHandoff({ ipcMain, getMainWindow: () => win, openApp: () => {}, isBusy: () => false });
+    h.register();
+    ready(ipcMain, wc);
+    const a = h.openSource({ sourceId: 'src-1', mountpoint: '/V', label: 'A' });
+    await waitFor(() => wc.sent.length === 1);
+    answer(ipcMain, wc, wc.sent[0][1].requestId, { ok: false, reason: 'workspace-in-use' });
+    assert.deepEqual([(await a.done).state, (await a.done).reason], ['refused', 'workspace-in-use']);
+    const b = h.openSource({ sourceId: 'src-1', mountpoint: '/V', label: 'A' });
+    await waitFor(() => wc.sent.length === 2);
+    answer(ipcMain, wc, wc.sent[1][1].requestId, { ok: false, reason: 'open-failed' });
+    assert.deepEqual([(await b.done).state, (await b.done).reason], ['failed', 'open-failed']);
+  });
+
+  await t('handoff: card removed while opening → cancelled; the late answer is ignored', async () => {
+    const { ipcMain, wc, win } = fakeWorld();
+    const h = createWorkspaceHandoff({ ipcMain, getMainWindow: () => win, openApp: () => {}, isBusy: () => false });
+    h.register();
+    ready(ipcMain, wc);
+    const r = h.openSource({ sourceId: 'src-7', mountpoint: '/V', label: 'A' });
+    await waitFor(() => wc.sent.length === 1);
+    h.cancelForSource('src-6', 'source-detached'); // another card: no effect
+    assert.equal(h.getActive().state, 'pending');
+    h.cancelForSource('src-7', 'source-detached');
+    assert.deepEqual([(await r.done).state, (await r.done).reason], ['cancelled', 'source-detached']);
+    answer(ipcMain, wc, wc.sent[0][1].requestId, { ok: true, selected: 3 });
+    assert.equal((await r.done).state, 'cancelled', 'terminal state never changes');
+    assert.equal(h.getActive(), null);
+  });
+
+  await t('handoff: window closed / reloaded while opening → cancelled; AutoIngest never opened → cancelled', async () => {
+    const { ipcMain, wc, win } = fakeWorld();
+    const h = createWorkspaceHandoff({ ipcMain, getMainWindow: () => win, openApp: () => {}, isBusy: () => false, readyTimeoutMs: 150 });
+    h.register();
+    ready(ipcMain, wc);
+    const a = h.openSource({ sourceId: 'src-1', mountpoint: '/V', label: 'A' });
+    await waitFor(() => wc.sent.length === 1);
     wc.emit('did-start-loading');
-    assert.equal((await h.openSource({ mountpoint: '/V', label: 'A' })).reason, 'workspace-unavailable');
+    assert.deepEqual([(await a.done).state, (await a.done).reason], ['cancelled', 'workspace-closed']);
+    const b = h.openSource({ sourceId: 'src-1', mountpoint: '/V', label: 'A' }); // readiness was forgotten
+    assert.deepEqual([(await b.done).state, (await b.done).reason], ['cancelled', 'workspace-not-opened']);
+  });
+
+  await t('handoff: one operation at a time — a repeated click starts nothing', async () => {
+    const { ipcMain, wc, win } = fakeWorld();
+    let opened = 0;
+    const h = createWorkspaceHandoff({ ipcMain, getMainWindow: () => win, openApp: () => opened++, isBusy: () => false });
+    h.register();
+    ready(ipcMain, wc);
+    const a = h.openSource({ sourceId: 'src-1', mountpoint: '/V', label: 'A' });
+    const b = h.openSource({ sourceId: 'src-1', mountpoint: '/V', label: 'A' });
+    const c = h.openSource({ sourceId: 'src-2', mountpoint: '/W', label: 'B' });
+    assert.deepEqual([a.started, b.started, c.started], [true, false, false]);
+    assert.equal(b.operation.id, a.operation.id, 'the pending operation is reported, not a new one');
+    await waitFor(() => wc.sent.length === 1);
+    await sleep(50);
+    assert.equal(wc.sent.length, 1, 'exactly one request sent');
+    assert.equal(opened, 1);
+    answer(ipcMain, wc, wc.sent[0][1].requestId, { ok: true, selected: 0 });
+    await a.done;
     h.unregister();
   });
 
