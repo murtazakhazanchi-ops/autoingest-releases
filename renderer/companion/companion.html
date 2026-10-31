@@ -53,6 +53,8 @@
 
       <!-- Q2: capture-date assessment. Every value below comes from main's snapshot. -->
       <div class="assessment">
+        <!-- Review handoff outcome first, so a refusal is visible without scrolling. -->
+        <p class="assess-notice" role="status" aria-live="polite" hidden></p>
         <div class="assess-progress" role="status">
           <span class="progress-text"></span>
           <div class="progress-track" aria-hidden="true"><div class="progress-bar"></div></div>
@@ -87,7 +89,6 @@
             <select class="midnight-select"></select>
           </label>
         </div>
-        <p class="assess-notice" role="status" aria-live="polite" hidden></p>
       </div>
     </li>
   </template>
