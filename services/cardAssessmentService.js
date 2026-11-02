@@ -1,6 +1,7 @@
 /**
- * cardAssessmentService.js — background capture-date assessment of connected camera
- * cards (AI-FEAT-061 Q2). Read-only: it lists media and reads metadata, nothing else.
+ * cardAssessmentService.js — background capture-date (Q2) and camera-identity (Q3)
+ * assessment of connected camera cards (AI-FEAT-061). Read-only: it lists media and
+ * reads metadata, nothing else.
  *
  * One job per card attachment (the sourceMonitorService sourceId):
  *   - a card stays assessed while it stays attached; repeated polls never rescan it;
@@ -14,6 +15,13 @@
  * reads pause while an import, sync, transfer or checksum is running. The main thread
  * only walks directories asynchronously and interprets small tag objects.
  *
+ * Two phases per card (Q3):
+ *   1. reading     — one read per file gives both capture date and identity tags;
+ *   2. identifying — photos read by exifr whose maker keeps body identifiers in maker
+ *      notes get one ExifTool identity read, unless their reliable RAW/JPEG partner
+ *      already identified the body (the pair inherits it instead).
+ * Then files are grouped by camera (cameraAssessmentModel). Identifiers stay in main.
+ *
  * Electron-free; every side effect is injected (unit-testable without a card).
  */
 
@@ -21,6 +29,8 @@
 
 const { captureEvidence } = require('./captureDateEvidence');
 const { resolvePairs } = require('./dateAssessmentModel');
+const { fileIdentity, needsMakerNoteRead } = require('./cameraIdentityEvidence');
+const { assessCameras } = require('./cameraAssessmentModel');
 
 const DEFAULT_CONCURRENCY = 3;
 const PAUSE_POLL_MS = 500;
@@ -33,14 +43,16 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
  * @param {object} deps
  * @param {(mountpoint: string) => Promise<Array<{path: string, name: string, type: string, size: number}>>} deps.listMedia
  *   the workspace's own discovery rules (fileBrowser.scanMediaRecursive)
- * @param {(filePath: string, type: string) => Promise<object>} deps.readTags  captureDateReader.readCaptureTags
+ * @param {(filePath: string, type: string) => Promise<object>} deps.readTags  captureDateReader.readCaptureMetadata
+ *   ({ tags, id, makerNotesRead }); a plain date-tag object is also accepted (no identity)
+ * @param {(filePath: string) => Promise<object>} [deps.readIdentity]  captureDateReader.readIdentityTags
  * @param {(mountpoint: string) => Promise<{dev: number, ino: number}|null>} deps.statMount
  * @param {() => boolean} [deps.isPaused]
  * @param {() => void} [deps.onChange]  progress/state changed (throttled)
  * @param {(msg: string) => void} [deps.log]
  * @param {number} [deps.concurrency]
  */
-function createCardAssessor({ listMedia, readTags, statMount, isPaused = () => false, onChange = () => {}, log = () => {}, concurrency = DEFAULT_CONCURRENCY }) {
+function createCardAssessor({ listMedia, readTags, readIdentity = null, statMount, isPaused = () => false, onChange = () => {}, log = () => {}, concurrency = DEFAULT_CONCURRENCY }) {
   /** @type {Map<string, object>} sourceId -> job */
   const _jobs = new Map();
   const _queue = [];
@@ -49,6 +61,7 @@ function createCardAssessor({ listMedia, readTags, statMount, isPaused = () => f
   let _lastEmit = 0;
   let _emitTimer = null;
   let _jobsStarted = 0;
+  let _identityReads = 0;
 
   function _emit(force = false) {
     if (_stopped) return;
@@ -66,6 +79,7 @@ function createCardAssessor({ listMedia, readTags, statMount, isPaused = () => f
     return {
       sourceId: card.sourceId, mountpoint: card.mountpoint, label: card.label,
       identity: null, state: 'pending', done: 0, total: 0, records: null, error: null,
+      idDone: 0, idTotal: 0, cameras: null, datesReady: false,
       cancelled: false, startedAt: null, finishedAt: null,
     };
   }
@@ -84,28 +98,51 @@ function createCardAssessor({ listMedia, readTags, statMount, isPaused = () => f
     log(`[assessment] ${job.sourceId} cancelled (${why})`);
   }
 
-  async function _readOne(job, file) {
+  /** Retries a read briefly (the shared pool is restarted when the main window closes). */
+  async function _withRetry(job, file, fn) {
     for (let attempt = 0; ; attempt++) {
       if (job.cancelled) return null;
       try {
-        return captureEvidence(await readTags(file.path, file.type), file.type);
+        return await fn();
       } catch (err) {
-        // The shared pool is restarted when the main window closes; retry briefly.
         if (attempt >= READ_RETRY_DELAYS_MS.length) {
           log(`[assessment] read failed ${file.name}: ${err && err.message}`);
-          return captureEvidence(null, file.type);
+          return undefined;
         }
         await sleep(READ_RETRY_DELAYS_MS[attempt]);
       }
     }
   }
 
+  async function _readOne(job, file) {
+    const res = await _withRetry(job, file, () => readTags(file.path, file.type));
+    if (res === null) return null; // cancelled
+    if (res === undefined) return { evidence: captureEvidence(null, file.type), id: null, makerNotesRead: true };
+    const meta = res && typeof res === 'object' && 'tags' in res && 'id' in res ? res : { tags: res, id: null, makerNotesRead: true };
+    return { evidence: captureEvidence(meta.tags, file.type), id: meta.id, makerNotesRead: meta.makerNotesRead !== false };
+  }
+
   async function _waitWhilePaused(job) {
+    let resumeTo = null;
     while (!job.cancelled && isPaused()) {
-      if (job.state !== 'paused') { job.state = 'paused'; _emit(true); }
+      if (job.state !== 'paused') { resumeTo = job.state; job.state = 'paused'; _emit(true); }
       await sleep(PAUSE_POLL_MS);
     }
-    if (!job.cancelled && job.state === 'paused') { job.state = 'reading'; _emit(true); }
+    if (!job.cancelled && job.state === 'paused') { job.state = resumeTo || 'reading'; _emit(true); }
+  }
+
+  /** Runs fn over items with `concurrency` workers, honouring pause and cancellation. */
+  async function _bounded(job, items, fn) {
+    let next = 0;
+    const worker = async () => {
+      while (!job.cancelled) {
+        await _waitWhilePaused(job);
+        const i = next++;
+        if (i >= items.length || job.cancelled) return;
+        await fn(items[i]);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.max(1, Math.min(concurrency, items.length)) }, worker));
   }
 
   async function _run(job) {
@@ -121,26 +158,51 @@ function createCardAssessor({ listMedia, readTags, statMount, isPaused = () => f
     job.state = 'reading';
     _emit(true);
 
-    const evidence = new Array(files.length);
-    let next = 0;
-    const worker = async () => {
-      while (!job.cancelled) {
-        await _waitWhilePaused(job);
-        const i = next++;
-        if (i >= files.length || job.cancelled) return;
-        evidence[i] = await _readOne(job, files[i]);
-        job.done++;
-        _emit();
-      }
-    };
-    await Promise.all(Array.from({ length: Math.max(1, Math.min(concurrency, files.length)) }, worker));
+    const reads = new Array(files.length);
+    await _bounded(job, files.map((f, i) => i), async (i) => {
+      reads[i] = await _readOne(job, files[i]);
+      job.done++;
+      _emit();
+    });
     if (job.cancelled) return;
+
+    // Q2 date classification and RAW/JPEG pairing (unchanged). Dates are final now, so they
+    // are published before camera identification — but never from a partial listing.
+    const mid = await statMount(job.mountpoint);
+    if (!mid || mid.dev !== job.identity.dev || mid.ino !== job.identity.ino) throw new Error('card removed during assessment');
+    const dated = resolvePairs(files.map((f, i) => ({ path: f.path, name: f.name, type: f.type, size: f.size, evidence: reads[i].evidence })));
+    job.records = dated;
+    job.datesReady = true;
+    _emit(true);
+
+    const ids = reads.map(r => r.id || {});
+    const level = (i) => fileIdentity(ids[i]).level;
+    const partnerIdentified = new Map();
+    dated.forEach((r, i) => {
+      if (r.pairKey && r.evidence.reason !== 'pair-inconsistent' && level(i) === 'body') partnerIdentified.set(r.pairKey, true);
+    });
+    const followUp = readIdentity ? dated.map((r, i) => i).filter(i =>
+      needsMakerNoteRead(fileIdentity(ids[i]), reads[i].makerNotesRead) && !partnerIdentified.get(dated[i].pairKey)) : [];
+    if (followUp.length) {
+      job.idTotal = followUp.length;
+      job.state = 'identifying';
+      _emit(true);
+      await _bounded(job, followUp, async (i) => {
+        const extra = await _withRetry(job, files[i], () => readIdentity(files[i].path));
+        if (extra) ids[i] = { ...ids[i], ...extra }; // a failed read keeps what exifr found; never invented
+        _identityReads++;
+        job.idDone++;
+        _emit();
+      });
+      if (job.cancelled) return;
+    }
 
     // A card pulled mid-scan leaves a partial listing; never present that as a result.
     const after = await statMount(job.mountpoint);
     if (!after || after.dev !== job.identity.dev || after.ino !== job.identity.ino) throw new Error('card removed during assessment');
 
-    job.records = resolvePairs(files.map((f, i) => ({ path: f.path, name: f.name, type: f.type, size: f.size, evidence: evidence[i] })));
+    job.records = dated.map((r, i) => ({ ...r, identity: fileIdentity(ids[i]) }));
+    job.cameras = assessCameras(job.records);
     job.state = 'complete';
     job.finishedAt = Date.now();
     log(`[assessment] ${job.sourceId} complete: ${files.length} file(s) in ${job.finishedAt - job.startedAt} ms`);
@@ -206,10 +268,10 @@ function createCardAssessor({ listMedia, readTags, statMount, isPaused = () => f
   /** @returns {object|null} the job for an attached card (records are main-only data) */
   function get(sourceId) { return _jobs.get(sourceId) || null; }
 
-  /** Confirms the job is complete and its volume is still the one that was assessed. */
+  /** Confirms the job's dates are final and its volume is still the one that was assessed. */
   async function verify(sourceId) {
     const job = _jobs.get(sourceId);
-    if (!job || job.state !== 'complete') return null;
+    if (!job || !job.datesReady) return null; // dates are final before camera identification ends
     const now = await statMount(job.mountpoint);
     if (!now || now.dev !== job.identity.dev || now.ino !== job.identity.ino) return null;
     return _jobs.get(sourceId) === job ? job : null;
@@ -226,10 +288,11 @@ function createCardAssessor({ listMedia, readTags, statMount, isPaused = () => f
   function getDiagnostics() {
     return {
       jobsStarted: _jobsStarted,
+      identityReads: _identityReads,
       running: _running ? _running.sourceId : null,
       queued: _queue.map(j => j.sourceId),
       jobs: [..._jobs.values()].map(j => ({
-        sourceId: j.sourceId, state: j.state, done: j.done, total: j.total,
+        sourceId: j.sourceId, state: j.state, done: j.done, total: j.total, idDone: j.idDone, idTotal: j.idTotal,
         durationMs: j.finishedAt && j.startedAt ? j.finishedAt - j.startedAt : null,
       })),
     };

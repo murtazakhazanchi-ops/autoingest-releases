@@ -12,8 +12,8 @@
 const SNAPSHOT_SCHEMA_VERSION = 2;
 
 const POPUP_WIDTH = 340;
-/** Tall enough for one card's date assessment; several cards scroll inside the list. */
-const POPUP_HEIGHT = 520;
+/** Tall enough for one card's cameras and date assessment; several cards scroll inside the list. */
+const POPUP_HEIGHT = 600;
 /** Gap between the tray icon and the popup edge. */
 const POPUP_MARGIN = 6;
 

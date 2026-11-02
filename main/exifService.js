@@ -809,6 +809,21 @@ function readFileTags(filePath) {
 }
 
 /**
+ * Reads only the named tags, keyed by family-1 group ("ExifIFD:SerialNumber",
+ * "Sony:InternalSerialNumber", …) with duplicates from every group kept (-a), as the
+ * original text ExifTool printed. Read-only; same shared process pool and the same
+ * `-fast` read as readFileTags (which still finds QuickTime dates after the media data).
+ * Used by the companion card assessment (AI-FEAT-061 Q2/Q3), where the group says
+ * which metadata block supplied each value.
+ * @param {string} filePath
+ * @param {string[]} tagNames  bare tag names, e.g. ['Make', 'SerialNumber']
+ * @returns {Promise<Record<string, unknown>>}
+ */
+function readGroupedTags(filePath, tagNames) {
+  return _getExifTool().readRaw(_normalizeArchivePath(filePath), ['-fast', '-G1', '-a', ...tagNames.map(t => `-${t}`)]);
+}
+
+/**
  * Resume-only entry point: writes a single previously-frozen expectation (from a
  * manifest recovered by metadataQueueRecovery.js) without re-resolving it. The
  * caller is responsible for the safety comparison against a fresh resolve (plan
@@ -853,7 +868,7 @@ function classifyForVerification(destPath) {
 }
 
 module.exports = {
-  applyBatch, retryFailed, getBatchStatus, shutdown, readFileTags, resumeFrozenFile,
+  applyBatch, retryFailed, getBatchStatus, shutdown, readFileTags, readGroupedTags, resumeFrozenFile,
   classifyForVerification, compareReadback: _compareReadback, buildEvidence: _buildEvidence,
   RAW_EXTENSIONS, VIDEO_EXTENSIONS,
   // Test-only: exposes the tag builder so test/fieldSpecsConsistency.test.js can

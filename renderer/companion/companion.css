@@ -141,6 +141,19 @@ html, body {
 .card-disambiguator:not(:empty)::before { content: '·'; margin: 0 5px 0 1px; }
 .card-disambiguator { color: var(--text-muted); }
 
+/* Cameras (Q3) ----------------------------------------------------------------- */
+.cameras { display: flex; flex-direction: column; gap: 3px; padding-bottom: var(--space-1); border-bottom: 1px solid var(--border); }
+.cameras-heading { margin: 0; font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.camera-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.camera-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: baseline; gap: 6px; font-size: 12px; }
+.camera-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.camera-count { color: var(--text-secondary); font-variant-numeric: tabular-nums; font-size: 11px; }
+.camera-badge { font-size: 10px; padding: 1px 5px; border-radius: 4px; white-space: nowrap; color: var(--text-secondary); background: color-mix(in srgb, var(--text) 6%, transparent); }
+.camera-row[data-status="body-identified"] .camera-badge { color: var(--success); background: color-mix(in srgb, var(--success) 12%, transparent); }
+.camera-row[data-status="conflict"] .camera-name, .camera-row[data-status="conflict"] .camera-badge { color: var(--warning); }
+.camera-row[data-status="unknown"] .camera-name { color: var(--text-secondary); }
+.cameras-more { align-self: flex-start; font-size: 11px; }
+
 /* Date assessment (Q2) ------------------------------------------------------- */
 .assessment { display: flex; flex-direction: column; gap: var(--space-2); }
 .assessment p { margin: 0; }

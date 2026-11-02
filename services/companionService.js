@@ -10,7 +10,9 @@
  *   - the automatic popup when a camera card is newly connected (see _maybeAutoOpen),
  *   - Q2: the read-only capture-date assessment of each connected card
  *     (cardAssessmentService), the operator's chosen shoot date per card, and the
- *     "Review" handoffs into the existing workspace (workspaceHandoff).
+ *     "Review" handoffs into the existing workspace (workspaceHandoff),
+ *   - Q3: the camera summary of each card (which cameras, how many files, whether each
+ *     body is identified). It never assigns a photographer and stores nothing.
  *
  * It never copies or writes anything, and never starts an import. Card data comes
  * from the single shared poller (sourceMonitorService) as a 'companion' consumer; the
@@ -22,6 +24,7 @@
 
 'use strict';
 
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, screen } = require('electron');
@@ -33,6 +36,7 @@ const {
 } = require('./companionModel');
 const { createCardAssessor } = require('./cardAssessmentService');
 const { summarize, filesForSelection, normalizeSelection } = require('./dateAssessmentModel');
+const { summarizeCameras } = require('./cameraAssessmentModel');
 const { createWorkspaceHandoff } = require('./workspaceHandoff');
 
 const MONITOR_CONSUMER = 'companion';
@@ -76,6 +80,13 @@ let _autoOpenCount = 0;
 let _autoOpenSuppressedCount = 0;
 let _assessor = null;
 let _handoff = null;
+/**
+ * Camera keys in the popup are HMACs under a secret that lives only for this process:
+ * they let the popup tell cameras apart, reveal nothing about serials, and are useless
+ * outside this run — never a registry identity (AI-FEAT-063 defines that, Q4+).
+ */
+const _sessionKeySecret = crypto.randomBytes(32);
+const _cameraKey = (ref) => crypto.createHmac('sha256', _sessionKeySecret).update(ref).digest('hex').slice(0, 16);
 /** sourceId -> the operator's chosen { date, untilTime }; absent = today. */
 const _selections = new Map();
 /** sourceId -> the latest Review handoff operation for that card ({ state, reason, selected, at, ... }). */
@@ -114,14 +125,23 @@ function _assessmentView(sourceId) {
   const view = {
     state: job.state,
     progress: { done: job.done, total: job.total },
+    identifyProgress: { done: job.idDone, total: job.idTotal },
     error: job.error,
     handoff: showOp ? { state: op.state, message: handoffStatusText(op), at: op.at } : null,
     // One handoff at a time: while any is pending, every card's Review actions wait.
     handoffPending: _reviewStarting || !!(_handoff && _handoff.getActive()),
     summary: null,
+    cameras: null,
   };
-  if (job.state === 'complete') {
+  if (job.datesReady) {
+    // Dates are final before camera identification finishes (Q3 phase 2).
     view.summary = summarize(job.records, { today: localDateString(new Date()), selection: _selections.get(sourceId) });
+  }
+  if (job.state === 'complete') {
+    if (job.cameras) {
+      if (!job.cameraSummary) job.cameraSummary = summarizeCameras(job.records, job.cameras, _cameraKey);
+      view.cameras = job.cameraSummary; // names, counts, opaque keys — never identifiers
+    }
   }
   return view;
 }
@@ -476,7 +496,9 @@ function init({ monitor, openApp, log }) {
   _assessor = createCardAssessor({
     // The workspace's own discovery rules; exifr / the shared ExifTool pool (read-only).
     listMedia: (mountpoint) => require('../main/fileBrowser').scanMediaRecursive(mountpoint),
-    readTags: (filePath, type) => require('./captureDateReader').readCaptureTags(filePath, type),
+    // One read per file for date + camera identity; maker-note follow-up only when needed.
+    readTags: (filePath, type) => require('./captureDateReader').readCaptureMetadata(filePath, type),
+    readIdentity: (filePath) => require('./captureDateReader').readIdentityTags(filePath),
     statMount: _statMount,
     // Never compete with an import/sync/transfer/checksum for disk or ExifTool.
     isPaused: () => operatorActivity.activeKinds().some(k => k !== 'dialog'),

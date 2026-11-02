@@ -19,6 +19,9 @@
   const rowTemplate = document.getElementById('card-row');
   /** @type {Map<string, HTMLElement>} */
   const rows = new Map();
+  /** sourceIds whose camera list the operator expanded (presentation only). */
+  const expandedCameras = new Set();
+  const CAMERAS_SHOWN = 3;
 
   const dateFormat = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
   const UNCERTAIN_REASONS = {
@@ -47,6 +50,7 @@
       case 'pending': return 'Waiting to check capture dates…';
       case 'scanning': return 'Finding photos and videos…';
       case 'reading': return `Reading capture dates… ${a.progress.done.toLocaleString()} of ${a.progress.total.toLocaleString()}`;
+      case 'identifying': return `Identifying cameras… ${a.identifyProgress.done.toLocaleString()} of ${a.identifyProgress.total.toLocaleString()}`;
       case 'paused': return `Paused while AutoIngest is importing… ${a.progress.done.toLocaleString()} of ${a.progress.total.toLocaleString()}`;
       default: return '';
     }
@@ -138,6 +142,61 @@
     reviewEarlier.onclick = () => { api.reviewEarlier(sourceId); };
   }
 
+  function cameraRow({ name, count, badge, status }) {
+    const li = document.createElement('li');
+    li.className = 'camera-row';
+    li.dataset.status = status;
+    const n = document.createElement('span');
+    n.className = 'camera-name';
+    n.textContent = name;
+    n.title = name;
+    const c = document.createElement('span');
+    c.className = 'camera-count';
+    c.textContent = status === 'pending' ? '' : plural(count, 'file');
+    li.append(n, c);
+    if (badge) {
+      const b = document.createElement('span');
+      b.className = 'camera-badge';
+      b.textContent = badge;
+      li.append(b);
+    }
+    return li;
+  }
+
+  /** Q3: cameras on the card — names, counts and body status from main; never serials. */
+  function renderCameras(row, sourceId, cams, identifying) {
+    const box = row.querySelector('.cameras');
+    box.hidden = !cams && !identifying;
+    if (!cams) {
+      if (identifying) {
+        row.querySelector('.cameras-heading').textContent = 'Cameras';
+        row.querySelector('.camera-list').replaceChildren(cameraRow({ name: 'Identifying cameras…', count: 0, badge: null, status: 'pending' }));
+        row.querySelector('.cameras-more').hidden = true;
+      }
+      return;
+    }
+    const items = cams.cameras.map(c => ({
+      name: c.bodyLabel ? `${c.display} · Body ${c.bodyLabel}` : c.display,
+      count: c.files,
+      badge: c.status === 'body-identified' ? 'Body identified' : 'Body not identified',
+      status: c.status,
+    }));
+    if (cams.unknownFiles) items.push({ name: 'Unknown camera', count: cams.unknownFiles, badge: null, status: 'unknown' });
+    if (cams.conflictFiles) items.push({ name: 'Conflicting camera information', count: cams.conflictFiles, badge: 'Not assigned', status: 'conflict' });
+    const heading = row.querySelector('.cameras-heading');
+    heading.textContent = cams.cameras.length === 1 ? 'Camera' : `Cameras (${cams.cameras.length})`;
+    const expanded = expandedCameras.has(sourceId);
+    const visible = expanded ? items : items.slice(0, CAMERAS_SHOWN);
+    row.querySelector('.camera-list').replaceChildren(...visible.map(cameraRow));
+    const more = row.querySelector('.cameras-more');
+    more.hidden = items.length <= CAMERAS_SHOWN;
+    more.textContent = expanded ? 'Show fewer' : `+${items.length - CAMERAS_SHOWN} more`;
+    more.onclick = () => {
+      if (expandedCameras.has(sourceId)) expandedCameras.delete(sourceId); else expandedCameras.add(sourceId);
+      renderCameras(row, sourceId, cams);
+    };
+  }
+
   function renderAssessment(row, src) {
     const a = src.assessment;
     const progress = row.querySelector('.assess-progress');
@@ -145,16 +204,18 @@
     const error = row.querySelector('.assess-error');
     const notice = row.querySelector('.assess-notice');
 
-    const working = !a || ['pending', 'scanning', 'reading', 'paused'].includes(a.state);
+    const working = !a || ['pending', 'scanning', 'reading', 'identifying', 'paused'].includes(a.state);
     progress.hidden = !working;
     if (working) {
       row.querySelector('.progress-text').textContent = a ? progressText(a) : 'Waiting to check capture dates…';
-      const pct = a && a.progress.total ? Math.round((a.progress.done / a.progress.total) * 100) : 0;
+      const p = a && a.state === 'identifying' ? a.identifyProgress : a && a.progress;
+      const pct = p && p.total ? Math.round((p.done / p.total) * 100) : 0;
       row.querySelector('.progress-bar').style.width = `${pct}%`;
     }
     error.hidden = !(a && a.state === 'error');
     error.textContent = a && a.state === 'error' ? (a.error || 'The card could not be read.') : '';
     result.hidden = !(a && a.summary);
+    renderCameras(row, src.sourceId, a && a.cameras, !!(a && a.summary && a.state === 'identifying'));
     if (a && a.summary) renderSummary(row, src.sourceId, a.summary, !!a.handoffPending);
     // Review handoff: pending / completed / refused / cancelled / failed, from main.
     notice.hidden = !(a && a.handoff);
@@ -184,7 +245,7 @@
 
     const live = new Set(sources.map(s => s.sourceId));
     for (const [id, row] of rows) {
-      if (!live.has(id)) { row.remove(); rows.delete(id); }
+      if (!live.has(id)) { row.remove(); rows.delete(id); expandedCameras.delete(id); }
     }
     const ordered = sources.map(rowFor);
     // Re-append only when the order actually changed, keeping focus inside a row.
