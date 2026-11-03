@@ -49,7 +49,7 @@ function fakeSecureStorage(over = {}) {
 }
 
 /** A computer: its own userData dir, a fake keychain and a learning service over a real store. */
-function computer({ computerId = 'comp-q4c-A', dir = path.join(ROOT, `ud-${++dirN}`, 'identity-registry'), enabled = true, secureStorage = fakeSecureStorage(), evidenceDelayMs = 0, clock } = {}) {
+function computer({ computerId = 'comp-q4c-A', dir = path.join(ROOT, `ud-${++dirN}`, 'identity-registry'), enabled = true, secureStorage = fakeSecureStorage(), evidenceDelayMs = 0, clock, maxQueue } = {}) {
   let evidence = null; // set per import
   let store = null;
   const c = {
@@ -67,6 +67,7 @@ function computer({ computerId = 'comp-q4c-A', dir = path.join(ROOT, `ud-${++dir
         return typeof evidence === 'function' ? evidence() : evidence;
       },
       now: clock || (() => new Date()),
+      ...(maxQueue ? { maxQueue } : {}),
     }),
   };
   return c;
@@ -290,6 +291,34 @@ const pid = (name) => (SHIPPED.includes(name) ? P.shippedPhotographerId(name) : 
     const swept = JSON.parse(fs.readFileSync(jf, 'utf8')).entries.find(e => e.runId === 'crashed-run');
     assert.deepEqual([swept.status, swept.reason], ['interrupted', 'app-closed-before-learning-finished']);
     await next.store().close();
+  });
+  await t('jobs still waiting at quit are journaled when accepted and reported as interrupted next run', async () => {
+    const c = computer({ evidenceDelayMs: 5000 });
+    c.setEvidence(ev([[T.canonA]]));
+    const keys = [1, 2, 3].map(() => { const id = `entry-${++entryN}`; assert.equal(commit(c, 'Local Q4c Alpha', 1, { entryIds: [id] }), 'queued'); return learningKey('comp-q4c-A', [id]); });
+    await new Promise(r => setTimeout(r, 150));
+    c.svc.shutdown();
+    await c.svc.whenIdle();
+    c.store().releaseLockSync();
+    const jf = path.join(c.dir, 'learning-journal.json');
+    const statusOf = () => { const e = JSON.parse(fs.readFileSync(jf, 'utf8')).entries; return keys.map(k => e.filter(x => x.key === k).map(x => `${x.status}:${x.reason}`)); };
+    assert.deepEqual(statusOf(), [['interrupted:shutdown'], ['queued:null'], ['queued:null']], 'running job interrupted; waiting jobs durably recorded as queued');
+    const next = computer({ dir: c.dir });
+    next.setEvidence(ev([[T.sony]])); commit(next, 'Local Q4c Alpha', 1); await next.svc.whenIdle();
+    assert.deepEqual(statusOf(), [['interrupted:shutdown'], ['interrupted:app-closed-before-learning-started'], ['interrupted:app-closed-before-learning-started']]);
+    assert.ok(!next.store().getEvents().some(e => keys.includes(e.importId)), 'nothing recorded for the dropped jobs (no retry, no guess)');
+    await next.store().close();
+  });
+  await t('a full learning queue is journaled as dropped, never silently lost', async () => {
+    const c = computer({ evidenceDelayMs: 300, maxQueue: 2 });
+    c.setEvidence(ev([[T.canonA]]));
+    const res = [1, 2, 3, 4].map(() => commit(c, 'Local Q4c Alpha', 1));
+    assert.deepEqual(res, ['queued', 'queued', 'queue-full', 'queue-full']);
+    await c.svc.whenIdle();
+    const e = JSON.parse(fs.readFileSync(path.join(c.dir, 'learning-journal.json'), 'utf8')).entries;
+    assert.equal(e.filter(x => x.status === 'dropped' && x.reason === 'queue-full').length, 2);
+    assert.equal(e.filter(x => x.status === 'recorded').length, 2, 'both accepted jobs still processed');
+    await c.store().close();
   });
   await t('journal reports outcomes without identifiers, names, paths or digests', async () => {
     const c = computer();

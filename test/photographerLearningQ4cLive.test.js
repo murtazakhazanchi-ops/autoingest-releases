@@ -95,14 +95,15 @@ const mainRequire = (app, mod, fn, arg) => app.evaluate(({ app: a }, { root, mod
 
 const journal = (ud) => { try { return JSON.parse(fs.readFileSync(path.join(ud, 'identity-registry', 'learning-journal.json'), 'utf8')).entries; } catch { return []; } };
 const registry = (ud) => { try { return JSON.parse(fs.readFileSync(path.join(ud, 'identity-registry', 'registry.json'), 'utf8')); } catch { return null; } };
+const PENDING = new Set(['queued', 'started']); // not yet a final outcome
 async function waitFinal(ud, n, timeoutMs = 60000) {
   const t0 = Date.now();
   while (Date.now() - t0 < timeoutMs) {
-    const e = journal(ud).filter(x => x.status !== 'started');
+    const e = journal(ud).filter(x => !PENDING.has(x.status));
     if (e.length >= n) return e;
     await sleep(200);
   }
-  return journal(ud).filter(x => x.status !== 'started');
+  return journal(ud).filter(x => !PENDING.has(x.status));
 }
 
 (async () => {

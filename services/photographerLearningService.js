@@ -19,8 +19,9 @@
  * committed import, and nothing at all while learning is switched off.
  *
  * Durable reporting: learning-journal.json (next to the registry) keeps the last N outcomes
- * — status, reason, counts — never identifiers, names, paths or digests. A job interrupted
- * by shutdown stays "started" and is reported as "interrupted" by the next run.
+ * — status, reason, counts — never identifiers, names, paths or digests. A job is journaled
+ * "queued" when accepted and "started" when processing begins; one cut off by shutdown is
+ * reported as "interrupted" by the next run. A full queue is journaled as "dropped".
  */
 
 'use strict';
@@ -80,12 +81,17 @@ function createPhotographerLearningService(deps) {
   // ── Journal (no identifiers) ─────────────────────────────────────────────────
   function _journal(entry) {
     journalQueue = journalQueue.then(async () => {
+      // Only after the store has opened: opening quarantines stray temp files in this
+      // directory, which would otherwise swallow an in-flight journal write.
+      await _store();
       const file = path.join(journalDir(), JOURNAL_FILE);
       let doc = { format: 'autoingest-learning-journal', version: 1, entries: [] };
       try { const buf = await readIfExists(fsx, file); if (buf) { const p = JSON.parse(buf.toString('utf8')); if (Array.isArray(p.entries)) doc = p; } } catch { /* damaged journal: start over, it is diagnostics only */ }
       if (!journalSwept) {
         journalSwept = true;
-        doc.entries = doc.entries.map(e => (e.status === 'started' && e.runId !== runId ? { ...e, status: 'interrupted', reason: 'app-closed-before-learning-finished' } : e));
+        doc.entries = doc.entries.map(e => (e.runId === runId ? e
+          : e.status === 'started' ? { ...e, status: 'interrupted', reason: 'app-closed-before-learning-finished' }
+            : e.status === 'queued' ? { ...e, status: 'interrupted', reason: 'app-closed-before-learning-started' } : e));
       }
       const i = doc.entries.findIndex(e => e.key === entry.key && e.runId === entry.runId);
       if (i >= 0) doc.entries[i] = { ...doc.entries[i], ...entry }; else doc.entries.push(entry);
@@ -108,7 +114,6 @@ function createPhotographerLearningService(deps) {
   async function _process(job) {
     const store = await _store();
     if (!store) return _finish(job, 'registry-unavailable', 'open-failed');
-    job.journaled = true;
     await _journal({ key: job.importId, runId, at: now().toISOString(), workflow: job.workflow, status: 'started', reason: null, files: job.files.length });
     const st = store.getStatus();
     if (!st.learning) return _finish(job, 'registry-unavailable', st.reason);
@@ -174,14 +179,18 @@ function createPhotographerLearningService(deps) {
       if (!['event-import', 'multi-event-import'].includes(ctx.workflow)) return 'ineligible';
       const importId = learningKey(computerId, entryIds);
       if (keysSeen.has(importId)) return 'duplicate';
-      if (queue.length >= maxQueue) return 'queue-full';
-      keysSeen.add(importId);
       const d = now();
-      queue.push({
-        importId, photographer, files, workflow: ctx.workflow, day: _localDay(d), startedMs: Date.now(), journaled: false,
+      const job = {
+        importId, photographer, files, workflow: ctx.workflow, day: _localDay(d), startedMs: Date.now(), journaled: true,
         origin: { computerId, operatorId: typeof ctx.operatorId === 'string' && ctx.operatorId ? ctx.operatorId : null, workflow: ctx.workflow },
         abort: new AbortController(),
-      });
+      };
+      if (queue.length >= maxQueue) { _finish(job, 'dropped', 'queue-full'); return 'queue-full'; }
+      keysSeen.add(importId);
+      queue.push(job);
+      // Durable from the moment it is accepted: a job still waiting when the app closes is
+      // reported as interrupted by the next run (never silently lost, never retried).
+      _journal({ key: importId, runId, at: d.toISOString(), workflow: ctx.workflow, status: 'queued', reason: null, files: files.length });
       setImmediate(_pump);
       return 'queued';
     } catch {
