@@ -11,6 +11,13 @@
  * Key IDs are namespaced: `local-<hex>` for a key this computer generated; Q7 will add
  * organisation keys (`org-…`) beside them. Q4b never exports, imports or synchronises keys.
  *
+ * Each key records the protecting identity (`identity`): for Electron safeStorage on macOS that
+ * is the app name, which selects the Keychain item "<name> Safe Storage". package.json "name"
+ * is "auto-ingest" and productName lives only in the electron-builder config, so development
+ * runs AND packaged builds both report "auto-ingest" (measured) and share one userData
+ * (~/Library/Application Support/auto-ingest) and one Keychain item. A key is only decrypted
+ * under the same identity; a renamed app reports 'key-protection-identity-mismatch' instead.
+ *
  * Failure policy: anything wrong with a key the registry depends on (file missing, damaged,
  * cannot be decrypted, belongs to another registry, secure storage unavailable) yields NO
  * keyring and a reason. Body matching is then disabled. A missing key is never silently
@@ -40,10 +47,11 @@ function _validateKeyDoc(doc) {
   if (!Array.isArray(doc.keys)) errors.push('keys must be an array');
   else for (const k of doc.keys) {
     if (!k || typeof k !== 'object') { errors.push('key entry must be an object'); continue; }
-    const kx = Object.keys(k).filter(x => !['keyId', 'createdAt', 'protection', 'backend', 'material', 'sha256'].includes(x));
+    const kx = Object.keys(k).filter(x => !['keyId', 'createdAt', 'protection', 'backend', 'identity', 'material', 'sha256'].includes(x));
     if (kx.length) errors.push(`key entry has unexpected field(s) ${kx.join(', ')}`);
     if (!KEY_ID_RE.test(k.keyId || '')) errors.push('key entry keyId invalid');
     if (k.protection !== 'os-secure-storage') errors.push('key entry protection must be os-secure-storage');
+    if (typeof k.identity !== 'string' || !k.identity) errors.push('key entry identity missing');
     if (typeof k.material !== 'string' || !k.material) errors.push('key entry material missing');
     if (typeof k.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(k.sha256)) errors.push('key entry checksum missing');
   }
@@ -83,6 +91,10 @@ function createIdentityKeyStore({ dir, secureStorage, fs: fsx = require('fs').pr
       for (const keyId of keyIds) {
         const k = r.doc.keys.find(x => x.keyId === keyId);
         if (!k) return { keyring: null, reason: 'key-missing-for-id' };
+        // Pinned protecting identity: decrypting under another one would make the OS create a
+        // NEW secret for that identity (e.g. a fresh "<other app name> Safe Storage" Keychain
+        // item) and still fail. Refuse before touching secure storage.
+        if (k.identity !== String(secureStorage.identity || '')) return { keyring: null, reason: 'key-protection-identity-mismatch' };
         const material = Buffer.from(k.material, 'base64');
         if (crypto.createHash('sha256').update(material).digest('hex') !== k.sha256) return { keyring: null, reason: 'key-file-corrupt' };
         let key;
@@ -112,6 +124,7 @@ function createIdentityKeyStore({ dir, secureStorage, fs: fsx = require('fs').pr
       const material = secureStorage.encrypt(key);
       const entry = {
         keyId, createdAt: now().toISOString(), protection: 'os-secure-storage', backend: String(secureStorage.backend || 'unknown'),
+        identity: String(secureStorage.identity || ''),
         material: material.toString('base64'), sha256: crypto.createHash('sha256').update(material).digest('hex'),
       };
       const doc = existing.status === 'present' ? { ...existing.doc, keys: [...existing.doc.keys, entry] } : { format: KEY_FORMAT, version: KEY_FILE_VERSION, registryId, keys: [entry] };

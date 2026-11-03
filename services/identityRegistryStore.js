@@ -346,12 +346,28 @@ function createIdentityRegistryStore(opts) {
     };
   }
 
+  /**
+   * will-quit: the process is ending and cannot await. Releases our lock (only if it is still
+   * ours) synchronously and stops accepting writes. An in-flight write is atomic either way.
+   */
+  function releaseLockSync() {
+    if (lockToken) {
+      try {
+        const fsSync = require('fs');
+        const held = JSON.parse(fsSync.readFileSync(lockFile, 'utf8'));
+        if (held.token === lockToken) fsSync.unlinkSync(lockFile);
+      } catch { /* already gone */ }
+      lockToken = null;
+    }
+    keyring = null; state = 'closed'; reason = 'shutdown';
+  }
+
   function close() {
     return serial(async () => { await _releaseLock(); keyring = null; doc = null; lastSerialized = null; state = 'closed'; reason = null; });
   }
 
   return {
-    open, close, getStatus, appendEvents, ensurePhotographerId, listRecoveryCandidates, recoverFromBackup,
+    open, close, releaseLockSync, getStatus, appendEvents, ensurePhotographerId, listRecoveryCandidates, recoverFromBackup,
     /** Main-process only. Null whenever body matching is disabled. Never send to a renderer. */
     getKeyring: () => (state === 'ready' ? keyring : null),
     getEvents: () => (doc ? doc.events.slice() : []),

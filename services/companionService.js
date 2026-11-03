@@ -519,6 +519,28 @@ function init({ monitor, openApp, log }) {
   _log('[companion] tray started');
 }
 
+/**
+ * AI-FEAT-063 Q4c: completed Q2/Q3 assessment records for committed import files. A record is
+ * returned only when its job is complete, the volume identity (dev/ino) still matches the one
+ * assessed, and the recorded size equals the committed size — a path alone is never trusted.
+ * @param {Array<{src: string, size: number}>} files
+ * @returns {Promise<Map<string, object>>} src → record (main-process only; never sent to a renderer)
+ */
+async function findAssessedRecords(files) {
+  const out = new Map();
+  if (!_assessor || !Array.isArray(files) || !files.length) return out;
+  for (const { sourceId } of _assessor.getDiagnostics().jobs) {
+    const job = await _assessor.verify(sourceId);
+    if (!job || job.state !== 'complete' || !Array.isArray(job.records)) continue;
+    const byPath = new Map(job.records.map(r => [r.path, r]));
+    for (const f of files) {
+      const r = byPath.get(f.src);
+      if (r && r.identity && Number.isFinite(f.size) && r.size === f.size) out.set(f.src, r);
+    }
+  }
+  return out;
+}
+
 /** Idempotent; safe to call from will-quit. */
 function shutdown() {
   hidePopup();
@@ -557,4 +579,4 @@ function getDiagnostics() {
   };
 }
 
-module.exports = { init, shutdown, showPopup, hidePopup, togglePopup, getDiagnostics };
+module.exports = { init, shutdown, showPopup, hidePopup, togglePopup, getDiagnostics, findAssessedRecords };

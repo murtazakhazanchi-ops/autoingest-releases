@@ -34,7 +34,7 @@ const _identifierKey = (ns, keyId, digest) => `${ns}|${keyId}|${digest}`;
  * @param {{groups: object[], unknown: number[], conflicts: number[], identities: object[]}} result  assessCameras(records)
  * @param {ReturnType<import('./identityKeyring').createKeyring>} keyring
  * @returns {{ cameras: Array<object>, unknownFiles: number, conflictFiles: number }}
- *   cameras[]: { kind: 'body'|'model', make, modelKey, modelDisplay, fileCount,
+ *   cameras[]: { kind: 'body'|'model', make, modelKey, modelDisplay, fileCount (captures: a RAW/JPEG pair counts once),
  *                identifiers?: [{ ns, trusted: true, digests: [{keyId, digest}] }] } — no raw values, no paths.
  */
 function protectCameraGroups(records, result, keyring) {
@@ -43,7 +43,9 @@ function protectCameraGroups(records, result, keyring) {
     const make = idns[0].make.name;
     const modelKey = idns[0].model.key;
     const modelDisplay = idns.map(x => x.model.display).sort((a, b) => b.length - a.length || a.localeCompare(b))[0];
-    const camera = { kind: g.kind, make, modelKey, modelDisplay, fileCount: g.files.length };
+    // A RAW/JPEG pair is one photograph: count captures, not files.
+    const captures = new Set(g.files.map(i => records[i].pairKey || `file:${i}`)).size;
+    const camera = { kind: g.kind, make, modelKey, modelDisplay, fileCount: captures };
     if (g.kind === 'body') {
       camera.identifiers = [...g.nodes].sort().map(_splitNode).map(({ ns, value }) => ({ ns, trusted: true, digests: keyring.digestAll(ns, make, value) }));
     }

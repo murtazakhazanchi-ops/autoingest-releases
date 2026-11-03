@@ -151,7 +151,7 @@ function resolvePhotographerName(name, { shipped, photographers = [] } = {}) {
 }
 
 module.exports = {
-  SHIPPED_PHOTOGRAPHER_NAMESPACE, normalizeName, isUuid,
+  SHIPPED_PHOTOGRAPHER_NAMESPACE, normalizeName, isUuid, uuidV5: _uuidV5,
   shippedPhotographerId, newPhotographerId, bootstrapShippedIds,
   checkNameCollision, resolvePhotographerName,
 };

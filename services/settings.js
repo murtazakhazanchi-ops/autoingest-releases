@@ -310,6 +310,17 @@ async function setAutoMetadataEnabled(value) {
   await _save();
 }
 
+/**
+ * Photographer & camera learning from committed imports (AI-FEAT-063 Q4c). Configuration-level
+ * opt-out only — no UI: set "photographerLearningEnabled": false in settings.json to switch it
+ * off. Absent or any other value = enabled.
+ * @returns {boolean}
+ */
+function getPhotographerLearningEnabled() {
+  if (!_loaded) init();
+  return _state.photographerLearningEnabled !== false;
+}
+
 // ─── Menu-bar / tray companion (AI-FEAT-061 Q1) ───────────────────────────────
 
 /**
@@ -628,6 +639,7 @@ module.exports = {
   getWindowBounds, setWindowBounds, setWindowBoundsSync,
   getLastActiveUserId, setLastActiveUserId,
   getAutoMetadataEnabled, setAutoMetadataEnabled,
+  getPhotographerLearningEnabled,
   getCompanionEnabled,
   getUpdateChannel, setUpdateChannel,
   getNasRoot, setNasRoot,

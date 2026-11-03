@@ -17,7 +17,10 @@
  *  - Model-only files of the SAME model as an identified body in the import are ambiguous
  *    (e.g. Canon video with an all-zero serial): they are not counted as another camera,
  *    and they do not strengthen anything.
- *  - Unknown-camera files carry no evidence and are ignored.
+ *  - Files whose camera is unknown, or that could not be read (source removed, read failed),
+ *    leave the import's attribution incomplete: an identified camera is NOT assumed to have
+ *    taken them, so no association or model observation is recorded. Identified bodies are
+ *    still registered as cameras (equipment facts, independent of any photographer).
  *  - New bodies are registered as devices; identifiers co-observed with a known body are
  *    added to it. Conflicting bodies register nothing.
  */
@@ -31,10 +34,10 @@ const { isUuid } = require('./photographerIdentity');
 /**
  * @param {{ cameras: object[], unknownFiles: number, conflictFiles: number }} protectedCard
  * @param {ReturnType<import('./associationModel').deriveRegistryState>} state
- * @param {{ photographerId: string, importId: string, day: string, newDeviceId?: () => string }} ctx
- * @returns {{ events: Array<{type: string, payload: object}>, outcomes: object[], observation: 'single-body'|'single-model'|'multiple-cameras'|'none' }}
+ * @param {{ photographerId: string, importId: string, day: string, newDeviceId?: () => string, unreadFiles?: number }} ctx
+ * @returns {{ events: Array<{type: string, payload: object}>, outcomes: object[], observation: 'single-body'|'single-model'|'multiple-cameras'|'incomplete-attribution'|'none' }}
  */
-function planImportLearning(protectedCard, state, { photographerId, importId, day, newDeviceId = crypto.randomUUID } = {}) {
+function planImportLearning(protectedCard, state, { photographerId, importId, day, newDeviceId = crypto.randomUUID, unreadFiles = 0 } = {}) {
   if (!isUuid(photographerId)) throw new Error('photographerId must be a UUID');
   if (typeof importId !== 'string' || !importId) throw new Error('importId required');
   const cameras = protectedCard.cameras || [];
@@ -66,8 +69,11 @@ function planImportLearning(protectedCard, state, { photographerId, importId, da
 
   const cameraCount = bodies.length + countedModels.length;
   const conflictFiles = protectedCard.conflictFiles || 0;
+  const unattributed = (protectedCard.unknownFiles || 0) + (unreadFiles || 0);
   let observation = 'none';
-  if (cameraCount === 1 && bodies.length === 1 && bodies[0].deviceId && conflictFiles === 0) {
+  if (unattributed > 0 && cameraCount > 0) {
+    observation = 'incomplete-attribution';
+  } else if (cameraCount === 1 && bodies.length === 1 && bodies[0].deviceId && conflictFiles === 0) {
     events.push({ type: 'import-observed', payload: { importId, photographerId, deviceId: bodies[0].deviceId, fileCount: bodies[0].cam.fileCount, day } });
     observation = 'single-body';
   } else if (cameraCount === 1 && countedModels.length === 1 && conflictFiles === 0) {

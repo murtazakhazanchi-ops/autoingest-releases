@@ -33,7 +33,7 @@ const freshDir = () => path.join(ROOT, `ud-${++dirN}`, 'identity-registry');
 // Fake OS secure storage: reversible sealing with a marker; toggles for failure scenarios.
 function fakeSecureStorage({ available = true, failDecrypt = false } = {}) {
   const s = {
-    backend: 'fake-test', available, failDecrypt,
+    backend: 'fake-test', identity: 'q4b-test-app', available, failDecrypt,
     isAvailable: () => s.available,
     encrypt: (buf) => Buffer.concat([Buffer.from('SEALED:'), Buffer.from(buf.map(b => b ^ 0x5a))]),
     decrypt: (c) => {

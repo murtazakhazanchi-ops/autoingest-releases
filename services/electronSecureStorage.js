@@ -11,7 +11,8 @@
  *             before any claim is made (not executed in Q4b).
  *   Linux   — only a real keyring backend counts; the 'basic_text' fallback is plaintext
  *             obfuscation and is treated as UNAVAILABLE.
- * isEncryptionAvailable() is only meaningful after the app 'ready' event.
+ * isEncryptionAvailable() is only meaningful after the app 'ready' event. Nothing here touches the
+ * Keychain until a key is actually encrypted or decrypted (registry initialisation / first load).
  */
 
 'use strict';
@@ -23,6 +24,9 @@ function createElectronSecureStorage(electron = require('electron')) {
       : `linux-${typeof safeStorage.getSelectedStorageBackend === 'function' ? safeStorage.getSelectedStorageBackend() : 'unknown'}`;
   return {
     backend,
+    // The identity safeStorage protects keys under. On macOS this is the app name, which names
+    // the Keychain item "<name> Safe Storage". Recorded with each key and checked before decrypting.
+    identity: electron.app.getName(),
     isAvailable() {
       try {
         if (!safeStorage.isEncryptionAvailable()) return false;

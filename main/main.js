@@ -77,6 +77,7 @@ const eventMetadataIntent = require('../services/eventMetadataIntent');
 const realtimeOps              = require('../services/realtimeOperationsService');
 const offlineCollectionRegistry    = require('../services/offlineCollectionRegistryService');
 const photographerSeqService       = require('../services/photographerSequenceService');
+const photographerLearning         = require('../services/photographerLearningRuntime');
 const qmzService                   = require('./qmzService');
 const { parseProgramPdf }          = require('./qmzProgramPdfParser');
 
@@ -403,6 +404,7 @@ app.on('window-all-closed', () => {
 
 app.on('will-quit', () => {
   companionService.shutdown();
+  photographerLearning.shutdown();
   sourceMonitor.release(MAIN_WINDOW_POLL_CONSUMER);
 });
 
@@ -1460,6 +1462,25 @@ _handleTracked('import:commitTransaction', 'import', async (event, {
       eventFolderName: eventJsonPath ? path.basename(eventJsonPath) : null,
       status:          'import-complete',
     });
+
+    // AI-FEAT-063 Q4c — photographer↔camera learning from this COMMITTED import (the commit can
+    // no longer roll back past this point). Only queues work and returns; it never throws and
+    // never changes this result. Observations only — the import modal is not a camera confirmation.
+    try {
+      if (eventJsonPath && logs.length > 0) {
+        photographerLearning.onImportCommitted({
+          entryIds:     logs.map(l => l.id),
+          photographer,
+          files:        [...(result.copiedFiles || []).map(f => ({ src: f.src, size: f.size, dest: f.dest })),
+                         ...(result.skippedFiles || []).map(f => ({ src: f.src, dest: f.dest }))],
+          copied:       result.copied || 0,
+          workflow:     (typeof importSessionId === 'string' && importSessionId) ? 'multi-event-import' : 'event-import',
+          operatorId:   importedBy && typeof importedBy.id === 'string' ? importedBy.id : null,
+        });
+      }
+    } catch (learnErr) {
+      log(`[identity-learning] not queued: ${learnErr.message}`);
+    }
 
     return result;
   } catch (err) {
