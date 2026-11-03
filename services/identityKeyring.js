@@ -10,9 +10,9 @@
  * it joins another computer's organisation key (Q7): every observation is digested under
  * every key, and two digests match only under the same keyId.
  *
- * Q4a scope: no key is generated, persisted or loaded here. Production key handling (Q4b)
- * needs an explicit design for encrypted persistence (Electron safeStorage: macOS Keychain /
- * Windows DPAPI), loss and recovery, and what happens when secure storage is unavailable.
+ * No key is generated, persisted or loaded here. Keys are generated, sealed with the OS
+ * secure storage and loaded by identityKeyStore.js (Q4b), which also owns the loss,
+ * recovery and secure-storage-unavailable rules.
  */
 
 'use strict';

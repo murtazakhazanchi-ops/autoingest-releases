@@ -29,7 +29,7 @@ function planMerge(localEvents, incomingEvents, opts = {}) {
   const local = normalizeEventSet(localEvents);
   const localById = new Map(local.events.map(e => [e.eventId, canonicalJson(e)]));
 
-  const invalid = [], added = [], idCollisions = [];
+  const invalid = [], added = [], idCollisions = [], held = [];
   let alreadyPresent = 0;
   const seenIncoming = new Set();
   (Array.isArray(incomingEvents) ? incomingEvents : []).forEach((e, index) => {
@@ -38,11 +38,16 @@ function planMerge(localEvents, incomingEvents, opts = {}) {
     const json = canonicalJson(e);
     if (localById.has(e.eventId)) {
       if (localById.get(e.eventId) === json) alreadyPresent++;
-      else idCollisions.push(e.eventId);
+      else { idCollisions.push(e.eventId); held.push(e); } // integrity conflict: local kept, incoming held for review
       return;
     }
-    if (seenIncoming.has(e.eventId)) return; // duplicate inside the incoming set
-    seenIncoming.add(e.eventId);
+    const twin = added.find(x => x.eventId === e.eventId);
+    if (twin) {
+      // Same eventId twice inside the incoming set: identical → duplicate; different → neither is added.
+      if (canonicalJson(twin) !== json) { idCollisions.push(e.eventId); held.push(twin, e); added.splice(added.indexOf(twin), 1); }
+      return;
+    }
+    if (idCollisions.includes(e.eventId)) { held.push(e); return; }
     added.push(e);
   });
 
@@ -70,7 +75,7 @@ function planMerge(localEvents, incomingEvents, opts = {}) {
       mergedEvents: merged.length,
       newConflicts: newConflicts.length,
     },
-    added, invalid, idCollisions: [...new Set(idCollisions)].sort(), foreignWithLocalOrigin,
+    added, invalid, idCollisions: [...new Set(idCollisions)].sort(), held, foreignWithLocalOrigin,
     merged, newConflicts,
   };
 }

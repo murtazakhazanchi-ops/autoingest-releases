@@ -47,7 +47,12 @@ function _heads(decisions) {
   return decisions.filter(d => !settled.has(d.eventId));
 }
 
-/** Validate, de-duplicate by eventId and order. An eventId reused with different content is a conflict. */
+/**
+ * Validate, de-duplicate by eventId and order. Same eventId + same content is an idempotent
+ * duplicate. Same eventId + different content is an INTEGRITY CONFLICT: neither version is
+ * trusted for derivation (both are held out and reported), so no conflicting event is ever
+ * silently accepted as equivalent. Stores and merges keep the local copy on disk.
+ */
 function normalizeEventSet(events) {
   const byId = new Map();
   const ignored = [], collisions = new Set();
@@ -56,11 +61,9 @@ function normalizeEventSet(events) {
     if (!res.ok) { ignored.push({ eventId: e && typeof e.eventId === 'string' ? e.eventId : null, reason: 'invalid', errors: res.errors }); continue; }
     const prev = byId.get(e.eventId);
     if (!prev) { byId.set(e.eventId, { e, known: res.known, json: canonicalJson(e) }); continue; }
-    const json = canonicalJson(e);
-    if (json === prev.json) continue;
-    collisions.add(e.eventId);
-    if (json < prev.json) byId.set(e.eventId, { e, known: res.known, json }); // order-independent pick
+    if (canonicalJson(e) !== prev.json) collisions.add(e.eventId);
   }
+  for (const id of collisions) { byId.delete(id); ignored.push({ eventId: id, reason: 'event-id-collision', errors: ['same eventId with different content'] }); }
   const all = [...byId.values()].sort((a, b) => compareEvents(a.e, b.e));
   return {
     events: all.map(x => x.e),
