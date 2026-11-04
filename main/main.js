@@ -341,6 +341,9 @@ app.whenReady().then(() => {
       .catch((err) => log(`[main] mxControlService failed to restart: ${err.message}`));
   });
   _startCompanion();
+  // AI-FEAT-063 Q4d — only if an earlier run left photographer learning pending: one bounded,
+  // delayed recovery pass (creates nothing; waits while an import/sync/transfer runs).
+  photographerLearning.scheduleRecoveryAfterLaunch();
 });
 
 // IPC handlers the operator is actively waiting on — imports, syncs, transfers,
@@ -1471,9 +1474,11 @@ _handleTracked('import:commitTransaction', 'import', async (event, {
         photographerLearning.onImportCommitted({
           entryIds:     logs.map(l => l.id),
           photographer,
-          files:        [...(result.copiedFiles || []).map(f => ({ src: f.src, size: f.size, dest: f.dest })),
-                         ...(result.skippedFiles || []).map(f => ({ src: f.src, dest: f.dest }))],
+          // Q4d: only the files THIS import copied. Same-size skips were counted by the import
+          // that copied them (and may even come from another source with the same name).
+          files:        (result.copiedFiles || []).map(f => ({ src: f.src, size: f.size, dest: f.dest })),
           copied:       result.copied || 0,
+          eventDir:     eventJsonPath,
           workflow:     (typeof importSessionId === 'string' && importSessionId) ? 'multi-event-import' : 'event-import',
           operatorId:   importedBy && typeof importedBy.id === 'string' ? importedBy.id : null,
         });

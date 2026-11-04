@@ -151,12 +151,24 @@ async function readIdentityTags(filePath) {
   return identityFromGrouped(await _exifService.readGroupedTags(filePath, IDENTITY_TAGS));
 }
 
+/**
+ * Q4d: ExifTool's hash of the image/media data only (metadata excluded), so a file whose
+ * metadata AutoIngest rewrote still matches its camera original. null when unsupported.
+ */
+async function readImageDataHash(filePath) {
+  _deps();
+  const grouped = await _exifService.readGroupedTags(filePath, ['ImageDataHash']);
+  const key = Object.keys(grouped || {}).find(k => k.endsWith(':ImageDataHash'));
+  const v = key ? grouped[key] : null;
+  return typeof v === 'string' && /^[0-9a-f]{32,128}$/i.test(v) ? v.toLowerCase() : null;
+}
+
 /** Q2 entry point (date tags only), kept for existing callers. */
 async function readCaptureTags(filePath, type) {
   return (await readCaptureMetadata(filePath, type)).tags;
 }
 
 module.exports = {
-  readCaptureMetadata, readIdentityTags, readCaptureTags, dateViewFromGrouped, identityFromGrouped,
+  readCaptureMetadata, readIdentityTags, readImageDataHash, readCaptureTags, dateViewFromGrouped, identityFromGrouped,
   DATE_TAGS, IDENTITY_TAGS, EXIFR_TIMEOUT_MS,
 };

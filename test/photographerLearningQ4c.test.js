@@ -173,7 +173,10 @@ const pid = (name) => (SHIPPED.includes(name) ? P.shippedPhotographerId(name) : 
     assert.equal(lastOutcome(c).observation, 'incomplete-attribution', 'an unidentified minority blocks the observation');
     assert.deepEqual(types(c).slice(before), ['device-registered'], 'the body is still registered as a camera, with no association');
     c.setEvidence({ records: [], unread: 2, source: 'unavailable' }); commit(c, 'Local Q4c Alpha', 2); await c.svc.whenIdle();
-    assert.equal(lastOutcome(c).status, 'nothing-to-record', 'source removed before reading: nothing guessed');
+    // Q4d: a live source that cannot be read is left to recovery (not recoverable here: no
+    // event folder given, so it is journaled as dropped) — never guessed either way.
+    assert.deepEqual([lastOutcome(c).status, lastOutcome(c).reason], ['dropped', 'source-unavailable'], 'source removed before reading: nothing guessed');
+    assert.equal(events(c).length, before + 1, 'nothing appended for it');
     c.setEvidence(ev([[T.nikon]], { unread: 1 })); commit(c, 'Local Q4c Alpha', 2); await c.svc.whenIdle();
     assert.equal(lastOutcome(c).observation, 'incomplete-attribution', 'partial read: no association');
   });
@@ -282,7 +285,7 @@ const pid = (name) => (SHIPPED.includes(name) ? P.shippedPhotographerId(name) : 
     c.store().releaseLockSync();
     assert.ok(!fs.existsSync(path.join(c.dir, 'registry.lock')), 'lock released synchronously at quit');
     // A process killed mid-learning leaves "started"; the next run's first journal write reports it.
-    const jf = path.join(c.dir, 'learning-journal.json');
+    const jf = path.join(c.dir, 'learning', 'learning-journal.json');
     const j = JSON.parse(fs.readFileSync(jf, 'utf8'));
     j.entries.push({ key: 'imp-' + 'a'.repeat(32), runId: 'crashed-run', at: new Date().toISOString(), workflow: 'event-import', status: 'started', reason: null, files: 1 });
     fs.writeFileSync(jf, JSON.stringify(j));
@@ -300,7 +303,7 @@ const pid = (name) => (SHIPPED.includes(name) ? P.shippedPhotographerId(name) : 
     c.svc.shutdown();
     await c.svc.whenIdle();
     c.store().releaseLockSync();
-    const jf = path.join(c.dir, 'learning-journal.json');
+    const jf = path.join(c.dir, 'learning', 'learning-journal.json');
     const statusOf = () => { const e = JSON.parse(fs.readFileSync(jf, 'utf8')).entries; return keys.map(k => e.filter(x => x.key === k).map(x => `${x.status}:${x.reason}`)); };
     assert.deepEqual(statusOf(), [['interrupted:shutdown'], ['queued:null'], ['queued:null']], 'running job interrupted; waiting jobs durably recorded as queued');
     const next = computer({ dir: c.dir });
@@ -315,7 +318,7 @@ const pid = (name) => (SHIPPED.includes(name) ? P.shippedPhotographerId(name) : 
     const res = [1, 2, 3, 4].map(() => commit(c, 'Local Q4c Alpha', 1));
     assert.deepEqual(res, ['queued', 'queued', 'queue-full', 'queue-full']);
     await c.svc.whenIdle();
-    const e = JSON.parse(fs.readFileSync(path.join(c.dir, 'learning-journal.json'), 'utf8')).entries;
+    const e = JSON.parse(fs.readFileSync(path.join(c.dir, 'learning', 'learning-journal.json'), 'utf8')).entries;
     assert.equal(e.filter(x => x.status === 'dropped' && x.reason === 'queue-full').length, 2);
     assert.equal(e.filter(x => x.status === 'recorded').length, 2, 'both accepted jobs still processed');
     await c.store().close();
@@ -324,7 +327,7 @@ const pid = (name) => (SHIPPED.includes(name) ? P.shippedPhotographerId(name) : 
     const c = computer();
     c.setEvidence(ev([[T.canonA], [T.sony]])); commit(c, 'Local Q4c Alpha', 2); await c.svc.whenIdle();
     c.setEvidence(ev([[T.nikon]])); commit(c, 'Local Q4c Beta', 1); await c.svc.whenIdle();
-    const text = fs.readFileSync(path.join(c.dir, 'learning-journal.json'), 'utf8');
+    const text = fs.readFileSync(path.join(c.dir, 'learning', 'learning-journal.json'), 'utf8');
     const j = JSON.parse(text);
     assert.ok(j.entries.length >= 2 && j.entries.every(e => /^imp-[0-9a-f]{32}$/.test(e.key)));
     for (const s of [...FAKE, 'Local Q4c', '/fake/', 'F0.JPG']) assert.ok(!text.includes(s), `journal leaks ${s.length} chars`);

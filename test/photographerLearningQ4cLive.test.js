@@ -93,7 +93,7 @@ const mainRequire = (app, mod, fn, arg) => app.evaluate(({ app: a }, { root, mod
   return new Function('m', 'arg', fn)(req(mod), arg);
 }, { root: PROJECT_ROOT, mod, fn, arg });
 
-const journal = (ud) => { try { return JSON.parse(fs.readFileSync(path.join(ud, 'identity-registry', 'learning-journal.json'), 'utf8')).entries; } catch { return []; } };
+const journal = (ud) => { try { return JSON.parse(fs.readFileSync(path.join(ud, 'identity-registry', 'learning', 'learning-journal.json'), 'utf8')).entries; } catch { return []; } };
 const registry = (ud) => { try { return JSON.parse(fs.readFileSync(path.join(ud, 'identity-registry', 'registry.json'), 'utf8')); } catch { return null; } };
 const PENDING = new Set(['queued', 'started']); // not yet a final outcome
 async function waitFinal(ud, n, timeoutMs = 60000) {
@@ -216,7 +216,8 @@ async function waitFinal(ud, n, timeoutMs = 60000) {
     await fsp.rm(gone, { recursive: true, force: true });
     await mainRequire(app, '../services/operatorActivity', 'm.end(arg); return true;', tok);
     fin = await waitFinal(userDataDir, 6);
-    check(fin[5]?.status === 'nothing-to-record' && fin[5]?.unreadFiles === 1, `source removed → nothing guessed (${fin[5]?.status}, unread ${fin[5]?.unreadFiles})`);
+    // Q4d: left pending for recovery from the verified archive copies — never guessed.
+    check(fin[5]?.status === 'deferred' && fin[5]?.reason === 'source-unavailable' && fin[5]?.pending === true, `source removed → nothing guessed, kept for recovery (${fin[5]?.status}/${fin[5]?.reason})`);
 
     // 6) Rolled-back import (event.json cannot be written) → no learning.
     const badEv = path.join(archiveRoot, 'CollQ4c', 'broken-event');
@@ -231,7 +232,7 @@ async function waitFinal(ud, n, timeoutMs = 60000) {
     const types = reg.events.map(e => e.type);
     check(!types.some(x => x.startsWith('association-')), 'no confirmed/rejected/retired events from imports');
     check(types.filter(x => x === 'import-observed').length === 3 && types.filter(x => x === 'import-cooccurred').length === 1 && types.filter(x => x === 'model-observed').length === 1, `event mix: ${JSON.stringify(types.reduce((a, x) => ({ ...a, [x]: (a[x] || 0) + 1 }), {}))}`);
-    const allText = ['registry.json', 'keys.json', 'learning-journal.json'].map(f => fs.readFileSync(path.join(userDataDir, 'identity-registry', f), 'utf8')).join('\n');
+    const allText = ['registry.json', 'keys.json', 'learning/learning-journal.json', 'learning/learning-pending.json'].map(f => fs.readFileSync(path.join(userDataDir, 'identity-registry', f), 'utf8')).join('\n');
     const logText = fs.readFileSync(path.join(userDataDir, 'app.log'), 'utf8');
     check(Object.values(FAKE).every(s => !allText.includes(s) && !logText.includes(s)), 'no raw serial in registry, keys, journal or app.log');
 
