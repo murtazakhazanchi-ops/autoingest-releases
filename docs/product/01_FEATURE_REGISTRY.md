@@ -90,7 +90,7 @@ IDs are assigned once and never reused or renumbered, even if a feature is later
 | AI-FEAT-035 | Dashboard Metadata Health | Implemented — evolving | Operational | AI-FEAT-031 | — | [features/AI-FEAT-035_DASHBOARD_METADATA_HEALTH.md](features/AI-FEAT-035_DASHBOARD_METADATA_HEALTH.md) |
 | AI-FEAT-036 | Keyword Registry | Implemented | Stable | — | — | [features/AI-FEAT-036_KEYWORD_REGISTRY.md](features/AI-FEAT-036_KEYWORD_REGISTRY.md) |
 | AI-FEAT-037 | Metadata Reapply / Sync | Implemented | Evolving | AI-FEAT-029 | — | [features/AI-FEAT-037_METADATA_REAPPLY_SYNC.md](features/AI-FEAT-037_METADATA_REAPPLY_SYNC.md) |
-| AI-FEAT-063 | Photographer & Camera Identity Registry (Learning, Registry, Exchange) | Planned | Planned | — | AI-RM-014 | [features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md](features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md) |
+| AI-FEAT-063 | Photographer & Camera Identity Registry (Learning, Registry, Exchange) | In active development | Experimental | — | AI-RM-014 | [features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md](features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md) |
 
 ## Transfer and Backup
 
@@ -168,7 +168,8 @@ IDs are assigned once and never reused or renumbered, even if a feature is later
 
 ## Totals
 
-- **63 features registered** (2026-10-28): 52 Implemented-family (45 plain "Implemented", including AI-FEAT-057 + 7 "Implemented — evolving", including AI-FEAT-058/AI-FEAT-059/AI-FEAT-060), 0 "Partially implemented", 1 "In active development" (AI-FEAT-061, Q1 on its feature branch), 10 "Planned" (including AI-FEAT-063).
+- **63 features registered** (2026-11-05): 52 Implemented-family (45 plain "Implemented", including AI-FEAT-057 + 7 "Implemented — evolving", including AI-FEAT-058/AI-FEAT-059/AI-FEAT-060), 0 "Partially implemented", 2 "In active development" (AI-FEAT-061 and AI-FEAT-063, each on feature branches only), 9 "Planned".
+- *Superseded totals line (kept per Append, Never Erase):* **63 features registered** (2026-10-28): 52 Implemented-family (45 plain "Implemented", including AI-FEAT-057 + 7 "Implemented — evolving", including AI-FEAT-058/AI-FEAT-059/AI-FEAT-060), 0 "Partially implemented", 1 "In active development" (AI-FEAT-061, Q1 on its feature branch), 10 "Planned" (including AI-FEAT-063).
 - *Superseded totals line (kept per Append, Never Erase):* **62 features registered** (2026-10-28): 52 Implemented-family (45 plain "Implemented", including AI-FEAT-057 + 7 "Implemented — evolving", including AI-FEAT-058/AI-FEAT-059/AI-FEAT-060), 0 "Partially implemented", 1 "In active development" (AI-FEAT-061, Q1 on its feature branch), 9 "Planned".
 - *Superseded totals line (kept per Append, Never Erase):* **62 features registered** (2026-10-27): 52 Implemented-family (45 plain "Implemented", including AI-FEAT-057 + 7 "Implemented — evolving", including AI-FEAT-058/AI-FEAT-059/AI-FEAT-060), 0 "Partially implemented", 0 "In active development", 10 "Planned" (0% implementation confirmed for all 10).
 - *Superseded totals line (kept per Append, Never Erase):* **60 features registered**: 51 Implemented-family (45 plain "Implemented", including AI-FEAT-057 + 6 "Implemented — evolving", including AI-FEAT-059/AI-FEAT-060), 0 "Partially implemented", 1 "In active development" (AI-FEAT-058), 8 "Planned" (0% implementation confirmed for all 8).

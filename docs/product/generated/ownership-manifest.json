@@ -1526,7 +1526,14 @@
       "test/companionQ1UiFreeze.test.js"
     ],
     "AI-FEAT-062": [],
-    "AI-FEAT-063": []
+    "AI-FEAT-063": [
+      "test/identityRegistryStoreQ4b.test.js",
+      "test/photographerCameraLearningQ4a.test.js",
+      "test/photographerLearningQ4c.test.js",
+      "test/photographerLearningQ4cLive.test.js",
+      "test/photographerLearningQ4d.test.js",
+      "test/photographerLearningQ4dLive.test.js"
+    ]
   },
   "ipc_to_features": {
     "SUBSYS-application-platform": {
@@ -1806,6 +1813,9 @@
       "AI-FEAT-030",
       "AI-FEAT-033"
     ],
+    "test/identityRegistryStoreQ4b.test.js": [
+      "AI-FEAT-063"
+    ],
     "test/importSession.test.js": [
       "AI-FEAT-058"
     ],
@@ -1863,6 +1873,21 @@
     ],
     "test/multiEventNewEventUiLive.test.js": [
       "AI-FEAT-058"
+    ],
+    "test/photographerCameraLearningQ4a.test.js": [
+      "AI-FEAT-063"
+    ],
+    "test/photographerLearningQ4c.test.js": [
+      "AI-FEAT-063"
+    ],
+    "test/photographerLearningQ4cLive.test.js": [
+      "AI-FEAT-063"
+    ],
+    "test/photographerLearningQ4d.test.js": [
+      "AI-FEAT-063"
+    ],
+    "test/photographerLearningQ4dLive.test.js": [
+      "AI-FEAT-063"
     ],
     "test/qmzLiveE2E.test.js": [
       "AI-FEAT-047"

@@ -13,8 +13,8 @@
 |---|---|
 | Implemented — evolving | 7 |
 | Implemented | 45 |
-| In active development | 1 |
-| Planned | 10 |
+| In active development | 2 |
+| Planned | 9 |
 
 ## Milestones
 

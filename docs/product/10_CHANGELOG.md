@@ -7,6 +7,15 @@ Append newest first. Never edit or delete a prior entry — if something was wro
 ---
 
 
+## 2026-11-05 — AI-FEAT-063 Q4a–Q4d recorded; Q3 multi-identifier amendment applied
+
+- **Task type**: feature journal (documentation only, on `docs/roadmap-quick-ingest-priority`; the application code lives on `feature/photographer-camera-learning-q4` — Q4a `ccd97e7`, Q4b `200c814`, Q4c `4cfafba`, fix `2a7a593`, Q4d `6d3cc45` — local and unmerged, reviewed separately)
+- **What changed**: AI-FEAT-063 Status Planned → In active development, Maturity Planned → Experimental (prior header values kept). New § Implemented behaviour (event-sourced registry, keyed identifier digests, learning eligibility, newly-copied-only evidence and renamed-duplicate exclusion, association confidence, bounded interrupted-learning recovery with commit and archive-evidence verification, learning state and concurrency, secure storage, multi-computer limitations, test isolation); § Proposed data model kept and marked superseded as the authority. Applied the 2026-11-02 multi-identifier amendment (`CameraDevice.identifiers`, per-namespace matching, identifier-privacy options; option 2 recorded as implemented with a per-registry key). Test rows 16–27, journal, Engineering Evolution and Related Files updated. Registry row and totals (2 In active development, 9 Planned), dashboard count rows and docs CLAUDE.md routing pointer updated.
+- **Affected feature(s)**: AI-FEAT-063
+- **Affected roadmap milestone(s)**: AI-RM-014
+- **Unresolved gaps**: Windows behaviour (DPAPI) not verified; technical docs under `docs/` not updated while the feature is unmerged; the dashboard and roadmap still describe AI-RM-014 as of Q1 (Q1 verification, Q2 and Q3 are not yet recorded on this branch); Q5–Q7 not started
+- **Evidence confidence**: commits on `feature/photographer-camera-learning-q4`, their unit/live tests, and the isolated packaged macOS run (75/75)
+
 ## 2026-10-28 — Six AI-RM-014 design decisions approved (DEC-029)
 
 - **Task type**: decision record (documentation only — no application code or UI changed; Q1 branch untouched; Q2/Q3 not started)

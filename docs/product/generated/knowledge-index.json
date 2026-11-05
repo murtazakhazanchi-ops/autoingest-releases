@@ -3262,10 +3262,10 @@
     {
       "availability": {
         "evidence": [
-          "canonical Status field: \"Planned\""
+          "canonical Status field: \"In active development\""
         ],
-        "operatorStatus": "PLANNED",
-        "reason": "Feature record status is Planned — not yet implemented."
+        "operatorStatus": "PARTIALLY_AVAILABLE",
+        "reason": "Implemented, but the record's own status marks it evolving or partial."
       },
       "canonicalDocument": "features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md",
       "category": "Metadata",
@@ -3276,11 +3276,11 @@
         "openBugs": []
       },
       "lastUpdated": {
-        "evidenceStatus": "Confirmed zero implementation (2026-10-28 read-only audit of `origin/stable/0.9` @ `0eb9c43`): no camera make/model/serial extraction and no photographer↔device association anywhere under `main/`, `services/`, `renderer/`. Requirements below are owner direction recorded 2026-10-28; the data model is a **proposal for review**, not shipped behaviour.",
-        "introducedVersion": "Not started",
-        "lastModifiedVersion": "2026-10-28 — six owner design decisions approved ([DEC-029](../decisions/DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md)): option (b) single photographer list, rename keeps alias, multi-photographer handoff"
+        "evidenceStatus": "Q4a–Q4d implemented on `feature/photographer-camera-learning-q4` (Q4a `ccd97e7`, Q4b `200c814`, Q4c `4cfafba`, fix `2a7a593`, Q4d `6d3cc45`) — local, unmerged, unreleased. Learning records OBSERVATIONS from committed event imports, with bounded recovery of interrupted learning. No UI shows them (Q5/Q6). macOS verified (dev + isolated packaged arm64); Windows DPAPI NOT verified. Stable is unchanged. *(Prior value, superseded 2026-11-05: Confirmed zero implementation (2026-10-28 read-only audit of `origin/stable/0.9` @ `0eb9c43`): no camera make/model/serial extraction and no photographer↔device association anywhere under `main/`, `services/`, `renderer/`. Requirements below are owner direction recorded 2026-10-28; the data model is a **proposal for review**, not shipped behaviour.)*",
+        "introducedVersion": "Q4a `ccd97e7` (2026-11-03), feature branch only *(Prior value, superseded 2026-11-05: Not started)*",
+        "lastModifiedVersion": "2026-11-04 — Q4d `6d3cc45`: bounded interrupted-learning recovery, verified archive evidence, newly-copied-only evidence, cross-process learning state (feature branch only) *(Prior value, superseded 2026-11-05: 2026-10-28 — six owner design decisions approved ([DEC-029](../decisions/DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md)): option (b) single photographer list, rename keeps alias, multi-photographer handoff)*"
       },
-      "operatorStatus": "PLANNED",
+      "operatorStatus": "PARTIALLY_AVAILABLE",
       "relatedFeatures": [
         "AI-FEAT-022",
         "AI-FEAT-029",
@@ -3312,7 +3312,7 @@
         "docs/metadata-system.md",
         "features/AI-FEAT-063_PHOTOGRAPHER_CAMERA_IDENTITY_REGISTRY.md"
       ],
-      "status": "Planned",
+      "status": "In active development",
       "summary": "One shared backend capability that remembers which photographers use which cameras, so AutoIngest can **suggest** (never decide) the photographer for an import. Camera details are captured automatically from the media, confirmed once by the operator, and reused everywhere photographer identification is needed: the menu-bar Quick Ingest companion, the existing Confirm Event Import modal, and a new Photographer Registry tab in Metadata Management. Registries are portable between AutoIngest computers through a versioned export file whose import **merges, never replaces**.",
       "title": "Photographer & Camera Identity Registry (Learning, Registry, Exchange)",
       "whatItDoes": "One shared backend capability that remembers which photographers use which cameras, so AutoIngest can **suggest** (never decide) the photographer for an import. Camera details are captured automatically from the media, confirmed once by the operator, and reused everywhere photographer identification is needed: the menu-bar Quick Ingest companion, the existing Confirm Event Import modal, and a new Photographer Registry tab in Metadata Management. Registries are portable between AutoIngest computers through a versioned export file whose import **merges, never replaces**."

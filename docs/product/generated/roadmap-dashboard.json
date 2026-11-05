@@ -15,8 +15,8 @@
   "feature_status_counts_overall": {
     "Implemented": 45,
     "Implemented — evolving": 7,
-    "In active development": 1,
-    "Planned": 10
+    "In active development": 2,
+    "Planned": 9
   },
   "following_milestone_id": "AI-RM-015",
   "milestones": [
@@ -321,8 +321,7 @@
         "AI-FEAT-058"
       ],
       "feature_status_counts": {
-        "In active development": 1,
-        "Planned": 1
+        "In active development": 2
       },
       "id": "AI-RM-014",
       "included_features": [

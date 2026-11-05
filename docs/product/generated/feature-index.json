@@ -3931,13 +3931,13 @@
       "dependents": [],
       "documentation_completeness": {
         "evidence_gap_count": 3,
-        "narrative": "Requirements, proposed model and the approved design decisions (DEC-029) recorded; technical investigations (per-manufacturer tags) still pending"
+        "narrative": "Requirements, approved decisions (DEC-029), Q3 multi-identifier amendment and implemented Q4a–Q4d behaviour recorded; Q5–Q7 not started; technical docs under `docs/` not yet updated (feature unmerged) *(Prior value, superseded 2026-11-05: Requirements, proposed model and the approved design decisions (DEC-029) recorded; technical investigations (per-manufacturer tags) still pending)*"
       },
-      "evidence_status": "Confirmed zero implementation (2026-10-28 read-only audit of `origin/stable/0.9` @ `0eb9c43`): no camera make/model/serial extraction and no photographer↔device association anywhere under `main/`, `services/`, `renderer/`. Requirements below are owner direction recorded 2026-10-28; the data model is a **proposal for review**, not shipped behaviour.",
+      "evidence_status": "Q4a–Q4d implemented on `feature/photographer-camera-learning-q4` (Q4a `ccd97e7`, Q4b `200c814`, Q4c `4cfafba`, fix `2a7a593`, Q4d `6d3cc45`) — local, unmerged, unreleased. Learning records OBSERVATIONS from committed event imports, with bounded recovery of interrupted learning. No UI shows them (Q5/Q6). macOS verified (dev + isolated packaged arm64); Windows DPAPI NOT verified. Stable is unchanged. *(Prior value, superseded 2026-11-05: Confirmed zero implementation (2026-10-28 read-only audit of `origin/stable/0.9` @ `0eb9c43`): no camera make/model/serial extraction and no photographer↔device association anywhere under `main/`, `services/`, `renderer/`. Requirements below are owner direction recorded 2026-10-28; the data model is a **proposal for review**, not shipped behaviour.)*",
       "feature_id": "AI-FEAT-063",
-      "introduced_version": "Not started",
-      "last_modified_version": "2026-10-28 — six owner design decisions approved ([DEC-029](../decisions/DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md)): option (b) single photographer list, rename keeps alias, multi-photographer handoff",
-      "maturity": "Planned",
+      "introduced_version": "Q4a `ccd97e7` (2026-11-03), feature branch only *(Prior value, superseded 2026-11-05: Not started)*",
+      "last_modified_version": "2026-11-04 — Q4d `6d3cc45`: bounded interrupted-learning recovery, verified archive evidence, newly-copied-only evidence, cross-process learning state (feature branch only) *(Prior value, superseded 2026-11-05: 2026-10-28 — six owner design decisions approved ([DEC-029](../decisions/DEC-029_PHOTOGRAPHER_REGISTRY_AND_QUICK_INGEST_DESIGN_DECISIONS.md)): option (b) single photographer list, rename keeps alias, multi-photographer handoff)*",
+      "maturity": "Experimental",
       "name": "Photographer & Camera Identity Registry (Learning, Registry, Exchange)",
       "parent_feature": [],
       "related_architecture_sections": [
@@ -3945,6 +3945,18 @@
       ],
       "related_bugs": [],
       "related_changelog_entries": [
+        {
+          "date": "2026-11-05",
+          "excerpt": "## 2026-11-05 — AI-FEAT-063 Q4a–Q4d recorded; Q3 multi-identifier amendment applied"
+        },
+        {
+          "date": "2026-11-05",
+          "excerpt": "**What changed**: AI-FEAT-063 Status Planned → In active development, Maturity Planned → Experimental (prior header values kept). New § Implemented behaviour (event-sourced registry, keyed identifier "
+        },
+        {
+          "date": "2026-11-05",
+          "excerpt": "**Affected feature(s)**: AI-FEAT-063"
+        },
         {
           "date": "2026-10-28",
           "excerpt": "**What changed**: Added DEC-029 recording six owner-approved decisions, split into final architectural decisions (1 single photographer list, option b; 2 rename keeps alias with pre-save collision che"
@@ -3987,7 +3999,14 @@
         "docs/data-model.md — none yet describe this feature",
         "because nothing is implemented"
       ],
-      "related_tests": [],
+      "related_tests": [
+        "test/identityRegistryStoreQ4b.test.js",
+        "test/photographerCameraLearningQ4a.test.js",
+        "test/photographerLearningQ4c.test.js",
+        "test/photographerLearningQ4cLive.test.js",
+        "test/photographerLearningQ4d.test.js",
+        "test/photographerLearningQ4dLive.test.js"
+      ],
       "roadmap_ids": [
         "AI-RM-014"
       ],
@@ -4000,7 +4019,7 @@
         "photographer",
         "registry"
       ],
-      "status": "Planned",
+      "status": "In active development",
       "subfeatures": [],
       "summary": "One shared backend capability that remembers which photographers use which cameras, so AutoIngest can **suggest** (never decide) the photographer for an import. Camera details are captured automatically from the media, confirmed once by the operator, and reused everywhere photographer identification is needed: the menu-bar Quick Ingest companion, the existing Confirm Event Import modal, and a new Photographer Registry tab in Metadata Management. Registries are portable between AutoIngest computers through a versioned export file whose import **merges, never replaces**.",
       "timeline_path": "generated/feature-timelines/AI-FEAT-063_TIMELINE.md"
