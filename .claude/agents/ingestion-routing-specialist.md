@@ -420,6 +420,23 @@ Validation:
 - Confirm `.autoingest-tx-tmp` residue is cleanable via `archiveRepairService.cleanupTempFile()`.
 - Confirm the final destination file is intact if `copyFile` completed before a crash on the EXDEV path.
 
+### Photographer Folders Are Located By Name — Rename Is Gated
+
+Context:
+- Applies to any change touching photographer folder naming, renaming, or the photographer registry's rename/alias commands.
+
+Rule:
+- Import routing, local/NAS sync, metadata audit and pending learning currently locate photographer folders by name (PCxx-<name>). Renaming is proposed only (`services/photographerRenameContract.js`) and `renameGate()` keeps it disabled until safeguards S1-S8 exist (event.json folder mapping, identity-aware routing, sync honouring folder history, journalled locked transaction with crash recovery not relying on file counts + bytes alone, PCxx preservation, audit former-name status, event:changed, pending-learning remap).
+- Profile rename commands stay off IPC and the folder planner stays read-only (`applied:false`) until then.
+
+Avoid:
+- Wiring rename to IPC, or describing it as working, before S1-S8 are implemented and approved.
+- Changing one by-name consumer (routing, sync, audit, learning) without the others.
+
+Validation:
+- Confirm no rename path is reachable from IPC while `renameGate()` is closed.
+- Confirm planner output is still non-applying.
+
 ### Error Handling
 
 Context:

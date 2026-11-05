@@ -310,6 +310,20 @@ Validation:
 - Grep the diff for `.replace(` calls where the second argument is a template literal or string concatenation containing a variable.
 - For each match, confirm the variable's value cannot originate from untrusted/dynamic input, or confirm the call uses a replacer function instead.
 
+### Read-Only Inspection Must Not Use Initializing Paths
+
+Context:
+- Applies to any viewer/inspector/diagnostic over persistent stores (identity registry, keys, locks, Keychain).
+
+Rule:
+- Inspection must use a dedicated read-only module (readFile/readdir, no decrypt), never the store's write/initialize entry point (e.g. `identityRegistryStore.open()` creates folder, lock, key and Keychain item). Viewing must not create persistent state.
+
+Avoid:
+- Approving a "view" feature that calls open()/init/ensure on the store.
+
+Validation:
+- Confirm a view on a fresh profile leaves the filesystem and Keychain unchanged.
+
 ## Validation Checklist
 
 Before giving a verdict, review:

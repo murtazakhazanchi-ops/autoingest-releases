@@ -2428,6 +2428,42 @@ Status:
 
 ---
 
+### 2026-11-05 — Q5a/Q5b Photographer Identity Registry (AI-FEAT-063 / AI-RM-014)
+
+Task type:
+- Data Model / Persistence / Security / Ingestion
+
+What happened:
+- IMPLEMENTED (verified by tests, code at 71f83d8; Q5a at 7efe238): (1) Viewing the registry must not initialize persistent identity storage: `identityRegistryStore.open()` is the write path (creates folder, lock, key, Keychain item); inspection uses `services/identityRegistryInspector.js` (readFile/readdir only, no decrypt). (2) Photographer identity and folder naming are distinct: a permanent photographer ID (shipped = UUIDv5 frozen in `data/photographer-ids.frozen.json`; local = random v4) resolves from CURRENT and FORMER official names via `services/photographerNameModel.js` `resolveOfficialName` (used by `store.ensurePhotographerId`). Profiles carry no folder name; folder names belong to each event. (3) Search shortcuts are not identity evidence: learned shortcuts (`photographers.aliases.json`) and registry search aliases (alias-added/-removed events, observed-remove set) are search-only; a shared alias returns all matches and selects none; aliases never resolve imports or folders. (4) Ambiguous official names are refused, not guessed (exception from Q4: a current shipped-list name resolves to its shipped ID). (5) Never tighten validation of an EXISTING registry event type (existing registries would fail validation and be treated as corrupt); add new event types instead (older versions preserve unknown types). (6) Correcting a shipped spelling = append the new spelling to that person's frozen entry; never edit/remove entries; a test fails if a shipped name has no frozen entry. (7) Profile rename/alias commands (`services/photographerProfileCommands.js`) are gated OFF and not wired to IPC; the folder planner (`services/photographerFolderRenamePlanner.js`) is read-only and always returns `applied:false, canApply:false`. (8) Q4b real-Keychain test: a different app identity yields `key-protection-identity-mismatch` (refused before decrypt, since 4cfafba); `key-undecryptable` is covered by a separate tampered-ciphertext phase.
+- ESTABLISHED CONSTRAINT (current code, unchanged): import routing, local/NAS sync, metadata audit and pending learning still locate photographer folders BY NAME (PCxx-<name>).
+- PROPOSED (NOT implemented; contract in `services/photographerRenameContract.js`): renaming requires coordinated safeguards S1-S8 (event.json photographerFolders mapping, identity-aware routing, sync honouring folder history, journalled transaction with archive locks and crash recovery that never relies on file counts + bytes alone, PCxx preservation, metadata-audit former-name status, event:changed, pending-learning remap). `renameGate()` keeps renaming disabled until all are implemented and approved.
+
+Reusable lesson:
+- Read-only inspection paths must be structurally separate from write/initialize paths.
+- Identity (permanent ID) must never be inferred from folder names or search aliases; folder names are per-event data.
+- Persisted-format evolution is additive: new event types, append-only frozen tables.
+- Do not let a gated/proposed capability be described as working; the by-name folder lookups in routing/sync/audit/learning make renaming unsafe until S1-S8 exist.
+
+Common failure mode:
+- Calling a store's open()/init from a "view" feature, silently creating key/lock/Keychain state.
+- Treating an alias or folder name as identity evidence, or auto-picking among ambiguous names.
+- Tightening an existing event-type validator and making old registries look corrupt.
+- Renaming a photographer folder while routing/sync/audit still match by name.
+
+Preferred pattern:
+- Inspector module with readFile/readdir only; resolve identity via ID + current/former official names; refuse ambiguity; add event types rather than change old ones; keep rename planners read-only until the rename contract is fully implemented and approved.
+
+Promote to agents:
+- event-data-guardian.md (identity vs folder name, search-only aliases, additive registry formats)
+- ingestion-routing-specialist.md (folders located by name; rename gated)
+- code-reviewer.md (read-only inspection must not call write/init paths)
+- Not metadata-specialist.md (audit-by-name constraint is covered by the routing rule; no metadata behaviour changed)
+
+Status:
+- Promoted
+
+---
+
 ## Entry Template
 
 ### YYYY-MM-DD — Task Name

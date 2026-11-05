@@ -156,6 +156,25 @@ Validation:
 - Confirm `lastImport.importedBy`, if added, derives from the latest import entry.
 - Confirm old entries without `importedBy` remain valid.
 
+### Photographer Identity Is Not Folder Name or Alias
+
+Context:
+- Applies to the photographer identity registry, photographer profiles, aliases, and any code resolving a photographer from text.
+
+Rule:
+- A permanent photographer ID (shipped = frozen UUIDv5 in `data/photographer-ids.frozen.json`; local = random v4) is the identity. Resolve it only from current/former official names (`resolveOfficialName`); profiles carry no folder name, folder names belong to each event.
+- Learned shortcuts and registry search aliases are search-only: a shared alias returns all matches and selects none, and never resolves imports or folders. Ambiguous official names are refused, not guessed.
+- Never tighten validation of an existing registry event type (old registries would be treated as corrupt); add new event types. Correct shipped spellings by appending to the frozen entry; never edit or remove entries.
+
+Avoid:
+- Deriving identity from folder names or aliases, or auto-selecting among ambiguous matches.
+- Changing validators for event types already written to disk.
+
+Validation:
+- Confirm alias matches never feed import/folder resolution.
+- Confirm an ambiguous name is refused.
+- Confirm a registry written by the previous version still validates.
+
 ### Event Structure Stability
 
 Context:
