@@ -5,6 +5,7 @@
  *   scheduleRecoveryAfterLaunch()  once at startup: if (and only if) an earlier run left
  *                           learning pending, a bounded recovery pass runs after a delay
  *   shutdown()              from will-quit
+ *   inspectRegistry()       Q5a: read-only Photographer Registry view (not wired to any IPC yet)
  * Nothing is created at launch or on card insert: the registry, its key, the journal and the
  * pending list are created lazily by the first eligible committed import.
  *
@@ -228,6 +229,53 @@ function scheduleRecoveryAfterLaunch() {
   } catch { return false; }
 }
 
+function _readJsonOr(file, fallback) {
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; }
+}
+
+/**
+ * Q5a — the read-only Photographer Registry view (photographerRegistryView.js contract).
+ * Never creates the registry, a key, a Keychain item, a photographer, a camera or a learning
+ * event; never takes a lock, decrypts, recovers or resets. When the learning store is already
+ * open in this process its in-memory events and authoritative key status are used; otherwise
+ * the files are only read (identityRegistryInspector.js). Never throws.
+ */
+async function inspectRegistry() {
+  const { buildRegistryView } = require('./photographerRegistryView');
+  try {
+    const { app, settings, dir } = _deps();
+    let registry;
+    const st = _store ? _store.getStatus() : null;
+    if (st && st.state === 'ready') {
+      registry = {
+        state: 'ready', reason: null, events: _store.getEvents(), keyStatus: st.keyStatus, keyVerified: true,
+        heldCount: st.integrityConflicts, unknownTypeEvents: st.unknownTypeEvents,
+      };
+    } else {
+      const { inspectRegistryFiles } = require('./identityRegistryInspector');
+      registry = await inspectRegistryFiles({ dir, expectedIdentity: app.getName() });
+    }
+    let pendingCount = null;
+    try {
+      const { createLearningStateStore } = require('./learningStateStore');
+      pendingCount = (await createLearningStateStore({ dir }).read()).pending.length;
+    } catch { /* unknown */ }
+    let operators = [];
+    try { operators = require('../main/userManager').listUsers().map(u => ({ id: u.id, name: u.name })); } catch { /* none */ }
+    return buildRegistryView({
+      registry,
+      listNames: require('../main/listManager').getList('photographers'),
+      shippedNames: _readJsonOr(path.join(__dirname, '..', 'data', 'photographers.json'), []),
+      learnedShortcuts: _readJsonOr(path.join(app.getPath('userData'), 'photographers.aliases.json'), {}),
+      operators,
+      thisComputerId: settings.getDeviceId(),
+      learning: { enabled: settings.getPhotographerLearningEnabled(), pendingCount },
+    });
+  } catch {
+    return buildRegistryView({ registry: { state: 'unreadable', reason: 'inspection-failed' } });
+  }
+}
+
 /** will-quit: cancel learning work and release the registry lock. Synchronous, idempotent. */
 function shutdown() {
   try { if (_service) _service.shutdown(); } catch { /* ignore */ }
@@ -236,6 +284,6 @@ function shutdown() {
 }
 
 module.exports = {
-  onImportCommitted, scheduleRecoveryAfterLaunch, shutdown,
-  _forTests: { get: () => _service, store: () => _store, recoverNow: (opts) => _get().recoverPending(opts), whenIdle: () => _get().whenIdle() },
+  onImportCommitted, scheduleRecoveryAfterLaunch, shutdown, inspectRegistry,
+  _forTests: { get: () => _service, store: () => _store, useStore: (s) => { _store = s; }, recoverNow: (opts) => _get().recoverPending(opts), whenIdle: () => _get().whenIdle() },
 };
