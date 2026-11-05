@@ -12,9 +12,14 @@
 // Phases run as separate processes (a real restart each time):
 //   init     new registry → key generated and sealed by safeStorage; one device event written
 //   reopen   same app identity → same key, same digest (restart / reinstall on the same Mac)
-//   othermac different app identity = different Keychain secret (stands in for a copied
-//            userData on another Mac/user) → key undecryptable → body matching disabled,
-//            nothing replaced
+//   othermac different app identity (stands in for a copied userData under another app name):
+//            the key file records the protecting identity, so the store refuses BEFORE touching
+//            secure storage → 'key-protection-identity-mismatch', body matching disabled,
+//            nothing replaced (protective check added in Q4c 4cfafba)
+//   tampered same app identity, key ciphertext damaged but checksum consistent (stands in for a
+//            Keychain secret that no longer matches) → real safeStorage decrypt fails →
+//            'key-undecryptable', body matching disabled, key file not replaced; the driver
+//            then restores the original key file
 // Run: node_modules/electron/dist/Electron.app/Contents/MacOS/Electron --no-sandbox \
 //        test/identityRegistrySafeStorageQ4b.electron.js
 
@@ -53,8 +58,19 @@ if (phase === 'driver') {
       check(re.status.events === 1, 'reopen: event persisted');
       const other = run('othermac');
       check(other.status.state === 'ready' && other.status.learning === true, 'other Keychain: registry still opens, learning unaffected');
-      check(other.status.bodyMatching === false && other.status.keyStatus === 'key-undecryptable', `other Keychain: body matching disabled (${other.status.keyStatus})`);
-      check(other.keyFileUnchanged === true, 'other Keychain: key file not replaced');
+      check(other.status.bodyMatching === false && other.status.keyStatus === 'key-protection-identity-mismatch', `other app identity: refused before decryption, body matching disabled (${other.status.keyStatus})`);
+      check(other.keyFileUnchanged === true, 'other app identity: key file not replaced');
+      const keyFilePath = path.join(root, 'userData', 'identity-registry', 'keys.json');
+      const original = fs.readFileSync(keyFilePath, 'utf8');
+      const doc = JSON.parse(original);
+      const damaged = Buffer.from(doc.keys[0].material, 'base64').subarray(0, -5); // not a whole cipher block
+      doc.keys[0] = { ...doc.keys[0], material: damaged.toString('base64'), sha256: require('node:crypto').createHash('sha256').update(damaged).digest('hex') };
+      fs.writeFileSync(keyFilePath, JSON.stringify(doc));
+      const tampered = run('tampered');
+      check(tampered.status.state === 'ready' && tampered.status.learning === true, 'undecryptable key: registry still opens, learning unaffected');
+      check(tampered.status.bodyMatching === false && tampered.status.keyStatus === 'key-undecryptable', `undecryptable key (same identity, real safeStorage decrypt fails): body matching disabled (${tampered.status.keyStatus})`);
+      check(tampered.keyFileUnchanged === true, 'undecryptable key: key file not replaced');
+      fs.writeFileSync(keyFilePath, original);
       const back = run('reopen');
       check(back.digest === init.digest, 'original identity again: key still decrypts (nothing was overwritten)');
     } catch (err) { check(false, err.message); }
@@ -95,7 +111,7 @@ if (phase === 'driver') {
       out.plaintextCheck = generated.some(g => files.includes(g.toString('hex')) || files.includes(g.toString('base64'))) ? 'PRESENT' : 'absent';
       out.serialInFiles = files.includes(SERIAL);
     }
-    if (phase === 'othermac') out.keyFileUnchanged = fs.readFileSync(keyFilePath, 'utf8') === keyBefore;
+    if (phase === 'othermac' || phase === 'tampered') out.keyFileUnchanged = fs.readFileSync(keyFilePath, 'utf8') === keyBefore;
     await store.close();
     process.stdout.write(`RESULT ${JSON.stringify(out)}\n`);
     app.exit(0);

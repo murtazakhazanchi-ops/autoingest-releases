@@ -1,0 +1,1881 @@
+{
+  "format": "autoingest-shipped-photographer-ids",
+  "version": 1,
+  "namespace": "9541e5b6-21e8-47a6-9b5f-0da59d5ed1a1",
+  "frozenAt": "2026-11-05",
+  "note": "Permanent IDs of shipped photographers. Never change or remove an entry. To correct a shipped spelling, append the new spelling to that entry's names (last = current) so the person keeps the same ID.",
+  "entries": [
+    {
+      "photographerId": "529986d2-cb65-5337-a374-2fb2e8da04db",
+      "names": [
+        "Shk Shabbir Kanorewala"
+      ]
+    },
+    {
+      "photographerId": "2111c94d-5f43-5741-bb4a-4dac40e60542",
+      "names": [
+        "Shk Abdeabiturab Rangwala"
+      ]
+    },
+    {
+      "photographerId": "f2be9263-e91e-5fb7-a15e-6356bbed98fd",
+      "names": [
+        "Huzaifa bs Vaziri"
+      ]
+    },
+    {
+      "photographerId": "2a415481-f56b-5039-941a-f1927a26117e",
+      "names": [
+        "Shk Ammar Talib"
+      ]
+    },
+    {
+      "photographerId": "e2f86307-2897-5c00-ae45-42080f064da9",
+      "names": [
+        "Shk Qusai Malindiwala"
+      ]
+    },
+    {
+      "photographerId": "040f16a8-bf3b-5761-8fe0-5a7fed239b4c",
+      "names": [
+        "Shk Moiz Raipurwala"
+      ]
+    },
+    {
+      "photographerId": "9fce2828-c3d8-5649-bc30-3f54dd202230",
+      "names": [
+        "Shk Murtaza Baqir"
+      ]
+    },
+    {
+      "photographerId": "1323d699-2561-5e7f-a41a-3e9bab51063a",
+      "names": [
+        "M Murtaza Khazanchi"
+      ]
+    },
+    {
+      "photographerId": "7e5e1633-5759-5b01-b1dd-97672309e286",
+      "names": [
+        "Huzaifa Hakimi"
+      ]
+    },
+    {
+      "photographerId": "11ed911c-3a15-56af-92c8-59a39926df83",
+      "names": [
+        "Mohammed KD"
+      ]
+    },
+    {
+      "photographerId": "2eee4931-d192-5670-8d44-3b33dd34d6cc",
+      "names": [
+        "M Murtaza Saeed"
+      ]
+    },
+    {
+      "photographerId": "6d2c5ea1-53f5-5431-bee5-0c81c125a8ce",
+      "names": [
+        "M Alaqmar Nasir"
+      ]
+    },
+    {
+      "photographerId": "07e0b444-aea3-5be9-8e94-0238481b2b9c",
+      "names": [
+        "M Husain Nadir"
+      ]
+    },
+    {
+      "photographerId": "98b07ac2-5495-5d9e-b497-6c29f5ade93b",
+      "names": [
+        "Moiz Ammar"
+      ]
+    },
+    {
+      "photographerId": "ccc2b4a6-48db-524f-85b5-f0eeca5efdb2",
+      "names": [
+        "M Aliasger Bagasrawala"
+      ]
+    },
+    {
+      "photographerId": "a746526a-10a5-564e-b250-1cfffa513bf1",
+      "names": [
+        "M Abdulhusain Najmi"
+      ]
+    },
+    {
+      "photographerId": "e751316b-307d-5173-955a-d204857d0c05",
+      "names": [
+        "Jamila Ezzi"
+      ]
+    },
+    {
+      "photographerId": "45ab7236-e6ab-51a1-bc65-ccd7d7af078c",
+      "names": [
+        "M Abdulqadir Chavi"
+      ]
+    },
+    {
+      "photographerId": "3227901e-c9cb-5ba5-aa2b-172558c9dede",
+      "names": [
+        "Taikhoom Rangwala"
+      ]
+    },
+    {
+      "photographerId": "724f18c0-705f-5408-b817-da9b9d2843cf",
+      "names": [
+        "Husain Esmailjee"
+      ]
+    },
+    {
+      "photographerId": "402962de-0f9e-561e-b7de-1179ab03b522",
+      "names": [
+        "Husain Liliyawala"
+      ]
+    },
+    {
+      "photographerId": "fccfdfda-2969-510f-856f-1f16497435c3",
+      "names": [
+        "Husain Vapiwala"
+      ]
+    },
+    {
+      "photographerId": "5030c1fe-1d47-5ec8-aaa9-7185ed4bede1",
+      "names": [
+        "Yahya Akberali"
+      ]
+    },
+    {
+      "photographerId": "3ecce066-2b4c-547f-9e32-4785210d5ca8",
+      "names": [
+        "M Najmuddin Chakkiwala"
+      ]
+    },
+    {
+      "photographerId": "9990aca2-bfbd-5bba-ba79-e951708046f9",
+      "names": [
+        "M Aliasger Chashmawala"
+      ]
+    },
+    {
+      "photographerId": "2f2464b4-fd95-58cd-894f-881d7ab71c20",
+      "names": [
+        "M Aliasger Yamani"
+      ]
+    },
+    {
+      "photographerId": "a6c7f368-4f14-581c-891c-5f1806333490",
+      "names": [
+        "Murtaza Nomani"
+      ]
+    },
+    {
+      "photographerId": "5d22f11d-6bd4-5973-929b-09db2850a656",
+      "names": [
+        "Mohammed al-Baqir Kawkaban"
+      ]
+    },
+    {
+      "photographerId": "1452f0d3-e335-57aa-aad9-b2e21fe56852",
+      "names": [
+        "M Murtaza Sonasath (Zen)"
+      ]
+    },
+    {
+      "photographerId": "d55ff958-2d65-50d0-a7c1-b4bcb14f5555",
+      "names": [
+        "M Juzer Kakaji"
+      ]
+    },
+    {
+      "photographerId": "8802f165-9546-58ca-9d89-9de268e9bb2a",
+      "names": [
+        "Mufaddal Petiwala"
+      ]
+    },
+    {
+      "photographerId": "d9917760-c5cd-5e0f-8662-abe097a64fef",
+      "names": [
+        "Qusai Jangbarwala"
+      ]
+    },
+    {
+      "photographerId": "041cbe4c-ca73-50ec-8e3d-0c2834aae410",
+      "names": [
+        "Mansoor Chawala"
+      ]
+    },
+    {
+      "photographerId": "5ff2c86a-4be7-573b-bd10-c3198355d9fd",
+      "names": [
+        "Abiturab Naria"
+      ]
+    },
+    {
+      "photographerId": "4e3a30af-082f-5877-b6a3-2d0c86e717f1",
+      "names": [
+        "Husain Taiyabally"
+      ]
+    },
+    {
+      "photographerId": "14142c01-0b5e-53d2-bcbf-21f7bfff7fd3",
+      "names": [
+        "Mustafa Badruddin"
+      ]
+    },
+    {
+      "photographerId": "5c26c2f5-be22-5f7c-9bc4-1895b0f979ad",
+      "names": [
+        "Zainab Mamujee"
+      ]
+    },
+    {
+      "photographerId": "646ff193-00c3-5b7d-aea3-3b7426c8e99e",
+      "names": [
+        "Ruqaiyah Taherally"
+      ]
+    },
+    {
+      "photographerId": "f73a2e72-4382-5cd4-b6a7-c8d3032f5e49",
+      "names": [
+        "Ahmed Badshah"
+      ]
+    },
+    {
+      "photographerId": "5051679a-97cc-56a7-b4d2-fa1ab1df9f55",
+      "names": [
+        "Radia Mulla Abidali bhai"
+      ]
+    },
+    {
+      "photographerId": "02edc505-f85b-5b3d-a15b-c95fa96c614e",
+      "names": [
+        "Aliasger Suleimanji"
+      ]
+    },
+    {
+      "photographerId": "9081d4f4-4ae5-5a66-a90c-e15008f8d700",
+      "names": [
+        "Hasan Nulwala"
+      ]
+    },
+    {
+      "photographerId": "ebdf2d20-c4f0-5c51-b2da-fec2371c965b",
+      "names": [
+        "Khadija Shakir"
+      ]
+    },
+    {
+      "photographerId": "e3138b5c-f6af-5da8-b949-2bc1d2c60a5e",
+      "names": [
+        "Tasneem Khuzaima"
+      ]
+    },
+    {
+      "photographerId": "a3131866-1b2d-57eb-a935-0e0a0400668e",
+      "names": [
+        "Zohair Rubberstampwala"
+      ]
+    },
+    {
+      "photographerId": "1d2e0085-a6a3-52ef-90d6-ae35454f0563",
+      "names": [
+        "Fatema Liliyawala"
+      ]
+    },
+    {
+      "photographerId": "2e932aef-8dc7-5155-ab7c-47fc43cbae7b",
+      "names": [
+        "Taher Kolsawala"
+      ]
+    },
+    {
+      "photographerId": "97397376-67de-5d9d-92a5-cc94ee3b2729",
+      "names": [
+        "Khuzaima Dohad"
+      ]
+    },
+    {
+      "photographerId": "a84288b2-ee15-517b-b38b-301ac116eae7",
+      "names": [
+        "M Habib Karimjee"
+      ]
+    },
+    {
+      "photographerId": "385a30db-d1fa-586d-ab85-053d7cb51ea9",
+      "names": [
+        "Adnan Karimjee"
+      ]
+    },
+    {
+      "photographerId": "0e23e93b-b2b2-5fdc-bba6-30dabb1aa7c3",
+      "names": [
+        "Imran Essaji"
+      ]
+    },
+    {
+      "photographerId": "33d277d0-991a-5d05-a1f6-2f9280eba2aa",
+      "names": [
+        "Miqdad Poona"
+      ]
+    },
+    {
+      "photographerId": "257667d2-0390-5d26-be64-fe545a9b2969",
+      "names": [
+        "Husain Mundrawala"
+      ]
+    },
+    {
+      "photographerId": "90066aec-4d84-533f-87d7-f8f58c00168c",
+      "names": [
+        "Burhanuddin Saker"
+      ]
+    },
+    {
+      "photographerId": "3711fa77-c26d-5e20-ad98-0f49c6fb655c",
+      "names": [
+        "Burhanuddin Alibhai"
+      ]
+    },
+    {
+      "photographerId": "61251e91-9c2a-5744-8673-763d081e0912",
+      "names": [
+        "M Husain Sadikot"
+      ]
+    },
+    {
+      "photographerId": "2d47e69e-d7be-58d5-b7a9-3bd7cf3922e3",
+      "names": [
+        "Hatim Jafferji"
+      ]
+    },
+    {
+      "photographerId": "583ee7cd-a6b0-5cd9-a66f-a1da439757a2",
+      "names": [
+        "Husain Ghor"
+      ]
+    },
+    {
+      "photographerId": "302fa1d7-5e1e-5a14-b1be-523f5adb2d1f",
+      "names": [
+        "Huzeifa Badri"
+      ]
+    },
+    {
+      "photographerId": "84a77e95-1785-5201-b516-1d32ae2b45ba",
+      "names": [
+        "Shk Huzaifa Wardh"
+      ]
+    },
+    {
+      "photographerId": "933ceb39-8cd2-5f02-9f44-76bb2bd59983",
+      "names": [
+        "Mustafa Champeli"
+      ]
+    },
+    {
+      "photographerId": "310dff5d-7f16-5c63-8b9c-9fd26ec96859",
+      "names": [
+        "Juzer Patan"
+      ]
+    },
+    {
+      "photographerId": "c0ab244f-ce8e-56aa-a2da-ab2f252f2f47",
+      "names": [
+        "Abbas Athar"
+      ]
+    },
+    {
+      "photographerId": "6ebdc62b-5a02-53cb-b451-70d1a04ab13b",
+      "names": [
+        "Ibrahim Dhud"
+      ]
+    },
+    {
+      "photographerId": "a1462ede-32a7-5a59-b483-9203942f204c",
+      "names": [
+        "Huzaifa Taiz"
+      ]
+    },
+    {
+      "photographerId": "6134b93f-6358-51da-a0c7-c4df85f302d7",
+      "names": [
+        "Murtaza Tayabali"
+      ]
+    },
+    {
+      "photographerId": "9827a6ff-f9a8-5655-8734-d461d6115bd2",
+      "names": [
+        "Sohail Raja"
+      ]
+    },
+    {
+      "photographerId": "775c71be-b73c-5ce3-b1ad-a842d4e7fea6",
+      "names": [
+        "Husain Dossaji"
+      ]
+    },
+    {
+      "photographerId": "9ca8b8df-7a23-57bc-bd3d-f2fa091b8328",
+      "names": [
+        "Mustansir Lokhand"
+      ]
+    },
+    {
+      "photographerId": "d7516107-b82c-5d7a-bdeb-91c82caf848a",
+      "names": [
+        "Naeem Dawoodbhai"
+      ]
+    },
+    {
+      "photographerId": "d5e8aea6-171b-5888-b11a-2dfdae31b797",
+      "names": [
+        "Murtaza Pisohri"
+      ]
+    },
+    {
+      "photographerId": "60dc51ca-6180-5709-9048-e65fa239957b",
+      "names": [
+        "Adnan Alibhai"
+      ]
+    },
+    {
+      "photographerId": "1b0d213b-e9cf-5e74-b8e7-2479fcbbbbc5",
+      "names": [
+        "Taher Husain"
+      ]
+    },
+    {
+      "photographerId": "15ae9575-25ae-5025-abcc-1a13933d9b6e",
+      "names": [
+        "Abbas Essajee"
+      ]
+    },
+    {
+      "photographerId": "9cbe6ca5-7827-5981-b71a-f219ae97125e",
+      "names": [
+        "Taha Raja"
+      ]
+    },
+    {
+      "photographerId": "78cef4c2-7e00-5544-884b-96cb95320ff6",
+      "names": [
+        "Taher Karimjee"
+      ]
+    },
+    {
+      "photographerId": "7eebbe72-5669-528d-8091-30e189db211f",
+      "names": [
+        "Murtaza Jari"
+      ]
+    },
+    {
+      "photographerId": "195758e4-c766-5b23-994d-257b2efc4c70",
+      "names": [
+        "Qaidjoher Ghadyali"
+      ]
+    },
+    {
+      "photographerId": "5a2a0b5b-a0a8-514d-9ac8-ddd9b8465a5f",
+      "names": [
+        "M Burhanuddin Akola"
+      ]
+    },
+    {
+      "photographerId": "2a24291f-cdbd-59df-b53a-a2d9e8c8adf5",
+      "names": [
+        "Mukarram Hatim"
+      ]
+    },
+    {
+      "photographerId": "51fe6b79-d558-5bd6-9c0b-cc0aeaea9afe",
+      "names": [
+        "Miqdad Ezzi"
+      ]
+    },
+    {
+      "photographerId": "b20a0be9-8e4b-5bf6-8158-2181a4dbe89b",
+      "names": [
+        "Abdutteyyeb Ghor"
+      ]
+    },
+    {
+      "photographerId": "c7b1d607-cb40-5bb1-bc64-9e7f06f37697",
+      "names": [
+        "Mustafa Kheralu"
+      ]
+    },
+    {
+      "photographerId": "353c4042-30cc-5281-8c81-012a560f2826",
+      "names": [
+        "Murtaza Siraj"
+      ]
+    },
+    {
+      "photographerId": "26230ce7-a99c-59f4-8235-80c668320d67",
+      "names": [
+        "Aamir Dohadwala"
+      ]
+    },
+    {
+      "photographerId": "8ffab992-8195-595d-bb3c-9ee467b2ec6e",
+      "names": [
+        "Al Rutba Photography"
+      ]
+    },
+    {
+      "photographerId": "b75f7bae-6b90-50cb-9ef0-601713bc7f64",
+      "names": [
+        "Ai Naaz Photo Studio"
+      ]
+    },
+    {
+      "photographerId": "87b32a1d-ec0e-55c6-b65c-e24d5c308cc9",
+      "names": [
+        "Burhanuddin AR"
+      ]
+    },
+    {
+      "photographerId": "b3cec32d-a413-5bd5-84ef-1ba6794039fa",
+      "names": [
+        "Taher Zavery"
+      ]
+    },
+    {
+      "photographerId": "56b7b75b-6fc8-5a11-8dee-5b0e83633f4a",
+      "names": [
+        "Taha Bakir"
+      ]
+    },
+    {
+      "photographerId": "d4a01c4f-5acf-537b-bd80-27271f2ad646",
+      "names": [
+        "Abizer Merchant"
+      ]
+    },
+    {
+      "photographerId": "a5ddb8d2-d141-5f40-a7e7-af2eaf6bd3e6",
+      "names": [
+        "M Husain Panvelwala"
+      ]
+    },
+    {
+      "photographerId": "32fc5eb5-a7d7-5aa2-9f3a-33bce38bc4df",
+      "names": [
+        "Mohammed Surat"
+      ]
+    },
+    {
+      "photographerId": "e6a85251-9758-51e8-98de-6af6a49514e7",
+      "names": [
+        "Husain Merchant (Valsad)"
+      ]
+    },
+    {
+      "photographerId": "7cd04c52-e7a3-50bf-92be-09c8097bfd69",
+      "names": [
+        "M Hatim Jawadwala"
+      ]
+    },
+    {
+      "photographerId": "859b1a82-1298-5d48-9573-dd85fa0eaea3",
+      "names": [
+        "Mustafa Jana"
+      ]
+    },
+    {
+      "photographerId": "be184594-c8e5-5204-a060-135014f27549",
+      "names": [
+        "Shamoil Petlawadwala"
+      ]
+    },
+    {
+      "photographerId": "0d0b95de-292b-5bd3-8e3e-b59eafeaea7d",
+      "names": [
+        "Mustafa Agarwala"
+      ]
+    },
+    {
+      "photographerId": "4e9cd29d-5180-5004-a511-e112463a65d5",
+      "names": [
+        "Abbas Kanorewala"
+      ]
+    },
+    {
+      "photographerId": "15ae24f0-60c9-5aba-95f5-a8d512c9a1e0",
+      "names": [
+        "Abdulqadir Jetpur"
+      ]
+    },
+    {
+      "photographerId": "3b8bf210-8325-59c7-b5d0-731297e8b85b",
+      "names": [
+        "Husain Patwari"
+      ]
+    },
+    {
+      "photographerId": "e510eac3-3c38-552a-9ba9-03de9d04f343",
+      "names": [
+        "Adnan Saleh"
+      ]
+    },
+    {
+      "photographerId": "a4a574fb-b2d0-52d7-b285-882083c4e16a",
+      "names": [
+        "M Aliasger Fruitwala"
+      ]
+    },
+    {
+      "photographerId": "e79dbb30-c310-5256-aaef-2dc0139e816a",
+      "names": [
+        "Yusuf Vithodawala"
+      ]
+    },
+    {
+      "photographerId": "36087dc7-0bc8-5ad0-b158-878d6dfac3a6",
+      "names": [
+        "Mohammed Kapadiya"
+      ]
+    },
+    {
+      "photographerId": "1a2723cb-b101-5cf6-89ee-d00fbf594413",
+      "names": [
+        "Husain Mandsaurwala"
+      ]
+    },
+    {
+      "photographerId": "1cff09b2-a48b-5ab9-9e35-71337d8b5baf",
+      "names": [
+        "M Mohammed Doctor"
+      ]
+    },
+    {
+      "photographerId": "379d90e0-57c1-54c4-adbd-a4ef7955c6b8",
+      "names": [
+        "Mohammedhusain Kankroliwala"
+      ]
+    },
+    {
+      "photographerId": "49a83574-6599-57b7-9ed0-e818a637e43c",
+      "names": [
+        "Alihusain Kankroliwala"
+      ]
+    },
+    {
+      "photographerId": "198bf2a8-d103-520f-84c3-19127218f01d",
+      "names": [
+        "Aliasger Amjherawala"
+      ]
+    },
+    {
+      "photographerId": "e6666d7f-26fa-5ffc-85d0-ef96dacfe204",
+      "names": [
+        "Murtaza Hamid"
+      ]
+    },
+    {
+      "photographerId": "1c22d39e-3c56-5456-9f92-f2aff80f815e",
+      "names": [
+        "Abdulqadir Kagalwala"
+      ]
+    },
+    {
+      "photographerId": "0c290676-fbaa-5957-9ac7-37fd136674c1",
+      "names": [
+        "Huzaifa Noori"
+      ]
+    },
+    {
+      "photographerId": "a7c872c4-9dd3-509e-9960-e8fa7a123dd2",
+      "names": [
+        "Ammar Dohadwala"
+      ]
+    },
+    {
+      "photographerId": "a1e8bf14-4e29-5793-921c-c443c0ca131e",
+      "names": [
+        "Murtaza Ratlamwala"
+      ]
+    },
+    {
+      "photographerId": "ab43a134-656f-5eae-b834-f94d84778af5",
+      "names": [
+        "Moiz Moti"
+      ]
+    },
+    {
+      "photographerId": "55e805d2-33e6-54a6-99b8-124d1519f7bc",
+      "names": [
+        "Ibrahim Kiranawala"
+      ]
+    },
+    {
+      "photographerId": "39089d64-02ec-5e5d-a86a-e310f42452b1",
+      "names": [
+        "Jamila Vasi"
+      ]
+    },
+    {
+      "photographerId": "71369bce-6986-50df-91da-2567949195c3",
+      "names": [
+        "Fatema Ajmerwala"
+      ]
+    },
+    {
+      "photographerId": "e077b7c8-3c08-52c9-95ca-b0f8fc7b6a18",
+      "names": [
+        "Alefiyah Badri"
+      ]
+    },
+    {
+      "photographerId": "228877a5-2ed9-5c7f-9b1e-33ad190ab4f3",
+      "names": [
+        "Ummehani Zulfiqar Kauka"
+      ]
+    },
+    {
+      "photographerId": "3250ca41-02fd-5d26-a8e6-6e12ab3009b4",
+      "names": [
+        "Shabbir Zakir"
+      ]
+    },
+    {
+      "photographerId": "94493d42-ce9c-58c1-9df7-b7f588b104be",
+      "names": [
+        "Fatema Shakir"
+      ]
+    },
+    {
+      "photographerId": "8c373b3c-cdf5-57f9-85fc-2e64c638acf2",
+      "names": [
+        "Khadija Saker"
+      ]
+    },
+    {
+      "photographerId": "197dd16a-98e7-5c66-b205-e2bae29a879e",
+      "names": [
+        "Arwa Khambalia"
+      ]
+    },
+    {
+      "photographerId": "155e06a0-9811-5e74-8a89-9434bb1fd330",
+      "names": [
+        "Ruqaiya Khaderbhai"
+      ]
+    },
+    {
+      "photographerId": "55c9bb46-38c1-540d-96a2-a1a8da9365bd",
+      "names": [
+        "Zainab Karkhana"
+      ]
+    },
+    {
+      "photographerId": "b4a42704-600e-570f-8260-10c289a7a593",
+      "names": [
+        "Rashida Khumusi"
+      ]
+    },
+    {
+      "photographerId": "f54466d5-233e-5553-8ff2-11c034f8a58a",
+      "names": [
+        "Zainab Jeddah"
+      ]
+    },
+    {
+      "photographerId": "6e3e7eb6-f7e8-5f84-8045-b9166e95703f",
+      "names": [
+        "Jamila Shakir"
+      ]
+    },
+    {
+      "photographerId": "da23991d-125b-5383-b82b-6d8038568d4b",
+      "names": [
+        "Arwa Soni"
+      ]
+    },
+    {
+      "photographerId": "ff158794-c16e-543d-8244-6f3784317ef6",
+      "names": [
+        "Ismail Modasawala (MDS)"
+      ]
+    },
+    {
+      "photographerId": "ed976c2b-e88e-5940-a39c-88c3b8fc7f51",
+      "names": [
+        "Hasan Khandwawala"
+      ]
+    },
+    {
+      "photographerId": "432651d5-e195-5eee-82a7-50ced6681d8d",
+      "names": [
+        "Taher Vaziri"
+      ]
+    },
+    {
+      "photographerId": "5b261a4b-60d5-50d1-a969-4b2586b50690",
+      "names": [
+        "M Yusuf Indorewala"
+      ]
+    },
+    {
+      "photographerId": "da497283-df83-57f1-8a81-e0c392dcd652",
+      "names": [
+        "M Murtaza Dohadwala"
+      ]
+    },
+    {
+      "photographerId": "21dc25df-5e84-53d4-97cf-37bda89f4875",
+      "names": [
+        "M Mustafa Tabha"
+      ]
+    },
+    {
+      "photographerId": "9783a284-3381-5b49-b5ab-36a5c82739ae",
+      "names": [
+        "M Mohammed Aunali"
+      ]
+    },
+    {
+      "photographerId": "e3cbfe0e-27db-53c3-971b-2ae08686dc41",
+      "names": [
+        "Yusuf Shahjapurwala"
+      ]
+    },
+    {
+      "photographerId": "42b134a0-936d-59ce-b251-84d41b2d6508",
+      "names": [
+        "Burhanuddin Hirani (Akola)"
+      ]
+    },
+    {
+      "photographerId": "dc16d1a3-1979-59db-9b72-3e84c9824553",
+      "names": [
+        "Mufaddal Fatehi"
+      ]
+    },
+    {
+      "photographerId": "c919cc8f-4641-54ab-9659-54b6c0d8bfde",
+      "names": [
+        "M Burhanuddin Selam"
+      ]
+    },
+    {
+      "photographerId": "f930a047-8d92-51d0-a14d-46f289c70100",
+      "names": [
+        "M Ibrahim Morbi"
+      ]
+    },
+    {
+      "photographerId": "f40a163c-39f7-553e-b1a5-8d68faf18319",
+      "names": [
+        "M Mustansir Mehsana"
+      ]
+    },
+    {
+      "photographerId": "12113eab-d7b9-5ef8-8c45-a289d6f1e238",
+      "names": [
+        "Hasan Salim"
+      ]
+    },
+    {
+      "photographerId": "adfed05c-de2e-503e-bf80-b5c0a5fd0b9d",
+      "names": [
+        "M Mustafa Shakir (Lokhandwala)"
+      ]
+    },
+    {
+      "photographerId": "007d415f-fb5a-5239-b106-b18ac987af82",
+      "names": [
+        "Aziz Najmi"
+      ]
+    },
+    {
+      "photographerId": "6cfa5a57-faf5-5fbc-bc5a-8b62d95beea2",
+      "names": [
+        "Hasan Peethwala"
+      ]
+    },
+    {
+      "photographerId": "373a1f18-c9a4-5c33-945c-093babc02cf2",
+      "names": [
+        "Husain Sultani"
+      ]
+    },
+    {
+      "photographerId": "b36b89f1-a22e-5728-8572-af923ab6e829",
+      "names": [
+        "Abbas Ghoghari"
+      ]
+    },
+    {
+      "photographerId": "9c840773-764c-5c16-95f8-79fc7ff94053",
+      "names": [
+        "Ibrahim Najmi"
+      ]
+    },
+    {
+      "photographerId": "2e3b03e9-25d8-5dc5-b0e7-f2c51bcf8c5d",
+      "names": [
+        "Idris Chikhli"
+      ]
+    },
+    {
+      "photographerId": "cf3119b1-7537-5ea6-bdfd-bace3a98ca76",
+      "names": [
+        "Taher Hakimji"
+      ]
+    },
+    {
+      "photographerId": "6ff5a8fc-d2a7-5a5b-9b8d-5cd5fda438f9",
+      "names": [
+        "Huzaifa Lokhandwala"
+      ]
+    },
+    {
+      "photographerId": "71bde4cc-51d6-5840-abc6-0a94ae13de60",
+      "names": [
+        "M Ali Indonesia"
+      ]
+    },
+    {
+      "photographerId": "4e030663-3f91-5d83-8114-ffc945a4c1c3",
+      "names": [
+        "Khuzaima Dahodwala"
+      ]
+    },
+    {
+      "photographerId": "864f7be2-feef-5765-9fc4-1e7193c026d3",
+      "names": [
+        "Zohair Loynmoon (Zafar)"
+      ]
+    },
+    {
+      "photographerId": "f9417b61-467a-5392-9924-5e1ec9309b22",
+      "names": [
+        "Huzaifa Khandwawala"
+      ]
+    },
+    {
+      "photographerId": "bc946acd-0930-517e-a354-d87b39df9035",
+      "names": [
+        "Aliasger Hamid"
+      ]
+    },
+    {
+      "photographerId": "b716546f-aa90-5760-b991-ed4374f280cb",
+      "names": [
+        "M Ibrahim Lokhandwala"
+      ]
+    },
+    {
+      "photographerId": "8a46a1fd-c52b-58de-a320-13141c3e7fda",
+      "names": [
+        "M Murtaza Kaprawala"
+      ]
+    },
+    {
+      "photographerId": "6288ec26-e528-5f56-a571-23e0575e6aab",
+      "names": [
+        "Burhanuddin Taranawala"
+      ]
+    },
+    {
+      "photographerId": "3517e8df-adf6-5d20-b4b8-cccd80f5daf6",
+      "names": [
+        "Kaizar Jetpurwala"
+      ]
+    },
+    {
+      "photographerId": "e8ef3849-7135-53ac-a3da-2ca5e508c24a",
+      "names": [
+        "Murtaza Borigamwala"
+      ]
+    },
+    {
+      "photographerId": "3a2d22eb-6461-5cae-9c03-76792fc5c490",
+      "names": [
+        "M Huzaifa Fidvi"
+      ]
+    },
+    {
+      "photographerId": "17226e3c-267c-5ee7-acb2-4d410cd1b081",
+      "names": [
+        "Huzaifa Hazari"
+      ]
+    },
+    {
+      "photographerId": "d5fe339e-7b7c-5227-839f-b4d76b47a57f",
+      "names": [
+        "Huzaifa Kauka"
+      ]
+    },
+    {
+      "photographerId": "93da0cee-ce35-5dbf-b670-cddef0184bd7",
+      "names": [
+        "Hatim Yusuf"
+      ]
+    },
+    {
+      "photographerId": "aa243dba-6ce3-5321-8fa2-ace8c66b04bc",
+      "names": [
+        "Tasneem Jiwaji"
+      ]
+    },
+    {
+      "photographerId": "351de5f3-8da5-52c6-b705-7304f0ccf7ff",
+      "names": [
+        "Taher bs Hasani"
+      ]
+    },
+    {
+      "photographerId": "ade18447-a883-5180-9079-20a9026fb839",
+      "names": [
+        "Huzaifa Ratlamwala"
+      ]
+    },
+    {
+      "photographerId": "eb6827ac-2331-54bd-9484-d1e7c36c913c",
+      "names": [
+        "M Shabbir Hazari"
+      ]
+    },
+    {
+      "photographerId": "61c28c00-038d-5055-8acd-e2ed4bf108bc",
+      "names": [
+        "M Ammar Jhadol"
+      ]
+    },
+    {
+      "photographerId": "3cc65737-a1c1-562b-9f3c-9410e000d24a",
+      "names": [
+        "M Husain Shabu"
+      ]
+    },
+    {
+      "photographerId": "5df7ff83-2e70-5bf6-89b0-c59610e546a8",
+      "names": [
+        "Taher Master"
+      ]
+    },
+    {
+      "photographerId": "82430345-e8ea-5421-98c3-209c23a3cf82",
+      "names": [
+        "Khuzaima Billah"
+      ]
+    },
+    {
+      "photographerId": "0412a197-3869-52c7-969f-dfbbe5aa0ab0",
+      "names": [
+        "Mufaddal Ghee"
+      ]
+    },
+    {
+      "photographerId": "c64f1f10-3792-56f0-b0ca-8fcc4e226230",
+      "names": [
+        "Mustansir Dungarpur"
+      ]
+    },
+    {
+      "photographerId": "78752c82-3cf5-5aa8-b19e-7f3264ce9292",
+      "names": [
+        "Hatim Cochin"
+      ]
+    },
+    {
+      "photographerId": "7b9d18f9-e88a-5c4f-9c7b-1cb45733c11a",
+      "names": [
+        "Husamuddin Motiwala"
+      ]
+    },
+    {
+      "photographerId": "4faf45f2-5c59-5ebf-b427-151b267d6f0c",
+      "names": [
+        "Aziz Fozi"
+      ]
+    },
+    {
+      "photographerId": "30901042-a668-5e03-9105-08b22f7d0833",
+      "names": [
+        "Burhanuddin Ghia"
+      ]
+    },
+    {
+      "photographerId": "57fbb981-fafb-5929-b84a-d1123fa208b3",
+      "names": [
+        "Husain Ghia"
+      ]
+    },
+    {
+      "photographerId": "3719b69b-cb39-5b94-8c68-64b415d1445e",
+      "names": [
+        "M Aliasger Gulamali"
+      ]
+    },
+    {
+      "photographerId": "29d8a7c9-3001-5fb3-a727-5c9dc9d15609",
+      "names": [
+        "Juzer Merchant"
+      ]
+    },
+    {
+      "photographerId": "64e4ca7e-99d9-5757-bb24-5fcc8f0ab69c",
+      "names": [
+        "M Murtaza MKE"
+      ]
+    },
+    {
+      "photographerId": "b3be3554-5fe4-5c52-b376-69220030763e",
+      "names": [
+        "M Huzaifa Ujjainwala"
+      ]
+    },
+    {
+      "photographerId": "5a9fec3f-27ce-58a4-860d-7ae67ffde927",
+      "names": [
+        "M Mustafa Sauti"
+      ]
+    },
+    {
+      "photographerId": "cdc66b9a-3b0f-5faf-b575-0e9458febe07",
+      "names": [
+        "Shk Shabbir Dhansurawala"
+      ]
+    },
+    {
+      "photographerId": "3e1cfe08-3d7b-554a-bee8-0d8adc3a0048",
+      "names": [
+        "Moiz Dhansurawala"
+      ]
+    },
+    {
+      "photographerId": "6bfa44ec-a260-5246-ac0e-519793531196",
+      "names": [
+        "M Huzaifa Zakir"
+      ]
+    },
+    {
+      "photographerId": "030c4948-fe69-559a-aab9-e9651a4ab7cc",
+      "names": [
+        "Luvai Gohar"
+      ]
+    },
+    {
+      "photographerId": "a97f27c2-7ec7-594a-84b3-27d1542b7d9b",
+      "names": [
+        "Mohammed Kapasi"
+      ]
+    },
+    {
+      "photographerId": "ee02ccd3-43e7-5fff-b5d7-61cbf8cc3778",
+      "names": [
+        "Murtaza Shakir"
+      ]
+    },
+    {
+      "photographerId": "0b355d32-1544-593c-9a53-a42b21668a2d",
+      "names": [
+        "Shk Kausar Shakir"
+      ]
+    },
+    {
+      "photographerId": "091959ed-c46a-554a-9d59-c1846cbfc80e",
+      "names": [
+        "Taher Essaji"
+      ]
+    },
+    {
+      "photographerId": "56bd3ab2-c6eb-5a58-82f5-28e862767a70",
+      "names": [
+        "Huzaifa Degani"
+      ]
+    },
+    {
+      "photographerId": "1ed5e7c8-816f-52c1-a3a4-43c405921bd8",
+      "names": [
+        "Mustafa Bhavnagar"
+      ]
+    },
+    {
+      "photographerId": "18c4a85a-2d2c-58b5-9304-c9159454e44d",
+      "names": [
+        "MohammedulBaqir Reshamwala"
+      ]
+    },
+    {
+      "photographerId": "e7d6e3bb-67be-5402-a760-3ce55cf782c4",
+      "names": [
+        "Abdullah Rangwala"
+      ]
+    },
+    {
+      "photographerId": "18a055e3-3eae-58b6-9ace-144e77d04b27",
+      "names": [
+        "Burhanuddin Kathawala"
+      ]
+    },
+    {
+      "photographerId": "5475ac80-1bbd-53eb-80dc-86ad42659e6a",
+      "names": [
+        "Shabbir Haji"
+      ]
+    },
+    {
+      "photographerId": "b55c700e-14e9-5d75-92b5-179e4e8db469",
+      "names": [
+        "Mustafa Dalal"
+      ]
+    },
+    {
+      "photographerId": "a82ed34f-b018-5fef-9612-b49871ac9a1c",
+      "names": [
+        "Mohammad Colombo"
+      ]
+    },
+    {
+      "photographerId": "89376486-f4c7-5c17-b207-58591dede8c0",
+      "names": [
+        "Huzaifa Wakaner"
+      ]
+    },
+    {
+      "photographerId": "c5cd73a4-5c1c-5f9a-89c1-b15c2c04e5c4",
+      "names": [
+        "Samina Ahmednagar"
+      ]
+    },
+    {
+      "photographerId": "08111440-b6b2-51af-9204-fb59ae9fb99d",
+      "names": [
+        "Husain Japanwala"
+      ]
+    },
+    {
+      "photographerId": "558c836a-ac65-5b97-b1fe-4d5a60c6bd40",
+      "names": [
+        "Khuzaima Raja"
+      ]
+    },
+    {
+      "photographerId": "b7564714-aca5-5fa1-a023-790e1440c1ab",
+      "names": [
+        "Husain Dhinojwala"
+      ]
+    },
+    {
+      "photographerId": "470ff2a8-9357-53e7-9122-b431be60b75e",
+      "names": [
+        "Moiz Rasheed"
+      ]
+    },
+    {
+      "photographerId": "bd2b1fd8-b5bf-508e-969d-91057560bdc0",
+      "names": [
+        "Abdulqadir Darbar"
+      ]
+    },
+    {
+      "photographerId": "18566b0e-5e70-5186-a598-74619c1a923b",
+      "names": [
+        "Ibrahim Rangoonwala"
+      ]
+    },
+    {
+      "photographerId": "4511f8c2-cb27-5467-ac3c-bc536161ebae",
+      "names": [
+        "Idris Rangwala"
+      ]
+    },
+    {
+      "photographerId": "3fa7c8c9-1aa5-59db-9956-69d7a6353619",
+      "names": [
+        "Mustansir Lokhandwala"
+      ]
+    },
+    {
+      "photographerId": "3b2e3c58-aa0d-55e5-9d5d-9071a97e68ce",
+      "names": [
+        "Mansoor Nabejee"
+      ]
+    },
+    {
+      "photographerId": "65bfc969-c2b4-5ce1-9120-49c97b5993c7",
+      "names": [
+        "Taher Hamid"
+      ]
+    },
+    {
+      "photographerId": "46dd43e1-9551-5e3c-ab60-a1f6955a545f",
+      "names": [
+        "Mufaddal Lokhandwala"
+      ]
+    },
+    {
+      "photographerId": "1d4102a4-416e-5ed5-9386-246706171164",
+      "names": [
+        "Adnan Manaf"
+      ]
+    },
+    {
+      "photographerId": "04107a26-a0ad-590a-9aad-b698a9de8f54",
+      "names": [
+        "Behlah Barbhaya"
+      ]
+    },
+    {
+      "photographerId": "3ee275dc-e764-5602-bc27-6d8b5ba94c05",
+      "names": [
+        "M Husain Abidali"
+      ]
+    },
+    {
+      "photographerId": "9f9ebad8-165b-5ca2-9013-aa5052979fe9",
+      "names": [
+        "Abbas Patwa"
+      ]
+    },
+    {
+      "photographerId": "d86be779-303b-586f-b690-c58476533c8e",
+      "names": [
+        "Aziz Taher"
+      ]
+    },
+    {
+      "photographerId": "17ab5454-6eaf-524d-bc5a-c3d37afb3fbd",
+      "names": [
+        "Alefiyah Nalwala"
+      ]
+    },
+    {
+      "photographerId": "81fae8dd-2e6d-5332-a3f6-d99632068788",
+      "names": [
+        "Ummehani Palanpurwala"
+      ]
+    },
+    {
+      "photographerId": "add1f613-4f2c-5104-8d0e-c15a12cdd2c4",
+      "names": [
+        "Husain Patwa"
+      ]
+    },
+    {
+      "photographerId": "0002c240-e3c2-55a8-9281-a935de8d2cd8",
+      "names": [
+        "Hakimuddin Maskati"
+      ]
+    },
+    {
+      "photographerId": "957e795c-4af3-5734-91c2-deebcbe36e34",
+      "names": [
+        "Amatullah Vazirbun"
+      ]
+    },
+    {
+      "photographerId": "ab0dc672-df35-5018-8a40-e08d84378156",
+      "names": [
+        "M Taha Saifuddin"
+      ]
+    },
+    {
+      "photographerId": "f836ff00-a089-573c-a4f8-26d3c72d863a",
+      "names": [
+        "Taher Mandviwala"
+      ]
+    },
+    {
+      "photographerId": "c22bf910-44c0-5b72-a805-37939fa11984",
+      "names": [
+        "Samina Soda"
+      ]
+    },
+    {
+      "photographerId": "b18dc48c-0e33-54b8-a8bc-867833f5afcf",
+      "names": [
+        "Jamila Harar"
+      ]
+    },
+    {
+      "photographerId": "e5f90aa6-62bd-5442-93d7-599e0559e937",
+      "names": [
+        "Alefiya Kothalya"
+      ]
+    },
+    {
+      "photographerId": "583862c7-8057-5b97-ad7a-a16705682a21",
+      "names": [
+        "Batul Zainuddin"
+      ]
+    },
+    {
+      "photographerId": "6bdcf1bc-e069-5734-88d9-8d39afbc1674",
+      "names": [
+        "Husaina Motiwala"
+      ]
+    },
+    {
+      "photographerId": "22885150-58a6-5696-beee-faf709bafbfd",
+      "names": [
+        "M Fakhruddin Challawala"
+      ]
+    },
+    {
+      "photographerId": "b1678894-472a-5824-a347-afa4cb4bf590",
+      "names": [
+        "Tasneem Saifee"
+      ]
+    },
+    {
+      "photographerId": "53038218-f006-54f5-90ff-cdbfad3a0877",
+      "names": [
+        "Husaina Fakhri"
+      ]
+    },
+    {
+      "photographerId": "7f72a31e-ce7d-58a4-8cbe-bbae828011ef",
+      "names": [
+        "Arwa Jamali"
+      ]
+    },
+    {
+      "photographerId": "ddd6897a-d589-5779-9e5f-890f3ed54ca3",
+      "names": [
+        "Munira Aari"
+      ]
+    },
+    {
+      "photographerId": "20173009-6b13-55e6-bd15-354b965ae193",
+      "names": [
+        "Fatema Dhanerawala"
+      ]
+    },
+    {
+      "photographerId": "1e2bb60b-06dc-5f0f-8c42-12cd312e6b99",
+      "names": [
+        "Zahabiya Dhanerawala"
+      ]
+    },
+    {
+      "photographerId": "c17c9711-9c3b-5eca-bd57-d2e982d98fec",
+      "names": [
+        "Mohammed Matarwala"
+      ]
+    },
+    {
+      "photographerId": "7ae746b5-1d70-5914-8497-2fb39c6df5e3",
+      "names": [
+        "Abbas Sanwerwala"
+      ]
+    },
+    {
+      "photographerId": "6d4f9d9b-d02e-5ec4-a2f0-1900d75d4d77",
+      "names": [
+        "Hatim Marfatiya"
+      ]
+    },
+    {
+      "photographerId": "73cf8c63-87e8-53a3-9ef5-0c0a758777a6",
+      "names": [
+        "Husain Rampurawala"
+      ]
+    },
+    {
+      "photographerId": "de359bf0-a6cd-5c4e-a711-6646c89bb4d1",
+      "names": [
+        "Zainab Zaki"
+      ]
+    },
+    {
+      "photographerId": "f59ef3dd-2c3e-5b18-a031-0ad2fd1007db",
+      "names": [
+        "Fatema al-Sugra Khambaty"
+      ]
+    },
+    {
+      "photographerId": "db8804e6-5dcc-5ab9-b660-b8297753087f",
+      "names": [
+        "Aliasger Limadiawala"
+      ]
+    },
+    {
+      "photographerId": "047b018c-3041-5a26-a046-9879f1bd6f43",
+      "names": [
+        "Nisreen Barodawala"
+      ]
+    },
+    {
+      "photographerId": "741f76ad-ca89-5790-844b-b734d9ded71f",
+      "names": [
+        "Umaima Patharia"
+      ]
+    },
+    {
+      "photographerId": "371174a9-9a67-5204-a4c9-89b9ae201761",
+      "names": [
+        "Shk Adnan Bodeliwala"
+      ]
+    },
+    {
+      "photographerId": "89fc43f5-2608-5946-991c-59ca8c887603",
+      "names": [
+        "Aliasger Kherodawala"
+      ]
+    },
+    {
+      "photographerId": "0e11317f-5365-5e8e-8bf3-0aaf5d60b106",
+      "names": [
+        "Burhanuddin Bigodi"
+      ]
+    },
+    {
+      "photographerId": "11dcf108-e5b9-5d6e-9d8d-8164a2284242",
+      "names": [
+        "Burhanuddin Hirany (Paris)"
+      ]
+    },
+    {
+      "photographerId": "138979f0-dcda-5368-9099-34f22403125c",
+      "names": [
+        "Ishaq Petiwala"
+      ]
+    },
+    {
+      "photographerId": "b57114bd-b3e9-5b79-b21d-f322b6c17340",
+      "names": [
+        "Idris Kotawala"
+      ]
+    },
+    {
+      "photographerId": "f7e656d9-17fd-5401-b371-a514f93aa8b6",
+      "names": [
+        "Husain Ujjainwala"
+      ]
+    },
+    {
+      "photographerId": "c74cc96c-c878-5568-becb-24e793dd7b84",
+      "names": [
+        "Murtaza Sharbat"
+      ]
+    },
+    {
+      "photographerId": "1b4608b9-9a9a-5169-b8f3-9398b2ae3df0",
+      "names": [
+        "Huzaifa Haji"
+      ]
+    },
+    {
+      "photographerId": "18276d7e-2bbf-5062-9687-2b8f669b16cc",
+      "names": [
+        "Taher Ezzi"
+      ]
+    },
+    {
+      "photographerId": "8a8f089e-8274-591f-a6e4-f7bd11942dce",
+      "names": [
+        "Murtaza Najafi"
+      ]
+    },
+    {
+      "photographerId": "f9595ef4-7882-55f6-80df-634396b11646",
+      "names": [
+        "Sakina Rajkotwala"
+      ]
+    },
+    {
+      "photographerId": "53c0b523-42ca-53d8-b26c-a495bdc5a5aa",
+      "names": [
+        "Qaizar Mandsaurwala"
+      ]
+    },
+    {
+      "photographerId": "63e7c300-1f49-51e1-b187-22e9baa2cf7f",
+      "names": [
+        "Taher Adenwala"
+      ]
+    },
+    {
+      "photographerId": "f9128c0a-fe4d-5fbb-8b19-091995ddd381",
+      "names": [
+        "Fakhruddin Saifee"
+      ]
+    },
+    {
+      "photographerId": "8e09c02e-f97a-5b28-adbe-ea67ca904dff",
+      "names": [
+        "M Moiz Hamid"
+      ]
+    },
+    {
+      "photographerId": "7350c261-e023-5042-a3eb-5f67969eba0f",
+      "names": [
+        "M Hatim Jannaty"
+      ]
+    },
+    {
+      "photographerId": "1841a2f3-6eb7-59cd-9cf9-f6e9d3626772",
+      "names": [
+        "Insiyah Yavatmalwala"
+      ]
+    },
+    {
+      "photographerId": "51af544d-aed0-5b4e-ae79-915bbdf902d8",
+      "names": [
+        "Huzaifa Kanorewala"
+      ]
+    },
+    {
+      "photographerId": "dcc82c22-3efc-5c88-b1f6-eaaacb36ffee",
+      "names": [
+        "Shabbir Ujjaini"
+      ]
+    },
+    {
+      "photographerId": "6b0f8d03-02ad-50eb-9033-945056be20e8",
+      "names": [
+        "M Hamza Kagdi"
+      ]
+    },
+    {
+      "photographerId": "3a802f98-790b-5b6e-95d5-ef6109e902fa",
+      "names": [
+        "Alefiya Lehri"
+      ]
+    },
+    {
+      "photographerId": "9963d65c-5c86-51c4-9bb1-3326dbb2a13a",
+      "names": [
+        "Zainab Makkawala"
+      ]
+    },
+    {
+      "photographerId": "fb4c544e-3040-57cd-9e0d-0c2ddc3fd74a",
+      "names": [
+        "Khadija Lakhat"
+      ]
+    },
+    {
+      "photographerId": "4cc71485-822b-5c1a-a294-f349bfa5905a",
+      "names": [
+        "Fatema Ghadiyali"
+      ]
+    },
+    {
+      "photographerId": "3d64e461-3f4b-527d-bac5-3fe6f0ba2628",
+      "names": [
+        "Mustansir Mehsanawala"
+      ]
+    },
+    {
+      "photographerId": "5482eb5a-3ed7-57a1-a1ef-c42cfb0a3138",
+      "names": [
+        "Khuzaima Saif"
+      ]
+    },
+    {
+      "photographerId": "9c44c516-0e5b-5c94-aba2-2c10bfdc7c60",
+      "names": [
+        "Rabab Challawala"
+      ]
+    },
+    {
+      "photographerId": "dd07ca2f-46ee-5f7b-bcfc-43f268033cb1",
+      "names": [
+        "Juzer Munpurwala"
+      ]
+    },
+    {
+      "photographerId": "3d58f747-45c0-52b8-bbf4-daf9b3dbc1f8",
+      "names": [
+        "M Murtaza Daud"
+      ]
+    },
+    {
+      "photographerId": "5a9c5cc5-fc7a-57be-b07f-e026a6264bcc",
+      "names": [
+        "Hatim Saeed"
+      ]
+    },
+    {
+      "photographerId": "b0e21cc5-4272-56cc-b1cc-bbcc7e0a2d03",
+      "names": [
+        "Mansoor Rassi"
+      ]
+    },
+    {
+      "photographerId": "3ffa3384-15a0-5ffd-8d51-48f7274933f9",
+      "names": [
+        "Hasnain Rangwala"
+      ]
+    },
+    {
+      "photographerId": "4bf48ba3-71bc-5060-8aaf-fed7c00beb30",
+      "names": [
+        "Abdulhusain Ezzi"
+      ]
+    },
+    {
+      "photographerId": "50c05c8e-775e-5810-9853-1590de64c00b",
+      "names": [
+        "Ibrahim Najmi Wana"
+      ]
+    },
+    {
+      "photographerId": "a57ef910-d1c8-5483-89ab-044b9847ffce",
+      "names": [
+        "M Mohammed Mamujee (Mojo)"
+      ]
+    },
+    {
+      "photographerId": "6c0996cb-a71f-55a6-a3cf-5915247b6aa2",
+      "names": [
+        "Yusuf Ezzi"
+      ]
+    },
+    {
+      "photographerId": "bf026713-8742-5d32-9c77-647e52c44d06",
+      "names": [
+        "Murtaza Valijee"
+      ]
+    },
+    {
+      "photographerId": "dda501ba-7485-5a98-8a5e-f05ac1e1015c",
+      "names": [
+        "Mohammed Cochin"
+      ]
+    },
+    {
+      "photographerId": "65dc5cb3-779d-5189-af84-a261ecf204fb",
+      "names": [
+        "Yahya Valihjee"
+      ]
+    },
+    {
+      "photographerId": "d4e8edae-b5f3-5ccd-8b77-725303e13dda",
+      "names": [
+        "Huzeifa Hunaid"
+      ]
+    },
+    {
+      "photographerId": "26565366-7ea9-53cb-a725-0f2f34989460",
+      "names": [
+        "Taha Sabit"
+      ]
+    },
+    {
+      "photographerId": "d1dab0c2-219c-5bd5-9141-d71a7a55e05e",
+      "names": [
+        "Burhanuddin Pirbhai"
+      ]
+    },
+    {
+      "photographerId": "e4079b4d-1376-5bc6-98b6-5466398895cf",
+      "names": [
+        "Mustafa Yusuf"
+      ]
+    },
+    {
+      "photographerId": "c6bc9eaa-2048-5118-9c81-b401e2ea47b8",
+      "names": [
+        "Qaidjohar Valijee"
+      ]
+    },
+    {
+      "photographerId": "16d6c908-329f-5fa7-8e6f-1d18d8840a2b",
+      "names": [
+        "Juzer Hunaid"
+      ]
+    },
+    {
+      "photographerId": "13c23775-88f5-5b20-b311-77622ababdd5",
+      "names": [
+        "Idris bhai Burhani"
+      ]
+    },
+    {
+      "photographerId": "10b7791e-25c5-5fa4-8c8e-b889b04c8660",
+      "names": [
+        "Moiz Mohammadali"
+      ]
+    },
+    {
+      "photographerId": "8122c462-37c6-5506-ad22-92c973e7646c",
+      "names": [
+        "Ibhahim Abdoulhusain"
+      ]
+    },
+    {
+      "photographerId": "5aad414f-1b25-53cb-9102-603563b9eafd",
+      "names": [
+        "Murtaza  Jafferjee"
+      ]
+    },
+    {
+      "photographerId": "e5264394-096e-57ae-9f64-b1c4c745a17d",
+      "names": [
+        "Huzaifa Noorani"
+      ]
+    },
+    {
+      "photographerId": "2f939f09-4a37-594b-98b8-434f3ac89fd4",
+      "names": [
+        "Yusuf Jivajee"
+      ]
+    },
+    {
+      "photographerId": "601cd882-9e43-5a58-8075-a16e51cd4516",
+      "names": [
+        "Mufaddal Jaorawala"
+      ]
+    },
+    {
+      "photographerId": "6219a965-80b5-5bd9-a8e9-1b18802967eb",
+      "names": [
+        "Aliasger Mograwala (Bhabra)"
+      ]
+    },
+    {
+      "photographerId": "3b6470b8-6ebb-552c-aff6-70fcfebfd4d5",
+      "names": [
+        "Huneid Milki"
+      ]
+    },
+    {
+      "photographerId": "63628c03-a7f9-558d-b51b-a7c4d8e517f1",
+      "names": [
+        "Tasneem Rounaq"
+      ]
+    },
+    {
+      "photographerId": "262e2130-8ab6-5008-91d0-60b328d57eea",
+      "names": [
+        "Qutbuddin Vohra"
+      ]
+    },
+    {
+      "photographerId": "0f5bb10c-7d63-5d38-b100-581e74019ddf",
+      "names": [
+        "M Burhanuddin Taheri"
+      ]
+    },
+    {
+      "photographerId": "193119e9-8348-5ec1-bfae-b55df718a34c",
+      "names": [
+        "M Murtaza Jabal"
+      ]
+    },
+    {
+      "photographerId": "54d1489f-8589-556c-a8b8-300f7cf0e42c",
+      "names": [
+        "Murtaza Pishori"
+      ]
+    },
+    {
+      "photographerId": "6d175879-366c-5ab3-8215-58156b135fb1",
+      "names": [
+        "Husaina Pishori"
+      ]
+    },
+    {
+      "photographerId": "e0714381-dc91-5c10-9014-2230bd6725fc",
+      "names": [
+        "Qubuddin Rampurawala"
+      ]
+    }
+  ]
+}

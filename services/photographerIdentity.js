@@ -26,6 +26,7 @@ const SHIPPED_PHOTOGRAPHER_NAMESPACE = '9541e5b6-21e8-47a6-9b5f-0da59d5ed1a1';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const SIMILAR_MIN_LENGTH = 5;
 const SIMILAR_MAX_EDITS = 2;
+const FROZEN_FORMAT = 'autoingest-shipped-photographer-ids';
 
 const normalizeName = (name) => normalizeForAliasMatch(typeof name === 'string' ? name : '');
 const isUuid = (v) => typeof v === 'string' && UUID_RE.test(v);
@@ -54,12 +55,53 @@ function newPhotographerId(randomUUID = crypto.randomUUID) {
 }
 
 /**
- * Bootstrap IDs for the shipped list. Two shipped entries that normalize to the same name
- * would collapse into one ID, so neither gets a deterministic ID; both are reported.
- * @param {string[]} shippedNames
- * @returns {{ byNormalized: Map<string,{photographerId:string,name:string}>, byId: Map<string,{photographerId:string,name:string}>, problems: object[] }}
+ * The frozen shipped-ID map (data/photographer-ids.frozen.json, Q5b). Every shipped photographer
+ * of the 2026-11 list has its ID written down, equal to the UUIDv5 it already had, so a later
+ * spelling correction in data/photographers.json cannot silently give that person a new ID:
+ * the maintainer appends the corrected spelling to the same entry instead. Names not in the map
+ * (photographers added to the shipped list later) keep the deterministic UUIDv5.
+ * @returns {{ byNormalized: Map<string,{photographerId:string,names:string[]}>, problems: object[] }}
  */
-function bootstrapShippedIds(shippedNames) {
+function loadFrozenShippedIds(doc) {
+  const byNormalized = new Map();
+  if (!doc || doc.format !== FROZEN_FORMAT || doc.version !== 1 || !Array.isArray(doc.entries)) return { byNormalized, problems: [{ kind: 'frozen-map-invalid' }] };
+  const ids = new Set();
+  const problems = [];
+  for (const e of doc.entries) {
+    const names = e && Array.isArray(e.names) ? e.names.filter(n => normalizeName(n)) : [];
+    if (!e || !isUuid(e.photographerId) || !names.length || ids.has(e.photographerId)) { problems.push({ kind: 'frozen-entry-invalid' }); continue; }
+    ids.add(e.photographerId);
+    const rec = Object.freeze({ photographerId: e.photographerId, names: Object.freeze([...names]) });
+    for (const n of names.map(normalizeName)) {
+      if (byNormalized.has(n) && byNormalized.get(n).photographerId !== rec.photographerId) problems.push({ kind: 'frozen-name-on-two-ids' });
+      else byNormalized.set(n, rec);
+    }
+  }
+  return { byNormalized, problems };
+}
+
+let _frozenDefault = null;
+function _defaultFrozen() {
+  if (!_frozenDefault) {
+    // A missing or damaged map falls back to UUIDv5, which is exactly what the map records for
+    // every frozen name, so no ID changes; only a later spelling correction would be unprotected.
+    try { _frozenDefault = loadFrozenShippedIds(require('../data/photographer-ids.frozen.json')); }
+    catch { _frozenDefault = { byNormalized: new Map(), problems: [{ kind: 'frozen-map-unreadable' }] }; }
+  }
+  return _frozenDefault;
+}
+
+/**
+ * Bootstrap IDs for the shipped list. Two shipped entries that normalize to the same name
+ * would collapse into one ID, so neither gets a deterministic ID; both are reported. Two
+ * shipped spellings recorded on one frozen entry are one person: both resolve to that ID.
+ * Frozen former spellings resolve too (byNormalized) and are listed as the record's formerNames.
+ * @param {string[]} shippedNames
+ * @param {{ frozen?: { byNormalized: Map<string,{photographerId:string,names:string[]}> } }} [opts]
+ * @returns {{ byNormalized: Map<string,ShippedRec>, byId: Map<string,ShippedRec>, problems: object[] }}
+ *   ShippedRec = { photographerId, name (current list spelling), originalName (first frozen spelling), formerNames }
+ */
+function bootstrapShippedIds(shippedNames, { frozen = _defaultFrozen() } = {}) {
   const groups = new Map();
   const problems = [];
   for (const name of Array.isArray(shippedNames) ? shippedNames : []) {
@@ -68,13 +110,31 @@ function bootstrapShippedIds(shippedNames) {
     if (!groups.has(n)) groups.set(n, []);
     groups.get(n).push(name);
   }
-  const byNormalized = new Map();
-  const byId = new Map();
+  const listed = new Map(); // id → { names in the shipped list, frozen entry }
   for (const [n, names] of groups) {
     if (names.length > 1) { problems.push({ kind: 'duplicate-shipped-name', names }); continue; }
-    const rec = Object.freeze({ photographerId: shippedPhotographerId(names[0]), name: names[0] });
-    byNormalized.set(n, rec);
-    byId.set(rec.photographerId, rec);
+    const fz = frozen.byNormalized.get(n) || null;
+    const id = fz ? fz.photographerId : shippedPhotographerId(names[0]);
+    if (!listed.has(id)) listed.set(id, { names: [], fz });
+    listed.get(id).names.push(names[0]);
+  }
+  const byNormalized = new Map();
+  const byId = new Map();
+  for (const [id, { names, fz }] of listed) {
+    if (names.length > 1) problems.push({ kind: 'shipped-spellings-share-id', names: [...names] });
+    // Current spelling: the latest frozen spelling still in the list, else the list's own.
+    const ordered = fz ? [...fz.names].reverse() : [];
+    const cur = ordered.map(normalizeName).find(k => names.some(x => normalizeName(x) === k));
+    const name = cur ? names.find(x => normalizeName(x) === cur) : names[0];
+    const former = new Map();
+    for (const f of [...(fz ? fz.names : []), ...names]) if (normalizeName(f) !== normalizeName(name) && !former.has(normalizeName(f))) former.set(normalizeName(f), f);
+    const rec = Object.freeze({ photographerId: id, name, originalName: fz ? fz.names[0] : name, formerNames: Object.freeze([...former.values()]) });
+    byId.set(id, rec);
+    for (const f of [name, ...rec.formerNames]) {
+      const k = normalizeName(f);
+      // A list name always wins over another entry's frozen former spelling.
+      if (!byNormalized.has(k) || names.some(x => normalizeName(x) === k)) byNormalized.set(k, rec);
+    }
   }
   return { byNormalized, byId, problems };
 }
@@ -152,6 +212,6 @@ function resolvePhotographerName(name, { shipped, photographers = [] } = {}) {
 
 module.exports = {
   SHIPPED_PHOTOGRAPHER_NAMESPACE, normalizeName, isUuid, uuidV5: _uuidV5,
-  shippedPhotographerId, newPhotographerId, bootstrapShippedIds,
-  checkNameCollision, resolvePhotographerName,
+  shippedPhotographerId, newPhotographerId, bootstrapShippedIds, loadFrozenShippedIds,
+  checkNameCollision, resolvePhotographerName, similarName: _similar,
 };

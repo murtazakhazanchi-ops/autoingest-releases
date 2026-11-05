@@ -37,6 +37,7 @@ const crypto = require('crypto');
 const { deriveRegistryState } = require('./associationModel');
 const { compareEvents } = require('./identityEvents');
 const P = require('./photographerIdentity');
+const N = require('./photographerNameModel');
 const { slugify } = require('../main/aliasEngine');
 const { suggestForCamera } = require('./photographerSuggestion');
 
@@ -86,6 +87,8 @@ const CONFLICT_TEXT = {
   'identifier-spans-devices': ['Camera records overlap', 'Two camera records share an identifier. Neither is used for suggestions until reviewed.'],
   'association-disputed': ['Camera confirmation disputed', 'This camera was confirmed and rejected for this photographer without the decisions seeing each other.'],
   'ambiguous-name': ['Name matches several photographers', 'This list name belongs to more than one photographer record, so it is not linked to any of them.'],
+  'stale-rename': ['Rename made from an older name', 'This rename started from a name the photographer no longer had, usually because it was made on another computer before an earlier rename arrived.'],
+  'shared-search-alias': ['Search alias shared', 'This search alias belongs to more than one photographer. Searching for it shows all of them and selects none.'],
   'integrity-conflicts': ['Records held for review', 'Some imported registry records conflicted with existing ones and are held aside.'],
 };
 
@@ -99,21 +102,12 @@ const _reviewKey = (k) => `r-${crypto.createHash('sha256').update(k).digest('hex
 /**
  * Normalised name → Set of canonical photographer IDs, from current names, former names and
  * shipped spellings. Learned shortcuts and search aliases are NOT included: they never prove
- * identity. (Pure; the basis for the Q5b identity-resolution fix.)
+ * identity. (Pure; a flattening of photographerNameModel.buildOfficialNameIndex, the index the registry
+ * store resolves import names through since Q5b.)
  */
 function buildNameIndex(state, shipped) {
   const index = new Map();
-  const add = (name, id) => {
-    const n = P.normalizeName(name);
-    if (!n || !id) return;
-    if (!index.has(n)) index.set(n, new Set());
-    index.get(n).add(id);
-  };
-  for (const p of state.photographers.values()) {
-    add(p.name, p.photographerId);
-    for (const f of p.formerNames) add(f, p.photographerId);
-  }
-  for (const [id, s] of shipped.byId) add(s.name, state.photographerCanonical(id));
+  for (const [n, hit] of N.buildOfficialNameIndex(state, shipped)) index.set(n, new Set([...hit.current, ...hit.former]));
   return index;
 }
 
@@ -145,7 +139,9 @@ function buildRegistryView(input = {}) {
   const computerOf = (id) => (thisComputer && id === thisComputer ? 'this' : 'another');
 
   const state = deriveRegistryState(events, { shipped });
-  const index = buildNameIndex(state, shipped);
+  const officialIndex = N.buildOfficialNameIndex(state, shipped);
+  const history = N.deriveNameHistory(events, { state, shipped });
+  const registryAliases = N.deriveSearchAliases(events, { state });
 
   // ── Photographer profiles ──────────────────────────────────────────────────────
   const profiles = new Map();
@@ -180,31 +176,39 @@ function buildRegistryView(input = {}) {
     if (!profiles.has(c)) profile(c, { photographerId: c, identity: 'shipped', name: s.name });
   }
 
+  // List names resolve exactly as an import would (photographerNameModel.resolveOfficialName).
   const ambiguous = [];
   for (const name of listNames) {
     const n = P.normalizeName(name);
-    const ids = index.get(n);
-    if (ids && ids.size === 1) {
-      profile([...ids][0]).listNames.push(name);
-    } else if (ids && ids.size > 1) {
+    const r = N.resolveOfficialName(name, { state, shipped, index: officialIndex });
+    if (r.ok && r.photographerId) {
+      profile(r.photographerId).listNames.push(name);
+    } else if (!r.ok && r.reason === 'ambiguous') {
       const key = `ambiguous:${n}`;
       const pr = profile(key, { identity: 'ambiguous', name });
       pr.listNames.push(name);
-      ambiguous.push({ key, name, ids: [...ids].sort() });
+      ambiguous.push({ key, name, ids: r.photographerIds });
     } else {
       profile(`name:${n}`, { identity: 'pending-first-use', name }).listNames.push(name);
     }
   }
 
-  // Name history: each rename event, in fold order, attributed and dated.
-  const renames = events.filter(e => e.type === 'photographer-renamed' && validEvent(e)).sort(compareEvents);
-  for (const e of renames) {
-    const pr = profiles.get(state.photographerCanonical(e.photographerId));
+  // Name history (photographerNameModel): each official rename, attributed and dated.
+  const staleRenames = [];
+  for (const [id, h] of history) {
+    const pr = profiles.get(id);
     if (!pr) continue;
-    pr.nameHistory.push({
-      day: _day(e.at), at: e.at, fromName: e.fromName, toName: e.toName,
-      operator: _operatorName(operators, e.origin.operatorId), computer: computerOf(e.origin.computerId),
-    });
+    for (const r of h.history) {
+      pr.nameHistory.push({
+        day: _day(r.at), at: r.at, fromName: r.fromName, toName: r.toName, stale: r.stale,
+        operator: _operatorName(operators, r.operatorId), computer: computerOf(r.computerId),
+      });
+    }
+    for (const c of h.conflicts) staleRenames.push({ id, eventId: c.eventId });
+  }
+  for (const [id, list] of registryAliases) {
+    const pr = profiles.get(id);
+    if (pr) pr.searchAliases = list.map(a => ({ text: a.alias, kind: a.kind, addedDay: _day(a.addedAt) }));
   }
   for (const pr of profiles.values()) {
     if (pr.photographerId) {
@@ -355,6 +359,10 @@ function buildRegistryView(input = {}) {
   }
   for (const a of ambiguous) {
     pushItem(`ambiguous-name|${a.key}`, 'ambiguous-name', [{ key: a.key, photographerId: null, name: a.name }, ...a.ids.map(personRef)], []);
+  }
+  for (const s of staleRenames) pushItem(`stale-rename|${s.eventId}`, 'stale-rename', [personRef(s.id)], []);
+  for (const [n, owners] of N.searchAliasOwners(registryAliases)) {
+    if (owners.size > 1) pushItem(`shared-search-alias|${n}`, 'shared-search-alias', [...owners].sort().map(personRef), []);
   }
   if (usable && reg.heldCount > 0) pushItem('integrity-conflicts', 'integrity-conflicts', [], []);
 

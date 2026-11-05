@@ -39,6 +39,7 @@ const { deriveRegistryState } = require('./associationModel');
 const { createIdentityKeyStore } = require('./identityKeyStore');
 const { atomicWriteFile, readIfExists, stamp, TMP_MARK } = require('./identityFileOps');
 const P = require('./photographerIdentity');
+const { resolveOfficialName } = require('./photographerNameModel');
 const { KEY_ID_RE } = require('./identityKeyring');
 
 const REGISTRY_FILE = 'registry.json';
@@ -267,9 +268,12 @@ function createIdentityRegistryStore(opts) {
 
   /**
    * Stable photographer ID for a name in the existing photographer list (the only name
-   * authority). Shipped names → deterministic ID (no write). Other names → the ID already
-   * registered for that name on this registry, or a new random ID persisted now.
-   * Several registered IDs for one name (after a merge) → ambiguous, nothing chosen.
+   * authority). The name resolves through OFFICIAL names only (photographerNameModel): current
+   * and former registry names, shipped names and frozen shipped spellings — so a renamed
+   * photographer, shipped or local, keeps one ID whichever of their names an import uses.
+   * Search aliases and learned shortcuts are never consulted. A name that is an official name
+   * of several identities is refused ('ambiguous'), except a current shipped list name, which
+   * keeps Q4's shipped precedence. Only a name with no identity at all gets a new random ID.
    */
   function ensurePhotographerId(name, { listNames = [], shippedNames = [], origin, at } = {}) {
     return serial(async () => {
@@ -278,15 +282,32 @@ function createIdentityRegistryStore(opts) {
       const entry = listNames.find(x => P.normalizeName(x) === n);
       if (!n || !entry) return { ok: false, reason: 'not-in-photographer-list' };
       const shipped = P.bootstrapShippedIds(shippedNames);
-      if (shipped.byNormalized.has(n)) return { ok: true, photographerId: shipped.byNormalized.get(n).photographerId, via: 'shipped' };
       const derived = deriveRegistryState(doc.events, { shipped });
-      const matches = [...derived.photographers.values()].filter(p => p.idOrigin === 'random' && p.name && P.normalizeName(p.name) === n);
-      if (matches.length > 1) return { ok: false, reason: 'ambiguous', photographerIds: matches.map(p => p.photographerId) };
-      if (matches.length === 1) return { ok: true, photographerId: matches[0].photographerId, via: 'registered' };
+      const r = resolveOfficialName(entry, { state: derived, shipped });
+      if (!r.ok) return r.reason === 'ambiguous' ? { ok: false, reason: 'ambiguous', photographerIds: r.photographerIds } : { ok: false, reason: r.reason };
+      if (r.photographerId) return { ok: true, photographerId: r.photographerId, via: r.via };
       const photographerId = P.newPhotographerId(randomUUID);
       const ev = createEvent('photographer-registered', { photographerId, name: entry, idOrigin: 'random' }, { origin, at: at || now().toISOString(), newId: randomUUID });
       const res = await _append([ev]);
       return res.ok && res.added.length ? { ok: true, photographerId, via: 'new' } : { ok: false, reason: res.reason || 'not-recorded' };
+    });
+  }
+
+  /**
+   * Profile commands (Q5b, not wired to IPC): `build(events)` runs INSIDE the write queue against
+   * the registry exactly as it is now, so a revision check made by `build` cannot race another
+   * write. Returns build's refusal unchanged, or the append result plus build's `result`.
+   * @param {(events: object[]) => ({ ok: true, events: object[], result?: object } | { ok: false, reason: string })} build
+   */
+  function appendEventsChecked(build) {
+    return serial(async () => {
+      if (state !== 'ready') return { ok: false, reason: `registry-${state}` };
+      let plan;
+      try { plan = build(doc.events.slice()); } catch { return { ok: false, reason: 'command-failed' }; }
+      if (!plan || plan.ok !== true) return plan && plan.reason ? plan : { ok: false, reason: 'command-failed' };
+      const res = await _append(plan.events);
+      if (!res.ok || res.added.length !== plan.events.length) return { ok: false, reason: res.reason || 'not-recorded', rejected: res.rejected };
+      return { ok: true, added: res.added, result: plan.result || null };
     });
   }
 
@@ -367,7 +388,7 @@ function createIdentityRegistryStore(opts) {
   }
 
   return {
-    open, close, releaseLockSync, getStatus, appendEvents, ensurePhotographerId, listRecoveryCandidates, recoverFromBackup,
+    open, close, releaseLockSync, getStatus, appendEvents, appendEventsChecked, ensurePhotographerId, listRecoveryCandidates, recoverFromBackup,
     /** Main-process only. Null whenever body matching is disabled. Never send to a renderer. */
     getKeyring: () => (state === 'ready' ? keyring : null),
     getEvents: () => (doc ? doc.events.slice() : []),

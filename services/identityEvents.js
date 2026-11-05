@@ -28,11 +28,13 @@ const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
 const MAX_TEXT = 200;
 const MAX_RESOLVES = 1000;
+const MAX_ALIAS = 80;
 
 // ── Field validators: return an error string or null ─────────────────────────────
 const v = {
   uuid: (x) => (isUuid(x) ? null : 'must be a UUID'),
   text: (x) => (typeof x === 'string' && x.trim() && x.length <= MAX_TEXT ? null : `must be a non-empty string ≤ ${MAX_TEXT}`),
+  alias: (x) => (typeof x === 'string' && x.trim() && x === x.trim() && x.length <= MAX_ALIAS && !/[\u0000-\u001f\u007f]/.test(x) ? null : `must be a trimmed string ≤ ${MAX_ALIAS} without control characters`),
   day: (x) => (typeof x === 'string' && DAY_RE.test(x) ? null : 'must be YYYY-MM-DD'),
   count: (x) => (Number.isInteger(x) && x >= 1 ? null : 'must be an integer ≥ 1'),
   countOrZero: (x) => (Number.isInteger(x) && x >= 0 ? null : 'must be an integer ≥ 0'),
@@ -70,6 +72,11 @@ const v = {
 const TYPES = {
   'photographer-registered': { photographerId: v.uuid, name: v.text, idOrigin: v.oneOf(['shipped', 'random']) },
   'photographer-renamed': { photographerId: v.uuid, fromName: v.text, toName: v.text },
+  // Registry-managed search aliases (Q5b): alternative spellings and abbreviations used to FIND
+  // a photographer. Never identity, never a folder name. An observed-remove set: a removal
+  // lists the additions it saw (`resolves`), so an alias re-added elsewhere stays.
+  'photographer-alias-added': { photographerId: v.uuid, alias: v.alias, kind: v.oneOf(['spelling', 'abbreviation', 'other']) },
+  'photographer-alias-removed': { photographerId: v.uuid, alias: v.alias, resolves: v.eventIds },
   'photographer-linked': { photographerIds: v.idPair, decision: v.oneOf(['same', 'different']), resolves: v.eventIds },
   'device-registered': { deviceId: v.uuid, make: v.text, modelKey: v.text, modelDisplay: v.text, identifiers: v.identifiers },
   'device-identifiers-added': { deviceId: v.uuid, identifiers: v.identifiers, basis: v.oneOf(['co-observed']) },
@@ -126,6 +133,7 @@ function validateEvent(e) {
   }
   if (!errors.length) {
     if (e.type === 'device-registered' && !e.identifiers.some(i => i.trusted)) errors.push('identifiers must include a trusted identifier');
+    if (e.type === 'photographer-alias-removed' && !e.resolves.length) errors.push('resolves must list the alias additions removed');
     if (e.type === 'suggestion-corrected' && e.suggestedPhotographerId === e.chosenPhotographerId) errors.push('chosen photographer must differ from the suggestion');
     if (e.type === 'import-cooccurred' && e.cameras.length + (e.conflictFiles > 0 ? 1 : 0) < 2) errors.push('co-occurrence needs two cameras, or one camera plus conflicting files');
   }

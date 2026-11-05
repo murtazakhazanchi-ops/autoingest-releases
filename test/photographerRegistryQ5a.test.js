@@ -288,7 +288,7 @@ const byName = (view, name) => view.photographers.find(p => p.name === name);
     assert.equal(p.originalName, 'M. Testname');
     assert.deepEqual(p.formerNames, ['M. Testname']);
     assert.deepEqual(p.listNames.sort(), ['M. Testname', 'Murtaza Testname']);
-    assert.deepEqual(p.nameHistory, [{ day: '2026-10-05', at: '2026-10-05T09:00:00Z', fromName: 'M. Testname', toName: 'Murtaza Testname', operator: 'Operator One', computer: 'this' }]);
+    assert.deepEqual(p.nameHistory, [{ day: '2026-10-05', at: '2026-10-05T09:00:00Z', fromName: 'M. Testname', toName: 'Murtaza Testname', stale: false, operator: 'Operator One', computer: 'this' }]);
     assert.ok(!view.photographers.some(x => x.key === 'name:murtaza testname'), 'the new name is not a second identity');
   });
 
