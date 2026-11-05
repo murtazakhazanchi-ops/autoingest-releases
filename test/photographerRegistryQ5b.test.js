@@ -533,10 +533,15 @@ const candidatesOf = (plan, copy = 0, scope = 0) => plan.copies[copy].scopes[sco
     const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
     const surfaces = ['main/main.js', 'main/preload.js', 'main/companionPreload.js'];
     for (const f of surfaces) {
-      for (const needle of ['photographerProfileCommands', 'photographerFolderRenamePlanner', 'photographerRenameContract', 'photographerNameModel', 'renamePhotographer', 'addSearchAlias', 'inspectRegistry']) {
+      for (const needle of ['photographerProfileCommands', 'photographerFolderRenamePlanner', 'photographerRenameContract', 'photographerNameModel', 'renamePhotographer', 'addSearchAlias']) {
         assert.ok(!read(f).includes(needle), `${f} references ${needle}`);
       }
     }
+    // Q5c (authorized) wires the read-only accessor to the Photographer Registry tab — once, in
+    // main.js, as the view loader of the read-only browser. Never in a preload.
+    for (const f of ['main/preload.js', 'main/companionPreload.js']) assert.ok(!read(f).includes('inspectRegistry'), `${f} references inspectRegistry`);
+    const inspectRefs = read('main/main.js').split('\n').filter(l => l.includes('inspectRegistry') && !/^\s*\/\//.test(l));
+    assert.ok(inspectRefs.length <= 1 && inspectRefs.every(l => /createRegistryBrowser\(\{ loadView: \(\) => photographerLearning\.inspectRegistry\(\) \}\)/.test(l)), 'main.js uses inspectRegistry only as the read-only browser loader');
     const rendererFiles = fs.readdirSync(path.join(ROOT, 'renderer')).filter(f => f.endsWith('.js') || f.endsWith('.html'));
     for (const f of rendererFiles) assert.ok(!/photographerProfileCommands|photographerFolderRenamePlanner|photographer-alias-/.test(read(`renderer/${f}`)), `renderer/${f}`);
     const users = fs.readdirSync(path.join(ROOT, 'services')).filter(f => f.endsWith('.js') && /require\(['"]\.\/photographer(ProfileCommands|FolderRenamePlanner)['"]\)/.test(read(`services/${f}`)));

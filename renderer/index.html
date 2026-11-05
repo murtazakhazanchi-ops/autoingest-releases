@@ -2155,6 +2155,99 @@
     }
     .ms-tab:hover { color: var(--text-secondary); background: var(--accent-hover); }
     .ms-tab.ms-tab-active { color: var(--accent); border-bottom-color: var(--accent); }
+    /* ── Photographer Registry tab (AI-RM-014 Q5c) — scoped to #msTabPhotographers ─ */
+    @media (max-width: 860px) {
+      #metadataSyncModal .ms-tabs { gap: 0; }
+      #metadataSyncModal .ms-tab { padding: 6px 10px 8px; font-size: 12.5px; }
+    }
+    #msTabPhotographers { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+    #msTabPhotographers .ms-tab-helper { margin-bottom: 10px; }
+    .pr-status { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; flex-shrink: 0; max-height: 96px; overflow-y: auto; }
+    .pr-status[hidden] { display: none; }
+    .pr-notice { margin: 0; padding: 7px 10px; border-radius: 7px; font-size: 12px; line-height: 1.45; color: var(--text-secondary); background: var(--bg-secondary); border: 1px solid var(--border-subtle); }
+    .pr-notice--attention { border-color: var(--warning-border); background: color-mix(in srgb, var(--warning) 8%, var(--bg-secondary)); color: var(--text-primary); }
+    .pr-views { display: flex; gap: 6px; margin-bottom: 10px; flex-shrink: 0; flex-wrap: wrap; }
+    .pr-view {
+      padding: 4px 12px; border-radius: 999px; border: 1px solid var(--border-subtle);
+      background: none; color: var(--text-muted); font-size: 12px; font-weight: 500; font-family: inherit; cursor: pointer;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+    }
+    .pr-view:hover { color: var(--text-secondary); background: var(--accent-hover); }
+    .pr-view.pr-view-active { color: var(--accent); border-color: var(--accent-border-sel); background: var(--accent-glow); }
+    .pr-view:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .pr-view-count { margin-left: 4px; font-variant-numeric: tabular-nums; opacity: 0.8; }
+    .pr-view-count:empty { display: none; }
+    .pr-view.pr-view-attention .pr-view-count { color: var(--warning); opacity: 1; font-weight: 600; }
+    .pr-split { flex: 1; min-height: 240px; display: grid; grid-template-columns: minmax(210px, 36%) 1fr; gap: 14px; }
+    .pr-list-pane { display: flex; flex-direction: column; min-height: 0; gap: 8px; }
+    .pr-search {
+      width: 100%; box-sizing: border-box; font-size: 12.5px; font-family: inherit; color: var(--text-primary);
+      background: var(--bg-primary); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 6px 9px;
+    }
+    .pr-search:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .pr-controls { display: flex; gap: 6px; }
+    .pr-controls[hidden] { display: none; }
+    .pr-controls .ms-scope-select { min-width: 0; }
+    .pr-list-note { margin: 0; font-size: 11.5px; line-height: 1.4; color: var(--text-secondary); }
+    .pr-list-note[hidden] { display: none; }
+    .pr-list {
+      flex: 1; min-height: 0; overflow-y: auto; border: 1px solid var(--border-subtle); border-radius: 8px;
+      background: var(--bg-secondary); padding: 4px;
+    }
+    .pr-list:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .pr-list-empty, .pr-detail-empty { margin: 0; padding: 14px 10px; font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+    .pr-row { padding: 6px 8px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; }
+    .pr-row:hover { background: var(--accent-hover); }
+    .pr-row.pr-row-active { border-color: var(--accent-border-sel); }
+    .pr-row.pr-row-selected { background: var(--accent-tint); }
+    .pr-row-top { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+    .pr-row-title { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 500; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pr-row-sub { font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
+    .pr-flag { flex-shrink: 0; font-size: 10.5px; font-weight: 600; color: var(--warning); }
+    .pr-detail { min-height: 0; overflow-y: auto; padding: 2px 4px 8px 2px; }
+    .pr-detail:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+    .pr-detail-head { padding-bottom: 10px; margin-bottom: 4px; border-bottom: 1px solid var(--border-subtle); }
+    .pr-detail-title { margin: 0 0 6px; font-size: 15px; font-weight: 600; color: var(--text-primary); overflow-wrap: anywhere; }
+    .pr-badges, .pr-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+    .pr-chip { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; line-height: 1.5; border: 1px solid var(--border-subtle); color: var(--text-secondary); background: var(--bg-secondary); }
+    .pr-chip--ok { color: var(--success); border-color: color-mix(in srgb, var(--success) 35%, transparent); background: var(--success-soft); }
+    .pr-chip--muted { color: var(--text-muted); }
+    .pr-chip--attention { color: var(--warning); border-color: var(--warning-border); background: color-mix(in srgb, var(--warning) 10%, transparent); }
+    .pr-chip--shortcut { border-style: dashed; }
+    .pr-section { padding: 10px 0; border-bottom: 1px solid var(--border-subtle); }
+    .pr-section:last-child { border-bottom: none; }
+    .pr-section-title { margin: 0 0 6px; font-size: 11.5px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .pr-section-hint { margin: 0 0 8px; font-size: 11.5px; color: var(--text-muted); line-height: 1.45; }
+    .pr-empty-line { margin: 0; font-size: 12px; color: var(--text-muted); }
+    .pr-field { display: flex; gap: 10px; font-size: 12px; line-height: 1.5; margin-bottom: 3px; }
+    .pr-field-label { flex: 0 0 168px; color: var(--text-muted); }
+    .pr-field-value { flex: 1; min-width: 0; color: var(--text-primary); overflow-wrap: anywhere; }
+    .pr-history-row { display: grid; grid-template-columns: 96px 1fr; column-gap: 10px; font-size: 12px; line-height: 1.45; margin-bottom: 6px; }
+    .pr-history-day { color: var(--text-muted); grid-row: span 2; }
+    .pr-history-what { color: var(--text-primary); overflow-wrap: anywhere; }
+    .pr-history-who { color: var(--text-muted); font-size: 11px; }
+    .pr-camera-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: 12px; margin-bottom: 5px; }
+    .pr-camera-meta { color: var(--text-muted); font-size: 11.5px; }
+    .pr-link {
+      background: none; border: none; padding: 0; font: inherit; font-size: 12px; font-weight: 500;
+      color: var(--accent); cursor: pointer; text-align: left;
+    }
+    .pr-link:hover { text-decoration: underline; }
+    .pr-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+    .pr-assoc-row { padding: 6px 0; }
+    .pr-assoc-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .pr-assoc-name { font-size: 12px; font-weight: 500; color: var(--text-primary); }
+    .pr-assoc-text, .pr-assoc-facts { margin: 3px 0 0; font-size: 11.5px; line-height: 1.45; color: var(--text-secondary); }
+    .pr-assoc-facts { color: var(--text-muted); }
+    .pr-state--confirmed { color: var(--success); }
+    .pr-state--observed { color: var(--accent); }
+    .pr-state--disputed { color: var(--warning); }
+    .pr-state--rejected, .pr-state--retired { color: var(--text-muted); }
+    .pr-reasons { margin: 4px 0 6px; padding-left: 18px; font-size: 12px; line-height: 1.5; color: var(--text-secondary); }
+    .pr-reason-head { margin: 6px 0 0; font-size: 12px; font-weight: 500; color: var(--text-primary); }
+    .pr-review-item { padding: 7px 10px; margin-bottom: 6px; border-radius: 7px; border: 1px solid var(--warning-border); background: color-mix(in srgb, var(--warning) 6%, transparent); }
+    .pr-review-title { margin: 0 0 2px; font-size: 12px; font-weight: 600; color: var(--text-primary); }
+    .pr-review-text { margin: 0; font-size: 12px; line-height: 1.5; color: var(--text-secondary); }
     .ms-status-strip {
       display: flex; gap: 20px; flex-wrap: wrap;
       padding: 0 24px 10px; margin-top: -4px;
@@ -7881,6 +7974,7 @@
           <button class="ms-tab ms-tab-active" id="msTab-metadata" role="tab" aria-selected="true" aria-controls="msTabMetadata" data-ms-tab="msTabMetadata">Metadata</button>
           <button class="ms-tab" id="msTab-audit" role="tab" aria-selected="false" aria-controls="msTabAudit" data-ms-tab="msTabAudit">Audit &amp; Repair</button>
           <button class="ms-tab" id="msTab-registry" role="tab" aria-selected="false" aria-controls="msTabRegistry" data-ms-tab="msTabRegistry">Keyword Registry</button>
+          <button class="ms-tab" id="msTab-photographers" role="tab" aria-selected="false" aria-controls="msTabPhotographers" data-ms-tab="msTabPhotographers">Photographer Registry</button>
         </div>
 
         <!-- Panel: Metadata -->
@@ -7995,6 +8089,39 @@
             <button class="ms-bridge-btn" id="msRepairIdsBtn">Regenerate IDs from Stored Paths</button>
           </div>
           <div id="msBridgePreview" style="display:none"></div>
+        </div>
+
+        <!-- Panel: Photographer Registry (AI-RM-014 Q5c) — read-only; rendered by photographerRegistryUI.js -->
+        <div id="msTabPhotographers" role="tabpanel" aria-labelledby="msTab-photographers" style="display:none">
+          <p class="ms-tab-helper">Photographers, their cameras and anything that needs review, as recorded by photographer learning. This view is read-only.</p>
+          <div id="prStatus" class="pr-status" role="status" aria-live="polite" hidden></div>
+          <div class="pr-views" role="tablist" aria-label="Photographer Registry sections">
+            <button type="button" class="pr-view pr-view-active" role="tab" aria-selected="true" aria-controls="prSplit" data-pr-view="photographers">Photographers <span class="pr-view-count"></span></button>
+            <button type="button" class="pr-view" role="tab" aria-selected="false" aria-controls="prSplit" tabindex="-1" data-pr-view="cameras">Cameras <span class="pr-view-count"></span></button>
+            <button type="button" class="pr-view" role="tab" aria-selected="false" aria-controls="prSplit" tabindex="-1" data-pr-view="review">Needs review <span class="pr-view-count"></span></button>
+          </div>
+          <div id="prSplit" class="pr-split" role="tabpanel">
+            <div class="pr-list-pane">
+              <input id="prSearch" class="pr-search" type="search" autocomplete="off" spellcheck="false" placeholder="Search names, former names, aliases or cameras" aria-label="Search names, former names, aliases or cameras" />
+              <div id="prPhotographerControls" class="pr-controls">
+                <select id="prFilter" class="ms-scope-select" aria-label="Filter photographers">
+                  <option value="all">All</option>
+                  <option value="with-cameras">Has cameras</option>
+                  <option value="no-camera-history">No cameras</option>
+                  <option value="needs-review">Needs review</option>
+                  <option value="retired">Retired</option>
+                </select>
+                <select id="prSort" class="ms-scope-select" aria-label="Sort photographers">
+                  <option value="name">By name</option>
+                  <option value="last-observed">By last seen</option>
+                  <option value="camera-count">By cameras</option>
+                </select>
+              </div>
+              <p id="prListNote" class="pr-list-note" hidden></p>
+              <div id="prList" class="pr-list" role="listbox" tabindex="0" aria-label="Photographers"></div>
+            </div>
+            <div id="prDetail" class="pr-detail" tabindex="0" aria-label="Details" aria-live="polite"></div>
+          </div>
         </div>
       </div>
       <div class="emm-footer">
@@ -9069,6 +9196,7 @@
     </div>
   </div>
 
+  <script src="photographerRegistryUI.js" defer></script>
   <script src="renderer.js" defer></script>
   <!-- Internal command registry for future external controllers (MX Creative
        Console, etc.) — see docs/commandLayer.md. Must load after renderer.js:

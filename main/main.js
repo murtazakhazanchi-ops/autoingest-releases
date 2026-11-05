@@ -4336,6 +4336,39 @@ ipcMain.handle('keywords:loadRegistry', async () => {
   return result;
 });
 
+// ── Photographer Registry tab (AI-FEAT-063 / AI-RM-014 Q5c) — READ-ONLY ─────────
+// Four read channels, main window only. Data comes from the non-initializing Q5a accessor
+// (photographerLearningRuntime.inspectRegistry) through photographerRegistryBrowser, which
+// replaces every identity ID with an opaque per-snapshot handle. No write channel exists.
+let _photographerRegistryBrowser = null;
+function _photographerRegistry(event) {
+  const main = windowRegistry.getMainWindow();
+  if (!main || event.sender !== main.webContents) return null;
+  if (!_photographerRegistryBrowser) {
+    const { createRegistryBrowser } = require('../services/photographerRegistryBrowser');
+    _photographerRegistryBrowser = createRegistryBrowser({ loadView: () => photographerLearning.inspectRegistry() });
+  }
+  return _photographerRegistryBrowser;
+}
+const _PR_DENIED = { ok: false, reason: 'not-permitted' };
+ipcMain.handle('photographerRegistry:load', async (event) => {
+  const b = _photographerRegistry(event);
+  return b ? b.load() : _PR_DENIED;
+});
+ipcMain.handle('photographerRegistry:search', (event, opts) => {
+  const b = _photographerRegistry(event);
+  const o = opts && typeof opts === 'object' ? opts : {};
+  return b ? b.search({ query: o.query, filter: o.filter, sort: o.sort }) : _PR_DENIED;
+});
+ipcMain.handle('photographerRegistry:photographer', (event, handle) => {
+  const b = _photographerRegistry(event);
+  return b ? b.photographer(handle) : _PR_DENIED;
+});
+ipcMain.handle('photographerRegistry:camera', (event, handle) => {
+  const b = _photographerRegistry(event);
+  return b ? b.camera(handle) : _PR_DENIED;
+});
+
 ipcMain.handle('keywords:saveCityCountry', async (_event, cityLabel, countryLabel) => {
   if (!cityLabel || typeof cityLabel !== 'string') return { ok: false };
   if (!countryLabel || typeof countryLabel !== 'string') return { ok: false };

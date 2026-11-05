@@ -5202,7 +5202,7 @@ async function _msRunSyncFromPreview(eventFolderPath, folderName, updateBtn) {
 }
 
 function _msSetTab(tabId) {
-  ['msTabMetadata', 'msTabAudit', 'msTabRegistry'].forEach(id => {
+  ['msTabMetadata', 'msTabAudit', 'msTabRegistry', 'msTabPhotographers'].forEach(id => {
     const panel = document.getElementById(id);
     const btn   = document.querySelector(`[data-ms-tab="${id}"]`);
     const active = id === tabId;
@@ -5217,6 +5217,8 @@ function _msSetTab(tabId) {
   // Apply & Status sub-section, however, needs an explicit refresh on every switch
   // into it, since _msCurrentEventPath is only set once per modal open.
   if (tabId === 'msTabMetadata') _refreshMsApplyStatusPanel();
+  // Photographer Registry (Q5c): read-only, loads lazily each time the tab is shown.
+  if (tabId === 'msTabPhotographers') window.PhotographerRegistryUI?.onShow();
 }
 
 async function _msRefreshRegistryStatus() {

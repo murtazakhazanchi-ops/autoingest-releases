@@ -381,6 +381,12 @@ contextBridge.exposeInMainWorld('api', {
   keywordsSaveCityCountry:     (cityLabel, countryLabel) => ipcRenderer.invoke('keywords:saveCityCountry', cityLabel, countryLabel),
   keywordsAddKeyword:          (params)                 => ipcRenderer.invoke('keywords:addKeyword',        params),
 
+  // ── Photographer Registry (AI-RM-014 Q5c) — read-only ──
+  photographerRegistryLoad:         ()       => ipcRenderer.invoke('photographerRegistry:load'),
+  photographerRegistrySearch:       (opts)   => ipcRenderer.invoke('photographerRegistry:search', opts),
+  photographerRegistryPhotographer: (handle) => ipcRenderer.invoke('photographerRegistry:photographer', handle),
+  photographerRegistryCamera:       (handle) => ipcRenderer.invoke('photographerRegistry:camera', handle),
+
   // ── Offline Collection Registry ──
   prepareOffline:              (params) => ipcRenderer.invoke('collection:prepareOffline',       params),
   readCollectionLink:          (params) => ipcRenderer.invoke('collection:readLink',              params),
