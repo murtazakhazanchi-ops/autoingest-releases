@@ -40,6 +40,7 @@ const P = require('./photographerIdentity');
 const N = require('./photographerNameModel');
 const { slugify } = require('../main/aliasEngine');
 const { suggestForCamera } = require('./photographerSuggestion');
+const { unsettledPairs } = require('./cameraAssociationCommands');
 
 const VIEW_CONTRACT_VERSION = 1;
 const ACTIVE = new Set(['confirmed', 'observed', 'disputed']);
@@ -86,6 +87,7 @@ const CONFLICT_TEXT = {
   'linked-device-model-mismatch': ['Linked cameras disagree on model', 'Camera records linked as one camera report different models.'],
   'identifier-spans-devices': ['Camera records overlap', 'Two camera records share an identifier. Neither is used for suggestions until reviewed.'],
   'association-disputed': ['Camera confirmation disputed', 'This camera was confirmed and rejected for this photographer without the decisions seeing each other.'],
+  'association-unsettled': ['Camera decisions disagree', 'Different decisions were recorded for this camera and photographer without seeing each other. The latest one is shown until an operator settles it.'],
   'ambiguous-name': ['Name matches several photographers', 'This list name belongs to more than one photographer record, so it is not linked to any of them.'],
   'stale-rename': ['Rename made from an older name', 'This rename started from a name the photographer no longer had, usually because it was made on another computer before an earlier rename arrived.'],
   'shared-search-alias': ['Search alias shared', 'This search alias belongs to more than one photographer. Searching for it shows all of them and selects none.'],
@@ -97,7 +99,7 @@ const _maxIso = (a, b) => (!a ? b : !b ? a : a > b ? a : b);
 const _minIso = (a, b) => (!a ? b : !b ? a : a < b ? a : b);
 const _OBSERVATION = new Set(['import-observed', 'import-cooccurred']);
 const _lastObservation = (a) => a.provenance.filter(pv => _OBSERVATION.has(pv.type)).reduce((m, pv) => _maxIso(m, pv.at), null);
-const _reviewKey = (k) => `r-${crypto.createHash('sha256').update(k).digest('hex').slice(0, 16)}`;
+const reviewKeyOf = (k) => `r-${crypto.createHash('sha256').update(k).digest('hex').slice(0, 16)}`;
 
 /**
  * Normalised name → Set of canonical photographer IDs, from current names, former names and
@@ -139,6 +141,7 @@ function buildRegistryView(input = {}) {
   const computerOf = (id) => (thisComputer && id === thisComputer ? 'this' : 'another');
 
   const state = deriveRegistryState(events, { shipped });
+  const unsettled = unsettledPairs(state);
   const officialIndex = N.buildOfficialNameIndex(state, shipped);
   const history = N.deriveNameHistory(events, { state, shipped });
   const registryAliases = N.deriveSearchAliases(events, { state });
@@ -281,6 +284,7 @@ function buildRegistryView(input = {}) {
         state: a.state,
         label: ASSOCIATION_LABEL[a.state],
         explanation: ASSOCIATION_EXPLANATION[a.state],
+        unsettled: unsettled.has(`${a.deviceId}|${a.photographerId}`),
         confirmations: a.confirmations,
         observedImports: a.observedImports,
         observedDays: a.observedDays,
@@ -297,15 +301,7 @@ function buildRegistryView(input = {}) {
         candidates: sug.candidates.map(c => ({ photographerId: c.photographerId, name: nameOf(c.photographerId), state: c.state, reasons: [...c.reasons] })),
         excluded: (sug.excluded || []).map(x => ({ photographerId: x.photographerId, name: nameOf(x.photographerId), state: x.state, reason: x.reason })),
       },
-      history: [...historyById.values()]
-        .sort((x, y) => (x.pv.at < y.pv.at ? -1 : x.pv.at > y.pv.at ? 1 : x.pv.eventId < y.pv.eventId ? -1 : 1))
-        .map(({ pv, photographerIds }) => ({
-          day: _day(pv.at),
-          what: _historyText(pv.type, [...photographerIds].map(nameOf).sort()),
-          computer: computerOf(pv.computerId),
-          operator: _operatorName(operators, pv.operatorId),
-          workflow: WORKFLOW_LABEL[pv.workflow] || 'Other',
-        })),
+      history: _cameraHistory(state, d, historyById, { nameOf, computerOf, operatorName: (id) => _operatorName(operators, id) }),
       review: [],
     });
     for (const a of assocs) {
@@ -347,12 +343,16 @@ function buildRegistryView(input = {}) {
   const personRef = (id) => { const c = state.photographerCanonical(id); return { key: c, photographerId: c, name: nameOf(c) }; };
   const pushItem = (rawKey, kind, people, cams) => {
     const [title, explanation] = CONFLICT_TEXT[kind] || ['Needs review', 'This record needs review.'];
-    const item = { key: _reviewKey(rawKey), kind, title, explanation, photographers: people, cameras: cams.filter(Boolean) };
+    const item = { key: reviewKeyOf(rawKey), kind, title, explanation, photographers: people, cameras: cams.filter(Boolean) };
     reviewItems.push(item);
     for (const p of people) { const pr = profiles.get(p.key); if (pr && !pr.review.includes(item.key)) pr.review.push(item.key); }
     for (const c of item.cameras) { const cm = cameras.get(c.deviceId); if (cm && !cm.review.includes(item.key)) cm.review.push(item.key); }
   };
-  for (const c of state.conflicts) {
+  const unsettledConflicts = [...unsettled].sort().map((k) => {
+    const [dId, pId] = k.split('|');
+    return { kind: 'association-unsettled', key: `association-unsettled|${k}`, deviceId: dId, photographerId: pId };
+  });
+  for (const c of [...state.conflicts, ...unsettledConflicts]) {
     const people = [...(c.photographerIds || []), ...(c.photographerId ? [c.photographerId] : [])].map(personRef);
     const cams = [...(c.deviceIds || []), ...(c.deviceId ? [c.deviceId] : [])].map(cameraRef);
     pushItem(c.key, c.kind, people, cams);
@@ -401,6 +401,50 @@ function buildRegistryView(input = {}) {
 
 function validEvent(e) { return e && typeof e === 'object' && e.origin && typeof e.at === 'string'; }
 
+const _DECISION_KIND = { 'association-confirmed': 'confirmation', 'association-rejected': 'rejection', 'association-retired': 'retirement' };
+
+/**
+ * Camera history rows, oldest first. Each operator decision stays visible and is labelled by what it
+ * did: a correction (a rejection/retirement and a confirmation recorded together for the same
+ * camera) is one row; a decision that settled disagreeing decisions is a conflict resolution.
+ */
+function _cameraHistory(state, device, historyById, { nameOf, computerOf, operatorName }) {
+  const byId = new Map(state.events.map(e => [e.eventId, e]));
+  const entries = [...historyById.values()].map(h => ({ ...h, e: byId.get(h.pv.eventId) }));
+  for (const e of state.events) {
+    if (e.type === 'device-linked' && e.deviceIds.some(id => device.memberIds.includes(id))) entries.push({ pv: { eventId: e.eventId, type: e.type, at: e.at, computerId: e.origin.computerId, operatorId: e.origin.operatorId, workflow: e.origin.workflow }, photographerIds: new Set(), e });
+  }
+  entries.sort((x, y) => (x.pv.at < y.pv.at ? -1 : x.pv.at > y.pv.at ? 1 : x.pv.eventId < y.pv.eventId ? -1 : 1));
+  const isDecision = (e) => !!(e && _DECISION_KIND[e.type]);
+  const pairOf = (e) => entries.find(o => o.e !== e && isDecision(o.e) && o.e.at === e.at && o.e.origin.computerId === e.origin.computerId
+    && o.e.origin.operatorId === e.origin.operatorId && o.e.origin.workflow === 'registry' && e.origin.workflow === 'registry'
+    && (o.e.type === 'association-confirmed') !== (e.type === 'association-confirmed'));
+  const settlesDisagreement = (e) => {
+    const prior = e.resolves.map(id => byId.get(id)).filter(Boolean);
+    const settledInside = new Set(prior.flatMap(x => x.resolves || []));
+    return new Set(prior.filter(x => !settledInside.has(x.eventId)).map(x => x.type)).size > 1;
+  };
+  const rows = [];
+  for (const { pv, photographerIds, e } of entries) {
+    const names = [...photographerIds].map(nameOf).sort();
+    let kind = _OBSERVATION.has(pv.type) ? 'observation' : _DECISION_KIND[pv.type] || (pv.type === 'device-linked' ? 'link' : 'other');
+    let what = _historyText(pv.type, names);
+    if (isDecision(e)) {
+      const other = pairOf(e);
+      if (other) {
+        if (e.type === 'association-confirmed') continue; // shown once, on the row of the decision it replaced
+        kind = 'correction';
+        what = `Corrected: ${e.type === 'association-rejected' ? `marked as not ${nameOf(state.photographerCanonical(e.photographerId))}'s camera` : `marked as no longer used by ${nameOf(state.photographerCanonical(e.photographerId))}`} and confirmed for ${nameOf(state.photographerCanonical(other.e.photographerId))}`;
+      } else if (settlesDisagreement(e)) {
+        kind = 'resolution';
+        what = `Review settled: ${what.charAt(0).toLowerCase()}${what.slice(1)}`;
+      }
+    }
+    rows.push({ day: _day(pv.at), kind, what, computer: computerOf(pv.computerId), operator: operatorName(pv.operatorId), workflow: WORKFLOW_LABEL[pv.workflow] || 'Other' });
+  }
+  return rows;
+}
+
 function _historyText(type, names) {
   const who = names.join(', ');
   switch (type) {
@@ -410,6 +454,7 @@ function _historyText(type, names) {
     case 'association-rejected': return `Marked as not ${who}'s camera`;
     case 'association-retired': return `Marked as no longer used by ${who}`;
     case 'suggestion-corrected': return 'The suggested photographer was changed by the operator';
+    case 'device-linked': return 'Linked with another record of the same camera body (shared identifier)';
     default: return 'Recorded';
   }
 }
@@ -502,7 +547,7 @@ function getCameraDetail(view, deviceId) {
 }
 
 module.exports = {
-  VIEW_CONTRACT_VERSION, buildRegistryView, buildNameIndex,
+  VIEW_CONTRACT_VERSION, buildRegistryView, buildNameIndex, reviewKeyOf,
   searchPhotographers, searchCameras, getPhotographerDetail, getCameraDetail,
   FILTERS: Object.freeze(Object.keys(FILTERS)), SORTS: Object.freeze(Object.keys(SORTS)),
 };

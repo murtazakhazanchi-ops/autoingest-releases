@@ -2248,6 +2248,58 @@
     .pr-review-item { padding: 7px 10px; margin-bottom: 6px; border-radius: 7px; border: 1px solid var(--warning-border); background: color-mix(in srgb, var(--warning) 6%, transparent); }
     .pr-review-title { margin: 0 0 2px; font-size: 12px; font-weight: 600; color: var(--text-primary); }
     .pr-review-text { margin: 0; font-size: 12px; line-height: 1.5; color: var(--text-secondary); }
+    /* Q5d — camera decisions (drawn by photographerRegistryActions.js) */
+    .pr-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+    .pr-actions--section { margin-top: 10px; }
+    .pr-action {
+      padding: 3px 10px; border-radius: 6px; border: 1px solid var(--border-subtle); background: var(--bg-primary);
+      color: var(--text-secondary); font-size: 11.5px; font-weight: 500; font-family: inherit; cursor: pointer; line-height: 1.5;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+    }
+    .pr-action:hover { color: var(--text-primary); border-color: var(--accent-border); background: var(--accent-hover); }
+    .pr-action:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .pr-action--primary { color: var(--accent); border-color: var(--accent-border-sel); }
+    .pr-decision {
+      margin: 10px 0 4px; padding: 12px 14px; border-radius: 9px; border: 1px solid var(--accent-border-sel);
+      background: var(--bg-secondary); box-shadow: 0 1px 0 var(--border-subtle);
+    }
+    .pr-decision[aria-busy="true"] { opacity: 0.85; }
+    .pr-decision-title { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--text-primary); line-height: 1.4; }
+    .pr-decision-wait { margin: 0; font-size: 12px; color: var(--text-muted); }
+    .pr-decision-caveat, .pr-decision-operator { margin: 8px 0 0; font-size: 11.5px; line-height: 1.45; color: var(--text-muted); }
+    .pr-decision-error { margin: 10px 0 0; padding: 7px 10px; border-radius: 7px; font-size: 12px; line-height: 1.45; color: var(--text-primary); border: 1px solid var(--warning-border); background: color-mix(in srgb, var(--warning) 9%, transparent); }
+    .pr-decision-buttons { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .pr-change { margin: 8px 0; border: 1px solid var(--border-subtle); border-radius: 7px; overflow: hidden; }
+    .pr-change-row { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr); gap: 8px; padding: 6px 9px; font-size: 12px; line-height: 1.4; }
+    .pr-change-row + .pr-change-row { border-top: 1px solid var(--border-subtle); }
+    .pr-change-head { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); background: var(--bg-primary); }
+    .pr-change-who { color: var(--text-primary); font-weight: 500; overflow-wrap: anywhere; }
+    .pr-change-now { color: var(--text-muted); }
+    .pr-change-after { color: var(--accent); font-weight: 600; }
+    .pr-consequences { margin: 8px 0 0; padding-left: 18px; font-size: 12px; line-height: 1.5; color: var(--text-secondary); }
+    .pr-choice { margin: 8px 0 0; padding: 0; border: none; display: flex; flex-direction: column; gap: 4px; }
+    .pr-choice-legend { padding: 0; margin-bottom: 4px; font-size: 11.5px; font-weight: 600; color: var(--text-secondary); display: block; }
+    .pr-choice-option { display: flex; align-items: baseline; gap: 7px; font-size: 12px; line-height: 1.45; color: var(--text-primary); cursor: pointer; }
+    .pr-choice-option input { accent-color: var(--accent); }
+    .pr-picker { display: flex; flex-direction: column; gap: 5px; margin-top: 4px; }
+    .pr-picker-list { display: flex; flex-direction: column; gap: 2px; max-height: 168px; overflow-y: auto; }
+    .pr-picker-option {
+      text-align: left; padding: 5px 8px; border-radius: 6px; border: 1px solid transparent; background: none;
+      color: var(--text-primary); font-size: 12px; font-family: inherit; cursor: pointer;
+    }
+    .pr-picker-option:hover { background: var(--accent-hover); }
+    .pr-picker-option[aria-selected="true"] { background: var(--accent-tint); border-color: var(--accent-border-sel); font-weight: 500; }
+    .pr-picker-option:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .pr-picker-note { margin: 0; font-size: 11.5px; line-height: 1.4; color: var(--text-muted); }
+    .pr-picker-note:empty { display: none; }
+    .pr-manage-note { margin: 0 0 8px; font-size: 11.5px; line-height: 1.45; color: var(--text-muted); }
+    .pr-result { margin: 0 0 10px; padding: 7px 10px; border-radius: 7px; font-size: 12px; line-height: 1.45; color: var(--text-primary); }
+    .pr-result:focus { outline: none; }
+    .pr-result--ok { border: 1px solid color-mix(in srgb, var(--success) 35%, transparent); background: var(--success-soft); }
+    .pr-result--attention { border: 1px solid var(--warning-border); background: color-mix(in srgb, var(--warning) 9%, transparent); }
+    .pr-chip--kind { margin-right: 6px; padding: 0 6px; font-size: 10.5px; vertical-align: 1px; }
+    .pr-kind--confirmation { color: var(--success); }
+    .pr-kind--correction, .pr-kind--resolution { color: var(--accent); border-color: var(--accent-border-sel); }
     .ms-status-strip {
       display: flex; gap: 20px; flex-wrap: wrap;
       padding: 0 24px 10px; margin-top: -4px;
@@ -8093,7 +8145,7 @@
 
         <!-- Panel: Photographer Registry (AI-RM-014 Q5c) — read-only; rendered by photographerRegistryUI.js -->
         <div id="msTabPhotographers" role="tabpanel" aria-labelledby="msTab-photographers" style="display:none">
-          <p class="ms-tab-helper">Photographers, their cameras and anything that needs review, as recorded by photographer learning. This view is read-only.</p>
+          <p class="ms-tab-helper">Photographers, their cameras and anything that needs review, as recorded by photographer learning. Camera decisions are saved with the active operator's name; photographer names and folders are not changed here.</p>
           <div id="prStatus" class="pr-status" role="status" aria-live="polite" hidden></div>
           <div class="pr-views" role="tablist" aria-label="Photographer Registry sections">
             <button type="button" class="pr-view pr-view-active" role="tab" aria-selected="true" aria-controls="prSplit" data-pr-view="photographers">Photographers <span class="pr-view-count"></span></button>
@@ -9197,6 +9249,7 @@
   </div>
 
   <script src="photographerRegistryUI.js" defer></script>
+  <script src="photographerRegistryActions.js" defer></script>
   <script src="renderer.js" defer></script>
   <!-- Internal command registry for future external controllers (MX Creative
        Console, etc.) — see docs/commandLayer.md. Must load after renderer.js:

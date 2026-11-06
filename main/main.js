@@ -4339,16 +4339,39 @@ ipcMain.handle('keywords:loadRegistry', async () => {
 // ── Photographer Registry tab (AI-FEAT-063 / AI-RM-014 Q5c) — READ-ONLY ─────────
 // Four read channels, main window only. Data comes from the non-initializing Q5a accessor
 // (photographerLearningRuntime.inspectRegistry) through photographerRegistryBrowser, which
-// replaces every identity ID with an opaque per-snapshot handle. No write channel exists.
+// replaces every identity ID with an opaque per-snapshot handle.
+// Q5d adds camera-association decisions (prepare → explicit confirmation → commit) through
+// photographerRegistryManager: main window only, the active operator and the record behind every
+// handle are resolved HERE, and the registry is only ever opened if it already exists and is healthy.
 let _photographerRegistryBrowser = null;
+let _photographerRegistryManager = null;
 function _photographerRegistry(event) {
   const main = windowRegistry.getMainWindow();
   if (!main || event.sender !== main.webContents) return null;
   if (!_photographerRegistryBrowser) {
     const { createRegistryBrowser } = require('../services/photographerRegistryBrowser');
-    _photographerRegistryBrowser = createRegistryBrowser({ loadView: () => photographerLearning.inspectRegistry() });
+    const { createRegistryManager } = require('../services/photographerRegistryManager');
+    _photographerRegistryBrowser = createRegistryBrowser({
+      loadView: () => photographerLearning.inspectRegistry({ withEvents: true }),
+      manageStatus: (view) => _photographerRegistryManager.availability(view),
+    });
+    _photographerRegistryManager = createRegistryManager({
+      browser: _photographerRegistryBrowser,
+      getOperator: () => userManager.getActiveUser(),
+      getComputerId: () => settings.getDeviceId(),
+      openStore: () => photographerLearning.openRegistryForManagement(),
+    });
   }
   return _photographerRegistryBrowser;
+}
+// Only these request fields, as short strings, reach the manager.
+function _registryRequest(raw) {
+  const o = raw && typeof raw === 'object' ? raw : {};
+  const out = {};
+  for (const k of ['action', 'camera', 'photographer', 'target', 'review', 'outcome', 'priorOutcome']) {
+    if (typeof o[k] === 'string' && o[k].length <= 40) out[k] = o[k];
+  }
+  return out;
 }
 const _PR_DENIED = { ok: false, reason: 'not-permitted' };
 ipcMain.handle('photographerRegistry:load', async (event) => {
@@ -4367,6 +4390,18 @@ ipcMain.handle('photographerRegistry:photographer', (event, handle) => {
 ipcMain.handle('photographerRegistry:camera', (event, handle) => {
   const b = _photographerRegistry(event);
   return b ? b.camera(handle) : _PR_DENIED;
+});
+ipcMain.handle('photographerRegistry:prepare', (event, request) => {
+  const b = _photographerRegistry(event);
+  return b ? _photographerRegistryManager.prepare(_registryRequest(request)) : _PR_DENIED;
+});
+ipcMain.handle('photographerRegistry:commit', async (event, token) => {
+  const b = _photographerRegistry(event);
+  return b ? _photographerRegistryManager.commit(token) : _PR_DENIED;
+});
+ipcMain.handle('photographerRegistry:cancel', (event, token) => {
+  const b = _photographerRegistry(event);
+  return b ? _photographerRegistryManager.cancel(token) : _PR_DENIED;
 });
 
 ipcMain.handle('keywords:saveCityCountry', async (_event, cityLabel, countryLabel) => {

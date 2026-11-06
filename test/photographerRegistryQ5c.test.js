@@ -317,14 +317,15 @@ function assertClean(payload, fx, label) {
 
   console.log('Q5c — IPC and module boundaries');
 
-  await t('main.js: exactly four read-only photographerRegistry channels, each limited to the main window', async () => {
+  await t('main.js: four read-only photographerRegistry channels (+ the Q5d decision channels), each limited to the main window', async () => {
     const src = fs.readFileSync(path.join(ROOT, 'main', 'main.js'), 'utf8');
     const channels = [...src.matchAll(/ipcMain\.(?:handle|on)\('(photographerRegistry:[A-Za-z]+)'/g)].map(m => m[1]);
-    assert.deepEqual(channels.sort(), ['photographerRegistry:camera', 'photographerRegistry:load', 'photographerRegistry:photographer', 'photographerRegistry:search']);
+    // Q5d (authorized) adds exactly the three decision channels; reads stay as Q5c shipped them.
+    assert.deepEqual(channels.sort(), ['photographerRegistry:camera', 'photographerRegistry:cancel', 'photographerRegistry:commit', 'photographerRegistry:load', 'photographerRegistry:photographer', 'photographerRegistry:prepare', 'photographerRegistry:search']);
     const block = src.slice(src.indexOf('Photographer Registry tab (AI-FEAT-063'), src.indexOf("ipcMain.handle('keywords:saveCityCountry'"));
     assert.ok(/event\.sender !== main\.webContents/.test(block), 'sender must be the main window');
-    assert.equal((block.match(/= _photographerRegistry\(event\)/g) || []).length, 4, 'every handler validates the sender');
-    assert.ok(!/appendEvents|createIdentityRegistryStore|\.open\(|writeFile|buildRenameEvent|createProfileCommandService|planCurrentEventFolderRename/.test(block), 'no write path reachable');
+    assert.equal((block.match(/= _photographerRegistry\(event\)/g) || []).length, 7, 'every handler validates the sender');
+    assert.ok(!/appendEvents|createIdentityRegistryStore|\.open\(|writeFile|buildRenameEvent|createProfileCommandService|planCurrentEventFolderRename/.test(block), 'no direct store write, naming or folder path in main.js');
   });
 
   await t('main.js / preload.js change since Q5b is additions only, confined to the Q5c block', async () => {
@@ -336,10 +337,10 @@ function assertClean(payload, fx, label) {
     }
     const pre = execFileSync('git', ['diff', '-U0', base, '--', 'main/preload.js'], { cwd: ROOT, encoding: 'utf8' });
     const exposed = [...pre.matchAll(/^\+\s+(\w+):/gm)].map(m => m[1]);
-    assert.deepEqual(exposed.sort(), ['photographerRegistryCamera', 'photographerRegistryLoad', 'photographerRegistryPhotographer', 'photographerRegistrySearch']);
+    assert.deepEqual(exposed.sort(), ['photographerRegistryCamera', 'photographerRegistryCancel', 'photographerRegistryCommit', 'photographerRegistryLoad', 'photographerRegistryPhotographer', 'photographerRegistryPrepare', 'photographerRegistrySearch']);
   });
 
-  await t('Q5c touches no import, routing, sync, metadata, autocomplete or identity-write module', async () => {
+  await t('Q5c/Q5d touch no import, routing, sync, metadata or autocomplete module', async () => {
     let base;
     try { base = execFileSync('git', ['rev-parse', '--verify', 'aa58eb1^{commit}'], { cwd: ROOT, encoding: 'utf8' }).trim(); } catch { return; }
     const changed = [
@@ -350,6 +351,12 @@ function assertClean(payload, fx, label) {
       'main/main.js', 'main/preload.js', 'renderer/index.html', 'renderer/renderer.js', 'renderer/photographerRegistryUI.js',
       'services/photographerRegistryBrowser.js', 'test/photographerRegistryQ5c.test.js', 'test/photographerRegistryQ5cLive.test.js',
       'test/companionQ1UiFreeze.test.js', 'test/photographerRegistryQ5b.test.js',
+      // Q5d: decisions (builders, manager, actions UI), the view's history/unsettled labels, the
+      // runtime's non-initializing management open, the store's opt-in non-initializing open and the
+      // key store's identity check before any secure-storage (Keychain) access.
+      'services/cameraAssociationCommands.js', 'services/photographerRegistryManager.js', 'services/photographerRegistryView.js',
+      'services/photographerLearningRuntime.js', 'services/identityRegistryStore.js', 'services/identityKeyStore.js', 'renderer/photographerRegistryActions.js',
+      'test/photographerRegistryQ5d.test.js', 'test/photographerRegistryQ5dLive.test.js',
     ]);
     assert.deepEqual(changed.filter(f => !allowed.has(f) && !f.startsWith('.claude/')), []);
   });

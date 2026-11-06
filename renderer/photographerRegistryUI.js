@@ -1,11 +1,12 @@
 /**
  * photographerRegistryUI.js — Photographer Registry tab of Metadata Management
- * (AI-FEAT-063, AI-RM-014 Q5c). READ-ONLY.
+ * (AI-FEAT-063, AI-RM-014 Q5c browsing; Q5d camera decisions).
  *
  * Shows photographers, cameras and review items from the main process's privacy-safe view
- * (photographerRegistryBrowser). Records are addressed only by opaque handles; nothing here
- * can rename, add aliases, confirm or reject cameras, retire, resolve reviews or create
- * records, and no such control is drawn. All text is set with textContent, never parsed as HTML.
+ * (photographerRegistryBrowser). Records are addressed only by opaque handles. Camera-association
+ * decisions and supported conflict resolutions are drawn by photographerRegistryActions.js, only
+ * where the main process allows them; nothing here renames, edits aliases, retires profiles or
+ * creates records. All text is set with textContent, never parsed as HTML.
  *
  * Entry point: window.PhotographerRegistryUI.onShow(), called by _msSetTab when the tab is
  * selected. Data loads lazily on each show; every request is guarded by a request id so a
@@ -32,6 +33,11 @@
     camera: 'Camera',
   };
   const STATE_ORDER = ['confirmed', 'observed', 'disputed', 'rejected', 'retired'];
+  const HISTORY_KIND_TEXT = {
+    observation: 'Import', confirmation: 'Confirmed', rejection: 'Not this photographer', retirement: 'No longer used',
+    correction: 'Correction', resolution: 'Review settled', link: 'Camera link',
+  };
+  const actions = () => window.PhotographerRegistryActions || null;
 
   let view = 'photographers';            // photographers | cameras | review
   let overview = null;
@@ -41,6 +47,7 @@
   let loadSeq = 0, searchSeq = 0, detailSeq = 0;
   let searchTimer = null;
   let wired = false;
+  let pendingResult = null;              // Q5d: result line to show above the next detail render
 
   // ── DOM helpers ───────────────────────────────────────────────────────────────
   function el(tag, cls, text) {
@@ -270,7 +277,35 @@
     const d = $('prDetail');
     if (!d) return;
     clear(d);
+    showPendingResult(d);
     d.appendChild(el('p', 'pr-detail-empty', text));
+  }
+
+  // ── Q5d: decision results ───────────────────────────────────────────────────
+  function showPendingResult(d) {
+    const A = actions();
+    if (!pendingResult || !A) return;
+    const line = A.resultLine(pendingResult);
+    pendingResult = null;
+    line.tabIndex = -1;
+    d.insertBefore(line, d.firstChild);
+    line.focus();
+  }
+
+  function decisionContext() {
+    const from = view;
+    return {
+      management: overview && overview.management,
+      // A saved (or refused) decision returns a fresh snapshot: show it, keep the operator's place.
+      onResult: (res, result) => {
+        overview = normalizedOverview(res.overview);
+        selected = { photographers: null, cameras: null, review: null };
+        pendingResult = result;
+        renderStatus();
+        const focus = res.focus && res.focus.camera;
+        switchView(from === 'review' || !focus ? from : 'cameras', from === 'review' ? null : focus);
+      },
+    };
   }
 
   function placeholderFor(v) {
@@ -296,6 +331,8 @@
       res = forView === 'cameras' ? await api.photographerRegistryCamera(id) : await api.photographerRegistryPhotographer(id);
     } catch { res = null; }
     if (seq !== detailSeq || forView !== view) return;
+    const A = actions();
+    if (A) A.closePanel({ restoreFocus: false });
     if (!res || !res.ok) { detailPlaceholder('This record is no longer available. The registry may have changed — reopen the tab to refresh.'); return; }
     if (forView === 'cameras') renderCameraDetail(res); else renderPhotographerDetail(res);
   }
@@ -411,6 +448,10 @@
     d.appendChild(info);
 
     const people = section('Photographers', 'A camera match suggests who usually uses this camera. It does not prove who took a particular photo.');
+    const A = actions();
+    const ctx = decisionContext();
+    const note = A && A.unavailableNote(overview && overview.management);
+    if (note) people.appendChild(note);
     if (!c.associations.length) people.appendChild(emptyLine('No photographer history for this camera.'));
     for (const a of c.associations) {
       const r = el('div', 'pr-assoc-row');
@@ -418,14 +459,17 @@
       if (a.photographer.handle) top.appendChild(linkButton(a.photographer.name, () => openRecord('photographer', a.photographer.handle), `Open photographer ${a.photographer.name}`));
       else top.appendChild(el('span', 'pr-assoc-name', a.photographer.name));
       top.appendChild(chip(a.label, `pr-state--${a.state}`));
+      if (a.unsettled) top.appendChild(chip('Decisions disagree', 'pr-chip--attention'));
       r.appendChild(top);
       r.appendChild(el('p', 'pr-assoc-text', a.explanation));
       const facts = [];
       if (a.confirmations) facts.push(`confirmed ${plural(a.confirmations, 'time')}${fmtDay(a.lastConfirmedDay) ? `, last ${fmtDay(a.lastConfirmedDay)}` : ''}`);
       if (a.observedImports) facts.push(`seen in ${plural(a.observedImports, 'import')} on ${plural(a.observedDays, 'day')}`);
       if (facts.length) r.appendChild(el('p', 'pr-assoc-facts', facts.join(' · ')));
+      if (A) A.associationActions(r, c, a, ctx);
       people.appendChild(r);
     }
+    if (A) A.cameraActions(people, c, ctx);
     d.appendChild(people);
 
     const sug = section('Suggestion at import');
@@ -443,7 +487,10 @@
     for (const h of c.history) {
       const r = el('div', 'pr-history-row');
       r.appendChild(el('span', 'pr-history-day', fmtDay(h.day) || 'Date not recorded'));
-      r.appendChild(el('span', 'pr-history-what', h.what));
+      const what = el('span', 'pr-history-what');
+      if (HISTORY_KIND_TEXT[h.kind]) what.appendChild(chip(HISTORY_KIND_TEXT[h.kind], `pr-chip--kind pr-kind--${h.kind}`));
+      what.appendChild(document.createTextNode(h.what));
+      r.appendChild(what);
       r.appendChild(el('span', 'pr-history-who', `${h.workflow} · ${operatorText(h.operator)} · ${h.computer === 'this' ? 'this computer' : 'another computer'}`));
       hist.appendChild(r);
     }
@@ -451,6 +498,7 @@
 
     d.appendChild(reviewSection(reviewItems));
     d.scrollTop = 0;
+    showPendingResult(d);
   }
 
   function renderReviewDetail(id) {
@@ -488,8 +536,11 @@
       }
       d.appendChild(s);
     }
-    d.appendChild(el('p', 'pr-section-hint', 'Shown for information. Nothing is merged, chosen or changed automatically.'));
+    const A = actions();
+    if (A) { A.closePanel({ restoreFocus: false }); A.reviewActions(d, r, decisionContext()); }
+    else d.appendChild(el('p', 'pr-section-hint', 'Shown for information. Nothing is merged, chosen or changed automatically.'));
     d.scrollTop = 0;
+    showPendingResult(d);
   }
 
   // ── View switching and loading ───────────────────────────────────────────────
@@ -506,6 +557,11 @@
     else { selected[v] = null; detailPlaceholder(placeholderFor(v)); }
   }
 
+  function normalizedOverview(res) {
+    const ov = res && res.status ? res : { ok: false, status: { state: 'unreadable' }, counts: {}, cameras: [], reviewItems: [] };
+    return { ...ov, cameras: ov.cameras || [], reviewItems: ov.reviewItems || [] };
+  }
+
   async function onShow() {
     wire();
     const seq = ++loadSeq;
@@ -517,9 +573,9 @@
     try { res = await api.photographerRegistryLoad(); } catch { res = null; }
     if (seq !== loadSeq) return;
     if (panel) panel.removeAttribute('aria-busy');
-    overview = res && res.status ? res : { ok: false, status: { state: 'unreadable' }, counts: {}, cameras: [], reviewItems: [] };
-    if (!overview.cameras) overview.cameras = [];
-    if (!overview.reviewItems) overview.reviewItems = [];
+    const A = actions();
+    if (A) A.closePanel({ restoreFocus: false });
+    overview = normalizedOverview(res);
     // Handles belong to one snapshot; a reload invalidates every selection.
     selected = { photographers: null, cameras: null, review: null };
     renderStatus();

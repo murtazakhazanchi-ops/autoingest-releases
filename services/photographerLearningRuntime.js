@@ -5,7 +5,9 @@
  *   scheduleRecoveryAfterLaunch()  once at startup: if (and only if) an earlier run left
  *                           learning pending, a bounded recovery pass runs after a delay
  *   shutdown()              from will-quit
- *   inspectRegistry()       Q5a: read-only Photographer Registry view (not wired to any IPC yet)
+ *   inspectRegistry()       Q5a: read-only Photographer Registry view (Q5c browser loader)
+ *   openRegistryForManagement()  Q5d: the registry store for operator decisions — an EXISTING,
+ *                           healthy registry only; never creates, initialises, recovers or resets
  * Nothing is created at launch or on card insert: the registry, its key, the journal and the
  * pending list are created lazily by the first eligible committed import.
  *
@@ -39,6 +41,8 @@ const RECOVERY_LAUNCH_DELAY_MS = 90000;
 let _service = null;
 let _store = null;
 let _fallback = null; // the running re-read assessor, if any
+let _opening = Promise.resolve(); // serialises opening the one shared store instance
+let _closedForQuit = false;
 
 function _deps() {
   const { app } = require('electron');
@@ -177,6 +181,28 @@ async function _resolveRecoveryEvidence(allFiles, { signal }) {
   };
 }
 
+/**
+ * The ONE store instance of this process (it holds the registry's single-writer lock), shared by
+ * learning and registry management. A store that is not ready is closed (releasing a lock it may
+ * still hold) and opened again. Only learning may initialise a new registry.
+ */
+function _sharedStore({ initialize }) {
+  const run = _opening.then(async () => {
+    if (!_store) {
+      const { createIdentityRegistryStore } = require('./identityRegistryStore');
+      const { createElectronSecureStorage } = require('./electronSecureStorage');
+      const { settings, dir } = _deps();
+      _store = createIdentityRegistryStore({ dir, secureStorage: createElectronSecureStorage(), computerId: settings.getDeviceId() });
+    }
+    if (_closedForQuit || _store.getStatus().state === 'ready') return _store;
+    if (_store.getStatus().state === 'disabled') await _store.close();
+    await _store.open({ initialize });
+    return _store;
+  });
+  _opening = run.catch(() => {});
+  return run;
+}
+
 function _get() {
   if (_service) return _service;
   const { createPhotographerLearningService } = require('./photographerLearningService');
@@ -190,13 +216,10 @@ function _get() {
       shippedNames: JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'photographers.json'), 'utf8')),
     }),
     openStore: async () => {
-      const { createIdentityRegistryStore } = require('./identityRegistryStore');
-      const { createElectronSecureStorage } = require('./electronSecureStorage');
-      const { settings, dir } = _deps();
-      _store = createIdentityRegistryStore({ dir, secureStorage: createElectronSecureStorage(), computerId: settings.getDeviceId() });
-      const st = await _store.open();
+      const store = await _sharedStore({ initialize: true });
+      const st = store.getStatus();
       log(`[identity-learning] registry ${st.state}${st.reason ? ` (${st.reason})` : ''}; body matching ${st.bodyMatching ? 'on' : `off (${st.keyStatus})`}`);
-      return _store;
+      return store;
     },
     resolveEvidence: _resolveEvidence,
     resolveRecoveryEvidence: _resolveRecoveryEvidence,
@@ -240,7 +263,7 @@ function _readJsonOr(file, fallback) {
  * open in this process its in-memory events and authoritative key status are used; otherwise
  * the files are only read (identityRegistryInspector.js). Never throws.
  */
-async function inspectRegistry() {
+async function inspectRegistry({ withEvents = false } = {}) {
   const { buildRegistryView } = require('./photographerRegistryView');
   try {
     const { app, settings, dir } = _deps();
@@ -262,28 +285,59 @@ async function inspectRegistry() {
     } catch { /* unknown */ }
     let operators = [];
     try { operators = require('../main/userManager').listUsers().map(u => ({ id: u.id, name: u.name })); } catch { /* none */ }
-    return buildRegistryView({
+    const shippedNames = _readJsonOr(path.join(__dirname, '..', 'data', 'photographers.json'), []);
+    const view = buildRegistryView({
       registry,
       listNames: require('../main/listManager').getList('photographers'),
-      shippedNames: _readJsonOr(path.join(__dirname, '..', 'data', 'photographers.json'), []),
+      shippedNames,
       learnedShortcuts: _readJsonOr(path.join(app.getPath('userData'), 'photographers.aliases.json'), {}),
       operators,
       thisComputerId: settings.getDeviceId(),
       learning: { enabled: settings.getPhotographerLearningEnabled(), pendingCount },
     });
+    // Q5d: the events the view was built from stay in the main process (registry browser).
+    if (!withEvents) return view;
+    const usable = registry.state === 'ready' || registry.state === 'locked';
+    return { view, events: usable && Array.isArray(registry.events) ? registry.events : [], shippedNames };
   } catch {
-    return buildRegistryView({ registry: { state: 'unreadable', reason: 'inspection-failed' } });
+    const view = buildRegistryView({ registry: { state: 'unreadable', reason: 'inspection-failed' } });
+    return withEvents ? { view, events: [], shippedNames: [] } : view;
+  }
+}
+
+/**
+ * Q5d — the registry store for operator decisions in the Photographer Registry tab. Only an
+ * existing, healthy registry: missing, corrupt, incompatible, locked or unreadable registries are
+ * refused (read-only inspection first, so a damaged file is never opened for writing and a missing
+ * one is never created). Works with photographer learning switched off. Never throws.
+ * @returns {Promise<{ ok: true, store: object } | { ok: false, reason: string }>}
+ */
+async function openRegistryForManagement() {
+  try {
+    if (_closedForQuit) return { ok: false, reason: 'shutting-down' };
+    if (_store && _store.getStatus().state === 'ready') return { ok: true, store: _store };
+    const { app, dir } = _deps();
+    const { inspectRegistryFiles } = require('./identityRegistryInspector');
+    const reg = await inspectRegistryFiles({ dir, expectedIdentity: app.getName() });
+    if (reg.state !== 'ready') return { ok: false, reason: reg.state === 'missing' ? 'no-registry' : `registry-${reg.state}` };
+    const store = await _sharedStore({ initialize: false });
+    const st = store.getStatus();
+    if (st.state === 'ready') return { ok: true, store };
+    return { ok: false, reason: st.reason === 'locked-by-another-process' ? 'registry-locked' : st.reason === 'registry-missing' ? 'no-registry' : 'registry-unavailable' };
+  } catch {
+    return { ok: false, reason: 'registry-unavailable' };
   }
 }
 
 /** will-quit: cancel learning work and release the registry lock. Synchronous, idempotent. */
 function shutdown() {
+  _closedForQuit = true;
   try { if (_service) _service.shutdown(); } catch { /* ignore */ }
   try { if (_fallback) _fallback.shutdown(); } catch { /* ignore */ }
   try { if (_store) _store.releaseLockSync(); } catch { /* ignore */ }
 }
 
 module.exports = {
-  onImportCommitted, scheduleRecoveryAfterLaunch, shutdown, inspectRegistry,
+  onImportCommitted, scheduleRecoveryAfterLaunch, shutdown, inspectRegistry, openRegistryForManagement,
   _forTests: { get: () => _service, store: () => _store, useStore: (s) => { _store = s; }, recoverNow: (opts) => _get().recoverPending(opts), whenIdle: () => _get().whenIdle() },
 };

@@ -11,6 +11,9 @@
 // that panel (plus the tab-row responsiveness rule), the dedicated photographerRegistryUI.js
 // module, the one-line tab registration + lazy-load hook in renderer.js, and four read-only
 // preload channels. Each is checked line by line below; everything else stays frozen.
+// Q5d extends it for camera-association decisions INSIDE that panel only: one more dedicated
+// module (photographerRegistryActions.js, which draws its controls in the panel's detail pane),
+// its script tag and scoped .pr-* styles, and three decision channels (prepare/commit/cancel).
 //
 // Run: node test/companionQ1UiFreeze.test.js [baseRef]   (default origin/stable/0.9)
 
@@ -41,14 +44,16 @@ const changed = new Set([
 const APPROVED_RENDERER_TOUCH = 'renderer/renderer.js';
 const Q5C_INDEX = 'renderer/index.html';
 const Q5C_MODULE = 'renderer/photographerRegistryUI.js';
+const Q5D_MODULE = 'renderer/photographerRegistryActions.js';
 const Q5C_TAB_LINE_OLD = "  ['msTabMetadata', 'msTabAudit', 'msTabRegistry'].forEach(id => {";
 const Q5C_TAB_LINE_NEW = "  ['msTabMetadata', 'msTabAudit', 'msTabRegistry', 'msTabPhotographers'].forEach(id => {";
 const Q5C_PRELOAD_CHANNELS = ['photographerRegistry:load', 'photographerRegistry:search', 'photographerRegistry:photographer', 'photographerRegistry:camera'];
+const Q5D_PRELOAD_CHANNELS = ['photographerRegistry:prepare', 'photographerRegistry:commit', 'photographerRegistry:cancel'];
 const diffLines = (file) => git('diff', '-U0', mergeBase, '--', file).split('\n')
   .filter(l => /^[+-]/.test(l) && !/^(\+\+\+|---) /.test(l));
 
 t('no existing renderer file changed except the approved handoff listener (main window, splash, shared modules)', () => {
-  const offending = [...changed].filter(f => f.startsWith('renderer/') && !f.startsWith('renderer/companion/') && ![APPROVED_RENDERER_TOUCH, Q5C_INDEX, Q5C_MODULE].includes(f));
+  const offending = [...changed].filter(f => f.startsWith('renderer/') && !f.startsWith('renderer/companion/') && ![APPROVED_RENDERER_TOUCH, Q5C_INDEX, Q5C_MODULE, Q5D_MODULE].includes(f));
   assert.deepEqual(offending, []);
 });
 
@@ -65,7 +70,7 @@ t('renderer.js: handoff listener is additions only and draws nothing', () => {
 t('main-window preload: only the companion handoff channels were added', () => {
   const lines = diffLines('main/preload.js');
   assert.deepEqual(lines.filter(l => l.startsWith('-')), [], 'no existing API removed or changed');
-  const allowed = new Set(['companion:openSource', 'companion:openSourceProgress', 'companion:openSourceResult', 'companion:workspaceReady', ...Q5C_PRELOAD_CHANNELS]);
+  const allowed = new Set(['companion:openSource', 'companion:openSourceProgress', 'companion:openSourceResult', 'companion:workspaceReady', ...Q5C_PRELOAD_CHANNELS, ...Q5D_PRELOAD_CHANNELS]);
   const channels = [...lines.join('\n').matchAll(/'([a-z-]+:[A-Za-z]+)'/g)].map(m => m[1]);
   assert.deepEqual(channels.filter(c => !allowed.has(c)), [], 'no other channel exposed to the main window');
 });
@@ -93,7 +98,7 @@ t('index.html (Q5c): additions only, confined to the Photographer Registry tab, 
   const scoped = (sel) => /^@media \(max-width: 860px\)/.test(sel) || sel.split('{')[0].split(',').every(part => /^\s*(\.pr-|#msTabPhotographers\b|#metadataSyncModal \.ms-tabs?\b)/.test(part));
   assert.deepEqual(selectors.filter(sel => !scoped(sel)), [], 'every new rule is scoped to the Q5c panel or the modal tab row');
   const scripts = added.filter(l => /<script\b/.test(l));
-  assert.deepEqual(scripts.map(l => l.trim()), ['<script src="photographerRegistryUI.js" defer></script>'], 'only the dedicated module is loaded');
+  assert.deepEqual(scripts.map(l => l.trim()), ['<script src="photographerRegistryUI.js" defer></script>', '<script src="photographerRegistryActions.js" defer></script>'], 'only the dedicated modules are loaded');
   const tabButtons = added.filter(l => /class="ms-tab"/.test(l));
   assert.equal(tabButtons.length, 1, 'exactly one new Metadata Management tab button');
   assert.ok(/data-ms-tab="msTabPhotographers">Photographer Registry<\/button>/.test(tabButtons[0]));
@@ -101,7 +106,17 @@ t('index.html (Q5c): additions only, confined to the Photographer Registry tab, 
   assert.deepEqual(actions, [], 'no action button (rename, alias, confirm, retire, resolve) in the markup');
 });
 
-t('photographerRegistryUI.js (Q5c): read-only — only the four read channels, no HTML injection', () => {
+t('photographerRegistryActions.js (Q5d): decisions only through prepare/commit/cancel (+ search for the picker), no HTML injection', () => {
+  const src = require('fs').readFileSync(path.join(ROOT, Q5D_MODULE), 'utf8');
+  const calls = [...src.matchAll(/api\.(\w+)\(/g)].map(m => m[1]);
+  assert.deepEqual([...new Set(calls)].sort(), ['photographerRegistryCancel', 'photographerRegistryCommit', 'photographerRegistryPrepare', 'photographerRegistrySearch']);
+  assert.ok(!/innerHTML|outerHTML|insertAdjacentHTML|document\.write/.test(src), 'text is set with textContent only');
+  assert.ok(!/ipcRenderer|require\(/.test(src), 'no direct IPC or module access');
+  assert.ok(!/rename|alias|retirePhotographer|folder/i.test(src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')), 'no naming, alias, profile or folder control');
+  assert.ok(!/getElementById\('(?!pr)|querySelector\('(?!\.pr-|input\[data-first\]|button)/.test(src), 'touches only its own panel elements');
+});
+
+t('photographerRegistryUI.js (Q5c): browsing reads only the four read channels, no HTML injection', () => {
   const src = require('fs').readFileSync(path.join(ROOT, Q5C_MODULE), 'utf8');
   const calls = [...src.matchAll(/api\.(\w+)\(/g)].map(m => m[1]);
   assert.deepEqual([...new Set(calls)].sort(), ['photographerRegistryCamera', 'photographerRegistryLoad', 'photographerRegistryPhotographer', 'photographerRegistrySearch']);

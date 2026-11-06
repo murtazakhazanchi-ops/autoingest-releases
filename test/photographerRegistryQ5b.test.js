@@ -541,7 +541,8 @@ const candidatesOf = (plan, copy = 0, scope = 0) => plan.copies[copy].scopes[sco
     // main.js, as the view loader of the read-only browser. Never in a preload.
     for (const f of ['main/preload.js', 'main/companionPreload.js']) assert.ok(!read(f).includes('inspectRegistry'), `${f} references inspectRegistry`);
     const inspectRefs = read('main/main.js').split('\n').filter(l => l.includes('inspectRegistry') && !/^\s*\/\//.test(l));
-    assert.ok(inspectRefs.length <= 1 && inspectRefs.every(l => /createRegistryBrowser\(\{ loadView: \(\) => photographerLearning\.inspectRegistry\(\) \}\)/.test(l)), 'main.js uses inspectRegistry only as the read-only browser loader');
+    // Q5d passes { withEvents: true } so the browser can offer decisions; still the only use.
+    assert.ok(inspectRefs.length <= 1 && inspectRefs.every(l => /loadView: \(\) => photographerLearning\.inspectRegistry\((\{ withEvents: true \})?\)/.test(l)), 'main.js uses inspectRegistry only as the registry browser loader');
     const rendererFiles = fs.readdirSync(path.join(ROOT, 'renderer')).filter(f => f.endsWith('.js') || f.endsWith('.html'));
     for (const f of rendererFiles) assert.ok(!/photographerProfileCommands|photographerFolderRenamePlanner|photographer-alias-/.test(read(`renderer/${f}`)), `renderer/${f}`);
     const users = fs.readdirSync(path.join(ROOT, 'services')).filter(f => f.endsWith('.js') && /require\(['"]\.\/photographer(ProfileCommands|FolderRenamePlanner)['"]\)/.test(read(`services/${f}`)));

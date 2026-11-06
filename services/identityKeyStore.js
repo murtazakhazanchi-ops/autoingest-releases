@@ -85,6 +85,12 @@ function createIdentityKeyStore({ dir, secureStorage, fs: fsx = require('fs').pr
     if (r.status === 'missing') return { keyring: null, reason: 'key-file-missing' };
     if (r.status === 'corrupt') return { keyring: null, reason: 'key-file-corrupt' };
     if (r.doc.registryId !== registryId) return { keyring: null, reason: 'key-registry-mismatch' };
+    // Identity first: even asking whether secure storage is available makes macOS create this
+    // app's "<name> Safe Storage" Keychain item, which a key sealed elsewhere can never use.
+    for (const keyId of keyIds) {
+      const k = r.doc.keys.find(x => x.keyId === keyId);
+      if (k && k.identity !== String(secureStorage.identity || '')) return { keyring: null, reason: 'key-protection-identity-mismatch' };
+    }
     if (!secureStorage.isAvailable()) return { keyring: null, reason: 'secure-storage-unavailable' };
     const entries = [];
     try {

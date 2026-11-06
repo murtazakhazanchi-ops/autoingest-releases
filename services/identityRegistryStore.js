@@ -184,11 +184,16 @@ function createIdentityRegistryStore(opts) {
     state = 'ready'; reason = orphan ? 'initialized-with-existing-keys' : 'initialized';
   }
 
-  /** Open (or initialise) the registry. Never throws. */
-  function open() {
+  /**
+   * Open (or initialise) the registry. Never throws.
+   * { initialize: false } (Q5d registry management) opens an EXISTING registry only: with no
+   * registry file nothing is created — no folder, lock, key or file — and the store stays disabled.
+   */
+  function open({ initialize = true } = {}) {
     return serial(async () => {
       if (state === 'ready') return getStatus();
       try {
+        if (!initialize && (await readIfExists(fsx, registryFile)) === null) return disable('registry-missing');
         await fsx.mkdir(backupDir, { recursive: true, mode: 0o700 });
         await fsx.mkdir(quarantineDir, { recursive: true, mode: 0o700 });
         if (!(await _acquireLock())) return disable('locked-by-another-process');
