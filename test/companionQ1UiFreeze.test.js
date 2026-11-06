@@ -14,6 +14,9 @@
 // Q5d extends it for camera-association decisions INSIDE that panel only: one more dedicated
 // module (photographerRegistryActions.js, which draws its controls in the panel's detail pane),
 // its script tag and scoped .pr-* styles, and three decision channels (prepare/commit/cancel).
+// Q5e-1 adds, still inside that panel only, the profile module (photographerRegistryProfile.js:
+// aliases, retire/reactivate, first registration, PREVIEW-ONLY rename), its script tag and scoped
+// styles, and one read-only channel (renamePreview). No rename can be applied from the UI.
 //
 // Run: node test/companionQ1UiFreeze.test.js [baseRef]   (default origin/stable/0.9)
 
@@ -45,15 +48,16 @@ const APPROVED_RENDERER_TOUCH = 'renderer/renderer.js';
 const Q5C_INDEX = 'renderer/index.html';
 const Q5C_MODULE = 'renderer/photographerRegistryUI.js';
 const Q5D_MODULE = 'renderer/photographerRegistryActions.js';
+const Q5E_MODULE = 'renderer/photographerRegistryProfile.js';
 const Q5C_TAB_LINE_OLD = "  ['msTabMetadata', 'msTabAudit', 'msTabRegistry'].forEach(id => {";
 const Q5C_TAB_LINE_NEW = "  ['msTabMetadata', 'msTabAudit', 'msTabRegistry', 'msTabPhotographers'].forEach(id => {";
 const Q5C_PRELOAD_CHANNELS = ['photographerRegistry:load', 'photographerRegistry:search', 'photographerRegistry:photographer', 'photographerRegistry:camera'];
-const Q5D_PRELOAD_CHANNELS = ['photographerRegistry:prepare', 'photographerRegistry:commit', 'photographerRegistry:cancel'];
+const Q5D_PRELOAD_CHANNELS = ['photographerRegistry:prepare', 'photographerRegistry:commit', 'photographerRegistry:cancel', 'photographerRegistry:renamePreview'];
 const diffLines = (file) => git('diff', '-U0', mergeBase, '--', file).split('\n')
   .filter(l => /^[+-]/.test(l) && !/^(\+\+\+|---) /.test(l));
 
 t('no existing renderer file changed except the approved handoff listener (main window, splash, shared modules)', () => {
-  const offending = [...changed].filter(f => f.startsWith('renderer/') && !f.startsWith('renderer/companion/') && ![APPROVED_RENDERER_TOUCH, Q5C_INDEX, Q5C_MODULE, Q5D_MODULE].includes(f));
+  const offending = [...changed].filter(f => f.startsWith('renderer/') && !f.startsWith('renderer/companion/') && ![APPROVED_RENDERER_TOUCH, Q5C_INDEX, Q5C_MODULE, Q5D_MODULE, Q5E_MODULE].includes(f));
   assert.deepEqual(offending, []);
 });
 
@@ -98,7 +102,7 @@ t('index.html (Q5c): additions only, confined to the Photographer Registry tab, 
   const scoped = (sel) => /^@media \(max-width: 860px\)/.test(sel) || sel.split('{')[0].split(',').every(part => /^\s*(\.pr-|#msTabPhotographers\b|#metadataSyncModal \.ms-tabs?\b)/.test(part));
   assert.deepEqual(selectors.filter(sel => !scoped(sel)), [], 'every new rule is scoped to the Q5c panel or the modal tab row');
   const scripts = added.filter(l => /<script\b/.test(l));
-  assert.deepEqual(scripts.map(l => l.trim()), ['<script src="photographerRegistryUI.js" defer></script>', '<script src="photographerRegistryActions.js" defer></script>'], 'only the dedicated modules are loaded');
+  assert.deepEqual(scripts.map(l => l.trim()), ['<script src="photographerRegistryUI.js" defer></script>', '<script src="photographerRegistryActions.js" defer></script>', '<script src="photographerRegistryProfile.js" defer></script>'], 'only the dedicated modules are loaded');
   const tabButtons = added.filter(l => /class="ms-tab"/.test(l));
   assert.equal(tabButtons.length, 1, 'exactly one new Metadata Management tab button');
   assert.ok(/data-ms-tab="msTabPhotographers">Photographer Registry<\/button>/.test(tabButtons[0]));
@@ -112,8 +116,20 @@ t('photographerRegistryActions.js (Q5d): decisions only through prepare/commit/c
   assert.deepEqual([...new Set(calls)].sort(), ['photographerRegistryCancel', 'photographerRegistryCommit', 'photographerRegistryPrepare', 'photographerRegistrySearch']);
   assert.ok(!/innerHTML|outerHTML|insertAdjacentHTML|document\.write/.test(src), 'text is set with textContent only');
   assert.ok(!/ipcRenderer|require\(/.test(src), 'no direct IPC or module access');
-  assert.ok(!/rename|alias|retirePhotographer|folder/i.test(src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')), 'no naming, alias, profile or folder control');
+  assert.ok(!/rename|folder/i.test(src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')), 'no naming or folder control');
   assert.ok(!/getElementById\('(?!pr)|querySelector\('(?!\.pr-|input\[data-first\]|button)/.test(src), 'touches only its own panel elements');
+});
+
+t('photographerRegistryProfile.js (Q5e-1): profile actions through the shared panel; rename is preview-only', () => {
+  const src = require('fs').readFileSync(path.join(ROOT, Q5E_MODULE), 'utf8');
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  const calls = [...code.matchAll(/api\.(\w+)\(/g)].map(m => m[1]);
+  assert.deepEqual([...new Set(calls)].sort(), ['photographerRegistryRenamePreview'], 'its only direct call is the read-only rename preview');
+  const actions = [...code.matchAll(/action: '([a-z-]+)'/g)].map(m => m[1]);
+  assert.deepEqual([...new Set(actions)].sort(), ['alias-add', 'alias-remove', 'register', 'status'], 'no rename, merge or folder action is ever requested');
+  assert.ok(/apply\.disabled = true/.test(code) && !/apply\.disabled = false|apply\.addEventListener/.test(code), 'the apply button exists only disabled, with no handler');
+  assert.ok(!/Rename Folder/i.test(code), 'no "Rename Folder Too" control');
+  assert.ok(!/innerHTML|outerHTML|insertAdjacentHTML|document\.write|ipcRenderer|require\(/.test(code), 'textContent only, no direct IPC');
 });
 
 t('photographerRegistryUI.js (Q5c): browsing reads only the four read channels, no HTML injection', () => {

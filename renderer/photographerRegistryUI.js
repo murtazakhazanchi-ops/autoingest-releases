@@ -4,9 +4,10 @@
  *
  * Shows photographers, cameras and review items from the main process's privacy-safe view
  * (photographerRegistryBrowser). Records are addressed only by opaque handles. Camera-association
- * decisions and supported conflict resolutions are drawn by photographerRegistryActions.js, only
- * where the main process allows them; nothing here renames, edits aliases, retires profiles or
- * creates records. All text is set with textContent, never parsed as HTML.
+ * decisions and supported conflict resolutions are drawn by photographerRegistryActions.js, and
+ * profile management (search aliases, retire/reactivate, first registration, preview-only rename)
+ * by photographerRegistryProfile.js (Q5e-1), only where the main process allows them.
+ * All text is set with textContent, never parsed as HTML.
  *
  * Entry point: window.PhotographerRegistryUI.onShow(), called by _msSetTab when the tab is
  * selected. Data loads lazily on each show; every request is guarded by a request id so a
@@ -22,7 +23,7 @@
   const IDENTITY_TEXT = {
     shipped: 'From the shipped photographer list',
     registered: 'Added to the photographer list',
-    'pending-first-use': 'Not used in an import yet',
+    'pending-first-use': 'No registry record yet',
     ambiguous: 'Name matches several photographer records',
     referenced: 'Known from registry history only',
   };
@@ -38,6 +39,7 @@
     correction: 'Correction', resolution: 'Review settled', link: 'Camera link',
   };
   const actions = () => window.PhotographerRegistryActions || null;
+  const profileUi = () => (window.PhotographerRegistryActions && window.PhotographerRegistryProfile) || null;
 
   let view = 'photographers';            // photographers | cameras | review
   let overview = null;
@@ -302,8 +304,11 @@
         selected = { photographers: null, cameras: null, review: null };
         pendingResult = result;
         renderStatus();
-        const focus = res.focus && res.focus.camera;
-        switchView(from === 'review' || !focus ? from : 'cameras', from === 'review' ? null : focus);
+        const cam = res.focus && res.focus.camera;
+        const person = res.focus && res.focus.photographer;
+        if (from === 'review') switchView('review');
+        else if (person) switchView('photographers', person);
+        else switchView(cam ? 'cameras' : from, cam || null);
       },
     };
   }
@@ -365,6 +370,15 @@
     if (IDENTITY_TEXT[p.identity]) badges.appendChild(chip(IDENTITY_TEXT[p.identity], 'pr-chip--muted'));
     if (p.needsReview) badges.appendChild(chip('Needs review', 'pr-chip--attention'));
     head.appendChild(badges);
+    const PU = profileUi();
+    const ctx = decisionContext();
+    if (PU) {
+      if (p.statusDisputed) badges.appendChild(chip('Status needs review', 'pr-chip--attention'));
+      if (p.identity === 'pending-first-use') head.appendChild(el('p', 'pr-manage-note', 'This photographer-list name has no registry record yet. One is created at its first import, or here with “Create registry record”. Until then aliases and status cannot be recorded.'));
+      const note = actions().unavailableNote(overview && overview.management);
+      if (note) head.appendChild(note);
+      PU.headerActions(head, p, ctx);
+    }
     d.appendChild(head);
 
     const names = section('Names');
@@ -385,15 +399,20 @@
     }
     d.appendChild(hist);
 
-    const aliases = section('Search aliases', 'Other spellings the registry uses to find this photographer in searches. Not names, and never used to choose a photographer.');
-    if (!p.searchAliases.length) aliases.appendChild(emptyLine('No search aliases.'));
-    else { const w = el('div', 'pr-chips'); p.searchAliases.forEach(a => w.appendChild(chip(a.text))); aliases.appendChild(w); }
-    d.appendChild(aliases);
-
-    const sc = section('Learned typing shortcuts', 'What operators typed in autocomplete before choosing this photographer. Shortcuts are not aliases or names.');
-    if (!p.learnedShortcuts.length) sc.appendChild(emptyLine('No typing shortcuts learned.'));
-    else { const w = el('div', 'pr-chips'); p.learnedShortcuts.forEach(s => w.appendChild(chip(s.text, 'pr-chip--shortcut'))); sc.appendChild(w); }
-    d.appendChild(sc);
+    if (PU && p.registered) d.appendChild(PU.statusSection(p));
+    if (PU) {
+      d.appendChild(PU.aliasSection(p, ctx));
+      d.appendChild(PU.shortcutSection(p, ctx));
+    } else {
+      const aliases = section('Search aliases', 'Other spellings the registry uses to find this photographer in searches. Not names, and never used to choose a photographer.');
+      if (!p.searchAliases.length) aliases.appendChild(emptyLine('No search aliases.'));
+      else { const w = el('div', 'pr-chips'); p.searchAliases.forEach(a => w.appendChild(chip(a.text))); aliases.appendChild(w); }
+      d.appendChild(aliases);
+      const sc = section('Learned typing shortcuts', 'What operators typed in autocomplete before choosing this photographer. Shortcuts are not aliases or names.');
+      if (!p.learnedShortcuts.length) sc.appendChild(emptyLine('No typing shortcuts learned.'));
+      else { const w = el('div', 'pr-chips'); p.learnedShortcuts.forEach(s => w.appendChild(chip(s.text, 'pr-chip--shortcut'))); sc.appendChild(w); }
+      d.appendChild(sc);
+    }
 
     const cams = section('Cameras', 'A camera match suggests who usually uses a camera. It does not prove who took a particular photo.');
     if (!p.cameras.length) cams.appendChild(emptyLine('No camera history recorded.'));
@@ -423,6 +442,7 @@
 
     d.appendChild(reviewSection(reviewItems));
     d.scrollTop = 0;
+    showPendingResult(d);
   }
 
   function renderCameraDetail({ camera: c, reviewItems }) {

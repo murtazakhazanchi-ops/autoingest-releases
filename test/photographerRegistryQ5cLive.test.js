@@ -278,8 +278,10 @@ const layout = (main) => main.evaluate(() => {
     check(/T\. Kayani/.test(prof) && /tkay/.test(prof) && /Search aliases/i.test(prof) && /Learned typing shortcuts/i.test(prof), 'profile: registry search alias and learned shortcut, in separate sections');
     check(/EOS R5/.test(prof) && /ILCE-7M3/.test(prof) && /does not prove who took a particular photo/.test(prof), 'profile: camera associations with the attribution caveat');
     check(/Needs review/i.test(prof) && /Camera confirmation disputed/.test(prof), 'profile: related conflict shown');
-    const buttons = await main.evaluate(() => [...document.querySelectorAll('#msTabPhotographers button')].map(b => b.textContent.trim()));
-    check(!buttons.some(t => /rename|alias|retire|confirm|reject|resolve|merge|delete|reset|save/i.test(t)), `no management action controls (${buttons.filter(t => !/^(Photographers|Cameras|Needs review)/.test(t)).length} link buttons only)`);
+    const buttons = await main.evaluate(() => [...document.querySelectorAll('#msTabPhotographers button')].filter(b => !b.disabled).map(b => b.textContent.trim()));
+    // Q5d/Q5e-1 (authorized) add decision and profile controls; merging, deleting, resetting,
+    // folder renames and applying a rename must still not exist.
+    check(!buttons.some(t => /merge|delete|reset|rename folder|apply rename/i.test(t)), `no merge, delete, reset, folder-rename or apply-rename control (${buttons.length} enabled buttons)`);
     await shot(main, '02-profile-dark');
 
     // Keyboard navigation

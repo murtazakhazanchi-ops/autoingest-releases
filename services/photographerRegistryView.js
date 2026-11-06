@@ -91,6 +91,7 @@ const CONFLICT_TEXT = {
   'ambiguous-name': ['Name matches several photographers', 'This list name belongs to more than one photographer record, so it is not linked to any of them.'],
   'stale-rename': ['Rename made from an older name', 'This rename started from a name the photographer no longer had, usually because it was made on another computer before an earlier rename arrived.'],
   'shared-search-alias': ['Search alias shared', 'This search alias belongs to more than one photographer. Searching for it shows all of them and selects none.'],
+  'photographer-status-disputed': ['Profile status disputed', 'This profile was marked retired and active without the changes seeing each other (for example on two computers). It is treated as active until an operator settles it.'],
   'integrity-conflicts': ['Records held for review', 'Some imported registry records conflicted with existing ones and are held aside.'],
 };
 
@@ -145,6 +146,8 @@ function buildRegistryView(input = {}) {
   const officialIndex = N.buildOfficialNameIndex(state, shipped);
   const history = N.deriveNameHistory(events, { state, shipped });
   const registryAliases = N.deriveSearchAliases(events, { state });
+  const profileStatus = N.deriveProfileStatus(events, { state });
+  const retired = new Set([...profileStatus].filter(([, x]) => x.status === 'retired').map(([c]) => c));
 
   // ── Photographer profiles ──────────────────────────────────────────────────────
   const profiles = new Map();
@@ -153,7 +156,7 @@ function buildRegistryView(input = {}) {
       profiles.set(key, {
         key, photographerId: null, identity: 'pending-first-use', name: null, originalName: null,
         formerNames: [], nameHistory: [], listNames: [], inList: false,
-        searchAliases: [], learnedShortcuts: [], status: 'active',
+        searchAliases: [], aliasHistory: [], learnedShortcuts: [], status: 'active', statusHistory: [], statusDisputed: false,
         cameras: [], modelsUsed: [], cameraCounts: { confirmed: 0, observed: 0, disputed: 0, rejected: 0, retired: 0, shared: 0 },
         lastObservedDay: null, review: [], ...base,
       });
@@ -209,9 +212,35 @@ function buildRegistryView(input = {}) {
     }
     for (const c of h.conflicts) staleRenames.push({ id, eventId: c.eventId });
   }
+  for (const [id, st] of profileStatus) {
+    const pr = profiles.get(id);
+    if (!pr) continue;
+    // 'disputed' is listed for review and treated as active everywhere else.
+    pr.status = st.status === 'retired' ? 'retired' : 'active';
+    pr.statusDisputed = st.status === 'disputed';
+    pr.statusHistory = st.history.map(h => ({
+      day: _day(h.at), at: h.at, status: h.status, settles: h.settles,
+      operator: _operatorName(operators, h.operatorId), computer: computerOf(h.computerId),
+    }));
+  }
+  const aliasOwners = N.searchAliasOwners(registryAliases);
   for (const [id, list] of registryAliases) {
     const pr = profiles.get(id);
-    if (pr) pr.searchAliases = list.map(a => ({ text: a.alias, kind: a.kind, addedDay: _day(a.addedAt) }));
+    if (pr) {
+      pr.searchAliases = list.map(a => ({
+        text: a.alias, kind: a.kind, addedDay: _day(a.addedAt),
+        operator: _operatorName(operators, a.operatorId), computer: computerOf(a.computerId),
+        sharedWith: [...(aliasOwners.get(P.normalizeName(a.alias)) || [])].filter(o => o !== id),
+      }));
+    }
+  }
+  // Every alias addition and removal stays visible (Q5e-1): removing an alias never deletes it.
+  for (const e of [...events].sort(compareEvents)) {
+    if ((e.type !== 'photographer-alias-added' && e.type !== 'photographer-alias-removed') || !validEvent(e)) continue;
+    const pr = profiles.get(state.photographerCanonical(e.photographerId));
+    if (!pr) continue;
+    if (!pr.aliasHistory) pr.aliasHistory = [];
+    pr.aliasHistory.push({ day: _day(e.at), action: e.type === 'photographer-alias-added' ? 'added' : 'removed', text: e.alias, operator: _operatorName(operators, e.origin.operatorId), computer: computerOf(e.origin.computerId) });
   }
   for (const pr of profiles.values()) {
     if (pr.photographerId) {
@@ -263,7 +292,7 @@ function buildRegistryView(input = {}) {
         historyById.get(pv.eventId).photographerIds.add(a.photographerId);
       }
     }
-    const sug = suggestForCamera(state, { kind: 'body', deviceId: d.deviceId });
+    const sug = suggestForCamera(state, { kind: 'body', deviceId: d.deviceId }, { retired });
     const types = [...new Set(d.identifiers.filter(i => i.trusted).map(i => IDENTIFIER_LABEL[i.ns] || 'Other camera identifier'))].sort();
     cameras.set(d.deviceId, {
       deviceId: d.deviceId,
@@ -364,6 +393,7 @@ function buildRegistryView(input = {}) {
   for (const [n, owners] of N.searchAliasOwners(registryAliases)) {
     if (owners.size > 1) pushItem(`shared-search-alias|${n}`, 'shared-search-alias', [...owners].sort().map(personRef), []);
   }
+  for (const [id, st] of profileStatus) if (st.status === 'disputed') pushItem(`photographer-status-disputed|${id}`, 'photographer-status-disputed', [personRef(id)], []);
   if (usable && reg.heldCount > 0) pushItem('integrity-conflicts', 'integrity-conflicts', [], []);
 
   const photographersOut = [...profiles.values()]

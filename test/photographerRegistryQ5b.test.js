@@ -299,7 +299,10 @@ const candidatesOf = (plan, copy = 0, scope = 0) => plan.copies[copy].scopes[sco
     assert.equal(r.ambiguous, true); assert.equal(r.selected, null);
     assert.ok(r.results.filter(x => x.matchedOn === 'search-alias').length === 2);
     assert.ok(view.reviewItems.some(i => i.kind === 'shared-search-alias'));
-    assert.deepEqual(view.photographers.find(p => p.photographerId === A).searchAliases, [{ text: 'HZ', kind: 'abbreviation', addedDay: events[2].at.slice(0, 10) }]);
+    // Q5e-1 adds provenance and sharing to each alias; the Q5b fields are unchanged.
+    const hz = view.photographers.find(p => p.photographerId === A).searchAliases;
+    assert.deepEqual(hz.map(({ text, kind, addedDay }) => ({ text, kind, addedDay })), [{ text: 'HZ', kind: 'abbreviation', addedDay: events[2].at.slice(0, 10) }]);
+    assert.equal(hz[0].sharedWith.length, 1, 'the other owner of the shared alias is listed');
     assert.equal(view.capabilities.searchAliases, false, 'no alias editing is exposed');
   });
 
@@ -546,7 +549,10 @@ const candidatesOf = (plan, copy = 0, scope = 0) => plan.copies[copy].scopes[sco
     const rendererFiles = fs.readdirSync(path.join(ROOT, 'renderer')).filter(f => f.endsWith('.js') || f.endsWith('.html'));
     for (const f of rendererFiles) assert.ok(!/photographerProfileCommands|photographerFolderRenamePlanner|photographer-alias-/.test(read(`renderer/${f}`)), `renderer/${f}`);
     const users = fs.readdirSync(path.join(ROOT, 'services')).filter(f => f.endsWith('.js') && /require\(['"]\.\/photographer(ProfileCommands|FolderRenamePlanner)['"]\)/.test(read(`services/${f}`)));
-    assert.deepEqual(users, ['photographerFolderRenamePlanner.js'], 'only the planner uses the command module; the runtime uses neither');
+    // Q5e-1 (authorized): profile actions use the alias/status builders, and the registry manager the
+    // read-only planner for the rename PREVIEW. buildRenameEvent / the service stay unused.
+    assert.deepEqual(users, ['photographerFolderRenamePlanner.js', 'photographerProfileActions.js', 'photographerRegistryManager.js'], 'only the planner, profile actions and the manager (preview) use them; the runtime uses neither');
+    for (const f of users) assert.ok(!/buildRenameEvent|createProfileCommandService|renamePhotographer/.test(read(`services/${f}`).replace(/\/\*[\s\S]*?\*\//g, '')) || f === 'photographerFolderRenamePlanner.js', `${f} never builds a rename`);
     assert.ok(!/ProfileCommands|FolderRenamePlanner/.test(read('services/photographerLearningRuntime.js')));
   });
 

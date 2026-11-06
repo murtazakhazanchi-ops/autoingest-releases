@@ -215,6 +215,23 @@ function buildAliasRemoveEvent(events, { shippedNames = [], photographerId, alia
   return { ok: true, events: [ev], result: { photographerId: c, alias: live.alias, previousRevision: revision } };
 }
 
+/**
+ * Retire or reactivate a profile (Q5e-1). A registry status only: names, aliases, cameras, history
+ * and the photographer list are untouched. `resolves` = every earlier status event of the identity
+ * (the ones the operator saw), so a disputed status is settled by this decision.
+ */
+function buildStatusEvent(events, { shippedNames = [], photographerId, status, expectedRevision, origin, at, newId } = {}) {
+  if (!['active', 'retired'].includes(status)) return { ok: false, reason: 'invalid-status' };
+  const pre = _prelude(events, { shippedNames, photographerId, expectedRevision, origin });
+  if (pre.refusal) return pre.refusal;
+  const { ctx, c, revision } = pre;
+  const current = N.deriveProfileStatus(events, { state: ctx.state }).get(c);
+  const now = current ? current.status : 'active';
+  if (now === status) return { ok: false, reason: 'status-unchanged' };
+  const ev = createEvent('photographer-status-set', { photographerId: c, status, resolves: current ? [...current.statusEventIds] : [] }, { origin, at, newId });
+  return { ok: true, events: [ev], result: { photographerId: c, from: now, status, previousRevision: revision } };
+}
+
 const _aliasesOff = () => ({ enabled: false, unmet: ['registry-ui-stage'] });
 
 /**
@@ -240,5 +257,5 @@ function createProfileCommandService({ store, getNames, now = () => new Date(), 
 module.exports = {
   NAME_MIN, NAME_MAX, ALIAS_KINDS,
   previewStoredName, folderNameErrors, validateProposedName, checkProposedName, getProfileRevision,
-  buildRenameEvent, buildAliasAddEvent, buildAliasRemoveEvent, createProfileCommandService,
+  buildRenameEvent, buildAliasAddEvent, buildAliasRemoveEvent, buildStatusEvent, createProfileCommandService,
 };

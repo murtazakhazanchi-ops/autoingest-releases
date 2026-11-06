@@ -306,6 +306,19 @@ async function inspectRegistry({ withEvents = false } = {}) {
 }
 
 /**
+ * Q5e-1 — the authoritative photographer names for registry profile actions (read-only): the
+ * photographer list (listManager), the shipped names and the learned typing shortcuts.
+ */
+function registryNames() {
+  const { app } = _deps();
+  return {
+    listNames: require('../main/listManager').getList('photographers'),
+    shippedNames: _readJsonOr(path.join(__dirname, '..', 'data', 'photographers.json'), []),
+    learnedShortcuts: _readJsonOr(path.join(app.getPath('userData'), 'photographers.aliases.json'), {}),
+  };
+}
+
+/**
  * Q5d — the registry store for operator decisions in the Photographer Registry tab. Only an
  * existing, healthy registry: missing, corrupt, incompatible, locked or unreadable registries are
  * refused (read-only inspection first, so a damaged file is never opened for writing and a missing
@@ -338,6 +351,6 @@ function shutdown() {
 }
 
 module.exports = {
-  onImportCommitted, scheduleRecoveryAfterLaunch, shutdown, inspectRegistry, openRegistryForManagement,
+  onImportCommitted, scheduleRecoveryAfterLaunch, shutdown, inspectRegistry, openRegistryForManagement, registryNames,
   _forTests: { get: () => _service, store: () => _store, useStore: (s) => { _store = s; }, recoverNow: (opts) => _get().recoverPending(opts), whenIdle: () => _get().whenIdle() },
 };

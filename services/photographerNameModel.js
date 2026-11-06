@@ -22,7 +22,7 @@ const crypto = require('crypto');
 const { normalizeEventSet } = require('./associationModel');
 const P = require('./photographerIdentity');
 
-const NAME_EVENT_TYPES = new Set(['photographer-registered', 'photographer-renamed', 'photographer-linked', 'photographer-alias-added', 'photographer-alias-removed']);
+const NAME_EVENT_TYPES = new Set(['photographer-registered', 'photographer-renamed', 'photographer-linked', 'photographer-alias-added', 'photographer-alias-removed', 'photographer-status-set']);
 
 const _canon = (state, id) => (state && typeof state.photographerCanonical === 'function' ? state.photographerCanonical(id) : id);
 
@@ -174,6 +174,47 @@ function searchAliasOwners(aliases) {
 }
 
 /**
+ * Profile status per canonical identity (Q5e-1). Default 'active'. The unsettled status events
+ * (those no later status event lists in `resolves`) decide it; if they disagree the status is
+ * 'disputed' and stays so until an operator settles it — never by timestamp.
+ * @returns {Map<string, { status: 'active'|'retired'|'disputed', statusEventIds: string[],
+ *   history: Array<{ eventId, at, status, operatorId, computerId, settles: boolean }> }>}
+ */
+function deriveProfileStatus(events, { state }) {
+  const ev = normalizeEventSet(events).knownEvents.filter(e => e.type === 'photographer-status-set');
+  const byId = new Map();
+  for (const e of ev) {
+    const c = _canon(state, e.photographerId);
+    if (!byId.has(c)) byId.set(c, []);
+    byId.get(c).push(e);
+  }
+  const out = new Map();
+  for (const [c, list] of byId) {
+    const settled = new Set(list.flatMap(e => e.resolves));
+    const heads = list.filter(e => !settled.has(e.eventId));
+    const kinds = new Set(heads.map(e => e.status));
+    const status = kinds.size > 1 ? 'disputed' : heads.length ? heads[heads.length - 1].status : 'active';
+    const byEvent = new Map(list.map(e => [e.eventId, e]));
+    const settlesDisagreement = (e) => {
+      const prior = e.resolves.map(id => byEvent.get(id)).filter(Boolean);
+      const inner = new Set(prior.flatMap(x => x.resolves));
+      return new Set(prior.filter(x => !inner.has(x.eventId)).map(x => x.status)).size > 1;
+    };
+    out.set(c, {
+      status,
+      statusEventIds: list.map(e => e.eventId),
+      history: list.map(e => ({ eventId: e.eventId, at: e.at, status: e.status, operatorId: e.origin.operatorId, computerId: e.origin.computerId, settles: settlesDisagreement(e) })),
+    });
+  }
+  return out;
+}
+
+/** Canonical IDs whose profile is retired (for suggestions). Disputed is not treated as retired. */
+function retiredIds(events, { state }) {
+  return new Set([...deriveProfileStatus(events, { state })].filter(([, s]) => s.status === 'retired').map(([c]) => c));
+}
+
+/**
  * Revision of one identity's name/alias/link record: changes whenever any of those events for
  * any linked member changes. Commands built against an older revision are rejected as stale.
  */
@@ -189,5 +230,5 @@ function profileRevision(events, { state, photographerId }) {
 
 module.exports = {
   NAME_EVENT_TYPES, buildOfficialNameIndex, resolveOfficialName, officialNamesOf,
-  deriveNameHistory, deriveSearchAliases, searchAliasOwners, profileRevision,
+  deriveNameHistory, deriveSearchAliases, searchAliasOwners, profileRevision, deriveProfileStatus, retiredIds,
 };

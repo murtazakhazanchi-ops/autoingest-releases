@@ -10,7 +10,8 @@
  * Records are addressed by opaque handles only; operator, IDs and revisions never pass through here.
  * All text is set with textContent, never parsed as HTML.
  *
- * Used by photographerRegistryUI.js through window.PhotographerRegistryActions.
+ * Used by photographerRegistryUI.js and photographerRegistryProfile.js through
+ * window.PhotographerRegistryActions (the profile module reuses the same confirm-and-save panel).
  */
 
 (function () {
@@ -60,6 +61,14 @@
     'write-failed': 'The decision could not be saved. Nothing was changed.',
     'computer-not-ready': 'AutoIngest is still finishing its first start on this computer. Try again in a moment. Nothing was changed.',
     'unsupported-action': 'This decision is not available here.',
+    'alias-rejected': 'This search alias cannot be used.',
+    'alias-exists': 'This photographer already has this search alias.',
+    'alias-not-found': 'This search alias is no longer active.',
+    'status-unchanged': 'The profile already has this status.',
+    'registration-required': 'This photographer has no registry record yet. Create one first.',
+    'ambiguous-profile': 'This list name matches several photographer records, so nothing can be recorded for it.',
+    'not-in-photographer-list': 'This name is no longer in the photographer list.',
+    'invalid-status': 'Choose Active or Retired.',
   };
   const errorText = (reason) => ERROR_TEXT[reason]
     || (/^registry-/.test(reason || '') ? 'The registry cannot be changed safely right now. Nothing was changed.' : 'The decision could not be recorded. Nothing was changed.');
@@ -218,6 +227,11 @@
     clearPanel(panel);
     if (!prep || !prep.ok) {
       showError(panel, prep && prep.reason);
+      if (prep && Array.isArray(prep.blocking) && prep.blocking.length) {
+        const ul = el('ul', 'pr-consequences');
+        prep.blocking.forEach(b => ul.appendChild(el('li', null, b.names && b.names.length ? `${b.text} (${b.names.join(', ')})` : b.text)));
+        panel.appendChild(ul);
+      }
       const row = el('div', 'pr-decision-buttons');
       row.appendChild(button('Close', 'emm-btn-secondary', () => closePanel()));
       panel.appendChild(row);
@@ -398,5 +412,14 @@
     return p;
   }
 
-  window.PhotographerRegistryActions = Object.freeze({ associationActions, cameraActions, reviewActions, unavailableNote, resultLine, closePanel });
+  /** Open a decision panel after `anchor` and show the main process's preview for `request`. */
+  function openDecision(anchor, opener, title, request, ctx) { preview(newPanel(anchor, opener, title), request, ctx); }
+  /** A panel for a form step (the caller fills it, then calls showPreview). */
+  function formPanel(anchor, opener, title) { return newPanel(anchor, opener, title); }
+  function showPreview(panel, request, ctx) { return preview(panel, request, ctx); }
+
+  window.PhotographerRegistryActions = Object.freeze({
+    associationActions, cameraActions, reviewActions, unavailableNote, resultLine, closePanel,
+    openDecision, formPanel, showPreview, stepButtons, errorText, el, button,
+  });
 })();

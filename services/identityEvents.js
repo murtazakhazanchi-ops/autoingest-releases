@@ -78,6 +78,10 @@ const TYPES = {
   'photographer-alias-added': { photographerId: v.uuid, alias: v.alias, kind: v.oneOf(['spelling', 'abbreviation', 'other']) },
   'photographer-alias-removed': { photographerId: v.uuid, alias: v.alias, resolves: v.eventIds },
   'photographer-linked': { photographerIds: v.idPair, decision: v.oneOf(['same', 'different']), resolves: v.eventIds },
+  // Profile status (Q5e-1): retired is a registry status, never a deletion — names, cameras,
+  // history and the photographer list are untouched. `resolves` lists the earlier status events
+  // the operator saw; opposite statuses that never saw each other stay disputed for review.
+  'photographer-status-set': { photographerId: v.uuid, status: v.oneOf(['active', 'retired']), resolves: v.eventIds },
   'device-registered': { deviceId: v.uuid, make: v.text, modelKey: v.text, modelDisplay: v.text, identifiers: v.identifiers },
   'device-identifiers-added': { deviceId: v.uuid, identifiers: v.identifiers, basis: v.oneOf(['co-observed']) },
   'device-linked': { deviceIds: v.idPair, decision: v.oneOf(['same', 'different']), resolves: v.eventIds },

@@ -26,7 +26,8 @@ const crypto = require('crypto');
 const V = require('./photographerRegistryView');
 const C = require('./cameraAssociationCommands');
 const { deriveRegistryState } = require('./associationModel');
-const { bootstrapShippedIds } = require('./photographerIdentity');
+const { bootstrapShippedIds, normalizeName } = require('./photographerIdentity');
+const { deriveProfileStatus } = require('./photographerNameModel');
 
 const HANDLE_RE = /^[pc]-[0-9a-f]{16}$/;
 const MAX_QUERY = 120;
@@ -54,6 +55,7 @@ const RESOLUTION_NOTE = {
   'event-id-collision': 'Damaged or conflicting registry records are kept aside. Repairing them is not available here.',
   'integrity-conflicts': 'Damaged or conflicting registry records are kept aside. Repairing them is not available here.',
 };
+const STATUS_OPTIONS = [{ id: 'active', label: 'Active — keep suggesting this photographer' }, { id: 'retired', label: 'Retired — stop camera suggestions' }];
 const SUPPORTED_NOTE = {
   'same-name-different-ids': 'Merging the two records into one person is not available here.',
 };
@@ -114,6 +116,9 @@ function createRegistryBrowser({ loadView, secret = crypto.randomBytes(32), mana
     if (Array.isArray(events)) {
       state = deriveRegistryState(events, { shipped: bootstrapShippedIds(shippedNames || []) });
       for (const c of state.conflicts) reviewByKey.set(V.reviewKeyOf(c.key), c);
+      for (const [id, st] of deriveProfileStatus(events, { state })) {
+        if (st.status === 'disputed') reviewByKey.set(V.reviewKeyOf(`photographer-status-disputed|${id}`), { kind: 'photographer-status-disputed', photographerId: id });
+      }
       for (const k of C.unsettledPairs(state)) {
         const [deviceId, photographerId] = k.split('|');
         reviewByKey.set(V.reviewKeyOf(`association-unsettled|${k}`), { kind: 'association-unsettled', deviceId, photographerId });
@@ -130,6 +135,7 @@ function createRegistryBrowser({ loadView, secret = crypto.randomBytes(32), mana
   function _resolution(r) {
     const c = snap.reviewByKey.get(r.key);
     if (!c || !snap.state) return { supported: false, options: [], note: RESOLUTION_NOTE[r.kind] || null };
+    if (c.kind === 'photographer-status-disputed') return { supported: _canManage(), options: STATUS_OPTIONS.map(o => ({ ...o })), note: null };
     const res = C.conflictResolution(snap.state, c, { bodyMatching: _bodyMatching() });
     return {
       supported: res.supported && _canManage(),
@@ -231,6 +237,27 @@ function createRegistryBrowser({ loadView, secret = crypto.randomBytes(32), mana
     });
   }
 
+  /** Profile actions the main process allows now (Q5e-1). Rename is preview-only. */
+  function _profileActions(d) {
+    const out = [];
+    if (_canManage() && d.identity === 'pending-first-use' && d.listNames.length === 1) out.push('register');
+    if (d.photographerId && snap.state) {
+      if (_canManage()) {
+        out.push('alias-add');
+        if (!d.statusDisputed) out.push(d.status === 'retired' ? 'reactivate' : 'retire');
+      }
+      out.push('rename-preview');
+    }
+    return out;
+  }
+
+  function _promotable(d, text) {
+    if (!_canManage() || !d.photographerId) return false;
+    const n = normalizeName(text);
+    const own = [d.name, d.originalName, ...d.formerNames, ...d.listNames, ...d.searchAliases.map(a => a.text)].filter(Boolean).map(normalizeName);
+    return !!n && !own.includes(n);
+  }
+
   function photographer(handle) {
     if (!snap || typeof handle !== 'string' || !HANDLE_RE.test(handle) || !snap.pByHandle.has(handle)) return { ok: false, reason: 'unknown-record' };
     const d = V.getPhotographerDetail(snap.view, snap.pByHandle.get(handle));
@@ -241,8 +268,17 @@ function createRegistryBrowser({ loadView, secret = crypto.randomBytes(32), mana
         ..._row(snap.view.photographers.find(p => p.key === d.key)),
         originalName: d.originalName, formerNames: [...d.formerNames], listNames: [...d.listNames],
         nameHistory: d.nameHistory.map(h => ({ day: _str(h.day), fromName: h.fromName, toName: h.toName, stale: !!h.stale, operator: h.operator, computer: h.computer })),
-        searchAliases: d.searchAliases.map(a => ({ text: a.text, kind: a.kind, addedDay: _str(a.addedDay) })),
-        learnedShortcuts: d.learnedShortcuts.map(s => ({ text: s.text, learnedFor: s.learnedFor })),
+        searchAliases: d.searchAliases.map(a => ({
+          text: a.text, kind: a.kind, addedDay: _str(a.addedDay), operator: _str(a.operator), computer: _str(a.computer),
+          sharedWith: (a.sharedWith || []).map(id => _personRef({ key: id, name: (snap.view.photographers.find(p => p.key === id) || {}).name })),
+          removable: _canManage() && !!d.photographerId,
+        })),
+        aliasHistory: (d.aliasHistory || []).map(h => ({ day: _str(h.day), action: h.action, text: h.text, operator: h.operator, computer: h.computer })),
+        learnedShortcuts: d.learnedShortcuts.map(s => ({ text: s.text, learnedFor: s.learnedFor, promotable: _promotable(d, s.text) })),
+        statusDisputed: !!d.statusDisputed,
+        statusHistory: (d.statusHistory || []).map(h => ({ day: _str(h.day), status: h.status, settles: !!h.settles, operator: h.operator, computer: h.computer })),
+        registered: !!d.photographerId,
+        actions: _profileActions(d),
         cameras: d.cameras.map(c => ({
           handle: cH(c.deviceId), make: c.make, model: c.model, nickname: _str(c.nickname), state: c.state, label: c.label,
           shared: !!c.shared, confirmations: _num(c.confirmations), observedImports: _num(c.observedImports), lastObservedDay: _str(c.lastObservedDay),
@@ -289,6 +325,7 @@ function createRegistryBrowser({ loadView, secret = crypto.randomBytes(32), mana
     photographerKeyOf: (h) => (snap && typeof h === 'string' && HANDLE_RE.test(h) ? snap.pByHandle.get(h) || null : null),
     reviewOf: (id) => (snap && typeof id === 'string' && /^r-[0-9a-f]{16}$/.test(id) ? snap.reviewByKey.get(id) || null : null),
     cameraHandleOf: (deviceId) => cH(deviceId),
+    photographerHandleOf: (key) => pH(key),
     safe: _safe,
   });
 

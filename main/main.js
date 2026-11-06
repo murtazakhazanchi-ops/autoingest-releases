@@ -4343,6 +4343,8 @@ ipcMain.handle('keywords:loadRegistry', async () => {
 // Q5d adds camera-association decisions (prepare → explicit confirmation → commit) through
 // photographerRegistryManager: main window only, the active operator and the record behind every
 // handle are resolved HERE, and the registry is only ever opened if it already exists and is healthy.
+// Q5e-1 adds profile actions (search aliases, retire/reactivate, explicit first registration) on
+// the same path, and a READ-ONLY rename preview: nothing can apply a rename or touch a folder.
 let _photographerRegistryBrowser = null;
 let _photographerRegistryManager = null;
 function _photographerRegistry(event) {
@@ -4351,6 +4353,8 @@ function _photographerRegistry(event) {
   if (!_photographerRegistryBrowser) {
     const { createRegistryBrowser } = require('../services/photographerRegistryBrowser');
     const { createRegistryManager } = require('../services/photographerRegistryManager');
+    const { createProfileActions } = require('../services/photographerProfileActions');
+    const { resolveEventCopies } = require('../services/eventCopyResolver');
     _photographerRegistryBrowser = createRegistryBrowser({
       loadView: () => photographerLearning.inspectRegistry({ withEvents: true }),
       manageStatus: (view) => _photographerRegistryManager.availability(view),
@@ -4360,6 +4364,13 @@ function _photographerRegistry(event) {
       getOperator: () => userManager.getActiveUser(),
       getComputerId: () => settings.getDeviceId(),
       openStore: () => photographerLearning.openRegistryForManagement(),
+      profile: createProfileActions({ getNames: () => photographerLearning.registryNames() }),
+      getListNames: () => photographerLearning.registryNames().listNames,
+      resolveCopies: (eventPath) => resolveEventCopies(eventPath, {
+        stagingRoot: settings.getLocalStagingRoot(), nasRoot: settings.getNasRoot(),
+        archiveRoots: [settings.getArchiveRoot(), settings.getMainArchiveRoot()].filter(Boolean),
+        readLink: (p) => offlineCollectionRegistry.readLink(p),
+      }),
     });
   }
   return _photographerRegistryBrowser;
@@ -4368,9 +4379,10 @@ function _photographerRegistry(event) {
 function _registryRequest(raw) {
   const o = raw && typeof raw === 'object' ? raw : {};
   const out = {};
-  for (const k of ['action', 'camera', 'photographer', 'target', 'review', 'outcome', 'priorOutcome']) {
+  for (const k of ['action', 'camera', 'photographer', 'target', 'review', 'outcome', 'priorOutcome', 'kind', 'status']) {
     if (typeof o[k] === 'string' && o[k].length <= 40) out[k] = o[k];
   }
+  if (typeof o.alias === 'string' && o.alias.length <= 200) out.alias = o.alias;
   return out;
 }
 const _PR_DENIED = { ok: false, reason: 'not-permitted' };
@@ -4402,6 +4414,16 @@ ipcMain.handle('photographerRegistry:commit', async (event, token) => {
 ipcMain.handle('photographerRegistry:cancel', (event, token) => {
   const b = _photographerRegistry(event);
   return b ? _photographerRegistryManager.cancel(token) : _PR_DENIED;
+});
+// READ-ONLY: validates a proposed name and plans the current event's folders. No token, no write.
+ipcMain.handle('photographerRegistry:renamePreview', async (event, request) => {
+  const b = _photographerRegistry(event);
+  const o = request && typeof request === 'object' ? request : {};
+  return b ? _photographerRegistryManager.renamePreview({
+    photographer: typeof o.photographer === 'string' && o.photographer.length <= 40 ? o.photographer : null,
+    name: typeof o.name === 'string' ? o.name.slice(0, 200) : '',
+    eventPath: typeof o.eventPath === 'string' && o.eventPath.length <= 4096 ? o.eventPath : null,
+  }) : _PR_DENIED;
 });
 
 ipcMain.handle('keywords:saveCityCountry', async (_event, cityLabel, countryLabel) => {

@@ -17,6 +17,8 @@
  *   none          unknown camera, conflicting evidence, or no history.
  * Rejected and retired associations are never suggested; they are listed under `excluded`
  * with their reason. Disputed associations are listed, flagged, and never strong.
+ * Q5e-1: photographers whose PROFILE is retired (opts.retired) are excluded the same way, with
+ * their own reason; their associations and history are unchanged.
  */
 
 'use strict';
@@ -57,12 +59,13 @@ function _order(a, b) {
 
 const _none = (reason, extra = {}) => ({ level: 'none', preselectable: false, candidates: [], excluded: [], reasons: [reason], ...extra });
 
-function _forDevice(state, deviceId) {
+function _forDevice(state, deviceId, retired) {
   const canon = state.deviceCanonical(deviceId);
   if (!state.devices.has(canon)) return _none('Camera not in the registry');
   const all = state.associationsForDevice(canon).filter(a => a.state);
   const excluded = all.filter(a => !ACTIVE.has(a.state)).map(a => ({ photographerId: a.photographerId, state: a.state, reason: a.state === 'rejected' ? 'Rejected by the operator for this camera' : 'Retired by the operator for this camera' }));
-  const active = all.filter(a => ACTIVE.has(a.state)).map(a => _candidate(state, a)).sort(_order);
+  for (const a of all.filter(x => ACTIVE.has(x.state) && retired.has(x.photographerId))) excluded.push({ photographerId: a.photographerId, state: a.state, reason: 'Photographer profile is retired' });
+  const active = all.filter(a => ACTIVE.has(a.state) && !retired.has(a.photographerId)).map(a => _candidate(state, a)).sort(_order);
   const inConflict = state.conflictedDevices.has(canon);
   const reasons = inConflict ? ['This camera has conflicting identity records — review needed'] : [];
   if (!active.length) return { ..._none('No photographer history for this camera'), excluded, deviceConflict: inConflict };
@@ -77,10 +80,11 @@ function _forDevice(state, deviceId) {
   return { level, preselectable: level === 'strong', candidates: [only], excluded, reasons, deviceConflict: inConflict };
 }
 
-function _forModel(state, make, modelKey) {
+function _forModel(state, make, modelKey, retired) {
   const usage = state.modelUsage.get(`${make}|${modelKey}`);
-  if (!usage || !usage.size) return _none('No photographer history for this camera model');
-  const candidates = [...usage.values()].map(u => ({
+  const users = usage ? [...usage.values()].filter(u => !retired.has(u.photographerId)) : [];
+  if (!users.length) return _none('No photographer history for this camera model');
+  const candidates = users.map(u => ({
     photographerId: u.photographerId,
     name: state.photographers.get(u.photographerId)?.name || null,
     state: 'model-usage', basis: 'model',
@@ -94,10 +98,10 @@ function _forModel(state, make, modelKey) {
  * @param {ReturnType<import('./associationModel').deriveRegistryState>} state
  * @param {{ kind: 'body', deviceId: string } | { kind: 'model', make: string, modelKey: string } | { kind: 'unknown' } | { kind: 'conflict' }} camera
  */
-function suggestForCamera(state, camera) {
+function suggestForCamera(state, camera, { retired = new Set() } = {}) {
   switch (camera && camera.kind) {
-    case 'body': return _forDevice(state, camera.deviceId);
-    case 'model': return _forModel(state, camera.make, camera.modelKey);
+    case 'body': return _forDevice(state, camera.deviceId, retired);
+    case 'model': return _forModel(state, camera.make, camera.modelKey, retired);
     case 'conflict': return _none('Conflicting camera information — cannot establish a photographer');
     default: return _none('Unknown camera — no camera-based suggestion');
   }
@@ -107,8 +111,8 @@ function suggestForCamera(state, camera) {
  * Card / selection level. Several cameras pointing at different photographers → hand off to
  * the full workspace (DEC-029 decision 3); nothing is assigned automatically.
  */
-function suggestForCameras(state, cameras) {
-  const perCamera = cameras.map(c => ({ camera: c, suggestion: suggestForCamera(state, c) }));
+function suggestForCameras(state, cameras, opts = {}) {
+  const perCamera = cameras.map(c => ({ camera: c, suggestion: suggestForCamera(state, c, opts) }));
   const tops = new Set(perCamera.filter(x => ['strong', 'likely', 'possible'].includes(x.suggestion.level)).map(x => x.suggestion.candidates[0].photographerId));
   const anyAlternatives = perCamera.some(x => x.suggestion.level === 'alternatives');
   return {

@@ -389,6 +389,7 @@ contextBridge.exposeInMainWorld('api', {
   photographerRegistryPrepare:      (request) => ipcRenderer.invoke('photographerRegistry:prepare', request),
   photographerRegistryCommit:       (token)  => ipcRenderer.invoke('photographerRegistry:commit', token),
   photographerRegistryCancel:       (token)  => ipcRenderer.invoke('photographerRegistry:cancel', token),
+  photographerRegistryRenamePreview: (request) => ipcRenderer.invoke('photographerRegistry:renamePreview', request),
 
   // ── Offline Collection Registry ──
   prepareOffline:              (params) => ipcRenderer.invoke('collection:prepareOffline',       params),

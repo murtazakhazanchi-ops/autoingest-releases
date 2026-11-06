@@ -686,18 +686,19 @@ async function act(fx, request, label = request.action) {
     assert.deepEqual(await runtime.openRegistryForManagement(), { ok: false, reason: 'shutting-down' });
   });
 
-  await t('main.js: four read + three decision channels, all main-window only; no rename/alias/folder path reachable', async () => {
+  await t('main.js: four read + three decision channels (+ Q5e-1 read-only rename preview), main-window only; no rename/folder write reachable', async () => {
     const src = fs.readFileSync(path.join(ROOT, 'main', 'main.js'), 'utf8');
     const channels = [...src.matchAll(/ipcMain\.(?:handle|on)\('(photographerRegistry:[A-Za-z]+)'/g)].map(m => m[1]).sort();
-    assert.deepEqual(channels, ['photographerRegistry:camera', 'photographerRegistry:cancel', 'photographerRegistry:commit', 'photographerRegistry:load', 'photographerRegistry:photographer', 'photographerRegistry:prepare', 'photographerRegistry:search']);
+    assert.deepEqual(channels, ['photographerRegistry:camera', 'photographerRegistry:cancel', 'photographerRegistry:commit', 'photographerRegistry:load', 'photographerRegistry:photographer', 'photographerRegistry:prepare', 'photographerRegistry:renamePreview', 'photographerRegistry:search']);
     const block = src.slice(src.indexOf('Photographer Registry tab (AI-FEAT-063'), src.indexOf("ipcMain.handle('keywords:saveCityCountry'"));
-    assert.equal((block.match(/= _photographerRegistry\(event\)/g) || []).length, 7, 'every handler validates the sender');
+    assert.equal((block.match(/= _photographerRegistry\(event\)/g) || []).length, 8, 'every handler validates the sender');
     assert.ok(/event\.sender !== main\.webContents/.test(block));
     assert.ok(/getOperator: \(\) => userManager\.getActiveUser\(\)/.test(block), 'operator comes from main, never the renderer');
     assert.ok(!/buildRenameEvent|createProfileCommandService|planCurrentEventFolderRename|photographerProfileCommands|renamePhotographer|addSearchAlias|recoverFromBackup|appendEvents\(/.test(block), 'no naming, folder or recovery path');
-    for (const f of ['services/photographerRegistryManager.js', 'services/cameraAssociationCommands.js']) {
-      const s = fs.readFileSync(path.join(ROOT, f), 'utf8');
-      assert.ok(!/photographerProfileCommands|FolderRenamePlanner|photographer-renamed|photographer-alias|recoverFromBackup|require\(['"]electron['"]\)|require\(['"]fs['"]\)/.test(s), `${f} stays decision-only and I/O-free`);
+    for (const f of ['services/photographerRegistryManager.js', 'services/cameraAssociationCommands.js', 'services/photographerProfileActions.js']) {
+      const s = fs.readFileSync(path.join(ROOT, f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+      // Q5e-1: the manager may use the READ-ONLY folder planner for the rename preview; nothing builds a rename.
+      assert.ok(!/buildRenameEvent|createProfileCommandService|renamePhotographer|photographer-renamed|recoverFromBackup|require\(['"]electron['"]\)|require\(['"]fs['"]\)/.test(s), `${f} builds no rename and does no direct I/O`);
     }
     const companion = fs.readFileSync(path.join(ROOT, 'main', 'companionPreload.js'), 'utf8');
     assert.ok(!/photographerRegistry/.test(companion), 'the companion popup has no registry channel');

@@ -321,10 +321,10 @@ function assertClean(payload, fx, label) {
     const src = fs.readFileSync(path.join(ROOT, 'main', 'main.js'), 'utf8');
     const channels = [...src.matchAll(/ipcMain\.(?:handle|on)\('(photographerRegistry:[A-Za-z]+)'/g)].map(m => m[1]);
     // Q5d (authorized) adds exactly the three decision channels; reads stay as Q5c shipped them.
-    assert.deepEqual(channels.sort(), ['photographerRegistry:camera', 'photographerRegistry:cancel', 'photographerRegistry:commit', 'photographerRegistry:load', 'photographerRegistry:photographer', 'photographerRegistry:prepare', 'photographerRegistry:search']);
+    assert.deepEqual(channels.sort(), ['photographerRegistry:camera', 'photographerRegistry:cancel', 'photographerRegistry:commit', 'photographerRegistry:load', 'photographerRegistry:photographer', 'photographerRegistry:prepare', 'photographerRegistry:renamePreview', 'photographerRegistry:search']);
     const block = src.slice(src.indexOf('Photographer Registry tab (AI-FEAT-063'), src.indexOf("ipcMain.handle('keywords:saveCityCountry'"));
     assert.ok(/event\.sender !== main\.webContents/.test(block), 'sender must be the main window');
-    assert.equal((block.match(/= _photographerRegistry\(event\)/g) || []).length, 7, 'every handler validates the sender');
+    assert.equal((block.match(/= _photographerRegistry\(event\)/g) || []).length, 8, 'every handler validates the sender');
     assert.ok(!/appendEvents|createIdentityRegistryStore|\.open\(|writeFile|buildRenameEvent|createProfileCommandService|planCurrentEventFolderRename/.test(block), 'no direct store write, naming or folder path in main.js');
   });
 
@@ -337,7 +337,7 @@ function assertClean(payload, fx, label) {
     }
     const pre = execFileSync('git', ['diff', '-U0', base, '--', 'main/preload.js'], { cwd: ROOT, encoding: 'utf8' });
     const exposed = [...pre.matchAll(/^\+\s+(\w+):/gm)].map(m => m[1]);
-    assert.deepEqual(exposed.sort(), ['photographerRegistryCamera', 'photographerRegistryCancel', 'photographerRegistryCommit', 'photographerRegistryLoad', 'photographerRegistryPhotographer', 'photographerRegistryPrepare', 'photographerRegistrySearch']);
+    assert.deepEqual(exposed.sort(), ['photographerRegistryCamera', 'photographerRegistryCancel', 'photographerRegistryCommit', 'photographerRegistryLoad', 'photographerRegistryPhotographer', 'photographerRegistryPrepare', 'photographerRegistryRenamePreview', 'photographerRegistrySearch']);
   });
 
   await t('Q5c/Q5d touch no import, routing, sync, metadata or autocomplete module', async () => {
@@ -357,6 +357,11 @@ function assertClean(payload, fx, label) {
       'services/cameraAssociationCommands.js', 'services/photographerRegistryManager.js', 'services/photographerRegistryView.js',
       'services/photographerLearningRuntime.js', 'services/identityRegistryStore.js', 'services/identityKeyStore.js', 'renderer/photographerRegistryActions.js',
       'test/photographerRegistryQ5d.test.js', 'test/photographerRegistryQ5dLive.test.js',
+      // Q5e-1: profile status event + derivation, suggestion exclusion of retired profiles, profile
+      // actions, the read-only event-copy resolver for the rename preview, and the profile UI.
+      'services/identityEvents.js', 'services/photographerNameModel.js', 'services/photographerSuggestion.js', 'services/photographerProfileCommands.js',
+      'services/photographerProfileActions.js', 'services/eventCopyResolver.js', 'renderer/photographerRegistryProfile.js',
+      'test/photographerRegistryQ5e1.test.js', 'test/photographerRegistryQ5e1Live.test.js',
     ]);
     assert.deepEqual(changed.filter(f => !allowed.has(f) && !f.startsWith('.claude/')), []);
   });
