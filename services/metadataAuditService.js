@@ -27,7 +27,22 @@ const config = require('../config/app.config');
 const exifService = require('../main/exifService');
 const { resolveExpectedMetadata, METADATA_CONTRACT_VERSION, RESOLVER_VERSION } = require('./metadataExpectationService');
 const { buildFileEvidence } = require('./eventEvidenceReconstruction');
+const photographerSeqService = require('./photographerSequenceService');
 const queueStore = require('../main/metadataQueueStore');
+
+/** Advisory diagnostic: current Creator matches a QMZ sequence-code/holding-folder
+ * shape (e.g. "27Z") — reported so a human can review and correct it through the
+ * preview-only repair-plan tool; never auto-corrected by Audit or Repair. */
+const CREATOR_SUSPECTED_CORRUPTION = 'photographer:suspected-corruption';
+/** Advisory diagnostic: XMP Creator, EXIF Artist, and IPTC By-line (and, for RAW,
+ * the embedded-vs-sidecar sources) disagree — never silently normalized to one
+ * value; reported so a human can review and resolve it explicitly. */
+const CREATOR_ATTRIBUTION_CONFLICT = 'photographer:attribution-conflict';
+/** Advisory diagnostic: the RAW file's own embedded attribution could not be read
+ * (exotic path, lock, corruption, etc.) — this file's attribution report is based
+ * on the sidecar alone and may be missing a conflict the RAW itself would reveal.
+ * Reported so the uncertainty stays visible rather than silently resolving as fine. */
+const CREATOR_RAW_EMBEDDED_UNVERIFIED = 'photographer:raw-embedded-unverified';
 
 const CANDIDATE_EXTENSIONS = new Set([...config.PHOTO_EXTENSIONS, ...exifService.VIDEO_EXTENSIONS]);
 const _SKIP_DIRS = new Set(['.autoingest', '.autoingest-transfer', '__MACOSX', '_Selected']);
@@ -194,6 +209,74 @@ async function classifyOneFile(eventFolderPath, eventJson, filePath) {
     }
   }
 
+  // For RAW, also read the RAW file's OWN embedded tags — a RAW is never written to
+  // directly, but it can already carry camera- or externally-embedded attribution
+  // the sidecar alone wouldn't show (same requirement exifService._readCurrentAttribution
+  // enforces at write time).
+  //
+  // Unlike that write-time gate, a failure on THIS supplementary read does not hard-
+  // fail the WHOLE record (Audit is read-only reporting; it never writes a file, and
+  // the real "never overwrite on an unreadable file" safety guarantee lives in
+  // exifService._writeAndVerify/readCurrentAttribution, which Repair's own write
+  // also goes through regardless of what this report says) — BUT it must never be
+  // silently treated as "the RAW has no embedded attribution" either. That would let
+  // a clean-looking sidecar value sail through as 'present'/'match'/'complete' while
+  // we genuinely don't know whether the RAW's own tags conflict with it — exactly
+  // the "read failure treated as empty, authorizing confidence" bug this whole
+  // mechanism exists to prevent. So a failure here sets rawEmbeddedUnverified
+  // (checked below): the uncertainty is reported, not hidden.
+  let rawEmbedded = {};
+  let rawEmbeddedUnverified = false;
+  if (isRaw) {
+    try { rawEmbedded = await exifService.readFileTags(filePath); }
+    catch { rawEmbeddedUnverified = true; }
+  }
+
+  // Preserve existing attribution in this DIFF/REPORT only: an attribution value
+  // that already exists and is plausible is never flagged merely because it differs
+  // from the folder-derived guess — only an explicit attribution correction or
+  // photographer-name change may replace it, and neither routes through Audit/
+  // Repair. Adjusting `expectation.photographer` HERE, before diffing, keeps this
+  // read-only report accurate for that case (no false "mismatch").
+  //
+  // Checks XMP Creator, EXIF Artist, and IPTC By-line INDIVIDUALLY (via the same
+  // extractAttributionFields exifService._readCurrentAttribution uses) rather than
+  // assuming they agree — reusing one field's value and silently treating the others
+  // as equivalent would hide a real conflict. If they disagree, flag it
+  // (CREATOR_ATTRIBUTION_CONFLICT) instead of guessing which one is "right".
+  //
+  // A value that is empty, conflicting, or itself QMZ-corrupted (matches a sequence
+  // code / _Unsequenced / Enroute) is deliberately NOT adopted — `expectation.
+  // photographer` stays the folder-derived value, so the diff below correctly
+  // reports a mismatch ("Report suspected corruption"). This does NOT mean Repair
+  // will silently rewrite it: exifService._writeAndVerify (which both Repair's
+  // resumeFrozenFile and every other automatic pass go through) unconditionally
+  // preserves any existing/conflicting/unreadable attribution regardless of what
+  // this frozen expectation says — Audit stays read-only and this module never
+  // performs or authorizes the actual write. The only way to change a suspected-
+  // corrupted or conflicting value is the explicit, human-approved correction
+  // channel (exifService.applyExplicitAttributionCorrection), reached by reviewing
+  // scripts/qmz-attribution-repair-plan.js's preview output — never automatically.
+  let suspectedCreatorCorruption = false;
+  let attributionConflict = false;
+  if (!expectation.photographerUnresolved) {
+    const found = new Set();
+    for (const tags of [actual, rawEmbedded]) {
+      const { creator, artist, byLine } = exifService.extractAttributionFields(tags);
+      for (const v of [creator, artist, byLine]) if (v) found.add(v);
+    }
+    if (found.size > 1) {
+      attributionConflict = true;
+    } else if (found.size === 1) {
+      const currentValue = [...found][0];
+      if (!photographerSeqService.isQmzContainerName(currentValue)) {
+        expectation.photographer = currentValue;
+      } else {
+        suspectedCreatorCorruption = true;
+      }
+    }
+  }
+
   const fields = {
     photographer: _fieldDiff(expectation.photographer, actual.Creator ?? actual['XMP-dc:Creator']),
     description:  _fieldDiff(expectation.eventDescription, actual.Description ?? actual['XMP-dc:Description']),
@@ -206,15 +289,38 @@ async function classifyOneFile(eventFolderPath, eventJson, filePath) {
   const keywords = _keywordDiff(expectation.keywords, actual.Subject ?? actual['XMP-dc:Subject']);
 
   const allFieldsMatch = Object.values(fields).every(f => f.status === 'match');
-  const status = (allFieldsMatch && keywords.compliant) ? 'complete' : 'partial';
+  // A photographerUnresolved, attributionConflict, or rawEmbeddedUnverified file must
+  // never classify as 'complete' — even when its Creator field happens to field-diff
+  // as "match" (photographerUnresolved: correctly empty vs a correctly null
+  // expectation; attributionConflict: Creator alone may coincidentally equal the
+  // folder-derived guess while Artist/By-line disagree with it; rawEmbeddedUnverified:
+  // the sidecar alone may look clean while the RAW's own tags — unread — could
+  // conflict with it), there is a real, flagged gap here that a human must review.
+  // 'complete' records are filtered out of the Audit UI's exception list entirely
+  // (see renderer.js's _maRenderList), so without this such a file with no other
+  // issues would be completely invisible to the operator.
+  const status = (allFieldsMatch && keywords.compliant && !expectation.photographerUnresolved && !attributionConflict && !rawEmbeddedUnverified) ? 'complete' : 'partial';
+
+  const intentDiagnostics = [
+    ...(evidence.intentDiagnostics || []),
+    ...(suspectedCreatorCorruption ? [CREATOR_SUSPECTED_CORRUPTION] : []),
+    ...(attributionConflict ? [CREATOR_ATTRIBUTION_CONFLICT] : []),
+    ...(rawEmbeddedUnverified ? [CREATOR_RAW_EMBEDDED_UNVERIFIED] : []),
+  ];
 
   return {
     ...base, status, photographer: expectation.photographer, component: expectation.component?.folderName || null,
     fields, keywords, error: null, ambiguityReason: null, evidenceSource: expectation.evidenceSource || null,
     // Repair (Phase F) consumes exactly this frozen expectation — never re-resolved.
+    // Note: even for a suspected-corruption file, Repair's actual write cannot change
+    // Creator — see this function's own comment above.
     expectation, verifyPath, snapshot,
-    // Advisory (never affects status): e.g. tagRefinements:label-not-in-component.
-    intentDiagnostics: evidence.intentDiagnostics || null,
+    // Advisory text for the operator. Most never affect `status` (e.g.
+    // tagRefinements:label-not-in-component, CREATOR_SUSPECTED_CORRUPTION — those
+    // already show up as a field mismatch on their own); attributionConflict and
+    // rawEmbeddedUnverified additionally force non-'complete' above specifically so
+    // they can't disappear from the Audit UI's exception list on their own.
+    intentDiagnostics: intentDiagnostics.length ? intentDiagnostics : null,
   };
 }
 
@@ -610,4 +716,7 @@ module.exports = {
   classifyOneFile, enumerateEvents, enumerateFiles,
   _fieldDiff, _keywordDiff,
   _jobDir, _statePath, _reportPath,
+  CREATOR_SUSPECTED_CORRUPTION,
+  CREATOR_ATTRIBUTION_CONFLICT,
+  CREATOR_RAW_EMBEDDED_UNVERIFIED,
 };

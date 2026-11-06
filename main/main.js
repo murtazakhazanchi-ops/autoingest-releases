@@ -3887,6 +3887,8 @@ ipcMain.handle('metadata:reapplyEvent', async (_event, eventFolderPath) => {
   const batchId = `reapply-${Date.now().toString(36)}`;
   const win     = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
   const reapplyEventJsonPath = path.join(eventFolderPath, 'event.json');
+  // Creator/Artist/By-line preservation on this routine pass is handled
+  // unconditionally inside exifService._writeAndVerify — no flag needed here.
   const reapplyContext = { ...reapplyBase, eventName, collName, eventJsonPath: reapplyEventJsonPath };
   const baseEmit = win
     ? (p) => { if (!win.isDestroyed()) win.webContents.send('metadata:progress', p); }
@@ -5438,22 +5440,15 @@ ipcMain.handle('event:applyPhotographerSequence', async (_event, { localEventPat
       return { ok: false, reason: `scope "${scope.scopeKey}": ordered array required.` };
     }
 
-    // Resolve and validate the scope base directory.
-    // EVENT_ROOT_KEY (__eventRoot__) maps directly to realEvent.
-    // Any other scopeKey is a component folder name — must be a single path
-    // segment with no separators and must resolve inside realEvent.
-    let scopeBaseDir;
-    if (scope.scopeKey === photographerSeqService.EVENT_ROOT_KEY) {
-      scopeBaseDir = realEvent;
-    } else {
-      if (/[/\\]/.test(scope.scopeKey)) {
-        return { ok: false, reason: `scope key "${scope.scopeKey}" contains path separator characters.` };
-      }
-      scopeBaseDir = path.resolve(path.join(realEvent, scope.scopeKey));
-      if (!PathUtils.isPathUnderRoot(scopeBaseDir, realEvent)) {
-        return { ok: false, reason: `scope key "${scope.scopeKey}" resolves outside event directory.` };
-      }
-    }
+    // Resolve and validate the scope base directory — the ONE place this is decided
+    // (photographerSequenceService.resolveScopeBaseDir), shared with its own tests.
+    // Handles EVENT_ROOT_KEY, a single component/QMZ-container segment ("CompFolder",
+    // "01Q", "_Unsequenced"), and a component with a nested QMZ container
+    // ("CompFolder/01Q") — see scanPhotographerFolders' header comment for exactly
+    // which scopeKey shapes it produces.
+    const scopeResolved = photographerSeqService.resolveScopeBaseDir(realEvent, scope.scopeKey);
+    if (!scopeResolved.ok) return { ok: false, reason: scopeResolved.reason };
+    const scopeBaseDir = scopeResolved.baseDir;
 
     const fullOrdered = [];
     for (const entry of scope.ordered) {

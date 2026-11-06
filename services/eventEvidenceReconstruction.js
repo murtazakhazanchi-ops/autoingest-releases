@@ -27,12 +27,40 @@ const RefinableTags = require('../renderer/refinableTags');
 
 /** Advisory diagnostic: a persisted refinement names a tag the component no longer offers. */
 const LABEL_DRIFT = 'tagRefinements:label-not-in-component';
+/**
+ * Advisory diagnostic: a file sits directly inside a QMZ sequence/holding container
+ * (e.g. ".../01Q/photo.jpg") with no photographer sub-folder beneath it — there is no
+ * reliable photographer to resolve. Never guessed as the container's own name (that is
+ * exactly the "Creator becomes a QMZ sequence code" bug class) — flagged instead so
+ * Audit/Repair surface the gap for a human to resolve.
+ */
+const PHOTOGRAPHER_UNRESOLVED_QMZ = 'photographer:qmz-container-unresolved';
 
+/**
+ * @returns {{ photographer: string, unresolved: boolean }} `unresolved` is true only for
+ *   the PHOTOGRAPHER_UNRESOLVED_QMZ case above — callers must not write `photographer` as
+ *   Creator/Artist/By-line when `unresolved` is true (it is always '' in that case; writing
+ *   it would clear existing attribution instead of preserving it).
+ */
 function resolvePhotographerFromPath(filePath, baseDir, fallback) {
-  const rel  = path.relative(baseDir, filePath);
+  const rel   = path.relative(baseDir, filePath);
   const parts = rel.split(path.sep);
-  const seg  = parts.length > 1 ? parts[0] : '';
-  return photographerSeqService.canonicalName(seg || fallback || '');
+  if (parts.length < 2) {
+    return { photographer: photographerSeqService.canonicalName(fallback || ''), unresolved: false };
+  }
+
+  let seg = parts[0];
+  // The first folder below the event/component root is a QMZ sequence container (or
+  // _Unsequenced/Enroute) — never a photographer. The real photographer, if any, is one
+  // level deeper. See photographerSequenceService.isQmzContainerName for the full set of
+  // recognized names/patterns this guards against.
+  if (photographerSeqService.isQmzContainerName(seg)) {
+    if (parts.length < 3) {
+      return { photographer: '', unresolved: true };
+    }
+    seg = parts[1];
+  }
+  return { photographer: photographerSeqService.canonicalName(seg || fallback || ''), unresolved: false };
 }
 
 /** Event-level facts every file shares (independent of any particular file). */
@@ -51,17 +79,22 @@ function _locate(eventFolderPath, eventJson, filePath) {
   const { components, isMulti, fallbackPhotographer } = _eventBasics(eventJson);
 
   let component = null;
-  let photographer;
+  let resolved;
   if (!isMulti) {
-    photographer = resolvePhotographerFromPath(filePath, eventFolderPath, fallbackPhotographer);
+    resolved = resolvePhotographerFromPath(filePath, eventFolderPath, fallbackPhotographer);
   } else {
     component = components.find(c => c.folderName
       && filePath.startsWith(path.join(eventFolderPath, c.folderName) + path.sep)) || null;
-    photographer = component
+    resolved = component
       ? resolvePhotographerFromPath(filePath, path.join(eventFolderPath, component.folderName), fallbackPhotographer)
-      : fallbackPhotographer;
+      : { photographer: fallbackPhotographer, unresolved: false };
   }
-  return { components, isMulti, component, photographer, fallbackPhotographer };
+  return {
+    components, isMulti, component,
+    photographer: resolved.photographer,
+    photographerUnresolved: resolved.unresolved,
+    fallbackPhotographer,
+  };
 }
 
 /**
@@ -102,7 +135,7 @@ function _intentFor(intent, eventFolderPath, destPath, srcForLookup, diskCompone
  * @returns {object} metadataExpectationService evidence (standard/diskComponents shape).
  */
 function buildFileEvidence(eventFolderPath, eventJson, filePath) {
-  const { components, isMulti, component, photographer } = _locate(eventFolderPath, eventJson, filePath);
+  const { components, isMulti, component, photographer, photographerUnresolved } = _locate(eventFolderPath, eventJson, filePath);
 
   // Multi-component with no resolvable component: no group entry at all (not a
   // 'root'-shaped fallback) — the resolver's tier-3 evidence match requires a group
@@ -114,18 +147,20 @@ function buildFileEvidence(eventFolderPath, eventJson, filePath) {
     : { id: 'root', subEventId: null, files: [filePath] };
 
   const evidence = {
-    filePath, photographer,
+    filePath, photographer, photographerUnresolved,
     hijriDate: eventJson?.hijriDate || null,
     eventDescription: eventJson?.eventName || null,
     groups: group ? [group] : [], diskComponents: components,
   };
 
+  const diagnostics = photographerUnresolved ? [PHOTOGRAPHER_UNRESOLVED_QMZ] : [];
   if (group) {
     const intent = intentModule.getIntent(eventJson);             // built once per event document
-    const { fields, diagnostics } = _intentFor(intent, eventFolderPath, filePath, filePath, isMulti ? component : components[0]);
+    const { fields, diagnostics: intentDiagnostics } = _intentFor(intent, eventFolderPath, filePath, filePath, isMulti ? component : components[0]);
     Object.assign(group, fields);
-    if (diagnostics.length) evidence.intentDiagnostics = diagnostics;
+    diagnostics.push(...intentDiagnostics);
   }
+  if (diagnostics.length) evidence.intentDiagnostics = diagnostics;
   return evidence;
 }
 
@@ -150,7 +185,7 @@ function buildEventEvidenceContext(eventFolderPath, eventJson, files) {
 
   for (const f of files) {
     const loc = _locate(eventFolderPath, eventJson, f.dest);
-    outFiles.push({ ...f, photographer: loc.photographer });
+    outFiles.push({ ...f, photographer: loc.photographer, photographerUnresolved: loc.photographerUnresolved });
 
     if (loc.isMulti && !loc.component) continue;                    // unresolvable: no group ⇒ resolver returns ambiguous
     const matchPath = f.src || f.dest;
@@ -184,4 +219,7 @@ function buildEventEvidenceContext(eventFolderPath, eventJson, files) {
   };
 }
 
-module.exports = { buildFileEvidence, buildEventEvidenceContext, resolvePhotographerFromPath, LABEL_DRIFT };
+module.exports = {
+  buildFileEvidence, buildEventEvidenceContext, resolvePhotographerFromPath,
+  LABEL_DRIFT, PHOTOGRAPHER_UNRESOLVED_QMZ,
+};

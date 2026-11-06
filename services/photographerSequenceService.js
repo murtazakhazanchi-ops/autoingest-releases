@@ -10,6 +10,16 @@ const { log }                = require('./logger');
 // pattern renderer/pathUtils.js already established for main/renderer
 // sharing — see that file for the full rationale.
 const { seqPrefix }          = require('../renderer/photographerSequenceUtils.js');
+// The ONE definition of the QMZ sequence-code shape (main/qmzService.js's own SEQ_RE,
+// re-exported from there for exactly this main/renderer sharing problem) — reused here
+// so a QMZ sequence container ("01Q", "05aMZ", …) can be recognized the same way
+// everywhere a photographer folder is resolved. See isQmzContainerName below.
+const { SEQ_RE }             = require('../renderer/qmzSequenceFormat.js');
+// The SAME Windows/UNC-safe containment check main/main.js's own IPC handlers use
+// (PathUtils.isPathUnderRoot) — reused here rather than re-implemented, so
+// resolveScopeBaseDir's containment guarantee is identical to every other
+// archive-root/staging-root boundary check in the app.
+const PathUtils              = require('../renderer/pathUtils.js');
 
 // PC prefix pattern: PC01- … PC999-
 const PC_PREFIX_RE = /^PC(\d{2,3})-/;
@@ -29,17 +39,45 @@ function canonicalName(name) {
   return (name || '').replace(PC_PREFIX_RE, '');
 }
 
+// QMZ's own reserved holding folders (mirrors main/qmzService.js's UNSEQUENCED/
+// ENROUTE_DIR constants, duplicated here rather than imported — this file already
+// stays decoupled from main/qmzService.js the same way main/qmzService.js's own
+// PC_PREFIX_RE comment explains for the reverse direction).
+const UNSEQUENCED = '_Unsequenced';
+const ENROUTE_DIR = 'Enroute';
+
+/**
+ * True when `name` is a QMZ structural container — a sequence code ("01Q", "05aMZ", …),
+ * the `_Unsequenced` holding folder, or the `Enroute` holding folder — never a
+ * photographer itself, even though it sits at exactly the folder depth a photographer
+ * folder normally would (bug: a QMZ sequence folder like "02-QMZ-BHUJ/01Q" being treated
+ * as if "01Q" were the photographer, both in "Sequence Photographer Folders" and in
+ * metadata Creator resolution). The real photographer folder, if any, is ONE level
+ * deeper inside the container.
+ *
+ * Checked against the PC-prefix-stripped name so an already-damaged archive (a prior,
+ * buggy run that renamed the container itself to "PC01-01Q") is still recognized as a
+ * container going forward — this function never renames anything itself, it only
+ * prevents the bug from being reinforced by a live scan; repairing an already-renamed
+ * container is a separate, explicit, previewable operation.
+ * @param {string} name
+ * @returns {boolean}
+ */
+function isQmzContainerName(name) {
+  const bare = canonicalName(name);
+  return bare === UNSEQUENCED || bare === ENROUTE_DIR || SEQ_RE.test(bare);
+}
+
 // Folder names that should never be treated as photographer or component folders.
 // _Selected/__MACOSX: mirror _NAS_SKIP_DIRS in main.js.
 // VIDEO: excluded at every archive-walk level; never a photographer folder.
 // .DS_Store/Thumbs.db: filesystem artefacts.
-// _Unsequenced: QMZ's own reserved holding folder (main/qmzService.js's
-// UNSEQUENCED constant) — sequencing a QMZ structure by mistake must never
-// rename this folder itself into "PCxx-_Unsequenced"; it is structural,
-// never a photographer.
+// _Unsequenced/Enroute are NOT listed here — they are QMZ structural containers
+// (see isQmzContainerName) whose own children must still be scanned for real
+// photographer folders, so they need different handling than a true dead-end skip.
 const SKIP_DIRS = new Set([
   '_Selected', '__MACOSX', 'VIDEO',
-  '.autoingest', '.DS_Store', 'Thumbs.db', '_Unsequenced',
+  '.autoingest', '.DS_Store', 'Thumbs.db',
 ]);
 
 function _skipDir(name) {
@@ -68,13 +106,27 @@ async function _directoryHardened(parentDir, entry) {
 }
 
 /**
- * Scan photographer folders, component/sub-event aware.
+ * Scan photographer folders, component/sub-event aware, and QMZ-sequence aware.
  *
  * Folder rules (matches importRouter.js):
  *   Single-component (components.length <= 1):
  *     EventFolder/<photographer>/... → scope key "__eventRoot__"
  *   Multi-component (components.length > 1):
  *     EventFolder/<comp.folderName>/<photographer>/... → scope key = comp.folderName
+ *
+ * QMZ addition: when a QMZ sequence passed through this event (or component), its
+ * sequence-code folder ("01Q", "05aMZ", …) or `_Unsequenced`/`Enroute` holding folder
+ * sits at exactly the depth a photographer folder normally would — but it is never a
+ * photographer itself (see isQmzContainerName). Such a container is excluded from its
+ * parent scope's `photographers` list and instead scanned ONE level deeper as its own
+ * nested scope (scopeKey = "<parentScopeKey>/<containerName>", or bare "<containerName>"
+ * at the event root), so:
+ *   - a QMZ sequence container is never prefixed/renamed as if it were a photographer;
+ *   - the same photographer name appearing in two different sequences gets two
+ *     independent scopes, never merged;
+ *   - photographer folders inside `_Unsequenced` are discovered and sequenceable.
+ * Ordinary (non-QMZ) events have no folder matching isQmzContainerName, so this adds
+ * zero extra scopes and leaves their existing behavior unchanged.
  *
  * @param {string} localEventPath
  * @param {Array<{ folderName?: string }>} components  Raw components[] from event.json
@@ -92,18 +144,47 @@ async function scanPhotographerFolders(localEventPath, components) {
 
   const isMulti = compFolders.length > 1;
 
-  async function readPhotographerDirs(dirPath) {
+  async function readSubdirNames(dirPath) {
     try {
       const entries = await fsp.readdir(dirPath, { withFileTypes: true });
-      const dirs = [];
+      const names = [];
       for (const e of entries) {
         if (_skipDir(e.name)) continue;
-        if (await _directoryHardened(dirPath, e)) {
-          dirs.push({ folderName: e.name, canonical: canonicalName(e.name) });
-        }
+        if (await _directoryHardened(dirPath, e)) names.push(e.name);
       }
-      return dirs;
+      return names;
     } catch { return []; }
+  }
+
+  // Scans one base directory for a single scope. Returns that scope's own
+  // (non-QMZ) photographer folders, plus one additional nested scope per QMZ
+  // container found directly inside it.
+  async function scanScope(baseDir, baseScopeKey, baseScopeLabel, excludeNames) {
+    const names = await readSubdirNames(baseDir);
+    const photographers = [];
+    const nestedScopes = [];
+
+    for (const name of names) {
+      if (excludeNames && excludeNames.has(name)) continue; // stale component folder from a prior state
+      if (isQmzContainerName(name)) {
+        const containerNames = await readSubdirNames(path.join(baseDir, name));
+        const containerPhotographers = containerNames
+          .filter(cname => !isQmzContainerName(cname)) // a container nested inside another container is never a photographer either
+          .map(cname => ({ folderName: cname, canonical: canonicalName(cname) }));
+        nestedScopes.push({
+          scopeKey:      baseScopeKey ? `${baseScopeKey}/${name}` : name,
+          scopeLabel:    baseScopeLabel ? `${baseScopeLabel} / ${name}` : name,
+          photographers: containerPhotographers,
+        });
+        continue;
+      }
+      photographers.push({ folderName: name, canonical: canonicalName(name) });
+    }
+
+    return {
+      scope: { scopeKey: baseScopeKey || EVENT_ROOT_KEY, scopeLabel: baseScopeLabel || null, photographers },
+      nestedScopes,
+    };
   }
 
   if (!isMulti) {
@@ -111,27 +192,52 @@ async function scanPhotographerFolders(localEventPath, components) {
     // Also filter out any component folder that might exist on disk from a previous
     // multi-component state to avoid confusing them with photographer names.
     const knownCompFolders = new Set(compFolders);
-    const dirs = await readPhotographerDirs(localEventPath);
-    const photographers = dirs.filter(p => !knownCompFolders.has(p.folderName));
-    return [{
-      scopeKey:      EVENT_ROOT_KEY,
-      scopeLabel:    null,
-      photographers,
-    }];
+    const { scope, nestedScopes } = await scanScope(localEventPath, '', null, knownCompFolders);
+    return [scope, ...nestedScopes];
   }
 
   // Multi-component: photographer folders are inside each component sub-folder.
   const result = [];
   for (const compFolder of compFolders) {
-    const compPath     = path.join(localEventPath, compFolder);
-    const photographers = await readPhotographerDirs(compPath);
-    result.push({
-      scopeKey:   compFolder,
-      scopeLabel: compFolder,
-      photographers,
-    });
+    const compPath = path.join(localEventPath, compFolder);
+    const { scope, nestedScopes } = await scanScope(compPath, compFolder, compFolder, null);
+    result.push(scope, ...nestedScopes);
   }
   return result;
+}
+
+/**
+ * Validate a scopeKey (as produced by scanPhotographerFolders, or as sent back by the
+ * renderer for event:applyPhotographerSequence) and resolve its absolute base directory
+ * under `realEvent`.
+ *
+ * EVENT_ROOT_KEY maps directly to realEvent. Any other scopeKey is a '/'-joined relative
+ * path — one segment for a plain component or top-level QMZ container ("CompFolder",
+ * "01Q", "_Unsequenced"), two for a QMZ container nested inside a component
+ * ("CompFolder/01Q") — see scanPhotographerFolders' own header comment for exactly which
+ * shapes it produces. Every segment is checked individually (non-empty, no '\', not
+ * literally '..') and the final resolved path must still land inside `realEvent` —
+ * segment-level checks and the containment check are independent layers, since joining
+ * alone is not trusted to stay contained on every platform.
+ *
+ * @param {string} realEvent  Absolute, already-resolved event folder path.
+ * @param {string} scopeKey
+ * @returns {{ ok: true, baseDir: string } | { ok: false, reason: string }}
+ */
+function resolveScopeBaseDir(realEvent, scopeKey) {
+  if (scopeKey === EVENT_ROOT_KEY) return { ok: true, baseDir: realEvent };
+
+  const segs = typeof scopeKey === 'string' ? scopeKey.split('/') : [];
+  const badSeg = segs.find(seg => !seg || seg.includes('\\') || seg === '..');
+  if (segs.length === 0 || badSeg !== undefined) {
+    return { ok: false, reason: `scope key "${scopeKey}" is invalid.` };
+  }
+
+  const baseDir = path.resolve(path.join(realEvent, ...segs));
+  if (!PathUtils.isPathUnderRoot(baseDir, realEvent)) {
+    return { ok: false, reason: `scope key "${scopeKey}" resolves outside event directory.` };
+  }
+  return { ok: true, baseDir };
 }
 
 /**
@@ -177,7 +283,11 @@ async function _applyRenamesInDir(baseDir, ordered) {
 
   // Phase 1: current → temp
   for (const entry of ordered) {
-    if (_skipDir(entry.canonical)) continue;  // defensive: never rename system/selection folders
+    // Defensive: never rename system/selection folders, nor a QMZ structural container
+    // (a sequence code, _Unsequenced, or Enroute) even if one ever reached this far —
+    // scanPhotographerFolders already excludes these from `photographers`, so this is a
+    // backstop, not the primary defense.
+    if (_skipDir(entry.canonical) || isQmzContainerName(entry.canonical)) continue;
     const target = path.join(baseDir, entry.folderName);
 
     // Locate whichever folder currently holds this canonical name
@@ -237,69 +347,67 @@ async function _applyRenamesInDir(baseDir, ordered) {
 /**
  * Update the sync manifest (event.sync.json) after photographer folder renames.
  *
- * File path format in manifest jobs:
- *   Single-component: "PhotographerA/file.jpg"  → parts[0] = photographer
- *   Multi-component:  "CompFolder/PhA/file.jpg" → parts[0] = component, parts[1] = photographer
+ * File path format in manifest jobs, generalized by scope depth (segs.length below):
+ *   EVENT_ROOT_KEY (segs=[]):         "PhotographerA/file.jpg"            → parts[0] = photographer
+ *   Single-segment (segs=[Comp]):     "CompFolder/PhA/file.jpg"           → parts[1] = photographer
+ *   Nested QMZ scope (segs=[Comp,Seq] or [Seq]):
+ *     "CompFolder/01Q/PhA/file.jpg"  or  "01Q/PhA/file.jpg"               → parts[segs.length] = photographer
+ * A scope's segments must match the file path's own leading parts exactly before its
+ * photographer slot is considered — so a rename in one scope never touches a file that
+ * merely happens to share a photographer name in a different (e.g. different-sequence)
+ * scope.
  *
  * @param {string} localEventPath
  * @param {Map<string, Map<string, string>>} scopedRenameMap
  *   scopeKey → Map<canonical, newFolderName>
  *   EVENT_ROOT_KEY → event-root photographer renames
- *   compFolderName → per-component photographer renames
+ *   any other key ("CompFolder", "01Q", "CompFolder/01Q", "_Unsequenced", …) → that
+ *   scope's own photographer renames, keyed by the exact scopeKey scanPhotographerFolders
+ *   produced for it
  */
 async function updateManifestAfterRename(localEventPath, scopedRenameMap) {
   const manifest = await localSyncManifest.readManifest(localEventPath);
   if (!manifest || !Array.isArray(manifest.jobs) || manifest.jobs.length === 0) return;
 
-  const rootRenames = scopedRenameMap.get(EVENT_ROOT_KEY) || new Map();
-  // Build per-component rename maps keyed by component folder name
-  const compRenamesByFolder = new Map();
-  for (const [key, rmap] of scopedRenameMap.entries()) {
-    if (key !== EVENT_ROOT_KEY) compRenamesByFolder.set(key, rmap);
-  }
+  const scopeEntries = [...scopedRenameMap.entries()].map(([scopeKey, rmap]) => ({
+    segs: scopeKey === EVENT_ROOT_KEY ? [] : scopeKey.split('/'),
+    rmap,
+  }));
+  const rootEntry = scopeEntries.find(s => s.segs.length === 0);
 
   let changed = false;
 
   const updatedJobs = manifest.jobs.map(job => {
     let updatedJob = job;
 
-    // Update job.photographer for single-component jobs (display field)
-    const phCanonical = canonicalName(job.photographer || '');
-    const rootNewFolder = rootRenames.get(phCanonical);
-    if (rootNewFolder && rootNewFolder !== job.photographer) {
-      changed = true;
-      updatedJob = { ...updatedJob, photographer: rootNewFolder };
+    // Update job.photographer (display field) — only meaningful for the plain event-root
+    // scope; a job whose files live under a nested (component and/or QMZ-sequence) scope
+    // has no single flat photographer field to correct here.
+    if (rootEntry) {
+      const phCanonical = canonicalName(job.photographer || '');
+      const rootNewFolder = rootEntry.rmap.get(phCanonical);
+      if (rootNewFolder && rootNewFolder !== job.photographer) {
+        changed = true;
+        updatedJob = { ...updatedJob, photographer: rootNewFolder };
+      }
     }
 
     if (!Array.isArray(updatedJob.files)) return updatedJob;
 
     const newFiles = updatedJob.files.map(f => {
       const parts = f.replace(/\\/g, '/').split('/');
-      if (parts.length === 0) return f;
-
-      // Single-component path: parts[0] is the photographer folder
-      if (rootRenames.size > 0) {
-        const c0 = canonicalName(parts[0]);
-        const newFolder = rootRenames.get(c0);
-        if (newFolder && newFolder !== parts[0]) {
+      for (const { segs, rmap } of scopeEntries) {
+        if (parts.length <= segs.length) continue;
+        if (!segs.every((seg, i) => parts[i] === seg)) continue;
+        const phIdx = segs.length;
+        const newFolder = rmap.get(canonicalName(parts[phIdx]));
+        if (newFolder && newFolder !== parts[phIdx]) {
           changed = true;
-          return [newFolder, ...parts.slice(1)].join('/');
+          const next = [...parts];
+          next[phIdx] = newFolder;
+          return next.join('/');
         }
       }
-
-      // Multi-component path: parts[0] = component folder, parts[1] = photographer folder
-      if (parts.length >= 2) {
-        const compMap = compRenamesByFolder.get(parts[0]);
-        if (compMap) {
-          const c1 = canonicalName(parts[1]);
-          const newFolder = compMap.get(c1);
-          if (newFolder && newFolder !== parts[1]) {
-            changed = true;
-            return [parts[0], newFolder, ...parts.slice(2)].join('/');
-          }
-        }
-      }
-
       return f;
     });
 
@@ -360,6 +468,8 @@ async function writeSequencesToEventJson(localEventPath, scopedSequences) {
 module.exports = {
   EVENT_ROOT_KEY,
   canonicalName,
+  isQmzContainerName,
+  resolveScopeBaseDir,
   seqPrefix,
   scanPhotographerFolders,
   applyRenames,

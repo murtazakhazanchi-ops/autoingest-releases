@@ -200,14 +200,13 @@ function _drain() {
  * @returns {object}
  */
 function _buildTags(expectation, isRaw) {
-  const { photographer, component, keywords, hijriDate, eventDescription, copyright } = expectation;
+  const { photographer, photographerUnresolved, component, keywords, hijriDate, eventDescription, copyright } = expectation;
   const location = component?.location || '';
   const city     = component?.city     || '';
   const country  = component?.country  || '';
 
   // XMP tags — valid for both .xmp sidecars and embedded XMP in images.
   const tags = {
-    'XMP-dc:Creator':           photographer ? [photographer] : [],
     'XMP-dc:Rights':            copyright,
     'XMP-dc:Subject':           keywords,
     'XMP-dc:Description':       eventDescription || '',
@@ -218,13 +217,19 @@ function _buildTags(expectation, isRaw) {
     'XMP-photoshop:Country':     country,
   };
 
+  // photographerUnresolved means "don't guess" (e.g. a file directly inside a QMZ
+  // sequence container, no photographer sub-folder found) — Creator/Artist/By-line are
+  // omitted entirely rather than written empty, so ExifTool leaves whatever attribution
+  // already exists on the file untouched instead of clearing it.
+  if (!photographerUnresolved) {
+    tags['XMP-dc:Creator'] = photographer ? [photographer] : [];
+  }
+
   if (hijriDate) tags['XMP-ajs:HijriDate'] = hijriDate;
 
   if (!isRaw) {
     // IPTC/EXIF tags for direct image writes. Not sent to .xmp sidecar files.
     Object.assign(tags, {
-      'EXIF:Artist':                       photographer || '',
-      'IPTC:By-line':                      photographer || '',
       'IPTC:CopyrightNotice':              copyright,
       'IPTC:Credit':                       'Aljamea-tus-Saifiyah',
       'IPTC:Caption-Abstract':             eventDescription || '',
@@ -233,6 +238,10 @@ function _buildTags(expectation, isRaw) {
       'IPTC:Country-PrimaryLocationName':  country,
       'IPTC:Keywords':                     keywords,
     });
+    if (!photographerUnresolved) {
+      tags['EXIF:Artist']  = photographer || '';
+      tags['IPTC:By-line'] = photographer || '';
+    }
   }
 
   return tags;
@@ -333,15 +342,16 @@ async function _writeMetadata(filePath, tags, isRaw) {
 // `diskComponents` (standard/reapply) vs `component` (QMZ) on the context object.
 
 function _buildEvidence(file, context) {
-  const photographer      = file.photographer != null ? file.photographer : (context.photographer || '');
-  const hijriDate          = context.hijriDate || null;
-  const eventDescription   = context.eventDescription || null;
+  const photographer           = file.photographer != null ? file.photographer : (context.photographer || '');
+  const photographerUnresolved = !!file.photographerUnresolved;
+  const hijriDate               = context.hijriDate || null;
+  const eventDescription        = context.eventDescription || null;
 
   if (Array.isArray(context.diskComponents)) {
-    return { filePath: file.src, photographer, hijriDate, eventDescription, groups: context.groups, diskComponents: context.diskComponents };
+    return { filePath: file.src, photographer, photographerUnresolved, hijriDate, eventDescription, groups: context.groups, diskComponents: context.diskComponents };
   }
   return {
-    filePath: file.src, photographer, hijriDate, eventDescription,
+    filePath: file.src, photographer, photographerUnresolved, hijriDate, eventDescription,
     qmzComponent: context.component ?? null, qmzExplicitTags: context.explicitTags,
   };
 }
@@ -374,7 +384,12 @@ function _compareReadback(actual, expectation, isRaw) {
     if (!match) mismatches.push(field);
   };
 
-  check('photographer', expectation.photographer, actual.Creator ?? actual['XMP-dc:Creator'], false);
+  // Skip entirely when unresolved: we deliberately did not write Creator/Artist/By-line
+  // this run (see _buildTags), so comparing against whatever pre-existing value the file
+  // happens to carry would produce a false "mismatch".
+  if (!expectation.photographerUnresolved) {
+    check('photographer', expectation.photographer, actual.Creator ?? actual['XMP-dc:Creator'], false);
+  }
   check('copyright',    expectation.copyright,     actual.Rights  ?? actual['XMP-dc:Rights'],  false);
   check('keywords',     expectation.keywords,      actual.Subject ?? actual['XMP-dc:Subject'], false);
   check('description',  expectation.eventDescription || '', actual.Description ?? actual['XMP-dc:Description'], false);
@@ -466,8 +481,115 @@ async function _writeBatchManifest(batchId, resolved, context) {
  * expectation so a resumed/retried write is guaranteed to target the same value
  * the original queue decision recorded.
  */
+/**
+ * Pure extraction: pulls Creator/Artist/By-line out of an already-read ExifTool tag
+ * object. Three independent fields — never assumes they agree with each other.
+ * @param {object} tags
+ * @returns {{creator: string|null, artist: string|null, byLine: string|null}}
+ */
+function _extractAttributionFields(tags) {
+  const pick = (v) => { const x = Array.isArray(v) ? v[0] : v; return (typeof x === 'string' && x) ? x : null; };
+  return {
+    creator: pick(tags.Creator ?? tags['XMP-dc:Creator']),
+    artist:  pick(tags.Artist ?? tags['EXIF:Artist']),
+    byLine:  pick(tags['By-line'] ?? tags.Byline ?? tags['IPTC:By-line']),
+  };
+}
+
+/**
+ * Reads EVERY existing attribution source for a file before any write is allowed to
+ * proceed — XMP Creator, EXIF Artist, and IPTC By-line checked individually (never
+ * assumed to agree), and for RAW files BOTH the XMP sidecar AND the RAW file's own
+ * embedded tags (a RAW is never written to directly, but it can already carry
+ * camera- or externally-embedded attribution the sidecar alone wouldn't show).
+ *
+ * This is the single gate `_writeAndVerify` consults before writing Creator/Artist/
+ * By-line — Creator/Artist/By-line is captured ONCE, whenever this returns 'absent',
+ * and preserved through EVERY subsequent automatic pass after that: QMZ auto-queue
+ * (including reassignment to a different sequence/photographer folder), Reapply,
+ * Repair (via resumeFrozenFile), retry, and resume all call _writeAndVerify, so this
+ * one gate is what makes "only initial import or an explicitly-approved correction
+ * may set/replace attribution" true everywhere at once.
+ *
+ * Three outcomes besides 'absent' are ALL treated as "do not write" by the caller,
+ * for different reasons Audit (metadataAuditService.js) reports differently:
+ *   - 'present':    a single, consistent value exists — preserve it.
+ *   - 'conflict':   Creator/Artist/By-line disagree — never silently normalize them
+ *                    to one value; flag the conflict instead (never guessed here).
+ *   - 'readFailed': the file (or an existing sidecar) could not be read — this must
+ *                    NEVER be treated as "empty, safe to write": it proves nothing
+ *                    about whether attribution exists, so it must block the write
+ *                    exactly like a real value would.
+ * Deliberately does NOT distinguish a plausible value from a QMZ-corrupted one
+ * (e.g. "27Z") at this layer — ANY non-empty/non-absent outcome is preserved, never
+ * auto-corrected. Automatic "self-healing" is explicitly NOT allowed: Audit detects
+ * and reports suspected corruption, but the actual correction can only happen
+ * through applyExplicitAttributionCorrection below, called only after a human has
+ * reviewed and approved a specific file via the preview-only repair-plan tool
+ * (scripts/qmz-attribution-repair-plan.js) — never from this automatic path, and
+ * never from Repair's own write (resumeFrozenFile goes through this same gate, so
+ * even an operator-triggered Repair run cannot silently "fix" attribution).
+ *
+ * @param {string} destPath
+ * @param {boolean} isRaw
+ * @returns {Promise<{status:'absent'|'present'|'conflict'|'readFailed', value:string|null, values:string[], error:string|null}>}
+ */
+async function _readCurrentAttribution(destPath, isRaw) {
+  const et = _getExifTool();
+  const normalized = _normalizeArchivePath(destPath);
+  const tagSets = [];
+
+  if (isRaw) {
+    // The sidecar may legitimately not exist yet (nothing written via AutoIngest
+    // so far) — checked for existence first so that case reads as 'absent', never
+    // as a read failure. An existing sidecar that fails to READ is a real failure.
+    const { verifyPath: sidecarPath } = classifyForVerification(destPath);
+    let sidecarExists = true;
+    try { await fsp.access(sidecarPath); } catch { sidecarExists = false; }
+    if (sidecarExists) {
+      try { tagSets.push(await et.read(sidecarPath)); }
+      catch (err) { return { status: 'readFailed', value: null, values: [], error: `sidecar: ${err.message}` }; }
+    }
+    // The RAW file itself is the already-archived file this write targets — it is
+    // expected to exist and be readable; any failure here is a real read failure,
+    // never treated as "no embedded attribution".
+    try { tagSets.push(await et.read(normalized)); }
+    catch (err) { return { status: 'readFailed', value: null, values: [], error: `raw: ${err.message}` }; }
+  } else {
+    try { tagSets.push(await et.read(normalized)); }
+    catch (err) { return { status: 'readFailed', value: null, values: [], error: err.message }; }
+  }
+
+  const found = new Set();
+  for (const tags of tagSets) {
+    const { creator, artist, byLine } = _extractAttributionFields(tags);
+    for (const v of [creator, artist, byLine]) if (v) found.add(v);
+  }
+
+  if (found.size === 0) return { status: 'absent', value: null, values: [], error: null };
+  if (found.size > 1) return { status: 'conflict', value: null, values: [...found], error: null };
+  return { status: 'present', value: [...found][0], values: [...found], error: null };
+}
+
 async function _writeAndVerify(file, status, expectation, isRaw) {
-  const tags    = _buildTags(expectation, isRaw);
+  let effectiveExpectation = expectation;
+  if (!expectation.photographerUnresolved) {
+    const current = await _readCurrentAttribution(file.dest, isRaw);
+    if (current.status !== 'absent') {
+      // 'present', 'conflict', AND 'readFailed' all refuse to write — see
+      // _readCurrentAttribution's own header comment for why a read failure must
+      // never be treated the same as a genuinely empty/absent value. Reuses the
+      // existing "don't guess, don't clear" write path — it already omits Creator/
+      // Artist/By-line from the tag map entirely so ExifTool leaves whatever is
+      // already there untouched. Only this single write's effective expectation is
+      // adjusted; the frozen `expectation` object (what gets persisted/retried/
+      // resumed) is never mutated, so staleness comparisons elsewhere keep comparing
+      // the same pure, folder-derived value they always have.
+      effectiveExpectation = { ...expectation, photographerUnresolved: true };
+    }
+  }
+
+  const tags    = _buildTags(effectiveExpectation, isRaw);
   const sidecar = await _writeMetadata(file.dest, tags, isRaw);
   status.sidecar = sidecar;
 
@@ -478,7 +600,45 @@ async function _writeAndVerify(file, status, expectation, isRaw) {
   const verifyPath = sidecar || _normalizeArchivePath(file.dest);
   const et  = _getExifTool();
   const rb  = await et.read(verifyPath);
-  return _compareReadback(rb, expectation, isRaw);
+  return _compareReadback(rb, effectiveExpectation, isRaw);
+}
+
+/**
+ * The ONLY function in this module that may replace an existing, non-empty Creator/
+ * Artist/By-line value. Writes unconditionally — it does not read or preserve the
+ * current value, because calling it at all IS the explicit, human-approved
+ * correction action. Never call this from routine/automatic processing (QMZ
+ * auto-queue, Reapply, Repair, retry, resume all go through _writeAndVerify's
+ * preserving check instead) — only from a caller that represents an operator
+ * explicitly approving a specific correction.
+ *
+ * CURRENT STATUS: this is an internal primitive only — nothing in the app calls it
+ * yet, and there is no UI/CLI "approve and apply" workflow wired up to it. It exists
+ * so the write-side half of "apply it only after explicit approval" is implemented
+ * and tested now; a caller (e.g. an "apply this repair-plan item" action reviewing
+ * scripts/qmz-attribution-repair-plan.js's preview output) is a separate, not-yet-
+ * built follow-up. Do not describe this as a completed approval workflow.
+ *
+ * Touches ONLY attribution fields — never keywords/location/copyright/etc. — so an
+ * attribution correction can never incidentally rewrite other metadata.
+ *
+ * @param {string} destPath
+ * @param {boolean} isRaw
+ * @param {string} verifiedPhotographer The human-approved, correct photographer name.
+ * @returns {Promise<{ok: boolean, actual: string|null}>}
+ */
+async function applyExplicitAttributionCorrection(destPath, isRaw, verifiedPhotographer) {
+  const tags = { 'XMP-dc:Creator': [verifiedPhotographer] };
+  if (!isRaw) {
+    tags['EXIF:Artist']  = verifiedPhotographer;
+    tags['IPTC:By-line'] = verifiedPhotographer;
+  }
+  const sidecar = await _writeMetadata(destPath, tags, isRaw);
+  const verifyPath = sidecar || _normalizeArchivePath(destPath);
+  const rb = await _getExifTool().read(verifyPath);
+  const raw = rb.Creator ?? rb['XMP-dc:Creator'];
+  const actual = Array.isArray(raw) ? raw[0] : raw;
+  return { ok: actual === verifiedPhotographer, actual: actual ?? null };
 }
 
 /**
@@ -856,10 +1016,28 @@ module.exports = {
   applyBatch, retryFailed, getBatchStatus, shutdown, readFileTags, resumeFrozenFile,
   classifyForVerification, compareReadback: _compareReadback, buildEvidence: _buildEvidence,
   RAW_EXTENSIONS, VIDEO_EXTENSIONS,
+  // The sanctioned, explicit-approval-only Creator/Artist/By-line correction channel
+  // — see its own header comment. Real public API: a caller representing a human's
+  // reviewed, approved correction (e.g. a future "apply this repair-plan item" action)
+  // calls this directly; it is never wired into any automatic/routine code path.
+  applyExplicitAttributionCorrection,
   // Test-only: exposes the tag builder so test/fieldSpecsConsistency.test.js can
   // behaviorally verify it stays in sync with the resolver's field set (closure item
   // #10's interim guardrail) without hand-copying a duplicate field list into the
   // test itself. Not part of the module's real public API — no other caller should
   // use this directly; go through applyBatch/resumeFrozenFile instead.
   _buildTags,
+  // Test-only: exposes the actual write-and-verify step (including the unconditional
+  // preserve-existing-attribution read-before-write decision) so a test can exercise
+  // it directly against a real temp file + real ExifTool, without needing Electron
+  // (this function itself never calls the app-dependent logger) and without needing a
+  // full applyBatch()/journal/manifest harness. Not part of the module's real public
+  // API — no other caller should use this directly.
+  _writeAndVerify,
+  // Shared with metadataAuditService.js so Audit's "is there an existing attribution
+  // / does it conflict" reporting reads Creator/Artist/By-line (and, for RAW, the
+  // embedded-vs-sidecar sources) the exact same way the write-time gate does — never
+  // a second, independently-written copy of this logic. Also test-only beyond that.
+  extractAttributionFields: _extractAttributionFields,
+  readCurrentAttribution: _readCurrentAttribution,
 };
