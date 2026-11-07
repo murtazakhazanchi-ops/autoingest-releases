@@ -362,6 +362,8 @@ function assertClean(payload, fx, label) {
       'services/identityEvents.js', 'services/photographerNameModel.js', 'services/photographerSuggestion.js', 'services/photographerProfileCommands.js',
       'services/photographerProfileActions.js', 'services/eventCopyResolver.js', 'renderer/photographerRegistryProfile.js',
       'test/photographerRegistryQ5e1.test.js', 'test/photographerRegistryQ5e1Live.test.js',
+      // Q5e-2a: S1 event-folder identity foundation (not connected to import, sync or UI).
+      'services/eventPhotographerFolders.js', 'services/photographerRenameContract.js', 'test/eventPhotographerFoldersQ5e2a.test.js',
     ]);
     assert.deepEqual(changed.filter(f => !allowed.has(f) && !f.startsWith('.claude/')), []);
   });

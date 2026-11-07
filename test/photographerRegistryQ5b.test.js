@@ -551,7 +551,8 @@ const candidatesOf = (plan, copy = 0, scope = 0) => plan.copies[copy].scopes[sco
     const users = fs.readdirSync(path.join(ROOT, 'services')).filter(f => f.endsWith('.js') && /require\(['"]\.\/photographer(ProfileCommands|FolderRenamePlanner)['"]\)/.test(read(`services/${f}`)));
     // Q5e-1 (authorized): profile actions use the alias/status builders, and the registry manager the
     // read-only planner for the rename PREVIEW. buildRenameEvent / the service stay unused.
-    assert.deepEqual(users, ['photographerFolderRenamePlanner.js', 'photographerProfileActions.js', 'photographerRegistryManager.js'], 'only the planner, profile actions and the manager (preview) use them; the runtime uses neither');
+    // Q5e-2a: eventPhotographerFolders uses only folderNameErrors (S1 folder-name validation).
+    assert.deepEqual(users, ['eventPhotographerFolders.js', 'photographerFolderRenamePlanner.js', 'photographerProfileActions.js', 'photographerRegistryManager.js'], 'only S1 validation, the planner, profile actions and the manager (preview) use them; the runtime uses neither');
     for (const f of users) assert.ok(!/buildRenameEvent|createProfileCommandService|renamePhotographer/.test(read(`services/${f}`).replace(/\/\*[\s\S]*?\*\//g, '')) || f === 'photographerFolderRenamePlanner.js', `${f} never builds a rename`);
     assert.ok(!/ProfileCommands|FolderRenamePlanner/.test(read('services/photographerLearningRuntime.js')));
   });

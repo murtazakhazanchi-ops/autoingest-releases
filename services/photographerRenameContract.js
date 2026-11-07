@@ -51,6 +51,25 @@
 
 'use strict';
 
+/**
+ * S4 invariants (recorded in Q5e-2a from the event.json writer audit; none is implemented yet):
+ *  I1  A folder rename remaps every event.json key that embeds the photographer folder path:
+ *      tagRefinements and metadataGroups (same mechanism as _remapEventIntentForRenames after
+ *      PCxx sequencing), photographerSequences, and photographerFolders/-History (S1).
+ *  I2  Staging and every NAS copy end consistent: same folders, same mappings, same history.
+ *      Today archive sync only merges imports/tagRefinements/metadataGroups into an existing NAS
+ *      event.json (S3 must merge the S1 fields).
+ *  I3  Pending learning never points at an obsolete folder path (S8).
+ *  I4  The PCxx sequencer keeps identity mappings in step with its own renames, and writes
+ *      event.json through updateEventJsonAtomic (S5; audit item F11).
+ *  I5  Event data held by open windows cannot route a new import into the old folder (S7).
+ *  I6  The registry name and the event-folder mapping recover together from one journal (S4).
+ *  I7  No rename starts while an import, sync, metadata job, transfer or sequencing run is active
+ *      on that event; the archive lock covers all of them.
+ * Foundation for S1: services/eventPhotographerFolders.js (schema, validation, gated writer).
+ */
+const S4_INVARIANTS = Object.freeze(['I1', 'I2', 'I3', 'I4', 'I5', 'I6', 'I7']);
+
 /** Every item must be implemented AND separately approved before profile renaming is enabled. */
 const PREREQUISITES = Object.freeze([
   { id: 'S1', title: 'event.json photographer-folder mapping', detail: 'photographerFolders {photographerId → folder per scope} and append-only photographerFolderHistory, written atomically; readers fall back to name matching only for events without it.' },
@@ -84,4 +103,4 @@ function renameGate(implemented = IMPLEMENTED) {
   return { enabled: unmet.length === 0, unmet };
 }
 
-module.exports = { PREREQUISITES, SAFETY_REQUIREMENTS, IMPLEMENTED, renameGate };
+module.exports = { PREREQUISITES, SAFETY_REQUIREMENTS, IMPLEMENTED, S4_INVARIANTS, renameGate };
