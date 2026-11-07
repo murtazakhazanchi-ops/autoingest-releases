@@ -19346,13 +19346,25 @@ const _transferMonitor = (() => {
     let html = '';
     for (const item of exceptions.slice(0, 100)) {
       const sevClass = item.status === 'ambiguous' || item.status === 'read-error' ? 'diag-item-error' : 'diag-item-warn';
+      // intentDiagnostics are advisory flags the resolver/auditor attaches (e.g. a
+      // persisted tag-refinement label no longer offered by the component, a file
+      // with no reliable photographer to resolve, suspected Creator corruption, or
+      // an attribution conflict/unverified-RAW case — see eventEvidenceReconstruction.js
+      // and metadataAuditService.js for the full set). Some of these already keep the
+      // record out of 'complete' so it isn't filtered from this list at all; either
+      // way the diagnostic TEXT must still reach the operator here — a flag with
+      // nowhere to render is the same as "flagged but invisible."
+      const diagText = Array.isArray(item.intentDiagnostics) && item.intentDiagnostics.length
+        ? `flags: ${item.intentDiagnostics.map(_esc).join(', ')}`
+        : '';
       const detail = item.status === 'ambiguous'
-        ? `Ambiguous: ${_esc(item.ambiguityReason || '')}`
+        ? [`Ambiguous: ${_esc(item.ambiguityReason || '')}`, diagText].filter(Boolean).join(' · ')
         : item.status === 'read-error'
-          ? `Read error: ${_esc(item.error || '')}`
+          ? [`Read error: ${_esc(item.error || '')}`, diagText].filter(Boolean).join(' · ')
           : [
               item.fields ? Object.entries(item.fields).filter(([, d]) => d.status !== 'match').map(([f, d]) => `${f}: ${d.status}`).join(', ') : '',
               item.keywords && !item.keywords.compliant ? 'keywords: non-compliant' : '',
+              diagText,
             ].filter(Boolean).join(' · ');
       html += `<div class="diag-item ${sevClass}">
   <div class="diag-item-header">

@@ -45,7 +45,12 @@ function oracleBuildFileEvidence(eventFolderPath, eventJson, filePath) {
     photographer = component ? rp(filePath, path.join(eventFolderPath, component.folderName), fallbackPhotographer) : fallbackPhotographer;
   }
   const groups = isMulti ? (component ? [{ id: component.folderName, subEventId: component.folderName, files: [filePath] }] : []) : [{ id: 'root', subEventId: null, files: [filePath] }];
-  return { filePath, photographer, hijriDate: eventJson?.hijriDate || null, eventDescription: eventJson?.eventName || null, groups, diskComponents: components };
+  // photographerUnresolved: false — none of this oracle's fixtures touch a QMZ sequence
+  // container, so the real implementation's new QMZ-container detection (bug:
+  // qmz-sequence-treated-as-photographer) never triggers here; added to keep this
+  // byte-identical comparison meaningful against the real function's current shape,
+  // not a behavior change to the oracle itself.
+  return { filePath, photographer, photographerUnresolved: false, hijriDate: eventJson?.hijriDate || null, eventDescription: eventJson?.eventName || null, groups, diskComponents: components };
 }
 
 t('NO intent fields ⇒ evidence is BYTE-IDENTICAL to the original implementation (single, multi, unresolvable, no imports, junk fields)', () => {

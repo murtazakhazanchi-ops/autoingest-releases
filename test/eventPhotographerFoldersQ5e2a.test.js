@@ -20,6 +20,24 @@ const F = require('../services/eventPhotographerFolders');
 const { updateEventJsonAtomic } = require('../main/eventJsonStore');
 
 const ROOT = path.resolve(__dirname, '..');
+const { execFileSync } = require('node:child_process');
+// Q5's OWN changes since a base: its non-merge commits on the first-parent line, plus uncommitted
+// and untracked work. Stable changes merged in (e.g. v0.9.17) arrive through merge commits and are
+// therefore not counted as Q5 changes by these stage-boundary checks.
+function q5OwnFiles(base) {
+  const run = (args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).split('\n');
+  return [...new Set([
+    ...run(['log', '--first-parent', '--no-merges', '--format=', '--name-only', `${base}..HEAD`]),
+    ...run(['diff', '--name-only', 'HEAD']),
+    ...run(['ls-files', '--others', '--exclude-standard']),
+  ].filter(Boolean))];
+}
+function q5OwnDiffLines(base, file) {
+  const run = (args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).split('\n');
+  return [...run(['log', '--first-parent', '--no-merges', '-p', '-U0', '--format=', `${base}..HEAD`, '--', file]), ...run(['diff', '-U0', 'HEAD', '--', file])]
+    .filter(l => /^[+-]/.test(l) && !/^(\+\+\+|---) /.test(l));
+}
+
 let passed = 0;
 async function t(name, fn) {
   try { await fn(); passed++; console.log(`  ok — ${name}`); }
@@ -289,10 +307,9 @@ const add = (ev, additions, extra = {}) => {
   });
 
   await t('no import, routing, sync, sequencing, metadata, renderer or preload code changed by Q5e-2a', async () => {
-    const { execFileSync } = require('node:child_process');
     let base;
     try { base = execFileSync('git', ['rev-parse', '--verify', 'bab0902^{commit}'], { cwd: ROOT, encoding: 'utf8' }).trim(); } catch { return; }
-    const changed = [...execFileSync('git', ['diff', '--name-only', base], { cwd: ROOT, encoding: 'utf8' }).split('\n'), ...execFileSync('git', ['ls-files', '--others', '--exclude-standard'], { cwd: ROOT, encoding: 'utf8' }).split('\n')].filter(Boolean).filter(f => !f.startsWith('graphify-out/') && !f.startsWith('.claude/'));
+    const changed = q5OwnFiles(base).filter(f => !f.startsWith('graphify-out/') && !f.startsWith('.claude/'));
     const allowed = new Set(['services/eventPhotographerFolders.js', 'services/photographerRenameContract.js', 'test/eventPhotographerFoldersQ5e2a.test.js', 'test/photographerRegistryQ5c.test.js', 'test/photographerRegistryQ5b.test.js',
       // Q5e-2b (authorized): sequencing in the event.json chain + identity guard, and their tests.
       'main/main.js', 'services/photographerSequenceService.js', 'services/photographerSequenceGuard.js', 'test/photographerSequencingQ5e2b.test.js']);

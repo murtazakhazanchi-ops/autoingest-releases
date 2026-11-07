@@ -23,6 +23,23 @@ const V = require('../services/photographerRegistryView');
 const { createRegistryBrowser, assertRendererSafe, HANDLE_RE } = require('../services/photographerRegistryBrowser');
 
 const ROOT = path.resolve(__dirname, '..');
+// Q5's OWN changes since a base: its non-merge commits on the first-parent line, plus uncommitted
+// and untracked work. Stable changes merged in (e.g. v0.9.17) arrive through merge commits and are
+// therefore not counted as Q5 changes by these stage-boundary checks.
+function q5OwnFiles(base) {
+  const run = (args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).split('\n');
+  return [...new Set([
+    ...run(['log', '--first-parent', '--no-merges', '--format=', '--name-only', `${base}..HEAD`]),
+    ...run(['diff', '--name-only', 'HEAD']),
+    ...run(['ls-files', '--others', '--exclude-standard']),
+  ].filter(Boolean))];
+}
+function q5OwnDiffLines(base, file) {
+  const run = (args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).split('\n');
+  return [...run(['log', '--first-parent', '--no-merges', '-p', '-U0', '--format=', `${base}..HEAD`, '--', file]), ...run(['diff', '-U0', 'HEAD', '--', file])]
+    .filter(l => /^[+-]/.test(l) && !/^(\+\+\+|---) /.test(l));
+}
+
 let passed = 0;
 async function t(name, fn) {
   try { await fn(); passed++; console.log(`  ok — ${name}`); }
@@ -332,7 +349,7 @@ function assertClean(payload, fx, label) {
     let base;
     try { base = execFileSync('git', ['rev-parse', '--verify', 'aa58eb1^{commit}'], { cwd: ROOT, encoding: 'utf8' }).trim(); } catch { console.log('    (Q5b commit not available — skipped)'); return; }
     for (const f of ['main/main.js', 'main/preload.js']) {
-      const lines = execFileSync('git', ['diff', '-U0', base, '--', f], { cwd: ROOT, encoding: 'utf8' }).split('\n').filter(l => /^[+-]/.test(l) && !/^(\+\+\+|---) /.test(l));
+      const lines = q5OwnDiffLines(base, f);
       // Q5e-2b (authorized S5 groundwork): the sequencing handler's closing "});" became "}" when its
       // original steps moved, unchanged, into the guarded _applySequenceUnlocked. Nothing else may go.
       const allowedRemoved = f === 'main/main.js' ? ['-});'] : [];
@@ -346,10 +363,7 @@ function assertClean(payload, fx, label) {
   await t('Q5c/Q5d touch no import, routing, sync, metadata or autocomplete module', async () => {
     let base;
     try { base = execFileSync('git', ['rev-parse', '--verify', 'aa58eb1^{commit}'], { cwd: ROOT, encoding: 'utf8' }).trim(); } catch { return; }
-    const changed = [
-      ...execFileSync('git', ['diff', '--name-only', base], { cwd: ROOT, encoding: 'utf8' }).split('\n'),
-      ...execFileSync('git', ['ls-files', '--others', '--exclude-standard'], { cwd: ROOT, encoding: 'utf8' }).split('\n'),
-    ].filter(Boolean).filter(f => !f.startsWith('graphify-out/'));
+    const changed = q5OwnFiles(base).filter(f => !f.startsWith('graphify-out/'));
     const allowed = new Set([
       'main/main.js', 'main/preload.js', 'renderer/index.html', 'renderer/renderer.js', 'renderer/photographerRegistryUI.js',
       'services/photographerRegistryBrowser.js', 'test/photographerRegistryQ5c.test.js', 'test/photographerRegistryQ5cLive.test.js',

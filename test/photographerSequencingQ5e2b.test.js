@@ -189,6 +189,19 @@ const sA = { componentId: '1', componentFolder: 'A-Day1' };
     }
   });
 
+  await t('v0.9.17 QMZ-aware sequencing: plan = actual for nested QMZ scopes; containers are never renamed', async () => {
+    const ev = await makeEvent({ components: ['C-Day3', 'D-Day4'], folders: { 'C-Day3': ['Kay Current'], 'C-Day3/01Q': ['Lee Two'], 'C-Day3/_Unsequenced': ['Mo Three'] } });
+    const scopes = await seq.scanPhotographerFolders(ev, readDoc(ev).components);
+    assert.deepEqual(scopes.map(s => [s.scopeKey, s.photographers.map(p => p.folderName)]), [['C-Day3', ['Kay Current']], ['C-Day3/01Q', ['Lee Two']], ['C-Day3/_Unsequenced', ['Mo Three']], ['D-Day4', []]], 'containers are scanned as their own nested scopes');
+    const so = ordered({ 'C-Day3': ['Kay Current', '01Q'], 'C-Day3/01Q': ['Lee Two'], 'C-Day3/_Unsequenced': ['Mo Three'] });
+    const plan = await seq.planRenames(ev, so);
+    assert.deepEqual(plan.renames.map(r => [r.scopeKey, r.from, r.to]), [['C-Day3', 'Kay Current', 'PC01-Kay Current'], ['C-Day3/01Q', 'Lee Two', 'PC01-Lee Two'], ['C-Day3/_Unsequenced', 'Mo Three', 'PC01-Mo Three']], 'a container sent as an entry is skipped, like applyRenames does');
+    const res = await applyGuarded(ev, so);
+    assert.equal(res.ok, true);
+    assert.deepEqual(res.renames.map(r => [r.scopeRel, r.from, r.to]), plan.renames.map(r => [r.scopeKey, r.from, r.to]));
+    assert.ok(fs.existsSync(path.join(ev, 'C-Day3', '01Q', 'PC01-Lee Two')) && !fs.existsSync(path.join(ev, 'C-Day3', 'PC02-01Q')), 'the 01Q container keeps its name');
+  });
+
   await t('legacy: intent paths remapped with the renames, imports and unknown fields kept, guard says not mapped', async () => {
     const ev = await makeEvent({ folders: { 'A-Day1': ['PC02-Kay Current', 'PC01-Lee Two'] } });
     const g = await G.checkSequencing({ eventPath: ev, doc: readDoc(ev), plan: [] });

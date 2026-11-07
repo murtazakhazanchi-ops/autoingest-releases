@@ -39,7 +39,7 @@ const COPYRIGHT = '© Aljamea-tus-Saifiyah';
 
 function _emptyFields() {
   return {
-    photographer: null, component: null, keywords: [],
+    photographer: null, photographerUnresolved: false, component: null, keywords: [],
     hijriDate: null, eventDescription: null, copyright: COPYRIGHT,
   };
 }
@@ -118,6 +118,7 @@ function _buildKeywords({ component, isMulti, explicitTags, eventTypeOverride, a
  * @param {{
  *   filePath: string,
  *   photographer?: string|null,
+ *   photographerUnresolved?: boolean,   // true = don't guess; writer must preserve existing attribution
  *   hijriDate?: string|null,
  *   eventDescription?: string|null,
  *   groups?: object[],            // standard/reapply evidence (tier 1 + 3)
@@ -216,6 +217,14 @@ function resolveExpectedMetadata(evidence) {
     metadataContractVersion: METADATA_CONTRACT_VERSION,
     resolverVersion: RESOLVER_VERSION,
     photographer: photographer || null,
+    // True only when the caller explicitly signaled "no reliable photographer could be
+    // resolved for this file" (e.g. a file sitting directly inside a QMZ sequence
+    // container with no photographer sub-folder) — as opposed to "photographer is simply
+    // absent/empty for this event", which is the ordinary, pre-existing null case. The
+    // writer (exifService._buildTags) must skip Creator/Artist/By-line entirely rather
+    // than clearing them when this is true, to preserve existing attribution instead of
+    // guessing or erasing it.
+    photographerUnresolved: !!evidence.photographerUnresolved,
     component: component
       ? {
           location: component.location || '', city: component.city || '', country: component.country || '',

@@ -43,7 +43,15 @@ async function mkArchiveWithTrickyValues() {
     components: [{ location: 'Hall, "A"', city: 'Mumbai', country: 'India', types: ['Majlis'], folderName: null }],
   }, null, 2), 'utf8');
   const f = path.join(eventDir, 'Jane Doe', 'IMG_0001.cr2');
-  await fsp.writeFile(f, Buffer.from('not-a-real-raw-file'));
+  // A real TIFF (ExifTool-readable) under a .cr2 extension — placeholder text bytes
+  // used to be fine here since Audit only ever read the (non-existent) XMP sidecar
+  // for RAW files, but it now also reads the RAW file's OWN embedded attribution
+  // (see metadataAuditService.js's RAW-embedded-tags read). That read fails soft on
+  // a non-image file (never hard-errors the whole record), but a realistic,
+  // ExifTool-readable fixture is still the more honest test of this archive-export
+  // path than placeholder text bytes.
+  const sharp = require('sharp');
+  await sharp({ create: { width: 2, height: 2, channels: 3, background: { r: 1, g: 2, b: 3 } } }).tiff().toFile(f);
   return archiveRoot;
 }
 
