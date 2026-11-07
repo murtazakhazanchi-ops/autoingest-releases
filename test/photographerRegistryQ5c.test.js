@@ -333,7 +333,10 @@ function assertClean(payload, fx, label) {
     try { base = execFileSync('git', ['rev-parse', '--verify', 'aa58eb1^{commit}'], { cwd: ROOT, encoding: 'utf8' }).trim(); } catch { console.log('    (Q5b commit not available — skipped)'); return; }
     for (const f of ['main/main.js', 'main/preload.js']) {
       const lines = execFileSync('git', ['diff', '-U0', base, '--', f], { cwd: ROOT, encoding: 'utf8' }).split('\n').filter(l => /^[+-]/.test(l) && !/^(\+\+\+|---) /.test(l));
-      assert.deepEqual(lines.filter(l => l.startsWith('-')), [], `${f}: nothing removed`);
+      // Q5e-2b (authorized S5 groundwork): the sequencing handler's closing "});" became "}" when its
+      // original steps moved, unchanged, into the guarded _applySequenceUnlocked. Nothing else may go.
+      const allowedRemoved = f === 'main/main.js' ? ['-});'] : [];
+      assert.deepEqual(lines.filter(l => l.startsWith('-')), allowedRemoved, `${f}: nothing removed`);
     }
     const pre = execFileSync('git', ['diff', '-U0', base, '--', 'main/preload.js'], { cwd: ROOT, encoding: 'utf8' });
     const exposed = [...pre.matchAll(/^\+\s+(\w+):/gm)].map(m => m[1]);
@@ -364,6 +367,8 @@ function assertClean(payload, fx, label) {
       'test/photographerRegistryQ5e1.test.js', 'test/photographerRegistryQ5e1Live.test.js',
       // Q5e-2a: S1 event-folder identity foundation (not connected to import, sync or UI).
       'services/eventPhotographerFolders.js', 'services/photographerRenameContract.js', 'test/eventPhotographerFoldersQ5e2a.test.js',
+      // Q5e-2b: S5 groundwork — sequencing write in the event.json chain and the identity guard.
+      'services/photographerSequenceService.js', 'services/photographerSequenceGuard.js', 'test/photographerSequencingQ5e2b.test.js',
     ]);
     assert.deepEqual(changed.filter(f => !allowed.has(f) && !f.startsWith('.claude/')), []);
   });

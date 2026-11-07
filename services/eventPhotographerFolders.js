@@ -60,19 +60,24 @@ const HISTORY_KEYS = ['txId', 'scope', 'photographerId', 'choice', 'fromFolderNa
 
 /**
  * What must exist before mappings may be written to real events (audit, Q5e-2a):
- *   F11  photographerSequenceService.writeSequencesToEventJson writes outside the event.json
- *        write chain (a concurrent mapping update can be lost) and its PCxx renames do not update
- *        mappings (they would point at the pre-sequencing folder name).
+ *   F11  photographerSequenceService.writeSequencesToEventJson wrote outside the event.json write
+ *        chain and its PCxx renames did not update mappings. RESOLVED in Q5e-2b: the write goes
+ *        through updateEventJsonAtomic, and photographerSequenceGuard refuses any sequencing that
+ *        would rename a mapped folder (recording it needs the S4 journal) — so sequencing can
+ *        neither lose nor stale a mapping.
+ *   COMP the full-payload event:update (Event Creator edit / repair) replaces `components`; a changed
+ *        component folder name would orphan that scope's mappings (see componentScopeImpact).
  *   S3   archiveSyncService merges only imports/tagRefinements/metadataGroups into an existing NAS
  *        event.json, so mappings written on staging would never reach the NAS copy.
  *   META metadataSyncService rewrites event.json outside the write chain (lost-update window).
  */
 const WRITE_PREREQUISITES = Object.freeze([
-  { id: 'F11', title: 'Sequencing writer goes through updateEventJsonAtomic and remaps photographerFolders when it renames PCxx folders' },
+  { id: 'F11', title: 'Sequencing writes through updateEventJsonAtomic and never renames a mapped folder without the S4 journal' },
   { id: 'S3', title: 'Archive sync merges photographerFolders/photographerFolderHistory between staging and NAS copies' },
   { id: 'META', title: 'metadataSyncService event.json writes go through updateEventJsonAtomic' },
+  { id: 'COMP', title: 'Component edits refuse (or carry over) a change that would orphan photographerFolders scopes' },
 ]);
-const IMPLEMENTED = Object.freeze([]);
+const IMPLEMENTED = Object.freeze(['F11']);
 
 /** @returns {{ enabled: boolean, unmet: string[] }} */
 function writeGate(implemented = IMPLEMENTED) {
@@ -265,6 +270,28 @@ function prepareMappingAdditions(doc, { expectedRevision, additions, origin, at,
 }
 
 /**
+ * Contract for component edits (COMP, not wired): which mappings a proposed `components` array
+ * would orphan. A component whose folder name changes, or which disappears, leaves its mappings
+ * pointing at a scope that no longer exists — the edit must be refused or carry the mappings over
+ * explicitly with history; mappings are never deleted silently. Pure.
+ * @returns {{ affected: Array<{ index: number, componentId: string, from: string, to: string|null }>, layoutChanges: boolean }}
+ *   layoutChanges — the event switches between root layout (0–1 components) and component layout
+ */
+function componentScopeImpact(doc, newComponents) {
+  const before = eventScopes(doc);
+  const after = eventScopes({ components: newComponents });
+  const read = readPhotographerFolders(doc);
+  const affected = [];
+  read.mappings.forEach((m, index) => {
+    if (m.scope.componentId === null) return;
+    const to = after.components.has(m.scope.componentId) ? after.components.get(m.scope.componentId) : null;
+    if (to !== m.scope.componentFolder) affected.push({ index, componentId: m.scope.componentId, from: m.scope.componentFolder, to });
+  });
+  const rootMapped = read.mappings.some(m => m.scope.componentId === null);
+  return { affected, layoutChanges: before.root !== after.root && (rootMapped || read.mappings.length > 0) };
+}
+
+/**
  * READ-ONLY physical check of mappings against one event copy: the folder must exist with exactly
  * this name, be a real directory (not a symlink) and resolve inside the event folder.
  * @returns {Promise<Array<{ index: number, state: 'present'|'missing'|'name-differs-in-case'|'not-a-directory'|'symlink'|'escapes-event'|'unreadable' }>>}
@@ -325,5 +352,5 @@ async function addMappings(eventFolderPath, req, { updateEventJsonAtomic, gate =
 
 module.exports = {
   SCHEMA, WRITE_PREREQUISITES, IMPLEMENTED, writeGate, eventScopes, folderEntryErrors,
-  readPhotographerFolders, foldersRevision, officialNameEvidence, prepareMappingAdditions, verifyMappingsOnDisk, addMappings,
+  readPhotographerFolders, foldersRevision, officialNameEvidence, prepareMappingAdditions, verifyMappingsOnDisk, addMappings, componentScopeImpact,
 };

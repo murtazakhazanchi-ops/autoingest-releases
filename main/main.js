@@ -48,6 +48,7 @@ const localSyncManifest   = require('../services/localSyncManifest');
 const syncQueueService    = require('../services/syncQueueService');
 const archiveSyncService  = require('../services/archiveSyncService');
 const archiveLockService      = require('../services/archiveLockService');
+const photographerSequenceGuard = require('../services/photographerSequenceGuard');
 const transferExportService      = require('../services/transferExportService');
 const transferImportService      = require('../services/transferImportService');
 const archiveDiagnosticsService  = require('../services/archiveDiagnosticsService');
@@ -5577,6 +5578,8 @@ async function _remapEventIntentForRenames(eventFolderPath, renames) {
   }
 }
 
+// Events with a sequencing run in flight (Q5e-2b): a second run on the same event is refused.
+const _sequencingEvents = new Set();
 ipcMain.handle('event:applyPhotographerSequence', async (_event, { localEventPath, scopedOrdered } = {}) => {
   if (!localEventPath || typeof localEventPath !== 'string') {
     return { ok: false, reason: 'localEventPath required' };
@@ -5663,6 +5666,29 @@ ipcMain.handle('event:applyPhotographerSequence', async (_event, { localEventPat
     fullScopedOrdered.push({ scopeKey: scope.scopeKey, ordered: fullOrdered });
   }
 
+  // Q5e-2b (S5 groundwork): one sequencing run per event at a time, and the identity guard decides
+  // BEFORE any folder is renamed. Legacy events (no S1 records) pass the guard unchanged.
+  if (_sequencingEvents.has(realEvent)) {
+    return { ok: false, reason: 'A photographer sequence is already being applied to this event. Please wait for it to finish.' };
+  }
+  _sequencingEvents.add(realEvent);
+  try {
+    let seqDoc = null;
+    try { seqDoc = JSON.parse(await fsp.readFile(path.join(realEvent, 'event.json'), 'utf8')); } catch { seqDoc = null; }
+    const plan = await photographerSeqService.planRenames(realEvent, fullScopedOrdered);
+    const guard = await photographerSequenceGuard.checkSequencing({ eventPath: realEvent, doc: seqDoc, plan: plan.ok ? plan.renames : null });
+    if (!guard.ok) {
+      log('warn', `[seq] Sequencing refused: ${guard.code}`);
+      return { ok: false, reason: guard.reason, code: guard.code };
+    }
+    return await _applySequenceUnlocked(realEvent, fullScopedOrdered);
+  } finally {
+    _sequencingEvents.delete(realEvent);
+  }
+});
+
+/** The pre-Q5e-2b sequencing steps, unchanged; only called by the guarded handler above. */
+async function _applySequenceUnlocked(realEvent, fullScopedOrdered) {
   const totalFolders = fullScopedOrdered.reduce((n, s) => n + s.ordered.length, 0);
   log('info', `[seq] Applying photographer sequence to ${realEvent} — ${fullScopedOrdered.length} scope(s), ${totalFolders} folder(s)`);
 
@@ -5718,7 +5744,7 @@ ipcMain.handle('event:applyPhotographerSequence', async (_event, { localEventPat
 
   log('info', `[seq] Sequence applied — ${renameResult.renames.length} folder(s) renamed`);
   return { ok: true, renames: renameResult.renames, sequences: scopedSequences };
-});
+}
 
 // ── QMZ Sequence Manager ──────────────────────────────────────────────────────
 

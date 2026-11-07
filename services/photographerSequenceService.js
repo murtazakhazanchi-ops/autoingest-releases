@@ -3,6 +3,7 @@ const fsp  = require('fs').promises;
 const path = require('path');
 
 const { hidePathBestEffort } = require('./internalFileProtection');
+const { updateEventJsonAtomic } = require('../main/eventJsonStore');
 const localSyncManifest      = require('./localSyncManifest');
 const { log }                = require('./logger');
 // Canonical Representation Audit, L6 (2026-08-11): seqPrefix() now lives in
@@ -148,6 +149,34 @@ async function scanPhotographerFolders(localEventPath, components) {
  *   directory the rename happened in ('' for the event root), so callers can remap durable records
  *   keyed by event-relative path (event.json tagRefinements / metadataGroups) from the real pairs.
  */
+/**
+ * READ-ONLY: the renames applyRenames would perform, without touching the disk (Q5e-2b). Uses the
+ * same folder location rule (first hardened directory whose canonical name matches), so a guard
+ * can decide before anything is renamed.
+ * @returns {Promise<{ ok: boolean, renames: Array<{ scopeKey: string, from: string, to: string }>, error?: string }>}
+ */
+async function planRenames(localEventPath, scopedOrdered) {
+  const renames = [];
+  for (const scope of scopedOrdered) {
+    const baseDir = scope.scopeKey === EVENT_ROOT_KEY ? localEventPath : path.join(localEventPath, scope.scopeKey);
+    let dirs;
+    try { dirs = await fsp.readdir(baseDir, { withFileTypes: true }); }
+    catch (err) { return { ok: false, renames, error: `Failed to scan ${baseDir}: ${err.message}` }; }
+    const claimed = new Set();
+    for (const entry of scope.ordered) {
+      if (_skipDir(entry.canonical)) continue;
+      let current = null;
+      for (const d of dirs) {
+        if (!claimed.has(d.name) && canonicalName(d.name) === entry.canonical && await _directoryHardened(baseDir, d)) { current = d.name; break; }
+      }
+      if (!current) continue;
+      claimed.add(current);
+      if (current !== entry.folderName) renames.push({ scopeKey: scope.scopeKey, from: current, to: entry.folderName });
+    }
+  }
+  return { ok: true, renames };
+}
+
 async function applyRenames(localEventPath, scopedOrdered) {
   const allRenames = [];
 
@@ -335,24 +364,25 @@ async function updateManifestAfterRename(localEventPath, scopedRenameMap) {
  */
 async function writeSequencesToEventJson(localEventPath, scopedSequences) {
   const jsonPath = path.join(localEventPath, 'event.json');
-  let existing   = {};
+  // Q5e-2b (audit item F11): through the event.json write chain, so a concurrent import, metadata
+  // or registry update to the same event.json is never overwritten by a stale copy, and the two
+  // writers never share the temp file. Only photographerSequences and updatedAt change; every
+  // other field (imports, tagRefinements, metadataGroups, photographerFolders, unknown fields) is
+  // carried over from the document as it is at write time.
+  let read = false;
   try {
-    const raw = await fsp.readFile(jsonPath, 'utf8');
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === 'object') existing = parsed;
-  } catch (err) {
-    return { ok: false, error: `Cannot read event.json: ${err.message}` };
-  }
-
-  const updated = { ...existing, photographerSequences: scopedSequences, updatedAt: Date.now() };
-  const tmp = jsonPath + '.tmp';
-  try {
-    await fsp.writeFile(tmp, JSON.stringify(updated, null, 2), 'utf8');
-    await fsp.rename(tmp, jsonPath);
+    await updateEventJsonAtomic(jsonPath, (doc) => {
+      read = true;
+      if (!doc || typeof doc !== 'object' || Array.isArray(doc)) {
+        const e = new Error('event.json is not an object'); e.readFailure = true; throw e;
+      }
+      return { photographerSequences: scopedSequences, updatedAt: Date.now() };
+    });
     hidePathBestEffort(jsonPath).catch(() => {});
     return { ok: true };
   } catch (err) {
-    try { await fsp.unlink(tmp); } catch {}
+    // Same contract as before: a read/parse failure is "Cannot read", anything later "Failed to write".
+    if (!read || err.readFailure) return { ok: false, error: `Cannot read event.json: ${err.message}` };
     return { ok: false, error: `Failed to write event.json: ${err.message}` };
   }
 }
@@ -363,6 +393,7 @@ module.exports = {
   seqPrefix,
   scanPhotographerFolders,
   applyRenames,
+  planRenames,
   updateManifestAfterRename,
   writeSequencesToEventJson,
   // Test-only: mirrors main/qmzService.js's identical export for the same

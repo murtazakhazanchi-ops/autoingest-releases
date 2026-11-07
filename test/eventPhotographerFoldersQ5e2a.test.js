@@ -205,7 +205,7 @@ const add = (ev, additions, extra = {}) => {
     assert.equal(stale.reason, 'stale-revision');
     const before = fs.readFileSync(json);
     const off = await F.addMappings(ev, { expectedRevision: F.foldersRevision(JSON.parse(before)), additions: [{ scope: scopeA, photographerId: ID.alpha, folderName: 'PC01-Test Shipped Alpha', basis: 'operator-confirmed' }], origin: ORIGIN, at: AT, registry: REGISTRY }, { updateEventJsonAtomic });
-    assert.deepEqual(off, { ok: false, reason: 'mapping-writes-disabled', unmet: ['F11', 'S3', 'META'] }, 'production writes stay off until the audited writers are protected');
+    assert.deepEqual(off, { ok: false, reason: 'mapping-writes-disabled', unmet: ['S3', 'META', 'COMP'] }, 'production writes stay off until the audited writers are protected (F11 closed in Q5e-2b)');
     assert.deepEqual(fs.readFileSync(json), before);
   });
 
@@ -240,7 +240,7 @@ const add = (ev, additions, extra = {}) => {
     assert.equal(JSON.parse(fs.readFileSync(json, 'utf8')).imports.length, 2);
   });
 
-  await t('F11 sequencing writer: keeps the fields, but writes outside the chain and does not remap them (why writes are gated)', async () => {
+  await t('F11 sequencing writer: keeps the fields and (since Q5e-2b) writes through the event.json chain', async () => {
     const { ev, json, fields } = await withFields();
     const seq = require('../services/photographerSequenceService');
     const r = await seq.writeSequencesToEventJson(ev, { 'A-Day1': { 'Kay Current': { sequence: 4, folderName: 'PC04-Kay Current' } } });
@@ -249,8 +249,8 @@ const add = (ev, additions, extra = {}) => {
     const doc = JSON.parse(fs.readFileSync(json, 'utf8'));
     assert.deepEqual(doc.futureField, { keep: true });
     const src = fs.readFileSync(path.join(ROOT, 'services', 'photographerSequenceService.js'), 'utf8');
-    assert.ok(!/updateEventJsonAtomic/.test(src) && !/photographerFolders/.test(src), 'F11 boundary still open: direct write, no mapping remap');
-    assert.deepEqual(F.writeGate().unmet, ['F11', 'S3', 'META']);
+    assert.ok(/updateEventJsonAtomic\(jsonPath/.test(src), 'Q5e-2b: the sequencing write is in the chain');
+    assert.deepEqual(F.writeGate().unmet, ['S3', 'META', 'COMP']);
   });
 
   await t('archive sync: a new NAS copy receives the fields; an existing NAS copy keeps its own and does not receive them (S3)', async () => {
@@ -280,7 +280,7 @@ const add = (ev, additions, extra = {}) => {
       'main/eventJsonStore.js', // the chain itself
       'main/main.js', // event:write and event:prepareFromRegistry — creation only (absent-check first)
       'main/metadataSyncService.js', // META (x2): whole-document read-modify-write, outside the chain
-      'services/photographerSequenceService.js', // F11
+      // services/photographerSequenceService.js — F11, moved into the chain in Q5e-2b
       'services/adoptionWriteService.js', // creation only (never overwrites)
     ];
     assert.deepEqual([...new Set(sites.map(s => s.split(':')[0]))].sort(), [...known].sort(), `event.json write sites: ${sites.join(' | ')}`);
@@ -293,7 +293,9 @@ const add = (ev, additions, extra = {}) => {
     let base;
     try { base = execFileSync('git', ['rev-parse', '--verify', 'bab0902^{commit}'], { cwd: ROOT, encoding: 'utf8' }).trim(); } catch { return; }
     const changed = [...execFileSync('git', ['diff', '--name-only', base], { cwd: ROOT, encoding: 'utf8' }).split('\n'), ...execFileSync('git', ['ls-files', '--others', '--exclude-standard'], { cwd: ROOT, encoding: 'utf8' }).split('\n')].filter(Boolean).filter(f => !f.startsWith('graphify-out/') && !f.startsWith('.claude/'));
-    const allowed = new Set(['services/eventPhotographerFolders.js', 'services/photographerRenameContract.js', 'test/eventPhotographerFoldersQ5e2a.test.js', 'test/photographerRegistryQ5c.test.js', 'test/photographerRegistryQ5b.test.js']);
+    const allowed = new Set(['services/eventPhotographerFolders.js', 'services/photographerRenameContract.js', 'test/eventPhotographerFoldersQ5e2a.test.js', 'test/photographerRegistryQ5c.test.js', 'test/photographerRegistryQ5b.test.js',
+      // Q5e-2b (authorized): sequencing in the event.json chain + identity guard, and their tests.
+      'main/main.js', 'services/photographerSequenceService.js', 'services/photographerSequenceGuard.js', 'test/photographerSequencingQ5e2b.test.js']);
     assert.deepEqual(changed.filter(f => !allowed.has(f)), []);
   });
 
