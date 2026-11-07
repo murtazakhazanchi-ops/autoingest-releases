@@ -1217,9 +1217,19 @@
         "[§3F — F. Specialized Archival Workflows](../11_ARCHITECTURAL_EVOLUTION.md#f-specialized-archival-workflows)"
       ],
       "related_bugs": [
-        "BUG-002"
+        "BUG-002",
+        "BUG-021"
       ],
-      "related_changelog_entries": [],
+      "related_changelog_entries": [
+        {
+          "date": "2026-11-07",
+          "excerpt": "## 2026-11-07 — BUG-021: QMZ sequence container misdetected as photographer (AI-FEAT-047, AI-FEAT-022) — v0.9.17 release"
+        },
+        {
+          "date": "2026-11-07",
+          "excerpt": "**New record**: [BUG-021](bugs/BUG-021_QMZ_SEQUENCE_CONTAINER_MISDETECTED_AS_PHOTOGRAPHER.md), cross-linked into AI-FEAT-047 and AI-FEAT-022."
+        }
+      ],
       "related_code_paths": [
         "services/photographerSequenceService.js"
       ],
@@ -2722,7 +2732,7 @@
       ],
       "dependents": [],
       "documentation_completeness": {
-        "evidence_gap_count": 7,
+        "evidence_gap_count": 6,
         "narrative": "Partial — 3 unresolved evidence gaps in this file (see fields/sections marked \"Evidence pending\" above)"
       },
       "evidence_status": "Verified from current code (`main/qmzService.js` full header + export list read) and `test/qmzLiveE2E.test.js`",
@@ -2736,9 +2746,19 @@
         "[§3F — F. Specialized Archival Workflows](../11_ARCHITECTURAL_EVOLUTION.md#f-specialized-archival-workflows)"
       ],
       "related_bugs": [
-        "BUG-007"
+        "BUG-007",
+        "BUG-021"
       ],
-      "related_changelog_entries": [],
+      "related_changelog_entries": [
+        {
+          "date": "2026-11-07",
+          "excerpt": "## 2026-11-07 — BUG-021: QMZ sequence container misdetected as photographer (AI-FEAT-047, AI-FEAT-022) — v0.9.17 release"
+        },
+        {
+          "date": "2026-11-07",
+          "excerpt": "**New record**: [BUG-021](bugs/BUG-021_QMZ_SEQUENCE_CONTAINER_MISDETECTED_AS_PHOTOGRAPHER.md), cross-linked into AI-FEAT-047 and AI-FEAT-022."
+        }
+      ],
       "related_code_paths": [
         "main/qmzService.js",
         "renderer/renderer.js",

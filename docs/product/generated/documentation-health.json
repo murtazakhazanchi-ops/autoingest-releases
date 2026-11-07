@@ -333,7 +333,7 @@
     {
       "file": "features/AI-FEAT-047_QMZ_SEQUENCING_WORKSPACE.md",
       "level": "evidence_gap",
-      "message": "AI-FEAT-047 has 7 evidence-pending marker(s)",
+      "message": "AI-FEAT-047 has 6 evidence-pending marker(s)",
       "note": null,
       "rule": "documentation-completeness"
     },
@@ -731,7 +731,7 @@
     }
   ],
   "schema_version": "1.3.0",
-  "source_commit": "8e1ba312e1615d4ec0011350a0c0d6d5c1c974e5",
+  "source_commit": "31e203de5cce3564ed28ebb2a32658cc14952bbf",
   "summary": {
     "error": 0,
     "evidence_gap": 59,

@@ -23,10 +23,10 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 |---|---|
 | Related features | [AI-FEAT-016](AI-FEAT-016_PREVIEW_FOCUS_SELECTION_SEPARATION.md), [AI-FEAT-046](AI-FEAT-046_ARCHIVE_FOLDER_ADOPTION.md) (found via cross-reference in this file's own prose, not yet in Dependencies/Parent/Subfeatures above) |
 | Related decisions | [DEC-011](../decisions/DEC-011_QMZ_DEDICATED_DOMAIN_WORKFLOW.md) |
-| Related bugs | [BUG-007](../bugs/BUG-007_QMZ_METADATA_CONTEXT_SHAPE_MISMATCH.md) |
+| Related bugs | [BUG-007](../bugs/BUG-007_QMZ_METADATA_CONTEXT_SHAPE_MISMATCH.md), [BUG-021](../bugs/BUG-021_QMZ_SEQUENCE_CONTAINER_MISDETECTED_AS_PHOTOGRAPHER.md) |
 | Related postmortems | [PM-001](../postmortems/PM-001_METADATA_CORRECTNESS_GAP_PRODUCTION_READINESS_REVIEW.md) |
 | Related architectural evolution sections | [§3F — F. Specialized Archival Workflows](../11_ARCHITECTURAL_EVOLUTION.md#f-specialized-archival-workflows) |
-| Related release notes | Evidence pending — no release-notes file matched this feature's cited version(s) by filename; docs/product/10_CHANGELOG.md tracks the documentation system itself, not per-feature user-facing changes |
+| Related release notes | `docs/release-notes-v0.9.17.md` |
 | Testing coverage | Referenced in 1 test file(s) (mechanical name/import match, not a coverage percentage — the test suite was not executed for this documentation pass): `test/qmzLiveE2E.test.js` |
 | Documentation completeness | Partial — 3 unresolved evidence gaps in this file (see fields/sections marked "Evidence pending" above) |
 
@@ -61,13 +61,15 @@ This section classifies this feature's already-evidenced history by milestone ty
 
 **Architectural / workflow decisions**: [DEC-011](../decisions/DEC-011_QMZ_DEDICATED_DOMAIN_WORKFLOW.md) — see the Decisions section above and each record's own "Decision"/"Consequences" fields for what changed and why.
 
-**Reliability / correctness fixes**: [BUG-007](../bugs/BUG-007_QMZ_METADATA_CONTEXT_SHAPE_MISMATCH.md) — see the Known Bugs section above and each record's own "Root Cause"/"Fix" fields for what changed and why.
+**Reliability / correctness fixes**: [BUG-007](../bugs/BUG-007_QMZ_METADATA_CONTEXT_SHAPE_MISMATCH.md), [BUG-021](../bugs/BUG-021_QMZ_SEQUENCE_CONTAINER_MISDETECTED_AS_PHOTOGRAPHER.md) — see the Known Bugs section above and each record's own "Root Cause"/"Fix" fields for what changed and why.
 
 **Other dated milestones**: 2 entries exist in the Evolution / Implementation Journal above; not individually re-classified by milestone type here to avoid restating evidence — read that section directly for the full dated sequence.
 
 ## Known Bugs / Troubleshooting
 
 The metadata-system.md's live-verified regression test explicitly calls out that QMZ was originally affected by "the original root-cause bug this entire [metadata] system was built to fix" (silently dropping keywords/Hijri date due to a context-shape mismatch) — now proven fixed end-to-end through the real UI. Documented as [BUG-007 — QMZ Metadata Context-Shape Mismatch Silently Drops Keywords/Hijri Date](../bugs/BUG-007_QMZ_METADATA_CONTEXT_SHAPE_MISMATCH.md); see also [PM-001](../postmortems/PM-001_METADATA_CORRECTNESS_GAP_PRODUCTION_READINESS_REVIEW.md) for the broader remediation this bug drove.
+
+See also [BUG-021 — QMZ Sequence Container Misdetected as Photographer](../bugs/BUG-021_QMZ_SEQUENCE_CONTAINER_MISDETECTED_AS_PHOTOGRAPHER.md) (fixed 2026-11-06, commit `43737fc`, released v0.9.17) — a QMZ sequence or holding container could be misdetected as the photographer itself, corrupting Creator/Artist/By-line metadata; routine processing now unconditionally preserves existing attribution and never self-heals suspected corruption.
 
 ## Decisions
 

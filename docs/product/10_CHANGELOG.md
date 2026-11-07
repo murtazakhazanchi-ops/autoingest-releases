@@ -6,6 +6,16 @@ Append newest first. Never edit or delete a prior entry — if something was wro
 
 ---
 
+## 2026-11-07 — BUG-021: QMZ sequence container misdetected as photographer (AI-FEAT-047, AI-FEAT-022) — v0.9.17 release
+
+- **Task type**: bug record for a real fix, on a dedicated branch off v0.9.16 (`fix/qmz-creator-and-photographer-sequencing`, commit `43737fc`), released as v0.9.17.
+- **What happened**: two user-reported symptoms — Creator/Artist/By-line metadata corrupted to a QMZ sequence code during routine processing, and the Photographer Folder Sequence dialog listing QMZ sequence/holding containers as photographers — both traced to the same first-folder-below-root assumption breaking on QMZ containers. A second, independent gap compounded it: routine processing had no read-before-write attribution-preservation gate, and Audit/Repair silently "self-healed" already-corrupted Creator values.
+- **Fix**: `resolvePhotographerFromPath()`/`scanPhotographerFolders()` made container-aware; unconditional attribution-preservation gate added to `exifService.js`'s `_writeAndVerify()`; Audit's self-healing removed (Audit stays read-only); new suspected-corruption/conflict/RAW-unverified diagnostics made visible in the renderer; preview-only repair-plan tool added (`scripts/qmz-attribution-repair-plan.js`).
+- **Verified**: 89 regression assertions re-run clean immediately before release (203 across the full pure-logic suite at commit time); one controlled live Electron session against disposable fixtures confirmed the sequencing dialog correctly lists nested photographer folders (user independently confirmed the same visually). The RAW-embedded-attribution-unreadable sub-case remains unit-tested only — not reproduced live.
+- **New record**: [BUG-021](bugs/BUG-021_QMZ_SEQUENCE_CONTAINER_MISDETECTED_AS_PHOTOGRAPHER.md), cross-linked into AI-FEAT-047 and AI-FEAT-022.
+- **Release**: `docs/release-notes-v0.9.17.md`. Promoted via `release/v0.9.17-rc.1` → Stable gate (auto-discovered, zero drift). macOS artifacts shipped unsigned/ad-hoc for this release only (no signing credentials provisioned, CI or local) — see that release note's Engineering Notes section.
+
+---
 
 ## 2026-10-15 — MX Creative Console: Unified Contextual Keypad migration
 
