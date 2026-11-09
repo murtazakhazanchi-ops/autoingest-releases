@@ -1058,6 +1058,10 @@
           {
             "id": "BUG-002",
             "status": "Fixed"
+          },
+          {
+            "id": "BUG-021",
+            "status": "Fixed"
           }
         ]
       },
@@ -2377,11 +2381,15 @@
       "category": "Special Workflows",
       "id": "AI-FEAT-047",
       "knownLimitations": {
-        "evidenceGapCount": 7,
+        "evidenceGapCount": 6,
         "futureEnhancements": "`docs/metadata-system.md` § Non-Goals notes: \"the primary QMZ flow (assign → auto-queue metadata) has been verified live through the real UI; less common paths through the QMZ Sequence Manager have not each been individually driven live\" — an open verification gap, not a known bug.",
         "openBugs": [
           {
             "id": "BUG-007",
+            "status": "Fixed"
+          },
+          {
+            "id": "BUG-021",
             "status": "Fixed"
           }
         ]

@@ -23,10 +23,10 @@ Additive fields not already covered by the header table or the Known Bugs/Decisi
 |---|---|
 | Related features | [AI-FEAT-002](AI-FEAT-002_LOGIN_OPERATOR_IDENTITY.md), [AI-FEAT-028](AI-FEAT-028_IMPORT_SOURCE_ATTRIBUTION.md) (found via cross-reference in this file's own prose, not yet in Dependencies/Parent/Subfeatures above) |
 | Related decisions | None recorded |
-| Related bugs | [BUG-002](../bugs/BUG-002_PHOTOGRAPHER_SEQUENCE_FOLDER_RESOLUTION.md) |
+| Related bugs | [BUG-002](../bugs/BUG-002_PHOTOGRAPHER_SEQUENCE_FOLDER_RESOLUTION.md), [BUG-021](../bugs/BUG-021_QMZ_SEQUENCE_CONTAINER_MISDETECTED_AS_PHOTOGRAPHER.md) |
 | Related postmortems | None |
 | Related architectural evolution sections | [§3B — B. Initial AutoIngest Foundation](../11_ARCHITECTURAL_EVOLUTION.md#b-initial-autoingest-foundation); [§3F — F. Specialized Archival Workflows](../11_ARCHITECTURAL_EVOLUTION.md#f-specialized-archival-workflows) |
-| Related release notes | `docs/release-notes-v0.9.0.md` |
+| Related release notes | `docs/release-notes-v0.9.0.md`, `docs/release-notes-v0.9.17.md` |
 | Testing coverage | No dedicated test file identified via automated search of `test/` (17 test files exist repository-wide, concentrated in the metadata subsystem — see AI-FEAT-029 through AI-FEAT-033) |
 | Documentation completeness | Partial — 3 unresolved evidence gaps in this file (see fields/sections marked "Evidence pending" above) |
 
@@ -54,13 +54,15 @@ This section classifies this feature's already-evidenced history by milestone ty
 
 **Architectural / workflow decisions**: None recorded — see Decisions section above.
 
-**Reliability / correctness fixes**: [BUG-002](../bugs/BUG-002_PHOTOGRAPHER_SEQUENCE_FOLDER_RESOLUTION.md) — see the Known Bugs section above and each record's own "Root Cause"/"Fix" fields for what changed and why.
+**Reliability / correctness fixes**: [BUG-002](../bugs/BUG-002_PHOTOGRAPHER_SEQUENCE_FOLDER_RESOLUTION.md), [BUG-021](../bugs/BUG-021_QMZ_SEQUENCE_CONTAINER_MISDETECTED_AS_PHOTOGRAPHER.md) — see the Known Bugs section above and each record's own "Root Cause"/"Fix" fields for what changed and why.
 
 **Other dated milestones**: Evolution / Implementation Journal above has exactly one entry (already reflected as Initial implementation, or see that section directly if it describes a later change).
 
 ## Known Bugs / Troubleshooting
 
 See [BUG-002 — Photographer Sequence Folder Resolution Discards Existing Sequenced Folders](../bugs/BUG-002_PHOTOGRAPHER_SEQUENCE_FOLDER_RESOLUTION.md) (fixed 2026-06-24, commit `0d7e0b3`).
+
+See [BUG-021 — QMZ Sequence Container Misdetected as Photographer](../bugs/BUG-021_QMZ_SEQUENCE_CONTAINER_MISDETECTED_AS_PHOTOGRAPHER.md) (fixed 2026-11-06, commit `43737fc`, released v0.9.17) — the Photographer Folder Sequence dialog listed a QMZ sequence/holding container itself as a photographer instead of the real photographer folder nested inside it.
 
 ## Decisions
 

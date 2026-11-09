@@ -2,7 +2,7 @@
 
 > Generated artifact. Implements the 13 rules specified in [14_VALIDATION_SPECIFICATION.md](../14_VALIDATION_SPECIFICATION.md) plus Part 4 tooling-integrity checks. Regenerate with `node scripts/product-docs/cli.js validate`.
 
-Generated against source commit `8e1ba312e1615d4ec0011350a0c0d6d5c1c974e5`.
+Generated against source commit `31e203de5cce3564ed28ebb2a32658cc14952bbf`.
 
 ## Summary
 
@@ -124,7 +124,7 @@ None.
 | documentation-completeness | AI-FEAT-044 has 8 evidence-pending marker(s) | features/AI-FEAT-044_LOCAL_FIRST_BACKGROUND_ARCHIVE_SYNC.md | — |
 | documentation-completeness | AI-FEAT-045 has 8 evidence-pending marker(s) | features/AI-FEAT-045_ARCHIVE_LOCK_HANDLING_STALE_LOCK_RECOVERY.md | — |
 | documentation-completeness | AI-FEAT-046 has 3 evidence-pending marker(s) | features/AI-FEAT-046_ARCHIVE_FOLDER_ADOPTION.md | — |
-| documentation-completeness | AI-FEAT-047 has 7 evidence-pending marker(s) | features/AI-FEAT-047_QMZ_SEQUENCING_WORKSPACE.md | — |
+| documentation-completeness | AI-FEAT-047 has 6 evidence-pending marker(s) | features/AI-FEAT-047_QMZ_SEQUENCING_WORKSPACE.md | — |
 | documentation-completeness | AI-FEAT-048 has 3 evidence-pending marker(s) | features/AI-FEAT-048_REALTIME_TEAM_PRESENCE_ONLINE_REGISTRY.md | — |
 | documentation-completeness | AI-FEAT-049 has 4 evidence-pending marker(s) | features/AI-FEAT-049_ARCHIVE_MAINTENANCE.md | — |
 | documentation-completeness | AI-FEAT-050 has 4 evidence-pending marker(s) | features/AI-FEAT-050_EVENT_MAINTENANCE.md | — |
