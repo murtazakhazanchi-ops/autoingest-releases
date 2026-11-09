@@ -33,9 +33,20 @@ function q5OwnFiles(base) {
   ].filter(Boolean))];
 }
 function q5OwnDiffLines(base, file) {
+  // Cumulative diff since `base`, minus exactly the lines Stable itself removed in the releases
+  // merged since (merge-base(base, Stable)..Stable) — those removals are Stable's, not Q5's.
   const run = (args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).split('\n');
-  return [...run(['log', '--first-parent', '--no-merges', '-p', '-U0', '--format=', `${base}..HEAD`, '--', file]), ...run(['diff', '-U0', 'HEAD', '--', file])]
-    .filter(l => /^[+-]/.test(l) && !/^(\+\+\+|---) /.test(l));
+  const pick = (lines) => lines.filter(l => /^[+-]/.test(l) && !/^(\+\+\+|---) /.test(l));
+  const own = pick(run(['diff', '-U0', base, '--', file]));
+  let stableRemoved = [];
+  try {
+    const stable = run(['rev-parse', '--verify', 'origin/stable/0.9^{commit}'])[0];
+    const from = run(['merge-base', base, stable])[0];
+    if (from && from !== stable) stableRemoved = pick(run(['diff', '-U0', from, stable, '--', file])).filter(l => l.startsWith('-'));
+  } catch { /* no Stable ref: count everything */ }
+  const left = new Map();
+  for (const l of stableRemoved) left.set(l, (left.get(l) || 0) + 1);
+  return own.filter((l) => { if (!l.startsWith('-') || !left.get(l)) return true; left.set(l, left.get(l) - 1); return false; });
 }
 
 let passed = 0;
