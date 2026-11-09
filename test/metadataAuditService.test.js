@@ -47,7 +47,13 @@ async function mkEvent(archiveRoot, collName, eventName, eventJson) {
 async function rawFile(dir, name) {
   const p = path.join(dir, name);
   await fsp.mkdir(dir, { recursive: true });
-  await fsp.writeFile(p, Buffer.from('not-a-real-raw-file-just-bytes'));
+  // A real TIFF (ExifTool-readable) under a RAW extension — placeholder text bytes
+  // make classifyOneFile's supplementary RAW-embedded-tag read throw, which sets
+  // rawEmbeddedUnverified and forces every RAW fixture in this file non-'complete'
+  // regardless of what's actually being tested here. Matches the same fix applied
+  // to test/metadataAuditExport.test.js's .cr2 fixture.
+  const sharp = require('sharp');
+  await sharp({ create: { width: 2, height: 2, channels: 3, background: { r: 4, g: 5, b: 6 } } }).tiff().toFile(p);
   return p;
 }
 
@@ -158,7 +164,7 @@ async function runBatchAndWait(files, context) {
     assert.equal(rec.keywords.compliant, true);
   });
 
-  await t('classifyOneFile: RAW tagged with the WRONG photographer → partial, field marked incorrect', async () => {
+  await t('classifyOneFile: RAW tagged with the WRONG photographer → partial, field marked incorrect, flagged as a review-required mismatch, expectation never adjusted to force a false match', async () => {
     const archiveRoot = await mkArchive();
     const eventDir = await mkEvent(archiveRoot, 'Coll', 'Event3', {
       version: 1, hijriDate: '1448-01-01', eventName: 'Waaz',
@@ -168,13 +174,48 @@ async function runBatchAndWait(files, context) {
     const eventJson = JSON.parse(await fsp.readFile(path.join(eventDir, 'event.json'), 'utf8'));
     // Written under a DIFFERENT photographer folder name than expected — simulates
     // e.g. a file moved after being tagged, or tagged under the pre-fix QMZ bug.
+    // "Someone Else" is a plausible real name, not a QMZ sequence/holding-folder
+    // code — this must surface as a visible mismatch for human review, never be
+    // silently adopted as if it were the correct/expected value.
     await writeSidecarDirect(f, { 'XMP-dc:Creator': ['Someone Else'] });
 
     const rec = await audit.classifyOneFile(eventDir, eventJson, f);
     assert.equal(rec.status, 'partial');
     assert.equal(rec.fields.photographer.status, 'incorrect');
-    assert.equal(rec.fields.photographer.expected, 'Jane Doe');
+    assert.equal(rec.fields.photographer.expected, 'Jane Doe', 'expectation.photographer must stay the folder-resolved value, never adopted to equal the existing Creator');
     assert.equal(rec.fields.photographer.actual, 'Someone Else');
+    assert.ok(rec.intentDiagnostics?.includes('photographer:attribution-mismatch'), 'a plausible-but-different existing value must be flagged as a review-required mismatch');
+    assert.ok(!rec.intentDiagnostics?.includes('photographer:suspected-corruption'), 'a plausible real name is not "suspected corruption" — that flag is reserved for a QMZ-code-shaped value');
+  });
+
+  await t('classifyOneFile: attribution mismatch does not authorize a write — Repair still preserves the existing (mismatched) value', async () => {
+    const archiveRoot = await mkArchive();
+    const eventDir = await mkEvent(archiveRoot, 'Coll', 'Event3b', {
+      version: 1, hijriDate: '1448-01-01', eventName: 'Waaz',
+      components: [{ location: 'Hall A', city: 'Mumbai', country: 'India', types: ['Majlis'], folderName: null }],
+    });
+    const f = await rawFile(path.join(eventDir, 'Jane Doe'), 'IMG_0003b.cr2');
+    const eventJson = JSON.parse(await fsp.readFile(path.join(eventDir, 'event.json'), 'utf8'));
+    await writeSidecarDirect(f, { 'XMP-dc:Creator': ['Someone Else'] });
+
+    const rec = await audit.classifyOneFile(eventDir, eventJson, f);
+    assert.ok(rec.intentDiagnostics?.includes('photographer:attribution-mismatch'), 'precondition: Audit must have flagged the mismatch');
+
+    // Detecting the mismatch must never itself authorize a correction — Repair's
+    // actual write goes through exifService._writeAndVerify with this exact frozen
+    // expectation, which unconditionally preserves whatever attribution already
+    // exists regardless of what Audit's report says.
+    const { _writeAndVerify } = require('../main/exifService');
+    await _writeAndVerify({ dest: f }, { sidecar: null }, rec.expectation, true);
+
+    const et = new ExifTool();
+    try {
+      const sidecar = f.slice(0, -path.extname(f).length) + '.xmp';
+      const rb = await et.read(sidecar);
+      assert.equal(rb.Creator?.[0] ?? rb.Creator, 'Someone Else', 'Repair must preserve the existing attribution, never overwrite it with the folder-derived "Jane Doe" just because Audit flagged a mismatch');
+    } finally {
+      await et.end().catch(() => {});
+    }
   });
 
   await t('classifyOneFile: duplicate keyword already on disk is detected, not masked by set comparison', async () => {
