@@ -243,7 +243,17 @@ function qmzAutoQueueExpectation(photographer) {
     imports: [{ photographer: 'Jane Doe' }],
   });
 
-  await t('classifyOneFile: a legitimate, different current Creator is NOT flagged as a mismatch (Audit correctly treats it as fine)', async () => {
+  await t('classifyOneFile: a plausible but different current Creator IS flagged as a review-required mismatch — preventing an automatic overwrite is not the same as hiding the difference', async () => {
+    // Corrected per explicit product feedback: the original version of this test
+    // asserted the opposite ('match', no diagnostic) on the theory that preserving
+    // existing attribution meant Audit should also treat it as equivalent to the
+    // folder-derived guess. That conflated two separate concerns — preventing an
+    // automatic attribution CHANGE (a write-path rule, enforced unconditionally by
+    // exifService._writeAndVerify, untouched by this test) vs. reporting an
+    // attribution DIFFERENCE (a read-only Audit concern). Silently adopting the
+    // existing value into the comparison hid a real discrepancy an operator should
+    // see and resolve — neither "Ann Poe" (the folder) nor "Jane Doe" (the file) is
+    // assumed correct here; the record only says they disagree.
     const dir = await tmpDir();
     const phDir = path.join(dir, 'Ann Poe');
     await fsp.mkdir(phDir, { recursive: true });
@@ -252,8 +262,18 @@ function qmzAutoQueueExpectation(photographer) {
     await writeCreator(file, 'Jane Doe'); // deliberately different from the folder ("Ann Poe")
 
     const record = await classifyOneFile(dir, singleDoc(), file);
-    assert.equal(record.fields.photographer.status, 'match');
-    assert.equal(record.intentDiagnostics, null);
+    assert.equal(record.fields.photographer.status, 'incorrect', 'the resolved/verified photographer ("Ann Poe") must never be silently replaced by whatever is already on the file');
+    assert.equal(record.fields.photographer.expected, 'Ann Poe', 'expectation.photographer must stay the folder-resolved value — never adjusted to force a false match');
+    assert.equal(record.fields.photographer.actual, 'Jane Doe');
+    assert.ok(record.intentDiagnostics?.includes('photographer:attribution-mismatch'), `expected the attribution-mismatch diagnostic: ${record.intentDiagnostics}`);
+    assert.ok(!record.intentDiagnostics?.includes(CREATOR_SUSPECTED_CORRUPTION), 'a plausible real name is not "suspected corruption" — that is reserved for a QMZ-code-shaped value');
+    assert.notEqual(record.status, 'complete', 'a mismatched file must never classify as complete, or it would silently vanish from the Audit exceptions list');
+
+    // Confirm this is purely a reporting change: detecting the mismatch must never
+    // itself authorize Repair (or any other automatic pass) to overwrite the
+    // existing "Jane Doe" with the folder-derived "Ann Poe".
+    await exifService._writeAndVerify({ src: file, dest: file }, {}, record.expectation, false);
+    assert.equal(await readCreator(file), 'Jane Doe', 'Repair must preserve the existing attribution even though Audit flagged it as mismatched — detecting a mismatch is not an approval to correct it');
   });
 
   await t('classifyOneFile: a suspected-corrupted Creator ("27Z") IS flagged as a mismatch with CREATOR_SUSPECTED_CORRUPTION — reported, not corrected', async () => {
