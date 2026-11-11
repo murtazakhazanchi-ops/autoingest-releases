@@ -323,7 +323,12 @@ const add = (ev, additions, extra = {}) => {
     const changed = q5OwnFiles(base).filter(f => !f.startsWith('graphify-out/') && !f.startsWith('.claude/'));
     const allowed = new Set(['services/eventPhotographerFolders.js', 'services/photographerRenameContract.js', 'test/eventPhotographerFoldersQ5e2a.test.js', 'test/photographerRegistryQ5c.test.js', 'test/photographerRegistryQ5b.test.js',
       // Q5e-2b (authorized): sequencing in the event.json chain + identity guard, and their tests.
-      'main/main.js', 'services/photographerSequenceService.js', 'services/photographerSequenceGuard.js', 'test/photographerSequencingQ5e2b.test.js']);
+      'main/main.js', 'services/photographerSequenceService.js', 'services/photographerSequenceGuard.js', 'test/photographerSequencingQ5e2b.test.js',
+      // Post-investigation stabilization (authorized, test-only): shared live-test isolation +
+      // external-Quit guard and the live tests wired to it. No app code.
+      'test/support/liveTestPreload.js', 'test/support/liveTestQuitGuard.js', 'test/support/liveTestHarness.js', 'test/liveTestQuitGuardLive.test.js',
+      'test/metadataIntentDurabilityLive.test.js', 'test/multiEventImportLive.test.js', 'test/photographerRegistryQ5aLive.test.js',
+      'test/photographerRegistryQ5cLive.test.js', 'test/photographerRegistryQ5dLive.test.js', 'test/photographerRegistryQ5e1Live.test.js']);
     assert.deepEqual(changed.filter(f => !allowed.has(f)), []);
   });
 

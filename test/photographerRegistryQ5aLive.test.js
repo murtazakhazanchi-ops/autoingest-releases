@@ -17,6 +17,7 @@ const fs = require('fs');
 const fsp = require('fs/promises');
 const os = require('os');
 const path = require('path');
+const H = require('./support/liveTestHarness');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const ELECTRON_BIN = require(path.join(PROJECT_ROOT, 'node_modules', 'electron'));
@@ -29,12 +30,6 @@ function check(c, m) { if (c) log('PASS —', m); else { failures++; log('FAIL �
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const keychainHas = (s) => { try { execFileSync('security', ['find-generic-password', '-s', s], { stdio: 'ignore' }); return true; } catch { return false; } };
 
-const PRELOAD = `
-'use strict';
-const fs = require('fs');
-const dl = require(require.resolve('drivelist', { paths: [process.env.AI_TEST_PROJECT_ROOT] }));
-dl.list = async () => { try { return JSON.parse(fs.readFileSync(process.env.AI_TEST_DRIVES_FILE, 'utf8')); } catch { return []; } };
-`;
 const WRAPPER_INDEX = `
 'use strict';
 const { app } = require('electron');
@@ -59,11 +54,11 @@ async function passSplash(app) {
   return main;
 }
 
-async function launch(work, userDataDir, drivesFile, stubFile) {
+async function launch(work, userDataDir, drivesFile) {
   const app = await electron.launch({
-    executablePath: ELECTRON_BIN, args: ['-r', stubFile, path.join(work, 'wrapper-app'), '--no-sandbox'],
+    executablePath: ELECTRON_BIN, args: ['-r', H.PRELOAD, path.join(work, 'wrapper-app'), '--no-sandbox'],
     cwd: PROJECT_ROOT, timeout: 60000,
-    env: { ...process.env, AI_TEST_DRIVES_FILE: drivesFile, AI_TEST_PROJECT_ROOT: PROJECT_ROOT, AI_TEST_USERDATA: userDataDir },
+    env: { ...process.env, AI_TEST_ISO_LOG: path.join(path.dirname(drivesFile), 'live-iso.jsonl'), AI_TEST_DRIVES_FILE: drivesFile, AI_TEST_PROJECT_ROOT: PROJECT_ROOT, AI_TEST_USERDATA: userDataDir },
   });
   await passSplash(app);
   return app;
@@ -122,10 +117,8 @@ async function seedRegistry(dir) {
 (async () => {
   const work = await fsp.mkdtemp(path.join(os.tmpdir(), 'ai-q5a-live-'));
   const ud = path.join(work, 'userData');
-  const stubFile = path.join(work, 'preload.js');
   const drivesFile = path.join(work, 'drives.json');
   await fsp.mkdir(ud, { recursive: true });
-  await fsp.writeFile(stubFile, PRELOAD);
   await fsp.mkdir(path.join(work, 'wrapper-app'), { recursive: true });
   await fsp.writeFile(path.join(work, 'wrapper-app', 'package.json'), JSON.stringify({ name: TEST_PKG_NAME, version: require(path.join(PROJECT_ROOT, 'package.json')).version, main: 'index.js' }));
   await fsp.writeFile(path.join(work, 'wrapper-app', 'index.js'), WRAPPER_INDEX);
@@ -136,7 +129,7 @@ async function seedRegistry(dir) {
   let app;
   try {
     // ── Session 1: fresh profile, no registry ──────────────────────────────────
-    app = await launch(work, ud, drivesFile, stubFile);
+    app = await launch(work, ud, drivesFile);
     check(await appName(app) === TEST_PKG_NAME, `isolated app identity (${TEST_PKG_NAME}), not the production "auto-ingest"`);
     check(path.resolve(await app.evaluate(({ app: a }) => a.getPath('userData'))) === path.resolve(ud), 'temp userData in use');
     const before1 = ownFiles(ud);
@@ -155,7 +148,7 @@ async function seedRegistry(dir) {
     const seeded = await seedRegistry(dir);
     check(seeded.ok, 'synthetic registry seeded (fake secure storage, outside the app)');
     fs.writeFileSync(path.join(ud, 'photographers.aliases.json'), JSON.stringify({ [require(path.join(PROJECT_ROOT, 'main', 'aliasEngine')).slugify(seeded.shippedName)]: ['q5aqk'] }));
-    app = await launch(work, ud, drivesFile, stubFile);
+    app = await launch(work, ud, drivesFile);
     const before2 = ownFiles(ud);
     const v2 = await inspect(app);
     check(v2.status.state === 'ready', `seeded registry → "ready" (got ${v2.status.state})`);
@@ -184,6 +177,7 @@ async function seedRegistry(dir) {
     failures++; log('FAIL — exception:', err.message);
   } finally {
     if (app) await app.close().catch(() => {});
+    { const q = H.quitGuardSummary({ isoLog: path.join(work, 'live-iso.jsonl') }); log(H.formatQuitGuardSummary(q)); check(q.isolated > 0 && q.failed === 0 && q.unguarded === 0 && q.endedWithoutExit === 0, `every launch isolated by the shared preload, ended by a deliberate quit; no external quit got through (${q.endedWithoutExit} ended without an exit record)`); }
     if (keychainHas(KEYCHAIN_ITEM)) { try { execFileSync('security', ['delete-generic-password', '-s', KEYCHAIN_ITEM], { stdio: 'ignore' }); } catch { /* ignore */ } }
     for (const d of [path.join(os.homedir(), 'Library', 'Logs', TEST_PKG_NAME)]) await fsp.rm(d, { recursive: true, force: true }).catch(() => {});
     await fsp.rm(work, { recursive: true, force: true }).catch(() => {});

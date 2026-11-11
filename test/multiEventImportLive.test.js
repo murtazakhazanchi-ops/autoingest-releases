@@ -27,6 +27,7 @@ const fs = require('fs');
 const fsp = require('fs/promises');
 const os = require('os');
 const path = require('path');
+const H = require('./support/liveTestHarness');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 
@@ -47,15 +48,20 @@ async function writeFake(p, bytes = 60 * 1024, fill = 0xab) {
   const userDataDir = await mkTmp('ai-multi-e2e-userdata-');
   const archiveRoot = await mkTmp('ai-multi-e2e-archive-');
   const sourceRoot  = await mkTmp('ai-multi-e2e-source-');
+  // test-only identity, drivelist stub, external-Quit guard (test/support/liveTestPreload.js)
+  const iso = H.prepareIsolatedApp({ tag: 'multi-event', work: await mkTmp('ai-multi-e2e-iso-'), projectRoot: PROJECT_ROOT });
+  const prodKeychainBefore = H.prodKeychainSnapshot(), testKeychainBefore = H.keychainHas(iso.keychainItem);
   log('userDataDir =', userDataDir);
   log('archiveRoot =', archiveRoot);
   log('sourceRoot  =', sourceRoot);
 
   const app = await electron.launch({
-    args: [PROJECT_ROOT, '--user-data-dir=' + userDataDir, '--no-sandbox'],
+    args: [...iso.args, '--user-data-dir=' + userDataDir, '--no-sandbox'],
+    env: iso.env(userDataDir),
     cwd: PROJECT_ROOT,
     timeout: 60000,
   });
+  await H.verifyIsolation(app, iso, userDataDir);
   app.process().stderr.on('data', (d) => { const t = String(d); if (/Error|Unhandled/i.test(t)) process.stdout.write('[main-stderr] ' + t); });
 
   let window = await app.firstWindow({ timeout: 60000 });
@@ -301,7 +307,13 @@ async function writeFake(p, bytes = 60 * 1024, fill = 0xab) {
   check(pageErrors.length === 0, `no renderer page errors (${JSON.stringify(pageErrors)})`);
 
   await app.close();
-  for (const d of [userDataDir, archiveRoot, sourceRoot]) await fsp.rm(d, { recursive: true, force: true }).catch(() => {});
+  const q = H.quitGuardSummary(iso);
+  log(H.formatQuitGuardSummary(q));
+  check(q.failed === 0 && q.unguarded === 0, 'launch isolated; no external quit got through the guard');
+  check(q.endedWithoutExit === 0, `the app ended only by the test's deliberate quit (${q.endedWithoutExit} ended without an exit record)`);
+  check(H.removeTestKeychainItem(iso, testKeychainBefore), 'test-identity Keychain item absent after the run');
+  check(JSON.stringify(H.prodKeychainSnapshot()) === JSON.stringify(prodKeychainBefore), 'production Keychain items unchanged (presence only)');
+  for (const d of [userDataDir, archiveRoot, sourceRoot, path.dirname(iso.isoLog)]) await fsp.rm(d, { recursive: true, force: true }).catch(() => {});
   log(`=== SUMMARY: ${failures === 0 ? 'ALL CHECKS PASSED' : failures + ' CHECK(S) FAILED'} ===`);
   process.exitCode = failures === 0 ? 0 : 1;
 })().catch(e => { console.error('[multi-event-e2e] FATAL', e.stack || e.message); process.exit(1); });

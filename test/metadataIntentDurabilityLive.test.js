@@ -13,6 +13,8 @@
 //
 // Run:  node test/metadataIntentDurabilityLive.test.js            (Playwright launches Electron)
 // Optional: TAGINTENT_ONLY=repair,reapply  (comma list of section ids) to run a subset.
+// Isolation: every launch (crash relaunches included) goes through test/support/liveTestPreload.js —
+// test-only identity, temp profile, drivelist stub, external-Quit guard; summary reports blocked quits.
 
 const { _electron: electron } = require('playwright-core');
 const { ExifTool } = require('exiftool-vendored');
@@ -20,6 +22,7 @@ const fs = require('fs');
 const fsp = require('fs/promises');
 const os = require('os');
 const path = require('path');
+const H = require('./support/liveTestHarness');
 
 const REPO = path.resolve(__dirname, '..');
 const ONLY = process.env.TAGINTENT_ONLY ? process.env.TAGINTENT_ONLY.split(',').map(s => s.trim()) : null;
@@ -39,8 +42,10 @@ const JPEG = Buffer.from('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP////////////////////
 const writeRaw = async (p, tag) => { await fsp.mkdir(path.dirname(p), { recursive: true }); await fsp.writeFile(p, Buffer.from('not-a-real-raw-' + tag + '-' + path.basename(p))); };
 const writeJpg = async p => { await fsp.mkdir(path.dirname(p), { recursive: true }); await fsp.writeFile(p, JPEG); };
 
+const ISO = H.prepareIsolatedApp({ tag: 'intent-durability', work: fs.mkdtempSync(path.join(os.tmpdir(), 'intent-iso-')), projectRoot: REPO });
 async function launch(userData, tag) {
-  const app = await electron.launch({ args: [REPO, '--user-data-dir=' + userData, '--no-sandbox'], cwd: REPO, timeout: 90000 });
+  const app = await electron.launch({ args: [...ISO.args, '--user-data-dir=' + userData, '--no-sandbox'], env: ISO.env(userData), cwd: REPO, timeout: 90000 });
+  await H.verifyIsolation(app, ISO, userData);
   let win = await app.firstWindow({ timeout: 90000 });
   await win.waitForTimeout(1500);
   const st = await win.evaluate(() => { const v = id => { const e = document.getElementById(id); return !!e && getComputedStyle(e).display !== 'none'; }; return { welcome: v('splashWelcome'), select: v('splashSelect'), create: v('splashCreate') }; });
@@ -129,6 +134,7 @@ async function section(id, title, fn) {
 }
 
 (async () => {
+  const prodKeychainBefore = H.prodKeychainSnapshot(), testKeychainBefore = H.keychainHas(ISO.keychainItem);
   const ud = await mk('intent-ud-'), root = await mk('intent-root-');
   let { app, win } = await launch(ud, 'main');
   await api(win, 'setMainArchiveRoot', root);
@@ -377,6 +383,13 @@ async function section(id, title, fn) {
   check(pageErrors.length === 0, `no renderer page errors (${J(pageErrors)})`);
   await et.end().catch(() => {});
   await app.close().catch(() => {});
+  const q = H.quitGuardSummary(ISO);
+  log(H.formatQuitGuardSummary(q));
+  check(q.failed === 0 && q.unguarded === 0, 'every launch isolated; no external quit got through the guard');
+  check(q.endedWithoutExit === 2, `every launch ended by a deliberate quit or by one of the 2 intentional SIGKILL crashes (${q.endedWithoutExit} ended without an exit record)`);
+  check(H.removeTestKeychainItem(ISO, testKeychainBefore), 'test-identity Keychain item absent after the run');
+  check(J(H.prodKeychainSnapshot()) === J(prodKeychainBefore), 'production Keychain items unchanged (presence only)');
+  fs.rmSync(path.dirname(ISO.isoLog), { recursive: true, force: true });
   log(`=== SUMMARY: ${failures === 0 ? 'ALL CHECKS PASSED' : failures + ' CHECK(S) FAILED'} ===`);
   process.exit(failures === 0 ? 0 : 1);
 })().catch(e => { console.error('[intent-live] FATAL', e.stack || e.message); process.exit(1); });

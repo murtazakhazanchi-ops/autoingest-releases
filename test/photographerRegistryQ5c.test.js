@@ -394,6 +394,10 @@ function assertClean(payload, fx, label) {
       'services/eventPhotographerFolders.js', 'services/photographerRenameContract.js', 'test/eventPhotographerFoldersQ5e2a.test.js',
       // Q5e-2b: S5 groundwork — sequencing write in the event.json chain and the identity guard.
       'services/photographerSequenceService.js', 'services/photographerSequenceGuard.js', 'test/photographerSequencingQ5e2b.test.js',
+      // Post-investigation stabilization (test-only): shared live-test isolation + external-Quit
+      // guard and the live tests wired to it.
+      'test/support/liveTestPreload.js', 'test/support/liveTestQuitGuard.js', 'test/support/liveTestHarness.js', 'test/liveTestQuitGuardLive.test.js',
+      'test/metadataIntentDurabilityLive.test.js', 'test/multiEventImportLive.test.js', 'test/photographerRegistryQ5aLive.test.js',
     ]);
     assert.deepEqual(changed.filter(f => !allowed.has(f) && !f.startsWith('.claude/')), []);
   });

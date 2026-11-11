@@ -20,6 +20,7 @@ const fs = require('fs');
 const fsp = require('fs/promises');
 const os = require('os');
 const path = require('path');
+const H = require('./support/liveTestHarness');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const ELECTRON_BIN = require(path.join(PROJECT_ROOT, 'node_modules', 'electron'));
@@ -36,12 +37,6 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const keychainHas = (s) => { try { execFileSync('security', ['find-generic-password', '-s', s], { stdio: 'ignore' }); return true; } catch { return false; } };
 const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');
 
-const PRELOAD = `
-'use strict';
-const fs = require('fs');
-const dl = require(require.resolve('drivelist', { paths: [process.env.AI_TEST_PROJECT_ROOT] }));
-dl.list = async () => { try { return JSON.parse(fs.readFileSync(process.env.AI_TEST_DRIVES_FILE, 'utf8')); } catch { return []; } };
-`;
 const WRAPPER_INDEX = `
 'use strict';
 const { app } = require('electron');
@@ -67,11 +62,11 @@ async function passSplash(app) {
   return main;
 }
 
-async function launch(work, ud, drivesFile, stubFile) {
+async function launch(work, ud, drivesFile) {
   const app = await electron.launch({
-    executablePath: ELECTRON_BIN, args: ['-r', stubFile, path.join(work, 'wrapper-app'), '--no-sandbox'],
+    executablePath: ELECTRON_BIN, args: ['-r', H.PRELOAD, path.join(work, 'wrapper-app'), '--no-sandbox'],
     cwd: PROJECT_ROOT, timeout: 60000,
-    env: { ...process.env, AI_TEST_DRIVES_FILE: drivesFile, AI_TEST_PROJECT_ROOT: PROJECT_ROOT, AI_TEST_USERDATA: ud },
+    env: { ...process.env, AI_TEST_ISO_LOG: path.join(path.dirname(drivesFile), 'live-iso.jsonl'), AI_TEST_DRIVES_FILE: drivesFile, AI_TEST_PROJECT_ROOT: PROJECT_ROOT, AI_TEST_USERDATA: ud },
   });
   return { app, main: await passSplash(app) };
 }
@@ -186,10 +181,8 @@ const waitRename = (main) => main.waitForFunction(() => { const r = document.que
 (async () => {
   const work = await fsp.mkdtemp(path.join(os.tmpdir(), 'ai-q5e1-live-'));
   const ud = path.join(work, 'userData');
-  const stubFile = path.join(work, 'preload.js');
   const drivesFile = path.join(work, 'drives.json');
   await fsp.mkdir(ud, { recursive: true });
-  await fsp.writeFile(stubFile, PRELOAD);
   await fsp.mkdir(path.join(work, 'wrapper-app'), { recursive: true });
   await fsp.writeFile(path.join(work, 'wrapper-app', 'package.json'), JSON.stringify({ name: TEST_PKG_NAME, version: require(path.join(PROJECT_ROOT, 'package.json')).version, main: 'index.js' }));
   await fsp.writeFile(path.join(work, 'wrapper-app', 'index.js'), WRAPPER_INDEX);
@@ -209,7 +202,7 @@ const waitRename = (main) => main.waitForFunction(() => { const r = document.que
   let app, main, seeded;
   const payloads = [];
   try {
-    ({ app, main } = await launch(work, ud, drivesFile, stubFile));
+    ({ app, main } = await launch(work, ud, drivesFile));
     shot.app = app;
     check(await app.evaluate(({ app: a }) => a.getName()) === TEST_PKG_NAME, `isolated app identity (${TEST_PKG_NAME})`);
     await settleStartup(ud);
@@ -348,7 +341,7 @@ const waitRename = (main) => main.waitForFunction(() => { const r = document.que
     await shot(main, '08-rename-folders-light');
     await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows().find(x => x.webContents.getURL().endsWith('index.html')); w.setSize(1100, 700); w.webContents.setZoomFactor(1.3); });
     await main.waitForTimeout(700);
-    await main.evaluate(() => document.querySelector('#prDetail .pr-rename').scrollIntoView({ block: 'end' }));
+    await main.evaluate(() => document.querySelector('#prDetail .pr-rename').scrollIntoView({ block: 'end', behavior: 'instant' }));   // #msBody scrolls smoothly; measure the settled position, not mid-animation
     await main.waitForTimeout(250);
     const narrow = await main.evaluate(() => {
       const r = (e) => e.getBoundingClientRect();
@@ -396,7 +389,7 @@ const waitRename = (main) => main.waitForFunction(() => { const r = document.que
     await app.close(); app = null;
 
     // Restart: everything persisted; files untouched
-    ({ app, main } = await launch(work, ud, drivesFile, stubFile));
+    ({ app, main } = await launch(work, ud, drivesFile));
     shot.app = app;
     await settleStartup(ud);
     await main.evaluate((id) => window.api.setActiveUser(id), operator.id);
@@ -422,6 +415,7 @@ const waitRename = (main) => main.waitForFunction(() => { const r = document.que
     failures++; log('FAIL — exception:', err.stack || err.message);
   } finally {
     if (app) await app.close().catch(() => {});
+    { const q = H.quitGuardSummary({ isoLog: path.join(work, 'live-iso.jsonl') }); log(H.formatQuitGuardSummary(q)); check(q.isolated > 0 && q.failed === 0 && q.unguarded === 0 && q.endedWithoutExit === 0, `every launch isolated by the shared preload, ended by a deliberate quit; no external quit got through (${q.endedWithoutExit} ended without an exit record)`); }
     if (keychainHas(KEYCHAIN_ITEM)) { try { execFileSync('security', ['delete-generic-password', '-s', KEYCHAIN_ITEM], { stdio: 'ignore' }); } catch { /* ignore */ } }
     check(!keychainHas(KEYCHAIN_ITEM), 'test Keychain item removed after the run');
     await fsp.rm(path.join(os.homedir(), 'Library', 'Logs', TEST_PKG_NAME), { recursive: true, force: true }).catch(() => {});
