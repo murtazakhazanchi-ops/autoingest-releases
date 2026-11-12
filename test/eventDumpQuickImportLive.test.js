@@ -25,111 +25,11 @@ const P1 = 'Testali Bhai', P2 = 'Testhusain Bhai';   // already in the photograp
 let failures = 0;
 const log = (...a) => console.log('[eqi1-live]', ...a);
 const check = (c, m) => { if (c) log('PASS —', m); else { failures++; log('FAIL —', m); } };
-const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const J = (x) => JSON.stringify(x);
-const localDate = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-const fakeDrive = (mountpoint, label) => ({ isSystem: false, isVirtual: false, isUSB: true, isRemovable: true, isCard: true, busType: 'SD', size: 64e9, description: 'Synthetic SD', mountpoints: [{ path: mountpoint, label }] });
-// Real-sized photos: the workspace's discovery rules skip files under 50 KB as thumbnails.
-const noiseJpeg = async () => require('sharp')(Buffer.from(Array.from({ length: 400 * 400 * 3 }, () => Math.floor(Math.random() * 256))), { raw: { width: 400, height: 400, channels: 3 } }).jpeg({ quality: 100 }).toBuffer();
-
-const mainRequire = (app, mod, fn, arg) => app.evaluate(({ app: a }, { root, mod, fn, arg }) => {
-  const req = process.getBuiltinModule('module').createRequire(root + '/main/main.js');
-  return new Function('m', 'arg', fn)(req(mod), arg);
-}, { root: PROJECT_ROOT, mod, fn, arg });
-const diag = (app) => mainRequire(app, '../services/companionService', 'return m.getDiagnostics();');
-
-async function waitFor(fn, ms, step = 250) {
-  const t0 = Date.now();
-  for (;;) { const v = await fn(); if (v) return v; if (Date.now() - t0 > ms) return null; await sleep(step); }
-}
-
-async function passSplash(app) {
-  const w = await app.firstWindow({ timeout: 60000 });
-  await w.waitForTimeout(1500);
-  const mainP = app.waitForEvent('window', { predicate: p => p.url().endsWith('index.html'), timeout: 30000 });
-  await w.evaluate(() => {
-    const vis = id => { const el = document.getElementById(id); return !!el && getComputedStyle(el).display !== 'none'; };
-    if (vis('splashSelect')) { const u = document.querySelector('.splash-user-item'); if (u) { u.click(); document.getElementById('splashSelectStartBtn').click(); } else document.getElementById('splashNewProfileBtn').click(); }
-    if (vis('splashWelcome')) document.getElementById('splashContinueBtn').click();
-  });
-  await sleep(300);
-  try { await w.fill('#splashInputName', 'EQI Operator', { timeout: 2000 }); await w.fill('#splashInputRole', 'QA'); await w.click('#splashCreateStartBtn'); } catch { /* existing profile */ }
-  const main = await mainP;
-  await main.waitForLoadState('domcontentloaded');
-  await main.waitForFunction(() => typeof EventCreator !== 'undefined' && typeof EventDumpImport !== 'undefined', null, { timeout: 30000 });
-  await main.waitForTimeout(1500);
-  await main.evaluate(() => { if (typeof obFinish === 'function') obFinish(); document.getElementById('onboardingOverlay')?.classList.remove('visible'); });
-  return main;
-}
-
-/** Opens the companion popup and returns its page. */
-async function openPopup(app) {
-  const existing = app.windows().find(p => p.url().endsWith('companion.html'));
-  if (existing && !existing.isClosed()) return existing;
-  const pageP = app.waitForEvent('window', { predicate: p => p.url().endsWith('companion.html'), timeout: 15000 });
-  await mainRequire(app, '../services/companionService', 'm.showPopup(); return true;');
-  const page = await pageP;
-  await page.waitForLoadState('domcontentloaded');
-  await page.waitForSelector('.card-row', { timeout: 30000 });
-  return page;
-}
-
-/**
- * Runs `fn(page)` against the popup. The popup is destroyed on blur by design (on-demand lifecycle),
- * so an interaction that finds it closing reopens it and retries — never a product failure.
- */
-async function withPopup(app, fn) {
-  for (let attempt = 1; ; attempt++) {
-    const page = await openPopup(app);
-    try { return await fn(page); }
-    catch (err) {
-      if (attempt >= 3 || !/closed|Target page/i.test(String(err && err.message))) throw err;
-      await sleep(500);
-    }
-  }
-}
-
-/** One card's Dump view from main (names/counts only). */
-async function dumpView(app) {
-  const d = await diag(app);
-  const src = (d.snapshot && d.snapshot.sources || [])[0];
-  return { card: src && src.assessment && src.assessment.dump, global: d.snapshot && d.snapshot.dump, assessment: src && src.assessment };
-}
-
-/** Selects the Dump mode + photographer in the REAL popup and clicks Import; waits for the outcome. */
-async function importViaPopup(app, photographer, { earlier = false } = {}) {
-  const label = await withPopup(app, async (page) => {
-    await page.click('.mode-btn[data-mode="dump"]');
-    await page.waitForSelector('.dump:not([hidden])', { timeout: 10000 });
-    await page.waitForFunction((p) => [...document.querySelectorAll('.dump-photographer option')].some(o => o.value === p), photographer, { timeout: 10000 });
-    await page.selectOption('.dump-photographer', photographer);
-    await waitFor(async () => (await dumpView(app)).card?.photographer === photographer, 5000);
-    if (earlier && !(await page.isChecked('.dump-earlier'))) {
-      await page.check('.dump-earlier');
-      await waitFor(async () => (await dumpView(app)).card?.includeEarlier === true, 5000);
-    }
-    await page.waitForFunction(() => !document.querySelector('.dump-import').disabled, null, { timeout: 10000 });
-    const text = await page.textContent('.dump-import');
-    await page.click('.dump-import');
-    return text;
-  });
-  const op = await waitFor(async () => { const v = await dumpView(app); return v.card?.op && v.card.op.state !== 'pending' ? v.card.op : null; }, 90000);
-  return { op, label };
-}
-
-async function setActiveEvent(main, archiveRoot, folder) {
-  await main.evaluate(async ({ collDir, coll, folder }) => {
-    await window.api.setLastEvent({ collectionPath: collDir, collectionName: coll, eventName: folder, safeEventName: folder });
-    await EventCreator.restoreLastEvent();
-  }, { collDir: path.join(archiveRoot, COLL), coll: COLL, folder });
-}
-
-const listFiles = async (dir) => {
-  const out = [];
-  async function walk(d) { for (const e of await fsp.readdir(d, { withFileTypes: true }).catch(() => [])) { const p = path.join(d, e.name); if (e.isDirectory()) await walk(p); else out.push(path.relative(dir, p)); } }
-  await walk(dir);
-  return out.sort();
-};
+const { sleep, localDate, fakeDrive, waitFor, createHelpers, listFiles, noiseJpeg: _noise } = require('./support/eventDumpLiveHelpers');
+const { passSplash, withPopup, dumpView, importViaPopup, setActiveEvent: _setActive } = createHelpers({ projectRoot: PROJECT_ROOT });
+const noiseJpeg = () => _noise(PROJECT_ROOT);
+const setActiveEvent = (main, archiveRoot, folder) => _setActive(main, path.join(archiveRoot, COLL), COLL, folder);
 
 (async () => {
   if (process.platform !== 'darwin') { log('SKIP — macOS only'); return; }

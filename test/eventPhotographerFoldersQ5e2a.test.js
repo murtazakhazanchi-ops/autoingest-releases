@@ -336,7 +336,7 @@ const add = (ev, additions, extra = {}) => {
       'renderer/importRouter.js', 'renderer/importSessionUI.js', 'renderer/companion/companion.html', 'renderer/companion/companion.js',
       'renderer/companion/companion.css', 'services/eventDumpCompanion.js', 'services/eventDumpPaths.js', 'services/companionService.js', 'services/workspaceHandoff.js',
       'services/eventEvidenceReconstruction.js', 'test/companionQ1UiFreeze.test.js', 'test/photographerRegistryQ5c.test.js',
-      'test/eventDumpQuickImportEQI1.test.js', 'test/eventDumpQuickImportLive.test.js', 'test/companionQ1Live.test.js']);
+      'test/eventDumpQuickImportEQI1.test.js', 'test/eventDumpQuickImportLive.test.js', 'test/companionQ1Live.test.js', 'test/eventDumpRoundTripRecoveryLive.test.js', 'test/support/eventDumpLiveHelpers.js']);
     assert.deepEqual(changed.filter(f => !allowed.has(f)), []);
   });
 

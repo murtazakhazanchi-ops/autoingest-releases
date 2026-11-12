@@ -53,6 +53,8 @@ function createEventDumpController(deps) {
   /** batchId → metadata outcome; a batch can finish before the import's result reaches main. */
   const _batches = new Map();
   let _pickerPending = false;      // the operator was sent to the event picker / Event Creator
+  let _pickerSeenOpen = false;     // …and the main window has reported it open since
+  let _lastPickerOpen = false;     // the main window's latest report: is Event Management open?
   /** The card mode last chosen this session; new cards start in it ('review' = the Q2 actions). */
   let _lastMode = 'review';
 
@@ -131,12 +133,22 @@ function createEventDumpController(deps) {
         pendingSync: info.pendingSync === true,
       };
     }
+    const pickerOpen = !!(info && typeof info === 'object' && info.pickerOpen === true);
+    _lastPickerOpen = pickerOpen;
     const changed = JSON.stringify(next) !== JSON.stringify(_event);
     _event = next;
-    if (!changed) return;
-    deps.pushSnapshot();
-    // Back to the menu bar after the operator chose or created the event in the main window.
-    if (_pickerPending && next) { _pickerPending = false; deps.showPopup({ inactive: true }); }
+    if (changed) deps.pushSnapshot();
+    // Back to the menu bar once the operator has left the event picker / Event Creator in the
+    // main window — after creating or choosing an event (the companion now shows it) or after
+    // cancelling (the previous event and every card choice are unchanged).
+    if (_pickerPending && _pickerSeenOpen && !pickerOpen) {
+      _pickerPending = false; _pickerSeenOpen = false;
+      log(`[event-dump] event picker closed (event ${changed ? 'changed' : 'unchanged'}) — back to the menu bar`);
+      deps.showPopup({ inactive: true });
+    } else if (_pickerPending && pickerOpen && !_pickerSeenOpen) {
+      _pickerSeenOpen = true;
+      log('[event-dump] event picker open in the main window');
+    }
   }
 
   /** @param {unknown} payload  { sourceId, mode?, photographer?, includeEarlier? } from the popup */
@@ -228,12 +240,19 @@ function createEventDumpController(deps) {
     if (deps.handoff.getActive() || _activeSourceId) return { state: 'refused', reason: 'busy' };
     deps.hidePopup();
     _pickerPending = true;
+    // Reports are sent on change only: if Event Management is already open, no "opened" report follows.
+    _pickerSeenOpen = _lastPickerOpen;
+    log(`[event-dump] event picker requested (${p.mode}; already open: ${_lastPickerOpen})`);
     const started = deps.handoff.request('event-picker', {
       channel: 'companion:openEventPicker',
       payload: (requestId) => ({ requestId, mode: p.mode }),
     });
     const final = await started.done;
-    if (final.state !== 'completed') { _pickerPending = false; deps.showPopup({ inactive: true }); }
+    if (final.state !== 'completed') { _pickerPending = false; _pickerSeenOpen = false; deps.showPopup({ inactive: true }); }
+    // The workspace answers only after Event Management has opened (and its messages arrive in
+    // order), so a completed request IS the "opened" signal — the open/close may both fall
+    // between two periodic reports when the operator is quick.
+    else if (_pickerPending) _pickerSeenOpen = true;
     return { state: final.state, reason: final.reason || null };
   }
 

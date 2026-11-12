@@ -361,6 +361,8 @@ function assertClean(payload, fx, label) {
     '-    const comp = liveComps[componentIndex];',
     "-    const componentName = comp ? comp.eventTypes.map(t => t.label).join(', ') : '';",
     "-          workflow:     (typeof importSessionId === 'string' && importSessionId) ? 'multi-event-import' : 'event-import',",
+    // EQI-1 re-import guard: a Dump import copies only the jobs not already in its Dump folder.
+    '-      result = await importFileJobs(event, fileJobs, _teamImportProgress);',
   ];
   const EQI1_PRELOAD_MEMBERS = ['onCompanionDumpImport', 'onCompanionOpenEventPicker', 'companionWorkspaceEvent'];
   await t('main.js / preload.js change since Q5b is additions only, confined to the Q5c block', async () => {
@@ -414,7 +416,7 @@ function assertClean(payload, fx, label) {
       'services/eventDumpCompanion.js', 'services/eventDumpPaths.js', 'services/companionService.js', 'services/workspaceHandoff.js', 'services/eventEvidenceReconstruction.js',
       'main/companionPreload.js', 'renderer/eventDumpImport.js', 'renderer/importRouter.js', 'renderer/importSessionUI.js',
       'renderer/companion/companion.html', 'renderer/companion/companion.js', 'renderer/companion/companion.css',
-      'test/eventDumpQuickImportEQI1.test.js', 'test/eventDumpQuickImportLive.test.js', 'test/companionQ1Live.test.js', 'test/eventPhotographerFoldersQ5e2a.test.js',
+      'test/eventDumpQuickImportEQI1.test.js', 'test/eventDumpQuickImportLive.test.js', 'test/companionQ1Live.test.js', 'test/eventDumpRoundTripRecoveryLive.test.js', 'test/support/eventDumpLiveHelpers.js', 'test/eventPhotographerFoldersQ5e2a.test.js',
     ]);
     assert.deepEqual(changed.filter(f => !allowed.has(f) && !f.startsWith('.claude/')), []);
   });

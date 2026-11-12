@@ -15,7 +15,7 @@ const path = require('node:path');
 const seq = require('../services/photographerSequenceService');
 const evidence = require('../services/eventEvidenceReconstruction');
 const ImportRouter = require('../renderer/importRouter.js');
-const { dumpJobsRefusal } = require('../services/eventDumpPaths');
+const { dumpJobsRefusal, partitionAlreadyInDump } = require('../services/eventDumpPaths');
 const { createEventDumpController } = require('../services/eventDumpCompanion');
 const { createWorkspaceHandoff } = require('../services/workspaceHandoff');
 const { classify, normalizeSelection } = require('../services/dateAssessmentModel');
@@ -146,6 +146,19 @@ const mkdirs = async (root, rels) => { for (const r of rels) await fsp.mkdir(pat
     assert.match(dumpJobsRefusal(ok, EV, '../x'), /safe folder name/);
     assert.match(dumpJobsRefusal(ok, EV, ''), /photographer/);
     assert.match(dumpJobsRefusal([], EV, 'Ali Bhai'), /no files/);
+  });
+
+  await t('partitionAlreadyInDump: held back ONLY when the destination exists with identical image data', async () => {
+    const files = { '/d/same.JPG': 'h1', '/d/diff.JPG': 'hX', '/d/unread.JPG': null, '/d/err.JPG': 'boom' };
+    const src = { '/c/same.JPG': 'h1', '/c/diff.JPG': 'h2', '/c/unread.JPG': null, '/c/new.JPG': 'h4', '/c/err.JPG': 'h5' };
+    const io = {
+      exists: async (p) => p in files,
+      hashOf: async (p) => { const v = p.startsWith('/d/') ? files[p] : src[p]; if (v === 'boom') throw new Error('read failed'); return v; },
+    };
+    const jobs = ['same', 'diff', 'unread', 'new', 'err'].map(n => ({ src: `/c/${n}.JPG`, dest: `/d/${n}.JPG` }));
+    const { copy, alreadyInDump } = await partitionAlreadyInDump(jobs, io);
+    assert.deepEqual(alreadyInDump.map(j => j.src), ['/c/same.JPG'], 'only the identical photo is held back');
+    assert.deepEqual(copy.map(j => j.src), ['/c/diff.JPG', '/c/unread.JPG', '/c/new.JPG', '/c/err.JPG'], 'different, unreadable, new and failing reads all proceed');
   });
 
   // ── Companion controller ──────────────────────────────────────────────────
@@ -287,13 +300,37 @@ const mkdirs = async (root, rels) => { for (const r of rels) await fsp.mkdir(pat
     h.finish({ state: 'completed' });
     await p;
     assert.equal(h.popups.n, 0);
-    h.c.onWorkspaceEvent({ eventPath: '/Arc/Coll/New', eventName: 'New' });
+    h.c.onWorkspaceEvent({ eventPath: '/Arc/Coll/Old', eventName: 'Old', pickerOpen: true });   // Event Creator open
+    assert.equal(h.popups.n, 0, 'the popup stays away while the Event Creator is open');
+    h.c.onWorkspaceEvent({ eventPath: '/Arc/Coll/New', eventName: 'New', pickerOpen: false }); // created → closed
     assert.equal(h.popups.n, 1, 'back to the menu bar with the new event selected');
+    assert.equal(h.c.globalView().event.eventName, 'New');
+    // Cancel: picker opens and closes with the event unchanged → back to the menu bar, state intact.
+    h.c.setOptions({ sourceId: 'src-1', photographer: 'Ali Bhai', mode: 'dump' });
+    const cp = h.c.openPicker({ mode: 'new' });
+    await new Promise(r => setImmediate(r));
+    h.finish({ state: 'completed' });
+    await cp;
+    h.c.onWorkspaceEvent({ eventPath: '/Arc/Coll/New', eventName: 'New', pickerOpen: true });
+    h.c.onWorkspaceEvent({ eventPath: '/Arc/Coll/New', eventName: 'New', pickerOpen: false });
+    assert.equal(h.popups.n, 2, 'cancelled: back to the menu bar');
+    assert.equal(h.c.globalView().event.eventName, 'New', 'cancelled: same event');
+    assert.deepEqual([h.c.cardView('src-1', job).photographer, h.c.cardView('src-1', job).mode], ['Ali Bhai', 'dump'], 'cancelled: card choices kept');
+    h.c.onWorkspaceEvent({ eventPath: '/Arc/Coll/Other', eventName: 'Other', pickerOpen: false });
+    assert.equal(h.popups.n, 2, 'a later, unrelated event change does not pop the companion open');
+    // Event Management already open when Create New Event is clicked (reports are sent on change only).
+    h.c.onWorkspaceEvent({ eventPath: '/Arc/Coll/Other', eventName: 'Other', pickerOpen: true });
+    const ap = h.c.openPicker({ mode: 'new' });
+    await new Promise(r => setImmediate(r));
+    h.finish({ state: 'completed' });
+    await ap;
+    h.c.onWorkspaceEvent({ eventPath: '/Arc/Coll/Made', eventName: 'Made', pickerOpen: false });
+    assert.equal(h.popups.n, 3, 'picker already open: still back to the menu bar once it closes');
     p = h.c.openPicker({ mode: 'choose' });
     await new Promise(r => setImmediate(r));
     h.finish({ state: 'refused', reason: 'busy' });
     await p;
-    assert.equal(h.popups.n, 2);
+    assert.equal(h.popups.n, 4, 'a refused picker request returns to the menu bar at once');
     assert.equal((await h.c.openPicker({ mode: 'other' })).reason, 'invalid');
   });
 

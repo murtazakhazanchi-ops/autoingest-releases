@@ -1247,9 +1247,34 @@ _handleTracked('import:commitTransaction', 'import', async (event, {
     // a stale earlier import can never leak into a later one's Deep Verify.
     const _accumulateFrom = (typeof importSessionId === 'string' && importSessionId && importSessionId === lastImportedSessionId)
       ? lastImportedFiles : null;
+    // EQI-1 Event Dump: a photo whose image data is already in this Dump folder is not copied
+    // again (eventDumpPaths.partitionAlreadyInDump — strong evidence only). It is reported as
+    // skipped, recorded in the import index, and left out of this import's record.
+    let _jobsToCopy = fileJobs;
+    let _alreadyInDump = [];
+    if (destination === 'dump') {
+      const captureDateReader = require('../services/captureDateReader');
+      ({ copy: _jobsToCopy, alreadyInDump: _alreadyInDump } = await eventDumpPaths.partitionAlreadyInDump(fileJobs, {
+        exists: (p) => fsp.stat(p).then(st => st.isFile(), () => false),
+        hashOf: (p) => captureDateReader.readImageDataHash(p),
+      }));
+      if (_alreadyInDump.length) {
+        log(`[event-dump] ${_alreadyInDump.length} file(s) already in the Dump (identical image data) — not copied again`);
+        const held = new Set(_alreadyInDump.map(j => j.src));
+        groups = (groups || []).map(g => ({ ...g, files: (g.files || []).filter(src => !held.has(src)) })).filter(g => g.files.length > 0);
+      }
+    }
     let result;
     try {
-      result = await importFileJobs(event, fileJobs, _teamImportProgress);
+      result = _jobsToCopy.length > 0
+        ? await importFileJobs(event, _jobsToCopy, _teamImportProgress)
+        : { copied: 0, skipped: 0, errors: 0, skippedReasons: [], failedFiles: [], copiedFiles: [], skippedFiles: [], duration: 0, wasAborted: false };
+      if (_alreadyInDump.length) {
+        result.skipped = (result.skipped || 0) + _alreadyInDump.length;
+        result.skippedFiles = [...(result.skippedFiles || []), ..._alreadyInDump.map(j => ({ src: j.src, dest: j.dest }))];
+        result.skippedReasons = [...(result.skippedReasons || []), ..._alreadyInDump.map(j => `Skipped: ${path.basename(j.src)} — already in the Dump (identical image data)`)];
+        await updateImportIndex(_alreadyInDump.map(j => j.src), null);
+      }
       if (_accumulateFrom) lastImportedFiles = _accumulateFrom.concat(result.copiedFiles || []);
       lastImportedSessionId = (typeof importSessionId === 'string' && importSessionId) ? importSessionId : null;
     } catch (err) {

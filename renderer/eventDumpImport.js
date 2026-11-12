@@ -17,7 +17,7 @@
 
 const EventDumpImport = (() => {
   const HEARTBEAT_MS = 2000;
-  const REPORT_MS = 1500;
+  const REPORT_MS = 1000;
   let _running = false;
   let _lastReport = '';
 
@@ -33,9 +33,11 @@ const EventDumpImport = (() => {
     };
   }
 
-  /** Push the active event to main whenever it changes (cheap; JSON compare). */
+  /** Push the active event (and whether the event picker is open) to main whenever it changes. */
   function _report() {
-    const info = _activeEventInfo();
+    const ev = _activeEventInfo();
+    const pickerOpen = typeof EventMgmt !== 'undefined' && typeof EventMgmt.isOpen === 'function' ? EventMgmt.isOpen() : false;
+    const info = ev ? { ...ev, pickerOpen } : (pickerOpen ? { pickerOpen } : null);
     const json = JSON.stringify(info);
     if (json === _lastReport) return;
     _lastReport = json;
@@ -82,9 +84,17 @@ const EventDumpImport = (() => {
 
     const { fileJobs } = ImportRouter.buildDumpFileJobs({ eventData: ed, photographer, files: req.files });
     if (fileJobs.length !== req.files.length) return _refuse('routing-failed');
+    // A busy photographer folder (e.g. this computer's own lock left by a crash): the EXISTING
+    // busy-archive dialog, exactly as the multi-event import uses it — Clear & Continue only on
+    // the operator's explicit choice; cancel/switch leave the decision to AutoIngest.
     if (importMode === 'direct-nas' && archSt.nasRoot) {
-      const lockCheck = await window.api.checkDirectArchiveLocks({ fileJobs });
-      if (lockCheck && lockCheck.blocked && lockCheck.blocked.length) return _refuse('archive-busy');
+      for (;;) {
+        const lockCheck = await window.api.checkDirectArchiveLocks({ fileJobs });
+        if (!lockCheck || !lockCheck.blocked || !lockCheck.blocked.length) break;
+        const pick = await _showDirectArchiveBusyDialog(lockCheck.blocked, lockCheck.currentDeviceName ?? null);
+        if (pick === 'refresh' || pick === 'clear') continue;
+        return _refuse('archive-busy');
+      }
     }
 
     const isMulti = Array.isArray(ed.event.components) && ed.event.components.length > 1;
@@ -165,17 +175,20 @@ const EventDumpImport = (() => {
   function openPicker(mode) {
     if (importRunning || _sessionRunBusy) return _refuse('busy');
     const workspaceLive = !!activeSource && document.getElementById('workspace').classList.contains('visible');
+    // The picker re-renders its list after a slide transition (and after a scan, when needed); a
+    // button already in the DOM belongs to the previous render and must not be clicked.
+    const staleNewBtn = document.getElementById('ecNewEventFromList');
     // A live Import workspace keeps every event's assignments; the landing-screen picker is a
     // session boundary — exactly as the workspace's own "Change event" and the hero's buttons do.
     const opened = workspaceLive ? openEventPickerFromWorkspace() : (showEventCreatorResume(), true);
     if (!opened) return _refuse('picker-unavailable');
     if (mode === 'new') {
       // The operator's own "+ Create New Event" — the same modal, validation and sequencing. The
-      // event list renders asynchronously, so wait (bounded) for its button before clicking it.
-      const deadline = Date.now() + 10000;
+      // event list renders asynchronously, so wait (bounded) for its freshly rendered button.
+      const deadline = Date.now() + 15000;
       const tryClick = () => {
         const btn = document.getElementById('ecNewEventFromList');
-        if (btn && btn.offsetParent !== null) { btn.click(); return; }
+        if (btn && btn !== staleNewBtn && btn.offsetParent !== null) { btn.click(); return; }
         if (Date.now() < deadline) setTimeout(tryClick, 100);
       };
       setTimeout(tryClick, 0);

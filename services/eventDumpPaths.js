@@ -39,4 +39,33 @@ function dumpJobsRefusal(fileJobs, eventJsonPath, photographer) {
   return null;
 }
 
-module.exports = { dumpJobsRefusal };
+/**
+ * Jobs whose photo is ALREADY in the Dump folder (EQI-1 re-import guard). The global import index
+ * is a rolling, filename+size history; once an entry rolls off, a card inserted again looks new.
+ * Its JPEGs in the Dump were since rewritten by metadata tagging (size changed), so the copy
+ * engine's same-size skip no longer recognises them and would add "_1" duplicates. A job is held
+ * back only on strong evidence: its destination exists AND ExifTool's ImageDataHash (image data
+ * only, metadata excluded) of source and destination is equal. Different, unreadable or
+ * unsupported → the job proceeds unchanged (a genuinely different photo with the same name is
+ * still imported, and renamed by the existing conflict rule). Never deletes or overwrites.
+ * @param {Array<{src: string, dest: string}>} fileJobs
+ * @param {{ exists: (p: string) => Promise<boolean>, hashOf: (p: string) => Promise<string|null> }} io
+ * @returns {Promise<{ copy: object[], alreadyInDump: object[] }>}
+ */
+async function partitionAlreadyInDump(fileJobs, { exists, hashOf }) {
+  const copy = [];
+  const alreadyInDump = [];
+  for (const job of fileJobs) {
+    let same = false;
+    try {
+      if (await exists(job.dest)) {
+        const [a, b] = await Promise.all([hashOf(job.src), hashOf(job.dest)]);
+        same = typeof a === 'string' && a.length > 0 && a === b;
+      }
+    } catch { same = false; }
+    (same ? alreadyInDump : copy).push(job);
+  }
+  return { copy, alreadyInDump };
+}
+
+module.exports = { dumpJobsRefusal, partitionAlreadyInDump };
